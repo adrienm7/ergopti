@@ -1,0 +1,1656 @@
+{
+	"description": "Native Windows application names and coherent raw typing/focus histories. Distinct endpoint tuples can share the same human arrow label.",
+	"names": ["a", "b ↔ c", "a ↔ b", "c"],
+	"dates": ["2026-10-26", "2026-10-27"],
+	"walk": [1, 2, 1, 2, 3, 4, 3, 4, 3, 4],
+	"delay_ms": 100,
+	"typed_character": "x",
+	"snapshots": [
+		{
+			"names": ["a", "b ↔ c", "a ↔ b", "c"],
+			"days": 1,
+			"expected_top_count": 5,
+			"manifest": {
+				"2026-10-26": {
+					"a": {
+						"app_time_ms": 200,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"b ↔ c": 2
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					},
+					"a ↔ b": {
+						"app_time_ms": 300,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"c": 3
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					},
+					"b ↔ c": {
+						"app_time_ms": 200,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"a": 1,
+							"a ↔ b": 1
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					},
+					"c": {
+						"app_time_ms": 200,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"a ↔ b": 2
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {},
+					"c": {
+						"x": {
+							"c": 4,
+							"t": 400,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {},
+					"w": {},
+					"w_bg": {}
+				},
+				"today": {}
+			}
+		},
+		{
+			"names": ["a", "b ↔ c", "a ↔ b", "c"],
+			"days": 2,
+			"expected_top_count": 10,
+			"manifest": {
+				"2026-10-26": {
+					"a": {
+						"app_time_ms": 200,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"b ↔ c": 2
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					},
+					"a ↔ b": {
+						"app_time_ms": 300,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"c": 3
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					},
+					"b ↔ c": {
+						"app_time_ms": 200,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"a": 1,
+							"a ↔ b": 1
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					},
+					"c": {
+						"app_time_ms": 200,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"a ↔ b": 2
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					}
+				},
+				"2026-10-27": {
+					"a": {
+						"app_time_ms": 200,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"b ↔ c": 2
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					},
+					"a ↔ b": {
+						"app_time_ms": 300,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"c": 3
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					},
+					"b ↔ c": {
+						"app_time_ms": 200,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"a": 1,
+							"a ↔ b": 1
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					},
+					"c": {
+						"app_time_ms": 200,
+						"auto_repeat_count": 0,
+						"bs_total": 0,
+						"burst_count_total": 1,
+						"burst_inter_delay_count": 0,
+						"burst_inter_delay_sum": 0,
+						"burst_inter_delay_sumsq": 0,
+						"burst_length_buckets": {
+							"1": 1
+						},
+						"burst_max_chars": 1,
+						"burst_max_cpm": 0,
+						"cascade_count_total": 0,
+						"cascade_max_len": 0,
+						"category": "",
+						"char_digit": 0,
+						"char_letter": 1,
+						"char_other": 0,
+						"char_punct": 0,
+						"char_space": 0,
+						"chars": 1,
+						"credited_buckets": {
+							"1000": 1,
+							"10000": 1,
+							"2000": 1,
+							"20000": 1,
+							"3000": 1,
+							"30000": 1,
+							"5000": 1,
+							"60000": 1
+						},
+						"first_typed_min": "12:00",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"kc_hold": {},
+						"last_typed_min": "12:00",
+						"layouts_seen": {},
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_input_credited_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_input_time_buckets": {
+							"1000": 0,
+							"10000": 0,
+							"2000": 0,
+							"20000": 0,
+							"3000": 0,
+							"30000": 0,
+							"5000": 0,
+							"60000": 0
+						},
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"media_hold": {},
+						"media_keys": {},
+						"pauses": 0,
+						"recovery_time_count": 0,
+						"recovery_time_sum_ms": 0,
+						"same_finger_streak_max": 0,
+						"same_hand_streak_max": 0,
+						"session_count_total": 1,
+						"session_durations": [0],
+						"session_longest_chars": 1,
+						"session_longest_ms": 0,
+						"session_total_active_ms": 0,
+						"switches_to": {
+							"a ↔ b": 2
+						},
+						"think_time": 0,
+						"time": 100,
+						"time_buckets": {
+							"1000": 100,
+							"10000": 100,
+							"2000": 100,
+							"20000": 100,
+							"3000": 100,
+							"30000": 100,
+							"5000": 100,
+							"60000": 100
+						},
+						"win_titles": {},
+						"hourly": {
+							"12": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"em": 0,
+								"e_buckets": {}
+							}
+						},
+						"hourly_min5": {
+							"12:00": {
+								"c": 1,
+								"e": 0,
+								"es": 0,
+								"e_buckets": {}
+							}
+						}
+					}
+				}
+			},
+			"range": {
+				"historical": {
+					"bg": {
+						"xx": {
+							"c": 4,
+							"t": 400,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"c": {
+						"x": {
+							"c": 8,
+							"t": 800,
+							"e": 0,
+							"hs": 0,
+							"llm": 0,
+							"o": 0
+						}
+					},
+					"hp": {},
+					"hx": {},
+					"kc": {},
+					"pg": {},
+					"qg": {},
+					"sc": {},
+					"sc_bg": {},
+					"sc_kb": {},
+					"tg": {},
+					"w": {},
+					"w_bg": {}
+				},
+				"today": {}
+			}
+		}
+	]
+}

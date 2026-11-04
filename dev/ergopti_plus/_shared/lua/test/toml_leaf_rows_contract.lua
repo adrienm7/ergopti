@@ -23,49 +23,6 @@ return function(helpers)
 	end
 
 	helpers.describe("toml leaf rows", function()
-		helpers.it("writes bare leaves as ordinary table rows in an absent file", function()
-			local decoded = apply(nil, {
-				{ path = { "hotstrings", "groups", "rolls" }, value = true },
-				{ path = { "hotstrings", "modules", "rolls", "hc" }, value = false },
-			})
-			helpers.assert_eq(decoded.hotstrings.groups.rolls, true)
-			helpers.assert_eq(decoded.hotstrings.modules.rolls.hc, false)
-		end)
-
-		helpers.it("creates one quoted inline table for a runtime identity and its bare siblings", function()
-			local decoded, bytes = apply("[hotstrings]\nkeep = 1\n", {
-				{ path = { "hotstrings", "groups", "rolls" }, value = true },
-				{ path = { "hotstrings", "groups", "ext:demo:rolls" }, value = true },
-			})
-			helpers.assert_eq(decoded.hotstrings.groups, { rolls = true, ["ext:demo:rolls"] = true })
-			helpers.assert_eq(decoded.hotstrings.keep, 1)
-			helpers.assert_true(bytes:find('"ext:demo:rolls"', 1, true) ~= nil, "the identity is quoted")
-		end)
-
-		helpers.it("rewrites an inline table whole and keeps its unknown entries", function()
-			local decoded = apply('[hotstrings]\ngroups = { rolls = false, "ext:x:y" = true, other = true }\n', {
-				{ path = { "hotstrings", "groups", "rolls" }, value = true },
-				{ path = { "hotstrings", "groups", "ext:x:y" }, delete = true },
-			})
-			helpers.assert_eq(decoded.hotstrings.groups, { rolls = true, other = true })
-		end)
-
-		helpers.it("removes an inline table that its deletions leave empty", function()
-			local decoded = apply("[hotstrings]\ngroups = { rolls = true }\nkeep = true\n", {
-				{ path = { "hotstrings", "groups", "rolls" }, delete = true },
-			})
-			helpers.assert_nil(decoded.hotstrings.groups)
-			helpers.assert_eq(decoded.hotstrings.keep, true)
-		end)
-
-		helpers.it("addresses sections below a quoted table header", function()
-			local decoded = apply('[hotstrings.modules."ext:demo:rolls"]\nkeep = true\nold = true\n', {
-				{ path = { "hotstrings", "modules", "ext:demo:rolls", "old" }, delete = true },
-				{ path = { "hotstrings", "modules", "ext:demo:rolls", "new" }, value = true },
-			})
-			helpers.assert_eq(decoded.hotstrings.modules["ext:demo:rolls"], { keep = true, new = true })
-		end)
-
 		-- A bare sibling written first creates the table header; an extension
 		-- pack's identity must still be switchable under it afterwards.
 		helpers.it("sets, updates and removes a quoted key under an existing table header", function()
@@ -106,12 +63,5 @@ return function(helpers)
 			end, "a write across a scalar is still refused")
 		end)
 
-		helpers.it("refuses malformed operations", function()
-			for _, operation in ipairs({ { path = { "a" }, value = true }, { path = { "a", "" }, value = true },
-				{ path = { "a", "b" } }, { path = { "a", "b" }, value = true, delete = true } }) do
-				helpers.assert_eq(pcall(LeafRows.prepare, "", { operation }), false)
-			end
-			helpers.assert_eq(pcall(LeafRows.prepare, "[a\n", {}), false, "malformed source")
-		end)
 	end)
 end

@@ -7,54 +7,33 @@ import Darwin
 import Foundation
 import Security
 
-// This diagnostic reads the exact owned certificate; certificate enumeration in
-// the admin domain can omit private-keychain certificates. Only a validated
-// external trust-list cardinality and the direct certificate lookup are emitted.
-private func fixtureAdminTrustQuery() -> Int32 {
-	var bytes = Data()
-	var buffer = [UInt8](repeating: 0, count: 4096)
-	while true {
-		let count = Darwin.read(STDIN_FILENO, &buffer, buffer.count)
-		if count < 0 && errno == EINTR { continue }
-		guard count >= 0 else { return 74 }
-		if count == 0 { break }
-		guard count <= 16_384 - bytes.count else { return 64 }
-		bytes.append(contentsOf: buffer.prefix(count))
+// Fixed fixture-only clock observation. This role never touches native trust,
+// proxy settings, requests or a release entrypoint.
+private func fixtureClockProof() -> Int32 {
+	var samples = [TimeInterval]()
+	for index in 0..<16 {
+		if index > 0 { usleep(10_000) }
+		let sample = ProcessInfo.processInfo.systemUptime
+		guard sample.isFinite, sample > 0 else { return 74 }
+		samples.append(sample)
 	}
-	guard !bytes.isEmpty, let certificate = SecCertificateCreateWithData(nil, bytes as CFData) else { return 64 }
-	var ownedSettings: CFArray?
-	let ownedStatus = SecTrustSettingsCopyTrustSettings(certificate, .admin, &ownedSettings)
-	let ownedPresent: Any
-	if ownedStatus == errSecSuccess, ownedSettings != nil { ownedPresent = 1 }
-	else if ownedStatus == errSecItemNotFound || ownedStatus == errSecNoTrustSettings { ownedPresent = 0 }
-	else { ownedPresent = NSNull() }
-	var external: CFData?
-	let exportStatus = SecTrustSettingsCreateExternalRepresentation(.admin, &external)
-	var entryCount: Any = NSNull()
-	if exportStatus == errSecNoTrustSettings { entryCount = 0 }
-	else if exportStatus == errSecSuccess, let external, CFDataGetLength(external) <= 1_048_576,
-		let fields = try? PropertyListSerialization.propertyList(from: external as Data, options: [], format: nil) as? [String: Any],
-		Set(fields.keys) == Set(["trustVersion", "trustList"]),
-		let version = fields["trustVersion"] as? NSNumber,
-		CFGetTypeID(version) != CFBooleanGetTypeID(), version.doubleValue == 1,
-		let entries = fields["trustList"] as? [String: Any], entries.count <= 65_535,
-		entries.allSatisfy({ key, value in
-			key.utf8.count == 40 && key.utf8.allSatisfy { (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) }
-				&& value is [String: Any]
-		}) { entryCount = entries.count }
-	let fact: [String: Any] = ["version": 1, "export_status": exportStatus, "entry_count": entryCount,
-		"owned_status": ownedStatus, "owned_present": ownedPresent]
-	guard let output = try? JSONSerialization.data(withJSONObject: fact, options: [.sortedKeys]) else { return 74 }
+	let fact: [String: Any] = [
+		"version": 1, "system_uptime": samples,
+	]
+	guard let encoded = try? JSONSerialization.data(withJSONObject: fact,
+		options: [.sortedKeys]), encoded.count <= 4_095 else { return 74 }
+	let output = encoded + Data([10])
 	var offset = 0
 	while offset < output.count {
-		let count = output.withUnsafeBytes { Darwin.write(STDOUT_FILENO, $0.baseAddress!.advanced(by: offset), output.count - offset) }
+		let count = output.withUnsafeBytes {
+			Darwin.write(STDOUT_FILENO, $0.baseAddress!.advanced(by: offset), output.count - offset)
+		}
 		if count < 0 && errno == EINTR { continue }
 		guard count > 0 else { return 74 }
 		offset += count
 	}
 	return 0
 }
-
 
 // Fixed lexical stages use a separate private file. stdout remains exclusively
 // the unchanged response ABI. A missing/refused observation cannot change its
@@ -151,7 +130,7 @@ func managedHTTPFixtureRoutes(_ routes: [[String: Any]]) {
 // and signed binary. Production has no settings-file/environment override.
 func fixtureMain() -> Int32 {
 	let arguments = CommandLine.arguments
-	if arguments.count == 2, arguments[1] == "--fixture-admin-trust-query" { return fixtureAdminTrustQuery() }
+	if arguments.count == 2, arguments[1] == "--fixture-clock-proof" { return fixtureClockProof() }
 	let stages = FixtureStages(executable: arguments[0])
 	FixtureHTTPObservation.owner = stages
 	defer { FixtureHTTPObservation.owner = nil }

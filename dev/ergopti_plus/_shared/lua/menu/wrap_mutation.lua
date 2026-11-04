@@ -7,6 +7,8 @@
 --- acknowledges them. Input readers retain the prior view until acknowledgement.
 --- ==============================================================================
 
+local Errors = require("adapter_errors")
+
 local M = {}
 local FIELDS = { "wrap_symbol_states", "custom_wrap_symbols" }
 local claims = setmetatable({}, { __mode = "k" })
@@ -52,7 +54,7 @@ function M.commit(state, mutate, save)
 	local called, changed = pcall(mutate, candidate)
 	if not called or changed ~= true then
 		claims[state] = nil
-		return false, called and "wrap mutation cancelled" or "wrap mutation failed"
+		return false, called and Errors.WRAP_MUTATION_CANCELLED or Errors.WRAP_MUTATION_FAILED
 	end
 	for _, field in ipairs(FIELDS) do
 		if type(candidate[field]) ~= "table" then

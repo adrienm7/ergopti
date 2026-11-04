@@ -1,0 +1,107 @@
+{
+	"description": "Cross-driver relative timer delay ceiling (2^53 ms, owned by _shared/lua/number_policy.lua MAX_TIMER_DELAY_MS). Replayed by _shared/lua/test/timer_delay_ceiling_contract.lua through the macOS and Linux suites: the policy, both TimerScheduler adapters and every Linux native timer and sleep boundary.",
+	"field_semantics": {
+		"milliseconds": "Delay in milliseconds. The strings \"inf\", \"-inf\" and \"nan\" stand for the values JSON cannot spell.",
+		"seconds": "Delay in seconds, as the TimerScheduler port receives it. Chosen so that seconds * 1000 is exact in a double and the verdict cannot depend on rounding.",
+		"admitted": "True when the delay may reach a native timer. A finite negative delay is admitted by the ceiling policy; each caller keeps its own lower bound."
+	},
+	"millisecond_vectors": [
+		{ "id": "zero", "description": "The shortest delay.", "milliseconds": 0, "admitted": true },
+		{ "id": "one", "description": "An ordinary delay.", "milliseconds": 1, "admitted": true },
+		{
+			"id": "fraction",
+			"description": "A fractional delay.",
+			"milliseconds": 0.5,
+			"admitted": true
+		},
+		{
+			"id": "finite_negative",
+			"description": "The ceiling owns only the upper bound.",
+			"milliseconds": -5,
+			"admitted": true
+		},
+		{
+			"id": "year",
+			"description": "A year, far below the ceiling.",
+			"milliseconds": 31536000000,
+			"admitted": true
+		},
+		{
+			"id": "ceiling",
+			"description": "Exactly 2^53 ms.",
+			"milliseconds": 9007199254740992,
+			"admitted": true
+		},
+		{
+			"id": "above_ceiling",
+			"description": "The next double above 2^53 ms.",
+			"milliseconds": 9007199254740994,
+			"admitted": false
+		},
+		{
+			"id": "int64_limit",
+			"description": "2^63 ms, where Lua 5.4 refuses the integer conversion and LuaJIT's is undefined.",
+			"milliseconds": 9223372036854775808,
+			"admitted": false
+		},
+		{
+			"id": "huge_finite",
+			"description": "A finite value far beyond every native range.",
+			"milliseconds": 1e300,
+			"admitted": false
+		},
+		{
+			"id": "positive_infinity",
+			"description": "Not finite.",
+			"milliseconds": "inf",
+			"admitted": false
+		},
+		{
+			"id": "negative_infinity",
+			"description": "Not finite.",
+			"milliseconds": "-inf",
+			"admitted": false
+		},
+		{ "id": "nan", "description": "Not a number.", "milliseconds": "nan", "admitted": false }
+	],
+	"second_vectors": [
+		{
+			"id": "zero_seconds",
+			"description": "Fires on the next loop turn.",
+			"seconds": 0,
+			"admitted": true
+		},
+		{
+			"id": "fraction_seconds",
+			"description": "A fractional delay.",
+			"seconds": 0.25,
+			"admitted": true
+		},
+		{
+			"id": "below_ceiling_seconds",
+			"description": "9007199254740000 ms, just below 2^53 ms.",
+			"seconds": 9007199254740,
+			"admitted": true
+		},
+		{
+			"id": "above_ceiling_seconds",
+			"description": "9007199254741000 ms, just above 2^53 ms.",
+			"seconds": 9007199254741,
+			"admitted": false
+		},
+		{
+			"id": "int64_limit_seconds",
+			"description": "Beyond 2^63 ms once converted.",
+			"seconds": 9223372036854776,
+			"admitted": false
+		},
+		{
+			"id": "huge_finite_seconds",
+			"description": "Finite, but infinite once converted to milliseconds.",
+			"seconds": 1e307,
+			"admitted": false
+		},
+		{ "id": "infinite_seconds", "description": "Not finite.", "seconds": "inf", "admitted": false },
+		{ "id": "nan_seconds", "description": "Not a number.", "seconds": "nan", "admitted": false }
+	]
+}

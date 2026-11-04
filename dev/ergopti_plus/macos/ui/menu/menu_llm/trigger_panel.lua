@@ -25,8 +25,17 @@ local PrivacyPolicy = require("llm.trigger_policy")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local SettingsManager = require("ui.menu.menu_llm.settings_manager")
+local ConfigKeys = require("config_keys")
+local Manifest = require("infra.manifest_reader")
 
 local LOG = "menu_llm.trigger_panel"
+
+-- The manifest owns these two defaults: their flat state keys are not the
+-- llm_disable_* names the shared defaults use.
+local PRIVACY_PATHS = {
+	llm_url_bar_filter_enabled = ConfigKeys.KEY.LLM_TRIGGER_URL_BAR_FILTER_ENABLED,
+	llm_secure_field_filter_enabled = ConfigKeys.KEY.LLM_TRIGGER_SECURE_FILTER_ENABLED,
+}
 
 --- Routes one trigger setting through the shared transactional owner.
 --- @param settings_mgr table Settings manager instance.
@@ -78,7 +87,7 @@ function M.build(ctx)
 	-- =====================================================
 
 	local debounce_val     = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce
-	local debounce_display = (debounce_val <= 0) and i18n.get("menu.settings.never") or (math.floor(debounce_val * 1000) .. " ms…")
+	local debounce_display = (debounce_val < 0) and i18n.get("menu.settings.never") or (math.floor(debounce_val * 1000) .. " ms…")
 
 	rows[#rows + 1] = {
 		label    = string.format(i18n.get("menu.llm.debounce_label"), debounce_display),
@@ -90,6 +99,22 @@ function M.build(ctx)
 			label    = string.format(i18n.get("menu.llm.reset_label"), math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000) .. " ms"),
 			disabled = is_disabled or nil,
 			action   = settings_mgr.reset_debounce,
+		}
+	end
+
+
+	-- The one minimum time between two automatic requests (a shortcut is never held).
+	local floor_val = tonumber(state.llm_min_request_interval) or llm_mod.DEFAULT_STATE.llm_min_request_interval
+	rows[#rows + 1] = {
+		label    = string.format(i18n.get("menu.llm.min_interval_label"), math.floor(floor_val * 1000) .. " ms…"),
+		disabled = is_disabled or nil,
+		action   = settings_mgr.set_min_request_interval,
+	}
+	if state.llm_min_request_interval ~= llm_mod.DEFAULT_STATE.llm_min_request_interval then
+		rows[#rows + 1] = {
+			label    = string.format(i18n.get("menu.llm.reset_label"), math.floor(llm_mod.DEFAULT_STATE.llm_min_request_interval * 1000) .. " ms"),
+			disabled = is_disabled or nil,
+			action   = settings_mgr.reset_min_request_interval,
 		}
 	end
 
@@ -111,13 +136,18 @@ function M.build(ctx)
 			local core = llm_mod.streaming_snapshot()
 			local runtime = settings_mgr.setting_snapshot(key)
 			local path = ConfigPaths.get("ConfigTomlPath")
-			local canonical, physical = Preferences.current_view(path)
+			-- Read-only here: an outdated entry belongs to the config cleanup, and
+			-- the save keeps it, so it must not take these rows away meanwhile.
+			local canonical, physical = Preferences.current_view(path, true)
 			snapshot.source = Preferences.source_snapshot(path)
 			snapshot.paused = ctx.is_paused()
 			snapshot.generation = core.generation + (runtime and runtime.generation or 0)
-			local function canonical_value(field)
+			-- Saves are sparse: a value at its shipped default is absent from the
+			-- file, and each field names the owner of that default. The absent
+			-- backend has none here, since the machine chose it at boot.
+			local function stored_or(field, shipped)
 				if canonical == nil then return nil end
-				if canonical[field] == nil then return llm_mod.DEFAULT_STATE[field] end
+				if canonical[field] == nil then return shipped end
 				return canonical[field]
 			end
 			snapshot.blocked = ctx.is_disabled ~= false or core.blocked ~= false
@@ -125,9 +155,9 @@ function M.build(ctx)
 				or (runtime and (runtime.owner ~= settings_mgr or runtime.value ~= snapshot.value))
 				or core.enabled ~= snapshot.enabled or core.backend ~= snapshot.backend
 				or not Preferences.source_matches(snapshot.source, physical)
-				or canonical_value(key) ~= snapshot.value
-				or canonical_value("llm_enabled") ~= snapshot.enabled
-				or canonical_value("llm_backend") ~= snapshot.backend
+				or stored_or(key, Manifest.default_for(PRIVACY_PATHS[key])) ~= snapshot.value
+				or stored_or("llm_enabled", llm_mod.DEFAULT_STATE.llm_enabled) ~= snapshot.enabled
+				or stored_or("llm_backend", snapshot.backend) ~= snapshot.backend
 		end, debug.traceback)
 		if not ok then
 			Logger.warn(LOG, "Privacy row source is unavailable: %s.", tostring(detail))
@@ -179,21 +209,28 @@ function M.build(ctx)
 	end
 	local shared_ctx = {
 		commands = {
-			["llm_url_bar_filter"] = function()
+			[ConfigKeys.COMMAND.LLM_URL_BAR_FILTER] = function()
 				return privacy_command(url_source, "llm_url_bar_filter_enabled", "set_llm_url_bar_filter_enabled")
 			end,
-			["llm_secure_field_filter"] = function()
+			[ConfigKeys.COMMAND.LLM_SECURE_FIELD_FILTER] = function()
 				return privacy_command(secure_source, "llm_secure_field_filter_enabled", "set_llm_secure_field_filter_enabled")
 			end,
-			["llm_instant_on_word_end"] = function()
+			[ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END] = function()
 				if not ready() then return false end
-				return apply_setting_transaction(settings_mgr, "llm_instant_on_word_end",
+				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END,
 					not state.llm_instant_on_word_end, "set_llm_instant_on_word_end")
 			end,
-			["llm_after_hotstring"] = function()
+			[ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING] = function()
 				if not ready() then return false end
-				return apply_setting_transaction(settings_mgr, "llm_after_hotstring",
+				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING,
 					not state.llm_after_hotstring, "set_llm_after_hotstring")
+			end,
+			[ConfigKeys.COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP] = function(value)
+				local current = state.llm_while_hotstring_tooltip
+					or Manifest.default_for(ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
+				if not ready() or current == value then return false end
+				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP,
+					value, "set_llm_while_hotstring_tooltip")
 			end,
 		},
 		state_getters = {
@@ -203,6 +240,11 @@ function M.build(ctx)
 			["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
 			["llm_instant_on_word_end_enabled"] = function() return state.llm_instant_on_word_end end,
 			["llm_after_hotstring_enabled"] = function() return state.llm_after_hotstring end,
+			-- A state not yet hydrated from the menu defaults reads the manifest's.
+			[ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP] = function()
+				if state.llm_while_hotstring_tooltip ~= nil then return state.llm_while_hotstring_tooltip end
+				return Manifest.default_for(ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
+			end,
 			["llm_trigger_ready"] = ready,
 		},
 	}

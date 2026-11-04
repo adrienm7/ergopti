@@ -12,8 +12,8 @@
 
 local uv = require('luv')
 require('compat.utf8').install()
-local Writer = require('modules.keylogger.sqlite_writer')
-local Reader = require('modules.keylogger.sqlite_reader')
+local Writer = require('modules.keystats.sqlite_writer')
+local Reader = require('modules.keystats.sqlite_reader')
 local Json = require('json')
 local root = assert(os.getenv('OWNED_READER_PROOF'))
 local db = root .. '/metrics.sqlite'

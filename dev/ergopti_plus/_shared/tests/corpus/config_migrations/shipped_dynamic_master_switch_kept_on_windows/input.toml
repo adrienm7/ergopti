@@ -1,0 +1,9 @@
+[_meta]
+schema_version = 12
+
+[category_enabled]
+dynamichotstrings = false
+rolls = true
+
+[hotstrings.dynamic.date]
+enabled = true

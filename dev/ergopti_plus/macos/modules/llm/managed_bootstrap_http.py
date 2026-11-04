@@ -28,6 +28,7 @@ REDIRECT_POLICY = SHARED_ROOT / "data/http/redirect_policy.json"
 PROXY_POLICY = SHARED_ROOT / "python/network_proxy_policy.py"
 PYTHON_RELEASE = SHARED_ROOT / "modules/llm/managed_python_release.json"
 NATIVE_ENGINE = DRIVER_ROOT / "platform/network/native_http.py"
+IDENTIFIERS = SHARED_ROOT / "data/identifiers.py"
 
 
 class BootstrapFailure(Exception):
@@ -46,16 +47,75 @@ def _remaining(deadline):
 
 
 def _native_request(*args, **kwargs):
-    if "_ergopti_native_http" not in sys.modules:
-        specification = importlib.util.spec_from_file_location(
-            "_ergopti_native_http", NATIVE_ENGINE
+    stage = "native_import"
+    try:
+        if "_ergopti_native_http" not in sys.modules:
+            specification = importlib.util.spec_from_file_location(
+                "_ergopti_native_http", NATIVE_ENGINE
+            )
+            if specification is None or specification.loader is None:
+                raise BootstrapFailure("unavailable")
+            module = importlib.util.module_from_spec(specification)
+            sys.modules[specification.name] = module
+            specification.loader.exec_module(module)
+        stage = "native_request"
+        return sys.modules["_ergopti_native_http"].open_request(*args, **kwargs)
+    except Exception as failure:
+        failure.bootstrap_stage = stage
+        raise
+
+
+# The marker and sentences network-retry.sh and the Swift download spool spell
+# too (test-managed-proxy-route-contract.cjs): one warning when an unusable
+# automatic configuration sends the download direct, then the direct outcome.
+PAC_DIRECT_FALLBACK_MARKER = "__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:"
+_PAC_FALLBACK = {"stage": None, "reported": False}
+
+
+def _report_route_fallback(stage):
+    """Name, on stderr, the lookup step after which the worker went direct.
+
+    Only a stage code from the loaded engine's closed vocabulary is printed, so
+    the company PAC address can never reach a log through this line. The first
+    fallback of the download also prints the marker and the one warning.
+    """
+    engine = sys.modules.get("_ergopti_native_http")
+    vocabulary = getattr(engine, "FAILURE_STAGES", None)
+    if type(stage) is str and type(vocabulary) is dict and stage in vocabulary:
+        print("# managed_bootstrap_route direct_fallback=" + stage, file=sys.stderr, flush=True)
+        if _PAC_FALLBACK["stage"] is None:
+            _PAC_FALLBACK["stage"] = stage
+            print(PAC_DIRECT_FALLBACK_MARKER + stage, file=sys.stderr, flush=True)
+            print(
+                "WARNING: The automatic network configuration could not be used ("
+                + stage
+                + "). Trying a direct connection.",
+                file=sys.stderr,
+                flush=True,
+            )
+
+
+def _report_pac_fallback_outcome(cause):
+    """Say once whether the direct attempt after a PAC fallback worked (cause None)."""
+    stage = _PAC_FALLBACK["stage"]
+    if stage is None or _PAC_FALLBACK["reported"]:
+        return
+    _PAC_FALLBACK["reported"] = True
+    if cause is None:
+        line = (
+            "The direct connection worked after the automatic network configuration failed ("
+            + stage
+            + ")."
         )
-        if specification is None or specification.loader is None:
-            raise BootstrapFailure("unavailable")
-        module = importlib.util.module_from_spec(specification)
-        sys.modules[specification.name] = module
-        specification.loader.exec_module(module)
-    return sys.modules["_ergopti_native_http"].open_request(*args, **kwargs)
+    else:
+        line = (
+            "The automatic network configuration was unreachable ("
+            + stage
+            + ") and the direct connection failed ("
+            + cause
+            + ")."
+        )
+    print(line, file=sys.stderr, flush=True)
 
 
 def _url(value, maximum):
@@ -81,6 +141,21 @@ def _url(value, maximum):
     if port is not None and not 1 <= port <= 65535:
         raise BootstrapFailure("protocol")
     return parsed
+
+
+def _github_host():
+    """The GitHub host declared once in _shared/data/identifiers.json."""
+    specification = importlib.util.spec_from_file_location(
+        "_ergopti_bootstrap_identifiers", IDENTIFIERS
+    )
+    if specification is None or specification.loader is None:
+        raise BootstrapFailure("unavailable")
+    module = importlib.util.module_from_spec(specification)
+    try:
+        specification.loader.exec_module(module)
+    except OSError:
+        raise BootstrapFailure("unavailable") from None
+    return module.HOSTS["github"]
 
 
 def _direct_route(url):
@@ -136,6 +211,7 @@ def download(url, output, digest, size, deadline, idle_timeout, request=_native_
                     idle_timeout=idle_timeout,
                     direct=_direct_route(current),
                 ) as response:
+                    _report_route_fallback(getattr(response, "route_fallback", None))
                     if policy["status_min"] <= response.status <= policy["status_max"]:
                         locations = [
                             value for name, value in response.headers if name.lower() == "location"
@@ -172,6 +248,7 @@ def download(url, output, digest, size, deadline, idle_timeout, request=_native_
                 raise BootstrapFailure("redirect")
         _remaining(deadline)
         complete = True
+        _report_pac_fallback_outcome(None)
         return output
     finally:
         if not complete:
@@ -266,7 +343,9 @@ def install_python(uv, python_request, deadline, idle_timeout):
         if (
             key != "cpython-" + version + "-darwin-" + architecture + "-none"
             or candidate.get("url")
-            != "https://github.com/astral-sh/python-build-standalone/releases/download/"
+            != "https://"
+            + _github_host()
+            + "/astral-sh/python-build-standalone/releases/download/"
             + candidate["build"]
             + "/cpython-"
             + version
@@ -494,6 +573,108 @@ def main(argv=None):
         )
 
 
+def _report_failure(failure, reason):
+    """Publish closed passive provenance, retaining the original failure message."""
+    stages = {
+        "bootstrap",
+        "native_import",
+        "native_request",
+        "native_identity",
+        "native_spawn",
+        "native_pipe_setup",
+        "native_write",
+        "native_first_frame",
+        "native_head",
+        "native_terminal",
+        "native_body",
+        "native_cleanup",
+    }
+    kinds = {
+        "NativeHTTPError",
+        "BootstrapFailure",
+        "TimeoutExpired",
+        "OSError",
+        "ImportError",
+        "ValueError",
+        "TypeError",
+        "AttributeError",
+        "other",
+    }
+    kind = type(failure).__name__ if type(failure).__name__ in kinds else "other"
+    for cls in (
+        subprocess.TimeoutExpired,
+        OSError,
+        ImportError,
+        ValueError,
+        TypeError,
+        AttributeError,
+    ):
+        if isinstance(failure, cls):
+            kind = cls.__name__
+            break
+    stage = getattr(failure, "bootstrap_stage", "bootstrap")
+    fact = {
+        "version": 1,
+        "stage": stage if type(stage) is str and stage in stages else "bootstrap",
+        "exception_class": kind,
+        "native_child_pid": None,
+        "native_child_status": None,
+        "native_receipt_reason": None,
+        "cleanup": "unconfirmed",
+    }
+    native = getattr(failure, "native_diagnostic", None)
+    # Only the exact already-loaded request engine supplies generated codes.
+    # Reporting never imports a successor engine or acquires another request.
+    engine = sys.modules.get("_ergopti_native_http")
+    vocabulary = getattr(engine, "FAILURE_STAGES", None)
+    narrow_stages = vocabulary if type(vocabulary) is dict else {}
+    stages.update(narrow_stages)
+    if type(native) is dict and set(native) == set(fact) - {"version"}:
+        if (
+            all(type(native[key]) is str for key in ("stage", "exception_class", "cleanup"))
+            and native["stage"] in stages
+            and native["exception_class"] in kinds
+            and native["cleanup"] in {"confirmed", "unconfirmed"}
+            and (
+                native["stage"] not in narrow_stages
+                or (
+                    type(native["native_receipt_reason"]) is str
+                    and native["native_receipt_reason"] in narrow_stages[native["stage"]]
+                )
+            )
+        ):
+            fact["stage"] = native["stage"]
+            fact["exception_class"] = native["exception_class"]
+            fact["cleanup"] = native["cleanup"]
+            if native["cleanup"] == "confirmed":
+                pid, status, terminal = (
+                    native[key]
+                    for key in ("native_child_pid", "native_child_status", "native_receipt_reason")
+                )
+                if type(pid) is int and pid > 0:
+                    fact["native_child_pid"] = pid
+                if type(status) is int and -65535 <= status <= 65535:
+                    fact["native_child_status"] = status
+                if type(terminal) is str and terminal in {
+                    "complete",
+                    "deadline",
+                    "cancelled",
+                    "offline",
+                    "certificate",
+                    "proxy",
+                    "connect",
+                    "unavailable",
+                    "protocol",
+                    "content_encoding",
+                }:
+                    fact["native_receipt_reason"] = terminal
+    print("# managed_bootstrap_failure " + json.dumps(fact, sort_keys=True), file=sys.stderr)
+    _report_route_fallback(getattr(failure, "native_route_fallback", None))
+    _report_pac_fallback_outcome(reason)
+    print("Managed bootstrap request failed: " + reason + ".", file=sys.stderr)
+    return fact
+
+
 if __name__ == "__main__":
     try:
         main()
@@ -516,5 +697,8 @@ if __name__ == "__main__":
             "content_encoding",
         }:
             reason = "unavailable"
-        print("Managed bootstrap request failed: " + reason + ".", file=sys.stderr)
-        sys.exit(74)
+        fact = _report_failure(failure, reason)
+        # Status 78 is EX_CONFIG: the native client cannot apply the configured
+        # route (for example a PAC it cannot evaluate). The next attempt reads the
+        # same settings, so the shell must not retry it (issue #101).
+        sys.exit(78 if fact.get("native_child_status") == 78 else 74)

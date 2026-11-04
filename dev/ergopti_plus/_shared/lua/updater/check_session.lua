@@ -7,7 +7,8 @@
 --- macOS and Linux hosts: it starts a check of the subscribed channel, shows
 --- "checking" and then the answer, and serves the page's actions (install the
 --- offered release, open the release notes, switch to another channel that has
---- a newer release, report or open the log of a failed check, close).
+--- a newer release, open a link of its notes, report or open the log of a failed
+--- check, close).
 ---
 --- FEATURES & RATIONALE:
 --- 1. One controller for both Lua hosts: the host only creates the window,
@@ -19,10 +20,17 @@
 ---    the answer of an older one inert, so a late result never replaces the
 ---    window's current phase; a retired session (its window closed, or
 ---    replaced by a new one) shows and does nothing more.
---- 4. PURE Lua (LuaJIT and 5.4): no driver imports, no io, no OS calls.
+--- 4. Release notes: an offered release carries its body, with the repository
+---    identity the page's link policy needs. The window shows the changelog
+---    section in place (the Windows prompt does the same with its own pane), and
+---    the one link action the notes add is checked here against the repository
+---    again before the host opens anything.
+--- 5. PURE Lua (LuaJIT and 5.4): no driver imports, no io, no OS calls.
 --- ==============================================================================
 
 local CheckResult = require("updater.check_result")
+local Parser = require("updater.release_parser")
+local RepositoryUrl = require("updater.repository_url")
 
 local M = {}
 
@@ -31,6 +39,7 @@ local ACTIONS = {
 	close          = true,
 	update         = "available",
 	whats_new      = "available",
+	open_url       = "available",
 	switch_channel = true,
 	report         = "error",
 	open_log       = "error",
@@ -41,7 +50,7 @@ local PORTS = {
 	push = "function", check = "function", channel = "function", current = "function",
 	set_channel = "function", install = "function", open_changelog = "function",
 	report = "function", open_log = "function", close = "function", log_path = "function",
-	log = "function",
+	log = "function", repository = "function", open_url = "function",
 }
 
 --- Creates the session of one window.
@@ -54,9 +63,14 @@ local PORTS = {
 ---   set_channel function(id): boolean The channel owner's set.
 ---   install function(result): boolean Hands the offered release to the installer.
 ---   open_changelog function(channel): boolean Opens the Versions window.
----   report function(result): boolean, boolean|nil Reports a failed check
----     (ok, missing).
+---   report function(result, complete, current): cancellable request|nil.
+---     Complete(ok, missing) receives the report outcome; nil is valid after
+---     inline completion. A return value never acknowledges the action.
 ---   open_log function(): boolean, boolean|nil Opens today's log (ok, missing).
+---   repository function(): table The repository identity { owner, repo } the
+---     notes' link policy needs.
+---   open_url function(url): boolean Opens one URL this session already
+---     checked against the repository.
 ---   close function() Closes the window.
 ---   log_path function(): string Today's log file.
 ---   log function(level, message, ...) The driver's logger.
@@ -71,8 +85,23 @@ function M.new(opts)
 	local session = {}
 	local generation = 0
 	local retired = false
+	local report_request = nil
+	local action_revision = 0
 	local result = nil     -- the last answer, nil while checking
 	local message = nil    -- the page's current state message
+
+	--- Revokes the receipt before cancellation can reenter this session.
+	local function cancel_report()
+		action_revision = action_revision + 1
+		local expected = action_revision
+		local prior = report_request
+		report_request = nil
+		if prior and prior.handle then
+			local ok, detail = pcall(prior.handle.cancel)
+			if not ok then opts.log("error", "The report request could not be cancelled: %s.", tostring(detail)) end
+		end
+		return expected
+	end
 
 	--- Sends the current phase to the page.
 	local function publish()
@@ -106,6 +135,18 @@ function M.new(opts)
 			latest  = answer.latest,
 			others  = answer.others or {},
 		}
+		-- An offer read from the Atom feed: the page shows no Update button for it
+		if answer.state == "available" and answer.check_only == true then page.check_only = true end
+		if answer.state == "available" and type(answer.release) == "string" then
+			local ok, repository = pcall(opts.repository)
+			if ok and type(repository) == "table" and type(repository.owner) == "string"
+				and type(repository.repo) == "string" then
+				page.notes = { body = Parser.parse_notes(answer.release), owner = repository.owner, repo = repository.repo }
+			else
+				-- The page then shows no notes pane; the log says why
+				opts.log("error", "The repository identity is unavailable for the release notes: %s.", tostring(repository))
+			end
+		end
 		if answer.state == "error" then
 			page.reason_key = answer.reason_key
 			local ok, path = pcall(opts.log_path)
@@ -132,6 +173,8 @@ function M.new(opts)
 				answer = CheckResult.failure({ channel = message and message.channel, current = message and message.current },
 					"unexpected", "the check answered without a known phase")
 			end
+			local revision = cancel_report()
+			if retired or expected ~= generation or revision ~= action_revision then return end
 			result = answer
 			message = state_message(answer)
 			opts.log("info", "Update check window: %s (channel %s).", answer.state, tostring(answer.channel))
@@ -146,6 +189,8 @@ function M.new(opts)
 			opts.log("warn", "Refused to start a check in a retired update-check session.")
 			return false
 		end
+		local revision = cancel_report()
+		if retired or revision ~= action_revision then return false end
 		generation = generation + 1
 		local expected = generation
 		result = nil
@@ -182,6 +227,15 @@ function M.new(opts)
 			end
 		elseif name == "whats_new" then
 			acknowledge(name, opts.open_changelog(result.channel) == true)
+		elseif name == "open_url" then
+			local notes = message and message.notes
+			if type(notes) ~= "table"
+				or not RepositoryUrl.is_repository_url(body.url, notes.owner, notes.repo) then
+				opts.log("warn", "Refused a release-notes link outside the repository.")
+				acknowledge(name, false)
+			else
+				acknowledge(name, opts.open_url(body.url) == true)
+			end
 		elseif name == "switch_channel" then
 			local id = body.channel
 			if not listed(id) then
@@ -193,8 +247,27 @@ function M.new(opts)
 				acknowledge(name, false)
 			end
 		elseif name == "report" then
-			local ok, missing = opts.report(result)
-			acknowledge(name, ok, missing)
+			local token = { result = result, generation = generation, done = false }
+			report_request = token
+			local function current()
+				return not retired and report_request == token and generation == token.generation and result == token.result
+			end
+			local function complete(ok, missing)
+				if not current() or token.done then return end
+				token.done = true
+				acknowledge(name, ok, missing)
+			end
+			local called, handle, detail = pcall(opts.report, token.result, complete, current)
+			if not called and token.done then opts.log("error", "The completed report port failed: %s.", tostring(handle)) end
+			if current() and not token.done then
+				if called and type(handle) == "table" and type(handle.cancel) == "function" then token.handle = handle
+				else
+					opts.log("error", "The report could not be dispatched: %s.", tostring(called and detail or handle))
+					complete(false)
+				end
+			elseif called and type(handle) == "table" and type(handle.cancel) == "function" then
+				handle.cancel()
+			end
 		elseif name == "open_log" then
 			local ok, missing = opts.open_log()
 			acknowledge(name, ok, missing)
@@ -218,6 +291,8 @@ function M.new(opts)
 			opts.log("warn", "Refused an update-check window message that is not one of its actions.")
 			return
 		end
+		local revision = cancel_report()
+		if retired or revision ~= action_revision then return end
 		if needs ~= true and (result == nil or result.state ~= needs) then
 			opts.log("warn", "Refused the update-check action '%s' outside the '%s' phase.", name, needs)
 			acknowledge(name, false)
@@ -234,6 +309,7 @@ function M.new(opts)
 	--- Retires the session: its pending answer and its page are ignored from now.
 	function session.retire()
 		retired = true
+		cancel_report()
 		generation = generation + 1
 	end
 

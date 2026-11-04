@@ -45,6 +45,7 @@ function M.new(ports, policy)
 	-- Capture the ports once; arbitrary mutation of the caller table has no authority.
 	local P = {}; for key, value in pairs(ports) do P[key] = value end
 	local active, app, sequence, controller = nil, nil, 0, {}
+	local responses = setmetatable({}, {__mode='k'})
 	local bootstrap_ms, poll_ms=policy.bootstrap_timeout_ms, policy.poll_ms
 
 	local function call(fn, ...)
@@ -99,6 +100,34 @@ function M.new(ports, policy)
 		return 'running'
 	end
 	function controller:has_debt() return active ~= nil or (app ~= nil and app.stopping) end
+
+	--- Captures original app/absence custody without invoking any observer or effect.
+	--- @return table receipt Opaque read-only response identity, never readiness.
+	function controller:capture_response()
+		local receipt={}
+		responses[receipt]={app=app,sequence=sequence}
+		return receipt
+	end
+	--- Checks the captured app, binary/source and exact retained service without retirement.
+	--- @param receipt table Original opaque observer receipt.
+	--- @param origin string Requested original service origin.
+	--- @return boolean current No start, stop, publication or cleanup is authorized.
+	function controller:response_current(receipt,origin)
+		local witness=responses[receipt]
+		if not witness or witness.app~=app or witness.sequence~=sequence then return false end
+		local record=witness.app
+		-- Absence authenticates only this controller view, never an external server.
+		if not record then return active == nil end
+		if record.origin~=origin or record.stopping then return false end
+		local held=record.service
+		if not held or held.acquiring or held.unknown or type(held.is_current)~='function'
+			or type(held.running)~='function' or not app_current(record) then return false end
+		if not yes(held.is_current,held.operation) or app~=record or record.stopping then return false end
+		if not yes(held.running,held.operation) or app~=record or record.stopping then return false end
+		-- Running is the final observer; later source callbacks could invalidate that proof.
+		return app==record and record.service==held
+			and responses[receipt]==witness and witness.sequence==sequence and not record.stopping
+	end
 
 	function controller:start(snapshot, action, explicit_consent, on_done)
 		local request = {started = false}
@@ -276,7 +305,7 @@ function M.new(ports, policy)
 			entry.promoted=true
 			budget_owner:finish()
 			request.result={ok=true, installed=entry.installed==true, origin=entry.origin,
-				model_installed=false}
+				model_installed=false, direct_fallback=entry.direct_fallback, relay_refusal=entry.relay_refusal}
 			entry.stage='done'; complete(); announce_result()
 		end
 		local function start_probe()
@@ -294,10 +323,24 @@ function M.new(ports, policy)
 			service=acquire('service', function(done)
 				return P.start_service(executable, {'serve'}, {origin=entry.origin,
 					host=entry.host, timeout_ms=false, authorized=service_authorized,
+					environment=entry.service_environment or {}, relay=entry.relay,
 					owner='ollama-runtime-' .. tostring(sequence)}, done)
 			end)
 			if not service_live() then fail('runtime_service_unavailable'); return end
 			request.started=true; start_probe()
+		end
+		-- The optional network port selects the proxy the daemon is started with
+		-- (a PAC the daemon cannot evaluate); a driver without one starts directly.
+		local function begin_network()
+			if P.network==nil then begin_service(); return end
+			if not current() or not yes(runtime_current) or not current() then fail('runtime_source_changed'); return end
+			entry.stage='network'
+			entry.network=acquire('network', function(done)
+				return P.network(budget, service_authorized, done)
+			end)
+			if entry.network.unknown then fail('runtime_network_acquisition_unknown'); return end
+			-- A lookup that settled synchronously must be observed by this pump.
+			again=true
 		end
 		local function resolved()
 			if not current() then fail('runtime_source_changed'); return end
@@ -314,7 +357,7 @@ function M.new(ports, policy)
 			executable=call(get)
 			if type(executable)~='string' or executable:sub(1,1)~='/' or executable:find('\0',1,true)
 				or not yes(runtime_current) or not current() then fail('runtime_source_changed'); return end
-			begin_service()
+			begin_network()
 		end
 		pump=function()
 			if pumping then again=true; return end
@@ -331,6 +374,27 @@ function M.new(ports, policy)
 						if held.delivered and type(held.result)=='table' and held.result.ok==true then
 							entry.installed=true; resolved()
 						else fail('runtime_install_failed') end
+					end
+				elseif entry.stage=='network' then
+					local held=entry.network
+					if held and op_settled(held) then
+						local answer=held.result
+						if held.delivered and type(answer)=='table' and answer.ok==true
+							and type(answer.environment)=='table' then
+							entry.service_environment=answer.environment
+							-- The lookup stage that sent an origin direct: a later pull
+							-- that fails names both causes (PAC unusable, direct failed).
+							entry.direct_fallback=type(answer.direct_fallback)=='string' and answer.direct_fallback or nil
+							-- A proxy that demands a sign-in the daemon cannot give: the
+							-- daemon starts under the local relay (proxy-auth-relay.md).
+							entry.relay=type(answer.relay)=='table' and answer.relay or nil
+							-- A refused sign-in: the daemon starts without the proxy for the
+							-- models on disk, and this closed reason refuses only the pull.
+							entry.relay_refusal=type(answer.relay_refusal)=='string' and answer.relay_refusal or nil
+							begin_service()
+						else
+							fail('runtime_proxy_unavailable')
+						end
 					end
 				elseif entry.stage=='probe' then
 					local held=entry.probe

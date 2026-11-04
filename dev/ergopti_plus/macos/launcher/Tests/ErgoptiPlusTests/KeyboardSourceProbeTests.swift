@@ -5,7 +5,8 @@
 // DESCRIPTION:
 // Exercises the production Carbon translator on real selected US/French input
 // sources, including a base-level dead key. No key event is constructed or posted.
-// Source changes are restricted to CI and restored even after assertion failures.
+// Source changes are restricted to CI, observed before use, and restored even
+// after assertion failures.
 // ==============================================================================
 
 import Carbon
@@ -19,35 +20,11 @@ final class KeyboardSourceProbeTests: XCTestCase {
 			"Input-source switching is restricted to disposable CI hosts")
 		let diagnostics = KeyboardSourceTestDiagnostics(name + ":" + identifier)
 		defer { diagnostics.emit() }
-		let original = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
-		diagnostics.record("original.capture", original: original)
-		defer {
-			let status = diagnostics.nativeCall("restore.outer", original: original) { TISSelectInputSource(original) }
-			XCTAssertEqual(status, noErr)
+		try KeyboardSourceSelectionFixture.withSelectedSource(identifier, diagnostics: diagnostics) { source in
+			diagnostics.record("body.before", target: source)
+			defer { diagnostics.record("body.after", target: source) }
+			try body(diagnostics)
 		}
-		let filter = [kTISPropertyInputSourceID as String: identifier] as CFDictionary
-		let sources = TISCreateInputSourceList(filter, true).takeRetainedValue() as! [TISInputSource]
-		let source = try XCTUnwrap(sources.first, "Missing native fixture: \(identifier)")
-		let pointer = try XCTUnwrap(TISGetInputSourceProperty(source, kTISPropertyInputSourceIsEnabled))
-		let wasEnabled = CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(pointer).takeUnretainedValue())
-		diagnostics.record("target.inventory", original: original, target: source)
-		if !wasEnabled {
-			let status = diagnostics.nativeCall("enable", original: original, target: source) { TISEnableInputSource(source) }
-			XCTAssertEqual(status, noErr)
-		}
-		defer {
-			let status = diagnostics.nativeCall("restore.inner", original: original, target: source) { TISSelectInputSource(original) }
-			XCTAssertEqual(status, noErr)
-			if !wasEnabled {
-				let disabled = diagnostics.nativeCall("disable", original: original, target: source) { TISDisableInputSource(source) }
-				XCTAssertEqual(disabled, noErr)
-			}
-		}
-		let status = diagnostics.nativeCall("select", original: original, target: source) { TISSelectInputSource(source) }
-		XCTAssertEqual(status, noErr)
-		diagnostics.record("body.before", original: original, target: source)
-		defer { diagnostics.record("body.after", original: original, target: source) }
-		try body(diagnostics)
 	}
 
 	func testActualSelectedSourcesProveDirectPunctuationAndRejectDeadAccent() throws {

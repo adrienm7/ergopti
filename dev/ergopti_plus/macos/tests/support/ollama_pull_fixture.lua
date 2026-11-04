@@ -26,7 +26,7 @@ local MODULES = {
 	"adapters.http_client",
 	"ui.download_window",
 	"ui.ui_builder",
-	"infra.paths",
+	"infra.paths", "infra.timings",
 	"infra.deferred_work",
 	"ui.download_window.javascript",
 	"ui.menu.menu_llm.requirement_operation_registry",
@@ -44,6 +44,9 @@ local function with_fixture(options, callback)
 	local progress = { shows = 0, completes = 0, aborts = 0, retry_starts = 0 }
 	local notifications = 0
 	local notification_records = {}
+	-- Every one-shot timer the manager scheduled, for a test to deliver.
+	local timers = {}
+	local error_records = {}
 	local http_callback
 	local terminate_mode = options.terminate_mode or "self"
 
@@ -56,7 +59,9 @@ local function with_fixture(options, callback)
 		done = noop,
 		info = noop,
 		warn = noop,
-		error = noop,
+		error = function(_, fmt, ...)
+			error_records[#error_records + 1] = select("#", ...) > 0 and string.format(fmt, ...) or tostring(fmt)
+		end,
 		callback = function(_, _, fn, ...)
 			if type(fn) ~= "function" then return false, nil end
 			return xpcall(fn, debug.traceback, ...)
@@ -71,7 +76,7 @@ local function with_fixture(options, callback)
 	}
 	package.loaded["infra.text_utils"] = nil
 	package.loaded["modules.llm.ollama_binary"] = {
-		resolve = function() return options.binary_path or "/fixture/ollama" end,
+		resolve = function() return options.binary_path or "/fixture/ollama", nil, options.binary_source end,
 	}
 	package.loaded["modules.llm.ollama_server_command"] = {
 		build = function() return "fixture restart" end,
@@ -83,8 +88,11 @@ local function with_fixture(options, callback)
 	}
 	package.loaded["adapters.shell_runner"] = { spawn = function() return nil end }
 	package.loaded["adapters.timer_scheduler"] = {
+		awake_time = function() return 0 end,
 		after = function(_, fn)
-			return { callback = fn, timer = {}, observers = {} }, true
+			local handle = { callback = fn, timer = {}, observers = {} }
+			timers[#timers + 1] = handle
+			return handle, true
 		end,
 		cancel = function(handle)
 			handle.timer = nil
@@ -145,7 +153,10 @@ local function with_fixture(options, callback)
 			if options.show_replaced then progress.shows = progress.shows + 1 end
 			return options.show_result ~= false
 		end,
-		update = function() progress.updates = (progress.updates or 0) + 1 end,
+		update = function(pct, bytes_done, bytes_total, line)
+			progress.updates = (progress.updates or 0) + 1
+			progress.last_update = { pct = pct, done = bytes_done, total = bytes_total, line = line }
+		end,
 		complete = function() progress.completes = progress.completes + 1; return true end,
 	}
 	package.loaded["adapters.task_lifecycle"] = {
@@ -182,6 +193,8 @@ local function with_fixture(options, callback)
 		start = function(task) return task:start() == true end,
 	}
 
+	-- Its loader reads the shared tree through hs.fs, which this fixture omits
+	package.loaded["modules.llm.thinking_families"] = { ollama_think = function() return false end }
 	_G.hs = {
 		execute = function() return "", true end,
 		http = {
@@ -197,6 +210,7 @@ local function with_fixture(options, callback)
 	package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
 	local real_window, native_window
 	if options.real_window then
+		helpers.provide_timings()
 		package.loaded["infra.paths"] = { shared = function()
 			return helpers.driver_root() .. "../_shared"
 		end }
@@ -259,6 +273,8 @@ local function with_fixture(options, callback)
 			native_window = function() return native_window end,
 			notifications = function() return notifications end,
 			notification_records = notification_records,
+			timers = timers,
+			error_records = error_records,
 			http_callback = function() return http_callback end,
 			set_terminate_mode = function(mode) terminate_mode = mode end,
 		})

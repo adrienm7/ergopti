@@ -22,12 +22,16 @@ local text_utils = require("infra.text_utils")
 local EventProvenance = require("adapters.event_provenance")
 local KeyboardGeometry = require("adapters.keyboard_geometry")
 local ControlSentinels = require("modules.keymap.control_sentinels")
+local SelftestGate = require("modules.keymap.selftest_gate")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local Keycodes   = require("infra.keycodes")
 local Manifest   = require("infra.manifest_reader")
+local HotstringCore = require("infra.hotstring_engine")
+local TextSender = require("adapters.text_sender")
+local AppFilter  = require("modules.llm.app_filter")
 
 local Registry   = require("modules.keymap.registry")
 local Expander   = require("modules.keymap.expander")
@@ -38,7 +42,13 @@ local MagicKeySource = require("modules.keymap.magic_key_source")
 local Terminators = require("keymap.terminators")
 local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
+local KeystrokeIntegrity = require("infra.keystroke_integrity")
+local KeyEventHealth = require("infra.key_event_health")
+local UnicodeCarrier = require("adapters.unicode_carrier")
+local EventClock = require("adapters.event_clock")
+local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+local ConfigKeys = require("config_keys")
 
 local M   = {}
 local LOG = "keymap"
@@ -61,7 +71,7 @@ local LOG = "keymap"
 M.DELAYS_DEFAULT = {
 	STAR_TRIGGER       = 2.0,  -- Manual expansions with ★ (magic key)
 	dynamichotstrings  = 2.0,  -- Phone numbers, SSN, dates…
-	autocorrection     = 1.0,  -- Spell checking
+	autocorrection     = 0.5,  -- Spell checking
 	rolls              = 0.5,  -- Rolls (e.g. sx → sk)
 	sfbsreduction      = 0.5,  -- Comma combos (e.g. ,t → pt)
 	distancesreduction = 0.5,  -- Dead keys and suffixes
@@ -88,16 +98,21 @@ M.DELAY_KEY_TO_CATEGORY = {
 --- builds its whole `Features` map from the same manifest). `default_for` fails
 --- fast if a path is missing, so a renamed feature never silently becomes nil.
 M.DEFAULT_STATE = {
-	keymap                      = Manifest.default_for("hotstrings.enabled"),
-	repeat_key_enabled          = Manifest.default_for("hotstrings.repeat_key_enabled"),
-	expansion_delay             = Manifest.default_for("hotstrings.expansion_delay"),
+	keymap                      = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_ENABLED),
+	repeat_key_enabled          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED),
+	expansion_delay             = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY),
+	idle_reset_seconds          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_IDLE_RESET_SECONDS),
+	cascade_max_arrows          = Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS),
+	click_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_CLICK_RESETS_WORD),
+	arrow_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_ARROW_RESETS_WORD),
+	shortcut_resets_word        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_SHORTCUT_RESETS_WORD),
 	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
-	trigger_char                = Manifest.default_for("hotstrings.trigger_char"),
-	preview_star_enabled        = Manifest.default_for("hotstrings.preview_star_enabled"),
-	preview_autocorrect_enabled = Manifest.default_for("hotstrings.preview_autocorrect_enabled"),
-	preview_ai_enabled          = Manifest.default_for("hotstrings.preview_ai_enabled"),
-	preview_colored_tooltips    = Manifest.default_for("hotstrings.preview_colored_tooltips"),
-	magic_key_source            = Manifest.default_for("hotstrings.magic_key_source"),
+	trigger_char                = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR),
+	preview_star_enabled        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED),
+	preview_autocorrect_enabled = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AUTOCORRECT_ENABLED),
+	preview_ai_enabled          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AI_ENABLED),
+	preview_colored_tooltips    = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS),
+	magic_key_source            = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE),
 }
 
 
@@ -123,15 +138,17 @@ local BUFFER_MAX_CHARS = 500
 local BUFFER_TRIM_BYTE_GATE = BUFFER_MAX_CHARS * 4
 
 -- Complex-keystroke delay multiplier. Shift- or Alt-held keystrokes take
--- longer finger-path time than a bare letter, so we widen the expansion
--- window for them by this factor.
-local COMPLEX_DELAY_MULT = 2
+-- longer finger-path time than a bare letter, so the expansion window widens
+-- for them by this factor. Declared once for the three drivers in the shared
+-- timing registry ([hotstrings] complex_key_delay_multiplier, complex_key_carry_ms);
+-- the rule is the shared engine's complex_delay_multiplier.
+local COMPLEX_DELAY_MULT = require("infra.timings").ms("hotstrings", "complex_key_delay_multiplier")
 
 -- How long after a complex keystroke the bonus multiplier still applies to
 -- the next keystroke — this covers the small lag between releasing Shift
 -- and pressing the next letter. Beyond this window the bonus is dropped so
 -- it cannot inadvertently stretch an expansion on an unrelated later key.
-local COMPLEX_CARRY_SEC = 0.3
+local COMPLEX_CARRY_MS = require("infra.timings").ms("hotstrings", "complex_key_carry_ms")
 
 -- Central memory struct passed via reference to all sub-modules. The shape,
 -- invariants, and default seeding live in modules/keymap/state.lua; keeping
@@ -204,7 +221,17 @@ local function observe_context_epoch(epoch)
 	if epoch ~= _last_context_epoch then
 		CoreState.buffer = ""
 		CoreState.llm_buffer = ""
+		CoreState.llm_private_mark = ""
+		-- Deliberately not governed by hotstrings.arrow_resets_word or
+		-- shortcut_resets_word. An epoch is an opaque token for "an Ergopti
+		-- action handed output to Quartz": it does not say whether that output was
+		-- an arrow, a shortcut, typed text or a paste of unknown length, so the
+		-- only safe claim is an unknown boundary. Hotstring expansions are
+		-- replacements, not actions, so they keep their own buffer handling; the
+		-- arrows and chords of the Karabiner layers are foreign events and do
+		-- follow the options in the keyDown tap.
 		CoreState.start_is_word_boundary = false
+		CoreState.start_is_line_start = false
 		_action_preview_refresh_pending = false
 		_last_context_epoch = epoch
 	end
@@ -374,10 +401,12 @@ local function invalidate_observed_context()
 	if _one_shot_shift then _one_shot_shift.disarm() end
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	cancel_action_preview_recovery()
 	-- Not a word boundary: the cursor sits in territory we never observed, so
 	-- word-anchored triggers must stay silent until a real terminator is seen.
 	CoreState.start_is_word_boundary = false
+	CoreState.start_is_line_start = false
 	-- A tap outage loses the target and ordering proof. Replaying a submit key into
 	-- an unknown context is unsafe, so revoke every still-reversible owner.
 	TerminatorReplay.discard_pending("keyboard tap outage", true)
@@ -392,7 +421,9 @@ local function discard_paused_text_context()
 	if _one_shot_shift then _one_shot_shift.disarm() end
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	CoreState.start_is_word_boundary = false
+	CoreState.start_is_line_start = false
 	cancel_action_preview_recovery()
 end
 
@@ -403,8 +434,10 @@ end
 local function invalidate_window_context()
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	cancel_action_preview_recovery()
 	CoreState.start_is_word_boundary = false
+	CoreState.start_is_line_start = false
 	TerminatorReplay.discard_pending("window context changed", true)
 	LLMBridge.set_runtime_quarantined(true)
 	_window_context_reconcile_pending = true
@@ -427,6 +460,19 @@ function M.get_base_delay()
 	return CoreState.BASE_DELAY_SEC
 end
 
+--- Observers of the baseline delay. The override file stores each delay as an
+--- offset of it, so whoever projects delays (the hotstring config) must project
+--- them again when it changes.
+local _base_delay_observers = {}
+
+--- Registers a function called after every change of the baseline delay.
+--- A false answer refuses the change: the previous baseline is put back.
+--- @param observer function Called with no argument, returns true when it applied the change.
+function M.on_base_delay_change(observer)
+	assert(type(observer) == "function", "a base-delay observer is a function")
+	_base_delay_observers[#_base_delay_observers + 1] = observer
+end
+
 --- Sets the baseline inter-key delay threshold used for all unmapped groups.
 --- @param secs number The new threshold in seconds (clamped to ≥ 0).
 function M.set_base_delay(secs)
@@ -435,10 +481,125 @@ function M.set_base_delay(secs)
 		Logger.error(LOG, "Base-delay change refused because the active hotstring preview could not be revoked.")
 		return false
 	end
+	local previous = CoreState.BASE_DELAY_SEC
 	CoreState.BASE_DELAY_SEC = v
+	for _, observer in ipairs(_base_delay_observers) do
+		local called, applied = pcall(observer)
+		if not called or applied ~= true then
+			CoreState.BASE_DELAY_SEC = previous
+			Logger.error(LOG, "Base-delay change refused because a delay owner could not apply it.")
+			return false
+		end
+	end
 	Logger.debug(LOG, "Base delay: %.3fs.", v)
 	return true
 end
+
+--- Returns the pause after which the next key starts a new word.
+--- @return number Seconds; 0 means the buffer is never reset by a pause.
+function M.get_idle_reset_seconds()
+	return CoreState.IDLE_RESET_SEC
+end
+
+--- Sets the pause after which the next key starts a new word.
+--- @param secs number hotstrings.idle_reset_seconds; 0 disables the reset.
+--- @return boolean committed False for a value that is not a non-negative number.
+function M.set_idle_reset_seconds(secs)
+	if not HotstringCore.valid_idle_reset_seconds(secs) then
+		Logger.error(LOG, "Idle reset refused: '%s' is not a non-negative number of seconds.", tostring(secs))
+		return false
+	end
+	-- Both fields at once: the same projection recompute_word_timeout makes.
+	CoreState.IDLE_RESET_SEC = secs
+	CoreState.WORD_TIMEOUT_SEC = secs
+	Logger.debug(LOG, "Idle reset: %gs.", secs)
+	return true
+end
+
+--- Returns how many expansions (arrows) a chain of hotstrings may hold.
+--- @return number Arrows; 1 means a single expansion, no cascade.
+function M.get_cascade_max_arrows()
+	return CoreState.CASCADE_MAX_ARROWS
+end
+
+--- Sets the longest chain of hotstrings.
+--- @param arrows number hotstrings.cascade_max_arrows; a whole number from 1 (a single expansion) to 10.
+--- @return boolean committed False for a value outside that range.
+function M.set_cascade_max_arrows(arrows)
+	if not HotstringCore.valid_cascade_max_arrows(arrows) then
+		Logger.error(LOG, "Cascade arrow count refused: '%s' is not a whole number from 1 to 10.", tostring(arrows))
+		return false
+	end
+	CoreState.CASCADE_MAX_ARROWS = arrows
+	Logger.debug(LOG, "Cascade arrows: %d.", arrows)
+	return true
+end
+
+--- Returns whether a mouse click starts a new word.
+--- @return boolean
+function M.is_click_resets_word_enabled()
+	return CoreState.click_resets_word == true
+end
+
+--- Sets whether a mouse click starts a new word.
+--- @param enabled boolean hotstrings.click_resets_word.
+--- @return boolean committed False for a non-boolean value.
+function M.set_click_resets_word(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Click reset refused: '%s' is not a boolean.", tostring(enabled))
+		return false
+	end
+	CoreState.click_resets_word = enabled
+	Logger.debug(LOG, "Click starts a new word: %s.", tostring(enabled))
+	return true
+end
+
+--- Returns whether an arrow key starts a new word.
+--- @return boolean
+function M.is_arrow_resets_word_enabled()
+	return CoreState.arrow_resets_word == true
+end
+
+--- Sets whether an arrow key (any modifiers held) starts a new word.
+--- @param enabled boolean hotstrings.arrow_resets_word.
+--- @return boolean committed False for a non-boolean value.
+function M.set_arrow_resets_word(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Arrow reset refused: '%s' is not a boolean.", tostring(enabled))
+		return false
+	end
+	CoreState.arrow_resets_word = enabled
+	Logger.debug(LOG, "Arrow starts a new word: %s.", tostring(enabled))
+	return true
+end
+
+--- Returns whether a Cmd/Ctrl shortcut starts a new word.
+--- @return boolean
+function M.is_shortcut_resets_word_enabled()
+	return CoreState.shortcut_resets_word == true
+end
+
+--- Sets whether a Cmd/Ctrl shortcut starts a new word.
+--- @param enabled boolean hotstrings.shortcut_resets_word.
+--- @return boolean committed False for a non-boolean value.
+function M.set_shortcut_resets_word(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Shortcut reset refused: '%s' is not a boolean.", tostring(enabled))
+		return false
+	end
+	CoreState.shortcut_resets_word = enabled
+	Logger.debug(LOG, "Shortcut starts a new word: %s.", tostring(enabled))
+	return true
+end
+
+-- The word-reset policy is neutral in state.lua; this module owns it and seeds
+-- it from the features manifest through its own setters, which refuse an
+-- invalid default with an ERROR and keep the neutral policy.
+M.set_idle_reset_seconds(M.DEFAULT_STATE.idle_reset_seconds)
+M.set_cascade_max_arrows(M.DEFAULT_STATE.cascade_max_arrows)
+M.set_click_resets_word(M.DEFAULT_STATE.click_resets_word)
+M.set_arrow_resets_word(M.DEFAULT_STATE.arrow_resets_word)
+M.set_shortcut_resets_word(M.DEFAULT_STATE.shortcut_resets_word)
 
 --- Returns the side of the last shift key pressed.
 --- @return string|nil "left", "right", or nil if Shift is not held.
@@ -515,6 +676,13 @@ end
 --- @return boolean
 function M.is_processing_paused()
 	return CoreState.processing_paused
+end
+
+--- Returns the opaque input lifecycle shared by callback-owned hotstring work.
+--- Registry changes and stop/pause revoke it even when settings return to their prior values.
+--- @return table token Current immutable generation identity.
+function M.current_hotstring_lifecycle()
+	return _user_hotstring_lifecycle
 end
 
 --- Sets the per-group delay threshold for the given key.
@@ -668,6 +836,9 @@ end
 M.add                   = preview_fenced_registry_mutation(Registry.add)
 M.load_file             = preview_fenced_registry_mutation(Registry.load_file, true)
 M.load_toml             = preview_fenced_registry_mutation(Registry.load_toml, true)
+-- The hotstring editor reloads the personal group after each save; disable and
+-- load run as one registry transaction that keeps the old mappings on failure.
+M.reload_toml           = preview_fenced_registry_mutation(Registry.reload_toml, true)
 M.replace_personal_source = preview_fenced_registry_mutation(Registry.replace_personal_source, true)
 -- Exposed so the hotstring editor can show the personal source default (the
 -- single source kept in sync with _shared/modules/hotstrings/priority.json) instead of
@@ -708,6 +879,8 @@ M.set_repeat_feature_enabled = preview_fenced_registry_mutation(Registry.set_rep
 M.set_terminator_enabled   = preview_fenced_registry_mutation(Registry.set_terminator_enabled)
 M.set_terminators_enabled  = preview_fenced_registry_mutation(Registry.set_terminators_enabled)
 M.is_terminator_enabled    = Registry.is_terminator_enabled
+M.set_terminators_consume  = preview_fenced_registry_mutation(Registry.set_terminators_consume)
+M.is_terminator_consume    = Registry.is_terminator_consume
 M.get_terminator_defs      = Registry.get_terminator_defs
 M.validate_custom_terminator = Registry.validate_custom_terminator
 local add_custom_terminator_fenced = preview_fenced_registry_mutation(
@@ -739,9 +912,12 @@ M.set_llm_nav_modifiers      = LLMBridge.set_llm_nav_modifiers
 M.get_llm_enabled            = LLMBridge.get_llm_enabled
 M.get_llm_runtime_setting    = LLMBridge.get_llm_runtime_setting
 M.set_llm_disabled_apps      = LLMBridge.set_llm_disabled_apps
+M.set_llm_app_profile_overrides = LLMBridge.set_llm_app_profile_overrides
 M.set_llm_enabled            = LLMBridge.set_llm_enabled
 M.set_llm_after_hotstring    = LLMBridge.set_llm_after_hotstring
+M.set_llm_while_hotstring_tooltip = LLMBridge.set_llm_while_hotstring_tooltip
 M.set_llm_debounce           = LLMBridge.set_llm_debounce
+M.set_llm_min_request_interval = LLMBridge.set_llm_min_request_interval
 M.set_llm_auto_raise_temp    = LLMBridge.set_llm_auto_raise_temp
 M.set_llm_streaming              = LLMBridge.set_llm_streaming
 M.set_llm_streaming_multi        = LLMBridge.set_llm_streaming_multi
@@ -761,6 +937,7 @@ M.set_preview_colored_tooltips    = LLMBridge.set_preview_colored_tooltips
 
 M.trigger_prediction = LLMBridge._perform_llm_check
 M.request_manual_prediction = LLMBridge.request_manual_prediction
+M.test_prediction = LLMBridge.test_prediction
 M.request_prompt_prediction = LLMBridge.request_prompt_prediction
 M.toggle_live_prompt = LLMBridge.toggle_live_prompt
 M.set_live_prompt    = LLMBridge.set_live_prompt
@@ -772,6 +949,8 @@ M.request_agent_selection = LLMBridge.request_agent_selection
 M.request_agent_command = LLMBridge.request_agent_command
 M.toggle_agent_auto = LLMBridge.toggle_agent_auto
 M.reset_predictions  = LLMBridge.reset_predictions
+-- Configuration retires prediction identity without reopening quarantined input.
+M.reset_predictions_for_configuration = LLMBridge.reset_quarantined_context
 M.reset_predictions_for_pause = LLMBridge.reset_predictions_for_pause
 
 M.classify_trigger   = Registry.classify_trigger
@@ -798,7 +977,7 @@ end
 --- to emit synthetic keystrokes and accurately sync the core buffer.
 ---
 --- `is_private` is NOT optional decoration: it is the only channel through which
---- a dynamic injector can tell the keylogger that what it just emitted is a
+--- a dynamic injector can tell the keystats that what it just emitted is a
 --- secret. perform_text_replacement forwards it to notify_synthetic, which keeps
 --- the discard markers intact and redacts only what it persists. Omitting it —
 --- which this function structurally forced, by stopping one argument short —
@@ -820,7 +999,9 @@ function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_
 			tostring(splice_error))
 		CoreState.buffer = ""
 		CoreState.llm_buffer = ""
+		CoreState.llm_private_mark = ""
 		CoreState.start_is_word_boundary = false
+		CoreState.start_is_line_start = false
 		local cleanup_ok, cleanup_result = xpcall(LLMBridge.reset_predictions, debug.traceback)
 		if not cleanup_ok or cleanup_result ~= true then
 			Logger.error(LOG, "Dynamic replacement context cleanup did not commit (result: %s).",
@@ -873,7 +1054,7 @@ function M.capture_user_hotstring(rule)
 	local destination = km_utils.capture_text_destination()
 	if not destination or CoreState.buffer:sub(-#rule.suffix) ~= rule.suffix
 		or M.has_registered_magic_action(CoreState.buffer) then return nil end
-	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = "user_code" },
+	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = require("config_keys").LEAF.USER_CODE },
 		_user_hotstring_elapsed, 1) ~= true then return nil end
 	return { lifecycle = _user_hotstring_lifecycle, input = _user_hotstring_input,
 		epoch = SyntheticInput.current_action_epoch(), buffer = CoreState.buffer,
@@ -934,8 +1115,9 @@ local function publication_receipt(transaction, capture)
 		if notified or receipt.is_settled() ~= true then return end
 		notified = true
 		if transaction.completion_status ~= "complete" and capture.input == _user_hotstring_input then
-			CoreState.buffer, CoreState.llm_buffer = "", ""
+			CoreState.buffer, CoreState.llm_buffer, CoreState.llm_private_mark = "", "", ""
 			CoreState.start_is_word_boundary = false
+			CoreState.start_is_line_start = false
 		end
 		for _, callback in ipairs(callbacks) do callback(transaction.completion_status) end
 	end
@@ -1002,8 +1184,8 @@ end
 --- is never used as transaction identity.
 ---
 --- Arming only: does NOT emit any keystroke. The caller is responsible for
---- also calling suppress_rescan() and keylogger.notify_synthetic() to complete
---- the synthetic-injection contract (see docs/PROJECT_MEMORY.md §synthetic).
+--- also calling suppress_rescan() and keystats.notify_synthetic() to complete
+--- the synthetic-injection contract (see docs/memory §synthetic).
 ---
 --- @param deletes number Retained for compatibility with legacy callers.
 --- @param text string Retained for compatibility with legacy callers.
@@ -1089,13 +1271,6 @@ local _tc_dt           = 0
 local _tc_complex_mult = 1
 local _tc_is_ignored   = false
 
--- Hot-path sub-segment timings (milliseconds) for the slow-keystroke log line.
--- Populated only when Perf sampling is enabled (DEBUG builds) so steady-state
--- typing pays nothing; nil means "not measured this keystroke". They let a slow
--- keydown be attributed to trigger matching vs. LLM/tooltip preview rebuild.
-local _tc_dbg_checks_ms  = nil
-local _tc_dbg_preview_ms = nil
-
 --- Per-mapping delay + group-enable gate, module-level to avoid closure allocation.
 --- @param m table The mapping entry.
 --- @return boolean True when the current timing/group state allows m to fire.
@@ -1174,8 +1349,8 @@ local function run_trigger_checks()
 						action.mapping, logical_char_len, false, logical_buffer)
 				end
 				if fired then return true end
-				-- A final no-op deliberately clears the buffer via suppress_rescan.
-				-- Returning immediately preserves that fence against repeat fallback.
+				-- A final no-op wins without an edit: returning immediately keeps it
+				-- masking the repeat fallback.
 				if action.is_noop and action.mapping.final_result then return false end
 			end
 		end
@@ -1215,10 +1390,11 @@ local function run_trigger_checks()
 		-- gets a repeat-key instead of the intended expansion.
 		local skip_delay = star_validated
 		for _, m in ipairs(term_bucket) do
-			if not m.auto and m.tlen > min_len and (skip_delay or mapping_fires(m))
-				and Expander.try_terminator_expand(m, chars, char_len, is_ignored)
-			then
-				return true
+			if not m.auto and m.tlen > min_len and (skip_delay or mapping_fires(m)) then
+				local fired, reason = Expander.try_terminator_expand(m, chars, char_len, is_ignored)
+				if fired then return true end
+				-- A final entry that changes nothing masks the lower candidates.
+				if reason == "noop_final" then return false, "noop_final" end
 			end
 		end
 		return false
@@ -1252,14 +1428,18 @@ local function run_trigger_checks()
 		end
 	end
 
-	if run_end_char_checks(auto_len) then return true end
+	local end_fired, end_reason = run_end_char_checks(auto_len)
+	if end_fired then return true end
+	if end_reason == "noop_final" then return false end
 
 	if auto_bucket then
 		for _, m in ipairs(auto_bucket) do
-			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m))
-				and Expander.try_auto_expand(m, char_len, is_ignored)
-			then
-				return true
+			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m)) then
+				local fired, reason = Expander.try_auto_expand(m, char_len, is_ignored)
+				if fired then return true end
+				-- A final entry that changes nothing masks the lower candidates of
+				-- this keystroke, end-char ones included.
+				if reason == "noop_final" then return false end
 			end
 		end
 	end
@@ -1310,6 +1490,59 @@ local FAST_EXIT_KEYCODES = {
 	[135] = true,  -- LAYER_SYN_3
 }
 
+-- The four arrows, governed by hotstrings.arrow_resets_word whatever modifiers
+-- are held with them.
+-- Literal like FAST_EXIT_KEYCODES above: this table is built when the module
+-- loads, and the keycode registry's LEFT_ARROW … UP_ARROW and FORWARD_DELETE
+-- (the same numbers) are not part of every narrowed registry fixture.
+local ARROW_KEYCODES = {
+	[123] = true,  -- Left
+	[124] = true,  -- Right
+	[125] = true,  -- Down
+	[126] = true,  -- Up
+}
+
+-- Forward Delete, Home, End, Page Up and Page Down: they delete text or jump to
+-- a place the buffer never observed, so the next run always starts at an
+-- unknown boundary. No word-reset option governs them.
+local UNOBSERVED_JUMP_KEYCODES = {
+	[117] = true,  -- Forward Delete
+	[115] = true,  -- Home
+	[116] = true,  -- Page Up
+	[119] = true,  -- End
+	[121] = true,  -- Page Down
+}
+
+--- The kind of application that receives typing, for the empty-line rules:
+--- "terminal", "browser" or "other". Read only on Return, Cmd+A and Cmd+L, never
+--- on ordinary typing. An identity that cannot be read is logged and makes no
+--- empty-line promise.
+--- @return string kind
+local function focused_input_kind()
+	local ok, bundle, name = pcall(TextSender.focusedAppIdentity)
+	if not ok then
+		Logger.error(LOG, "Focused application identity unreadable: %s.", tostring(bundle))
+		return "other"
+	end
+	if TextSender.isTerminalInputHost(bundle, name) then return "terminal" end
+	if AppFilter.is_browser_bundle(bundle) then return "browser" end
+	return "other"
+end
+
+--- Whether Cmd and the character `chars` select the whole text of the field:
+--- Cmd+A outside a terminal (whose Cmd+A selects the scrollback, not the
+--- prompt), Cmd+L in a browser (its address bar).
+--- @param chars string|nil The event's characters.
+--- @return boolean
+local function selects_whole_field(chars)
+	if type(chars) ~= "string" then return false end
+	local key = chars:lower()
+	if key ~= "a" and key ~= "l" then return false end
+	local kind = focused_input_kind()
+	if key == "a" then return kind ~= "terminal" end
+	return kind == "browser"
+end
+
 -- One-shot per interceptor index, so a throwing interceptor is reported once
 -- instead of on every keystroke.
 --
@@ -1321,6 +1554,16 @@ local FAST_EXIT_KEYCODES = {
 -- "Keyboard interception failure" while every keystroke loses Escape handling,
 -- backspace handling, buffer tracking and expansions.
 local _interceptor_error_logged = {}
+
+-- What the wrapper already read of the physical key-down it hands to
+-- onKeyDownRaw: its key code (read once per event, the keycode budget the
+-- ignored-window tests pin) and whether it waited behind the main thread.
+-- Declared above onKeyDownRaw for the same reason; cleared after every call.
+local _key_down_context = { keycode = nil, stale = false }
+
+-- The tap-hold copy watch (modules/keymap/tap_copy.lua), built by M.start.
+-- Declared above every tap callback that reads it, for the same reason.
+local _tap_copy = nil
 
 local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A stale internal loopback has lost the live transaction identity required to
@@ -1338,7 +1581,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A press already consumed before PAUSE still owns its repeats and release.
 	-- Ordinary paused keys retain the no-decode fast path below.
 	if provenance == nil and provenance_status == EventProvenance.STATUS_FOREIGN
-		and _one_shot_shift and _one_shot_shift.claim_repeat(e) then return true end
+		and _one_shot_shift then
+		if _key_down_context.stale and not FAST_EXIT_KEYCODES[_key_down_context.keycode]
+			and CoreState.processing_paused ~= true and SyntheticInput.admission_open() then
+			-- This press can already belong to the application, including a repeat
+			-- of an earlier consumed press. Its release must pass with it.
+			_one_shot_shift.forget_passed_key(_key_down_context.keycode)
+		elseif _one_shot_shift.claim_repeat(e) then
+			return true
+		end
+	end
 
 	-- The pause transaction closes new synthetic admission immediately after the
 	-- global drain reaches idle and keeps it closed through PAUSED/rollback. Raw
@@ -1372,7 +1624,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	end
 
 	-- Single getKeyCode() call — reused for every subsequent keyCode check
-	local keyCode = e:getKeyCode()
+	local keyCode = _key_down_context.keycode or e:getKeyCode()
 
 	-- Explicit user-data tags are the only synthetic identity. The wrapper reads
 	-- provenance once before its physical-ordering fence and passes the result in,
@@ -1391,6 +1643,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- no application ever receives one, and publish the signal in-process.
 	if ControlSentinels.is_sentinel(keyCode)
 		and ControlSentinels.claim_key(keyCode, true, e:getFlags()) then return true end
+	-- A key that waited behind the main thread may already be in the application
+	-- (SyntheticInput.STALE_PHYSICAL_EVENT_MS): an expansion or a repeat built on
+	-- it now would delete or retype text the user never saw that way. It passes
+	-- untouched and the buffer starts over.
+	if _key_down_context.stale and not FAST_EXIT_KEYCODES[keyCode] then
+		invalidate_observed_context()
+		pcall(KeyEventHealth.note_stale_pass)
+		return false
+	end
+
 	-- The physical magic key: a plain press of the chosen key types the magic key.
 	-- The event itself carries it from here, so the one-shot Shift, the buffer and
 	-- the application all see the magic key, in ignored and secure windows too,
@@ -1443,6 +1705,8 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 
 	local dt  = now - CoreState.last_key_time
 	_user_hotstring_elapsed = dt
+	-- 0 is the "no key yet" seed, not a timestamp: the first key has no pause.
+	local previous_key_ms = CoreState.last_key_time > 0 and CoreState.last_key_time * 1000 or nil
 	CoreState.last_key_time = now
 	local flags = e:getFlags()
 
@@ -1458,14 +1722,27 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	if not internal_loopback and keyCode ~= Keycodes.F16_LLM_CHAIN_SIGNAL
 		and LLMBridge.handle_llm_keys(keyCode, flags, false) then return true end
 
-	-- Wipe the buffer after the user pauses long enough that the next keystroke
-	-- cannot possibly belong to the same word. The pause itself stands in for
-	-- a word terminator, so the post-wipe context starts on a fresh word
-	-- boundary and word-boundary-required triggers are allowed to fire.
-	if CoreState.WORD_TIMEOUT_SEC > 0 and dt > CoreState.WORD_TIMEOUT_SEC then
-		CoreState.buffer = ""
+	-- Wipe the buffer after the user pauses for hotstrings.idle_reset_seconds:
+	-- the pause itself stands in for a word terminator, so the post-wipe
+	-- context starts on a fresh word boundary and word-boundary-required
+	-- triggers are allowed to fire. The rule is the shared engine's; the
+	-- seconds clock is exact enough that no resolution is taken off.
+	-- A bare Backspace is no new word: it edits the word typed before the pause,
+	-- so that word stays in the buffer for it ("ab", a pause, Backspace,
+	-- Backspace, "c★" expands). An empty buffer at a word start has nothing to
+	-- forget and keeps the empty line a terminal Return left.
+	if HotstringCore.idle_resets_word(previous_key_ms, now * 1000, CoreState.WORD_TIMEOUT_SEC, 0) then
+		local edits_word = keyCode == Keycodes.BACKSPACE
+			and not (flags.cmd or flags.ctrl or flags.alt)
+		if not edits_word and (CoreState.buffer ~= "" or not CoreState.start_is_word_boundary) then
+			CoreState.buffer = ""
+			CoreState.start_is_word_boundary = true
+			CoreState.start_is_line_start = false
+		end
 		CoreState.llm_buffer = ""
-		CoreState.start_is_word_boundary = true
+		-- The mark describes the hotstring buffer: it goes with it, and stays while a
+		-- bare Backspace keeps the word before the pause (and so a secret in it).
+		if CoreState.buffer == "" then CoreState.llm_private_mark = "" end
 		LLMBridge.reset_predictions()
 	end
 
@@ -1519,14 +1796,31 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		return LLMBridge.check_escape_reset()
 	end
 
-	-- 5. Modifier shortcuts (Cmd/Ctrl) break the current word context.
-	-- Cmd+A / Ctrl+A is the one exception — select-all replaces the entire
-	-- selection with the next typed char, so the new context starts at a
-	-- fresh word-start. Every other Cmd/Ctrl combo (cut, paste, undo,
-	-- redo, app shortcuts, …) leaves the cursor in unobservable territory.
-	if flags.cmd or flags.ctrl then
-		CoreState.buffer = ""
-		CoreState.start_is_word_boundary = (keyCode == hs.keycodes.map["a"])
+	-- 5. Cmd/Ctrl shortcuts, Shift or Option added or not. Option alone types
+	-- characters on macOS and is no shortcut modifier, and an arrow with
+	-- modifiers is an arrow: step 7 and its own option own it.
+	-- Cmd/Ctrl + Backspace / Forward Delete delete an unknown amount of text and
+	-- Cmd/Ctrl + Home/End/PgUp/PgDn jump somewhere unobserved: they keep the
+	-- unconditional reset to an unknown boundary. Every other chord (cut, paste,
+	-- undo, select-all, app shortcuts, …) follows hotstrings.shortcut_resets_word:
+	-- on, the next run starts a new word; off, the buffer and the word-start
+	-- state are left exactly as they were and the word continues. The prediction
+	-- side is the same either way: a shortcut still withdraws a visible
+	-- prediction.
+	-- Cmd+A outside a terminal and Cmd+L in a browser select the whole text of
+	-- the field: once a Backspace or a character replaces it the field is empty,
+	-- and a further Backspace deletes nothing (start_is_line_start).
+	if (flags.cmd or flags.ctrl) and not ARROW_KEYCODES[keyCode] then
+		if keyCode == Keycodes.BACKSPACE or UNOBSERVED_JUMP_KEYCODES[keyCode] then
+			CoreState.buffer = ""
+			CoreState.start_is_word_boundary = false
+			CoreState.start_is_line_start = false
+		elseif CoreState.shortcut_resets_word == true then
+			CoreState.buffer = ""
+			CoreState.start_is_word_boundary = true
+			CoreState.start_is_line_start = flags.cmd == true and not flags.ctrl and not flags.alt
+				and selects_whole_field(chars)
+		end
 		cancel_action_preview_recovery()
 		LLMBridge.check_nav_reset()
 		return false
@@ -1534,11 +1828,13 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 
 	-- 6. Handle Backspace.
 	if keyCode == Keycodes.BACKSPACE then
-		-- Cmd+Backspace / Alt+Backspace delete whole words — wipe the buffer
-		-- and refuse to assume a word boundary on the new cursor's left.
-		if flags.cmd or flags.alt then
+		-- Option+Backspace deletes the previous word: the caret now sits where
+		-- that word began, so the next character starts a word. (Cmd and Ctrl
+		-- with Backspace were handled above, at an unknown position.)
+		if flags.alt then
 			CoreState.buffer = ""
-			CoreState.start_is_word_boundary = false
+			CoreState.start_is_word_boundary = true
+			CoreState.start_is_line_start = false
 			cancel_action_preview_recovery()
 			LLMBridge.check_nav_reset()
 			return false
@@ -1547,7 +1843,14 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 			-- Remove the last UTF-8 character from the buffer safely.
 			local ok, offset = pcall(utf8.offset, CoreState.buffer, -1)
 			CoreState.buffer = (ok and offset) and CoreState.buffer:sub(1, offset - 1) or ""
+			-- The Backspace that erases the last character typed since the
+			-- buffer started puts the caret back where that typing began: the
+			-- next character starts a word, as on Windows and Linux.
+			if CoreState.buffer == "" then CoreState.start_is_word_boundary = true end
 			update_preview_with_action_recovery(CoreState.buffer)
+		elseif CoreState.start_is_line_start and CoreState.start_is_word_boundary then
+			-- The start of an empty line: the Backspace deleted nothing.
+			cancel_action_preview_recovery()
 		else
 			-- Backspace pressed against an already-empty buffer: the user
 			-- has just deleted a character that lived to the LEFT of where
@@ -1555,17 +1858,32 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 			-- Flip the boundary flag so subsequent word-boundary-required
 			-- triggers refuse to fire until a real terminator is observed.
 			CoreState.start_is_word_boundary = false
+			CoreState.start_is_line_start = false
 			cancel_action_preview_recovery()
 		end
 		return false
 	end
 
-	-- 7. Arrow / navigation keys move the cursor; the next typed run starts
-	-- fresh, so treat the new position as a word boundary.
-	if keyCode == 117 or keyCode == 115 or keyCode == 116 or keyCode == 119 or keyCode == 121
-		or (keyCode >= 123 and keyCode <= 126) then
+	-- 7. Navigation. Forward Delete, Home, End, Page Up and Page Down always
+	-- empty the buffer at an unknown boundary. An arrow (with any modifier; the
+	-- Karabiner navigation layer's arrows are foreign events and arrive here the
+	-- same way) follows hotstrings.arrow_resets_word: on, the next run starts a
+	-- new word; off, the buffer and the word-start state are left untouched and
+	-- the word continues. Predictions are withdrawn in every case.
+	if UNOBSERVED_JUMP_KEYCODES[keyCode] then
 		CoreState.buffer = ""
 		CoreState.start_is_word_boundary = false
+		CoreState.start_is_line_start = false
+		cancel_action_preview_recovery()
+		LLMBridge.check_nav_reset()
+		return false
+	end
+	if ARROW_KEYCODES[keyCode] then
+		if CoreState.arrow_resets_word == true then
+			CoreState.buffer = ""
+			CoreState.start_is_word_boundary = true
+			CoreState.start_is_line_start = false
+		end
 		cancel_action_preview_recovery()
 		LLMBridge.check_nav_reset()
 		return false
@@ -1585,6 +1903,8 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	CoreState.buffer = CoreState.buffer .. chars
 	if #CoreState.buffer > BUFFER_TRIM_BYTE_GATE then
 		local ok, off = pcall(utf8.offset, CoreState.buffer, -BUFFER_MAX_CHARS)
+		-- The private mark loses the same head, so it keeps describing the buffer.
+		LLMBridge.private_context_trimmed(CoreState.buffer, (ok and off) and off - 1 or #CoreState.buffer)
 		-- Fall back to empty on a failed offset (malformed UTF-8) rather than
 		-- keeping the full overgrown buffer — losing ≤500 chars of history is
 		-- acceptable, unbounded growth is not.
@@ -1593,6 +1913,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		-- boundary on screen — flip the flag so word-boundary-required
 		-- triggers do not fire flush against the new (mid-screen) start.
 		CoreState.start_is_word_boundary = false
+		CoreState.start_is_line_start = false
 	end
 
 	-- 9. Run expansion trigger checks. The LLM preview used to be refreshed
@@ -1601,7 +1922,15 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- buffer (via perform_text_replacement), so the pre-expansion preview
 	-- was pure waste. We now defer the preview call to the branch below
 	-- that actually keeps the buffer unchanged.
+	-- After a wiping expansion the window only fences Ergopti's own loopback:
+	-- the replacement it injected exits above as owned output, and the buffer
+	-- holds none of it. Applied to the user's own keys, it swallowed every
+	-- trigger typed within a second of a final-result expansion: typing
+	-- "sru sru sru sru" fast expanded one word in two (field report of
+	-- 2026-10-30). A chain step keeps its replacement in the buffer, so there
+	-- the window still holds for every key.
 	local rescan_suppressed = now < CoreState.no_rescan_until
+		and (internal_loopback or CoreState.no_rescan_keeps_buffer == true)
 	if suppress_triggers or rescan_suppressed then
 		-- Buffer didn't expand, so refresh the tooltip/predictions once here.
 		update_preview_with_action_recovery(CoreState.buffer)
@@ -1611,12 +1940,13 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- Complex keystrokes (involving Shift or Alt) allow a wider timing window
 	-- to accommodate the extra finger movement required by the modifier. The
 	-- bonus also carries over to the NEXT keystroke to cover Shift-release lag
-	-- — but only within a short window (COMPLEX_CARRY_SEC). A long pause
+	-- — but only within a short window (COMPLEX_CARRY_MS). A long pause
 	-- between a complex key and the following one means the two are unrelated,
 	-- and we must not stretch an expansion delay across that gap.
-	local is_complex       = flags.shift or flags.alt
-	local carry_from_prev  = CoreState.last_key_was_complex and dt <= COMPLEX_CARRY_SEC
-	local complex_mult     = (is_complex or carry_from_prev) and COMPLEX_DELAY_MULT or 1
+	local is_complex       = (flags.shift or flags.alt) and true or false
+	-- The shared rule (autocorrections are excluded later, by the mapping's group).
+	local complex_mult     = HotstringCore.complex_delay_multiplier(is_complex,
+		CoreState.last_key_was_complex == true, dt * 1000, COMPLEX_DELAY_MULT, COMPLEX_CARRY_MS, true)
 	CoreState.last_key_was_complex = is_complex
 
 	-- Populate module-level upvalues consumed by run_trigger_checks / mapping_fires.
@@ -1627,21 +1957,24 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	_tc_char_len     = (chars_bytes <= 2) and 1 or (text_utils.utf8_len(chars))
 	_tc_dt           = dt
 	_tc_complex_mult = complex_mult
+	-- The same two values for the cascade's further steps (expander.lua).
+	CoreState.cascade_elapsed      = dt
+	CoreState.cascade_complex_mult = complex_mult
 
-	-- DEBUG-only sub-segment timing (Perf gate): attribute a slow keystroke to
-	-- trigger matching vs. preview rebuild in the HotPath warning line.
-	local hot_dbg = Perf.is_enabled()
-	local ck0 = hot_dbg and HotPath.now() or nil
+	-- Sub-segment timing, always on: it feeds the phase counters summarised
+	-- every interval, and the nesting tracker reports a slow match or preview
+	-- rebuild with keydown as its parent instead of billing keydown for it.
+	local ck0 = HotPath.now()
 	local fired = run_trigger_checks()
-	if ck0 then _tc_dbg_checks_ms = HotPath.elapsed_ms(ck0) end
+	HotPath.log_if_slow("hotstring.match", ck0)
 	if fired then return true end
 
 	-- No trigger fired — the buffer is still the one we appended `chars` to,
 	-- so refresh the preview now (expander.update_preview is only reached
 	-- when an expansion happens, which we just ruled out).
-	local pv0 = hot_dbg and HotPath.now() or nil
+	local pv0 = HotPath.now()
 	update_preview_with_action_recovery(CoreState.buffer)
-	if pv0 then _tc_dbg_preview_ms = HotPath.elapsed_ms(pv0) end
+	HotPath.log_if_slow("preview.rebuild", pv0)
 
 	-- Enter / Tab with no predictions visible clears prediction state.
 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
@@ -1649,6 +1982,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	if keyCode == Keycodes.RETURN or keyCode == 48 then
 		cancel_action_preview_recovery()
 		LLMBridge.check_nav_reset()
+	end
+
+	-- A bare Return in a terminal submits the line: the prompt that follows is
+	-- empty and a Backspace there deletes nothing. Shift+Return inserts a
+	-- newline in the multi-line TUIs and keeps no such promise.
+	if keyCode == Keycodes.RETURN and not (flags.shift or flags.alt or flags.cmd or flags.ctrl)
+		and focused_input_kind() == "terminal" then
+		CoreState.buffer = ""
+		CoreState.start_is_word_boundary = true
+		CoreState.start_is_line_start = true
 	end
 
 	return false
@@ -1668,6 +2011,32 @@ local function merge_returned_events(older, newer)
 	return merged
 end
 
+local AUTOREPEAT_PROPERTY = eventtap.event.properties.keyboardEventAutorepeat
+
+--- Feeds one physical key event to the session's pairing counters
+--- (infra/key_event_health.lua) and to the held keys synthetic text avoids
+--- (adapters/unicode_carrier.lua). Never changes what the key does: every read
+--- is protected and both only write tables.
+--- @param e table Physical keyDown or keyUp event.
+--- @param phase string "down" or "up".
+--- @param lateness_ms number|nil Callback lateness from adapters/event_clock.lua.
+--- @param stamp integer|nil Raw event stamp from adapters/event_clock.lua.
+--- @return any keycode The key code read, or nil when it could not be read.
+local function observe_key_health(e, phase, lateness_ms, stamp)
+	local ok_code, keycode = pcall(e.getKeyCode, e)
+	if not ok_code or keycode == nil then return nil end
+	local autorepeat = false
+	if phase == "down" then
+		local ok_repeat, value = pcall(e.getProperty, e, AUTOREPEAT_PROPERTY)
+		autorepeat = ok_repeat and value ~= nil and value ~= 0
+	end
+	local ok_char, character = pcall(Keycodes.character_for, keycode)
+	KeyEventHealth.note(phase, keycode, autorepeat, ok_char and character ~= nil, lateness_ms, stamp)
+	-- Synthetic text must not ride a key the user still holds (hsfix-held-carrier).
+	if type(keycode) == "number" then UnicodeCarrier.note_physical_key(phase, keycode) end
+	return keycode
+end
+
 --- pcall wrapper around onKeyDownRaw to prevent keyboard lockups on uncaught errors.
 --- Latency sampling is gated on Perf.is_enabled() so the measurement path adds
 --- no steady-state cost in production; when disabled the wrapper is a single
@@ -1677,25 +2046,27 @@ end
 local function onKeyDown(e)
 	-- Always-on latency tripwire (ported from the AHK hot-path profiler): two
 	-- monotonic clock reads per keystroke, logging a WARNING only when a keystroke
-	-- exceeds the slow threshold. Normal typing stays silent; a real hitch surfaces
-	-- with the offending char + buffer tail so "typing feels slow" is diagnosable
-	-- from the log alone. Opt-in Perf.sample below adds the p50/p99 distribution.
+	-- exceeds the slow threshold on its own time. Normal typing stays silent; a
+	-- real hitch surfaces with the segment that spent the time, never the typed
+	-- text. Opt-in Perf.sample below adds the p50/p99 distribution.
 	local t0_hot = HotPath.now()
 	local t0 = Perf.is_enabled() and Perf.now() or nil
-	-- Clear last keystroke's sub-segment timings so a slow line never reports
-	-- stale figures from an earlier keystroke that took a different branch.
+	-- Clear last keystroke's characters so trigger matching never reads stale
+	-- input from an earlier keystroke that took a different branch.
 	_tc_chars = ""
-	_tc_dbg_checks_ms, _tc_dbg_preview_ms = nil, nil
 
 	-- Classify once before any physical-input state mutation. Action-epoch
 	-- reconciliation deliberately runs from this immutable provenance result.
 	-- The first Ergopti tap reached by a
 	-- physical event claims every older deferred action, publishes its epoch and
-	-- returns its payload before the original. This makes keymap/keylogger ordering
+	-- returns its payload before the original. This makes keymap/keystats ordering
 	-- independent of Quartz tap insertion order.
 	local provenance = nil
 	local provenance_status = EventProvenance.STATUS_UNREADABLE
-	local classify_ok, provenance_or_err, status_or_nil, fence_or_nil = pcall(
+	local event_lateness_ms, event_stamp = EventClock.lateness_ms(e)
+	local stale = false
+	local physical_keycode = nil
+	local classify_ok, provenance_or_err, status_or_nil, fence_or_nil, replay_or_nil = pcall(
 		EventProvenance.classify_with_fence, e, "keymap")
 	local fence_events = nil
 	local fence_consumes_original = false
@@ -1705,6 +2076,16 @@ local function onKeyDown(e)
 		if fence_or_nil then
 			fence_events = fence_or_nil.events
 			fence_consumes_original = fence_or_nil.consume_original == true
+		end
+		if provenance_status == EventProvenance.STATUS_FOREIGN and replay_or_nil ~= true then
+			physical_keycode = observe_key_health(e, "down", event_lateness_ms, event_stamp)
+			stale = event_lateness_ms ~= nil
+				and event_lateness_ms >= SyntheticInput.STALE_PHYSICAL_EVENT_MS
+			-- First delivery only: the application has not received this key yet, so
+			-- a tap-hold's Cmd+C is checked against the clipboard as it was before.
+			if _tap_copy and _tap_copy:watching() then
+				pcall(_tap_copy.key_down, _tap_copy, e, event_stamp, event_lateness_ms)
+			end
 		end
 	else
 		pcall(Logger.error, LOG, "Synthetic event provenance classification failed: %s.",
@@ -1721,8 +2102,21 @@ local function onKeyDown(e)
 		end
 	end
 	if fence_consumes_original then
-		HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
+		HotPath.log_if_slow("keydown", t0_hot)
 		return true, fence_events
+	end
+	-- A field-run selftest key is the driver's own output, typed to prove this
+	-- very path. It is decoded as typing only while the field run's scratch
+	-- window has the focus; anywhere else it is consumed, so no application
+	-- receives it. An admitted key takes no physical fence: a fenced replay
+	-- would carry a physical tag and lose the class for every other tap.
+	local selftest_admitted = false
+	if provenance and provenance.selftest == true then
+		if not SelftestGate.admits(provenance) then
+			HotPath.log_if_slow("keydown", t0_hot)
+			return true
+		end
+		provenance, provenance_status, selftest_admitted = nil, EventProvenance.STATUS_FOREIGN, true
 	end
 	if provenance_status ~= EventProvenance.STATUS_OWNED then _user_hotstring_input = {} end
 
@@ -1733,12 +2127,16 @@ local function onKeyDown(e)
 	local entered, enter_err = pcall(SyntheticInput.enter_callback)
 	if not entered then
 		Logger.error(LOG, "Synthetic callback collector failed to start: %s.", tostring(enter_err))
-		HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
+		HotPath.log_if_slow("keydown", t0_hot)
 		return (provenance and (provenance.loopback or provenance.stale_loopback)) == true,
 			fence_events
 	end
 
+	_key_down_context.keycode = physical_keycode
+	_key_down_context.stale = stale
 	local ok, result = pcall(onKeyDownRaw, e, provenance, provenance_status)
+	_key_down_context.keycode = nil
+	_key_down_context.stale = false
 	local returned_events = nil
 	local abort_requires_consumption = false
 	if ok then
@@ -1768,13 +2166,12 @@ local function onKeyDown(e)
 		end
 	end
 	if t0 then Perf.sample("keymap_keydown", t0) end
-	-- Enrich the slow-keystroke detail with the per-stage breakdown when measured.
-	local hot_detail = _tc_chars
-	if _tc_dbg_checks_ms or _tc_dbg_preview_ms then
-		hot_detail = string.format("%s | match=%.2fms preview=%.2fms",
-			tostring(_tc_chars), _tc_dbg_checks_ms or 0, _tc_dbg_preview_ms or 0)
+	HotPath.log_if_slow("keydown", t0_hot)
+	-- Owned echoes are the driver's own output; only physical presses (replays
+	-- included) enter the integrity ring, never an admitted selftest key.
+	if provenance_status ~= EventProvenance.STATUS_OWNED and not selftest_admitted then
+		KeystrokeIntegrity.note(not ok and "error" or (result == true and "consumed" or "passed"))
 	end
-	HotPath.log_if_slow("keydown", t0_hot, hot_detail)
 	if not ok then
 		pcall(Logger.error, LOG, "Keyboard interception failure: %s.", tostring(result))
 		if abort_requires_consumption then
@@ -1816,17 +2213,28 @@ tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 -- consumes the down phase; this minimal sibling consumes the exact tagged up
 -- phase so an application/hotkey cannot observe an orphan F16 release.
 loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
-	local provenance, status, fence = EventProvenance.classify_with_fence(
+	local event_lateness_ms, event_stamp = EventClock.lateness_ms(e)
+	local provenance, status, fence, replay = EventProvenance.classify_with_fence(
 		e, "keymap.loopback_keyup")
+	local observed_keycode = nil
+	if status == EventProvenance.STATUS_FOREIGN and replay ~= true then
+		observed_keycode = observe_key_health(e, "up", event_lateness_ms, event_stamp)
+	end
 	local fence_events = fence and fence.events or nil
 	if fence and fence.consume_original == true then return true, fence_events end
+	-- The release of a selftest key follows its press's rule (keyDown wrapper).
+	if provenance and provenance.selftest == true then
+		if not SelftestGate.admits(provenance) then return true, fence_events end
+		provenance, status = nil, EventProvenance.STATUS_FOREIGN
+	end
 	if provenance and (provenance.loopback or provenance.stale_loopback) then
 		return true, fence_events
 	end
 	-- Release phase of a Karabiner control sentinel: its key-down was deleted by
 	-- the keyDown tap, so an orphan release must not reach the application.
 	if provenance == nil and status == EventProvenance.STATUS_FOREIGN then
-		local ok, keycode = pcall(e.getKeyCode, e)
+		local ok, keycode = true, observed_keycode
+		if keycode == nil then ok, keycode = pcall(e.getKeyCode, e) end
 		if ok and ControlSentinels.claim_key(keycode, false) then return true, fence_events end
 		if ok and _one_shot_shift then
 			local settled, consumed = pcall(_one_shot_shift.key_up, e, keycode)
@@ -1848,6 +2256,9 @@ end)
 -- key independently via its own keycode and derive shift_side from the pair.
 local SHIFT_KC_LEFT  = 56
 local SHIFT_KC_RIGHT = 60
+-- kVK_CapsLock: its flagsChanged with Control held is a Ctrl+Caps Lock press,
+-- counted so the field run can judge the secondary_capslock slot.
+local CAPS_LOCK_KC   = 57
 local _shift_left_down   = false
 local _shift_right_down  = false
 -- When both shifts are held simultaneously, shift_side reflects the most
@@ -1873,6 +2284,11 @@ shift_tap = eventtap.new(
 			e, "keymap.shift")
 		local fence_events = fence and fence.events or nil
 		if fence and fence.consume_original == true then return true, fence_events end
+		-- A selftest modifier edge follows the selftest key rule (keyDown wrapper).
+		if provenance and provenance.selftest == true then
+			if not SelftestGate.admits(provenance) then return true, fence_events end
+			provenance, provenance_status = nil, EventProvenance.STATUS_FOREIGN
+		end
 		if provenance then return false end
 		_user_hotstring_input = {}
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
@@ -1885,6 +2301,11 @@ shift_tap = eventtap.new(
 		local ok, result = pcall(function()
 			local kc = e:getKeyCode()
 			local f  = e:getFlags()
+			-- Its own pcall: a watch failure must never pass for a shift-side one.
+			if _tap_copy then
+				local _, stamp = EventClock.lateness_ms(e)
+				pcall(_tap_copy.modifier_edge, _tap_copy, kc, f, stamp)
+			end
 
 			-- The keycode on a flagsChanged event identifies which modifier
 			-- just toggled. We flip the matching side's flag, then resync
@@ -1896,6 +2317,8 @@ shift_tap = eventtap.new(
 			elseif kc == SHIFT_KC_RIGHT then
 				_shift_right_down = not _shift_right_down
 				if _shift_right_down then _shift_last_side = "right" end
+			elseif kc == CAPS_LOCK_KC and f.ctrl then
+				CapsLockChordEvidence.note_press()
 			end
 
 			-- Hard reconcile: if the OS says shift is not down, neither side
@@ -1938,7 +2361,7 @@ mouse_tap = eventtap.new(
 	function(e)
 		-- A click can move focus to another app before the deferred broker runs.
 		-- Claim older output here and return it ahead of the original mouseDown, even
-		-- when the optional keylogger tap is disabled. Otherwise an Ergopti shortcut
+		-- when the optional keystats tap is disabled. Otherwise an Ergopti shortcut
 		-- queued for app A can land in app B after the click changes focus.
 		local provenance, provenance_status, fence = EventProvenance.classify_with_fence(
 			e, "keymap.mouse")
@@ -1949,6 +2372,8 @@ mouse_tap = eventtap.new(
 		-- passes through, but PAUSE owns every keymap mutation and deferred reset.
 		-- Claim any older synthetic fence above, then stop before touching context.
 		if CoreState.processing_paused == true then return false, fence_events end
+		-- A modifier held through a click was used with it: its release is no tap.
+		if _tap_copy then _tap_copy:activity() end
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
 			invalidate_observed_context()
 			return false, fence_events
@@ -1957,7 +2382,10 @@ mouse_tap = eventtap.new(
 		-- Canvas, AX, task cancellation and logging run only after Quartz receives
 		-- the older fence payload and the original mouse event.
 		CoreState.buffer = ""
-		CoreState.start_is_word_boundary = false
+		-- hotstrings.click_resets_word: the caret moved somewhere unobservable;
+		-- by default the next run is a new word, as on the other drivers.
+		CoreState.start_is_word_boundary = CoreState.click_resets_word == true
+		CoreState.start_is_line_start = false
 		cancel_action_preview_recovery()
 		LLMBridge.set_runtime_quarantined(true)
 		local scheduled = SyntheticInput.defer_after_callback("keymap mouse reset",
@@ -2133,6 +2561,24 @@ local function taps_are_enabled()
 		and eventtap_is_enabled("mouse", mouse_tap)
 end
 
+--- The native state of each keymap event tap, read without changing any, for
+--- the field run's event tap check (infra/field_check_probes.lua).
+--- @return table states { started, watchdog, taps = { { name, state } } } where
+---   state is "enabled", "disabled", "absent" or "unreadable", in a fixed order.
+function M.tap_states()
+	local taps = {}
+	for _, entry in ipairs({ { "keyDown", tap }, { "loopbackKeyUp", loopback_keyup_tap },
+		{ "flagsChanged", shift_tap }, { "mouse", mouse_tap } }) do
+		local state = "absent"
+		if entry[2] then
+			local enabled, state_ok = eventtap_is_enabled(entry[1], entry[2])
+			state = not state_ok and "unreadable" or (enabled and "enabled" or "disabled")
+		end
+		taps[#taps + 1] = { name = entry[1], state = state }
+	end
+	return { started = _started == true, watchdog = _watchdog_committed == true, taps = taps }
+end
+
 tap_watchdog = function(timer, generation)
 	if _started ~= true
 		or _watchdog_committed ~= true
@@ -2159,13 +2605,81 @@ tap_watchdog = function(timer, generation)
 	end
 	local keydown_revived = revive("keyDown", tap)
 	local keyup_revived = revive("loopbackKeyUp", loopback_keyup_tap)
+	-- A press made while the tap was off reached the application undecided:
+	-- name the outage when the user was typing around it.
+	if keydown_revived then KeystrokeIntegrity.note_exposure("a keyDown event-tap outage") end
+	if keydown_revived or keyup_revived then
+		pcall(KeyEventHealth.note_transition, "a keymap event-tap outage")
+	end
 	if (keydown_revived or keyup_revived) and _one_shot_shift then _one_shot_shift.reset() end
 	revive("flagsChanged", shift_tap)
 	revive("mouse", mouse_tap)
+	-- The key pairing lines queued by the taps are written here, off the taps.
+	pcall(KeyEventHealth.flush)
 	-- Only the keyDown tap feeds the buffer, so only its outage invalidates it.
 	if keydown_revived and CoreState.processing_paused ~= true then
 		invalidate_observed_context()
 	end
+end
+
+--- Builds the tap-hold copy watch over the live adapters.
+--- @return table watch modules/keymap/tap_copy.lua owner.
+local function build_tap_copy()
+	local TapCopy = require("modules.keymap.tap_copy")
+	local CopyCheck = require("tap_hold.copy_check")
+	local Clipboard = require("adapters.clipboard")
+	local log_name = "keymap.tap_copy"
+	local function log(level, fmt, ...) Logger[level](log_name, fmt, ...) end
+	local function warn_user()
+		local ok, sent_or_err = pcall(require("infra.notifications").notify,
+			require("infra.i18n").get("notify.tap_hold.copy_failed"), nil, "warning")
+		if not ok or sent_or_err ~= true then
+			Logger.error(log_name, "Copy failure notice was not delivered: %s.", tostring(sent_or_err))
+		end
+	end
+	local report = CopyCheck.reporter(log, warn_user)
+	local watch
+	local checker = CopyCheck.new({
+		verify_ms = require("infra.timings").ms("tap_hold", "copy_verify_ms"),
+		read_counter = function() return (Clipboard._change_count()) end,
+		send_copy = function() return SyntheticInput.emit_key_stroke({ "cmd" }, "c", 0) == true end,
+		after = function(delay_ms, callback)
+			local handle, committed = TimerScheduler.after(delay_ms / 1000, callback)
+			return committed == true and handle or nil
+		end,
+		cancel = TimerScheduler.cancel,
+		-- Each outcome is counted for the field run (TapCopy statistics).
+		report = function(outcome, detail)
+			if watch then watch:note_outcome(outcome) end
+			report(outcome, detail)
+		end,
+	})
+	watch = TapCopy.new({
+		change_count = function() return (Clipboard._change_count()) end,
+		duration_ms = EventClock.duration_ms,
+		defer = SyntheticInput.defer_after_callback,
+		event_flags = function(event) return event:getFlags() end,
+		event_chars = function(event) return event:getCharacters(true) end,
+		-- The tap timeout Karabiner was given for the key: the lone tap window
+		-- when it applies (Generator.last_tap_timeouts), else its delay.
+		key_config = function(key_id)
+			local Remap = require("platform.remap")
+			if Remap.get_tap_holds_enabled() ~= true then return nil, nil end
+			local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
+			return Remap.get_tap_action(key_id),
+				deployed[key_id] or Remap.get_tap_timeout(key_id) or Remap.get_tap_hold_timeout()
+		end,
+		log = log,
+		checker = checker,
+	})
+	return watch
+end
+
+--- The tap-hold copy watch's statistics since the keymap started, for the field
+--- run (infra/field_check_tap_copy.lua).
+--- @return table|nil stats nil before the keymap started.
+function M.tap_copy_statistics()
+	return _tap_copy and _tap_copy:statistics() or nil
 end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
@@ -2193,6 +2707,7 @@ function M.start()
 	if not _one_shot_shift then
 		_one_shot_shift = require("adapters.one_shot_shift").new({ magic = M.get_trigger_char })
 	end
+	if not _tap_copy then _tap_copy = build_tap_copy() end
 	ControlSentinels.set_listener("keymap.one_shot_shift", function(signal)
 		if signal == ControlSentinels.ONE_SHOT_SHIFT then M.arm_one_shot_shift() end
 	end)
@@ -2294,6 +2809,7 @@ function M.stop(teardown)
 	CoreState.lifecycle_generation = (CoreState.lifecycle_generation or 0) + 1
 	_started = false
 	if _one_shot_shift then _one_shot_shift.reset() end
+	if _tap_copy then _tap_copy:stop() end
 	local listener_stopped = true
 	if _action_listener_registered then
 		local ok, result = pcall(SyntheticInput.unregister_action_listener, ACTION_EPOCH_LISTENER_ID)
@@ -2315,7 +2831,9 @@ function M.stop(teardown)
 	_window_context_reconcile_pending = false
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	CoreState.start_is_word_boundary = false
+	CoreState.start_is_line_start = false
 	cancel_action_preview_recovery()
 	local taps_stopped = stop_eventtap("keyDown", tap)
 	if not stop_eventtap("loopbackKeyUp", loopback_keyup_tap) then taps_stopped = false end

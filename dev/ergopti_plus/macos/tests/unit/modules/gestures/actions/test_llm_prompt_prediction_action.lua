@@ -42,11 +42,11 @@ helpers.describe("llm_prompt_prediction action", function()
 		helpers.assert_eq(actions.get_action_parameter_spec("llm_prompt_prediction"), "llm_prompt")
 		helpers.assert_eq(actions.set_action_parameter("tap_3", "llm_prompt_prediction", "rewrite|2"), true)
 		helpers.assert_eq(actions.set_action_parameter(
-			"keyboard__cmd_1", "llm_prompt_prediction", "custom_17_4"), true,
+			"keyboard__primary_1", "llm_prompt_prediction", "custom_17_4"), true,
 			"a custom id is stored even if no such profile exists yet: existence is a run-time check")
 		with_bridge(function(requests)
 			helpers.assert_eq(actions.execute_single("llm_prompt_prediction", "tap_3"), true)
-			helpers.assert_eq(actions.execute_single("llm_prompt_prediction", "keyboard__cmd_1"), true)
+			helpers.assert_eq(actions.execute_single("llm_prompt_prediction", "keyboard__primary_1"), true)
 			helpers.assert_eq(requests[1], "rewrite|2", "the gesture's own value")
 			helpers.assert_eq(requests[2], "custom_17_4", "the keyboard slot's own value")
 		end)

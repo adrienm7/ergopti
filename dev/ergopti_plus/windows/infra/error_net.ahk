@@ -33,7 +33,7 @@ global ERROR_NET_DEDUP_TTL_MS := 60000
 ; DISTINCT error signatures accumulate over a long-running session.
 global ERROR_NET_DEDUP_CACHE_CAP := 256
 
-; A detached worker (keylogger prefetch, UIA selection) owns no log file, no
+; A detached worker (keystats prefetch, UIA selection) owns no log file, no
 ; tray and no dialog: the resident driver reads its captured standard output. An
 ; uncaught error ends it with one structural line instead of the driver's fatal
 ; startup dialog, crash report and log initialisation. The message is omitted:
@@ -72,7 +72,7 @@ _ErrorNetReleaseNeedsMenuMask(ModKeys) {
 
 ; Retire input state that can already be owned while startup is still partial.
 ; This function is intentionally independent of the full OnExit transaction:
-; OnExit is registered only after the keylogger starts, while parse-time hotkeys
+; OnExit is registered only after the keystats starts, while parse-time hotkeys
 ; can acquire a synthetic modifier much earlier whenever startup pumps messages.
 ; Every late global is IsSet-guarded so a fault before its include remains safe.
 ; Optional callbacks provide a behavioural seam without injecting real keys or
@@ -173,9 +173,13 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		; resident with a partial set of hotkeys/hooks and no reliable recovery path.
 		; Cleanup is best-effort because this handler also covers failures before
 		; those modules are loaded; ExitApp is the only publication boundary here.
-		if (_DriverBootPhase != "ready") {
+		; A smoke ends on any error, ready or not: one that survived a failed readiness
+		; receipt stayed resident and hooked until its harness killed it. It exits
+		; through ExitProcess, as its ready path does, because a teardown can veto ExitApp.
+		SmokeRun := IsSet(_DriverStartupSmokeDir) && _DriverStartupSmokeDir != ""
+		if (_DriverBootPhase != "ready" or SmokeRun) {
 				try LoggerError("ErgoptiPlus", "Fatal startup error during phase '{1}': {2}",
-						_DriverBootPhase, Exc.Message
+						_DriverBootPhase, ErrorNet_Describe(Exc)
 								. (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
 				; A parse-time hotkey may already own a synthetic modifier even though
 				; the full OnExit transaction is not registered yet. Release that exact
@@ -200,12 +204,14 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 				; Tell the user WHY the driver is exiting. A modal is safe here: no input
 				; pipeline is owned yet and we are about to ExitApp. i18n may not be loaded
 				; this early, so the message is a hardcoded French string (last-resort path).
-				if !(IsSet(_DriverStartupSmokeDir) && _DriverStartupSmokeDir != "")
+				if !SmokeRun
 						try Ui_MsgBox("ErgoptiPlus n'a pas pu démarrer (phase « " . _DriverBootPhase . " ») :`n`n"
 								. Exc.Message . "`n`nLe driver va se fermer. Le journal des erreurs contient le détail.",
 								"erreur de démarrage", "Iconx")
 				try KL_Stop()
 				try HookDispatcher.Stop()
+				if SmokeRun
+						PLC_ExitProcessNow(1)
 				ExitApp(1)
 				return true
 		}
@@ -299,6 +305,32 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		return true
 }
 
+; The message of a thrown value with what AutoHotkey keeps beside it: Extra
+; names the unassigned global or the offending value, File and Line its site.
+; Boot stage aborts logged Message alone, so "This global variable has not been
+; assigned a value." reached the maintainer's log without the variable.
+; @param Exc {Any} The thrown value.
+; @returns {String}
+ErrorNet_Describe(Exc) {
+	if !IsObject(Exc)
+		return String(Exc)
+	Text := Type(Exc)
+	try Text := Exc.HasProp("Message") ? String(Exc.Message) : Text
+	Extra := ""
+	try Extra := Exc.HasProp("Extra") ? String(Exc.Extra) : ""
+	if (Extra != "")
+		Text .= " (" . Extra . ")"
+	SourcePath := ""
+	Line := ""
+	try SourcePath := Exc.HasProp("File") ? String(Exc.File) : ""
+	try Line := Exc.HasProp("Line") ? String(Exc.Line) : ""
+	if (SourcePath != "") {
+		SplitPath(SourcePath, &FileName)
+		Text .= " at " . FileName . ":" . Line
+	}
+	return Text
+}
+
 ; The logger template of an uncaught error: its type and site are part of the
 ; template, the message and stack are its argument. The error window keys an
 ; error by its template, so the site keeps two faults apart, and a message that
@@ -351,7 +383,7 @@ _CrashReport_CheapSnapshot(Exc) {
 	try Version := Updater_CurrentVersion()
 	UptimeSec := -1
 	if IsSet(_HealthCheckStartMs)
-		UptimeSec := (A_TickCount - _HealthCheckStartMs & 0xFFFFFFFF) // 1000
+		UptimeSec := (A_TickCount - _HealthCheckStartMs) // 1000
 	ActiveWindowTitle := ""
 	ActiveWindowProcess := ""
 	try ActiveWindowTitle := WinGetTitle("A")
@@ -363,8 +395,8 @@ _CrashReport_CheapSnapshot(Exc) {
 				StuckMods.Push(ModKey)
 		}
 	}
-	KeyloggerInitialized := "unknown"
-	try KeyloggerInitialized := Keylogger.initialized ? "true" : "false"
+	KeystatsInitialized := "unknown"
+	try KeystatsInitialized := Keystats.initialized ? "true" : "false"
 	AdapterState := _CrashReport_CheapAdapterState()
 	LogTail := ""
 	try LogTail := _CrashReport_JoinNewlines(LoggerRingBufferSnapshot())
@@ -382,25 +414,26 @@ _CrashReport_CheapSnapshot(Exc) {
 		"error_file", Exc.HasProp("File") ? String(Exc.File) : "",
 		"error_line", Exc.HasProp("Line") ? String(Exc.Line) : "",
 		"stack_trace", Exc.HasProp("Stack") ? Exc.Stack : "",
-		"os_name", A_OSVersion, "os_build", "",
+		"os_version", A_OSVersion, "os_build", "",
 		"os_arch", A_Is64bitOS ? "64 bits" : "32 bits",
-		"ahk_version", A_AhkVersion,
+		"hs_version", A_AhkVersion,
 		"ahk_bitness", A_PtrSize = 8 ? "64-bit" : "32-bit",
 		"cpu_name", "", "cpu_cores", "",
 		"ram_total_gb", "", "ram_free_gb", "",
-		"screen_resolution", A_ScreenWidth . "x" . A_ScreenHeight,
+		"screen_res", A_ScreenWidth . "x" . A_ScreenHeight,
 		"dpi", String(A_ScreenDPI),
 		"dpi_scale", String(Round(A_ScreenDPI / 96 * 100)),
 		"locale", A_Language, "script_dir", A_ScriptDir, "git_hash", BuiltCommit,
+		"commit_source", BuiltCommit != "" ? "build" : "unknown",
 		"uptime_sec", String(UptimeSec),
-		"active_window_title", ActiveWindowTitle,
-		"active_window_process", ActiveWindowProcess,
+		"active_title", ActiveWindowTitle,
+		"active_app", ActiveWindowProcess,
 		"stuck_modifiers", StuckMods.Length ? _CrashReport_JoinArr(StuckMods) : "none",
 		"adapters_ok", AdapterState["validated"],
 		"adapters_failed", AdapterState["failed"],
 		"session_warnings", IsSet(_HealthCheckWarnCount) ? String(_HealthCheckWarnCount) : "unknown",
 		"session_errors", IsSet(_HealthCheckErrCount) ? String(_HealthCheckErrCount) : "unknown",
-		"keylogger_initialized", KeyloggerInitialized,
+		"keystats_initialized", KeystatsInitialized,
 		"config_dir", _ConfigDir, "log_tail", LogTail)
 	; These two values authorize only local worker operations. They are excluded
 	; from the canonical schema and removed before either worker writes a report.
@@ -414,6 +447,11 @@ _CrashReport_WorkerDone(ReleaseDedup, ExitCode, Stdout, Stderr) {
 	if (ExitCode = 0 and RegExMatch(Text, "m)^OK:(.+)$", &Match)) {
 		try LoggerSuccess("CrashReporter", "Crash report saved by worker: {1}.", Match[1])
 		try NotifierSend(Match[1], Map("title", t("crash.report.saved_title"), "level", "info"))
+		; The worker writes the report out of process; the cap is enforced here,
+		; where the logger owns the folder.
+		try CrashReport_PruneReports()
+		catch as PruneErr
+			try LoggerError("CrashReporter", "Crash reports could not be pruned: {1}.", PruneErr.Message)
 		return
 	}
 	if ReleaseDedup

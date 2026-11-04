@@ -77,6 +77,23 @@ class LLMMenuBuildCoordinator {
 		try this.ErrorFn.Call(Err)
 	}
 
+	/** Emits closed request metadata without forcing file I/O or altering admission. */
+	_ObserveBuild(Reason, Generation) {
+		if !(Generation is Integer) || Generation < 1
+			return
+		static Known := Map("boot", true, "post_pull", true,
+			"aux_completion", true, "backend_committed", true, "backend_lifecycle", true,
+			"deps_failure", true, "live_mode", true, "local_servers_applied", true,
+			"local_servers_deferred_discovery", true, "local_servers_initialized", true,
+			"local_servers_lifecycle_repaired", true, "local_servers_published", true,
+			"local_servers_rescan", true, "local_servers_view_prepared", true,
+			"model_committed", true, "ollama_port_committed", true,
+			"standard_committed", true, "toggle_committed", true)
+		ClosedReason := Known.Has(Reason) ? Reason : "other"
+		try LoggerInfo("LLMBuildObservation." . ClosedReason,
+			"Build entered; generation={1}.", Generation)
+	}
+
 	_Drain() {
 		loop {
 			PreviousCritical := Critical("On")
@@ -90,8 +107,10 @@ class LLMMenuBuildCoordinator {
 					return true
 				}
 				TargetGeneration := this.RequestedGeneration
+				TargetReason := this.LatestReason
 			} finally Critical(PreviousCritical)
 
+			this._ObserveBuild(TargetReason, TargetGeneration)
 			try Published := this.BuildFn.Call()
 			catch as Err {
 				this._Report(Err)

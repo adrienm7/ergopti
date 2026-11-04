@@ -3,14 +3,67 @@
 // ===================================
 // ===================================
 
+// These watermarks belong to this document, not to the native submission queue.
+let appliedManifestRevision = -1;
+let appliedCategoriesRevision = -1;
+
+/** Refuses invalid revisions before any component is mutated. */
+function validatePublicationRevision(revision) {
+	if (!Number.isSafeInteger(revision) || revision < 0) {
+		throw new TypeError('Metrics publication requires a nonnegative safe integer revision');
+	}
+}
+
+const metricsAppsPublications = {
+	/** Publishes a native category edit without admitting a reordered older edit. */
+	categories(newCategories, revision) {
+		validatePublicationRevision(revision);
+		if (revision <= appliedCategoriesRevision) return false;
+		userCategories = newCategories || {};
+		appliedCategoriesRevision = revision;
+		invalidateAggregationCache();
+		rebuildFilterButtons();
+		renderDashboard();
+		return true;
+	},
+
+	/** Publishes independently versioned native data and categories in this document. */
+	data(newManifest, newCategories, newIcons, revisions) {
+		if (!revisions || typeof revisions !== 'object' || Array.isArray(revisions)) {
+			throw new TypeError('Metrics publication requires component revisions');
+		}
+		validatePublicationRevision(revisions.manifest_revision);
+		validatePublicationRevision(revisions.categories_revision);
+		let changed = false;
+		if (revisions.manifest_revision > appliedManifestRevision) {
+			manifestData = newManifest || {};
+			appIcons = newIcons || {};
+			appliedManifestRevision = revisions.manifest_revision;
+			changed = true;
+		}
+		if (revisions.categories_revision > appliedCategoriesRevision) {
+			userCategories = newCategories || {};
+			appliedCategoriesRevision = revisions.categories_revision;
+			changed = true;
+		}
+		// Applied watermarks remain authoritative even if drawing subsequently throws.
+		if (changed) {
+			invalidateAggregationCache();
+			initDashboard();
+		}
+		return changed;
+	}
+};
+
 window.updateUserCategories = function (newCategories) {
 	userCategories = newCategories || {};
 	invalidateAggregationCache();
+	rebuildFilterButtons();
 	renderDashboard();
 };
 
 function getAppCategory(appName, nativeCategory) {
-	if (userCategories[appName]) {
+	if (Object.prototype.hasOwnProperty.call(userCategories, appName) && userCategories[appName]) {
 		const uc = userCategories[appName];
 		return { type: translateCategory(uc.type), score: uc.score };
 	}
@@ -73,7 +126,7 @@ function getAggregatedData() {
 /** Builds one query without mutating the source manifest or a retained projection. */
 function buildAggregatedData() {
 	const result = {
-		apps: {},
+		apps: Object.create(null),
 		_sys: { wifi: {}, power: {}, sleep: 0, unlock: 0, spaces: 0 },
 		// Rich, manifest-wide rollup. Populated alongside the per-app pass below
 		// so every future card / chart / drill-down can read the same shape.
@@ -154,7 +207,7 @@ function buildAggregatedData() {
 			// Per-day rollup: date_str → { time_ms, active_ms, chars, switches, sessions }
 			by_date: {},
 			// Per-category rollup: cat → { time_ms, chars, active_ms }
-			by_category: {},
+			by_category: Object.create(null),
 			// Sessions count signal: how many app/day rows whose longest_ms is
 			// above the long-session threshold (≥ 90 min by default).
 			long_sessions: 0,
@@ -182,15 +235,15 @@ function buildAggregatedData() {
 	let targetTsStart = 0;
 	const anchorTs = currentSelectedDate ? parseDateKey(currentSelectedDate) : allDates[0].ts;
 
-	if (currentPeriod === 'day') targetTsStart = anchorTs;
-	else if (currentPeriod === 'week') targetTsStart = anchorTs - 7 * 86400000;
-	else if (currentPeriod === 'month') targetTsStart = anchorTs - 30 * 86400000;
-	else if (currentPeriod === 'year') targetTsStart = anchorTs - 365 * 86400000;
+	if (Object.hasOwn(METRICS_PERIOD_DAYS, currentPeriod)) {
+		// The selected recorded day is included, independent of local timezone changes.
+		targetTsStart = shiftMetricsDay(anchorTs, 1 - METRICS_PERIOD_DAYS[currentPeriod]);
+	}
 
 	const validDates = allDates.filter((d) => {
 		if (currentPeriod !== 'all' && (d.ts > anchorTs || d.ts < targetTsStart)) return false;
 		if (currentWeekdayFilter) {
-			const dow = (new Date(d.ts).getDay() + 6) % 7;
+			const dow = (new Date(d.ts).getUTCDay() + 6) % 7;
 			if (!currentWeekdayFilter.has(dow)) return false;
 		}
 		return true;
@@ -218,7 +271,7 @@ function buildAggregatedData() {
 			);
 		}
 
-		// New _system pseudo-app written by the keylogger caffeinate callbacks.
+		// New _system pseudo-app written by the keystats caffeinate callbacks.
 		// Tracks precise locked / sleeping durations so the active ratio can be
 		// computed without inflation from screen-locked time.
 		const sysEntry = dayData._system;
@@ -260,7 +313,7 @@ function buildAggregatedData() {
 				switches: 0,
 				sessions: 0,
 				passive_ms: 0,
-				by_category: {},
+				by_category: Object.create(null),
 				first_min: null,
 				last_min: null
 			});
@@ -268,8 +321,8 @@ function buildAggregatedData() {
 			byDate.passive_ms += (sysEntry.locked_ms || 0) + (sysEntry.sleep_ms || 0);
 		}
 
-		// Weekday: parseDateKey returns a JS-compatible ts; convert to Mon=0..Sun=6
-		const dow = (new Date(d.ts).getDay() + 6) % 7;
+		// Read the recorded Gregorian weekday as Mon=0..Sun=6.
+		const dow = (new Date(d.ts).getUTCDay() + 6) % 7;
 		const byWk =
 			result.rich.by_weekday[dow] || (result.rich.by_weekday[dow] = { time_ms: 0, chars: 0 });
 
@@ -283,7 +336,7 @@ function buildAggregatedData() {
 			}
 
 			if (!result.apps[appName]) {
-				result.apps[appName] = { time_ms: 0, typing_time: 0, switches: {} };
+				result.apps[appName] = { time_ms: 0, typing_time: 0, switches: Object.create(null) };
 			}
 
 			// Per-app keep-awake correction: when the toggle is OFF (default),
@@ -355,7 +408,7 @@ function buildAggregatedData() {
 			}
 			// #39 aggregate window titles
 			if (appData.win_titles) {
-				appOut.win_titles = appOut.win_titles || {};
+				appOut.win_titles = appOut.win_titles || Object.create(null);
 				Object.entries(appData.win_titles).forEach(([t, w]) => {
 					const slot = appOut.win_titles[t] || (appOut.win_titles[t] = { c: 0, ms: 0 });
 					slot.c += w.c || 0;
@@ -481,7 +534,7 @@ function buildAggregatedData() {
 					slot.score_x_ms = (slot.score_x_ms || 0) + (_hourCat.score || 0) * hMs;
 					// Ribbon (#25) per-day per-hour per-category accumulation
 					const ribDay = r.ribbon[d.key] || (r.ribbon[d.key] = {});
-					const ribHour = ribDay[hour] || (ribDay[hour] = {});
+					const ribHour = ribDay[hour] || (ribDay[hour] = Object.create(null));
 					const ribCat = _hourCat.type || 'Général';
 					ribHour[ribCat] = (ribHour[ribCat] || 0) + hMs;
 					// Hour × weekday cell — same dow as the day this app/day row
@@ -533,7 +586,7 @@ function buildAggregatedData() {
 			else r.prod_split.neutral_ms += appMs;
 
 			// #22 per-weekday × category time
-			const wkSlot = r.weekday_category[dow] || (r.weekday_category[dow] = {});
+			const wkSlot = r.weekday_category[dow] || (r.weekday_category[dow] = Object.create(null));
 			wkSlot[cat] = (wkSlot[cat] || 0) + appMs;
 
 			const catName = cat;
@@ -544,7 +597,7 @@ function buildAggregatedData() {
 					Object.values(appData.hourly).forEach((h) => (totalAppChars += h.c || 0));
 
 					Object.entries(appData.hourly).forEach(([hour, hData]) => {
-						if (!result.timeline[hour]) result.timeline[hour] = {};
+						if (!result.timeline[hour]) result.timeline[hour] = Object.create(null);
 
 						let hTimeMs = hData.time_ms || 0;
 						if (hTimeMs === 0 && totalAppChars > 0 && hData.c > 0) {
@@ -555,10 +608,9 @@ function buildAggregatedData() {
 					});
 				}
 			} else {
-				const dayLabel = formatDisplayDate(d.key).substring(0, 5);
-				if (!result.timeline[dayLabel]) result.timeline[dayLabel] = {};
-				result.timeline[dayLabel][catName] =
-					(result.timeline[dayLabel][catName] || 0) + (Number(appData.app_time_ms) || 0);
+				if (!result.timeline[d.key]) result.timeline[d.key] = Object.create(null);
+				result.timeline[d.key][catName] =
+					(result.timeline[d.key][catName] || 0) + (Number(appData.app_time_ms) || 0);
 			}
 		}
 	});

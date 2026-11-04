@@ -87,7 +87,13 @@ ReleaseInstall_Start(Tag, Channel, Deps) {
 	Found := Deps["find"].Call(Tag)
 	if !(Found is Map) || !Found.Has("release") {
 		Reason := (Found is Map && Found.Has("reason")) ? Found["reason"] : RELEASE_INSTALL_REASONS["unknown_release"]
-		try LoggerError("ReleaseInstall", "Refused to install {1}: it is not in the release list the window loaded.", Tag)
+		; Expected while the API is rate limited: the page says why and when to
+		; retry, so no error window opens over it (#99, the Lua drivers' twin).
+		if (Reason == RELEASE_INSTALL_REASONS["no_details"]) {
+			try LoggerWarn("ReleaseInstall", "Refused to install {1}: the window's list came from the Atom feed, which names no files or digests to verify.", Tag)
+		} else {
+			try LoggerError("ReleaseInstall", "Refused to install {1}: it is not in the release list the window loaded.", Tag)
+		}
 		_ReleaseInstall_Report(Deps, Map("tag", Tag, "phase", "failed", "reason_key", Reason))
 		return false
 	}

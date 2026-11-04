@@ -17,7 +17,7 @@
 ---     `{"en", "fr"}` took over — so the language menu offered 2 locales out of
 ---     the 21 that ship. Nothing failed; the menu just quietly had two rows.
 ---
----   * modules/keylogger/sqlite_writer.lua walked `../../../` for
+---   * modules/keystats/sqlite_writer.lua walked `../../../` for
 ---     `_shared/data/db/schema.sql`. Two levels too high, with a bare relative
 ---     path as the fallback — which made schema loading depend on the process's
 ---     CURRENT DIRECTORY rather than on where the driver is installed.
@@ -129,10 +129,10 @@ local _driver_root = driver_root()
 local _shared_root = nil
 
 local function shared_probe(path)
-	local handle = io.open(path, "r")
+	local handle = require("infra.regular_file_reader").open_source(path)
 	if not handle then return false end
-	handle:close()
-	return true
+	local closed, acknowledged = pcall(handle.close, handle)
+	return closed and acknowledged == true
 end
 
 --- Resolves the shared tree beside or inside an explicit driver root.
@@ -174,7 +174,7 @@ end
 --- daemon starts and only the DATA reads fail.
 ---
 --- The sibling is probed first because it is the layout every developer, test
---- and CI run uses, so the common case still costs a single io.open.
+--- and CI run uses, so the common case still requires only one regular-file probe.
 --- @return string|nil Absolute path with no trailing slash.
 function M.shared_root()
 	if _shared_root ~= nil then return _shared_root end

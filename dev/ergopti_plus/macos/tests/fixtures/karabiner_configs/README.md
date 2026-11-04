@@ -41,4 +41,4 @@ layout-stable schema (e.g. by always invoking the generator with a fixed
 synthetic `hs.keycodes.map`), the snapshot file is omitted on purpose.
 
 A surface-level smoke test that asserts the public functions exist lives at
-`tests/unit/platform/remap/test_generator_surface.lua`.
+`tests/unit/platform/remap/generator/test_generator_surface.lua`.

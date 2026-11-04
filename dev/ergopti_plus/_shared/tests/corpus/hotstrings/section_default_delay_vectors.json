@@ -1,0 +1,115 @@
+{
+	"description": "The delay a built-in hotstring section declares: its manifest row's default time_activation_seconds, which every driver waits when the user set no delay of their own (the maintainer's decision of 3 November 2026). hotstrings.languages.section_default_delay (Lua, macOS and Linux) and HotstringsSectionDefaultDelay (AutoHotkey) replay these vectors over the fixture rows below. A vector with no expectation means the section declares no delay, so the category file and then the base expansion delay decide.",
+	"features": [
+		{
+			"section": "hotstrings.autocorrection",
+			"id": "names",
+			"path": "hotstrings.autocorrection.names",
+			"default": { "enabled": false, "time_activation_seconds": 0.5 }
+		},
+		{
+			"section": "hotstrings.distances_reduction",
+			"id": "qu",
+			"path": "hotstrings.distances_reduction.qu",
+			"default": { "enabled": false, "time_activation_seconds": 0.5 }
+		},
+		{
+			"section": "hotstrings.distances_reduction",
+			"id": "comma_j",
+			"path": "hotstrings.distances_reduction.comma_j",
+			"default": { "enabled": false }
+		},
+		{
+			"section": "hotstrings.magic_key",
+			"id": "repeat_corrections",
+			"path": "hotstrings.magic_key.repeat_corrections",
+			"default": { "enabled": false, "time_activation_seconds": 2.0 }
+		},
+		{
+			"section": "hotstrings.french_magickey",
+			"id": "text_expansion",
+			"path": "hotstrings.french_magickey.text_expansion",
+			"default": { "enabled": false, "time_activation_seconds": 2.0 }
+		},
+		{
+			"section": "hotstrings.rolls",
+			"id": "hc",
+			"path": "hotstrings.rolls.hc",
+			"default": { "enabled": false, "time_activation_seconds": 0 }
+		},
+		{
+			"section": "hotstrings.personal",
+			"id": "code",
+			"path": "hotstrings.personal.code",
+			"default": { "enabled": false, "time_activation_seconds": 0.75 }
+		},
+		{
+			"section": "hotstrings",
+			"id": "expansion_delay",
+			"path": "hotstrings.expansion_delay",
+			"default": 0.75
+		}
+	],
+	"vectors": [
+		{
+			"name": "a declared section waits its manifest delay",
+			"group": "autocorrection",
+			"section": "names",
+			"expected": 0.5
+		},
+		{
+			"name": "the file stem matches the manifest spelling with underscores",
+			"group": "distancesreduction",
+			"section": "qu",
+			"expected": 0.5
+		},
+		{
+			"name": "the magic key stem matches magic_key",
+			"group": "magickey",
+			"section": "repeat_corrections",
+			"expected": 2.0
+		},
+		{
+			"name": "a language group matches its own rows",
+			"group": "french_magickey",
+			"section": "text_expansion",
+			"expected": 2.0
+		},
+		{
+			"name": "zero is a declared delay, not an absent one",
+			"group": "rolls",
+			"section": "hc",
+			"expected": 0
+		},
+		{
+			"name": "a row with no delay declares none",
+			"group": "distancesreduction",
+			"section": "comma_j"
+		},
+		{
+			"name": "a section with no row declares none",
+			"group": "autocorrection",
+			"section": "future"
+		},
+		{
+			"name": "the section case is exact",
+			"group": "autocorrection",
+			"section": "Names"
+		},
+		{
+			"name": "the category itself declares no section delay",
+			"group": "autocorrection",
+			"section": ""
+		},
+		{
+			"name": "the personal rows describe the user's own files, not a built-in section",
+			"group": "personal",
+			"section": "code"
+		},
+		{
+			"name": "a scalar row is no section",
+			"group": "hotstrings",
+			"section": "expansion_delay"
+		}
+	]
+}

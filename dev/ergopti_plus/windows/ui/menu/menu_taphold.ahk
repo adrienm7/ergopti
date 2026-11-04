@@ -11,12 +11,14 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
 ; Build the TapHolds submenu — one entry per physical key, each with a
-; tap picker (modal GUI, same UI as gesture/shortcut pickers) and a hold
-; picker submenu, mirroring the macOS Karabiner menu design.
+; tap row and a hold row that both open the shared action picker (the same
+; window as the gesture and shortcut pickers), as on macOS and Linux.
 ;
 ; Render shape:
 ;
@@ -31,7 +33,7 @@
 ;       ↳ Rien (désactiver)
 ;       ↳ ---
 ;       ↳ Tap  → "Alt-Tab"             [opens modal action picker GUI]
-;       ↳ Hold → "Alt"                 [opens hold picker submenu]
+;       ↳ Hold → "Alt"                 [opens the action picker on the hold options]
 ;     ↳ …                              [down to Space]
 ;     ↳ ---
 ;     ↳ — Main droite — Tap / Hold —   [manifest header]
@@ -43,24 +45,105 @@
 ; between the hands are the manifest's.
 ;
 ; Tap picker: full GESTURE_ACTIONS list in the searchable modal GUI (ShowActionPicker).
-; Hold picker: fixed set from _TH_HoldOptions (modifiers + nav layer + none).
-; Both pickers persist immediately via WriteTapHoldTap / WriteTapHoldHold and
-; reload the script to refresh the menu.
-_BuildTapHoldsSubmenu() {
+; Hold picker: the same window on the hold options of _TH_HoldOptions (the
+; modifiers, their combinations and the nav layer; its « none » row clears it).
+; Both pickers persist immediately via WriteTapHoldTap / TapHoldSetHold and
+; reload the script to refresh the menu; a refused hold keeps its picker open.
+_BuildTapHoldsSubmenu(TargetMenu := unset) {
 	Commands := _TH_ScopeCommands()
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map(
+		"tap_hold_global_delay", (*) => _TH_GlobalDelayRows(),
+		"tap_hold_lone_tap", (*) => _TH_LoneTapRows(),
 		"tap_hold_keys_left", (*) => _TH_KeyRows("left"),
 		"tap_hold_keys_right", (*) => _TH_KeyRows("right"))
-	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters)
+	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters,
+		IsSet(TargetMenu) ? TargetMenu : unset)
+}
+
+; The GLOBAL delay row: the delay of every key that has none of its own. The label
+; carries the current value; the click asks for a new one in milliseconds.
+_TH_GlobalDelayRows() {
+	global TapHold
+	GlobalMs := Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(TapHold)) * 1000)
+	Label := StrReplace(t("menu.tapholds.tap_hold_title"), "%s", GlobalMs . " ms")
+	return [Map("label", Label, "action", _TH_MakeGlobalDelayFn())]
+}
+
+; The lone tap window's choices in milliseconds, in menu order; 0 is off (the
+; strict tap-hold). They are the feature's preset_values in the manifest, the
+; one list the macOS and Linux menus read too.
+; @returns {Array}
+_TH_LoneTapChoicesMs() {
+	Feature := ManifestFindEntryByPath(ConfigKey.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
+	Choices := (Feature is Map) ? Feature.Get("preset_values", 0) : 0
+	if !(Choices is Array) || Choices.Length < 2
+		throw ValueError("tap_holds.lone_modifier_tap_max_ms declares no preset_values in the manifest.")
+	for _, Ms in Choices
+		TapHoldValidLoneTapMaxMs(Ms)
+	return Choices
+}
+
+; How the lone tap window reads in the menu: « off (strict tap-hold) » for 0,
+; « up to 1000 ms » otherwise.
+; @param Ms {Integer} The window in milliseconds.
+; @returns {String}
+_TH_LoneTapCaption(Ms) {
+	return Ms == 0 ? t("menu.tapholds.lone_tap_off")
+		: StrReplace(t("menu.tapholds.lone_tap_up_to"), "%s", Ms . " ms")
+}
+
+; The lone tap window row (tap_holds.lone_modifier_tap_max_ms): its caption
+; carries the window in force and it opens the choices, the current one checked.
+; A window set by hand outside the choices is shown in the caption, unchecked.
+; @param CurrentMs {Integer} The window shown; the one in force by default.
+; @returns {Array} One row.
+_TH_LoneTapRows(CurrentMs := unset) {
+	Current := IsSet(CurrentMs) ? CurrentMs : TapHoldLoneTapMaxMs()
+	Choices := []
+	for _, Ms in _TH_LoneTapChoicesMs() {
+		Choices.Push(Map(
+			"label", Ms == 0 ? t("menu.tapholds.lone_tap_off") : Ms . " ms",
+			"checked", Ms == Current,
+			; The fat arrow drops the native menu arguments, which would otherwise
+			; fill the commit's Path and ReloadFn seams.
+			"action", ((Value, *) => _TH_CommitLoneTapMaxMs(Value)).Bind(Ms)))
+	}
+	Label := StrReplace(t("menu.tapholds.lone_tap_title"), "%s", _TH_LoneTapCaption(Current))
+	return [Map("label", Label, "items", Choices)]
+}
+
+; Persists the lone tap window chosen in the menu, then reloads.
+; @param Ms {Integer} 0 (strict) or a positive whole number of milliseconds.
+; @param Path {String} The config.toml to write; ConfigurationFile by default.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @returns {Boolean} False when nothing was committed.
+_TH_CommitLoneTapMaxMs(Ms, Path := "", ReloadFn := 0) {
+	global ConfigurationFile
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_CommitLoneTapMaxMs(Ms, Path, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	try TapHoldValidLoneTapMaxMs(Ms)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "The lone modifier tap window is refused: {1}.", Err.Message)
+		return false
+	}
+	Rows := [ManifestSparseOperation(ConfigKey.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS, Ms)]
+	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the lone modifier tap window")
+		return false
+	try LoggerInfo("TapHoldMenu", "Lone modifier tap window set to {1} ms (pid={2}).", Ms, DriverPid)
+	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 
 ; List provider: one row per configurable key of one hand.
 ;
-; Row DATA since 2026-08-07. The tree is three levels — the key, its disable /
-; tap / hold rows, and the hold picker's options — which is what the renderer
-; allows, and none of it mutates a live menu: every action writes the user's
-; tap_hold.toml and reloads the script, which rebuilds the tray from scratch.
+; Row DATA since 2026-08-07. The tree is two levels — the key, then its
+; disable / tap / hold / delay rows, the tap and the hold opening the shared
+; action picker — and none of it mutates a live menu: every action writes the
+; user's tap_hold.toml and reloads the script, which rebuilds the tray.
 ; @param Hand {String} "left" or "right".
 _TH_KeyRows(Hand) {
 	global TapHold
@@ -80,25 +163,28 @@ _TH_KeyRows(Hand) {
 			: (TapLbl . "  /  " . HoldLbl)
 		ParentLabel := KeyLabel . "  :  " . ComboLabel
 
-		; Indirection avoids a call-site occurrence of the function name before
-		; its definition, which would cause the meta test's body-extractor to
-		; resolve the wrong function body (see HIGH-07 regression guard).
-		_HoldRowsBuilder := _TH_HoldPickerRows
-
-		DelayRows := MenuRenderer_TemplateRows("tap_hold_key_delay_rows",
-			Map("tap_hold_key_delay_set", _TH_MakeDelayPickerFn(KeyId)), Map(), Map())
-		if !(DelayRows is Array)
-			continue
-		DelayCaption := Round(TapHoldDuration(MasterGateDesiredTapHold(TapHold), KeyId) * 1000) . " ms"
+		; « global (200 ms) » while the key follows the global delay, its own delay
+		; once it has one; « Use global delay (200 ms) » removes that override.
+		Desired := MasterGateDesiredTapHold(TapHold)
+		GlobalCaption := Round(TapHoldGlobalDuration(Desired) * 1000) . " ms"
+		HasOwnDelay := TapHoldHasOwnDuration(Desired, KeyId)
+		DelayCaption := HasOwnDelay
+			? Round(TapHoldDuration(Desired, KeyId) * 1000) . " ms"
+			: StrReplace(t("menu.tapholds.key_tap_delay_inherited"), "%s", GlobalCaption)
 		KeyRows := MenuRenderer_TemplateRows("tap_hold_key_rows",
-			Map("tap_hold_key_native", _TH_MakeDisableFn(KeyId),
-				"tap_hold_key_tap", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl)),
+			Map(MenuCommand.TAP_HOLD_KEY_NATIVE, _TH_MakeDisableFn(KeyId),
+				MenuCommand.TAP_HOLD_KEY_TAP, _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl),
+				MenuCommand.TAP_HOLD_KEY_HOLD_ACTION, _TH_MakeHoldPickerFn(KeyId, KeyLabel),
+				MenuCommand.TAP_HOLD_KEY_DELAY, _TH_MakeDelayPickerFn(KeyId),
+				MenuCommand.TAP_HOLD_KEY_DELAY_USE_GLOBAL, _TH_MakeDelayResetFn(KeyId)),
 			Map("tap_hold_key_configured", ((Value) => Value).Bind(IsConfigured),
 				"tap_hold_key_tap_caption", ((Value) => Value).Bind(TapLbl),
 				"tap_hold_key_hold_caption", ((Value) => Value).Bind(HoldLbl),
-				"tap_hold_key_delay_caption", ((Value) => Value).Bind(DelayCaption)),
-			Map("tap_hold_key_hold", _HoldRowsBuilder(KeyId),
-				"tap_hold_key_delay", DelayRows))
+				"tap_hold_key_delay_caption", ((Value) => Value).Bind(DelayCaption),
+				"tap_hold_key_global_delay_caption", ((Value) => Value).Bind(GlobalCaption),
+				"tap_hold_key_delay_is_global", ((Value) => Value).Bind(!HasOwnDelay),
+				"tap_hold_key_delay_has_override", ((Value) => Value).Bind(HasOwnDelay)),
+			Map())
 		if !(KeyRows is Array)
 			continue
 		Rows.Push(Map(
@@ -293,7 +379,7 @@ class _TH_TapPickerFnObj {
 		global TapHold
 		; Current tap action at call time (not at menu-build time).
 		; "" means native (unconfigured) — pass as-is; ShowNative:=true adds the entry.
-		Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, this.KeyId) : ""
+		Current := IsSet(TapHold) ? TapHoldConfiguredTapAction(TapHold, this.KeyId) : ""
 		try LoggerDebug("TapHoldMenu", "Opening tap picker for '{1}' (current='{2}').", this.KeyId, (Current == "" ? "<native>" : Current))
 		Title := t("tap_hold.picker.title_prefix") . this.KeyLabel
 		_KeyId := this.KeyId
@@ -312,30 +398,83 @@ class _TH_DelayPickerFnObj {
 	}
 }
 
-class _TH_HoldFnObj {
-	KeyId   := ""
-	HoldOpt := ""
-	Call(Args*) {
-		return _TH_ApplyHold(this.KeyId, this.HoldOpt)
+class _TH_GlobalDelayFnObj {
+	PromptFn := 0
+	SetterFn := 0
+	ReloadFn := 0
+	Call(*) {
+		return _TH_PromptGlobalDelay(this.PromptFn, this.SetterFn, this.ReloadFn)
 	}
 }
 
-; Apply a hold option chosen from the hold picker. The write goes through the
-; owner that brings the navigation layer along with a key that enters it: the
+class _TH_DelayResetFnObj {
+	KeyId := ""
+	SetterFn := 0
+	ReloadFn := 0
+	Call(*) {
+		return _TH_ResetKeyDelay(this.KeyId, this.SetterFn, this.ReloadFn)
+	}
+}
+
+class _TH_HoldPickerFnObj {
+	KeyId    := ""
+	KeyLabel := ""
+	Call(*) {
+		return _TH_OpenHoldPicker(this.KeyId, this.KeyLabel)
+	}
+}
+
+; Open the shared action picker on a key's hold: the hold options, the current
+; one marked, the window titled « Hold action — <key> ». A pick is written
+; while the picker is open; the script reloads once it has closed.
+; @param KeyId {String} The key.
+; @param KeyLabel {String} Its translated name, for the title.
+; @param OpenFn {Func} Replaces ShowActionPicker in tests.
+; @param SetHoldFn {Func} Replaces TapHoldSetHold in tests.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @returns {Any} What the picker returns.
+_TH_OpenHoldPicker(KeyId, KeyLabel, OpenFn := 0, SetHoldFn := 0, ReloadFn := 0) {
+	Current := TapHoldCurrentHoldPickId(KeyId)
+	try LoggerDebug("TapHoldMenu", "Opening hold picker for '{1}' (current='{2}').", KeyId, Current)
+	Slot := Map("items", TapHoldHoldPickerItems(),
+		"after_close", _TH_AfterHoldPick.Bind(KeyId, ReloadFn))
+	Open := HasMethod(OpenFn, "Call") ? OpenFn : ShowActionPicker
+	return Open.Call(t("tap_hold.picker.hold_title_prefix") . KeyLabel, Current,
+		_TH_CommitHoldPick.Bind(KeyId, SetHoldFn), false, "", Slot)
+}
+
+; Write a hold picked in the picker. The write goes through the owner that
+; brings the navigation layer along with a key that enters it: the
 ; configuration folder is handed over here, by the tray alone.
-_TH_ApplyHold(KeyId, HoldOpt) {
+; @param KeyId {String} The key.
+; @param SetHoldFn {Func} Replaces TapHoldSetHold in tests; 0 in production.
+; @param PickId {String} The picked id ("none" clears the hold).
+; @returns {Integer|Boolean} 1 when written, false to keep the picker open.
+_TH_CommitHoldPick(KeyId, SetHoldFn, PickId) {
 	global _ConfigDir
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _TH_ApplyHold(KeyId, HoldOpt)
+		try return _TH_CommitHoldPick(KeyId, SetHoldFn, PickId)
 		finally Critical(InheritedCritical)
+	}
+	HoldOpt := TapHoldHoldOptionForPick(PickId)
+	if !(HoldOpt is Map) {
+		try LoggerError("TapHoldMenu", "The hold of '{1}' does not offer the picked action '{2}'.",
+			KeyId, (PickId is String) ? PickId : Type(PickId))
+		return false
 	}
 	try LoggerInfo("TapHoldMenu", "Hold picker selection for '{1}': kind='{2}', id='{3}' (pid={4}).",
 		KeyId, HoldOpt["kind"], HoldOpt["id"], DriverPid)
-	if !TapHoldSetHold(KeyId, HoldOpt, _ConfigDir)
-		return false
-	return _TH_ReloadTapHoldMenu("hold_set", KeyId)
+	Written := HasMethod(SetHoldFn, "Call") ? SetHoldFn.Call(KeyId, HoldOpt, _ConfigDir)
+		: TapHoldSetHold(KeyId, HoldOpt, _ConfigDir)
+	return ((Written is Integer) && Written == 1) ? 1 : false
+}
+
+; Reload once the hold picker has closed on a written hold.
+_TH_AfterHoldPick(KeyId, ReloadFn, *) {
+	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call("hold_set", KeyId)
+		: _TH_ReloadTapHoldMenu("hold_set", KeyId)
 }
 
 ; Build a bound callback that clears both tap and hold for a key.
@@ -353,6 +492,14 @@ _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl) {
 	return ObjBindMethod(obj, "Call")
 }
 
+; Build a bound callback that opens the action picker modal for the hold slot.
+_TH_MakeHoldPickerFn(KeyId, KeyLabel) {
+	obj := _TH_HoldPickerFnObj()
+	obj.KeyId    := KeyId
+	obj.KeyLabel := KeyLabel
+	return ObjBindMethod(obj, "Call")
+}
+
 /**
  * Captures the physical key while discarding native menu callback arguments.
  * @param {String} KeyId Shared physical-key identifier.
@@ -365,6 +512,114 @@ _TH_MakeDelayPickerFn(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 	obj.SetterFn := SetterFn
 	obj.ReloadFn := ReloadFn
 	return ObjBindMethod(obj, "Call")
+}
+
+; Build a bound callback that asks for the global delay.
+_TH_MakeGlobalDelayFn(PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
+	obj := _TH_GlobalDelayFnObj()
+	obj.PromptFn := PromptFn
+	obj.SetterFn := SetterFn
+	obj.ReloadFn := ReloadFn
+	return ObjBindMethod(obj, "Call")
+}
+
+; Build a bound callback that returns a key to the global delay.
+_TH_MakeDelayResetFn(KeyId, SetterFn := 0, ReloadFn := 0) {
+	obj := _TH_DelayResetFnObj()
+	obj.KeyId := KeyId
+	obj.SetterFn := SetterFn
+	obj.ReloadFn := ReloadFn
+	return ObjBindMethod(obj, "Call")
+}
+
+/**
+ * Asks for the GLOBAL delay in milliseconds, publishes it, then reloads once. A key
+ * with a delay of its own is untouched; every other key follows the new value.
+ * @returns {Integer|Boolean} Strict1 after publication and reload, otherwise false.
+ */
+_TH_PromptGlobalDelay(PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
+	global TapHold, TAPHOLD_DEFAULT_ACTIVATION_SECONDS
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_PromptGlobalDelay(PromptFn, SetterFn, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	for Adapter in [PromptFn, SetterFn, ReloadFn] {
+		if !((Adapter is Integer) && Adapter == 0) && !HasMethod(Adapter, "Call")
+			return false
+	}
+	if !(TapHold is Map)
+		return false
+	CurrentMs := Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(TapHold)) * 1000)
+	DefaultMs := Round(TAPHOLD_DEFAULT_ACTIVATION_SECONDS * 1000)
+	Prompt := StrReplace(t("menu.tapholds.tap_hold_dialog_prompt"), "%d", DefaultMs)
+	Title := t("menu.tapholds.tap_hold_dialog_title")
+	try {
+		Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w340 h160", CurrentMs)
+			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
+		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
+			return false
+		Raw := Trim(Answer.Value, " `t")
+		if !IsNumber(Raw)
+			return false
+		Ms := Round(Raw + 0)
+		if Ms <= 0 || !_TH_DurationValueValid(Ms / 1000)
+			return false
+	} catch as Err {
+		try LoggerError("TapHoldMenu", "The global delay prompt was refused: {1}.", Err.Message)
+		return false
+	}
+	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(Ms / 1000)
+		: WriteTapHoldGlobalDuration(Ms / 1000)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "The global delay could not be saved: {1}.", Err.Message)
+		return false
+	}
+	if !(Published is Integer) || Published != 1
+		return false
+	try Reloaded := HasMethod(ReloadFn, "Call") ? ReloadFn.Call("global_delay_set", "")
+		: _TH_ReloadTapHoldMenu("global_delay_set", "")
+	catch as Err {
+		try LoggerError("TapHoldMenu", "Reload after the global delay failed: {1}.", Err.Message)
+		return false
+	}
+	return (Reloaded is Integer) && Reloaded == 1 ? 1 : false
+}
+
+/**
+ * Removes a key's own delay so it follows the global delay again, then reloads once.
+ * @param {String} KeyId Shared physical-key identifier.
+ * @returns {Integer|Boolean} Strict1 after publication and reload, otherwise false.
+ */
+_TH_ResetKeyDelay(KeyId, SetterFn := 0, ReloadFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_ResetKeyDelay(KeyId, SetterFn, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	for Adapter in [SetterFn, ReloadFn] {
+		if !((Adapter is Integer) && Adapter == 0) && !HasMethod(Adapter, "Call")
+			return false
+	}
+	if !(KeyId is String) || !_TH_DurationKeyKnown(KeyId)
+		return false
+	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(KeyId)
+		: WriteTapHoldDurationReset(KeyId)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "The per-key delay could not be reset: {1}.", Err.Message)
+		return false
+	}
+	if !(Published is Integer) || Published != 1
+		return false
+	try Reloaded := HasMethod(ReloadFn, "Call") ? ReloadFn.Call("delay_reset", KeyId)
+		: _TH_ReloadTapHoldMenu("delay_reset", KeyId)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "Reload after the per-key delay reset failed: {1}.", Err.Message)
+		return false
+	}
+	return (Reloaded is Integer) && Reloaded == 1 ? 1 : false
 }
 
 /**
@@ -457,7 +712,7 @@ _TH_ApplyTap(KeyId, ActionId) {
 		try return _TH_ApplyTap(KeyId, ActionId)
 		finally Critical(InheritedCritical)
 	}
-	Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, KeyId) : "<not_ready>"
+	Current := IsSet(TapHold) ? TapHoldConfiguredTapAction(TapHold, KeyId) : "<not_ready>"
 	try LoggerInfo("TapHoldMenu", "ApplyTap key='{1}' current='{2}' -> '{3}' (pid={4}).", KeyId,
 		(Current == "" ? "<native>" : Current), (ActionId == "" ? "<native>" : ActionId), DriverPid)
 	if !GestureEnsureActionParameter(GestureBindingId("tap_hold", KeyId), ActionId)
@@ -465,34 +720,6 @@ _TH_ApplyTap(KeyId, ActionId) {
 	if !WriteTapHoldTap(KeyId, ActionId)
 		return false
 	return _TH_ReloadTapHoldMenu("tap_set", KeyId)
-}
-
-; Build the hold picker submenu for a given key. Shows the fixed hold options
-; from _TH_HoldOptions; current selection is checked.
-_TH_HoldPickerRows(KeyId) {
-	global _TH_HoldOptions
-	Rows := []
-	for _, HoldOpt in _TH_HoldOptions {
-		Label    := ""
-		if (HoldOpt["kind"] == "modifier" && HoldOpt["i18n"] == "") {
-			Label := _TH_HoldOptionLabel(HoldOpt["id"])
-		} else {
-			Label := t(HoldOpt["i18n"])
-		}
-		Rows.Push(Map(
-			"label",   Label,
-			"checked", IsTapHoldHoldActive(KeyId, HoldOpt),
-			"action",  _TH_MakeHoldFn(KeyId, HoldOpt)))
-	}
-	return Rows
-}
-
-; Build a bound callback that writes a hold option for a key, then reloads.
-_TH_MakeHoldFn(KeyId, HoldOpt) {
-	obj := _TH_HoldFnObj()
-	obj.KeyId   := KeyId
-	obj.HoldOpt := HoldOpt
-	return ObjBindMethod(obj, "Call")
 }
 
 ; Shared reload helper — keeps menu-triggered updates observable in debug logs.
@@ -536,8 +763,8 @@ _TH_ScopeCommands(Options := unset) {
 	global _ConfigDir
 	OwnedOptions := IsSet(Options) ? Options : Map("layers_config_dir", _ConfigDir)
 	return Map(
-		"tapholds_toggle", MenuRenderer_CategoryGateCommand("TapHolds"),
-		"scope_restore", (*) => TapHoldScopeApply("recommended", OwnedOptions),
-		"scope_clear", (*) => TapHoldScopeApply("clear", OwnedOptions),
-		"edit_nav_layer", LayerEditor_Open)
+		MenuCommand.TAPHOLDS_TOGGLE, MenuRenderer_CategoryGateCommand("TapHolds"),
+		MenuCommand.SCOPE_RESTORE, (*) => TapHoldScopeApply("recommended", OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => TapHoldScopeApply("clear", OwnedOptions),
+		MenuCommand.EDIT_NAV_LAYER, LayerEditor_Open)
 }

@@ -2,8 +2,9 @@
 --- ==============================================================================
 --- MODULE: Native Process Supervision Receipt Regression
 --- DESCRIPTION:
---- Simulates timer or stream invalidation by closing one actual libuv handle
---- before its native start. Child creation, pipes, returned EINVAL, process-group
+--- Redirects one native start to a closing fixture-owned twin to produce a
+--- genuine EINVAL. The production handle stays owned through its actual close
+--- callback. Child creation, pipes, returned EINVAL, process-group
 --- retirement and cleanup are real. This does not establish that ordinary
 --- production handles spontaneously become invalid (linux-process-supervision).
 --- ==============================================================================
@@ -23,8 +24,12 @@ for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
 		return process, child_pid, code
 	end
 	local function invalidate(handle, start, ...)
-		uv.close(handle) -- Simulated invalidation of an actual native handle.
-		local accepted, message, code = start(handle, ...)
+		-- Never close somebody else's owner without its captured close callback.
+		-- A fixture twin produces the same genuine native refusal while leaving
+		-- production's handle available for its authoritative cleanup receipt.
+		local twin = operation == "timer" and uv.new_timer() or uv.new_pipe(false)
+		assert(twin); uv.close(twin)
+		local accepted, message, code = start(twin, ...)
 		native_receipt = { accepted = accepted, message = message, code = code }
 		return accepted, message, code
 	end
@@ -43,11 +48,17 @@ for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
 		local dispatched = Runner.run("/bin/sleep", { "30" }, { timeout_ms = 50 }, function(answer)
 			callbacks, result = callbacks + 1, answer
 		end)
-		assert(pid and native_receipt and native_receipt.accepted == nil and native_receipt.code == "EINVAL",
+		assert(native_receipt and native_receipt.accepted == nil and native_receipt.code == "EINVAL",
 			"fixture did not observe a native supervision refusal")
-		assert(dispatched == false and callbacks == 1,
-			"ProcessRunner accepted a child whose native " .. operation .. " supervision could not start")
-		assert(result.exit_code == -1 and result.error == "process supervision could not start")
+		-- The deadline is armed before spawn, so its refusal must launch no
+		-- child at all; pipe refusals happen after a real child exists.
+		if operation == "timer" then
+			assert(pid == nil, "refused deadline still launched a child")
+		else
+			assert(pid, "pipe supervision refusal happened before the native child existed")
+		end
+		assert(dispatched == false and callbacks == 0,
+			"ProcessRunner admitted dispatch or published before native cleanup ACK")
 		local deadline = uv.hrtime() + 1000000000
 		repeat
 			uv.run("nowait")
@@ -55,8 +66,11 @@ for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
 			uv.sleep(5)
 		until uv.hrtime() >= deadline
 		assert(not uv.loop_alive(), "refused supervision left a live child or native handle")
-		local absent, _, code = uv.kill(-pid, 0)
-		assert(absent == nil and code == "ESRCH", "refused child group survived before fixture cleanup")
+		assert(callbacks == 1 and result.exit_code == -1 and result.error == "process supervision could not start")
+		if pid then
+			local absent, _, code = uv.kill(-pid, 0)
+			assert(absent == nil and code == "ESRCH", "refused child group survived before fixture cleanup")
+		end
 	end, debug.traceback)
 	uv.spawn, uv.timer_start, uv.read_start = original_spawn, original_timer_start, original_read_start
 	-- Own the cleanup even when an assertion fails against the unfixed source.
@@ -65,7 +79,8 @@ for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
 	assert(not uv.loop_alive(), "owned native handles survived fixture cleanup")
 	if ok then
 		assert(callbacks == 1, "late native exit published another callback")
-		print("PASS " .. operation .. " native EINVAL refused (simulated invalidation; native child and cleanup)")
+		local proof = pid and "native child and cleanup" or "no child launched"
+		print("PASS " .. operation .. " native EINVAL refused (controlled closing-twin port; " .. proof .. ")")
 	else
 		failures = failures + 1
 		io.stderr:write("FAIL " .. operation .. ": " .. tostring(err) .. "\n")

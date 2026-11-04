@@ -14,8 +14,9 @@
 ;   KS_IsUp(keyName)   → KS_IsUp(KeyName)
 ;
 ; PHYSICAL MODE:
-; Both functions use the "P" (physical) mode of GetKeyState exclusively.
-; Logical/toggle state (CapsLock LED, NumLock) is out of scope for this adapter.
+; Both port functions use the "P" (physical) mode exclusively. The separate
+; Windows-local startup observation reads the native CapsLock toggle; it
+; does not extend the cross-platform physical KeyState contract.
 ;
 ; FAIL-SAFE:
 ; GetKeyState is wrapped in try/catch. An unknown key name or any AHK error
@@ -24,6 +25,12 @@
 ; ==============================================================================
 
 
+
+; ERGOPTI_NAV_KEY_REAL_DOWN and ERGOPTI_NAV_KEY_HIDDEN of native/nav_event_owner/nav_event_owner.h.
+global KS_NATIVE_KEY_REAL_DOWN := 0x01
+global KS_NATIVE_KEY_HIDDEN := 0x02
+; The key's scan code on every layout, including those that map it to Kana.
+global KS_SC_RIGHT_ALT := 0x138
 
 ; ===========================================
 ; ===========================================
@@ -53,6 +60,141 @@ KS_IsUp(KeyName) {
 	} catch {
 		return 1
 	}
+}
+
+; The native press ledger, bound once the owner's DLL has started; 0 before. It
+; answers what AutoHotkey cannot see: a press the owner captured or consumed, or
+; replayed with its marker, never reaches the physical state (see the "Native
+; press ledger" section of docs/design/windows-input-hooks.md).
+; @param Bind {Func} Optional: replaces the query, taking a scan code and giving
+;        an object with flags and sequence.
+; @return {Func|Integer} The query, or 0 while no owner has started.
+KS_NativeKeyPressPort(Bind := unset) {
+	static Query := 0
+	if IsSet(Bind)
+		Query := Bind
+	return Query
+}
+
+; What the ledger holds for one key, or 0 with no owner or no scan code.
+_KS_NativeKeyPress(KeyName) {
+	Query := KS_NativeKeyPressPort()
+	if !Query
+		return 0
+	; A layout that maps right Alt to Kana gives VK_RMENU no scan code, and the
+	; standard AltGr check names that key: the ledger holds it by its own code.
+	global KS_SC_RIGHT_ALT
+	Sc := KeyName = "RAlt" ? KS_SC_RIGHT_ALT : GetKeySC(KeyName)
+	if !(Sc > 0 && Sc <= 0x1FF)
+		return 0
+	; This runs in #HotIf criteria: a ledger that fails must never take a key with it.
+	; Without it the physical state answers and the catalogue decides the order.
+	try return Query.Call(Sc)
+	catch as Err {
+		static Reported := false
+		if !Reported {
+			Reported := true
+			try LoggerError("KeyState", "The press ledger cannot be read ({1}): keys read as AutoHotkey sees them.", Err.Message)
+		}
+		return 0
+	}
+}
+
+; Starts the owner of the press ledger, whatever the AI's state. A hook that cannot
+; install is no broken keyboard: first keys fall back to the catalogue order.
+; @param StartFn {Func} Test seam, LLM_NavEventOwner_EnsureStarted by default.
+; @return {Boolean} Whether the owner runs.
+KeyboardArbiterEnsureForLedger(StartFn := 0) {
+	Started := false
+	try Started := HasMethod(StartFn, "Call") ? StartFn.Call() : LLM_NavEventOwner_EnsureStarted()
+	catch as Err
+		LoggerError("KeyboardArbiter", "stage=ledger_start outcome=raised detail={1}.", Err.Message)
+	if !Started
+		LoggerWarn("KeyboardArbiter", "stage=ledger_start outcome=not_started: first keys follow the catalogue order.")
+	return Started ? true : false
+}
+
+; Returns 1 when the key is held for the user: physically down for AutoHotkey,
+; or held in the native ledger through a press it never saw. A consumer that
+; must treat a replayed edge as physical reads this one, not KS_IsDown.
+; @param KeyName {String} Platform key identifier (e.g. "SC138", "RAlt").
+; @return {Integer} 1 if the key is held, 0 otherwise.
+KS_IsHeld(KeyName) {
+	global KS_NATIVE_KEY_HIDDEN
+	if KS_IsDown(KeyName)
+		return 1
+	Press := _KS_NativeKeyPress(KeyName)
+	return (Press && (Press.flags & KS_NATIVE_KEY_HIDDEN)) ? 1 : 0
+}
+
+; Whether the ledger holds the real key behind a shared scan code, as opposed to
+; a system alias of it (the fake LCtrl of AltGr, which AutoHotkey's physical state
+; cannot tell from the real one). A missed release is forgotten by the ledger on
+; Ctrl+Alt+Del and on every desktop switch, so it cannot stay real here.
+; @param KeyName {String} Platform key identifier.
+; @return {Integer} 1 real, 0 not real, -1 unknown: no owner is running.
+KS_RealPressState(KeyName) {
+	global KS_NATIVE_KEY_REAL_DOWN
+	Press := _KS_NativeKeyPress(KeyName)
+	if !IsObject(Press)
+		return -1
+	return (Press.flags & KS_NATIVE_KEY_REAL_DOWN) ? 1 : 0
+}
+
+; How often a wait for a press only the ledger holds looks at it.
+global KS_WAIT_RELEASED_POLL_MS := 10
+
+; Waits for a key to come up, for a bounded time. AutoHotkey's KeyWait answers at once
+; for a press replayed after a terminal expansion (its physical state never had it),
+; which made every such press a tap. Such a press is watched in the ledger instead,
+; whose release comes with the replay or from a reset (Ctrl+Alt+Del, a desktop switch).
+; Any other press is exactly a KeyWait, so its duration does not change. The bound
+; stands either way: a release nobody sees costs the timeout, never a stuck key.
+; @param KeyName {String} Platform key identifier.
+; @param TimeoutSec {Number} The longest wait, in seconds.
+; @param Ports {Map} Test seams: "key_wait"(Options), "tick"(), "sleep"(Ms).
+; @return {Boolean} True when the key came up, false at the timeout.
+KS_WaitReleased(KeyName, TimeoutSec, Ports := 0) {
+	global KS_NATIVE_KEY_HIDDEN, KS_WAIT_RELEASED_POLL_MS
+	Press := _KS_NativeKeyPress(KeyName)
+	if !(Press && (Press.flags & KS_NATIVE_KEY_HIDDEN)) {
+		if (Ports is Map)
+			return Ports["key_wait"].Call("T" . TimeoutSec)
+		return KeyWait(KeyName, "T" . TimeoutSec)
+	}
+	Tick := (Ports is Map) ? Ports["tick"] : () => A_TickCount
+	Wait := (Ports is Map) ? Ports["sleep"] : Sleep
+	Start := Tick.Call()
+	while KS_IsHeld(KeyName) {
+		if (Tick.Call() - Start >= TimeoutSec * 1000)
+			return false
+		Wait.Call(KS_WAIT_RELEASED_POLL_MS)
+	}
+	return true
+}
+
+; KS_IsHeld for either Shift: one scan code cannot name both.
+; @return {Integer} 1 if a Shift is held, 0 otherwise.
+KS_ShiftIsHeld() {
+	return (KS_IsHeld("SC02A") || KS_IsHeld("SC036")) ? 1 : 0
+}
+
+; The press number of a key held now: higher means pressed later. 0 when the
+; ledger never saw this press, so an order read from it is known only when every
+; key compared has a number.
+; @param KeyName {String} Platform key identifier.
+; @return {Integer} The press number, or 0.
+KS_PressSequence(KeyName) {
+	Press := _KS_NativeKeyPress(KeyName)
+	return Press ? Press.sequence : 0
+}
+
+; Captures native CapsLock intent once before callbacks can write the LED.
+; This Windows-local observation has no include-position globals and keeps
+; native read failures visible; physical key state is a different contract.
+; @return {Boolean} The native toggle state; throws when observation fails.
+KS_CapsLockToggleState() {
+	return GetKeyState("CapsLock", "T") ? true : false
 }
 
 ; Returns the wrap-safe tick epoch of the most recent physical keyboard or
@@ -140,6 +282,44 @@ KS_RecordPhysicalInput() {
 KS_GetPhysicalInputGeneration() {
 	global _KS_PhysicalInputGeneration
 	return _KS_PhysicalInputGeneration
+}
+
+
+/**
+ * The existing context-reset class shared by prefix and prediction observers.
+ * The caller still owns Space handling and configurable boundary policies.
+ * @param {Integer} VK The native virtual-key code.
+ * @returns {Boolean} True when this key makes the caret context unknowable.
+ */
+KS_IsContextResetKey(VK) {
+	if !(VK is Integer)
+		throw TypeError("Context reset requires an integer virtual key.")
+	static ResetVKs := Map(
+		; VK_BACK is deliberately ABSENT: backspace decrements both buffers
+		; rather than wiping the preview — each observer owns that edit.
+		0x09, true,  ; VK_TAB
+		0x0D, true,  ; VK_RETURN
+		0x1B, true,  ; VK_ESCAPE
+		0x20, true,  ; VK_SPACE
+		; Hotstring word resets still depend on hotstrings.arrow_resets_word.
+		0x25, true,  ; VK_LEFT
+		0x26, true,  ; VK_UP
+		0x27, true,  ; VK_RIGHT
+		0x28, true,  ; VK_DOWN
+		; The rest of the navigation cluster. The engine's own contract lists
+		; these as buffer-invalidating, but only the arrows were ever enumerated
+		; here — so typing "bonjour ia", pressing Home and typing "." fired
+		; ia -> IA with {BackSpace 3} at line start and ate three characters of
+		; unrelated text. Delete and Insert belong with them: both rewrite the
+		; document by an amount this watcher cannot observe.
+		0x21, true,  ; VK_PRIOR  (PgUp)
+		0x22, true,  ; VK_NEXT   (PgDn)
+		0x23, true,  ; VK_END
+		0x24, true,  ; VK_HOME
+		0x2D, true,  ; VK_INSERT
+		0x2E, true,  ; VK_DELETE
+	)
+	return ResetVKs.Has(VK)
 }
 
 
@@ -440,6 +620,69 @@ KS_LayoutDigitRowSymbols(Hkl) {
 	return Symbols
 }
 
+; What each digit-row key types with Shift on layout Hkl: the digits on AZERTY,
+; "!" to ")" on US QWERTY. MapVirtualKeyExW has no Shift level, so this asks
+; ToUnicodeEx with Shift down and flag 4, which leaves the kernel keyboard and
+; dead-key state untouched. A dead key reads as its accent (the call answers
+; -1 with the accent in the buffer); a key typing nothing is left out.
+; @param Hkl {Integer} Keyboard layout handle; 0 gives an empty map.
+; @return {Map} Scan code -> string.
+KS_LayoutDigitRowShiftedSymbols(Hkl) {
+	global KS_DIGIT_ROW_KEYS
+	Symbols := Map()
+	if (Hkl == 0)
+		return Symbols
+	State := Buffer(256, 0)
+	NumPut("UChar", 0x80, State, 0x10) ; VK_SHIFT
+	NumPut("UChar", 0x80, State, 0xA0) ; VK_LSHIFT
+	Chars := Buffer(32, 0)
+	for _, Key in KS_DIGIT_ROW_KEYS {
+		Count := DllCall("ToUnicodeEx", "UInt", Key[1], "UInt", Key[2], "Ptr", State,
+			"Ptr", Chars, "Int", 16, "UInt", 4, "Ptr", Hkl, "Int")
+		if (Count > 0)
+			Symbols[Key[2]] := StrGet(Chars, Count, "UTF-16")
+		else if (Count < 0)
+			Symbols[Key[2]] := StrGet(Chars, 1, "UTF-16")
+	}
+	return Symbols
+}
+
+; What each of the keys Scs types unshifted and with Shift on layout Hkl, read
+; as KS_LayoutDigitRowSymbols and KS_LayoutDigitRowShiftedSymbols read the
+; digit keys (the edge keys of the number row have no fixed virtual key, so
+; theirs is looked up on that layout). A level typing nothing is "".
+; @param Hkl {Integer} Keyboard layout handle; 0 gives empty levels.
+; @param Scs {Array} Scan codes.
+; @return {Map} Scan code -> Map("plain", String, "shift", String).
+KS_LayoutKeyLevels(Hkl, Scs) {
+	global KS_MAPVK_VK_TO_CHAR
+	Levels := Map()
+	State := Buffer(256, 0)
+	NumPut("UChar", 0x80, State, 0x10) ; VK_SHIFT
+	NumPut("UChar", 0x80, State, 0xA0) ; VK_LSHIFT
+	Chars := Buffer(32, 0)
+	for _, Sc in Scs {
+		Plain := "", Shift := ""
+		Vk := Hkl == 0 ? 0 : DllCall("MapVirtualKeyExW", "UInt", Sc, "UInt", 3, "Ptr", Hkl, "UInt")
+		if (Vk != 0) {
+			Char := DllCall("MapVirtualKeyExW", "UInt", Vk, "UInt", KS_MAPVK_VK_TO_CHAR, "Ptr", Hkl, "UInt") & 0xFFFF
+			if (Char >= 0x20)
+				Plain := Chr(Char)
+			Count := DllCall("ToUnicodeEx", "UInt", Vk, "UInt", Sc, "Ptr", State,
+				"Ptr", Chars, "Int", 16, "UInt", 4, "Ptr", Hkl, "Int")
+			if (Count > 0)
+				Shift := StrGet(Chars, Count, "UTF-16")
+			else if (Count < 0)
+				Shift := StrGet(Chars, 1, "UTF-16")
+			; A control character (Ctrl-like output of some layouts) types nothing.
+			if (Shift != "" && Ord(Shift) < 0x20)
+				Shift := ""
+		}
+		Levels[Sc] := Map("plain", Plain, "shift", Shift)
+	}
+	return Levels
+}
+
 ; Translates a scancode into its virtual key under Hkl, distinguishing left and
 ; right keys (MAPVK_VSC_TO_VK_EX = 3).
 ; @param Scancode {Integer} The physical scancode.
@@ -499,7 +742,7 @@ KS_InstalledKeyboardLayouts() {
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
-; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_KEY_STATE := Map(
     "isDown", KS_IsDown,

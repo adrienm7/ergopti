@@ -91,6 +91,9 @@ function M.new(defaults, delays_default)
 		-- hotstring buffer. Navigation always invalidates hotstring eligibility,
 		-- while the user-facing llm_reset_on_nav preference may retain this text.
 		llm_buffer                 = "",
+		-- The hotstring buffer content up to the last private (personal-information)
+		-- expansion: the AI context never shows anything of it. "" when none.
+		llm_private_mark           = "",
 		-- True when the character immediately to the LEFT of `buffer` is
 		-- known to be a word terminator (or there is no character at all
 		-- — start of input). Flipped to false whenever the cursor moves
@@ -101,6 +104,12 @@ function M.new(defaults, delays_default)
 		-- — without it we cannot distinguish « fresh document » from
 		-- « cursor moved mid-word and buffer was wiped ».
 		start_is_word_boundary     = true,
+		-- True when the buffer's start is also the start of an empty input line
+		-- (a terminal prompt after a bare Return, a field whose whole text Cmd+A
+		-- or a browser's Cmd+L selected): a Backspace that finds the buffer empty
+		-- there deleted nothing, so the word start stands. Only meaningful with
+		-- start_is_word_boundary; every reset that moves the caret clears it.
+		start_is_line_start        = false,
 		magic_key                  = defaults.trigger_char,
 		-- Flat list of mapping entries, sorted longest-first. See the
 		-- invariants comment above for how the adjacent indexes must stay
@@ -127,8 +136,32 @@ function M.new(defaults, delays_default)
 		last_key_time              = 0,
 		last_key_was_complex       = false,
 		no_rescan_until            = 0,
+		-- Whether that window keeps the replacement in the buffer (a chain step),
+		-- where a quick key could still complete a trigger spanning it.
+		no_rescan_keeps_buffer     = false,
 		lifecycle_generation       = 0,
-		WORD_TIMEOUT_SEC           = 5.0,
+		-- The pause, in seconds, after which the next key starts a new word
+		-- (hotstrings.idle_reset_seconds, 0 = never) and whether a mouse click
+		-- starts one (hotstrings.click_resets_word). Neutral here, so a bare
+		-- registry fixture keeps the buffer; keymap/init.lua seeds both from the
+		-- features manifest right after construction and owns their setters.
+		IDLE_RESET_SEC             = 0,
+		click_resets_word          = false,
+		-- Whether an arrow key (hotstrings.arrow_resets_word) and a Cmd/Ctrl
+		-- shortcut (hotstrings.shortcut_resets_word) start a new word. Neutral
+		-- (the word continues) until keymap/init.lua seeds them the same way.
+		arrow_resets_word          = false,
+		shortcut_resets_word       = false,
+		-- The timeout the keyDown tap applies, projected from IDLE_RESET_SEC.
+		WORD_TIMEOUT_SEC           = 0,
+		-- How many expansions a chain of hotstrings may hold
+		-- (hotstrings.cascade_max_arrows, 1 = a single expansion). Neutral here; keymap/init.lua seeds
+		-- it from the features manifest and owns its setter. The two fields below
+		-- are the current keystroke's pause and complex-key factor, published by the
+		-- tap so a further cascade step is gated by the same delay rule.
+		CASCADE_MAX_ARROWS         = 1,
+		cascade_elapsed            = 0,
+		cascade_complex_mult       = 1,
 		BASE_DELAY_SEC             = defaults.expansion_delay,
 		DELAYS                     = {},
 		-- Per-section delay overrides (seconds), keyed first by owning group and
@@ -156,13 +189,16 @@ function M.new(defaults, delays_default)
 	-- from rolling Quartz back after the engine already describes new text.
 	s.commit_suppress_rescan = function(deadline)
 		s.no_rescan_until = deadline
+		s.no_rescan_keeps_buffer = false
 		s.buffer = ""
 		s.llm_buffer = ""
+		s.llm_private_mark = ""
 		-- Post-expansion: the replacement just landed on screen. Treat the
 		-- new cursor position as abutting a word boundary so the next typed
 		-- char can fire word-boundary-required triggers — that mirrors the
 		-- AHK HSEv2 contract (HSE_ApplyExpansion semantics).
 		s.start_is_word_boundary = true
+		s.start_is_line_start = false
 	end
 
 	s.suppress_rescan = function(duration)
@@ -212,7 +248,12 @@ function M.new(defaults, delays_default)
 	--- comparison; the caller supplies elapsed time so no consumer reads another
 	--- consumer's transient clock state.
 	--- @param m table Registry mapping.
-	--- @param elapsed number Seconds since the preceding physical key.
+	--- The comparison is in whole milliseconds, as on Windows (the configured seconds
+	--- rounded to milliseconds against the elapsed milliseconds) and Linux: the exact
+	--- deadline instant still fires, one millisecond later does not. A missing elapsed
+	--- time fails closed, as there. The tooltip never promises a zero-length window
+	--- (see literal_preview_allowed in llm_bridge.lua).
+	--- @param elapsed number|nil Seconds since the preceding physical key.
 	--- @param complex_mult number|nil Modifier timing multiplier (defaults to 1).
 	--- @return boolean allowed
 	--- @return number|nil remaining Nil means the mapping has no deadline.
@@ -223,17 +264,21 @@ function M.new(defaults, delays_default)
 		-- on letter combos, not modifier+letter sequences).
 		local allowed_delay = m and m.group == "autocorrection"
 			and specific_delay or (specific_delay * multiplier)
-		if allowed_delay == 0 then return true, nil end
-		local remaining = allowed_delay - math.max(0, tonumber(elapsed) or 0)
-		-- Deadlines are half-open. Tooltip dequeue expires a row when now >=
-		-- expire_at; accepting the mapping at equality would let callback order
-		-- decide whether the same timestamp still owns a visible promise.
-		return remaining > 0, math.max(0, remaining)
+		local allowed_ms = math.floor(allowed_delay * 1000 + 0.5)
+		if allowed_ms <= 0 then return true, nil end
+		if type(elapsed) ~= "number" or elapsed ~= elapsed then return false, 0 end
+		local elapsed_ms = math.floor(math.max(0, elapsed) * 1000 + 0.5)
+		local remaining_ms = allowed_ms - elapsed_ms
+		return remaining_ms >= 0, math.max(0, remaining_ms) / 1000
 	end
 
+	-- Returns true once committed: the LLM chain arms its fallback only after
+	-- this commit (prediction_engine), and a missing value read as a refusal.
 	s.suppress_rescan_keep_buffer = function(duration)
 		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
 		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_KEEP_SEC)
+		s.no_rescan_keeps_buffer = true
+		return true
 	end
 
 	-- Seed the initial per-group delays from defaults.
@@ -241,28 +286,15 @@ function M.new(defaults, delays_default)
 		s.DELAYS[k] = v
 	end
 
-	-- Recompute the word-inactivity timeout from the LARGEST active delay,
-	-- considering BOTH group delays and per-section overrides. A delay of 0
-	-- means "always-active" → the timeout must be infinite (0) so the buffer is
-	-- never auto-wiped before such a trigger can fire. Section delays MUST be
-	-- included: a long per-section window (e.g. comma_j = 5 s) would otherwise
-	-- be cut short by a timeout sized only to the group delays. Call again
-	-- whenever DELAYS or SECTION_DELAYS change (set_delay, load_toml).
+	-- Projects the configured idle reset onto the timeout the tap reads. The
+	-- timeout used to be derived from the LARGEST active delay (+0.5 s, or never
+	-- once any delay was 0, which every shipped configuration has), so in
+	-- practice the buffer was never wiped and a word-start hotstring typed after
+	-- a pause read the previous word. It is the user's setting now; delays and
+	-- section overrides still call this after every change, which keeps the
+	-- registry's snapshot/restore and refusal points unchanged.
 	s.recompute_word_timeout = function()
-		local has_infinite = false
-		local max_delay    = 0
-		local function consider(value)
-			if type(value) ~= "number" then return end
-			if value == 0        then has_infinite = true end
-			if value > max_delay then max_delay = value end
-		end
-		for _, delay in pairs(s.DELAYS) do consider(delay) end
-		for _, group_sections in pairs(s.SECTION_DELAYS) do
-			if type(group_sections) == "table" then
-				for _, delay in pairs(group_sections) do consider(delay) end
-			end
-		end
-		s.WORD_TIMEOUT_SEC = has_infinite and 0 or (max_delay + 0.5)
+		s.WORD_TIMEOUT_SEC = s.IDLE_RESET_SEC
 	end
 	s.recompute_word_timeout()
 

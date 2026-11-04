@@ -93,7 +93,9 @@ UriDecode(s) {
 			Pos += LiteralLength
 		}
 	}
-	return StrGet(Buf, ByteLen, "UTF-8")
+	; Retain decoded NULs so path validation can reject the complete value
+	; instead of silently accepting a different prefix before the control.
+	return StrGet(Buf, -ByteLen, "UTF-8")
 }
 
 
@@ -171,6 +173,22 @@ _TextTailCodeUnits(Text, Count) {
 }
 
 
+/** Returns the final complete scalar, or empty for an orphan UTF-16 tail. */
+_TextCompleteTailScalar(Text) {
+	if !(Text is String)
+		throw TypeError("_TextCompleteTailScalar expects a string.")
+	if Text == ""
+		return ""
+	Tail := SubStr(Text, -_TextTailCodeUnits(Text, 1))
+	if StrLen(Tail) == 1 {
+		Unit := NumGet(StrPtr(Tail), 0, "UShort")
+		if Unit >= 0xD800 && Unit <= 0xDFFF
+			return ""
+	}
+	return Tail
+}
+
+
 /** Returns whole Unicode characters without splitting surrogate pairs. */
 _TextCodepoints(Text) {
 	if !(Text is String)
@@ -209,6 +227,26 @@ _TextCodepointStart(Text, Position) {
 	return Position
 }
 
+/**
+ * Returns the longest prefix within a UTF-16 budget without splitting a pair.
+ * SubStr counts code units, so a supplementary character straddling the
+ * budget would otherwise leave a lone high surrogate at the end.
+ * @param {String} Text Source text.
+ * @param {Integer} MaxUnits Nonnegative UTF-16 code-unit budget.
+ * @returns {String} Text itself when it fits, else its whole-character prefix.
+ */
+TextHeadWithinUnits(Text, MaxUnits) {
+	if !(Text is String) || !(MaxUnits is Integer) || MaxUnits < 0
+		throw TypeError("TextHeadWithinUnits expects a string and a nonnegative integer.")
+	if StrLen(Text) <= MaxUnits
+		return Text
+	; Dropping the high half removes the whole straddling pair.
+	End := MaxUnits
+	if End > 0 && _TextCodepointStart(Text, End + 1) == End
+		End -= 1
+	return SubStr(Text, 1, End)
+}
+
 /** Returns a contiguous suffix within a UTF-16 budget without splitting a pair. */
 _TextTailWithinUnits(Text, MaxUnits) {
 	if !(Text is String) || !(MaxUnits is Integer) || MaxUnits < 0
@@ -225,6 +263,32 @@ _TextTailWithinUnits(Text, MaxUnits) {
 	return SubStr(Text, Start)
 }
 
+
+/** Returns the final complete scalar of Text, or empty. */
+_TextLastCodepoint(Text) {
+	if !(Text is String)
+		throw TypeError("_TextLastCodepoint expects a string.")
+	Units := StrLen(Text)
+	if Units == 0
+		return ""
+	return SubStr(Text, _TextCodepointStart(Text, Units))
+}
+
+/**
+ * The character a hotstring's expansion delay is measured from.
+ * The delay is the time between the LAST LETTER OF THE INPUT and the EXPANDER,
+ * which decides whether to give the output. The expander is the magic key when
+ * the trigger ends with it (then the last input letter is the one just before
+ * it), and otherwise the end character that completes the trigger (Space,
+ * punctuation...; for the Space tap-hold, its press). The reference is thus
+ * always the character typed immediately before the expander.
+ * @param Trigger {String} The trigger as written, magic key included.
+ * @param EndsWithMagic {Boolean} Whether the trigger ends with the magic key.
+ * @returns {String} The reference character, empty when the trigger has none.
+ */
+HSE_TimeGateReferenceChar(Trigger, EndsWithMagic) {
+	return EndsWithMagic ? _TextPenultimateCodepoint(Trigger) : _TextLastCodepoint(Trigger)
+}
 
 /** Returns the complete scalar immediately before the final scalar, or empty. */
 _TextPenultimateCodepoint(Text) {

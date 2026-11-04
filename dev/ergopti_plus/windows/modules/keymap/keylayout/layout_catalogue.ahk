@@ -58,6 +58,10 @@ global LAYOUT_CATALOGUE_FAILURE_UNSUPPORTED := "unsupported_platform"
 global LAYOUT_CATALOGUE_FAILURE_DOWNLOAD := "download_failed"
 global LAYOUT_CATALOGUE_FAILURE_WRITE := "write_failed"
 global LAYOUT_CATALOGUE_FAILURE_RECORD := "record_failed"
+global LAYOUT_CATALOGUE_FAILURE_INVALID := "invalid"
+
+; Where a layout the user composed comes from (the composer, not the registry).
+global LAYOUT_CATALOGUE_SOURCE_COMPOSER := "composer"
 
 ; Version of the installed record this module reads and writes.
 global LAYOUT_CATALOGUE_INSTALLED_SCHEMA := 1
@@ -65,11 +69,12 @@ global LAYOUT_CATALOGUE_INSTALLED_SCHEMA := 1
 ; The platform name registry entries list when Windows can emulate them.
 global LAYOUT_CATALOGUE_PLATFORM := "windows"
 
-; The index-entry fields the installed record keeps: what verifies the local
-; copy (file, size, sha256), what the emulation reads (keycode_convention) and
-; what the layout manager shows.
-global LAYOUT_CATALOGUE_RECORD_FIELDS := ["id", "name", "family", "keyboard_name", "version", "file",
-	"sha256", "size", "keycode_convention", "licence", "author", "homepage"]
+; The fields an update owns (INSTALLED_ENTRY_FIELDS of _shared/lua/layouts/catalogue.lua):
+; the entry it installs replaces them as one, so one it omits is gone. Every other
+; member of a recorded row has no owner in this build and stays source data.
+global LAYOUT_CATALOGUE_OWNED_FIELDS := ["id", "name", "family", "keyboard_name", "version", "file",
+	"sha256", "size", "licence", "homepage", "author", "languages", "variants", "platforms",
+	"keycode_convention", "source_url", "extension", "source_sha256", "licence_file", "xkb"]
 
 
 
@@ -237,18 +242,18 @@ LayoutCatalogue_IsErgopti(Entry) {
 ; ==============================
 ; ==============================
 
-; Replaces a file atomically: the text lands under a partial name first.
+; Acquire the stage exclusively: a pre-existing sidecar belongs to another owner.
 _LayoutCatalogueWriteText(Path, Text) {
 	global LAYOUT_REGISTRY_PARTIAL_SUFFIX
 	Partial := Path . LAYOUT_REGISTRY_PARTIAL_SUFFIX
-	if !FSWrite(Partial, Text)
+	if !FSWriteCreateDurable(Partial, Text)
 		throw Error("Cannot write " . Partial)
 	if !FSAtomicMoveReplace(Partial, Path)
 		throw Error("Cannot publish " . Path)
 }
 
-; Minimal JSON writer for the installed record: Maps, Arrays, strings and
-; integers, the only shapes the record holds.
+; Minimal JSON writer for the installed record, which holds a verified index
+; entry whole: Maps, Arrays, strings, numbers and typed booleans.
 _LayoutCatalogueJson(Value) {
 	if (Value is Map) {
 		Out := ""
@@ -262,10 +267,12 @@ _LayoutCatalogueJson(Value) {
 			Out .= (A_Index > 1 ? "," : "") . _LayoutCatalogueJson(Item)
 		return "[" . Out . "]"
 	}
-	if (Value is Integer)
+	if (Value is Integer) || (Value is Float)
 		return String(Value)
 	if (Value is String)
 		return JsonStringLiteral(Value)
+	if (Value is TOML_Bool)
+		return Value.Value ? "true" : "false"
 	throw TypeError("The installed-layouts record holds an unsupported value.", -1, Type(Value))
 }
 
@@ -290,12 +297,15 @@ LayoutCatalogue_ReadInstalled(LocalDir) {
 	catch
 		throw Error("The installed-layouts record is not valid JSON: " . Path)
 	if !(Record is Map) || !Record.Has("schema_version")
-			|| (Record["schema_version"] != LAYOUT_CATALOGUE_INSTALLED_SCHEMA)
+		throw Error("The installed-layouts record has an unknown schema version: " . Path)
+	TopMembers := JsonObjectMemberSpans(Text)
+	if TopMembers["schema_version"]["kind"] != "number"
+			|| Record["schema_version"] != LAYOUT_CATALOGUE_INSTALLED_SCHEMA
 		throw Error("The installed-layouts record has an unknown schema version: " . Path)
 	if !Record.Has("layouts") || !(Record["layouts"] is Map)
 		throw Error("The installed-layouts record has no layouts table: " . Path)
 	Installed := Map()
-	Source := { path: Path, text: Text, top_members: JsonObjectMemberSpans(Text),
+	Source := { path: Path, text: Text, top_members: TopMembers,
 		layout_members: JsonObjectMemberSpans(Text, ["layouts"]), original: Map() }
 	for Id, Entry in Record["layouts"] {
 		Problem := _LayoutCatalogueInstalledEntryProblem(Id, Entry)
@@ -363,8 +373,15 @@ _LayoutCatalogueInstalledEntryProblem(Id, Entry) {
 		return "the entry is not an object"
 	if !Entry.Has("id") || Entry["id"] !== Id
 		return "its id field does not name this entry"
-	if !Entry.Has("sha256") || !Entry.Has("version") || !Entry.Has("size")
-		return "it has no verified checksum, version or size"
+	; A row needs no size: the checksum vouches for its copy (LayoutRegistry_Verify).
+	if !Entry.Has("sha256") || !(Entry["sha256"] is String)
+			|| !Entry.Has("version") || !(Entry["version"] is String)
+		return "it has no verified sha256 and version"
+	if Entry.Has("extension") {
+		Problem := LayoutExtension_Problem(Entry)
+		if Problem != ""
+			return "its extension is unusable: " . Problem
+	}
 	return ""
 }
 
@@ -394,10 +411,11 @@ _LayoutCatalogueSameValue(Left, Right) {
 
 ; A catalogue update owns the current index fields; future members remain raw.
 _LayoutCatalogueOverlayEntry(Entry, Original, OriginalText) {
-	global LAYOUT_CATALOGUE_RECORD_FIELDS
+	global LAYOUT_CATALOGUE_OWNED_FIELDS
 	Members := JsonObjectMemberSpans(OriginalText)
-	Owned := Map("extension", true)
-	for Field in LAYOUT_CATALOGUE_RECORD_FIELDS
+	Owned := Map()
+	Owned.CaseSense := "On"
+	for Field in LAYOUT_CATALOGUE_OWNED_FIELDS
 		Owned[Field] := true
 	Text := ""
 	for Field, Span in Members {
@@ -417,16 +435,21 @@ _LayoutCatalogueOverlayEntry(Entry, Original, OriginalText) {
 	return "{" . Text . "}"
 }
 
-; The record keeps the fields LAYOUT_CATALOGUE_RECORD_FIELDS names.
+; The record keeps the verified entry whole, detached from the index it came from.
 _LayoutCatalogueRecordEntry(Entry) {
-	global LAYOUT_CATALOGUE_RECORD_FIELDS
-	Kept := Map()
-	for Field in LAYOUT_CATALOGUE_RECORD_FIELDS
-		if Entry.Has(Field) && ((Entry[Field] is String) || (Entry[Field] is Integer))
-			Kept[Field] := Entry[Field]
-	if Entry.Has("extension")
-		Kept["extension"] := JsonParse(_LayoutCatalogueJson(Entry["extension"]))
-	return Kept
+	if Entry is Array {
+		Copy := []
+		for Item in Entry
+			Copy.Push(_LayoutCatalogueRecordEntry(Item))
+		return Copy
+	}
+	if !(Entry is Map)
+		return Entry
+	Copy := Map()
+	Copy.CaseSense := Entry.CaseSense
+	for Field, Item in Entry
+		Copy[Field] := _LayoutCatalogueRecordEntry(Item)
+	return Copy
 }
 
 /**
@@ -472,88 +495,7 @@ _LayoutCatalogueReadCache(LocalDir) {
 ; ============================
 ; ============================
 
-/**
- * Refreshes the catalogue with a conditional request for the registry index.
- * @param {string} LocalDir - Folder from LayoutRegistry_LocalDir.
- * @param {Func} OnDone - OnDone(Outcome), called exactly once (LayoutCatalogue_ResolveIndex).
- * @param {Map} Transport - See LayoutRegistry_Request; injectable for tests.
- * @param Bundled - Index shipped with the driver (0 for none); read from the
- *   shipped registry folder when omitted.
- * @param {Boolean} LocalSource - Use the checkout registry; defaults to the updater's source mode.
- */
-LayoutCatalogue_Refresh(LocalDir, OnDone, Transport := 0, Bundled := unset, LocalSource := unset) {
-	global LAYOUT_REGISTRY_PARTIAL_SUFFIX, LAYOUT_REGISTRY_USER_AGENT
-	global LAYOUT_CATALOGUE_SOURCE_BUNDLED, LAYOUT_CATALOGUE_SOURCE_NONE, LAYOUT_CATALOGUE_ERROR_INVALID_INDEX
-	Settings := LayoutRegistry_Settings()
-	if !IsSet(Bundled)
-		Bundled := LayoutCatalogue_BundledIndex()
-	LoggerStart("LayoutCatalogue", "Refreshing the layout catalogue…")
-	if !IsSet(LocalSource)
-		LocalSource := Updater_IsLocalSource()
-	if LocalSource {
-		Problem := LayoutCatalogue_IndexProblem(Bundled)
-		_LayoutCatalogueFinishRefresh(Map("index", Problem == "" ? Bundled : 0,
-			"source", Problem == "" ? LAYOUT_CATALOGUE_SOURCE_BUNDLED : LAYOUT_CATALOGUE_SOURCE_NONE,
-			"store", false, "etag", "", "error", Problem == "" ? 0
-				: Map("code", LAYOUT_CATALOGUE_ERROR_INVALID_INDEX, "detail", Problem)), OnDone)
-		return
-	}
-	try {
-		if !DirExist(LocalDir)
-			DirCreate(LocalDir)
-		Cached := _LayoutCatalogueReadCache(LocalDir)
-	} catch as Err {
-		_LayoutCatalogueFinishRefresh(LayoutCatalogue_ResolveIndex(0, "", "",
-			"cannot prepare " . LocalDir . ": " . Err.Message, 0, Bundled, Settings["max_file_bytes"]), OnDone)
-		return
-	}
-	Headers := Map("User-Agent", LAYOUT_REGISTRY_USER_AGENT)
-	if (Cached is Map) && (Cached["etag"] != "")
-		Headers["If-None-Match"] := Cached["etag"]
-	Partial := LocalDir . Settings["index_file"] . LAYOUT_REGISTRY_PARTIAL_SUFFIX
-	LayoutRegistry_Request(LayoutRegistry_RawUrl(Settings["index_file"]), Partial, Headers,
-		Settings["download_timeout_sec"] * 1000, Transport,
-		_LayoutCatalogueOnIndex.Bind(LocalDir, Partial, Cached, Bundled, OnDone))
-}
-
-_LayoutCatalogueOnIndex(LocalDir, Partial, Cached, Bundled, OnDone, Status, Etag, Err) {
-	global LAYOUT_CATALOGUE_ERROR_TOO_LARGE
-	Settings := LayoutRegistry_Settings()
-	Body := ""
-	if (Status == 200)
-		Body := FSReadBounded(Partial, Settings["max_file_bytes"])
-	if (Body is String)
-		Outcome := LayoutCatalogue_ResolveIndex(Status, Body, Etag, Err, Cached, Bundled, Settings["max_file_bytes"])
-	else
-		Outcome := LayoutCatalogue_Fallback(Map("code", LAYOUT_CATALOGUE_ERROR_TOO_LARGE,
-			"detail", "the registry index exceeds the download bound or cannot be read"), Cached, Bundled)
-	if Outcome["store"] {
-		try {
-			if !FSAtomicMoveReplace(Partial, LocalDir . Settings["index_file"])
-				throw Error("cannot publish the downloaded index in " . LocalDir)
-			EtagPath := LocalDir . Settings["etag_file"]
-			if (Outcome["etag"] != "")
-				_LayoutCatalogueWriteText(EtagPath, Outcome["etag"])
-			else if !FSDelete(EtagPath)
-				throw Error("cannot remove " . EtagPath)
-		} catch as Err {
-			LoggerError("LayoutCatalogue", "The refreshed layout index could not be cached: {1}", Err.Message)
-		}
-	}
-	if !FSDelete(Partial)
-		LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
-	_LayoutCatalogueFinishRefresh(Outcome, OnDone)
-}
-
-_LayoutCatalogueFinishRefresh(Outcome, OnDone) {
-	global _LayoutCatalogueLast
-	_LayoutCatalogueLast := Outcome
-	if (Outcome["error"] is Map)
-		LoggerWarn("LayoutCatalogue", "The layout catalogue shows the {1} index: {2} ({3}).", Outcome["source"],
-			Outcome["error"]["code"], Outcome["error"]["detail"])
-	LoggerSuccess("LayoutCatalogue", "Layout catalogue refreshed from the {1} index.", Outcome["source"])
-	OnDone.Call(Outcome)
-}
+#Include layout_catalogue_refresh.ahk
 
 /**
  * The last refresh outcome (index 0 and source "none" before any refresh).
@@ -695,24 +637,26 @@ _LayoutCatalogueOnInstallIndex(Id, LocalDir, Transport, Bundled, BundledDir, Fin
 	Url := LayoutRegistry_RawUrl(Entry["file"])
 	LayoutRegistry_Request(Url, Partial, Map("User-Agent", LAYOUT_REGISTRY_USER_AGENT),
 		LayoutRegistry_Settings()["download_timeout_sec"] * 1000, Transport,
-		_LayoutCatalogueOnLayout.Bind(Id, LocalDir, Entry, Url, Partial, Finish, Transport, BundledDir))
+		_LayoutCatalogueOnLayout.Bind(Id, LocalDir, Entry, Url, Finish, Transport, BundledDir))
 }
 
-_LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Partial, Finish, Transport, BundledDir, Status, Etag, Err) {
+_LayoutCatalogueOnLayout(Id, LocalDir, Entry, Url, Finish, Transport, BundledDir, Status, Etag, Err, OutputOwner) {
 	global LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, LAYOUT_CATALOGUE_SOURCE_NETWORK
 	try {
-		if (Status != 200)
-			throw Error((Status == 0) ? Err : "HTTP " . Status . " for " . Url)
-		Text := _LayoutRegistryReadText(Partial)
+		if Status != 200
+			throw Error(Status == 0 ? Err : "HTTP " . Status . " for " . Url)
+		Text := OutputOwner.ReadText(LayoutRegistry_Settings()["max_file_bytes"])
+		if !(Text is String)
+			throw Error("Cannot read the owned registry layout response.")
 		LayoutRegistry_Verify(Entry, Text)
+		; Publication uses this same sibling name. Finish the exact download
+		; first, while a foreign acquisition failure owns no cleanup authority.
+		if !OutputOwner.Remove()
+			throw Error("Cannot retire the owned registry layout response.")
 	} catch as Failure {
-		if !FSDelete(Partial)
-			LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
 		Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, Failure.Message)
 		return
 	}
-	if !FSDelete(Partial)
-		LoggerWarn("LayoutCatalogue", "Cannot remove the partial download {1}.", Partial)
 	_LayoutCatalogueFinishPublish(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_NETWORK, Finish, Transport, BundledDir)
 }
 
@@ -751,6 +695,45 @@ _LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, Source, Finish) {
 		return
 	}
 	Finish.Call(true, Map("entry", Installed[Id], "source", Source))
+}
+
+/**
+ * Installs the layout the user composed (docs/design/layout-composer.md): no catalogue
+ * and no download, the caller built the entry from the compiled file. The copy
+ * must still match the entry it is recorded with, so it is read back like any
+ * other installed layout.
+ * @param {Map} Entry - Record entry (id, name, version, file, size, sha256, keycode_convention...).
+ * @param {string} LocalDir - Folder from LayoutRegistry_LocalDir.
+ * @param {string} Text - The compiled .keylayout.
+ * @param {Func} OnDone - OnDone(true, Map("entry", Entry, "source", Source)) or
+ *   OnDone(false, FailureCode, Detail); called exactly once.
+ */
+LayoutCatalogue_InstallLocal(Entry, LocalDir, Text, OnDone) {
+	global LAYOUT_CATALOGUE_FAILURE_UNKNOWN_LAYOUT, LAYOUT_CATALOGUE_FAILURE_BUSY
+	global LAYOUT_CATALOGUE_FAILURE_RECORD, LAYOUT_CATALOGUE_FAILURE_INVALID, LAYOUT_CATALOGUE_SOURCE_COMPOSER
+	Id := (Entry is Map) && Entry.Has("id") ? Entry["id"] : ""
+	if !LayoutRegistry_IsValidId(Id) {
+		OnDone.Call(false, LAYOUT_CATALOGUE_FAILURE_UNKNOWN_LAYOUT, "'" . Id . "' is not a layout id")
+		return
+	}
+	if !_LayoutCatalogueAcquire(Id, "install") {
+		OnDone.Call(false, LAYOUT_CATALOGUE_FAILURE_BUSY, "another layout operation is still running")
+		return
+	}
+	LoggerStart("LayoutCatalogue", "Installing the '{1}' layout…", Id)
+	Finish := _LayoutCatalogueFinishInstall.Bind(Id, OnDone)
+	try LayoutRegistry_Verify(Entry, Text)
+	catch as Err {
+		Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_INVALID, Err.Message)
+		return
+	}
+	; The record is read before anything is written, like a registry install.
+	try LayoutCatalogue_ReadInstalled(LocalDir)
+	catch as Err {
+		Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_RECORD, Err.Message)
+		return
+	}
+	_LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_COMPOSER, Finish)
 }
 
 /**

@@ -12,11 +12,15 @@
 --- FEATURES & RATIONALE:
 --- 1. Listed only when it answers: the menu shows the last sweep's verdicts
 ---    and asks for a new sweep, asynchronously, when they are stale; the menu
----    is redrawn only when a verdict changed.
+---    is redrawn only when a verdict changed. That sweep starts after the menu
+---    build returns: its probes answer on the main run loop, which the build
+---    holds for about a second, so a probe dispatched from inside it spent its
+---    1.5 s deadline waiting and every server read as silent (issue #95).
 --- 2. Choosing a model is choosing the backend: the server's API entry is
 ---    stored (api_panel.apply_local_server), then the API backend is selected
 ---    if it was not, so predictions go to the server at once.
---- 3. Every failure offers its fix: a server that stopped answering, a key it
+--- 3. Inert with the AI off: no sweep, no live row, as on Windows (issue #97).
+--- 4. Every failure offers its fix: a server that stopped answering, a key it
 ---    wants and a model it no longer serves each post a notice whose click
 ---    searches again, asks for the key or asks for another model.
 --- ==============================================================================
@@ -24,12 +28,14 @@
 local M = {}
 
 local Logger        = require("infra.logger")
+local DeferredWork  = require("infra.deferred_work")
 local i18n          = require("infra.i18n")
 local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local llm_mod       = require("modules.llm")
 local ApiPanel      = require("ui.menu.menu_llm.api_panel")
 local ServerMenu    = require("llm.local_server_menu")
+local TextUtils = require("text_utils")
 
 local LOG = "menu_llm.local_servers"
 
@@ -37,6 +43,8 @@ local LOG = "menu_llm.local_servers"
 local _ctx = nil
 -- The AI agent menu's context: a missing model of a System is fixed through it
 local _agent_ctx = nil
+-- True while a stale-verdict sweep waits for the menu build to return
+local _rescan_deferred = false
 
 
 
@@ -58,6 +66,86 @@ end
 --- @return table modules/llm/local_servers.lua
 local function servers()
 	return require("modules.llm.local_servers")
+end
+
+--- Requires the actual pause owner, including after a retained menu or dialog.
+--- @param ctx table
+--- @return boolean
+local function admitted(ctx)
+	if type(ctx) ~= "table" or ctx.paused == true or type(ctx.is_paused) ~= "function" then return false end
+	local ok, paused = pcall(ctx.is_paused)
+	return ok and type(paused) == "boolean" and paused == false
+end
+
+--- Whether the user switched the AI on. With the AI off the rows stay inert
+--- and no sweep probes the servers behind it (issue #97).
+--- @param ctx table|nil Engine menu context.
+--- @return boolean
+local function ai_enabled(ctx)
+	return type(ctx) == "table" and type(ctx.state) == "table" and ctx.state.llm_enabled == true
+end
+
+--- Captures an originating entry and current jointly published model view.
+--- @param id string
+--- @return table|nil
+local function capture_view(id)
+	local target = remote().local_server_target(id)
+	if not target then return nil end
+	local models, verdict = {}, servers().result(id)
+	for index, model in ipairs(verdict and verdict.models or {}) do models[index] = model end
+	return { target = target, generation = remote().get_identity_generation(),
+		verdict = verdict, models = models }
+end
+
+--- Rechecks the exact native identity and optionally the admitted model choice.
+--- @param ctx table
+--- @param held table|nil
+--- @param model string|nil
+--- @return boolean
+local function view_current(ctx, held, model)
+	if not admitted(ctx) or not held or held.generation ~= remote().get_identity_generation() then return false end
+	if held.notice_context ~= nil and (ctx ~= held.notice_context or _ctx ~= ctx) then return false end
+	if held.notice_agent_owned == true and _agent_ctx ~= held.notice_agent_context then return false end
+	local current = remote().local_server_target(held.target.id)
+	if not current then return false end
+	for _, key in ipairs({ "id", "entry_id", "provider", "base_url", "token" }) do
+		if current[key] ~= held.target[key] then return false end
+	end
+	if model ~= nil then
+		local verdict = servers().result(held.target.id)
+		if not verdict or verdict ~= held.verdict or verdict.status ~= servers().STATUS_UP
+			or #verdict.models ~= #held.models then return false end
+		local found = false
+		for index, value in ipairs(verdict.models) do
+			if value ~= held.models[index] then return false end
+			if value == model then found = true end
+		end
+		return found
+	end
+	return true
+end
+
+--- Binds a deferred notification action to the exact menu and native view.
+--- @param id string Original server id.
+--- @param action function Receives the originating context and view receipt.
+--- @param owns_agent boolean|nil Also retains the agent context for a model repair.
+--- @return function callback Refuses a replaced owner before acquiring any work.
+local function notice_action(id, action, owns_agent)
+	local ctx, held = _ctx, capture_view(id)
+	if held then
+		held.notice_context = ctx
+		if owns_agent == true then
+			held.notice_agent_owned = true
+			held.notice_agent_context = _agent_ctx
+		end
+	end
+	return function()
+		if not view_current(ctx, held) then
+			Logger.warn(LOG, "Local server notification action expired after its owner changed.")
+			return false
+		end
+		return action(ctx, held)
+	end
 end
 
 --- The host and port of a base URL, for a row or a notice.
@@ -92,7 +180,7 @@ local function ask(message, informative, default, secure)
 		return nil
 	end
 	if button ~= ok_label or type(typed) ~= "string" then return nil end
-	return (typed:gsub("^%s+", ""):gsub("%s+$", ""))
+	return TextUtils.trim(typed)
 end
 
 --- Sweeps the servers again and redraws the menu when a verdict changed.
@@ -100,6 +188,7 @@ end
 --- @param on_done function|nil Called once the sweep settled.
 --- @return boolean started
 function M.rescan(ctx, on_done)
+	if not admitted(ctx) then return false end
 	return remote().detect_local_servers(function(changed)
 		if changed and ctx and type(ctx.update_menu) == "function" then
 			local ok, err = pcall(ctx.update_menu)
@@ -125,21 +214,27 @@ end
 --- @param on_selected function|nil Receives true once the API backend serves
 ---        the model, false when the entry or the backend switch did not commit.
 --- @return boolean started
-function M.select_model(ctx, id, model, on_selected)
+function M.select_model(ctx, id, model, on_selected, receipt)
+	local held = receipt or capture_view(id)
+	if not view_current(ctx, held, receipt and model or nil) then return false end
 	Logger.info(LOG, "Local server '%s' model '%s' chosen.", id, model)
 	return ApiPanel.apply_local_server(ctx, id, { model = model }, function(committed)
-		if committed and ctx.state.llm_backend ~= "api" and type(ctx.activate_api) == "function" then
-			ctx.activate_api()
+		local activated = ctx.state.llm_backend == "api"
+		if committed == true and admitted(ctx) and not activated and type(ctx.activate_api) == "function" then
+			local ok, accepted = Logger.callback(LOG, "Local server backend selection", ctx.activate_api)
+			activated = ok == true and accepted == true
 		end
 		if type(on_selected) == "function" then
-			local selected = committed == true and ctx.state.llm_backend == "api"
+			local active = remote().get_active_entry()
+			local selected = committed == true and admitted(ctx) and activated and ctx.state.llm_backend == "api"
+				and type(active) == "table" and remote().local_server_entry(id) == active and active.model == model
 			if committed == true and not selected then
 				-- Leaving MLX waits for its server to stop: the switch lands later
 				Logger.warn(LOG, "Local server '%s' is stored; the API backend is not selected yet.", id)
 			end
 			on_selected(selected)
 		end
-	end)
+	end, function() return view_current(ctx, held, receipt and model or nil) end)
 end
 
 --- Makes a server the prediction backend from outside the engine menu (the
@@ -161,54 +256,69 @@ end
 --- @param ctx table Engine menu context.
 --- @param id string Server id.
 --- @return boolean started
-function M.prompt_address(ctx, id)
-	local server = servers().SERVERS[id]
+function M.prompt_address(ctx, id, receipt)
+	local held = receipt or capture_view(id)
+	if not view_current(ctx, held) then return false end
+	local server = remote().local_server_descriptor(id)
 	local current = remote().local_server_target(id).base_url
 	local typed = ask(i18n.get("menu.llm.local_servers.header"),
 		i18n.format("dialog.local_servers.address_prompt", server.label, server.base_url), current)
-	if typed == nil then return false end
+	if typed == nil or not view_current(ctx, held) then return false end
 	if typed == "" then typed = server.base_url end
 	local base = remote().normalize_base_url(typed)
 	if not base then
+		if _ctx ~= ctx then
+			Logger.warn(LOG, "Local server address retry expired after its menu owner changed.")
+			return false
+		end
 		notify(server.label, i18n.format("llm.local_servers.invalid_address", server.base_url), "error",
-			function() M.prompt_address(ctx, id) end)
+			notice_action(id, function(ctx, held) return M.prompt_address(ctx, id, held) end))
 		return false
 	end
 	return ApiPanel.apply_local_server(ctx, id, { base_url = base }, function(committed)
 		if committed then M.rescan(ctx, function() M.report_sweep(id) end) end
-	end)
+	end, function() return view_current(ctx, held) end)
 end
 
 --- Asks for the key a server wants, stores it and searches again.
 --- @param ctx table Engine menu context.
 --- @param id string Server id.
 --- @return boolean started
-function M.prompt_key(ctx, id)
-	local server = servers().SERVERS[id]
+function M.prompt_key(ctx, id, receipt)
+	local held = receipt or capture_view(id)
+	if not view_current(ctx, held) then return false end
+	local server = remote().local_server_descriptor(id)
 	local typed = ask(i18n.get("menu.llm.local_servers.header"),
 		i18n.format("dialog.local_servers.key_prompt", server.label), "", true)
-	if typed == nil then return false end
+	if typed == nil or not view_current(ctx, held) then return false end
 	return ApiPanel.apply_local_server(ctx, id, { token = typed }, function(committed)
 		if committed then M.rescan(ctx, function() M.report_sweep(id) end) end
-	end)
+	end, function() return view_current(ctx, held) end)
 end
 
 --- Says what a new search found about one server.
 --- @param id string Server id.
 function M.report_sweep(id)
-	local server = servers().SERVERS[id]
+	local server = remote().local_server_descriptor(id)
 	local verdict = servers().result(id)
 	local target = remote().local_server_target(id)
+	if not server or not target then return false end
 	if verdict and verdict.status == servers().STATUS_UP then
 		notify(server.label, i18n.format("llm.local_servers.found_body", #verdict.models), "success")
 	elseif verdict and verdict.status == servers().STATUS_NEEDS_KEY then
 		notify(i18n.format("llm.local_servers.needs_key_title", server.label),
 			i18n.format("llm.local_servers.needs_key_body", server.label), "warning",
-			function() M.prompt_key(_ctx, id) end)
+			notice_action(id, function(ctx, held) return M.prompt_key(ctx, id, held) end))
+	elseif verdict and verdict.status == servers().STATUS_UNAVAILABLE then
+		notify(server.label, i18n.get("healthcheck.status.failed"), "error")
 	else
 		notify(i18n.format("llm.local_servers.not_running_title", server.label),
 			i18n.format("llm.local_servers.still_down_body", host_of(target.base_url)), "warning",
-			function() M.rescan(_ctx, function() M.report_sweep(id) end) end)
+			notice_action(id, function(ctx, held)
+				return M.rescan(ctx, function()
+					if view_current(ctx, held) then M.report_sweep(id) end
+				end)
+			end))
 	end
 end
 
@@ -236,18 +346,27 @@ end
 --- Searches again, then asks which of the served models replaces a missing one.
 --- @param id string Server id.
 --- @param missing string|nil The model the server refused.
-function M.prompt_model(id, missing)
-	M.rescan(_ctx, function()
-		local server = servers().SERVERS[id]
+--- @param ctx table|nil Originating menu context, or the current context for a direct action.
+--- @param receipt table|nil Retained source view for a notification action.
+--- @return boolean started
+function M.prompt_model(id, missing, ctx, receipt)
+	ctx = ctx or _ctx
+	local held = receipt or capture_view(id)
+	if not view_current(ctx, held) then return false end
+	return M.rescan(ctx, function()
+		if not view_current(ctx, held) then return end
+		local server = remote().local_server_descriptor(id)
 		local verdict = servers().result(id)
 		if not verdict or verdict.status ~= servers().STATUS_UP then
 			M.report_sweep(id)
 			return
 		end
+		local prompted = capture_view(id)
 		local typed = ask(i18n.format("llm.local_servers.model_missing_title", server.label, missing or "?"),
 			i18n.format("dialog.local_servers.model_prompt", server.label, table.concat(verdict.models, ", ")),
 			verdict.models[1] or "")
-		if typed == nil or typed == "" then return end
+		if typed == nil or typed == "" or not view_current(ctx, held)
+			or not view_current(ctx, prompted) or servers().result(id) ~= verdict then return end
 		replace_model(id, missing, typed)
 	end)
 end
@@ -258,19 +377,25 @@ end
 --- @param kind string A FAILURE_* value of modules/llm/local_servers.lua.
 --- @param detail table { status, message, model }.
 local function on_failure(id, kind, detail)
-	local server = servers().SERVERS[id]
+	local server = remote().local_server_descriptor(id)
 	if kind == servers().FAILURE_NOT_RUNNING then
 		notify(i18n.format("llm.local_servers.not_running_title", server.label),
 			i18n.format("llm.local_servers.not_running_body", host_of(remote().local_server_target(id).base_url)),
-			"warning", function() M.rescan(_ctx, function() M.report_sweep(id) end) end)
+			"warning", notice_action(id, function(ctx, held)
+				return M.rescan(ctx, function()
+					if view_current(ctx, held) then M.report_sweep(id) end
+				end)
+			end))
 	elseif kind == servers().FAILURE_NEEDS_KEY then
 		notify(i18n.format("llm.local_servers.needs_key_title", server.label),
 			i18n.format("llm.local_servers.needs_key_body", server.label), "warning",
-			function() M.prompt_key(_ctx, id) end)
+			notice_action(id, function(ctx, held) return M.prompt_key(ctx, id, held) end))
 	elseif kind == servers().FAILURE_MODEL_MISSING then
 		notify(i18n.format("llm.local_servers.model_missing_title", server.label, detail.model or "?"),
 			i18n.get("llm.local_servers.model_missing_body"), "warning",
-			function() M.prompt_model(id, detail.model) end)
+			notice_action(id, function(ctx, held)
+				return M.prompt_model(id, detail.model, ctx, held)
+			end, true))
 	end
 end
 M.on_failure = on_failure
@@ -303,19 +428,30 @@ function M.rows(ctx)
 	end
 	_ctx = ctx
 	servers().set_failure_handler(on_failure)
-	-- A paused script sends nothing: the rows keep the last verdicts
-	if not ctx.paused and servers().is_stale() then M.rescan(ctx) end
-
+	-- Source provenance is refreshed before cache age can grant a model view.
+	api_remote.refresh_local_server_views()
+	if admitted(ctx) and ai_enabled(ctx) and servers().is_stale() and not _rescan_deferred then
+		_rescan_deferred = true
+		local scheduled = DeferredWork.after(0, function()
+			_rescan_deferred = false
+			-- A switch-off before the build returned drops the queued sweep.
+			if ai_enabled(_ctx) then M.rescan(_ctx) end
+		end, "menu_llm.local_servers.rescan")
+		if not scheduled then _rescan_deferred = false end
+	end
 	local data = servers()
+	local receipts = {}
+	for _, id in ipairs(data.view_order()) do receipts[id] = capture_view(id) end
 	return ServerMenu.rows({
-		order = data.ORDER, servers = data.SERVERS, detected = data.detected(),
-		result = data.result, sweeping = data.is_sweeping(), paused = ctx.paused,
+		order = data.view_order(), servers = data.view_servers(), detected = data.detected(),
+		result = data.result, sweeping = data.is_sweeping(), paused = not admitted(ctx) or not ai_enabled(ctx),
 		backend = ctx.state.llm_backend, active = remote().get_active_entry(),
+		entry_id = function(id) local entry = remote().local_server_entry(id); return entry and entry.id end,
 		tr = i18n.get, format = i18n.format,
 		actions = {
-			select = function(id, model) return M.select_model(ctx, id, model) end,
-			address = function(id) return M.prompt_address(ctx, id) end,
-			key = function(id) return M.prompt_key(ctx, id) end,
+			select = function(id, model) return M.select_model(ctx, id, model, nil, receipts[id]) end,
+			address = function(id) return M.prompt_address(ctx, id, receipts[id]) end,
+			key = function(id) return M.prompt_key(ctx, id, receipts[id]) end,
 			rescan = function() return M.rescan(ctx) end,
 		},
 	})

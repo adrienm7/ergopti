@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local TomlReader = require("infra.toml.reader")
+local NativePath = require("native_path")
 
 local D = {}
 
@@ -67,10 +68,10 @@ local function shared_defaults_path()
 	-- Fallback: walk up from this file.
 	-- macos/platform/remap/defaults.lua → … → ergopti_plus → /_shared.
 	local src = debug.getinfo(1, "S").source:gsub("^@", "")
-	local dir = src:match("^(.*)[/\\][^/\\]+$") or src   -- → macos/platform/remap
-	dir = dir:match("^(.*)[/\\][^/\\]+$") or dir          -- → macos/modules
-	dir = dir:match("^(.*)[/\\][^/\\]+$") or dir          -- → macos
-	local ergopti_plus = dir:match("^(.*)[/\\][^/\\]+$") or dir  -- → ergopti_plus
+	local dir = NativePath.dirname(src) or src             -- → macos/platform/remap
+	dir = NativePath.dirname(dir) or dir                    -- → macos/platform
+	dir = NativePath.dirname(dir) or dir                    -- → macos
+	local ergopti_plus = NativePath.dirname(dir) or dir     -- → ergopti_plus
 	return ergopti_plus .. "/_shared/tap_hold/defaults.toml"
 end
 
@@ -113,8 +114,14 @@ D.rollover_keys = require("tap_hold.key_catalog").load_rollover(shared_defaults_
 
 -- ----- Timeouts + flags ([hs_timeouts]) -----
 local timeouts = require_section(sections, "hs_timeouts")
-D.tap_hold_timeout_ms        = timeouts.tap_hold_timeout_ms        -- KE basic.to_if_alone_timeout_milliseconds
-D.sticky_timeout_ms          = timeouts.sticky_timeout_ms          -- One-shot modifier auto-cancel delay
+-- Global tap/hold delay (KE basic.to_if_alone_timeout_milliseconds) of every key
+-- that has no delay of its own: the timing registry's tap_hold.default_activation_ms,
+-- the one declaration Windows and Linux read too (PAR-15). No key ships a delay.
+D.tap_hold_timeout_ms        = require("infra.timings").ms("tap_hold", "default_activation_ms")
+-- One-shot modifier auto-cancel delay: the cross-driver timing registry's value
+-- (tap_hold.one_shot_shift_timeout_ms), the one Windows and Linux read, so the
+-- three drivers cancel a one-shot Shift after the same time (PAR-15).
+D.sticky_timeout_ms          = require("infra.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
 D.simultaneous_threshold_ms  = timeouts.simultaneous_threshold_ms  -- Combo activation window
 D.combo_symmetric            = timeouts.combo_symmetric            -- A+B == B+A for the chord slot
 

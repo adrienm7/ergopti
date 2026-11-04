@@ -11,6 +11,8 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -20,8 +22,8 @@
 ; (which item greys out on which toggle) lives once in menu_manifest.json
 ; instead of being re-derived per handler.
 global _MET_STATE_GETTERS := Map(
-	"keylogger_enabled",       () => MetricsShortcuts.enabled,
-	"wpm_widget_visible",      () => WPMWidget.visible,
+	"keystats_enabled",       () => MetricsShortcuts.enabled,
+	ConfigLeaf.WPM_WIDGET_VISIBLE,      () => WPMWidget.visible,
 	"metrics_widget_colors",   () => WPMWidget.use_colors,
 	"metrics_widget_graph",    () => WPMWidget.show_graph,
 	; Read by the manifest's checked_when predicates, so the checkmark state is
@@ -32,11 +34,13 @@ global _MET_STATE_GETTERS := Map(
 	; The encryption row became `check` on 2026-08-07, so its tick is read here
 	; instead of being set by a handler.
 	"metrics_encrypt_enabled", () => KL_Enc_IsEnabled(),
+	; The user's pause from the Metrics menu, ticked from the pause state itself.
+	"metrics_suspended",       () => KL_IsCollectionSuspended(),
 )
 
 ; Build the « 📊 Métriques » submenu. The caller publishes the completed tree
 ; to the tray, so expensive renderer work never runs after the live root has
-; been cleared. Its first row is the category switch for the global keylogger
+; been cleared. Its first row is the category switch for the global keystats
 ; feature: ticked from MetricsShortcuts.enabled, and clicking it runs
 ; ToggleMetricsEnabled() with a confirmation dialog before turning ON. The
 ; parent entry carries the same tick but cannot be clicked: a Win32 item that
@@ -53,17 +57,19 @@ BuildMetricsMenu() {
 	DynHandlers := Map()
 	Commands := _MET_ScopeCommands()
 	for Id, Handler in Map(
-		"metrics_toggle",  (*) => ToggleMetricsEnabled(),
-		"wpm_widget",      (*) => _ToggleWpmWidget(),
-		"widget_colors",   (*) => _ToggleWpmWidgetColors(),
-		"include_realtime", (*) => _ToggleWpmWidgetGraph(),
-		"filter_private",  ToggleFilterPrivate,
-		"filter_secure",   ToggleFilterSecureField,
-		"filter_sysauth",  ToggleFilterSystemAuth,
+		MenuCommand.METRICS_TOGGLE,  (*) => ToggleMetricsEnabled(),
+		MenuCommand.WPM_WIDGET,      (*) => _ToggleWpmWidget(),
+		MenuCommand.WIDGET_COLORS,   (*) => _ToggleWpmWidgetColors(),
+		MenuCommand.INCLUDE_REALTIME, (*) => _ToggleWpmWidgetGraph(),
+		MenuCommand.FILTER_PRIVATE,  ToggleFilterPrivate,
+		MenuCommand.FILTER_SECURE,   ToggleFilterSecureField,
+		MenuCommand.FILTER_SYSAUTH,  ToggleFilterSystemAuth,
 		"encryption",         ToggleAtRestEncryption,
-		"reset_wpm_position", (*) => WPMWidget_ResetPosition(),
-		"show_typing",     KLUI_ToggleTyping,
-		"show_apps",       KLUI_ToggleApps,
+		MenuCommand.RESET_WPM_POSITION, (*) => WPMWidget_ResetPosition(),
+		MenuCommand.SHOW_TYPING,     KLUI_ToggleTyping,
+		MenuCommand.SHOW_APPS,       KLUI_ToggleApps,
+		MenuCommand.METRICS_SUSPEND, (*) => ToggleMetricsCollectionPause(),
+		MenuCommand.METRICS_RESET_SESSION, (*) => ResetMetricsSession(),
 	)
 		Commands[Id] := Handler
 
@@ -73,6 +79,35 @@ BuildMetricsMenu() {
 	)
 
 	return MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers, "", ListProviders, Commands, _MET_STATE_GETTERS)
+}
+
+; The Metrics menu's pause row. Pausing stores the text already typed, then stops
+; recording until the row is ticked off or the driver reloads; the tick is
+; repainted from the pause state itself.
+ToggleMetricsCollectionPause(SuspendFn := 0, ResumeFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return ToggleMetricsCollectionPause(SuspendFn, ResumeFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	if KL_IsCollectionSuspended()
+		HasMethod(ResumeFn, "Call") ? ResumeFn.Call() : KL_ResumeCollection()
+	else
+		HasMethod(SuspendFn, "Call") ? SuspendFn.Call() : KL_SuspendCollection()
+	return _MET_RebuildWidgetMenu(RebuildFn)
+}
+
+; The Metrics menu's session-reset row: ends the typing session, stores what is
+; pending, and restarts the live figures. Stored history is untouched.
+ResetMetricsSession(ResetFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return ResetMetricsSession(ResetFn)
+		finally Critical(InheritedCritical)
+	}
+	return HasMethod(ResetFn, "Call") ? ResetFn.Call() : KL_ResetSession()
 }
 
 ; List provider: App exclusion — label reflects current count.
@@ -91,6 +126,6 @@ _MET_ExcludeAppsRows(Getters) {
 ; The Configuration clear still composes the metrics settings.
 _MET_ScopeCommands(Options := unset) {
 	Commands := ConfigScopeMenuCommands("metrics", Map(), IsSet(Options) ? Options : Map())
-	Commands.Delete("scope_clear")
+	Commands.Delete(MenuCommand.SCOPE_CLEAR)
 	return Commands
 }

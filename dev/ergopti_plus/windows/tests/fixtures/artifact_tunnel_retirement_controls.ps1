@@ -25,11 +25,20 @@ public static class ErgoptiArtifactTunnelRetirementControls {
         public volatile bool Stopping;
         public int Failures, CloseState;
         public bool ReceiverAliveAtRefusal;
-        public Exception RequestFailure, OriginFailure;
+        public Exception RequestFailure, OriginFailure, ResponseFailure;
         public string FailureOperation, RequestSite;
     }
     static void Require(bool value,string field) {
         if(!value) throw new InvalidDataException("Actual full-duplex control refused: "+field);
+    }
+    static string Describe(Exception failure) {
+        return failure==null ? "none" : failure.GetType().FullName+" ("+failure.Message+")";
+    }
+    // A refused duplex names the mode and every observed failure, not just the field.
+    static string Observed(State state,string mode) {
+        return mode+": request="+Describe(state.RequestFailure)+" at "+(state.RequestSite??"none")+
+            ", origin="+Describe(state.OriginFailure)+", response="+Describe(state.ResponseFailure)+
+            " on "+(state.FailureOperation??"none")+", failures="+state.Failures;
     }
     static void Equal(byte[] literal,byte[] actual,int count) {
         Require(count==literal.Length,"byte_count");
@@ -53,7 +62,7 @@ public static class ErgoptiArtifactTunnelRetirementControls {
             NetworkStream source=client.Reader.GetStream(), remote=origin.Writer.GetStream(), external=client.Writer.GetStream();
             reverse=new Thread(delegate() {
                 try { response.Invoke(null,new object[]{remote,source,new Action<string,Exception>(delegate(string operation,Exception failure) {
-                    if(!state.Stopping) { state.FailureOperation=operation; Interlocked.Increment(ref state.Failures); }
+                    if(!state.Stopping) { state.FailureOperation=operation; state.ResponseFailure=failure; Interlocked.Increment(ref state.Failures); }
                 })}); }
                 finally { client.Reader.Close(); }
             }); reverse.IsBackground=true; reverse.Start();
@@ -101,7 +110,7 @@ public static class ErgoptiArtifactTunnelRetirementControls {
             Require(forward.Join(3000),"forward_retirement"); Require(reverse.Join(3000),"reverse_retirement");
             Require(target.Join(3000),"origin_retirement");
             if(mode=="request_eof" || mode=="response_first") {
-                Require(state.RequestFailure==null && state.OriginFailure==null && state.Failures==0,"successful_duplex");
+                Require(state.RequestFailure==null && state.OriginFailure==null && state.Failures==0,"successful_duplex "+Observed(state,mode));
                 byte[] actual=new byte[128]; Equal(reply,actual,ReadUntilEof(external,actual));
                 Require(state.CloseState==2 && !reverse.IsAlive,"full_close_after_receiver");
             } else if(mode=="unfinished") {
@@ -129,12 +138,36 @@ public static class ErgoptiArtifactTunnelRetirementControls {
             Require(retired,"exact_component_threads_retired");
         }
     }
+    // The finished receiver closes the client to end the request copy. When
+    // that close lands before the copy's next read, the read reports
+    // ObjectDisposedException instead of IOException; response_first lost
+    // that race about once in 25 runs. Pin the late side deterministically.
+    static void DisposedSource(System.Reflection.MethodInfo request) {
+        Pair origin=null, client=null; string site=null;
+        try {
+            origin=new Pair(); client=new Pair();
+            NetworkStream source=client.Reader.GetStream(), remote=origin.Writer.GetStream();
+            Thread retired=new Thread(delegate() { }); retired.IsBackground=true; retired.Start();
+            Require(retired.Join(3000),"disposed_source_receiver_retired");
+            client.Reader.Close();
+            try { request.Invoke(null,new object[]{source,remote,origin.Writer,retired,new Action<string>(delegate(string value) { site=value; })}); }
+            catch(System.Reflection.TargetInvocationException failure) {
+                Require(false,"disposed_source_ends_request "+Describe(failure.InnerException)+" at "+(site??"none"));
+            }
+            Require(site=="join_receiver","disposed_source_joins_receiver");
+            byte[] tail=new byte[16];
+            Require(ReadUntilEof(origin.Reader.GetStream(),tail)==0,"disposed_source_half_closes_origin");
+        } finally {
+            if(origin!=null) origin.Dispose(); if(client!=null) client.Dispose();
+        }
+    }
     public static int Run() {
         System.Reflection.MethodInfo request=typeof(ErgoptiArtifactNtlmProxy).GetMethod("CopyRequestAndRetireResponse",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic);
         System.Reflection.MethodInfo response=typeof(ErgoptiArtifactNtlmProxy).GetMethod("CopyResponse",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic);
         Require(request!=null && response!=null,"actual_source_methods");
         foreach(string mode in new string[]{"request_eof","response_first","foreign_write","foreign_origin","unfinished","cancel"}) Case(request,response,mode);
-        return 6;
+        DisposedSource(request);
+        return 7;
     }
 }
 '@

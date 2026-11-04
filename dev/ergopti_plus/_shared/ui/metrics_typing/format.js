@@ -154,10 +154,10 @@ const tooltipTitleCallback = (context) => {
 		_t('ui_typing.day_6')
 	];
 	const d = new Date(context[0].parsed.x);
-	const dayName = days[d.getDay()];
-	const dd = String(d.getDate()).padStart(2, '0');
-	const mm = String(d.getMonth() + 1).padStart(2, '0');
-	const yyyy = d.getFullYear();
+	const dayName = days[d.getUTCDay()];
+	const dd = String(d.getUTCDate()).padStart(2, '0');
+	const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+	const yyyy = d.getUTCFullYear();
 	return `${dayName} ${dd}/${mm}/${yyyy}`;
 };
 
@@ -203,31 +203,20 @@ function format_display_key(str) {
  * @returns {string} HTML string of adjacent chip spans.
  */
 function format_seq_chips(str) {
-	// Split on bracketed markers (e.g. "[BS]", "[LEFT]") preserving the delimiters
-	const parts = str.split(/(\[[^\]]+\])/i).filter((p) => p.length > 0);
-
-	return parts
-		.map((part) => {
-			const lower = part.toLowerCase();
-
-			// Bracketed special marker → look up in CONTROL_KEY_LABELS for symbol
-			if (/^\[[^\]]+\]$/.test(part)) {
+	return key_tokens(str)
+		.map((token) => {
+			// Marker → look up in CONTROL_KEY_LABELS for symbol
+			if (is_key_marker(token)) {
+				const lower = token.toLowerCase();
 				const sym = CONTROL_KEY_SYMBOLS[lower] ?? lower.toUpperCase();
 				return `<span class="shortcut-chip shortcut-key-control">${escape_html(sym)}</span>`;
 			}
-
-			// Regular character run — split grapheme by grapheme
-			return Array.from(part)
-				.map((ch) => {
-					if (ch === '\u00A0')
-						return `<span class="shortcut-chip shortcut-key-control">NBSP</span>`;
-					if (ch === '\u202F')
-						return `<span class="shortcut-chip shortcut-key-control">NNBSP</span>`;
-					if (ch === ' ') return `<span class="shortcut-chip shortcut-key-control">Space</span>`;
-					if (ch === '\n') return `<span class="mono-space seq-space">&#x21B5;</span>`;
-					return `<span class="mono-space">${escape_html(ch)}</span>`;
-				})
-				.join('');
+			if (token === '\u00A0') return `<span class="shortcut-chip shortcut-key-control">NBSP</span>`;
+			if (token === '\u202F')
+				return `<span class="shortcut-chip shortcut-key-control">NNBSP</span>`;
+			if (token === ' ') return `<span class="shortcut-chip shortcut-key-control">Space</span>`;
+			if (token === '\n') return `<span class="mono-space seq-space">&#x21B5;</span>`;
+			return `<span class="mono-space">${escape_html(token)}</span>`;
 		})
 		.join('');
 }

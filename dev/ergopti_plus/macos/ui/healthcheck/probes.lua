@@ -27,6 +27,14 @@
 ---    is the whole peripherals list, USB devices first.
 --- 6. A run is cancelled as a whole when the window closes or refreshes, and a
 ---    late answer of a cancelled run publishes nothing.
+--- 7. configuration reads and reduces the user's configuration files on a
+---    timer after phase A. It reads only local files, so it also runs without
+---    the extensive opt-in (local_only), and an answer past its timeout_ms is a
+---    timeout without sections.
+--- 8. local_state reads the main-thread facts phase A leaves out (the
+---    versions, the keyboard state, the USB devices, the Wi-Fi signal, the
+---    module contract check) in slices of the phase A budget, on timers after
+---    phase A; local, like the configuration.
 --- ==============================================================================
 
 local M = {}
@@ -41,6 +49,9 @@ local DF = "/bin/df"
 
 -- ps prints this process's processor share (100 = one core) and resident memory (KiB)
 local PS = "/bin/ps"
+
+-- scutil prints the system proxy settings, among them the PAC URL
+local SCUTIL = "/usr/sbin/scutil"
 
 -- system_profiler lists the Bluetooth devices hs.usb cannot see
 local SYSTEM_PROFILER = "/usr/sbin/system_profiler"
@@ -107,7 +118,11 @@ local function start_probe(run, id, timeout_ms, body)
 			Logger.done(LOG, "Probe '%s' cancelled after %d ms.", id, result.ms)
 			return
 		end
-		Logger.done(LOG, "Probe '%s' answered: %s (%d ms).", id, result.state, result.ms)
+		-- A failed answer carries its detail into the log: the diagnostics window
+		-- closes, and a field report holds only the log (issue #104).
+		local detail = result.state ~= "ok" and type(result.detail) == "string" and result.detail ~= ""
+			and (": " .. result.detail) or ""
+		Logger.done(LOG, "Probe '%s' answered: %s (%d ms)%s.", id, result.state, result.ms, detail)
 		run.publish(id, result, sections)
 	end
 	run.finishers[#run.finishers + 1] = function()
@@ -244,6 +259,35 @@ local function run_task(executable, args, on_cancel, on_output, on_failure)
 	end)
 	on_cancel(function() handle.terminate() end)
 	if not handle.start() then on_failure(executable .. " could not start") end
+end
+
+--- The system proxy auto-config (PAC): configured, downloadable and usable by the
+--- managed downloader. The URL is read and fetched here but never reported.
+--- @return function Probe body.
+local function proxy_pac()
+	return function(done, on_cancel)
+		local PacCheck = require("network.pac_check")
+		run_task(SCUTIL, { "--proxy" }, on_cancel, function(stdout)
+			local url = PacCheck.url_from_scutil(stdout)
+			if not url then
+				done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } })
+				return
+			end
+			local client = require("adapters.http_client").new({ timeout_ms = 6000 })
+			on_cancel(function() client.cancel() end)
+			client.get(url, { ["User-Agent"] = USER_AGENT }, function(result)
+				local state, text = PacCheck.judge(result.status, result.body, result.error)
+				if state == "ok" then
+					done({ state = "ok" }, { network = { proxy_pac = text } })
+				else
+					-- The managed downloads go direct after such a failure (network-retry.sh).
+					done({ state = "error", detail = PacCheck.with_direct_fallback(text) })
+				end
+			end)
+		end, function(detail)
+			done({ state = "error", detail = detail })
+		end)
+	end
 end
 
 --- The model, processor and cores from sysctl, and the logs volume's free
@@ -394,11 +438,83 @@ function M.bluetooth_devices(json, detailed)
 	return items
 end
 
---- The Bluetooth input devices, after the USB ones phase A listed.
---- @param usb_items table The snapshot's peripherals items.
+--- The user's configuration files and settings, read on a timer after phase A:
+--- local files only, so it needs no opt-in. Its answer is the two sections;
+--- one that arrives after its timeout is discarded as a timeout.
+--- @param schema table
+--- @param overrides table|nil Replacements for tests (see helpers.configuration_context).
+--- @return function Probe body.
+local function configuration(schema, overrides)
+	return function(done, on_cancel)
+		local Timers = require("adapters.timer_scheduler")
+		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_yield_ms"), function()
+			local context = require("ui.healthcheck.helpers").configuration_context(schema, overrides)
+			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
+			if not ok then
+				done({ state = "error", cleanup = "settled", detail = tostring(result):match("^[^\n]*") })
+				return
+			end
+			done(result, sections)
+		end)
+		on_cancel(function() Timers.cancel(handle) end)
+	end
+end
+
+--- The main-thread facts phase A leaves out (ui.healthcheck.core
+--- local_state_steps: the Wi-Fi signal, the module contract check), run in
+--- slices between run-loop turns: each slice stops once it has held the main
+--- thread for the phase A budget, so opening the window never stalls the
+--- event taps behind them. A raising step costs its own fact and turns the
+--- answer into an error that still carries the others.
+--- @param slice_ms number The phase A budget, the most one slice may hold.
+--- @param snapshot table The phase A snapshot the steps complete.
+--- @return function Probe body.
+local function local_state(slice_ms, snapshot)
+	return function(done, on_cancel)
+		local Timers = require("adapters.timer_scheduler")
+		local yield = require("infra.timings").sec("ui", "healthcheck_probe_yield_ms")
+		local steps, sections = require("ui.healthcheck.core").local_state_steps(snapshot)
+		local next_step, failures, handle = 1, {}, nil
+		local function slice()
+			handle = nil
+			local started = now_ms()
+			while next_step <= #steps do
+				local ok, err = pcall(steps[next_step])
+				if not ok then
+					failures[#failures + 1] = string.format("step %d: %s", next_step, tostring(err):match("^[^\n]*"))
+				end
+				next_step = next_step + 1
+				if next_step <= #steps and now_ms() - started >= slice_ms then
+					local committed
+					handle, committed = Timers.after(yield, slice)
+					if committed ~= true then
+						done({ state = "error", detail = "the next slice could not be armed" }, sections)
+					end
+					return
+				end
+			end
+			if #failures > 0 then
+				done({ state = "error", detail = table.concat(failures, "; ") }, sections)
+				return
+			end
+			done({ state = "ok" }, sections)
+		end
+		local committed
+		handle, committed = Timers.after(yield, slice)
+		if committed ~= true then
+			done({ state = "error", detail = "the first slice could not be armed" })
+			return
+		end
+		on_cancel(function() if handle then Timers.cancel(handle) end end)
+	end
+end
+
+--- The Bluetooth input devices, after the USB ones the local_state probe lists.
+--- @param peripherals table The snapshot's live peripherals section, read when
+---   the answer comes: the local_state probe fills its USB devices meanwhile.
 --- @param detailed boolean
 --- @return function Probe body.
-local function bluetooth(usb_items, detailed)
+local function bluetooth(peripherals, detailed)
 	return function(done, on_cancel)
 		run_task(SYSTEM_PROFILER, { "SPBluetoothDataType", "-json" }, on_cancel, function(stdout)
 			local devices, err = M.bluetooth_devices(stdout, detailed)
@@ -407,7 +523,9 @@ local function bluetooth(usb_items, detailed)
 				return
 			end
 			local items = {}
-			for _, item in ipairs(usb_items) do items[#items + 1] = item end
+			for _, item in ipairs(peripherals.items or {}) do
+				if item.bus ~= "bluetooth" then items[#items + 1] = item end
+			end
 			for _, item in ipairs(devices) do items[#items + 1] = item end
 			done({ state = "ok" }, { peripherals = { items = items } })
 		end, function(detail) done({ state = "error", detail = detail }) end)
@@ -429,17 +547,32 @@ end
 --- @param snapshot table The phase A snapshot: its paths, its peripherals and
 ---   whether details are included.
 --- @param publish function(id, result, sections) Receives each answer once.
+--- @param options table|nil { local_only = true runs only the probes that read
+---   local files; overrides = test replacements for the configuration probe }
 --- @return table run { cancel = function() } Cancels every probe still running.
-function M.start(schema, snapshot, publish)
+function M.start(schema, snapshot, publish, options)
+	options = options or {}
 	local run = { cancelled = false, finishers = {}, actors = {}, results = {}, watchdogs = {}, publish = publish }
 	local config = schema.probes
 	local sections = snapshot.sections
+	start_probe(run, "configuration", config.configuration.timeout_ms, configuration(schema, options.overrides))
+	start_probe(run, "local_state", config.local_state.timeout_ms, local_state(schema.phase_a_budget_ms, snapshot))
+	if options.local_only == true then
+		function run.refresh_cleanup() end
+		function run.has_pending_cleanup() return false end
+		function run.cancel()
+			run.cancelled = true
+			for _, finisher in ipairs(run.finishers) do finisher() end
+		end
+		return run
+	end
 	start_probe(run, "github_api", config.github_api.timeout_ms, github_api(config.github_api))
+	start_probe(run, "proxy_pac", config.proxy_pac.timeout_ms, proxy_pac())
 	start_probe(run, "ai_health", config.ai_health.timeout_ms, ai_health(config.ai_health))
 	start_probe(run, "system_details", config.system_details.timeout_ms, system_details(sections.paths.logs_dir))
 	start_probe(run, "cpu_load", config.cpu_load.timeout_ms, cpu_load(config.cpu_load))
 	start_probe(run, "bluetooth", config.bluetooth.timeout_ms,
-		bluetooth(sections.peripherals.items or {}, snapshot.detailed == true))
+		bluetooth(sections.peripherals, snapshot.detailed == true))
 	start_probe(run, "appleevent_transport", config.appleevent_transport.timeout_ms,
 		require("ui.healthcheck.appleevents").body(config.appleevent_transport))
 	function run.refresh_cleanup()

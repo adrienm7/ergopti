@@ -8,6 +8,13 @@
 --- ==============================================================================
 
 local M = {}
+
+--- The category delay the split file ships. The capture keeps the historical
+--- 1.0 s; the maintainer's decision of 3 November 2026 has every section wait
+--- its declared 0.5 s, and the file names that delay. Written here, never read
+--- from the file or the manifest under test.
+M.SHIPPED_DELAY = 0.5
+
 local Json = require("json")
 local Reader = require("toml_codec.reader")
 local Codec = require("toml_codec")
@@ -60,9 +67,11 @@ function M.register(helpers, shared)
 				helpers.assert_nil(actual.priority)
 			end
 			local meta = Codec.decode(read(path))._meta
-			for _, key in ipairs({ "color", "delay", "show_tooltip", "description" }) do
+			for _, key in ipairs({ "color", "show_tooltip", "description" }) do
 				helpers.assert_eq(meta[key], reference.meta[key])
 			end
+			helpers.assert_eq(reference.meta.delay, 1.0, "the capture keeps its historical delay")
+			helpers.assert_eq(meta.delay, M.SHIPPED_DELAY, "the split file names its sections' declared delay")
 			for _, section in ipairs(classification.sections) do
 				helpers.assert_eq(#parsed.sections[section.id].entries, #section.triggers)
 				local languages = 0

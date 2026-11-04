@@ -4,9 +4,9 @@
 		{
 			"id": "module_and_template",
 			"separator": "|",
-			"module": "keylogger",
+			"module": "keystats",
 			"template": "Flush failed: %s",
-			"expected": "keylogger|Flush failed: %s"
+			"expected": "keystats|Flush failed: %s"
 		},
 		{
 			"id": "ahk_placeholders_stay",
@@ -55,7 +55,7 @@
 			},
 			"events": [
 				{
-					"module": "keylogger",
+					"module": "keystats",
 					"template": "Flush failed: %s",
 					"at": 0,
 					"enabled": true,
@@ -63,7 +63,7 @@
 					"expected": "show"
 				},
 				{
-					"module": "keylogger",
+					"module": "keystats",
 					"template": "Flush failed: %s",
 					"at": 10,
 					"enabled": true,
@@ -71,7 +71,7 @@
 					"expected": "duplicate"
 				},
 				{
-					"module": "keylogger",
+					"module": "keystats",
 					"template": "Flush failed: %s",
 					"at": 100000,
 					"enabled": true,
@@ -87,7 +87,7 @@
 					"expected": "show"
 				},
 				{
-					"module": "keylogger",
+					"module": "keystats",
 					"template": "Flush failed after %d tries: %s",
 					"at": 100020,
 					"enabled": true,

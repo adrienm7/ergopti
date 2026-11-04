@@ -28,6 +28,7 @@
 
 local M = {}
 local WebviewResult = require("adapters.webview_result")
+local NativePath = require("native_path")
 
 local i18n         = require("infra.i18n")
 local toml_writer  = require("infra.toml.writer")
@@ -68,6 +69,24 @@ local _config_path  = nil
 -- The generated catalogue of this driver, loaded by the first run.
 local _catalogue = nil
 
+-- Publication custody survives native view disposal and wizard reruns.
+local _publication = nil
+
+local function publication_owner()
+	if not _publication then
+		local native_write, native_read = toml_writer.batch_write, FileSystem.read_with_status
+		_publication = require("onboarding_publication").new({
+			files = FileSystem, write = native_write, current = function()
+				return rawequal(package.loaded["ui.onboarding"], M)
+					and rawequal(package.loaded["infra.toml.writer"], toml_writer)
+					and rawequal(package.loaded["adapters.file_system"], FileSystem)
+					and toml_writer.batch_write == native_write and FileSystem.read_with_status == native_read
+			end,
+		})
+	end
+	return _publication
+end
+
 -- Keeps each tap-hold import's backup of config_karabiner.toml unique.
 local _backup_sequence = 0
 
@@ -103,11 +122,15 @@ end
 --- @param view userdata|table Captured native window.
 --- @param method string Fixed frontend function name.
 --- @param payload table|string Frontend payload, never included in diagnostics.
-local function submit_data(owner, view, method, payload)
-	if not publication_is_current(owner, view) then return false end
+--- @param config_path string|nil Captured configuration source, absent for unrelated publications.
+local function submit_data(owner, view, method, payload, config_path)
+	local function current()
+		return publication_is_current(owner, view) and (config_path == nil or _config_path == config_path)
+	end
+	if not current() then return false end
 	owner.javascript_failures = owner.javascript_failures or {}
 	local function report(category)
-		if not publication_is_current(owner, view) then return end
+		if not current() then return end
 		local key = method .. ":" .. category
 		if owner.javascript_failures[key] then return end
 		owner.javascript_failures[key] = true
@@ -119,17 +142,18 @@ local function submit_data(owner, view, method, payload)
 	local encoded, json = pcall(Json.encode, payload)
 	local arguments = encoded and type(json) == "string" and json or nil
 	if not arguments or arguments:match("^%s*$") then report("encoding failed"); return false end
-	if not publication_is_current(owner, view) then return false end
+	if not current() then return false end
 	local admitted, settled, pending, failed = false, false, nil, false
 	local function complete(_, script_error)
 		if settled then return end
 		if not admitted then pending = pending or { error = script_error }; return end
 		settled = true
-		if not publication_is_current(owner, view) then return end
+		if not current() then return end
 		if WebviewResult.is_error(script_error) then failed = true; report("execution failed"); return end
 		Logger.debug(LOG, "Onboarding JavaScript completed (%s).", method)
 	end
 	local ok, candidate = pcall(function()
+		if not current() then return nil end
 		return view:evaluateJavaScript("window." .. method .. "(" .. arguments .. ")", complete)
 	end)
 	if not ok or candidate ~= view then
@@ -139,7 +163,7 @@ local function submit_data(owner, view, method, payload)
 	end
 	admitted = true
 	if pending then complete(nil, pending.error) end
-	return not failed and publication_is_current(owner, view)
+	return not failed and current(), admitted
 end
 
 --- Retitles the native window. WKWebView never mirrors document.title onto the
@@ -159,7 +183,7 @@ local function retitle(owner, view, title)
 end
 
 --- Metrics store path for the folder typed on the config step, from the same
---- rule the keylogger uses to place the store. An empty field keeps the current
+--- rule the keystats uses to place the store. An empty field keeps the current
 --- folder, because commit() persists no override for it.
 --- @param config_dir string|nil Folder from the wizard field.
 --- @return string Absolute metrics directory.
@@ -237,8 +261,8 @@ end
 --- @param config_path string Absolute config.toml path.
 --- @return string
 local function remap_settings_beside(config_path)
-	local name = require("infra.config_paths").get("KarabinerConfigPath"):match("([^/\\]+)$")
-	local folder = type(config_path) == "string" and config_path:match("^(.*)[/\\][^/\\]+$") or nil
+	local name = NativePath.basename(require("infra.config_paths").get("KarabinerConfigPath"))
+	local folder = type(config_path) == "string" and NativePath.dirname(config_path) or nil
 	assert(name and folder, "no remap settings file beside " .. tostring(config_path))
 	return folder .. "/" .. name
 end
@@ -246,11 +270,13 @@ end
 --- The wizard values of the tap-hold keys and switch the remap owner reports
 --- beside a config.toml: a configured key is shown as kept, never imported over.
 --- @param config_path string Absolute config.toml path.
+--- @param is_current function|nil Captured import authority.
 --- @return table|nil values nil when the remap settings cannot be read.
-local function tap_hold_values(config_path)
+local function tap_hold_values(config_path, is_current)
 	local ok, report, err = pcall(function()
 		return require("platform.remap").recommended_key_report(remap_settings_beside(config_path))
 	end)
+	if is_current and not is_current() then return nil end
 	if not ok or type(report) ~= "table" then
 		Logger.error(LOG, "The tap-hold keys in force could not be read: %s.", tostring(ok and err or report))
 		return nil
@@ -261,9 +287,10 @@ end
 --- Adds the tap-hold values beside a config.toml to its configured values.
 --- @param values table Values of config.toml, completed in place.
 --- @param config_path string Absolute config.toml path.
+--- @param is_current function|nil Captured import authority.
 --- @return table|nil values nil when the remap settings cannot be read.
-local function with_tap_hold_values(values, config_path)
-	local tap_holds = tap_hold_values(config_path)
+local function with_tap_hold_values(values, config_path, is_current)
+	local tap_holds = tap_hold_values(config_path, is_current)
 	if not tap_holds then return nil end
 	for path, value in pairs(tap_holds) do values[path] = value end
 	return values
@@ -306,10 +333,21 @@ local function inject_strings(code, owner, view)
 	retitle(owner, view, strings[WINDOW_TITLE_KEY] or WINDOW_TITLE_KEY)
 end
 
+--- The folder retained by an empty wizard input, from its captured destination.
+--- @param config_path string Absolute configuration file path.
+--- @return string|nil folder
+local function empty_config_folder(config_path)
+	local parent = type(config_path) == "string" and NativePath.dirname(config_path) or nil
+	local folder = parent and NativePath.directory_prefix(config_path) or nil
+	if not folder or folder:sub(1, 1) ~= "/" or folder:find("%z") then return nil end
+	-- Native configuration files live under the driver's terminal subdirectory.
+	if NativePath.basename(parent) == "hammerspoon" then return NativePath.directory_prefix(parent) end
+	return folder
+end
+
 --- Sends the initData payload (locale, strings, folders and the values in
 --- force) so the first step renders correctly on open.
-local function inject_init_data()
-	local owner, view = _focus_owner, _webview
+local function inject_init_data(owner, view, config_path)
 	if not publication_is_current(owner, view) then return end
 
 	local current_locale = i18n.get_locale()
@@ -317,7 +355,7 @@ local function inject_init_data()
 	if not strings then return end
 
 	-- Resolve the current + default config directories so the wizard can
-	-- pre-fill the input AND show the default as a placeholder.
+	-- pre-fill the input when the driver uses a custom folder.
 	local cur_config_dir, default_config_dir = "", ""
 	local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
 	if ok_mp and menu_paths then
@@ -337,8 +375,14 @@ local function inject_init_data()
 		if type(v) == "string" then system_layout = v end
 	end)
 
-	local values = current_values(_config_path)
-	if not values then return end
+	if not publication_is_current(owner, view) or _config_path ~= config_path then return end
+	local values = current_values(config_path)
+	if not values or not publication_is_current(owner, view) or _config_path ~= config_path then return end
+	local empty_config_dir = empty_config_folder(config_path)
+	if not empty_config_dir then
+		Logger.error(LOG, "Onboarding empty configuration folder unresolved for the captured source.")
+		return
+	end
 
 	local config_dir = (cur_config_dir ~= default_config_dir) and cur_config_dir or ""
 	local resolved, metrics_path = pcall(M._metrics_path_for, config_dir)
@@ -348,21 +392,79 @@ local function inject_init_data()
 	end
 
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
-	submit_data(owner, view, "initData", {
+	local _, admitted = submit_data(owner, view, "initData", {
 		platform           = CATALOGUE_DRIVER,
+		-- Gesture registration with the system is a Windows host action only.
+		capabilities       = { gesture_registration = false },
 		locale             = current_locale,
 		strings            = strings,
 		-- One locale order for the wizard and every tray language menu.
 		locales            = i18n.get_sorted_locales(),
 		default_config_dir = default_config_dir,
-		-- Empty when the folder is the OS default: the placeholder shows it.
+		-- An empty wizard field retains its captured configuration destination.
+		empty_config_dir   = empty_config_dir,
+		-- Empty when the folder is the OS default.
 		config_dir         = config_dir,
 		system_layout      = system_layout,
 		current            = values,
 		metrics_path       = metrics_path,
-	})
+	}, config_path)
 	-- initData resets the page to the current locale; keep the window in step.
 	retitle(owner, view, strings[WINDOW_TITLE_KEY] or WINDOW_TITLE_KEY)
+	return admitted == true
+end
+
+
+--- Reserves deferred initialization before native scheduling can reenter.
+--- Scheduling refusal retains only the exact owner's original-source retry.
+--- @param owner table Captured wizard owner.
+--- @param label string Deferred work diagnostic label.
+--- @return boolean reserved True when deferred work is reserved or already pending.
+local function schedule_init_data(owner, label)
+	if owner == nil or _focus_owner ~= owner then return false end
+	local path = _config_path
+	local active = owner.init_delivery
+	if active ~= nil then
+		if active.path == path then
+			active.followup = nil
+			owner.init_retry = active
+		else
+			local followup = { path = path, label = label }
+			active.followup = followup
+			owner.init_retry = followup
+		end
+		return true
+	end
+	local previous = owner.init_request
+	if previous ~= nil then
+		previous.path = path
+		owner.init_retry = previous
+		return true
+	end
+	local request = { path = path, view = _webview }
+	owner.init_request = request
+	owner.init_retry = request
+	local called, committed = pcall(DeferredWork.after, 0.05, function()
+		if owner.init_request ~= request then return end
+		owner.init_request = nil
+		if _config_path ~= request.path or not publication_is_current(owner, request.view) then return end
+		owner.init_delivery = request
+		local delivered, admitted = pcall(inject_init_data, owner, request.view, request.path)
+		if owner.init_delivery == request then owner.init_delivery = nil end
+		if not delivered then error(admitted, 0) end
+		if admitted == true and owner.init_retry == request
+			and _config_path == request.path and publication_is_current(owner, request.view) then
+			owner.init_retry = nil
+		end
+		local followup = request.followup
+		if followup ~= nil and owner.init_retry == followup and _config_path == followup.path
+			and publication_is_current(owner, request.view) then
+			schedule_init_data(owner, followup.label)
+		end
+	end, label)
+	if owner.init_request == request and (not called or committed ~= true) then owner.init_request = nil end
+	if not called then error(committed, 0) end
+	return committed == true
 end
 
 
@@ -590,7 +692,7 @@ end
 --- answer to config.toml in one batch, imports the checked tap-hold keys and
 --- reloads Hammerspoon.
 --- @param answers table The answers object from the JS "finish" message.
-local function commit(answers)
+local function commit_owned(answers, publication)
 	Logger.start(LOG, "Committing the onboarding answers…")
 
 	-- Validate the whole payload before any side effect: a refused answer must
@@ -654,7 +756,7 @@ local function commit(answers)
 		manifest   = ManifestReader,
 		path       = _config_path,
 		prepare    = prepare_destination,
-		write      = function(path, batch) return toml_writer.batch_write(path, batch) end,
+		write      = publication.write,
 	})
 	if not committed then
 		Logger.error(LOG, "commit: the configuration batch failed — %s.", tostring(err))
@@ -678,7 +780,7 @@ local function commit(answers)
 	end
 	-- The layer the imported keys enter is written first, so a live bridge's
 	-- regeneration already deploys it; a refused key import takes it back.
-	local layer, layer_failed = import_nav_layer(tap_hold_keys)
+	local layer, layer_failed
 	-- The answers are saved: a refused import leaves config_karabiner.toml as
 	-- it was, says so, and the reload still applies the rest. A bridge that
 	-- never answers cannot hold the reload back past the timeout either.
@@ -703,8 +805,12 @@ local function commit(answers)
 			"onboarding.error.tap_holds_import_timeout")
 	end, "onboarding.tap_holds_import_timeout")
 	if armed ~= true then
-		Logger.error(LOG, "The tap-hold import timeout could not be armed; the import runs without it.")
+		Logger.error(LOG, "The tap-hold import timeout could not be armed; the import is refused.")
+		settle(false, "the import timeout could not be armed", "onboarding.error.tap_holds_import")
+		return
 	end
+	-- No remap or layer work starts without its bounded continuation owner.
+	layer, layer_failed = import_nav_layer(tap_hold_keys)
 	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
 		-- Only a refusal takes the layer back: after a timeout the keys may
 		-- still land, and they must not enter an empty layer then.
@@ -729,6 +835,23 @@ end
 
 --- Dispatches incoming usercontent messages from the JS wizard.
 --- @param body table The decoded message body.
+--- Keeps synchronous native callbacks from borrowing another Finish stack.
+local function commit(answers)
+	local publication = publication_owner()
+	local claim = publication.begin()
+	if claim == nil then
+		Logger.error(LOG, "Onboarding finish refused while publication compensation remains pending.")
+		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed"))
+		return
+	end
+	local called, detail = xpcall(function() return commit_owned(answers, publication) end, debug.traceback)
+	publication.finish(claim)
+	if not called then
+		Logger.error(LOG, "Onboarding commit refused after a native callback failure: %s.", tostring(detail))
+		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed"))
+	end
+end
+
 local function handle_message(body)
 	if type(body) ~= "table" then return end
 	local owner, view = _focus_owner, _webview
@@ -737,9 +860,7 @@ local function handle_message(body)
 
 	if action == "ready" then
 		-- JS page finished loading — inject initial data
-		DeferredWork.after(0.05, function()
-			if publication_is_current(owner, view) then inject_init_data() end
-		end, "onboarding.ready")
+		schedule_init_data(owner, "onboarding.ready")
 
 	elseif action == "previewLocale" then
 		-- User hovered/clicked a language row — inject its strings live
@@ -798,23 +919,22 @@ local function handle_message(body)
 			return
 		end
 		local chosen = type(body.config_dir) == "string" and body.config_dir or ""
-		if chosen == "" then
-			-- Empty input = "use the OS default" — read from the resolved
-			-- default location so a returning user gets pre-fill regardless
-			-- of whether they left the input empty or typed the same path.
-			local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
-			if ok_mp and menu_paths and menu_paths.get_default_config_dir then
-				local ok_v, v = pcall(menu_paths.get_default_config_dir)
-				if ok_v and type(v) == "string" then chosen = v end
-			end
-		end
+		-- Finish keeps the captured destination when the field is empty. Import
+		-- that same source instead of copying another folder's answers into it.
+		local cfg_path = _config_path
 		if chosen ~= "" then
-			if not chosen:match("[/\\]$") then chosen = chosen .. "/" end
-			local cfg_path = chosen .. "hammerspoon/config.toml"
-			if not publication_is_current(owner, view) then return false end
+			cfg_path = NativePath.with_trailing_separator(chosen) .. "hammerspoon/config.toml"
+		end
+		local import_source = chosen == "" and cfg_path or nil
+		local function import_is_current()
+			return publication_is_current(owner, view)
+				and (import_source == nil or _config_path == import_source)
+		end
+		if type(cfg_path) == "string" and cfg_path ~= "" then
+			if not import_is_current() then return false end
 			local reported = false
 			local function import_failure(category)
-				if not publication_is_current(owner, view) then return end
+				if not import_is_current() then return end
 				reported = true
 				local categories = { inspect = true, open = true, read = true, close = true,
 					path_changed = true, identity_changed = true, validation = true,
@@ -830,28 +950,28 @@ local function handle_message(body)
 				Logger.error(LOG, "Onboarding existing configuration import failed (%s; content withheld; repeats suppressed).", label)
 			end
 			local read_ok, content, status = pcall(FileSystem.read_with_status, cfg_path, import_failure)
-			if not publication_is_current(owner, view) then return false end
+			if not import_is_current() then return false end
 			if not read_ok then import_failure("dependency"); return false end
 			if status == "absent" then
 				if not reported then import_failure("absent") end
-				local absent_values = with_tap_hold_values({}, cfg_path)
-				if not publication_is_current(owner, view) then return false end
+				local absent_values = with_tap_hold_values({}, cfg_path, import_is_current)
+				if not import_is_current() then return false end
 				if not absent_values then import_failure("answers"); return false end
-				return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = absent_values })
+				return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = absent_values }, import_source)
 			end
 			if status ~= "ok" or type(content) ~= "string" then
 				if not reported then import_failure("read") end
 				return false
 			end
 			local decoded, parsed = pcall(toml_codec.decode, content)
-			if not publication_is_current(owner, view) then return false end
+			if not import_is_current() then return false end
 			if not decoded or type(parsed) ~= "table" then import_failure("decode"); return false end
 			local projected, values = pcall(function()
-				return with_tap_hold_values(Answers.current_values(catalogue(), parsed), cfg_path)
+				return with_tap_hold_values(Answers.current_values(catalogue(), parsed), cfg_path, import_is_current)
 			end)
-			if not publication_is_current(owner, view) then return false end
+			if not import_is_current() then return false end
 			if not projected or type(values) ~= "table" then import_failure("answers"); return false end
-			return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = values })
+			return submit_data(owner, view, "applyCurrentValues", { request = body.request, values = values }, import_source)
 		end
 
 	elseif action == "finish" then
@@ -888,10 +1008,17 @@ end
 --- @param config_path string Absolute path where config.toml should be written.
 --- @return boolean opened True only when the wizard window is active.
 function M.run(config_path)
+	if _publication and _publication.ready() ~= true then
+		Logger.error(LOG, "Cannot reopen onboarding while native publication compensation remains pending.")
+		return false
+	end
 	if type(config_path) ~= "string" or config_path == "" then
 		Logger.error(LOG, "M.run() called with missing config_path.")
 		return false
 	end
+	-- Retained cleanup authority cannot retarget its captured configuration.
+	-- Same-source reuse keeps the existing singleton acknowledgment and revoked page.
+	if _webview and _focus_owner == nil and config_path ~= _config_path then return false end
 	_config_path = config_path
 
 	-- Bring the existing window to front if the wizard is already open
@@ -900,6 +1027,9 @@ function M.run(config_path)
 		require("ui.ui_builder").force_focus(view, false, { is_current = function()
 			return focus_owner ~= nil and _focus_owner == focus_owner and _webview == view
 		end })
+		if focus_owner ~= nil and focus_owner.init_retry ~= nil and focus_owner.init_retry.path == config_path then
+			schedule_init_data(focus_owner, "onboarding.reopen")
+		end
 		return true
 	end
 	if _usercontent and close_webview() ~= true then
@@ -975,6 +1105,7 @@ function M.run(config_path)
 	_focus_owner = focus_owner
 	local show_ok, candidate = xpcall(function()
 		return ui_builder.show_webview({
+			delete_on_close = true,
 			frame       = ui_builder.get_centered_frame(win_w, win_h),
 			title       = i18n.get(WINDOW_TITLE_KEY),
 			style_masks = style_masks,
@@ -996,15 +1127,13 @@ function M.run(config_path)
 				if _focus_owner ~= focus_owner or closed then return false end
 				if action == "didFinishNavigation" then
 					Logger.debug(LOG, "Navigation finished — injecting initData.")
-					DeferredWork.after(0.05, function()
-						if publication_is_current(focus_owner, webview) then inject_init_data() end
-					end, "onboarding.navigation")
+					schedule_init_data(focus_owner, "onboarding.navigation")
 				end
 				return true
 			end,
 		})
 	end, debug.traceback)
-	webview = candidate
+	webview = show_ok and candidate or nil
 	if show_ok ~= true or webview == nil or webview == false or closed then
 		if _focus_owner == focus_owner then _focus_owner = nil end
 		if webview and not closed then
@@ -1019,11 +1148,12 @@ function M.run(config_path)
 		end
 		if not release_usercontent(uc) then _usercontent = uc end
 		Logger.error(LOG, "Onboarding webview creation failed: %s.",
-			tostring(webview))
+			tostring(candidate))
 		return false
 	end
 	_usercontent = uc
 	_webview = webview
+	if focus_owner.init_request ~= nil then focus_owner.init_request.view = webview end
 
 	Logger.success(LOG, "Onboarding wizard opened.")
 	return true

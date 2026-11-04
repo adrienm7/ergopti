@@ -2,34 +2,39 @@
 --- ==============================================================================
 --- MODULE: Native Linux Process Snapshot Receipts
 --- DESCRIPTION:
---- Drives production app launch/quit polling around owned native processes.
---- A controlled ps wrapper delegates unchanged argv to the real GNU tool, then
---- omits one actual row and exits nonzero or signals itself. Those partial
---- snapshots cannot synthesize lifecycle events. A real launch/quit control
---- proves successful snapshots still work. No ps rows or syscalls are forged;
---- focus/title/input behavior is not exercised or changed.
+--- Drives production app launch/quit polling around owned native processes,
+--- which the snapshot reads from the real /proc in the daemon's own process.
+--- A refused process table (the snapshot pointed at a path the kernel answers
+--- ENOENT for) cannot synthesize lifecycle events or seed startup ownership. A
+--- real launch/quit control proves successful snapshots still work, a real
+--- zombie is an exited application before its parent reaps it, and the
+--- kernel's own name bytes (parentheses, spaces, COMMAND) survive. No process
+--- rows or syscalls are forged; focus/title/input behavior is not exercised.
 --- ==============================================================================
 
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
 local Life = require("adapters.process_lifecycle")
-local real_ps = assert(Shell.exec_line("command -v ps"), "procps must be installed")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-process-snapshot-XXXXXX"))
-local previous_path = assert(os.getenv("PATH"))
 local marker_a, marker_b = "epA" .. root:sub(-6), "epB" .. root:sub(-6)
+local marker_z = "epZ" .. root:sub(-6)
 local literal_names = { " ep lead", "ep trail ", " ep both ", "   " }
-local tracked_names = { [marker_a] = true, [marker_b] = true, COMMAND = true, ["ep pair"] = true, [" ep pair "] = true }
+local tracked_names = {
+	[marker_a] = true, [marker_b] = true, [marker_z] = true, COMMAND = true,
+	["ep pair"] = true, [" ep pair "] = true, ["ep) (x y"] = true,
+}
 for _, name in ipairs(literal_names) do
 	tracked_names[name] = true
-	tracked_names[name:match("^%s*(.-)%s*$")] = true -- also observe old parser aliases.
+	tracked_names[name:match("^%s*(.-)%s*$")] = true -- also observe trimmed aliases.
 end
 local children = {}
 local checks, failures = 0, 0
 
-local function write(path, value)
-	local file = assert(io.open(path, "w"))
-	assert(file:write(value))
-	assert(file:close())
+local function read(path)
+	local file = io.open(path, "rb")
+	if not file then return nil end
+	local value = file:read("*a")
+	file:close()
+	return value
 end
 
 local function pump_until(predicate)
@@ -38,8 +43,9 @@ local function pump_until(predicate)
 	assert(predicate(), "owned native process did not acknowledge its transition")
 end
 
+--- Starts an owned python3 whose kernel name (comm) is exactly marker.
 local function spawn(marker)
-	local child = { ready = root .. "/ready-" .. marker }
+	local child = { ready = root .. "/ready-" .. marker:gsub("[^%w]", "_") .. "-" .. tostring(#children) }
 	local program = "import ctypes,sys,time; assert ctypes.CDLL(None).prctl(15,sys.argv[1].encode(),0,0,0)==0; open(sys.argv[2],'w').close(); time.sleep(60)"
 	child.handle = assert(uv.spawn("python3", { args = { "-c", program, marker, child.ready } }, function()
 		child.exited = true
@@ -55,70 +61,81 @@ local function retire(child)
 	pump_until(function() return child.exited end)
 end
 
-write(root .. "/ps", table.concat({
-	"#!/bin/sh",
-	"mode=$(cat " .. Shell.quote(root .. "/mode") .. ")",
-	'if [ "$mode" = success ]; then exec ' .. Shell.quote(real_ps) .. ' "$@"; fi',
-	'if [ "$mode" = header ]; then ' .. Shell.quote(real_ps) .. ' "$@" | head -n 0; exit 0; fi',
-	Shell.quote(real_ps) .. ' "$@" | sed ' .. Shell.quote("/^" .. marker_a .. "$/d"),
-	'case "$mode" in term) kill -TERM $$;; kill) kill -KILL $$;; *) exit "$mode";; esac',
-	"",
-}, "\n"))
-assert(uv.fs_chmod(root .. "/ps", 448))
-assert(uv.os_setenv("PATH", root .. ":" .. previous_path))
+--- Starts an owned parent that never reaps its child named marker: once the
+--- go file exists the child exits and stays a zombie until the parent dies.
+local function spawn_zombie_parent(marker)
+	local parent = { ready = root .. "/zombie-ready", go = root .. "/zombie-go" }
+	local program = table.concat({
+		"import ctypes,os,sys,time",
+		"pid = os.fork()",
+		"if pid == 0:",
+		"    assert ctypes.CDLL(None).prctl(15,sys.argv[1].encode(),0,0,0)==0",
+		"    open(sys.argv[2],'w').write(str(os.getpid()))",
+		"    while not os.path.exists(sys.argv[3]): time.sleep(0.01)",
+		"    os._exit(0)",
+		"time.sleep(60)",
+	}, "\n")
+	parent.handle = assert(uv.spawn("python3", { args = { "-c", program, marker, parent.ready, parent.go } }, function()
+		parent.exited = true
+		uv.close(parent.handle)
+	end))
+	children[#children + 1] = parent
+	pump_until(function() return (read(parent.ready) or "") ~= "" end)
+	parent.child_pid = tonumber(read(parent.ready))
+	assert(parent.child_pid, "zombie fixture child did not publish its pid")
+	return parent
+end
+
+--- The scheduler state the kernel reports for one pid, from its stat line.
+local function state_of(pid)
+	local line = read("/proc/" .. tostring(pid) .. "/stat") or ""
+	return line:match("^.*%) (%u)")
+end
+
+assert(read("/proc/self/stat"), "the native process table is required")
 local child_a = spawn(marker_a)
 local launched, quit = {}, {}
 Life.onAppLaunch(function(name) if tracked_names[name] then launched[#launched + 1] = name end end)
 Life.onAppQuit(function(name) if tracked_names[name] then quit[#quit + 1] = name end end)
 
-local function mode(value) write(root .. "/mode", value) end
-
 local function check(name, test)
 	checks = checks + 1
 	launched, quit = {}, {}
 	Life.stop()
+	Life._set_proc_root_for_test(nil)
 	local ok, err = xpcall(test, debug.traceback)
 	Life.stop()
+	Life._set_proc_root_for_test(nil)
 	if ok then print("PASS " .. name) else
 		failures = failures + 1
 		io.stderr:write("FAIL " .. name .. ": " .. tostring(err) .. "\n")
 	end
 end
 
-for _, failure in ipairs({ "1", "7", "127", "255", "term", "kill" }) do
-	check("partial native ps " .. failure .. " retains the successful baseline", function()
-		mode("success")
-		Life.start()
-		mode(failure)
-		Life.tick(8)
-		assert(#quit == 0 and #launched == 0, "failed partial snapshot synthesized events for a still-live process")
-		mode("success")
-		Life.tick(16)
-		assert(#quit == 0 and #launched == 0, "CLI recovery synthesized a relaunch")
-		assert(not child_a.exited, "owned process actually exited during the refusal test")
-	end)
-	check("partial native ps " .. failure .. " cannot seed startup ownership", function()
-		mode(failure)
-		Life.start()
-		mode("success")
-		Life.tick(8)
-		assert(#quit == 0 and #launched == 0, "failed startup snapshot treated an existing process as newly launched")
-		assert(not child_a.exited)
-	end)
-end
+-- A path the kernel refuses with ENOENT stands for an unreadable process table.
+local refused = root .. "/no-process-table"
 
-check("empty native ps cannot erase the successful baseline", function()
-	mode("success")
+check("refused native process table retains the successful baseline", function()
 	Life.start()
-	mode("header")
+	Life._set_proc_root_for_test(refused)
 	Life.tick(8)
-	mode("success")
+	assert(#quit == 0 and #launched == 0, "a refused table synthesized events for a still-live process")
+	Life._set_proc_root_for_test(nil)
 	Life.tick(16)
-	assert(#quit == 0 and #launched == 0)
+	assert(#quit == 0 and #launched == 0, "table recovery synthesized a relaunch")
+	assert(not child_a.exited, "owned process actually exited during the refusal test")
+end)
+
+check("refused native process table cannot seed startup ownership", function()
+	Life._set_proc_root_for_test(refused)
+	Life.start()
+	Life._set_proc_root_for_test(nil)
+	Life.tick(8)
+	assert(#quit == 0 and #launched == 0, "a refused startup table treated an existing process as newly launched")
+	assert(not child_a.exited)
 end)
 
 check("actual process launch and exit still deliver exactly one event", function()
-	mode("success")
 	Life.start()
 	local child_b = spawn(marker_b)
 	Life.tick(8)
@@ -130,26 +147,47 @@ check("actual process launch and exit still deliver exactly one event", function
 	assert(#quit == 1 and #launched == 1, "stable native snapshot repeated settled events")
 end)
 
+check("an actual unreaped zombie is an exited application", function()
+	local parent = spawn_zombie_parent(marker_z)
+	Life.start()
+	local file = assert(io.open(parent.go, "w"))
+	assert(file:close())
+	pump_until(function() return state_of(parent.child_pid) == "Z" end)
+	Life.tick(8)
+	assert(#quit == 1 and quit[1] == marker_z, "a zombie still read as a running application")
+	assert(not parent.exited, "the parent must still hold the unreaped child")
+	retire(parent)
+	Life.tick(16)
+	assert(#quit == 1 and #launched == 0, "reaping a zombie repeated or reversed its quit")
+end)
+
 check("actual process named COMMAND is data, never a header", function()
-	local accepted, current = Shell.exec_checked(Shell.quote(real_ps) .. " -eo comm=")
-	assert(accepted and not ("\n" .. current):find("\nCOMMAND\n", 1, true), "fixture requires no pre-existing COMMAND process")
-	mode("success")
 	Life.start()
 	local command = spawn("COMMAND")
 	Life.tick(8)
-	assert(#launched == 1 and launched[1] == "COMMAND", "legitimate native process name was discarded as a header")
+	assert(#launched == 1 and launched[1] == "COMMAND", "legitimate native process name was discarded")
 	retire(command)
 	Life.tick(16)
-	assert(#quit == 1 and quit[1] == "COMMAND", "header-like process retirement was never observed")
+	assert(#quit == 1 and quit[1] == "COMMAND", "COMMAND retirement was never observed")
+end)
+
+check("actual process name with parentheses and spaces is read whole", function()
+	Life.start()
+	local child = spawn("ep) (x y")
+	assert(read("/proc/" .. child.handle:get_pid() .. "/comm") == "ep) (x y\n", "the kernel must hold the exact name")
+	Life.tick(8)
+	assert(#launched == 1 and launched[1] == "ep) (x y", "the name ends at the stat line's last parenthesis")
+	retire(child)
+	Life.tick(16)
+	assert(#quit == 1 and quit[1] == "ep) (x y")
 end)
 
 for index, name in ipairs(literal_names) do
 	check("actual process whitespace name " .. index .. " retains its native bytes", function()
-		mode("success")
 		Life.start()
 		local child = spawn(name)
-		local accepted, output = Shell.exec_checked(Shell.quote(real_ps) .. " -p " .. child.handle:get_pid() .. " -o comm=")
-		assert(accepted and output == name .. "\n", "native ps must prove these are data bytes, not padding")
+		assert(read("/proc/" .. child.handle:get_pid() .. "/comm") == name .. "\n",
+			"the kernel must prove these are data bytes, not padding")
 		Life.tick(8)
 		assert(#launched == 1 and launched[1] == name, "process launch changed or discarded native whitespace")
 		retire(child)
@@ -159,7 +197,6 @@ for index, name in ipairs(literal_names) do
 end
 
 check("distinct native whitespace names cannot collapse into one process identity", function()
-	mode("success")
 	local plain = spawn("ep pair")
 	Life.start()
 	local spaced = spawn(" ep pair ")
@@ -174,7 +211,6 @@ check("distinct native whitespace names cannot collapse into one process identit
 end)
 
 Life.stop()
-assert(uv.os_setenv("PATH", previous_path))
 for _, child in ipairs(children) do retire(child) end
 uv.run("nowait")
 for name in uv.fs_scandir_next, assert(uv.fs_scandir(root)) do assert(uv.fs_unlink(root .. "/" .. name)) end

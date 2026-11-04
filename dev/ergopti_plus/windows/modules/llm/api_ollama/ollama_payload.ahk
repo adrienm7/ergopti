@@ -116,7 +116,7 @@ LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, streaming :
 	return '{"model":"' _LLM_Ollama_EscapeJSON(model) '",'
 		. '"messages":[' msgs_json '],'
 		. '"stream":' stream_field ','
-		. '"think":false,'
+		. '"think":' LLM_OllamaThink(model) ','
 		. '"keep_alive":"' (LLM_OLLAMA_KEEP_ALIVE != "" ? LLM_OLLAMA_KEEP_ALIVE : "30m") '",'
 		. '"options":{"temperature":' Format("{:g}", temperature)
 		. ',"num_predict":' num_predict
@@ -142,7 +142,7 @@ _LLM_Ollama_ParseStreamLine(line) {
 		if obj.Has("error") {
 			ProviderError := obj["error"]
 			Result["error"] := Type(ProviderError) = "String" && ProviderError != ""
-				? "Ollama stream error: " . SubStr(ProviderError, 1, 200)
+				? "Ollama stream error: " . TextHeadWithinUnits(ProviderError, 200)
 				: "Ollama reported a stream error."
 			return Result
 		}
@@ -155,10 +155,21 @@ _LLM_Ollama_ParseStreamLine(line) {
 			Result["error"] := "Stream message is missing string content."
 			return Result
 		}
+		; AHK aliases JSON true and numeric one. Preserve the canonical parser's
+		; last decoded member identity before admitting a terminal marker.
+		Done := false
+		if obj.Has("done") {
+			Marker := JsonObjectMemberSpans(line)["done"]["text"]
+			if Marker != "true" && Marker != "false" {
+				Result["error"] := "Stream envelope has a non-Boolean done marker."
+				return Result
+			}
+			Done := Marker == "true"
+		}
 		content := msg["content"]
 		Result["ok"] := true
 		Result["token"] := content
-		Result["done"] := obj.Has("done") && obj["done"] = true
+		Result["done"] := Done
 		return Result
 	} catch as e {
 		Result["error"] := "Malformed stream JSON: " . e.Message
@@ -168,35 +179,39 @@ _LLM_Ollama_ParseStreamLine(line) {
 
 /**
  * Extracts assistant text from a /api/chat JSON reply (non-streaming).
+ * @param {String} raw Original response body.
+ * @param {Boolean} Redact Keep private response bytes out of diagnostics and errors.
+ * @returns {String|Map} Assistant text or a typed failure.
  */
-LLM_ParseOllamaChatResponse(raw) {
+LLM_ParseOllamaChatResponse(raw, Redact := false) {
 	if (raw == "")
 		return ""
-	try {
-		obj := JsonParse(raw)
-		if (obj is Map) and obj.Has("message") {
-			msg := obj["message"]
-			if (msg is Map) and msg.Has("content") and Type(msg["content"]) = "String" {
-				text := Trim(msg["content"])
-				if (text != "")
-					return text
-				if msg.Has("thinking") and Type(msg["thinking"]) = "String" {
-					thinking := Trim(msg["thinking"])
-					if (thinking != "") {
-						try LoggerInfo("LLM.ollama", "Using thinking field as fallback ({1} chars).", StrLen(thinking))
-						return (IsSet(LLM_Parser_StripThinking))
-							? LLM_Parser_StripThinking(thinking) : thinking
-					}
-				}
-			}
+	try obj := JsonParse(raw)
+	catch as e {
+		if Redact {
+			try LoggerError("LLM.ollama", "JSON parse failed in ChatResponse ({1} chars).", StrLen(raw))
+			return Map("error", true, "message", "JSON parse failed.")
 		}
-	} catch as e {
-		err_substr := SubStr(raw, 1, 200)
+		err_substr := TextHeadWithinUnits(raw, 200)
 		try LoggerError("LLM.ollama", "JSON parse failed in ChatResponse: {1}. Raw (200c): {2}", e.Message, err_substr)
 		return Map("error", true, "message", "JSON parse failed: " . e.Message)
 	}
-	; Legacy /api/generate bodies (tests + old logs).
-	return LLM_ParseOllamaResponse(raw)
+	if !(obj is Map)
+		return ""
+	if obj.Has("error") {
+		ProviderError := obj["error"]
+		return Map("error", true, "message", !Redact && ProviderError is String && ProviderError != ""
+			? "Ollama error: " . TextHeadWithinUnits(ProviderError, 200) : "Ollama reported an error.")
+	}
+	; A canonical chat message owns an empty result too. Reasoning is not an
+	; assistant answer, and a legacy-looking field elsewhere cannot replace it.
+	if obj.Has("message") {
+		msg := obj["message"]
+		return msg is Map && msg.Has("content") && msg["content"] is String
+			? Trim(msg["content"]) : ""
+	}
+	; Legacy /api/generate compatibility belongs only to the decoded root.
+	return obj.Has("response") && obj["response"] is String ? obj["response"] : ""
 }
 
 /**

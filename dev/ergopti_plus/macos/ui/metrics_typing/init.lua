@@ -4,7 +4,7 @@
 --- MODULE: Typing Metrics Dashboard UI
 --- DESCRIPTION:
 --- Hosts the typing-metrics WebView. Reads from `db.sqlite` (the tmpdir cache
---- rebuildable from `data.sql`) via `modules.keylogger.sqlite_reader` and
+--- rebuildable from `data.sql`) via `modules.keystats.sqlite_reader` and
 --- projects the result into the JSON shape consumed by the (unchanged)
 --- frontend JS.
 ---
@@ -21,14 +21,21 @@
 --- 4. Filter requests: the JS frontend pushes `(start_date, end_date, apps)`
 ---    via `window._lua_request`; the poll timer reads it, queues the paced
 ---    projection (latest request wins), and pushes back the result.
+--- 5. Incomplete reads are shown, never cached. When a SQLite query fails the
+---    page still gets the counts that were read, flagged so it says the
+---    history is incomplete; the snapshot is not saved and the projection
+---    cache is left as it was, so the next open retries a full read.
 --- ==============================================================================
 
 local M = {}
 local WebviewResult = require("adapters.webview_result")
+local RunningApplication = require("adapters.running_application")
+local OwnWindow = require("adapters.own_window")
 
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
+local Json       = require("json")
 local FileSystem = require("adapters.file_system")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
@@ -46,7 +53,7 @@ local LOG = "metrics_typing"
 local _log_manager = nil
 local function _get_log_manager()
 	if not _log_manager then
-		_log_manager = require("modules.keylogger.log_manager")
+		_log_manager = require("modules.keystats.log_manager")
 	end
 	return _log_manager
 end
@@ -94,13 +101,15 @@ local _continuation_timers = {}
 local _closing_webview = nil
 local _delivery_errors = {}
 local _delivery_generation = nil
---- Running paced projection, if any; one job at a time per window.
+--- Running projection or cleanup-only job retaining exact native timers.
 M._job = nil
 --- Work waiting for the running job: a full refresh, a live manifest refresh,
 --- and the latest range request (older ones are superseded by the frontend).
 local _pending_work = { full = false, live = false, range = nil }
 --- Snapshot timestamp painted in this window, shown again if the refresh fails.
 local _painted_snapshot_at = nil
+--- True while the last delivered read was incomplete; pairs the recovery log.
+local _incomplete_read_reported = false
 
 local function delivery_is_current(generation, webview)
 	return generation == _generation and M._wv == webview
@@ -155,7 +164,11 @@ end
 
 local function encode_delivery(generation, webview, site, value)
 	if not delivery_is_current(generation, webview) then return nil end
-	local ok, encoded = pcall(json.encode, value)
+	-- Native hs.json.encode requires a table; this mailbox owns an exact string.
+	local ok, encoded = pcall(function()
+		if type(value) ~= "string" or not utf8.len(value) then return nil end
+		return Json.quote(value)
+	end)
 	if not delivery_is_current(generation, webview) then return nil end
 	if not ok or type(encoded) ~= "string" or encoded == "" then
 		delivery_failure(generation, webview, site, "encoding")
@@ -164,16 +177,25 @@ local function encode_delivery(generation, webview, site, value)
 	return encoded
 end
 
+--- Settles the exact projection's timers before releasing its owner.
+--- @return boolean settled True once every acquired timer acknowledged cleanup.
+local function settle_job()
+	local job = M._job
+	if not job then return true end
+	local settled = job.cancel()
+	if settled ~= true then
+		Logger.error(LOG, "Typing metrics projection job retained timer cleanup debt.")
+		return false
+	end
+	if M._job == job then M._job = nil end
+	return true
+end
+
 --- Cancels the running projection job and forgets queued work.
 --- @return boolean settled True once no job timer remains owned.
 local function cancel_job()
 	_pending_work = { full = false, live = false, range = nil }
-	local job = M._job
-	if not job then return true end
-	M._job = nil
-	local settled = job.cancel()
-	if not settled then Logger.error(LOG, "Typing metrics projection job retained timer cleanup debt.") end
-	return settled
+	return settle_job()
 end
 
 local _cache_reset_failure_generation = nil
@@ -181,16 +203,16 @@ local _cache_reset_failure_generation = nil
 local request_work
 
 --- Forgets every cached projection, on disk and in memory, once the disk
---- snapshot is gone. The running job is cancelled in the same turn, so it can
---- neither republish nor re-save what was cleared, and a full projection is
+--- snapshot is gone. The running job must settle before any cache mutation,
+--- so it can neither republish nor re-save what was cleared. A full projection is
 --- queued again so the page leaves its refreshing state.
 --- @return boolean removed True only when the disk snapshot is gone.
 local function reset_caches(generation, webview)
 	if not delivery_is_current(generation, webview) then return false end
+	if not cancel_job() or not delivery_is_current(generation, webview) then return false end
 	local removed = Snapshot.remove()
 	if not delivery_is_current(generation, webview) then return false end
 	if removed then
-		cancel_job()
 		Projection.reset()
 		request_work(generation, webview, "full")
 		return true
@@ -403,7 +425,9 @@ local MAX_ICON_LOOKUPS_PER_OPEN = 24
 local EXCLUDED_APPS = { Unknown = true, _sys = true, _system = true }
 
 local function get_app_icon(app_name)
-	local app = hs.application.find(app_name)
+	-- Never hs.application.find: for an app that is not running it searches every
+	-- window of every application, once per icon, on the main thread.
+	local app = RunningApplication.by_name(app_name)
 	if app and type(app.bundleID) == "function" then
 		local ok, img = pcall(hs.image.imageFromAppBundle, app:bundleID())
 		if ok and img then
@@ -432,19 +456,21 @@ local function readable_sqlite_path()
 	return sqlite_path
 end
 
---- Computes the complete first-paint publication: manifest, app icons, the
---- all-time n-gram prefetch, and the keycode layout.
+--- Computes the first-paint publication: manifest, app icons, the all-time
+--- n-gram prefetch, and the keycode layout.
 --- @param pacer table Pacer from `infra.paced_job`.
---- @return table result { payload = string, generated_at = epoch seconds }.
+--- @return table result { payload = string, generated_at = epoch seconds,
+---     complete = boolean }; an incomplete result is shown but never saved.
 local function compute_full(pacer)
 	local generated_at = os.time()
 	local today = os.date("%Y-%m-%d")
 	local manifest, manifest_json = {}, "{}"
+	local manifest_complete, range_complete = true, true
 	local session = nil
 	local sqlite_path = readable_sqlite_path()
 	if sqlite_path then
-		session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path, today, pacer)
-		manifest, manifest_json = session.manifest()
+		session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path, today, pacer)
+		manifest, manifest_json, manifest_complete = session.manifest()
 	end
 
 	-- App icons + apps list + first_date computed from manifest. The apps list
@@ -491,41 +517,63 @@ local function compute_full(pacer)
 	-- Initial range pre-fetch (first_date → today).
 	local initial_data_json = "null"
 	if session and first_date then
-		initial_data_json = session.range(first_date, today, all_apps_list)
+		initial_data_json, range_complete = session.range(first_date, today, all_apps_list)
 	end
 
 	return {
 		generated_at = generated_at,
-		payload = string.format('{"manifest":%s,"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
-			manifest_json, PacedJson.encode(app_icons, pacer), initial_data_json,
-			PacedJson.encode(kc_layout, pacer)),
+		complete = manifest_complete == true and range_complete == true,
+		payload = string.format('{"manifest":%s,%s"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
+			manifest_json, manifest_complete == true and "" or '"manifest_incomplete":true,',
+			PacedJson.encode(app_icons, pacer), initial_data_json, PacedJson.encode(kc_layout, pacer)),
 	}
 end
 
 --- Computes the manifest alone after an ingest; the frontend then replays its
 --- active range request.
 --- @param pacer table Pacer from `infra.paced_job`.
---- @return string payload Publication object text.
+--- @return table result { payload = publication object text, complete = boolean }.
 local function compute_live(pacer)
 	local sqlite_path = readable_sqlite_path()
-	if not sqlite_path then return '{"manifest":{}}' end
-	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
+	if not sqlite_path then return { payload = '{"manifest":{}}', complete = true } end
+	local session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
-	local _, manifest_json = session.manifest()
-	return '{"manifest":' .. manifest_json .. "}"
+	local _, manifest_json, manifest_complete = session.manifest()
+	return {
+		payload = '{"manifest":' .. manifest_json
+			.. (manifest_complete == true and "" or ',"manifest_incomplete":true') .. "}",
+		complete = manifest_complete == true,
+	}
 end
 
 --- Computes one range request's { historical, today } payload.
 --- @param query table Decoded frontend request.
 --- @param pacer table Pacer from `infra.paced_job`.
---- @return string payload Encoded range data.
+--- @return table result { payload = encoded range data, complete = boolean }.
 local function compute_range(query, pacer)
 	local sqlite_path = readable_sqlite_path()
-	if not sqlite_path then return '{"historical":[],"today":[]}' end
+	if not sqlite_path then return { payload = '{"historical":[],"today":[]}', complete = true } end
 	local apps = type(query.apps) == "table" and query.apps or nil
-	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
+	local session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
-	return session.range(query.start_date, query.end_date, apps)
+	local payload, range_complete = session.range(query.start_date, query.end_date, apps)
+	return { payload = payload, complete = range_complete == true }
+end
+
+--- Logs an incomplete read once and its recovery once, so the pair brackets
+--- the time the page showed partial counts.
+--- @param site string Delivered projection kind.
+--- @param complete boolean Whether every SQLite read of that projection succeeded.
+local function note_read_completion(site, complete)
+	if not complete then
+		if not _incomplete_read_reported then
+			_incomplete_read_reported = true
+			Logger.warn(LOG, "Typing metrics %s read incomplete; partial counts shown with a notice, not cached.", site)
+		end
+	elseif _incomplete_read_reported then
+		_incomplete_read_reported = false
+		Logger.info(LOG, "Typing metrics %s read complete again; caching resumed.", site)
+	end
 end
 
 
@@ -583,7 +631,7 @@ local function publish_data(generation, webview, site, payload, revision, with_a
 	local metadata = string.format('{"manifest_revision":%d%s%s}', revision,
 		with_assets and string.format(',"assets_revision":%d', revision) or "",
 		freshness and (',"freshness":' .. freshness) or "")
-	local code = "window.publishTypingMetricsData(" .. payload .. "," .. metadata .. ");"
+	local code = "window.publishTypingMetricsData(JSON.parse(" .. Json.quote(payload) .. ")," .. metadata .. ");"
 	local publication = { code = code, generation = generation, revision = revision }
 	if site == "live manifest" then
 		if _pending_live_publication and _pending_live_publication.generation == generation then
@@ -653,16 +701,20 @@ local function deliver_work(generation, webview, work, ok, result)
 				_publication_revision)
 			return
 		end
-		Snapshot.save(result.payload, result.generated_at)
+		note_read_completion("history", result.complete)
+		-- Only a complete read may become the snapshot the next open paints
+		if result.complete then Snapshot.save(result.payload, result.generated_at) end
 		publish_data(generation, webview, "manifest", result.payload, _publication_revision, true,
 			freshness_json("fresh"))
 	elseif work.kind == "live" then
 		if not ok then return end
+		note_read_completion("live manifest", result.complete)
 		_publication_revision = _publication_revision + 1
-		publish_data(generation, webview, "live manifest", result, _publication_revision, false)
+		publish_data(generation, webview, "live manifest", result.payload, _publication_revision, false)
 	else
 		local request_id = work.request_id
-		local encoded = ok and result or "null"
+		if ok then note_read_completion("range", result.complete) end
+		local encoded = ok and result.payload or "null"
 		local js_cmd
 		if request_id then
 			js_cmd = string.format("window.receive_range_data(%s,%d)", encoded, request_id)
@@ -681,7 +733,12 @@ end
 --- @return boolean accepted
 local function run_next_work(generation, webview)
 	if not delivery_is_current(generation, webview) then return false end
-	if M._job then return true end
+	if M._job then
+		local state = M._job.state
+		if state ~= "done" and state ~= "failed" and state ~= "cancelled" then return true end
+		if not settle_job() or not delivery_is_current(generation, webview) then return false end
+		if M._job then return true end
+	end
 	local work
 	if _pending_work.full then
 		_pending_work.full = false
@@ -707,9 +764,9 @@ local function run_next_work(generation, webview)
 		end,
 		on_done = function(ok, result)
 			if M._job ~= job then return end
-			M._job = nil
+			local settled = settle_job()
 			deliver_work(generation, webview, work, ok, result)
-			run_next_work(generation, webview)
+			if settled then run_next_work(generation, webview) end
 		end,
 	})
 	if not job then
@@ -756,6 +813,10 @@ end
 -- =============================
 -- =============================
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return M._wv end
+
 --- Closes the typing metrics dashboard without losing an ambiguous native owner.
 --- @return boolean committed
 function M.close()
@@ -788,14 +849,9 @@ function M.show()
 	end
 	if M._wv then
 		local generation, webview = _generation, M._wv
-		local already_focused = false
-		pcall(function()
-			local win     = webview:hswindow()
-			if win then
-				local focused   = hs.window.focusedWindow()
-				already_focused = focused and focused:id() == win:id()
-			end
-		end)
+		-- A failed lookup reads as not focused, so the dashboard is presented.
+		local ok_focused, focused = pcall(OwnWindow.is_webview_focused, webview)
+		local already_focused = ok_focused and focused == true
 		if not delivery_is_current(generation, webview) then return false end
 		if already_focused then
 			Logger.debug(LOG, "Dashboard already focused — closing.")
@@ -810,6 +866,10 @@ function M.show()
 		return submit_javascript(generation, webview, "reopen", "window.apply_date_app_filters();")
 	end
 
+	if not cancel_job() then
+		Logger.error(LOG, "Typing metrics dashboard startup refused: prior projection cleanup remains pending.")
+		return false
+	end
 	Logger.start(LOG, "Opening typing metrics dashboard…")
 
 	local sf    = hs.screen.mainScreen():frame()
@@ -832,6 +892,7 @@ function M.show()
 		frame       = frame,
 		title       = i18n.get("metrics_apps.title"),
 		style_masks = 15,
+		delete_on_close = true,
 		assets_dir = assets_dir,
 		on_close   = function()
 			if generation ~= _generation then return end
@@ -839,6 +900,7 @@ function M.show()
 			_generation = _generation + 1
 			M._wv = nil
 			_painted_snapshot_at = nil
+			M._pending_full_refresh = false
 			local job_stopped = cancel_job()
 			local poller_stopped = cancel_poller()
 			local continuations_stopped = cancel_continuations()
@@ -871,7 +933,7 @@ function M.show()
 		return rollback_startup_webview(webview, "prior poller cleanup remains pending")
 	end
 	local poll_ok, poll_candidate, poll_committed = xpcall(function()
-		return TimerScheduler.every(0.3, function()
+		return TimerScheduler.every(require("infra.timings").sec("ui", "metrics_typing_poll_ms"), function()
 		if generation ~= _generation or M._wv ~= webview then return end
 		pcall(function()
 			submit_javascript(generation, webview, "request poll", "window._lua_request", function(req)

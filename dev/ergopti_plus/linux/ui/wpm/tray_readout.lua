@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger    = require("logger.shim")
 local Constants = require("infra.wpm_constants")
@@ -30,12 +31,13 @@ local ConfigPaths = require("infra.config_paths")
 local Shell     = require("adapters.shell_runner")
 local Model     = require("wpm_widget.model")
 local Widget    = require("ui.wpm.widget")
+local ConfigKeys = require("config_keys")
 
 local LOG = "ui.wpm.tray_readout"
 
 local PREF_PATHS = {
-	visible = "metrics.wpm_menubar_visible",
-	colors = "metrics.wpm_menubar_colors",
+	visible = ConfigKeys.KEY.METRICS_WPM_MENUBAR_VISIBLE,
+	colors = ConfigKeys.KEY.METRICS_WPM_MENUBAR_COLORS,
 }
 
 
@@ -58,8 +60,8 @@ local function shipped(path)
 end
 
 local DEFAULTS = {
-	visible = shipped("metrics.wpm_menubar_visible"),
-	colors = shipped("metrics.wpm_menubar_colors"),
+	visible = shipped(ConfigKeys.KEY.METRICS_WPM_MENUBAR_VISIBLE),
+	colors = shipped(ConfigKeys.KEY.METRICS_WPM_MENUBAR_COLORS),
 }
 
 local _state = {
@@ -78,12 +80,7 @@ local _painter = nil
 local _restore_debt = nil
 local ensure_item
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone(child) end
-	return copy
-end
+local clone = TableUtil.deep_copy
 
 
 
@@ -345,7 +342,7 @@ ensure_item = function(icon)
 end
 
 --- Refreshes the readout. Called from the daemon's periodic tick.
---- @param stats table|nil From keylogger.get_live_stats().
+--- @param stats table|nil From keystats.get_live_stats().
 --- @param now_s number Monotonic seconds.
 --- @return table|nil The frame shown, or nil when hidden.
 function M.tick(stats, now_s)

@@ -10,10 +10,12 @@
 --- FEATURES & RATIONALE:
 --- 1. Fail-safe return: sha256() returns "" on any failure rather than
 ---    propagating an exception, matching the port contract error_behavior.
---- 2. Text compatibility: sha256() preserves the existing OpenSSL-backed port
----    contract used by shared domain code.
---- 3. Binary integrity: sha256_bytes() hashes arbitrary bytes through hs.hash,
----    so archives containing NUL bytes never cross a shell boundary.
+--- 2. One native digest: sha256() and sha256_bytes() both hash the exact Lua
+---    string through hs.hash. The text digest used to interpolate its input
+---    into a /bin/sh command for openssl; popen(3) stops at the first NUL, so a
+---    NUL-bearing input returned "" here while Windows and Linux hashed it.
+--- 3. Private failures: a native refusal is logged by fixed category, because
+---    the hashed text (an SSID, a row seed) can appear in the native error.
 --- ==============================================================================
 
 local M = {}
@@ -36,28 +38,10 @@ local LOG = "adapters.crypto"
 --- @param data string The input string to hash.
 --- @return string Lowercase hex digest (64 chars), or "" on failure.
 function M.sha256(data)
-	local ok, result = pcall(function()
-		if type(data) ~= "string" then return "" end
-		-- POSIX single-quoting: replace every ' in data with '\'' so the shell
-		-- never interprets $, backticks, backslash-newline or other expansions.
-		-- %q (Lua double-quoting) is NOT shell-safe and would mangle newlines and
-		-- dollar signs, producing wrong digests or allowing shell injection.
-		local q = "'" .. data:gsub("'", "'\\''") .. "'"
-		local cmd = "printf '%s' " .. q .. " | openssl dgst -sha256 -hex 2>/dev/null"
-		local output = hs.execute(cmd)
-		if type(output) ~= "string" then return "" end
-		-- openssl output format: "SHA2-256(stdin)= <hex>" or "(stdin)= <hex>"
-		-- Anchoring on "=" prevents spurious matches on words like "here" whose
-		-- last character happens to be a valid hex digit (e.g. "e").
-		local digest = output:match("%=%s*([0-9a-f]+)%s*$")
-		if not digest then return "" end
-		return (digest:gsub("%s+", ""))
+	if type(data) ~= "string" then return "" end
+	return M.sha256_bytes(data, function(category)
+		Logger.error(LOG, "sha256(): native digest refused (%s).", category)
 	end)
-	if not ok then
-		Logger.error(LOG, "sha256(): unexpected error — %s", tostring(result))
-		return ""
-	end
-	return type(result) == "string" and result or ""
 end
 
 --- Computes the SHA-256 digest of an arbitrary binary string.

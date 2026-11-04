@@ -20,8 +20,9 @@ local function read_bytes(path)
 end
 
 local function corpus_root()
-	local source = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
-	local root = assert(source:match("^(.*)/lua/test/config_migrate_records_contract%.lua$"),
+	local source = debug.getinfo(1, "S").source:gsub("^@", "")
+	local NativePath = require("native_path")
+	local root = assert(NativePath.dirname(assert(NativePath.dirname(assert(NativePath.dirname(source))))),
 		"cannot locate the migration record corpus")
 	return root .. "/tests/corpus/config_migration_record_bytes"
 end

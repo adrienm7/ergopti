@@ -9,7 +9,7 @@
 ; modules/keymap/layout.ahk, the Shift and CapsLock layers
 ; (layout_shift_caps.ahk), the AltGr layers (layout_altgr.ahk) and the
 ; dead-key tables (DeadKey, and the circumflex hotstrings). No Windows copy of
-; the layout exists; the keylogger heatmap labels its keys from the same data.
+; the layout exists; the keystats heatmap labels its keys from the same data.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Read once at boot (ErgoptiLayout_Init), never on the typing path, from
@@ -35,6 +35,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -265,8 +266,9 @@ _ErgoptiAltGrTables(Plain, Shifted, Keys, WrapSet, Names, Pairs) {
  * @param {Map} KeyDeviations - Per-table key deviations (ERGOPTI_KEY_DEVIATIONS by default).
  * @param {Map} DeadKeyDeviations - Per-dead-key deviations (ERGOPTI_DEAD_KEY_DEVIATIONS by default).
  * @returns {Map} "levels" (table -> scan code -> descriptor), "dead_keys"
- *   (name -> character -> result) and "terminators" (name -> what the dead key
- *   types alone). A descriptor types "text" (after committing the hotstring when
+ *   (name -> character -> result), "terminators" (name -> what the dead key
+ *   types alone) and "number_row_base" (the number row's base level, which
+ *   no layer remaps: the direct-access option orders it). A descriptor types "text" (after committing the hotstring when
  *   "hotstrings" is set), types "word" and the space-around-symbols setting,
  *   wraps the selection ("wrap", "left", "right"), starts the dead key "dead"
  *   (typing "chain" inside a sequence), or does nothing ("none"); a base key
@@ -288,7 +290,7 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 	PlusLevels := KeylayoutTables_Levels(PlusModel, KeyCodes)
 
 	DeadKeys := Map()
-	Terminators := Map()
+	TerminatorMap := Map()
 	for State, Dead in Tables["DeadKeys"] {
 		if !ERGOPTI_DEAD_KEY_NAMES.Has(State)
 			throw ValueError("The Ergopti .keylayout has a dead key the emulation does not name.", -1, State)
@@ -305,7 +307,7 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 			for Input, Output in DeadKeyDeviations[Name]
 				Table[Input] := Output
 		DeadKeys[Name] := Table
-		Terminators[Name] := Dead["Terminator"]
+		TerminatorMap[Name] := Dead["Terminator"]
 	}
 	for Name in DeadKeyDeviations
 		if !DeadKeys.Has(Name)
@@ -322,9 +324,14 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 
 	Spec := Map()
 	Base := Map()
+	; The number row's base level is not remapped here, but it is the row the
+	; direct-access option orders (_DigitRowSwapResolution), so it is kept.
+	BaseNumberRow := Map()
 	for Sc, Entry in Levels["base"] {
-		if ERGOPTI_NUMBER_ROW.Has(Sc)
+		if ERGOPTI_NUMBER_ROW.Has(Sc) {
+			BaseNumberRow[Sc] := _ErgoptiDescribe(Entry, NoWrap, false, false, Names, Pairs)
 			continue
+		}
 		Descriptor := _ErgoptiDescribe(Entry, NoWrap, false, false, Names, Pairs)
 		if Descriptor.Has("text") && ShortcutFeatures.Has(Descriptor["text"])
 			Descriptor["shortcut_feature"] := ShortcutFeatures[Descriptor["text"]]
@@ -381,7 +388,8 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 			Spec[Table][Sc] := Descriptor.Clone()
 		}
 	}
-	return Map("levels", Spec, "dead_keys", DeadKeys, "terminators", Terminators)
+	return Map("levels", Spec, "dead_keys", DeadKeys, "terminators", TerminatorMap,
+		"number_row_base", BaseNumberRow)
 }
 
 /**
@@ -636,19 +644,6 @@ ErgoptiBaseLabels() {
 	return Out
 }
 
-; Scancode → the character the digit-row emulation (direct_access_digits) types
-; on the three keys at the edges of the number row. Its hotkeys in
-; modules/keymap/layout.ahk type from this table, and the tap-key menu label
-; (infra/tap_keys.ahk) reads it, so a label cannot name a character the key
-; does not type.
-ErgoptiNumberRowEdgeMapping() {
-	return Map(
-		0x29, "$", ; SC029, left of 1
-		0x0C, "%", ; SC00C, first right of 0
-		0x0D, "=", ; SC00D, second right of 0
-	)
-}
-
 /**
  * Resolves the helper-backed variant from effective features, never a raw registry layout.
  * A runtime gate projects the variant to Ergopti while retained desired intent stays intact.
@@ -667,7 +662,7 @@ ErgoptiLayout_BuiltinVariant(FeaturesSource := unset) {
 	Layout := FeaturesSource.Get("layout", Map())
 	if !(Layout is Map)
 		return ""
-	Variant := Layout.Get("ergopti_variant", "none")
+	Variant := Layout.Get(ConfigLeaf.ERGOPTI_VARIANT, "none")
 	return (Variant is String) && (StrCompare(Variant, "none", true) == 0 || StrCompare(Variant, "ergopti", true) == 0 || StrCompare(Variant, "ergopti_plus", true) == 0) ? Variant : ""
 }
 
@@ -687,6 +682,6 @@ ErgoptiLayout_PlusIsActive(FeaturesSource := unset) {
 	if ErgoptiLayout_BuiltinVariant(FeaturesSource) != "ergopti_plus"
 		return false
 	Layout := FeaturesSource["layout"]
-	Selected := Layout.Get("emulated_layout", "")
+	Selected := Layout.Get(ConfigLeaf.EMULATED_LAYOUT, "")
 	return (Selected is String) && Selected == ""
 }

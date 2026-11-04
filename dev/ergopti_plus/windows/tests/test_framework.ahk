@@ -46,14 +46,19 @@
 
 ; Registry of all Test() calls. Each entry is { name, callback, interactive }.
 global TEST_REGISTRY := []
+; Once execution owns the plan, registration and nested runners must refuse.
+global _TEST_RUN_STARTED := false
 
 ; Counters updated by RunTests.
 global TEST_PASS_COUNT := 0
 global TEST_FAIL_COUNT := 0
+; Cases that could not run on this host. Never part of the pass count.
+global TEST_NOT_EXECUTED_COUNT := 0
 
-; Results file for CI live tailing (same pattern as E2E to guarantee progress logs even
-; when stdout is buffered or the process has no console handle).
-global _TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
+; The marker of a not-executed TAP result. validate-ahk-suite-manifest.cjs and
+; report.cjs parse the same spelling.
+global TEST_NOT_EXECUTED_MARKER := " # SKIP NOT EXECUTED: "
+
 ; Including assertion helpers does not acquire or reset a runner receipt.
 
 ; Default false when no runner pre-declares it (run_all sets true for --dry-run).
@@ -68,6 +73,17 @@ if !IsSet(_AHK_ONLY_FILTER)
 
 if !IsSet(_AHK_QUALIFICATION_PROFILE)
 	global _AHK_QUALIFICATION_PROFILE := ""
+
+; Optional selection flags (run_all sets them): --module=<group>,
+; --list=<file>, --dump-plan=<file> and --reverse. Empty means unused.
+if !IsSet(_AHK_MODULE)
+	global _AHK_MODULE := ""
+if !IsSet(_AHK_LIST_FILE)
+	global _AHK_LIST_FILE := ""
+if !IsSet(_AHK_DUMP_PLAN)
+	global _AHK_DUMP_PLAN := ""
+if !IsSet(_AHK_REVERSE)
+	global _AHK_REVERSE := false
 
 ; Only the principal runner owns parser registration. Including assertion
 ; helpers alone must not create an undeclared function dependency at load time.
@@ -96,10 +112,24 @@ Assert(Condition, Message := "assertion failed") {
 	}
 }
 
+; Raised by TestNotExecuted. RunTests reports the case as NOT EXECUTED: it is
+; neither a pass nor a failure, and the summary lists it with its reason.
+class TestNotExecutedSignal extends Error {
+}
+
+; Ends the current case before it exercises anything because this host cannot
+; run it. Call it only from a capability check that has positively observed the
+; missing capability; an unknown capability must let the case run.
+; @param Reason {String} One line naming the missing capability and its remedy.
+TestNotExecuted(Reason) {
+	if !(Reason is String) || Trim(Reason) == "" || RegExMatch(Reason, "[\x00-\x1F]")
+		throw ValueError("A not-executed reason must be one nonempty line.")
+	throw TestNotExecutedSignal(Reason)
+}
+
 ; Append a line to the results file (for CI tailing) and also to stdout when possible.
 _TestAppendProgress(line) {
-	try FileAppend(line . "`r`n", _TEST_RESULTS_FILE)
-	try FileAppend(line . "`r`n", "*")
+	_TestPrint(line)
 }
 
 ; ``!==`` and not ``!=``: AHK v2's ``!=`` compares strings CASE-INSENSITIVELY, so
@@ -139,7 +169,7 @@ AssertThrows(Callback, Message := "expected exception") {
 	Threw := false
 	try {
 		Callback()
-	} catch {
+	} catch Any {
 		Threw := true
 	}
 	if !Threw {
@@ -192,6 +222,27 @@ _DescribeValue(V, Depth := 0) {
 	}
 }
 
+; A thrown object is opaque: inspecting it could execute arbitrary getters or
+; string conversion while reporting the original failure. Only primitive values
+; use the existing bounded renderer; escaping controls preserves one TAP line.
+_TestThrownValueDescription(Value) {
+	if Value is String || Value is Number {
+		Description := ""
+		for Character in StrSplit(_DescribeValue(Value)) {
+			if RegExMatch(Character, "[\x00-\x1F\x7F-\x9F\x{2028}\x{2029}]")
+				Description .= "\x" . Format("{:02X}", Ord(Character))
+			else
+				Description .= Character
+		}
+		return Type(Value) . ": " . Description
+	}
+	if Value is Map
+		return "Map"
+	if Value is Array
+		return "Array"
+	return "Object"
+}
+
 _JoinParts(parts) {
 	s := ""
 	for i, p in parts {
@@ -222,17 +273,85 @@ _DriverIsProductionSource(Path) {
 	return !RegExMatch(StrReplace(Path, "\", "/"), "i)/(tests|vendor|build|_generated)/")
 }
 
+; One native census owns the production scope for source consumers. Enumeration
+; failure cannot be represented by a successful empty scan.
+_DriverProductionSourceCensus(Root := unset) {
+	if !IsSet(Root)
+		SplitPath(A_ScriptDir, , &Root)
+	if !(Root is String) || Root == "" || !DirExist(Root)
+		throw ValueError("The production source census requires an existing directory.")
+	; Match the filesystem's full/long path before deriving relative identities.
+	; Standalone framework consumers cannot depend on a loaded filesystem adapter.
+	Size := DllCall("Kernel32\GetFullPathNameW", "Str", Root, "UInt", 0, "Ptr", 0, "Ptr", 0, "UInt")
+	if !Size
+		throw OSError()
+	Full := Buffer(Size * 2)
+	Written := DllCall("Kernel32\GetFullPathNameW", "Str", Root, "UInt", Size, "Ptr", Full, "Ptr", 0, "UInt")
+	if !Written || Written >= Size
+		throw Error("The production source root did not resolve completely.")
+	Size := DllCall("Kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", 0, "UInt", 0, "UInt")
+	if !Size
+		throw OSError()
+	Long := Buffer(Size * 2)
+	Written := DllCall("Kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", Long, "UInt", Size, "UInt")
+	if !Written || Written >= Size
+		throw Error("The production source long root did not resolve completely.")
+	Root := StrGet(Long)
+	Paths := []
+	Loop Files, RTrim(Root, "\") . "\*.ahk", "FR" {
+		if _DriverIsProductionSource(A_LoopFileFullPath)
+			Paths.Push(A_LoopFileFullPath)
+	}
+	if !Paths.Length
+		throw ValueError("The production source census found no authored AHK files.")
+	return { Root: Root, Paths: Paths }
+}
+
+; The generated constants a source test reads through: "ConfigLeaf.MAX_WORDS" -> "max_words".
+_DriverGeneratedConstants() {
+	SplitPath(A_ScriptDir, , &Root)
+	Text := FileRead(Root . "\_generated\config_keys.ahk", "UTF-8")
+	Table := Map()
+	Owner := ""
+	loop parse, Text, "`n", "`r" {
+		if RegExMatch(A_LoopField, "^class (\w+) \{", &Header)
+			Owner := Header[1]
+		else if RegExMatch(A_LoopField, '^\s*static (\w+) := "([^"]*)"', &Entry)
+			Table[Owner . "." . Entry[1]] := Entry[2]
+	}
+	if (Table.Count == 0)
+		throw Error("_DriverGeneratedConstants: _generated\config_keys.ahk declares no constant.")
+	return Table
+}
+
+; A pin on a literal must survive that literal moving to its generated constant,
+; as tools/lib/config-key-tokens.cjs does for the Node gates: each reference reads
+; as the quoted string it stands for. A name the table does not hold stays, so a
+; misspelt constant still fails its pin, and one inside a string stays as written.
+_DriverResolveConstants(Src) {
+	; Read on the first reference: a fixture tree of its own holds no generated file.
+	static Table := 0
+	Out := ""
+	Position := 1
+	while RegExMatch(Src, "\b(?:ConfigKey|ConfigLeaf|MenuCommand)\.[A-Z][A-Z0-9_]*\b", &Found, Position) {
+		if !IsObject(Table)
+			Table := _DriverGeneratedConstants()
+		Before := SubStr(Src, Found.Pos - 1, 1)
+		Quoted := Found.Pos > 1 && (Before == '"' || Before == "'")
+		Out .= SubStr(Src, Position, Found.Pos - Position)
+			. (Table.Has(Found[0]) && !Quoted ? '"' . Table[Found[0]] . '"' : Found[0])
+		Position := Found.Pos + Found.Len
+	}
+	return Out . SubStr(Src, Position)
+}
+
 _DriverSourceConcat() {
 	static cache := ""
 	if (cache != "")
 		return cache
-	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests  ->  Root = windows
 	Combined := ""
-	Loop Files, Root . "\*.ahk", "FR" {
-		if !_DriverIsProductionSource(A_LoopFileFullPath)
-			continue
-		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
-	}
+	for Path in _DriverProductionSourceCensus().Paths
+		Combined .= "`n" . _DriverResolveConstants(FileRead(Path, "UTF-8"))
 	cache := Combined
 	return cache
 }
@@ -247,11 +366,13 @@ _DriverSourceConcat() {
 ; no-prefix-keywait, where "; native Suspend() never disarms..." comments
 ; added by the Pattern-1 hardening campaign inflated a raw "Suspend(" count).
 _StripFullLineComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r")
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	return Out
+	if Src == ""
+		return ""
+	; Native passes keep the line contract: CR is trimmed around every LF and the
+	; text boundaries, and each surviving line ends in LF. `[^\S\n]` stops the
+	; leading whitespace from spanning a line, which a bare \s would do.
+	Lines := RegExReplace(Trim(Src, "`r"), "\r*\n\r*", "`n") . "`n"
+	return RegExReplace(Lines, "m`n)^[^\S\n]*;[^\n]*\n", "")
 }
 
 ; How a refused exit looks in Ergopti_OnShutdown source.
@@ -310,12 +431,35 @@ _DriverMaskBlockComments(&Src) {
 }
 
 ; Code-only consumers also exclude quoted data and single-line comments.
+; The memo is keyed by the text itself, never by a path, so a rewritten file or
+; a mutated fixture is simply a new key and no stale mask can be returned.
 _DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
+	static Memo := [Map(), Map()], MemoChars := 0
 	if BlockCommentsOnly && !InStr(Src, "/*")
 		return Src
+	Length := StrLen(Src)
+	if Length < 1024
+		return _DriverComputeNonCodeMask(&Src, BlockCommentsOnly)
+	Masks := Memo[BlockCommentsOnly ? 1 : 2]
+	; A mask preserves offsets; the length check refuses a key cut short by NUL.
+	if Masks.Has(Src) && StrLen(Masks[Src]) == Length
+		return Masks[Src]
+	Mask := _DriverComputeNonCodeMask(&Src, BlockCommentsOnly)
+	; Whole-tree mutants must not accumulate without limit: past the budget a
+	; mask is only recomputed, which costs time but cannot change a result.
+	if MemoChars + Length <= 100000000 {
+		Masks[Src] := Mask
+		MemoChars += Length
+	}
+	return Mask
+}
+
+_DriverComputeNonCodeMask(&Src, BlockCommentsOnly) {
 	Quote := Chr(34)
-	Pattern := "'(?:``[\s\S]|[^'``])*'|" . Quote
-		. "(?:``[\s\S]|[^" . Quote . "``])*" . Quote
+	; Atomic runs keep large fixture literals from exhausting the PCRE stack.
+	; Escaped delimiters remain separate atoms and cannot close their string.
+	Pattern := "'(?:``[\s\S]|[^'``]++)*+'|" . Quote
+		. "(?:``[\s\S]|[^" . Quote . "``]++)*+" . Quote
 		. "|;[^`r`n]*|(?m:^[ `t]*/\*)"
 	Position := 1
 	CopiedThrough := 1
@@ -338,6 +482,10 @@ _DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
 ; PCRE replaces a supplementary character once, but source positions count its
 ; two UTF-16 units. Blank spans by native string length to keep aligned offsets.
 _DriverBlankNonNewlines(Text) {
+	static Blanks := Format("{:4096}", "")
+	; Nearly every token is a short one-line string or comment.
+	if StrLen(Text) <= 4096 && !InStr(Text, "`n") && !InStr(Text, "`r")
+		return SubStr(Blanks, 1, StrLen(Text))
 	Out := ""
 	Position := 1
 	while RegExMatch(Text, "[`r`n]", &Boundary, Position) {
@@ -546,10 +694,35 @@ _DriverDirConcat(RelDir) {
 	Dir := Root . "\" . StrReplace(RelDir, "/", "\")
 	Combined := ""
 	Loop Files, Dir . "\*.ahk", "FR"
-		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
+		Combined .= "`n" . _DriverResolveConstants(FileRead(A_LoopFileFullPath, "UTF-8"))
 	if (Combined == "")
 		throw Error("_DriverDirConcat: '" . RelDir . "' holds no readable .ahk file — the directory was renamed, moved or emptied. Update the test's directory name; do not let it scan nothing.")
 	return Combined
+}
+
+; Reads ONE production file by its name, wherever the tree holds it, for a test
+; whose claim is about that whole file (a single-file absence assertion that a
+; directory-wide scan would weaken). A move between directories cannot break it;
+; a rename, a missing file or a second file of that name throws, because each of
+; those would otherwise leave the test scanning the wrong text or nothing.
+; @param FileName {String} Base name, such as "logger.ahk".
+; @returns {String} The file's content.
+_DriverFileSource(FileName) {
+	static ByName := 0
+	if !IsObject(ByName) {
+		Found := Map()
+		Found.CaseSense := "Off"
+		for Path in _DriverProductionSourceCensus().Paths {
+			SplitPath(Path, &Name)
+			Found[Name] := Found.Has(Name) ? "" : Path
+		}
+		ByName := Found
+	}
+	if !ByName.Has(FileName)
+		throw Error("_DriverFileSource: no production file is named '" . FileName . "': it was renamed or deleted. Update the test.")
+	if (ByName[FileName] == "")
+		throw Error("_DriverFileSource: several production files are named '" . FileName . "'. Read it by a symbol it defines instead.")
+	return _DriverResolveConstants(FileRead(ByName[FileName], "UTF-8"))
 }
 
 ; Export a callable reference for fragment tests. AHK's isolated #Warn pass
@@ -571,12 +744,134 @@ global _DriverDirConcatFn := _DriverDirConcat
 ; Register a test. ``Callback`` must be a 0-arg callable; it receives no
 ; setup/teardown — tests should be self-contained.
 Test(Name, Callback, Interactive := false) {
-	global TEST_REGISTRY
-	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive })
+	global TEST_REGISTRY, _TEST_RUN_STARTED
+	if _TEST_RUN_STARTED
+		throw Error("Tests cannot be registered after execution starts.")
+	; The registering file decides the module shard (see _TestShardGroup).
+	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive,
+		file: Error("", -1).File })
 }
 
 ; Keep excluded cases outside the execution plan, with explicit diagnostics;
 ; they must never contribute a fabricated successful result to the TAP footer.
+; Test categories for CI: each Windows unit runner executes one category with
+; --module=<name>, so a red job names the kind of test that broke. A test
+; belongs to the first category whose pattern matches its registering file
+; (relative to tests/, lower case); categories follow the domain folders of
+; unit/ (which mirror the driver tree). There is no catch-all: a file that no
+; category declares fails every --module run and the partition test, so a new
+; folder must join or add a category. A category is split only when one runner
+; would be far too long, and then by sub-domain with a name that says it.
+; unit/test_updater.ahk, unit/updater/ and unit/test_config_scope_manifest.ahk
+; keep their flat paths because the sealed updater source roster names them.
+global TEST_MODULE_GROUPS := [
+	; Source-scanning meta tests of the whole driver.
+	["meta", "^meta/"],
+	; Local LLM server panel (view preparation, discovery, panel actions).
+	["llm-server-panel", "^unit/modules/llm/servers/test_local_server_panel"],
+	; Every other local and managed LLM server test: sharing, publication, Ollama.
+	["llm-servers", "^unit/modules/llm/servers/"],
+	; LLM terminal navigation owner.
+	["llm-terminal", "^unit/modules/llm/nav_event_owner/"],
+	; The rest of the LLM module: prediction, menus, API clients.
+	["llm", "^unit/modules/llm/"],
+	; Configuration version transitions.
+	["config-transition", "^unit/infra/config/transition/"],
+	; Whole-configuration scope: global scope, recommended restore, scope manifest, menus.
+	["config-scope-global", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm|config_scope_menus|config_scope_shortcuts)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
+	; Per-feature configuration scope: hotstrings, tap-hold, personal files.
+	["config-scope-features", "^unit/infra/config/scope/"],
+	; Configuration storage, TOML and the updater.
+	["config-updater", "^unit/infra/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
+	; Hotstrings, dynamic hotstrings and shortcuts.
+	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
+	; Keyboard remapping, layouts and gestures.
+	["keymap-gestures", "^unit/(platform/remap|modules/(keymap|gestures))/"],
+	; Keystats capture, storage and metrics.
+	["keystats", "^unit/modules/keystats/"],
+	; User interface: menus, windows, onboarding, tooltips, healthcheck.
+	["ui", "^unit/ui/"],
+	; Adapters, platform services, shared infrastructure and the test runner.
+	["core", "^unit/(adapters|platform|infra|suite)/"]
+]
+
+; The test category of a registering test file; a file no category declares is refused.
+_TestModuleOf(File) {
+	global TEST_MODULE_GROUPS
+	Relative := StrLower(StrReplace(File, "\", "/"))
+	if Position := InStr(Relative, "/windows/tests/")
+		Relative := SubStr(Relative, Position + StrLen("/windows/tests/"))
+	for Group in TEST_MODULE_GROUPS {
+		if RegExMatch(Relative, Group[2])
+			return Group[1]
+	}
+	throw Error("No test category declares " . Relative . "; add it to TEST_MODULE_GROUPS.")
+}
+
+; Runs the selection backwards when Reverse is set. A test that silently
+; relies on state an earlier test left behind then runs before that test and
+; fails, which is how --reverse finds order-dependent tests.
+_SelectReversed(Tests, Reverse) {
+	if !Reverse
+		return Tests
+	Reversed := []
+	loop Tests.Length
+		Reversed.Push(Tests[Tests.Length - A_Index + 1])
+	return Reversed
+}
+
+; Keeps the tests of one module group; an empty name keeps every test.
+_SelectModule(Tests, Module) {
+	global TEST_MODULE_GROUPS
+	if Module == ""
+		return Tests
+	Known := false
+	for Group in TEST_MODULE_GROUPS
+		Known := Known || Group[1] == Module
+	if !Known
+		throw ValueError("Unknown test module group: " . Module)
+	Selected := []
+	for Entry in Tests {
+		if _TestModuleOf(Entry.file) == Module
+			Selected.Push(Entry)
+	}
+	return Selected
+}
+
+; Keeps the tests named in a UTF-8 file (one name per line), in registry order,
+; to replay an exact sequence such as the tests that ran before a failure.
+_SelectListed(Tests, ListFile) {
+	if ListFile == ""
+		return Tests
+	Wanted := Map()
+	loop parse, FileRead(ListFile, "UTF-8"), "`n", "`r" {
+		if A_LoopField != ""
+			Wanted[A_LoopField] := true
+	}
+	Selected := []
+	Matched := Map()
+	for Entry in Tests {
+		if Wanted.Has(Entry.name) {
+			Selected.Push(Entry)
+			Matched[Entry.name] := true
+		}
+	}
+	for Name in Wanted {
+		if !Matched.Has(Name)
+			throw ValueError("Unknown test listed for replay: " . Name)
+	}
+	return Selected
+}
+
+; Admit every replay name against the full registry before applying optional
+; intersections. Known tests outside a requested module or filter remain valid.
+_SelectRunTests(Registry, Filter, Module, ListFile, AllowInteractive, Reverse, &Excluded, &UnmodularCount) {
+	Listed := _SelectListed(Registry, ListFile)
+	Selected := _SelectTests(Listed, Filter, AllowInteractive, &Excluded)
+	UnmodularCount := Selected.Length
+	return _SelectReversed(_SelectModule(Selected, Module), Reverse)
+}
+
 _SelectTests(Registry, Filter, AllowInteractive, &Excluded) {
 	Selected := []
 	Excluded := []
@@ -789,18 +1084,50 @@ _TestPrint(Line) {
 	try FileAppend(Line . "`r`n", "*")
 }
 
+; Resolve only the declared Integer zero default; a string zero is not an owner.
+_TestPlanClassifier(ModuleOf) {
+	if (ModuleOf is Integer) && ModuleOf == 0
+		return _TestModuleOf
+	if !HasMethod(ModuleOf, "Call")
+		throw TypeError("The test plan classifier must be callable.")
+	return ModuleOf
+}
+
+; Build all metadata before writing a plan so a refused owner leaves no partial file.
+_TestBuildPlan(Entries, ModuleOf := 0) {
+	Classifier := _TestPlanClassifier(ModuleOf)
+	Plan := ""
+	for Entry in Entries {
+		Group := Classifier.Call(Entry.file)
+		if !(Group is String) || Trim(Group) == "" || RegExMatch(Group, "[\t\r\n]")
+			throw TypeError("The test plan classifier must return one nonempty field.")
+		Plan .= Group . "`t" . Entry.file . "`t" . Entry.name . "`n"
+	}
+	return Plan
+}
+
 ; Execute every registered test, print TAP-style results and exit with
 ; code 0 (all green) or 1 (any failure). Designed to be called from the
 ; bottom of ``run_all.ahk`` after every test file has been #Included.
 ; When --dry-run is passed on the command line, exits immediately after
 ; printing the plan line so the CI warning-check step stays fast.
-RunTests() {
+; The optional callable classifies plan metadata only; Integer zero retains
+; the canonical unit shard owner, independent of any other runner profile.
+RunTests(PlanModuleOf := 0) {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
+	global TEST_NOT_EXECUTED_COUNT, TEST_NOT_EXECUTED_MARKER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
-	global _AHK_INTERACTIVE
+	global _AHK_INTERACTIVE, _AHK_MODULE, _AHK_LIST_FILE, _AHK_DUMP_PLAN, _AHK_REVERSE
+	global _TEST_RUN_STARTED
+	if _TEST_RUN_STARTED
+		throw Error("The test runner has already started.")
+	PlanClassifier := _TestPlanClassifier(PlanModuleOf)
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
+	; Close registration before receipt I/O or selection can dispatch a callback.
+	_TEST_RUN_STARTED := true
+	ReplayCommand := _TestReplayCommand(A_AhkPath, A_ScriptFullPath, A_Args)
 	if !IsSet(_AHK_DRY_RUN)
 		_AHK_DRY_RUN := false
 	if !IsSet(_AHK_ONLY_FILTER)
@@ -809,7 +1136,12 @@ RunTests() {
 	; Apply the optional --only <substr> filter. The plan line (1..N) and the run
 	; loop both operate on the selected subset so a filtered run is a valid, fast
 	; replay of a single failing test.
-	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
+	ActiveTests := _SelectRunTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_MODULE, _AHK_LIST_FILE,
+		_AHK_INTERACTIVE, _AHK_REVERSE, &Excluded, &UnmodularCount)
+	if _AHK_DUMP_PLAN != "" {
+		Plan := _TestBuildPlan(ActiveTests, PlanClassifier)
+		FileAppend(Plan, _AHK_DUMP_PLAN, "UTF-8")
+	}
 	DeferredName := _TestDevQualificationName()
 	if DeferredName != "" {
 		for Index, Entry in ActiveTests
@@ -824,23 +1156,30 @@ RunTests() {
 	if (_AHK_ONLY_FILTER != "")
 		_TestPrint("# --only " . _AHK_ONLY_FILTER . " - " . ActiveTests.Length
 			. " of " . TEST_REGISTRY.Length . " test(s) selected.")
+	if (_AHK_MODULE != "")
+		_TestPrint("# --module " . _AHK_MODULE . " - "
+			. ActiveTests.Length . " of " . UnmodularCount . " test(s) selected.")
+	if _AHK_REVERSE
+		_TestPrint("# --reverse - the selected tests run in reverse registry order.")
 	if (_AHK_DRY_RUN) {
 		_TestPrint("# dry-run - skipping execution.")
-		_CopyTestResultsForCi()
+		_TestResultsPublishOrExit()
 		ExitApp(0)
 	}
 	if (ActiveTests.Length == 0) {
 		_TestPrint("# no test matched --only " . _AHK_ONLY_FILTER . ".")
-		_CopyTestResultsForCi()
+		_TestResultsPublishOrExit()
 		ExitApp(1)
 	}
 	Index := 0
+	NotExecuted := []
 	for TestEntry in ActiveTests {
 		Index += 1
 		_TestPrint("RUNNING " . Index . "/" . ActiveTests.Length . " - " . TestEntry.name)
 		Status := "ok"
 		Detail := ""
 		StartedMs := _TestClockMs()
+		AuxMark := _TestLlmAuxMark()
 		try {
 			try TestEntry.callback.Call()
 			finally {
@@ -853,35 +1192,72 @@ RunTests() {
 			}
 			if LeakedCritical
 				throw Error("Test LEAKED Critical: " . TestEntry.name)
-		} catch as e {
-			Status := "not ok"
-			; Point [file:line] at the test's own call site, not the assert helper
-			; in test_framework.ahk where the throw physically happened.
-			Site := ""
-			try Site := _TestCallSite(e.Stack)
-			if (Site == "") {
-				SplitPath(e.File, &EFileName)
-				Site := EFileName . ":" . e.Line
+			LeakedWorkers := _TestLlmAuxLeaked(AuxMark)
+			if LeakedWorkers != ""
+				throw Error("Test LEFT an LLM worker in flight (" . LeakedWorkers . "): " . TestEntry.name)
+		} catch Any as e {
+			if e is TestNotExecutedSignal {
+				Status := "not executed"
+				Detail := TEST_NOT_EXECUTED_MARKER . e.Message
+			} else {
+				Status := "not ok"
+				if e is Error {
+					; Point [file:line] at the test's own call site, not the assert helper
+					; in test_framework.ahk where the throw physically happened.
+					Site := ""
+					try Site := _TestCallSite(e.Stack)
+					if (Site == "") {
+						SplitPath(e.File, &EFileName)
+						Site := EFileName . ":" . e.Line
+					}
+					Detail := " — " . e.Message . " [" . Site . "]"
+				} else
+					Detail := " — callback threw " . _TestThrownValueDescription(e)
 			}
-			Detail := " — " . e.Message . " [" . Site . "]"
 		}
 		if (Status == "ok") {
 			TEST_PASS_COUNT += 1
+		} else if (Status == "not executed") {
+			TEST_NOT_EXECUTED_COUNT += 1
+			NotExecuted.Push(TestEntry.name . Detail)
 		} else {
 			TEST_FAIL_COUNT += 1
 		}
-		_TestPrint(Status . " " . Index . " - " . TestEntry.name . Detail)
+		; TAP spells a case that did not run as an ok line with a SKIP directive;
+		; the marker keeps it out of every pass count.
+		_TestPrint((Status == "not executed" ? "ok" : Status) . " " . Index . " - " . TestEntry.name . Detail)
 		_TestPrint("# duration_ms " . Index . " " . Format("{:.3f}", DurationMs))
-		; Print the exact one-test replay command so a red test is reproducible
-		; without re-running the whole suite (the JS runner sets this bar).
+		; Preserve the actual owner's supported selection, including isolated runners.
 		if (Status == "not ok")
-			_TestPrint("#   replay: AutoHotkey64.exe tests\run_all.ahk"
-				. (TestEntry.interactive ? " --interactive" : "") . " --only "
-				. Chr(34) . TestEntry.name . Chr(34))
+			_TestPrint("#   replay: " . ReplayCommand)
 	}
-	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed.")
-	_CopyTestResultsForCi()
+	if NotExecuted.Length {
+		_TestPrint("# NOT EXECUTED on this host: " . NotExecuted.Length . " case(s), none counted as passed:")
+		for Line in NotExecuted
+			_TestPrint("#   " . Line)
+	}
+	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed"
+		. (TEST_NOT_EXECUTED_COUNT ? ", " . TEST_NOT_EXECUTED_COUNT . " not executed" : "") . ".")
+	_TestResultsPublishOrExit()
 	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
+}
+
+; Build a PowerShell invocation without interpolating paths or selection values.
+_TestReplayCommand(Interpreter, Entry, Arguments) {
+	if !(Arguments is Array)
+		throw TypeError("Runner replay arguments must be an Array.")
+	if !(Interpreter is String) || Interpreter == "" || !(Entry is String) || Entry == ""
+		throw TypeError("Runner replay requires an interpreter and entry path.")
+	Operands := [Interpreter, Entry]
+	for Argument in Arguments
+		Operands.Push(Argument)
+	Command := "&"
+	for Operand in Operands {
+		if !(Operand is String)
+			throw TypeError("Runner replay operands must be strings.")
+		Command .= " '" . StrReplace(Operand, "'", "''") . "'"
+	}
+	return Command
 }
 
 ; Measure callback wall time without including TAP output or error formatting.
@@ -899,14 +1275,60 @@ _TestClockMs() {
 	return Counter * 1000.0 / Frequency
 }
 
+; A test that starts an LLM auxiliary request (an Ollama health or tags probe,
+; a pull, a server check) must retire it before it returns. A request left in
+; flight keeps its native process and poll timer alive, and its completion
+; runs inside whichever later test next yields: a rebuild launched from there
+; reached a proof that forbids every launch, in a whole-group CI run only.
+; @returns {Integer} The owner counter before the test, or -1 without the module.
+_TestLlmAuxMark() {
+	global _LLM_AuxOwnerCounter
+	return IsSet(_LLM_AuxOwnerCounter) ? _LLM_AuxOwnerCounter : -1
+}
+
+; @param {Integer} Mark The counter _TestLlmAuxMark returned before the test.
+; @returns {String} The kinds of the owners the test opened and left current,
+;   comma-separated; "" when it retired every one.
+_TestLlmAuxLeaked(Mark) {
+	global _LLM_AuxOwners
+	if Mark < 0 || !IsSet(_LLM_AuxOwners) || !(_LLM_AuxOwners is Map)
+		return ""
+	Kinds := ""
+	for Kind, Owner in _LLM_AuxOwners {
+		if Owner is Map && Owner.Get("token", 0) > Mark
+			Kinds .= (Kinds == "" ? "" : ", ") . Kind
+	}
+	return Kinds
+}
+
 ; CI and local tooling read %TEMP%\ergopti_test_results.txt (fixed name).
 _CopyTestResultsForCi() {
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
 	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL)
 		return
+	FileCopy(TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL, true)
+}
+
+; A canonical publication refusal must terminate standalone runners headlessly.
+_TestResultsPublishOrExit(ErrorOutputFn := unset, ExitFn := unset) {
 	try {
-		if FileExist(TEST_RESULTS_FILE)
-			FileCopy(TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL, true)
+		_CopyTestResultsForCi()
+		return true
+	} catch as Failure {
+		Message := "not ok 0 - FATAL TAP PUBLICATION ERROR: " . Type(Failure)
+			. "|" . Failure.Extra . ": " . Failure.Message . "`r`n"
+		try {
+			if IsSet(ErrorOutputFn)
+				ErrorOutputFn.Call(Message)
+			else
+				FileAppend(Message, "**")
+		} finally {
+			if IsSet(ExitFn)
+				ExitFn.Call(1)
+			else
+				ExitApp(1)
+		}
+		return false
 	}
 }
 
@@ -931,7 +1353,19 @@ TrayTip(Text, Title := "", Options := 0) {
 }
 MsgBox(Text := "", Title := "", Options := "") {
 	TestMsgBoxCount(true)
-	return
+	Responder := TestMsgBoxResponder()
+	return IsObject(Responder) ? Responder(Text, Title, Options) : ""
+}
+
+; Lets one test answer the stubbed MsgBox in place of the user, for code that
+; acts on the reply. Always clear it (pass "") in the test's finally block.
+; @param {Func|String} Responder Called with (Text, Title, Options); "" clears.
+; @returns {Func|String} The responder in force.
+TestMsgBoxResponder(Responder?) {
+	static Current := ""
+	if IsSet(Responder)
+		Current := Responder
+	return Current
 }
 
 ; Counts the dialogs the MsgBox stub above absorbed, so a test can prove that an
@@ -951,6 +1385,9 @@ TestMsgBoxCount(Record := false) {
 ; retaining production registration while following module moves by symbol.
 ; A fresh complete census refuses missing, duplicate and unreadable sources;
 ; no first match or cached path may hide a moved or newly duplicated export.
+; Each lookup walks the tree again, but _DriverSymbolScanCount reuses what an
+; unchanged file already taught: a child fixture resolves dozens of symbols per
+; case, and rereading and masking the whole tree each time cost minutes per test.
 ; @param Name {String} Unqualified function name; AHK identity ignores case.
 ; @param Root {String} Driver root; the suite's windows parent by default.
 ; @returns {String} Absolute path of the unique production definition.
@@ -968,10 +1405,8 @@ _DriverProductionFileForSymbol(Name, Root := "") {
 		Path := A_LoopFileFullPath
 		if !_DriverIsProductionSource(Path)
 			continue
-		Source := FileRead(Path, "UTF-8")
-		Code := _DriverMaskNonCode(&Source)
-		Count := _DriverTopLevelDefinitionCount(&Code, Name)
-		Loop Count
+		Stamp := A_LoopFileTimeModified . ":" . A_LoopFileSize
+		Loop _DriverSymbolScanCount(Path, Stamp, A_LoopFileTimeModified, Name)
 			Matches.Push(Path)
 	}
 	if Matches.Length == 0
@@ -979,6 +1414,40 @@ _DriverProductionFileForSymbol(Name, Root := "") {
 	if Matches.Length != 1
 		throw Error("Multiple production definitions for function '" . Name . "': " . Matches.Length . ".")
 	return Matches[1]
+}
+
+; How many exported definitions of Name one source file holds, remembered per
+; file for as long as its modification time and size stand. Those stamps have a
+; one-second grain, so a file written within the racy window is read afresh and
+; not remembered: a rewrite of the same size in the same second cannot go unseen
+; (the same rule as Git's racy index entries). Masking cannot add a name, so a
+; raw substring miss answers zero without paying for the mask.
+_DriverSymbolScanCount(Path, Stamp, Modified, Name) {
+	static Entries := Map(), RacyWindowSeconds := 2
+	Entry := Entries.Get(Path, 0)
+	if !IsObject(Entry) || Entry.Stamp != Stamp {
+		if Entries.Has(Path)
+			Entries.Delete(Path)
+		Counts := Map()
+		Counts.CaseSense := "Off"
+		Entry := {Stamp: Stamp, Source: FileRead(Path, "UTF-8"), Code: "", Counts: Counts}
+		if DateDiff(A_Now, Modified, "Seconds") > RacyWindowSeconds
+			Entries[Path] := Entry
+	}
+	if Entry.Counts.Has(Name)
+		return Entry.Counts[Name]
+	if !InStr(Entry.Source, Name)
+		Count := 0
+	else {
+		if Entry.Code == "" {
+			Source := Entry.Source
+			Entry.Code := _DriverMaskNonCode(&Source)
+		}
+		Code := Entry.Code
+		Count := _DriverTopLevelDefinitionCount(&Code, Name)
+	}
+	Entry.Counts[Name] := Count
+	return Count
 }
 
 ; Definition syntax comes from the existing signature scanner. Prefix brace

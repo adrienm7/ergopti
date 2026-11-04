@@ -1,0 +1,6 @@
+# _shared/tests/corpus/config_migrations/oldest_version_refuses_a_lower_stamp/case.toml
+
+[case]
+description = "A stamp below oldest_version has no step left and is refused, though it is at or above unstamped_version."
+drivers = ["ahk", "hs", "linux"]
+outcome = "unsupported"

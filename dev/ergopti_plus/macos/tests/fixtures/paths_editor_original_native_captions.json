@@ -1,0 +1,135 @@
+{
+	"description": "Independent old-source paths editor native captions captured before implementation; do not regenerate from the new host.",
+	"old_producer_sha256": "12da00797a76f3768f5fd8bda981d31f16ae0803e172a8a5c47979497466d1d4",
+	"old_host_sha256": "a4cb38e53f0f6bd0a4f9cb2829be43dc532fb32becc9d5f7f46349c2a8ea409d",
+	"app_manifest_sha256": "934a66a2df3a7c01658dd49433983c6099e06e00c5aa7079fbb1ee877a6333ad",
+	"key": "menu.paths.window_title",
+	"rows": [
+		{
+			"locale": "ar",
+			"label": "المسارات",
+			"caption": "ErgoptiPlus — المسارات",
+			"locale_source_sha256": "fe571a55ecb339ba73a4a295ce8f73d2d3d61c61f3fc6470f70576d458bf7165"
+		},
+		{
+			"locale": "cs",
+			"label": "Cesty",
+			"caption": "ErgoptiPlus — Cesty",
+			"locale_source_sha256": "b3cf8c1a949b285ea31ebce9830b2423f2763c9c70a3e542ddd7f46a002f048b"
+		},
+		{
+			"locale": "da",
+			"label": "Stier",
+			"caption": "ErgoptiPlus — Stier",
+			"locale_source_sha256": "8f4240971e38f9b74a3e284edf954c9461b0779c249031f7ba8c79f044f7e5c6"
+		},
+		{
+			"locale": "de",
+			"label": "Pfade",
+			"caption": "ErgoptiPlus — Pfade",
+			"locale_source_sha256": "2cfb160f8a0c5282f643b9f6cef3db54b3c31d1b1ccb254ace5f66c1412f19fc"
+		},
+		{
+			"locale": "en",
+			"label": "Paths",
+			"caption": "ErgoptiPlus — Paths",
+			"locale_source_sha256": "56e632734a3180c97314b001e38e71bcad47640772d0afcda6f82380296f492b"
+		},
+		{
+			"locale": "es",
+			"label": "Rutas",
+			"caption": "ErgoptiPlus — Rutas",
+			"locale_source_sha256": "9644d094fe4e64c4a9ddb8a775cc9b5114004a5b0732c56a5e36b55cf6ecbe05"
+		},
+		{
+			"locale": "fr",
+			"label": "Chemins",
+			"caption": "ErgoptiPlus — Chemins",
+			"locale_source_sha256": "184317bed5b9e9f1eb18d5a17d2b5944bf42ab664a0ba75041132aaac56d9e64"
+		},
+		{
+			"locale": "he",
+			"label": "נתיבים",
+			"caption": "ErgoptiPlus — נתיבים",
+			"locale_source_sha256": "86fbc4d0d7bdcbaf4c2b5fd4dc78b8067a4c4e7bfcd0883dad9ce4d5b612aadd"
+		},
+		{
+			"locale": "hi",
+			"label": "पथ",
+			"caption": "ErgoptiPlus — पथ",
+			"locale_source_sha256": "809706ba6db13f3c46d281e70023730dfe672017be81fb085da5d68a88262100"
+		},
+		{
+			"locale": "it",
+			"label": "Percorsi",
+			"caption": "ErgoptiPlus — Percorsi",
+			"locale_source_sha256": "1c076f54452bc97ed4a07983e4e3ced9d6d4b2c631fe5b2c9ba81b6ce51c489a"
+		},
+		{
+			"locale": "ja",
+			"label": "パス",
+			"caption": "ErgoptiPlus — パス",
+			"locale_source_sha256": "d0cef33d7a558b21862c446cef0a6b09679733573d4a6ca12e0f114ac535e30c"
+		},
+		{
+			"locale": "ko",
+			"label": "경로",
+			"caption": "ErgoptiPlus — 경로",
+			"locale_source_sha256": "d7842962f4195ca78bf144b197410c428b39d116a39ae03a1d5220073daea1d1"
+		},
+		{
+			"locale": "nl",
+			"label": "Paden",
+			"caption": "ErgoptiPlus — Paden",
+			"locale_source_sha256": "d74e21d9698e435dbb21e5791e0a818e551893800c1d05a493a885caddb9cec0"
+		},
+		{
+			"locale": "no",
+			"label": "Stier",
+			"caption": "ErgoptiPlus — Stier",
+			"locale_source_sha256": "8b71d8dd65215d74e0e8529953342ba0e2b5ae550f09064c1d76ff75457d65a0"
+		},
+		{
+			"locale": "pl",
+			"label": "Ścieżki",
+			"caption": "ErgoptiPlus — Ścieżki",
+			"locale_source_sha256": "cdc9d3e034d093031ee12e8862b303152ae99110f09611a8e4975da9be30b9b4"
+		},
+		{
+			"locale": "pt",
+			"label": "Caminhos",
+			"caption": "ErgoptiPlus — Caminhos",
+			"locale_source_sha256": "d71613700f06e9eb4a3734cbcc62f7dbc12a542499398271d45085aa43e9d100"
+		},
+		{
+			"locale": "ru",
+			"label": "Пути",
+			"caption": "ErgoptiPlus — Пути",
+			"locale_source_sha256": "1cf9dbdd495cce3c2bbe2f0ffddd09ca3062f3bfa113a2ed35d621a282a3dd2e"
+		},
+		{
+			"locale": "sv",
+			"label": "Sökvägar",
+			"caption": "ErgoptiPlus — Sökvägar",
+			"locale_source_sha256": "f940f543e2085aab6b69250efac2bb35449bccc95dea058cba810b30907ab401"
+		},
+		{
+			"locale": "tr",
+			"label": "Yollar",
+			"caption": "ErgoptiPlus — Yollar",
+			"locale_source_sha256": "8f9ab7b044c1758fc6fd26a7bb27ea2cbf43f4c3bec1346e96f97645fd6c58a9"
+		},
+		{
+			"locale": "uk",
+			"label": "Шляхи",
+			"caption": "ErgoptiPlus — Шляхи",
+			"locale_source_sha256": "b61ae60f8e65a6a0f63da2dbd5c4375b2d3ca0424848f2f369716c0471a9d3d9"
+		},
+		{
+			"locale": "zh",
+			"label": "路径",
+			"caption": "ErgoptiPlus — 路径",
+			"locale_source_sha256": "356eb058ca1f6bc3a392b43a4b87b919c0c3f1c6c122a33c40e76b312828dd85"
+		}
+	]
+}

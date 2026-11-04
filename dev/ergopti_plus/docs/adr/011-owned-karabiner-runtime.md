@@ -15,11 +15,11 @@ modifications. Up to `v0.0.0-dev.147` onboarding installs the official
 Karabiner-Elements 16.0.0 application (UI, system extension and root grabber)
 and ErgoptiPlus merges token-scoped rules into the user's own
 `~/.config/karabiner/karabiner.json`. Ergopti never owns a Karabiner process:
-that is rule R3, and `tests/meta/test_karabiner_stock_process_isolation.lua`
+that is rule R3, and `tests/meta/architecture/test_karabiner_stock_process_isolation.lua`
 enforces it.
 
 That arrangement cannot count physical keys exactly (HS-274). Karabiner rewrites
-key codes before Quartz sees them, so the keylogger's event tap credits the
+key codes before Quartz sees them, so the keystats's event tap credits the
 remapped output, and a `shell_command` ledger in each tap-hold manipulator also
 credits the physical key: every remapped tap is counted twice. Suppressing the
 managed output key codes instead loses real presses, because the shipped
@@ -29,9 +29,10 @@ heuristic (timing, order, PID, user data, sender identity) was measured and
 rejected. The only exact source is a raw HID stream read inside the Karabiner
 core, before remapping, with device and element identity: a producer Ergopti
 must own. The complete analysis, the rejected paths and the work packages are in
-the [HS-274 delivery plan](../../../../docs/handovers/2026-09-29-overnight/hs274-delivery-plan.md);
-its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
-[decision log](../../../../docs/handovers/2026-09-29-overnight/DECISIONS.md).
+the HS-274 delivery plan; its section 6 asked the maintainer five questions,
+answered on 2026-09-29 in the decision log. Both left the tree with the old
+handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
+`docs/handovers/2026-09-29-overnight/` (`hs274-delivery-plan.md`, `DECISIONS.md`).
 
 ## Decision
 
@@ -52,6 +53,21 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
    Tap-Hold off or unticking the option. This deliberately overrides R3 for that
    explicit, default-on option only. With the option off, the owned runtime does
    not fight another grabber: it reports an explicit, named unavailable state.
+   Confirmed by the maintainer on 2026-10-27 under the owned-runtimes rule
+   (`docs/design/owned-runtimes.md`): Tap-Hold on quits the user's Karabiner;
+   Tap-Hold off never activates the owned runtime beside theirs.
+   **Revised by the maintainer on 2026-10-31**, superseding the Tap-Hold
+   trigger and the option: the rule follows Ergopti running. While Ergopti runs
+   and is not paused it always uses its own runtime and closes a running user
+   Karabiner-Elements, and tells the user so; paused or quit, it stops its
+   runtime and restarts the user's Karabiner if, and only if, it closed it. A
+   persisted marker records the close, so a crash or a forced quit still gives
+   it back. No feature switch (Tap-Hold or another) takes part; the consent
+   row « close other Karabiner apps while Ergopti is running (restored when
+   paused or quit) » stays, on by default (`[karabiner] close_other_instances`),
+   and unticked it keeps ours from running beside theirs. Because one Lua VM cannot start a
+   second capture (decision 8), a resume after a pause reloads the driver.
+   The owner is `platform/remap/runtime_activation.lua`.
 4. **Branding and signing (question 2).** The pqrs branding of the
    VirtualHIDDevice (hidden manager application, notification, Driver
    Extensions entry) is acceptable. Ergopti does not get an Apple Developer ID:
@@ -65,6 +81,31 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
 7. **Keys and hardware (question 5).** Everything is counted, the fn/globe key
    and the media (consumer) keys included. Real-Mac acceptance uses the
    internal Mac keyboard, with fn/globe, only.
+8. **One Console owner (2026-10-23).** The user-side Console is started, watched
+   and retired only by the signed launcher's installed-source role
+   (`InstalledPhysicalSourceBridge`, role `--installed-physical-source`), which
+   authenticates the installed runtime by designated requirement, pins the
+   Console image and its configuration root, and ends the Console with the
+   capture stream. The Lua runtime owner (`runtime_owner.lua`) spawns no process:
+   it requests the capture through a port (`adapters/runtime_capture_port.lua`
+   over the native module `ergopti_installed_source_native`) and is READY only
+   when that capture admits its first stream, which proves the Console, the Core
+   and the stream are up. Rejected: a second, Lua-spawned Console with
+   `--owner-pid` (two Consoles would fight for the owned sockets, and the
+   launcher already ties the Console's life to the stream and to Hammerspoon's
+   stdin). Consequence: the owned runtime has no mode without the capture, and a
+   managed capture session is single-use in one Lua VM, so a restart takes a
+   reload.
+9. **Closing another Karabiner, and uninstalling.** The default-on option runs
+   Karabiner's own « Quit » steps through its Non-Privileged Agents helper
+   (`unregister-core-agents` and the optional agent steps), never a kill or a
+   `launchctl` call, and only when `[karabiner] close_other_instances` (hidden,
+   default `true`) holds the user's consent; every refusal has a stable reason.
+   The user-side process is what is counted as « active » (an installed but idle
+   Karabiner does not block). The application uninstall retires the owned
+   runtime (two launchd jobs, root-owned directory) under one administrator
+   prompt before the bundle is trashed, and refuses by name when the prompt is
+   declined; the DriverKit extension is shared and stays.
 
 ## Consequences
 
@@ -98,9 +139,15 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
   production path until the owned runtime passes native and real-Mac
   acceptance. New flags default to today's behaviour and use key names no older
   build ever wrote, so shared-mode generator output and boot stay identical.
-- VirtualHIDDevice version skew (only one version can be active system-wide) was
-  not part of the answers; the owned mode must surface it as an explicit named
-  state, and its resolution is still to be decided.
+- An incompatible VirtualHIDDevice (only one version can be active system-wide)
+  blocks owned mode in an explicit named unavailable state with an explanation.
+  The decided policy offers a driver-only update requiring explicit confirmation:
+  detection is `platform/remap/runtime_vhid.lua`, the Tap-Holds row and its
+  confirmation are wired, and the payload is the manifest's pinned pqrs package,
+  whose digest and Developer ID Installer team are checked again by the
+  administrator shell before `/usr/sbin/installer`
+  (`platform/remap/runtime_vhid_update.lua`). Native validation and real-Mac
+  acceptance remain unfinished.
 - Counts are exact only inside an admitted capture. Before approval, during
   stream loss or with the option off while another Karabiner holds the
   keyboards, the gaps are recorded explicitly and never reconstructed.
@@ -119,14 +166,42 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
 
 ## Evidence in the codebase
 
-- The plan and its work packages:
-  `docs/handovers/2026-09-29-overnight/hs274-delivery-plan.md` (section 6
-  records these answers).
+- The plan and its work packages: the HS-274 delivery plan quoted above, in
+  Git at `49c62d77a1` (section 6 records these answers); the open work
+  packages are item 31 of `TODO.md`.
 - The realigned invariants: `docs/memory/macos-hammerspoon.md`
   (`project-hs-owned-remap-runtime`, `project-hs-karabiner-exact-lease-isolation`,
   `project-hs-fork-admission-in-both-launch-modes`).
 - The dual-mode description: `static/ergopti_plus/macos/platform/remap/README.md`
   and `static/ergopti_plus/macos/launcher/README.md`.
 - R3 stays enforced for stock processes by
-  `static/ergopti_plus/macos/tests/meta/test_karabiner_stock_process_isolation.lua`
-  until the owned runtime lands together with the exact code it must allow.
+  `static/ergopti_plus/macos/tests/meta/architecture/test_karabiner_stock_process_isolation.lua`.
+  The one exception, the consented closer, is `adapters/karabiner_coexistence.lua`,
+  which uses Karabiner's own helper and is pinned by its own unit test; the
+  isolation test needed no rewrite because no Ergopti-labelled launchd call was
+  added to the driver (the uninstall's launchd calls run in the launcher, on
+  Ergopti labels only, and `test_owned_runtime_uninstall_scope.lua` pins them).
+- The artifact pin is `static/ergopti_plus/macos/vendor/remap-runtime/manifest.json`,
+  judged by `platform/remap/runtime_manifest.lua` and gated by
+  `tools/test/test-remap-runtime-manifest.cjs` (`--require-pinned` refuses the
+  unbuilt runtime fields until the hosted build fills them).
+- The HS-274 tooling in `tools/diagnostics/hs274*` is an input of the owned
+  runtime, not a closed study: `tools/build/remap_runtime_source.py` pins the
+  producer patch set (`hs274_raw_patch.py`, `hs274_stream_patch.py`) and the
+  `hs274-*.hpp` stream headers by SHA-256, `tools/build/remap_runtime_build.py`
+  pins `hs274_native_build.py`, the macOS physical-history Lua tests load
+  `hs274-context*.lua` and `hs274_persistence_test.py`, and `hs274-remap.py`
+  with `hs274-core.py`, `hs274-provider.py` and the Hammerspoon harness is the
+  native fixture that acceptance builds on. `npm run test:hs274-diagnostics`
+  runs its portable Python suites and the two C++ tests without vendor
+  headers in the shared Linux lane; the C++ tests that include the pinned
+  Karabiner-Elements vendor headers run with the runtime build.
+- Retired on 2026-10-22: the 10-product « complete candidate » packaging
+  (`tools/build/karabiner_candidate*.py`, `karabiner_package_policy.py` and
+  their tests), which installed the fork over the official application against
+  decision 1, and the one-shot capability probes `hs274-native.swift`
+  (Quartz fields and user data cannot tell a remapped key from a physical one)
+  and `hs274-hid-device.c` (root does not grant the entitlement an ordinary
+  `IOHIDUserDevice` acquisition needs). Their findings stand in the
+  alternatives above and in `docs/memory/macos-hammerspoon.md`; the code is in
+  Git history before that date.

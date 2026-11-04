@@ -266,12 +266,20 @@ local function _json_decode(s)
 	end
 	-- Minimal JSON parser sufficient for fixture-based tests
 	local pos = 1
-	local function skip_ws() while pos <= #s and s:sub(pos, pos):match("%s") do pos = pos + 1 end end
+	-- Runs are skipped and copied with string.find (C) rather than byte by byte:
+	-- tests decode the 21 locale catalogues through this stub many times.
+	local function skip_ws()
+		if pos > #s then return end
+		pos = s:find("%S", pos) or (#s + 1)
+	end
 	local parse_value
 	local function parse_string()
 		assert(s:sub(pos, pos) == '"') ; pos = pos + 1
 		local buf = {}
 		while pos <= #s do
+			local stop = s:find('["\\]', pos)
+			if not stop then break end
+			if stop > pos then buf[#buf + 1] = s:sub(pos, stop - 1) ; pos = stop end
 			local c = s:sub(pos, pos)
 			if c == '"' then pos = pos + 1 ; return table.concat(buf) end
 			if c == '\\' then
@@ -284,7 +292,7 @@ local function _json_decode(s)
 				elseif e == '"' or e == '\\' or e == '/' then buf[#buf + 1] = e
 				else buf[#buf + 1] = '\\' ; buf[#buf + 1] = e end
 				pos = pos + 2
-			else buf[#buf + 1] = c ; pos = pos + 1 end
+			end
 		end
 		error("unterminated string")
 	end
@@ -683,6 +691,10 @@ M.sqlite3 = {
 	MISUSE  = 21,
 	ROW     = 100,
 	DONE    = 101,
+	-- SQLite open flags, exported by Hammerspoon's lsqlite3 (SC(OPEN_*)).
+	OPEN_READONLY  = 0x1,
+	OPEN_READWRITE = 0x2,
+	OPEN_CREATE    = 0x4,
 	open = function(path)
 		table.insert(SQLITE3_CALLS, { op = "open", path = path })
 		-- Returns a stub db handle that succeeds on all calls
@@ -730,7 +742,7 @@ M.eventtap = {
 	-- The third argument is recorded so tests can assert an explicit delay was passed.
 	-- Real hs.eventtap.keyStroke() defaults it to a BLOCKING 200 000 us usleep on the
 	-- main run loop; dropping it here made the harness structurally unable to observe
-	-- the omission (see tests/meta/test_keystroke_explicit_delay.lua).
+	-- the omission (see tests/meta/runloop/test_keystroke_explicit_delay.lua).
 	keyStroke = function(mods, key, delay) table.insert(KEYSTROKES, { mods = mods, key = key, delay = delay }) end,
 	keyStrokes = function(s) table.insert(KEYSTROKES, { text = s }) end,
 	-- Both arguments are recorded, for the same reason the keyStroke delay is:
@@ -769,6 +781,8 @@ M.eventtap = {
 			keyboardEventAutorepeat = 6,
 			keyboardEventKeyboardType = 8,
 			scrollWheelEventDeltaAxis2 = 7,
+			scrollWheelEventScrollPhase = 9,
+			scrollWheelEventMomentumPhase = 10,
 		},
 		-- Every type the driver actually names. It used to carry five, and the
 		-- gap was invisible in the worst way: keep-awake builds its watch list as
@@ -857,7 +871,16 @@ local INPUT_SOURCE_CALLBACK = nil
 --- from __reset() so that tests which assign `hs.keycodes.map = { ... }` to
 --- a stripped-down literal table cannot leak that state into later tests.
 M.keycodes.__rebuild_map = function()
-	M.keycodes.map = setmetatable({}, {
+	-- The printable ASCII keys are raw entries, as in the real active keymap,
+	-- so rawget-based layout probes see them; their values are the ones the
+	-- fallback below always served. A test models a layout lacking a key by
+	-- clearing that raw entry.
+	local raw = {}
+	for byte = 33, 126 do
+		local name = string.char(byte)
+		if name == name:lower() then raw[name] = tonumber(name) or 0 end
+	end
+	M.keycodes.map = setmetatable(raw, {
 		__index = function(_, k)
 			local hit = DEFAULT_KEYCODES_MAP[k]
 			if hit then return hit end
@@ -892,8 +915,17 @@ end
 local EXEC_RESPONSES = {}
 local EXEC_CALLS = {}
 
+local FusedMetadataCommand = require("tests.support.fused_metadata_command")
+
+local execute_one
+
 M.execute = function(cmd, _withUserEnv)
 	table.insert(EXEC_CALLS, cmd)
+	if FusedMetadataCommand.is_fused(cmd) then return FusedMetadataCommand.run(cmd, execute_one) end
+	return execute_one(cmd)
+end
+
+execute_one = function(cmd)
 	for pattern, response in pairs(EXEC_RESPONSES) do
 		if cmd:find(pattern, 1, true) then
 			return response.output, response.success, response.exitType, response.rc
@@ -1082,8 +1114,8 @@ M.console = { printStyledtext = function(_) end }
 M.notify = {
 	new = function(arg1, arg2)
 		local opts = type(arg1) == "function" and arg2 or arg1
+		-- No release(): Hammerspoon 1.1.1 notifications do not have one (issue #104).
 		local notification = {
-			release = function() end,
 			opts = opts,
 		}
 		notification.send = function() return notification end
@@ -1242,6 +1274,13 @@ M.axuielement = {
 M.window = {
 	focusedWindow = function() return nil end,
 	frontmostWindow = function() return nil end,
+	-- Like the real call (AXUIElementSetMessagingTimeout on the system-wide
+	-- element): true for a positive number of seconds, recorded for assertions.
+	timeout = function(seconds)
+		if type(seconds) ~= "number" or seconds <= 0 then return false end
+		M.window.__messaging_timeout = seconds
+		return true
+	end,
 	filter = {
 		default = {
 			subscribe   = function(self, events, cb) end,
@@ -1268,6 +1307,7 @@ M.urlevent = {
 	__reset   = function() M.urlevent.__opened = {} end,
 }
 local PASTEBOARD_DATA = {}
+local PASTEBOARD_COUNTS = {}
 local GENERAL_PASTEBOARD = {}
 local PASTEBOARD_TEXT_UTI = "public.utf8-plain-text"
 
@@ -1282,6 +1322,7 @@ end
 -- table references. Raw strings are immutable, so one table copy suffices.
 -- Explicit test overrides remain responsible for daemon/ownership refusals.
 M.pasteboard = {
+	changeCount = function(name) return PASTEBOARD_COUNTS[pasteboard_key(name)] or 0 end,
 	getContents = function(name)
 		local data = PASTEBOARD_DATA[pasteboard_key(name)] or {}
 		local text = data[PASTEBOARD_TEXT_UTI]
@@ -1290,6 +1331,8 @@ M.pasteboard = {
 		return text:match("^[^%z]*")
 	end,
 	setContents = function(text, name)
+		local key = pasteboard_key(name)
+		PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
 		PASTEBOARD_DATA[pasteboard_key(name)] = { [PASTEBOARD_TEXT_UTI] = tostring(text) }
 		return true
 	end,
@@ -1308,6 +1351,7 @@ M.pasteboard = {
 			name, contents = ...
 		end
 		local key = pasteboard_key(name)
+		PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
 		local data = {}
 		PASTEBOARD_DATA[key] = data
 		for uti, bytes in pairs(contents) do
@@ -1318,6 +1362,8 @@ M.pasteboard = {
 		return true
 	end,
 	clearContents = function(name)
+		local key = pasteboard_key(name)
+		PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
 		PASTEBOARD_DATA[pasteboard_key(name)] = nil
 	end,
 }
@@ -1465,6 +1511,7 @@ function M.__reset()
 	HOST_UUID_COUNTER = 0
 	for k in pairs(SETTINGS_STORE) do SETTINGS_STORE[k] = nil end
 	for name in pairs(PASTEBOARD_DATA) do PASTEBOARD_DATA[name] = nil end
+	for name in pairs(PASTEBOARD_COUNTS) do PASTEBOARD_COUNTS[name] = nil end
 	for i = #TIMERS, 1, -1 do TIMERS[i] = nil end
 	for i = #KEYSTROKES, 1, -1 do KEYSTROKES[i] = nil end
 	for i = #EXEC_CALLS, 1, -1 do EXEC_CALLS[i] = nil end

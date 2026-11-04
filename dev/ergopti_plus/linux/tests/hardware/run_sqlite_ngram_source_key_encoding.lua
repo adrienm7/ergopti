@@ -18,8 +18,8 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local K = require("modules.keylogger.keylogger")
-local W = require("modules.keylogger.sqlite_writer")
+local K = require("modules.keystats.keystats")
+local W = require("modules.keystats.sqlite_writer")
 local Clock = require("infra.monotonic")
 assert(Clock.backend() == "luv.hrtime")
 local db = root .. "/metrics.sqlite"
@@ -38,7 +38,7 @@ for name, label in pairs(labels) do
 	K.record_synthetic_output("owned-" .. name, "xx", label, math.floor(Clock.now_ms()))
 end
 K.on_keydown("x", math.floor(Clock.now_ms()), "owned-manual")
-K.flush()
+require("tests.support.sqlite_flush_native").flush(K)
 assert(W.exec_sql("VACUUM INTO '" .. root .. "/accepted.sqlite';"))
 local sqlite_version = assert(W.query_rows("SELECT sqlite_version();"))[1]
 W.close_db()

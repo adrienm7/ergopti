@@ -6,7 +6,8 @@
 ; AHK v2 implementation of the ProcessLifecycle port contract. Provides
 ; callbacks for foreground-window (focus) changes via a SetTimer polling loop
 ; since AHK v2 exposes no native app-launch/quit notification mechanism short
-; of WMI subscriptions. Launch and quit callbacks are accepted but never fired.
+; of WMI subscriptions. The same loop diffs a Toolhelp process snapshot for
+; launch and quit callbacks while any of them is registered.
 ;
 ; NAMING CONVENTION:
 ; Port method        -> AHK name mapping:
@@ -37,11 +38,25 @@
 ; Array of callbacks invoked when the foreground window changes
 global PLC_FocusCallbacks  := []
 
-; Array of app-launch callbacks - accepted but never triggered on AHK (no WMI)
+; Array of callbacks invoked with an executable name when its first process starts
 global PLC_LaunchCallbacks := []
 
-; Array of app-quit callbacks - accepted but never triggered on AHK (no WMI)
+; Array of callbacks invoked with an executable name when its last process exits
 global PLC_QuitCallbacks   := []
+
+; Executable names of the last successful process snapshot (0 = no baseline).
+; Without a baseline the first snapshot would report every process as launched.
+global PLC_LastProcesses   := 0
+
+; Tick of the last process snapshot attempt (0 = none yet)
+global PLC_LastProcessTick := 0
+
+; Process snapshots are coarser than focus polls: the Linux adapter diffs its
+; process list every 2 s for the same launch/quit contract.
+global PLC_PROCESS_POLL_MS := 2000
+
+; Injectable snapshot seam used only by snapshot-failure regression tests.
+global PLC_PROCESS_SNAPSHOT_DRIVER := 0
 
 ; Whether the polling timer is currently running
 global PLC_Running         := false
@@ -105,9 +120,9 @@ PLC_OnFocusChange(Callback) {
 	}
 }
 
-; Registers a callback for application-launch events (stub - never fired).
-; AHK v2 has no built-in launch notification without WMI; this is accepted
-; to satisfy the port contract but will never be triggered.
+; Registers a callback for application-launch events. While any launch or quit
+; subscriber exists, PLC_Poll diffs a process snapshot every PLC_PROCESS_POLL_MS
+; and calls Callback(AppId) when an executable name appears.
 ; @param Callback {Func} A callable object to append to PLC_LaunchCallbacks.
 PLC_OnAppLaunch(Callback) {
 	try {
@@ -120,8 +135,8 @@ PLC_OnAppLaunch(Callback) {
 	}
 }
 
-; Registers a callback for application-quit events (stub - never fired).
-; Same constraint as PLC_OnAppLaunch: no WMI means no quit signal.
+; Registers a callback for application-quit events, called with the executable
+; name once its last process has exited (same snapshot diff as launches).
 ; @param Callback {Func} A callable object to append to PLC_QuitCallbacks.
 PLC_OnAppQuit(Callback) {
 	try {
@@ -179,6 +194,7 @@ PLC_Start() {
 ; @return {Boolean} True only after every native and logical owner is retired.
 PLC_Stop() {
 	global PLC_Running, PLC_FocusCallbacks, PLC_LaunchCallbacks, PLC_QuitCallbacks
+	global PLC_LastProcesses, PLC_LastProcessTick
 	FailureMessage := ""
 	PreviousCritical := Critical("On")
 	try {
@@ -193,6 +209,9 @@ PLC_Stop() {
 		PLC_FocusCallbacks  := []
 		PLC_LaunchCallbacks := []
 		PLC_QuitCallbacks   := []
+		; A later start diffs against a fresh baseline, never a stale one.
+		PLC_LastProcesses   := 0
+		PLC_LastProcessTick := 0
 	} catch as Err {
 		FailureMessage := Err.Message
 	} finally Critical(PreviousCritical)
@@ -253,6 +272,40 @@ PLC_CloseNativeHandle(Handle) {
 		return false
 }
 
+; Whether a process holds the named mutex, without taking it. Only "no such
+; mutex" proves absence: any other refusal counts as held.
+; @param Name {String} Exact mutex name.
+; @return {Boolean}
+PLC_NamedMutexHeld(Name) {
+	static SYNCHRONIZE := 0x00100000, ERROR_FILE_NOT_FOUND := 2
+	Handle := DllCall("Kernel32\OpenMutexW", "UInt", SYNCHRONIZE, "Int", 0, "Str", Name, "Ptr")
+	if !Handle
+		return A_LastError != ERROR_FILE_NOT_FOUND
+	PLC_CloseNativeHandle(Handle)
+	return true
+}
+
+; Ends this process at once, after one line on stderr when a message is given.
+; ExitProcess rather than ExitApp: an OnExit owner can veto ExitApp and keep a
+; wedged process resident with its hooks.
+; @param ExitCode {Integer} Process exit code.
+; @param Message {String} Line written to stderr first, or "".
+PLC_ExitProcessNow(ExitCode, Message := "") {
+	if Message != ""
+		try FileAppend(Message . "`n", "**")
+	DllCall("Kernel32\ExitProcess", "UInt", ExitCode)
+}
+
+; Arms a one-shot deadline for this process. A bare native timer: the boot arms it
+; before the timer scheduler adapter's state is initialised.
+; @param Callback {Func} Callback that ends the process; cancelled by its identity.
+; @param DelayMs {Integer} Positive delay in milliseconds.
+PLC_ArmProcessDeadline(Callback, DelayMs) {
+	if !HasMethod(Callback, "Call") || !IsInteger(DelayMs) || DelayMs <= 0
+		throw ValueError("A process deadline needs a callback and a positive delay.", -1, String(DelayMs))
+	SetTimer(Callback, -DelayMs)
+}
+
 ; Returns the native current process identity without a failure sentinel.
 ; @return {Integer} This process's positive DWORD identifier.
 ; @throws {Error} The native call fails or returns an invalid identifier.
@@ -305,12 +358,19 @@ PLC_TerminateProcessHandle(Handle, ExitCode := 1) {
 ; Creates a child with inherited handles into caller-owned native buffers. The
 ; PROCESS_INFORMATION buffer remains caller-owned so an OnExit thread can claim
 ; its handles atomically if creation and shutdown race.
-PLC_CreateProcessWithInheritedHandles(ApplicationPath, CommandBuffer, CreationFlags, StartupInfo, ProcessInfo) {
+PLC_CreateProcessWithInheritedHandles(ApplicationPath, CommandBuffer, CreationFlags, StartupInfo, ProcessInfo,
+		Environment := 0, WorkingDir := "") {
 	if !(ApplicationPath is String) or ApplicationPath = ""
 		throw TypeError("CreateProcessW requires an application path")
 	if !(CommandBuffer is Buffer) or !(StartupInfo is Buffer)
 		or !(ProcessInfo is Buffer)
 		throw TypeError("CreateProcessW requires native buffers")
+	if (!(Environment is Integer) || Environment != 0) && !(Environment is Buffer)
+		throw TypeError("CreateProcessW requires an inherited or private environment")
+	if !(WorkingDir is String)
+		throw TypeError("CreateProcessW requires a working directory string")
+	if Environment is Buffer
+		CreationFlags |= 0x00000400
 	Created := DllCall("Kernel32\CreateProcessW",
 		"Str", ApplicationPath,
 		"Ptr", CommandBuffer.Ptr,
@@ -318,8 +378,8 @@ PLC_CreateProcessWithInheritedHandles(ApplicationPath, CommandBuffer, CreationFl
 		"Ptr", 0,
 		"Int", true,
 		"UInt", CreationFlags,
-		"Ptr", 0,
-		"Ptr", 0,
+		"Ptr", Environment is Buffer ? Environment.Ptr : 0,
+		"Ptr", WorkingDir == "" ? 0 : StrPtr(WorkingDir),
 		"Ptr", StartupInfo.Ptr,
 		"Ptr", ProcessInfo.Ptr,
 		"Int")
@@ -375,15 +435,19 @@ PLC_SetEventHandle(Handle) {
 ; the window closed between the SetTimer tick and the WinGet call) cannot
 ; permanently disrupt subsequent poll cycles.
 PLC_Poll() {
-	global PLC_LastAppId, PLC_LastWindowTitle
+	global PLC_LastAppId, PLC_LastWindowTitle, PLC_LastProcesses
 	; Pause invariant: a suspended driver must be fully silent. This SetTimer
 	; callback is not gated by native Suspend, so early-return while suspended -
 	; otherwise focus changes keep being observed and fanned out to the
-	; registered callbacks (which downstream feed keylogger app-switch events)
+	; registered callbacks (which downstream feed keystats app-switch events)
 	; while the user expects every feature paused. The timer is periodic, so
 	; polling resumes automatically on unpause; no re-arm is needed.
-	if A_IsSuspended
+	if A_IsSuspended {
+		; Launches and quits during the pause are not replayed as one burst.
+		PLC_LastProcesses := 0
 		return
+	}
+	_PLC_PollProcesses()
 	try {
 		local NewApp   := WinGetProcessName("A")
 		local NewTitle := WinGetTitle("A")
@@ -401,8 +465,64 @@ PLC_Poll() {
 	}
 }
 
+; Diffs the running executable names against the last successful snapshot and
+; fires launch/quit callbacks, at most once per PLC_PROCESS_POLL_MS and only
+; while a launch or quit subscriber exists. A failed snapshot keeps the last
+; set: reading it as an empty machine would report every process as quit, then
+; as launched again once snapshots recover.
+_PLC_PollProcesses() {
+	global PLC_LaunchCallbacks, PLC_QuitCallbacks, PLC_LastProcesses, PLC_LastProcessTick
+	global PLC_PROCESS_POLL_MS
+	if PLC_LaunchCallbacks.Length == 0 && PLC_QuitCallbacks.Length == 0
+		return
+	if PLC_LastProcessTick && TickElapsed(PLC_LastProcessTick) < PLC_PROCESS_POLL_MS
+		return
+	PLC_LastProcessTick := A_TickCount
+	Current := _PLC_ProcessSnapshot()
+	if !(Current is Map)
+		return
+	Previous := PLC_LastProcesses
+	PLC_LastProcesses := Current
+	if !(Previous is Map)
+		return
+	; Iterate snapshots so a callback registering a subscriber cannot corrupt them.
+	for Name in Current
+		if !Previous.Has(Name)
+			for Cb in PLC_LaunchCallbacks.Clone()
+				try Cb(Name)
+	for Name in Previous
+		if !Current.Has(Name)
+			for Cb in PLC_QuitCallbacks.Clone()
+				try Cb(Name)
+}
+
+; Returns the running executable names as a case-insensitive set, or 0 when
+; Windows refused the snapshot or its enumeration.
+_PLC_ProcessSnapshot() {
+	global PLC_PROCESS_SNAPSHOT_DRIVER
+	if HasMethod(PLC_PROCESS_SNAPSHOT_DRIVER, "Call")
+		return PLC_PROCESS_SNAPSHOT_DRIVER.Call()
+	static TH32CS_SNAPPROCESS := 0x2, ERROR_NO_MORE_FILES := 18
+	Snapshot := DllCall("Kernel32\CreateToolhelp32Snapshot", "UInt", TH32CS_SNAPPROCESS, "UInt", 0, "Ptr")
+	if Snapshot == -1 || !Snapshot
+		return 0
+	try {
+		; PROCESSENTRY32W: dwSize first, szExeFile[MAX_PATH] after the fixed fields.
+		Entry := Buffer(A_PtrSize == 8 ? 568 : 556, 0)
+		NumPut("UInt", Entry.Size, Entry)
+		Names := Map()
+		Names.CaseSense := "Off"
+		Next := DllCall("Kernel32\Process32FirstW", "Ptr", Snapshot, "Ptr", Entry, "Int")
+		while Next {
+			Names[StrGet(Entry.Ptr + (A_PtrSize == 8 ? 44 : 36), 260, "UTF-16")] := true
+			Next := DllCall("Kernel32\Process32NextW", "Ptr", Snapshot, "Ptr", Entry, "Int")
+		}
+		return A_LastError == ERROR_NO_MORE_FILES && Names.Count ? Names : 0
+	} finally DllCall("Kernel32\CloseHandle", "Ptr", Snapshot)
+}
+
 ; Machine-readable contract map - consumed by the generic adapter compliance test
-; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_PROCESS_LIFECYCLE := Map(
     "onFocusChange",    PLC_OnFocusChange,
@@ -412,3 +532,85 @@ global ADAPTER_PROCESS_LIFECYCLE := Map(
     "start",            PLC_Start,
     "stop",             PLC_Stop,
 )
+
+
+/** Reads the current process identity without acquiring a new process handle. */
+PLC_CurrentProcessIdentity() {
+	Times := Buffer(32, 0)
+	if !DllCall("GetProcessTimes", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "Ptr", Times,
+		"Ptr", Times.Ptr + 8, "Ptr", Times.Ptr + 16, "Ptr", Times.Ptr + 24, "Int")
+		throw OSError(A_LastError, "GetProcessTimes", "Diagnostic host identity could not be observed.")
+	return Map("pid", DllCall("GetCurrentProcessId", "UInt"),
+		"created_filetime", NumGet(Times, 0, "Int64"))
+}
+
+/** Observes the native wall clock without changing collection timing policy. */
+PLC_CurrentFiletime() {
+	Time := Buffer(8, 0)
+	DllCall("GetSystemTimeAsFileTime", "Ptr", Time)
+	return NumGet(Time, 0, "Int64")
+}
+
+/** Returns the original GUID status; callers retain their own refusal policy. */
+PLC_CreateGuid(Guid, ResultType := "Int") {
+	return DllCall("Ole32\CoCreateGuid", "Ptr", Guid, ResultType)
+}
+
+/** Queries only an already-loaded, started native module; never lazy-loads it. */
+_DiagSnapshot_ResidentNativeReads(Rows) {
+	global _VendorDir, _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerModule, _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerQuarantined
+	global _LLM_TerminalOutputRecords, _LLM_TerminalOutputUnknown, _HSE_TerminalOwner, _HSE_TerminalReplayPending
+	global _LLM_NavEventOwnerStopPending, _LLM_NavEventOwnerStartRollbackPending, _LLM_NavEventOwnerStartCancelled
+	global _LLM_NavEventOwnerLifecycleQuiesced, _LLM_NavEventOwnerShutdownFenced, _LLM_NavEventOwnerDrainActive
+	if !_LLM_NavEventOwnerStarted || !_LLM_NavEventOwnerModule || _LLM_NavEventOwnerStarting
+			|| _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerQuarantined || _LLM_NavEventOwnerPort is Map
+			|| _LLM_NavEventOwnerStopPending || _LLM_NavEventOwnerStartRollbackPending || _LLM_NavEventOwnerStartCancelled
+			|| _LLM_NavEventOwnerLifecycleQuiesced || _LLM_NavEventOwnerShutdownFenced || _LLM_NavEventOwnerDrainActive
+		return
+	Module := _LLM_NavEventOwnerModule
+	Path := Buffer(65536, 0)
+	Length := DllCall("GetModuleFileNameW", "Ptr", Module, "Ptr", Path, "UInt", 32768, "UInt")
+	if !Length || Length >= 32768 || StrGet(Path, Length, "UTF-16") != StrReplace(_VendorDir . "\ergopti_nav_owner.dll", "/", "\")
+		return
+	CanStopFn := DllCall("GetProcAddress", "Ptr", Module, "AStr", "ErgoptiNav_CanStop", "Ptr")
+	CaptureFn := DllCall("GetProcAddress", "Ptr", Module, "AStr", "ErgoptiNav_GetTerminalCapture", "Ptr")
+	if !CanStopFn || !CaptureFn
+		return
+	Row := Rows[4], Started := A_TickCount, CanStop := 0
+	Status := DllCall(CanStopFn, "UChar*", &CanStop, "Int")
+	Row["status"] := Status == 0 ? "PASS" : "FAIL", Row["scope"] := "native_readonly"
+	Row["reason"] := Status == 0 ? "native_aggregate_drain_observed" : "native_query_refused"
+	Row["duration_ms"] := TickElapsed(Started), Row["values"]["native_status"] := Status
+	Row["values"]["can_stop"] := Status == 0 ? CanStop : -1
+	if Status != 0
+		Row["errors"] := [Map("native_status", Status)]
+	Row["values"]["record_count"] := _LLM_TerminalOutputRecords.Count
+	Row["values"]["pending_count"] := 0, Row["values"]["unknown_count"] := IsObject(_LLM_TerminalOutputUnknown) ? 1 : 0
+	for _, Record in _LLM_TerminalOutputRecords {
+		Row["values"]["pending_count"] += Record["pending"] ? 1 : 0
+		Row["values"]["unknown_count"] += Record["unknown"] ? 1 : 0
+	}
+	Token := 0
+	if _HSE_TerminalOwner is Map && !(_HSE_TerminalOwner.Get("Port", 0) is Map)
+		Token := _HSE_TerminalOwner.Get("Id", 0)
+	else if _HSE_TerminalReplayPending is Map && !(_HSE_TerminalReplayPending.Get("Port", 0) is Map)
+		Token := _HSE_TerminalReplayPending.Get("Token", 0)
+	if !(Token is Integer) || Token <= 0
+		return
+	Row := Rows[3], Started := A_TickCount, Snapshot := Buffer(28, 0)
+	Status := DllCall(CaptureFn, "UInt64", Token, "Ptr", Snapshot, "Int")
+	Row["values"]["native_status"] := Status
+	Row["duration_ms"] := TickElapsed(Started), Row["scope"] := "native_readonly"
+	Row["reason"] := Status == 0 ? "native_capture_state_observed" : "native_capture_not_present"
+	Row["status"] := Status == 0 ? "PASS" : (Status == 8 ? "UNRUN" : "FAIL")
+	if Status != 0 && Status != 8
+		Row["errors"] := [Map("native_status", Status)]
+	if Status == 0 {
+		if NumGet(Snapshot, 0, "UInt64") != Token
+			throw Error("Native capture identity changed during its diagnostic read.")
+		Row["values"]["token"] := Token
+		for Index, Field in ["phase", "queued", "replayed", "last_os_error", "release_kind"]
+			Row["values"][Field] := NumGet(Snapshot, 8 + (Index - 1) * 4, "UInt")
+	}
+}

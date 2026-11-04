@@ -16,8 +16,10 @@
 ---    off past its due time catches up once the boot delay has passed.
 --- 2. One release list: the check reads update_check.releases_url with an ETag
 ---    and keeps the channel's latest release through the shared registry and
----    offer rule; a 304 reuses the list this session holds, and a session that
----    holds none sends a full request.
+---    offer rule; a 304 reuses the list copy kept in the Storage port
+---    (check_state.list_storage_key), so a restart does not spend one of the 60
+---    anonymous GitHub API calls an hour. The copy keeps only the fields the
+---    check reads, since the full list with its notes is several megabytes.
 --- 3. Never on the typing path: evaluations run from timers and the wake
 ---    watcher, and the request is asynchronous.
 --- 4. Paused: nothing is dispatched and the record is left as it is. A wake
@@ -31,6 +33,10 @@
 ---    recorded like an automatic one and answers the update-check window with
 ---    the shared result (updater.check_result): the release it offers is the
 ---    one the About row names, and it is not announced again afterwards.
+--- 8. When the API gives no list (its anonymous rate limit spent, a proxy
+---    blocking api.github.com), both checks read the public releases Atom feed
+---    on github.com, the changelog window's alternate source: Sparkle installs
+---    from the channel's appcast, so the feed's tags are all a check needs (#99).
 --- ==============================================================================
 
 local M = {}
@@ -40,8 +46,11 @@ local Paths     = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec = require("adapters.json_codec")
 local Schedule  = require("updater.schedule")
-local Parser    = require("updater.release_parser")
+local ListCache = require("updater.list_cache")
+local Parser   = require("updater.release_parser")
 local CheckResult = require("updater.check_result")
+local RateLimit = require("updater.rate_limit")
+local ReleaseSources = require("updater.release_sources")
 local Updater   = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
 local notifications = require("infra.notifications")
@@ -68,7 +77,7 @@ local MS_PER_SEC = 1000
 
 --- Loads the automatic-check contract from the shared updater defaults. It has
 --- no fallback: a guessed cadence or URL would check the wrong list or never.
---- @return table config { timing, state_key, releases_url, timeout_sec }
+--- @return table config { timing, state_key, list_key, releases_url, feed_url, timeout_sec }
 function M.load_config()
 	local path = Paths.shared("modules/updater/defaults.json")
 	local raw = type(path) == "string" and path ~= "" and FileSystem.read(path) or nil
@@ -80,11 +89,16 @@ function M.load_config()
 	local ok, err = Schedule.validate_timing(decoded.timing)
 	if not ok then error("the shared updater timing is invalid: " .. tostring(err), 0) end
 	local state_key = type(decoded.check_state) == "table" and decoded.check_state.storage_key or nil
+	local list_key = type(decoded.check_state) == "table" and decoded.check_state.list_storage_key or nil
 	local template = type(decoded.update_check) == "table" and decoded.update_check.releases_url or nil
 	local sources = decoded.release_sources
 	local timeout_sec = type(sources) == "table" and sources.source_timeout_sec or nil
+	local feed_template = type(sources) == "table" and sources.atom_feed_url or nil
 	if type(state_key) ~= "string" or state_key == "" then
 		error("the shared updater defaults declare no check_state.storage_key", 0)
+	end
+	if type(list_key) ~= "string" or list_key == "" or list_key == state_key then
+		error("the shared updater defaults declare no distinct check_state.list_storage_key", 0)
 	end
 	if type(template) ~= "string" or not template:find("{owner}/{repo}", 1, true) then
 		error("the shared updater defaults declare no update_check.releases_url", 0)
@@ -92,9 +106,15 @@ function M.load_config()
 	if type(timeout_sec) ~= "number" or timeout_sec <= 0 then
 		error("the shared updater defaults declare no release_sources.source_timeout_sec", 0)
 	end
-	local url = template:gsub("{owner}", function() return Updater.GH_OWNER end)
-		:gsub("{repo}", function() return Updater.GH_REPO end)
-	return { timing = decoded.timing, state_key = state_key, releases_url = url, timeout_sec = timeout_sec }
+	if type(feed_template) ~= "string" or not feed_template:find("{owner}/{repo}", 1, true) then
+		error("the shared updater defaults declare no release_sources.atom_feed_url", 0)
+	end
+	local function expand(text)
+		return (text:gsub("{owner}", function() return Updater.GH_OWNER end)
+			:gsub("{repo}", function() return Updater.GH_REPO end))
+	end
+	return { timing = decoded.timing, state_key = state_key, list_key = list_key, releases_url = expand(template),
+		feed_url = expand(feed_template), timeout_sec = timeout_sec }
 end
 
 --- Reads a header case-insensitively (HTTP/2 lowercases names, Foundation
@@ -169,7 +189,8 @@ end
 ---   config table|nil load_config() result (tests pass one).
 ---   timer table { after(sec, fn) -> handle, committed; cancel(handle) -> boolean }
 ---   storage table { get(key, default), set(key, value) -> boolean }
----   http table { get(url, headers, callback(result)) -> boolean }
+---   http table Background transport { get(url, headers, callback(result)) -> boolean }.
+---   manual_http table Distinct manual transport with the same contract.
 ---   now function(): number Wall clock in epoch seconds.
 ---   current_version function(): string|nil, installed_channel function(): string|nil
 --- @return table owner
@@ -177,10 +198,14 @@ function M.new(opts)
 	if type(opts) ~= "table" or type(opts.state) ~= "table" or type(opts.save) ~= "function"
 		or type(opts.channel) ~= "function" or type(opts.is_paused) ~= "function"
 		or type(opts.on_available) ~= "function" or type(opts.timer) ~= "table"
-		or type(opts.storage) ~= "table" or type(opts.http) ~= "table" or type(opts.now) ~= "function" then
-		error("the automatic update-check owner needs its state, save, channel, pause, callback and ports", 2)
+		or type(opts.storage) ~= "table" or type(opts.http) ~= "table"
+		or type(opts.manual_http) ~= "table" or opts.manual_http == opts.http or type(opts.now) ~= "function" then
+		error("the automatic update-check owner needs its state, save, channel, pause, callback and distinct transport ports", 2)
 	end
 	local config = opts.config or M.load_config()
+	if type(config.feed_url) ~= "string" or config.feed_url == "" then
+		error("the automatic update-check owner needs the releases Atom feed URL", 2)
+	end
 	local timing = config.timing
 	local current_version = opts.current_version or Updater.current_version
 	local installed_channel = opts.installed_channel or Updater.installed_channel
@@ -189,11 +214,13 @@ function M.new(opts)
 	local timer_handle = nil
 	local record = nil
 	local started_at = nil
-	local list_cache = nil     -- { body, etag } of the last 200 this session read
+	local list_cache = nil     -- { url, etag, body } of the last 200, kept in the Storage port
 	local in_flight = false
 	local latest = nil         -- { tag, channel } offered by the last check
 	local active = false
 	local generation = 0
+	-- Manual answers survive channel changes, but not a retired schedule owner.
+	local manual_generation = 0
 
 	--- The check record, loaded once; a missing install seed is created.
 	local function load_record()
@@ -220,6 +247,50 @@ function M.new(opts)
 		if opts.storage.set(config.state_key, state) == true then return true end
 		Logger.error(LOG, "The update-check record could not be saved; this session keeps its copy.")
 		return false
+	end
+
+	--- The list copy an earlier session stored, when it belongs to this list URL.
+	--- @return table|nil copy { url, etag, body }
+	local function load_list_cache()
+		local stored = opts.storage.get(config.list_key, nil)
+		if stored == nil then return nil end
+		local copy, reason = ListCache.validate(stored, config.releases_url)
+		if not copy then
+			Logger.warn(LOG, "Dropped the unusable stored copy of the release list: %s.", reason)
+			return nil
+		end
+		return copy
+	end
+	list_cache = load_list_cache()
+
+	--- Keeps the fields the check reads from a validated list, with its ETag.
+	--- A refused write leaves this session's copy; the next start sends a full request.
+	--- @param decoded table The decoded release array.
+	--- @param etag string|nil The response's validator.
+	local function store_list_cache(decoded, etag)
+		-- An empty array would encode as a JSON object, which no copy may hold.
+		if not etag or #decoded == 0 then
+			list_cache = nil
+			if opts.storage.set(config.list_key, nil) ~= true then
+				Logger.error(LOG, "The stale copy of the release list could not be removed.")
+			end
+			return
+		end
+		local kept = {}
+		for index, entry in ipairs(decoded) do
+			kept[index] = { tag_name = entry.tag_name, published_at = entry.published_at,
+				prerelease = entry.prerelease, draft = entry.draft }
+		end
+		local body, encode_error = JsonCodec.encode(kept)
+		if type(body) ~= "string" then
+			list_cache = nil
+			Logger.error(LOG, "The release list copy could not be encoded: %s.", tostring(encode_error))
+			return
+		end
+		list_cache = { url = config.releases_url, etag = etag, body = body }
+		if opts.storage.set(config.list_key, list_cache) ~= true then
+			Logger.error(LOG, "The release list copy could not be saved; this session keeps it.")
+		end
 	end
 
 	--- The interval in force: the persisted preference snapped to a preset.
@@ -318,7 +389,7 @@ function M.new(opts)
 		return { tag = tag, channel = channel }
 	end
 
-	--- The headers of one list request, conditional on this session's copy.
+	--- The headers of one list request, conditional on the stored copy.
 	local function list_headers()
 		local headers = { Accept = "application/vnd.github+json", ["User-Agent"] = USER_AGENT }
 		if list_cache then headers["If-None-Match"] = list_cache.etag end
@@ -334,7 +405,7 @@ function M.new(opts)
 	local function read_response(result)
 		local status = type(result) == "table" and tonumber(result.status) or 0
 		if status == 304 and list_cache then
-			Logger.debug(LOG, "Release list unchanged (304); reusing this session's copy.")
+			Logger.debug(LOG, "Release list unchanged (304); reusing the stored copy.")
 			return list_cache.body
 		end
 		if type(result) == "table" and result.ok == true and type(result.body) == "string"
@@ -348,12 +419,41 @@ function M.new(opts)
 					return nil, "parse_failed", "a release without a tag"
 				end
 			end
-			local etag = header_value(result.headers, "etag")
-			list_cache = etag and { body = result.body, etag = etag } or nil
+			store_list_cache(decoded, header_value(result.headers, "etag"))
 			return result.body
 		end
+		local limited = RateLimit.exhausted_detail(status, header_value(result.headers, "x-ratelimit-remaining"),
+			header_value(result.headers, "x-ratelimit-reset"))
+		if limited then return nil, "no_connection", limited end
 		return nil, "no_connection",
 			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result")
+	end
+
+	--- Reads the public releases Atom feed after the API gave no list, and
+	--- answers once with its tags as a release list, or with both causes.
+	--- @param http table Transport owned by this check kind.
+	--- @param api_detail string Why the API list failed.
+	--- @param done function(body|nil, detail|nil)
+	local function read_feed(http, api_detail, done)
+		local settled = false
+		local function settle(body, detail)
+			if settled then return end
+			settled = true
+			done(body, detail)
+		end
+		local headers = { Accept = "application/atom+xml", ["User-Agent"] = USER_AGENT }
+		local ok_dispatch, sent = pcall(http.get, config.feed_url, headers, function(result)
+			local status = type(result) == "table" and result.status or 0
+			local body = type(result) == "table" and result.body or nil
+			local ok, reason = ReleaseSources.classify_feed(status, body, type(result) == "table" and result.error or nil)
+			local list
+			if ok then list, reason = ReleaseSources.feed_release_list(body, Updater.GH_OWNER, Updater.GH_REPO) end
+			if not list then return settle(nil, api_detail .. "; Atom feed: " .. tostring(reason)) end
+			settle(list, nil)
+		end)
+		if not ok_dispatch or sent ~= true then
+			settle(nil, api_detail .. "; Atom feed: " .. (ok_dispatch and "the request was refused" or tostring(sent)))
+		end
 	end
 
 	--- Sends one conditional request for the release list.
@@ -370,6 +470,24 @@ function M.new(opts)
 				return
 			end
 			local body, reason, detail = read_response(result)
+			if not body and reason == "no_connection" then
+				Logger.info(LOG, "Background check: the GitHub API gave no list (%s); reading the Atom feed.", detail)
+				read_feed(opts.http, detail, function(feed_body, feed_detail)
+					if not active or request_generation ~= generation then return end
+					if channel ~= opts.channel() then
+						in_flight = false
+						Logger.info(LOG, "Discarded a completed check for the previous channel '%s'.", channel)
+						return
+					end
+					if not feed_body then
+						Logger.warn(LOG, "Background check failed: %s.", feed_detail)
+						complete(false, nil)
+						return
+					end
+					complete(true, read_list(feed_body, channel))
+				end)
+				return
+			end
 			if not body then
 				if reason == "parse_failed" then
 					Logger.warn(LOG, "Background check returned %s.", detail)
@@ -427,18 +545,20 @@ function M.new(opts)
 	--- one the About row names, and a later automatic check does not announce
 	--- it again: the window already showed it.
 	--- @param channel string Registry channel id to check.
-	--- @param on_result function(result) Receives the check result, exactly once.
+	--- @param on_result function(result) Receives one result unless the owner stops or restarts.
 	--- @return boolean dispatched
 	function owner.check_now(channel, on_result)
+		local request_generation = manual_generation
 		local base = { channel = channel, current = current_version() }
 		local answered = false
 		local function answer(result)
-			if answered then return end
+			if answered or request_generation ~= manual_generation then return end
 			answered = true
 			local ok, err = pcall(on_result, result)
 			if not ok then Logger.error(LOG, "The manual check's answer raised: %s.", tostring(err)) end
 		end
 		local function fail(reason, detail)
+			if answered or request_generation ~= manual_generation then return end
 			save_record(Schedule.record_check(load_record(), opts.now(), false))
 			Logger.warn(LOG, "Manual update check failed on channel '%s': %s.", tostring(channel), tostring(detail))
 			answer(CheckResult.failure(base, reason, detail))
@@ -449,10 +569,9 @@ function M.new(opts)
 			answer(CheckResult.failure(base, "unexpected", "not a registry channel"))
 			return false
 		end
-		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(response)
-			if answered then return end
-			local body, reason, detail = read_response(response)
-			if not body then return fail(reason, detail) end
+		--- Answers the window from one release list, the API's or the feed's.
+		--- @param body string Release list JSON.
+		local function answer_from(body)
 			local result = CheckResult.classify(body, {
 				registry = Updater.channels(), channel = channel,
 				current = base.current, installed = installed_channel(),
@@ -472,6 +591,19 @@ function M.new(opts)
 			Logger.success(LOG, "Manual update check answered: %s (channel %s, latest %s, %d other channel(s)).",
 				result.state, channel, tostring(result.latest), #result.others)
 			answer(result)
+		end
+		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(), function(response)
+			if answered or request_generation ~= manual_generation then return end
+			local body, reason, detail = read_response(response)
+			if body then return answer_from(body) end
+			if reason ~= "no_connection" then return fail(reason, detail) end
+			Logger.info(LOG, "Manual update check on channel '%s': the GitHub API gave no list (%s); reading the Atom feed.",
+				tostring(channel), detail)
+			read_feed(opts.manual_http, detail, function(feed_body, feed_detail)
+				if answered or request_generation ~= manual_generation then return end
+				if not feed_body then return fail("no_connection", feed_detail) end
+				answer_from(feed_body)
+			end)
 		end)
 		if not ok_dispatch or sent ~= true then
 			if not answered then fail("no_connection", ok_dispatch and "the request was refused" or tostring(sent)) end
@@ -503,6 +635,7 @@ function M.new(opts)
 			return false
 		end
 		generation = generation + 1
+		manual_generation = manual_generation + 1
 		in_flight = false
 		active = true
 		if not evaluate() then
@@ -516,6 +649,7 @@ function M.new(opts)
 	--- Stops the schedule; a completion still in flight is discarded.
 	--- @return boolean stopped
 	function owner.stop()
+		manual_generation = manual_generation + 1
 		active = false
 		generation = generation + 1
 		in_flight = false
@@ -605,6 +739,7 @@ function M.start_session(opts)
 		timer = require("adapters.timer_scheduler"),
 		storage = require("adapters.storage"),
 		http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
+		manual_http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
 		now = os.time,
 	})
 	local watcher = require("adapters.wake_watcher").new(owner.on_wake)

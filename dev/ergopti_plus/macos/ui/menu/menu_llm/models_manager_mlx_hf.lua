@@ -21,6 +21,8 @@
 
 local M = {}
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
+local Identifiers = require("identifiers")
+local RunningApplication = require("adapters.running_application")
 
 local hs            = hs
 local notifications = require("infra.notifications")
@@ -30,6 +32,7 @@ local Paths         = require("infra.paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Logger        = require("infra.logger")
+local TextUtils = require("text_utils")
 
 local LOG = "menu_llm.models.mlx_hf"
 
@@ -51,6 +54,7 @@ function M.install(ctx)
 	local obj, deps, presets = ctx.obj, ctx.deps, ctx.presets
 	local active_flow = nil
 	local try_release_flow
+	local run_flow_callback
 	local pause_flow_ui_timers
 	local schedule_flow_ui_timer
 
@@ -69,6 +73,7 @@ function M.install(ctx)
 	--- @return boolean live
 	local function flow_has_live_work(flow)
 		return flow.timer_owner ~= nil
+			or flow.usercontent ~= nil
 			or flow.prompt_callback_expected == true
 			or flow.webview ~= nil
 			or flow.webview_installing == true
@@ -77,6 +82,25 @@ function M.install(ctx)
 			or (tonumber(flow.callback_depth) or 0) > 0
 			or (type(flow.ui_timer_owners) == "table"
 				and next(flow.ui_timer_owners) ~= nil)
+	end
+
+	--- Releases the exact native callback before retiring its flow authority.
+	--- @param flow table Exact auth-flow owner.
+	--- @return boolean released
+	local function release_flow_controller(flow)
+		local controller = flow.usercontent
+		if controller == nil then return true end
+		if flow.controller_releasing then return false end
+		flow.usercontent_retired = true
+		flow.controller_releasing = true
+		local ok, receipt = xpcall(function() return controller:setCallback(nil) end, debug.traceback)
+		flow.controller_releasing = false
+		if not ok or receipt ~= controller then
+			Logger.error(LOG, "HuggingFace script callback release refused: %s.", tostring(receipt))
+			return false
+		end
+		if flow.usercontent == controller then flow.usercontent = nil end
+		return true
 	end
 
 	--- Publishes one business terminal only after every exact child has settled.
@@ -103,6 +127,16 @@ function M.install(ctx)
 	--- @param flow table HuggingFace auth owner.
 	--- @return boolean settled
 	try_release_flow = function(flow)
+		if flow.webview == nil and flow.webview_installing ~= true then
+			if not release_flow_controller(flow) then return false end
+			if flow.webview_continuation_pending and flow.on_ui_timers_settled
+				and next(flow.ui_timer_owners) == nil
+				and (flow.callback_depth or 0) == 0 then
+				local callback = flow.on_ui_timers_settled
+				flow.on_ui_timers_settled = nil
+				run_flow_callback(flow, "HuggingFace script callback settlement", callback)
+			end
+		end
 		if flow_has_live_work(flow) then return false end
 		local terminal = flow.pending_terminal
 		if terminal ~= nil and flow.terminal_sent ~= true then
@@ -179,7 +213,7 @@ function M.install(ctx)
 				end
 			end
 		end
-		if flow.webview ~= nil then
+		if flow.webview ~= nil or flow.usercontent ~= nil then
 			local close_ok, closed = xpcall(function()
 				if type(flow.close_webview) ~= "function" then return false end
 				return flow.close_webview(nil, true)
@@ -238,6 +272,7 @@ function M.install(ctx)
 	--- @param passed table|nil `{ owner, lifecycle, is_authorized }`.
 	--- @return table|nil flow Exact auth-flow owner.
 	local function begin_flow(on_done, passed)
+		if active_flow ~= nil then try_release_flow(active_flow) end
 		if active_flow ~= nil then
 			Logger.error(LOG,
 				"HuggingFace login refused while a prior exact flow remains owned.")
@@ -329,7 +364,7 @@ function M.install(ctx)
 		return flow
 	end
 
-	local function run_flow_callback(flow, label, callback, ...)
+	run_flow_callback = function(flow, label, callback, ...)
 		flow.callback_depth = (flow.callback_depth or 0) + 1
 		local args = table.pack(...)
 		local ok, result = xpcall(function()
@@ -486,7 +521,7 @@ function M.install(ctx)
 		if not fh then return nil end
 		local raw = fh:read("*a")
 		fh:close()
-		local token = raw and raw:match("^%s*(.-)%s*$") or ""
+		local token = raw and TextUtils.trim(raw) or ""
 		return token ~= "" and token or nil
 	end
 
@@ -496,7 +531,7 @@ function M.install(ctx)
 				for _, m in ipairs(family.models or {}) do
 					if m.name == model_name and m.urls and m.urls.mlx then
 						local repository = m.urls.mlx:gsub(
-							"^https?://huggingface%.co/", "")
+							"^https?://" .. Identifiers.hosts.huggingface:gsub("%.", "%%.") .. "/", "")
 						if MlxRepo.is_valid(repository) then return repository end
 						Logger.error(LOG,
 							"Preset MLX repository identifier is invalid; entry refused.")
@@ -573,7 +608,7 @@ function M.install(ctx)
 			return false
 		end
 
-		local url = "https://huggingface.co/" .. repo
+		local url = "https://" .. Identifiers.hosts.huggingface .. "/" .. repo
 		local ok_open, opened = xpcall(function()
 			return hs.urlevent.openURL(url)
 		end, debug.traceback)
@@ -615,21 +650,18 @@ function M.install(ctx)
 			return false
 		end
 
-		local hs_app = hs.application and hs.application.get
-			and hs.application.get("Hammerspoon") or nil
-		if not hs_app and hs.application and hs.application.find then
-			hs_app = hs.application.find("Hammerspoon")
-		end
+		-- By PID: a name lookup that misses reads every window of every app.
+		local hs_app = RunningApplication.current()
 		if hs_app and type(hs_app.activate) == "function"
 			and flow_is_authorized(flow) then
 			pcall(function() hs_app:activate(true) end)
 		end
 
-		local hf_token_url = "https://huggingface.co/settings/tokens"
+		local hf_token_url = "https://" .. Identifiers.hosts.huggingface .. "/settings/tokens"
 		local clipboard_token_raw = hs.pasteboard and hs.pasteboard.getContents
 			and hs.pasteboard.getContents() or ""
 		local clipboard_token = type(clipboard_token_raw) == "string"
-			and clipboard_token_raw:match("^%s*(.-)%s*$") or ""
+			and TextUtils.trim(clipboard_token_raw) or ""
 		local token_seed = clipboard_token:match("^hf_[%w_%-]+$")
 			and clipboard_token or ""
 		if token_seed == "" then token_seed = read_hf_token() or "" end
@@ -641,7 +673,8 @@ function M.install(ctx)
 
 		local function continue_after_webview()
 			if flow.webview_continuation_pending ~= true
-				or next(flow.ui_timer_owners) ~= nil then
+				or next(flow.ui_timer_owners) ~= nil
+				or not release_flow_controller(flow) then
 				return false
 			end
 			flow.webview_continuation_pending = false
@@ -711,10 +744,12 @@ function M.install(ctx)
 			end
 			local webview = flow.webview
 			if webview == nil then
-				return flow.webview_installing ~= true
+				if flow.webview_installing == true then return false end
+				return try_release_flow(flow)
 			end
 			if flow.webview_close_requested == true then return false end
 			flow.webview_close_requested = true
+			local native_metatable = getmetatable(webview)
 			local ok, accepted = xpcall(function()
 				if type(webview.delete) ~= "function" then
 					error("HuggingFace token webview has no delete method")
@@ -724,6 +759,13 @@ function M.install(ctx)
 			-- The close callback is stronger settlement evidence than a misleading
 			-- nil/false/throwing delete return from a mutating native implementation.
 			if flow.webview == nil then return true end
+			-- A failed factory can precede callback installation. Native GC strips
+			-- the userdata metatable even then; a nil return alone proves nothing.
+			if flow.webview == webview and native_metatable ~= nil
+				and getmetatable(webview) == nil then
+				after_webview_settled()
+				return true
+			end
 			if ok ~= true or accepted == false or accepted == nil then
 				flow.webview_close_requested = false
 				Logger.error(LOG,
@@ -744,6 +786,7 @@ function M.install(ctx)
 				"HuggingFace prompt bridge construction failure")
 			return false
 		end
+		flow.usercontent = ucc
 		if not flow_is_authorized(flow) then
 			flow.webview_installing = false
 			try_release_flow(flow)
@@ -752,6 +795,8 @@ function M.install(ctx)
 
 		local callback_ok, callback_result = xpcall(function()
 			return ucc:setCallback(function(msg)
+				if flow.usercontent_retired or flow.usercontent ~= ucc
+					or flow.webview_terminal_consumed then return end
 				local ok, result = run_flow_callback(flow,
 					"HuggingFace webview message", function()
 						if type(msg) ~= "table" or not flow_is_authorized(flow) then return end
@@ -771,7 +816,7 @@ function M.install(ctx)
 						end
 						flow.prompt_action_consumed = true
 						local token = type(msg.body.token) == "string"
-							and msg.body.token:match("^%s*(.-)%s*$") or ""
+							and TextUtils.trim(msg.body.token) or ""
 						if token == "" and token_seed ~= "" then
 							token = token_seed
 							pcall(notifications.notify, i18n.get("mlx.token_detected"),
@@ -825,11 +870,17 @@ function M.install(ctx)
 			return false
 		end
 		local show_ok, webview = xpcall(function()
+			-- The caption is the shared token_prompt/hf_login presentation; a
+			-- refused receipt makes the factory refuse before any allocation.
+			local title_receipt = ui_builder.prepare_app_window_title("token_prompt", "hf_login")
 			return ui_builder.show_webview({
 				frame             = frame,
-				title             = i18n.get("mlx.hf_login_title"),
+				app_id            = "token_prompt",
+				presentation_id   = "hf_login",
+				presentation_receipt = title_receipt,
 				style_masks       = { "titled", "closable", "nonactivating" },
 				allow_new_windows = false,
+				delete_on_close   = true,
 				usercontent       = ucc,
 				assets_dir        = TOKEN_ASSETS_DIR,
 				on_close          = on_webview_close,
@@ -948,7 +999,7 @@ function M.install(ctx)
 		end
 
 		local schedule_ok, handle_or_error, committed = xpcall(function()
-			local handle, started = TimerScheduler.after(0.05, function()
+			local handle, started = TimerScheduler.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 				if owner.callback_consumed == true then return end
 				owner.callback_pending = true
 				deliver_prompt()
@@ -1043,7 +1094,7 @@ try:
 
     ctx = ssl.create_default_context()
     req = urllib.request.Request(
-        'https://huggingface.co/api/whoami-v2',
+        'https://]] .. Identifiers.hosts.huggingface .. [[/api/whoami-v2',
         headers={
             'User-Agent': 'huggingface/hub',
             'Authorization': f'Bearer {token.strip()}'
@@ -1080,7 +1131,7 @@ try:
             text=True
         )
 
-        credential_input = f"protocol=https\nhost=huggingface.co\nusername=oauth2config\npassword={token.strip()}\n"
+        credential_input = f"protocol=https\nhost=]] .. Identifiers.hosts.huggingface .. [[\nusername=oauth2config\npassword={token.strip()}\n"
         process.communicate(input=credential_input, timeout=5)
     except Exception as e:
         print(f"Note: Git credential save skipped: {e}", file=sys.stderr)
@@ -1191,11 +1242,6 @@ PY
 			flow.task_committed = true
 			if pending_completion ~= nil then
 				finish_task(pending_completion.code, true)
-			elseif task_proven_not_running(task) then
-				-- A truthy start without either a live task or an exact terminal is
-				-- not a committed native capability. Settle it as a failed launch.
-				finish_task(nil, false)
-				return false
 			elseif not flow_is_authorized(flow) then
 				-- A signal accepted while start() was still on-stack predates the
 				-- capability that start() has just committed. Signal the same exact

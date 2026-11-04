@@ -1,0 +1,685 @@
+﻿; tests/unit/modules/llm/api/test_llm_api_test_entry.ahk
+
+; ==============================================================================
+; MODULE: LLM API Test-Entry Action Tests
+; DESCRIPTION:
+; The Test-selected-API row sends the shared minimal probe
+; (api_providers.json test_request, verbatim) to the active entry and
+; surfaces the verdict. Unlike the save-time /models ping this proves the
+; full path: credentials, model id and body format. The token never reaches
+; a tip or a log — only the entry name, latency and a short reply excerpt.
+;
+; Stale completions (entry changed or deleted mid-flight, driver suspended)
+; are discarded exactly like the validation flow, and refusals (no active
+; entry, missing shared spec) stay fail-closed without touching the network.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_LAT_FixtureEntry() {
+	return Map("Id", "prod", "Name", "Prod", "Provider", "openai",
+		"BaseUrl", "https://b.invalid/v1", "Token", "secret", "Model", "b")
+}
+
+_LAT_FixtureMenu() {
+	global _LLM_Menu
+	SavedMenu := _LLM_Menu
+	_LLM_Menu := Map("enabled", true, "backend", "api", "api_entry_id", "prod",
+		"api_entries", [_LAT_FixtureEntry()])
+	return SavedMenu
+}
+
+_LAT_RestoreMenu(SavedMenu) {
+	global _LLM_Menu
+	_LLM_Menu := SavedMenu
+}
+
+; @returns {Array} The registry it replaced, for _LAT_RestoreOwners.
+_LAT_ResetOwners() {
+	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
+	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	Saved := [_LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners,
+		_LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter]
+	_LLM_AuxGeneration := 41
+	_LLM_AuxOwnerCounter := 0
+	_LLM_AuxOwners := Map()
+	_LLM_AuxCleanupDebt := Map()
+	_LLM_AuxCleanupDebtCounter := 0
+	return Saved
+}
+
+; A scenario's owners are records of its own private registry: putting the
+; suite's back keeps them from reading as requests still in flight.
+_LAT_RestoreOwners(Saved) {
+	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
+	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	_LLM_AuxGeneration := Saved[1]
+	_LLM_AuxOwnerCounter := Saved[2]
+	_LLM_AuxOwners := Saved[3]
+	_LLM_AuxCleanupDebt := Saved[4]
+	_LLM_AuxCleanupDebtCounter := Saved[5]
+}
+
+_LAT_TestOwner(EntryId := "prod") {
+	return LLM_AuxBegin("api_test:" . EntryId, Map(
+		"backend", "api",
+		"endpoint", "https://b.invalid/v1",
+		"identity", EntryId))
+}
+
+
+
+; The creation dialog asks the provider first, then the URL, the key and the
+; model; it asks no name. Scanned comment-stripped.
+_LAT_PromptOrder() {
+	Code := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_PromptApiEntry"))
+	Assert(Code != "", "_LLM_Menu_PromptApiEntry must remain source-visible")
+	Pos := Map()
+	for Key in ["api_prompt_provider", "api_prompt_url", "api_prompt_token",
+		"api_prompt_model"] {
+		At := InStr(Code, Key)
+		Assert(At > 0, "the dialog must prompt " . Key)
+		Pos[Key] := At
+	}
+	AssertTrue(Pos["api_prompt_provider"] < Pos["api_prompt_url"],
+		"provider comes first")
+	AssertTrue(Pos["api_prompt_url"] < Pos["api_prompt_token"],
+		"URL comes before the token")
+	AssertTrue(Pos["api_prompt_token"] < Pos["api_prompt_model"],
+		"token comes before the model")
+	AssertEqual(0, InStr(Code, "api_prompt_name"), "the dialog asks no name")
+}
+Test("llm api test: creation asks provider, URL, key and model (api-test-entry-prompt-order)",
+	_LAT_PromptOrder)
+
+; After a creation persist the flow offers the end-to-end probe on the new
+; (now active) entry; edits never ask. The stubbed MsgBox declines, so the
+; helper documents its headless default. Scanned comment-stripped.
+_LAT_AskDefaultsDecline() {
+	AssertFalse(_LLM_Menu_AskTestNewApiEntry(),
+		"without a user answer the offer must decline, never probe")
+	Code := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_PromptApiEntry"))
+	Assert(Code != "", "_LLM_Menu_PromptApiEntry must remain source-visible")
+	PersistAt := InStr(Code, "LLM_Menu_CommitApiEntriesMutation")
+	AskAt := InStr(Code, "_LLM_Menu_AskTestNewApiEntry(")
+	TestAt := InStr(Code, "_LLM_Menu_TestActiveApiEntry(")
+	Assert(PersistAt > 0 && AskAt > PersistAt,
+		"the offer must come after the persist, never before")
+	Assert(TestAt > AskAt,
+		"a confirmed offer must dispatch the probe on the new entry")
+}
+Test("llm api test: creation offers the probe after persist (api-test-entry-add-offers-probe)",
+	_LAT_AskDefaultsDecline)
+
+; No active entry, or an entry id pointing nowhere: refuse before any owner,
+; request or network. The refusal still surfaces through the seam (MsgBox in
+; production) — a clicked Test action must never end in silence.
+_LAT_RefusesWithNoActiveEntry() {
+	SavedMenu := _LAT_FixtureMenu()
+	Notices := []
+	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
+	try {
+		_LLM_Menu["api_entries"] := []
+		_LLM_Menu["api_entry_id"] := ""
+		AssertFalse(_LLM_Menu_TestActiveApiEntry(NotifyFn),
+			"an empty entry list must refuse the probe")
+		_LLM_Menu["api_entries"] := [_LAT_FixtureEntry()]
+		_LLM_Menu["api_entry_id"] := "ghost"
+		AssertFalse(_LLM_Menu_TestActiveApiEntry(NotifyFn),
+			"an entry id pointing nowhere must refuse the probe")
+		AssertEqual(2, Notices.Length, "each refusal must surface, not vanish")
+		for Notice in Notices {
+			AssertFalse(Notice["ok"])
+			AssertEqual(t("menu.llm.api_dialog_title"), Notice["tip"]["title"])
+			AssertEqual(t("menu.llm.api_no_entry"), Notice["tip"]["body"])
+		}
+	} finally _LAT_RestoreMenu(SavedMenu)
+}
+Test("llm api test: refuses with no active entry, without dispatching (api-test-entry-no-active)",
+	_LAT_RefusesWithNoActiveEntry)
+
+; A missing shared spec must refuse loudly instead of probing with invented
+; values (single-source contract).
+_LAT_RefusesWithMissingSpec() {
+	global LLM_REMOTE_TEST_REQUEST
+	SavedMenu := _LAT_FixtureMenu()
+	SavedSpec := LLM_REMOTE_TEST_REQUEST
+	Notices := []
+	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
+	try {
+		LLM_REMOTE_TEST_REQUEST := Map()
+		AssertFalse(_LLM_Menu_TestActiveApiEntry(NotifyFn),
+			"a missing shared probe spec must refuse the probe")
+		AssertEqual(1, Notices.Length, "the refusal must surface, not vanish")
+		AssertFalse(Notices[1]["ok"])
+		AssertEqual(t("menu.llm.api_providers_unavailable"), Notices[1]["tip"]["body"])
+	} finally {
+		LLM_REMOTE_TEST_REQUEST := SavedSpec
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("llm api test: refuses when the shared probe spec is unavailable (api-test-entry-no-spec)",
+	_LAT_RefusesWithMissingSpec)
+
+; The verdict triple is pure: success carries name, latency and excerpt (long
+; replies truncated); empty replies and failures map to the unreachable pair.
+_LAT_TipMapping() {
+	Tip := _LLM_Menu_ApiTestTip(true, "Prod", 42, "OK")
+	AssertTrue(Tip["ok"])
+	AssertEqual(t("menu.llm.api_test_ok_title"), Tip["title"])
+	AssertEqual(Format(t("menu.llm.api_test_ok_body"), "Prod", 42, "OK"), Tip["body"])
+	Long := ""
+	Loop 200
+		Long .= "x"
+	Tip := _LLM_Menu_ApiTestTip(true, "Prod", 7, Long)
+	AssertTrue(InStr(Tip["body"], "Prod") > 0, "the body must name the entry")
+	AssertTrue(InStr(Tip["body"], "7 ms") > 0, "the body must carry the latency")
+	AssertFalse(InStr(Tip["body"], Long) > 0, "a long reply must be excerpted, not pasted whole")
+	Tip := _LLM_Menu_ApiTestTip(true, "Prod", 7, "")
+	AssertFalse(Tip["ok"], "an empty reply proves nothing and must read as failure")
+	AssertEqual(t("menu.llm.api_unreachable_title"), Tip["title"])
+	Tip := _LLM_Menu_ApiTestTip(false, "Prod", 9, "")
+	AssertFalse(Tip["ok"])
+	AssertEqual(t("menu.llm.api_unreachable_title"), Tip["title"])
+	AssertEqual(StrReplace(t("menu.llm.api_unreachable_body"), "%s", "Prod"), Tip["body"])
+}
+Test("llm api test: verdict triple maps success, truncation and failure (api-test-entry-tip)",
+	_LAT_TipMapping)
+
+; One current completion notifies once through the seam; a superseded owner,
+; a deleted entry and a suspended driver stay silent.
+_LAT_CompletionOwnership() {
+	SavedMenu := _LAT_FixtureMenu()
+	Notices := []
+	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
+	SavedOwners := _LAT_ResetOwners()
+	try {
+		Owner := _LAT_TestOwner()
+		AssertTrue(_LLM_Menu_OnApiTestDone(true, "OK", "prod", "Prod",
+			A_TickCount - 12, Owner, NotifyFn),
+			"the current completion must publish")
+		AssertEqual(1, Notices.Length, "exactly one notification may survive")
+		AssertTrue(Notices[1]["ok"])
+		AssertEqual(t("menu.llm.api_test_ok_title"), Notices[1]["tip"]["title"])
+
+		StaleOwner := LLM_AuxBegin("api_test:prod", Map(
+			"backend", "api", "endpoint", "https://b.invalid/v1", "identity", "prod"))
+		NewOwner := _LAT_TestOwner()
+		AssertFalse(_LLM_Menu_OnApiTestDone(true, "OK", "prod", "Prod",
+			A_TickCount, StaleOwner, NotifyFn),
+			"a superseded probe result must not relabel the newer one")
+		AssertEqual(1, Notices.Length)
+
+		_LLM_Menu["api_entries"] := []
+		AssertFalse(_LLM_Menu_OnApiTestDone(true, "OK", "prod", "Prod",
+			A_TickCount, NewOwner, NotifyFn),
+			"a deleted entry must never produce a late notification")
+		AssertEqual(1, Notices.Length,
+			"only the current completion may notify")
+	} finally {
+		_LAT_RestoreOwners(SavedOwners)
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("llm api test: completion ownership silences stale and deleted entries (api-test-entry-ownership)",
+	_LAT_CompletionOwnership)
+
+; A failed probe notifies through the seam exactly like a success: the
+; unreachable title, never silence. (Production shows it in a MsgBox; the
+; 23:26 timeout proved a TrayTip-only verdict is invisible in practice.)
+_LAT_FailureCompletionNotifies() {
+	SavedMenu := _LAT_FixtureMenu()
+	Notices := []
+	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
+	SavedOwners := _LAT_ResetOwners()
+	try {
+		Owner := _LAT_TestOwner()
+		AssertTrue(_LLM_Menu_OnApiTestDone(false, "", "prod", "Prod",
+			A_TickCount - 30031, Owner, NotifyFn),
+			"a failed completion must publish like a success")
+		AssertEqual(1, Notices.Length, "exactly one notification may survive")
+		AssertFalse(Notices[1]["ok"])
+		AssertEqual(t("menu.llm.api_unreachable_title"), Notices[1]["tip"]["title"])
+	} finally {
+		_LAT_RestoreOwners(SavedOwners)
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("llm api test: failed probe notifies through the seam (api-test-entry-failure)",
+	_LAT_FailureCompletionNotifies)
+
+; The failure verdict carries the server's own words (status + message):
+; a 402 quota refusal must read as quota, never as a generic unreachable.
+_LAT_FailureServerMessageNotifies() {
+	SavedMenu := _LAT_FixtureMenu()
+	Notices := []
+	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
+	SavedOwners := _LAT_ResetOwners()
+	try {
+		Owner := _LAT_TestOwner()
+		Info := Map("reason", "no_completion", "status", 402,
+			"message", "Payment required to access this resource. Visit your billing tab.")
+		AssertTrue(_LLM_Menu_OnApiTestDone(false, "", "prod", "Prod",
+			A_TickCount - 120032, Owner, NotifyFn, Info),
+			"a failed completion with server info must publish")
+		AssertEqual(1, Notices.Length)
+		AssertFalse(Notices[1]["ok"])
+		AssertContains(Notices[1]["tip"]["body"], "402")
+		AssertContains(Notices[1]["tip"]["body"], "Payment required")
+	} finally {
+		_LAT_RestoreOwners(SavedOwners)
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+Test("llm api test: failure verdict carries the server message (api-test-entry-server-message)",
+	_LAT_FailureServerMessageNotifies)
+
+; Contract: every remote on_fail hand-off carries a failure Info map, and
+; both user-facing closures accept it (optional, so zero-arg callers keep
+; working). Scanned comment-stripped so prose can never satisfy it.
+_LAT_FailureInfoContract() {
+	Poll := _StripFullLineComments(_DriverFuncBody("_LLMRemote_PollCurl"))
+	Assert(Poll != "", "_LLMRemote_PollCurl must remain source-visible")
+	Assert(InStr(Poll, "_LLMRemote_FailInfo(") > 0,
+		"the curl poller must build failure info for on_fail")
+	Assert(InStr(Poll, '"on_fail", _LLMRemote_FailInfo(') > 0,
+		"the curl poller must hand the info to on_fail")
+	Handler := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_TestActiveApiEntry"))
+	Assert(InStr(Handler, "(Info := ") > 0,
+		"the test on_fail closure must accept the failure info")
+	Assert(InStr(Handler, "OnApiTestDone(false") > 0,
+		"the test on_fail closure must forward to the verdict")
+	Batch := _StripFullLineComments(_DriverFuncBody("_LLM_Engine_DispatchBatch"))
+	Assert(InStr(Batch, "(failure := ") > 0,
+		"the batch on_fail closure must accept the failure info")
+}
+Test("llm api test: failure info reaches every on_fail (api-test-entry-server-message)",
+	_LAT_FailureInfoContract)
+
+; Contract: every Test-action outcome ends in _LLM_Menu_ApiTestSurface (MsgBox
+; in production), never a bare TrayTip. Scanned comment-stripped so prose can
+; never satisfy the assertions.
+_LAT_MsgBoxContract() {
+	for FnName in ["_LLM_Menu_ApiTestSurface", "_LLM_Menu_TestActiveApiEntry",
+			"_LLM_Menu_OnApiTestDone"] {
+		Code := _StripFullLineComments(_DriverFuncBody(FnName))
+		Assert(Code != "", FnName . " must remain source-visible")
+	}
+	Surface := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_ApiTestSurface"))
+	Assert(InStr(Surface, "MsgBox(") > 0,
+		"the surface seam must pop a MsgBox in production")
+	Assert(InStr(Surface, "TrayTip(") == 0,
+		"the surface seam must never fall back to a TrayTip")
+	for FnName in ["_LLM_Menu_TestActiveApiEntry", "_LLM_Menu_OnApiTestDone"] {
+		Code := _StripFullLineComments(_DriverFuncBody(FnName))
+		Assert(InStr(Code, "_LLM_Menu_ApiTestSurface(") > 0,
+			FnName . " must route its verdict through the surface seam")
+		Assert(InStr(Code, "TrayTip(") == 0,
+			FnName . " must not show a bare TrayTip for a Test verdict")
+	}
+}
+Test("llm api test: verdicts surface through MsgBox, never TrayTip (api-test-entry-msgbox)",
+	_LAT_MsgBoxContract)
+
+; Contract: the probe tags its reservation with the owned-probe kind, and both
+; engine cancel paths spare that kind. Otherwise every keystroke during the
+; probe (ResetPredictions, per-keystroke CancelInflight) silently kills it:
+; the poller sees a missing reservation and fires neither callback. Scanned
+; comment-stripped so prose can never satisfy the assertions.
+_LAT_SurvivesTypingCancels() {
+	Handler := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_TestActiveApiEntry"))
+	Assert(Handler != "", "_LLM_Menu_TestActiveApiEntry must remain source-visible")
+	Assert(InStr(Handler, "LLM_REMOTE_KIND_API_TEST") > 0,
+		"the probe must tag its reservation with the owned-probe kind")
+	for FnName in ["LLM_Engine_StopGeneration", "LLM_Engine_CancelInflight"] {
+		Code := _StripFullLineComments(_DriverFuncBody(FnName))
+		Assert(Code != "", FnName . " must remain source-visible")
+		Assert(InStr(Code, "LLM_RemoteCancelAllAsync(LLM_REMOTE_KIND_API_TEST)") > 0,
+			FnName . " must spare the owned probe when cancelling prediction work")
+	}
+}
+Test("llm api test: typing never cancels the probe (api-test-entry-survives-typing)",
+	_LAT_SurvivesTypingCancels)
+
+; Contract: the click shows a cancellable progress immediately, the completion
+; hides it, Cancel aborts the request, and the probe gets a longer timeout
+; than predictions (cold models need more than 30 s). Scanned
+; comment-stripped so prose can never satisfy the assertions.
+_LAT_ProgressContract() {
+	Handler := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_TestActiveApiEntry"))
+	Assert(Handler != "", "_LLM_Menu_TestActiveApiEntry must remain source-visible")
+	Assert(InStr(Handler, "_LLM_Menu_ApiTestProgressShow(") > 0,
+		"the click must show a cancellable progress immediately")
+	Assert(InStr(Handler, "LLM_API_TEST_TIMEOUT_MS") > 0,
+		"the probe must use its own longer timeout, not the prediction one")
+	Done := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_OnApiTestDone"))
+	Assert(Done != "", "_LLM_Menu_OnApiTestDone must remain source-visible")
+	Assert(InStr(Done, "_LLM_Menu_ApiTestProgressHide(") > 0,
+		"the completion must hide the progress before popping the verdict")
+	Cancel := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_ApiTestProgressCancel"))
+	Assert(Cancel != "", "_LLM_Menu_ApiTestProgressCancel must remain source-visible")
+	Assert(InStr(Cancel, "LLM_RemoteCancelAsync(") > 0,
+		"Cancel must abort the in-flight request")
+	Gen := _DriverFuncBody("LLM_RemoteGenerate_Async")
+	Assert(InStr(Gen, "TimeoutMs := 0") > 0,
+		"the generator must accept a timeout override")
+	Assert(InStr(Gen, "TimeoutMs > 0") > 0,
+		"the generator must honor the timeout override")
+}
+Test("llm api test: progress, cancel and longer timeout are wired (api-test-entry-progress)",
+	_LAT_ProgressContract)
+
+; The progress label is pure: entry name, elapsed whole seconds, and the
+; budget so the user sees the limit (no open-ended wait).
+_LAT_ProgressText() {
+	Label := _LLM_Menu_ApiTestProgressText("Cerebras", 62000, 120000)
+	Assert(InStr(Label, "Cerebras") > 0, "the label must name the entry")
+	Assert(InStr(Label, "62") > 0, "the label must carry elapsed seconds")
+	Assert(InStr(Label, "120") > 0, "the label must show the budget")
+}
+Test("llm api test: progress label names entry and elapsed time (api-test-entry-progress-text)",
+	_LAT_ProgressText)
+
+; Cancelling with no window open is headless-safe: it aborts the request id,
+; finishes the owner so a late completion stays silent, clears the state, and
+; never touches UI.
+_LAT_ProgressCancel() {
+	global _LLM_Menu_ApiTestProgress
+	SavedOwners := _LAT_ResetOwners()
+	try {
+		Owner := _LAT_TestOwner()
+		_LLM_Menu_ApiTestProgress := Map("entry", "prod", "name", "Prod",
+			"req_id", 999888, "owner", Owner, "start", A_TickCount)
+		AssertTrue(_LLM_Menu_ApiTestProgressCancel(),
+			"cancel must succeed when a probe is showing")
+		AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"),
+			"cancel must clear the progress state")
+		AssertFalse(LLM_AuxIsCurrent(Owner),
+			"cancel must finish the owner so a late completion stays silent")
+		AssertFalse(_LLM_Menu_ApiTestProgressCancel(),
+			"cancel with nothing showing must report false, not throw")
+	} finally _LAT_RestoreOwners(SavedOwners)
+}
+Test("llm api test: cancel aborts headlessly and stays silent (api-test-entry-progress-cancel)",
+	_LAT_ProgressCancel)
+
+/** Native monotonic observations exercise ordinary and DWORD-boundary uptimes. */
+_LAT_ProbeClockProgress(Origin, Elapsed, Budget := 120000) {
+	global _LLM_Menu_ApiTestProgress
+	Saved := _LLM_Menu_ApiTestProgress
+	Label := { Text: "unpublished" }
+	Bar := { Value: -1 }
+	try {
+		_LLM_Menu_ApiTestProgress := Map("entry", "prod", "name", "Prod",
+			"start", Origin, "budget", Budget, "label", Label, "bar", Bar)
+		_LLM_Menu_ApiTestProgressTick(Origin + Elapsed)
+		AssertEqual(_LLM_Menu_ApiTestProgressText("Prod", Elapsed, Budget), Label.Text,
+			"the real timer must publish full elapsed whole seconds from the native monotonic clock")
+		AssertEqual(Budget > 0 ? Min(100, (Elapsed * 100) // Budget) : 0, Bar.Value,
+			"the real timer must retain its capped progress and zero-budget behavior")
+	} finally _LLM_Menu_ApiTestProgress := Saved
+}
+for Origin in [0, 100, 0xFFFFFFF0]
+	for Elapsed in [0, 999, 1000, 119999, 120000, 120001]
+		Test("llm api probe clock: progress origin=" . Origin . " elapsed=" . Elapsed,
+			_LAT_ProbeClockProgress.Bind(Origin, Elapsed))
+for Origin in [0, 100, 0xFFFFFFF0]
+	Test("llm api probe clock: zero budget origin=" . Origin,
+		_LAT_ProbeClockProgress.Bind(Origin, 1000, 0))
+
+/** Completion retains real auxiliary ownership and publishes exact elapsed time. */
+_LAT_ProbeClockCompletion(Origin, Elapsed := 1234) {
+	global _LLM_Menu_ApiTestProgress, _LLM_AuxGeneration, _LLM_AuxOwnerCounter
+	global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	SavedMenu := _LAT_FixtureMenu()
+	SavedProgress := _LLM_Menu_ApiTestProgress
+	SavedOwners := [_LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners,
+		_LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter]
+	Notices := []
+	try {
+		_LAT_ResetOwners()
+		_LLM_Menu_ApiTestProgress := Map()
+		Owner := _LAT_TestOwner()
+		AssertTrue(_LLM_Menu_OnApiTestDone(true, "OK", "prod", "Prod", Origin,
+			Owner, (Ok, Tip) => Notices.Push(Tip), "", Origin + Elapsed))
+		AssertEqual(1, Notices.Length)
+		AssertEqual(Format(t("menu.llm.api_test_ok_body"), "Prod", Elapsed, "OK"),
+			Notices[1]["body"], "the actual completion must retain full native elapsed latency")
+		AssertFalse(LLM_AuxIsCurrent(Owner), "successful publication must retire its exact owner")
+	} finally {
+		_LLM_Menu_ApiTestProgress := SavedProgress
+		_LLM_AuxGeneration := SavedOwners[1]
+		_LLM_AuxOwnerCounter := SavedOwners[2]
+		_LLM_AuxOwners := SavedOwners[3]
+		_LLM_AuxCleanupDebt := SavedOwners[4]
+		_LLM_AuxCleanupDebtCounter := SavedOwners[5]
+		_LAT_RestoreMenu(SavedMenu)
+	}
+}
+for Origin in [0, 100, 0xFFFFFFF0]
+	Test("llm api probe clock: completion origin=" . Origin,
+		_LAT_ProbeClockCompletion.Bind(Origin))
+
+for Origin in [100, 0x100000064]
+	for Elapsed in [0x100000000, 0x10001D4BF, 0x10001D4C0, 0x10001D4C1, 0x2000004D2]
+		Test("llm api probe clock: long progress origin=" . Origin . " elapsed=" . Elapsed,
+			_LAT_ProbeClockProgress.Bind(Origin, Elapsed))
+for Elapsed in [0x1000004D2, 0x2000004D2]
+	Test("llm api probe clock: long completion elapsed=" . Elapsed,
+		_LAT_ProbeClockCompletion.Bind(100, Elapsed))
+
+
+
+/** Independent inert status data, separate from selectable NoModel commands. */
+
+
+
+/** The existing native API list consumes the complete fixed Edit declaration. */
+
+
+
+class _LAT_ProgressReentrantDestroy {
+	Fired := false
+	__New(Window) {
+		this.Window := Window
+	}
+	Destroy() {
+		global _LLM_Menu_ApiTestProgress
+		if this.Fired
+			return
+		this.Fired := true
+		this.Window.Destroy()
+		this.NextOwner := _LAT_TestOwner()
+		_LLM_Menu_ApiTestProgressShow("prod", "Private reentrant progress", this.NextOwner)
+		this.NextState := _LLM_Menu_ApiTestProgress
+	}
+}
+
+_LAT_ProgressNativeEvent(Receipt, *) {
+	Receipt.Delivered := true
+}
+
+_LAT_ProgressCloseDuringShow(Receipt, Showing, Param, Message, Hwnd) {
+	global _LLM_Menu_ApiTestProgress
+	if !Showing || Receipt.Delivered || !_LLM_Menu_ApiTestProgress.Has("gui")
+		return
+	Window := _LLM_Menu_ApiTestProgress["gui"]
+	if Window.Hwnd != Hwnd
+		return
+	Receipt.Delivered := true
+	Receipt.Hwnd := Hwnd
+	DllCall("PostMessageW", "Ptr", Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Int")
+	Started := A_TickCount
+	while _LLM_Menu_ApiTestProgress.Has("entry") && A_TickCount - Started < 2000
+		Sleep(1)
+}
+
+_LAT_ProgressNativeCancellation(Event) {
+	global _LLM_Menu_ApiTestProgress, _LLM_AuxGeneration, _LLM_AuxOwnerCounter
+	global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	SavedMenu := _LAT_FixtureMenu()
+	SavedProgress := _LLM_Menu_ApiTestProgress
+	SavedOwners := [_LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners,
+		_LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter]
+	SavedCritical := Critical("Off")
+	Window := 0, DestroyProbe := 0, ShowCallback := 0
+	try {
+		_LAT_ResetOwners()
+		_LLM_Menu_ApiTestProgress := Map()
+		Owner := _LAT_TestOwner()
+		if Event == "DuringShow" {
+			Receipt := {Delivered: false, Hwnd: 0}
+			ShowCallback := _LAT_ProgressCloseDuringShow.Bind(Receipt)
+			OnMessage(0x18, ShowCallback)
+			Opened := _LLM_Menu_ApiTestProgressShow("prod", "Private opening cancellation", Owner)
+			AssertTrue(Receipt.Delivered, "real WM_SHOWWINDOW must expose the published native owner")
+			AssertFalse(Opened, "closing while Show pumps messages cannot authorize request dispatch")
+			AssertFalse(LLM_AuxIsCurrent(Owner), "early cancellation retires the owner before dispatch")
+			AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"))
+			AssertFalse(WMHandleExists(Receipt.Hwnd))
+			return
+		}
+		AssertTrue(_LLM_Menu_ApiTestProgressShow("prod", "Private progress cancellation", Owner))
+		State := _LLM_Menu_ApiTestProgress
+		AssertTrue(State.Has("gui"), "the real progress factory must create its native window")
+		Window := State["gui"], Hwnd := Window.Hwnd
+		AssertTrue(LLM_AuxIsCurrent(Owner), "the native progress must begin with a real live auxiliary owner")
+		Receipt := {Delivered: false}
+		Window.OnEvent(Event, _LAT_ProgressNativeEvent.Bind(Receipt), -1)
+		AssertTrue(DllCall("PostMessageW", "Ptr", Hwnd, "UInt", Event == "Close" ? 0x10 : 0x100,
+			"Ptr", Event == "Close" ? 0 : 0x1B, "Ptr", 0, "Int"),
+			"the private progress window must receive its cancellation message")
+		Started := A_TickCount
+		while (!Receipt.Delivered || LLM_AuxIsCurrent(Owner)) && A_TickCount - Started < 2000
+			Sleep(1)
+		AssertTrue(Receipt.Delivered, "the native cancellation event must really run")
+		AssertFalse(LLM_AuxIsCurrent(Owner), "closing progress must retire the probe instead of leaving hidden work")
+		AssertFalse(WMHandleExists(Hwnd), "native cancellation must destroy the progress window")
+		AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"), "native cancellation must clear progress state")
+		Notices := []
+		AssertFalse(_LLM_Menu_OnApiTestDone(true, "late answer", "prod", "Private progress cancellation",
+			A_TickCount, Owner, (Ok, Tip) => Notices.Push(Tip)))
+		AssertEqual(0, Notices.Length, "a closed probe cannot publish a later verdict")
+		ReplacementOwner := _LAT_TestOwner()
+		AssertTrue(_LLM_Menu_ApiTestProgressShow("prod", "Private replacement progress", ReplacementOwner))
+		Replacement := _LLM_Menu_ApiTestProgress
+		AssertFalse(_LLM_Menu_ApiTestProgressCancel(State), "a delayed old cancellation cannot claim a replacement")
+		AssertTrue(_LLM_Menu_ApiTestProgress == Replacement)
+		AssertTrue(LLM_AuxIsCurrent(ReplacementOwner), "the replacement keeps its exact owner")
+		DestroyProbe := _LAT_ProgressReentrantDestroy(Replacement["gui"])
+		Replacement["gui"] := DestroyProbe
+		AssertTrue(_LLM_Menu_ApiTestProgressCancel(Replacement))
+		AssertFalse(LLM_AuxIsCurrent(ReplacementOwner))
+		AssertTrue(DestroyProbe.Fired, "native retirement must reach the controlled reentrant boundary")
+		AssertTrue(_LLM_Menu_ApiTestProgress == DestroyProbe.NextState,
+			"retiring an old HWND cannot erase progress opened by that native callout")
+		AssertTrue(LLM_AuxIsCurrent(DestroyProbe.NextOwner), "the reentrant progress retains its own live owner")
+		AssertTrue(DestroyProbe.NextState.Has("gui"), "the replacement owns an actual native progress window")
+		AssertTrue(WMHandleExists(DestroyProbe.NextState["gui"].Hwnd))
+		AssertTrue(_LLM_Menu_ApiTestProgressCancel(DestroyProbe.NextState))
+	} finally {
+		if HasMethod(ShowCallback, "Call")
+			OnMessage(0x18, ShowCallback, 0)
+		_LLM_Menu_ApiTestProgressHide()
+		SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+		if IsObject(DestroyProbe) && DestroyProbe.HasOwnProp("NextState") {
+			if DestroyProbe.NextState.Has("gui")
+				try DestroyProbe.NextState["gui"].Destroy()
+			try LLM_AuxFinish(DestroyProbe.NextOwner)
+		}
+		if IsObject(Window)
+			try Window.Destroy()
+		_LLM_Menu_ApiTestProgress := SavedProgress
+		_LLM_AuxGeneration := SavedOwners[1]
+		_LLM_AuxOwnerCounter := SavedOwners[2]
+		_LLM_AuxOwners := SavedOwners[3]
+		_LLM_AuxCleanupDebt := SavedOwners[4]
+		_LLM_AuxCleanupDebtCounter := SavedOwners[5]
+		_LAT_RestoreMenu(SavedMenu)
+		Critical(SavedCritical)
+	}
+}
+for _LAT_NativeCancelEvent in ["Close", "Escape", "DuringShow"]
+	Test("llm api progress: " . _LAT_NativeCancelEvent . " cancels the live probe (api-progress-native-cancel)",
+		_LAT_ProgressNativeCancellation.Bind(_LAT_NativeCancelEvent))
+
+
+_LAT_RefuseProbeTransport(Calls, *) {
+	Calls.Push(true)
+	throw Error("Controlled probe transport refusal before network work.")
+}
+
+_LAT_ProgressShowSupersession() {
+	global _LLM_Menu_ApiTestProgress, _LLM_AuxGeneration, _LLM_AuxOwnerCounter
+	global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_Menu_ApiFailureEpoch
+	global LLM_REMOTE_TEST_REQUEST
+	SavedMenu := _LAT_FixtureMenu()
+	SavedProgress := _LLM_Menu_ApiTestProgress
+	SavedOwners := [_LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners,
+		_LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter]
+	SavedRemote := [_LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_Menu_ApiFailureEpoch]
+	HadConstructor := CurlAsyncRequest.HasOwnProp("Call")
+	SavedConstructor := HadConstructor ? CurlAsyncRequest.GetOwnPropDesc("Call") : 0
+	SavedCritical := Critical("Off")
+	DestroyProbe := 0, Window := 0
+	Calls := [], Notices := []
+	try {
+		_LAT_ResetOwners()
+		_LLM_Menu_ApiTestProgress := Map()
+		_LLM_Remote_Async := Map()
+		_LLM_Remote_AsyncCounter := 0
+		CurlAsyncRequest.DefineProp("Call", {Call: _LAT_RefuseProbeTransport.Bind(Calls)})
+		AssertTrue(LLM_REMOTE_TEST_REQUEST is Map && LLM_REMOTE_TEST_REQUEST.Count > 0,
+			"the public probe must have the genuine shared request specification")
+		Owner := _LAT_TestOwner()
+		AssertTrue(_LLM_Menu_ApiTestProgressShow("prod", "Private predecessor progress", Owner))
+		OldState := _LLM_Menu_ApiTestProgress
+		Window := OldState["gui"]
+		DestroyProbe := _LAT_ProgressReentrantDestroy(Window)
+		OldState["gui"] := DestroyProbe
+		AssertFalse(_LLM_Menu_TestActiveApiEntry((Ok, Tip) => Notices.Push(Tip)),
+			"a reentrant replacement withdraws the outer probe request")
+		AssertTrue(DestroyProbe.Fired, "the real public probe must retire its predecessor HWND")
+		AssertEqual(0, Calls.Length, "a withdrawn probe cannot construct an outgoing HTTP transport")
+		AssertEqual(0, _LLM_Remote_AsyncCounter, "withdrawal must precede even remote request reservation")
+		AssertTrue(_LLM_Menu_ApiTestProgress == DestroyProbe.NextState,
+			"the outer opening cannot overwrite progress opened by predecessor destruction")
+		AssertTrue(LLM_AuxIsCurrent(DestroyProbe.NextOwner))
+		AssertTrue(WMHandleExists(DestroyProbe.NextState["gui"].Hwnd),
+			"the latest native progress remains independently owned and visible")
+		AssertEqual(0, Notices.Length, "a withdrawn probe cannot report a transport verdict")
+	} finally {
+		RequestIds := []
+		for RequestId in _LLM_Remote_Async
+			RequestIds.Push(RequestId)
+		for RequestId in RequestIds
+			LLM_RemoteCancelAsync(RequestId)
+		_LLM_Menu_ApiTestProgressHide()
+		SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+		if IsObject(DestroyProbe) && DestroyProbe.HasOwnProp("NextState") {
+			if DestroyProbe.NextState.Has("gui")
+				try DestroyProbe.NextState["gui"].Destroy()
+			try LLM_AuxFinish(DestroyProbe.NextOwner)
+		}
+		if IsObject(Window)
+			try Window.Destroy()
+		if HadConstructor
+			CurlAsyncRequest.DefineProp("Call", SavedConstructor)
+		else
+			CurlAsyncRequest.DeleteProp("Call")
+		_LLM_Menu_ApiTestProgress := SavedProgress
+		_LLM_AuxGeneration := SavedOwners[1]
+		_LLM_AuxOwnerCounter := SavedOwners[2]
+		_LLM_AuxOwners := SavedOwners[3]
+		_LLM_AuxCleanupDebt := SavedOwners[4]
+		_LLM_AuxCleanupDebtCounter := SavedOwners[5]
+		_LLM_Remote_Async := SavedRemote[1]
+		_LLM_Remote_AsyncCounter := SavedRemote[2]
+		_LLM_Menu_ApiFailureEpoch := SavedRemote[3]
+		_LAT_RestoreMenu(SavedMenu)
+		Critical(SavedCritical)
+	}
+}
+Test("llm api progress: public probe cannot overwrite reentrant teardown ownership (api-progress-opening-supersession)",
+	_LAT_ProgressShowSupersession)

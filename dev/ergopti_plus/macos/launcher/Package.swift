@@ -102,7 +102,8 @@ let package = Package(
 		.target(
 			name: "CPOSIXCompatibility",
 			path: "Sources/CPOSIXCompatibility",
-			publicHeadersPath: "include"
+			publicHeadersPath: "include",
+			cSettings: [.define("ERGOPTI_GUARDIAN_TEST_SUPPORT", .when(configuration: .debug))]
 		),
 		.executableTarget(
 			name: "ErgoptiPlus",
@@ -132,5 +133,6 @@ let package = Package(
 				.define("ERGOPTI_GUARDIAN_TEST_SUPPORT", .when(configuration: .debug))
 			]
 		)
-	]
+	],
+	cxxLanguageStandard: .cxx17
 )

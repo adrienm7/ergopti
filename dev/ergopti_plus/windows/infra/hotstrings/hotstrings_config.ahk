@@ -58,26 +58,20 @@ global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
 ; supplies which are active.
 global HSE_Terminators := Terminators()
 
-; Default word-terminator and consumed-delimiter strings — the canonical
-; fallbacks applied when no override is stored in hotstrings_config.toml. Both
-; are DERIVED from the catalogue's default_enabled / consume flags so the AHK
-; defaults are byte-identical to the macOS defaults (one source). Only the basic
+; The word and consumed delimiter strings the engine matches are DERIVED from the
+; catalogue's default_enabled / consume flags and the user's config.toml leaves
+; (hotstrings.terminator_states, hotstrings.terminator_consume, the records of
+; hotstrings.terminators): see HotstringsTerminatorStrings. Only the basic
 ; terminators ship on (whitespace + sentence punctuation + the magic key); every
 ; other slot is available but off by default. See Terminators.spec.js.
-global HOTSTRINGS_DEFAULT_WORD_DELIMITERS     := HSE_TerminatorDefaultWordDelimiters()
-global HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 
 ; Absolute path of the user override file (set by HotstringsConfigInit).
 global _HotstringsOverridesPath := ""
 
-; User-overridden word-delimiter string read from [__global__] in the override
-; file. Empty string means "use the engine default".
-global _HotstringsWordDelimiters := ""
-
-; Chars within the active word-delimiter set that are consumed (not re-injected)
-; after an expansion fires. Stored in [__global__] consumed_delimiters in the
-; override file. Empty string means "consume nothing" (default behaviour).
-global _HotstringsConsumedDelimiters := ""
+; The word_delimiters / consumed_delimiters strings an earlier build left in
+; [__global__] of the override file, read once so HotstringsDelimitersBoot can
+; move them to config.toml. { Word, Consumed }, both "" once nothing is left.
+global _HotstringsLegacyDelimiters := { Word: "", Consumed: "" }
 
 ; In-memory cache of the override file content. Shape mirrors the HS module:
 ;   Map(category -> { Delay: Number|"", Color: String|"", ShowTooltip: true|"", Sections: Map(name -> { Delay, Color, ShowTooltip }) })
@@ -96,3 +90,16 @@ global _HSResolveGen := 0
 #Include hotstrings_io.ahk
 #Include hotstrings_catalogue.ahk
 #Include terminator_records.ahk
+
+/**
+ * Applies the admitted magic key before custom records or native typing starts.
+ * The delimiter strings are derived, so they follow the configured magic slot.
+ */
+HotstringsConfigApplyMagicKey(MagicKey) {
+	global HSE_Terminators
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	MagicKey := _FeatureStateValidateTriggerChar(MagicKey)
+	HSE_Terminators.updateMagicKey(MagicKey)
+	HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
+	HSE_CONSUMED_DELIMITERS := HotstringsGetConsumedDelimiters()
+}

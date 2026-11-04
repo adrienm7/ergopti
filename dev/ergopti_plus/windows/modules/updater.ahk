@@ -41,3 +41,4 @@
 #Include updater/self_update.ahk
 #Include updater/config_backup.ahk
 #Include updater/release_install.ahk
+#Include updater/asset_signature.ahk

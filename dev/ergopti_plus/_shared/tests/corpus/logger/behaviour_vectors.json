@@ -569,6 +569,188 @@
 						"stamp": "2026-01-16 00:00:10:000"
 					}
 				]
+			},
+			{
+				"id": "evidence_burst_with_one_template_is_never_collapsed",
+				"description": "Spec 4.3. A field check writes eight result records through one template with a different argument each. An ordinary info line would keep the first and fold the other seven into a summary that never reaches the file; evidence records are all delivered, and no summary follows even after a terminal flush.",
+				"steps": [
+					{
+						"at": 0,
+						"variant": "evidence",
+						"module": "corpus",
+						"template": "Row <arg>",
+						"args": ["a", "b", "c", "d", "e", "f", "g", "h"]
+					},
+					{ "at": 5, "flush": "terminal" }
+				],
+				"expect": [
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row a",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row b",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row c",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row d",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row e",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row f",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row g",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row h",
+						"stamp": "2026-01-15 10:00:00:000"
+					}
+				]
+			},
+			{
+				"id": "evidence_identical_to_the_previous_record_is_not_deduplicated",
+				"description": "Spec 4.3. The consecutive dedup of 4.1 must not swallow an evidence record that equals the one before it: two checks that measure the same value both have to be on record.",
+				"steps": [
+					{
+						"at": 0,
+						"variant": "evidence",
+						"module": "corpus",
+						"template": "Row <arg>",
+						"arg": "x",
+						"times": 3
+					},
+					{ "at": 5, "flush": "terminal" }
+				],
+				"expect": [
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row x",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row x",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row x",
+						"stamp": "2026-01-15 10:00:00:000"
+					}
+				]
+			},
+			{
+				"id": "evidence_rerun_later_is_delivered_again",
+				"description": "Spec 4.3. A check run again two minutes later, inside the ten minute repeat window, writes all its records again.",
+				"steps": [
+					{
+						"at": 0,
+						"variant": "evidence",
+						"module": "corpus",
+						"template": "Row <arg>",
+						"args": ["a", "b"]
+					},
+					{
+						"at": 120,
+						"variant": "evidence",
+						"module": "corpus",
+						"template": "Row <arg>",
+						"args": ["a", "b"]
+					},
+					{ "at": 130, "flush": "terminal" }
+				],
+				"expect": [
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row a",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row b",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row a",
+						"stamp": "2026-01-15 10:02:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Row b",
+						"stamp": "2026-01-15 10:02:00:000"
+					}
+				]
+			},
+			{
+				"id": "ordinary_lines_sharing_a_template_with_evidence_still_collapse",
+				"description": "Spec 4.3. The exemption belongs to the evidence record alone: an info line with the same template opens its own streak and the third line is still folded into one summary, so no other line stops collapsing.",
+				"steps": [
+					{ "at": 0, "variant": "info", "module": "corpus", "template": "Probe <arg>", "arg": "1" },
+					{
+						"at": 1,
+						"variant": "evidence",
+						"module": "corpus",
+						"template": "Probe <arg>",
+						"arg": "2"
+					},
+					{ "at": 2, "variant": "info", "module": "corpus", "template": "Probe <arg>", "arg": "3" },
+					{ "at": 5, "flush": "terminal" }
+				],
+				"expect": [
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Probe 1",
+						"stamp": "2026-01-15 10:00:00:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "Probe 2",
+						"stamp": "2026-01-15 10:00:01:000"
+					},
+					{
+						"variant": "info",
+						"module": "corpus",
+						"body": "↑ \"Probe <arg>\" repeated 1 more time between 2026-01-15 10:00:02:000 and 2026-01-15 10:00:02:000 (last: Probe 3).",
+						"stamp": "2026-01-15 10:00:05:000"
+					}
+				]
 			}
 		]
 	},

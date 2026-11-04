@@ -4,44 +4,47 @@
 	<head>
 		<meta charset="utf-8" />
 		<title data-i18n="model_browser.window_title"></title>
+		<link rel="stylesheet" href="../theme.css" />
 		<link rel="stylesheet" href="style.css" />
 		<script src="../i18n.js"></script>
 		<script src="../host_bridge.js"></script>
 	</head>
 	<body>
-		<div id="toolbar">
+		<div id="toolbar" role="toolbar">
 			<input
 				id="search"
-				type="text"
+				type="search"
 				autocomplete="off"
 				spellcheck="false"
 				data-i18n-placeholder="model_browser.search_placeholder"
+				data-i18n-title="model_browser.search_placeholder"
 			/>
-			<span id="count"></span>
+			<label
+				id="backend-filter-label"
+				for="backend-filter"
+				data-i18n="model_browser.filter_backend"
+			></label>
+			<select id="backend-filter"></select>
+			<span id="count" aria-live="polite"></span>
 		</div>
 
+		<div id="current" aria-live="polite"></div>
+
 		<div id="table-wrap">
-			<table id="models">
+			<table id="models" aria-describedby="hint">
 				<thead>
-					<tr>
-						<th class="col-status" data-sort="installed" data-i18n="model_browser.col_status"></th>
-						<th class="col-name" data-sort="name" data-i18n="model_browser.col_name"></th>
-						<th class="col-family" data-sort="family" data-i18n="model_browser.col_family"></th>
-						<th class="col-num" data-sort="params_b" data-i18n="model_browser.col_params"></th>
-						<th class="col-num" data-sort="ram_gb" data-i18n="model_browser.col_ram"></th>
-						<th class="col-num" data-sort="speed_tok_s" data-i18n="model_browser.col_speed"></th>
-						<th class="col-type" data-sort="type" data-i18n="model_browser.col_type"></th>
-						<th class="col-src"></th>
-					</tr>
+					<tr id="head-row"></tr>
 				</thead>
-				<tbody id="rows"></tbody>
 			</table>
 			<div id="empty" style="display: none" data-i18n="model_browser.no_models"></div>
 		</div>
 
 		<div id="footer">
 			<div id="hint" data-i18n="model_browser.select_hint"></div>
-			<button id="btn-use" disabled></button>
+			<div id="footer-actions">
+				<button id="btn-disable" type="button" data-i18n="model_browser.disable_button"></button>
+				<button id="btn-use" type="button" disabled data-i18n="model_browser.use_button"></button>
+			</div>
 		</div>
 
 		<script src="script.js"></script>

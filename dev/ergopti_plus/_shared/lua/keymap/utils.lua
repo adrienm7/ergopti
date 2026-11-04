@@ -42,30 +42,7 @@ local function strip_leading_spacing(value)
 end
 
 local Logger = require("logger.shim")
-
-
-
-
-
--- ====================================
--- ====================================
--- ======= 1/ Constants & State =======
--- ====================================
--- ====================================
-
--- Mapping from {Placeholder} names inside replacement strings to key action names.
--- The values match hs.eventtap key names on Hammerspoon; Linux drivers map them
--- to their own equivalents via the same token kind="key" entries.
-local KEY_COMMANDS = {
-	Left      = "left",          Right     = "right",
-	Up        = "up",            Down      = "down",
-	Home      = "home",          End       = "end",
-	Delete    = "forwarddelete", Del       = "forwarddelete",
-	Backspace = "delete",        BackSpace = "delete", BS = "delete",
-	Tab       = "tab",
-	Enter     = "return",        Return    = "return",
-	Escape    = "escape",        Esc       = "escape",
-}
+local SendInput = require("send_input")
 
 
 
@@ -73,62 +50,36 @@ local KEY_COMMANDS = {
 
 -- =======================================
 -- =======================================
--- ======= 2/ Token Parsing & Text =======
+-- ======= 1/ Token Parsing & Text =======
 -- =======================================
 -- =======================================
 
---- Splits a plain-text segment on newlines and pushes the result as tokens.
---- Each "\n" becomes a {kind="key", value="return"} token.
---- @param tokens table Destination token array.
---- @param text string The string to split and append.
-local function push_text_tokens(tokens, text)
-	if type(text) ~= "string" or type(tokens) ~= "table" then return end
-
-	local first = true
-	for segment in (text .. "\n"):gmatch("([^\n]*)\n") do
-		if not first then table.insert(tokens, { kind = "key", value = "return" }) end
-		if segment ~= "" then table.insert(tokens, { kind = "text", value = segment }) end
-		first = false
-	end
-end
-
---- Parses a replacement string containing optional {Placeholder} directives into
---- a list of action tokens. Unknown placeholders are kept as literal text.
----
---- Example:
----   "Hello{Enter}World" → [{kind="text", value="Hello"}, {kind="key", value="return"}, {kind="text", value="World"}]
----
+--- Parses a replacement into the action tokens the macOS emitter plays: the
+--- grammar is send_input.parse_output, shared with Linux and pinned by the corpus
+--- Windows replays too. A counted key becomes that many tokens.
 --- @param repl string The raw replacement string.
---- @return table An array of {kind, value} token tables.
-function M.tokens_from_repl(repl)
+--- @param vocabulary function Returns the decoded send_keys.json, called only for
+---   an output holding a brace or a control character: most never do.
+--- @return table An array of {kind, value} token tables, a key's value being its
+---   Hammerspoon name.
+function M.tokens_from_repl(repl, vocabulary)
 	if type(repl) ~= "string" then
 		Logger.error(LOG, "tokens_from_repl: repl must be a string (got %s).", type(repl))
 		return {}
 	end
-
+	if not SendInput.output_needs_parsing(repl) then
+		return repl == "" and {} or { { kind = "text", value = repl } }
+	end
 	local tokens = {}
-	local i      = 1
-
-	while i <= #repl do
-		local s, e, name = repl:find("{(%w+)}", i)
-		if s then
-			if s > i then push_text_tokens(tokens, repl:sub(i, s - 1)) end
-			-- Match case-insensitively: {enter}, {ENTER}, {Enter} all work.
-			local title  = name:sub(1, 1):upper() .. name:sub(2):lower()
-			local hs_key = KEY_COMMANDS[name] or KEY_COMMANDS[title]
-			if hs_key then
-				table.insert(tokens, { kind = "key", value = hs_key })
-			else
-				-- Unknown placeholder — treat literally rather than silently dropping it
-				table.insert(tokens, { kind = "text", value = "{" .. name .. "}" })
-			end
-			i = e + 1
+	for _, token in ipairs(SendInput.parse_output(repl, vocabulary()).tokens) do
+		if token.kind == "text" then
+			tokens[#tokens + 1] = { kind = "text", value = token.value }
 		else
-			push_text_tokens(tokens, repl:sub(i))
-			break
+			for _ = 1, token.count do
+				tokens[#tokens + 1] = { kind = "key", value = token.entry.hs }
+			end
 		end
 	end
-
 	return tokens
 end
 
@@ -153,7 +104,7 @@ end
 
 -- ================================================
 -- ================================================
--- ======= 3/ LLM Prediction Overlap Solver =======
+-- ======= 2/ LLM Prediction Overlap Solver =======
 -- ================================================
 -- ================================================
 

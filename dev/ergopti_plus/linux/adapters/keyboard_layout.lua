@@ -37,6 +37,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local Shell = require("adapters.shell_runner")
@@ -46,6 +47,8 @@ local Keysym = require("infra.keysym")
 local XkbCapture = require("adapters.xkb_capture")
 local inverse_table, inverse_current = XkbCapture.inverse_table, XkbCapture.inverse_current
 local inverse_republish = XkbCapture.inverse_republish
+local inverse_retarget = XkbCapture.inverse_retarget
+local retarget_is_x11 = DisplayServer.is_x11
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
 local EvdevCodes = require("infra.evdev_codes")
@@ -162,6 +165,47 @@ local function publish(built, receipt)
 end
 
 
+-- Only new typing requests may renew a different native X11 group. Existing
+-- plan checks, readiness and explicit overrides keep their old refusal contract.
+local typing_lookup = false
+local function typing_cohort()
+	if typing_lookup then return nil end
+	typing_lookup = true
+	local previous, epoch, source, base, selection = _cohort, _refresh_epoch, _source, _base, _selection_override
+	local function selection_current()
+		return rawequal(package.loaded["adapters.keyboard_layout"], M)
+			and rawequal(_cohort, previous) and _refresh_epoch == epoch and _source == source
+			and rawequal(_base, base) and _selection_override == selection
+			and previous ~= nil and rawequal(_table, previous.built)
+			and rawequal(package.loaded["adapters.xkb_capture"], XkbCapture)
+			and rawequal(package.loaded["infra.display_server"], DisplayServer)
+			and rawequal(DisplayServer.is_x11, retarget_is_x11)
+			and rawequal(XkbCapture.inverse_retarget, inverse_retarget)
+			and rawequal(XkbCapture.inverse_table, inverse_table) and rawequal(XkbCapture.inverse_current, inverse_current)
+	end
+	local called, result = pcall(function()
+		local current = current_cohort()
+		if current then return current end
+		if not selection_current() or not previous.revoked or not previous.receipt
+			or selection ~= nil or source == "override" or type(inverse_retarget) ~= "function" then return nil end
+		if not retarget_is_x11() or not selection_current() then return nil end
+		local built, _, receipt = inverse_retarget(previous.receipt)
+		if not selection_current() or type(built) ~= "table" or getmetatable(built) ~= nil or not receipt then return nil end
+		local count = TableUtil.count(built)
+		if count < MIN_PLAUSIBLE_ENTRIES then return nil end
+		local checked, current_receipt = pcall(inverse_current, receipt)
+		if not checked or current_receipt ~= true or not selection_current() then return nil end
+		local sealed, final = pcall(inverse_current, receipt, true)
+		if not sealed or final ~= true or not selection_current() then return nil end
+		publish(built, receipt)
+		return _cohort
+	end)
+	typing_lookup = false
+	return called and result or nil
+end
+
+
+
 
 
 -- ===============================================
@@ -181,21 +225,37 @@ local function read_file(path)
 	return text
 end
 
---- The session's layout names, from the first desktop store that has them.
+--- Admits session metadata only after its command acknowledges success.
+--- @param cmd string Static desktop query.
+--- @return string|nil Captured metadata, or nil on command refusal.
+local function checked_session_output(cmd)
+	local ok, output, err = Shell.exec_checked(cmd)
+	if ok then return output end
+	Logger.warn(LOG, "Session layout query refused via %s — %s.", cmd, tostring(err))
+	return nil
+end
+
+--- The session's layout names, from the first acknowledged desktop store.
 --- @return table|nil Descriptor from infra/xkb_rmlvo.lua.
 local function session_layout_names()
-	local options = nil
 	if Shell.has_command("gsettings") then
-		options = Shell.exec(GNOME_OPTIONS)
-		local desc = XkbRmlvo.parse_gnome(Shell.exec(GNOME_MRU), options)
-			or XkbRmlvo.parse_gnome(Shell.exec(GNOME_SOURCES), options)
-		if desc then return desc end
+		local options = checked_session_output(GNOME_OPTIONS)
+		-- Failed options are unknown, never an acknowledged empty/default set.
+		if options ~= nil then
+			local desc = XkbRmlvo.parse_gnome(checked_session_output(GNOME_MRU), options)
+				or XkbRmlvo.parse_gnome(checked_session_output(GNOME_SOURCES), options)
+			if desc then return desc end
+		end
 	end
 
 	local desc = XkbRmlvo.parse_kxkbrc(read_file(ConfigPaths.config_home() .. "/kxkbrc"))
 		or XkbRmlvo.from_env()
-		or XkbRmlvo.parse_localectl(Shell.exec(LOCALECTL))
 	if desc then return desc end
+	-- systemd-localed is absent from minimal and non-systemd systems.
+	if Shell.has_command("localectl") then
+		desc = XkbRmlvo.parse_localectl(checked_session_output(LOCALECTL))
+		if desc then return desc end
+	end
 
 	for _, path in ipairs(KEYBOARD_DEFAULTS) do
 		desc = XkbRmlvo.parse_keyboard_defaults(read_file(path))
@@ -222,8 +282,8 @@ local function dump_keymap()
 	end
 
 	for _, cmd in ipairs(candidates) do
-		local out = Shell.exec(cmd)
-		if type(out) == "string" and out:find("xkb_keymap", 1, true) then
+		local ok, out = Shell.exec_checked(cmd)
+		if ok and out:find("xkb_keymap", 1, true) then
 			return out, cmd
 		end
 	end
@@ -231,8 +291,8 @@ local function dump_keymap()
 	local desc = session_layout_names()
 	if desc then
 		local cmd = XkbRmlvo.compile_command(desc)
-		local out = Shell.exec(cmd)
-		if type(out) == "string" and out:find("xkb_keymap", 1, true) then
+		local ok, out = Shell.exec_checked(cmd)
+		if ok and out:find("xkb_keymap", 1, true) then
 			return out, cmd .. " (layout names from " .. desc.source .. ")"
 		end
 		Logger.warn(LOG, "Compiling the session layout (%s from %s) produced no keymap.",
@@ -273,10 +333,11 @@ end
 --- comes from libxkbcommon through XkbCapture.inverse_table(). This remains the
 --- libxkbcommon-free model the planner's fixture tests drive plan() with.
 --- @param text string Keymap dump.
+--- @param group integer|nil 1-based active XKB group; group 1 when nil.
 --- @return table char → { keycode, level, mods }, and the count.
-function M.build(text)
+function M.build(text, group)
 	local built = {}
-	local entries = XkbKeymap.parse(text or "")
+	local entries = XkbKeymap.parse(text or "", group)
 
 	for _, entry in ipairs(entries) do
 		local char = Keysym.to_char(entry.keysym)
@@ -295,9 +356,7 @@ function M.build(text)
 		end
 	end
 
-	local count = 0
-	for _ in pairs(built) do count = count + 1 end
-	return built, count
+	return built, TableUtil.count(built)
 end
 
 
@@ -332,8 +391,7 @@ function M.publish_current_capture(override_path)
 		Logger.error(LOG, "Current capture inverse publication refused — %s.", tostring(ok and reason or built))
 		return false
 	end
-	local count = 0
-	for _ in pairs(built) do count = count + 1 end
+	local count = TableUtil.count(built)
 	if count < MIN_PLAUSIBLE_ENTRIES then _table, _cohort = nil, nil; return false end
 	local checked, current = pcall(inverse_current, receipt)
 	if not checked or current ~= true or not same_selection() then return false end
@@ -401,8 +459,7 @@ function M.refresh(override_path)
 		Logger.error(LOG, "Cannot enumerate the keymap via %s — %s.", tostring(source), tostring(inverse_err))
 		return false
 	end
-	local count = 0
-	for _ in pairs(built) do count = count + 1 end
+	local count = TableUtil.count(built)
 	if count < MIN_PLAUSIBLE_ENTRIES then
 		-- A keymap that parsed to almost nothing is a parse failure wearing the
 		-- shape of a success, and the consequence is silent: every expansion
@@ -413,7 +470,15 @@ function M.refresh(override_path)
 		return false
 	end
 
-	local base = M.build_base(text)
+	-- The labels follow the group the native table was taken in: with several
+	-- layouts active, group 1's symbols would name another layout's keys.
+	local group, group_err = XkbCapture.inverse_receipt_group(receipt)
+	if not group then
+		if _refresh_epoch == epoch then _table, _base, _cohort = nil, nil, nil end
+		Logger.error(LOG, "Cannot read the active XKB group via %s — %s.", tostring(source), tostring(group_err))
+		return false
+	end
+	local base = M.build_base(text, group)
 	local check = inverse_current
 	local ok, current = pcall(check, receipt)
 	if _refresh_epoch ~= epoch or XkbCapture.inverse_current ~= check or not ok or current ~= true then return false end
@@ -476,7 +541,7 @@ end
 --- @return table|nil { keycode = integer, level = integer, mods = table }.
 function M.resolve(char)
 	if type(char) ~= "string" or char == "" then return nil end
-	local cohort = current_cohort()
+	local cohort = typing_cohort()
 	local hit = cohort and cohort.built[char]
 	return hit and copy_step(hit) or nil
 end
@@ -496,7 +561,7 @@ function M.plan(text)
 	if type(text) ~= "string" then return nil, nil end
 	-- A pattern walk can skip malformed bytes and falsely approve a partial plan.
 	if not Utf8.len(text) then return nil, nil end
-	local cohort = current_cohort()
+	local cohort = typing_cohort()
 	if not cohort then return nil, text:sub(1, 1) end
 
 	local plan = {}
@@ -537,10 +602,11 @@ end
 --- The reverse of build()'s question, asked by labels rather than by injection:
 --- the menu names a physical key by what it types under the loaded keymap.
 --- @param text string Keymap dump.
+--- @param group integer|nil 1-based active XKB group; group 1 when nil.
 --- @return table evdev keycode → keysym name.
-function M.build_base(text)
+function M.build_base(text, group)
 	local base = {}
-	for _, entry in ipairs(XkbKeymap.parse(text or "")) do
+	for _, entry in ipairs(XkbKeymap.parse(text or "", group)) do
 		if entry.level == 1 then base[entry.keycode] = entry.keysym end
 	end
 	return base

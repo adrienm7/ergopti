@@ -69,7 +69,8 @@ function M.new(options)
 			return { entries = entries, positions = options.positions, capture = type(options.capture_position) == "function"
 				and type(options.cancel_position) == "function" and type(options.position_available) == "function"
 				and type(options.position_field) == "string"
-				and options.position_available() == true and current() }
+				and options.position_available() == true and current()
+				and type(options.emit_position) == "function" }
 		end)
 		busy = false
 		return called and packet or nil, called and reason or "window_unavailable"
@@ -82,7 +83,7 @@ function M.new(options)
 		record.cancelled = true
 		if record.token == nil or record.retiring then return false end
 		record.retiring = true
-		local called, retired = pcall(options.cancel_position, record.token)
+		local called, retired = pcall(record.cancel, record.token)
 		record.retiring = false
 		if not called or retired ~= true then return false end
 		if position == record then position = nil end
@@ -100,15 +101,19 @@ function M.new(options)
 				or type(request.request_id) ~= "number" or request.request_id < 1 or request.request_id % 1 ~= 0
 				or type(options.capture_position) ~= "function" or type(options.cancel_position) ~= "function"
 				or type(options.position_field) ~= "string" then return false end
-			if owner.cancel_position() ~= true then return false end
-			local record = { source = source, epoch = generation, request_id = request.request_id }
+			if owner.cancel_position() ~= true or type(options.emit_position) ~= "function" then return false end
+			-- Cancellation belongs to this native request even if the optional port changes.
+			-- The preceding retirement callback may have removed the next request's port.
+			local cancel = options.cancel_position
+			if type(cancel) ~= "function" then return false end
+			local record = { source = source, epoch = generation, request_id = request.request_id, cancel = cancel }
 			position = record
 			local function owned()
 				return rawequal(position, record) and not record.cancelled and rawequal(source, record.source)
 					and generation == record.epoch
 			end
 			local function exact()
-				return owned() and current() and owned()
+				return owned() and current() and owned() and type(options.emit_position) == "function"
 			end
 			local began, token = pcall(options.capture_position, exact, function(facts)
 				if busy or record.completed or record.token == nil then return false end
@@ -163,10 +168,14 @@ function M.new(options)
 					local request_rows = planner.plan({ operation = previous and "edit" or "add", slot = slot,
 						previous_slot = previous, action = selected, parameter = parameter }, inventory)
 					if not request_rows or generation ~= epoch or not current() then return false end
-					draft = { token = token, epoch = epoch, slot = slot, previous = previous,
+					local candidate = { token = token, epoch = epoch, slot = slot, previous = previous,
 						action = selected, parameter = parameter }
-					options.emit({ action = "selected", token = token, request_id = request.request_id, label = options.label(selected) })
-					return current() and generation == epoch
+					local packet = { action = "selected", token = token, request_id = request.request_id, label = options.label(selected) }
+					if generation ~= epoch or not current() or generation ~= epoch then return false end
+					local sent = options.emit(packet)
+					if sent ~= true or not current() or generation ~= epoch then return false end
+					draft = candidate
+					return true
 				end)
 				busy = false
 				return accepted and result == true
@@ -190,7 +199,10 @@ function M.new(options)
 		generation = generation + 1
 		local refreshed, packet = pcall(function()
 			if not alive or generation ~= epoch + 1 or not capture() then return nil end
-			return records()
+			local entries = records()
+			-- Labels may retire the displayed source after its capture acknowledged.
+			if not current() or generation ~= epoch + 1 then return nil end
+			return entries
 		end)
 		if not refreshed or packet == nil then
 			return { committed = true, refreshed = false }

@@ -21,7 +21,8 @@
 /**
  * Non-blocking Ollama generation. Returns immediately; calls
  * ``on_success(text)`` when the model finishes responding, or ``on_fail()``
- * on any HTTP / parse failure. Mirrors hs.http.asyncPost on the HS side.
+ * on HTTP / parse failure while the captured origin remains current.
+ * Origin supersession retires custody without public delivery.
  *
  * The transport is a curl child process, not WinHTTP: WinHTTP's async ``Send()``
  * returned HTTP 200 with an empty ``content`` on this driver despite valid JSON
@@ -34,18 +35,29 @@
  * @param {string}   user_text     - User context.
  * @param {number}   temperature   - Sampling temperature.
  * @param {function} on_success    - Callback receiving the generated text.
- * @param {function} on_fail       - Callback fired on any failure.
+ * @param {function} on_fail       - Failure callback while the captured origin is current.
  * @param {string}   payload       - A complete /api/chat body the caller wrote
  *                                   (LLM_OllamaChat_Async); "" builds it from
  *                                   the other parameters.
+ * @param {Func|Integer} CurrentFn - Bounded, non-blocking requester admission, or 0.
+ *   May run in the short publication Critical: no file/network/menu I/O or
+ *   synchronous callback dispatch. A native focus peek must remain non-blocking.
  * @returns {Integer} The request id, for correlating log lines. Aborting is
  *                    always all-or-nothing via LLM_OllamaCancelAllAsync — the
  *                    registry holds at most one in-flight slot by design.
  */
-LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "", payload := "") {
+LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "", payload := "", CurrentFn := 0) {
 	global _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending, LLM_OLLAMA_BASE_URL
+	if !HasMethod(CurrentFn, "Call") && !(CurrentFn is Integer && CurrentFn == 0)
+		throw TypeError("Ollama requester admission must be callable or 0.")
+	if HasMethod(CurrentFn, "Call") {
+		on_success := _LLM_Ollama_InvokeRequesterCurrent.Bind(CurrentFn, on_success, "on_success")
+		on_fail := _LLM_Ollama_InvokeRequesterCurrent.Bind(CurrentFn, on_fail, "on_fail")
+	}
 	_LLM_Ollama_AsyncCounter += 1
 	req_id := _LLM_Ollama_AsyncCounter
+	if !_LLM_Ollama_RequesterCurrent(CurrentFn)
+		return req_id
 	job := Map(
 		"req_id", req_id,
 		"model", model,
@@ -58,32 +70,56 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		"max_tokens", max_tokens,
 		"is_batch", is_batch,
 		"tail_text", tail_text,
-		"payload", payload
+		"payload", payload,
+		"requester_current", CurrentFn
 	)
-	if payload != "" {
+	try {
+		job["origin_custody"] := LLM_OllamaCaptureOriginCustody()
 		job["presence_generation"] := LLM_AuxGeneration()
-		job["base_url"] := LLM_OLLAMA_BASE_URL
-	}
-	global _LLM_Ollama_Async
-	if (_LLM_Ollama_Async.Count > 0) {
-		; Latest-only coalescing keeps a single pending slot. If a previous job
-		; is already waiting there, it is being superseded and will never run —
-		; honour the async contract (exactly one of on_success / on_fail fires)
-		; by failing the displaced job before overwriting it. Without this a
-		; future consumer that advances a state machine on the callback would
-		; stall forever on the dropped job.
-		displaced := ""
-		if (_LLM_Ollama_Pending is Map and _LLM_Ollama_Pending.Has("on_fail"))
-			displaced := _LLM_Ollama_Pending["on_fail"]
-		; Overwrite the slot BEFORE firing the displaced callback: on_fail re-enters
-		; the engine, and a re-entrant dispatch that still found the displaced job
-		; parked here would fail it a second time, breaking the exactly-once contract.
-		_LLM_Ollama_Pending := job
-		_LLM_InvokeCallback(displaced, "on_fail")
-		try LoggerInfo("LLM.ollama", "Ollama busy — coalescing request #{1} until slot free.", req_id)
+		job["base_url"] := job["origin_custody"].Call("origin")
+		job["origin_owned"] := job["origin_custody"].Call("owned")
+		job["on_success"] := LLM_OllamaInvokeOriginCurrent.Bind(job["origin_custody"], job["base_url"], on_success, "on_success")
+		job["on_fail"] := LLM_OllamaInvokeOriginCurrent.Bind(job["origin_custody"], job["base_url"], on_fail, "on_fail")
+	} catch {
+		_LLM_InvokeCallback(on_fail, "on_fail")
 		return req_id
 	}
-	_LLM_Ollama_DispatchAsync(job)
+	; Origin capture may admit a newer request. The final bounded lifecycle /
+	; focus predicate and RAM publication share one transaction; origin capture,
+	; terminal callbacks and diagnostics remain outside it.
+	global _LLM_Ollama_Async
+	Busy := false, Queued := false, displaced := "", Entry := 0
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_Ollama_RequesterCurrent(CurrentFn)
+			return req_id
+		if (_LLM_Ollama_Async.Count > 0) {
+			Busy := true
+			if _LLM_Ollama_Pending is Map && _LLM_Ollama_Pending["req_id"] > req_id {
+				; Only a published newer job supersedes this invocation. A refused
+				; newer call may advance the counter without acquiring this slot.
+				displaced := job["on_fail"]
+			} else {
+				if (_LLM_Ollama_Pending is Map and _LLM_Ollama_Pending.Has("on_fail"))
+					displaced := _LLM_Ollama_Pending["on_fail"]
+				; Publish before settling: a displaced callback can admit a newer
+				; job and must never find its old owner still parked here.
+				_LLM_Ollama_Pending := job
+				Queued := true
+			}
+		} else
+			Entry := _LLM_Ollama_ReserveAsync(job)
+	} finally Critical(PreviousCritical)
+	if Busy {
+		; A still-current independent older job also receives one failure when
+		; a newer published owner wins; requester/origin wrappers suppress stale
+		; delivery. No callback or logger runs inside queue publication.
+		_LLM_InvokeCallback(displaced, "on_fail")
+		if Queued
+			try LoggerInfo("LLM.ollama", "Ollama busy — coalescing request #{1} until slot free.", req_id)
+		return req_id
+	}
+	_LLM_Ollama_DispatchAsync(job, Entry)
 	return req_id
 }
 
@@ -94,62 +130,95 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
  * callbacks as LLM_OllamaGenerate_Async.
  * @param {string}   payload    - The complete JSON body.
  * @param {function} on_success - Callback receiving the generated text.
- * @param {function} on_fail    - Callback fired on any failure.
+ * @param {function} on_fail    - Failure callback while the captured origin is current.
+ * @param {Func|Integer} CurrentFn - Original requester admission retained through origin capture and dispatch.
  * @returns {Integer} The request id.
  */
-LLM_OllamaChat_Async(payload, on_success, on_fail) {
+LLM_OllamaChat_Async(payload, on_success, on_fail, CurrentFn := 0) {
 	if !(payload is String) || payload == ""
 		throw ValueError("LLM_OllamaChat_Async needs a JSON body.")
-	return LLM_OllamaGenerate_Async("", "", "", 0, on_success, on_fail, "", "", false, "", payload)
+	return LLM_OllamaGenerate_Async("", "", "", 0, on_success, on_fail, "", "", false, "", payload, CurrentFn)
 }
 
-; Starts one /api/chat request via curl (UTF-8 file body). WinHTTP async ``Send()``
-; returned HTTP 200 with ``content: ""`` on this driver despite valid JSON payloads.
-_LLM_Ollama_DispatchAsync(job) {
-	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL, LLM_OLLAMA_TIMEOUT, _LLM_Ollama_PreflightPort
+; Called only inside the slot-admission transaction, before any yielding work.
+_LLM_Ollama_ReserveAsync(job) {
+	global _LLM_Ollama_Async, LLM_OLLAMA_TIMEOUT
 	req_id := job["req_id"]
-	payload := (job.Get("payload", "") != "") ? job["payload"] : LLM_BuildOllamaPayload(
-		job["model"], job["system_prompt"], job["full_text"], job["temperature"],
-		false, job["stop_sequences"], job["max_tokens"], job["is_batch"], job["tail_text"])
-	; Reap any crash-orphaned payload files before writing a new one. The
-	; non-streaming path is the hot path that actually creates these PII files,
-	; so the sweeper must run here too — coupling it only to the (currently
-	; dead) streaming path left orphans accumulating forever after a hard kill.
-	_LLM_Ollama_ScheduleOrphanSweep()
-	uid := _LLM_Ollama_NextStreamUid()
-	try tmp_dir := _LLM_Ollama_TempDir()
-	catch as Err {
-		try LoggerError("LLM.ollama", "Private curl directory unavailable: {1}", Err.Message)
-		_LLM_InvokeCallback(job["on_fail"], "on_fail")
-		return
-	}
-	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
-	tmp_stdout := tmp_dir . "\ergopti_ollama_" . uid . ".out"
-	terminal := _LLM_CurlTerminalPaths(tmp_stdout)
-	_LLM_Ollama_TrimAsyncRegistry()
-	; AHK-28: mark the slot busy synchronously so DrainPending's
-	; _LLM_Ollama_Async.Count > 0 coalescing check sees it before the
-	; deferred spawn runs. FSWrite + Run are deferred via SetTimer(-1)
-	; to release the Critical region before the blocking OS calls.
-	_LLM_Ollama_Async[req_id] := Map(
+	Entry := Map(
 		"pid", 0, "process_owner", 0,
 		"presence_owner", 0, "presence_pending", false,
 		"presence_admitted", false, "presence_model", "",
-		"tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
-		"tmp_status", terminal["status"], "tmp_exit", terminal["exit"],
+		"tmp_payload", "", "tmp_stdout", "",
+		"tmp_status", "", "tmp_exit", "",
 		"on_success", job["on_success"], "on_fail", job["on_fail"],
 		"cancelled", false, "start_tick", A_TickCount,
 		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000, "payload_snip", "",
 		"redact", job.Get("payload", "") != "",
-		"base_url", job.Get("base_url", LLM_OLLAMA_BASE_URL),
-		"presence_generation", job.Get("presence_generation", LLM_AuxGeneration()))
-	if job.Get("payload", "") != "" {
-		Port := _LLM_Ollama_PreflightPort
-		ScheduleFn := _LLM_CurlArtifactPortFn(Port, "schedule", _LLM_Ollama_SchedulePreflight)
-		ScheduleFn.Call(() => _LLM_Ollama_Preflight(req_id, payload, job, Port), -1)
+		"base_url", job.Get("base_url", ""),
+		"origin_custody", job.Get("origin_custody", 0),
+		"origin_owned", job.Get("origin_owned", false),
+		"presence_generation", job.Get("presence_generation", LLM_AuxGeneration()),
+		"requester_current", job["requester_current"])
+	_LLM_Ollama_Async[req_id] := Entry
+	return Entry
+}
+
+; Starts one /api/chat request via curl (UTF-8 file body). WinHTTP async ``Send()``
+; returned HTTP 200 with ``content: ""`` on this driver despite valid JSON payloads.
+_LLM_Ollama_DispatchAsync(job, Entry) {
+	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL, LLM_OLLAMA_TIMEOUT, _LLM_Ollama_PreflightPort
+	req_id := job["req_id"]
+	try {
+		payload := (job.Get("payload", "") != "") ? job["payload"] : LLM_BuildOllamaPayload(
+			job["model"], job["system_prompt"], job["full_text"], job["temperature"],
+			false, job["stop_sequences"], job["max_tokens"], job["is_batch"], job["tail_text"])
+		if !_LLM_Ollama_Async.Has(req_id) || _LLM_Ollama_Async[req_id] != Entry
+			return
+		; Reap any crash-orphaned payload files before writing a new one. The
+		; non-streaming path is the hot path that actually creates these PII files,
+		; so the sweeper must run here too — coupling it only to the (currently
+		; dead) streaming path left orphans accumulating forever after a hard kill.
+		_LLM_Ollama_ScheduleOrphanSweep()
+		uid := _LLM_Ollama_NextStreamUid()
+		try tmp_dir := _LLM_Ollama_TempDir()
+		catch as Err {
+			try LoggerError("LLM.ollama", "Private curl directory unavailable: {1}", Err.Message)
+			if _LLM_Ollama_DeleteAsyncOwned(req_id, Entry) {
+				_LLM_Ollama_CleanupCurlFiles(Entry)
+				_LLM_InvokeCallback(Entry["on_fail"], "on_fail")
+				_LLM_Ollama_DrainPending()
+			}
+			return
+		}
+		if !_LLM_Ollama_Async.Has(req_id) || _LLM_Ollama_Async[req_id] != Entry
+			return
+		tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
+		tmp_stdout := tmp_dir . "\ergopti_ollama_" . uid . ".out"
+		terminal := _LLM_CurlTerminalPaths(tmp_stdout)
+		_LLM_Ollama_TrimAsyncRegistry()
+		; Preparation can yield to cancellation or another public request. Keep the
+		; original reservation rather than publishing a fresh owner after it returns.
+		if !_LLM_Ollama_Async.Has(req_id) || _LLM_Ollama_Async[req_id] != Entry
+			return
+		Entry["tmp_payload"] := tmp_payload
+		Entry["tmp_stdout"] := tmp_stdout
+		Entry["tmp_status"] := terminal["status"]
+		Entry["tmp_exit"] := terminal["exit"]
+		if job.Get("payload", "") != "" {
+			Port := _LLM_Ollama_PreflightPort
+			ScheduleFn := _LLM_CurlArtifactPortFn(Port, "schedule", _LLM_Ollama_SchedulePreflight)
+			ScheduleFn.Call(() => _LLM_Ollama_Preflight(req_id, payload, job, Port), -1)
+		}
+		else
+			SetTimer(() => _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job), -1)
+	} catch as Err {
+		; Retire only this reservation before propagating preparation failures.
+		if _LLM_Ollama_DeleteAsyncOwned(req_id, Entry) {
+			_LLM_Ollama_CleanupCurlFiles(Entry)
+			_LLM_Ollama_DrainPending()
+		}
+		throw Err
 	}
-	else
-		SetTimer(() => _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job), -1)
 }
 
 ; Deferred preflight owns one-shot delivery and exact callback cancellation.
@@ -184,12 +253,12 @@ _LLM_Ollama_Preflight(req_id, payload, job, Port := 0) {
 		return
 	}
 	if Entry.Get("presence_generation", 0) != LLM_AuxGeneration()
-			|| Entry.Get("base_url", "") != LLM_OLLAMA_BASE_URL {
+			|| !_LLM_Ollama_PresenceStillCurrent(Entry) {
 		_LLM_Ollama_PresenceFail(req_id, Entry, "request_superseded")
 		return
 	}
 	Owner := LLM_AuxBegin("ollama_chat_presence:" . req_id,
-		Map("backend", "ollama", "endpoint", Entry["base_url"], "identity", Model))
+		Map("backend", "ollama", "endpoint", Entry["base_url"], "origin_custody", Entry.Get("origin_custody", 0), "identity", Model))
 	Entry["presence_owner"] := Owner
 	Entry["presence_pending"] := true
 	Owner["on_retired"] := _LLM_Ollama_PresenceRetired.Bind(req_id, Entry)
@@ -227,7 +296,7 @@ _LLM_Ollama_OnPresence(req_id, Entry, payload, job, Model, Owner, Port, Receipt)
 		return
 	if Entry["cancelled"] || A_IsSuspended || !LLM_AuxIsCurrent(Owner)
 			|| Entry["presence_generation"] != LLM_AuxGeneration()
-			|| Entry["base_url"] != LLM_OLLAMA_BASE_URL {
+			|| !_LLM_Ollama_PresenceStillCurrent(Entry) {
 		_LLM_Ollama_PresenceFail(req_id, Entry, "request_superseded")
 		return
 	}
@@ -247,11 +316,33 @@ _LLM_Ollama_OnPresence(req_id, Entry, payload, job, Model, Owner, Port, Receipt)
 	SpawnFn.Call(req_id, payload, Entry["tmp_payload"], Entry["tmp_stdout"], job)
 }
 
+_LLM_Ollama_RequesterCurrent(Current) {
+	if Current is Integer && Current == 0
+		return true
+	Valid := Current.Call()
+	return (Valid is Integer) && Valid == true
+}
+
+_LLM_Ollama_InvokeRequesterCurrent(Current, Callback, Kind, Args*) {
+	if _LLM_Ollama_RequesterCurrent(Current)
+		_LLM_InvokeCallback(Callback, Kind, Args*)
+}
+
 _LLM_Ollama_PresenceStillCurrent(Entry) {
-	global LLM_OLLAMA_BASE_URL
-	return !Entry.Get("presence_admitted", false)
-		|| (Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
-			&& Entry.Get("base_url", "") == LLM_OLLAMA_BASE_URL)
+	Current := Entry["requester_current"]
+	if !_LLM_Ollama_RequesterCurrent(Current)
+		return false
+	if Entry.Has("origin_custody")
+		Admitted := Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
+			&& LLM_OllamaOriginCustodyCurrent(Entry["origin_custody"], Entry.Get("base_url", ""))
+	else if Entry.Get("origin_owned", false) || LLM_OllamaManagedOriginRequired()
+		return false
+	else if !Entry.Get("presence_admitted", false)
+		Admitted := true
+	else
+		Admitted := Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
+			&& LLM_OllamaOriginMatches(Entry.Get("base_url", ""))
+	return Admitted && _LLM_Ollama_RequesterCurrent(Current)
 }
 
 ; Deferred spawn: writes the payload file and launches curl outside the
@@ -318,12 +409,14 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 				if (A_IsSuspended or entry["cancelled"] or !_LLM_Ollama_PresenceStillCurrent(entry)) {
 					launch_blocked := true
 				} else {
-					cmdLine := '"' . curl_exe . '" -s -S -m '
+					; --disable must come first: it alone stops curl from reading
+					; the user's personal .curlrc (headers, output, TLS options).
+					cmdLine := '"' . curl_exe . '" --disable -s -S -m '
 						. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' '
 						. _LLM_CurlMaxFileSizeArg() . '-X POST '
 						. '-H "Content-Type: application/json" '
 						. '--data-binary @' . _Q(tmp_payload) . ' '
-						. _Q(LLM_OLLAMA_BASE_URL . "/api/chat") . ' '
+						. _Q(entry["base_url"] . "/api/chat") . ' '
 						. '-o ' . _Q(tmp_stdout)
 					cmdLine := _LLM_CurlOwnedCommand(cmdLine,
 						entry["tmp_status"], entry["tmp_exit"])
@@ -359,6 +452,14 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 		_LLM_Ollama_DrainPending()
 		return
 	}
+	if entry is Map && !_LLM_Ollama_PresenceStillCurrent(entry) {
+		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
+		_LLM_Ollama_CleanupCurlFiles(entry)
+		if _LLM_Ollama_Async.Has(req_id) && _LLM_Ollama_Async[req_id] == entry
+			_LLM_Ollama_Async.Delete(req_id)
+		_LLM_Ollama_DrainPending()
+		return
+	}
 	; A body the caller wrote may carry a screenshot: it is never quoted in a log
 	payload_snip := (job.Get("payload", "") != "") ? ""
 		: (StrLen(payload) > 160 ? SubStr(payload, 1, 160) . "…" : payload)
@@ -376,23 +477,16 @@ _LLM_Ollama_DrainPending() {
 	; SetTimer poll ticks bypass native Suspend, so this guard is the chokepoint.
 	if A_IsSuspended
 		return
-	; Engine disabled at runtime (user toggled off) — do not re-dispatch pending
-	; jobs; on_fail already fired when the job was displaced from the pending slot.
-	; IsSet proves the Map exists, not that this key does. Reading an absent key
-	; RAISES in AHK v2, and this runs from a SetTimer tick: the throw escapes into
-	; the timer thread, where it is a fatal startup error rather than a failed
-	; prediction. The engine Map is populated during boot, so any tick that lands
-	; before that — or against a harness stub — crashes the whole driver
-	; (llm-engine-enabled-read-unguarded-in-timer).
-	if (IsSet(_LLM_Engine) and _LLM_Engine is Map and !_LLM_Engine.Get("enabled", false))
-		return
-	if (_LLM_Ollama_Async.Count > 0)
-		return
-	if !(_LLM_Ollama_Pending is Map)
-		return
-	job := _LLM_Ollama_Pending
-	_LLM_Ollama_Pending := ""
-	_LLM_Ollama_DispatchAsync(job)
+	; Taking the queued job and reserving its active slot are one RAM handoff.
+	PreviousCritical := Critical("On")
+	try {
+		if (_LLM_Ollama_Async.Count > 0) || !(_LLM_Ollama_Pending is Map)
+			return
+		job := _LLM_Ollama_Pending
+		_LLM_Ollama_Pending := ""
+		Entry := _LLM_Ollama_ReserveAsync(job)
+	} finally Critical(PreviousCritical)
+	_LLM_Ollama_DispatchAsync(job, Entry)
 }
 
 /**
@@ -433,7 +527,7 @@ LLM_OllamaCancelAllAsync() {
 	; _LLM_Ollama_DrainPending() which re-dispatches the pending job — a fresh
 	; curl POST + PII temp-file write — AFTER the driver was suspended (the engine
 	; calls this from Ergopti_OnSuspendEnter -> LLM_Engine_StopGeneration). Honour
-	; the async contract by failing the displaced job exactly once before dropping.
+	; the async contract by failing the displaced job once while its origin remains current.
 	if (_LLM_Ollama_Pending is Map) {
 		displaced := _LLM_Ollama_Pending.Has("on_fail") ? _LLM_Ollama_Pending["on_fail"] : ""
 		; Drop the slot before firing so a callback that re-enters the dispatcher
@@ -463,6 +557,7 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 	if !_LLM_Ollama_Async.Has(req_id)
 		return
 	entry := _LLM_Ollama_Async[req_id]
+	CleanupFn := _LLM_CurlArtifactPortFn(Port, "cleanup", _LLM_Ollama_CleanupCurlFiles)
 	if !_LLM_Ollama_PresenceStillCurrent(entry)
 		entry["cancelled"] := true
 	Terminal := Map("complete", false, "exit", -1,
@@ -475,21 +570,36 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 	if _LLM_CurlTerminalComplete(Terminal) {
 		_LLM_CurlReleaseEntryProcess(entry, false, Port)
 		if entry["cancelled"] {
-			_LLM_Ollama_CleanupCurlFiles(entry)
-			_LLM_Ollama_Async.Delete(req_id)
+			CleanupFn.Call(entry)
+			_LLM_Ollama_DeleteAsyncOwned(req_id, entry)
 			_LLM_Ollama_DrainPending()
 			return
 		}
 		on_success := entry["on_success"]
 		on_fail := entry["on_fail"]
 		body := Terminal["body"]
-		_LLM_Ollama_CleanupCurlFiles(entry)
-		_LLM_Ollama_Async.Delete(req_id)
+		if !_LLM_Ollama_PresenceStillCurrent(entry)
+			entry["cancelled"] := true
+		CleanupFn.Call(entry)
+		if !_LLM_Ollama_DeleteAsyncOwned(req_id, entry) || entry["cancelled"] {
+			_LLM_Ollama_DrainPending()
+			return
+		}
 		if !_LLM_CurlTerminalOk(Terminal) or body == "" {
 			try LoggerWarn("LLM.ollama", "curl terminal failure (exit={1}, status={2}, body_chars={3}).",
 				Terminal["exit"], Terminal["status"], StrLen(body))
 			Failure := entry.Get("presence_admitted", false)
 				? LLM_LocalModelResponseFailure(Terminal, entry["base_url"]) : 0
+			if Failure is Map {
+				RequestedModel := entry["presence_model"]
+				if LLM_LocalModelNormalize(Failure["model"]) != LLM_LocalModelNormalize(RequestedModel) {
+					try LoggerWarn("LLM.ollama", "Rejected an Ollama missing-model response for an unrequested model (request={1}).", req_id)
+					Failure := Map("reason", "model_identity_mismatch")
+				} else {
+					; The admitted request owns recovery identity and spelling.
+					Failure := LLM_LocalModelFailure(RequestedModel, entry["base_url"])
+				}
+			}
 			if Failure is Map
 				_LLM_InvokeCallback(on_fail, "on_fail", Failure)
 			else
@@ -503,8 +613,8 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 	}
 	if entry["cancelled"] {
 		_LLM_CurlReleaseEntryProcess(entry, true, Port)
-		_LLM_Ollama_CleanupCurlFiles(entry)
-		_LLM_Ollama_Async.Delete(req_id)
+		CleanupFn.Call(entry)
+		_LLM_Ollama_DeleteAsyncOwned(req_id, entry)
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -513,13 +623,30 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 		elapsed := entry.Has("start_tick") ? TickElapsed(entry["start_tick"]) : 0
 		try LoggerWarn("LLM.ollama", "curl request timed out after {1} ms.", elapsed)
 		on_fail := entry["on_fail"]
-		_LLM_Ollama_CleanupCurlFiles(entry)
-		_LLM_Ollama_Async.Delete(req_id)
+		CleanupFn.Call(entry)
+		if !_LLM_Ollama_DeleteAsyncOwned(req_id, entry) || entry["cancelled"] {
+			_LLM_Ollama_DrainPending()
+			return
+		}
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
 	SetTimer(() => _LLM_Ollama_PollCurl(req_id, Port), -LLM_OLLAMA_POLL_MS)
+}
+
+
+; File reads and artifact cleanup may yield to cancellation or slot eviction.
+; Retire the captured owner only, then let the caller decide public delivery.
+_LLM_Ollama_DeleteAsyncOwned(req_id, Entry) {
+	global _LLM_Ollama_Async
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_Ollama_Async.Has(req_id) || _LLM_Ollama_Async[req_id] != Entry
+			return false
+		_LLM_Ollama_Async.Delete(req_id)
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_Ollama_CleanupCurlFiles(entry) {
@@ -538,7 +665,10 @@ _LLM_Ollama_CleanupCurlFiles(entry) {
  * Ollama's /api/generate reply and hands the unescaped text to on_success.
  */
 _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
-	text := LLM_ParseOllamaChatResponse(body)
+	if entry is Map && !_LLM_Ollama_PresenceStillCurrent(entry)
+		return
+	Redact := (entry is Map) && entry.Get("redact", false)
+	text := LLM_ParseOllamaChatResponse(body, Redact)
 	; LLM_ParseOllamaChatResponse returns a structured Map("error", true, ...)
 	; on a JSON parse failure (malformed body) instead of an empty string, so
 	; that case must be checked before the empty-string "parse miss" branch —
@@ -549,21 +679,27 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 		return
 	}
 	if (text == "") {
-		snip := StrLen(body) > 120 ? SubStr(body, 1, 120) . "…" : body
-		payload_hint := ""
-		if (entry is Map) and entry.Has("payload_snip")
-			payload_hint := " Payload: «" . entry["payload_snip"] . "»."
-		try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss). Body: «{1}».{2}", snip, payload_hint)
+		if Redact {
+			try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss; body_chars={1}).", StrLen(body))
+		} else {
+			snip := StrLen(body) > 120 ? SubStr(body, 1, 120) . "…" : body
+			payload_hint := ""
+			if (entry is Map) and entry.Has("payload_snip")
+				payload_hint := " Payload: «" . entry["payload_snip"] . "»."
+			try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss). Body: «{1}».{2}", snip, payload_hint)
+		}
 		_LLM_InvokeCallback(on_fail, "on_fail", Map("error", true, "message", "empty prediction"))
 		return
 	}
 	; A caller-written body (the screen reading) answers with what is on the
 	; user's screen: its size is logged, never its text
-	Redact := (entry is Map) && entry.Get("redact", false)
 	snip := Redact ? "…" : (StrLen(text) > 60 ? SubStr(text, 1, 60) . "…" : text)
 	try LoggerInfo("LLM.ollama", "Prediction received ({1} chars): «{2}».", StrLen(text), snip)
+	if entry is Map && !_LLM_Ollama_PresenceStillCurrent(entry)
+		return
 	try LLM_OllamaNoteInferenceSuccess()
-	_LLM_InvokeCallback(on_success, "on_success", text)
+	if !(entry is Map) || _LLM_Ollama_PresenceStillCurrent(entry)
+		_LLM_InvokeCallback(on_success, "on_success", text)
 }
 
 /**
@@ -703,30 +839,56 @@ _LLM_Ollama_TrimAsyncRegistry() {
  *                   to LLM_OllamaCancelStream to terminate the curl process.
  */
 LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_partial, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "", Port := 0) {
-	; Build the streaming payload — ``stream:true`` flips Ollama to JSONL (/api/chat).
-	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, true, stop_sequences, max_tokens, is_batch, tail_text)
-	curl_exe := A_WinDir . "\System32\curl.exe"
-	if !_HTTP_CurlRuntimeLimitSupported(curl_exe) {
-		try LoggerWarn("LLM.ollama", "curl cannot enforce the live response-size limit.")
-		_LLM_InvokeCallback(on_fail, "on_fail")
-		return { Pid: 0, ProcessOwner: 0, Cancelled: false }
-	}
-	if A_IsSuspended {
-		_LLM_InvokeCallback(on_fail, "on_fail")
-		return { Pid: 0, ProcessOwner: 0, Cancelled: true }
-	}
-	TempDirFn := _LLM_CurlArtifactPortFn(Port, "temp_dir", _LLM_Ollama_TempDir)
-	WriteFn := _LLM_CurlArtifactPortFn(Port, "write", FSWrite)
-	RunFn := _LLM_CurlArtifactPortFn(Port, "run", _LLM_CurlArtifactRun)
-
-	; A stream must be cancellable before its first filesystem operation. Both
-	; the private-directory creation and payload write can pump messages; without
-	; this reservation a later keystroke can cancel the current generation, then
-	; this stack resumes and launches its stale POST after the cancellation.
-	handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
-		TmpPayload: "", TmpStdout: "" }
 	global _LLM_Ollama_ActiveStreams
-	_LLM_Ollama_ActiveStreams.Push(handle)
+	; Origin admission, payload configuration and executable inspection may all
+	; pump cancellation. Reserve one identity before any of those yielding calls.
+	PreviousCritical := Critical("On")
+	try {
+		handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
+			TmpPayload: "", TmpStdout: "", TmpHeaders: "", OriginGeneration: LLM_AuxGeneration() }
+		_LLM_Ollama_ActiveStreams.Push(handle)
+	} finally Critical(PreviousCritical)
+	try {
+		try Custody := LLM_OllamaCaptureOriginCustody()
+		catch {
+			handle.Cancelled := true
+			_LLM_Ollama_RemoveStreamHandle(handle)
+			_LLM_InvokeCallback(on_fail, "on_fail")
+			return handle
+		}
+		Origin := Custody.Call("origin")
+		handle.Origin := Origin
+		handle.OriginCustody := Custody
+		handle.OriginOwned := Custody.Call("owned")
+		on_partial := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_partial, "on_partial")
+		on_success := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_success, "on_success")
+		on_fail := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_fail, "on_fail")
+		if A_IsSuspended
+			handle.Cancelled := true
+		if _LLM_Ollama_StopStaleStream(handle, on_fail)
+			return handle
+		; Build the streaming payload — ``stream:true`` selects JSONL (/api/chat).
+		payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, true, stop_sequences, max_tokens, is_batch, tail_text)
+		curl_exe := A_WinDir . "\System32\curl.exe"
+		if !_HTTP_CurlRuntimeLimitSupported(curl_exe) {
+			try LoggerWarn("LLM.ollama", "curl cannot enforce the live response-size limit.")
+			_LLM_Ollama_RemoveStreamHandle(handle)
+			_LLM_InvokeCallback(on_fail, "on_fail")
+			return handle
+		}
+		if A_IsSuspended
+			handle.Cancelled := true
+		if _LLM_Ollama_StopStaleStream(handle, on_fail)
+			return handle
+		TempDirFn := _LLM_CurlArtifactPortFn(Port, "temp_dir", _LLM_Ollama_TempDir)
+		WriteFn := _LLM_CurlArtifactPortFn(Port, "write", FSWrite)
+		RunFn := _LLM_CurlArtifactPortFn(Port, "run", _LLM_CurlArtifactRun)
+	} catch as Err {
+		; Earlier reservation also owns synchronous preparation failures. Preserve
+		; the original exception without leaving an unlaunchable active stream.
+		_LLM_Ollama_RemoveStreamHandle(handle)
+		throw Err
+	}
 
 	; Write the payload to a temp file (curl --data-binary @file). Avoids
 	; command-line length limits and shell escaping headaches with the JSON
@@ -741,7 +903,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 		_LLM_Ollama_RemoveStreamHandle(handle)
 		return handle
 	}
-	if (A_IsSuspended or handle.Cancelled) {
+	if (A_IsSuspended or handle.Cancelled or !_LLM_Ollama_StreamOriginCurrent(handle)) {
 		_LLM_Ollama_RemoveStreamHandle(handle)
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		return handle
@@ -750,6 +912,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	tmp_stdout := tmp_dir . "\ergopti_ollama_" . uid . ".out"
 	handle.TmpPayload := tmp_payload
 	handle.TmpStdout := tmp_stdout
+	handle.TmpHeaders := tmp_stdout . ".headers"
 	if !WriteFn.Call(tmp_payload, payload) {
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_CleanupStreamFiles(handle)
@@ -760,12 +923,15 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; Launch curl.exe directly (not cmd /c): hidden cmd often lacks curl on PATH and
 	; shell redirects (> file) silently produce empty/missing stdout — logs showed
 	; "Streaming finished with empty response. No stdout file."
-	cmdLine := '"' . curl_exe . '" -N -s -S -m '
+	; --disable must come first: it alone stops curl from reading the user's
+	; personal .curlrc (headers, output, TLS options).
+	cmdLine := '"' . curl_exe . '" --disable -N -s -S -m '
 		. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' '
 		. _LLM_CurlMaxFileSizeArg() . '-X POST '
 		. '-H "Content-Type: application/json" '
 		. '--data-binary @' . _Q(tmp_payload) . ' '
-		. _Q(LLM_OLLAMA_BASE_URL . "/api/chat") . ' '
+		. _Q(handle.Origin . "/api/chat") . ' '
+		. '--dump-header ' . _Q(handle.TmpHeaders) . ' '
 		. '-o ' . _Q(tmp_stdout)
 
 	launch_blocked := false
@@ -773,7 +939,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	try {
 		PreviousCritical := Critical("On")
 		try {
-			if (A_IsSuspended or handle.Cancelled) {
+			if (A_IsSuspended or handle.Cancelled or !_LLM_Ollama_StreamOriginCurrent(handle)) {
 				launch_blocked := true
 			} else {
 				ProcessOwner := _LLM_CurlRunOwned(RunFn,
@@ -806,6 +972,17 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	return handle
 }
 
+_LLM_Ollama_StreamOriginCurrent(Handle) {
+	if Handle.HasOwnProp("OriginCustody")
+		return Handle.OriginGeneration == LLM_AuxGeneration()
+			&& LLM_OllamaOriginCustodyCurrent(Handle.OriginCustody, Handle.Origin)
+	if !Handle.HasOwnProp("Origin")
+		return !LLM_OllamaManagedOriginRequired()
+	if Handle.OriginOwned || LLM_OllamaManagedOriginRequired()
+		return false
+	return true
+}
+
 ; Read a growing JSONL file without asking the UTF-8 decoder to cross a
 ; temporary EOF. A poll only advances through the last complete LF-delimited
 ; record; bytes after it stay on disk and are read again once curl has appended
@@ -813,7 +990,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 ; remainder in bounded slices, accepting one valid short final record without a
 ; newline.
 _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
-	global LLM_OLLAMA_STREAM_MAX_READ_BYTES
+	global LLM_OLLAMA_STREAM_MAX_READ_BYTES, SR_ERROR_FILE_NOT_FOUND
 	ReadLimit := MaxReadBytes
 	if (ReadLimit = 0)
 		ReadLimit := LLM_OLLAMA_STREAM_MAX_READ_BYTES
@@ -823,9 +1000,14 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
 	; previous slice's value before any early return (missing/empty file included)
 	; so it cannot re-arm indefinitely from stale state.
 	State["stream_bytes_pending"] := false
-	Fh := FileOpen(Path, "r")
-	if !IsObject(Fh)
-		return ""
+	try Fh := FileOpen(Path, "r")
+	catch OSError as Err {
+		; curl creates its output after launch. Only file-not-found is pending;
+		; invalid directories, sharing refusals and other I/O failures propagate.
+		if Err.Number == SR_ERROR_FILE_NOT_FOUND
+			return ""
+		throw Err
+	}
 	try {
 		Offset := State["last_pos"]
 		Fh.Pos := Offset
@@ -859,13 +1041,53 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
 				throw Error("Ollama stream record exceeds " . ReadLimit . " bytes.")
 			return ""
 		}
-		Text := StrGet(Raw.Ptr, ConsumeBytes, "UTF-8")
+		; StrGet repairs invalid UTF-8 into U+FFFD. Validate the admitted record
+		; bytes first so repaired text cannot become a successful prediction.
+		if !HTTPIsValidUtf8(Raw, ConsumeBytes)
+			throw Error("Ollama stream output contains invalid UTF-8.")
+		; A raw NUL is valid UTF-8 but invalid JSON. Never hide its suffix.
+		Text := StrGet(Raw.Ptr, -ConsumeBytes, "UTF-8")
+		if RegExMatch(Text, "\x00")
+			throw Error("Ollama stream output contains a raw NUL byte.")
 		State["last_pos"] := Offset + ConsumeBytes
 		State["stream_bytes_pending"] := Available > ConsumeBytes
 		return Text
 	} finally {
 		Fh.Close()
 	}
+}
+
+; curl writes headers before response bytes. Admit only a complete final HTTP
+; response, retaining informational/partial blocks as pending and using the
+; canonical parser and header-size ceiling rather than a second status grammar.
+_LLM_Ollama_ReadStreamHttpStatus(Handle, State) {
+	global HTTP_CURL_MAX_HEADER_BYTES, SR_ERROR_FILE_NOT_FOUND
+	if State.Has("http_status")
+		return State["http_status"]
+	try Raw := FileRead(Handle.TmpHeaders, "RAW m" . (HTTP_CURL_MAX_HEADER_BYTES + 1))
+	catch OSError as Err {
+		if Err.Number == SR_ERROR_FILE_NOT_FOUND
+			return 0
+		throw Err
+	}
+	if Raw.Size > HTTP_CURL_MAX_HEADER_BYTES
+		throw Error("Streaming HTTP headers exceeded the response-header ceiling.")
+	if Raw.Size == 0
+		return 0
+	Headers := StrGet(Raw.Ptr, -Raw.Size, "UTF-8")
+	if RegExMatch(Headers, "\x00")
+		throw Error("Streaming HTTP headers contain a raw NUL byte.")
+	if !RegExMatch(Headers, "(?:`r`n`r`n|`n`n)\z")
+		return 0
+	Status := _HTTP_CurlParseHeaders(Headers)["status"]
+	if Status == 101
+		throw Error("Streaming HTTP upgrade responses are unsupported.")
+	if Status >= 100 && Status < 200
+		return 0
+	if Status < 200 || Status >= 300
+		throw Error("Streaming HTTP response was refused (status=" . Status . ").")
+	State["http_status"] := Status
+	return Status
 }
 
 /**
@@ -876,14 +1098,8 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
  */
 _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	global LLM_OLLAMA_POLL_MS
-	if handle.Cancelled {
-		_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
-		_LLM_Ollama_CleanupStreamFiles(handle)
-		_LLM_Ollama_RemoveStreamHandle(handle)
-		try LoggerInfo("LLM.ollama", "Streaming cancelled (newer prediction).")
-		_LLM_InvokeCallback(on_fail, "on_fail")
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
 		return
-	}
 	if (state.Has("start_tick") and state.Has("timeout_ms") and _LLM_DeadlineExpired(state["start_tick"], state["timeout_ms"])) {
 		_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
 		_LLM_Ollama_CleanupStreamFiles(handle)
@@ -895,13 +1111,25 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	}
 	; Read whatever new bytes appeared.
 	try {
-		chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state)
-		if chunk != ""
-			_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
+		HttpStatus := _LLM_Ollama_ReadStreamHttpStatus(handle, state)
+		if _LLM_Ollama_StopStaleStream(handle, on_fail)
+			return
+		if HttpStatus {
+			chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state)
+			; The filesystem read can pump cancellation before its bytes are admitted.
+			if _LLM_Ollama_StopStaleStream(handle, on_fail)
+				return
+			if chunk != ""
+				_LLM_Ollama_ConsumeStreamChunk(chunk, state,
+					_LLM_Ollama_StreamPartial.Bind(handle, on_partial))
+		}
 	} catch as Err {
 		state["failed"] := true
 		state["stream_error"] := "Stream output read failed: " . Err.Message
 	}
+	; A partial callback may itself retire the stream before this tick resumes.
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
+		return
 	if state.Get("failed", false) {
 		_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
 		try LoggerError("LLM.ollama", "{1}", state.Get("stream_error", "Streaming failed."))
@@ -914,6 +1142,21 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	if !_LLM_CurlProcessExited(handle.ProcessOwner) {
 		SetTimer(() => _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail), -LLM_OLLAMA_POLL_MS)
 		return
+	}
+	; A provider done frame cannot authorize success after a failed transfer.
+	; Capture status before release retires the only exact native query handle.
+	try {
+		ExitCode := _LLM_CurlProcessExitCode(handle.ProcessOwner)
+		if ExitCode != 0 {
+			state["failed"] := true
+			state["stream_error"] := "Streaming curl exited with code " . ExitCode . "."
+		} else if !state.Has("http_status") {
+			state["failed"] := true
+			state["stream_error"] := "Streaming HTTP response ended without a complete final status."
+		}
+	} catch as Err {
+		state["failed"] := true
+		state["stream_error"] := "Streaming process exit receipt failed: " . Err.Message
 	}
 	_LLM_CurlReleaseProcess(handle.ProcessOwner)
 	; Process exited: flush whatever is left on disk before declaring the
@@ -928,22 +1171,42 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 ; if the accumulator is still empty but the stdout file is non-empty (flush
 ; lag), it re-arms itself as a one-shot timer instead of Sleep()ing so the AHK
 ; message pump keeps pumping. Bounded by _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES.
-_LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
+_LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail, ReadFn := 0) {
 	global _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES, _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
+		return
+	if !IsObject(ReadFn)
+		ReadFn := _LLM_Ollama_ReadStreamText
 	try {
-		chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state, true)
-		if chunk != ""
-			_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
+		HttpStatus := _LLM_Ollama_ReadStreamHttpStatus(handle, state)
+		if _LLM_Ollama_StopStaleStream(handle, on_fail)
+			return
+		if !HttpStatus
+			throw Error("Streaming HTTP response ended without a complete final status.")
+		chunk := ReadFn.Call(handle.TmpStdout, state, true)
 	} catch as Err {
 		state["failed"] := true
 		state["stream_error"] := "Final stream output read failed: " . Err.Message
 	}
+	; File I/O can pump cancellation before any returned bytes are admitted.
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
+		return
+	try {
+		if !state.Get("failed", false) && chunk != ""
+			_LLM_Ollama_ConsumeStreamChunk(chunk, state,
+				_LLM_Ollama_StreamPartial.Bind(handle, on_partial))
+	} catch as Err {
+		state["failed"] := true
+		state["stream_error"] := "Final stream output read failed: " . Err.Message
+	}
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
+		return
 	; The process has stopped, but a response can still contain many bounded
 	; JSONL records. Yield between slices instead of collapsing the final tail
 	; into one FileRead-sized allocation on the AHK timer thread.
 	if !state.Get("failed", false) && state.Get("stream_bytes_pending", false) {
 		SetTimer(() => _LLM_Ollama_StreamFinalFlush(handle, state, on_partial,
-			on_success, on_fail), -1)
+			on_success, on_fail, ReadFn), -1)
 		return
 	}
 	retries := state.Has("flush_retries") ? state["flush_retries"] : 0
@@ -957,10 +1220,12 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 		state["failed"] := true
 		state["stream_error"] := "Final stream size check failed: " . Err.Message
 	}
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
+		return
 	if (!state.Get("failed", false) and state["acc"] == "" and more_to_read
 			and retries < _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES) {
 		state["flush_retries"] := retries + 1
-		SetTimer(() => _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail), -_LLM_OLLAMA_STREAM_FLUSH_RETRY_MS)
+		SetTimer(() => _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail, ReadFn), -_LLM_OLLAMA_STREAM_FLUSH_RETRY_MS)
 		return
 	}
 	; Flush any leftover (last JSON line that did not end with \n).
@@ -973,14 +1238,23 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 			and state["leftover"] != "") {
 		_resid := state["leftover"]
 		state["leftover"] := ""
-		_LLM_Ollama_ConsumeStreamChunk(_resid . "`n", state, on_partial)
+		_LLM_Ollama_ConsumeStreamChunk(_resid . "`n", state,
+			_LLM_Ollama_StreamPartial.Bind(handle, on_partial))
 	}
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
+		return
 	Result := _LLM_Ollama_StreamTerminalResult(state)
 	hint := ""
 	if !Result["ok"] and Result["error"] == "Streaming finished with empty response."
 		hint := _LLM_Ollama_StreamFailHint(handle.TmpStdout)
 	_LLM_Ollama_CleanupStreamFiles(handle)
 	_LLM_Ollama_RemoveStreamHandle(handle)
+	if !_LLM_Ollama_StreamOriginCurrent(handle)
+		return
+	if handle.Cancelled {
+		_LLM_InvokeCallback(on_fail, "on_fail")
+		return
+	}
 	if !Result["ok"] {
 		try LoggerWarn("LLM.ollama", "{1}{2}", Result["error"],
 			hint != "" ? " " . hint : "")
@@ -988,7 +1262,40 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 		return
 	}
 	try LLM_OllamaNoteInferenceSuccess()
-	_LLM_InvokeCallback(on_success, "on_success", Result["text"])
+	if handle.Cancelled
+		_LLM_InvokeCallback(on_fail, "on_fail")
+	else if _LLM_Ollama_StreamOriginCurrent(handle)
+		_LLM_InvokeCallback(on_success, "on_success", Result["text"])
+}
+
+
+; Both live reads and final drains can yield to cancellation or origin changes.
+; Retire the exact child before removing artifacts; origin currency alone does
+; not carry an explicit cancellation, and final flush may reuse a released owner.
+_LLM_Ollama_StopStaleStream(handle, on_fail) {
+	if _LLM_Ollama_StreamDeliveryCurrent(handle)
+		return false
+	_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
+	_LLM_Ollama_CleanupStreamFiles(handle)
+	_LLM_Ollama_RemoveStreamHandle(handle)
+	try LoggerInfo("LLM.ollama", "Streaming retired after cancellation or origin withdrawal.")
+	if handle.Cancelled
+		_LLM_InvokeCallback(on_fail, "on_fail")
+	return true
+}
+
+; The JSONL parser can pump messages too. Authorize its one partial handoff at
+; the actual sink, after parsing and after any yielding origin reader.
+_LLM_Ollama_StreamDeliveryCurrent(handle) {
+	OriginCurrent := _LLM_Ollama_StreamOriginCurrent(handle)
+	return OriginCurrent && !handle.Cancelled
+}
+
+_LLM_Ollama_StreamPartial(handle, OnPartial, Text) {
+	if !_LLM_Ollama_StreamDeliveryCurrent(handle)
+		return false
+	_LLM_InvokeCallback(OnPartial, "on_partial", Text)
+	return true
 }
 
 _LLM_Ollama_StreamTerminalResult(state) {
@@ -1030,7 +1337,7 @@ _LLM_Ollama_StreamFailHint(stdout_path) {
 		if (raw == "")
 			return "Stdout empty."
 		if InStr(raw, '"error"')
-			return "Ollama error: " . SubStr(raw, 1, 200)
+			return "Ollama error: " . TextHeadWithinUnits(raw, 200)
 		if InStr(raw, '"thinking"') and !InStr(raw, '"response":"') 
 			return "Model returned thinking-only tokens (enable think:false)."
 		return "Stdout snippet: " . SubStr(raw, 1, 120)
@@ -1067,6 +1374,11 @@ _LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial) {
 	for _, line in lines {
 		if (line == "")
 			continue
+		if state.Get("done", false) {
+			state["failed"] := true
+			state["stream_error"] := "Ollama returned a record after its terminal marker."
+			break
+		}
 		Parsed := _LLM_Ollama_ParseStreamLine(line)
 		if !Parsed["ok"] {
 			state["failed"] := true
@@ -1106,7 +1418,7 @@ LLM_OllamaCancelStream(handle) {
 _LLM_Ollama_CleanupStreamFiles(handle) {
 	if (handle == "" or !IsObject(handle))
 		return
-	LLM_CurlCleanupPaths([handle.TmpPayload, handle.TmpStdout])
+	LLM_CurlCleanupPaths([handle.TmpPayload, handle.TmpStdout, handle.TmpHeaders])
 }
 
 ; Per-call counter so two streams fired in the same millisecond cannot

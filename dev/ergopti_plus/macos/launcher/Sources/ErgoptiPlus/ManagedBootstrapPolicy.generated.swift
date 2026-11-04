@@ -20,4 +20,5 @@ enum ManagedNetworkBootstrapPolicy {
 	static let pacSourceEncodings = ["utf-8","utf-8-bom","utf-16le-bom","utf-16be-bom"]
 	static let pacSourceStrictDecoding = true
 	static let pacSourceForbidsDowngrade = true
+	static let pacUnavailableFallbackStages: Set<String> = ["native_proxy_lookup","native_proxy_budget","native_proxy_candidates","native_pac_download","native_pac_evaluation","native_proxy_routes","native_wpad_discovery","native_route_empty"]
 }

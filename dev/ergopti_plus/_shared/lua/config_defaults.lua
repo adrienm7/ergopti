@@ -5,13 +5,8 @@
 local M = {}
 local PersonalFiles = require("hotstrings.personal_files")
 local KeyPath = require("toml_codec.key_path")
-
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local out = {}
-	for key, child in pairs(value) do out[key] = clone(child) end
-	return out
-end
+local TableUtil = require("table_util")
+local clone = TableUtil.deep_copy
 
 local function equal(left, right)
 	if type(left) ~= type(right) then return false end
@@ -204,10 +199,7 @@ function M.new(manifest)
 			elseif selected then
 				local value = entry.recommended
 				if entry.type == "feature" then
-					local keys = {}
-					for key in pairs(value) do keys[#keys + 1] = key end
-					table.sort(keys)
-					for _, key in ipairs(keys) do emit(entry.path .. "." .. key, value[key]) end
+					for _, key in ipairs(TableUtil.sorted_keys(value)) do emit(entry.path .. "." .. key, value[key]) end
 				else
 					emit(entry.path, value)
 				end
@@ -281,9 +273,7 @@ function M.new(manifest)
 	local function scope_plan(scope_id, mode, owned_paths, owners, direct_only)
 		local operations = scope_operations(scope_id, mode, owned_paths, owners, direct_only)
 		local _, _, _, selected = collect_scope(scope_id, direct_only)
-		local scopes, presets = {}, {}
-		for scope in pairs(selected) do scopes[#scopes + 1] = scope end
-		table.sort(scopes)
+		local scopes, presets = TableUtil.sorted_keys(selected), {}
 		for _, scope in ipairs(scopes) do
 			presets[#presets + 1] = { scope = scope, preset = selected[scope], mode = mode }
 		end

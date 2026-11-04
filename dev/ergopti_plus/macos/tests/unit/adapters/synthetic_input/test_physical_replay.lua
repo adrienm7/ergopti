@@ -123,12 +123,15 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			if metadata and metadata.physical_replay then
 				physical_replay = event
 				replay_seen = replay_seen + 1
-				for _, consumer in ipairs({ "keymap", "keylogger", "shortcuts" }) do
-					local owned, status, replay_fence = provenance.classify_with_fence(event, consumer)
+				for _, consumer in ipairs({ "keymap", "keystats", "shortcuts" }) do
+					local owned, status, replay_fence, is_replay = provenance.classify_with_fence(event, consumer)
 					helpers.assert_nil(owned)
 					helpers.assert_eq(status, provenance.STATUS_FOREIGN)
 					helpers.assert_nil(replay_fence,
 						"a tagged physical replay must not recursively fence itself")
+					-- The key pairing counters already saw the original arrive
+					-- (key-event-pairing): the copy must not count twice.
+					helpers.assert_true(is_replay == true, "a physical replay names itself")
 				end
 			end
 		end
@@ -331,6 +334,39 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			"terminal failure must open the process-wide drain exactly once")
 	end)
 
+	helpers.it("reports a consumed physical key whose replay never posts (keystroke-integrity)", function()
+		-- The original was consumed at the fence: a replay that fails before its
+		-- post is a typed key the user never sees, and must be named as such.
+		local Integrity = require("infra.keystroke_integrity")
+		Integrity.reset()
+		local fixture = make_fixture({ key_post_always_throws = true })
+		local synthetic = fixture.load()
+		synthetic.enter_callback()
+		local tx = synthetic.begin("unit.integrity-paced", "replacement")
+		synthetic.with_transaction(tx, function()
+			synthetic.emit_key_stroke({}, "delete", 0)
+			synthetic.emit_key_strokes("X")
+		end)
+		local owner = synthetic.prepare_collected_paced(tx, 1, 12000, { id = "terminal-app" })
+		helpers.assert_not_nil(owner)
+		helpers.assert_true(synthetic.seal(tx))
+		helpers.assert_true(synthetic.authorize_collected_paced(owner))
+		helpers.assert_true(synthetic.commit_collected_paced(owner))
+		synthetic.leave_callback(true)
+		local fence = synthetic.claim_physical_fence(fixture.external_event(nil, 42))
+		helpers.assert_not_nil(fence)
+		helpers.assert_true(fence.consume_original)
+		helpers.assert_true(Integrity.summary():find("replay_queued=1", 1, true) ~= nil)
+		for _ = 1, 40 do
+			if synthetic.stats().pending == 0 or #fixture.timers == 0 then break end
+			fixture.fire_next_timer()
+		end
+		helpers.assert_eq(synthetic.stats().pending, 0, "the refused replay must settle")
+		helpers.assert_eq(Integrity.drop_count(), 1,
+			"a consumed key whose replay never posted must be reported as swallowed")
+		Integrity.reset()
+	end)
+
 	helpers.it("fences a physical mouse event globally and replays it once to provenance consumers", function()
 		local fixture = make_fixture()
 		local synthetic, provenance = fixture.load()
@@ -357,7 +393,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			local metadata = synthetic.lookup_tag(event:getProperty(USER_DATA))
 			if metadata and metadata.physical_replay then
 				replay_seen = replay_seen + 1
-				for _, consumer in ipairs({ "tooltip.mouse", "keylogger.nonkeyboard" }) do
+				for _, consumer in ipairs({ "tooltip.mouse", "keystats.nonkeyboard" }) do
 					local owned, status, replay_fence = provenance.classify_with_fence(event, consumer)
 					helpers.assert_nil(owned)
 					helpers.assert_eq(status, provenance.STATUS_FOREIGN)

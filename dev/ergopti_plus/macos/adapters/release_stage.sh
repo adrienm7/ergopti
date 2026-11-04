@@ -97,8 +97,10 @@ else
 		*) exit 10 ;;
 	esac
 fi
+# shasum prefixes the digest with a backslash when the name holds one.
 actual=$(/usr/bin/shasum -a 256 "$archive") || exit 20
 actual=${actual%% *}
+actual=${actual#\\}
 [ "$actual" = "$digest" ] || exit 21
 case "$format" in
 	zip)
@@ -126,4 +128,7 @@ case "$requirement" in
 '*) exit 26 ;;
 esac
 /usr/bin/codesign --verify --deep --strict -R "=$requirement" "$app" || exit 27
+# The verified app is the only payload the swap needs. Retire this exact owned
+# archive before a parent-filesystem stage can become a persistent large cache.
+/bin/rm -f -- "$archive" || { echo "The verified release archive could not be retired." >&2; exit 28; }
 printf 'READY %s\n' "$app"

@@ -15,8 +15,10 @@
 ---    evaluateJavaScript("injectModels(…)"), so the page never reads files itself.
 --- 2. Singleton window: a second M.open() while visible brings the window to front
 ---    and refreshes the catalogue instead of stacking duplicates.
---- 3. Thin bridge: only two messages cross the boundary — "select_model" (activate)
----    and "open_url" (open the model's source page) — mirroring the changelog window.
+--- 3. Thin bridge: "select_model" and "open_url" keep their historic callers; the
+---    selector page owner (ui/menu/menu_llm/model_selector_page.lua) also answers
+---    download, delete, custom-model and disable actions through on_action, and
+---    each one runs the tray's own code path.
 --- ==============================================================================
 
 local M = {}
@@ -39,6 +41,7 @@ local _wv        = nil
 local _wv_committed = false
 local _focus_owner = nil
 local _ucc       = nil
+local _releasing_controller = false
 local _ready     = false
 local _queued    = {}
 local _on_select = nil   -- callback(name) invoked when the user picks a model
@@ -48,11 +51,35 @@ local _javascript_failures = {}
 local _session = 0
 local _rejected_session_logged = false
 
+--- Releases a callback only after the native controller acknowledges its unref.
+--- @param controller userdata|table|nil Exact controller to release.
+--- @return boolean released Refusals retain cleanup-only ownership.
+local function release_controller(controller)
+	if _releasing_controller then return false end
+	if controller == nil or _ucc ~= controller then return true end
+	_releasing_controller = true
+	local ok, result = pcall(controller.setCallback, controller, nil)
+	local released = ok and result == controller
+	if released then
+		if _ucc == controller then _ucc = nil end
+	else
+		Logger.error(LOG, "Model browser callback release did not commit; exact controller retained: %s.", tostring(result))
+	end
+	_releasing_controller = false
+	return released
+end
+
 -- The shared UI assets live in …/ergopti_plus/_shared/ui/model_browser/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
 -- preserved because ui_builder concatenates asset filenames directly onto this
 -- directory.
 local ASSETS_DIR = (Paths.shared("ui/model_browser") or "") .. "/"
+
+-- Actions the selector page owner answers through its on_action callback.
+local PAGE_ACTIONS = {
+	select_model = true, download_model = true, delete_model = true, remove_custom_model = true,
+	disable_model = true, add_model = true, add_provider = true, group_action = true, row_action = true,
+}
 
 
 
@@ -70,7 +97,13 @@ local ASSETS_DIR = (Paths.shared("ui/model_browser") or "") .. "/"
 --- @return boolean submitted Whether the native view accepted the script.
 local function submit_javascript(view, code)
 	local failures = _javascript_failures
+	local session, controller, focus_owner = _session, _ucc, _focus_owner
+	local function current()
+		return focus_owner ~= nil and _focus_owner == focus_owner and _wv == view
+			and _ucc == controller and _session == session and _wv_committed == true
+	end
 	local function report(category)
+		if not current() then return end
 		if failures[category] then return end
 		failures[category] = true
 		-- Native errors can echo the catalogue payload; report only fixed metadata
@@ -83,7 +116,7 @@ local function submit_javascript(view, code)
 	end)
 	if not ok then report("submission raised"); return false end
 	if result ~= view then report("submission refused"); return false end
-	return true
+	return current()
 end
 
 --- Queues catalogue scripts until the native page reports readiness.
@@ -111,6 +144,8 @@ end
 --- @param ctx table { presets, active_backend, active_model, models_mgr }.
 --- @return table { backend, active, models = { … } }.
 local function build_catalogue(ctx)
+	-- The selector page owner builds the whole multi-backend payload itself.
+	if type(ctx.build_payload) == "function" then return ctx.build_payload() end
 	local backend = ctx.active_backend or "mlx"
 	return ModelCatalogue.build(ctx.presets, backend, ctx.active_model,
 		function(display_name)
@@ -173,8 +208,9 @@ local function create_ucc()
 		return nil
 	end
 	local controller = controller_or_err
+	_ucc = controller
 	local callback_set, callback_err = xpcall(function()
-		controller:setCallback(function(msg)
+		return controller:setCallback(function(msg)
 			if _ucc ~= controller then return end
 			if type(msg) ~= "table" then return end
 			local body = msg.body
@@ -205,6 +241,20 @@ local function create_ucc()
 				return
 			end
 
+			if PAGE_ACTIONS[body.action] and type(_ctx.on_action) == "function" then
+				local context, session = _ctx, _session
+				Logger.info(LOG, "Model selector action: %s.", body.action)
+				local ok, accepted = Logger.callback(LOG, "Model selector action", context.on_action, body)
+				if _ctx ~= context or _session ~= session or _wv_committed ~= true then return end
+				if ok and accepted == true and (body.action == "select_model" or body.action == "disable_model") then
+					M.close()
+				elseif (ok and accepted == true) or body.action == "group_action" then
+					-- A refused tool too: the page already drew its click as running,
+					-- and only a new payload brings the outcome and its reason back.
+					inject_catalogue(context)
+				end
+				return
+			end
 			if body.action == "select_model" and type(body.name) == "string" and body.name ~= "" then
 				if _selection_owner ~= nil then return end
 				local selection = { context = _ctx, callback = _on_select, session = _session }
@@ -231,7 +281,8 @@ local function create_ucc()
 			end
 		end)
 	end, debug.traceback)
-	if not callback_set then
+	if not callback_set or callback_err ~= controller then
+		release_controller(controller)
 		Logger.error(LOG, "Failed to bind the model browser bridge: %s.",
 			tostring(callback_err))
 		return nil
@@ -258,6 +309,8 @@ function M.open(ctx)
 		Logger.error(LOG, "M.open() requires a context table.")
 		return false
 	end
+	if _releasing_controller then return false end
+	if not _wv and not release_controller(_ucc) then return false end
 	_session = _session + 1
 	_rejected_session_logged = false
 	local session = _session
@@ -294,7 +347,7 @@ function M.open(ctx)
 
 	local geo = ui_builder.get_app_geometry("model_browser")
 	if not geo then
-		if _ucc == usercontent then _ucc = nil end
+		release_controller(usercontent)
 		return false
 	end
 	local candidate = nil
@@ -310,6 +363,7 @@ function M.open(ctx)
 	end
 	local show_ok, webview_or_err = xpcall(function()
 		return ui_builder.show_webview({
+			delete_on_close = true,
 			frame             = ui_builder.get_centered_frame(geo.width, geo.height),
 			title             = i18n.get("model_browser.window_title"),
 			style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
@@ -318,7 +372,7 @@ function M.open(ctx)
 			html_string       = final_html,
 			on_navigation     = function(action)
 				if action == "didFinishNavigation" then
-					DeferredWork.after(0.15, function()
+					DeferredWork.after(require("infra.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
 						if not candidate_is_active() then return end
 						local navigation_session = _session
 						if not _ready then flush_queue() end
@@ -333,7 +387,7 @@ function M.open(ctx)
 				if _wv ~= candidate then return end
 				_wv = nil
 				_wv_committed = false
-				if _ucc == usercontent then _ucc = nil end
+				release_controller(usercontent)
 				_ready = false
 				_queued = {}
 				_selection_owner = nil
@@ -355,14 +409,14 @@ function M.open(ctx)
 		if candidate ~= nil and _wv == candidate and M.close() ~= true then
 			Logger.error(LOG, "Model browser construction rollback remains pending.")
 		end
-		if (candidate == nil or _wv ~= candidate) and _ucc == usercontent then _ucc = nil end
+		if candidate == nil or _wv ~= candidate then release_controller(usercontent) end
 		Logger.error(LOG, "Model browser WebView creation failed.")
 		return false
 	end
 	_wv_committed = true
 
 	-- Safety: flush after 1.5 s if the ready handshake never arrives.
-	DeferredWork.after(1.5, function()
+	DeferredWork.after(require("infra.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
 		if not candidate_is_active() or _ready then return end
 		local fallback_session = _session
 		flush_queue()
@@ -373,9 +427,14 @@ function M.open(ctx)
 	return true
 end
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _wv end
+
 --- Closes the model browser window if open.
 function M.close()
-	if not _wv then return true end
+	if _releasing_controller then return false end
+	if not _wv then return release_controller(_ucc) end
 	_focus_owner = nil
 	local owned = _wv
 	local owned_ucc = _ucc
@@ -401,9 +460,51 @@ function M.close()
 		_queued = {}
 		_selection_owner = nil
 	end
-	if _ucc == owned_ucc then _ucc = nil end
+	local controller_settled = release_controller(owned_ucc)
 	Logger.info(LOG, "Model browser closed.")
+	return controller_settled
+end
+
+--- Re-sends the payload to the open page, after a runtime or model change.
+--- @return boolean refreshed False when no page is open.
+function M.refresh()
+	if not _wv or _wv_committed ~= true or not _ctx then return false end
+	inject_catalogue(_ctx)
 	return true
+end
+
+--- Shows one row's download percentage on the open page.
+--- @param update table { backend, name, percent }.
+--- @return boolean sent False when no page is open.
+function M.inject_progress(update)
+	if not _wv or _wv_committed ~= true or type(update) ~= "table" then return false end
+	local ok, json = pcall(hs.json.encode, { backend = update.backend, name = update.name, percent = update.percent })
+	if not ok or not json then
+		Logger.warn(LOG, "Failed to encode a download percentage as JSON.")
+		return false
+	end
+	eval("injectProgress(" .. json .. ")")
+	return true
+end
+
+--- Shows a local backend's runtime install percentage in its group header.
+--- @param update table { backend, percent }.
+--- @return boolean sent False when no page is open.
+function M.inject_install_progress(update)
+	if not _wv or _wv_committed ~= true or type(update) ~= "table" then return false end
+	local ok, json = pcall(hs.json.encode, { backend = update.backend, percent = update.percent })
+	if not ok or not json then
+		Logger.warn(LOG, "Failed to encode a runtime install percentage as JSON.")
+		return false
+	end
+	eval("injectInstallProgress(" .. json .. ")")
+	return true
+end
+
+--- Whether the page is open.
+--- @return boolean
+function M.is_open()
+	return _wv ~= nil and _wv_committed == true
 end
 
 -- Exposed for unit tests only — pure catalogue-normalisation helpers with no

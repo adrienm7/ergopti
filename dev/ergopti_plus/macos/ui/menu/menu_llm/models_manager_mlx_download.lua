@@ -32,10 +32,28 @@ local text_utils    = require("infra.text_utils")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
+local Json = require("json")
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
-local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", ""):gsub("\\", "/")
-local _native_network_directory = _module_source:match("^(.*)/ui/menu/menu_llm/[^/]+$")
+local NativePath = require("native_path")
+-- A backslash is a filename byte on macOS: only the host's separators split it.
+local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
+local _source_sep = "[" .. NativePath.separators() .. "]"
+local _native_network_directory = _module_source:match("^(.*)" .. _source_sep .. "ui" .. _source_sep
+	.. "menu" .. _source_sep .. "menu_llm" .. _source_sep .. "[^" .. NativePath.separators() .. "]+$")
 _native_network_directory = _native_network_directory and (_native_network_directory .. "/platform/network")
+
+--- Quotes the Python import directory without a table-only native JSON encoder.
+--- Invalid UTF-8 and quotation failures refuse before any helper is published.
+--- @return string|nil literal
+local function quote_native_network_directory()
+	if type(_native_network_directory) ~= "string" or _native_network_directory == "" then return nil end
+	local ok, literal = pcall(function()
+		if utf8.len(_native_network_directory) == nil then return nil end
+		return Json.quote(_native_network_directory)
+	end)
+	if ok ~= true or type(literal) ~= "string" or literal == "" then return nil end
+	return literal
+end
 
 -- Optional download-progress webview; absent in headless/unusual layouts.
 local ok_dw, download_window = pcall(require, "ui.download_window")
@@ -1122,9 +1140,13 @@ function M.install(ctx)
 
 			local clean_repo = repo:gsub("[%c%s]", "")
 			local network_prelude, network_err = NetworkEnv.managed_http_prelude("MLX")
-			local native_directory_literal = _native_network_directory and JsonCodec.encode(_native_network_directory)
+			-- A proxy override routes the download through the environment-driven
+			-- client (huggingface_hub reads the exported relay), not the native worker.
+			local managed_transport, transport_err = NetworkEnv.uses_managed_transport()
+			if managed_transport == nil then network_prelude, network_err = nil, transport_err end
+			local native_directory_literal = quote_native_network_directory()
 			if not network_prelude or type(native_directory_literal) ~= "string" then
-				Logger.error(LOG, "The MLX model download cannot start: %s.", tostring(network_err))
+				Logger.error(LOG, "The MLX model download cannot start: %s.", tostring(network_err or "MLX native network directory quotation refused"))
 				do_cancel(true, "network_policy_missing")
 				return false
 			end
@@ -1156,9 +1178,11 @@ function M.install(ctx)
 			py:write("atexit.register(_write_exit, 1)\n")
 			py:write("try:\n")
 			py:write("    import truststore; truststore.inject_into_ssl()\n")
-			py:write("    sys.path.insert(0, " .. native_directory_literal .. ")\n")
-			py:write("    from managed_http import install_huggingface_transport\n")
-			py:write("    install_huggingface_transport()\n")
+			if managed_transport then
+				py:write("    sys.path.insert(0, " .. native_directory_literal .. ")\n")
+				py:write("    from managed_http import install_huggingface_transport\n")
+				py:write("    install_huggingface_transport()\n")
+			end
 			py:write("    from huggingface_hub import snapshot_download\n")
 			py:write("except Exception:\n")
 			py:write("    print('--- ERREUR DEPENDANCES ---', flush=True)\n")
@@ -1829,7 +1853,28 @@ function M.install(ctx)
 				if encode_ok ~= true or type(encoded) ~= "string" then return false end
 				return publish_owned_file(session_file, encoded, "MLX download session PID")
 			end
-			local function finish_launcher(code, _stdout, stderr)
+			--- Adopts the download PID a launcher output names, once.
+			--- @param out string Launcher output.
+			--- @return boolean|nil adopted True when adopted, nil when absent or already
+			---   known, false when the operation was cancelled by its persistence.
+			local function adopt_launcher_pid(out)
+				if owner.partial.pid then return nil end
+				local pid_str = tostring(out or ""):match("__DLPID__:(%d+)")
+				if not pid_str then return nil end
+				owner.partial.pid = tonumber(pid_str)
+				if persist_owned_pid() ~= true then
+					if operation_closed or owner.revoked then
+						schedule_pid_cleanup()
+					else
+						do_cancel(true, "session_pid_write_failed")
+					end
+					return false
+				end
+				if not current_or_cancel() then return false end
+				return true
+			end
+
+			local function finish_launcher(code, stdout, stderr)
 				if owner.tasks.launcher ~= launcher_task then return false end
 				owner.tasks.launcher = nil
 				if deps.active_tasks and deps.active_tasks["download"] == launcher_task then
@@ -1855,9 +1900,28 @@ function M.install(ctx)
 					end
 				end
 				if not current_or_cancel() then return false end
-				-- stdout/stderr are empty when a streaming callback is active — the
-				-- owner PID was already set by the __DLPID__ stream sentinel.
+				-- stdout/stderr are empty when a streaming callback delivered every
+				-- chunk, and the owner PID was set by the __DLPID__ stream sentinel. A
+				-- launcher that exits at once can leave its last chunk, PID line
+				-- included, to the termination callback alone (field runs of
+				-- 2026-10-27 21:08 and 2026-10-28 12:05: exit 0, sentinel only in the
+				-- final output): that line is the same evidence, so it is adopted.
+				if code == 0 and not owner.partial.pid then
+					local final_output = tostring(stdout or "") .. tostring(stderr or "")
+					local adopted = adopt_launcher_pid(final_output)
+					if adopted == false then return false end
+					if adopted == true then
+						Logger.info(LOG, "MLX download PID arrived with the launcher's final output; adopted.")
+					end
+				end
 				if not owner.partial.pid or code ~= 0 then
+					-- The 2026-10-27 21:08 field run showed only "the launcher failed (code 0)"
+					-- in a notification: name the exit and whether the PID line arrived only in
+					-- the final output, after the stream had stopped, so the next report says why.
+					local final_output = tostring(stdout or "") .. tostring(stderr or "")
+					Logger.error(LOG, "MLX download launcher failed (exit=%s, pid=%s, sentinel in final output=%s).",
+						tostring(code), owner.partial.pid and "received" or "missing",
+						final_output:find("__DLPID__:%d+") and "yes" or "no")
 					-- Reset icon here: handle_download_done will not run after a launcher failure
 					update_icon("MLX launcher-failure icon reset")
 					if not current_or_cancel() then return false end
@@ -1910,21 +1974,7 @@ function M.install(ctx)
 							local out = (stdout or "") .. (stderr or "")
 							-- Resource discovery remains live after logical revocation: a queued PID
 							-- sentinel is cleanup evidence, never publication authority.
-							if not owner.partial.pid then
-								local pid_str = out:match("__DLPID__:(%d+)")
-								if pid_str then
-									owner.partial.pid = tonumber(pid_str)
-									if persist_owned_pid() ~= true then
-										if operation_closed or owner.revoked then
-											schedule_pid_cleanup()
-										else
-											do_cancel(true, "session_pid_write_failed")
-										end
-										return false
-									end
-									if not current_or_cancel() then return false end
-								end
-							end
+							if adopt_launcher_pid(out) == false then return false end
 							-- Strip the sentinel line before forwarding to the download window log
 							local clean = out:gsub("__DLPID__:%d+\n?", "")
 							if launcher_starting then

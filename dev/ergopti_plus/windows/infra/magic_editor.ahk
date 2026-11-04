@@ -8,6 +8,9 @@
 ; remap, ordinary assignment and legacy shortcut owners behind that one variant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\ai_action_gate.ahk
+
 
 
 
@@ -117,7 +120,7 @@ MagicEditorRecordOrdinaryHandle(Slot, Handle) {
 	State := MagicEditorState()
 	if State["initialized"]
 		throw Error("Ordinary keyboard registration cannot mutate an initialized Win broker.")
-	if SubStr(Slot, 1, 4) == "win_" && Handle != ""
+	if SubStr(Slot, 1, 5) == "meta_" && Handle != ""
 		State["ordinary_handles"][Slot] := Handle
 }
 
@@ -165,13 +168,13 @@ MagicEditorNormalizeScan(Scan, Keycodes := unset) {
 
 /**
  * Joins a previously supported explicit SC slot without a competing native owner.
- * @param {String} Slot Existing ordinary win_scNNN identity.
+ * @param {String} Slot Existing ordinary meta_scNNN identity.
  * @param {String} Action Validated ordinary action, without inventing assignments.
  * @param {Map} Keycodes Actual physical catalogue, optional fixture root seam.
  * @returns {Boolean} Whether this exact existing slot is physical.
  */
 MagicEditorRecordOrdinaryPhysical(Slot, Action, Keycodes := unset) {
-	if !RegExMatch(Slot, "i)^win_(SC[0-9a-f]{3})$", &Match)
+	if !RegExMatch(Slot, "i)^meta_(SC[0-9a-f]{3})$", &Match)
 		return false
 	State := MagicEditorState(), Scan := MagicEditorNormalizeScan(Match[1]), Known := false
 	Catalogue := IsSet(Keycodes) ? Keycodes : MagicEditorPhysicalCatalogue()
@@ -185,6 +188,26 @@ MagicEditorRecordOrdinaryPhysical(Slot, Action, Keycodes := unset) {
 		throw ValueError("An existing physical Win assignment must name an actual unacquired key.")
 	State["ordinary_physical"][Scan] := Map("slot", Slot, "action", Action)
 	return true
+}
+
+/**
+ * Joins an ordinary Win slot whose letter lives on a key the layout owner decides,
+ * so the slot shares that key's one Win variant with its remap.
+ * @param {String} Scan Canonical physical scan.
+ * @param {String} Slot The ordinary slot.
+ * @param {String} Action Its validated action.
+ * @param {Map} Keycodes Actual physical catalogue, optional fixture root seam.
+ */
+MagicEditorRecordOrdinaryScan(Scan, Slot, Action, Keycodes := unset) {
+	State := MagicEditorState()
+	if State["initialized"]
+		throw Error("An ordinary Win slot requires an unstarted broker.")
+	Canonical := MagicEditorNormalizeScan(Scan, IsSet(Keycodes) ? Keycodes : MagicEditorPhysicalCatalogue())
+	; Two slots can name one key (Win+4 and Win+' on AZERTY); only one can answer.
+	if State["ordinary_physical"].Has(Canonical)
+		LoggerWarn("MagicEditor", "Win slot '{1}' replaces '{2}' on the key {3}: both name the same key.",
+			Slot, State["ordinary_physical"][Canonical]["slot"], Canonical)
+	State["ordinary_physical"][Canonical] := Map("slot", Slot, "action", Action)
 }
 
 /** Retains an effective legacy feature's Win callback without a parallel variant. */
@@ -217,15 +240,21 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 	TapId := TapHoldResolveKeyIdFromVkSc(0, Numeric)
 	if TapId != "" && TapHoldIsActive(TapHold, TapId)
 		return { Count: 0, Text: "" }
-	if Features["hotstrings"]["magic_key"]["replace"]["enabled"]
+	if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
 			&& StrUpper(Scan) == StrUpper(ScriptInformation["MagicKeySourceScan"])
 		return { Count: StrLen(ScriptInformation["MagicKey"]), Text: ScriptInformation["MagicKey"] }
+	; « Also reorder the three edge keys » types the other level.
+	Edge := NumberRowEdgeText(Numeric, false, NumberRowForegroundLayout(), false)
+	if Edge != ""
+		return { Count: StrLen(Edge), Text: Edge }
 	if NumberRowEffectiveMode() == "digits" {
 		if Numeric >= 0x02 && Numeric <= 0x0B
 			return { Count: 1, Text: Numeric == 0x0B ? "0" : String(Numeric - 1) }
-		Edges := ErgoptiNumberRowEdgeMapping()
-		if Edges.Has(Numeric)
-			return { Count: StrLen(Edges[Numeric]), Text: Edges[Numeric] }
+	} else if !KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) {
+		; « Symbols first » on the native or built-in row (NumberRowSymbolsFirstText).
+		Swapped := NumberRowSymbolsFirstText(Numeric, false, NumberRowForegroundLayout(), false)
+		if Swapped != ""
+			return { Count: StrLen(Swapped), Text: Swapped }
 	}
 	if _KLE_BaseCriterion(Scan, false) && KLE_KeyCodes.Has(Scan) {
 		Shift := false
@@ -239,7 +268,11 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 		return { Count: Step["Next"] != "" && Step["Next"] != KEYLAYOUT_NEUTRAL_STATE ? -1 : StrLen(Step["Output"]),
 			Text: Step["Output"] }
 	}
-	if Features["layout"]["ergopti_base"] {
+	if Features["layout"][ConfigLeaf.ERGOPTI_BASE] && LayoutRowIsEmulated(Scan) {
+		; The built-in emulation types its own number row (RegisterBuiltinNumberRow).
+		Row := NumberRowEmulatedBase(StrUpper(Scan))
+		if Row != ""
+			return { Count: StrLen(Row), Text: Row }
 		if ErgoptiBaseDeadKeys().Has(Scan)
 			return { Count: -1, Text: ErgoptiBaseDeadKeys()[Scan]["chain"] }
 		Base := ErgoptiBaseMapping()
@@ -257,7 +290,7 @@ _MagicEditorCurrentSource(Generation, Keycodes, Hkl) {
 	global Features, ScriptInformation
 	Source := MagicEditorProbeSource(Hkl, ScriptInformation["MagicKey"], Generation, Keycodes,
 		0, _MagicEditorEffectivePlain)
-	if ScriptInformation["MagicKeySourceChosen"] && Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
+	if ScriptInformation["MagicKeySourceChosen"] && Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
 		Chosen := StrUpper(ScriptInformation["MagicKeySourceScan"])
 		Owned := []
 		for Candidate in Source["candidates"] {
@@ -272,15 +305,15 @@ _MagicEditorCurrentSource(Generation, Keycodes, Hkl) {
 /** Resolves only present ordinary Win settings against one exact native source. */
 _MagicEditorExplicitClaim(Source, Hkl) {
 	global _IniCache, KeyboardShortcutAssignments
-	if !(Source is Map) || !IsSet(_IniCache) || !_IniCache.Has("shortcuts.keyboard")
+	if !(Source is Map) || !IsSet(_IniCache) || !_IniCache.Has(ConfigKey.SHORTCUTS_KEYBOARD)
 		return 0
 	Resolver := HotkeyRegistrarNativeKeyResolverSnapshot(Map("get_layout", (*) => Hkl))
 	if !HasMethod(Resolver, "Call")
 		throw Error("The ordinary Win source identity could not be resolved.")
 	SourceVk := KS_ScancodeToVk(Source["native_code"], Hkl)
 	Selected := 0, Slots := []
-	for Slot in _IniCache["shortcuts.keyboard"] {
-		if SubStr(Slot, 1, 4) != "win_" || !KeyboardShortcutAssignments.Has(Slot)
+	for Slot in _IniCache[ConfigKey.SHORTCUTS_KEYBOARD] {
+		if SubStr(Slot, 1, 5) != "meta_" || !KeyboardShortcutAssignments.Has(Slot)
 			continue
 		Chord := ChordParse(_KeyboardSlotChord(Slot))
 		if !Chord["ok"]
@@ -307,9 +340,9 @@ _MagicEditorSourceSignature() {
 	Layout := Features["layout"]
 	return ScriptInformation["MagicKey"] . "|" . ScriptInformation["MagicKeySourceScan"]
 		. "|" . ScriptInformation["MagicKeySourceChosen"] . "|" . ScriptInformation["MagicKeySourceOverridesEmulation"]
-		. "|" . Features["hotstrings"]["magic_key"]["replace"]["enabled"]
-		. "|" . Layout["ergopti_base"] . "|" . Layout["direct_access_digits"]
-		. "|" . Layout["emulated_layout"] . "|" . KLE_Id
+		. "|" . Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
+		. "|" . Layout[ConfigLeaf.ERGOPTI_BASE] . "|" . Layout[ConfigLeaf.DIRECT_ACCESS_DIGITS]
+		. "|" . Layout[ConfigLeaf.EMULATED_LAYOUT] . "|" . KLE_Id
 }
 
 /** Rejects source changes and an actual tap-hold owner before stale delivery. */
@@ -329,25 +362,43 @@ _MagicEditorSourceIsCurrent() {
 
 /** Returns live delivery gates with the exact source and configuration epochs. */
 _MagicEditorDeliveryState() {
-	global KeyboardShortcutAssignments
 	State := MagicEditorState()
 	Admission := _MagicEditorAdmission()
 	Admission["source_generation"] := _MagicEditorSourceIsCurrent() ? State["source_generation"] : -1
 	Admission["configuration_generation"] := State["configuration_generation"]
-	Admission["action"] := KeyboardShortcutAssignments.Get(MagicEditorSlot()["id"], "none")
+	Admission["action"] := _MagicEditorArmedAction(MagicEditorSlot()["id"])
 	return Admission
+}
+
+/** Returns a slot's action as armed now: an AI action is not while the AI is off. */
+_MagicEditorArmedAction(Slot) {
+	global KeyboardShortcutAssignments
+	Action := KeyboardShortcutAssignments.Get(Slot, "none")
+	return AiActionBlocked(Action) ? "none" : Action
+}
+
+/** Whether the broker took this ordinary slot, whose native hotkey it keeps disabled. */
+MagicEditorOwnsOrdinarySlot(Slot) {
+	State := MagicEditorState()
+	Claim := State["ordinary_claim"]
+	if !State["initialized"] || !(Claim is Map)
+		return false
+	for Taken in Claim["slots"] {
+		if Taken == Slot
+			return true
+	}
+	return false
 }
 
 /** Selects the live callback owner without running it from a native criterion. */
 _MagicEditorBrokerWinner(Scan) {
-	global KeyboardShortcutAssignments
 	State := MagicEditorState()
 	if !State["initialized"] || A_IsSuspended
 		return 0
 	Admission := _MagicEditorAdmission()
 	if Admission["master"] && !Admission["inhibited"] && State["ordinary_physical"].Has(Scan) {
 		Physical := State["ordinary_physical"][Scan]
-		if KeyboardShortcutAssignments.Get(Physical["slot"], "none") != "none"
+		if _MagicEditorArmedAction(Physical["slot"]) != "none"
 			return Map("kind", "ordinary", "slot", Physical["slot"])
 	}
 	Decision := State["decision"]
@@ -356,7 +407,7 @@ _MagicEditorBrokerWinner(Scan) {
 	if Scan == SourceScan && Admission["master"] && !Admission["inhibited"]
 			&& _MagicEditorSourceIsCurrent() {
 		Claim := State["ordinary_claim"]
-		if (Claim is Map) && KeyboardShortcutAssignments.Get(Claim["slot"], "none") != "none"
+		if (Claim is Map) && _MagicEditorArmedAction(Claim["slot"]) != "none"
 			return Map("kind", "ordinary", "slot", Claim["slot"])
 	}
 	if Admission["master"] && !Admission["inhibited"] && State["legacy"].Has(Scan)
@@ -587,7 +638,7 @@ MagicEditorSlotRows() {
 	global KeyboardShortcutAssignments, GESTURE_ACTIONS
 	Slot := MagicEditorSlot()
 	Action := KeyboardShortcutAssignments.Get(Slot["id"], ManifestDefaultFor(Slot["path"]))
-	Label := MagicEditorSlotLabel() . " : " . (GESTURE_ACTIONS.Has(Action)
+	Label := LabelValue(MagicEditorSlotLabel(), GESTURE_ACTIONS.Has(Action)
 		? GestureActionDisplayLabel(Action, Slot["binding_id"]) : t("dialog.action_picker.disabled"))
 	Decision := MagicEditorState()["decision"]
 	if (Decision is Map) && Decision["reason"] != ""

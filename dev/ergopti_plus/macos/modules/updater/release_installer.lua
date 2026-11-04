@@ -30,19 +30,23 @@
 
 local M = {}
 
+local Identifiers = require("identifiers")
 local Logger      = require("infra.logger")
 local Paths       = require("infra.paths")
+local NativePath  = require("native_path")
 local FileSystem  = require("adapters.file_system")
 local JsonCodec   = require("adapters.json_codec")
 local ShellRunner = require("adapters.shell_runner")
 local Archives    = require("updater.release_assets")
 
 local LOG = "updater.release_installer"
+local ARMING_RECEIPT = "ARMED"
+local RENAME_FLAG = "--release-rename"
 
 -- The executable inside the app bundle the launcher runs from.
 local EXECUTABLE_SUFFIX = "/Contents/MacOS/ErgoptiPlus"
 -- The app folder name inside the release archive.
-local APP_NAME = "ErgoptiPlus.app"
+local APP_NAME = Identifiers.app.bundle
 
 -- Test seams.
 M._run = function(...) return ShellRunner.run(...) end
@@ -73,6 +77,22 @@ assert(type(M.STAGE_SCRIPT) == "string" and M.STAGE_SCRIPT ~= "", "The native re
 M.SWAP_SCRIPT = table.concat({
 	"set -u",
 	'pid=$1; app=$2; staged=$3; previous=$4',
+	'# Stage/destination filesystem admission begins',
+	'parent=${app%/*}; [ -n "$parent" ] || parent=/',
+	'[ -d "$staged" ] && [ ! -L "$staged" ] || { echo "The verified app is not an owned directory."; exit 1; }',
+	"staged_device=$(/usr/bin/stat -f '%d' \"$staged\") || exit 1",
+	"parent_device=$(/usr/bin/stat -L -f '%d' \"$parent\") || exit 1",
+	'for device in "$staged_device" "$parent_device"; do',
+	'	case "$device" in ""|*[!0-9]*) echo "The replacement filesystem identity is invalid."; exit 1 ;; esac',
+	'done',
+	'[ "$staged_device" = "$parent_device" ] || { echo "The verified app is not on the installation filesystem: nothing was replaced."; exit 1; }',
+	'# Stage/destination filesystem admission ends',
+	'rename_flag=' .. RENAME_FLAG,
+	'launcher="$app' .. EXECUTABLE_SUFFIX .. '"',
+	'receipt=$("$launcher" "$rename_flag" probe && printf .) || { echo "The native release rename role is unavailable."; exit 1; }',
+	"[ \"$receipt\" = \"$(printf '%s\\n.' \"$rename_flag\")\" ] || { echo \"The native release rename receipt is invalid.\"; exit 1; }",
+	"printf '" .. ARMING_RECEIPT .. "\\n' >&3 || exit 1",
+	"exec 3>&- || exit 1",
 	"waited=0",
 	'while /bin/kill -0 "$pid" 2>/dev/null; do',
 	'	waited=$((waited + 1))',
@@ -80,20 +100,49 @@ M.SWAP_SCRIPT = table.concat({
 	"	/bin/sleep 0.1",
 	"done",
 	'/bin/rm -rf -- "$previous" || { echo "The previous backup app could not be removed."; /usr/bin/open -- "$app"; exit 4; }',
-	'/bin/mv -- "$app" "$previous" || { echo "The installed app could not be moved aside."; /usr/bin/open -- "$app"; exit 5; }',
-	'if /bin/mv -- "$staged" "$app"; then',
+	'"$launcher" "$rename_flag" move "$app" "$previous" || { echo "The installed app could not be moved aside."; /usr/bin/open -- "$app"; exit 5; }',
+	'launcher="$previous' .. EXECUTABLE_SUFFIX .. '"',
+	'# Occupied destinations are retained rather than overwritten or nested into',
+	'replacement_path_clear() {',
+	'	if [ -e "$app" ] || [ -L "$app" ]; then',
+	'		echo "The replacement path is occupied: the previous app remains at $previous."',
+	'		return 1',
+	'	fi',
+	'	return 0',
+	'}',
+	'# Occupied destination admission ends',
+	'replacement_path_clear || exit 8',
+	'if "$launcher" "$rename_flag" move "$staged" "$app"; then',
 	'	echo "Installed."',
-	'	/usr/bin/open -- "$app"',
+	'	/usr/bin/open -- "$app" || { echo "The installed app could not be opened."; exit 7; }',
 	"	exit 0",
 	"fi",
-	'/bin/mv -- "$previous" "$app"',
+	'replacement_path_clear || exit 8',
+	'if ! "$launcher" "$rename_flag" move "$previous" "$app"; then',
+	'	echo "The previous app could not be restored: it remains at $previous."',
+	"	exit 8",
+	"fi",
 	'echo "The verified app could not be moved in: the previous one is back."',
 	'/usr/bin/open -- "$app"',
 	"exit 6",
 }, "\n")
 
 -- Starts the swap script detached from this process, with its output in a log.
-local DETACH_SCRIPT = 'nohup /bin/sh -c "$1" swap "$2" "$3" "$4" "$5" >>"$6" 2>&1 </dev/null &'
+local DETACH_SCRIPT = table.concat({
+	"set -u",
+	"{",
+	"\texec 3>&1",
+	'\texec >>"$6" 2>&1 || exit 1',
+	'\t/usr/bin/nohup "$3' .. EXECUTABLE_SUFFIX .. '" ' .. RENAME_FLAG .. ' lock "$3" "$1" "$2" "$4" "$5" </dev/null &',
+	"} | {",
+	"\tIFS= read -r receipt || exit 1",
+	'\t[ "$receipt" = ' .. ARMING_RECEIPT .. ' ] || exit 1',
+	"\textra=",
+	"\tif IFS= read -r extra; then exit 1; fi",
+	'\t[ -z "$extra" ] || exit 1',
+	"\tprintf '" .. ARMING_RECEIPT .. "\\n'",
+	"}",
+}, "\n")
 
 
 
@@ -171,8 +220,8 @@ end
 --- @return boolean dispatched
 function M.stage(asset, done)
 	local app = M.app_bundle()
-	local tmp = M._getenv("TMPDIR")
-	if not app or type(tmp) ~= "string" or tmp:sub(1, 1) ~= "/" then
+	local parent = app and NativePath.dirname(app)
+	if not app or type(parent) ~= "string" then
 		Logger.error(LOG, "Cannot stage %s: this is not a packaged ErgoptiPlus.", tostring(asset and asset.tag))
 		return false
 	end
@@ -180,7 +229,9 @@ function M.stage(asset, done)
 		Logger.error(LOG, "Cannot stage a release without its declared native archive format.")
 		return false
 	end
-	local stage_dir = (tmp:gsub("/+$", "")) .. "/ergopti-release-install-" .. os.date("!%Y%m%d-%H%M%S")
+	-- Publication must remain a rename: a failed cross-device mv can leave a
+	-- partial destination that makes rollback nest the original app inside it.
+	local stage_dir = (parent:gsub("/+$", "")) .. "/.ergopti-release-install-" .. os.date("!%Y%m%d-%H%M%S")
 	-- Keep JSON release data out of shell source and bind the native request to
 	-- this exact stage, using the existing per-child environment override.
 	local request, request_err = JsonCodec.encode({ version = 1, url = asset.url, sha256 = asset.digest,
@@ -189,6 +240,8 @@ function M.stage(asset, done)
 		Logger.error(LOG, "Cannot encode the chosen release download request.")
 		return false
 	end
+	-- The stage script downloads with the system curl, checked at this use.
+	if not require("adapters.system_curl").check("the release download") then return false end
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
 		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)
@@ -202,31 +255,59 @@ function M.stage(asset, done)
 		local code = tonumber(exit_code)
 		local stage = (code and code >= M.EXIT_VERIFY_FIRST) and "verify" or "download"
 		local detail = string.format("exit %s: %s", tostring(exit_code), (tostring(stderr or ""):gsub("%s+$", "")))
-		Logger.error(LOG, "Release %s refused at the %s (%s).", asset.tag, stage, detail)
+		Logger.error(LOG, "Release %s refused at the %s; stage path: %s (%s).", asset.tag, stage, stage_dir, detail)
 		done(nil, stage, detail)
 	end, nil, { ERGOPTI_RELEASE_STAGE_REQUEST = request })
 	return type(handle) == "table" and handle.start() == true
 end
 
---- Arms the replacement of the installed app by the verified one, to run once
---- the launcher quits.
+--- Asynchronously arms replacement after the launcher quits. Dispatch alone is
+--- never the detached worker's acknowledgement: only its exact receipt completes.
 --- @param staged_app string Verified app path from M.stage().
---- @return boolean armed
+--- @param done function fn(armed, detail) after an admitted arming request settles.
+--- @return boolean admitted
 --- @return string|nil error
-function M.arm_swap(staged_app)
+function M.arm_swap(staged_app, done)
+	if type(done) ~= "function" then return false, "an asynchronous arming observer is required" end
 	local app, pid = M.app_bundle(), M.launcher_pid()
 	if not app or not pid then return false, "not a packaged launch" end
 	if type(staged_app) ~= "string" or not staged_app:match("/" .. APP_NAME:gsub("%.", "%%.") .. "$") then
 		return false, "no verified app"
 	end
 	local log = staged_app:gsub("/app/" .. APP_NAME:gsub("%.", "%%.") .. "$", "") .. "/swap.log"
-	local started = M._run("/bin/sh", { "-c", DETACH_SCRIPT, "detach", M.SWAP_SCRIPT, pid, app, staged_app,
-		app .. ".previous", log }, function(ok, _, stderr)
-		if not ok then Logger.error(LOG, "The app replacement could not be armed: %s.", tostring(stderr)) end
-	end)
-	if started ~= true then return false, "the replacement could not start" end
-	Logger.info(LOG, "App replacement armed: %s replaces %s once ErgoptiPlus quits (log: %s).",
-		staged_app, app, log)
+	local constructing, admitted, settled, early = true, false, false, nil
+	local function completed(ok, stdout, stderr)
+		if settled then return end
+		if constructing then
+			if early == nil then early = table.pack(ok, stdout, stderr) end
+			return
+		end
+		if not admitted then return end
+		settled = true
+		if ok == true and stdout == ARMING_RECEIPT then
+			Logger.success(LOG, "App replacement armed: %s replaces %s once ErgoptiPlus quits (log: %s).",
+				staged_app, app, log)
+			done(true)
+		else
+			Logger.error(LOG, "The detached installer refused its arming receipt (completion=%s).", tostring(ok))
+			done(false, "the detached installer did not acknowledge arming")
+		end
+	end
+	Logger.start(LOG, "Arming the verified app replacement (log: %s)…", log)
+	local called, started = pcall(M._run, "/bin/sh", { "-c", DETACH_SCRIPT, "detach", M.SWAP_SCRIPT,
+		pid, app, staged_app, app .. ".previous", log }, completed)
+	admitted = called and started == true
+	constructing = false
+	if not admitted then
+		settled = true
+		if not called then
+			Logger.error(LOG, "The app replacement arming dispatch threw: %s.", tostring(started))
+		else
+			Logger.error(LOG, "The app replacement arming request could not start.")
+		end
+		return false, "the replacement could not start"
+	end
+	if early ~= nil then completed(table.unpack(early, 1, early.n)) end
 	return true
 end
 

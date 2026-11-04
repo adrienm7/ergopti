@@ -24,6 +24,7 @@ local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local FileSystem = require("adapters.file_system")   -- OS-pure file read (port FileSystem)
 local JsonCodec  = require("adapters.json_codec")    -- OS-pure JSON decode (port JsonCodec)
+local Temperature = require("llm.temperature")       -- shared diversity temperature algorithm
 local LOG    = "llm.api_common"
 
 
@@ -53,11 +54,6 @@ local FALLBACK = {
 		max_multiplier         = 2,
 		retry_temperature_step = 0.18,
 		retry_extra_tokens     = 5,
-	},
-	rate_limit_min_interval_ms = {
-		ollama = 300,
-		mlx    = 300,
-		api    = 500,
 	},
 	stop_sequences = {
 		batch = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" },
@@ -118,6 +114,18 @@ end
 local DEFAULT_TEMPERATURE = load_default_temperature()
 M.DEFAULT_TEMPERATURE = DEFAULT_TEMPERATURE
 
+--- The temperature of the AI menu's « Test a prediction », from defaults.json. It
+--- has no mirror: a test sent at another temperature would prove nothing, so a
+--- missing value fails that test with its cause.
+--- @return number
+function M.test_prediction_temperature()
+	local raw = FileSystem.read(Paths.shared("modules/llm/defaults.json"))
+	local parsed = raw and JsonCodec.decode(raw)
+	local value = type(parsed) == "table" and tonumber(parsed.llm_test_prediction_temperature)
+	if not value then error("defaults.json has no llm_test_prediction_temperature", 0) end
+	return value
+end
+
 --- Loads the default Ollama keep-alive window from the shared defaults.json — the
 --- single source every payload builder reads so "30m" is never hardcoded at the
 --- call site. Mirrors "30m" only when the JSON is unreadable, matching the
@@ -153,16 +161,14 @@ end
 
 M.DEFAULT_DEDUPLICATION_ENABLED = cfg("dedup", "enabled_by_default") == true
 
---- Returns the minimum interval (seconds) between two prediction requests
---- for the given backend id. Mirrors the AHK twin's
---- LLM_BACKEND_MIN_REQUEST_INTERVAL_MS so the floor is identical across
---- drivers. Falls back to 0.3 s for unknown backends.
-function M.get_rate_limit_min_interval_s(backend_id)
-	local map = INFERENCE.rate_limit_min_interval_ms or FALLBACK.rate_limit_min_interval_ms
-	local ms  = tonumber(map[backend_id])
-	if ms == nil then ms = 300 end
-	return ms / 1000.0
+-- The diversity policy the shared algorithm reads, resolved and validated once
+-- at load: a broken policy fails here rather than inside a request callback,
+-- where the error would vanish with the prediction.
+local DIVERSITY_POLICY = {}
+for _, key in ipairs(Temperature.POLICY_KEYS) do
+	DIVERSITY_POLICY[key] = cfg("diversity_temperature", key)
 end
+Temperature.validate(DIVERSITY_POLICY)
 
 --- Returns the full retry policy, intended for the sequential fetch loop.
 --- @return number max_multiplier, number retry_temperature_step, number retry_extra_tokens
@@ -200,17 +206,11 @@ end
 -- =========================================
 -- =========================================
 
---- Computes request temperature for a prediction variant.
---- Algorithm (must stay in lockstep with the AHK twin):
----   1. Resolve the diversity step:
----        - explicit ``step`` parameter wins when provided,
----        - else: base ≤ 0.15 → step_when_base_le_0_15
----                base ≤ 0.35 → step_when_base_le_0_35
----                base  > 0.35 → step_default
----   2. Raise the effective base to effective_base_floor when variant_index > 1
----      AND base < effective_base_floor — the first variant stays faithful to
----      the user's setting, the next ones get headroom for diversity.
----   3. Clamp the final value at max_temperature.
+--- Computes request temperature for a prediction variant through the shared
+--- algorithm (_shared/lua/llm/temperature.lua), which the Linux engine and the
+--- AHK twin's vectors follow too: the step depends on the base unless one is
+--- given, a base below the floor is raised from the second variant on, and the
+--- result is clamped at the policy's maximum.
 --- @param base_temp number Base temperature configured by the user.
 --- @param variant_index number Index of the generated variant (1-based).
 --- @param step number|nil Optional diversity increment per variant.
@@ -218,25 +218,7 @@ end
 function M.get_diversity_temperature(base_temp, variant_index, step)
 	local idx = math.max(1, tonumber(variant_index) or 1)
 	local base = tonumber(base_temp) or DEFAULT_TEMPERATURE
-	local delta = tonumber(step)
-	if delta == nil then
-		if base <= 0.15 then
-			delta = cfg("diversity_temperature", "step_when_base_le_0_15")
-		elseif base <= 0.35 then
-			delta = cfg("diversity_temperature", "step_when_base_le_0_35")
-		else
-			delta = cfg("diversity_temperature", "step_default")
-		end
-	end
-
-	local floor_val = cfg("diversity_temperature", "effective_base_floor")
-	local max_val   = cfg("diversity_temperature", "max_temperature")
-	local effective_base = base
-	if idx > 1 and effective_base < floor_val then
-		effective_base = floor_val
-	end
-
-	return math.min(max_val, effective_base + (idx - 1) * delta)
+	return Temperature.variant(DIVERSITY_POLICY, base, idx, tonumber(step))
 end
 
 
@@ -355,6 +337,31 @@ end
 function M.protected_call(fn, name, ...)
 	if type(fn) ~= "function" then return end
 	return Logger.callback(LOG, name, fn, ...)
+end
+
+
+--- Writes a streaming request only after both native file operations acknowledge it.
+--- Failed paths are retained: the pathname may have been replaced after opening,
+--- so it cannot authorize deleting a concurrent file. Always close before reporting
+--- a write failure, including one raised by the native file boundary.
+--- @param path string Temporary payload pathname.
+--- @param content string Encoded JSON request.
+--- @return boolean written True only after exact write and close acknowledgements.
+--- @return string|nil detail Local I/O failure, before any transport is allocated.
+function M.write_stream_payload(path, content)
+	local opened, file, open_error = pcall(io.open, path, "w")
+	if not opened or not file then
+		return false, tostring(opened and open_error or file)
+	end
+	local wrote, written, write_error = pcall(function() return file:write(content) end)
+	local closed, close_result, close_error = pcall(function() return file:close() end)
+	if not wrote or written ~= file then
+		return false, "payload write failed: " .. tostring(wrote and write_error or written)
+	end
+	if not closed or close_result ~= true then
+		return false, "payload close failed: " .. tostring(closed and close_error or close_result)
+	end
+	return true
 end
 
 return M

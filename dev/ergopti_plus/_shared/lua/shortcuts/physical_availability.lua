@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local Slots = require("shortcuts.physical_slots")
+local ConfigKeys = require("config_keys")
 local M = {}
 
 --- Accepts only a strict native capability acknowledgement.
@@ -50,7 +51,7 @@ end
 function M.requires_delivery(rows, parameter_section, split)
 	for _, row in ipairs(rows) do
 		if type(row) == "table" and row.delete ~= true then
-			if row.section == "shortcuts.keyboard" and Slots.is_namespace(row.key) and row.value ~= "none" then return true end
+			if row.section == ConfigKeys.KEY.SHORTCUTS_KEYBOARD and Slots.is_namespace(row.key) and row.value ~= "none" then return true end
 			if row.section == parameter_section and type(row.key) == "string" then
 				local called, binding = pcall(split, row.key)
 				if not called then return true end

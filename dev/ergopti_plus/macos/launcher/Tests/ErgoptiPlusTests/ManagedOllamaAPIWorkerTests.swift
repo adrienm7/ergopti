@@ -58,10 +58,41 @@ private final class ManagedOllamaTestSession {
 				}
 				throw Failure.process
 			}
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		}
-		guard let value else { peer.terminate(); peer.waitUntilExit(); throw Failure.deadline }
+		guard let value else {
+			peer.terminate(); peer.waitUntilExit()
+			// Preserve the original deadline failure after the exact peer's
+			// original retirement. Diagnostic collection never waits for EOF.
+			Self.retainProfileDeadlineDiagnostics(peer: peer, diagnostics: peerDiagnostics)
+			throw Failure.deadline
+		}
 		profile = value
+	}
+	private static func retainProfileDeadlineDiagnostics(peer: Process, diagnostics: Pipe) {
+		let handle = diagnostics.fileHandleForReading
+		var bytes = Data(), eof = false, drainAvailable = false, readRefused = false, closed = false
+		if ManagedPTYWorker.nonblocking(handle.fileDescriptor) {
+			// One finite read of the original pipe: no waiter, retry, clock,
+			// destructive signal or new retirement authority.
+			var buffer = [UInt8](repeating: 0, count: 4096)
+			let count = Darwin.read(handle.fileDescriptor, &buffer, buffer.count)
+			if count >= 0 { drainAvailable = true }
+			if count > 0 { bytes.append(contentsOf: buffer.prefix(count)) }
+			else if count == 0 { eof = true }
+			else if ![EINTR, EAGAIN, EWOULDBLOCK].contains(errno) { readRefused = true }
+		} else { readRefused = true }
+		do { try handle.close(); closed = true } catch { /* Preserve Failure.deadline. */ }
+		let text = String(decoding: bytes, as: UTF8.self)
+		print("ERGOPTI_PEER_PROFILE_DEADLINE_DIAGNOSTIC status=\(peer.terminationStatus) reason=\(peer.terminationReason.rawValue) eof=\(eof ? 1 : 0) drain_available=\(drainAvailable ? 1 : 0) read_refused=\(readRefused ? 1 : 0) descriptor_closed=\(closed ? 1 : 0) dyld_library_missing=\(text.contains("Library not loaded:") ? 1 : 0) code_signature_failure=\(text.contains("code signature") ? 1 : 0)")
+		// Only complete LF-terminated native fixed receipts are projected.
+		// Partial captures and arbitrary inherited child stderr are never text.
+		for line in text.components(separatedBy: "\n").dropLast().prefix(16) {
+			if line.range(of: #"\AERGOPTI_RETAINED_IMAGE_DIAGNOSTIC stage=[1-4] errno=[0-9]{1,5}\z"#, options: .regularExpression) != nil
+				|| line.range(of: #"\AERGOPTI_RETAINED_IMAGE_EXIT timeout=[01] status=[0-9]{1,3}\z"#, options: .regularExpression) != nil {
+				print(line)
+			}
+		}
 	}
 	deinit {
 		if !closed && peer.isRunning { peer.terminate(); peer.waitUntilExit() }
@@ -122,7 +153,7 @@ private final class ManagedOllamaTestSession {
 			if count > 0 { bytes.append(contentsOf: buffer.prefix(count)) }
 			else if count == 0 { eof = true }
 			else if ![EINTR, EAGAIN, EWOULDBLOCK].contains(errno) { process.terminate(); process.waitUntilExit(); throw Failure.process }
-			usleep(1_000)
+			usleep(LauncherTimings.testFastPoll.microseconds)
 		}
 		guard eof && !process.isRunning else { process.terminate(); process.waitUntilExit(); throw Failure.deadline }
 		process.waitUntilExit(); try output.fileHandleForReading.close()
@@ -147,7 +178,7 @@ private final class ManagedOllamaTestSession {
 	}
 	func finish() throws {
 		let deadline = ProcessInfo.processInfo.systemUptime + 5
-		while peer.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(10_000) }
+		while peer.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(LauncherTimings.testPoll.microseconds) }
 		guard !peer.isRunning else { peer.terminate(); peer.waitUntilExit(); throw Failure.deadline }
 		peer.waitUntilExit(); guard peer.terminationStatus == 0 else { throw Failure.process }
 		try peerDiagnostics.fileHandleForReading.close()
@@ -159,7 +190,7 @@ private final class ManagedOllamaTestSession {
 			if FileManager.default.fileExists(atPath: root.appendingPathComponent("closed-\(index)").path) {
 				return try Data(contentsOf: root.appendingPathComponent("request-\(index).bin"))
 			}
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		}
 		throw Failure.deadline
 	}
@@ -296,7 +327,7 @@ final class ManagedOllamaAPIWorkerTests: XCTestCase {
 		XCTAssertEqual(frames.filter { $0.0 == 68 }.reduce(Data()) { $0 + $1.1 }, Data("oneTWO".utf8))
 		_ = try session.captured(1)
 		let deadline = ProcessInfo.processInfo.systemUptime + 5
-		while session.peer.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(10_000) }
+		while session.peer.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(LauncherTimings.testPoll.microseconds) }
 		XCTAssertFalse(session.peer.isRunning); session.peer.waitUntilExit()
 		let receipt = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: session.root.appendingPathComponent("retained-image.json"))) as? [String: Any])
 		XCTAssertEqual(receipt["read_only"] as? Bool, true); XCTAssertEqual(receipt["reaped"] as? Bool, true)

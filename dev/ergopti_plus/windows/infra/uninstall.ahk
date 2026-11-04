@@ -21,7 +21,7 @@ _UninstallClose(Owner, Cancel) {
 	Info := Owner.Get("ProcessInfo", 0)
 	if (Info is Buffer) {
 		Process := NumGet(Info, 0, "Ptr")
-		Thread := NumGet(Info, A_PtrSize, "Ptr")
+		ThreadHandle := NumGet(Info, A_PtrSize, "Ptr")
 		NumPut("Ptr", 0, Info, 0)
 		NumPut("Ptr", 0, Info, A_PtrSize)
 		if Cancel && Process {
@@ -29,14 +29,15 @@ _UninstallClose(Owner, Cancel) {
 				LoggerError("Uninstall", "Could not cancel the exact removal worker.")
 			PLC_WaitHandle(Process, 5000)
 		}
-		PLC_CloseNativeHandle(Thread)
+		PLC_CloseNativeHandle(ThreadHandle)
 		PLC_CloseNativeHandle(Process)
 	}
 	for Key in ["Parent", "Ready", "Commit"] {
 		PLC_CloseNativeHandle(Owner.Get(Key, 0))
 		Owner[Key] := 0
 	}
-	if Cancel && FileExist(Owner.Get("Script", "")) {
+	; A random filename is not ownership when create-only copying was refused.
+	if Cancel && Owner.Get("ScriptCopied", false) && FileExist(Owner.Get("Script", "")) {
 		try FileDelete(Owner["Script"])
 		catch as Err
 			LoggerWarn("Uninstall", "Temporary worker cleanup failed: {1}.", Err.Message)
@@ -92,7 +93,7 @@ ShowUninstallErgopti(*) {
 	State := UninstallState()
 	if State.Has("Owner")
 		return false
-	Owner := Map("Phase", "Confirming")
+	Owner := Map("Phase", "Confirming", "ScriptCopied", false)
 	State["Owner"] := Owner
 	try {
 		ExecutableDigest := CryptoSha256Bytes(FileRead(A_ScriptFullPath, "RAW"))
@@ -125,6 +126,7 @@ ShowUninstallErgopti(*) {
 		CommitName := "Local\ErgoptiPlus.Uninstall.Commit." . Nonce
 		Owner["Script"] := A_Temp . "\ergopti-uninstall-" . Nonce . ".ps1"
 		FileCopy(_VendorDir . "\ergopti_uninstall.ps1", Owner["Script"], false)
+		Owner["ScriptCopied"] := true
 		Owner["Ready"] := PLC_CreateNamedManualResetEvent(ReadyName)
 		Owner["Commit"] := PLC_CreateNamedManualResetEvent(CommitName)
 		Owner["Parent"] := PLC_OpenCurrentProcessHandle(0x100000)
@@ -154,6 +156,7 @@ ShowUninstallErgopti(*) {
 			throw Error("Could not resume the removal worker")
 		_UninstallAwaitReady(Owner, Info)
 		Owner["Phase"] := "Ready"
+		LifecycleNoteExitRequester("the uninstaller")
 		ExitApp()
 		; ExitApp returns only when an OnExit owner refuses the shutdown.
 		UninstallCancel()
@@ -178,10 +181,17 @@ _UninstallAwaitReady(Owner, Info, ClockFn := unset, WaitFn := unset, SleepFn := 
 	Wait := IsSet(WaitFn) ? WaitFn : PLC_WaitHandle
 	Nap := IsSet(SleepFn) ? SleepFn : Sleep
 	Started := Clock.Call()
-	while Wait.Call(Owner.Get("Ready", 0), 0) != 0 {
+	loop {
+		Ready := Owner.Get("Ready", 0)
+		if Wait.Call(Ready, 0) == 0 {
+			; Native success belongs to the exact capability observed by this
+			; wait, not to a local owner that cancellation has already retired.
+			if !Ready || Owner.Get("Ready", 0) != Ready
+				throw Error("The removal worker readiness was revoked during its native wait")
+			return true
+		}
 		if TickElapsed64(Started, Clock.Call()) > 10000 || Wait.Call(NumGet(Info, 0, "Ptr"), 0) != 0x102
 			throw Error("The removal worker did not become ready")
 		Nap.Call(20)
 	}
-	return true
 }

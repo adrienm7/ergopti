@@ -12,7 +12,8 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Data-only steps. A step is a list of ops from a closed set (rename,
----    move_section, merge_into, map_value, delete, set_if_absent). The engine
+---    rename_prefix, move_section, merge_into, map_value, wrap_value, encode_value,
+---    delete, set_if_absent). The engine
 ---    holds the only op semantics on this side; the corpus under
 ---    _shared/tests/corpus/config_migrations pins them to the Windows
 ---    interpreter and to the JS reference, and the registry defects under
@@ -36,6 +37,8 @@
 --- ==============================================================================
 
 local M = {}
+local NativePath = require("native_path")
+local TableUtil = require("table_util")
 local SourceIdentity = require("module_source_identity")
 local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
 local source_directory = require("module_source_directory").capture()
@@ -83,6 +86,27 @@ local canonical_decode = assert(rawget(TomlCodec, "decode_with_shapes"))
 -- absence. Generic unregistered adapter seams need no native constructor;
 -- a boot destination captures only an actual initializer owner/issuer tuple.
 -- This assumes the trusted normal loader, not hostile searcher/debug mutation.
+
+--- Whether a native file adapter sits where this module expects its driver.
+---
+--- A checkout keeps the driver beside the shared tree (<root>/linux/adapters,
+--- <root>/_shared); every package (.deb, .rpm, AppImage, Flatpak) ships the
+--- shared tree inside the driver root (<root>/adapters, <root>/_shared).
+--- Accepting only the first refused the native configuration ports in every
+--- package: config.toml could not be read and the daemon died at startup.
+--- @param adapter_source string The adapter function's debug source.
+--- @param own_source string This module's debug source.
+--- @param folder string The driver folder in a checkout ("linux", "macos").
+--- @return boolean
+local function native_adapter_in_layout(adapter_source, own_source, folder)
+	for _, suffix in ipairs({ folder .. "/adapters/file_system.lua", "adapters/file_system.lua" }) do
+		local expected = source_sibling(adapter_source, suffix, "_shared/lua/config_migrate.lua", source_directory)
+		if source_same(own_source, expected, source_directory) then return true end
+	end
+	return false
+end
+M._native_adapter_in_layout = native_adapter_in_layout
+
 local function native_configuration_ports(driver)
 	local owner = rawget(package.loaded, "adapters.file_system")
 	if owner == nil then owner = require("adapters.file_system") end
@@ -91,9 +115,7 @@ local function native_configuration_ports(driver)
 	if type(issuer) ~= "function" then return nil end
 	local source = debug.getinfo(1, "S").source
 	local folder = driver == "hs" and "macos" or driver
-	local expected = source_sibling(debug.getinfo(issuer, "S").source,
-		folder .. "/adapters/file_system.lua", "_shared/lua/config_migrate.lua", source_directory)
-	if not source_same(source, expected, source_directory) then return nil end
+	if not native_adapter_in_layout(debug.getinfo(issuer, "S").source, source, folder) then return nil end
 	local called, issued, reader, writer_method, publisher, remover, admitted_remover, exact_remover, delete = pcall(issuer)
 	if not called or not rawequal(issued, owner) or type(reader) ~= "function"
 		or type(writer_method) ~= "function" or type(publisher) ~= "function" or type(delete) ~= "function"
@@ -129,18 +151,21 @@ M.DRIVERS = { ahk = true, hs = true, linux = true }
 
 -- The only keys of [registry] and of a [steps.*] table. Anything else is a
 -- defect every interpreter rejects: the shared registry-defect corpus pins it.
-local REGISTRY_FIELDS = { current_version = true, unstamped_version = true }
+local REGISTRY_FIELDS = { current_version = true, unstamped_version = true, oldest_version = true }
 local STEP_FIELDS = { from = true, to = true, drivers = true, reason = true, ops = true }
 
 --- Fields of each op of the closed set.
 local OPS = {
 	rename        = { required = { "section", "key" }, optional = { "to_section", "to_key" } },
+	rename_prefix = { required = { "section", "prefix", "to_prefix" }, optional = {} },
 	copy_if_absent = { required = { "section", "key" }, optional = { "to_section", "to_key" } },
 	move_ergopti_variant = { required = { "section", "key", "to_key", "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant" }, optional = { "neutral_variant" } },
 	move_chord_action = { required = { "section", "key", "to_section", "action", "conditional_key", "disabled_action", "platform" }, optional = {} },
 	move_section  = { required = { "section", "to_section" }, optional = {} },
 	merge_into    = { required = { "section", "to_section" }, optional = {} },
 	map_value     = { required = { "section", "key", "map" }, optional = {} },
+	wrap_value    = { required = { "section", "key", "to_key" }, optional = {} },
+	encode_value  = { required = { "section", "key", "to_section", "to_key", "encoding" }, optional = {} },
 	delete        = { required = { "section" }, optional = { "key" } },
 	set_if_absent = { required = { "section", "key", "value" }, optional = {} },
 }
@@ -166,15 +191,14 @@ end
 -- module cannot grant readiness. The normal loader constructs one journal;
 -- arbitrary replacement searchers/debug mutation are outside this boundary.
 local destinations = {}
+-- The boot status that first made a destination read-only ("newer", "invalid",
+-- "unsupported", "failed"): the menus name a newer file's cause on the rows
+-- it greys. Refusals last for the session, so the first cause stays the cause.
+local read_only_statuses = {}
 local validated_registries = setmetatable({}, { __mode = "k" })
 local admission_factory
 
-local function detached(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = detached(child) end
-	return copy
-end
+local detached = TableUtil.deep_copy
 
 -- Resolve only a journal key, never rewrite a native path or fold its case.
 -- Dot spellings of a known destination are refused: '..' through a symlink
@@ -193,13 +217,23 @@ local function destination_key(path)
 	return (spelling:sub(1, 1) == "/" and "/" or "") .. table.concat(parts, "/"), ambiguous
 end
 
-local function current_schema(source, version)
+--- Whether a source is at the destination's schema. Once the chain was squashed,
+--- a file with no stamp has no step left and counts as current (see M.classify).
+--- @param source table { status, content }.
+--- @param version number The registry's current version.
+--- @param stampless_current boolean|nil Whether a file with no stamp is current.
+--- @return boolean
+local function current_schema(source, version, stampless_current)
 	if type(source) ~= "table" then return false end
 	if source.status == "absent" then return true end
 	if source.status ~= "ok" or type(source.content) ~= "string" then return false end
 	local called, document, shapes = pcall(canonical_decode, source.content)
 	if not called or type(document) ~= "table" or type(shapes) ~= "table" then return false end
 	local meta = document._meta
+	if stampless_current == true and (meta == nil
+		or type(meta) == "table" and shapes.arrays[meta] ~= true and meta.schema_version == nil) then
+		return true
+	end
 	return type(meta) == "table" and shapes.arrays[meta] ~= true
 		and is_version(meta.schema_version) and meta.schema_version == version
 end
@@ -241,17 +275,19 @@ local function capture_admission(path, source, candidate, operation, adapter)
 		migration.consumed = true
 		return function()
 			return destination_live(record) and rawequal(record.publication, migration)
-				and migration.consumed and current_schema({ status = "ok", content = candidate }, record.current)
+				and migration.consumed and current_schema({ status = "ok", content = candidate }, record.current, record.stampless_current)
 		end, snapshot
 	end
-	if record.phase ~= "ready" or not current_schema(snapshot, record.current)
-		or candidate ~= nil and not current_schema({ status = "ok", content = candidate }, record.current) then
+	-- Only an existing file may stay unstamped: a file this build creates is stamped.
+	local stampless_candidate = record.stampless_current and snapshot.status ~= "absent"
+	if record.phase ~= "ready" or not current_schema(snapshot, record.current, record.stampless_current)
+		or candidate ~= nil and not current_schema({ status = "ok", content = candidate }, record.current, stampless_candidate) then
 		return false
 	end
 	return function()
 		return destination_live(record) and record.phase == "ready"
-			and current_schema(snapshot, record.current)
-			and (candidate == nil or current_schema({ status = "ok", content = candidate }, record.current))
+			and current_schema(snapshot, record.current, record.stampless_current)
+			and (candidate == nil or current_schema({ status = "ok", content = candidate }, record.current, stampless_candidate))
 	end, snapshot
 end
 
@@ -277,7 +313,7 @@ local function read_admitted(path, adapter)
 	if record.phase ~= "ready" then return false end
 	return function(content, status)
 		return destination_live(record) and record.phase == "ready"
-			and current_schema({ status = status, content = content }, record.current)
+			and current_schema({ status = status, content = content }, record.current, record.stampless_current)
 	end
 end
 
@@ -355,17 +391,12 @@ end
 --- @return boolean
 local function is_array(value)
 	if type(value) ~= "table" then return false end
-	local count = 0
-	for _ in pairs(value) do count = count + 1 end
-	return count == #value
+	return TableUtil.count(value) == #value
 end
 
 --- Sorted keys of a table.
 local function sorted_keys(map)
-	local keys = {}
-	for key in pairs(map) do keys[#keys + 1] = key end
-	table.sort(keys, function(left, right) return tostring(left) < tostring(right) end)
-	return keys
+	return TableUtil.sorted_keys(map, TableUtil.by_text)
 end
 
 --- Formats a version for a log line without a Lua 5.4 float suffix.
@@ -413,8 +444,20 @@ local function validate_op(op)
 			return false, "'" .. field .. "' must be one bare segment"
 		end
 	end
+	if op.op == "encode_value" and op.encoding ~= "user_profile_registry" then
+		return false, "encode_value names no known encoding"
+	end
 	if (op.op == "rename" or op.op == "copy_if_absent") and op.to_section == nil and op.to_key == nil then
 		return false, op.op .. " needs to_section or to_key"
+	end
+	if op.op == "rename_prefix" then
+		if not is_bare_key(op.prefix) or not is_bare_key(op.to_prefix) then
+			return false, "'prefix' and 'to_prefix' must be bare key text"
+		end
+		-- A prefix that extends the other would match a renamed key again on replay.
+		if op.prefix:sub(1, #op.to_prefix) == op.to_prefix or op.to_prefix:sub(1, #op.prefix) == op.prefix then
+			return false, "rename_prefix prefixes must not extend each other"
+		end
 	end
 	if op.op == "move_ergopti_variant" then
 		for _, field in ipairs({ "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant" }) do
@@ -463,7 +506,7 @@ end
 
 --- Validates a decoded registry and returns it in execution order.
 --- @param decoded table Decoded migrations.toml.
---- @return table|nil registry `{ current, unstamped, steps = { { from, to, drivers, reason, ops } } }`.
+--- @return table|nil registry `{ current, unstamped, oldest, steps = { { from, to, drivers, reason, ops } } }`.
 --- @return string|nil detail
 function M.validate_registry(decoded)
 	if type(decoded) ~= "table" or type(decoded.registry) ~= "table" then
@@ -486,6 +529,13 @@ function M.validate_registry(decoded)
 	local unstamped = decoded.registry.unstamped_version
 	if not is_version(current) or not is_version(unstamped) or unstamped > current then
 		return nil, "current_version and unstamped_version must be integers with 1 <= unstamped <= current"
+	end
+	-- Steps below the oldest supported version were squashed away: the chain
+	-- starts there, and anything older is refused rather than half migrated.
+	local oldest = decoded.registry.oldest_version
+	if oldest == nil then oldest = unstamped end
+	if not is_version(oldest) or oldest < unstamped or oldest > current then
+		return nil, "oldest_version must be an integer with unstamped <= oldest <= current"
 	end
 	local steps = {}
 	for name, step in pairs(decoded.steps or {}) do
@@ -519,15 +569,16 @@ function M.validate_registry(decoded)
 		steps[#steps + 1] = { from = step.from, to = step.to, drivers = drivers, reason = step.reason, ops = step.ops }
 	end
 	table.sort(steps, function(left, right) return left.from < right.from end)
-	if #steps ~= current - unstamped then
-		return nil, "the steps do not chain v" .. version_text(unstamped) .. " to v" .. version_text(current)
+	if #steps ~= current - oldest then
+		return nil, "the steps do not chain v" .. version_text(oldest) .. " to v" .. version_text(current)
 	end
 	for index, step in ipairs(steps) do
-		if step.from ~= unstamped + index - 1 then
+		if step.from ~= oldest + index - 1 then
 			return nil, "the chain has a gap at v" .. version_text(step.from)
 		end
 	end
-	local registry = { current = as_integer(current), unstamped = as_integer(unstamped), steps = steps }
+	local registry = { current = as_integer(current), unstamped = as_integer(unstamped),
+		oldest = as_integer(oldest), steps = steps }
 	validated_registries[registry] = detached(registry)
 	return registry
 end
@@ -691,6 +742,14 @@ local function copy_destination_absent(sections, section, key)
 end
 
 local VARIANT_REFUSAL = "Ergopti variant migration refused:"
+local PREFIX_REFUSAL = "Prefix rename refused:"
+
+--- Whether a raised migration error is a typed refusal the plan reports as
+--- "invalid" instead of an engine fault.
+local function is_refusal(err)
+	local text = tostring(err)
+	return text:sub(1, #VARIANT_REFUSAL) == VARIANT_REFUSAL or text:sub(1, #PREFIX_REFUSAL) == PREFIX_REFUSAL
+end
 
 
 -- Every new operation names jointly retained physical and semantic owners.
@@ -859,6 +918,29 @@ function APPLY.move_chord_action(sections, op, context, model)
 	else source[op.key] = nil; drop_if_empty(sections, op.section) end
 end
 
+--- Renames every key of one section that starts with a prefix, keeping the
+--- remainder. A renamed key that would land on an occupied key or namespace
+--- refuses the whole migration before any key moves: the two values cannot
+--- both survive, and dropping either would lose a user's setting unseen.
+function APPLY.rename_prefix(sections, op)
+	local entries = sections[op.section]
+	if entries == nil then return end
+	local moves = {}
+	for _, key in ipairs(sorted_keys(entries)) do
+		if key:sub(1, #op.prefix) == op.prefix then
+			local target = op.to_prefix .. key:sub(#op.prefix + 1)
+			if not copy_destination_absent(sections, op.section, target) then
+				error(PREFIX_REFUSAL .. " [" .. op.section .. "] " .. key .. " would land on the occupied " .. target, 0)
+			end
+			moves[#moves + 1] = { key, target }
+		end
+	end
+	for _, move in ipairs(moves) do
+		entries[move[2]] = entries[move[1]]
+		entries[move[1]] = nil
+	end
+end
+
 function APPLY.move_section(sections, op)
 	for _, name in ipairs(sections_at_or_below(sections, op.section)) do
 		local target = op.to_section .. name:sub(#op.section + 1)
@@ -891,6 +973,36 @@ function APPLY.map_value(sections, op)
 	end
 end
 
+--- A scalar where the manifest keeps a feature row becomes that row's switch
+--- in its own [section.key] table. A table, an array or an absent key stays,
+--- so a replay changes nothing.
+function APPLY.wrap_value(sections, op)
+	local entries = sections[op.section]
+	local entry = entries and entries[op.key]
+	if entry == nil or not is_scalar(entry.value) then return end
+	move_entry(sections, op.section, op.key, op.section .. "." .. op.key, op.to_key)
+	drop_if_empty(sections, op.section)
+end
+
+--- A non-empty array of tables becomes the encoded string of its new key. An
+--- occupied target wins (the source stays for the cleanup), and anything the
+--- encoding cannot carry stays where it is: not encoded means not deleted.
+function APPLY.encode_value(sections, op)
+	local entries = sections[op.section]
+	local entry = entries and entries[op.key]
+	if entry == nil or type(entry.value) ~= "table" or #entry.value == 0 then return end
+	if sections[op.to_section] ~= nil and sections[op.to_section][op.to_key] ~= nil then return end
+	for _, item in ipairs(entry.value) do
+		if type(item) ~= "table" then return end
+	end
+	local encodable, envelope = pcall(require("llm.profile_registry_codec").encode, entry.value)
+	if not encodable or type(envelope) ~= "string" then return end
+	if sections[op.to_section] == nil then sections[op.to_section] = {} end
+	sections[op.to_section][op.to_key] = { value = envelope }
+	entries[op.key] = nil
+	drop_if_empty(sections, op.section)
+end
+
 function APPLY.delete(sections, op)
 	if op.key == nil then
 		for _, name in ipairs(sections_at_or_below(sections, op.section)) do sections[name] = nil end
@@ -917,10 +1029,14 @@ function M.classify(model, registry)
 	if entry ~= nil then
 		version = entry.value
 		if not is_version(version) then return "invalid", version end
+	elseif registry.unstamped < registry.oldest then
+		-- The steps a file with no stamp would need are gone: it is hand-written or
+		-- very old, so it runs as it is and the next save stamps it.
+		return "current", registry.current
 	end
 	if version > registry.current then return "newer", version end
 	if version == registry.current then return "current", version end
-	if version < registry.unstamped then return "unsupported", version end
+	if version < registry.oldest then return "unsupported", version end
 	return "migrate", version
 end
 
@@ -1097,7 +1213,7 @@ function M.plan(source, registry, driver, context)
 		return M.apply_steps(clone_model(before), registry, driver, version, context)
 	end)
 	if not applied then
-		if tostring(after):sub(1, #VARIANT_REFUSAL) == VARIANT_REFUSAL then
+		if is_refusal(after) then
 			return { outcome = "invalid", version = version, detail = tostring(after) }
 		end
 		error(after, 0)
@@ -1137,10 +1253,10 @@ function M.plan_operations(source, operations)
 	end
 	local after = clone_model(before)
 	for _, op in ipairs(operations) do
-		if op.op == "move_ergopti_variant" then
+		if op.op == "move_ergopti_variant" or op.op == "rename_prefix" then
 			local accepted, refusal = pcall(APPLY[op.op], after.sections, op, nil, after)
 			if not accepted then
-				if tostring(refusal):sub(1, #VARIANT_REFUSAL) == VARIANT_REFUSAL then
+				if is_refusal(refusal) then
 					return { outcome = "invalid", detail = tostring(refusal) }
 				end
 				error(refusal, 0)
@@ -1202,8 +1318,9 @@ end
 --- @param stamp string
 --- @return string
 function M.backup_path(path, version, stamp)
-	local dir, name = path:match("^(.*[/\\])([^/\\]+)$")
-	if not dir then dir, name = "", path end
+	local dir = NativePath.directory_prefix(path)
+	local name = dir and path:sub(#dir + 1)
+	if not name or name == "" then dir, name = "", path end
 	local stem, ext = name:match("^(.+)(%.[^%.]+)$")
 	if not stem then stem, ext = name, "" end
 	return dir .. stem .. ".pre-v" .. version_text(version) .. "-" .. stamp .. ext
@@ -1214,6 +1331,35 @@ end
 --- @return string|nil
 function M.read_only_reason(path)
 	return writer().write_refusal(path)
+end
+
+--- The boot migration status that made path read-only this session, the
+--- counterpart of the Windows ConfigSchemaReadOnlyStatus.
+--- @param path string
+--- @return string|nil status "newer", "invalid", "unsupported" or "failed";
+---   nil while path is writable or was refused by another owner.
+function M.read_only_status(path)
+	if type(path) ~= "string" or path == "" or writer().write_refusal(path) == nil then return nil end
+	return read_only_statuses[(destination_key(path))]
+end
+
+-- The locale key of the notice a newer file earns, shared with the Windows
+-- driver's refused-save notification (config_io.ahk).
+M.NEWER_SCHEMA_NOTICE_KEY = "config.read_only.newer_schema"
+-- The one a file older than the registry's oldest supported version earns.
+M.OLDER_SCHEMA_NOTICE_KEY = "config.read_only.older_schema"
+
+--- Names the notice a boot result asks the driver to show once: a file saved
+--- by a newer build, or one too old to migrate, is preserved and read-only, and
+--- the user must act before changing settings. Other refusals keep their log
+--- diagnostics.
+--- @param result table|nil The table M.boot or M.run returned.
+--- @return string|nil key The locale key, or nil when no notice is due.
+function M.read_only_notice_key(result)
+	if type(result) ~= "table" or result.read_only ~= true then return nil end
+	if result.status == "newer" then return M.NEWER_SCHEMA_NOTICE_KEY end
+	if result.status == "unsupported" then return M.OLDER_SCHEMA_NOTICE_KEY end
+	return nil
 end
 
 --- Migrates a config file at boot. Every outcome other than "absent",
@@ -1271,6 +1417,7 @@ function M.run(opts)
 		result.status = status
 		result.detail = detail
 		result.read_only = true
+		if read_only_statuses[key] == nil then read_only_statuses[key] = status end
 		writer().refuse_writes(path, detail)
 		log.error(LOG, "Config migration of '%s' refused (%s): %s. The file is left untouched and "
 			.. "this session will not write it.", path, status, tostring(detail))
@@ -1294,6 +1441,7 @@ function M.run(opts)
 	if opts.context_error ~= nil then return refuse("failed", opts.context_error) end
 	result.to = registry.current
 	record.current = registry.current
+	record.stampless_current = registry.unstamped < registry.oldest
 	if not destination_live(record) then return refuse("failed", "config admission owner changed during boot") end
 
 	local adapter = opts.file_adapter
@@ -1303,9 +1451,7 @@ function M.run(opts)
 		-- The Linux adapter is exactly the shared writer delegate. Use its same
 		-- captured native owner once, rather than recursively consuming a permit.
 		local reader_source = type(record.adapter_reader) == "function" and debug.getinfo(record.adapter_reader, "S").source
-		local expected = source_sibling(reader_source, "linux/adapters/file_system.lua",
-			"_shared/lua/config_migrate.lua", source_directory)
-		if source_same(debug.getinfo(1, "S").source, expected, source_directory) then native_io_adapter = nil
+		if native_adapter_in_layout(reader_source, debug.getinfo(1, "S").source, "linux") then native_io_adapter = nil
 		else native_adapter = false end
 	end
 	local native_default = opts.read == nil and opts.publish == nil and opts.create_backup == nil
@@ -1320,7 +1466,7 @@ function M.run(opts)
 		-- native destination was admitted by this constructor.
 		if native_default then
 			local content, current_status = default_read(path)
-			if not current_schema({ status = current_status, content = content }, registry.current) then
+			if not current_schema({ status = current_status, content = content }, registry.current, record.stampless_current) then
 				return refuse("failed", "fresh native source is not current before runtime admission")
 			end
 			record.phase = "ready"
@@ -1367,14 +1513,19 @@ function M.run(opts)
 		return refuse(status, detail)
 	end
 	if version ~= nil and not is_version(version) then return refuse_version("invalid", "canonical schema version is invalid") end
-	if version ~= nil and version > registry.current then return refuse_version("newer", "canonical schema version is newer than this build") end
+	-- Both versions are named: a developer who switches branches reads which
+	-- build wrote the file (field log 2026-10-30: five refusals, no versions).
+	if version ~= nil and version > registry.current then
+		return refuse_version("newer", "canonical schema v" .. version_text(version)
+			.. " is newer than this build's v" .. version_text(registry.current))
+	end
 	local plan = M.plan(source, registry, opts.driver, opts.context)
 	if version ~= nil and version ~= registry.current and plan.version ~= version then
 		return refuse("unsupported", "legacy metadata is not addressable by this migration owner")
 	end
 	-- The strict canonical document, not the flat migration operation model,
 	-- owns current-schema admission for inline/dotted/quoted metadata.
-	if current_schema({ status = "ok", content = source }, registry.current) then
+	if current_schema({ status = "ok", content = source }, registry.current, record.stampless_current) then
 		plan = { outcome = "current", version = registry.current, candidate = source }
 	elseif plan.outcome == "current" then
 		return refuse("invalid", "canonical schema metadata is not current")
@@ -1389,13 +1540,15 @@ function M.run(opts)
 			.. ", newer than this build's v" .. version_text(registry.current))
 	end
 	if plan.outcome == "invalid" then
-		if type(plan.detail) == "string" and plan.detail:find("Ergopti variant migration refused:", 1, true) == 1 then
+		-- A typed op refusal keeps its own named detail, as on Windows.
+		if type(plan.detail) == "string" and is_refusal(plan.detail) then
 			return refuse("invalid", plan.detail)
 		end
 		return refuse("invalid", "[_meta] schema_version is not a positive integer")
 	end
 	if plan.outcome == "unsupported" then
-		return refuse("unsupported", "no migration path from schema v" .. version_text(plan.version))
+		return refuse("unsupported", "no migration path from schema v" .. version_text(plan.version)
+			.. ": the oldest this build migrates is v" .. version_text(registry.oldest))
 	end
 	if plan.outcome ~= "migrated" then return refuse("failed", plan.detail) end
 

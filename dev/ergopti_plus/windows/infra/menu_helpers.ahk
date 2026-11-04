@@ -9,6 +9,9 @@
 ; handlers. Pure helpers — no boot-time side effects.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\_generated\menu_section_header.ahk
+
 
 
 
@@ -24,7 +27,7 @@
 ; Uses a global cache to avoid redundant calculations during menu build.
 CountDynamicSection(SectionName) {
 		; Loaded user metadata can change asynchronously; never freeze its count.
-		if SectionName == "user_code"
+		if SectionName == ConfigLeaf.USER_CODE
 			return UserHotstringsCount()
 		global PersonalInformation, _TomlCountCache
 		CacheKey := "dynamic|" . StrLower(SectionName)
@@ -40,9 +43,9 @@ CountDynamicSection(SectionName) {
 
 		Count := 0
 		switch SectionName {
-				case "DateFr", "DateLongFr", "Date", "date_fr", "date_long_fr", "date":
+				case "DateFr", "DateLongFr", "Date", ConfigLeaf.DATE_FR, ConfigLeaf.DATE_LONG_FR, "date":
 						Count := 1
-				case "PhonePrefixes", "phone_prefixes":
+				case "PhonePrefixes", ConfigLeaf.PHONE_PREFIXES:
 						N := 0
 						if StrLen(Phone) >= 2
 								N += 2  ; phone[1:2]+★ and +33+phone[1:2]
@@ -53,13 +56,13 @@ CountDynamicSection(SectionName) {
 						if StrLen(FPhone) >= 5
 								N += 1  ; fphone[1:5]
 						Count := N
-				case "SsnPrefixes", "ssn_prefixes":
+				case "SsnPrefixes", ConfigLeaf.SSN_PREFIXES:
 						; No-space + spaced triggers — both fire when ssn_raw has >= 5 digits
 						Count := StrLen(SsnRaw) >= 5 ? 2 : 0
-				case "IbanPrefixes", "iban_prefixes":
+				case "IbanPrefixes", ConfigLeaf.IBAN_PREFIXES:
 						; 6 raw chars (no-space) and 7-char spaced trigger if iban_raw has >= 6 chars
 						Count := StrLen(IbanRaw) >= 6 ? 2 : 0
-				case "TextExpansionPersonalInformation", "text_expansion_personal_information":
+				case "TextExpansionPersonalInformation", ConfigLeaf.TEXT_EXPANSION_PERSONAL_INFORMATION:
 						N := 0
 						for Key, Val in PersonalInformation {
 								if (Val != "")
@@ -74,43 +77,37 @@ _MakeOpenSectionFn(SecName) {
 		return (*) => OpenPersonalEditor(SecName)
 }
 ; DisambiguatedLabels is the Map built by _HS_BuildDisambiguatedSectionLabels —
-; Check/Uncheck must target the SAME (possibly-suffixed) label the menu was
+; the tick must land on the SAME (possibly-suffixed) label the menu was
 ; actually built with, or a duplicate description would resolve to the wrong
 ; item (duplicate-personal-section-desc-menu-mistarget).
-_SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels) {
+; DefaultChild is the renderer's handle on the default-section child: the
+; renderer refuses the whole change, preference write included, once it no
+; longer publishes that child under PersonalMenu.
+_SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels) {
 		global _PrevDefaultLabel
 		NewLabel := (SecName == "") ? t("menu.hotstrings.default_none")
 				: (DisambiguatedLabels.Has(SecName) ? DisambiguatedLabels[SecName] : SecName)
 		OldCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",
-			DefaultSectionMenu, Map("personal_default_label", (*) => _PrevDefaultLabel))
+			DefaultChild, Map("personal_default_label", (*) => _PrevDefaultLabel))
 		NewCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",
-			DefaultSectionMenu, Map("personal_default_label", (*) => NewLabel))
+			DefaultChild, Map("personal_default_label", (*) => NewLabel))
 		if !(OldCaption is Map) || !(NewCaption is Map)
 			return false
-		_EditorPrefSet("DefaultSection", SecName)
-		DefaultSectionMenu.Uncheck(t("menu.hotstrings.default_none"))
-		for _, SN in TomlData["sections_order"] {
-				if (SN == "-")
-						continue
-				if !TomlData["sections"].Has(SN)
-						continue
-				try DefaultSectionMenu.Uncheck(DisambiguatedLabels[SN])
-		}
-		if (SecName == "") {
-				DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
-		} else if (TomlData["sections"].Has(SecName)) {
-				DefaultSectionMenu.Check(DisambiguatedLabels[SecName])
-		}
-		try PersonalMenu.Rename(OldCaption["label"], NewCaption["label"])
+		Checked := (SecName == "") ? t("menu.hotstrings.default_none")
+				: (TomlData["sections"].Has(SecName) ? DisambiguatedLabels[SecName] : "")
+		if !MenuRenderer_RepaintTemplateChild(DefaultChild, PersonalMenu, OldCaption, NewCaption, Checked,
+			(*) => _EditorPrefSet("default_section", SecName))
+			return false
 		_PrevDefaultLabel := NewLabel
+		return true
 }
 
-_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels) {
-		return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)
+_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels) {
+		return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels)
 }
 _TogglePersonalCloseOnAdd(PersonalMenu) {
 		Label  := t("menu.hotstrings.close_on_add")
-		NewVal := (_EditorPrefGet("close_on_add", "1") == "1") ? "0" : "1"
+		NewVal := _EditorCloseOnAddEnabled() ? "0" : "1"
 		_EditorPrefSet("close_on_add", NewVal)
 		if (NewVal == "1") {
 				PersonalMenu.Check(Label)
@@ -159,7 +156,7 @@ _ParseExtTomlSections(FilePath) {
 				Trimmed := Trim(A_LoopField, " `t")
 				if RegExMatch(Trimmed, "^\[+([^\[\]]+)\]+$", &SecM) {
 						CurSec := StrLower(Trim(SecM[1]))
-						if (CurSec == "_meta" or CurSec == "_meta.sections") {
+						if (CurSec == ConfigLeaf._META or CurSec == "_meta.sections") {
 								CurSec := ""
 						} else if !SectionCounts.Has(CurSec) {
 								SectionCounts[CurSec] := 0
@@ -205,6 +202,10 @@ _HS_BubbleSort(Array) {
 		}
 	}
 }
+; Formatted menu counts, owned here so every includer (the driver and the
+; test runner) starts with the cache; menu_init.ahk clears it on rebuild.
+global _FmtCountCache := Map()
+
 FmtCount(N) {
 		global _FmtCountCache
 		if _FmtCountCache.Has(N)
@@ -223,8 +224,11 @@ FmtCount(N) {
 }
 NoAction(*) {
 }
+; Frames a translated title as a disabled menu section header. The frame is the
+; one format of _shared/modules/menu/section_header.json, which macOS and Linux
+; read through menu.labels too.
 MenuSectionTitle(Text) {
-		return "— " . Text . " —"
+		return MENU_SECTION_HEADER_PREFIX . Text . MENU_SECTION_HEADER_SUFFIX
 }
 
 ; Build a Map(SecName -> disambiguated description) for the personal-hotstrings

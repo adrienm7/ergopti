@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local SourceIdentity = require("module_source_identity")
 local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
 local source_directory = require("module_source_directory").capture()
@@ -42,9 +43,56 @@ if not _ok_i18n or type(i18n) ~= "table" then
 end
 local LOG    = "toml_writer"
 local ENOENT_ERROR_CODE = 2
+-- A save and its preflight refuse the same row: one notice is enough.
+local CASE_TWIN_NOTICE_GAP_SECONDS = 5
+local case_twin_reporter = nil
+local case_twin_noticed = { setting = nil, at = 0 }
+-- The setting whose case twin refused the batch being prepared.
+local case_twin_setting = nil
+-- The setting the latest batch's refusal already named to the user, until a
+-- caller takes it instead of showing its own generic save failure; a caller
+-- answers in the same callback, so an older notice no longer covers it.
+local case_twin_shown = nil
+local case_twin_shown_at = 0
+
+local function case_twin_name(section, key)
+	return section == "" and key or section .. "." .. key
+end
+
+--- Tells the user which setting two spellings make unwritable, and the way out.
+--- @param setting string Dotted name of the refused setting.
+local function report_case_twin(setting)
+	if case_twin_reporter == nil then return end
+	local now = os.time()
+	if case_twin_noticed.setting == setting and now - case_twin_noticed.at < CASE_TWIN_NOTICE_GAP_SECONDS then
+		case_twin_shown, case_twin_shown_at = setting, now
+		return
+	end
+	-- Literal replacement: a setting name may hold characters gsub would interpret.
+	local message = i18n.get("dialog.config_save.case_twin")
+	local first, last = message:find("{1}", 1, true)
+	-- A notice that cannot name the setting leaves the user no way to find it.
+	if not first then
+		Logger.error(LOG, "The case-twin notice has no {1} placeholder for setting '%s'.", setting)
+		return
+	end
+	message = message:sub(1, first - 1) .. setting .. message:sub(last + 1)
+	first, last = message:find("{2}", 1, true)
+	if first then message = message:sub(1, first - 1) .. i18n.get("menu.global.clean_unused_keys") .. message:sub(last + 1) end
+	local shown, detail = pcall(case_twin_reporter, message)
+	if not shown then
+		Logger.error(LOG, "The case-twin notice could not be shown: %s.", tostring(detail))
+		return
+	end
+	case_twin_noticed.setting, case_twin_noticed.at = setting, now
+	case_twin_shown, case_twin_shown_at = setting, now
+end
 local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
 local Bom = require("toml_codec.bom")
+local SourceOpen = require("toml_codec.source_open")
+local NATIVE_WRITER = "infra.regular_file_writer"
+local has_native_writer = package.searchpath(NATIVE_WRITER, package.path) ~= nil
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
 local inline_member_spans = Codec.inline_member_spans
@@ -105,6 +153,7 @@ M.preparation_admission = preparation_lookup
 
 local math_type = math.type
 local OperationReporter = require("diagnostics.operation_reporter")
+local ConfigKeys = require("config_keys")
 
 
 
@@ -124,10 +173,10 @@ local read_batch_source
 -- file this build does not understand.
 local _refused_writes = {}
 
--- Rows a writer adds when it creates a path from absence. The config migration
--- registers the schema stamp here, so a config.toml this build creates carries
--- this build's version and a later boot never mistakes it for an unstamped,
--- older file.
+-- Rows a writer adds when it creates a path from absence, or to an existing file
+-- that lacks them. The config migration registers the schema stamp here, so a
+-- config.toml this build creates carries this build's version and a file with
+-- no stamp gets one at its next save.
 local _create_rows = {}
 local _sparse_defaults = {}
 
@@ -146,6 +195,19 @@ local function publication_admitted(admission)
 	if type(admission) ~= "function" then return false end
 	local called, admitted = pcall(admission)
 	return called and admitted == true
+end
+
+--- Acquires Linux staging exclusively; other drivers keep their stdio owner.
+--- An installed native module which refuses or fails to load never falls back.
+--- @param tmp_path string Adjacent staging path.
+--- @return file*|nil stream
+--- @return string|nil detail
+--- @return number|string|nil errno
+--- @return function|nil cleanup Native creation's identity-checked removal.
+--- @return function|nil current_image Native staging's regular-path byte proof.
+local function open_staging(tmp_path)
+	if has_native_writer then return require(NATIVE_WRITER).open(tmp_path, "wx") end
+	return io.open(tmp_path, "w")
 end
 
 --- Publishes complete content through a same-directory staging file.
@@ -170,26 +232,30 @@ local function publish(path, content, expected_source, admission)
 		return true
 	end
 	local tmp_path = path .. ".tmp"
-	local open_ok, fh, open_err = pcall(io.open, tmp_path, "w")
+	local open_ok, fh, open_err, _, remove_owned, current_image = pcall(open_staging, tmp_path)
 	if not open_ok or not fh then
 		return false, "cannot open staging file: " .. tostring(open_ok and open_err or fh)
+	end
+	local function discard_staging()
+		if has_native_writer then return type(remove_owned) == "function" and remove_owned() end
+		return os.remove(tmp_path)
 	end
 
 	local write_ok, wrote, write_err = pcall(fh.write, fh, content)
 	local close_ok, closed, close_err = pcall(fh.close, fh)
 	if not write_ok or wrote == nil or wrote == false then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "write failed: " .. tostring(write_ok and write_err or wrote)
 	end
 	if not close_ok or closed == nil or closed == false then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "close failed: " .. tostring(close_ok and close_err or closed)
 	end
 	if type(expected_source) == "table" then
 		local current, current_err, current_status = read_batch_source(path)
 		if current_status ~= expected_source.status
 			or (current_status == "ok" and current ~= expected_source.content) then
-			pcall(os.remove, tmp_path)
+			pcall(discard_staging)
 			return false, "source changed before publication: " .. tostring(current_err or current_status)
 		end
 	end
@@ -197,8 +263,13 @@ local function publish(path, content, expected_source, admission)
 	-- The last classified source read has completed. No logical reader or
 	-- observer runs between this captured admission and native publication.
 	if not publication_admitted(admission) then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "publication admission refused"
+	end
+	if has_native_writer then
+		local checked, current = pcall(current_image, content)
+		-- A refusal cannot prove the staging still belongs to this attempt.
+		if not checked or current ~= true then return false, "staging image verification refused" end
 	end
 	local rename_ok, renamed, rename_err = pcall(os.rename, tmp_path, path)
 	-- POSIX replaces an existing destination atomically. Windows' C runtime does
@@ -218,7 +289,7 @@ local function publish(path, content, expected_source, admission)
 		end
 	end
 	if not rename_ok or renamed ~= true then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "rename failed: " .. tostring(rename_ok and rename_err or renamed)
 	end
 	return true
@@ -231,7 +302,8 @@ end
 --- @return string|nil error_message
 --- @return string status "ok" | "absent" | "error"
 read_batch_source = function(path)
-	local open_ok, fh, open_err, open_code = pcall(io.open, path, "r")
+	-- Never stdio on the path itself: opening a FIFO waits for a writer.
+	local open_ok, fh, open_err, open_code = pcall(SourceOpen.open, path)
 	if not open_ok then return nil, "source open raised: " .. tostring(fh), "error" end
 	if not fh then
 		if open_code == ENOENT_ERROR_CODE then return "", nil, "absent" end
@@ -470,7 +542,7 @@ end
 --- @param data table  The configuration dictionary.
 --- @param expected_source table|nil Optional exact source precondition.
 --- @return boolean, string|nil, string|nil Commit, error, and committed payload.
-function M.write(path, data, file_adapter, create_only, expected_source)
+function M.write(path, data, file_adapter, create_only, expected_source, preserve_source)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "Invalid path provided for TOML write.")
 		return false, "Invalid path provided."
@@ -604,6 +676,12 @@ function M.write(path, data, file_adapter, create_only, expected_source)
 	end
 
 	local payload = table.concat(L, "\n")
+	if preserve_source == true then
+		local detail
+		payload, detail = require("hotstrings.personal_model").prepare(expected_source, data,
+			function(value) return BasicString.unescape_body(esc(value)) end)
+		if payload == nil then return false, detail end
+	end
 	local published, publish_err
 	local committed_payload = nil
 	local create_admission
@@ -740,7 +818,10 @@ local function inline_scalar_state(document, path, row, shapes, allow_absent)
 			end
 			return nil
 		end
-		if matches ~= 1 then return nil, nil, "ambiguous inline scalar case identity" end
+		if matches ~= 1 then
+			case_twin_setting = case_twin_name(row.section, row.key)
+			return nil, nil, "ambiguous inline scalar case identity"
+		end
 		value = child
 	end
 	local kind, desired = type(value), row.value
@@ -816,12 +897,36 @@ function M.source_inline_scalar_parents(content, updates)
 		identities[identity] = true
 		rows[#rows + 1] = { path = path, row = row }
 	end
+	-- Two rows overlap when one case-folded path is a prefix of, or equal to,
+	-- the other. A trie of folded segments finds every such pair in one walk
+	-- per row; comparing every pair lowercased segments O(rows^2) times, about
+	-- 45 000 pairs for a 300-operation save.
 	local overlapping = {}
+	local trie = { children = {}, ends = {} }
 	for index, request in ipairs(rows) do
-		for other_index = index + 1, #rows do
-			local other = rows[other_index]
-			if has_prefix(request.path, other.path, true) or has_prefix(other.path, request.path, true) then
-				overlapping[index], overlapping[other_index] = true, true
+		local node = trie
+		for _, segment in ipairs(request.path) do
+			local folded = segment:lower()
+			local child = node.children[folded]
+			if not child then
+				child = { children = {}, ends = {} }
+				node.children[folded] = child
+			end
+			node = child
+		end
+		node.ends[#node.ends + 1] = index
+	end
+	for index, request in ipairs(rows) do
+		local node = trie
+		local depth = #request.path
+		for level, segment in ipairs(request.path) do
+			node = node.children[segment:lower()]
+			local ends = node.ends
+			if level < depth and #ends > 0 then
+				overlapping[index] = true
+				for _, other in ipairs(ends) do overlapping[other] = true end
+			elseif level == depth and #ends > 1 then
+				overlapping[index] = true
 			end
 		end
 	end
@@ -885,7 +990,7 @@ end
 --- @return string|nil detail
 --- @return string|nil content Candidate bytes.
 --- @return table|nil source Exact publication precondition.
-function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
+local function prepare_batch_checked(path, updates, file_adapter, expected_source, on_error)
 	local report = OperationReporter.new(on_error, Logger, LOG)
 	if type(path) ~= "string" or path == "" then
 		report("validation", "error", "batch_write: invalid path.")
@@ -1024,7 +1129,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		else ordinary[#ordinary + 1] = row end
 	end
 	if model_row then
-		local target = { "llm", "models", "user_models" }
+		local target = { "llm", "models", ConfigKeys.LEAF.USER_MODELS }
 		for _, row in ipairs(ordinary) do
 			local path_segments = row_path(row)
 			local collides = true
@@ -1040,24 +1145,25 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		or type(source_shapes.numbers) ~= "table" then
 		return false, "the existing destination is not valid TOML"
 	end
-	if read_status == "absent" then
-		source = ""
-		local seeds = {}
-		for _, seed in ipairs(_create_rows[refusal_key(path)] or {}) do
-			local segments = KeyPath.parse(seed.section, true)
-			if not segments then return false, "invalid creation seed section" end
-			local row = { section = KeyPath.render(segments), segments = segments, key = seed.key, value = seed.value }
-			local sl, kl = row.section:lower(), row.key:lower()
-			if not (lookup[sl] and lookup[sl][kl]) then
-				if not lookup[sl] then lookup[sl] = {} end
-				lookup[sl][kl] = row
-				seeds[#seeds + 1] = row
-			end
+	if read_status == "absent" then source = "" end
+	local seeds = {}
+	for _, seed in ipairs(_create_rows[refusal_key(path)] or {}) do
+		local segments = KeyPath.parse(seed.section, true)
+		if not segments then return false, "invalid creation seed section" end
+		local row = { section = KeyPath.render(segments), segments = segments, key = seed.key, value = seed.value }
+		local sl, kl = row.section:lower(), row.key:lower()
+		local held = decoded
+		for _, segment in ipairs(segments) do held = type(held) == "table" and held[segment] or nil end
+		local present = read_status ~= "absent" and held ~= nil and (type(held) ~= "table" or held[seed.key] ~= nil)
+		if not present and not (lookup[sl] and lookup[sl][kl]) then
+			if not lookup[sl] then lookup[sl] = {} end
+			lookup[sl][kl] = row
+			seeds[#seeds + 1] = row
 		end
-		if #seeds > 0 then
-			for _, u in ipairs(updates) do seeds[#seeds + 1] = u end
-			updates = seeds
-		end
+	end
+	if #seeds > 0 then
+		for _, u in ipairs(updates) do seeds[#seeds + 1] = u end
+		updates = seeds
 	end
 	-- Finite scalar publication must retain the requested native numeric value.
 	-- Reuse the optional codec; authentic source literals retain precedence and
@@ -1080,7 +1186,10 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 	for _, header in ipairs(scanned.headers) do
 		if header.segments then
 			local identity = header.section:lower()
-			if lookup[identity] and seen_headers[identity] then return false, "ambiguous batch table identity" end
+			if lookup[identity] and seen_headers[identity] then
+				case_twin_setting = header.section
+				return false, "ambiguous batch table identity"
+			end
 			seen_headers[identity] = true
 			if header.array then
 				for _, row in ipairs(updates) do
@@ -1191,7 +1300,10 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 								end
 							end
 							local identity = u.section:lower() .. "\0" .. u.key:lower()
-							if applied[identity] then return false, "ambiguous batch key identity" end
+							if applied[identity] then
+								case_twin_setting = case_twin_name(u.section, u.key)
+								return false, "ambiguous batch key identity"
+							end
 							applied[identity] = true
 							root_owned[#root_owned + 1] = { path = path, row = u }
 							u.inline_unchanged = not u.delete and same_value(existing, desired)
@@ -1254,12 +1366,18 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 						for key in pairs(parent) do
 							if type(key) == "string" and key:lower() == segment:lower() then matches = matches + 1 end
 						end
-						if matches ~= 1 then return false, "ambiguous section scalar case identity" end
+						if matches ~= 1 then
+							case_twin_setting = KeyPath.render(scalar_path)
+							return false, "ambiguous section scalar case identity"
+						end
 						parent = parent[segment]
 					end
 				end
 				local identity = sl .. "\0" .. kl
-				if applied[identity] then return false, "ambiguous batch key identity" end
+				if applied[identity] then
+					case_twin_setting = KeyPath.render(scalar_path)
+					return false, "ambiguous batch key identity"
+				end
 				applied[identity] = true
 				root_owned[#root_owned + 1] = { path = scalar_path, row = u }
 				local unchanged = not u.delete and same_value(existing, u.value)
@@ -1297,7 +1415,10 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			local sl, kl = section:lower(), key:lower()
 			local u = lookup[sl] and lookup[sl][kl]
 			if u and (not record.quoted or not key:find(".", 1, true) or u.literal_key) then
-				if applied[sl .. "\0" .. kl] then return false, "ambiguous batch key identity" end
+				if applied[sl .. "\0" .. kl] then
+					case_twin_setting = case_twin_name(section, key)
+					return false, "ambiguous batch key identity"
+				end
 				applied[sl .. "\0" .. kl] = true
 				for index = record.first, record.last do removed[index] = true end
 				if not u.delete then
@@ -1385,10 +1506,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		end
 	end
 
-	local pending_sections = {}
-	for section in pairs(pending) do pending_sections[#pending_sections + 1] = section end
-	table.sort(pending_sections)
-	for _, section in ipairs(pending_sections) do
+	for _, section in ipairs(TableUtil.sorted_keys(pending)) do
 		local entries = pending[section]
 		lines[#lines + 1] = "\n[" .. section .. "]\n"
 		for _, u in ipairs(entries) do
@@ -1448,6 +1566,43 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		}
 	end
 	return true, nil, content, snapshot
+end
+
+--- Prepares one batch and reports a refusal a case twin caused.
+--- @param path string Destination path.
+--- @param updates table Explicit set/delete operations.
+--- @param file_adapter table|nil Classified platform file adapter.
+--- @param expected_source table|nil Exact source precondition.
+--- @param on_error function|nil Receives only fixed failure categories.
+--- @return boolean prepared
+--- @return string|nil detail
+--- @return string|nil content Candidate bytes.
+--- @return table|nil source Exact publication precondition.
+function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
+	case_twin_setting, case_twin_shown = nil, nil
+	local prepared, detail, content, source = prepare_batch_checked(path, updates, file_adapter, expected_source, on_error)
+	if not prepared and case_twin_setting then report_case_twin(case_twin_setting) end
+	return prepared, detail, content, source
+end
+
+--- Registers how this driver shows a case-twin refusal. Callers only see a false
+--- from their preference owner and show a generic save failure, so the writer is
+--- the one place that still knows the cause.
+--- @param reporter function Receives the localized message.
+function M.set_case_twin_reporter(reporter)
+	if type(reporter) ~= "function" then error("a case-twin reporter must be a function") end
+	case_twin_reporter = reporter
+end
+
+--- Takes the case twin the latest batch's refusal already named to the user.
+--- A caller that would show its generic save failure shows nothing instead, so
+--- one refusal reaches the user once and names the setting.
+--- @return string|nil setting Dotted setting name, or nil when no notice was shown.
+function M.take_case_twin_notice()
+	local setting = case_twin_shown
+	case_twin_shown = nil
+	if setting == nil or os.time() - case_twin_shown_at >= CASE_TWIN_NOTICE_GAP_SECONDS then return nil end
+	return setting
 end
 
 --- Prepares and atomically publishes one explicit set/delete batch.

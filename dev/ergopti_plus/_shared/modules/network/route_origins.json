@@ -1,0 +1,22 @@
+{
+	"schema_version": 1,
+	"clients": {
+		"ollama": [
+			"https://registry.ollama.ai",
+			"https://dd20bb891979d25aebc8bec07b2b3bbc.r2.cloudflarestorage.com"
+		],
+		"uv": [
+			"https://pypi.org",
+			"https://files.pythonhosted.org",
+			"https://github.com",
+			"https://release-assets.githubusercontent.com"
+		]
+	},
+	"refusals": [
+		"route-plan-empty",
+		"route-plan-invalid",
+		"route-plan-conflict",
+		"route-plan-unplanned-host"
+	],
+	"route_lookup_budget_seconds": 20
+}

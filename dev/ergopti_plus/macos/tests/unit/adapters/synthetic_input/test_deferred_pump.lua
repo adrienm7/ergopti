@@ -239,20 +239,20 @@ helpers.describe("synthetic input: callback and deferred dispatch", function()
 
 			local state = {
 				keymap = { epoch = initial_epoch, buffer = { "pre" } },
-				keylogger = { epoch = initial_epoch, buffer = { "pre" }, snapshots = {} },
+				keystats = { epoch = initial_epoch, buffer = { "pre" }, snapshots = {} },
 			}
 			local function reconcile(name)
 				local epoch = synthetic.current_action_epoch()
 				local consumer = state[name]
 				if epoch == consumer.epoch then return end
-				if name == "keylogger" then
+				if name == "keystats" then
 					consumer.snapshots[#consumer.snapshots + 1] = table.concat(consumer.buffer)
 				end
 				consumer.buffer = {}
 				consumer.epoch = epoch
 			end
 			local callbacks = {}
-			for _, name in ipairs({ "keymap", "keylogger" }) do
+			for _, name in ipairs({ "keymap", "keystats" }) do
 				callbacks[name] = function(event)
 					local owned = provenance.classify(event, name)
 					local fence = nil
@@ -282,16 +282,16 @@ helpers.describe("synthetic input: callback and deferred dispatch", function()
 
 			deliver(1, fixture.external_event(nil, CURRENT_PID))
 			helpers.assert_eq(table.concat(app_keys, ","), "a,x")
-			helpers.assert_eq(state.keylogger.snapshots[1], "pre",
+			helpers.assert_eq(state.keystats.snapshots[1], "pre",
 				"the overtaking physical key belongs to the post-action run")
-			helpers.assert_eq(table.concat(state.keylogger.buffer), "x")
+			helpers.assert_eq(table.concat(state.keystats.buffer), "x")
 			helpers.assert_eq(table.concat(state.keymap.buffer), "x")
 			helpers.assert_true(synthetic.current_action_epoch() ~= initial_epoch)
 			helpers.assert_eq(synthetic.stats().pending, 0)
 		end
 
-		exercise({ "keylogger", "keymap" })
-		exercise({ "keymap", "keylogger" })
+		exercise({ "keystats", "keymap" })
+		exercise({ "keymap", "keystats" })
 	end)
 
 	helpers.it("strongly retains broker, listener, and confirmation timers across GC", function()

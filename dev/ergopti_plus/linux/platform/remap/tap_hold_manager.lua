@@ -19,12 +19,19 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
 local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
 local Combinations = require("modules.shortcuts.key_combinations")
+local AiActions = require("modules.shortcuts.ai_actions")
 local original_combination_constructor = Combinations.new
+local original_combination_instance_current = Combinations.instance_is_current
+local BindingIdentity = require("config_binding_identity")
+local BindingPublication = require("config_binding_publication")
+local original_combination_catalogue = BindingIdentity.combination_binding_catalogue
 local original_engine_constructor = Engine.new
 local original_config_load, original_config_document = Config.load, Config.load_document
 local NativeCatalogue = require("_generated.action_catalogue")
@@ -35,6 +42,7 @@ local original_pair_constructor = CombinationEngine.new
 local Timings = require("infra.timings")
 local HoldOptions = require("tap_hold.hold_options")
 local EmitActions = require("_generated.gesture_emit_actions")
+local ScriptActions = require("modules.shortcuts.script_actions")
 local Json = require("json")
 local Paths = require("infra.paths")
 local NavLayer = require("platform.remap.nav_layer")
@@ -51,10 +59,72 @@ local MS_PER_SECOND = 1000
 -- =========================================
 -- =========================================
 
+-- Weak-key values never retain their engine key (including the bare engine).
+-- A source observation is configured-map provenance, not Hook installation.
+local nav_builds = setmetatable({}, { __mode = "k" })
+local original_nav_load, original_nav_capture = NavLayer.load, NavLayer.capture_source_observation
+local original_shared_root = Paths.shared_root
+local original_input_arm_state = Engine.input_arm_state
+local original_codec_decode = Codec.decode
+local nav_engine_ports = {}
+local NAV_ENGINE_PORT_NAMES = { "new", "process", "tick", "handles", "release_all", "input_arm_state" }
+for _, name in ipairs(NAV_ENGINE_PORT_NAMES) do
+	nav_engine_ports[name] = Engine[name]
+end
+
+local function nav_ports_current()
+	if not rawequal(package.loaded["platform.remap.nav_layer"], NavLayer) or getmetatable(NavLayer) ~= nil
+		or rawget(NavLayer, "load") ~= original_nav_load
+		or type(original_nav_capture) ~= "function" or rawget(NavLayer, "capture_source_observation") ~= original_nav_capture
+		or not rawequal(package.loaded["infra.paths"], Paths) or rawget(Paths, "shared_root") ~= original_shared_root
+		or not rawequal(package.loaded["toml_codec"], Codec) or rawget(Codec, "decode") ~= original_codec_decode
+		or not rawequal(package.loaded["platform.remap.tap_hold_engine"], Engine) or getmetatable(Engine) ~= nil
+		or not rawequal(package.loaded["platform.remap.key_combination_engine"], PairModule)
+		or rawget(PairModule, "new") ~= original_pair_constructor then return false end
+	for _, name in ipairs(NAV_ENGINE_PORT_NAMES) do
+		local port = nav_engine_ports[name]
+		if type(port) ~= "function" or rawget(Engine, name) ~= port then return false end
+	end
+	return true
+end
+
+local function nav_mapping_current(engine, record)
+	if not record or record.unavailable or not nav_ports_current()
+		or type(record.observation) ~= "table" or getmetatable(record.observation) ~= nil
+		or rawget(record.observation, "current") ~= record.current
+		or rawget(record.observation, "sealed") ~= record.sealed or record.sealed() ~= true then return false end
+	local base, base_metatable = record.base[1], record.base[2]
+	local metatable, index = record.metatable[1], record.metatable[2]
+	if not base or not base_metatable or not rawequal(getmetatable(base), base_metatable)
+		or rawget(base_metatable, "__index") ~= Engine or not rawequal(rawget(base, "nav_layer"), record.map)
+		or not metatable or not index or not rawequal(getmetatable(engine), metatable)
+		or rawget(metatable, "__index") ~= index then return false end
+	if record.wrapped then
+		-- The genuine base was captured before wrapping, retained only weakly.
+		-- No wrapper getter or native installation observation is invoked here.
+		return record.empty and type(index) == "function" and rawget(engine, "nav_layer") == nil
+			and record.sealed() == true
+	end
+	if not rawequal(base, engine) or index ~= Engine then return false end
+	if record.empty then return true end
+	if rawget(engine, "has_combinations")
+		or rawget(engine, "input_arm_state") ~= nil
+		or rawget(engine, "layer_depth") ~= 0 or rawget(engine, "undecided") ~= nil
+		or rawget(engine, "one_shot_until") ~= nil then return false end
+	for _, field in ipairs({ "held", "layer_keys", "key_refs", "physical_down", "native_keys", "instant_down",
+		"one_shot_keys", "one_shot_swallowed", "passed_down", "modifiers_down" }) do
+		local value = rawget(engine, field)
+		if type(value) ~= "table" or getmetatable(value) ~= nil or next(value) ~= nil then return false end
+	end
+	local observed, state = pcall(original_input_arm_state, engine)
+	return observed and state == nil
+end
+
 local _initialized = false
 local _hook = nil            -- The keyboard hook the engine is installed in.
 local _native_hook = nil     -- Request receiver only; no native authority snapshot.
 local _execute_action = nil  -- Runs a catalogue action by name.
+local _dry_run = false       -- Keeps native remaps while refusing catalogue payloads.
 local _action_names = nil    -- The action catalogue's ids.
 local _on_text_injected = nil -- Told of text the injector typed for a one-shot.
 local _defaults_path = nil
@@ -67,6 +137,10 @@ local _paused = false        -- The daemon's pause.
 local _combinations = nil
 local _installed_engine = nil
 local _generation = 0        -- Revokes queued actions across runtime installations.
+local _tap_copy = nil        -- Checks each tap's copy (platform/remap/tap_copy.lua).
+
+-- The catalogue action whose tap is checked against the clipboard.
+local COPY_ACTION = "copy"
 local managed_options = setmetatable({}, { __mode = "k" })
 local managed_owners = setmetatable({}, { __mode = "k" })
 
@@ -87,7 +161,10 @@ local managed_owners = setmetatable({}, { __mode = "k" })
 local function _run_tap(action, binding)
 	-- This is intent, not an ACK: only Hook's original live-frame controller
 	-- can mint and publish the input arm. Late public exports grant no authority.
-	if action == "one_shot_shift" or action == "caps_word" then return action end
+	if action == "one_shot_shift" then return action end
+	-- CapsWord is an ordinary catalogue action, as on Windows: the executor
+	-- toggles the shortcuts manager's session, the one the tray row shows,
+	-- which locks CapsLock and ends on the [shortcuts.caps_word] settings.
 	if type(action) == "table" then
 		local ok, result = pcall(function()
 			return require("modules.hotstrings.injector").inject(0, action.type_text)
@@ -100,9 +177,85 @@ local function _run_tap(action, binding)
 		_on_text_injected(action.type_text)
 		return
 	end
+	-- A logging sink may synchronously revoke or republish the engine. Capture
+	-- its Manager before the callback, then join again before the irreversible
+	-- action. Pair taps additionally retain their original configured source.
+	local pair_current, tap_current
+	local execute = _execute_action
+	if type(binding) == "string" and binding:match("^combination__") then
+		local combinations, engine, generation = _combinations, _engine, _generation
+		if type(combinations) ~= "table" or type(combinations.capture_runtime) ~= "function" then return end
+		local captured, guard = pcall(combinations.capture_runtime)
+		if not captured or type(guard) ~= "function" then return end
+		pair_current = function()
+			local checked, current = pcall(guard)
+			return checked and current == true and _initialized and not _paused
+				and rawequal(_combinations, combinations) and rawequal(_engine, engine)
+				and _generation == generation and _execute_action == execute
+		end
+		if not pair_current() then return end
+	else
+		local loaded, engine, generation = _loaded, _engine, _generation
+		tap_current = function()
+			return _initialized and not _paused and _enabled and loaded ~= nil and loaded.enabled
+				and engine ~= nil and rawequal(_loaded, loaded) and rawequal(_engine, engine)
+				and rawequal(_installed_engine, engine) and _generation == generation and _execute_action == execute
+		end
+		if not tap_current() then return end
+	end
+	-- Re-read at delivery: the AI may be switched off between the key and its run.
+	if AiActions.blocked(action) then
+		Logger.debug(LOG, "Tap action '%s' held back: the AI is off.", action)
+		return
+	end
 	Logger.debug(LOG, "Tap action '%s'.", action)
-	local ok, err = pcall(_execute_action, action, binding or "tap_hold")
+	if pair_current and not pair_current() then return end
+	if tap_current and not tap_current() then return end
+	local source = binding or "tap_hold"
+	local ok, err
+	-- A dry run keeps the physical remap and touches no clipboard at all, not
+	-- even its counter: the copy is sent unchecked there.
+	if action == COPY_ACTION and _tap_copy and not _dry_run then
+		-- The copy is checked against the clipboard's change counter and sent
+		-- once more when it did not land (platform/remap/tap_copy.lua).
+		ok, err = pcall(_tap_copy.run, _tap_copy, source, function()
+			local sent, send_err = pcall(execute, action, source)
+			if not sent then error(send_err, 0) end
+		end)
+	else
+		ok, err = pcall(execute, action, source)
+	end
 	if not ok then Logger.error(LOG, "Tap action '%s' failed: %s.", action, tostring(err)) end
+end
+
+--- Builds the copy owner over the live clipboard, timer and notifier.
+--- @param execute function The catalogue executor init() was handed.
+--- @return table owner platform/remap/tap_copy.lua
+local function build_tap_copy(execute)
+	return require("platform.remap.tap_copy").new({
+		verify_ms = Timings.ms("tap_hold", "copy_verify_ms"),
+		read_counter = function() return require("adapters.clipboard").change_counter() end,
+		-- The retry runs on a timer: only while this initialisation still owns the
+		-- executor and the daemon is not paused.
+		send_copy = function()
+			if not _initialized or _paused or _execute_action ~= execute then return false end
+			local sent = pcall(execute, COPY_ACTION, "tap_hold")
+			return sent
+		end,
+		after = function(delay_ms, callback)
+			local handle = require("adapters.timer_scheduler").after(delay_ms / MS_PER_SECOND, callback)
+			return handle.armed == true and handle or nil
+		end,
+		cancel = function(handle) require("adapters.timer_scheduler").cancel(handle) end,
+		log = function(level, fmt, ...) Logger[level](LOG, fmt, ...) end,
+		warn_user = function()
+			local sent_ok, sent = pcall(require("adapters.notifier").send,
+				require("infra.i18n").get("notify.tap_hold.copy_failed"), { level = "warning" })
+			if not sent_ok or sent == false then
+				Logger.error(LOG, "Copy failure notice was not delivered: %s.", tostring(sent))
+			end
+		end,
+	})
 end
 
 --- Reads what the one-shot Shift types for a character, from the table the
@@ -144,7 +297,7 @@ local function _pair_thresholds(loaded)
 	local thresholds = {}
 	for _, row in ipairs(loaded.catalog) do
 		local key = loaded.keys[row.id]
-		thresholds[row.id] = math.floor((key and key.time_activation_seconds or Config.FALLBACK_THRESHOLD_SECONDS) * MS_PER_SECOND + 0.5)
+		thresholds[row.id] = math.floor((key and key.time_activation_seconds or loaded.global_seconds) * MS_PER_SECOND + 0.5)
 	end
 	return thresholds
 end
@@ -153,10 +306,7 @@ end
 -- Only this construction path records a saved/public pending configuration.
 -- SourceOwner still owns disk/state currency; it cannot enroll a caller's
 -- catalogue by merely returning a normalized options object.
-local function copy_fields(value)
- if type(value)~="table" then return value end
- local result={};for key,item in pairs(value) do result[key]=copy_fields(item) end;return result
-end
+local copy_fields = TableUtil.deep_copy
 local function fields_equal(value,captured)
  if type(value)~="table" or type(captured)~="table" then return value==captured end
  if getmetatable(value)~=nil then return false end
@@ -164,6 +314,15 @@ local function fields_equal(value,captured)
  for key in pairs(value) do if captured[key]==nil then return false end end
  return true
 end
+
+--- Whether this action is a physical remap or an admitted lifecycle command.
+--- @param action string Configured action id.
+--- @return boolean admitted
+local function action_admitted(action)
+	return not _dry_run or action == "" or action == "none" or action == "one_shot_shift" or action == "caps_word"
+		or Engine.KEY_TAPS[action] ~= nil or EmitActions[action] ~= nil or ScriptActions.is_script_action(action)
+end
+local original_engine_key_codes = copy_fields(rawget(Engine, "KEY_CODES"))
 local catalogue_snapshot=copy_fields(rawget(NativeCatalogue,"actions"))
 local function managed_owner_current(loaded,combinations)
  local issuer=managed_owners[combinations]
@@ -172,6 +331,44 @@ local function managed_owner_current(loaded,combinations)
   and fields_equal(loaded.catalog,issuer.catalogue) and fields_equal(loaded.keys,issuer.keys)
   and fields_equal(loaded.hold_picker,issuer.holds)
 end
+--- Observes only the original complete logical key catalogue and its issuer.
+--- Pause, installed hooks, enabled assignments and physical frames grant no rights.
+--- @param owner table Exact original Manager-created combinations owner.
+--- @return boolean current No action callbacks, native operations, registration or IO.
+function M.managed_combination_catalogue_current(owner)
+	local issuer = type(owner) == "table" and managed_owners[owner] or nil
+	return issuer ~= nil and _initialized and type(_loaded) == "table" and getmetatable(_loaded) == nil
+		and rawequal(owner, _combinations) and type(owner) == "table"
+		and getmetatable(M) == nil and rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
+		and getmetatable(Combinations) == nil
+		and rawequal(package.loaded["modules.shortcuts.key_combinations"], Combinations)
+		and rawget(Combinations, "new") == original_combination_constructor
+		and rawget(Combinations, "instance_is_current") == original_combination_instance_current
+		and original_combination_instance_current(owner, issuer.catalogue) == true
+		and rawequal(package.loaded["platform.remap.tap_hold_loader"], Config)
+		and rawequal(package.loaded["platform.remap.tap_hold_engine"], Engine)
+		and getmetatable(Engine) == nil and rawget(Engine, "new") == original_engine_constructor
+		and fields_equal(rawget(Engine, "KEY_CODES"), original_engine_key_codes)
+		and getmetatable(Config) == nil and rawget(Config, "load") == original_config_load
+		and rawget(Config, "load_document") == original_config_document
+		and managed_owner_current(_loaded, owner)
+end
+local original_logical_catalogue_current = M.managed_combination_catalogue_current
+
+--- Returns a detached complete logical publication from the original build issuer.
+--- @return table|nil catalogue Withdrawn ownership remains unjudged without IO.
+function M.published_binding_catalogue()
+	if not BindingPublication.owner_is_current("combination", "platform.remap.tap_hold_manager", M)
+		or rawget(M, "managed_combination_catalogue_current") ~= original_logical_catalogue_current
+		or not original_logical_catalogue_current(_combinations)
+		or not rawequal(package.loaded["config_binding_identity"], BindingIdentity)
+		or getmetatable(BindingIdentity) ~= nil
+		or rawget(BindingIdentity, "combination_binding_catalogue") ~= original_combination_catalogue then return nil end
+	local issuer = managed_owners[_combinations]
+	local okay, catalogue = pcall(original_combination_catalogue, issuer.catalogue)
+	return okay and catalogue or nil
+end
+
 local function pair_options(loaded,combinations)
  local issuer=assert(managed_owners[combinations],"original managed pair constructor required")
  assert(issuer.loaded==loaded and getmetatable(combinations)==nil
@@ -182,7 +379,15 @@ local function pair_options(loaded,combinations)
  managed_options[configured]={owner=combinations,loaded=loaded,catalogue=copy_fields(loaded.catalog),
   keys=copy_fields(loaded.keys),holds=copy_fields(loaded.hold_picker),options_getter=issuer.engine_options,
   action_names=_action_names,execute_action=_execute_action}
- return configured
+ -- Original options are sealed by their source owner. A separate projection
+ -- can remove payloads before consumption without changing their authority.
+ local projection
+ if _dry_run then
+  projection={taps={},chords=configured.chords and {} or nil}
+  for pair,action in pairs(configured.taps) do projection.taps[pair]=action_admitted(action) and action or "none" end
+  for pair,action in pairs(configured.chords or {}) do projection.chords[pair]=action_admitted(action) and action or "none" end
+ end
+ return configured,projection
 end
 --- Observes only an original Manager-created configuration after installation.
 --- @param owner table Original private combinations owner.
@@ -197,9 +402,9 @@ function M.managed_pair_options_current(owner,configured)
   if action~="none" and catalogue_snapshot[action]==nil then return false end
  end
  return getmetatable(M)==nil and rawequal(package.loaded["platform.remap.tap_hold_manager"],M)
-  and record~=nil and record.owner==owner and _combinations==owner and record.loaded==_loaded
-  and record.engine==_engine and _installed_engine==_engine and record.generation==_generation
-  and _initialized and not _paused and _hook==_native_hook and type(_native_hook)=="table"
+  and record~=nil and rawequal(record.owner,owner) and rawequal(_combinations,owner) and rawequal(record.loaded,_loaded)
+  and rawequal(record.engine,_engine) and rawequal(_installed_engine,_engine) and record.generation==_generation
+  and _initialized and not _paused and rawequal(_hook,_native_hook) and type(_native_hook)=="table"
   and rawequal(package.loaded["modules.shortcuts.key_combinations"],Combinations)
   and rawget(Combinations,"new")==original_combination_constructor
   and rawget(Engine,"new")==original_engine_constructor
@@ -236,11 +441,13 @@ local function _apply()
 	if _combinations and not managed_owner_current(_loaded,_combinations) then return false end
 	if _engine and _combinations and _combinations.has_bindings() and not _engine.has_combinations then
 		if _hook.set_remapper(nil) == false then return false end
-		_engine = CombinationEngine.new(_engine, pair_options(_loaded,_combinations), _buffered_ports())
+		local configured, projection = pair_options(_loaded,_combinations)
+		_engine = CombinationEngine.new(_engine, configured, _buffered_ports(), projection)
 	end
 	if _engine and _engine.has_combinations then
 		if _hook.set_remapper(nil) ~= true then return false end
-		if _engine:configure(pair_options(_loaded,_combinations), _buffered_ports()) ~= true then return false end
+		local configured, projection = pair_options(_loaded,_combinations)
+		if _engine:configure(configured, _buffered_ports(), projection) ~= true then return false end
 		if _engine:set_tap_holds_enabled(_enabled and _loaded.enabled) ~= true then return false end
 	end
 	if _active() then
@@ -324,27 +531,49 @@ local function _build(loaded, boot)
  local issued={loaded=loaded,catalogue=copy_fields(loaded.catalog),keys=copy_fields(loaded.keys),holds=copy_fields(loaded.hold_picker)}
 	_check_catalog(loaded.catalog)
 	local one_shot = _read_one_shot()
-	local config_dir = assert(_user_path:match("^(.*)[/\\][^/\\]+$"), "tap-hold path needs a configuration folder")
-	local nav_layer = NavLayer.load({ shared_root = Paths.shared_root(), config_dir = config_dir, boot = boot == true })
+	local config_dir = assert(NativePath.dirname(_user_path), "tap-hold path needs a configuration folder")
+	local nav_eligible = nav_ports_current()
+	local root_port = nav_eligible and original_shared_root or Paths.shared_root
+	local shared_root = root_port()
+	if not nav_ports_current() then nav_eligible = false end
+	local nav_load = nav_eligible and original_nav_load or NavLayer.load
+	local nav_layer, nav_issuance = nav_load({ shared_root = shared_root, config_dir = config_dir, boot = boot == true })
+	local nav_observation
+	if nav_eligible and nav_ports_current() then
+		nav_observation = original_nav_capture(nav_layer, nav_issuance, shared_root, config_dir)
+	end
 	_warn_unsupported_taps(loaded)
 	local count = 0
 	for _, key in pairs(loaded.keys) do
 		if key.enabled ~= false then count = count + 1 end
 	end
+	local runtime_keys = loaded.keys
+	if _dry_run then
+		runtime_keys = copy_fields(loaded.keys)
+		for _, key in pairs(runtime_keys) do
+			-- Empty tap already means the original physical key. Its hold, layer,
+			-- release accounting and no-hold pass-through stay in the native engine.
+			if not action_admitted(key.tap_action or "") then key.tap_action = "" end
+		end
+	end
 	local engine = original_engine_constructor({
-		keys = loaded.keys,
+		keys = runtime_keys,
 		roll_keys = loaded.roll_keys,
 		nav_layer = nav_layer,
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
+		-- tap_hold.toml's [tap_hold] lone_modifier_tap_max_ms, or the manifest's default.
+		lone_tap_max_ms = loaded.lone_tap_max_ms,
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
-		caps_word_plan = function(text) return _hook.plan_caps_word(text) end,
 		one_shot_result = _one_shot_result,
+		-- An AI action is unarmed while the AI is off: the key keeps its own tap.
+		tap_blocked = AiActions.blocked,
 		held_modifiers = function() return _hook.held_modifiers() end,
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
 		held_shortcut_modifier_codes = function() return _hook.held_shortcut_modifier_codes() end,
 	})
+	local nav_base, nav_wrapped = engine, false
 	assert(rawget(Combinations,"new")==original_combination_constructor and rawget(Engine,"new")==original_engine_constructor
   and rawget(PairModule,"new")==original_pair_constructor,
   "original pair/base constructors required")
@@ -353,14 +582,31 @@ local function _build(loaded, boot)
 		actions = { is_assignable = function(action)
 			-- Native adapter identity selects the request route; frame/source/output
 			-- admission still belongs exclusively to its original controller.
-			return action ~= "caps_word" and (action ~= "one_shot_shift" or _hook == _native_hook)
+			-- CapsWord runs through the executor like any action (_run_tap).
+			return (action ~= "one_shot_shift" or _hook == _native_hook)
 				and _tap_action_set()[action] == true
 		end } })
 	issued.engine_options=rawget(combinations,"engine_options")
  managed_owners[combinations]=issued
 	if combinations.has_bindings() then
-		engine = CombinationEngine.new(engine, pair_options(loaded,combinations), _buffered_ports())
+		local configured, projection = pair_options(loaded,combinations)
+		engine = CombinationEngine.new(engine, configured, _buffered_ports(), projection)
+		nav_wrapped = true
 	end
+	local nav_record = { unavailable = true }
+	if nav_observation and nav_ports_current() then
+		local empty = next(nav_layer) == nil
+		if empty or not nav_wrapped then
+			nav_record = { map = nav_layer, empty = empty, observation = nav_observation,
+				base = setmetatable({ nav_base, getmetatable(nav_base) }, { __mode = "v" }),
+				current = nav_observation.current, sealed = nav_observation.sealed,
+				metatable = setmetatable({ getmetatable(engine), rawget(getmetatable(engine), "__index") }, { __mode = "v" }),
+				wrapped = nav_wrapped, shared_root = shared_root }
+		end
+	end
+	-- A nonempty wrapped route remains explicitly unsupported. No record value
+	-- retains the engine key, so retirement works on LuaJIT's weak-key collector.
+	nav_builds[engine] = nav_record
 	Logger.info(LOG, "Tap-holds loaded: %d key(s), feature %s.", count, loaded.enabled and "on" or "off")
 	return loaded, one_shot, engine, combinations
 end
@@ -397,10 +643,11 @@ end
 --- Loads the configuration and installs the engine.
 --- @param opts table { keyboard_hook, execute_action(action, binding),
 ---   action_names() -> ids, on_text_injected(text), told of each one-shot
----   result the injector typed, defaults_path, user_path }
+---   result the injector typed, defaults_path, user_path, dry_run = boolean|nil }
 function M.init(opts)
 	if _initialized then error("tap-hold manager already initialised", 2) end
 	if type(opts) ~= "table" then error("tap-hold manager options must be a table", 2) end
+	if opts.dry_run ~= nil and type(opts.dry_run) ~= "boolean" then error("tap-hold dry_run must be a boolean", 2) end
 	if type(opts.keyboard_hook) ~= "table" or type(opts.keyboard_hook.set_remapper) ~= "function"
 		or type(opts.keyboard_hook.key_text) ~= "function"
 		or type(opts.keyboard_hook.held_modifiers) ~= "function"
@@ -417,14 +664,16 @@ function M.init(opts)
 			error("tap-hold manager requires " .. name, 2)
 		end
 	end
-	-- Keylogger imports Manager before Hook. Select the loaded receiver at init,
+	-- Keystats imports Manager before Hook. Select the loaded receiver at init,
 	-- before callbacks; its private frame controller alone proves native rights.
 	_native_hook = package.loaded["adapters.keyboard_hook"]
 	Logger.start(LOG, "Initialising tap-holds…")
 	_hook = opts.keyboard_hook
+	_dry_run = opts.dry_run == true
 	_execute_action = opts.execute_action
 	_action_names = opts.action_names
 	_on_text_injected = opts.on_text_injected
+	_tap_copy = build_tap_copy(opts.execute_action)
 	_defaults_path = opts.defaults_path
 	_user_path = opts.user_path
 	_enabled, _paused = true, false
@@ -515,11 +764,31 @@ function M.set_enabled(enabled)
 	return installed
 end
 
+--- How long a modifier key pressed alone still taps, in milliseconds (0 = strict):
+--- the value of the configuration in force, read from tap_hold.toml.
+--- @return number
+function M.lone_tap_max_ms()
+	_require_init()
+	return _loaded.lone_tap_max_ms
+end
+
+--- Sets how long a modifier key pressed alone still taps: written to
+--- tap_hold.toml by the writer, which reloads this manager, so the file stays
+--- the one source of the value.
+--- @param ms number 0 (strict) or a positive whole number of milliseconds.
+--- @param guard function|nil Original deferred editor, strict true required.
+--- @return boolean True when the new engine is in force.
+function M.set_lone_tap_max_ms(ms, guard)
+	_require_init()
+	return require("platform.remap.tap_hold_writer").set_lone_tap_max_ms(ms, guard)
+end
+
 --- Follows the daemon's pause: a paused script remaps nothing.
 --- @param paused boolean
 function M.set_paused(paused)
 	_require_init()
 	_paused = paused == true
+	if _paused and _tap_copy then _tap_copy:stop() end
 	return _apply()
 end
 
@@ -536,6 +805,25 @@ function M.keys()
 	return _loaded.keys
 end
 
+--- The GLOBAL delay in seconds: what a key with no delay of its own waits before
+--- its hold fires. The user's `[tap_hold] time_activation_seconds`, else the
+--- timing registry's default.
+--- @return number
+function M.global_seconds()
+	_require_init()
+	return _loaded.global_seconds
+end
+
+--- Whether the user gave a key a delay of its own, as opposed to it following the
+--- global delay. The tray names the delay « global (N ms) » when this is false.
+--- @param key_id string Canonical shared tap-hold key id.
+--- @return boolean
+function M.has_own_delay(key_id)
+	_require_init()
+	local own = _loaded.user_fields[key_id]
+	return type(own) == "table" and own.time_activation_seconds == true
+end
+
 --- Resolves only an actual enabled key of the currently active engine.
 --- @param key_id string Canonical shared tap-hold key id.
 --- @return string|nil action
@@ -544,6 +832,45 @@ function M.get_tap_action(key_id)
 	local code = Engine.KEY_CODES[key_id]
 	local key = code and _engine.by_code[code]
 	return key and key.id == key_id and key.tap or nil
+end
+
+--- Captures an editor's original configuration, independently of input authority.
+--- Disabled features and an absent user file remain editable; pause retires it.
+--- @return function|nil current Strict true only while the original scope survives.
+function M.capture_configuration_edit()
+	if not _initialized or not _loaded or _paused or not config_exports_current() then return nil end
+	local Files = require("adapters.file_system")
+	local read, factory = Files.read_with_status, M.capture_configuration_edit
+	local path, defaults, loaded = _user_path, _defaults_path, _loaded
+	local engine, installed, generation = _engine, _installed_engine, _generation
+	local enabled, combinations = _enabled, _combinations
+	local keys = copy_fields(loaded.keys)
+	local file_enabled = loaded.enabled
+	local function runtime()
+		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
+			and M.capture_configuration_edit == factory and _initialized and not _paused
+			and _generation == generation and _user_path == path and _defaults_path == defaults
+			and rawequal(_loaded, loaded) and rawequal(_engine, engine) and rawequal(_installed_engine, installed)
+			and _enabled == enabled and rawequal(_combinations, combinations)
+			and loaded.enabled == file_enabled and fields_equal(loaded.keys, keys) and config_exports_current()
+			and rawequal(package.loaded["adapters.file_system"], Files) and Files.read_with_status == read
+	end
+	local bytes, status = read(path)
+	local shipped, shipped_status = read(defaults)
+	if not runtime() or (status ~= "ok" and status ~= "absent") or shipped_status ~= "ok"
+		or (status == "ok" and type(bytes) ~= "string") or type(shipped) ~= "string" then return nil end
+	local ok, decoded = pcall(original_config_load, defaults, path)
+	if not ok or type(decoded) ~= "table" or decoded.enabled ~= file_enabled
+		or not fields_equal(decoded.keys, keys) or not runtime() then return nil end
+	local function current()
+		if not runtime() then return false end
+		local content, classification = read(path)
+		local current_defaults, defaults_status = read(defaults)
+		return content == bytes and classification == status and current_defaults == shipped
+			and defaults_status == shipped_status and runtime()
+	end
+	if current() ~= true then return nil end
+	return current
 end
 
 --- Captures the effective native tap and its own canonical configuration source.
@@ -625,10 +952,7 @@ end
 --- @return table
 function M.tap_actions()
 	_require_init()
-	local ids = {}
-	for id in pairs(_tap_action_set()) do ids[#ids + 1] = id end
-	table.sort(ids)
-	return ids
+	return TableUtil.sorted_keys(_tap_action_set())
 end
 
 --- Whether `action` is an id a tap can be set to.
@@ -684,9 +1008,96 @@ function M._reset_for_test()
 	if _hook and _hook.set_remapper(nil) == false then return false end
 	_initialized, _hook, _execute_action, _action_names, _loaded, _engine = false, nil, nil, nil, nil, nil
 	_on_text_injected = nil
+	if _tap_copy then _tap_copy:stop() end
+	_tap_copy = nil
 	_combinations, _installed_engine = nil, nil
 	_enabled, _paused = true, false
+	_dry_run = false
 	return true
+end
+
+BindingPublication.register("combination", "platform.remap.tap_hold_manager", M, M.published_binding_catalogue)
+
+--- Captures configured native key-prefix reservations from the original Manager.
+--- This observes source/configuration ownership; it grants no physical/output rights.
+function M.capture_collision_inventory()
+	if not _initialized or not _loaded or _paused or not config_exports_current()
+		or original_logical_catalogue_current(_combinations) ~= true then return nil end
+	local Files = require("adapters.file_system")
+	local read, factory = Files.read_with_status, M.capture_collision_inventory
+	local path, defaults, loaded, engine, installed, epoch = _user_path, _defaults_path, _loaded, _engine, _installed_engine, _generation
+	local enabled, paused, combinations = _enabled, _paused, _combinations
+	local nav_record = nav_builds[engine]
+	if not nav_mapping_current(engine, nav_record) then return nil end
+	local bytes, status = read(path)
+	local shipped, shipped_status = read(defaults)
+	if status ~= "ok" or shipped_status ~= "ok" or type(bytes) ~= "string" or type(shipped) ~= "string" then return nil end
+	local decoded = original_config_document(defaults, original_codec_decode(bytes), nil, path)
+	if not nav_mapping_current(engine, nav_record) or not config_exports_current() then return nil end
+	if decoded.enabled ~= loaded.enabled or not fields_equal(decoded.keys, loaded.keys) then return nil end
+	local keys = copy_fields(loaded.keys)
+	local codes = copy_fields(original_engine_key_codes)
+	local native_records = {}
+	if enabled and loaded.enabled and engine and type(engine.by_code) == "table" then
+		for id, fields in pairs(keys) do
+			local code = codes[id]
+			local row = code and engine.by_code[code]
+			if fields.enabled ~= false and row ~= nil then
+				if type(row) ~= "table" or row.id ~= id then return nil end
+				native_records[code] = { row = row, fields = copy_fields(row) }
+			end
+		end
+	end
+	local function runtime()
+		if not rawequal(nav_builds[engine], nav_record) or not nav_mapping_current(engine, nav_record) then return false end
+		if engine and ((engine.layer_depth or 0) ~= 0 or next(engine.held or {}) ~= nil
+			or next(engine.key_refs or {}) ~= nil or next(engine.physical_down or {}) ~= nil) then return false end
+		for code, saved in pairs(native_records) do
+			if not rawequal(engine.by_code[code], saved.row) or not fields_equal(saved.row, saved.fields) then return false end
+		end
+		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M) and _initialized
+			and _user_path == path and _defaults_path == defaults and rawequal(_loaded, loaded)
+			and rawequal(_engine, engine) and rawequal(_installed_engine, installed) and _generation == epoch
+			and _enabled == enabled and _paused == paused and not paused and config_exports_current()
+			and loaded.enabled == decoded.enabled and rawequal(_combinations, combinations)
+			and original_logical_catalogue_current(combinations) == true
+			and fields_equal(loaded.keys, keys) and fields_equal(Engine.KEY_CODES, codes)
+			and rawequal(package.loaded["adapters.file_system"], Files) and Files.read_with_status == read
+			and M.capture_collision_inventory == factory
+	end
+	local function current()
+		if not runtime() then return false end
+		local content, classification = read(path)
+		local current_defaults, defaults_status = read(defaults)
+		if content ~= bytes or classification ~= status or current_defaults ~= shipped
+			or defaults_status ~= shipped_status or not runtime() then return false end
+		if original_shared_root() ~= nav_record.shared_root or not runtime() or nav_record.current() ~= true then return false end
+		return runtime()
+	end
+	if not current() then return nil end
+	local claims = {}
+	if enabled and loaded.enabled then
+		if not rawequal(installed, engine) or not M.is_active() then return nil end
+		for code, saved in pairs(native_records) do
+			-- Native tap with no hold has no by_code entry in the actual engine.
+			claims[#claims + 1] = { kind = "prefix", binding = "tap_hold__" .. saved.row.id,
+				codes = { code }, unmodified_only = true }
+		end
+		if not nav_record.empty then
+			local reachable = false
+			for _, saved in pairs(native_records) do
+				if type(saved.fields.layer) == "string" and saved.fields.layer ~= "" then reachable = true end
+			end
+			if reachable then
+				for code in pairs(nav_record.map) do
+					claims[#claims + 1] = { kind = "prefix", binding = "nav_layer__" .. tostring(code),
+						codes = { code }, unmodified_only = true }
+				end
+			end
+		end
+	end
+	if not current() then return nil end
+	return { claims = claims, codes = codes, path = path, content = bytes, status = status, current = current, sealed = runtime }
 end
 
 return M

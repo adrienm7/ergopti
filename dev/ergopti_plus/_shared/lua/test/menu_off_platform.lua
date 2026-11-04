@@ -69,7 +69,11 @@ end
 --- @return table leaks, number menus_rendered, number greyed stand-ins drawn
 function M.reason_leaks(Renderer, opts)
 	local leaks, greyed = {}, 0
-	local marked = function(key) return OPEN .. tostring(key) .. CLOSE end
+	-- The label-value join is a template, not a title: it keeps its slots.
+	local marked = function(key)
+		if key == "common.label_value" then return "{1}: {2}" end
+		return OPEN .. tostring(key) .. CLOSE
+	end
 	local fh = assert(io.open(opts.manifest_path, "r"))
 	local allowed = greyed_titles(opts.json_decode(fh:read("*a")), opts.platform, marked)
 	fh:close()

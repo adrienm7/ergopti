@@ -11,7 +11,7 @@ function New-OllamaOwnedCurlCapture($Wal, [string]$Stage, $Directories) {
 	$handle = [Ergopti.Ollama.ManagedNative]::OpenDirectory($path, $false)
 	$Directories.Add($relative, $handle)
 	Add-OllamaCreationRecord $Wal 'directory-owned' $relative ([Ergopti.Ollama.ManagedNative]::Identity($handle))
-	foreach ($name in @('artifact.bin', 'headers.bin', 'capability.json', 'transport.conf', 'payload.bin')) {
+	foreach ($name in @('artifact.bin', 'headers.bin')) {
 		$owned = New-OllamaExtractedFile $Wal $Stage ($relative + '/' + $name)
 		try { $owned.stream.Flush($true) } finally { $owned.stream.Dispose() }
 	}
@@ -27,7 +27,7 @@ function Invoke-OllamaManagedArchiveDownload {
 		-not $Source.stream.CanRead -or $ConnectTimeoutMs -le 0 -or
 		$DeadlineMs -le 0 -or $StartedTick -le 0) { throw 'Managed archive acquisition requires its original source and clock.' }
 	$state = @{ Stage = 'file_create'; Reason = 'download'; Receipt = @{};
-		CleanupDebt = @(); NativeCleanupDebt = $false }
+		CleanupDebt = @(); NativeCleanupDebt = $false; PacFallbackStage = '' }
 	$null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $state
 	$stagePath = [IO.Path]::Combine($Root.path, '.stage-' + $Ticket)
 	$drive = [IO.DriveInfo]::new([IO.Path]::GetPathRoot($stagePath))
@@ -65,7 +65,7 @@ function Invoke-OllamaManagedArchiveDownload {
 			param($DestinationUrl, $RemainingMs)
 			return Resolve-ErgoptiNativeNetworkRoutes $DestinationUrl $RemainingMs $ReadConfig $ReadEnvironment $PolicyPath $DefaultsPath
 		}
-		$bytes = Invoke-ErgoptiUpdaterCurlDownload ([Uri]$Source.url) $destination $ConnectTimeoutMs $state $resolver $DeadlineMs $StartedTick $Source.pin.bytes $PolicyPath $DefaultsPath $ReadEnvironment $factory
+		$bytes = Invoke-ErgoptiUpdaterArtifactDownload ([Uri]$Source.url) $destination $ConnectTimeoutMs $state $resolver $DeadlineMs $StartedTick $Source.pin.bytes $PolicyPath $DefaultsPath $ReadEnvironment $factory
 		# The native copy owner has closed its output. Reacquire the exact file,
 		# reject a replaced object, and consume all bytes under the read lease.
 		$read = Open-OllamaReadFile $destination
@@ -81,7 +81,7 @@ function Invoke-OllamaManagedArchiveDownload {
 		return [ordered]@{ ok = $true; phase = 'downloaded'; ticket = $Ticket;
 			root_identity = $Root.identity; stage_identity = $stageIdentity;
 			archive_identity = $capture.output_owner.identity; archive = $destination;
-			bytes = $bytes; sha256 = $Source.pin.sha256;
+			bytes = $bytes; sha256 = $Source.pin.sha256; pac_fallback_stage = $state.PacFallbackStage;
 			creation_wal_identity = $receipt.creation_wal_identity;
 			creation_wal_sha256 = $receipt.creation_wal_sha256 }
 	} catch {

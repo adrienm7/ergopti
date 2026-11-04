@@ -11,6 +11,9 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include ../../infra/phase_stats.ahk
+#Include ../../infra/perf_budget.ahk
+
 
 
 
@@ -30,6 +33,10 @@ global _TrayRootBootDetailsPending := false
 global _TrayRootLifecycleEpoch := 0
 global _TrayRootLatestAuthorizeFn := 0
 global _TrayRootLatestWorkerFn := 0
+; The detached AI child the latest request already constructed: a full rebuild
+; that replaces that request's narrow worker attaches it instead of building
+; a second one (llm-caller-child-survives-full-root).
+global _TrayRootLatestCallerLlm := 0
 global _TrayRootRetryGeneration := 0
 global _TrayRootAutomaticRetryCount := 0
 global _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT := 3
@@ -259,9 +266,11 @@ TrayMenuStage_Publish(AuthorizeFn := 0, ApplyFn := 0) {
 }
 
 _TrayRootRequestAndTryAcquire(AuthorizeFn := 0, WorkerFn := 0,
-		&RequestedGeneration := 0, ForceFullWorkerWhenQueued := false) {
+		&RequestedGeneration := 0, ForceFullWorkerWhenQueued := false,
+		CallerLlm := 0) {
 	global _TrayRootRequestedGeneration, _TrayRootActive
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootLatestCallerLlm
 	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	global _TrayRootBootDetailsPending
 	PreviousCritical := Critical("On")
@@ -278,6 +287,9 @@ _TrayRootRequestAndTryAcquire(AuthorizeFn := 0, WorkerFn := 0,
 			WorkerFn := 0
 		_TrayRootLatestAuthorizeFn := AuthorizeFn
 		_TrayRootLatestWorkerFn := WorkerFn
+		; Only the latest request may lend its child: an older one was built
+		; before whatever the newer request changed.
+		_TrayRootLatestCallerLlm := (CallerLlm is Menu) ? CallerLlm : 0
 		_TrayRootRetryGeneration := RequestedGeneration
 		_TrayRootAutomaticRetryCount := 0
 		if _TrayRootActive
@@ -365,14 +377,16 @@ _TrayRootAcquireRetained(&TargetGeneration, &AuthorizeFn, &WorkerFn) {
 }
 
 _TrayRootClaimLatest(&TargetGeneration, &AuthorizeFn, &WorkerFn,
-		&LifecycleEpoch) {
+		&LifecycleEpoch, &CallerLlm := 0) {
 	global _TrayRootRequestedGeneration, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootLatestCallerLlm
 	PreviousCritical := Critical("On")
 	try {
 		TargetGeneration := _TrayRootRequestedGeneration
 		AuthorizeFn := _TrayRootLatestAuthorizeFn
 		WorkerFn := _TrayRootLatestWorkerFn
+		CallerLlm := _TrayRootLatestCallerLlm
 		LifecycleEpoch := _TrayRootLifecycleEpoch
 		return true
 	} finally Critical(PreviousCritical)
@@ -456,25 +470,46 @@ _TrayRootRetireFatal(TargetGeneration) {
 	} finally Critical(PreviousCritical)
 }
 
-_TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn := 0) {
-	global _TrayRootBootDetailsPending
+_TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn := 0, CallerLlm := 0) {
+	global _TrayRootBootDetailsPending, _LLM_Menu_Handle, _MenuPopulationBuilding, _MenuPopulationPublished
 	if HasMethod(WorkerFn, "Call")
 		return WorkerFn.Call(PublishAuthorizeFn)
 	_HS_InvalidatePersonalCache()
-	InitSubMenus()
-	Published := initMenu(PublishAuthorizeFn)
-	if ((Published is Integer) && Published == 1)
-		_TrayRootBootDetailsPending := false
-	return Published
+	; A full rebuild publishes the root: each submenu is rebuilt where it is next
+	; opened, so one toggle does not redraw a thousand rows nobody is looking at.
+	if _MenuPopulationBuilding is MenuPopulation
+		throw Error("Native menu population already has a build owner")
+	PopulationOwner := MenuPopulation()
+	_MenuPopulationBuilding := PopulationOwner
+	try {
+		InitSubMenus()
+		; The AI child lent by the request is attached through the root builder map
+		; while it is still the live IA submenu. A rebuild of the AI menu since then
+		; replaced it, and the default builder stages the current one.
+		if (CallerLlm is Menu) {
+			if IsSet(_LLM_Menu_Handle) && _LLM_Menu_Handle == CallerLlm
+				LiveLlm := CallerLlm
+			else
+				try LoggerDebug("Menu", "Full tray root: the AI submenu lent by its request was replaced; staging the current one.")
+		}
+		Published := initMenu(PublishAuthorizeFn, false, LiveLlm?)
+		if ((Published is Integer) && Published == 1)
+			_TrayRootBootDetailsPending := false
+		return Published
+	} finally {
+		_MenuPopulationBuilding := false
+		if !IsSet(_MenuPopulationPublished) || _MenuPopulationPublished != PopulationOwner
+			PopulationOwner.Pending.Clear()
+	}
 }
 
 _TrayRootDrain(IsAutomaticRetry := false, LogFn := 0) {
 	loop {
 		_TrayRootClaimLatest(&TargetGeneration, &UpstreamAuthorizeFn,
-			&WorkerFn, &LifecycleEpoch)
+			&WorkerFn, &LifecycleEpoch, &CallerLlm)
 		PublishAuthorizeFn := _TrayRootPublishAuthorized.Bind(
 			TargetGeneration, LifecycleEpoch, UpstreamAuthorizeFn)
-		try Published := _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn)
+		try Published := _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn, CallerLlm)
 		catch as Err {
 			if (Err is TrayRootFatalContextError) {
 				_TrayRootRetireFatal(TargetGeneration)
@@ -486,7 +521,7 @@ _TrayRootDrain(IsAutomaticRetry := false, LogFn := 0) {
 				throw Err
 			}
 			FailureOutcome := _TrayRootFinishReportableFailure(
-				TargetGeneration, IsAutomaticRetry, Err.Message, LogFn)
+				TargetGeneration, IsAutomaticRetry, ErrorNet_Describe(Err), LogFn)
 			if FailureOutcome == 0
 				continue
 			return false
@@ -781,18 +816,37 @@ _RebuildHotstringsLiveOnce() {
 ; do not require re-parsing config or rebinding hotkeys. State-changing
 ; hotstring section toggles rebuild in-process via RebuildHotstringsLive; other
 ; state-changing toggles (layout, tap-holds, shortcuts) still call Reload().
+; CallerLlm is the detached IA submenu a narrow AI worker already built; a full
+; rebuild that takes over the request attaches it rather than building another.
 RebuildTrayMenu(PublishAuthorizeFn := 0, WorkerFn := 0,
-		QueuedOutcome := true, ForceFullWorkerWhenQueued := false) {
+		QueuedOutcome := true, ForceFullWorkerWhenQueued := false,
+		CallerLlm := 0) {
 	; Every root reconstruction—tray click, editor projection, updater, HSLR—uses
 	; one generation owner. A request delivered while an older detached tree is
 	; building only invalidates that tree; it never enters TrayMenuStage_Begin
 	; recursively or throws out of the user callback.
+	PerfCount("menu.rebuild_request")
 	Acquired := _TrayRootRequestAndTryAcquire(
 		PublishAuthorizeFn, WorkerFn, &RequestedGeneration,
-		ForceFullWorkerWhenQueued)
+		ForceFullWorkerWhenQueued, CallerLlm)
 	if !Acquired
 		return QueuedOutcome
-	return _TrayRootDrain()
+	Started := PhaseStats_Now()
+	Published := false
+	try Published := _TrayRootDrain()
+	finally ElapsedMs := PhaseStats_Stop("menu.rebuild", Started)
+	if ((Published is Integer) && Published == 1)
+		_TrayRootReportRebuild(ElapsedMs, TrayMenuItemCount(A_TrayMenu))
+	return Published
+}
+
+; The macOS and Linux line of a tray rebuild and its budget, so one pattern of
+; tools/dev/field-log-analyse.py judges every driver. A refused pass rebuilt nothing.
+; @param ElapsedMs {Number} What the rebuild took.
+; @param TopLevelItems {Integer} The rows of the published root.
+_TrayRootReportRebuild(ElapsedMs, TopLevelItems) {
+	LoggerInfo("Menu", "Menu tree rebuilt in {1} ms ({2} top-level item(s)).", Format("{:.1f}", ElapsedMs), TopLevelItems)
+	PerfBudget_Report("Menu", "menu.rebuild", ElapsedMs, TimingsGet("budgets", "menu_rebuild_ms"))
 }
 
 ; Sets the active log level without a restart. Disk and the cached hot-path
@@ -810,7 +864,7 @@ LoggerSetLevel(Level, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 		try LoggerWarn("Menu", "LoggerSetLevel: unknown level '{1}' — ignoring.", Level)
 		return false
 	}
-	Updates := [{ Section: "script", Key: "log_level", Value: Level }]
+	Updates := [{ Section: "script", Key: ConfigLeaf.LOG_LEVEL, Value: Level }]
 	Persisted := ConfigCommitUpdates(ConfigurationFile, Updates,
 		"the runtime log level", WriterFn, NotifyFn,
 		_LoggerSetLevelPublish.Bind(Level))

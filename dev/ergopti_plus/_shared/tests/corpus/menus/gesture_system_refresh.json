@@ -6,30 +6,17 @@
 			"type": "command",
 			"id": "gesture_system_refresh",
 			"i18n": "ui_apps.btn_refresh",
-			"platforms": ["ahk", "hs"],
+			"platforms": ["hs"],
 			"unavailable": "hide"
 		}
 	],
 	"platform_rows": {
-		"ahk": ["gesture_system_refresh"],
+		"ahk": [],
 		"hs": ["gesture_system_refresh"],
 		"linux": []
 	},
 	"cached_children": {
-		"hs": ["conflict", "pinch", "refresh"],
-		"ahk": [
-			"tap_3",
-			"swipe_3_up",
-			"swipe_3_down",
-			"swipe_3_left",
-			"swipe_3_right",
-			"tap_4",
-			"swipe_4_up",
-			"swipe_4_down",
-			"swipe_4_left",
-			"swipe_4_right",
-			"refresh"
-		]
+		"hs": ["conflict", "pinch", "refresh"]
 	},
 	"captions": {
 		"ar": "تحديث",

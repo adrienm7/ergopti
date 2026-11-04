@@ -10,8 +10,9 @@ return function(helpers)
 	local Codec = require("toml_codec")
 	local Extension = require("layouts.extension")
 	local Extensions = require("hotstrings.extensions")
-	local shared = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
-		:match("^(.*)/lua/test/[^/]+$")
+	local NativePath = require("native_path")
+	local source = debug.getinfo(1, "S").source:gsub("^@", "")
+	local shared = NativePath.dirname(assert(NativePath.dirname(assert(NativePath.dirname(source)))))
 	assert(shared, "the shared tree must enclose this contract")
 
 	local function read(path)
@@ -25,7 +26,7 @@ return function(helpers)
 		return assert(Codec.decode(assert(read(path), path)), path)
 	end
 	local function decode(relative) return decode_path(shared .. "/modules/hotstrings/" .. relative) end
-	local default_delay = assert(tonumber(decode("defaults.toml").delays.default_sec))
+	local default_delay = assert(tonumber(require("infra.manifest_reader").default_for("hotstrings.expansion_delay")))
 	local index = decode("_index.toml")
 
 	-- The real bundled inventory: the neutral files and every declared language
@@ -92,11 +93,14 @@ return function(helpers)
 		groups[#groups + 1] = { id = item.id, override = { item.id }, sections = sections, bundled = true }
 	end
 
-	--- The corpus rung of the cascade, which is what a deleted override leaves.
+	--- The declared and corpus rungs of the cascade, which is what a deleted
+	--- override leaves.
 	local function inherited(group, section)
 		local meta = metas[group]
 		local section_delay = meta.section_delays and meta.section_delays[section]
-		return Resolver.resolve({ meta_category = meta,
+		return Resolver.resolve({
+			declared_delay = Languages.section_default_delay(Manifest.features(), group, section),
+			meta_category = meta,
 			meta_section = section_delay ~= nil and { delay = section_delay } or nil,
 			default_delay = default_delay }).delay
 	end
@@ -136,6 +140,7 @@ return function(helpers)
 		local meta = metas[group]
 		local section_delay = meta.section_delays and meta.section_delays[section]
 		return Resolver.resolve({ user_category = user, user_section = (user.sections or {})[section],
+			declared_delay = Languages.section_default_delay(Manifest.features(), group, section),
 			meta_category = meta, meta_section = section_delay ~= nil and { delay = section_delay } or nil,
 			default_delay = default_delay })
 	end
@@ -171,6 +176,30 @@ return function(helpers)
 			end
 		end)
 
+		helpers.it("replays the declared section delays shared with the AHK owner", function()
+			local fixture = assert(require("json").decode(assert(read(shared ..
+				"/tests/corpus/hotstrings/section_default_delay_vectors.json"))))
+			helpers.assert_true(#fixture.vectors >= 10, "the corpus must hold its vectors")
+			for _, vector in ipairs(fixture.vectors) do
+				helpers.assert_eq(Languages.section_default_delay(fixture.features, vector.group, vector.section),
+					vector.expected, vector.name)
+			end
+		end)
+
+		helpers.it("puts the declared delay above the category file and below the user", function()
+			local meta = { delay = 1.0, sections = {} }
+			helpers.assert_eq(Resolver.resolve({ declared_delay = 0.5, meta_category = meta,
+				meta_section = { delay = 3 }, default_delay = 0.75 }).delay, 0.5, "the declaration beats the file")
+			helpers.assert_eq(Resolver.resolve({ user_category = { delay = 0.2 }, declared_delay = 0.5,
+				meta_category = meta, default_delay = 0.75 }).delay, 0.2, "the user's category delay beats it")
+			helpers.assert_eq(Resolver.resolve({ declared_delay = 0, meta_category = meta,
+				default_delay = 0.75 }).delay, 0, "a declared 0 is unlimited, not absent")
+			helpers.assert_eq(Resolver.resolve({ meta_category = {}, default_delay = 0.75 }).delay, 0.75,
+				"a section declaring nothing waits the base")
+			helpers.assert_eq(Resolver.resolve({ declared_delay = 0.5, default_delay = 0.75 }).has_override, false,
+				"a declaration is not the user's override")
+		end)
+
 		helpers.it("leaves every bundled section on the manifest recommendation after restore", function()
 			local tree = apply(customised(), (plan("recommended")))
 			local checked = 0
@@ -192,38 +221,26 @@ return function(helpers)
 			helpers.assert_true(checked >= 30, "the manifest must recommend delays for the bundled corpus")
 		end)
 
-		helpers.it("writes the autocorrection recommendation that deletion would inherit as 1.0 s", function()
+		-- The maintainer's decision of 3 November 2026: a built-in section waits
+		-- the delay its manifest row declares, so deleting a user's delay already
+		-- leaves it on the recommendation and a restore writes no delay at all.
+		-- Before it, the twelve autocorrection families inherited their file's
+		-- 1.0 s and the restore wrote 0.5 s for each.
+		helpers.it("inherits every declared delay, so a restore writes none", function()
 			local changes, recommendations = plan("recommended")
 			for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
-				helpers.assert_eq(inherited("autocorrection", section), 1.0, "the split preserves each family corpus delay")
+				helpers.assert_eq(inherited("autocorrection", section), 0.5, section .. " waits its declared delay")
 			end
-			local explicit = {}
+			helpers.assert_eq(inherited("french_autocorrection", "accents"), 0.5)
+			helpers.assert_eq(inherited("magickey", "repeat_corrections"), 2.0)
+			helpers.assert_eq(inherited("french_magickey", "text_expansion"), 2.0)
 			for _, change in ipairs(changes) do
-				if change.value ~= nil then
-					explicit[change.override[1] .. "." .. tostring(change.section) .. "." .. change.field] = change.value
+				if change.field == "delay" then
+					helpers.assert_nil(change.value,
+						"no explicit delay for " .. change.override[1] .. "." .. tostring(change.section))
 				end
 			end
-			for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
-				helpers.assert_eq(explicit["autocorrection." .. section .. ".delay"], 0.5, section .. " explicit recommendation")
-			end
-			helpers.assert_nil(explicit["autocorrection.caps.delay"], "the retired family is not a shipped recommendation")
-			helpers.assert_eq(explicit["french_autocorrection.accents.delay"], 0.5)
-			helpers.assert_eq(explicit["rolls.hc.delay"], nil, "an equal inheritance stays sparse")
-			-- The historical ten differences were one common caps family and the
-			-- nine French families below. Three replacements add exactly two rows;
-			-- this independent membership list also refuses accidental additions.
-			helpers.assert_eq(#recommendations, 12, "ten historical rows minus caps plus three common families")
-			local reported = {}
-			for _, row in ipairs(recommendations) do
-				helpers.assert_true(row.inherited ~= row.seconds, row.group .. "." .. row.section)
-				reported[#reported + 1] = row.group .. "." .. row.section
-			end
-			table.sort(reported)
-			helpers.assert_eq(reported, { "autocorrection.abbreviations", "autocorrection.names", "autocorrection.technical_terms",
-				"french_autocorrection.accents", "french_autocorrection.errors", "french_autocorrection.minus",
-				"french_autocorrection.minus_apostrophe", "french_autocorrection.multiple_punctuation_marks",
-				"french_autocorrection.names", "french_autocorrection.ou", "french_autocorrection.suffixes_a_chaining",
-				"french_autocorrection.typographic_apostrophe" })
+			helpers.assert_eq(#recommendations, 0, "every declared section already inherits its recommendation")
 		end)
 
 		helpers.it("returns every section to its corpus inheritance on clear", function()
@@ -255,7 +272,30 @@ return function(helpers)
 			for _, change in ipairs(changes) do helpers.assert_nil(change.value) end
 		end)
 
-		helpers.it("owns only the four override fields of listed tables and extras", function()
+		-- The maintainer's rule: « restaurer les valeurs conseillées » never touches
+		-- the user's own hotstrings; only « tout effacer » resets their tuning.
+		helpers.it("leaves a personal group untouched on restore and resets it on clear", function()
+			local user = { { id = "personal", override = { "personal" }, sections = { "code" }, bundled = false, personal = true },
+				{ id = "rolls", override = { "rolls" }, sections = { "hc" }, bundled = true } }
+			local restored = Planner.plan({ mode = "recommended", features = Manifest.features(),
+				groups = user, inherited = inherited })
+			for _, change in ipairs(restored) do
+				helpers.assert_true(change.override[1] ~= "personal", "a restore plans no personal row")
+			end
+			helpers.assert_true(#restored > 0, "the bundled group is still restored")
+			local cleared = Planner.plan({ mode = "clear", features = Manifest.features(),
+				groups = user, inherited = inherited })
+			local personal = 0
+			for _, change in ipairs(cleared) do
+				if change.override[1] == "personal" then personal = personal + 1 end
+			end
+			helpers.assert_eq(personal, 8, "a clear resets the group and its section, four fields each")
+			helpers.assert_eq(pcall(Planner.plan, { mode = "clear", features = Manifest.features(), inherited = inherited,
+				groups = { { id = "p", override = { "p" }, sections = {}, bundled = false, personal = "yes" } } }), false,
+				"a malformed personal flag is refused")
+		end)
+
+		helpers.it("owns only the override fields of listed tables and extras, the delay in each of its spellings", function()
 			local changes = Planner.plan({ mode = "clear", features = Manifest.features(),
 				groups = { { id = "rolls", override = { "rolls" }, sections = { "hc" }, bundled = true } },
 				inherited = inherited, extra = { { override = { "_global" }, fields = { "delay" } } } })
@@ -266,8 +306,28 @@ return function(helpers)
 				found[#found + 1] = row.section .. "." .. row.key
 			end
 			table.sort(found)
-			helpers.assert_eq(found, { "_global.delay", "rolls.color", "rolls.delay", "rolls.hc.color", "rolls.hc.delay",
+			helpers.assert_eq(found, { "_global.delay", "_global.delay_offset", "_global.delay_unlimited",
+				"rolls.color", "rolls.delay", "rolls.delay_offset", "rolls.delay_unlimited",
+				"rolls.hc.color", "rolls.hc.delay", "rolls.hc.delay_offset", "rolls.hc.delay_unlimited",
 				"rolls.hc.priority", "rolls.hc.show_tooltip", "rolls.priority", "rolls.show_tooltip" })
+		end)
+
+		helpers.it("writes a recommended delay as an offset of the base and an unlimited one as its flag", function()
+			local rows = Planner.writer_rows({
+				{ override = { "autocorrection" }, section = "names", field = "delay", value = 0.5 },
+				{ override = { "rolls" }, section = "hc", field = "delay", value = 0 },
+				{ override = { "rolls" }, section = "ct", field = "delay", value = 2 },
+			}, 0.75)
+			local by_key = {}
+			for _, row in ipairs(rows) do by_key[row.section .. "." .. row.key] = row end
+			helpers.assert_eq(by_key["autocorrection.names.delay_offset"].value, -0.25)
+			helpers.assert_eq(by_key["autocorrection.names.delay_unlimited"].delete, true)
+			helpers.assert_eq(by_key["autocorrection.names.delay"].delete, true, "the absolute spelling never survives")
+			helpers.assert_eq(by_key["rolls.hc.delay_unlimited"].value, true)
+			helpers.assert_eq(by_key["rolls.hc.delay_offset"].delete, true)
+			helpers.assert_eq(by_key["rolls.ct.delay_offset"].value, 1.25)
+			helpers.assert_eq(pcall(Planner.writer_rows, { { override = { "rolls" }, field = "delay", value = 1 } }), false,
+				"a written delay needs the base")
 		end)
 
 		helpers.it("renders an extension identity as one quoted table segment", function()
@@ -275,7 +335,11 @@ return function(helpers)
 				groups = { { id = "ext:demo:rolls", override = { "ext:demo:rolls" }, sections = { "a.b" }, bundled = false } },
 				inherited = inherited }))
 			helpers.assert_eq(rows[1].section, '"ext:demo:rolls"')
-			helpers.assert_eq(rows[5].section, '"ext:demo:rolls"."a.b"')
+			local sectioned
+			for _, row in ipairs(rows) do
+				if row.section == '"ext:demo:rolls"."a.b"' then sectioned = row end
+			end
+			helpers.assert_true(sectioned ~= nil, "the section row carries both quoted segments")
 		end)
 
 		helpers.it("refuses an unknown mode, a malformed group and a missing inheritance", function()

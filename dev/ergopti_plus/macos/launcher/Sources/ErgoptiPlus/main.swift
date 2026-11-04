@@ -36,6 +36,7 @@ import Sparkle
 
 
 
+
 // ==================================
 // ==================================
 // ======= 1/ App-Level State =======
@@ -62,7 +63,7 @@ func installPrivateProcessUmask(
 /// - Parameter homeDirectory: Current user's Foundation home directory.
 /// - Returns: Absolute path exported to the embedded Hammerspoon process.
 func managedPathsFile(homeDirectory: String = NSHomeDirectory()) -> String {
-	return homeDirectory + "/Library/Application Support/ErgoptiPlus/paths.toml"
+	return homeDirectory + "/" + kMacOSPathsFileHomeRelativePath
 }
 
 /// Returns the inherited child environment with the exact live launcher
@@ -78,9 +79,16 @@ func launcherChildEnvironment(
 	launcherPid: Int32,
 	launcherBundleId: String?,
 	loggerEndpoint: LoggerDatagramEndpoint? = nil,
-	keyboardGeometry: KeyboardGeometryMap? = nil
+	keyboardGeometry: KeyboardGeometryMap? = nil,
+	developerSourceRoot: String? = nil
 ) -> [String: String] {
 	var environment = base
+	// Only a developer build names a clone root; an inherited value would make
+	// the packaged Lua believe it runs from source and switch its updates off.
+	environment.removeValue(forKey: Identifiers.DevSource.environment)
+	if let developerSourceRoot {
+		environment[Identifiers.DevSource.environment] = developerSourceRoot
+	}
 	// Launch Services injects the outer app identity into its environment.
 	// Process inherits it verbatim, but the child is a second GUI bundle: keeping
 	// either marker makes AppKit/NSUserDefaults treat embedded Hammerspoon as the
@@ -89,6 +97,9 @@ func launcherChildEnvironment(
 	// identity from its own executable and Info.plist.
 	environment.removeValue(forKey: "__CFBundleIdentifier")
 	environment.removeValue(forKey: "XPC_SERVICE_NAME")
+	// Only the original Fresh issuer may add its private route after this ordinary
+	// inheritance boundary; inherited text cannot select the first native loader.
+	environment.removeValue(forKey: "ERGOPTI_INSTALLED_CAPTURE_CONTROL")
 	environment["ERGOPTI_LAUNCHER_PID"] = String(launcherPid)
 	environment.removeValue(forKey: "ERGOPTI_LAUNCHER_BUNDLE_ID")
 	environment.removeValue(forKey: kLoggerDatagramPortEnvironment)
@@ -235,7 +246,7 @@ enum LauncherLog {
 	static let maximumFileBytes: off_t = 1_048_576
 	private static let queue = DispatchQueue(label: "com.ergoptiplus.launcher-log")
 	private static let lockTimeoutSeconds: TimeInterval = 0.25
-	private static let lockRetryMicroseconds: useconds_t = 1_000
+	private static let lockRetryMicroseconds = LauncherTimings.fileLockRetry.microseconds
 
 	/// Absolute launcher.log path, exported so the Lua runtime can append its
 	/// own fatal line and named in every fatal alert.
@@ -526,6 +537,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var hsLogFolderRefusal: LogDirectoryFailure?
 	private var loggerWorker: LoggerDatagramServing?
 	private var updater: SPUUpdater?
+	// Decided once: the signed payload, or the clone of a developer build.
+	private lazy var luaSource = LuaSourceSelection.resolve(
+		infoDictionary: Bundle.main.infoDictionary,
+		bundlePath: Bundle.main.bundlePath,
+		fileExists: { FileManager.default.fileExists(atPath: $0) }
+	)
 	// Retained here: Sparkle keeps its delegate weakly.
 	private let updateChannelFeed = UpdateChannelFeed()
 	private let updaterCommandRouter = UpdaterCommandRouter()
@@ -541,6 +558,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let processExitMonitorFactory: EmbeddedProcessExitMonitorFactory
 	private let fatalReportStore: EmbeddedFatalReportStore
 	private let childActivity: EmbeddedChildActivity
+	private let instanceLock: LauncherInstanceLock
+	private let runningApplicationsReader: (String) -> [NSRunningApplication]
 	private var applicationIsTerminating = false
 	// Monotonic origin of this launcher's startup trail.
 	private let launcherStartUptime = ProcessInfo.processInfo.systemUptime
@@ -560,6 +579,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - processExitMonitorFactory: Acquires the child's kernel exit-status owner.
 	///   - fatalReportStore: Per-launch report the Lua runtime writes before a fatal exit.
 	///   - childActivity: Keeps App Nap off the launcher while its child runs.
+	///   - instanceLock: Per-user lock that makes this process the sole launcher.
+	///   - runningApplicationsReader: Lists running applications by bundle identifier.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
@@ -583,7 +604,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			makeEmbeddedProcessExitMonitor,
 		fatalReportStore: EmbeddedFatalReportStore =
 			EmbeddedFatalReportStore(path: LauncherLog.fatalReportPath),
-		childActivity: EmbeddedChildActivity = EmbeddedChildActivity()
+		childActivity: EmbeddedChildActivity = EmbeddedChildActivity(),
+		instanceLock: LauncherInstanceLock = LauncherInstanceLock(path: launcherInstanceLockPath()),
+		runningApplicationsReader: @escaping (String) -> [NSRunningApplication] = {
+			NSRunningApplication.runningApplications(withBundleIdentifier: $0)
+		}
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.applicationLauncher = applicationLauncher
@@ -593,6 +618,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.processExitMonitorFactory = processExitMonitorFactory
 		self.fatalReportStore = fatalReportStore
 		self.childActivity = childActivity
+		self.instanceLock = instanceLock
+		self.runningApplicationsReader = runningApplicationsReader
 		super.init()
 	}
 
@@ -605,11 +632,94 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		LauncherLog.write("launcher startup started — version \(bundleVersionString())")
+		acquireSoleLauncherOwnership(attempt: 0) { [weak self] in
+			self?.finishLaunchingAsSoleLauncher()
+		}
+	}
 
+	/// Becomes the only launcher of this user, or hands over to the one that is.
+	/// Everything that can start an embedded runtime runs only after this.
+	/// - Parameters:
+	///   - attempt: Retries already spent on a held lock.
+	///   - proceed: Continues startup once the lock is held.
+	@MainActor
+	private func acquireSoleLauncherOwnership(attempt: Int, then proceed: @escaping @MainActor () -> Void) {
+		switch instanceLock.acquire() {
+		case .acquired:
+			LauncherLog.write("launcher stage: sole-launcher lock held at \(instanceLock.path)")
+			proceed()
+		case .heldByAnotherLauncher where attempt < kLauncherLockRetryAttempts:
+			Task { @MainActor [weak self] in
+				try? await Task.sleep(nanoseconds: LauncherTimings.instanceLockRetry.nanoseconds)
+				self?.acquireSoleLauncherOwnership(attempt: attempt + 1, then: proceed)
+			}
+		case .heldByAnotherLauncher:
+			// A second launcher would start a second embedded runtime beside the first
+			LauncherLog.write(
+				"another ErgoptiPlus launcher holds \(instanceLock.path); activating it and exiting"
+			)
+			let ownPid = ProcessInfo.processInfo.processIdentifier
+			for other in runningApplicationsReader(kErgoptiBundleId) where other.processIdentifier != ownPid {
+				_ = other.activate(options: [])
+			}
+			applicationIsTerminating = true
+			applicationTerminator(self)
+		case let .failed(errorCode):
+			fail("The ErgoptiPlus instance lock \(instanceLock.path) could not be taken (errno \(errorCode)).")
+		}
+	}
+
+	/// Startup that only the sole launcher performs.
+	@MainActor
+	private func finishLaunchingAsSoleLauncher() {
 		// Hide the launcher from the Dock — Hammerspoon's own menubar item
 		// is the only UI affordance the user should see.
 		NSApp.setActivationPolicy(.accessory)
 
+		// Decide where the Lua comes from before anything is started for it.
+		switch luaSource {
+		case let .refused(reason):
+			fail(reason)
+			return
+		case let .developer(root, _):
+			LauncherLog.write("launcher stage: developer source mode; Lua runs from \(root)")
+		case .packaged:
+			break
+		}
+		// A developer app is never updated in place: Sparkle would replace it.
+		if luaSource.developerRoot == nil {
+			startSparkleUpdater()
+		} else {
+			LauncherLog.write("launcher stage: Sparkle updater not started: a developer source build is never updated")
+		}
+
+		// Tell the embedded Hammerspoon where to read its Lua config from.
+		seedConfigDirDefault()
+		LauncherLog.write("launcher stage: \(kHammerspoonConfigKey) seeded to \(bundledInitLuaPath())")
+
+		// Spawn the embedded Hammerspoon binary; if it cannot be located we
+		// surface a hard error rather than silently degrading.
+		guard let hsBinary = locateEmbeddedHammerspoonBinary() else {
+			fail("Embedded Hammerspoon binary not found inside the .app bundle.")
+			return
+		}
+
+		// Hammerspoon itself tolerates a missing/invalid MJConfigFile by starting
+		// normally with no Lua loaded — no crash, exit code 0. Without this check
+		// a partial unzip, a disk-full install, or a build-script regression that
+		// silently drops the Lua tree would all produce an app that launches,
+		// shows nothing wrong, and remaps nothing (F-HIGH-28). Fail loudly instead.
+		guard FileManager.default.fileExists(atPath: bundledInitLuaPath()) else {
+			fail("Bundled configuration (init.lua) not found inside the .app bundle.")
+			return
+		}
+		LauncherLog.write("launcher stage: embedded Hammerspoon and bundled init.lua found at \(hsBinary)")
+		startManagedHammerspoon(at: hsBinary)
+	}
+
+	/// Starts the retained Sparkle controller of a packaged app.
+	@MainActor
+	private func startSparkleUpdater() {
 		// Lua owns the check cadence; Sparkle handles authenticated installation.
 		// Prove the consent policy before starting the localized user driver.
 		// The feed delegate serves the channel selected in the menu.
@@ -640,29 +750,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 				LauncherLog.write("ERROR: Sparkle updater could not start: \(failure.domain) \(failure.code)")
 			}
 		}
-
-		// Tell the embedded Hammerspoon where to read its Lua config from.
-		seedConfigDirDefault()
-		LauncherLog.write("launcher stage: \(kHammerspoonConfigKey) seeded to \(bundledInitLuaPath())")
-
-		// Spawn the embedded Hammerspoon binary; if it cannot be located we
-		// surface a hard error rather than silently degrading.
-		guard let hsBinary = locateEmbeddedHammerspoonBinary() else {
-			fail("Embedded Hammerspoon binary not found inside the .app bundle.")
-			return
-		}
-
-		// Hammerspoon itself tolerates a missing/invalid MJConfigFile by starting
-		// normally with no Lua loaded — no crash, exit code 0. Without this check
-		// a partial unzip, a disk-full install, or a build-script regression that
-		// silently drops the Lua tree would all produce an app that launches,
-		// shows nothing wrong, and remaps nothing (F-HIGH-28). Fail loudly instead.
-		guard FileManager.default.fileExists(atPath: bundledInitLuaPath()) else {
-			fail("Bundled configuration (init.lua) not found inside the .app bundle.")
-			return
-		}
-		LauncherLog.write("launcher stage: embedded Hammerspoon and bundled init.lua found at \(hsBinary)")
-		startManagedHammerspoon(at: hsBinary)
 	}
 
 	/// Routes the private menu commands to the retained Sparkle controller.
@@ -681,7 +768,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		LauncherLog.write(
 			"launcher stage: remap guardian registration left to the driver's Karabiner switch"
 		)
-		launchHammerspoon(at: hsBinary, remapGuardianStatus: .notRequested)
+		replaceStaleEmbeddedRuntimes { [weak self] in
+			self?.launchHammerspoon(at: hsBinary, remapGuardianStatus: .notRequested)
+		}
+	}
+
+	/// Ends every embedded runtime this launcher did not start, then proceeds.
+	/// Only the embedded bundle identity is scanned, so a Hammerspoon the user
+	/// installed is never touched. Runs after the sole-launcher lock, so a
+	/// runtime found here has no live launcher of its own.
+	/// - Parameter proceed: Starts this launcher's own runtime.
+	private func replaceStaleEmbeddedRuntimes(then proceed: @escaping () -> Void) {
+		let running = runningApplicationsReader(kEmbeddedHammerspoonBundleId)
+		let stalePids = Set(staleEmbeddedRuntimes(
+			running.map {
+				RunningRuntimeCandidate(processIdentifier: $0.processIdentifier, bundleIdentifier: $0.bundleIdentifier)
+			},
+			trackedChild: hsApplication?.processIdentifier
+		))
+		let stale = running.filter { stalePids.contains($0.processIdentifier) }
+		guard !stale.isEmpty else {
+			proceed()
+			return
+		}
+		for application in stale {
+			LauncherLog.write("replacing a leftover embedded Hammerspoon (pid \(application.processIdentifier))")
+			application.terminate()
+		}
+		waitForStaleRuntimes(
+			stale,
+			deadline: Date().addingTimeInterval(kStaleRuntimeTerminateGraceSeconds),
+			then: proceed
+		)
+	}
+
+	/// Polls the terminated runtimes, force-terminating any past the grace period.
+	/// - Parameters:
+	///   - stale: Runtimes asked to terminate.
+	///   - deadline: End of their grace period.
+	///   - proceed: Starts this launcher's own runtime.
+	private func waitForStaleRuntimes(
+		_ stale: [NSRunningApplication],
+		deadline: Date,
+		then proceed: @escaping () -> Void
+	) {
+		let alive = stale.filter { !$0.isTerminated }
+		if alive.isEmpty {
+			LauncherLog.write("launcher stage: leftover embedded Hammerspoon ended")
+			proceed()
+			return
+		}
+		if Date() >= deadline {
+			for application in alive {
+				LauncherLog.write(
+					"leftover embedded Hammerspoon pid \(application.processIdentifier) ignored terminate; forcing it"
+				)
+				application.forceTerminate()
+			}
+			proceed()
+			return
+		}
+		DispatchQueue.main.asyncAfter(deadline: .now() + kStaleRuntimePollIntervalSeconds) { [weak self] in
+			self?.waitForStaleRuntimes(stale, deadline: deadline, then: proceed)
+		}
 	}
 
 	func applicationWillTerminate(_ notification: Notification) {
@@ -721,7 +870,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// directory is derived from the file path by HS internally, so every Lua
 	// require() and hs.configdir resolve correctly from this single override.
 	private func bundledConfigDir() -> String {
-		return "\(Bundle.main.bundlePath)/Contents/Resources/static/ergopti_plus/macos"
+		switch luaSource {
+		case let .packaged(configDir), let .developer(_, configDir):
+			return configDir
+		case let .refused(reason):
+			// finishLaunchingAsSoleLauncher() stops on a refusal before any caller.
+			preconditionFailure("Lua source refused before launch: \(reason)")
+		}
 	}
 
 	private func bundledInitLuaPath() -> String {
@@ -842,7 +997,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			launcherPid: ProcessInfo.processInfo.processIdentifier,
 			launcherBundleId: Bundle.main.bundleIdentifier,
 			loggerEndpoint: activeLoggerWorker.endpoint,
-			keyboardGeometry: keyboardGeometry
+			keyboardGeometry: keyboardGeometry,
+			developerSourceRoot: luaSource.developerRoot
 		)
 		env["ERGOPTI_LAUNCHER_VERSION"]       = bundleVersionString()
 		env["ERGOPTI_CONFIG_DIR"]             = bundledConfigDir()
@@ -1126,6 +1282,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // spawned by Hammerspoon owns no GUI/application lifecycle.
 installPrivateProcessUmask()
 
+// Explicit diagnostic only. The genuine signed helper query refuses unavailable profiles before admin staging.
+if OwnedVirtualHIDDaemonReportMainOperation.handles(arguments: CommandLine.arguments) {
+	let reportResult = DispatchSemaphore(value: 0)
+	DispatchQueue.global(qos: .userInitiated).async {
+		// Darwin.exit never returns: the main thread pumps the run loop until it ends the process.
+		Darwin.exit(OwnedVirtualHIDDaemonReportMainOperation.run(arguments: CommandLine.arguments))
+	}
+	while reportResult.wait(timeout: .now() + 0.02) == .timedOut { RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02)) }
+}
+
+
 if OwnedSuspendedImageGuardian.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(OwnedSuspendedImageGuardian.run(arguments: CommandLine.arguments))
 }
@@ -1135,6 +1302,9 @@ if ManagedOllamaAPIWorker.handles(arguments: CommandLine.arguments) {
 }
 
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT
+if OwnedListenerEventFixture.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(OwnedListenerEventFixture.run(arguments: CommandLine.arguments))
+}
 if ManagedOllamaListenerFixture.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(ManagedOllamaListenerFixture.run(arguments: CommandLine.arguments))
 }
@@ -1144,12 +1314,22 @@ if ManagedPTYWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(ManagedPTYWorker.run(arguments: CommandLine.arguments))
 }
 
+if ReleaseRenameWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(ReleaseRenameWorker.run(arguments: CommandLine.arguments))
+}
+
 if ManagedBootstrapDownload.handles(arguments: CommandLine.arguments) {
+	guard ManagedCertificateAuthorities.dropInheritedTrustVariables() else { Darwin.exit(78) }
 	Darwin.exit(ManagedBootstrapDownload.run(arguments: CommandLine.arguments))
 }
 
 if ManagedHTTPWorker.handles(arguments: CommandLine.arguments) {
+	guard ManagedCertificateAuthorities.dropInheritedTrustVariables() else { Darwin.exit(78) }
 	Darwin.exit(ManagedHTTPWorker.run(arguments: CommandLine.arguments))
+}
+
+if ManagedProxyRouteWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(ManagedProxyRouteWorker.run(arguments: CommandLine.arguments))
 }
 
 if OwnedAutomationQueryWorker.handles(arguments: CommandLine.arguments) {
@@ -1160,12 +1340,28 @@ if OwnedProgramWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(OwnedProgramWorker.run(arguments: CommandLine.arguments))
 }
 
+if InputSourceUpgradeWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(InputSourceUpgradeWorker.run(arguments: CommandLine.arguments))
+}
+
+if InputSourceSelectionWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(InputSourceSelectionWorker.run(arguments: CommandLine.arguments))
+}
+
 if KeyboardSourceProbeWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(KeyboardSourceProbeWorker.run(arguments: CommandLine.arguments))
 }
 
+if NumberRowSourceProbeWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(NumberRowSourceProbeWorker.run(arguments: CommandLine.arguments))
+}
+
 if LoginStartupWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(LoginStartupWorker.run(arguments: CommandLine.arguments))
+}
+
+if InputMonitoringAccessWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(InputMonitoringAccessWorker.run(arguments: CommandLine.arguments))
 }
 
 if UninstallWorker.handles(arguments: CommandLine.arguments) {
@@ -1178,6 +1374,14 @@ if KeychainTokenWorker.handles(arguments: CommandLine.arguments) {
 
 if KarabinerLeaseWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(KarabinerLeaseWorker.run(arguments: CommandLine.arguments))
+}
+
+// The owned runtime's capture stream and, through it, its Console user server
+// (ADR 011, decision 8). It authenticates the installed runtime itself and
+// refuses with a closed status when none is installed, so reaching it changes
+// nothing for a Mac without the owned runtime.
+if InstalledPhysicalSourceBridge.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(InstalledPhysicalSourceBridge.run())
 }
 
 // Write MJConfigFile via CFPreferences before NSApplication.run() so Hammerspoon

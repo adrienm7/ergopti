@@ -31,6 +31,7 @@ local M = {}
 
 local Layers = require("keymap.layers")
 local TomlWriter = require("toml_codec.writer")
+local Timings = require("infra.timings")
 
 
 
@@ -42,9 +43,8 @@ local TomlWriter = require("toml_codec.writer")
 -- ============================
 -- ============================
 
--- The largest layers.toml the editor accepts. Every registry key bound in all
--- four sections is about 25 KB; anything larger is not a layer file.
-M.MAX_TEXT_BYTES = 65536
+-- The largest layers.toml the editor accepts ([limits] layer_file_bytes).
+M.MAX_TEXT_BYTES = Timings.count("limits", "layer_file_bytes")
 
 -- The error codes this module adds to the loader's.
 M.INVALID_PAYLOAD = "invalid_payload"

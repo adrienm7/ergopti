@@ -9,6 +9,8 @@
 ; .keylayout (layout/layout_ergopti.ahk); this file owns the hotkeys.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -55,7 +57,7 @@ DeadKey(Mapping) {
 		; SerializeSymbols path, AltGrShiftDispatch's unconditional wrap) so their
 		; own SendEvent-based emits serialize against neighbouring remapped keys.
 		; ih.Wait() below is a blocking, message-pumping wait with up to a 2s
-		; timeout ("L1 T2") -- running THAT under Critical stalls the ENTIRE AHK
+		; timeout ("L2 E C T2") -- running THAT under Critical stalls the ENTIRE AHK
 		; message pump (every hotkey/timer in the process) for up to 2 seconds on
 		; every CapsLock dead-key press, not just this key
 		; (deadkey-wait-under-critical-stalls-pump). Release Critical for the wait
@@ -63,32 +65,36 @@ DeadKey(Mapping) {
 		; below still serializes exactly as the caller intended.
 		_AtCrit := Critical("Off")
 		try {
-			ih := InputHook(
-				"L1 T2",
-				"{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
-			)
+			NamedKeys := "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Insert}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
+			ih := InputHook("L2 E C T2", _SIHO_ScalarEndKeys() . NamedKeys)
 			OwnerToken := SIHO_StartOwned(ih, "dead-key", true)
 			if !OwnerToken
 				return
 			try {
 				ih.Wait()
 			} finally {
-				SIHO_StopOwned(OwnerToken, ih)
+				CaptureSettled := SIHO_StopOwned(OwnerToken, ih)
 			}
 		} finally {
 			Critical(_AtCrit)
 		}
 		; A live InputHook bypasses native Suspend, so a pause can land DURING Wait().
 		; If the driver was paused mid-sequence, emit nothing — « pause = tout eteint »
-		; (deadkey-inputhook-post-wait-suspend-leak). The finally still resets the flag.
-		if A_IsSuspended
+		; (deadkey-inputhook-post-wait-suspend-leak). The exact owner acknowledgement
+		; also rejects a pause which resumed before this older Wait unwound.
+		if !CaptureSettled || A_IsSuspended
 			return
-		if (ih.EndReason = "Timeout") {
+		Capture := _SIHO_ReadScalar(ih, NamedKeys)
+		if Capture.Reason != ""
+			LoggerWarn("DeadKey", "Discarded invalid scalar capture ({1}).", Capture.Reason)
+		if Capture.Kind == "invalid"
+			return
+		if Capture.Kind == "timeout" {
 			if Mapping.Has(" ")
 				SendNewResult(Mapping[" "])
 			return
 		}
-		PressedKey := ih.Input
+		PressedKey := Capture.Text
 		if Mapping.Has(PressedKey) {
 			SendNewResult(Mapping[PressedKey])
 		} else {
@@ -101,8 +107,8 @@ DeadKey(Mapping) {
 		; Re-send EndKeys (Enter, BackSpace, Delete) consumed by the InputHook.
 		; Without the "V" option the hook swallows them; the user's newline,
 		; delete or erase would disappear silently after a dead-key sequence.
-		if (ih.EndReason = "EndKey")
-			Send("{" . ih.EndKey . "}")
+		if Capture.Kind == "control"
+			Send("{" . Capture.Name . "}")
 	} finally {
 		InDeadKeySequence := false
 	}
@@ -114,6 +120,12 @@ UpdateLastSentCharacter(Character) {
 	; timestamp write (AppState_TouchLastSentKey).
 	_LSCPush(Character)
 	AppState_TouchLastSentKey(Character)
+	; Every emit that reached the screen passes here (layers, AltGr, dead keys,
+	; the shifted digit row, a hotstring's last character), much of it invisible
+	; to the auto-off InputHook: a checked delimiter ends CapsWord as if typed.
+	; Key names ("Space", "LControl") hold no delimiter character.
+	if IsSet(CapsWordAutoOffObserveOutput)
+		CapsWordAutoOffObserveOutput(Character)
 }
 
 ; Serialized remap emit — the callback every remapped key fires. SendMode is
@@ -128,6 +140,16 @@ UpdateLastSentCharacter(Character) {
 ; drained — restoring strict per-key ordering. Same SendEvent semantics
 ; (``{Blind}`` / AltGr / modifiers unchanged); only ordering is enforced. There is
 ; NO Sleep on this path, so Critical's guarantee holds (a Sleep would yield it).
+; It stays a SendEvent rather than a SendInput on purpose. Measured on the live
+; driver (2026-10-23, several hundred keystrokes, SetKeyDelay 0): mean 2.1 to
+; 2.6 ms and worst 5.7 ms per emitted key, so SendInput could gain about 2 ms a
+; key, below what typing can feel. Against that, this emit is the only trace of
+; the key its level-2 hotkey suppresses and must reach the prefix watcher in
+; order, {Blind} and AltGr/Kana modifier handling are those of the hook path,
+; every SendInput reinstalls AutoHotkey's hook in front of the native owner, and
+; with another AutoHotkey hook it falls back to SendEvent anyway. A hotstring's
+; own output is the opposite case and already a SendInput (see
+; project-hotstring-output-is-final in docs/memory/windows-ahk.md).
 ; Profiled because this is the FIRST stage of every remapped keystroke and the
 ; only one that had no segment at all: an "OnChar" line that looked slow could
 ; equally have been a slow SendEvent that had already finished before OnChar
@@ -226,8 +248,15 @@ _LockWorkstationEmit(*) {
 		_ResetPrefixBuffer()
 }
 
+; A Ctrl or Alt chord of a remapped key: the keyboard slot set on it, else the layout's.
+_RemapChordEmit(Variant, SendStr, KeyChar, *) {
+	if !KeyboardShortcutRunLayoutChord(Variant)
+		_RemapEmit(SendStr, KeyChar)
+}
+
 RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	global RemappedList
+	static WinCriteria := Map()
 	InputLevel := "I2"
 
 	Hotkey(
@@ -248,20 +277,27 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	; In theory, * and {Blind} should be sufficient, but it isn't the case when we define custom hotkeys in next sections
 	; For example, a new hotkey for ^b leads to ^t giving ^b in QWERTY
 	; The same happens for Win shortcuts, where we can get the shortcut on the QWERTY layer and not emulated Ergopti layer
+	; A keyboard slot on the same chord asks here: it cannot take a variant the
+	; layout owns (KeyboardShortcutsBindAll).
 	Hotkey(
 		"^" ScanCode,
-		_RemapEmit.Bind("^" Character, Character),
+		_RemapChordEmit.Bind("^" . StrUpper(ScanCode), "^" Character, Character),
 		InputLevel
 	)
 	Hotkey(
 		"!" ScanCode,
-		_RemapEmit.Bind("!" Character, Character),
+		_RemapChordEmit.Bind("!" . StrUpper(ScanCode), "!" Character, Character),
 		"I3" ; Needs to be higher to keep the Alt shortcuts
 	)
-	; One physical Win variant arbitrates ordinary assignments, the conditional
-	; magic editor and this exact layout fallback. Preserve Win+L's native owner.
+	; Win variants share a broker, so the earlier row passthrough cannot win
+	; their arbitration. Keep the same live row admission and magic exception
+	; on this fallback without withdrawing independent shortcut assignments.
+	; The magic-key producer may register this scan again: retain one context
+	; identity so its later callback replaces the earlier layout fallback.
+	if !WinCriteria.Has(ScanCode)
+		WinCriteria[ScanCode] := (*) => !_LayoutRowPassthroughCriterion(ScanCode, "#" . ScanCode)
 	MagicEditorRecordLayoutFallback(ScanCode, Character == "l" ? _LockWorkstationEmit
-		: _RemapEmit.Bind("#" Character, Character))
+		: _RemapEmit.Bind("#" Character, Character), WinCriteria[ScanCode])
 }
 
 ; Per-process UIA selection result caches.
@@ -396,8 +432,12 @@ _UIA_OnSelectionWorkerTerminal(Status, Context, Result) {
 	}
 
 	; File/log sinks never run inside the keyboard-ownership transaction.
+	; A provider slower than the deadline is the case the deadline and the backoff
+	; exist for, so it is INFO and names the application that was backed off; a
+	; worker that failed outright still warns.
 	if (LogKind = "timeout") {
-		try LoggerWarn("Layout", "UIA selection worker exceeded its {1} ms deadline; the provider is backed off for this process.", UIASW_DEADLINE_MS)
+		try LoggerInfo("Layout", "UIA selection worker exceeded its {1} ms deadline; the provider of '{2}' is backed off for {3} ms.",
+			UIASW_DEADLINE_MS, Context["ProcName"], _UIA_NO_TP_TTL_MS)
 	} else if (LogKind = "failed") {
 		try LoggerWarn("Layout", "UIA selection worker failed: {1}", LogDetail)
 	}
@@ -434,7 +474,7 @@ _UIA_SelectionPollTick() {
     ; When the wrap feature is off, skip the COM round-trip entirely so non-users
     ; never pay the per-tick cost or the large-selection keyboard-thread stall
     ; risk (uia-poll-bypasses-suspend).
-    if (!Features.Has("shortcuts") || !Features["shortcuts"].Has("wrap_text_if_selected") || !Features["shortcuts"]["wrap_text_if_selected"]) {
+    if (!Features.Has("shortcuts") || !Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED) || !Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]) {
 		_UIA_SelectionCache := 0
         return
     }
@@ -568,8 +608,8 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 	; path, but it returns an empty Map when the manifest fails to load, and a
 	; raw read here would throw on the keystroke thread.
 	WrapEnabled := Features.Has("shortcuts")
-		and Features["shortcuts"].Has("wrap_text_if_selected")
-		and Features["shortcuts"]["wrap_text_if_selected"]
+		and Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
+		and Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 	if (WrapEnabled and WrapSymbols_IsEnabled(LeftSymbol)) {
 		; Critical is RELEASED across the selection probe and the clipboard
 		; round-trip, then restored.
@@ -605,7 +645,9 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 				if !SendInstant(LeftSymbol Selection RightSymbol)
 					SendNewResult(Symbol)
 				else
-					UpdateLastSentCharacter(Symbol)
+					; Wrapping ends at the closing text, which can differ from the
+					; pressed key and can include a no-break prefix or a surrogate pair.
+					UpdateLastSentCharacter(SubStr(RightSymbol, -_TextTailCodeUnits(RightSymbol, 1)))
 				return
 			}
 		} finally {
@@ -630,7 +672,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 ; =============================
 
 
-#HotIf NumberRowEffectiveMode() == "digits"
+#HotIf NumberRowEffectiveMode() == "digits" && !TapHoldKanaAltGrHeld()
 ; We need to use SendEvent for symbols, otherwise it may trigger and lock AltGr. This issue happens on AZERTY at least.
 ; For digits, it is better to remap with sending the down event instead of using the RemapKey function.
 ; Otherwise, there is a problem of digit password boxes that skips to the n+2 box instead of n+2 because two down key events are sent by key
@@ -644,7 +686,8 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 ; re-introducing the out-of-order emission Critical was added to prevent — only
 ; with the digit as the unprotected boundary (remap-emit-critical-uneven). There
 ; is no Sleep on these paths, so Critical's guarantee holds.
-SC029:: _DigitShiftSend(ErgoptiNumberRowEdgeMapping()[0x29])
+; Only the ten digit keys are reordered: the edge keys (left of 1, right of 0)
+; keep what the effective layout types there (number-row-effective-edges).
 SC002:: _DigitRowDown("1")
 SC002 Up:: _DigitRowUp("1")
 SC003:: _DigitRowDown("2")
@@ -665,27 +708,52 @@ SC00A:: _DigitRowDown("9")
 SC00A Up:: _DigitRowUp("9")
 SC00B:: _DigitRowDown("0")
 SC00B Up:: _DigitRowUp("0")
-SC00C:: _DigitShiftSend(ErgoptiNumberRowEdgeMapping()[0x0C])
-SC00D:: _DigitShiftSend(ErgoptiNumberRowEdgeMapping()[0x0D])
 #HotIf
 
-; Serialised digit-row emit. Critical("On") makes the SendEvent uninterruptible
-; so it cannot interleave with a neighbouring remapped letter's emit in the
-; single OS input queue (remap-emit-critical-uneven). Down and Up are split so
-; the key's auto-repeat / release timing is preserved exactly as before.
-_DigitRowDown(Digit, *) {
-	Critical("On")
-	SendEvent("{" Digit " Down}")
-	; Same rule as _RemapEmit and _DigitShiftSend ten lines below, which this
-	; sibling was left out of: an armed suppressing hook eats this character, so
-	; it must not be recorded as having reached the screen.
-	if _EmitReachedScreen()
-		UpdateLastSentCharacter(Digit)
-}
-_DigitRowUp(Digit, *) {
-	Critical("On")
-	SendEvent("{" Digit " Up}")
-}
+; « Symbols first » on a row no registry layout owns (the OS layout's or the
+; built-in Ergopti one): the registry emulation types its own levels swapped
+; (keylayout_emulation.ahk), so these stand down while it owns the row. Every
+; number-row hotkey also stands down under a held Kana AltGr, which AutoHotkey
+; does not count as a modifier: the layout's AltGr level must stay its own.
+#HotIf NumberRowEffectiveMode() == "symbols" && !NumberRowRegistryOwnsRow() && !TapHoldKanaAltGrHeld()
+SC002:: _NumberRowSymbolsFirstSend(0x02, false)
++SC002:: _NumberRowSymbolsFirstSend(0x02, true)
+SC003:: _NumberRowSymbolsFirstSend(0x03, false)
++SC003:: _NumberRowSymbolsFirstSend(0x03, true)
+SC004:: _NumberRowSymbolsFirstSend(0x04, false)
++SC004:: _NumberRowSymbolsFirstSend(0x04, true)
+SC005:: _NumberRowSymbolsFirstSend(0x05, false)
++SC005:: _NumberRowSymbolsFirstSend(0x05, true)
+SC006:: _NumberRowSymbolsFirstSend(0x06, false)
++SC006:: _NumberRowSymbolsFirstSend(0x06, true)
+SC007:: _NumberRowSymbolsFirstSend(0x07, false)
++SC007:: _NumberRowSymbolsFirstSend(0x07, true)
+SC008:: _NumberRowSymbolsFirstSend(0x08, false)
++SC008:: _NumberRowSymbolsFirstSend(0x08, true)
+SC009:: _NumberRowSymbolsFirstSend(0x09, false)
++SC009:: _NumberRowSymbolsFirstSend(0x09, true)
+SC00A:: _NumberRowSymbolsFirstSend(0x0A, false)
++SC00A:: _NumberRowSymbolsFirstSend(0x0A, true)
+SC00B:: _NumberRowSymbolsFirstSend(0x0B, false)
++SC00B:: _NumberRowSymbolsFirstSend(0x0B, true)
+#HotIf
+
+; « Also reorder the three edge keys »: the edge keys swap their own two levels,
+; read from the effective layout, while an ordering applies and each edge key
+; can be swapped (NumberRowEdgesEffective). Off by default: they then keep the
+; effective layout's levels. The tap keys' hotkeys, created earlier, keep an
+; assigned edge key. A Kana AltGr is no modifier to AutoHotkey, so under it these
+; hotkeys would replace the layout's AltGr level: they stand down there.
+; This static criterion can run during Bundle_Init, before the edge owner's
+; globals exist. The ordering's admission stays native until its sources publish.
+#HotIf NumberRowEffectiveMode() != "native" && NumberRowEdgesEffective() && !TapHoldKanaAltGrHeld()
+SC029:: _NumberRowEdgeSend(0x29, false)
++SC029:: _NumberRowEdgeSend(0x29, true)
+SC00C:: _NumberRowEdgeSend(0x0C, false)
++SC00C:: _NumberRowEdgeSend(0x0C, true)
+SC00D:: _NumberRowEdgeSend(0x0D, false)
++SC00D:: _NumberRowEdgeSend(0x0D, true)
+#HotIf
 
 ; On OS layouts where digits are behind Shift (e.g. AZERTY, bépo), swap
 ; the layers: Shift+digit-key produces the OS native symbol (passthrough),
@@ -704,58 +772,25 @@ try {
 } finally {
 	HotIf()
 }
-
-_DigitRowSwapIsLive(Sc, ForegroundFn := 0, *) {
-	Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()
-	return _DigitRowSwapResolution(Sc, Hkl)["swap"]
-}
-
-; The symbol is read again on the layout of the press: a layout switch between
-; the criterion and this thread leaves nothing to type, which is logged.
-_DigitRowSwapSend(Sc, ForegroundFn := 0, *) {
-	Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()
-	Resolution := _DigitRowSwapResolution(Sc, Hkl)
-	if !Resolution["swap"] {
-		try LoggerWarn("Layout", "Shift+SC{1:03X}: the foreground layout changed during the press; nothing typed.", Sc)
-		return
-	}
-	if Resolution["source"] == "emulated" {
-		; A real press, unlike the neutral-state probe, advances the source's own
-		; action/dead-key machine on its effective unshifted level.
-		_KLE_Emit(Format("SC{:03X}", Sc), false, false)
-		return
-	}
-	; Native symbols retain the established Unicode path and emission timing.
-	_DigitShiftSend(Resolution["descriptor"]["Text"])
-}
-
-; Top-level helper for the shifted-symbol send — must be at module scope so
-; AHK v2 hoists it before the if-block above executes.
-_DigitShiftSend(Symbol, *) {
-	; Critical("On") so this shifted-symbol emit shares the one atomicity
-	; contract with _RemapEmit / _DigitRowDown and cannot interleave with a
-	; neighbouring remap's SendEvent (remap-emit-critical-uneven).
-	Critical("On")
-	; SendEvent {Text} bypasses the keyboard hook and sends the Unicode
-	; character directly, so the SC002–SC00B digit remaps never interfere.
-	SendEvent("{Text}" . Symbol)
-	; Same rule as _RemapEmit: an armed dead-key hook eats this character, so it
-	; must not be recorded as having reached the screen.
-	if _EmitReachedScreen()
-		UpdateLastSentCharacter(Symbol)
-}
+; The handlers these hotkeys run live in layout/number_row_send.ahk, which the
+; headless E2E harness replays on the real layouts of the machine.
 
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
 ; The character mapping comes from modules/keymap/layout/layout_ergopti.ahk (read from the
-; .keylayout) so the keylogger heatmap reads the same source of truth without drifting.
-if Features["layout"]["ergopti_base"] {
-	for sc_int, entry in ErgoptiBaseMapping() {
-		sc_str := Format("SC{:03X}", sc_int)
-		if (entry is String) {
-			RemapKey(sc_str, entry)
-		} else if IsObject(entry) {
-			alt := entry.HasOwnProp("alt") ? entry.alt : ""
-			RemapKey(sc_str, entry.c, alt)
+; .keylayout) so the keystats heatmap reads the same source of truth without drifting.
+if Features["layout"][ConfigLeaf.ERGOPTI_BASE] {
+	; A row switched off types what the OS layout types there: its keys pass
+	; through, through variants created before every built-in layer below.
+	RegisterLayoutRowPassthrough()
+	; Script-level loop variables are globals: distinctive names keep them from
+	; shadowing the locals of functions loaded beside this file under #Warn.
+	for _BaseRemapScInt, _BaseRemapEntry in ErgoptiBaseMapping() {
+		_BaseRemapSc := Format("SC{:03X}", _BaseRemapScInt)
+		if (_BaseRemapEntry is String) {
+			RemapKey(_BaseRemapSc, _BaseRemapEntry)
+		} else if IsObject(_BaseRemapEntry) {
+			_BaseRemapAlt := _BaseRemapEntry.HasOwnProp("alt") ? _BaseRemapEntry.alt : ""
+			RemapKey(_BaseRemapSc, _BaseRemapEntry.c, _BaseRemapAlt)
 		}
 	}
 	; Dead keys (¨ and ^ on Ergopti) — their behaviour goes through DeadKey()
@@ -801,8 +836,8 @@ _DeadKeyDispatch(BareChar, Mapping, *) {
 ; own magic-key position takes every level of the source character, a key the
 ; user chose only its plain press.
 _MagicKeyHotkeys := LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"],
-	ScriptInformation["MagicKeySourceChosen"], Features["layout"]["ctrl_magic_save"])
-if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
+	ScriptInformation["MagicKeySourceChosen"], Features["layout"][ConfigLeaf.CTRL_MAGIC_SAVE])
+if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
 	for _MagicKeyHotkey in _MagicKeyHotkeys {
 		switch _MagicKeyHotkey["kind"] {
 			case "remap":
@@ -816,7 +851,8 @@ if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
 			case "ctrl_save":
 				; InputLevel 3 overrides the Ctrl+source-scan → "^★" binding
 				; that RemapKey installs at InputLevel 2, routing to Ctrl+S instead.
-				Hotkey(_MagicKeyHotkey["hotkey"], (*) => SendFinalResult("^s"), "I3")
+				Hotkey(_MagicKeyHotkey["hotkey"], (*) => KeyboardShortcutRunLayoutChord("^" . StrUpper(ScriptInformation["MagicKeySourceScan"]))
+					|| SendFinalResult("^s"), "I3")
 		}
 	}
 }
@@ -834,6 +870,8 @@ if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
 
 ; Shift layer — bindings registered table-driven via modules/keymap/layout/layout_shift_caps.ahk.
 RegisterShiftLayer()
+; The built-in emulation's unshifted digit keys, after the direct-access ones.
+RegisterBuiltinNumberRow()
 
 
 
@@ -846,7 +884,7 @@ RegisterShiftLayer()
 ; =================================
 
 GetCapsLockCondition() {
-	return GetKeyState("CapsLock", "T") and not LayerEnabled
+	return KS_CapsLockToggleState() and not LayerEnabled
 }
 
 ; CapsLock layer — bindings registered table-driven via modules/keymap/layout/layout_shift_caps.ahk.
@@ -1009,16 +1047,22 @@ _RegisterRollsAltGrHotkeys()
 
 ; Ctrl on the QWERTY V position pastes, like Ctrl on Ergopti's own V (RemapKey).
 ; Both emit through _RemapEmit: a SendEvent at this hotkey's SendLevel 2 that the
-; keylogger's paste observer (level 1 and above) sees. SendInput removes the
+; keystats's paste observer (level 1 and above) sees. SendInput removes the
 ; script's own hook while it sends, so the paste it typed was never observed.
-#HotIf IsSet(Features) and Features["layout"]["ergopti_base"]
+; These static contexts precede the dynamic row passthrough: each must stand
+; down itself when its row belongs to the OS, including modified zoom chords.
+#HotIf IsSet(Features) and Features["layout"][ConfigLeaf.ERGOPTI_BASE] and LayoutRowIsEmulatedHotkey(A_ThisHotkey)
 ^SC02F:: _RemapEmit("^v", "v")
+
+; The first eligible context wins: leave the general zoom to non-Office hosts
+; so the Wheel variants below can handle Word, Excel and the other Office apps.
+#HotIf IsSet(Features) and Features["layout"][ConfigLeaf.ERGOPTI_BASE] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and !MicrosoftApps()
 *^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
 *^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf
 
 ; In Microsoft apps like Word or Excel, we can't use Numpad + to zoom
-#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and MicrosoftApps()
+#HotIf IsSet(Features) and Features["layout"][ConfigLeaf.ERGOPTI_BASE] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and MicrosoftApps()
 *^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with (Shift +) Ctrl + %
 *^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf

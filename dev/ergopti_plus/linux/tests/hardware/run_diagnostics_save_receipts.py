@@ -16,8 +16,9 @@ local function shared(path)
  local file = assert(io.open("../_shared/"..path, "rb"))
  local value = Json.decode(file:read("*a")); assert(file:close()); return value
 end
-local schema = shared("modules/diagnostics/schema.json")
-local rules = shared("modules/diagnostics/redaction.json")
+local config = require("healthcheck.snapshot").load_config(function(path) return "../_shared/"..path end)
+local schema = config.schema
+local rules = config.redaction
 local catalogue = shared("data/locales/en.json")
 local notice = assert(catalogue[schema.share_policy.notice_key])
 package.loaded["infra.i18n"] = {get=function(key)
@@ -44,11 +45,12 @@ assert(not document.text:find("/private-owner",1,true) and not document.text:fin
 if #raw>=8192 then assert(#document.text>=8192,"immediate-write corpus lost its large native write") end
 local name=document.name
 local revealed = 0
-local result = Report.perform({action="save", name=name, text=document.text},
+local result
+Report.perform({action="save", name=name, text=document.text},
  {diagnostics_dir=directory}, {redaction=rules,schema=schema}, {home="/private-owner",user="privateowner"},
- {reveal=function(path)
-  assert(path==directory.."/"..name);revealed=revealed+1;return true
- end},snapshot)
+ {reveal=function(path,done)
+  assert(path==directory.."/"..name);revealed=revealed+1;done({ok=true,code=0})
+ end},snapshot,{current=function()return true end,complete=function(value)result=value end})
 print(Json.encode({ok=result.ok, revealed=revealed, path=result.path, expected=document.text,name=name}))
 """
 

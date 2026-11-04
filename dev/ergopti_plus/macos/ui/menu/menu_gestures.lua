@@ -18,6 +18,7 @@ local gestures_mod  = require("modules.gestures")
 local MenuUtils = require("ui.menu.menu_utils")
 local dialog        = require("infra.dialog_util")
 local i18n          = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
@@ -65,6 +66,8 @@ end
 --- @param ctx table Context containing state, updateMenu, save_prefs, etc.
 --- @return table|nil The menu definition table.
 function M.build(ctx)
+	local receive = ManifestMenu.group_receiver("top_level", "gestures")
+	if not receive then return nil end
 	local gestures = ctx.gestures
 	if not gestures then return nil end
 
@@ -201,11 +204,6 @@ function M.build(ctx)
 		return true
 	end
 
-	local item = {
-		label    = i18n.get("menu.gestures.title"),
-		checked  = state.gestures or nil,
-		disabled = paused or nil,
-	}
 
 
 
@@ -254,7 +252,6 @@ function M.build(ctx)
 		end
 		ActionPicker.open({
 			title   = slot_label(slot),
-			label   = i18n.get("dialog.action_picker.label"),
 			current = current or "none",
 			items   = items,
 			send_vocabulary   = editor.send_vocabulary,
@@ -272,8 +269,8 @@ function M.build(ctx)
 				return conflict
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
-			if spec == "program" then
-				DeferredWork.after(0.05, function()
+			if spec then
+				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 					local committed = shortcut_utils.prompt_action_parameter(gestures, slot, a, spec, picked, {
 						section = "gestures", key = slot,
 						read = function() return gestures.get_action(slot) end,
@@ -288,39 +285,8 @@ function M.build(ctx)
 				end, "menu_gestures.action_parameter")
 				return
 			end
-			if spec then
-				DeferredWork.after(0.05, function()
-					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
-					local title    = shortcut_utils.action_parameter_title(gestures.get_action_label(a) or a)
-					-- A value the picker's editor collected is stored without asking.
-					local value = type(picked) == "string" and picked or nil
-					while true do
-						if value == nil then
-							-- The prompt (or the application chooser) and its refusal
-							-- text belong to the parameter kind.
-							value = shortcut_utils.ask_parameter_value(gestures, a, spec, title, prior)
-							if value == nil then return end
-						end
-						if type(gestures.validate_action_parameter) == "function" and gestures.validate_action_parameter(a, value) then
-
-							local stored_ok, stored = xpcall(gestures.set_action_parameter, debug.traceback, slot, a, value)
-							if not stored_ok or stored ~= true then
-								Logger.error(LOG, "Gesture parameter edit did not commit for '%s': %s.", tostring(slot), tostring(stored))
-								return
-							end
-							local conflict = apply_action()
-							show_conflict(conflict)
-							return
-						end
-						pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-							gestures.parameter_error(a), "OK", nil, "warning")
-						prior = value or prior
-						value = nil
-					end
-				end, "menu_gestures.action_parameter")
-				return
-			end
 			local conflict = apply_action()
+			if conflict == false then return false end
 			show_conflict(conflict)
 		end)
 	end
@@ -339,10 +305,23 @@ function M.build(ctx)
 		local parameter = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, current) or ""
 		if type(gestures.get_action_parameter_spec) ~= "function"
 			or gestures.get_action_parameter_spec(current) ~= "program" then
-			actionLbl = ParameterLabel.format(actionLbl, parameter)
+			actionLbl = ParameterLabel.for_spec(actionLbl, type(gestures.get_action_parameter_spec) == "function"
+				and gestures.get_action_parameter_spec(current) or nil, parameter)
 		end
 
 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
+
+		-- A slot whose macOS gesture is on is greyed with a short suffix and the
+		-- engine holds it back (never a double action); the Infos dialog says
+		-- where to turn the macOS gesture off. The row stays short on purpose.
+		local system_state = type(gestures.system_slot_state) == "function"
+			and gestures.system_slot_state(slot) or "free"
+		local held_suffix = (system_state == "taken" and i18n.get("menu.gestures.slot_taken_by_macos"))
+			or (system_state == "unverified" and i18n.get("menu.gestures.slot_unverified_macos"))
+			or nil
+		local rowLabel = LabelValue.compose(i18n.get, slotLbl, actionLbl)
+			.. (held_suffix and (" — " .. held_suffix) or "")
+		local rowDisabled = not state.gestures or paused or held_suffix ~= nil or nil
 
 		-- Provider data from here down: `label` / `action` / `items`, which the
 		-- renderer materialises. These rows used to be built in this driver's own
@@ -351,10 +330,10 @@ function M.build(ctx)
 		local modeSubmenu
 		if slot:match("swipe") then
 			modeSubmenu = ManifestMenu.template_rows("gesture_slot_mode_commands", {
-				["gesture_mode_single"] = function()
+				[require("config_keys").COMMAND.GESTURE_MODE_SINGLE] = function()
 					return commit_gesture_row_value("get_mode", "set_mode", slot, "x1", "mode")
 				end,
-				["gesture_mode_incremental"] = function()
+				[require("config_keys").COMMAND.GESTURE_MODE_INCREMENTAL] = function()
 					return commit_gesture_row_value("get_mode", "set_mode", slot, "incremental", "mode")
 				end,
 			}, {
@@ -368,7 +347,7 @@ function M.build(ctx)
 			sensSubmenu = ManifestMenu.template_rows("gesture_sensitivity_head")
 			if not sensSubmenu then return nil end
 		end
-		local sensitivities = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0 }
+		local sensitivities = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0, 60.0 }
 		for _, s in ipairs(sensitivities) do
 			local label = string.format("%.1f", s)
 			if s == 3.5 then label = label .. " " .. i18n.get("menu.gestures.default_sensitivity") end
@@ -388,8 +367,8 @@ function M.build(ctx)
 			or  i18n.get("menu.gestures.mode_single")
 
 		local slot_commands = {
-			["gesture_slot_change_action"] = function()
-				DeferredWork.after(0.05,
+			[require("config_keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
+				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
 					function() open_action_chooser(slot, names, current) end,
 					"menu_gestures.action_chooser")
 			end,
@@ -409,8 +388,8 @@ function M.build(ctx)
 			})
 			if not swipeSubmenu then return nil end
 			return {
-				label    = slotLbl .. " : " .. actionLbl,
-				disabled = not state.gestures or paused or nil,
+				label    = rowLabel,
+				disabled = rowDisabled,
 				items    = swipeSubmenu,
 			}
 		end
@@ -419,8 +398,8 @@ function M.build(ctx)
 		local change_action_rows = ManifestMenu.template_rows("gesture_change_action", slot_commands, slot_getters)
 		if not change_action_rows then return nil end
 		return {
-			label    = slotLbl .. " : " .. actionLbl,
-			disabled = not state.gestures or paused or nil,
+			label    = rowLabel,
+			disabled = rowDisabled,
 			items    = change_action_rows,
 		}
 	end
@@ -439,6 +418,17 @@ function M.build(ctx)
 	end
 	local function cmd_scope_clear() return apply_scope("clear") end
 	local function cmd_scope_restore() return apply_scope("recommended") end
+
+	--- Shows the recommended-defaults rule and the macOS reason behind the
+	--- menu's « Infos… » row: several sentences do not fit a menu row.
+	--- @return boolean shown
+	local function cmd_recommended_info()
+		dialog.block_alert(i18n.get("menu.gestures.notify_title"),
+			i18n.get("menu.gestures.recommended_note") .. "\n\n"
+				.. i18n.get("menu.gestures.recommended_reason_macos"),
+			i18n.get("button.ok"), nil, "informational")
+		return true
+	end
 
 	-- Build a slot group from the manifest gesture_slots table.
 	-- One provider per finger count. The slot ids come from the manifest's own
@@ -471,10 +461,10 @@ function M.build(ctx)
 			local pinch = gestures.system_pinch_enabled()
 			local open_settings = gestures.open_system_gestures
 			local children = ManifestMenu.template_rows("gesture_system_macos_children", {
-				["gesture_system_open_enabled_pinch"] = function(...) return open_settings(...) end,
-				["gesture_system_open_disabled_pinch"] = function(...) return open_settings(...) end,
-				["gesture_system_open_unknown_pinch"] = function(...) return open_settings(...) end,
-				["gesture_system_refresh"] = function()
+				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_ENABLED_PINCH] = function(...) return open_settings(...) end,
+				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_DISABLED_PINCH] = function(...) return open_settings(...) end,
+				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_UNKNOWN_PINCH] = function(...) return open_settings(...) end,
+				[require("config_keys").COMMAND.GESTURE_SYSTEM_REFRESH] = function()
 					return gestures.refresh_system_gestures(ctx.updateMenu)
 				end,
 			}, {
@@ -502,6 +492,12 @@ function M.build(ctx)
 		["gesture_slots_5"] = slots_provider(5),
 	}
 
+	-- A macOS gesture turned on or off since the last read greys or restores its
+	-- slot: the recheck asks for the next build.
+	if type(gestures.set_system_gestures_listener) == "function" and type(ctx.updateMenu) == "function" then
+		gestures.set_system_gestures_listener(ctx.updateMenu)
+	end
+
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.state_getters = {
@@ -514,13 +510,15 @@ function M.build(ctx)
 	-- renderer builds them from the declaration, right after the switch, and
 	-- this driver registers only the behaviour.
 	render_ctx.commands = {}
-	render_ctx.commands["gestures_toggle"] = toggle_gestures
-	render_ctx.commands["scope_restore"] = cmd_scope_restore
-	render_ctx.commands["scope_clear"] = cmd_scope_clear
-	render_ctx.commands["system_gesture_settings"] = gestures.open_system_gestures
+	render_ctx.commands[require("config_keys").COMMAND.GESTURES_TOGGLE] = toggle_gestures
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = cmd_scope_restore
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = cmd_scope_clear
+	render_ctx.commands[require("config_keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = gestures.open_system_gestures
+	render_ctx.commands[require("config_keys").COMMAND.GESTURE_RECOMMENDED_INFO] = cmd_recommended_info
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
-	item.submenu = gm
+	local item = receive(gm, { gestures_enabled = function() return state.gestures or nil end })
+	if item then item.disabled = paused or nil end
 	return item
 end
 

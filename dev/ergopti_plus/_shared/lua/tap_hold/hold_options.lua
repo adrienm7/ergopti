@@ -23,6 +23,8 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
+local KeyNames = require("keycodes.key_names")
 
 --- The ordered modifier and layer ids of a picker catalogue.
 --- @param catalogue table|nil The `[tap_hold.hold_picker]` table.
@@ -37,8 +39,8 @@ end
 --- The modifier id an alias of the catalogue means, or nil. The aliases live
 --- in the catalogue (`modifier_aliases`, `left_modifier_aliases`) because the
 --- Windows loader (ResolveHoldModifierKey) reads the same two tables: one file
---- must mean one hold everywhere. This driver always holds the left key, so
---- the two mean the same here.
+--- must mean one hold everywhere. Both name the same modifier id; the side a
+--- left alias forces is read by M.left_forced.
 --- @param catalogue table|nil The `[tap_hold.hold_picker]` table.
 --- @param alias string A lower-case spelling.
 --- @return string|nil
@@ -121,6 +123,32 @@ function M.canonical_modifier(value, catalogue)
 	return table.concat(ordered, "+")
 end
 
+--- The modifiers a `hold_modifier` value spells with a left-key alias (`lctrl`,
+--- `lshift`, `lalt`, `lwin`), as canonical ids. A plain `ctrl` or
+--- `shift` on the right Ctrl / right Shift key holds that key's own side; the
+--- left alias forces the left key there, as the Windows loader reads it
+--- (ResolveHoldModifierKey). Canonicalising drops the spelling, so a driver that
+--- honours the side asks here before it canonicalises.
+--- @param value string A raw `hold_modifier` value.
+--- @param catalogue table|nil The `[tap_hold.hold_picker]` table.
+--- @return string|nil forced The canonical ids joined with "+" in the picker's
+---   order ("ctrl+shift"), nil when no modifier is spelled with a left alias.
+function M.left_forced(value, catalogue)
+	local aliases = type(catalogue) == "table" and catalogue.left_modifier_aliases or nil
+	if type(value) ~= "string" or type(aliases) ~= "table" then return nil end
+	local forced = {}
+	for token in value:gmatch("[^+%s]+") do
+		local id = aliases[token:lower()]
+		if type(id) == "string" then forced[id] = true end
+	end
+	local ordered = {}
+	for _, id in ipairs((catalogue_ids(catalogue))) do
+		if forced[id] then ordered[#ordered + 1] = id end
+	end
+	if #ordered == 0 then return nil end
+	return table.concat(ordered, "+")
+end
+
 --- The canonical form of a `hold_layer` value: a declared layer id, matched
 --- without regard to case or surrounding blanks; "" is no layer.
 --- @param value string
@@ -129,7 +157,7 @@ end
 function M.canonical_layer(value, catalogue)
 	if type(value) ~= "string" then return nil, "a hold layer must be a string" end
 	local _, layers = catalogue_ids(catalogue)
-	local wanted = value:match("^%s*(.-)%s*$"):lower()
+	local wanted = TextUtils.trim(value):lower()
 	if wanted == "" then return "" end
 	for _, layer in ipairs(layers) do
 		if layer == wanted then return layer end
@@ -159,36 +187,64 @@ function M.canonical(kind, id, catalogue)
 	return canonical, err
 end
 
---- The label key of one modifier of a combination.
---- @param modifier string A modifier id, e.g. "alt_gr".
---- @return string
-function M.modifier_i18n(modifier)
-	return "tap_hold.hold." .. modifier
-end
-
 --- The label a driver shows for one option.
 ---
---- A modifier combination is its modifiers' translated labels joined with
---- " + " ("Ctrl + Shift", "AltGr"), as the Windows menu shows it. The stored id
+--- A modifier combination is its modifiers' names from the shared key name
+--- table joined with " + " ("Ctrl + Maj", "AltGr"), as the Windows menu shows
+--- it, under the platform's usual name (Super on Linux). The stored id
 --- ("ctrl+shift", "alt_gr") used to be shown as is, in every locale.
 --- @param option table One entry of M.build().
 --- @param translate function Takes an i18n key, returns the translated string.
+--- @param platform string "windows", "macos" or "linux".
 --- @return string
-function M.label(option, translate)
+function M.label(option, translate, platform)
 	if type(option) ~= "table" then error("a hold option must be a table", 2) end
 	if type(translate) ~= "function" then error("a hold option label needs a translate function", 2) end
 	if option.kind == "modifier" then
-		local labels = {}
-		for modifier in tostring(option.id):gmatch("[^+]+") do
-			labels[#labels + 1] = translate(M.modifier_i18n(modifier))
-		end
-		if #labels == 0 then error("a modifier hold option has no modifier", 2) end
-		return table.concat(labels, " + ")
+		return KeyNames.combo_label(tostring(option.id), platform, translate)
 	end
 	if type(option.i18n) ~= "string" or option.i18n == "" then
 		error(string.format("hold option '%s' has no label key", tostring(option.id)), 2)
 	end
 	return translate(option.i18n)
+end
+
+--- The id the shared action picker gives one option: the picker's own « none »
+--- row is the no-hold sentinel, every other option is its stored id.
+--- @param option table One entry of M.build().
+--- @return string
+function M.picker_id(option)
+	if type(option) ~= "table" then error("a hold option must be a table", 2) end
+	return option.kind == "none" and "none" or option.id
+end
+
+--- The shared action picker's items for a hold slot, a key's or a key
+--- combination's: every option of M.build() in its order, except the no-hold
+--- sentinel, which the picker draws as its own « none » row. A hold is never
+--- a gesture action, so the slot lists these options rather than the action
+--- catalogue: they are what a hold can be.
+--- @param options table The ordered result of M.build().
+--- @param translate function Takes an i18n key, returns the translated string.
+--- @param platform string "windows", "macos" or "linux".
+--- @return table items Picker items { type = "action", id, label }.
+--- @return table by_id Picker id → option, "none" included.
+function M.picker_items(options, translate, platform)
+	if type(options) ~= "table" then error("hold picker items need the hold options", 2) end
+	local items, by_id = {}, {}
+	for _, option in ipairs(options) do
+		local id = M.picker_id(option)
+		if by_id[id] ~= nil then
+			error(string.format("hold option id '%s' is offered twice", tostring(id)), 2)
+		end
+		by_id[id] = option
+		if option.kind ~= "none" then
+			items[#items + 1] = { type = "action", id = id, label = M.label(option, translate, platform) }
+		end
+	end
+	if by_id.none == nil or by_id.none.kind ~= "none" then
+		error("hold picker items need the no-hold sentinel", 2)
+	end
+	return items, by_id
 end
 
 return M

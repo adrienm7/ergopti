@@ -27,6 +27,7 @@
 
 local hs            = hs
 local Logger        = require("infra.logger")
+local NativePath = require("native_path")
 local text_utils = require("infra.text_utils")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
@@ -148,7 +149,7 @@ local function list_bundles(dir)
 		-- Windows (used during Lua test runs)
 		cmd = string.format('cmd /c dir /b /a:d "%s"', dir:gsub("/", "\\"))
 	else
-		cmd = string.format("ls -1 '%s'", dir)
+		cmd = string.format("ls -1 %s", text_utils.shell_quote(dir))
 	end
 	local p = io.popen(cmd)
 	if not p then return out end
@@ -243,7 +244,7 @@ local function find_installed_bundles(dir)
 	local cmd = string.format("ls -1 %s 2>/dev/null", text_utils.shell_quote(dir))
 	local p = io.popen(cmd)
 	if not p then return out end
-	local dir_with_slash = dir:match("[/\\]$") and dir or (dir .. "/")
+	local dir_with_slash = NativePath.with_trailing_separator(dir)
 	for raw_line in p:lines() do
 		local line = raw_line:gsub("[\r\n]+$", "")
 		if line:match("^Ergopti_v[%d%.]+%.bundle$") then
@@ -296,7 +297,7 @@ end
 --- @return table|nil Numeric version components, or nil when unreadable.
 local function read_bundle_version(bundle_path)
 	if type(bundle_path) ~= "string" or bundle_path == "" then return nil end
-	local plist_path = bundle_path:gsub("[/\\]$", "") .. "/Contents/Info.plist"
+	local plist_path = NativePath.without_trailing_separators(bundle_path) .. "/Contents/Info.plist"
 	local content, status, detail = FileSystem.read_with_status(plist_path)
 	if status ~= "ok" or type(content) ~= "string" then
 		Logger.warn(LOG, "Bundle version unreadable — %s (%s: %s).",
@@ -352,7 +353,7 @@ end
 --- @return table Array of { name, tis_id, keylayout } in Info.plist order.
 local function bundle_variants(bundle_path)
 	if type(bundle_path) ~= "string" or bundle_path == "" then return {} end
-	local root = bundle_path:gsub("[/\\]$", "")
+	local root = NativePath.without_trailing_separators(bundle_path)
 	local content, status, detail = FileSystem.read_with_status(root .. "/Contents/Info.plist")
 	if status ~= "ok" or type(content) ~= "string" then
 		Logger.warn(LOG, "Bundle Info.plist unreadable — %s (%s: %s).", root, tostring(status), tostring(detail))
@@ -394,11 +395,11 @@ local function layout_version(kl_name)
 	local maj, min, pat = kl_name:match("_v(%d+)[_.](%d+)[_.](%d+)")
 	if maj then return { tonumber(maj), tonumber(min), tonumber(pat) } end
 	-- A name is matched against file basenames only; a separator could never match.
-	if kl_name:find("[/\\]") then return nil end
+	if NativePath.has_separator(kl_name) then return nil end
 	for _, dir in ipairs({ SYSTEM_LAYOUTS_DIR, USER_LAYOUTS_DIR }) do
 		local bundle = keylayout_index(dir)[kl_name]
 		if bundle then
-			local layouts_dir = dir:gsub("[/\\]$", "")
+			local layouts_dir = NativePath.without_trailing_separators(dir)
 			return read_bundle_version(layouts_dir .. "/" .. bundle)
 		end
 	end
@@ -505,12 +506,51 @@ local function cleanup_other_scope(dir, scope_label)
 	return true
 end
 
+--- The Ergopti bundles installed in both the user and the system folders.
+--- macOS loads both copies: it logs "duplicate keyboard layout identifier" and
+--- renumbers the ids of the copy it reads second. On the maintainer's Mac (probe
+--- v5, P8 b) new content written to the user copy did not apply even after a
+--- re-register while a loose user layout's did (P8 a): the system copy is the
+--- one macOS types with. A second copy is therefore never written.
+--- @return table names Bundle names present in both folders.
+local function duplicate_bundles()
+	local system = {}
+	for _, entry in ipairs(find_installed_bundles(SYSTEM_LAYOUTS_DIR)) do system[entry.name] = true end
+	local both = {}
+	for _, entry in ipairs(find_installed_bundles(USER_LAYOUTS_DIR)) do
+		if system[entry.name] then both[#both + 1] = entry.name end
+	end
+	table.sort(both)
+	return both
+end
+
+--- Logs each Ergopti bundle installed in both folders, naming the copy macOS uses.
+--- @return table names Bundle names present in both folders.
+local function report_duplicate_bundles()
+	local both = duplicate_bundles()
+	for _, name in ipairs(both) do
+		Logger.warn(LOG, "%s is installed both in %s and in %s: macOS loads both and renumbers the second copy's layout ids; the system copy is the one it types with (probe v5, P8 b). Remove one copy (the user copy needs no password).",
+			name, USER_LAYOUTS_DIR, SYSTEM_LAYOUTS_DIR)
+	end
+	return both
+end
+
 --- Copies the latest bundle to the user's Keyboard Layouts directory.
 --- The user replacement commits before obsolete system copies are removed.
+--- The same bundle already in the system folder is not copied a second time.
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
 --- @return boolean true on success.
 local function install_user_unlocked(bundles_dir, bundle_name)
+	local in_system = false
+	for _, entry in ipairs(find_installed_bundles(SYSTEM_LAYOUTS_DIR)) do
+		if entry.name == bundle_name then in_system = true end
+	end
+	if in_system then
+		Logger.info(LOG, "%s is already installed in %s: no second copy is written to the user folder.",
+			bundle_name, SYSTEM_LAYOUTS_DIR)
+		return true
+	end
 	Logger.start(LOG, "Installing %s into the user Keyboard Layouts folder…", bundle_name)
 	local committed, detail = execute_install_transaction(
 		USER_LAYOUTS_DIR, bundles_dir, bundle_name)
@@ -616,6 +656,8 @@ return {
 	bundle_variants        = bundle_variants,
 	bundle_keylayout_names = bundle_keylayout_names,
 	install_user          = install_user,
+	duplicate_bundles     = duplicate_bundles,
+	report_duplicate_bundles = report_duplicate_bundles,
 	install_system         = install_system,
 	invalidate_bundle_caches = invalidate_bundle_caches,
 }

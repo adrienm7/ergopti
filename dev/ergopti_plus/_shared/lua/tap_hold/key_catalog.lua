@@ -4,8 +4,9 @@
 --- MODULE: Tap-Hold Key Catalogue (shared)
 --- DESCRIPTION:
 --- Reads `[tap_hold.catalog]` from `_shared/tap_hold/defaults.toml`: every key a
---- tap-hold can be set on, in tray order, with its hand and its label key, and
---- the id each driver's engine gives it. A driver asks for its own column and
+--- tap-hold can be set on, in tray order, with its hand and the id each
+--- driver's engine gives it. Its name is the shared key name table's
+--- (_shared/data/keycodes/key_names.json), under each OS's usual name. A driver asks for its own column and
 --- gets its keys in order; the Tap-Hold submenu lists them under one header per
 --- hand.
 ---
@@ -20,15 +21,20 @@
 --- or a key would be the exact failure this table exists to end.
 --- ==============================================================================
 
+local KeyNames = require("keycodes.key_names")
+
 local M = {}
 
 --- The driver columns an entry may carry.
 M.PLATFORMS = { "ahk", "hs", "linux" }
 
+--- The key name table's platform of each driver column.
+local KEY_NAME_PLATFORM = { ahk = "windows", hs = "macos", linux = "linux" }
+
 --- The hands, in the order the Tap-Hold submenu shows them.
 M.HANDS = { "left", "right" }
 
-local KNOWN_FIELDS = { id = true, hand = true, label_key = true, ahk = true, hs = true, linux = true }
+local KNOWN_FIELDS = { id = true, hand = true, ahk = true, hs = true, linux = true }
 
 
 
@@ -65,7 +71,8 @@ local function validate(keys)
 		if not hands[entry.hand] then
 			error(string.format("%s: hand must be 'left' or 'right', got '%s'", where, tostring(entry.hand)), 0)
 		end
-		if not is_name(entry.label_key) then error(where .. " has no label_key", 0) end
+		-- The name comes from the shared key name table, never from the catalogue.
+		if KeyNames.canonical(entry.id) ~= entry.id then error(where .. " has no key name", 0) end
 		local columns = 0
 		for _, platform in ipairs(M.PLATFORMS) do
 			local id = entry[platform]
@@ -100,7 +107,8 @@ end
 --- @param defaults table The decoded `_shared/tap_hold/defaults.toml`.
 --- @param platform string "ahk", "hs" or "linux".
 --- @return table Array of { id, key, hand, label_key }: `id` is the driver's own
----   key id, `key` the catalogue id.
+---   key id, `key` the catalogue id, `label_key` the locale key the shared key
+---   name table gives it on that driver's OS.
 function M.for_platform(defaults, platform)
 	local known = false
 	for _, name in ipairs(M.PLATFORMS) do known = known or name == platform end
@@ -114,7 +122,8 @@ function M.for_platform(defaults, platform)
 	local out = {}
 	for _, entry in ipairs(catalog.keys) do
 		if entry[platform] ~= nil then
-			out[#out + 1] = { id = entry[platform], key = entry.id, hand = entry.hand, label_key = entry.label_key }
+			out[#out + 1] = { id = entry[platform], key = entry.id, hand = entry.hand,
+				label_key = KeyNames.i18n(entry.id, KEY_NAME_PLATFORM[platform]) }
 		end
 	end
 	if #out == 0 then error("[tap_hold.catalog] lists no key for '" .. platform .. "'", 0) end
@@ -178,6 +187,42 @@ end
 --- @return table set Driver key id -> true.
 function M.load_rollover(path, platform)
 	return M.rollover_for_platform(read_defaults(path), platform)
+end
+
+--- The per-key delays the shared defaults used to ship, resolved to one
+--- driver's key ids. They are not defaults any more: the loaders and writers of
+--- Windows and Linux use them to tell a delay nobody chose (copied into a user
+--- file by a rewrite) from one the user set; see `[tap_hold.retired_delays]`.
+--- @param defaults table Decoded shared tap-hold defaults.
+--- @param platform string Driver column.
+--- @return table retired Driver key id -> seconds; keys the driver does not
+---   have are omitted.
+function M.retired_delays_for_platform(defaults, platform)
+	local catalog = M.for_platform(defaults, platform)
+	local declared = defaults.tap_hold.retired_delays
+	if type(declared) ~= "table" then error("the shared tap-hold defaults declare no [tap_hold.retired_delays]", 0) end
+	local known = {}
+	for _, entry in ipairs(defaults.tap_hold.catalog.keys) do known[entry.id] = true end
+	for id, seconds in pairs(declared) do
+		if not known[id] then error("[tap_hold.retired_delays] " .. tostring(id) .. " is not in [tap_hold.catalog]", 0) end
+		if type(seconds) ~= "number" or seconds <= 0 then
+			error(string.format("[tap_hold.retired_delays] %s must be a number of seconds above zero, got %s",
+				tostring(id), tostring(seconds)), 0)
+		end
+	end
+	local result = {}
+	for _, entry in ipairs(catalog) do
+		if declared[entry.key] ~= nil then result[entry.id] = declared[entry.key] end
+	end
+	return result
+end
+
+--- Reads one driver's retired per-key delays from the shared defaults.
+--- @param path string Absolute defaults path.
+--- @param platform string Driver column.
+--- @return table retired See M.retired_delays_for_platform.
+function M.load_retired_delays(path, platform)
+	return M.retired_delays_for_platform(read_defaults(path), platform)
 end
 
 --- The keys of one hand, in order.

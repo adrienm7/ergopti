@@ -9,6 +9,10 @@
 
 local M = {}
 
+local Logger = require("logger.shim")
+
+local LOG = "ui.menu.ai_parent"
+
 local declarations = {
 	llm = { frame = "llm_native_parent_linux", id = "llm_parent_linux", child = "llm_menu" },
 	agent = { frame = "agent_native_parent", id = "agent_parent_linux", child = "agent_menu" },
@@ -240,6 +244,24 @@ local function current(ticket)
 	return current_enabled == ticket.enabled
 end
 
+--- The glyph the manifest's top-level ``llm`` entry declares for the engine's
+--- current health, shared by every driver's AI title.
+--- @param ticket table Captured genuine source and native owners.
+--- @return string|nil glyph Nil when the engine reports no health.
+local function title_health_dot(ticket)
+	local getter = rawget(ticket.native, "health_status")
+	if type(getter) ~= "function" then return nil end
+	local ok, status = pcall(getter)
+	if not ok then
+		Logger.error(LOG, "The AI health could not be read: %s.", tostring(status))
+		return nil
+	end
+	local dots = rawget(ticket.top_parent, "health_dot")
+	local glyph = type(status) == "string" and type(dots) == "table" and rawget(dots, status) or nil
+	if type(glyph) == "string" and glyph ~= "" then return glyph end
+	return nil
+end
+
 --- Projects only a whole completed child with its original callbacks retained.
 --- @param ticket table|nil Captured genuine source and native owners.
 --- @param children table Finished native subtree.
@@ -258,9 +280,12 @@ function M.finish(ticket, children)
 		agent_parent_ready = function() return ready end,
 	}
 	local getter_snapshot = capture(getters)
+	-- The health is a native read: it completes before the final cohort check.
+	local dot = ready and ticket.enabled == true and ticket.kind == "llm" and title_health_dot(ticket) or nil
 	local row = ticket.methods.group_row(ticket.declaration.frame, ticket.declaration.id, children, getters)
 	if not current(ticket) or not unchanged(native_children) or not unchanged(getter_snapshot)
 		or type(row) ~= "table" or not rawequal(rawget(row, "submenu"), children) then return nil end
+	if dot and type(rawget(row, "label")) == "string" then row.label = row.label .. " " .. dot end
 	return row
 end
 

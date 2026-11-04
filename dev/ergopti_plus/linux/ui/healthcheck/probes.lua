@@ -14,7 +14,8 @@
 --- 1. github_api asks api.github.com for its rate limit, the host every update
 ---    check talks to; the endpoint does not count against that limit.
 --- 2. ai_health asks the local Ollama for its version when the AI is on.
---- 3. system_details runs `kanata --version` and `df -Pk` on the logs folder.
+--- 3. system_details runs `df -Pk` on the logs folder. kanata left the driver
+---    on 2026-09-24, so its version probe is gone with it.
 --- 4. cpu_load reads /proc/stat and /proc/self/stat twice, sample_ms apart on
 ---    a libuv timer, for the machine's load and the daemon's share of it.
 --- 5. Without libuv there is no asynchronous child, no HTTP client and no
@@ -22,6 +23,10 @@
 ---    loop with a synchronous fallback.
 --- 6. A run is cancelled as a whole when the page refreshes or closes, and a
 ---    late answer of a cancelled run publishes nothing.
+--- 7. configuration reads and reduces the user's configuration files on a
+---    timer after phase A. It reads only local files, so it also runs without
+---    the extensive opt-in (local_only), and an answer past its timeout_ms is a
+---    timeout without sections.
 --- ==============================================================================
 
 local M = {}
@@ -37,6 +42,7 @@ local USER_AGENT = "ErgoptiPlus-Diagnostics"
 -- request of the updater or the AI engine
 local GITHUB_OWNER = "diagnostics.github"
 local AI_OWNER = "diagnostics.ai"
+local PAC_OWNER = "diagnostics.pac"
 
 -- The Ollama port when the engine names no base URL
 local AI_BACKEND = "ollama"
@@ -69,7 +75,11 @@ local function start_probe(run, id, body)
 		if settled then return end
 		settled = true
 		result.ms = math.floor(now_ms() - started + 0.5)
-		Logger.done(LOG, "Probe '%s' answered: %s (%d ms).", id, result.state, result.ms)
+		-- A failed answer carries its detail into the log: the diagnostics window
+		-- closes, and a field report holds only the log (issue #104).
+		local detail = result.state ~= "ok" and type(result.detail) == "string" and result.detail ~= ""
+			and (": " .. result.detail) or ""
+		Logger.done(LOG, "Probe '%s' answered: %s (%d ms)%s.", id, result.state, result.ms, detail)
 		if run.cancelled then return end
 		run.publish(id, result, sections)
 	end
@@ -146,6 +156,53 @@ local function github_api(config, run)
 	end
 end
 
+--- The desktop's proxy auto-config (PAC): configured, downloadable and usable by
+--- the managed downloader. The URL is read and fetched here but never reported.
+--- @param config table { timeout_ms }
+--- @param run table
+--- @return function
+local function proxy_pac(config, run)
+	return function(done)
+		local Shell = require("adapters.shell_runner")
+		local HttpClient = require("adapters.http_client")
+		if not Shell.HAS_ASYNC or not HttpClient.HAS_ASYNC then
+			done({ state = "unsupported" })
+			return
+		end
+		local PacCheck = require("network.pac_check")
+		local function none() done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } }) end
+		local function fetch(url)
+			run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(PAC_OWNER) end
+			HttpClient.get(url, { ["User-Agent"] = USER_AGENT },
+				{ timeout_ms = config.timeout_ms, owner = PAC_OWNER }, function(result)
+					local state, text = PacCheck.judge(result.status, result.body, result.error)
+					if state == "ok" then
+						done({ state = "ok" }, { network = { proxy_pac = text } })
+					else
+						done({ state = "error", detail = text })
+					end
+				end)
+		end
+		local function ask(key, on_output)
+			-- Only GNOME stores a proxy setting there; elsewhere there is none to read.
+			if not Shell.has_command("gsettings") then on_output(nil) return end
+			local handle = Shell.run_async("gsettings", { "get", "org.gnome.system.proxy", key },
+				{ timeout_ms = config.timeout_ms }, function(result)
+					on_output(result.ok and result.stdout or nil)
+				end)
+			if not handle then on_output(nil) return end
+			run.cancellers[#run.cancellers + 1] = function() handle.cancel() end
+		end
+		ask("mode", function(mode)
+			if not (mode and mode:find("'auto'", 1, true)) then none() return end
+			ask("autoconfig-url", function(value)
+				local url = value and value:match("'([^']+)'")
+				if url and url ~= "" then fetch(url) else none() end
+			end)
+		end)
+	end
+end
+
 --- The local AI backend answers its version endpoint.
 --- @param config table { paths, timeout_ms }
 --- @param state table Daemon state.
@@ -178,7 +235,7 @@ local function ai_health(config, state, run)
 	end
 end
 
---- The kanata version and the logs volume's free space.
+--- The logs volume's free space.
 --- @param config table { timeout_ms }
 --- @param logs_dir string|nil
 --- @param run table
@@ -190,42 +247,26 @@ local function system_details(config, logs_dir, run)
 			done({ state = "unsupported" })
 			return
 		end
-		local sections = { versions = {}, system = {} }
-		local pending, failures = 0, {}
-		local function step(detail)
-			if detail then failures[#failures + 1] = detail end
-			pending = pending - 1
-			if pending > 0 then return end
-			if #failures > 0 then
-				done({ state = "error", detail = table.concat(failures, "; ") }, sections)
-			else
-				done({ state = "ok" }, sections)
+		local sections = { system = {} }
+		if not logs_dir then
+			done({ state = "ok" }, sections)
+			return
+		end
+		local handle, err = Shell.run_async("df", { "-Pk", logs_dir }, { timeout_ms = config.timeout_ms }, function(result)
+			if not result.ok then
+				done({ state = "error", detail = "df: " .. tostring(result.error) }, sections)
+				return
 			end
-		end
-		local function run_command(executable, args, on_output)
-			pending = pending + 1
-			local handle, err = Shell.run_async(executable, args, { timeout_ms = config.timeout_ms }, function(result)
-				if result.ok then
-					on_output(result.stdout)
-					step(nil)
-				else
-					step(executable .. ": " .. tostring(result.error))
-				end
-			end)
-			if not handle then step(executable .. ": " .. tostring(err)) return end
-			run.cancellers[#run.cancellers + 1] = function() handle.cancel() end
-		end
-		run_command("kanata", { "--version" }, function(stdout)
-			local version = stdout:match("(%d+%.%d+[%w%.%-]*)")
-			sections.versions.kanata = version and ("kanata " .. version) or nil
+			-- Second line: filesystem, 1024-blocks, used, available, ...
+			local available = result.stdout:match("\n%S+%s+%d+%s+%d+%s+(%d+)")
+			sections.system.disk_free = available and tonumber(available) * 1024 or nil
+			done({ state = "ok" }, sections)
 		end)
-		if logs_dir then
-			run_command("df", { "-Pk", logs_dir }, function(stdout)
-				-- Second line: filesystem, 1024-blocks, used, available, ...
-				local available = stdout:match("\n%S+%s+%d+%s+%d+%s+(%d+)")
-				sections.system.disk_free = available and tonumber(available) * 1024 or nil
-			end)
+		if not handle then
+			done({ state = "error", detail = "df: " .. tostring(err) }, sections)
+			return
 		end
+		run.cancellers[#run.cancellers + 1] = function() handle.cancel() end
 	end
 end
 
@@ -295,6 +336,33 @@ local function cpu_load(config, run)
 	end
 end
 
+--- The user's configuration files and settings, read on a libuv timer after
+--- phase A: local files only, so it needs no opt-in. Its answer is the two
+--- sections; one that arrives after its timeout is discarded as a timeout.
+--- @param schema table
+--- @param run table
+--- @param overrides table|nil Replacements for tests (see bridge.configuration_context).
+--- @return function
+local function configuration(schema, run, overrides)
+	return function(done)
+		local Timers = require("adapters.timer_scheduler")
+		if not Timers.HAS_ASYNC then
+			done({ state = "unsupported" })
+			return
+		end
+		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_defer_ms"), function()
+			local context = require("ui.healthcheck.bridge").configuration_context(schema, overrides)
+			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
+			if not ok then
+				done({ state = "error", cleanup = "settled", detail = tostring(result):match("^[^\n]*") })
+				return
+			end
+			done(result, sections)
+		end)
+		run.cancellers[#run.cancellers + 1] = function() Timers.cancel(handle) end
+	end
+end
+
 
 
 
@@ -310,15 +378,15 @@ end
 --- @param paths table The snapshot's paths section.
 --- @param state table Daemon state.
 --- @param publish function(id, result, sections) Receives each answer once.
+--- @param options table|nil { local_only = true runs only the probes that read
+---   local files; overrides = test replacements for the configuration probe }
 --- @return table run { cancel = function() }
-function M.start(schema, paths, state, publish)
+function M.start(schema, paths, state, publish, options)
+	options = options or {}
 	local run = { cancelled = false, cancellers = {}, publish = publish }
 	local config = schema.probes
-	start_probe(run, "github_api", github_api(config.github_api, run))
-	start_probe(run, "ai_health", ai_health(config.ai_health, state, run))
-	start_probe(run, "system_details", system_details(config.system_details, paths.logs_dir, run))
-	start_probe(run, "cpu_load", cpu_load(config.cpu_load, run))
-	function run.cancel()
+	start_probe(run, "configuration", configuration(schema, run, options.overrides))
+	local function stop()
 		if run.cancelled then return end
 		run.cancelled = true
 		for index = #run.cancellers, 1, -1 do
@@ -326,6 +394,16 @@ function M.start(schema, paths, state, publish)
 			if not ok then Logger.error(LOG, "A diagnostics probe could not be cancelled: %s.", tostring(err)) end
 		end
 	end
+	if options.local_only == true then
+		run.cancel = stop
+		return run
+	end
+	start_probe(run, "github_api", github_api(config.github_api, run))
+	start_probe(run, "ai_health", ai_health(config.ai_health, state, run))
+	start_probe(run, "system_details", system_details(config.system_details, paths.logs_dir, run))
+	start_probe(run, "cpu_load", cpu_load(config.cpu_load, run))
+	start_probe(run, "proxy_pac", proxy_pac(config.proxy_pac, run))
+	run.cancel = stop
 	return run
 end
 

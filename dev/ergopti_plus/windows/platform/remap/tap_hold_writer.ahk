@@ -29,6 +29,8 @@
 
 
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\key_names.ahk
 #Include ../../adapters/native_number.ahk
 
 ; ===========================
@@ -52,8 +54,9 @@
 global _TH_KeyDefs := _TH_BuildKeyDefs()
 
 ; Reads this driver's column of the shared key catalogue. An entry that names
-; no hand or no label is a broken catalogue: it is logged as an ERROR and left
-; out, so the tray never shows a guessed hand.
+; no hand is a broken catalogue: it is logged as an ERROR and left out, so the
+; tray never shows a guessed hand. Its name is the shared key name table's
+; (infra/key_names.ahk), which throws on a key it does not name.
 ; @returns {Array} One Map per Windows key, in catalogue order.
 _TH_BuildKeyDefs() {
 	global _SharedDir
@@ -67,8 +70,8 @@ _TH_BuildKeyDefs() {
 		return Out
 	}
 	for Index, Entry in Keys {
-		if !(Entry is Map) || !Entry.Has("id") || !Entry.Has("hand") || !Entry.Has("label_key") {
-			try LoggerError("TapHoldWriter", "[tap_hold.catalog] keys[{1}] needs an id, a hand and a label_key — left out.", Index)
+		if !(Entry is Map) || !Entry.Has("id") || !Entry.Has("hand") {
+			try LoggerError("TapHoldWriter", "[tap_hold.catalog] keys[{1}] needs an id and a hand — left out.", Index)
 			continue
 		}
 		Hand := Entry["hand"]
@@ -78,7 +81,7 @@ _TH_BuildKeyDefs() {
 		}
 		if !Entry.Has("ahk")
 			continue
-		Out.Push(Map("id", Entry["ahk"], "i18n", Entry["label_key"], "hand", Hand))
+		Out.Push(Map("id", Entry["ahk"], "i18n", KeyNameI18n(Entry["id"]), "hand", Hand))
 	}
 	return Out
 }
@@ -189,7 +192,8 @@ global _TH_TapNoneI18n := "tap_hold.tap.none"
 ; Return the ordered key-definition array.
 TapHoldKeyDefs() {
 	global _TH_KeyDefs
-	return _TH_KeyDefs
+	; A parse-time #HotIf reaches this before the table's include has run.
+	return IsSet(_TH_KeyDefs) ? _TH_KeyDefs : Map()
 }
 
 ; Return the key definitions of one hand ("left" or "right"), in order.
@@ -217,7 +221,7 @@ TapHoldHoldOptions() {
 ; the single source of truth for action names.
 TapHoldCurrentTapLabel(KeyId) {
 	global TapHold, _TH_TapNoneI18n
-	TapAction := TapHoldTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
+	TapAction := TapHoldConfiguredTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
 	if (TapAction == "") {
 		return t(_TH_TapNoneI18n)
 	}
@@ -240,36 +244,21 @@ TapHoldCurrentHoldLabel(KeyId) {
 			return t(Opt["i18n"])
 		}
 	}
-	return HoldMod != "" ? HoldMod : (HoldLayer != "" ? HoldLayer : t(_TH_HoldOptions[1]["i18n"]))
+	; A hand-written spelling the picker does not list (`lctrl`, `shift+ctrl`)
+	; is still named, never printed as written.
+	if (HoldMod != "")
+		return _TH_HoldOptionLabel(HoldMod)
+	if (HoldLayer != "")
+		return t("tap_hold.hold." . HoldLayer . "_layer")
+	return t(_TH_HoldOptions[1]["i18n"])
 }
 
-; Human label for a hold modifier identifier.
-; Built from base i18n keys when possible, then joined with ' + '.
+; Human label for a hold modifier identifier: the shared key name of each
+; modifier ("Ctrl gauche" for lctrl), joined with ' + '.
 _TH_HoldOptionLabel(HoldId) {
-	if (HoldId == "") {
+	if (Trim(HoldId, " +") == "")
 		return t("tap_hold.hold.none")
-	}
-	Parts := StrSplit(HoldId, "+")
-	Out := []
-	for _, Part in Parts {
-		Clean := Trim(Part)
-		if (Clean == "") {
-			continue
-		}
-		Label := t("tap_hold.hold." . Clean)
-		if (InStr(Label, "tap_hold.hold.") > 0) {
-			Label := Clean
-		}
-		Out.Push(Label)
-	}
-	if (Out.Length == 0) {
-		return t("tap_hold.hold.none")
-	}
-	Result := ""
-	for Index, Label in Out {
-		Result .= (Index = 1 ? "" : " + ") . Label
-	}
-	return Result
+	return KeyNameComboLabel(HoldId)
 }
 
 ; Return true when the tap action for a key matches the given action id.
@@ -278,7 +267,7 @@ IsTapHoldTapActive(KeyId, ActionId) {
 	if !IsSet(TapHold) {
 		return false
 	}
-	Current := TapHoldTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
+	Current := TapHoldConfiguredTapAction(MasterGateDesiredTapHold(TapHold), KeyId)
 	if (ActionId == "") {
 		return (Current == "")
 	}
@@ -305,6 +294,54 @@ IsTapHoldHoldActive(KeyId, HoldOpt) {
 		return (HoldLayer == Id)
 	}
 	return false
+}
+
+; The shared action picker's items for a hold slot, a key's or a key
+; combination's: every hold option in its order, except the "none" sentinel,
+; which the picker draws as its own row. A hold is never a gesture action, so
+; the slot lists these options rather than the action catalogue: they are what
+; a hold can be. _shared/lua/tap_hold/hold_options.lua's picker_items builds
+; the same list for Linux from the same [tap_hold.hold_picker].
+; @returns {Array} Objects { Type: "action", Id, Label }.
+TapHoldHoldPickerItems() {
+	Items := []
+	Seen := Map("none", true)
+	for _, Opt in TapHoldHoldOptions() {
+		if (Opt["kind"] == "none")
+			continue
+		Id := Opt["id"]
+		if Seen.Has(Id)
+			throw ValueError("A hold option id must be distinct and never the picker's none.", -1, Id)
+		Seen[Id] := true
+		Label := (Opt["i18n"] != "") ? t(Opt["i18n"]) : _TH_HoldOptionLabel(Id)
+		Items.Push({ Type: "action", Id: Id, Label: Label })
+	}
+	return Items
+}
+
+; The hold option a pick of the shared action picker names: its « none » row
+; is the "none" sentinel, any other id the option of that id.
+; @param PickId {String} The picked id.
+; @returns {Map|Integer} The option, or 0 when the hold does not offer the id.
+TapHoldHoldOptionForPick(PickId) {
+	if !(PickId is String)
+		return 0
+	for _, Opt in TapHoldHoldOptions() {
+		if (Opt["kind"] == "none") ? (PickId == "none") : (Opt["id"] == PickId)
+			return Opt
+	}
+	return 0
+}
+
+; The id the shared action picker marks as a key's current hold.
+; @param KeyId {String} The key.
+; @returns {String} The option's id, or "none" for no hold.
+TapHoldCurrentHoldPickId(KeyId) {
+	for _, Opt in TapHoldHoldOptions() {
+		if IsTapHoldHoldActive(KeyId, Opt)
+			return (Opt["kind"] == "none") ? "none" : Opt["id"]
+	}
+	return "none"
 }
 
 
@@ -375,6 +412,53 @@ WriteTapHoldDuration(KeyId, Seconds, WriterFn := 0, ReplaceFn := 0,
 		_TH_BuildDurationCandidate.Bind(KeyId, Seconds),
 		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn,
 		_TH_BuildDurationContent.Bind(KeyId, Seconds, ExpectedSource, ConfigurationFile))
+}
+
+/**
+ * Persists the GLOBAL tap-hold delay: the delay of every key that has none of its own.
+ * A key with a delay of its own keeps it; this never writes a per-key value.
+ * @param {Number} Seconds Positive finite delay within the runtime limit.
+ * @returns {Integer|Boolean} Strict1 after publication, or false after refusal.
+ */
+WriteTapHoldGlobalDuration(Seconds, WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, AuthorizeFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return WriteTapHoldGlobalDuration(Seconds, WriterFn, ReplaceFn,
+			DeleteFn, AuthorizeFn)
+		finally Critical(InheritedCritical)
+	}
+	if !_TH_DurationValueValid(Seconds) {
+		try LoggerError("TapHoldWriter", "Refusing an invalid global tap-hold delay.")
+		return false
+	}
+	return _TH_CommitTapHoldMutation("global-duration",
+		_TH_BuildGlobalDurationCandidate.Bind(Seconds),
+		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
+}
+
+/**
+ * Removes a key's own delay so it follows the global delay again.
+ * @param {String} KeyId Shared physical-key identifier.
+ * @returns {Integer|Boolean} Strict1 after publication, or false after refusal.
+ */
+WriteTapHoldDurationReset(KeyId, WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, AuthorizeFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return WriteTapHoldDurationReset(KeyId, WriterFn, ReplaceFn,
+			DeleteFn, AuthorizeFn)
+		finally Critical(InheritedCritical)
+	}
+	if !(KeyId is String) || !_TH_DurationKeyKnown(KeyId) {
+		try LoggerError("TapHoldWriter", "Refusing to reset the delay of an unknown physical key.")
+		return false
+	}
+	return _TH_CommitTapHoldMutation("duration-reset",
+		_TH_BuildDurationResetCandidate.Bind(KeyId),
+		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
 }
 
 ; Apply a new hold option for a key directly to TapHold + tap_hold.toml.
@@ -631,8 +715,11 @@ _TH_DurationInitialImage(Data) {
 	InheritDefaults := Data.Get("inherit_defaults", false)
 	if !(InheritDefaults is Integer) || (InheritDefaults != 0 && InheritDefaults != 1)
 		throw ValueError("The inheritance flag needs strict Boolean intent")
-	Content := Chr(0xFEFF) . "[tap_hold]`n"
+	Content := Chr(0xFEFF) . "[_meta]`nschema_version = " . TapHoldMigrationRegistry()["current"] . "`n`n"
+	Content .= "[tap_hold]`n"
 	Content .= "inherit_defaults = " . TOML_RenderValue(TOML_Bool(InheritDefaults)) . "`n"
+	if Data.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		Content .= "time_activation_seconds = " . TOML_RenderValue(Data[ConfigLeaf.TIME_ACTIVATION_SECONDS]) . "`n"
 	for KeyId, Entry in Data["keys"] {
 		if !(KeyId is String) || !(Entry is Map)
 			throw ValueError("Duration persistence cannot serialize an invalid key model")
@@ -652,10 +739,14 @@ _TH_DurationInitialImage(Data) {
 	return Content
 }
 
+; A write migrates before it applies (see tap_hold_migration.ahk), so the key being
+; set keeps the value being set, even one an earlier build shipped.
 _TH_DurationLeafImage(Source, KeyId, Seconds) {
+	global _SharedDir
 	Section := "tap_hold.keys." . TOML_RenderKey(KeyId)
-	Admitted := TOML_BuildConfigDocumentCandidate(Source,
-		[{ Section: Section, Key: "time_activation_seconds", Value: Seconds }], [])
+	Rows := [{ Section: Section, Key: ConfigLeaf.TIME_ACTIVATION_SECONDS, Value: Seconds }]
+	Migrated := TapHoldMigrateSource(Source, _SharedDir . "\tap_hold\defaults.toml")
+	Admitted := TOML_BuildConfigDocumentCandidate(Migrated, Rows, [])
 	if !(Admitted is Map) || !Admitted.Has("content") || !(Admitted["content"] is String)
 		throw ValueError("The semantic TOML owner refused the duration image")
 	return Admitted["content"]
@@ -668,9 +759,9 @@ _TH_DurationWasPublished(KeyId, Seconds) {
 		return (TapHold is Map) && (Desired is Map) && Desired.Has("keys")
 			&& (Desired["keys"] is Map) && Desired["keys"].Has(KeyId)
 			&& (Desired["keys"][KeyId] is Map)
-			&& Desired["keys"][KeyId].Has("time_activation_seconds")
-			&& _TH_DurationValueValid(Desired["keys"][KeyId]["time_activation_seconds"])
-			&& Desired["keys"][KeyId]["time_activation_seconds"] == Seconds
+			&& Desired["keys"][KeyId].Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+			&& _TH_DurationValueValid(Desired["keys"][KeyId][ConfigLeaf.TIME_ACTIVATION_SECONDS])
+			&& Desired["keys"][KeyId][ConfigLeaf.TIME_ACTIVATION_SECONDS] == Seconds
 	} catch {
 		return false
 	}
@@ -708,7 +799,31 @@ _TH_DurationReceiptMatches(Source, Path, KeyId, Seconds, PhysicalMatchFn := 0) {
 _TH_BuildDurationCandidate(KeyId, Seconds, Candidate) {
 	if !_TH_CandidateEntry(Candidate, KeyId, &Entry)
 		return false
-	Entry["time_activation_seconds"] := Seconds
+	Entry[ConfigLeaf.TIME_ACTIVATION_SECONDS] := Seconds
+	return 1
+}
+
+_TH_BuildGlobalDurationCandidate(Seconds, Candidate) {
+	if !(Candidate is Map)
+		return false
+	Candidate[ConfigLeaf.TIME_ACTIVATION_SECONDS] := Seconds
+	return 1
+}
+
+; Drops the key's own delay; an entry that held nothing else goes with it, so the
+; file does not keep an empty table for a key that follows the global delay.
+_TH_BuildDurationResetCandidate(KeyId, Candidate) {
+	if !(Candidate is Map)
+		return false
+	if !Candidate.Has("keys") || !(Candidate["keys"] is Map) || !Candidate["keys"].Has(KeyId)
+		return 1
+	Entry := Candidate["keys"][KeyId]
+	if !(Entry is Map)
+		return false
+	if Entry.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		Entry.Delete(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+	if Entry.Count == 0
+		Candidate["keys"].Delete(KeyId)
 	return 1
 }
 
@@ -926,6 +1041,13 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		try LoggerError("TapHoldWriter", "Refusing to rewrite '{1}': it could not be read at load, so the in-memory tap-hold map holds the shipped defaults rather than the user's configuration. Restart the driver once the file is readable.", BoundPath)
 		return false
 	}
+	; Nor to replace a file this build cannot version: a newer build's settings
+	; are not in the map below, and a downgrade must not destroy them.
+	Refusal := TapHoldMigrationWriteRefusal(BoundPath)
+	if (Refusal != "") {
+		try LoggerError("TapHoldWriter", "Refusing to rewrite '{1}': {2}.", BoundPath, Refusal)
+		return false
+	}
 	try LoggerDebug("TapHoldWriter", "Persisting tap-hold config to '{1}' (keys={2}, inherit_defaults={3}).",
 		BoundPath, Data.Has("keys") ? Data["keys"].Count : 0,
                 Data.Has("inherit_defaults") ? (Data["inherit_defaults"] ? "true" : "false") : "unset")
@@ -951,13 +1073,21 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		Lines.Push("# is set in layers.toml, not here.")
 		Lines.Push("")
 
-		; Root [tap_hold] section — emit inherit_defaults when it is false so
-		; the loader does not re-merge shipped defaults on the next reload.
-	        if Data.Has("inherit_defaults") and !Data["inherit_defaults"] {
-			Lines.Push("[tap_hold]")
+		; The stamp says every per-key delay written below is one the user set: the
+		; loader dropped the delays earlier builds copied into the file.
+		Lines.Push("[_meta]")
+		Lines.Push("schema_version = " . TapHoldMigrationRegistry()["current"])
+		Lines.Push("")
+
+		; Root [tap_hold] section — inherit_defaults when it is false, so the loader
+		; does not re-merge shipped defaults on the next reload; the global delay
+		; when the user set one.
+		Lines.Push("[tap_hold]")
+		if Data.Has("inherit_defaults") and !Data["inherit_defaults"]
 			Lines.Push("inherit_defaults = false")
-			Lines.Push("")
-		}
+		if Data.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+			Lines.Push(_TH_TomlFormatLine(ConfigLeaf.TIME_ACTIVATION_SECONDS, Data[ConfigLeaf.TIME_ACTIVATION_SECONDS]))
+		Lines.Push("")
 
 		; Keys section.
 	        if Data.Has("keys") {
@@ -1218,7 +1348,7 @@ TapHoldScopeApply(Mode, Options := unset) {
 	Defaults := CandidateOptions.Get("tap_hold_defaults", _SharedDir . "\tap_hold\defaults.toml")
 	CandidateOptions["preset_owner"] := TapHoldScopeOwner(Path, Defaults, Mode,
 		CandidateOptions.Get("layers_config_dir", ""))
-	return ConfigScopeApply("tap_holds", Mode,
+	return ConfigScopeApply(ConfigLeaf.TAP_HOLDS, Mode,
 		Map("parameters", ConfigScopeActionParameterPaths), CandidateOptions)
 }
 
@@ -1255,24 +1385,30 @@ class TapHoldScopeOwner {
 		Source := Present ? FSReadUtf8Exact(this.path) : ""
 		if !(Source is String)
 			throw Error("The tap-hold source cannot be read.")
-		Existing := Present ? TOML_ParseFreshFile(this.path) : Map()
+		Existing := TOML_ParseDocument(TapHoldMigrateSource(Source, this.defaults))
 		Kinds := TapHoldFieldKinds()
-		Rows := [{ Section: "tap_hold", Key: "inherit_defaults", Delete: true }]
-		for Section, Fields in Existing {
-			if !RegExMatch(Section, "^tap_hold\.keys\.[A-Za-z0-9_]+$")
-				continue
-			for Field in Fields {
-				if Kinds.Has(Field)
-					Rows.Push({ Section: Section, Key: Field, Delete: true })
-			}
-		}
+		; Every delay goes, the global one included: the recommendation sets none, and
+		; the per-key ones are deleted below with the rest of each key's fields.
+		Rows := [{ Section: "tap_hold", Key: "inherit_defaults", Delete: true },
+			{ Section: "tap_hold", Key: ConfigLeaf.TIME_ACTIVATION_SECONDS, Delete: true }]
+		PresetKeys := Map()
 		if this.mode == "recommended" {
 			if !FileExist(this.defaults)
 				throw Error("The canonical tap-hold preset is missing.")
 			Preset := LoadTapHoldToml(this.defaults)
 			if TOML_UnreadableFile(this.defaults) || Preset["keys"].Count == 0
 				throw Error("The canonical tap-hold preset is unreadable or empty.")
-			for KeyId, Fields in Preset["keys"] {
+			PresetKeys := Preset["keys"]
+		}
+		; A field the preset also sets gets its value row below: two rows on one path
+		; are refused, so this deletes only what the preset leaves out.
+		for KeyId, Fields in _TH_OwnedDocumentKeys(Existing) {
+			for Field in Fields
+				if !(PresetKeys.Has(KeyId) && PresetKeys[KeyId].Has(Field))
+					Rows.Push({ Section: "tap_hold.keys." . KeyId, Key: Field, Delete: true })
+		}
+		if this.mode == "recommended" {
+			for KeyId, Fields in PresetKeys {
 				for Field, Value in Fields {
 					if !Kinds.Has(Field)
 						throw Error("The canonical tap-hold preset contains an unknown field.")
@@ -1281,7 +1417,7 @@ class TapHoldScopeOwner {
 				}
 			}
 		}
-		Image := TOML_BuildUpdatedContent(this.path, Rows)
+		Image := _TH_BuildSemanticImage(this.path, Source, Present, Rows, this.defaults)
 		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 				|| Image["source_present"] != Present || !(Image["source_content"] == Source)
 			throw Error("The tap-hold source changed or its scoped image could not be rendered.")
@@ -1311,10 +1447,10 @@ TapHoldConfigPathBeside(ConfigPath) {
 	return Folder . "\tap_hold.toml"
 }
 
-; Whether a loaded or parsed TOML value is true.
+; Whether a parsed source value carries genuine TOML Boolean intent.
 ; @param Value any
 ; @returns {Boolean}
-_TH_TomlTrue(Value) => (Value is TOML_Bool) ? Value.Value : ((Value is Integer) && Value == 1)
+_TH_TomlTrue(Value) => (Value is TOML_Bool) && Value.Value
 
 ; Same type and value; strings compare case-sensitively, TOML Booleans by value.
 ; @returns {Boolean}
@@ -1339,23 +1475,48 @@ _TH_SameOwnedFields(Left, Right) {
 	return true
 }
 
-; The owned fields of every [tap_hold.keys.<id>] section of a parsed file.
-; @param Sections Map From TOML_ParseFreshFileTyped.
-; @returns {Map} Key id -> Map of owned fields.
-_TH_OwnedKeySections(Sections) {
+; The typed document keeps exact namespace identity for every admitted spelling.
+; Unknown leaves and table-array members never lend a key identity to this owner.
+_TH_OwnedDocumentKeys(Document) {
 	Kinds := TapHoldFieldKinds()
 	Keys := Map()
-	for Section, Fields in Sections {
-		if !RegExMatch(Section, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &Match)
+	Root := Document.Get("tap_hold", Map())
+	if !(Root is Map)
+		throw ValueError("The tap_hold source namespace must be a table.")
+	Entries := Root.Get("keys", Map())
+	if !(Entries is Map)
+		throw ValueError("The tap_hold.keys source namespace must be a table.")
+	for KeyId, Fields in Entries {
+		if !RegExMatch(KeyId, "^[A-Za-z0-9_]+$") || !(Fields is Map)
 			continue
 		Owned := Map()
 		for Field, Value in Fields {
 			if Kinds.Has(Field)
 				Owned[Field] := Value
 		}
-		Keys[Match[1]] := Owned
+		Keys[KeyId] := Owned
 	}
 	return Keys
+}
+
+; Tap-hold files carry their own version, not config.toml's. Build a detached
+; image through the same semantic leaf owner as per-key duration persistence,
+; from the source at the current version, without config.toml first-use stamping
+; or publication of a runtime cache. An edit that changes nothing in an absent
+; file creates nothing.
+_TH_BuildSemanticImage(Path, Source, Present, Rows, Defaults) {
+	if TOML_WriteRefusal(Path) != ""
+		throw Error("The tap-hold source is read-only for this session.")
+	Migrated := TapHoldMigrateSource(Source, Defaults)
+	Admitted := TOML_BuildConfigDocumentCandidate(Migrated, Rows, [])
+	if !Present && Admitted["content"] == Migrated
+		Admitted := Map("content", Source, "preserve_source", true)
+	else if !(Migrated == Source)
+		Admitted["preserve_source"] := false
+	if !_TOML_WriteSourceMatches(Path, Present, Source)
+		throw Error("The tap-hold source changed during candidate preparation.")
+	return Map("status", "ok", "kind", "rendered", "content", Admitted["content"],
+		"source_present", Present, "source_content", Source, "preserve_source", Admitted["preserve_source"])
 }
 
 ; The first-run wizard's view of a tap_hold.toml, read fresh from disk: each
@@ -1369,17 +1530,26 @@ _TH_OwnedKeySections(Sections) {
 TapHoldKeyReport(Path, Defaults) {
 	if !FileExist(Path)
 		return Map()
-	Sections := TOML_ParseFreshFileTyped(Path, &DiscardedArrays)
-	if TOML_ReadFailed(Path) || DiscardedArrays
+	try Document := TOML_ParseDocument(TapHoldMigrateSource(FSReadStrict(Path), Defaults))
+	catch
 		return "the tap-hold file '" . Path . "' could not be read"
+	try return _TH_KeyReportDocument(Document, Defaults)
+	catch
+		return "the tap-hold file '" . Path . "' could not be read"
+}
+
+; Report and import inspect the same captured source instead of racing a second
+; file read between the customised-key refusal and candidate construction. The
+; document is at the current version, so every delay in it is the user's own.
+_TH_KeyReportDocument(Document, Defaults) {
 	Preset := LoadTapHoldToml(Defaults)["keys"]
 	Keys := Map()
-	Root := Sections.Get("tap_hold", Map())
+	Root := Document.Get("tap_hold", Map())
 	if Root.Has("inherit_defaults") && _TH_TomlTrue(Root["inherit_defaults"]) {
 		for KeyId, Fields in Preset
 			Keys[KeyId] := _TH_CloneData(Fields)
 	}
-	for KeyId, Fields in _TH_OwnedKeySections(Sections) {
+	for KeyId, Fields in _TH_OwnedDocumentKeys(Document) {
 		if !Keys.Has(KeyId)
 			Keys[KeyId] := Map()
 		; A modifier hold and a layer hold exclude each other, as in the loader.
@@ -1440,10 +1610,12 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 	if TOML_UnreadableFile(Defaults) || Preset["keys"].Count == 0
 		throw Error("The canonical tap-hold preset is unreadable or empty.")
 	Present := FileExist(Path) ? 1 : 0
-	Existing := Present ? TOML_ParseFreshFile(Path) : Map()
-	Report := TapHoldKeyReport(Path, Defaults)
-	if (Report is String)
-		throw Error(Report)
+	Source := Present ? FSReadUtf8Exact(Path) : ""
+	if !(Source is String)
+		throw Error("The tap-hold source cannot be read.")
+	Document := TOML_ParseDocument(TapHoldMigrateSource(Source, Defaults))
+	Existing := _TH_OwnedDocumentKeys(Document)
+	Report := _TH_KeyReportDocument(Document, Defaults)
 	Kinds := TapHoldFieldKinds()
 	Rows := []
 	Imported := Map()
@@ -1456,9 +1628,11 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 			throw ValueError("Tap-hold key '" . KeyId . "' holds the user's own setting.")
 		Imported[KeyId] := true
 		Section := "tap_hold.keys." . KeyId
-		if Existing.Has(Section) {
-			for Field in Existing[Section] {
-				if Kinds.Has(Field)
+		if Existing.Has(KeyId) {
+			for Field in Existing[KeyId] {
+				; A field the preset also sets gets its value row below: two rows on
+				; one path are refused, so this deletes only what the preset leaves out.
+				if Kinds.Has(Field) && !Preset["keys"][KeyId].Has(Field)
 					Rows.Push({ Section: Section, Key: Field, Delete: true })
 			}
 		}
@@ -1469,7 +1643,7 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 			Rows.Push({ Section: Section, Key: Field, Value: Serialized })
 		}
 	}
-	Image := TOML_BuildUpdatedContent(Path, Rows)
+	Image := _TH_BuildSemanticImage(Path, Source, Present, Rows, Defaults)
 	if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 			|| Image["source_present"] != Present
 		throw Error("The tap-hold file '" . Path . "' could not be read or rendered.")

@@ -15,6 +15,7 @@ local hs = hs
 local Logger = require("infra.logger")
 local LOG = "tooltip_renderer"
 local Config = require("ui.tooltip.config")
+local AXResponsiveness = require("adapters.accessibility_permission")
 -- The two pieces of tooltip maths that must not differ between drivers, and
 -- are pinned to the same JSON vectors on both.
 local SharedTint   = require("tooltip.tint")
@@ -46,6 +47,7 @@ M.ELEM_SEPARATOR   = 4  -- Thin horizontal separator above hint/info
 M.ELEM_HINT        = 5  -- Hint line (or hint+info combined when they fit on one row)
 M.ELEM_INFO        = 6  -- Info bar (variable zone — TTFT/TTLT timing line)
 M.ELEM_MODEL_INFO  = 7  -- Stable "model + prompt" header (FIXED zone — render once per chain)
+M.ELEM_LABELS      = 8  -- Shortcut column, right-aligned over the predictions block
 
 M.canvas = hs.canvas.new({ x = 0, y = 0, w = 0, h = 0 })
 if M.canvas then
@@ -58,6 +60,7 @@ if M.canvas then
 		{ type = "rectangle" },
 		{ type = "text" },
 		{ type = "text" },
+		{ type = "text", action = "skip" },
 		{ type = "text", action = "skip" }
 	)
 end
@@ -258,53 +261,107 @@ function M.apply_tint(requested_tint)
 	})
 end
 
---- Resolves the best screen coordinates to display the tooltip.
---- @return table|nil Table containing x, y, and optionally h and type.
-function M.resolve_anchor()
-	local ok_ax, position_ax = pcall(function()
+-- Raised inside the AX cascade to stop it at the first unanswered read: each
+-- one holds the main thread for the whole messaging timeout, and the cascade
+-- asked up to seven (2515 ms, field run 2026-10-31)
+local UNANSWERED_SENTINEL = {}
+
+--- Reads one AX value and stops the cascade at an unanswered read.
+--- @param element userdata|table AX element.
+--- @param method string attributeValue or parameterizedAttributeValue.
+--- @return any value
+local function ax_read(element, method, ...)
+	local value, err = element[method](element, ...)
+	if value == nil and type(err) == "string" and err:find(AXResponsiveness.UNANSWERED_ERROR, 1, true) then
+		error(UNANSWERED_SENTINEL, 0)
+	end
+	return value
+end
+
+--- Resolves the caret, line or input-box anchor through Accessibility.
+--- @return table|nil anchor
+--- @return boolean unanswered True when the application left a read unanswered.
+local function resolve_ax_anchor()
+	local ok, position = pcall(function()
 		local ax_engine = require("hs.axuielement")
-		local focused_element = ax_engine.systemWideElement():attributeValue("AXFocusedUIElement")
+		local focused_element = ax_read(ax_engine.systemWideElement(), "attributeValue", "AXFocusedUIElement")
 		if not focused_element then return nil end
 
-		local text_range = focused_element:attributeValue("AXSelectedTextRange")
+		local text_range = ax_read(focused_element, "attributeValue", "AXSelectedTextRange")
 		if text_range and type(text_range) == "table" then
-			local bounds = focused_element:parameterizedAttributeValue("AXBoundsForRange", { location = text_range.location, length = 0 })
+			local bounds = ax_read(focused_element, "parameterizedAttributeValue", "AXBoundsForRange", { location = text_range.location, length = 0 })
 			if bounds and type(bounds) == "table" and bounds.x and bounds.y and bounds.h and bounds.h > 0 and bounds.h < Config.layout.max_caret_height then
 				return { x = bounds.x, y = bounds.y, h = bounds.h, type = "caret" }
 			end
 		end
 
-		local line_number = focused_element:attributeValue("AXInsertionPointLineNumber")
+		local line_number = ax_read(focused_element, "attributeValue", "AXInsertionPointLineNumber")
 		if line_number then
-			local line_range = focused_element:parameterizedAttributeValue("AXRangeForLine", line_number)
+			local line_range = ax_read(focused_element, "parameterizedAttributeValue", "AXRangeForLine", line_number)
 			if line_range then
-				local bounds = focused_element:parameterizedAttributeValue("AXBoundsForRange", line_range)
+				local bounds = ax_read(focused_element, "parameterizedAttributeValue", "AXBoundsForRange", line_range)
 				if bounds and type(bounds) == "table" and bounds.x and bounds.y and bounds.h and bounds.h > 0 and bounds.h < Config.layout.max_caret_height then
 					return { x = bounds.x, y = bounds.y, h = bounds.h, type = "caret" }
 				end
 			end
 		end
 
-		local container_frame = focused_element:attributeValue("AXFrame")
+		local container_frame = ax_read(focused_element, "attributeValue", "AXFrame")
 		if container_frame and type(container_frame) == "table" and container_frame.x and container_frame.y and container_frame.w and container_frame.h then
 			return { x = container_frame.x + container_frame.w / 2, y = container_frame.y + container_frame.h, h = 0, type = "input_box" }
 		end
 
 		return nil
 	end)
+	if not ok then
+		local unanswered = position == UNANSWERED_SENTINEL
+			or (type(position) == "string" and position:find(AXResponsiveness.UNANSWERED_ERROR, 1, true) ~= nil)
+		return nil, unanswered
+	end
+	return type(position) == "table" and position or nil, false
+end
 
-	if ok_ax and type(position_ax) == "table" then return position_ax end
-
-	local active_window = hs.window.focusedWindow()
-	if active_window then
-		local ok_frame, window_frame = pcall(function() return active_window:frame() end)
-		if ok_frame and window_frame and type(window_frame) == "table" then
-			return { x = window_frame.x + window_frame.w / 2, y = window_frame.y + window_frame.h - Config.layout.window_bottom_inset, h = 0, type = "window" }
-		end
+--- Resolves the tooltip anchor and the screen it belongs on, asking the
+--- frontmost application at most one unanswered Accessibility read per render.
+--- @return table|nil anchor Table containing x, y, and optionally h and type.
+--- @return table screen_frame Frame of the focused window's screen or the main one.
+function M.resolve_placement()
+	local pid = AXResponsiveness.frontmost_pid()
+	local askable = AXResponsiveness.is_askable(pid)
+	local anchor, unanswered = nil, false
+	if askable then anchor, unanswered = resolve_ax_anchor() end
+	if unanswered and pid ~= nil then
+		AXResponsiveness.mark_unanswered(pid)
+		Logger.debug(LOG, "Frontmost application (PID %s) left an Accessibility read unanswered; tooltip placed without it for %d s.",
+			tostring(pid), AXResponsiveness.unanswered_cooldown_sec())
 	end
 
-	return nil
+	-- hs.window.focusedWindow is an Accessibility read of the same application
+	local window_screen = nil
+	if askable and not unanswered then
+		local active_window = hs.window.focusedWindow()
+		if active_window then
+			if anchor == nil then
+				local ok_frame, window_frame = pcall(function() return active_window:frame() end)
+				if ok_frame and window_frame and type(window_frame) == "table" then
+					anchor = { x = window_frame.x + window_frame.w / 2, y = window_frame.y + window_frame.h - Config.layout.window_bottom_inset, h = 0, type = "window" }
+				end
+			end
+			if type(active_window.screen) == "function" then
+				pcall(function() window_screen = active_window:screen() end)
+			end
+		end
+	end
+	return anchor, (window_screen or hs.screen.mainScreen()):frame()
 end
+
+--- Resolves the best screen coordinates to display the tooltip.
+--- @return table|nil Table containing x, y, and optionally h and type.
+function M.resolve_anchor()
+	return (M.resolve_placement())
+end
+
+
 
 
 
@@ -338,6 +395,45 @@ function M.compute_position(anchor, canvas, screen_frame)
 		window_offset_y = Config.layout.window_offset_y,
 		screen_margin   = Config.layout.screen_margin,
 	})
+end
+
+-- llm.trigger.while_hotstring_tooltip = "both": the standard canvas goes under the
+-- visible hotstring rows, so the two read as one stack.
+local _stack_below_hotstring = false
+
+--- Places the standard canvas under the hotstring rows while they are shown.
+--- @param enabled boolean
+function M.set_stack_below_hotstring(enabled)
+	_stack_below_hotstring = enabled == true
+end
+
+--- Where a canvas goes to continue the hotstring stack: under it, or above it
+--- when the screen ends first, left-aligned with it and kept on screen. Pure.
+--- @param stacked table { x, y, w, h } The hotstring canvas frame.
+--- @param canvas table { w, h } The canvas size.
+--- @param screen_frame table { x, y, w, h }
+--- @return table { x, y }
+function M.position_below_stack(stacked, canvas, screen_frame)
+	local margin = Config.layout.screen_margin
+	local gap = Config.layout.line_spacing
+	local y = stacked.y + stacked.h + gap
+	if y + canvas.h > screen_frame.y + screen_frame.h - margin then
+		y = stacked.y - canvas.h - gap
+	end
+	local x = math.max(screen_frame.x + margin,
+		math.min(stacked.x, screen_frame.x + screen_frame.w - canvas.w - margin))
+	y = math.max(screen_frame.y + margin, math.min(y, screen_frame.y + screen_frame.h - canvas.h - margin))
+	return { x = x, y = y }
+end
+
+--- The visible hotstring canvas frame the standard canvas continues, or nil.
+--- @return table|nil
+local function visible_stack_frame()
+	if not _stack_below_hotstring or not M.stacked_canvas then return nil end
+	local ok, frame = pcall(function()
+		return M.stacked_canvas:isShowing() and M.stacked_canvas:frame() or nil
+	end)
+	return ok and type(frame) == "table" and frame or nil
 end
 
 --- Compiles the component blocks, applies layout logic, and draws the canvas.
@@ -394,7 +490,16 @@ function M.render(blocks, state, start_watchers_callback)
 		local current_y = Config.layout.pad_y
 
 		M.canvas[3].text  = blocks.preds
-		M.canvas[3].frame = { x = Config.layout.pad_x, y = current_y, w = max_width, h = size_predictions.h }
+		M.canvas[3].frame = { x = Config.layout.pad_x, y = current_y, w = blocks.line_limit or max_width, h = size_predictions.h }
+		-- The column gets the block's whole frame, so it ends on the inner edge
+		-- of the panel however far a footer widened it past the lines.
+		if blocks.labels_st then
+			M.canvas[M.ELEM_LABELS].text   = blocks.labels_st
+			M.canvas[M.ELEM_LABELS].frame  = { x = Config.layout.pad_x, y = current_y, w = max_width, h = size_predictions.h }
+			M.canvas[M.ELEM_LABELS].action = "fill"
+		else
+			M.canvas[M.ELEM_LABELS].action = "skip"
+		end
 		current_y = current_y + size_predictions.h + Config.layout.line_spacing
 
 		if hint_styled or info_styled then
@@ -433,16 +538,12 @@ function M.render(blocks, state, start_watchers_callback)
 		end
 
 		local canvas_height = current_y - Config.layout.line_spacing + Config.layout.pad_y
-		local anchor = M.resolve_anchor()
-		local focused_window = hs.window.focusedWindow()
-		local window_screen = nil
-		
-		if focused_window and type(focused_window.screen) == "function" then 
-			pcall(function() window_screen = focused_window:screen() end) 
-		end
-		local screen_frame = (window_screen or hs.screen.mainScreen()):frame()
+		local anchor, screen_frame = M.resolve_placement()
 
-		local placed = M.compute_position(anchor, { w = canvas_width, h = canvas_height }, screen_frame)
+		local stack_frame = visible_stack_frame()
+		local placed = stack_frame
+			and M.position_below_stack(stack_frame, { w = canvas_width, h = canvas_height }, screen_frame)
+			or M.compute_position(anchor, { w = canvas_width, h = canvas_height }, screen_frame)
 		local pos_x, pos_y = placed.x, placed.y
 
 		M.canvas:frame({ x = pos_x, y = pos_y, w = canvas_width, h = canvas_height })
@@ -701,13 +802,7 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		end
 
 		-- Resolve position (same anchor cascade as render()).
-		local anchor = M.resolve_anchor()
-		local focused_window = hs.window.focusedWindow()
-		local window_screen
-		if focused_window and type(focused_window.screen) == "function" then
-			pcall(function() window_screen = focused_window:screen() end)
-		end
-		local screen_frame = (window_screen or hs.screen.mainScreen()):frame()
+		local anchor, screen_frame = M.resolve_placement()
 
 		local pos_x, pos_y
 		if anchor then

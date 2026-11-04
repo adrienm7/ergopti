@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 
 
@@ -38,7 +39,7 @@ local M = {}
 --- @return string host Lowercase, "" when the URL names none.
 function M.host(url)
 	if type(url) ~= "string" then return "" end
-	local rest = url:match("^%s*(.-)%s*$")
+	local rest = TextUtils.trim(url)
 	rest = rest:gsub("^%a[%w+.-]*://", "")
 	rest = rest:gsub("^[^/?#@]*@", "")
 	return (rest:match("^[^/?#]*") or ""):lower()

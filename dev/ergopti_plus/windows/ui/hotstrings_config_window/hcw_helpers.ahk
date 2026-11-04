@@ -42,15 +42,23 @@ global _HCW_CATEGORY_LIST := []
 ; Shape: { Key, Label }
 global _HCW_GROUP_LIST := []
 
-; The bundled common categories (always present, in display order).
-global _HCW_COMMON_CATS := [
-	"magickey", "autocorrection", "rolls",
-	"sfbsreduction", "distancesreduction"
-]
+#Include ../../infra/menu_row_order.ahk
+
+; The bundled common categories (always present), in the shared display order;
+; "personal" closes that order but has its own group, built from the user's files.
+_HCW_CommonCategories() {
+	Common := []
+	for Category in MenuRowOrderList("hotstring_config_categories")
+		if (Category != "personal")
+			Common.Push(Category)
+	return Common
+}
 
 ; Override-only categories (no TOML file) — colour / delay live in
 ; hotstrings_config.toml under the category key (e.g. llm_prediction).
 global _HCW_VIRTUAL_CATS := ["llm_prediction"]
+
+#Include ../../_generated/native_theme.ahk
 
 ; Locale-dependent labels — populated lazily at window-open time.
 global _HCW_CATEGORY_LABELS := Map()
@@ -74,25 +82,20 @@ _HCW_InitLocaleStrings() {
 	; not the picker's, and a hint that was valid before
 	; ``rolls/sfbs/distancesreduction`` lost their hardcoded orange would
 	; now actively mislead. Colours are ordered along the standard hue wheel
-	; (warm → cool → neutral) so the picker reads naturally.
-	_HCW_COLOR_PRESETS := [
-		Map("Label", t("hs_config.color_inherit"),   "Hex", ""),
-		Map("Label", t("hs_config.color_red"),       "Hex", "#e53935"),
-		Map("Label", t("hs_config.color_pink"),      "Hex", "#e91e63"),
-		Map("Label", t("hs_config.color_purple"),    "Hex", "#8e44ad"),
-		Map("Label", t("menu.hotstrings.tooltip_ai"), "Hex", "#AD61FF"),
-		Map("Label", t("hs_config.color_indigo"),    "Hex", "#3f51b5"),
-		Map("Label", t("hs_config.color_blue"),      "Hex", "#1e88e5"),
-		Map("Label", t("hs_config.color_cyan"),      "Hex", "#00838f"),
-		Map("Label", t("hs_config.color_turquoise"), "Hex", "#009688"),
-		Map("Label", t("hs_config.color_green"),     "Hex", "#43a047"),
-		Map("Label", t("hs_config.color_lime"),      "Hex", "#9e9d24"),
-		Map("Label", t("hs_config.color_yellow"),    "Hex", "#fdd835"),
-		Map("Label", t("hs_config.color_orange"),    "Hex", "#fb8c00"),
-		Map("Label", t("hs_config.color_brown"),     "Hex", "#8d6e63"),
-		Map("Label", t("hs_config.color_gray"),      "Hex", "#6e6e73"),
-	]
+	; (warm → cool → neutral) so the picker reads naturally. The colours come from
+	; _shared/data/native_theme.toml, the palette macOS and Linux read too.
+	_HCW_COLOR_PRESETS := [Map("Label", t("hs_config.color_inherit"), "Hex", "")]
+	for Row in NativeThemeHotstringPalette()
+		_HCW_COLOR_PRESETS.Push(Map("Label", t(Row["I18n"]), "Hex", Row["Hex"]))
 	_HCW_FILE_LEVEL_LABEL := t("hs_config.file_level")
+}
+
+; One colour of the shared palette by its name; a missing name is a broken generator.
+_HCW_PaletteHex(Name) {
+	for Row in NativeThemeHotstringPalette()
+		if Row["Name"] == Name
+			return Row["Hex"]
+	throw ValueError("The hotstring palette holds no colour named " . Name . ".")
 }
 
 ; Build the unified category list:
@@ -100,11 +103,11 @@ _HCW_InitLocaleStrings() {
 ; 2. Personal TOML files discovered from PersonalHotstringsDir (Group: "personal")
 ; 3. Extension TOML files discovered from the extensions root (Group: "ext:<id>")
 _HCW_BuildCategoryList(Publish := true) {
-	global _HCW_CATEGORY_LIST, _HCW_COMMON_CATS, _HCW_CATEGORY_LABELS
+	global _HCW_CATEGORY_LIST, _HCW_CATEGORY_LABELS
 	List := []
 
 	; --- Common categories ---
-	for _, Cat in _HCW_COMMON_CATS {
+	for _, Cat in _HCW_CommonCategories() {
 		Label := _HCW_CATEGORY_LABELS.Has(Cat) ? _HCW_CATEGORY_LABELS[Cat] : Cat
 		List.Push({
 			Key:         Cat,
@@ -159,7 +162,9 @@ _HCW_BuildCategoryList(Publish := true) {
 			PersonalFiles := []
 			Loop Files, HsDir . "*.toml" {
 				Stem := RegExReplace(A_LoopFileName, "\.toml$", "")
-				if (SubStr(Stem, 1, 1) == "_") {
+				; A writer backup is not a source: listing it here also made the
+				; scoped reset own it and back up the backup.
+				if (SubStr(Stem, 1, 1) == "_") || PersonalFileIsBackup(A_LoopFileName) {
 					continue
 				}
 				PersonalFiles.Push({ Stem: Stem, Path: A_LoopFileFullPath })
@@ -481,7 +486,7 @@ OpenHotstringsConfigWindow() {
 	G.Add("Text", "xm y+14 w70 h20", t("hs_config.label_delay"))
 	DelayEdit := G.Add("Edit", "x+6 yp-3 w80 Number")
 	DelayUpDown := G.Add("UpDown", "Range0-10000", 0)
-	G.Add("Text", "x+4 yp+3 w24", "ms")
+	G.Add("Text", "x+4 yp+3 w24", t("hs_config.unit_ms"))
 	DelayDefault := G.Add("Text", "x+6 yp w300 Right", "")
 	DelayReset := G.Add("Button", "x512 yp-3 w28 h24", "↺")
 
@@ -927,10 +932,10 @@ _HCW_GetSections(Entry, ReadFn := ReadTomlFile) {
 		Ordered := Map()
 		Pos := 1
 		while (RegExMatch(SectionsOrderRaw, '"([^"]*)"', &Tok, Pos)) {
-			T := StrLower(Tok[1])
-			if (T != "-" and Seen.Has(T)) {
-				Order.Push(T)
-				Ordered[T] := true
+			TokenLower := StrLower(Tok[1])
+			if (TokenLower != "-" and Seen.Has(TokenLower)) {
+				Order.Push(TokenLower)
+				Ordered[TokenLower] := true
 			}
 			Pos := Tok.Pos + Tok.Len
 		}
@@ -979,10 +984,10 @@ _HCW_StatusPath(Entry, Sec) {
 
 
 _HCW_FallbackDelayMs(Entry) {
-	global GLOBAL_DEFAULT_DELAY, UI_LLM_TIMEOUT_SEC
+	global UI_LLM_TIMEOUT_SEC
 	if (Entry.Key = "llm_prediction")
 		return Round(UI_LLM_TIMEOUT_SEC * 1000)
-	return Round(GLOBAL_DEFAULT_DELAY * 1000)
+	return Round(HotstringsBaseDelay() * 1000)
 }
 
 ; Source-default collision priority for the current entry's group — personal 50,

@@ -25,8 +25,8 @@ body {
 }
 
 body {
-	background: #f5f5f7;
-	color: #333;
+	background: var(--theme-page-background);
+	color: var(--theme-grey-333);
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
 	font-size: 14px;
 	/* The outer page never scrolls: the step region does, so the footer
@@ -84,7 +84,7 @@ body {
 }
 
 .step-dot {
-	background: #d0d0d5;
+	background: var(--theme-hue-d0d0d5);
 	border-radius: 50%;
 	height: 7px;
 	transition:
@@ -94,12 +94,12 @@ body {
 }
 
 .step-dot.active {
-	background: #007aff;
+	background: var(--theme-blue);
 	transform: scale(1.25);
 }
 
 .step-dot.done {
-	background: #34c759;
+	background: var(--theme-green);
 }
 
 /* =============================== */
@@ -109,14 +109,14 @@ body {
 /* =============================== */
 
 h1 {
-	color: #1d1d1f;
+	color: var(--theme-label);
 	font-size: 17px;
 	font-weight: 600;
 	margin: 0 0 6px;
 }
 
 .desc {
-	color: #555;
+	color: var(--theme-grey-555);
 	font-size: 12.5px;
 	line-height: 1.55;
 	margin: 0 0 14px;
@@ -124,7 +124,7 @@ h1 {
 }
 
 .hint {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 11px;
 	font-style: italic;
 	line-height: 1.5;
@@ -132,10 +132,10 @@ h1 {
 }
 
 .warning {
-	background: #fff8e1;
-	border: 1px solid #f0c040;
+	background: var(--theme-hue-fff8e1);
+	border: 1px solid var(--theme-hue-f0c040);
 	border-radius: 6px;
-	color: #7a5500;
+	color: var(--theme-hue-7a5500);
 	font-size: 11px;
 	line-height: 1.5;
 	margin: 0 0 12px;
@@ -144,10 +144,10 @@ h1 {
 }
 
 .note {
-	background: #eef4ff;
-	border: 1px solid #c6d8f5;
+	background: var(--theme-hue-eef4ff);
+	border: 1px solid var(--theme-hue-c6d8f5);
 	border-radius: 6px;
-	color: #2a4a7a;
+	color: var(--theme-hue-2a4a7a);
 	font-size: 12px;
 	line-height: 1.5;
 	margin: 0 0 12px;
@@ -162,14 +162,14 @@ h1 {
 /* ====================================== */
 
 .lang-list {
-	border: 1px solid #e0e0e0;
+	border: 1px solid var(--theme-grey-e0e0e0);
 	border-radius: 8px;
 }
 
 .lang-item {
 	align-items: center;
-	background: #fff;
-	border-bottom: 1px solid #f0f0f0;
+	background: var(--theme-white);
+	border-bottom: 1px solid var(--theme-grey-f0f0f0);
 	cursor: pointer;
 	display: flex;
 	gap: 10px;
@@ -188,15 +188,15 @@ h1 {
 }
 
 .lang-item:hover {
-	background: #f0f4ff;
+	background: var(--theme-hue-f0f4ff);
 }
 
 .lang-item.selected {
-	background: #e8f0ff;
+	background: var(--theme-hue-e8f0ff);
 }
 
 .lang-item.selected .lang-name {
-	color: #007aff;
+	color: var(--theme-blue);
 	font-weight: 600;
 }
 
@@ -219,7 +219,7 @@ h1 {
 }
 
 .lang-name {
-	color: #1d1d1f;
+	color: var(--theme-label);
 	font-size: 13px;
 }
 
@@ -236,11 +236,11 @@ h1 {
 }
 
 #config-input {
-	background: #fff;
-	border: 1.5px solid #d0d0d0;
+	background: var(--theme-white);
+	border: 1.5px solid var(--theme-grey-d0d0d0);
 	border-radius: 7px 0 0 7px;
 	border-right: none;
-	color: #1d1d1f;
+	color: var(--theme-label);
 	flex: 1;
 	font-family: inherit;
 	font-size: 12.5px;
@@ -253,7 +253,7 @@ h1 {
 }
 
 #config-input:focus {
-	border-color: #007aff;
+	border-color: var(--theme-blue);
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 	z-index: 1;
 }
@@ -276,7 +276,7 @@ h1 {
 }
 
 .question-label {
-	color: #1d1d1f;
+	color: var(--theme-label);
 	font-size: 13px;
 	font-weight: 600;
 	margin: 0 0 8px;
@@ -299,8 +299,8 @@ h1 {
 
 .radio-card {
 	align-items: center;
-	background: #fff;
-	border: 1.5px solid #e0e0e0;
+	background: var(--theme-white);
+	border: 1.5px solid var(--theme-grey-e0e0e0);
 	border-radius: 8px;
 	cursor: pointer;
 	display: flex;
@@ -312,12 +312,12 @@ h1 {
 }
 
 .radio-card:hover {
-	background: #f5f8ff;
-	border-color: #a0bfff;
+	background: var(--theme-hue-f5f8ff);
+	border-color: var(--theme-hue-a0bfff);
 }
 
 .radio-card input[type='radio'] {
-	accent-color: #007aff;
+	accent-color: var(--theme-blue);
 	flex-shrink: 0;
 	height: 16px;
 	margin: 0;
@@ -325,12 +325,12 @@ h1 {
 }
 
 .radio-card input[type='radio']:checked + .radio-label {
-	color: #007aff;
+	color: var(--theme-blue);
 	font-weight: 500;
 }
 
 .radio-label {
-	color: #333;
+	color: var(--theme-grey-333);
 	flex: 1 1 auto;
 	font-size: 13px;
 	line-height: 1.4;
@@ -340,11 +340,20 @@ h1 {
 	margin: 0 0 12px;
 }
 
+/* Persistent controls: one group per control, spaced like the magic key. */
+.controls {
+	margin: 0 0 12px;
+}
+
+.control-group {
+	margin: 0 0 10px;
+}
+
 .magic-input {
-	background: #fff;
-	border: 1.5px solid #d0d0d0;
+	background: var(--theme-white);
+	border: 1.5px solid var(--theme-grey-d0d0d0);
 	border-radius: 7px;
-	color: #1d1d1f;
+	color: var(--theme-label);
 	font-family: 'SF Mono', Monaco, Consolas, monospace;
 	font-size: 13px;
 	outline: none;
@@ -354,12 +363,12 @@ h1 {
 }
 
 .magic-input:focus {
-	border-color: #007aff;
+	border-color: var(--theme-blue);
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
 
 .magic-input.invalid {
-	border-color: #d11;
+	border-color: var(--theme-hue-dd1111);
 	box-shadow: 0 0 0 3px rgba(221, 17, 17, 0.15);
 }
 
@@ -370,15 +379,15 @@ h1 {
 /* ====================================== */
 
 .checklist {
-	background: #fff;
-	border: 1px solid #e0e0e0;
+	background: var(--theme-white);
+	border: 1px solid var(--theme-grey-e0e0e0);
 	border-radius: 8px;
 	margin: 0 0 12px;
 	padding: 8px 12px;
 }
 
 .checklist summary {
-	color: #1d1d1f;
+	color: var(--theme-label);
 	cursor: pointer;
 	font-size: 12.5px;
 	font-weight: 600;
@@ -408,17 +417,17 @@ h1 {
 }
 
 .check-row input[type='checkbox'] {
-	accent-color: #007aff;
+	accent-color: var(--theme-blue);
 	flex-shrink: 0;
 	margin: 2px 0 0;
 }
 
 .check-row input[type='checkbox']:disabled + .check-label {
-	color: #999;
+	color: var(--theme-grey-999);
 }
 
 .check-label {
-	color: #333;
+	color: var(--theme-grey-333);
 	font-size: 12.5px;
 	line-height: 1.4;
 }
@@ -426,7 +435,7 @@ h1 {
 /* The separator between a trigger and its action: the arrows inside gesture
    and action labels must never read as it. */
 .value-separator {
-	color: #007aff;
+	color: var(--theme-blue);
 	font-weight: 700;
 }
 
@@ -464,13 +473,13 @@ button:hover {
 }
 
 .primary {
-	background: #007aff;
-	color: #fff;
+	background: var(--theme-blue);
+	color: var(--theme-white);
 }
 
 .secondary {
-	background: #e0e0e0;
-	color: #333;
+	background: var(--theme-grey-e0e0e0);
+	color: var(--theme-grey-333);
 }
 
 /* The Back button sits on the left, Next / Finish on the right. */
@@ -486,13 +495,13 @@ button:hover {
 
 /* Windows touchpad registration panel of the gestures page. */
 .gesture-register {
-	border-top: 1px solid #e8e8e8;
+	border-top: 1px solid var(--theme-grey-e8e8e8);
 	margin: 0 0 12px;
 	padding-top: 12px;
 }
 
 .register-section {
-	color: #1d1d1f;
+	color: var(--theme-label);
 	font-size: 12px;
 	font-weight: 600;
 	margin: 0 0 10px;
@@ -514,9 +523,9 @@ button:hover {
 }
 
 .register-status.register-ok {
-	color: #1a8c3a;
+	color: var(--theme-hue-1a8c3a);
 }
 
 .register-status.register-err {
-	color: #d11;
+	color: var(--theme-hue-dd1111);
 }

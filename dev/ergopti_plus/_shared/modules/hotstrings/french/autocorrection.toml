@@ -7,7 +7,7 @@
 
 [_meta]
 color = "#2e7d32"
-delay = 1.0
+delay = 0.5
 show_tooltip = true
 description = { fr = "Autocorrection", en = "Autocorrection", de = "Autokorrektur", es = "Autocorrección", zh = "自动纠错", ar = "تصحيح تلقائي", cs = "Automatická oprava", da = "Autokorrektur", he = "תיקון אוטומטי", hi = "स्वत: सुधार", it = "Correzione automatica", ja = "自動修正", ko = "자동 수정", nl = "Autocorrectie", no = "Autokorrektur", pl = "Autokorekta", pt = "Autocorreção", ru = "Автокоррекция", sv = "Autokorrigering", tr = "Otomatik düzeltme", uk = "Автовиправлення" }
 sections_order = ["accents", "names", "-", "typographic_apostrophe", "-", "errors", "ou", "multiple_punctuation_marks", "suffixes_a_chaining", "-", "minus", "minus_apostrophe"]
@@ -458,8 +458,8 @@ typographic_apostrophe ={ fr = "L’apostrophe devient typographique lors de l�
 "oiu" = { output = "oui", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "OUi" = { output = "Oui", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "oyu" = { output = "you", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-"poru" = { output = "pour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"sru" = { output = "sur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"poru" = { output = "pour", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"sru" = { output = "sur", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "uei" = { output = "uie", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "uio" = { output = "uoi", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "~_" = { output = "~ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }

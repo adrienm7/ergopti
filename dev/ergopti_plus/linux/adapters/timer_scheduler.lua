@@ -37,7 +37,7 @@ local LOG = "adapters.timer_scheduler"
 -- =========================================
 -- =========================================
 
--- The scheduler owns every armed token until firing or accepted cancellation.
+-- The scheduler owns armed tokens and refused native rollback cleanup.
 -- Weak values let GC erase a fire-and-forget repeater while its native timer
 -- remained live, making cancelAll() report success without stopping it.
 local _live_timers = {}
@@ -50,14 +50,13 @@ local function _new_id()
 	return _next_id
 end
 
---- Converts an admitted finite duration before any native allocation.
+--- Converts an admitted duration before any native allocation.
 --- @param seconds any Duration in seconds.
 --- @param minimum_ms number Existing method-specific finite clamping floor.
---- @return number|nil milliseconds Finite normalized duration, or refusal.
+--- @return number|nil milliseconds Normalized duration within the shared timer ceiling, or refusal.
 local function _duration_ms(seconds, minimum_ms)
-	if not NumberPolicy.is_finite(seconds) then return nil end
-	local milliseconds = seconds * 1000
-	if not NumberPolicy.is_finite(milliseconds) then return nil end
+	local milliseconds = NumberPolicy.timer_delay_ms(seconds)
+	if milliseconds == nil then return nil end
 	return math.max(minimum_ms, math.floor(milliseconds))
 end
 
@@ -99,7 +98,7 @@ function M.after(delaySec, fn)
 	end
 	local delay_ms = _duration_ms(delaySec, 0)
 	if delay_ms == nil then
-		Logger.error(LOG, "after(): duration must be finite in seconds and milliseconds — timer rejected.")
+		Logger.error(LOG, "after(): duration must be finite and within the timer ceiling — timer rejected.")
 		handle.fired = true
 		return handle
 	end
@@ -136,7 +135,13 @@ function M.after(delaySec, fn)
 		return t
 	end)
 	if not ok then
-		if allocated_timer then pcall(luv.close, allocated_timer) end
+		if allocated_timer then
+			local closed = pcall(luv.close, allocated_timer)
+			if not closed then
+				handle.timer = allocated_timer
+				_live_timers[handle.id] = handle
+			end
+		end
 		Logger.error(LOG, "after(): timer allocation/start failed — %s", tostring(timer_or_err))
 		handle.fired = true
 		return handle
@@ -161,7 +166,7 @@ function M.every(intervalSec, fn)
 	end
 	local interval_ms = _duration_ms(intervalSec, 1)
 	if interval_ms == nil then
-		Logger.error(LOG, "every(): duration must be finite in seconds and milliseconds — timer rejected.")
+		Logger.error(LOG, "every(): duration must be finite and within the timer ceiling — timer rejected.")
 		handle.fired = true
 		return handle
 	end
@@ -184,7 +189,13 @@ function M.every(intervalSec, fn)
 		return t
 	end)
 	if not ok then
-		if allocated_timer then pcall(luv.close, allocated_timer) end
+		if allocated_timer then
+			local closed = pcall(luv.close, allocated_timer)
+			if not closed then
+				handle.timer = allocated_timer
+				_live_timers[handle.id] = handle
+			end
+		end
 		Logger.error(LOG, "every(): timer allocation/start failed — %s", tostring(timer_or_err))
 		handle.fired = true
 		return handle

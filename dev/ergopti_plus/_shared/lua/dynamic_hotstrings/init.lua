@@ -232,14 +232,18 @@ end
 --- @param start_is_boundary boolean|nil The exact input owner's rolling-buffer start state.
 function M.match_buffer(buffer, group_name, is_section_enabled_fn, start_is_boundary)
 	if type(buffer) ~= "string" then return nil end
+	local length = #buffer
 	for _, rule in ipairs(_rules) do
-		-- Apply section guard when provided; skip disabled sections
-		if is_section_enabled_fn == nil
-				or is_section_enabled_fn(group_name, rule.section) then
-			local suf = rule.suffix
-			if #suf > 0 and buffer:sub(-#suf) == suf
-				and (rule.require_word_boundary ~= true
-					or M.word_boundary_allows(buffer, suf, start_is_boundary)) then
+		local suf = rule.suffix
+		local at = length - #suf + 1
+		-- The suffix test comes first: it is pure and allocates nothing, while the
+		-- section guard reads the settings store (a native read on macOS). Asking
+		-- the guard of every rule on every keystroke made the preview providers
+		-- cost 1.7 ms per key on average in the 2026-10-30 macOS field report.
+		if #suf > 0 and at >= 1 and buffer:find(suf, at, true) == at
+			and (is_section_enabled_fn == nil or is_section_enabled_fn(group_name, rule.section)) then
+			if rule.require_word_boundary ~= true
+					or M.word_boundary_allows(buffer, suf, start_is_boundary) then
 				local ok, result = pcall(rule.resolver)
 				if not ok then report_resolver_failure(rule, result) end
 				if ok and type(result) == "string" and result ~= "" then

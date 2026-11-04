@@ -18,9 +18,9 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local Keylogger = require("modules.keylogger.keylogger")
-local Writer = require("modules.keylogger.sqlite_writer")
-local Reader = require("modules.keylogger.sqlite_reader")
+local Keystats = require("modules.keystats.keystats")
+local Writer = require("modules.keystats.sqlite_writer")
+local Reader = require("modules.keystats.sqlite_reader")
 local database = root .. "/metrics.sqlite"
 local today = os.date("%Y-%m-%d")
 -- An elapsed 24 hours can still be today on a 25-hour local calendar day.
@@ -28,8 +28,8 @@ local today = os.date("%Y-%m-%d")
 local historical_day = "2000-01-01"
 assert(historical_day < today, "native fixture needs a distinct historical day")
 local checks, failures = 0, 0
-Keylogger.init({ sqlite_path = database, log_dir = root .. "/logs" })
-assert(Keylogger.is_enabled(), "owned configuration must grant collection consent")
+Keystats.init({ sqlite_path = database, log_dir = root .. "/logs" })
+assert(Keystats.is_enabled(), "owned configuration must grant collection consent")
 
 local function check(name, test)
 	checks = checks + 1
@@ -41,11 +41,11 @@ local function check(name, test)
 end
 
 check("real synthetic output survives flush and the public range payload", function()
-	Keylogger.record_synthetic_output("owned-synthetic-app", "a\0b", "other", 1000)
-	Keylogger.flush()
+	Keystats.record_synthetic_output("owned-synthetic-app", "a\0b", "other", 1000)
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	local rows = assert(Writer.query_rows("SELECT hex(token),c FROM ngram_chars WHERE app='owned-synthetic-app' ORDER BY hex(token);"))
 	assert(table.concat(rows, ",") == "00|1,61|1,62|1", "real flush did not persist the exact original characters")
-	local payload = Keylogger.get_range_payload(today, today, { "owned-synthetic-app" })
+	local payload = Keystats.get_range_payload(today, today, { "owned-synthetic-app" })
 	local chars = assert(payload.today["owned-synthetic-app"]).c
 	assert(chars["\0"] and chars["\0"].c == 1 and chars["\0"].o == 1,
 		"range projection dropped the actual persisted synthetic NUL")
@@ -95,6 +95,48 @@ for _, item in ipairs(tables) do
 	end)
 end
 
+-- The CLI's JSON mode cuts raw TEXT at NUL: the application, title, layout and
+-- destination columns must cross it quoted, as the n-gram tokens do.
+local nul_app = "owned\0app"
+local function nul_text(prefix, suffix) return "'" .. prefix .. "'||char(0)||'" .. suffix .. "'" end
+assert(Writer.exec_sql(table.concat({
+	"INSERT INTO agg_app_day (device_id,date,app,chars) VALUES ('owned-nul','" .. today .. "',"
+		.. nul_text("owned", "app") .. ",3);",
+	"INSERT INTO agg_app_day (device_id,date,app,chars) VALUES ('owned-nul','" .. today .. "','owned',5);",
+	"INSERT INTO agg_app_day_titles (device_id,date,app,title,c,ms) VALUES ('owned-nul','" .. today .. "',"
+		.. nul_text("owned", "app") .. "," .. nul_text("doc", "title") .. ",1,5);",
+	"INSERT INTO agg_app_day_layouts (device_id,date,app,layout,count) VALUES ('owned-nul','" .. today .. "',"
+		.. nul_text("owned", "app") .. "," .. nul_text("fr", "x") .. ",2);",
+	"INSERT INTO agg_app_day_switches_to (device_id,date,app_from,app_to,count) VALUES ('owned-nul','" .. today .. "',"
+		.. nul_text("owned", "app") .. "," .. nul_text("term", "inal") .. ",4);",
+}, "\n")), "native NUL text fixture rows must insert")
+assert(Writer.upsert_ngrams("owned-ngram", today, nul_app, expected, "ngram_chars"))
+check("manifest keeps application, title, layout and destination bytes past a NUL", function()
+	local manifest, complete = Reader.read_manifest(database, today, today, { nul_app, "owned" })
+	assert(complete == true, "native projection must complete")
+	local entry = assert(manifest[today][nul_app], "the complete application id keys the manifest")
+	assert(entry.chars == 3 and manifest[today].owned.chars == 5, "a NUL-cut id merged two applications")
+	assert(entry.win_titles["doc\0title"].c == 1 and entry.win_titles.doc == nil and entry.titles == nil, "title bytes changed")
+	assert(entry.layouts_seen["fr\0x"] == 2 and entry.layouts_seen.fr == nil, "layout bytes changed")
+	assert(entry.switches_to["term\0inal"] == 4 and entry.switches_to.term == nil, "destination bytes changed")
+end)
+check("today's per-application split keeps the complete application id", function()
+	local split = Reader.read_range_split_today(database, today, today, { nul_app })
+	verify_tokens(assert(split.today[nul_app], "the complete application id keys today's n-grams").c)
+	assert(split.today.owned == nil, "a NUL-cut id is another application")
+end)
+
+check("open-session record round-trips through the actual meta table", function()
+	local encoded = '[{"date":"2000-01-01","app":"owned\\u0000app","session":[3,250],"burst":null}]'
+	assert(Writer.upsert_open_walk("owned-open-walk", encoded) == true, "native record write refused")
+	local read, ok = Writer.read_open_walk("owned-open-walk")
+	assert(ok == true and read == encoded, "native record changed: " .. tostring(read))
+	assert(Writer.upsert_open_walk("owned-open-walk", "[]") == true)
+	assert(select(1, Writer.read_open_walk("owned-open-walk")) == "[]", "a replaced record must not keep the old value")
+	local absent, absent_ok = Writer.read_open_walk("owned-no-record")
+	assert(absent == nil and absent_ok == true, "a missing record is a proven absence")
+end)
+
 check("native empty range keeps every n-gram family empty", function()
 	local empty = Reader.read_ngrams(database, today, today, { "owned-absent-app" })
 	for _, item in ipairs(tables) do assert(next(empty[item[1]]) == nil) end
@@ -113,6 +155,6 @@ local function remove_owned_tree(path)
 	end
 end
 remove_owned_tree(root)
-assert(checks == 29, "all nine n-gram families and public controls must execute")
+assert(checks == 32, "all nine n-gram families and public controls must execute")
 print(string.format("Native SQLite n-gram text receipts: %d checks, %d failures", checks, failures))
 os.exit(failures == 0 and 0 or 1)

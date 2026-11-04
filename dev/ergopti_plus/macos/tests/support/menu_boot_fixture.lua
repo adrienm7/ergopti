@@ -33,6 +33,9 @@ local REAL_MODULES = {
 	"ui.menu.keymap_lifecycle",
 	"ui.menu.global_actions_transaction",
 	"ui.menu.recoverable_file_moves",
+	"ui.menu.click_gate",
+	-- Captures hs at require time; each boot gets a fresh stub table.
+	"adapters.timer_scheduler",
 }
 
 --- Deep-copies plain Lua data so fixture snapshots cannot alias live state.
@@ -60,7 +63,7 @@ end
 local function saved_config()
 	return {
 		gestures = true,
-		keylogger_enabled = true,
+		keystats_enabled = true,
 		llm_enabled = true,
 		shortcuts = true,
 		custom_editor_shortcut = { mods = { "ctrl" }, key = "k" },
@@ -69,7 +72,8 @@ end
 
 --- Boots ui.menu.start once over in-memory boundaries.
 --- @param opts table Failure plan: load_status (ok, corrupt, absent), saved, editor_bind, gestures_enable,
---- gestures_query, keylogger_start.
+--- gestures_query, keystats_start; generate(ctx, actions) returns the menu tree, and
+--- before_start() runs on the reset stubs just before ui.menu.start.
 --- @return table fixture Live state, saves, log records and the menu ctx.
 function M.boot(opts)
 	opts = opts or {}
@@ -81,6 +85,8 @@ function M.boot(opts)
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, fmt, ...) logs.errors[#logs.errors + 1] = format_message(fmt, ...) end
 	logger.warn = function(_, fmt, ...) logs.warns[#logs.warns + 1] = format_message(fmt, ...) end
+	logs.infos = {}
+	logger.info = function(_, fmt, ...) logs.infos[#logs.infos + 1] = format_message(fmt, ...) end
 
 	-- Pre-load defaults, as Preferences.build_initial_state produces them.
 	local state = {
@@ -96,7 +102,7 @@ function M.boot(opts)
 		gestures = false,
 		shortcuts = true,
 		llm_enabled = false,
-		keylogger_enabled = false,
+		keystats_enabled = false,
 		script_control_enabled = true,
 	}
 	local saves = {}
@@ -155,6 +161,7 @@ function M.boot(opts)
 		generate = function(ctx, _menu_mods, actions)
 			fixture.ctx = ctx
 			fixture.actions = actions
+			if type(opts.generate) == "function" then return opts.generate(ctx, actions) end
 			return {}
 		end,
 		invalidate_cache = noop,
@@ -200,7 +207,7 @@ function M.boot(opts)
 	}
 	package.loaded["infra.termination_coordinator"] = {
 		request_exit = function() return true end,
-		is_pending = function() return false end,
+		is_pending = function() return fixture.terminal_pending == true end,
 	}
 	for _, module_name in ipairs({
 		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
@@ -215,7 +222,7 @@ function M.boot(opts)
 	package.loaded["modules.gestures"] = {
 		SINGLE_SLOTS = { "swipe_left" }, DEFAULT_GESTURES = { swipe_left = "none" },
 	}
-	package.loaded["modules.keylogger.text_cipher"] = { set_enabled = function() return true end }
+	package.loaded["modules.keystats.text_cipher"] = { set_enabled = function() return true end }
 
 	local identity = function() return true end
 	package.loaded["modules.llm"] = {
@@ -225,11 +232,11 @@ function M.boot(opts)
 		set_llm_model_ollama = identity,
 		set_llm_model_mlx = identity,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		set_options = noop,
 		set_disabled_apps = noop,
 		start = function()
-			if opts.keylogger_start == false then return false end
+			if opts.keystats_start == false then return false end
 			return true
 		end,
 		stop = function() return true end,
@@ -319,6 +326,7 @@ function M.boot(opts)
 		end,
 		restore_settings = function() return true end,
 	}
+	if type(opts.before_start) == "function" then opts.before_start() end
 	fixture.menu = Menu.start("/virtual/", {}, gestures, keymap, {}, {}, karabiner, {})
 	helpers.assert_type(fixture.program_admission, "function", "menu startup registers its required program admission owner")
 	fixture.boot_saves = #saves
@@ -350,7 +358,7 @@ function M.boot(opts)
 		return fixture.actions
 	end
 
-	--- Runs every deferred sync callback (hotkey warm-up, keylogger start).
+	--- Runs every deferred sync callback (hotkey warm-up, keystats start).
 	function fixture.flush_deferred()
 		local pending = {}
 		for index, callback in ipairs(deferred) do pending[index] = callback end

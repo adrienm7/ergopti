@@ -26,9 +26,13 @@ dependencies = [
 	# way — Qwen / Llama / Mistral / NVIDIA-Nemotron all work on 0.31.3.
 	"mlx-lm==0.31.3",
 
+	# First released consent-before-download fix for GHSA-x9r9-c232-4q39.
+	# An explicit pin prevents a later transitive resolution from downgrading it.
+	"transformers==5.17.0",
+
 	# Used by data/generate_models.py to scrape the HuggingFace MLX
 	# community organization page when refreshing data/llm_models.json.
-	"requests==2.32.3",
+	"requests==2.33.0",
 	"beautifulsoup4==4.12.3",
 
 	# System trust store for Python TLS. The MLX download / server scripts call

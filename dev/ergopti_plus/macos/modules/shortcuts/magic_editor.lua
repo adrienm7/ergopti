@@ -211,20 +211,24 @@ local function deliver()
 		return value
 	end
 	local effective_action = action or Manifest.default_for(Policy.PATH)
-	local paused, inhibited = observe(ports.paused), observe(ports.inhibited)
-	if paused ~= false or inhibited ~= false
-		or observe(ports.trigger) ~= decision.trigger
-		or observe(ports.magic_source) ~= decision.magic_source
-		or observe(ports.replace_active) ~= decision.replace_active then return false end
-	-- Join source and parent after the final context callback, then leave only
-	-- exact private identity checks after those external observations.
-	if observe(source_id) ~= decision.source_id or observe(ports.is_current) ~= true
-		or not Policy.can_deliver(decision, {
-			source_generation = epoch, configuration_generation = configuration,
-			action = effective_action, master = true, paused = paused, inhibited = inhibited,
-		}) or Registrar.physical_claims()[decision.source.identity] ~= nil
-		or not owner_current() then return false end
-	return ports.execute(decision.action, Policy.BINDING_ID)
+	local function delivery_current()
+		local paused, inhibited = observe(ports.paused), observe(ports.inhibited)
+		if paused ~= false or inhibited ~= false
+			or observe(ports.trigger) ~= decision.trigger
+			or observe(ports.magic_source) ~= decision.magic_source
+			or observe(ports.replace_active) ~= decision.replace_active then return false end
+		-- The parent's logger is another callback boundary. Retain this same
+		-- decision and rejoin it immediately before the parent's executor entry.
+		if observe(source_id) ~= decision.source_id or observe(ports.is_current) ~= true
+			or not Policy.can_deliver(decision, {
+				source_generation = epoch, configuration_generation = configuration,
+				action = effective_action, master = true, paused = paused, inhibited = inhibited,
+			}) or Registrar.physical_claims()[decision.source.identity] ~= nil
+			or not owner_current() then return false end
+		return true
+	end
+	if not delivery_current() then return false end
+	return ports.execute(decision.action, Policy.BINDING_ID, delivery_current)
 end
 
 --- Replaces the source proof only after exact prior owners have settled.

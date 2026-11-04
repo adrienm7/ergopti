@@ -4,8 +4,9 @@
 --- MODULE: Menu Keyboard Slots
 --- DESCRIPTION:
 --- Renders the configurable keyboard-shortcut groups in the Shortcuts submenu:
---- one submenu per modifier group, listing every slot the user has assigned, plus
---- a row that offers the unassigned ones.
+--- one submenu per modifier group, opening with the group's restore and clear,
+--- then listing every slot the user has assigned, plus a row that offers the
+--- unassigned ones.
 ---
 --- The module underneath (modules/shortcuts/keyboard_shortcuts.lua) has always
 --- bound, persisted and released these shortcuts; what it never had was a way to
@@ -29,6 +30,7 @@ local ParameterLabel = require("action_parameter_label")
 
 local hs           = hs
 local i18n         = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local Logger       = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local ActionPicker = require("ui.action_picker")
@@ -125,7 +127,7 @@ function M.warn_if_input_source_conflict(slot_id)
 		if #ids == 0 then return end
 		Logger.warn(LOG, "Slot '%s' is also macOS's input-source shortcut (symbolic hotkey %s) — it will not fire.",
 			slot_id, table.concat(ids, ", "))
-		DeferredWork.after(0.3, function()
+		DeferredWork.after(require("infra.timings").sec("ui", "slot_conflict_notice_delay_ms"), function()
 			local open_label = i18n.get("button.open_settings")
 			local ok, clicked = pcall(dialog.block_alert,
 				i18n.get("dialog.keyboard_shortcut.input_source_conflict_title"),
@@ -149,8 +151,8 @@ local function choose_action_for(slot_id, ctx)
 	local editor = ShortcutUtils.picker_parameter_fields(ctx.gestures, items,
 		KbShortcuts.keyboard_binding_id(slot_id))
 	ActionPicker.open({
-		title   = i18n.get("dialog.keyboard_shortcut.title_prefix") .. KbShortcuts.get_keyboard_slot_label(slot_id),
-		label   = i18n.get("dialog.action_picker.label"),
+		presentation_id = "keyboard_slot_action",
+		presentation_suffix = KbShortcuts.get_keyboard_slot_label(slot_id),
 		current = KbShortcuts.get_keyboard_action(slot_id),
 		items   = items,
 		send_vocabulary   = editor.send_vocabulary,
@@ -180,25 +182,19 @@ local function choose_action_for(slot_id, ctx)
 		local spec = type(gestures) == "table" and type(gestures.get_action_parameter_spec) == "function"
 			and gestures.get_action_parameter_spec(action_id) or nil
 		if not spec then return bind() end
-		DeferredWork.after(0.05, function()
-			if spec == "program" then
-				local committed = ShortcutUtils.prompt_action_parameter(gestures,
-					KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked, {
-						publishes_assignment = true, section = "shortcuts.keyboard", key = slot_id,
-						read = function() return KbShortcuts.get_keyboard_action(slot_id) end,
-						apply = function(on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, action_id, on_error, publication_observer) == true end,
-						restore = function(previous, on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, previous, on_error, publication_observer) == true end,
-					}, ctx.commit_program_parameter)
-				if committed then
-					if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
-					M.warn_if_input_source_conflict(slot_id)
-				end
-				return committed
+		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+			local committed = ShortcutUtils.prompt_action_parameter(gestures,
+				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked, {
+					publishes_assignment = true, section = require("config_keys").KEY.SHORTCUTS_KEYBOARD, key = slot_id,
+					read = function() return KbShortcuts.get_keyboard_action(slot_id) end,
+					apply = function(on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, action_id, on_error, publication_observer) == true end,
+					restore = function(previous, on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, previous, on_error, publication_observer) == true end,
+				}, ctx.commit_program_parameter)
+			if committed then
+				if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
+				M.warn_if_input_source_conflict(slot_id)
 			end
-			if ShortcutUtils.prompt_action_parameter(gestures,
-				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked) then
-				bind()
-			end
+			return committed
 		end, "menu_keyboard_slots.action_parameter")
 		return true
 	end)
@@ -215,8 +211,7 @@ local function add_binding_to(prefix, ctx)
 	end
 
 	ActionPicker.open({
-		title   = i18n.get("dialog.keyboard_shortcut.title_prefix"),
-		label   = i18n.get("dialog.keyboard_shortcut.prompt"),
+		presentation_id = "keyboard_slot_selection",
 		current = NONE_ID,
 		items   = items,
 	}, function(slot_id)
@@ -224,7 +219,7 @@ local function add_binding_to(prefix, ctx)
 		-- The second picker is opened on the next tick: the shared webview needs
 		-- the first window torn down before it will build another, and chaining
 		-- them synchronously leaves the user staring at nothing.
-		DeferredWork.after(0.05,
+		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
 			function() choose_action_for(slot_id, ctx) end,
 			"menu_keyboard_slots.action_picker")
 	end)
@@ -258,27 +253,46 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		return function() return not group.fixed and group.prefix == prefix end
 	end
 	local getters = {
+		keyboard_group_has_scope = function() return not group.fixed end,
 		keyboard_group_has_fixed = function() return #fixed > 0 end,
 		keyboard_group_ready = function() return not disabled and ctx.paused ~= true and not group.fixed end,
-		keyboard_group_add_option = add_for("hs_option_"),
-		keyboard_group_add_ctrl = add_for("hs_ctrl_"),
-		keyboard_group_add_ctrl_shift = add_for("hs_ctrl_shift_"),
-		keyboard_group_add_cmd = add_for("cmd_"),
-		keyboard_group_add_cmd_shift = add_for("cmd_shift_"),
+		keyboard_group_add_option = add_for("alt_"),
+		keyboard_group_add_ctrl = add_for("secondary_"),
+		keyboard_group_add_ctrl_shift = add_for("secondary_shift_"),
+		keyboard_group_add_cmd = add_for("primary_"),
+		keyboard_group_add_cmd_shift = add_for("primary_shift_"),
+		-- The {1} of the Add row's template: the group's modifiers by name.
+		keyboard_group_add_caption = function() return KbShortcuts.get_keyboard_group_modifiers_label(group) end,
 	}
 	local function add_action()
 		if not getters.keyboard_group_ready() then return false end
 		return add_binding_to(group.prefix, ctx)
 	end
+	-- The group's restore and clear: the Shortcuts scope narrowed to its slots.
+	local function apply_scope(mode)
+		if not getters.keyboard_group_ready() or type(ctx.apply_keyboard_group_scope) ~= "function" then
+			return false
+		end
+		return ctx.apply_keyboard_group_scope(group.prefix, mode) == true
+	end
+	local function restore_action() return apply_scope("recommended") end
+	local function clear_action() return apply_scope("clear") end
 	local function fixed_provider() return fixed end
 	local function assigned_provider() return assigned end
 	-- Admit the entire declared frame before querying the genuine assignment and
 	-- parameter owners. Empty assigned data exercises the same renderer policy.
-	local admission = ManifestMenu.template_rows("keyboard_group_frame", { keyboard_group_add = add_action }, getters, {
+	local admission = ManifestMenu.template_rows("keyboard_group_frame", {
+		keyboard_group_add = add_action,
+		scope_restore = restore_action,
+		scope_clear = clear_action,
+	}, getters, {
 		keyboard_group_fixed_rows = fixed_provider,
 		keyboard_group_assigned_rows = assigned_provider,
 	})
-	local fixed_count = #fixed + (#fixed > 0 and 1 or 0) + (not group.fixed and 1 or 0)
+	-- The scope group (restore, clear, separator) and the Add row belong to
+	-- every group the user can bind; a fixed group has neither.
+	local scope_count = not group.fixed and 3 or 0
+	local fixed_count = scope_count + #fixed + (#fixed > 0 and 1 or 0) + (not group.fixed and 1 or 0)
 	if type(admission) ~= "table" or #admission ~= fixed_count then
 		Logger.error(LOG, "Declared keyboard group admission refused for '%s'.", tostring(group.prefix))
 		return nil
@@ -291,18 +305,23 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 				gestures, KbShortcuts.keyboard_binding_id(slot.id), slot.action)
 		end
 		assigned[#assigned + 1] = {
-			label    = KbShortcuts.get_keyboard_slot_label(slot.id) .. " : " .. action_label,
+			label    = LabelValue.compose(i18n.get, KbShortcuts.get_keyboard_slot_label(slot.id), action_label),
 			disabled = disabled or nil,
 			action   = function() choose_action_for(slot.id, ctx) end,
 		}
 	end
 
-	local rows = ManifestMenu.template_rows("keyboard_group_frame", { keyboard_group_add = add_action }, getters, {
+	local rows = ManifestMenu.template_rows("keyboard_group_frame", {
+		keyboard_group_add = add_action,
+		scope_restore = restore_action,
+		scope_clear = clear_action,
+	}, getters, {
 		keyboard_group_fixed_rows = fixed_provider,
 		keyboard_group_assigned_rows = assigned_provider,
 	})
-	-- A withdrawn Add declaration must not publish a group with no creation port.
-	local expected = #fixed + (#fixed > 0 and 1 or 0) + #assigned + (not group.fixed and 1 or 0)
+	-- A withdrawn Add, restore or clear declaration must not publish a group
+	-- missing one of its ports.
+	local expected = scope_count + #fixed + (#fixed > 0 and 1 or 0) + #assigned + (not group.fixed and 1 or 0)
 	if type(rows) ~= "table" or #rows ~= expected then
 		Logger.error(LOG, "Declared keyboard group frame refused for '%s'.", tostring(group.prefix))
 		return nil
@@ -325,7 +344,7 @@ function M.provide_rows(ctx, disabled, fixed_by_prefix)
 		local items = build_group_rows(group, ctx, disabled, fixed)
 		if not items then return {} end
 		rows[#rows + 1] = {
-			label    = i18n.get(group.group_key),
+			label    = KbShortcuts.get_keyboard_group_label(group),
 			disabled = disabled or nil,
 			items    = items,
 		}

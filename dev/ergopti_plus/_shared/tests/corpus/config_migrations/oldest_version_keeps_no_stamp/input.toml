@@ -1,0 +1,4 @@
+# _shared/tests/corpus/config_migrations/oldest_version_keeps_no_stamp/input.toml
+
+[gestures]
+space_wrap = false

@@ -1,0 +1,8 @@
+{
+	"schema_version": 1,
+	"maximum_metadata_bytes": 1048576,
+	"hmac_domain": "ERGOPTI_NATIVE_NETWORK_BOOTSTRAP_V1\n",
+	"trust_environment": ["SSL_CERT_FILE", "SSL_CERT_DIR"],
+	"maximum_certificate_bytes": 16777216,
+	"maximum_certificate_files": 1024
+}

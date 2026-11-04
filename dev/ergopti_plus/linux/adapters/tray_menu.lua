@@ -43,6 +43,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Indicator = require("platform.tray.appindicator")
 local Protocol = require("tray.protocol")
+local Perf = require("infra.perf_counters")
 
 local LOG = "adapters.tray_menu"
 
@@ -131,16 +132,66 @@ function M.setIcon(opts)
 	end
 end
 
---- Replaces the menu.
---- @param items table Array of { title, fn?, menu?, checked?, disabled?, separator? }.
-function M.setMenu(items)
+--- The native menu replacement behind setMenu, which counts and times it.
+--- @param items table Array of rows.
+--- @return boolean accepted
+local function replace_menu(items)
 	_items = type(items) == "table" and items or {}
 	if not ensure_started() then
 		Logger.debug(LOG, "setMenu() before an icon exists — kept for when one does.")
-		return
+		return false
 	end
-	Indicator.set_menu(_items)
+	if Indicator.set_menu(_items) ~= true then return false end
 	Logger.debug(LOG, "Tray menu set (%d top-level row(s)).", #_items)
+	return true
+end
+
+--- Replaces the menu.
+--- @param items table Array of { title, fn?, menu?, checked?, disabled?, separator? }.
+--- @return boolean accepted Native menu accepted; GTK events may remain queued.
+function M.setMenu(items)
+	local started = Perf.clock()
+	Perf.count("tray.builds")
+	local accepted = replace_menu(items)
+	Perf.span("tray.build", started)
+	return accepted
+end
+
+--- Installs a fallback menu: a name, optional action groups and a way out.
+---
+--- The only rows this driver draws outside the shared renderer, and on
+--- purpose: they serve when the menu subsystem failed to load, and when the
+--- daemon cannot reach the keyboard and holds its icon to say so, so they must
+--- not depend on what they survive without. One builder serves both.
+--- @param title string The first, inert row.
+--- @param quit_label string The translated Quit row.
+--- @param on_quit function Runs when Quit is clicked.
+--- @param groups table|nil Ordered lists of { label, fn } actions; a separator
+---   parts each group after the first from the previous one, and from Quit.
+function M.setFallbackMenu(title, quit_label, on_quit, groups)
+	local rows = { { title = title, disabled = true } }
+	for index, group in ipairs(groups or {}) do
+		if index > 1 then rows[#rows + 1] = { separator = true } end
+		for _, action in ipairs(group) do
+			rows[#rows + 1] = { title = action.label, fn = action.fn }
+		end
+	end
+	if groups and #groups > 0 then rows[#rows + 1] = { separator = true } end
+	rows[#rows + 1] = { title = quit_label, fn = on_quit }
+	M.setMenu(rows)
+end
+
+--- Shows (or brings back) the status window beside the icon.
+---
+--- Linux-only and outside the port contract: it serves the degraded state the
+--- daemon holds when it cannot reach the keyboard, the one case where the tray
+--- alone does not say enough.
+--- @param title string Window title.
+--- @param text string The explanation.
+--- @return boolean shown
+function M.showStatusWindow(title, text)
+	if not ensure_started() then return false end
+	return Indicator.show_window(title, text) == true
 end
 
 --- Shows the greyed logo while the daemon is paused, as the macOS menu bar and

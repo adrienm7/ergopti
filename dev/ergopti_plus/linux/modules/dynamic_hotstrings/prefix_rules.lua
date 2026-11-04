@@ -20,7 +20,7 @@
 --- The replacement IS the secret, and so is the trigger — the first six
 --- characters of an IBAN identify the account as surely as all twenty-seven. The
 --- `is_private` flag keeps both out of the metrics database and the 14-day log;
---- see modules/keylogger/keylogger.lua, which is where it is honoured.
+--- see modules/keystats/keystats.lua, which is where it is honoured.
 ---
 --- WHY THE GATE IS READ AT BUILD TIME:
 --- A prefix mapping is matched by the ordinary engine, which knows nothing about

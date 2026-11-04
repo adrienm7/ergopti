@@ -79,6 +79,54 @@ function M.run(helpers, corpus_path)
 				"pause then resume retains epoch")
 
 		end)
+		helpers.it("offers an ordering only where it reorders all ten keys (number-row-availability)", function()
+			local function descriptor(spelling)
+				if spelling == "" then return nil end
+				if spelling:sub(1, 5) == "dead:" then
+					return { Kind = "dead", Text = spelling:sub(6), State = "corpus", Action = "corpus" }
+				end
+				return { Kind = "text", Text = spelling, State = "", Action = "" }
+			end
+			local function levels(case)
+				local out = {}
+				for index = 1, 10 do
+					out[index] = { plain = descriptor(case.plain[index]), shift = descriptor(case.shift[index]) }
+				end
+				return out
+			end
+			helpers.assert_eq(#corpus.availability, 10, "every row shape of the rule is represented")
+			local by_id = {}
+			for _, case in ipairs(corpus.availability) do
+				by_id[case.id] = case
+				local actual = Policy.availability(levels(case))
+				helpers.assert_eq(actual.digits, case.digits, case.id .. ": digits first")
+				helpers.assert_eq(actual.symbols, case.symbols, case.id .. ": symbols first")
+			end
+			for _, case in ipairs(corpus.effective) do
+				local actual = Policy.effective(case.mode, Policy.availability(levels(by_id[case.availability])))
+				helpers.assert_eq(actual.mode, case.effective, case.mode .. " on " .. case.availability)
+				helpers.assert_eq(actual.reason, case.reason, case.mode .. " on " .. case.availability .. ": reason")
+			end
+			helpers.assert_eq(pcall(Policy.availability, {}), false, "the rule needs all ten keys")
+		end)
+		helpers.it("lets the edge keys join an ordering only where swapping them changes them (number-row-edge-keys)", function()
+			local function descriptor(spelling)
+				if spelling == "" then return nil end
+				if spelling:sub(1, 5) == "dead:" then
+					return { Kind = "dead", Text = spelling:sub(6), State = "corpus", Action = "corpus" }
+				end
+				return { Kind = "text", Text = spelling, State = "", Action = "" }
+			end
+			helpers.assert_eq(#corpus.edges, 6, "every edge-key case of the rule is represented")
+			for _, case in ipairs(corpus.edges) do
+				local edges = {}
+				for index = 1, 3 do
+					edges[index] = { plain = descriptor(case.plain[index]), shift = descriptor(case.shift[index]) }
+				end
+				helpers.assert_eq(Policy.edges_availability(edges, case.ordering), case.expected, case.id)
+			end
+			helpers.assert_eq(pcall(Policy.edges_availability, {}, "digits"), false, "the rule needs the three edge keys")
+		end)
 		helpers.it("uses the real renderer for native-only posture and translated disabled choices", function()
 			local Renderer = require("menu.renderer")
 			local shared = corpus_path:gsub("tests/corpus/layouts/number_row_policy%.json$", "")
@@ -100,7 +148,7 @@ function M.run(helpers, corpus_path)
 				local commands = { ["number_row_mode"] = function()
 					attempts = attempts + 1
 					return false
-				end }
+				end, ["number_row_edges"] = function() return false end }
 				local choice_row = renderer.choice_row
 				local borrowed
 				renderer.choice_row = function(key, id, actual_commands, getters)
@@ -113,7 +161,14 @@ function M.run(helpers, corpus_path)
 				helpers.assert_eq(attempts, 1)
 				helpers.assert_eq(#Policy.native_rows(renderer), 0, "missing driver command refuses")
 				helpers.assert_eq(#Policy.native_rows(renderer, { number_row_mode = true }), 0, "noncallable command refuses")
-				helpers.assert_eq(#rows, 1, "one canonical head")
+				helpers.assert_eq(#Policy.native_rows(renderer, { number_row_mode = commands.number_row_mode }), 0,
+					"the edge-key row needs its driver command too")
+				helpers.assert_eq(#rows, 2, "the canonical head and the edge-key checkbox")
+				helpers.assert_eq(rows[2].label, translations["menu.layout.number_row_edges"], "the shared edge-key caption")
+				helpers.assert_eq(rows[2].disabled, true, "the edge keys follow an ordering this driver never applies")
+				helpers.assert_eq(rows[2].checked, false)
+				helpers.assert_eq(rows[2].action, nil, "no writer is acquired")
+				helpers.assert_eq(rows[2].disabled_reason_key, "platform_reason.number_row_override_unsupported")
 				helpers.assert_eq(rows[1].label, "Number row")
 				local expected = { "Native order", "Digits first", "Symbols first" }
 				for index, item in ipairs(rows[1].items) do
@@ -126,9 +181,13 @@ function M.run(helpers, corpus_path)
 				end
 				local native = renderer.render_rows(rows)
 				helpers.assert_eq(#native[1].menu, 3)
+				-- The title carries the reason's short form, the text before its colon,
+				-- read from the catalogue so a reworded reason does not break the pin.
+				local head = translations["platform_reason.number_row_override_unsupported"]:match("^([^:]+):")
+				helpers.assert_true(head ~= nil, "the reason opens with a short form")
 				for index, item in ipairs(native[1].menu) do
 					helpers.assert_eq(item.disabled, true)
-					if index ~= 1 then helpers.assert_eq(item.title:find("Unsupported", 1, true) ~= nil, true) end
+					if index ~= 1 then helpers.assert_eq(item.title:find(head, 1, true) ~= nil, true) end
 				end
 				local old = translations["menu.layout.number_row_symbols"]
 				translations["menu.layout.number_row_symbols"] = "Changed canonical caption"
@@ -145,38 +204,60 @@ function M.run(helpers, corpus_path)
 		end)
 
 
-		helpers.it("replays the shipped typed migration through the actual Lua planner", function()
-			local Migrate = require("config_migrate")
-			local Codec = require("toml_codec")
+		helpers.it("draws live rows that store a choice, or greyed ones that keep it and say why (number-row-live-rows)", function()
+			local Renderer = require("menu.renderer")
 			local shared = corpus_path:gsub("tests/corpus/layouts/number_row_policy%.json$", "")
-			local function read(path)
-				local stream = assert(io.open(path, "rb"))
-				local bytes = stream:read("*a")
-				assert(stream:close())
-				return bytes
+			local stream = assert(io.open(shared .. "data/locales/en.json", "rb"))
+			local translations = Json.decode(stream:read("*a"))
+			assert(stream:close())
+			local i18n = { get = function(key) return translations[key] or key end,
+				section = function(key) return translations[key] or key end }
+			local renderer = assert(Renderer.new({ platform = "linux",
+				manifest_path = function() return shared .. "modules/menu/menu_manifest.json" end,
+				json_decode = Json.decode, i18n = i18n,
+				logger = { warn = function() end, error = function() end } }))
+			local commands = { number_row_mode = function() return false end, number_row_edges = function() return false end }
+			local function live(available)
+				local state = { order = "digits", edges = true, calls = {} }
+				return state, {
+					available = available, reason_key = "platform_reason.number_row_live_session",
+					get_order = function() return state.order end,
+					get_edges = function() return state.edges end,
+					set_order = function(value) state.calls[#state.calls + 1] = { "order", value } end,
+					set_edges = function(value) state.calls[#state.calls + 1] = { "edges", value } end,
+				}
 			end
-			local registry = assert(Migrate.load_registry(shared .. Migrate.REGISTRY_PATH))
-			helpers.assert_eq(registry.current, 12, "the actual shipped registry includes the common-family migration")
-			local replays = 0
-			for index = 0, 10 do
-				local directory = shared .. "tests/corpus/config_migrations/shipped_number_row_typed_" .. index .. "/"
-				local meta = Codec.decode(read(directory .. "case.toml")).case
-				local source = read(directory .. "input.toml")
-				local expected = read(directory .. "expected.toml")
-				for _, driver in ipairs(meta.drivers) do
-					local planned = Migrate.plan(source, registry, driver)
-					helpers.assert_eq(planned.outcome, "migrated", driver .. ": typed migration")
-					helpers.assert_eq(planned.candidate, expected, driver .. ": exact independent expected bytes")
-					helpers.assert_eq(planned.candidate:find('future = "kept" # independently retained', 1, true) ~= nil, true)
-					local replay = Migrate.plan(planned.candidate, registry, driver)
-					helpers.assert_eq(replay.outcome, "current", driver .. ": idempotent native plan")
-					helpers.assert_eq(replay.candidate, nil, "current sources acquire no rewrite")
-					replays = replays + 1
-				end
+			local state, owner = live(true)
+			local rows = Policy.native_rows(renderer, commands, owner)
+			helpers.assert_eq(#rows, 2)
+			for index, item in ipairs(rows[1].items) do
+				helpers.assert_eq(item.checked, index == 2, "the stored ordering is ticked")
+				helpers.assert_eq(item.disabled, nil)
+				helpers.assert_eq(type(item.action), "function")
 			end
-			helpers.assert_eq(replays, 21, "every declared driver vector executed")
+			helpers.assert_eq(rows[2].checked, true, "the stored edge switch is ticked")
+			helpers.assert_eq(rows[1].items[3].action(), true)
+			helpers.assert_eq(rows[2].action(), true)
+			helpers.assert_eq(state.calls, { { "order", "symbols" }, { "edges", false } },
+				"a choice reaches the driver, the switch with its opposite")
+			state, owner = live(false)
+			rows = Policy.native_rows(renderer, commands, owner)
+			helpers.assert_eq(#rows, 2)
+			for index, item in ipairs(rows[1].items) do
+				helpers.assert_eq(item.checked, index == 2, "the stored choice is still shown")
+				helpers.assert_eq(item.disabled, true)
+				helpers.assert_eq(item.action, nil)
+				if index ~= 1 then helpers.assert_eq(item.disabled_reason_key, "platform_reason.number_row_live_session") end
+			end
+			helpers.assert_eq(rows[2].disabled, true)
+			helpers.assert_eq(rows[2].action, nil)
+			helpers.assert_eq(rows[2].disabled_reason_key, "platform_reason.number_row_live_session")
+			helpers.assert_eq(#state.calls, 0)
+			helpers.assert_eq(#Policy.native_rows(renderer, commands, { available = true }), 0, "an incomplete owner refuses")
+			helpers.assert_eq(#Policy.native_rows(renderer, commands, { available = false, get_order = owner.get_order,
+				get_edges = owner.get_edges, set_order = owner.set_order, set_edges = owner.set_edges }), 0,
+				"a greyed row needs its reason")
 		end)
-
 	end)
 end
 

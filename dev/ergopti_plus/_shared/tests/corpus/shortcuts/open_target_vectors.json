@@ -1,0 +1,489 @@
+{
+	"description": "Golden vectors for the copy_selected_path action outside a file manager: what a selected text names before it is opened. Replayed by the macOS and Linux suites against _shared/lua/open_target and by the Windows suite against windows/infra/open_target.ahk, each with the environment below. A vector's expect applies to every OS; a windows, posix (macOS and Linux), macos or linux entry replaces it on that OS.",
+	"rule": "Trim spaces (no-break and zero-width ones included); an empty text is empty, a text holding a line break is searched. Unwrap quotes, brackets and guillemets that wrap the whole text. Then, in order: a registry key (an optional Computer\\, Ordinateur\\ or Registry:: prefix, a root such as HKEY_LOCAL_MACHINE or HKLM, an optional PowerShell colon, then \\subkeys; trailing backslashes dropped) opens Regedit on Windows; a file: URI is the local path it decodes to; a drive path (C:, C:\\ or C:/), a UNC path (\\\\server\\share, smb:// on macOS and Linux) or a %VARIABLE% path is a path on Windows; ~ is the home folder; an absolute POSIX path or a $VARIABLE path is a path on macOS and Linux; a scheme followed by // is a URL, as are the opaque schemes mailto, tel, sms, callto, sip, xmpp, magnet and news; ms-settings: and shell: open on Windows only; javascript:, vbscript: and data: are never opened; a mail address becomes mailto:; an IPv4 (each octet at most 255), a bracketed or bare IPv6 and localhost, each with an optional port and path, become http://; a domain name with an optional port and path becomes https://, unless it is a single name.ext with a known file extension, which is a file name without its folder. When trailing punctuation or an unopened closing bracket removed gives the same kind, or the only kind, that cleaned target wins. Anything else is searched as the trimmed text. A Windows-only target on macOS or Linux is unsupported, never searched.",
+	"env": {
+		"windows": {
+			"USERPROFILE": "C:\\Users\\ada",
+			"APPDATA": "C:\\Users\\ada\\AppData\\Roaming"
+		},
+		"posix": {
+			"HOME": "/home/ada",
+			"XDG_CONFIG_HOME": "/home/ada/.config"
+		}
+	},
+	"vectors": [
+		{
+			"id": "ipv4_bare",
+			"text": "192.168.1.1",
+			"expect": { "kind": "url", "target": "http://192.168.1.1" }
+		},
+		{
+			"id": "ipv4_port_and_path",
+			"text": "10.0.0.1:8080/admin",
+			"expect": { "kind": "url", "target": "http://10.0.0.1:8080/admin" }
+		},
+		{
+			"id": "ipv4_trailing_comma",
+			"text": "192.168.1.1,",
+			"expect": { "kind": "url", "target": "http://192.168.1.1" }
+		},
+		{
+			"id": "ipv4_quoted",
+			"text": "\"192.168.0.10\"",
+			"expect": { "kind": "url", "target": "http://192.168.0.10" }
+		},
+		{
+			"id": "ipv4_surrounding_whitespace",
+			"text": "  \t192.168.1.1\n",
+			"expect": { "kind": "url", "target": "http://192.168.1.1" }
+		},
+		{
+			"id": "ipv4_octet_out_of_range",
+			"text": "300.1.1.1",
+			"expect": { "kind": "search", "target": "300.1.1.1" }
+		},
+		{
+			"id": "ipv4_port_out_of_range",
+			"text": "10.0.0.1:70000",
+			"expect": { "kind": "search", "target": "10.0.0.1:70000" }
+		},
+		{
+			"id": "five_numbers_are_text",
+			"text": "1.2.3.4.5",
+			"expect": { "kind": "search", "target": "1.2.3.4.5" }
+		},
+		{
+			"id": "ipv6_bracketed_with_port",
+			"text": "[2001:db8::1]:8443/status",
+			"expect": { "kind": "url", "target": "http://[2001:db8::1]:8443/status" }
+		},
+		{ "id": "ipv6_loopback", "text": "::1", "expect": { "kind": "url", "target": "http://[::1]" } },
+		{
+			"id": "ipv6_full",
+			"text": "2001:0db8:0000:0000:0000:ff00:0042:8329",
+			"expect": { "kind": "url", "target": "http://[2001:0db8:0000:0000:0000:ff00:0042:8329]" }
+		},
+		{
+			"id": "cpp_scope_is_text",
+			"text": "std::vector",
+			"expect": { "kind": "search", "target": "std::vector" }
+		},
+		{
+			"id": "clock_time_is_text",
+			"text": "12:30",
+			"expect": { "kind": "search", "target": "12:30" }
+		},
+		{
+			"id": "localhost",
+			"text": "localhost",
+			"expect": { "kind": "url", "target": "http://localhost" }
+		},
+		{
+			"id": "localhost_port_and_path",
+			"text": "localhost:3000/api",
+			"expect": { "kind": "url", "target": "http://localhost:3000/api" }
+		},
+		{
+			"id": "https_url",
+			"text": "https://example.com/a?b=1#c",
+			"expect": { "kind": "url", "target": "https://example.com/a?b=1#c" }
+		},
+		{
+			"id": "ftp_url",
+			"text": "ftp://files.example.org/pub",
+			"expect": { "kind": "url", "target": "ftp://files.example.org/pub" }
+		},
+		{
+			"id": "application_scheme",
+			"text": "obsidian://open?vault=notes",
+			"expect": { "kind": "url", "target": "obsidian://open?vault=notes" }
+		},
+		{
+			"id": "bare_domain",
+			"text": "example.com",
+			"expect": { "kind": "url", "target": "https://example.com" }
+		},
+		{
+			"id": "www_domain_with_path",
+			"text": "www.example.fr/chemin",
+			"expect": { "kind": "url", "target": "https://www.example.fr/chemin" }
+		},
+		{
+			"id": "domain_with_port",
+			"text": "example.com:8080",
+			"expect": { "kind": "url", "target": "https://example.com:8080" }
+		},
+		{
+			"id": "domain_keeps_its_case",
+			"text": "Example.COM/Path",
+			"expect": { "kind": "url", "target": "https://Example.COM/Path" }
+		},
+		{
+			"id": "punycode_domain",
+			"text": "xn--bcher-kva.example",
+			"expect": { "kind": "url", "target": "https://xn--bcher-kva.example" }
+		},
+		{
+			"id": "tld_that_is_no_extension",
+			"text": "allegro.pl",
+			"expect": { "kind": "url", "target": "https://allegro.pl" }
+		},
+		{
+			"id": "mailto_url",
+			"text": "mailto:ada@example.com",
+			"expect": { "kind": "url", "target": "mailto:ada@example.com" }
+		},
+		{
+			"id": "bare_mail_address",
+			"text": "ada@example.com",
+			"expect": { "kind": "url", "target": "mailto:ada@example.com" }
+		},
+		{
+			"id": "tel_url",
+			"text": "tel:+33123456789",
+			"expect": { "kind": "url", "target": "tel:+33123456789" }
+		},
+		{
+			"id": "magnet_url",
+			"text": "magnet:?xt=urn:btih:abc",
+			"expect": { "kind": "url", "target": "magnet:?xt=urn:btih:abc" }
+		},
+		{
+			"id": "javascript_is_never_opened",
+			"text": "javascript:alert(1)",
+			"expect": { "kind": "search", "target": "javascript:alert(1)" }
+		},
+		{
+			"id": "javascript_slashes_is_never_opened",
+			"text": "javascript://x",
+			"expect": { "kind": "search", "target": "javascript://x" }
+		},
+		{
+			"id": "data_url_is_never_opened",
+			"text": "data:text/html,hi",
+			"expect": { "kind": "search", "target": "data:text/html,hi" }
+		},
+		{
+			"id": "url_trailing_period",
+			"text": "https://example.com/page.",
+			"expect": { "kind": "url", "target": "https://example.com/page" }
+		},
+		{
+			"id": "url_unopened_paren_and_comma",
+			"text": "https://example.com/a),",
+			"expect": { "kind": "url", "target": "https://example.com/a" }
+		},
+		{
+			"id": "url_balanced_parens_kept",
+			"text": "https://en.wikipedia.org/wiki/Foo_(bar)",
+			"expect": { "kind": "url", "target": "https://en.wikipedia.org/wiki/Foo_(bar)" }
+		},
+		{
+			"id": "domain_trailing_period",
+			"text": "example.com.",
+			"expect": { "kind": "url", "target": "https://example.com" }
+		},
+		{
+			"id": "angle_brackets",
+			"text": "<https://example.com>",
+			"expect": { "kind": "url", "target": "https://example.com" }
+		},
+		{
+			"id": "guillemets",
+			"text": "« example.org »",
+			"expect": { "kind": "url", "target": "https://example.org" }
+		},
+		{
+			"id": "guillemets_no_break_spaces",
+			"text": "« example.org »",
+			"expect": { "kind": "url", "target": "https://example.org" }
+		},
+		{
+			"id": "sentence_with_url_is_text",
+			"text": "voir https://example.com",
+			"expect": { "kind": "search", "target": "voir https://example.com" }
+		},
+		{
+			"id": "file_name",
+			"text": "notes.txt",
+			"expect": { "kind": "file_name", "target": "notes.txt" }
+		},
+		{
+			"id": "file_name_with_underscore",
+			"text": "rapport_final.pdf",
+			"expect": { "kind": "file_name", "target": "rapport_final.pdf" }
+		},
+		{
+			"id": "file_name_upper_case_extension",
+			"text": "Photo.JPG",
+			"expect": { "kind": "file_name", "target": "Photo.JPG" }
+		},
+		{
+			"id": "file_name_double_extension",
+			"text": "archive.tar.gz",
+			"expect": { "kind": "file_name", "target": "archive.tar.gz" }
+		},
+		{
+			"id": "file_name_beats_fake_domain",
+			"text": "node.js",
+			"expect": { "kind": "file_name", "target": "node.js" }
+		},
+		{
+			"id": "plain_text",
+			"text": "bonjour le monde",
+			"expect": { "kind": "search", "target": "bonjour le monde" }
+		},
+		{
+			"id": "abbreviation_is_text",
+			"text": "e.g.",
+			"expect": { "kind": "search", "target": "e.g." }
+		},
+		{
+			"id": "multi_line_is_text",
+			"text": "first line\nsecond line",
+			"expect": { "kind": "search", "target": "first line\nsecond line" }
+		},
+		{ "id": "empty", "text": "", "expect": { "kind": "empty", "target": "" } },
+		{ "id": "blank", "text": "  \t ", "expect": { "kind": "empty", "target": "" } },
+		{
+			"id": "registry_full_root",
+			"text": "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft",
+			"windows": { "kind": "registry", "target": "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "registry_abbreviated_root_trailing_backslash",
+			"text": "HKCU\\Software\\Ergopti\\",
+			"windows": { "kind": "registry", "target": "HKEY_CURRENT_USER\\Software\\Ergopti" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "HKEY_CURRENT_USER\\Software\\Ergopti",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "registry_powershell_drive",
+			"text": "HKLM:\\SYSTEM\\CurrentControlSet",
+			"windows": { "kind": "registry", "target": "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "registry_regedit_address_bar",
+			"text": "Computer\\HKEY_CURRENT_USER\\Control Panel\\Desktop",
+			"windows": { "kind": "registry", "target": "HKEY_CURRENT_USER\\Control Panel\\Desktop" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "HKEY_CURRENT_USER\\Control Panel\\Desktop",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "registry_french_address_bar",
+			"text": "Ordinateur\\hkcr\\.txt",
+			"windows": { "kind": "registry", "target": "HKEY_CLASSES_ROOT\\.txt" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "HKEY_CLASSES_ROOT\\.txt",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "registry_provider_path",
+			"text": "Registry::HKEY_USERS\\.DEFAULT",
+			"windows": { "kind": "registry", "target": "HKEY_USERS\\.DEFAULT" },
+			"posix": { "kind": "unsupported", "target": "HKEY_USERS\\.DEFAULT", "reason": "windows_only" }
+		},
+		{
+			"id": "registry_root_only",
+			"text": "HKCU",
+			"windows": { "kind": "registry", "target": "HKEY_CURRENT_USER" },
+			"posix": { "kind": "unsupported", "target": "HKEY_CURRENT_USER", "reason": "windows_only" }
+		},
+		{
+			"id": "drive_path_with_spaces",
+			"text": "C:\\Program Files\\Ergopti",
+			"windows": { "kind": "path", "target": "C:\\Program Files\\Ergopti" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "C:\\Program Files\\Ergopti",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "drive_path_forward_slashes",
+			"text": "D:/Documents/notes.txt",
+			"windows": { "kind": "path", "target": "D:\\Documents\\notes.txt" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "D:/Documents/notes.txt",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "drive_root",
+			"text": "C:",
+			"windows": { "kind": "path", "target": "C:\\" },
+			"posix": { "kind": "unsupported", "target": "C:", "reason": "windows_only" }
+		},
+		{
+			"id": "quoted_drive_path",
+			"text": "\"C:\\Users\\ada\\My Documents\"",
+			"windows": { "kind": "path", "target": "C:\\Users\\ada\\My Documents" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "C:\\Users\\ada\\My Documents",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "drive_path_trailing_period",
+			"text": "C:\\Windows\\notepad.exe.",
+			"windows": { "kind": "path", "target": "C:\\Windows\\notepad.exe" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "C:\\Windows\\notepad.exe",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "drive_path_with_forbidden_character",
+			"text": "C:\\a|b",
+			"expect": { "kind": "search", "target": "C:\\a|b" }
+		},
+		{
+			"id": "unc_path",
+			"text": "\\\\server\\share\\dossier",
+			"windows": { "kind": "path", "target": "\\\\server\\share\\dossier" },
+			"posix": { "kind": "url", "target": "smb://server/share/dossier" }
+		},
+		{
+			"id": "unc_path_with_spaces",
+			"text": "\\\\nas\\Mes Photos\\2024",
+			"windows": { "kind": "path", "target": "\\\\nas\\Mes Photos\\2024" },
+			"posix": { "kind": "url", "target": "smb://nas/Mes%20Photos/2024" }
+		},
+		{
+			"id": "environment_variable_path",
+			"text": "%APPDATA%\\Ergopti",
+			"windows": { "kind": "path", "target": "C:\\Users\\ada\\AppData\\Roaming\\Ergopti" },
+			"posix": { "kind": "unsupported", "target": "%APPDATA%\\Ergopti", "reason": "windows_only" }
+		},
+		{
+			"id": "unknown_environment_variable_stays_literal",
+			"text": "%ERGOPTI_UNSET_VARIABLE%\\x",
+			"windows": { "kind": "path", "target": "%ERGOPTI_UNSET_VARIABLE%\\x" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "%ERGOPTI_UNSET_VARIABLE%\\x",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "home_relative_path",
+			"text": "~/Documents/a b.txt",
+			"windows": { "kind": "path", "target": "C:\\Users\\ada\\Documents\\a b.txt" },
+			"posix": { "kind": "path", "target": "/home/ada/Documents/a b.txt" }
+		},
+		{
+			"id": "home_folder",
+			"text": "~",
+			"windows": { "kind": "path", "target": "C:\\Users\\ada" },
+			"posix": { "kind": "path", "target": "/home/ada" }
+		},
+		{
+			"id": "posix_absolute_path",
+			"text": "/usr/local/bin",
+			"windows": { "kind": "search", "target": "/usr/local/bin" },
+			"posix": { "kind": "path", "target": "/usr/local/bin" }
+		},
+		{
+			"id": "posix_path_with_spaces",
+			"text": "/Users/ada/Mes documents/fichier final.pdf",
+			"windows": { "kind": "search", "target": "/Users/ada/Mes documents/fichier final.pdf" },
+			"posix": { "kind": "path", "target": "/Users/ada/Mes documents/fichier final.pdf" }
+		},
+		{
+			"id": "posix_path_trailing_period",
+			"text": "/etc/hosts.",
+			"windows": { "kind": "search", "target": "/etc/hosts." },
+			"posix": { "kind": "path", "target": "/etc/hosts" }
+		},
+		{
+			"id": "posix_variable_path",
+			"text": "$HOME/projets",
+			"windows": { "kind": "search", "target": "$HOME/projets" },
+			"posix": { "kind": "path", "target": "/home/ada/projets" }
+		},
+		{
+			"id": "posix_braced_variable_path",
+			"text": "${XDG_CONFIG_HOME}/ergopti",
+			"windows": { "kind": "search", "target": "${XDG_CONFIG_HOME}/ergopti" },
+			"posix": { "kind": "path", "target": "/home/ada/.config/ergopti" }
+		},
+		{
+			"id": "file_uri_posix",
+			"text": "file:///home/ada/a%20b.txt",
+			"windows": { "kind": "url", "target": "file:///home/ada/a%20b.txt" },
+			"posix": { "kind": "path", "target": "/home/ada/a b.txt" }
+		},
+		{
+			"id": "file_uri_drive",
+			"text": "file:///C:/Users/ada/a%20b.txt",
+			"windows": { "kind": "path", "target": "C:\\Users\\ada\\a b.txt" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "file:///C:/Users/ada/a%20b.txt",
+				"reason": "windows_only"
+			}
+		},
+		{
+			"id": "file_uri_remote_host",
+			"text": "file://server/share/x.txt",
+			"windows": { "kind": "path", "target": "\\\\server\\share\\x.txt" },
+			"posix": { "kind": "url", "target": "file://server/share/x.txt" }
+		},
+		{
+			"id": "file_uri_localhost",
+			"text": "file://localhost/etc/hosts",
+			"windows": { "kind": "url", "target": "file://localhost/etc/hosts" },
+			"posix": { "kind": "path", "target": "/etc/hosts" }
+		},
+		{
+			"id": "settings_uri",
+			"text": "ms-settings:display",
+			"windows": { "kind": "url", "target": "ms-settings:display" },
+			"posix": { "kind": "unsupported", "target": "ms-settings:display", "reason": "windows_only" }
+		},
+		{
+			"id": "settings_uri_home",
+			"text": "ms-settings:",
+			"windows": { "kind": "url", "target": "ms-settings:" },
+			"posix": { "kind": "unsupported", "target": "ms-settings:", "reason": "windows_only" }
+		},
+		{
+			"id": "shell_folder_uri",
+			"text": "shell:startup",
+			"windows": { "kind": "url", "target": "shell:startup" },
+			"posix": { "kind": "unsupported", "target": "shell:startup", "reason": "windows_only" }
+		},
+		{
+			"id": "shell_folder_uri_with_spaces",
+			"text": "shell:Common Startup",
+			"windows": { "kind": "url", "target": "shell:Common Startup" },
+			"posix": { "kind": "unsupported", "target": "shell:Common Startup", "reason": "windows_only" }
+		},
+		{
+			"id": "shell_word_in_a_sentence_is_text",
+			"text": "Shell: une coquille",
+			"expect": { "kind": "search", "target": "Shell: une coquille" }
+		}
+	]
+}

@@ -53,6 +53,19 @@ function M.write_now(open, path, mode, text)
 	return true
 end
 
+--- Reads the canonical privacy policy before bootstrap can emit text.
+--- The exact file owner is closed before the caller commits Logger privacy.
+--- @param shared_root string Captured bundled shared root.
+--- @return string raw Complete policy bytes; read or close refusal throws.
+function M.read_privacy_policy(shared_root)
+	assert(type(shared_root) == "string" and shared_root ~= "")
+	local file = assert(io.open(shared_root .. "/modules/diagnostics/redaction.json", "rb"))
+	local read_ok, raw = pcall(file.read, file, "*a")
+	local close_ok, closed = pcall(file.close, file)
+	assert(read_ok and type(raw) == "string" and close_ok and closed == true)
+	return raw
+end
+
 --- Replaces the test seams: getenv, open, clock and fallback_path.
 --- @param deps table|nil Nil restores production behaviour.
 function M.configure_for_tests(deps)
@@ -89,6 +102,7 @@ end
 --- @param message string Stage message without timestamp.
 --- @return boolean written True when the fallback boot log accepted the line.
 function M.append(variant, message)
+	message = Logger.redact_message(tostring(message))
 	local open = _deps.open or io.open
 	local getenv = _deps.getenv or os.getenv
 	local clock = _deps.clock or function() return os.date("%Y-%m-%d %H:%M:%S") end

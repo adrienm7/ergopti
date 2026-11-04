@@ -70,6 +70,7 @@ _ScopeManifestQuotedRoundTrip() {
 		Assert(TOML_BatchWrite(Path, _ConfigPrepareTypedUpdates([Row])))
 		AssertContains(FSReadUtf8Exact(Path), "fast = true", "dynamic Boolean intent must survive admitted serialization")
 		Candidate := Map("hotstrings", Map("modules", Map("ext:ergopti:rolls", Map("fast", false))))
+		_CMJFixtureReadonly(Path)
 		ApplyConfigToml(Candidate, Path)
 		AssertEqual(Candidate["hotstrings"]["modules"]["ext:ergopti:rolls"]["fast"], true,
 			"real loader must address the same unquoted runtime identity")
@@ -106,15 +107,28 @@ _ScopeBuiltBorrowedOwner() {
 Test("config-scope: borrowed candidate admission retains exact lifecycle ownership", _ScopeBuiltBorrowedOwner)
 
 ; The filesystem and WAL are real; only replacement-process launch is injected.
-_ScopeOwnerFixture() {
+_ScopeOwnerFixture(InitialSource := unset) {
 	Directory := A_Temp . "\ergopti-scope-" . A_TickCount . "-" . Random(10000, 99999)
 	DirCreate(Directory)
-	Source := '[layout]`nergopti_base = true`nergopti_altgr = true`n[llm]`nenabled = true`n[private]`ncredential = "keep"`n'
+	if IsSet(InitialSource) {
+		Assert(InitialSource is String, "an ordinary current-schema subject supplies its actual source before native startup")
+		Source := _CMJFixtureCurrentSource(InitialSource)
+	} else
+		Source := _CMJFixtureCurrentSource('[layout]`nergopti_base = true`nergopti_altgr = true`n[llm]`nenabled = true`n[private]`ncredential = "keep"`n')
 	Path := Directory . "\config.toml"
 	Assert(FSWriteDurable(Path, Source))
+	Boot := ConfigMigrateBoot(Path)
+	AssertEqual("current", Boot["status"], "the actual source must complete its genuine default constructor")
+	AssertEqual(0, Boot["read_only"])
+	AssertTrue(FSUtf8ExactMatches(Path, Source), "ordinary current startup preserves the independently authored source")
+	; A clear restores the touchpad through this fake, never the real registry:
+	; each call is recorded for the clears that assert it.
+	Touchpad := []
 	Options := Map("path", Path, "locator", Directory . "\paths.toml", "stamp", "scope-test",
-		"settle", (*) => 1, "notify", (*) => 0)
-	return { directory: Directory, path: Path, source: Source, options: Options }
+		"settle", (*) => 1, "notify", (*) => 0,
+		"touchpad_restore", () => (Touchpad.Push("restore"), "factory_defaults"),
+		"touchpad_notify", (Message, *) => (Touchpad.Push(Message), true))
+	return { directory: Directory, path: Path, source: Source, options: Options, touchpad: Touchpad }
 }
 
 _ScopeOwnerCleanup(Fixture) {
@@ -241,13 +255,21 @@ _SGM_LabelAt(TargetMenu, Position) {
 ; conseillées », « Tout effacer », then a separator (menu-first-group), and a
 ; click on either scope row runs the gesture scope owner over the fixture.
 _ScopeGestureMenuOwnsParameters() {
-	global GestureActionParameters, _MenuDispatchCallbacks
+	global GestureActionParameters, _MenuDispatchCallbacks, Features
 	SavedParameters := GestureActionParameters
-	Fixture := _ScopeOwnerFixture()
-	Source := '[gestures]`nenabled = true`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__win_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
+	; The menu reads Gestures on, as the fixture's file says: an off category
+	; greys its restore and clear (category-off rule).
+	HadGestures := Features.Has("gestures")
+	SavedGestures := HadGestures ? Features["gestures"] : 0
+	ShownGestures := HadGestures ? SavedGestures.Clone() : Map()
+	ShownGestures["enabled"] := true
+	Features["gestures"] := ShownGestures
+	Source := '[gestures]`nenabled = true`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__meta_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
+	Fixture := _ScopeOwnerFixture(Source)
+	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
 	GestureActionParameters := Map("gesture__tap_4__open_url", "https://example.com/old",
-		"keyboard__win_a__open_url", "https://example.com/keep", "unknown_user_key", "keep")
+		"keyboard__meta_a__open_url", "https://example.com/keep", "unknown_user_key", "keep")
 	Refusal := 0, Bundle := 0
 	Launch(_Success, Borrowed, Refused) {
 		Bundle := Borrowed
@@ -279,7 +301,7 @@ _ScopeGestureMenuOwnsParameters() {
 			AssertEqual(Receipt["status"], "pending")
 			Parsed := TOML_ParseFreshFile(Fixture.path)
 			Assert(!Parsed["action_parameters"].Has("gesture__tap_4__open_url"), "old binding parameters leave with their scope")
-			AssertEqual(Parsed["action_parameters"]["keyboard__win_a__open_url"], "https://example.com/keep")
+			AssertEqual(Parsed["action_parameters"]["keyboard__meta_a__open_url"], "https://example.com/keep")
 			AssertEqual(Parsed["action_parameters"]["unknown_user_key"], "keep")
 			AssertEqual(Parsed["llm"]["enabled"], true)
 			if Mode == "clear" {
@@ -287,8 +309,19 @@ _ScopeGestureMenuOwnsParameters() {
 				; (gestures-clear-keeps-switch).
 				AssertEqual(true, Parsed["gestures"]["enabled"], "clear removes the assignments and keeps the switch")
 				Assert(!Parsed["gestures"].Has("tap_4"), "clear removes the assignment")
-			} else
+				; The Configuration menu's touchpad restore was merged into this
+				; clear (gestures-clear-restores-touchpad).
+				AssertEqual("factory_defaults", Receipt.Get("touchpad", ""),
+					"the Gestures clear also puts the touchpad back to its system state")
+				AssertEqual("restore", Fixture.touchpad[1], "the touchpad restore runs once")
+				AssertEqual(t("notify.touchpad.factory_defaults"), Fixture.touchpad[2],
+					"and says the factory defaults were written")
+				AssertEqual(2, Fixture.touchpad.Length)
+			} else {
 				AssertEqual(Parsed["gestures"]["enabled"], ManifestRecommendedFor("gestures.enabled"))
+				AssertEqual(0, Fixture.touchpad.Length, "a restore of the recommendations leaves the touchpad alone")
+				AssertFalse(Receipt.Has("touchpad"))
+			}
 			AssertEqual(GestureActionParameters["gesture__tap_4__open_url"], "https://example.com/old",
 				"pending reload preserves current runtime authority")
 			Refusal.Call("refused")
@@ -297,27 +330,34 @@ _ScopeGestureMenuOwnsParameters() {
 		}
 	} finally {
 		GestureActionParameters := SavedParameters
+		if HadGestures
+			Features["gestures"] := SavedGestures
+		else
+			Features.Delete("gestures")
 		if Bundle is Object
 			_ConfigWriteTerminalRelease(Bundle)
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
 Test("config-scope: the gesture menu's restore owns the master, its clear keeps it, and both own only its action parameters",
-	_ScopeGestureMenuOwnsParameters)
+	_RRNC_NoDialog.Bind("Gestures", _ScopeGestureMenuOwnsParameters))
 
 _ScopeOwnerRetainsRollbackDebt() {
 	global _ConfigTransitionRetainedBarrier
 	PriorRetained := _ConfigTransitionRetainedBarrier
 	Fixture := _ScopeOwnerFixture()
-	Bundle := 0, RefuseMove := false
+	Bundle := 0, Handle := -1
 	Port := ConfigTransitionProductionPort()
-	Move(Source, Destination) {
-		return RefuseMove ? false : FSAtomicMoveReplace(Source, Destination)
-	}
-	Port["move_replace"] := Move
+	AssertTrue(ConfigTransitionProductionPort(Port), "this rollback subject retains the actual native port owner")
 	Launch(_Success, Borrowed, _Refused) {
 		Bundle := Borrowed
-		RefuseMove := true
+		AssertFalse(FSUtf8ExactMatches(Fixture.path, Fixture.source), "the actual native journal published before physical rollback denial")
+		; Share read/write but deny deletion: the real native replacement must fail.
+		Handle := DllCall("kernel32\CreateFileW", "Str", Fixture.path,
+			"UInt", 0x80000000, "UInt", 3, "Ptr", 0, "UInt", 3,
+			"UInt", 0x00000080, "Ptr", 0, "Ptr")
+		AssertTrue(Handle != -1, "the real Windows non-delete-sharing handle must be acquired")
+		AssertTrue(ConfigTransitionProductionPort(Port), "physical sharing denial does not mutate native callbacks")
 		return false
 	}
 	Fixture.options["port"] := Port
@@ -328,12 +368,23 @@ _ScopeOwnerRetainsRollbackDebt() {
 		Assert(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object)
 		Assert(!_ConfigWriteLeaseTryAcquire(Fixture.path, "must remain blocked"))
 		AssertEqual(FSReadUtf8Exact(Receipt["backup"]), Fixture.source)
-		RefuseMove := false
+		AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int"), "the real sharing denial must close before native recovery")
+		Handle := -1
+		AssertTrue(ConfigTransitionProductionPort(Port), "the same genuine native port admits exact recovery")
 		Recovered := ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
 		Assert(ConfigTransitionResultIs(Recovered, "recovered_old"))
 		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
 	} finally {
+		if Handle != -1 {
+			AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int"), "fixture failure must close its genuine native handle")
+			Handle := -1
+		}
 		try {
+			if Bundle is Object {
+				Resolution := ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
+				AssertTrue(ConfigTransitionResultIs(Resolution, "absent") || ConfigTransitionResultIs(Resolution, "recovered_old"),
+					"fixture retirement resolves real native WAL debt before releasing its actual owner")
+			}
 			if Bundle is Object
 				_ConfigWriteTerminalRelease(Bundle)
 		} finally {
@@ -358,7 +409,12 @@ _ScopeExpectedOldHashRefusal(AdditionalFile := false) {
 	TargetPath := AdditionalFile ? Fixture.overrides : Fixture.path
 	Original := AdditionalFile ? Fixture.overrideSource : Fixture.source
 	Changed := Original . "# external edit after candidate read`n"
-	Port := ConfigTransitionProductionPort()
+	NativePort := ConfigTransitionProductionPort()
+	AssertTrue(ConfigTransitionProductionPort(NativePort), "the genuine canonical port stays owned throughout this precondition-only subject")
+	; A never-issued detached custom port exercises the portable hash refusal.
+	; It cannot qualify config.toml publication as a genuine native writer.
+	Port := NativePort.Clone()
+	AssertFalse(ConfigTransitionProductionPort(Port), "the portable callback copy grants no native authority")
 	Rejected := false, Launches := 0, Bundle := 0
 	Hash(Content) {
 		if !Rejected && Content == Original {
@@ -385,6 +441,7 @@ _ScopeExpectedOldHashRefusal(AdditionalFile := false) {
 		AssertEqual(Changed, FSReadUtf8Exact(TargetPath), "the external edit remains authoritative")
 		Assert(!FileExist(Receipt["backup"]), "precondition failure precedes backup effects")
 	} finally {
+		AssertTrue(ConfigTransitionProductionPort(NativePort), "portable hash failure leaves the actual native owner image intact")
 		if Bundle is Object {
 			ConfigTransitionRollbackOwned(Fixture.options["locator"], Bundle, Port)
 			_ConfigWriteTerminalRelease(Bundle)
@@ -399,9 +456,18 @@ Test("scope-hash-precondition: extra file hash refusal never publishes a stale i
 ; injected, exactly as the existing scope fixture. No boot warning is authority.
 _ScopeObsoleteSource(Literal, Parent := false) {
 	Assert(ManifestBuildFeaturesMap()["layout"].Has("ergopti_alt_gr"), "the fixture sibling must be a real declared layout setting")
-	return Chr(0xFEFF) . (Parent
+	return Chr(0xFEFF) . "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n" . (Parent
 		? '[hotstrings]`nautocorrection = ' . Literal . ' # retain until explicit cleanup`n[layout]`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
 		: '[layout]`nergopti_base = ' . Literal . ' # retain until explicit cleanup`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n')
+}
+
+; The four preview switches are active by default, so a hotstrings clear writes
+; their off value (the manifest's cleared value) instead of deleting them. A new
+; key opens its section, as the shared batch-write corpus pins (the vector
+; header-scalar-new-key-gets-the-precise-numeric-literal); keys follow the manifest order.
+_ScopePreviewOffRows() {
+	return "preview_ai_enabled = false`npreview_autocorrect_enabled = false`n"
+		. "preview_colored_tooltips = false`npreview_star_enabled = false`n"
 }
 
 _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
@@ -439,6 +505,7 @@ _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
 			Restart := Fixture.directory . "\restart.toml"
 			Assert(FSWriteDurable(Restart, Expected))
 			RestartSeed := ManifestBuildFeaturesMap()
+			_CMJFixtureReadonly(Restart)
 			ApplyConfigToml(RestartSeed, Restart, &RestartRejected, , &RestartOutdated)
 			AssertEqual(0, RestartRejected)
 			Assert(RestartOutdated.Has("layout`nergopti_base"))
@@ -509,7 +576,8 @@ _ScopeObsoleteParentClear(Literal) {
 		Assert(Outdated.Has("hotstrings`nautocorrection"))
 		Receipt := ConfigScopeApply("hotstrings", "clear", Map(), Fixture.options)
 		AssertEqual("pending", Receipt["status"])
-		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "neutral descendants cannot replace an obsolete table parent")
+		AssertEqual(StrReplace(Source, "[hotstrings]`n", "[hotstrings]`n" . _ScopePreviewOffRows()), FSReadUtf8Exact(Fixture.path),
+			"neutral descendants cannot replace an obsolete table parent")
 		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
 		Refusal.Call("native refusal")
 		AssertEqual("refused", Receipt["status"])
@@ -546,6 +614,7 @@ _ScopeObsoleteFreshRepair() {
 		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
 		AssertEqual("pending", Receipt["status"])
 		Expected := '[layout]`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
+		Expected := _CMJFixtureCurrentSource(Expected)
 		Actual := TOML_ParseDocument(FSReadUtf8Exact(Fixture.path))
 		Assert(Actual["layout"] is Map && Actual["layout"].Count == 0,
 			"fresh valid values clear despite stale boot warnings, retaining the existing explicit empty header")
@@ -649,7 +718,7 @@ _ScopeObsoleteGlobal(Mode) {
 			AssertEqual("pending", Receipt["status"])
 			Assert(Backups >= 4, "the genuine global file cohort crosses its coordinated backup boundary")
 			AssertEqual(1, Launches)
-			Expected := StrReplace(Source, "ergopti_alt_gr = true`n", "")
+			Expected := StrReplace(StrReplace(Source, "ergopti_alt_gr = true`n", ""), "[hotstrings]`n", "[hotstrings]`n" . _ScopePreviewOffRows())
 				. '[shortcuts.keyboard]`nmagic_editor = "none"`n'
 				. '[shortcuts.script_control]`nscript_altgr_backspace = "none"`n'
 				. 'script_altgr_delete = "none"`nscript_altgr_enter = "none"`nscript_altgr_escape = "none"`n'
@@ -677,7 +746,7 @@ _ScopeObsoleteGlobal(Mode) {
 Test("scope-obsolete-source: actual global clear retains obsolete source and exact inverse", _ScopeObsoleteGlobal.Bind("clear"))
 Test("scope-obsolete-source: actual global recommendation refuses before the cohort backup", _ScopeObsoleteGlobal.Bind("recommended"))
 
-_ScopeObsoleteSessionRefusal() {
+_ScopeObsoleteSessionRefusal(Observe := 0) {
 	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource('"old-shape"')
 	Assert(FSWriteDurable(Fixture.path, Source))
 	Backups := 0, Launches := 0
@@ -698,6 +767,8 @@ _ScopeObsoleteSessionRefusal() {
 		AssertEqual(0, Backups)
 		AssertEqual(0, Launches)
 		AssertEqual(Source, FSReadUtf8Exact(Fixture.path))
+		if HasMethod(Observe, "Call")
+			Observe.Call(Receipt, Fixture)
 	} finally {
 		_TOML_WriteRefusals().Delete(_TOML_WriteRefusalKey(Fixture.path))
 		_ScopeOwnerCleanup(Fixture)
@@ -778,3 +849,166 @@ _ScopeObsoleteUnownedNeighbor() {
 	}
 }
 Test("scope-obsolete-source: misspelled layout neighbor stays unowned and retained", _ScopeObsoleteUnownedNeighbor)
+
+
+; A preexisting session refusal must not leave a barrier around a no-op recovery.
+_ScopeObsoleteRefusalThenIndependentNativeWrite() {
+	global _ConfigTransitionRetainedBarrier
+	PriorRetained := _ConfigTransitionRetainedBarrier
+	Seen := Map(), FixtureBundle := false, NextBundle := false, NextRefusal := 0
+	NextDirectory := A_Temp . "\ergopti-scope-ordered-" . A_TickCount . "-" . Random(10000, 99999)
+	AssertTrue(DllCall("CreateDirectoryW", "Str", NextDirectory, "Ptr", 0, "Int"))
+	NextPath := NextDirectory . "\config.toml", NextLocator := NextDirectory . "\paths.toml"
+	NextSource := _CMJFixtureCurrentSource('[layout]`nergopti_base = true`n[private]`ncredential = "keep"`n')
+	Observe(Receipt, Fixture) {
+		Seen["path"] := Fixture.path
+		Seen["locator"] := Fixture.options["locator"]
+		Seen["source"] := FSReadUtf8Exact(Fixture.path)
+		Seen["refusal"] := TOML_WriteRefusal(Fixture.path)
+		Detail := Receipt.Get("detail", 0)
+		if (Detail is Map) && Detail.Has("bundle")
+			FixtureBundle := Detail["bundle"]
+	}
+	Launch(_Success, Borrowed, Refused) {
+		NextBundle := Borrowed, NextRefusal := Refused
+		return true
+	}
+	AssertFalse(_ConfigWriteTerminalIsActive(), "the ordered subject starts without another transaction")
+	try {
+		_ScopeObsoleteSessionRefusal(Observe)
+		AssertEqual("invalid schema stamp", Seen["refusal"], "the genuine refusal is preserved during the original scenario")
+		AssertTrue(FSWriteCreateDurable(NextPath, NextSource))
+		Boot := ConfigMigrateBoot(NextPath)
+		AssertEqual("current", Boot["status"], "the next different source completes genuine native Boot after the strict-refusal scenario")
+		AssertEqual(0, Boot["read_only"])
+		AssertEqual(NextSource, FSReadUtf8Exact(NextPath))
+		Options := Map("path", NextPath, "locator", NextLocator, "stamp", "ordered-refusal",
+			"settle", (*) => 1, "notify", (*) => 0, "reload", Launch)
+		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Options)
+		AssertEqual("pending", Receipt["status"], "the independent source crosses actual native WAL publication")
+		AssertTrue(_ConfigWriteLeaseSelectOwner(NextBundle, NextPath) is Object)
+		AssertEqual(NextSource, FSReadUtf8Exact(Receipt["backup"]))
+		AssertFalse(TOML_ParseFreshFile(NextPath)["layout"].Has("ergopti_base"))
+		NextRefusal.Call("ordered native replacement refused")
+		AssertEqual("refused", Receipt["status"])
+		AssertEqual(NextSource, FSReadUtf8Exact(NextPath))
+		AssertFalse(FSStrictExists(ConfigTransitionWalPath(NextLocator)))
+		AssertFalse(_ConfigWriteTerminalIsActive(), "the independent native transaction retires its exact owner")
+		AssertTrue(_ConfigTransitionRetainedBarrier == PriorRetained, "the no-op refusal registered no recovery debt")
+	} finally {
+		if (NextBundle is Object) && _ConfigWriteTerminalTryAcquire([], NextBundle) {
+			Resolution := ConfigTransitionRollbackOwned(NextLocator, NextBundle)
+			AssertTrue(ConfigTransitionResultIs(Resolution, "absent") || ConfigTransitionResultIs(Resolution, "recovered_old"))
+			AssertTrue(_ConfigWriteTerminalRelease(NextBundle))
+			if _ConfigTransitionRetainedBarrier == NextBundle
+				_ConfigTransitionRetainedBarrier := PriorRetained
+		}
+		; The original failing implementation can retain this exact fixture bundle.
+		; Its fence has already been removed by that fixture, so recover honestly
+		; before retiring the real issued object; unrelated retained owners survive.
+		if FixtureBundle is Object {
+			AssertTrue(_ConfigWriteTerminalOwnsExact(FixtureBundle, Seen["path"]))
+			AssertTrue(_ConfigWriteTerminalOwnsExact(FixtureBundle, Seen["locator"]))
+			Resolution := ConfigTransitionRecoverOwned(Seen["locator"], FixtureBundle)
+			AssertTrue(ConfigTransitionResultIs(Resolution, "absent"), "original leak cleanup observes actual absence")
+			AssertTrue(_ConfigWriteTerminalRelease(FixtureBundle))
+			if _ConfigTransitionRetainedBarrier == FixtureBundle
+				_ConfigTransitionRetainedBarrier := PriorRetained
+		}
+		DirDelete(NextDirectory, true)
+	}
+}
+Test("scope-obsolete-source: preexisting refusal leaves an independent native transaction usable", _ScopeObsoleteRefusalThenIndependentNativeWrite)
+
+
+_ScopeAbsentUntouchedNoop(Ready) {
+	Directory := A_Temp . "\ergopti-scope-noop-" . A_TickCount . "-" . Random(10000, 99999)
+	DirCreate(Directory)
+	Path := Directory . "\config.toml", Locator := Directory . "\paths.toml"
+	Source := _CMJFixtureCurrentSource('[script]`nlocale = "fr"`n[private]`nkeep = "unchanged"`n')
+	Bundle := false, Reason := "fixture preexisting schema refusal"
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		if Ready
+			AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		else
+			ConfigSchemaPrepareSource(Path)
+		AssertEqual(Ready, ConfigSchemaCanPrepareWrite(Path), "only the genuine prior Boot grants write admission")
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		AssertTrue(Bundle is Object)
+		TOML_RefuseWrites(Path, Reason)
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "unbounded absent settlement changes no source phase")
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		AssertEqual(Reason, TOML_WriteRefusal(Path))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "no-op cannot authorize writes through the retained refusal")
+		Bounds := Map("present", 1, "hash", CryptoSha256(Source))
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old", Bounds), "a bounded recovered-image claim keeps the strict fence even without promotion")
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		AssertEqual(Reason, TOML_WriteRefusal(Path))
+		_TOML_WriteRefusals().Delete(_TOML_WriteRefusalKey(Path))
+		AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		Bundle := false
+		AssertEqual(Ready, ConfigSchemaCanPrepareWrite(Path), "retirement leaves the exact prior readonly/write state unchanged")
+	} finally {
+		Key := _TOML_WriteRefusalKey(Path)
+		if _TOML_WriteRefusals().Has(Key)
+			_TOML_WriteRefusals().Delete(Key)
+		if Bundle is Object {
+			AssertTrue(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"))
+			AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		}
+		DirDelete(Directory, true)
+	}
+}
+Test("scope absent settlement: untouched ready source preserves refusal and write state", _ScopeAbsentUntouchedNoop.Bind(true))
+Test("scope absent settlement: untouched prepared source preserves refusal and readonly state", _ScopeAbsentUntouchedNoop.Bind(false))
+
+
+_ScopeAbsentUnknownAndOwnedRefusals() {
+	Directory := A_Temp . "\ergopti-scope-settlement-" . A_TickCount . "-" . Random(10000, 99999)
+	DirCreate(Directory)
+	Path := Directory . "\config.toml", Locator := Directory . "\paths.toml"
+	Source := _CMJFixtureCurrentSource('[script]`nlocale = "fr"`n')
+	Bundle := false, Reason := "fixture strict settlement refusal"
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		AssertFalse(ConfigMigrateBoot(Path, "known"))
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		AssertTrue(Bundle is Object)
+		TOML_RefuseWrites(Path, Reason)
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "unknown destination does not borrow the untouched-row no-op")
+		AssertFalse(ConfigMigrateBoot(Path, "known"), "refused settlement constructs no destination")
+		AssertEqual(Reason, TOML_WriteRefusal(Path))
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		_TOML_WriteRefusals().Delete(_TOML_WriteRefusalKey(Path))
+		AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		Bundle := false
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		AssertTrue(Bundle is Object)
+		AssertTrue(ConfigSchemaPrepareOwnedSource(Path, Bundle))
+		TOML_RefuseWrites(Path, Reason)
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "owned promotion still refuses without a bounded record")
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old", Map("present", 1, "hash", CryptoSha256(Source))), "bounded owned promotion still refuses")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+		AssertEqual(Reason, TOML_WriteRefusal(Path))
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		_TOML_WriteRefusals().Delete(_TOML_WriteRefusalKey(Path))
+		AssertTrue(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "only exact native settlement after the fixture fence is removed restores the acquired phase")
+		AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		Bundle := false
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		Key := _TOML_WriteRefusalKey(Path)
+		if _TOML_WriteRefusals().Has(Key)
+			_TOML_WriteRefusals().Delete(Key)
+		if Bundle is Object {
+			Resolution := ConfigTransitionRecoverOwned(Locator, Bundle)
+			AssertTrue(ConfigTransitionResultIs(Resolution, "absent"))
+			AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		}
+		DirDelete(Directory, true)
+	}
+}
+Test("scope absent settlement: unknown and owned sources retain strict refusal", _ScopeAbsentUnknownAndOwnedRefusals)

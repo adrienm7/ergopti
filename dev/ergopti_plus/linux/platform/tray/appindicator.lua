@@ -62,6 +62,10 @@ local LOG = "platform.tray.appindicator"
 -- hardware, communications or system services.
 local CATEGORY_APPLICATION_STATUS = 0
 
+-- The component names a refusal shows, the same words in every language.
+M.GTK_COMPONENT = "GTK 3"
+M.INDICATOR_COMPONENT = "libayatana-appindicator3"
+
 -- AppIndicatorStatus. PASSIVE is what hides an item from the panel.
 local STATUS_PASSIVE = 0
 local STATUS_ACTIVE = 1
@@ -95,10 +99,16 @@ local PACKAGE_HINTS = {
 
 -- nil until probed, false when this machine cannot host an indicator.
 local _lib = nil
+-- The library the binding could not load, named as the start check reports
+-- it (infra/gui_stack.lua); nil when every library loaded.
+local _missing = nil
 
 -- The live indicator, its current menu, and every callback keeping GTK alive.
 local _indicator = nil
 local _menu = nil
+-- The status window, created on first show and kept (hidden on close) until
+-- destroy(), so a second show re-presents it instead of stacking copies.
+local _window = nil
 
 -- Menu actions by id, and the one C callback that dispatches to them.
 --
@@ -173,10 +183,26 @@ local function bind()
 		gboolean     gtk_init_check(int *argc, char ***argv);
 		gboolean     gtk_events_pending(void);
 		gboolean     gtk_main_iteration_do(gboolean blocking);
+		GtkWidget*   gtk_window_new(int type);
+		void         gtk_window_set_title(GtkWidget *window, const char *title);
+		void         gtk_window_set_position(GtkWidget *window, int position);
+		void         gtk_window_set_default_size(GtkWidget *window, int width, int height);
+		void         gtk_window_present(GtkWidget *window);
+		void         gtk_container_add(GtkWidget *container, GtkWidget *widget);
+		void         gtk_container_set_border_width(GtkWidget *container, unsigned int width);
+		GtkWidget*   gtk_label_new(const char *text);
+		void         gtk_label_set_line_wrap(GtkWidget *label, gboolean wrap);
+		void         gtk_label_set_max_width_chars(GtkWidget *label, int n_chars);
+		void         gtk_label_set_selectable(GtkWidget *label, gboolean selectable);
+		gboolean     gtk_widget_hide_on_delete(GtkWidget *widget);
+		void         gtk_widget_destroy(GtkWidget *widget);
 
 		gulong       g_signal_connect_data(gpointer instance, const char *detailed_signal,
 		                                   GCallback c_handler, gpointer data,
 		                                   void *destroy_data, int connect_flags);
+		void         g_signal_handler_block(gpointer instance, gulong handler_id);
+		void         g_signal_handler_unblock(gpointer instance, gulong handler_id);
+		void         g_object_unref(gpointer object);
 
 		AppIndicator* app_indicator_new(const char *id, const char *icon_name, int category);
 		void          app_indicator_set_status(AppIndicator *self, int status);
@@ -194,8 +220,8 @@ local function bind()
 	local gobject = load_any(ffi, CANDIDATE_LIBS.gobject)
 	local indicator = load_any(ffi, CANDIDATE_LIBS.indicator)
 	if not gtk or not gobject or not indicator then
-		Logger.error(LOG, "Tray unavailable — %s is missing. Try: %s",
-			(not indicator) and "libayatana-appindicator3" or "GTK 3", package_hint())
+		_missing = (not indicator) and M.INDICATOR_COMPONENT or M.GTK_COMPONENT
+		Logger.error(LOG, "Tray unavailable — %s is missing. Try: %s", _missing, package_hint())
 		return nil
 	end
 
@@ -214,14 +240,26 @@ end
 
 --- Test seam: forces the binding state without touching any library.
 --- @param value table|false|nil
+--- @return table|false|nil Previous binding state.
 function M._set_binding_for_test(value)
+	local previous = _lib
 	_lib = value
+	return previous
 end
 
 --- Whether this machine can host a tray icon.
 --- @return boolean
 function M.is_available()
 	return bind() ~= nil
+end
+
+--- The system library the tray cannot load, for the start check's refusal.
+--- nil when the libraries loaded, even if no display then accepted GTK: that
+--- is a session without a desktop, not a missing package.
+--- @return string|nil M.GTK_COMPONENT or M.INDICATOR_COMPONENT.
+function M.missing_component()
+	bind()
+	return _missing
 end
 
 
@@ -253,11 +291,28 @@ end
 --- @param lib table
 --- @param widget userdata
 --- @param fn function
-local function on_activate(lib, widget, fn, owned)
+--- @param owned table
+--- @param checked boolean|nil
+local function on_activate(lib, widget, fn, owned, checked)
+	local signal_id
+	local action = fn
+	if checked ~= nil then
+		action = function()
+			-- GTK toggles before activate handlers run. Only the owning rebuild
+			-- may publish a changed setting; rejected writes must keep its check.
+			-- set_active emits activate too, so block this exact handler while
+			-- restoring, before fn can rebuild and destroy the old widget.
+			lib.gobject.g_signal_handler_block(widget, signal_id)
+			local restored, err = pcall(lib.gtk.gtk_check_menu_item_set_active, widget, checked and 1 or 0)
+			lib.gobject.g_signal_handler_unblock(widget, signal_id)
+			if not restored then error(err, 0) end
+			return fn()
+		end
+	end
 	_next_action = _next_action + 1
-	_actions[_next_action] = fn
+	_actions[_next_action] = action
 	owned[#owned + 1] = _next_action
-	lib.gobject.g_signal_connect_data(widget, "activate", dispatcher(lib),
+	signal_id = lib.gobject.g_signal_connect_data(widget, "activate", dispatcher(lib),
 		lib.ffi.cast("gpointer", _next_action), nil, 0)
 end
 
@@ -269,11 +324,13 @@ end
 --- @param lib table
 --- @param items table
 --- @param owned table Receives the action ids the menu registers.
+--- @param inherited_disabled boolean|nil An unavailable ancestor revokes descendant actions.
 --- @return userdata GtkMenu
-local function build_menu(lib, items, owned)
+local function build_menu(lib, items, owned, inherited_disabled)
 	local menu = lib.gtk.gtk_menu_new()
 
 	for _, item in ipairs(items or {}) do
+		local disabled = inherited_disabled or item.disabled
 		local widget
 		if item.separator or item.title == "-" then
 			widget = lib.gtk.gtk_separator_menu_item_new()
@@ -285,12 +342,14 @@ local function build_menu(lib, items, owned)
 		end
 
 		if type(item.menu) == "table" and #item.menu > 0 then
-			lib.gtk.gtk_menu_item_set_submenu(widget, build_menu(lib, item.menu, owned))
-		elseif type(item.fn) == "function" then
-			on_activate(lib, widget, item.fn, owned)
+			lib.gtk.gtk_menu_item_set_submenu(widget, build_menu(lib, item.menu, owned, disabled))
+		elseif not disabled and type(item.fn) == "function" then
+			-- dbusmenu Event can activate an insensitive GTK item directly.
+			-- Unavailable rows therefore never receive an action capability.
+			on_activate(lib, widget, item.fn, owned, item.checked)
 		end
 
-		if item.disabled then
+		if disabled then
 			lib.gtk.gtk_widget_set_sensitive(widget, 0)
 		end
 
@@ -395,10 +454,16 @@ function M.destroy()
 	if not lib or not _indicator then return end
 	-- Status PASSIVE (0) is what removes it from the panel; there is no
 	-- app_indicator_destroy, and dropping the reference alone leaves the icon on
-	-- screen until the process exits.
+	-- screen until the process exits. Release the constructor's reference too:
+	-- PASSIVE hides the icon but retains its menu and D-Bus registration.
 	lib.indicator.app_indicator_set_status(_indicator, STATUS_PASSIVE)
+	lib.gobject.g_object_unref(_indicator)
 	_indicator = nil
 	_menu = nil
+	if _window ~= nil then
+		lib.gtk.gtk_widget_destroy(_window)
+		_window = nil
+	end
 	for _, id in ipairs(_menu_actions) do _actions[id] = nil end
 	_menu_actions = {}
 	Logger.info(LOG, "Tray icon removed.")
@@ -407,6 +472,52 @@ end
 --- @return boolean True when an icon is live.
 function M.is_live()
 	return _indicator ~= nil
+end
+
+-- GtkWindowType TOPLEVEL and GtkWindowPosition CENTER. Centred because,
+-- without a window manager, a window maps at 0,0, which is where an XEmbed
+-- tray such as stalonetray docks the icon: the window would cover it.
+local GTK_WINDOW_TOPLEVEL = 0
+local GTK_WIN_POS_CENTER = 1
+
+--- Shows a plain window carrying a message, or brings the existing one back.
+---
+--- The degraded no-keyboard state needs something a desktop launch can see
+--- without knowing where the tray is. The AppImage catalogue looks for a named
+--- window first and screenshots it; a tray menu, being an override-redirect
+--- popup, is never the active window it can capture. Closing the window only
+--- hides it: the tray menu can show it again.
+--- @param title string The window title.
+--- @param text string The message, wrapped.
+--- @return boolean shown
+function M.show_window(title, text)
+	local lib = bind()
+	if not lib then return false end
+	if _window == nil then
+		local window = lib.gtk.gtk_window_new(GTK_WINDOW_TOPLEVEL)
+		if window == nil then
+			Logger.error(LOG, "gtk_window_new returned nothing — no status window.")
+			return false
+		end
+		lib.gtk.gtk_window_set_title(window, tostring(title))
+		lib.gtk.gtk_window_set_position(window, GTK_WIN_POS_CENTER)
+		lib.gtk.gtk_window_set_default_size(window, 420, -1)
+		lib.gtk.gtk_container_set_border_width(window, 18)
+		local label = lib.gtk.gtk_label_new(tostring(text))
+		lib.gtk.gtk_label_set_line_wrap(label, 1)
+		lib.gtk.gtk_label_set_max_width_chars(label, 60)
+		lib.gtk.gtk_label_set_selectable(label, 1)
+		lib.gtk.gtk_container_add(window, label)
+		-- A C handler, not a Lua callback: hiding needs no Lua and spends no
+		-- FFI callback slot.
+		lib.gobject.g_signal_connect_data(window, "delete-event",
+			lib.ffi.cast("GCallback", lib.gtk.gtk_widget_hide_on_delete), nil, nil, 0)
+		_window = window
+	end
+	lib.gtk.gtk_widget_show_all(_window)
+	lib.gtk.gtk_window_present(_window)
+	Logger.info(LOG, "Status window shown (%s).", tostring(title))
+	return true
 end
 
 
@@ -472,8 +583,10 @@ function M.remove_item(handle)
 		return false
 	end
 	for _, id in ipairs(handle.owned) do _actions[id] = nil end
+	lib.gobject.g_object_unref(handle.ptr)
 	handle.owned = {}
 	handle.ptr = nil
+	handle.menu = nil
 	handle.active = false
 	return true
 end

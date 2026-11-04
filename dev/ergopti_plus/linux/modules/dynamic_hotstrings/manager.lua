@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local ManifestReader = require("infra.manifest_reader")
@@ -30,6 +31,7 @@ local UserCode = require("modules.dynamic_hotstrings.user_code")
 -- Shared TOML decoder — this module owns no bespoke parser.
 local TomlCodec = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
+local KEY = require("config_keys").KEY
 
 local LOG = "modules.dynamic_hotstrings.manager"
 
@@ -72,15 +74,17 @@ local PERSONAL_SECTION = "personal_info"
 -- Active trigger character. Seeded from the shared manifest — the declaration
 -- is the only place the default lives — and overridden by init() when the user
 -- has chosen another one.
-local _trigger_char = ManifestReader.default_for("hotstrings.trigger_char")
+local _trigger_char = ManifestReader.default_for(KEY.HOTSTRINGS_TRIGGER_CHAR)
 -- The canonical master leaf; its desired value is read at init() and refresh().
-local MASTER_PATH = "hotstrings.dynamic.enabled"
+local MASTER_PATH = KEY.HOTSTRINGS_DYNAMIC_ENABLED
 local _desired_enabled = ManifestReader.default_for(MASTER_PATH)
-local _enabled      = false        -- native availability and desired master
+local _enabled      = false        -- builtin availability and desired master
 local _rules_count  = 0            -- how many rules were registered
 local _info         = {}           -- parsed [info] table
 local _letters      = {}           -- parsed [letters] map
 local _info_path    = nil          -- active personal_info.toml owner
+local _info_generation = 0
+local _info_edits = setmetatable({}, { __mode = "k" })
 
 local native_utf8 = rawget(_G, "utf8")
 local utf8_lib = (type(native_utf8) == "table" and native_utf8.len
@@ -153,6 +157,7 @@ end
 --- dynamic_hotstrings engine.
 --- @param opts table|nil { trigger_char?, personal_info_path? }
 function M.init(opts)
+	_info_generation = _info_generation + 1
 	UserCode.invalidate("dynamic initialization")
 	local options = type(opts) == "table" and opts or {}
 
@@ -234,8 +239,7 @@ function M.init(opts)
 
 	-- The parsed [info] table is string-keyed, so the length operator (#) always
 	-- reports 0; count its keys explicitly to log the real field total
-	local info_field_count = 0
-	for _ in pairs(_info) do info_field_count = info_field_count + 1 end
+	local info_field_count = TableUtil.count(_info)
 
 	_desired_enabled = Preferences.get(MASTER_PATH)
 	_enabled = _desired_enabled and _rules_count > 0
@@ -262,7 +266,7 @@ end
 --- the WHOLE tag rather than skipping that field. A partial expansion in a form
 --- shifts every later value up by one box, which is silently wrong; nothing
 --- happening is merely visibly wrong. Note this differs from macOS's
---- `resolve_combo`, which skips what it cannot resolve — see PROJECT_MEMORY.
+--- `resolve_combo`, which skips what it cannot resolve — see docs/memory.
 --- @param tag string The tag WITHOUT its leading "@" and without the trigger.
 --- @return table Array of personal_info field names; empty when the tag resolves to none.
 function M.resolve_combo(tag)
@@ -319,7 +323,10 @@ end
 --- Returns true when the module has been initialised and has active rules.
 --- @return boolean
 function M.is_enabled()
-	return _enabled
+	-- The programmable owner can start, reload or stop independently of builtin
+	-- registration. Read its admitted availability live rather than caching it
+	-- only on refresh, which made identical scope snapshots restore differently.
+	return _enabled or (_desired_enabled and UserCode.is_enabled() and UserCode.count() > 0)
 end
 
 --- Commits the master and every canonical family through one runtime owner.
@@ -346,7 +353,7 @@ function M.set_enabled(state)
 	end
 	_desired_enabled = state
 	_enabled = state and _rules_count > 0
-	return _enabled == state
+	return M.is_enabled() == state
 end
 
 --- Adopts the master's canonical value after another owner published it.
@@ -360,15 +367,14 @@ function M.refresh(snapshot, inverse)
 		if snapshot and inverse then
 			if UserCode.scope_restore(snapshot) ~= true then return false, "programmable-refused" end
 		elseif snapshot then
-			if UserCode.scope_adopt(snapshot, Preferences.get("hotstrings.dynamic.user_code.time_activation_seconds"),
-				Preferences.get("hotstrings.dynamic.user_code.enabled")) ~= true then return false, "programmable-refused" end
-		elseif UserCode.set_time_activation(Preferences.get("hotstrings.dynamic.user_code.time_activation_seconds")) ~= true
-			or UserCode.set_enabled(Preferences.get("hotstrings.dynamic.user_code.enabled")) ~= true then
+			if UserCode.scope_adopt(snapshot, Preferences.get(KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS),
+				Preferences.get(KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED)) ~= true then return false, "programmable-refused" end
+		elseif UserCode.set_time_activation(Preferences.get(KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS)) ~= true
+			or UserCode.set_enabled(Preferences.get(KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED)) ~= true then
 			return false, "programmable-refused"
 		end
 	end
-	_enabled = _desired_enabled and (_rules_count > 0 or (UserCode.is_enabled() and UserCode.count() > 0))
-	if _enabled == _desired_enabled then return true end
+	if M.is_enabled() == _desired_enabled then return true end
 	return false, "builtin-unavailable"
 end
 
@@ -437,7 +443,7 @@ local function _fire_combo(prefix, trigger)
 	return true, {
 		trigger = "@" .. tag .. trigger,
 		-- The LOGICAL text: values only, no tab. A Tab moves focus and inserts
-		-- nothing on screen, so this is what the buffer and the keylogger's record
+		-- nothing on screen, so this is what the buffer and the keystats's record
 		-- must hold — the same split macOS documents at its own injection seam.
 		replacement = table.concat(values),
 		h_type = "dynamic",
@@ -453,10 +459,11 @@ end
 --- @param trigger string The character that just triggered the check (the
 ---   magic key, typically "★" or "\\").
 --- @param start_is_boundary boolean|nil Input owner state captured with the complete buffer.
+--- @param publication table|nil Original single-field text destination.
 --- @return boolean True if a dynamic expansion was performed.
 --- @return table|nil Canonical event details for a successful expansion.
-function M.on_trigger(buffer, trigger, start_is_boundary)
-	if not _enabled then return false end
+function M.on_trigger(buffer, trigger, start_is_boundary, publication)
+	if not M.is_enabled() then return false end
 	if type(buffer) ~= "string" or buffer == "" then return false end
 
 	-- Only fire on the configured trigger character.
@@ -496,12 +503,17 @@ function M.on_trigger(buffer, trigger, start_is_boundary)
 		return false
 	end
 	local backspace_count = suffix_length + 1  -- suffix + trigger
+	if type(publication) ~= "table" or getmetatable(publication) ~= nil
+		or type(publication.current) ~= "function" or type(publication.cached) ~= "function" then
+		Logger.warn(LOG, "Dynamic single-field expansion refused: no retained text destination.")
+		return false
+	end
 	-- Injector is loaded once at require-time; the hotstrings injector module
 	-- wraps ydotool and is always available on Linux.
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
 	if ok_inj and injector and type(injector.inject) == "function" then
 		local delivery = injector.inject(backspace_count, match.result,
-			match.rule.section == PERSONAL_SECTION)
+			match.rule.section == PERSONAL_SECTION, nil, publication)
 		if type(delivery) ~= "table" or delivery.ok ~= true then
 			Logger.error(LOG,
 				"Dynamic expansion output did not commit for '%s' (family=%s, %d-char content withheld).",
@@ -561,12 +573,12 @@ end
 --- @return table Array of candidate records; empty when nothing is offered.
 function M.preview_candidates(buffer, start_is_boundary)
 	local rows = {}
-	if not _enabled then return rows end
+	if not M.is_enabled() then return rows end
 	if not require("dynamic_hotstrings").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled, start_is_boundary) then
 		local user = UserCode.preview(buffer)
 		if user then
 			rows[#rows + 1] = { trigger = user.suffix .. _trigger_char, replacement = user.preview,
-				group = DYNAMIC_GROUP, section = "user_code", fires = true }
+				group = DYNAMIC_GROUP, section = require("config_keys").LEAF.USER_CODE, fires = true }
 		end
 	end
 	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return rows end
@@ -607,7 +619,7 @@ end
 --- @param start_is_boundary boolean|nil Input owner state captured with the complete buffer.
 --- @return string|nil Preview text, or nil.
 function M.preview(buffer, start_is_boundary)
-	if not _enabled then return nil end
+	if not M.is_enabled() then return nil end
 	if type(buffer) ~= "string" or buffer == "" then return nil end
 
 	local ok_eng, Engine = pcall(require, "dynamic_hotstrings")
@@ -685,6 +697,7 @@ M.set_user_code_enabled = UserCode.set_enabled
 M.user_code_source_path = UserCode.source_path
 M.user_code_count = UserCode.count
 M.create_user_code_example = UserCode.create_example
+M.user_code_problem = UserCode.problem
 M.set_user_code_time_activation = UserCode.set_time_activation
 M.user_code_is_enabled = UserCode.is_enabled
 M.user_code_time_activation = UserCode.time_activation
@@ -710,14 +723,40 @@ function M.get_letters()
 	return copy
 end
 
+--- Captures fresh personal fields with an opaque source and initialization receipt.
+--- @return table|nil receipt Private edit capability, never a page payload.
+--- @return table|nil info Detached fields from the exact captured file.
+--- @return table|nil letters Detached aliases from the same file.
+--- @return string|nil trigger Active trigger character.
+function M.capture_info_edit()
+	local path, generation, trigger = _info_path, _info_generation, _trigger_char
+	if type(path) ~= "string" or path == "" then return nil end
+	local read, content, status = pcall(TomlWriter.read_classified, path)
+	if not read or status ~= "ok" or type(content) ~= "string" then return nil end
+	local decoded, document = pcall(TomlCodec.decode, content)
+	if not decoded or type(document) ~= "table" or type(document.info) ~= "table"
+		or path ~= _info_path or generation ~= _info_generation or trigger ~= _trigger_char then return nil end
+	local info, letters, keys = {}, {}, {}
+	for key, value in pairs(document.info) do info[key], keys[key] = value, true end
+	for key, value in pairs(type(document.letters) == "table" and document.letters or {}) do letters[key] = value end
+	local receipt = {}
+	_info_edits[receipt] = { path = path, generation = generation, trigger = trigger,
+		keys = keys, source = { status = "ok", content = content } }
+	return receipt, info, letters, trigger
+end
+
+
 --- Persists edited personal-information fields and refreshes their live rules.
 ---
 --- Only fields present in the active source may be changed. This keeps a stale
 --- or foreign page from growing an arbitrary TOML namespace, while preserving
 --- user-defined fields that were valid when the editor opened.
 --- @param values table Map of field names to string values.
+--- @param receipt table|nil Opaque display source; omitted for an immediate API edit.
+--- @param admission function|nil Final page admission, rechecked by the native writer.
 --- @return boolean committed
-function M.save_info(values)
+--- @return table|nil next_receipt Receipt for only the acknowledged committed bytes.
+function M.save_info(values, receipt, admission)
 	if type(values) ~= "table" or next(values) == nil then
 		Logger.error(LOG, "Personal-info save requires at least one edited field.")
 		return false
@@ -727,9 +766,22 @@ function M.save_info(values)
 		return false
 	end
 
+	if admission ~= nil and type(admission) ~= "function" then return false end
+	if receipt == nil then receipt = M.capture_info_edit() end
+	local edit = type(receipt) == "table" and _info_edits[receipt] or nil
+	local function current()
+		if not edit or edit.path ~= _info_path or edit.generation ~= _info_generation
+			or edit.trigger ~= _trigger_char then return false end
+		if admission == nil then return true end
+		local called, admitted = pcall(admission)
+		return called and admitted == true and edit.path == _info_path
+			and edit.generation == _info_generation and edit.trigger == _trigger_char
+	end
+	if not current() then return false end
+
 	local keys = {}
 	for key, value in pairs(values) do
-		if type(key) ~= "string" or _info[key] == nil then
+		if type(key) ~= "string" or not edit.keys[key] then
 			Logger.error(LOG, "Personal-info save refused an unknown field '%s'.", tostring(key))
 			return false
 		end
@@ -745,21 +797,31 @@ function M.save_info(values)
 	for _, key in ipairs(keys) do
 		updates[#updates + 1] = { section = "info", key = key, value = values[key] }
 	end
-	local written, write_err = TomlWriter.batch_write(_info_path, updates)
+	local written, write_err, committed_content = TomlWriter.batch_write(edit.path, updates, nil, edit.source, nil, current)
 	if written ~= true then
 		Logger.error(LOG, "Personal-info publication failed: %s.", tostring(write_err))
 		return false
 	end
 
-	local was_enabled = _enabled
+	local was_enabled = M.is_enabled()
 	local refreshed = M.init({ trigger_char = _trigger_char, personal_info_path = _info_path })
 	if refreshed ~= true then
 		Logger.error(LOG, "Personal-info source committed but live rule refresh failed.")
 		return false
 	end
 	if not was_enabled then M.set_enabled(false) end
+	local next_receipt
+	local allowed = admission == nil
+	if admission ~= nil then local called, accepted = pcall(admission);allowed = called and accepted == true end
+	if allowed and type(committed_content) == "string" then
+		local captured = M.capture_info_edit()
+		local following = captured and _info_edits[captured]
+		if following and following.path == edit.path and following.source.content == committed_content then
+			next_receipt = captured
+		end
+	end
 	Logger.info(LOG, "Personal information saved and live rules refreshed.")
-	return true
+	return true, next_receipt
 end
 
 
@@ -872,7 +934,7 @@ end
 --- to filter on.
 --- @return table Array of mapping tables.
 function M.prefix_mappings()
-	if not _enabled then return {} end
+	if not M.is_enabled() then return {} end
 	local ok, Prefix = pcall(require, "modules.dynamic_hotstrings.prefix_rules")
 	if not ok or not Prefix then
 		Logger.error(LOG, "prefix_rules module unavailable — no prefix expansion is registered.")

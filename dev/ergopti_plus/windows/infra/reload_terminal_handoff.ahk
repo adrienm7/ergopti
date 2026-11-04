@@ -57,7 +57,7 @@ ReloadTerminalHandoffPrepare(Bundle, SuccessFn := 0, CommitFn := 0,
 		_ReloadTerminalHandoffNextId += 1
 		Record := Map("id", _ReloadTerminalHandoffNextId, "bundle", Bundle,
 			"success", SuccessFn, "commit", CommitFn, "abort", AbortFn,
-			"refused", RefusedFn, "release", ReleaseFn, "retract", RetractFn,
+			"refused", RefusedFn, "refusal_observers", Map(), "release", ReleaseFn, "retract", RetractFn,
 			"port", 0, "successor", 0, "launch_tick", 0,
 			"stall_reported", false, "probe_failure_reported", false,
 			"state", "authorized", "stop_mode", "", "stop_origin", "",
@@ -68,7 +68,8 @@ ReloadTerminalHandoffPrepare(Bundle, SuccessFn := 0, CommitFn := 0,
 			"stop_probe_reported", false, "compensation_done", false,
 			"compensation_ok", false, "resume_exit", 0, "resume_armed", false,
 			"delivery_armed", false, "delivery_done", false,
-			"close_attempted", false, "close_acknowledged", false)
+			"close_attempted", false, "close_acknowledged", false,
+			"retry_started", 0, "retry_deferred", false, "retry_armed", false)
 		_ReloadTerminalHandoff := Record
 		return Record
 	} finally Critical(PreviousCritical)
@@ -92,6 +93,28 @@ ReloadTerminalHandoffClaim(ExitReason) {
 			return false
 		Record["state"] := "claimed"
 		return Record
+	} finally Critical(PreviousCritical)
+}
+
+/**
+ * Subscribes to the exact pending successor's terminal refusal. Joined clients
+ * observe the owner instead of replacing its configuration-repair callback.
+ * @param {Map} Record The pending hand-off returned by the lifecycle owner.
+ * @param {Object} Owner Stable client identity; a new request replaces its callback.
+ * @param {Func} Callback Receives the refusal reason after native retirement.
+ * @returns {Boolean} Whether the exact pending owner admitted the observer.
+ */
+ReloadTerminalHandoffObserveRefusal(Record, Owner, Callback) {
+	if !(Owner is Object)
+		throw TypeError("A reload refusal observer needs an owner identity.")
+	if !HasMethod(Callback, "Call")
+		throw TypeError("A reload refusal observer must be callable.")
+	PreviousCritical := Critical("On")
+	try {
+		if !_ReloadTerminalHandoffOwns(Record) || Record["state"] != "pending"
+			return false
+		Record["refusal_observers"][Owner] := Callback
+		return true
 	} finally Critical(PreviousCritical)
 }
 
@@ -181,6 +204,7 @@ _ReloadTerminalHandoffFinishNonCritical(Record, BeforeSuccessFn) {
 		; All validation that may refuse happens before the teardown callback.
 		; Clearing the global makes the accepted record terminal and single-use.
 		Record["state"] := "finishing"
+		Record["refusal_observers"] := Map()
 		_ReloadTerminalHandoff := false
 	} finally Critical(PreviousCritical)
 	try {
@@ -419,6 +443,103 @@ _ReloadTerminalHandoffWatch(Record, *) {
 	return true
 }
 
+; An OnExit gate refused only because a thread OnExit interrupted still holds its
+; state (a log flush, a keystats flush). That thread can resume only once OnExit
+; returns, so nothing inside OnExit can wait for it. The successor is still blocked
+; on this window, polling for it to close, and asks only once: the record goes back
+; to pending, the successor is left alone, and the same exit is retried here when
+; the gate's state settles. Only a claim, before any commit, can be returned.
+; @param Retry {Object} Settled() -> Boolean, Run() re-enters OnExit, BudgetMs, PollMs.
+; @returns {Boolean} False when the caller must refuse the reload for real.
+ReloadTerminalHandoffDeferClaim(ExitReason, Retry) {
+	global _ReloadTerminalHandoff
+	if !(ExitReason is String) || StrCompare(ExitReason, "Reload", true) != 0
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		Record := _ReloadTerminalHandoff
+		if !(Record is Map) || Record["state"] != "claimed"
+			return false
+		Port := Record["port"]
+		Now := Port["now"].Call()
+		; The budget spans every retry of this reload: a gate that keeps refusing
+		; ends in the real refusal, not in a new wait.
+		if Record["retry_deferred"] && TickExpired(Record["retry_started"], Retry.BudgetMs, Now)
+			return false
+		if !_ConfigWriteTerminalCancelShutdown(Record["bundle"])
+			|| !_ConfigWriteTerminalAuthorize(Record["bundle"])
+			return false
+		if !Record["retry_deferred"] {
+			Record["retry_deferred"] := true
+			Record["retry_started"] := Now
+		}
+		Record["state"] := "pending"
+	} catch as Err {
+		try LoggerError("Lifecycle", "A refused reload could not go back to pending: {1}.", Err.Message)
+		return false
+	} finally Critical(PreviousCritical)
+	return _ReloadTerminalHandoffArmRetry(Record, Retry)
+}
+
+_ReloadTerminalHandoffArmRetry(Record, Retry) {
+	if Record["retry_armed"]
+		return true
+	Record["retry_armed"] := true
+	try {
+		Record["port"]["arm"].Call(_ReloadTerminalHandoffRetryPoll.Bind(Record, Retry), Retry.PollMs)
+		return true
+	} catch as Err {
+		Record["retry_armed"] := false
+		try LoggerError("Lifecycle", "The retry of the reload could not be armed: {1}.", Err.Message)
+		return false
+	}
+}
+
+; One look at a deferred reload. Any other outcome of the record (an ordinary exit
+; that superseded it, a refusal) already owns what happens next.
+_ReloadTerminalHandoffRetryPoll(Record, Retry, *) {
+	global _ReloadTerminalHandoff
+	Record["retry_armed"] := false
+	PreviousCritical := Critical("On")
+	try {
+		if !(_ReloadTerminalHandoff is Map) || (_ReloadTerminalHandoff != Record)
+				|| Record["state"] != "pending"
+			return false
+	} finally Critical(PreviousCritical)
+	Port := Record["port"]
+	; Accepting the retry ends this process: it must never run without a successor.
+	try Alive := Port["alive"].Call(Record["successor"])
+	catch as Err {
+		try LoggerError("Lifecycle", "The successor of a deferred reload could not be probed: {1}.", Err.Message)
+		Alive := true
+		Settled := false
+	}
+	if !Alive
+		return ReloadTerminalHandoffRefuse(Record, "the successor exited while the reload was deferred")
+	if !IsSet(Settled) {
+		try Settled := Retry.Settled.Call()
+		catch as Err {
+			try LoggerError("Lifecycle", "A deferred reload could not read its gate: {1}.", Err.Message)
+			Settled := false
+		}
+	}
+	if Settled {
+		try LoggerInfo("Lifecycle", "The interrupted work settled; retrying the same reload.")
+		try Retry.Run.Call()
+		catch as Err {
+			try LoggerError("Lifecycle", "The retry of the reload raised: {1}.", Err.Message)
+			return ReloadTerminalHandoffRefuse(Record, "the retry of the reload raised")
+		}
+		return true
+	}
+	if TickExpired(Record["retry_started"], Retry.BudgetMs, Port["now"].Call())
+		return ReloadTerminalHandoffRefuse(Record,
+			"the interrupted work did not settle within " . Retry.BudgetMs . " ms")
+	if !_ReloadTerminalHandoffArmRetry(Record, Retry)
+		return ReloadTerminalHandoffRefuse(Record, "the retry of the reload could not be armed")
+	return false
+}
+
 ; Withdraws a launched reload. The successor is stopped first, while this code
 ; still runs before any rollback, so no close request of its own can race the
 ; rollback. Pause intent is withdrawn here: AbortFn removes what was only
@@ -492,6 +613,7 @@ _ReloadTerminalHandoffDeliverRefusal(Record, Reason, *) {
 		catch as Err
 			try LoggerError("Lifecycle", "Reload refusal callback failed: {1}.", Err.Message)
 	}
+	_ReloadTerminalHandoffNotifyObservers(Record, Reason)
 	ReleaseFn := Record["release"]
 	if HasMethod(ReleaseFn, "Call") {
 		try ReleaseFn.Call()
@@ -501,6 +623,17 @@ _ReloadTerminalHandoffDeliverRefusal(Record, Reason, *) {
 	if !_ReloadTerminalHandoffCloseSuccessor(Record)
 		_ReloadTerminalHandoffRetainCloseDebt(Record)
 	return true
+}
+
+/** Retires each exact client's terminal subscription before invoking it. */
+_ReloadTerminalHandoffNotifyObservers(Record, Reason) {
+	Observers := Record["refusal_observers"]
+	Record["refusal_observers"] := Map()
+	for _, Observer in Observers {
+		try Observer.Call(Reason)
+		catch as Err
+			try LoggerError("Lifecycle", "Reload refusal observer failed: {1}.", Err.Message)
+	}
 }
 
 ; An ordinary exit accepted while the successor is still loading supersedes the
@@ -521,6 +654,7 @@ ReloadTerminalHandoffAbandon(Record, ExitReason) {
 			Record["state"] := "abandoned"
 			_ReloadTerminalHandoffReleaseOwner(Record)
 		} finally Critical(PreviousOwnershipCritical)
+		_ReloadTerminalHandoffNotifyObservers(Record, "reload superseded by exit: " . ExitReason)
 		Closed := _ReloadTerminalHandoffCloseSuccessor(Record)
 		if !Closed
 			_ReloadTerminalHandoffRetainCloseDebt(Record)

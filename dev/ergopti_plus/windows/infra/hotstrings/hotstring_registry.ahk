@@ -20,6 +20,7 @@
 ;    comparable with the live registrations.
 ;
 ; Included by infra/hotstrings/hotstring_prefix_watcher.ahk.
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\..\..\_generated\personal_file_descriptors.ahk
 #Include personal_file_controls.ahk
 ; ==============================================================================
@@ -96,11 +97,11 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "", PathOver
 	;    Features v2 uses snake_case with underscores.
 	V2Cat := Category
 	if (V2Cat == "distancesreduction")
-		V2Cat := "distances_reduction"
+		V2Cat := ConfigLeaf.DISTANCES_REDUCTION
 	else if (V2Cat == "sfbsreduction")
-		V2Cat := "sfbs_reduction"
+		V2Cat := ConfigLeaf.SFBS_REDUCTION
 	else if (V2Cat == "magickey")
-		V2Cat := "magic_key"
+		V2Cat := ConfigLeaf.MAGIC_KEY
 
 	if !Features.Has("hotstrings") or !Features["hotstrings"].Has(V2Cat) {
 		return 0
@@ -223,6 +224,10 @@ HS_EnumeratePersonalExtFiles() {
 			if !(A_LoopFileName ~= "i)\.toml$")
 				continue
 			if (Prefix == "" and A_LoopFileName == "personal_hotstrings.toml")
+				continue
+			; A writer backup duplicates its source's triggers and would itself be
+			; backed up by the next scoped reset.
+			if PersonalFileIsBackup(A_LoopFileName)
 				continue
 			SplitPath OwnedChildPath, , , , &Stem
 			Found.Push(Map("Path", OwnedChildPath,
@@ -381,11 +386,11 @@ _RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "")
 	;    lowercase but Features v2 uses snake_case (same remap as the TOML path).
 	V2Cat := Category
 	if (V2Cat == "distancesreduction")
-		V2Cat := "distances_reduction"
+		V2Cat := ConfigLeaf.DISTANCES_REDUCTION
 	else if (V2Cat == "sfbsreduction")
-		V2Cat := "sfbs_reduction"
+		V2Cat := ConfigLeaf.SFBS_REDUCTION
 	else if (V2Cat == "magickey")
-		V2Cat := "magic_key"
+		V2Cat := ConfigLeaf.MAGIC_KEY
 	if !Features.Has("hotstrings") or !Features["hotstrings"].Has(V2Cat) {
 		return 0
 	}
@@ -483,8 +488,9 @@ _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStric
 	LowerTrig := StrLower(Trigger)
 	TitleTrig := StrTitle(Trigger)
 	UpperTrig := StrUpper(Trigger)
-	_AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
-	_AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
+	; The replacement keeps its own capitals, as CreateCaseSensitiveHotstrings fires it.
+	_AddTriggerToIndex(LowerTrig, Output, Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
+	_AddTriggerToIndex(TitleTrig, _HSE_ReplTitle(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
 	MagicSuffix := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
 		? ScriptInformation["MagicKey"] : "★"
 	BodyLen := StrLen(RTrim(Trigger, MagicSuffix))

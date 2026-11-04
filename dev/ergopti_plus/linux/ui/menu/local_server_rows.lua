@@ -14,18 +14,26 @@ local function format(key, ...)
 	return (I18n.get(key):gsub("{(%d+)}", function(index) return tostring(values[tonumber(index)] or "") end))
 end
 
---- Configuration remains available while the prediction master is OFF.
-function M.rows(llm, dialogs, changed, context)
+--- The rows are inert and no sweep probes a server while the AI is off, as on
+--- Windows and macOS (issue #97); switching the AI on rebuilds and sweeps them.
+--- The options of the shared local-server projection, with this driver's actions.
+--- @return table options For llm.local_server_menu rows or page_rows.
+local function server_options(llm, dialogs, changed, context)
 	local function admit()
 		return type(context) == "table" and type(context.is_paused) == "function"
 			and context.paused ~= true and context.is_paused() ~= true
 			and type(llm.can_configure_local_servers) == "function" and llm.can_configure_local_servers() == true
 	end
+	local function ai_on()
+		return type(llm.is_enabled) == "function" and llm.is_enabled() == true
+	end
+	-- The sweep's own fences recheck the switch: one switched off mid-sweep publishes nothing.
+	local function sweep_admit() return admit() and ai_on() end
 	local function redraw() if type(changed) == "function" then changed() end end
 	local function rescan()
-		return Servers.rescan(admit, function(changed_models) if changed_models then redraw() end end)
+		return Servers.rescan(sweep_admit, function(changed_models) if changed_models then redraw() end end)
 	end
-	if admit() and Servers.is_stale() then rescan() end
+	if sweep_admit() and Servers.is_stale() then rescan() end
 	local receipts = {}
 	for _, id in ipairs(Servers.order()) do receipts[id] = Servers.capture(id) end
 	local function apply(id, fields)
@@ -67,11 +75,26 @@ function M.rows(llm, dialogs, changed, context)
 		-- rechecked after the blocking dialog, before the private publisher.
 		return apply(id, { [key] = value })
 	end
-	return Menu.rows({ order = Servers.order(), servers = Servers.servers(), detected = Servers.detected(),
-		result = Servers.result, sweeping = Servers.is_sweeping(), paused = not admit(),
+	return { order = Servers.order(), servers = Servers.servers(), detected = Servers.detected(),
+		result = Servers.result, sweeping = Servers.is_sweeping(), paused = not sweep_admit(),
+		entry_id = function(id) local target = Servers.target(id); return target and target.entry_id end,
 		backend = llm.get_backend(), active = Entries.active(), tr = I18n.get, format = format,
 		actions = { select = function(id, model) return apply(id, { model = model }) end,
 			address = function(id) return prompt(id, "base_url") end,
-			key = function(id) return prompt(id, "token") end, rescan = rescan } })
+			key = function(id) return prompt(id, "token") end, rescan = rescan } }
 end
+
+--- The local servers as shared menu rows, with this driver's actions: the
+--- projection the behaviour suite drives (the page reads page_rows below).
+--- @return table rows
+function M.rows(llm, dialogs, changed, context)
+	return Menu.rows(server_options(llm, dialogs, changed, context))
+end
+
+--- The local servers' rows of the model selector page, and the API group's tools.
+--- @return table rows, table tools As llm.local_server_menu.page_rows.
+function M.page_rows(llm, dialogs, changed, context)
+	return Menu.page_rows(server_options(llm, dialogs, changed, context))
+end
+
 return M

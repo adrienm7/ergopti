@@ -19,10 +19,11 @@
 ; =====================================
 ; =====================================
 
-; Ollama server port. The default lives in exactly ONE place —
-; _shared/modules/llm/defaults.json (llm_ollama_port). The user can override it
-; from the tray menu (persisted under [llm] ollama_port in config.toml) when they
-; run the daemon on a non-standard port. Sentinel 0 — sourced at boot from
+; Port of the Ollama Ergopti runs itself. The default lives in exactly ONE place —
+; _shared/modules/llm/defaults.json (llm_ollama_owned_port); a user's own Ollama
+; keeps the stock port and is never contacted. The user can move Ergopti's daemon
+; from the tray menu (persisted under [llm] ollama_port in config.toml), never onto
+; the stock port. Sentinel 0 — sourced at boot from
 ; LLM_Defaults by LLM_Ollama_LoadDefaults() (well before any request fires).
 ; LLM_OLLAMA_BASE_URL is DERIVED from it; change both via LLM_Ollama_SetPort.
 global LLM_OLLAMA_PORT     := 0
@@ -246,6 +247,9 @@ LLM_AuxBegin(Kind, Context := 0) {
 			"cancel", 0,
 			"finalizer", 0,
 			"cleanup_claimed", false)
+		; The lexical origin capability must survive this explicit context projection.
+		if Context.Has("origin_custody")
+			Owner["origin_custody"] := Context["origin_custody"]
 		_LLM_AuxOwners[Kind] := Owner
 	} finally Critical(PreviousCritical)
 	if Retired is Map
@@ -312,12 +316,24 @@ _LLM_AuxRunScheduled(Owner, TimerFn, Callback) {
 	return true
 }
 
+; A callable object supplies its own exact timer identity without a closure
+; capturing the variable that stores that same closure indefinitely.
+class _LLM_AuxScheduledCallback {
+	__New(Owner, Callback) {
+		this.Owner := Owner
+		this.Callback := Callback
+	}
+
+	Call(*) {
+		return _LLM_AuxRunScheduled(this.Owner, this, this.Callback)
+	}
+}
+
 LLM_AuxSchedule(Owner, Callback, Period, ScheduleFn := 0, RetainOnFailure := false) {
 	if !HasMethod(Callback, "Call")
 		throw TypeError("An auxiliary LLM timer requires a callable callback.")
 	DelayMs := Max(1, Abs(Period))
-	TimerFn := 0
-	TimerFn := (*) => _LLM_AuxRunScheduled(Owner, TimerFn, Callback)
+	TimerFn := _LLM_AuxScheduledCallback(Owner, Callback)
 	PredecessorError := 0
 	ScheduleError := 0
 	PreviousCritical := Critical("On")
@@ -455,9 +471,9 @@ global LLM_OLLAMA_KEEP_ALIVE := ""
 global LLM_OLLAMA_TIMEOUT  := 180000  ; ms (3 min) — cold CPU inference headroom
 
 ; DELETE /api/delete round-trip ceiling for LLM_OllamaDeleteModel_Async.
-; Mirrors the retired blocking version's WinHTTP receive timeout so observed
-; behaviour is unchanged — only non-blocking now (F24).
-global LLM_OLLAMA_DELETE_TIMEOUT_MS := 10000  ; ms
+; Sentinel 0 — sourced at boot by LLMApiLoadTimings() ([llm]
+; ollama_delete_timeout_ms), the value the Linux model delete reads too.
+global LLM_OLLAMA_DELETE_TIMEOUT_MS := 0
 
 ; Polling interval for the async path. 50 ms is the same cadence the HS side
 ; effectively gets from hs.http.asyncPost's underlying CFRunLoop tick — fine
@@ -475,8 +491,9 @@ global LLM_OLLAMA_POLL_MS := 0
 ; TimingsGet on a missing key.
 LLMApiLoadTimings() {
 	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS, LLM_INSTALLED_CACHE_TTL_MS
-	global LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
+	global LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS, LLM_OLLAMA_DELETE_TIMEOUT_MS
 	LLM_OLLAMA_POLL_MS         := TimingsGet("llm", "poll_interval_ms")
+	LLM_OLLAMA_DELETE_TIMEOUT_MS := TimingsGet("llm", "ollama_delete_timeout_ms")
 	LLM_REMOTE_TIMEOUT_MS      := TimingsGet("llm", "request_timeout_ms")
 	LLM_REMOTE_READY_PING_DEADLINE_MS := TimingsGet("llm", "request_timeout_ms")
 	LLM_REMOTE_POLL_MS         := TimingsGet("llm", "poll_interval_ms")
@@ -485,18 +502,18 @@ LLMApiLoadTimings() {
 }
 
 ; Source the Ollama port default from the shared registry (LLM_Defaults, loaded
-; from _shared/modules/llm/defaults.json) at boot — keeps 11434 in exactly one
+; from _shared/modules/llm/defaults.json) at boot — keeps the port in exactly one
 ; place. Mirrors LLMApiLoadTimings; called right after it in infra/boot.ahk, after
 ; LLM_Defaults_Load(). The per-user override is applied later by LLM_Menu_Init.
 LLM_Ollama_LoadDefaults(SetPortFn := 0) {
 	global LLM_Defaults, LLM_OLLAMA_KEEP_ALIVE
 	if !IsSet(LLM_Defaults) || !(LLM_Defaults is Map)
 		return false
-	if !LLM_Defaults.Has("llm_ollama_port")
+	if !LLM_Defaults.Has("llm_ollama_owned_port")
 			|| !LLM_Defaults.Has("llm_ollama_keep_alive")
 		return false
 	if !LLM_Option_TryNormalizeOllamaPort(
-			LLM_Defaults["llm_ollama_port"], &NormalizedPort)
+			LLM_Defaults["llm_ollama_owned_port"], &NormalizedPort)
 		return false
 	if !(LLM_Defaults["llm_ollama_keep_alive"] is String)
 		return false
@@ -553,6 +570,8 @@ global _LLM_Ollama_WarmupGeneration := 0
 ; Tracks the current in-flight warmup WinHTTP object so overlapping retries can
 ; abort the previous request before issuing a new one — prevents object leaks
 global _LLM_Ollama_WarmupHttp := 0
+; Closed observation of one admitted request; never a fresh acquisition receipt.
+global _LLM_Ollama_WarmupPendingFn := 0
 ; Warmup uses a shorter ceiling than real predictions — a hung warmup must not
 ; block the server for 3 min while the user is typing real requests.
 global LLM_OLLAMA_WARMUP_TIMEOUT := 90000

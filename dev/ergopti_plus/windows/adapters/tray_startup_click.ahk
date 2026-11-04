@@ -10,6 +10,26 @@
 
 #Requires AutoHotkey v2.0
 
+/**
+ * Whether a tray clicked during boot may open: the configured root exists and
+ * input is ready. An open native menu stops the auto-execute thread, so opening
+ * it before the keyboard is ready stalled whole boots (maintainer decision,
+ * 3 November 2026).
+ * @param {Boolean} MenuReady - The configured root is published.
+ * @param {Boolean} InputPending - Input initialization is still running.
+ * @returns {Boolean}
+ */
+TrayStartupClickReady(MenuReady, InputPending) {
+	return MenuReady && !InputPending
+}
+
+/** TrayStartupClickReady on the driver's boot state; unset state is not ready. */
+TrayStartupClickReadyNow() {
+	global _DriverMenuReady, _DriverInputInitPending
+	return TrayStartupClickReady(IsSet(_DriverMenuReady) && _DriverMenuReady,
+		!IsSet(_DriverInputInitPending) || _DriverInputInitPending)
+}
+
 class TrayStartupClick {
 	/**
 	 * Installs one notification owner for a driver instance.
@@ -106,10 +126,30 @@ class TrayStartupClick {
 				this.CloseFn.Call()
 			return false
 		}
+		Generation := this.Generation
 		this.Pending := false
 		this.Scheduled := true
-		this.ScheduleFn.Call(ObjBindMethod(this, "ShowPending", this.Generation), -1)
+		try this.ScheduleFn.Call(ObjBindMethod(this, "ShowPending", Generation), -1)
+		catch as Err {
+			this._RetainPending(Generation)
+			throw Err
+		}
 		return true
+	}
+
+	/** Retains undelivered navigation without reviving a canceled generation. */
+	_RetainPending(Generation) {
+		PreviousCritical := Critical("On")
+		try {
+			if Generation != this.Generation
+				return false
+			; The failed producer may already hold its callback. Revoke that
+			; exact generation before a fresh readiness notification can retry.
+			this.Generation += 1
+			this.Pending := true
+			this.Scheduled := false
+			return true
+		} finally Critical(PreviousCritical)
 	}
 
 	CancelPending() {
@@ -119,8 +159,15 @@ class TrayStartupClick {
 	}
 
 	ShowPending(Generation) {
-		if Generation != this.Generation || !this.ReadyFn.Call()
-			return
+		if Generation != this.Generation
+			return false
+		Ready := this.ReadyFn.Call()
+		if Generation != this.Generation
+			return false
+		if !Ready {
+			this._RetainPending(Generation)
+			return false
+		}
 		this.Scheduled := false
 		try LoggerInfo("BootProfile", Format("Opening the ready tray after {1} early request(s); request wait={2} ms.",
 			this.RequestCount, TickElapsed(this.RequestedAt)))

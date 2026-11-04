@@ -19,10 +19,11 @@ local i18n   = require("infra.i18n")
 local ManifestReader = require("infra.manifest_reader")
 local Languages = require("hotstrings.languages")
 local PersonalFiles = require("hotstrings.personal_files")
+local ConfigKeys = require("config_keys")
 local LOG    = "keymap.registry"
 
 local _state = nil
-local _repeat_enabled = ManifestReader.default_for("hotstrings.repeat_key_enabled")
+local _repeat_enabled = ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED)
 
 --- Guard: verifies that M.setup() was called before any state-dependent public
 --- function. Mirrors registry_groups.lua's require_state verbatim (section 5.8).
@@ -363,14 +364,21 @@ end
 --- @param targets table Dense category ids from the discovered registry.
 --- @param enabled boolean
 --- @param publish function|nil Persistence owner callback returning exact true.
+--- @param excluded table|nil group -> { section = true } drawn by another
+---   submenu (an extension's bound sections), which this scope never switches.
 --- @return boolean committed
-function M.set_category_scope_enabled(targets, enabled, publish)
+function M.set_category_scope_enabled(targets, enabled, publish, excluded)
 	if not require_state("set_category_scope_enabled") then return false end
+	if excluded ~= nil and type(excluded) ~= "table" then
+		Logger.error(LOG, "set_category_scope_enabled: excluded sections must be a table.")
+		return false
+	end
 	local inventory = {}
 	for id in pairs(Groups.list_groups()) do
 		inventory[id] = {}
+		local skip = excluded and excluded[id] or {}
 		for _, section in ipairs(M.get_sections(id) or {}) do
-			if Languages.section_actionable(ManifestReader.features(), id, section) then
+			if not skip[section.name] and Languages.section_actionable(ManifestReader.features(), id, section) then
 				inventory[id][#inventory[id] + 1] = section.name
 			end
 		end

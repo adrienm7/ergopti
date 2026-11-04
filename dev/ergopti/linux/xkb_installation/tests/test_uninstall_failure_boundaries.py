@@ -19,10 +19,9 @@ class UninstallFailureBoundaryTests(unittest.TestCase):
         installer = Path(__file__).resolve().parents[1] / "install.sh"
         for method in ("clean", "legacy"):
             for refusal in (False, True):
-                with (
-                    self.subTest(method=method, refusal=refusal),
-                    tempfile.TemporaryDirectory() as temporary,
-                ):
+                with self.subTest(
+                    method=method, refusal=refusal
+                ), tempfile.TemporaryDirectory() as temporary:
                     root = Path(temporary)
                     binaries = root / "bin"
                     binaries.mkdir()

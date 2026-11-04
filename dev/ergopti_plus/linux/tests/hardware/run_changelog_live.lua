@@ -39,13 +39,31 @@ local Gtk = lgi.require("Gtk", "3.0")
 -- refused with HTTP 403 on a release run. The shell expands the variable.
 local auth = os.getenv("GITHUB_TOKEN") and " -H \"Authorization: Bearer $GITHUB_TOKEN\"" or ""
 local pipe = io.popen("curl -fsS --max-time 20" .. auth
-	.. " 'https://api.github.com/repos/adrienm7/ergopti/releases?per_page=1'")
-local latest_json = pipe and pipe:read("*a") or ""
+	.. " 'https://api.github.com/repos/adrienm7/ergopti/releases?per_page=100'")
+local releases_json = pipe and pipe:read("*a") or ""
 if pipe then pipe:close() end
-local latest = latest_json:match('"tag_name"%s*:%s*"([^"]+)"')
-if not latest then abort("GitHub's release API is unreachable.") end
-local latest_is_prerelease = latest_json:match('"prerelease"%s*:%s*true') ~= nil
-print("  newest published release: " .. latest .. (latest_is_prerelease and " (prerelease)" or ""))
+-- The repository also publishes releases that are not Ergopti versions (the
+-- Linux remap runtime, remap-runtime-v…), which the page rightly never lists:
+-- the head is the highest Ergopti version, as the page orders them.
+local function version_key(tag)
+	local major, minor, patch, pre = tag:match("^v(%d+)%.(%d+)%.(%d+)(.*)$")
+	if not major then return nil end
+	local pre_number = tonumber(pre:match("(%d+)$") or "0")
+	return { tonumber(major), tonumber(minor), tonumber(patch), pre == "" and 1 or 0, pre_number }
+end
+local function newer(a, b)
+	for i = 1, #a do
+		if a[i] ~= b[i] then return a[i] > b[i] end
+	end
+	return false
+end
+local latest, latest_key = nil, nil
+for tag in releases_json:gmatch('"tag_name"%s*:%s*"([^"]+)"') do
+	local key = version_key(tag)
+	if key and (not latest_key or newer(key, latest_key)) then latest, latest_key = tag, key end
+end
+if not latest then abort("GitHub's release API is unreachable or lists no Ergopti release.") end
+print("  newest published Ergopti release: " .. latest)
 
 local Manager = require("ui.webview_manager")
 local Updater = require("modules.updater.manager")

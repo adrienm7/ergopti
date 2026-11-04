@@ -13,7 +13,7 @@
 --- 1. One collector per section, each isolated: a report exists to be read
 ---    when things are broken, so one collector raising costs its own section,
 ---    never the window. Phase A reads /proc, /sys and daemon memory only.
---- 2. The probes (api.github.com, the AI backend, kanata and df) run as curl
+--- 2. The probes (api.github.com, the AI backend and df) run as curl
 ---    and child processes owned by libuv; their answers are pushed into the
 ---    page only while the page they were started for is still open.
 --- 3. Every page message is validated by healthcheck.actions before anything
@@ -23,6 +23,8 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 M.bridge_name = "healthcheck"
 
 local Logger = require("logger.shim")
@@ -46,7 +48,7 @@ local _started_at = os.time()
 -- RuntimeGuard.optional_require, but the user can switch them off: switched
 -- off is a neutral "disabled"; absent means the module failed to load (logged
 -- by the guard), which is a failure.
-local REQUIRED_PARTS = { "engine", "keylogger", "config" }
+local REQUIRED_PARTS = { "engine", "keystats", "config" }
 local OPTIONAL_PARTS = { "llm" }
 
 -- The evdev bus numbers of /proc/bus/input/devices, as schema buses
@@ -59,6 +61,7 @@ local _config = nil
 -- The state of the window's current page: its epoch, whether details are
 -- included, its last snapshot and its running probes
 local _session = nil
+local _action_revision = 0
 
 
 
@@ -172,7 +175,7 @@ end
 local function machine_model()
 	local vendor = read_file("/sys/class/dmi/id/sys_vendor")
 	local product = read_file("/sys/class/dmi/id/product_name")
-	local text = ((vendor or "") .. " " .. (product or "")):gsub("%s+", " "):match("^%s*(.-)%s*$")
+	local text = TextUtils.trim((((vendor or "") .. " " .. (product or "")):gsub("%s+", " ")))
 	return text ~= "" and text or nil
 end
 
@@ -230,11 +233,34 @@ local function process_memory(status)
 	return kib and tonumber(kib) * 1024 or nil
 end
 
+--- The applications with a window on screen, as the other two drivers list them
+--- (opt-in, process names only). Wayland has no cross-client window enumeration
+--- (no compositor exposes one), so the field is left out there rather than shown
+--- as an empty list, which would read as "nothing is open".
+--- @return table|nil Sorted process names, nil when the session cannot list windows.
+local function running_apps()
+	if not require("infra.display_server").is_x11() then
+		Logger.info(LOG, "Open applications are not listed: this session is not X11 and Wayland exposes no window list.")
+		return nil
+	end
+	local list, seen = {}, {}
+	for _, info in ipairs(require("adapters.window_info").getAll()) do
+		local app = type(info) == "table" and info.appId or nil
+		if type(app) == "string" and app ~= "" and info.windowTitle ~= "" and not seen[app] then
+			seen[app] = true
+			list[#list + 1] = app
+		end
+	end
+	table.sort(list)
+	return list
+end
+
 --- The system section and its load.
 --- @param facts table system_facts()
 --- @param state table Daemon state.
+--- @param detailed boolean Whether the user ticked "Include details".
 --- @return table
-local function collect_system(facts, state)
+local function collect_system(facts, state, detailed)
 	local layout = state.layout
 	local status = read_file("/proc/self/status")
 	return {
@@ -248,6 +274,7 @@ local function collect_system(facts, state)
 		process_memory  = process_memory(status),
 		uptime          = os.time() - _started_at,
 		elevated        = elevated(status),
+		running_apps    = detailed == true and running_apps() or nil,
 	}
 end
 
@@ -309,7 +336,7 @@ local function collect_features(state)
 	local ok_manager, Manager = pcall(require, "platform.remap.manager")
 	if ok_manager then add("tapholds", Manager.tap_holds_enabled()) end
 	add("llm", module_enabled(state.llm))
-	add("metrics", module_enabled(state.keylogger))
+	add("metrics", module_enabled(state.keystats))
 	return { items = items }
 end
 
@@ -343,6 +370,22 @@ local function device_access(path, mode)
 	return "unknown"
 end
 
+--- Whether the daemon may write a device node, asked through access(2).
+--- Opening for writing from Lua means O_CREAT: with the uinput module absent, a
+--- root daemon created a regular file at /dev/uinput that the writer then took
+--- for the device. access(2) answers the same question and creates nothing.
+--- @param path string
+--- @return string "granted", "missing" or "unknown"
+local function device_writable(path)
+	local allowed, err = require("luv").fs_access(path, "W")
+	if allowed == true then return "granted" end
+	-- false: absent, or present and not writable by this user
+	if allowed == false then return "missing" end
+	Logger.warn(LOG, "Diagnostics could not check %s: %s.", path, tostring(err))
+	return "unknown"
+end
+M._device_writable_for_test = device_writable
+
 --- The devices /proc/bus/input/devices lists, one table per block.
 --- @return table
 local function input_devices()
@@ -375,7 +418,7 @@ local function collect_permissions(ids)
 	end
 	local readers = {
 		input_devices = function() return event and device_access(event, "rb") or "unknown" end,
-		uinput        = function() return device_access("/dev/uinput", "ab") end,
+		uinput        = function() return device_writable(require("adapters.uinput_writer").UINPUT_PATH) end,
 	}
 	local items = {}
 	for _, id in ipairs(ids) do
@@ -384,6 +427,26 @@ local function collect_permissions(ids)
 		items[#items + 1] = { id = id, state = reader() }
 	end
 	return { items = items }
+end
+
+--- What the configuration probe works with: where the files live, the
+--- manifest, the decoder and a clock. The sections are filled by the probe
+--- (ui.healthcheck.probes), never by phase A.
+--- @param schema table The diagnostics schema.
+--- @param overrides table|nil Replacements for tests: features, path_of, open_fn, clock.
+--- @return table
+function M.configuration_context(schema, overrides)
+	overrides = overrides or {}
+	local names = schema.configuration.file_names
+	return {
+		schema   = schema,
+		driver   = M.DRIVER,
+		features = overrides.features or function() return require("infra.manifest_reader").features() end,
+		path_of  = overrides.path_of or function(id) return require("infra.config_paths").config(names[id]) end,
+		decode   = require("toml_codec").decode,
+		open_fn  = overrides.open_fn,
+		clock    = overrides.clock or function() return require("infra.monotonic").now_ms() end,
+	}
 end
 
 --- The keyboards, mice and touchpads the kernel lists: bus, kind and ids, and
@@ -488,30 +551,42 @@ end
 --- Builds the synchronous (phase A) snapshot.
 --- @param state table Daemon state.
 --- @param detailed boolean Whether the user ticked "Include details".
+--- @param extensive boolean Whether the user opted into the extensive checks.
+--- @param complete_local boolean|nil Collect the configuration now (a report from
+---   the Debug menu has no page to keep responsive).
 --- @return table
-function M.build_snapshot(state, detailed, extensive)
+function M.build_snapshot(state, detailed, extensive, complete_local)
 	state = type(state) == "table" and state or {}
 	-- The budget is the collection's: the shared documents load once per
 	-- session, before the clock starts
 	local schema = M.config().schema
 	local started = now_ms()
-	local facts = collect("system facts", function() return require("infra.diagnostic_snapshot").system_facts() end)
-	local permission_ids = {}
-	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
-	table.sort(permission_ids)
+	local timings = {}
+	local function collect_timed(name, fn)
+		local section_started = now_ms()
+		local value = collect(name, fn)
+		timings[#timings + 1] = { name = name, ms = now_ms() - section_started }
+		return value
+	end
+	local facts = collect_timed("system facts", function() return require("infra.diagnostic_snapshot").system_facts() end)
+	local permission_ids = TableUtil.sorted_keys(schema.permissions[M.DRIVER] or {})
 	local sections = {
-		paths       = collect("paths", function() return collect_paths(schema) end),
-		versions    = collect("versions", function() return collect_versions(facts) end),
-		hardware    = collect("hardware", function() return collect_hardware(facts) end),
-		system      = collect("system", function() return collect_system(facts, state) end),
-		input       = collect("input", function() return collect_input(state) end),
-		features    = collect("features", function() return collect_features(state) end),
-		ai          = collect("ai", function() return collect_ai(state) end),
+		paths       = collect_timed("paths", function() return collect_paths(schema) end),
+		versions    = collect_timed("versions", function() return collect_versions(facts) end),
+		hardware    = collect_timed("hardware", function() return collect_hardware(facts) end),
+		system      = collect_timed("system", function() return collect_system(facts, state, detailed == true) end),
+		input       = collect_timed("input", function() return collect_input(state) end),
+		features    = collect_timed("features", function() return collect_features(state) end),
+		-- Filled by the configuration probe: reading and decoding the files is far
+		-- over the phase A budget
+		configuration_files = { items = {} },
+		configuration = { items = {} },
+		ai          = collect_timed("ai", function() return collect_ai(state) end),
 		network     = {},
-		permissions = collect("permissions", function() return collect_permissions(permission_ids) end),
-		peripherals = collect("peripherals", function() return collect_peripherals(detailed == true) end),
-		issues      = collect("issues", collect_issues),
-		developer   = collect("developer", function() return collect_developer(state) end),
+		permissions = collect_timed("permissions", function() return collect_permissions(permission_ids) end),
+		peripherals = collect_timed("peripherals", function() return collect_peripherals(detailed == true) end),
+		issues      = collect_timed("issues", collect_issues),
+		developer   = collect_timed("developer", function() return collect_developer(state) end),
 	}
 	local snapshot = {
 		schema_version = schema.schema_version,
@@ -527,13 +602,17 @@ function M.build_snapshot(state, detailed, extensive)
 	-- Not a warning: the next snapshot would count it among the session's
 	-- problems. The report's developer section carries the duration.
 	if elapsed > schema.phase_a_budget_ms then
-		Logger.info(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget.", elapsed,
-			schema.phase_a_budget_ms)
+		Logger.info(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget%s.", elapsed,
+			schema.phase_a_budget_ms, Snapshot.slowest_collectors(timings, schema.phase_a_slowest_named))
 	end
 	local undeclared = Snapshot.check_fields(snapshot, schema)
 	if #undeclared > 0 then
 		Logger.error(LOG, "The diagnostics snapshot carries fields the schema does not declare: %s.",
 			table.concat(undeclared, ", "))
+	end
+	if complete_local == true then
+		local err = require("healthcheck.configuration").complete(snapshot, M.configuration_context(schema))
+		if err then Logger.error(LOG, "The configuration could not be collected: %s.", err) end
 	end
 	return snapshot
 end
@@ -577,8 +656,12 @@ end
 --- @param session table The exact window session being refreshed.
 local function archive_cleanup_metadata(session)
 	local rows = {}
+	local declared = M.config().schema.probes
 	for id, result in pairs(session.snapshot.probes) do
-		if result.state == "pending" or (result.cleanup ~= nil and result.cleanup ~= "settled") then
+		-- A local probe owns nothing outside the process (a timer and file
+		-- reads), so its cancellation leaves no cleanup to remember
+		local is_local = declared[id] ~= nil and declared[id]["local"] == true
+		if not is_local and (result.state == "pending" or (result.cleanup ~= nil and result.cleanup ~= "settled")) then
 			local copied = {}
 			for key, value in pairs(result) do copied[key] = value end
 			if copied.state == "pending" then copied.state, copied.cleanup = "cancelled", "pending" end
@@ -594,7 +677,7 @@ end
 --- @param state table Daemon state.
 local function start_probes(session, state)
 	cancel_probes(session)
-	if session.snapshot.extensive ~= true then return end
+	-- Without the extensive opt-in only the local probes run (the configuration)
 	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot.sections.paths, state,
 		function(id, result, sections)
 			if _session ~= session then return end
@@ -604,7 +687,7 @@ local function start_probes(session, state)
 				for key, value in pairs(values) do target[key] = value end
 			end
 			push(session, { type = "probe", id = id, result = result, sections = sections })
-		end)
+		end, { local_only = session.snapshot.extensive ~= true })
 end
 
 --- The first message of a page: its configuration and the first snapshot.
@@ -612,13 +695,15 @@ end
 --- @return table
 local function init_message(session)
 	local documents = M.config()
+	session.snapshot.export_revision = session.snapshot.export_revision or 1
 	return {
 		type = "init",
 		config = {
 			schema    = documents.schema,
 			redaction = documents.redaction,
 			context   = require("ui.healthcheck.report").redaction_context(),
-			mode      = session.mode,
+			-- The guided diagnostic collection is a Windows host action only.
+			capabilities = { diagnostic_collection = false },
 		},
 		snapshot = session.snapshot,
 	}
@@ -634,6 +719,17 @@ end
 -- ===============================
 -- ===============================
 
+--- Retires an action before cancellation can call back into this page.
+local function cancel_action(session)
+	_action_revision = _action_revision + 1
+	local revision = _action_revision
+	if not session then return revision end
+	local request = session.action_request
+	session.action_token, session.action_request = nil, nil
+	if request then request.cancel() end
+	return revision
+end
+
 --- Performs one validated action.
 --- @param session table
 --- @param action table From healthcheck.actions.
@@ -644,41 +740,92 @@ local function perform(session, action, state, context)
 	local Report = require("ui.healthcheck.report")
 	local documents = M.config()
 	if action.action == "export_snapshot" then
+		if not require("healthcheck.share").capture_page_checks(session.snapshot, action) then
+			return { type = "action", action = "export_snapshot", ok = false, export_sequence = action.export_sequence }
+		end
 		return { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
 			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key)).text }
+				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text }
+	end
+	if action.action == "day_log" then
+		-- Opt-in: ticking collects and redacts today's log; unticking drops it
+		local DayLogHost = require("healthcheck.day_log")
+		if not action.enabled then
+			DayLogHost.discard(session.snapshot)
+			return { type = "action", action = "day_log", ok = true, state = "off" }
+		end
+		Logger.start(LOG, "Collecting today's log for the report…")
+		local reply = DayLogHost.prepare(session.snapshot, documents, Report.redaction_context(), function(cap)
+			return DayLogHost.read_file(LoggerSink.main_log_path(), cap)
+		end)
+		if reply.state == "ready" then
+			Logger.success(LOG, "Today's log is ready: %d lines, %d bytes.", reply.lines, reply.bytes)
+		else
+			Logger.warn(LOG, "Today's log is not attachable: %s.", tostring(reply.state))
+		end
+		return reply
 	end
 	if action.action == "cancel" then
+		local revision = cancel_action(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		cancel_probes(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		for id, result in pairs(session.snapshot.probes) do
 			if result.state == "pending" then session.snapshot.probes[id] = { state = "cancelled", cleanup = "pending" } end
 		end
 		return { type = "action", action = "cancel", ok = true, snapshot = session.snapshot }
 	end
 	if action.action == "refresh" then
+		local revision = cancel_action(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		cancel_probes(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		archive_cleanup_metadata(session)
 		session.detailed = action.detailed
+		local revision = (session.snapshot.export_revision or 1) + 1
 		session.snapshot = M.build_snapshot(state, action.detailed, action.extensive)
+		session.snapshot.export_revision = revision
 		session.snapshot.retired_probes = session.cleanup_history
 		start_probes(session, state)
 		return { type = "snapshot", snapshot = session.snapshot }
 	end
 	if action.action == "close" then
+		local revision = cancel_action(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		cancel_probes(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		if context and type(context.close_owned_window) == "function" then context.close_owned_window() end
 		return nil
 	end
-	local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot)
-	result.type = "action"
-	result.action = action.action
-	return result
+	local revision = cancel_action(session)
+	if _session ~= session or revision ~= _action_revision then return nil end
+	local token = { snapshot = session.snapshot, revision = session.snapshot.export_revision }
+	session.action_token = token
+	local inline, answer, completed = true, nil, false
+	local function current()
+		return _session == session and session.action_token == token and session.snapshot == token.snapshot
+			and session.snapshot.export_revision == token.revision
+			and require("ui.webview_manager").current_epoch("healthcheck") == session.epoch
+	end
+	local request = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot, {
+		current = current,
+		complete = function(result)
+			if not current() or completed then return end
+			completed = true
+			session.action_request = nil
+			result.type, result.action = "action", action.action
+			if inline then answer = result else push(session, result) end
+		end,
+	})
+	inline = false
+	if current() and not completed then session.action_request = request else request.cancel() end
+	return answer
 end
 
 --- Handles an incoming page message.
 --- @param payload any String or table from host_bridge.js.
---- @param state table Daemon state { engine, keylogger, config, llm, gestures, shortcuts, layout, … }.
+--- @param state table Daemon state { engine, keystats, config, llm, gestures, shortcuts, layout, … }.
 --- @param context table|nil { app_name, epoch, close_owned_window } from the webview manager.
 --- @return table|nil The answer the page receives.
 function M.on_message(payload, state, context)
@@ -686,13 +833,15 @@ function M.on_message(payload, state, context)
 	local epoch = type(context) == "table" and context.epoch or nil
 	if payload == "ready" then
 		Logger.info(LOG, "Diagnostics page ready.")
-		cancel_probes(_session)
+		local previous = _session
+		local revision = cancel_action(previous)
+		if _session ~= previous or revision ~= _action_revision then return nil end
+		cancel_probes(previous)
+		if _session ~= previous or revision ~= _action_revision then return nil end
 		_session = {
 			epoch    = epoch,
 			detailed = false,
-			mode     = M._pending_mode,
 		}
-		M._pending_mode = nil
 		_session.snapshot = M.build_snapshot(state, false)
 		local message = init_message(_session)
 		start_probes(_session, state)
@@ -719,20 +868,25 @@ function M.on_message(payload, state, context)
 	return answer
 end
 
---- Opens the diagnostics window, in report mode when asked: the page then
---- starts from the preview of what is shared and the report button. An open
---- window is replaced, as on macOS and Windows: bringing it forward would keep
---- its mode and its stale snapshot.
---- @param mode string|nil "report" or nil.
+--- Invalidates work even when the native close box did not send a page action.
+function M.on_window_closed(epoch)
+	if not _session or (epoch ~= nil and _session.epoch ~= epoch) then return end
+	local previous = _session
+	_session = nil
+	cancel_action(previous)
+	cancel_probes(previous)
+end
+
+--- Opens the diagnostics window. An open window is replaced, as on macOS and
+--- Windows: bringing it forward would keep its stale snapshot.
 --- @return boolean opened
-function M.open(mode)
+function M.open()
 	local manager = require("ui.webview_manager")
 	local epoch = manager.current_epoch("healthcheck")
 	if epoch ~= nil and not manager.hide("healthcheck", epoch) then
 		Logger.error(LOG, "The open diagnostics window could not be replaced.")
 		return false
 	end
-	M._pending_mode = mode
 	return manager.show("healthcheck", require("infra.i18n").get_locale())
 end
 

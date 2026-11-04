@@ -18,10 +18,14 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local Paths = require("infra.paths")
+local NativePath = require("native_path")
+local TextUtils = require("text_utils")
 local I18nSeed = require("webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
+local OwnWindow = require("adapters.own_window")
+local WebviewCloseOwner = require("ui.webview_close_owner").new(DeferredWork, Logger)
 
 --- Monotonic milliseconds for webview open, load and close durations.
 --- @return number
@@ -32,6 +36,24 @@ local LOG = "ui_builder"
 
 -- The generated shared policy owns branding for every native host.
 local WindowTitles = require("window_titles")
+local WindowTitleKeyOwner = rawget(WindowTitles, "key_for_app")
+local WindowTitleComposeOwner = rawget(WindowTitles, "compose")
+local WindowPresentationOwner = rawget(WindowTitles, "presentation_for_app")
+local Presentation = require("webview.presentation")
+local PresentationPrepareOwner = rawget(Presentation, "prepare")
+local PresentationTitlePrepareOwner = rawget(Presentation, "prepare_window_title")
+local PresentationContextPrepareOwner = rawget(Presentation, "prepare_contextual_title")
+local PresentationI18n = require("infra.i18n")
+local PresentationLocale = require("infra.locale")
+local PresentationTranslateOwner = rawget(PresentationI18n, "get")
+local PresentationLocaleGetOwner = rawget(PresentationLocale, "get")
+local PresentationLocaleCurrentOwner = rawget(PresentationLocale, "current_locale")
+local PresentationLocaleCore = require("locale.core")
+local PresentationCoreGetOwner = rawget(PresentationLocaleCore, "get")
+local PresentationCoreCurrentOwner = rawget(PresentationLocaleCore, "current_locale")
+local _presentation_receipts = setmetatable({}, { __mode = "k" })
+local PresentationPrepareApi, PresentationFieldsApi, PresentationCurrentApi, PresentationShowApi
+local PresentationTitlePrepareApi, PresentationContextPrepareApi
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
 -- CSS/JS files (and re-running the gsub inlining pass) on every UI open —
@@ -56,14 +78,17 @@ local function settle_factory_cleanup()
 		return false
 	end
 	_factory_cleanup_closing = webview
-	local ok, err = xpcall(function() webview:delete() end, debug.traceback)
-	if _factory_cleanup_closing == webview then _factory_cleanup_closing = nil end
-	if not ok then
+	local metadata = getmetatable(webview)
+	local ok, result = xpcall(function() return webview:delete() end, debug.traceback)
+	local consumed = metadata ~= nil and getmetatable(webview) == nil
+	if not consumed and (not ok or result == false) then
 		_factory_cleanup_owner = webview
-		Logger.error(LOG, "WebView factory cleanup did not commit; exact owner retained: %s.",
-			tostring(err))
+		pcall(Logger.error, LOG, "WebView factory cleanup did not commit; exact owner retained: %s.",
+			tostring(result))
+		if _factory_cleanup_closing == webview then _factory_cleanup_closing = nil end
 		return false
 	end
+	if _factory_cleanup_closing == webview then _factory_cleanup_closing = nil end
 	if _factory_cleanup_owner == webview then _factory_cleanup_owner = nil end
 	return true
 end
@@ -125,8 +150,15 @@ local _locales_base_url = (function()
 	-- trailing slash is preserved because the browser-side fetch() concatenates
 	-- the locale filename directly onto this base.
 	local locales = (Paths.shared("data/locales") or "") .. "/"
-	-- Normalise to forward slashes and prepend file:// so fetch() accepts it
-	locales = locales:gsub("\\", "/")
+	-- A backslash separates components only on a Windows host (the headless
+	-- suite); on macOS it is a filename byte, so it and every other byte a URL
+	-- path cannot carry verbatim (a quote would also end the injected string)
+	-- are percent-encoded rather than rewritten.
+	if NativePath.separators() ~= "/" then locales = locales:gsub("\\", "/") end
+	-- The "/" and ":" separators stay; every segment between them goes
+	-- through the shared encoder. A function replacement's result is taken
+	-- literally, so the "%" the encoder writes is never read as a capture.
+	locales = locales:gsub("[^/:]+", function(segment) return TextUtils.percent_encode(segment) end)
 	if not locales:match("^/") then locales = "/" .. locales end
 	return "file://" .. locales
 end)()
@@ -294,7 +326,7 @@ function M.warmup_webkit()
 		pcall(function() wv:html("<html><body></body></html>") end)
 		pcall(function() wv:hide() end)
 		-- Hold the warmup webview for 5 s so WebKit fully initialises, then release.
-		if DeferredWork.after(5,
+		if DeferredWork.after(require("infra.timings").sec("ui", "webkit_warmup_hold_ms"),
 			function()
 				if _webkit_warmup_session ~= session then return false end
 				session.pending = false
@@ -489,7 +521,9 @@ function M.force_focus(wv, is_new, lifecycle)
 		local ok_sp, hs_spaces = pcall(require, "hs.spaces")
 		if not current() then return false end
 		if ok_sp and hs_spaces then
-			local ok_win, win = pcall(function() return wv:hswindow() end)
+			-- Among this process's windows only: hswindow() alone reads every
+			-- window of every application (issue #100).
+			local ok_win, win = pcall(OwnWindow.for_webview, wv)
 			if not current() then return false end
 			if not ok_win then return fail("window lookup") end
 			if ok_win and win then
@@ -518,13 +552,13 @@ function M.force_focus(wv, is_new, lifecycle)
 	end
 
 	-- Bring to front and request system focus.
-	-- We use a retry mechanism because hswindow() might return nil while the
-	-- window is still being composited by the OS.
+	-- We use a retry mechanism because the window may not be listed yet while
+	-- it is still being composited by the OS.
 	local attempts = 0
 	local max_attempts = 20
 	local function try_focus()
 		if not wv or not current() then return false end
-		local ok, win = pcall(function() return wv:hswindow() end)
+		local ok, win = pcall(OwnWindow.for_webview, wv)
 		if not current() then return false end
 		if not ok then return fail("window lookup") end
 		
@@ -584,12 +618,8 @@ end
 --- @return boolean
 function M.is_window_focused(wv)
 	if not wv then return false end
-	local ok_win, win = pcall(function() return wv:hswindow() end)
-	if not ok_win or not win then return false end
-	local ok_focused, focused = pcall(function() return hs.window.focusedWindow() end)
-	if not ok_focused or not focused then return false end
-	local ok_same, same = pcall(function() return win:id() == focused:id() end)
-	return ok_same and same == true
+	local ok, focused = pcall(OwnWindow.is_webview_focused, wv)
+	return ok and focused == true
 end
 
 --- Composes a native window title. The product name is added here and only
@@ -618,7 +648,7 @@ end
 --- The one window kept above other apps: the Accessibility steps of the macOS
 --- permission dialog (ui/permission_dialog; its other kinds are focused like
 --- any window). It is shown only while ErgoptiPlus is not trusted for
---- Accessibility, where force_focus cannot find it (hswindow() is an
+--- Accessibility, where force_focus cannot find it (OwnWindow is an
 --- Accessibility lookup), and its steps are followed in System Settings, the
 --- active app, whose first click would bury a window at the normal level. It
 --- floats, never activates the app (it requires focus = false) and its owner
@@ -632,13 +662,207 @@ function M.can_create_webview()
 		and type(hs.webview.new) == "function"
 end
 
+--- Authenticates the actual contextual declaration and translation dependencies.
+--- @return boolean current
+local function presentation_owners_current()
+	return getmetatable(WindowTitles) == nil and getmetatable(Presentation) == nil
+		and getmetatable(PresentationI18n) == nil and getmetatable(PresentationLocale) == nil
+		and getmetatable(PresentationLocaleCore) == nil
+		and rawget(package.loaded, "ui.ui_builder") == M
+		and rawget(package.loaded, "window_titles") == WindowTitles
+		and rawget(package.loaded, "webview.presentation") == Presentation
+		and rawget(package.loaded, "infra.i18n") == PresentationI18n
+		and rawget(package.loaded, "infra.locale") == PresentationLocale
+		and rawget(package.loaded, "locale.core") == PresentationLocaleCore
+		and rawget(PresentationLocaleCore, "get") == PresentationCoreGetOwner
+		and rawget(PresentationLocaleCore, "current_locale") == PresentationCoreCurrentOwner
+		and rawget(WindowTitles, "presentation_for_app") == WindowPresentationOwner
+		and rawget(WindowTitles, "compose") == WindowTitleComposeOwner
+		and rawget(Presentation, "prepare") == PresentationPrepareOwner
+		and rawget(Presentation, "prepare_window_title") == PresentationTitlePrepareOwner
+		and rawget(Presentation, "prepare_contextual_title") == PresentationContextPrepareOwner
+		and rawget(PresentationI18n, "get") == PresentationTranslateOwner
+		and rawget(PresentationLocale, "get") == PresentationLocaleGetOwner
+		and rawget(PresentationLocale, "current_locale") == PresentationLocaleCurrentOwner
+		and rawget(M, "prepare_app_presentation") == PresentationPrepareApi
+		and rawget(M, "prepare_app_window_title") == PresentationTitlePrepareApi
+		and rawget(M, "prepare_app_contextual_title") == PresentationContextPrepareApi
+		and rawget(M, "presentation_fields") == PresentationFieldsApi
+		and rawget(M, "presentation_current") == PresentationCurrentApi
+		and rawget(M, "show_webview") == PresentationShowApi
+end
+
+--- Prepares one genuine context before its caller replaces an existing window.
+--- @param app_id string Canonical app identity.
+--- @param presentation_id string Canonical context identity.
+--- @return table|nil Opaque factory-owned receiving receipt.
+function M.prepare_app_presentation(app_id, presentation_id)
+	if type(WindowPresentationOwner) ~= "function" or type(PresentationPrepareOwner) ~= "function"
+		or not presentation_owners_current() then return nil end
+	local ok, prepared = pcall(PresentationPrepareOwner, WindowTitles, PresentationI18n,
+		PresentationLocale, app_id, presentation_id, "hs", presentation_owners_current)
+	if not ok or type(prepared) ~= "table" or getmetatable(prepared) ~= nil
+		or type(rawget(prepared, "current")) ~= "function" or not presentation_owners_current()
+		or prepared.current() ~= true then return nil end
+	local receipt = {}
+	_presentation_receipts[receipt] = {
+		app_id = app_id, presentation_id = presentation_id,
+		title = prepared.title, label = prepared.label, caption = prepared.caption,
+		current = prepared.current,
+	}
+	return receipt
+end
+
+--- Prepares an explicit native-title context using this factory's exact receipt.
+--- @param app_id string Canonical app identity.
+--- @param presentation_id string Explicit window_title context identity.
+--- @return table|nil Opaque factory-owned receiving receipt without a page label.
+function M.prepare_app_window_title(app_id, presentation_id)
+	if type(WindowPresentationOwner) ~= "function" or type(PresentationTitlePrepareOwner) ~= "function"
+		or not presentation_owners_current() then return nil end
+	local ok, prepared = pcall(PresentationTitlePrepareOwner, WindowTitles, PresentationI18n,
+		PresentationLocale, app_id, presentation_id, "hs", presentation_owners_current)
+	if not ok or type(prepared) ~= "table" or getmetatable(prepared) ~= nil
+		or type(rawget(prepared, "current")) ~= "function" or not presentation_owners_current()
+		or prepared.current() ~= true or rawget(prepared, "label") ~= nil then return nil end
+	local receipt = {}
+	_presentation_receipts[receipt] = {
+		app_id = app_id, presentation_id = presentation_id,
+		title = prepared.title, caption = prepared.caption, current = prepared.current,
+	}
+	return receipt
+end
+
+--- Prepares ordinary suffix display data through a genuine contextual declaration.
+--- @param app_id string Canonical app identity.
+--- @param presentation_id string Explicit contextual_title identity.
+--- @param suffix string Ordinary one-line display data.
+--- @return table|nil Opaque factory-owned receipt for page and native caption.
+function M.prepare_app_contextual_title(app_id, presentation_id, suffix)
+	if type(WindowPresentationOwner) ~= "function" or type(PresentationContextPrepareOwner) ~= "function"
+		or not presentation_owners_current() then return nil end
+	local ok, prepared = pcall(PresentationContextPrepareOwner, WindowTitles, PresentationI18n,
+		PresentationLocale, app_id, presentation_id, "hs", suffix, presentation_owners_current)
+	if not ok or type(prepared) ~= "table" or getmetatable(prepared) ~= nil
+		or type(rawget(prepared, "current")) ~= "function" or not presentation_owners_current()
+		or prepared.current() ~= true or rawget(prepared, "label") ~= nil then return nil end
+	local receipt = {}
+	_presentation_receipts[receipt] = {
+		app_id = app_id, presentation_id = presentation_id,
+		title = prepared.title, caption = prepared.caption, current = prepared.current,
+	}
+	return receipt
+end
+
+--- Checks only this factory's exact receipt and its retained Source cohort.
+--- @param receipt table Opaque context receipt.
+--- @return boolean current
+function M.presentation_current(receipt)
+	if type(receipt) ~= "table" or getmetatable(receipt) ~= nil or next(receipt) ~= nil
+		or not presentation_owners_current() then return false end
+	local retained = _presentation_receipts[receipt]
+	if retained == nil then return false end
+	local ok, current = pcall(retained.current)
+	return ok and current == true and presentation_owners_current()
+end
+
+--- Reads the two immutable page strings from the actual factory-owned context.
+--- @param receipt table Opaque context receipt.
+--- @return string|nil title
+--- @return string|nil label
+function M.presentation_fields(receipt)
+	if not PresentationCurrentApi(receipt) then return nil end
+	local retained = _presentation_receipts[receipt]
+	return retained.title, retained.label
+end
+
+PresentationPrepareApi = M.prepare_app_presentation
+PresentationTitlePrepareApi = M.prepare_app_window_title
+PresentationContextPrepareApi = M.prepare_app_contextual_title
+PresentationFieldsApi = M.presentation_fields
+PresentationCurrentApi = M.presentation_current
+
+--- Resolves an explicit app identity through the actual shared title policy.
+--- Caller text remains supported only when no declared app identity is supplied.
+--- @param opts table Native factory request.
+--- @return string|nil label
+--- @return string|nil caption
+--- @return function|nil live
+local function declared_window_title(opts)
+	if getmetatable(opts) ~= nil then return nil end
+	local app_id = rawget(opts, "app_id")
+	local presentation_id, receipt = rawget(opts, "presentation_id"), rawget(opts, "presentation_receipt")
+	if presentation_id ~= nil or receipt ~= nil then
+		if rawget(opts, "title") ~= nil or rawget(opts, "label") ~= nil
+			or not PresentationCurrentApi(receipt) then return nil end
+		local retained = _presentation_receipts[receipt]
+		if app_id ~= retained.app_id or presentation_id ~= retained.presentation_id then return nil end
+		local function live()
+			return getmetatable(opts) == nil and rawget(opts, "app_id") == app_id
+				and rawget(opts, "presentation_id") == presentation_id
+				and rawget(opts, "presentation_receipt") == receipt
+				and rawget(opts, "title") == nil and rawget(opts, "label") == nil
+				and PresentationCurrentApi(receipt)
+		end
+		if not live() then return nil end
+		return retained.title, retained.caption, live
+	end
+	if type(app_id) ~= "string" or not app_id:match("^[a-z][a-z0-9_]*$")
+		or rawget(opts, "title") ~= nil then return nil end
+	local ok_i18n, i18n = pcall(require, "infra.i18n")
+	if not ok_i18n or type(i18n) ~= "table" then return nil end
+	local translate = rawget(i18n, "get")
+	local function live()
+		return getmetatable(opts) == nil and rawget(opts, "app_id") == app_id
+			and rawget(opts, "title") == nil
+			and getmetatable(WindowTitles) == nil and getmetatable(i18n) == nil
+			and rawget(package.loaded, "window_titles") == WindowTitles
+			and rawget(package.loaded, "infra.i18n") == i18n
+			and rawget(WindowTitles, "key_for_app") == WindowTitleKeyOwner
+			and rawget(WindowTitles, "compose") == WindowTitleComposeOwner
+			and rawget(i18n, "get") == translate
+			and type(WindowTitleKeyOwner) == "function"
+			and type(WindowTitleComposeOwner) == "function" and type(translate) == "function"
+	end
+	if not live() then return nil end
+	local ok, label, caption = pcall(function()
+		local key = WindowTitleKeyOwner(app_id)
+		if not live() or type(key) ~= "string" or key == "" then return nil end
+		local text = translate(key)
+		if not live() or type(text) ~= "string" or text == "" or text == key then return nil end
+		local composed = WindowTitleComposeOwner(text)
+		if not live() or type(composed) ~= "string" or composed == "" then return nil end
+		return text, composed
+	end)
+	if not ok or label == nil or not live() then return nil end
+	return label, caption, live
+end
+
 --- Centralized factory to create a webview window with consistent properties.
+--- An explicit app_id receives its canonical shared title; title is caller text
+--- only when no app identity is supplied. Unknown app identities refuse.
 --- @param opts table The configuration options for the webview; focus = false
 ---        shows the window without activating the app or changing its level;
----        chrome = M.PERMISSION_DIALOG_CHROME is the one floating exception.
+---        chrome = M.PERMISSION_DIALOG_CHROME is the one floating exception;
+---        allow_new_windows accepts only false: native children lack an owner;
+---        delete_on_close = true defers native deletion after user close.
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
+	local child_policy = opts.allow_new_windows
+	if child_policy ~= nil and child_policy ~= false then
+		Logger.error(LOG, "WebView factory refused native child windows: each window requires its own lifecycle owner.")
+		return nil
+	end
+	local title_label, declared_caption, title_live
+	if rawget(opts, "presentation_id") ~= nil or rawget(opts, "presentation_receipt") ~= nil
+		or opts.app_id ~= nil then
+		title_label, declared_caption, title_live = declared_window_title(opts)
+		if title_label == nil then
+			Logger.error(LOG, "WebView factory refused its declared app title.")
+			return nil
+		end
+	end
 	if M.can_create_webview() ~= true then return nil end
 	if opts.level ~= nil then
 		-- Refused before the native window exists, so nothing is left to clean up.
@@ -658,13 +882,16 @@ function M.show_webview(opts)
 		Logger.warn(LOG, "WebView factory construction re-entry refused; candidate still in progress.")
 		return nil
 	end
-	if settle_factory_cleanup() ~= true then return nil end
+	if WebviewCloseOwner.retry_cleanup() ~= true or settle_factory_cleanup() ~= true then return nil end
 	-- Open, first load and close are timed: a blank or slow window is otherwise
 	-- indistinguishable in the log from a window that was never requested.
-	local view_label = (type(opts.title) == "string" and opts.title ~= "") and opts.title or "untitled"
+	local view_label = title_live and title_label
+		or ((type(opts.title) == "string" and opts.title ~= "") and opts.title or "untitled")
 	local opened_ms = now_ms()
 	local load_logged = false
 	Logger.debug(LOG, "Creating webview window '%s'…", view_label)
+
+	if title_live and not title_live() then return nil end
 
 	-- Prevent LuaSkin crash by not passing explicit nil for the third argument
 	local wv
@@ -679,6 +906,25 @@ function M.show_webview(opts)
 		return nil 
 	end
 	_factory_build_owner = wv
+	local children_blocked, child_detail = xpcall(function()
+		-- WebKit children copy the parent callback and force the unsafe native
+		-- automatic GC flag. Refuse them before exposing any candidate or HTML.
+		assert(wv:allowNewWindows(false) == wv, "native child-window policy was not acknowledged")
+		assert(wv:allowNewWindows() == false, "native child windows remain enabled")
+	end, debug.traceback)
+	if not children_blocked then
+		Logger.error(LOG, "Required webview child-window policy failed: %s.", tostring(child_detail))
+		abandon_factory_candidate(wv, "child-window policy")
+		return nil
+	end
+	if opts.delete_on_close == true then
+		local disarmed, detail = xpcall(function() WebviewCloseOwner.disarm(wv) end, debug.traceback)
+		if not disarmed then
+			Logger.error(LOG, "Required webview close policy failed: %s.", tostring(detail))
+			abandon_factory_candidate(wv, "close policy")
+			return nil
+		end
+	end
 	local caller_owns_webview = false
 	if type(opts.on_webview_created) == "function" then
 		local acquired_ok, acquired = xpcall(function()
@@ -696,12 +942,14 @@ function M.show_webview(opts)
 		-- caller has installed its close contract.
 		if acquired ~= true then return nil end
 	end
+	local contextual_title = rawget(opts, "presentation_id") ~= nil or rawget(opts, "presentation_receipt") ~= nil
 	local function webview_current()
+		if contextual_title and (not title_live or not title_live()) then return false end
 		if type(opts.is_current) ~= "function" then return true end
 		local ok, result = xpcall(opts.is_current, debug.traceback)
 		return ok == true and result == true
 	end
-	local strict_lifecycle = type(opts.is_current) == "function"
+	local strict_lifecycle = type(opts.is_current) == "function" or contextual_title
 	local function abandon_required_mutation()
 		if caller_owns_webview ~= true then
 			abandon_factory_candidate(wv, "required mutation")
@@ -741,10 +989,18 @@ function M.show_webview(opts)
 		return DeferredWork.after(delay, callback, label or "ui_builder.webview")
 	end
 
-	local win_title = M.window_title(opts.title)
-	if not apply_webview_mutation(function() wv:windowTitle(win_title) end) then
+	if title_live and not title_live() then return abandon_required_mutation() end
+	local win_title = declared_caption or M.window_title(opts.title)
+	local title_received = false
+	if not apply_webview_mutation(function()
+		-- Lifecycle observation may yield after the outer title admission.
+		if title_live and not title_live() then return end
+		wv:windowTitle(win_title)
+		title_received = true
+	end) then
 		return abandon_required_mutation()
 	end
+	if title_live and (not title_received or not title_live()) then return abandon_required_mutation() end
 	
 	-- The chrome every Ergopti window shares comes from one function, so no
 	-- window can be built with only part of it.
@@ -761,23 +1017,26 @@ function M.show_webview(opts)
 	if not apply_webview_mutation(function()
 		wv:allowGestures(opts.allow_gestures == true)
 	end) then return abandon_required_mutation() end
-	if opts.allow_new_windows ~= nil and not apply_webview_mutation(function()
-		wv:allowNewWindows(opts.allow_new_windows)
-	end) then return abandon_required_mutation() end
 
 	-- Bind closing cleanup callback
-	if type(opts.on_close) == "function" then
-		if not apply_webview_mutation(function()
-			wv:windowCallback(function(action)
-				if action == "closing" or action == "closed" then
-					if action == "closing" then
-						Logger.info(LOG, "Webview '%s' closed after %.1f s open.", view_label,
-							(now_ms() - opened_ms) / 1000)
-					end
-					opts.on_close()
-				end
-			end)
-		end) then return abandon_required_mutation() end
+	if type(opts.on_close) == "function" or opts.delete_on_close == true then
+		local bind_close = opts.delete_on_close == true and apply_required_webview_mutation or apply_webview_mutation
+		if not bind_close(function()
+			local function closed()
+				pcall(function()
+					Logger.info(LOG, "Webview '%s' closed after %.1f s open.", view_label,
+						(now_ms() - opened_ms) / 1000)
+				end)
+				if type(opts.on_close) == "function" then opts.on_close() end
+			end
+			if opts.delete_on_close == true then
+				WebviewCloseOwner.bind(wv, closed)
+			else
+				wv:windowCallback(function(action)
+					if action == "closing" or action == "closed" then closed() end
+				end)
+			end
+		end, "automatic close cleanup") then return abandon_required_mutation() end
 	end
 
 	-- Bind navigation callback; also inject i18n strings after every navigation
@@ -910,5 +1169,7 @@ function M.window_chrome_steps(wv, opts)
 		{ name = "level",       apply = function() wv:level(level) end },
 	}
 end
+
+PresentationShowApi = M.show_webview
 
 return M

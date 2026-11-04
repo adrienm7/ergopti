@@ -46,11 +46,12 @@ local EvdevCodes  = require("infra.evdev_codes")
 local Timings     = require("infra.timings")
 local InputEvent  = require("infra.input_event")
 local Shared      = require("keymap.magic_key_source")
+local ConfigKeys = require("config_keys")
 
 local LOG = "magic_key_source"
 
 -- The canonical configuration path of the setting, and its automatic value.
-M.PATH = "hotstrings.magic_key_source"
+M.PATH = ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE
 local AUTOMATIC = Manifest.default_for(M.PATH)
 
 -- How long a capture waits for a key (shared with macOS and Windows).
@@ -83,9 +84,19 @@ local _deps = nil
 
 -- The capture waiting for a key, nil when none: { handlers }.
 local _capture = nil
+local _capture_epoch = 0
+-- Accepted deferred choices still own a possible preference publication.
+local _pending_choices = {}
 
 -- The magic key character last reported as untypable on the session layout.
 local _untypable_reported = nil
+
+-- The evdev code last reported as yielding its press to a tap owner, nil once
+-- the source is admitted again, so a held or repeated key logs only once.
+local _yield_reported = nil
+
+-- Shown on a tap key's menu row while its action takes the physical magic key.
+M.TAP_OVERRIDE_REASON = "menu.shortcuts.tap_keys.overrides_magic_key_source"
 
 
 
@@ -144,6 +155,20 @@ function M.choice_reason(value)
 		return Shared.TAP_CONFLICT_REASON
 	end
 	return nil
+end
+
+--- The reverse of choice_reason: whether a tap assignment on a native key takes
+--- the key the physical magic key is set to. The explicit assignment keeps its
+--- priority (the press runs the action), so the menu row and the log must say
+--- that the magic key no longer comes from that key.
+--- @param evdev number Native key of the tap key.
+--- @param action string|nil The action assigned to it, "none" when unassigned.
+--- @return string|nil reason_key
+function M.tap_override_reason(evdev, action)
+	if type(evdev) ~= "number" or action == nil or action == "none" then return nil end
+	local code = M.evdev_code()
+	if code == nil or code ~= evdev then return nil end
+	return M.TAP_OVERRIDE_REASON
 end
 
 --- Stores a new value; the next press follows it, nothing is re-registered.
@@ -323,7 +348,7 @@ end
 function M.init(deps)
 	if _deps ~= nil then error("magic_key_source: already initialized", 2) end
 	if type(deps) ~= "table" then error("magic_key_source.init needs its collaborators", 2) end
-	for _, name in ipairs({ "is_active", "replace_on", "magic_key", "can_type", "type_text", "dispatch_char",
+	for _, name in ipairs({ "is_active", "replace_on", ConfigKeys.LEAF.MAGIC_KEY, "can_type", "type_text", "dispatch_char",
 		"end_selection", "can_capture", "key_text", "defer" }) do
 		if type(deps[name]) ~= "function" then error("magic_key_source.init needs " .. name, 2) end
 	end
@@ -348,6 +373,15 @@ function M.can_capture()
 	return _deps ~= nil and _deps.can_capture() == true and _deps.is_active() == true
 end
 
+--- Fences pending and deferred captured choices at a committed pause boundary.
+--- Deferred timer capabilities remain owned by the event loop; their callbacks
+--- cannot publish after this logical capture generation is retired.
+function M.cancel_capture()
+	_capture_epoch = _capture_epoch + 1
+	_capture = nil
+	_pending_choices = {}
+end
+
 --- Captures the next grabbed key-down as the physical magic key. Escape or the
 --- shared timeout (timings [ui] magic_key_capture_timeout_ms) ends it with
 --- nothing changed. The decision runs after the hook returns: persisting it is
@@ -359,19 +393,25 @@ function M.capture(handlers)
 		or type(handlers.on_refused) ~= "function" then
 		error("magic_key_source.capture needs on_chosen and on_refused", 2)
 	end
-	if _capture ~= nil or not M.can_capture() then return false end
-	local live = { handlers = handlers }
+	if _capture ~= nil then return false end
+	local allowed = M.can_capture()
+	if _capture ~= nil or not allowed then return false end
+	local epoch = _capture_epoch
+	local live = { handlers = handlers, epoch = epoch + 1 }
 	_capture = live
-	local armed = _deps.defer(function()
+	local called, armed = pcall(_deps.defer, function()
 		if _capture ~= live then return end
 		_capture = nil
 		Logger.info(LOG, "Physical magic key capture timed out: nothing changed.")
 	end, CAPTURE_TIMEOUT_MS)
-	if armed ~= true then
-		_capture = nil
+	if not called or armed ~= true or _capture ~= live or _capture_epoch ~= epoch then
+		if _capture == live then _capture = nil end
 		Logger.error(LOG, "The capture timeout could not be armed — no key is captured.")
 		return false
 	end
+	-- Only a genuinely admitted request supersedes queued predecessor choices.
+	_capture_epoch = live.epoch
+	_pending_choices = {}
 	Logger.info(LOG, "Waiting for the physical magic key…")
 	return true
 end
@@ -439,19 +479,52 @@ end
 function M.on_key(detail)
 	if _deps == nil or type(detail) ~= "table" then return false end
 	if _capture ~= nil then
-		-- The answer of a capture reaches no application, whatever it is.
 		local live, evdev = _capture, detail.code
-		_capture = nil
-		if _deps.defer(function() settle(live, evdev) end, 0) ~= true then
-			Logger.error(LOG, "The captured key could not be settled — nothing changed.")
+		local allowed = M.can_capture()
+		if _capture ~= live or live.epoch ~= _capture_epoch or not allowed then
+			if _capture == live then M.cancel_capture() end
+			return false
 		end
+		local admitted, premature, pending = false, false, _pending_choices
+		local called, queued = pcall(_deps.defer, function()
+			if admitted ~= true then premature = true return end
+			local settled, failure = pcall(function()
+				local allowed = M.can_capture()
+				if live.epoch ~= _capture_epoch or not allowed then return end
+				settle(live, evdev)
+			end)
+			pending[live] = nil
+			if not settled then error(failure, 0) end
+		end, 0)
+		if not called or queued ~= true or premature then
+			Logger.error(LOG, "The captured key could not be settled — nothing changed.")
+			return false
+		end
+		allowed = M.can_capture()
+		if _capture ~= live or live.epoch ~= _capture_epoch or not allowed then
+			if _capture == live then M.cancel_capture() end
+			return false
+		end
+		admitted = true
+		pending[live] = true
+		_capture = nil
 		return true
 	end
 	local code = M.evdev_code()
 	if code == nil or detail.code ~= code then return false end
 	if not Shared.unmodified(detail.mods) then return false end
 	if _deps.is_active() ~= true or _deps.replace_on() ~= true then return false end
-	if _deps.direct_source_admitted and _deps.direct_source_admitted(code, true) ~= true then return false end
+	if _deps.direct_source_admitted and _deps.direct_source_admitted(code, true) ~= true then
+		-- The configured tap or tap-hold action keeps its priority; say once why
+		-- the chosen key stopped typing the magic key instead of going quiet.
+		if _yield_reported ~= code then
+			_yield_reported = code
+			Logger.warn(LOG, "The physical magic key %s yields to the tap action configured on its key — "
+				.. "it types no magic key until that action is set to none or another key is chosen.", M.get())
+		end
+		return false
+	end
+	_yield_reported = nil
 	local magic = _deps.magic_key()
 	if type(magic) ~= "string" or magic == "" then return false end
 	if _deps.can_type(magic) ~= true then
@@ -485,9 +558,106 @@ function M._reset_for_test()
 	_registry = nil
 	_editor_signature = nil
 	_editor_generation = _editor_generation + 1
-	_capture = nil
+	M.cancel_capture()
 	_code, _code_generation = nil, nil
 	_untypable_reported = nil
+	_yield_reported = nil
 end
+
+
+-- These source observers are captured by the same original replacement owner.
+local CollisionRoutes = require("infra.config_paths")
+local CollisionCodec = require("toml_codec")
+local collision_route, collision_read, collision_decode = CollisionRoutes.config, FileSystem.read_with_status, CollisionCodec.decode
+local preference_ports = { get = Preferences.get, generation = Preferences.generation,
+	snapshot = Preferences.snapshot, is_acquired = Preferences.is_acquired }
+local collision_methods = { get = M.get, evdev_code = M.evdev_code, resolver = M.resolver,
+	on_key = M.on_key, capture = M.capture, cancel_capture = M.cancel_capture, init = M.init,
+	_reset_for_test = M._reset_for_test }
+local collision_callback_names = { "is_active", "replace_on", ConfigKeys.LEAF.MAGIC_KEY, "can_type", "type_text",
+	"dispatch_char", "end_selection", "can_capture", "key_text", "defer",
+	"input_source_receipt", "typing_plan", "direct_source_admitted" }
+local collision_factory
+
+--- Captures a configured replacement reservation, not a conditional editor recommendation.
+--- No output, capture, preference write or native input authority is acquired.
+--- @return table|nil frame Exact source and private lifetime observation.
+collision_factory = function()
+	local deps, capture_epoch, pending = _deps, _capture_epoch, _pending_choices
+	if _capture ~= nil or next(pending) ~= nil or preference_ports.is_acquired() then return nil end
+	if deps ~= nil and (type(deps) ~= "table" or getmetatable(deps) ~= nil) then return nil end
+	local callbacks = {}
+	for _, name in ipairs(collision_callback_names) do callbacks[name] = deps and rawget(deps, name) end
+	local path = collision_route("config.toml")
+	if type(path) ~= "string" or path:sub(1, 1) ~= "/" or path:find("%z") then return nil end
+	local bytes, status = collision_read(path)
+	if status ~= "ok" and status ~= "absent" then return nil end
+	if status == "ok" and type(bytes) ~= "string" then return nil end
+	local function observe()
+		if deps == nil then return {} end -- Original on_key cannot consume before init.
+		local facts = { value = collision_methods.get(), code = collision_methods.evdev_code() }
+		if facts.code == nil then return facts end
+		if type(facts.code) ~= "number" then return nil end
+		facts.active = callbacks.is_active()
+		if facts.active ~= true then return facts.active == false and facts or nil end
+		facts.replace = callbacks.replace_on()
+		if facts.replace ~= true then return facts.replace == false and facts or nil end
+		facts.admitted = callbacks.direct_source_admitted == nil or callbacks.direct_source_admitted(facts.code, true) == true
+		if not facts.admitted then return facts end
+		facts.magic = callbacks.magic_key()
+		if type(facts.magic) ~= "string" or facts.magic == "" then return nil end
+		facts.typable = callbacks.can_type(facts.magic)
+		if type(facts.typable) ~= "boolean" then return nil end
+		return facts
+	end
+	local facts = observe()
+	if facts == nil then return nil end
+	local preference_epoch, cached_code, cached_generation = preference_ports.generation(), _code, _code_generation
+	-- Cached preferences may be stale after a foreign writer. Compare the exact
+	-- owned source leaf, using the original reader's effective value unchanged.
+	if deps ~= nil then
+		local snapshot = preference_ports.snapshot()
+		local document = collision_decode(bytes or "")
+		if type(snapshot) ~= "table" or type(snapshot.document) ~= "table" or type(document) ~= "table" then return nil end
+		local stored, cached = document.hotstrings, snapshot.document.hotstrings
+		if stored ~= nil and type(stored) ~= "table" or cached ~= nil and type(cached) ~= "table" then return nil end
+		local value, prior = stored and stored.magic_key_source, cached and cached.magic_key_source
+		if value ~= prior or value ~= nil and type(value) ~= "string" then return nil end
+	end
+	local function private_current()
+		if not rawequal(package.loaded["modules.hotstrings.magic_key_source"], M)
+			or M.PATH ~= ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE or M.capture_collision_inventory ~= collision_factory
+			or _deps ~= deps or _capture ~= nil or _capture_epoch ~= capture_epoch
+			or _pending_choices ~= pending or next(pending) ~= nil
+			or preference_ports.generation() ~= preference_epoch or preference_ports.is_acquired()
+			or _code ~= cached_code or _code_generation ~= cached_generation then return false end
+		for name, method in pairs(collision_methods) do if rawget(M, name) ~= method then return false end end
+		for name, method in pairs(preference_ports) do if rawget(Preferences, name) ~= method then return false end end
+		if deps then for _, name in ipairs(collision_callback_names) do
+			if rawget(deps, name) ~= callbacks[name] then return false end
+		end end
+		return rawequal(package.loaded["infra.hotstring_preferences"], Preferences)
+			and rawequal(package.loaded["infra.config_paths"], CollisionRoutes) and CollisionRoutes.config == collision_route
+			and rawequal(package.loaded["adapters.file_system"], FileSystem) and FileSystem.read_with_status == collision_read
+			and rawequal(package.loaded["toml_codec"], CollisionCodec) and CollisionCodec.decode == collision_decode
+	end
+	local function current()
+		if not private_current() or collision_route("config.toml") ~= path then return false end
+		local observed = observe()
+		if type(observed) ~= "table" then return false end
+		for _, name in ipairs({ "value", "code", "active", "replace", "admitted", "magic", "typable" }) do
+			if observed[name] ~= facts[name] then return false end
+		end
+		local content, classification = collision_read(path)
+		return classification == status and content == bytes and collision_route("config.toml") == path and private_current()
+	end
+	if not current() then return nil end
+	local claims = {}
+	if facts.code ~= nil and facts.active and facts.replace and facts.admitted and facts.typable then
+		claims[1] = { kind = "chord", binding = "magic_key_source__replacement", code = facts.code, mods = {} }
+	end
+	return { path = path, content = bytes, status = status, claims = claims, current = current, sealed = private_current }
+end
+M.capture_collision_inventory = collision_factory
 
 return M

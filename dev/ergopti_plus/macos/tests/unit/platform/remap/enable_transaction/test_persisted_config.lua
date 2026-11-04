@@ -36,12 +36,14 @@ helpers.describe("HS-019 malformed TOML keeps the real Clear All command inert",
 			local MenuRemap = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 			package.loaded["infra.logger"] = saved_logger
 
-			local built = MenuRemap.build({
-				karabiner = remap,
-				updateMenu = function()
-					observations.refreshes = observations.refreshes + 1
-				end,
-			})
+			local function build_menu()
+				return MenuRemap.build({
+					karabiner = remap,
+					updateMenu = function()
+						observations.refreshes = observations.refreshes + 1
+					end,
+				})
+			end
 			local function children(row)
 				if type(row) ~= "table" then return {} end
 				return row.submenu or row.items or row.menu or {}
@@ -55,6 +57,26 @@ helpers.describe("HS-019 malformed TOML keeps the real Clear All command inert",
 				end
 				return nil
 			end
+			local function find_prefixed(row, label)
+				if type(row) ~= "table" then return nil end
+				if type(row.title) == "string" and row.title:sub(1, #label) == label then return row end
+				for _, child in ipairs(children(row)) do
+					local found = find_prefixed(child, label)
+					if found then return found end
+				end
+				return nil
+			end
+			-- The failed owner reads off, so the category-off rule greys the row.
+			local greyed = find_prefixed(build_menu(), "common.clear_to_system")
+			helpers.assert_not_nil(greyed, "the real manifest must draw the Clear All row")
+			helpers.assert_eq(greyed.disabled, true, "Clear All is greyed while the failed owner reads off")
+			helpers.assert_nil(greyed.fn, "a greyed Clear All runs nothing")
+			-- Read on, the row is live and the command itself must still refuse.
+			local read_off = remap.get_tap_holds_enabled
+			remap.get_tap_holds_enabled = function() return true end
+			local built_ok, built = pcall(build_menu)
+			remap.get_tap_holds_enabled = read_off
+			if not built_ok then error(built, 0) end
 			local row = find_row(built, "common.clear_to_system")
 			helpers.assert_not_nil(row,
 				"the real manifest must expose the Clear All command")

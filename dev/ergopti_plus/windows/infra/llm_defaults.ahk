@@ -179,7 +179,7 @@ LLM_Defaults_Load() {
 
 	; Booleans (all present in defaults.json)
 	for key in ["llm_enabled", "llm_show_info_bar", "llm_streaming", "llm_streaming_multi",
-		"llm_instant_on_word_end", "llm_after_hotstring", "llm_reset_on_nav",
+		MenuCommand.LLM_INSTANT_ON_WORD_END, MenuCommand.LLM_AFTER_HOTSTRING, MenuCommand.LLM_RESET_ON_NAV,
 		"llm_auto_raise_temp", "llm_disable_url_bars", "llm_disable_password_fields"] {
 		if !_LLMD_HasKey(raw, key)
 			missing.Push(key)
@@ -189,7 +189,7 @@ LLM_Defaults_Load() {
 
 	; Numbers
 	for key in ["llm_num_predictions", "llm_debounce_ms", "llm_context_length",
-		"llm_min_words", "llm_max_words", "llm_pred_indent", "llm_ollama_port"] {
+		"llm_min_words", "llm_max_words", "llm_pred_indent", "llm_ollama_port", "llm_ollama_owned_port"] {
 		if !_LLMD_HasKey(raw, key)
 			missing.Push(key)
 		else
@@ -208,6 +208,12 @@ LLM_Defaults_Load() {
 		else
 			d[key] := _LLMD_GetString(raw, key)
 	}
+
+	; The test prediction's temperature stays a number: it is sent, never displayed.
+	if !_LLMD_HasKey(raw, "llm_test_prediction_temperature")
+		missing.Push("llm_test_prediction_temperature")
+	else
+		d["llm_test_prediction_temperature"] := _LLMD_GetNumber(raw, "llm_test_prediction_temperature")
 
 	; Temperature stored as string to preserve decimal precision in display
 	if !_LLMD_HasKey(raw, "llm_temperature")

@@ -23,11 +23,14 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local Reader = require("toml_codec")
 local Mask   = require("personal_info.mask")
 local Paths  = require("infra.paths")
+local FileReader = require("infra.regular_file_reader")
+local ErrorDescription = require("error_description")
 
 local LOG = "infra.personal_info_fields"
 
@@ -70,6 +73,21 @@ local function resolve_path()
 	return Paths.shared("modules/personal_info/fields.toml")
 end
 
+--- Validates named field records before the shared mask reads their flags.
+--- Source receipts distinguish an empty TOML array from an empty field map.
+--- @param fields any Parsed optional field dictionary.
+--- @param shapes table Canonical source-bound array identity receipts.
+--- @return boolean valid
+local function valid_fields(fields, shapes)
+	if fields == nil then return true end
+	if type(fields) ~= "table" or shapes.arrays[fields] then return false end
+	for name, entry in pairs(fields) do
+		if type(name) ~= "string" or type(entry) ~= "table" or shapes.arrays[entry]
+			or (entry.masked ~= nil and type(entry.masked) ~= "boolean") then return false end
+	end
+	return true
+end
+
 --- Loads the declaration, once.
 --- @return table { policy = table, fields = table }
 local function declaration()
@@ -85,19 +103,26 @@ local function declaration()
 	-- Read then decode: toml_codec exposes `decode(string)`, not `parse(path)` —
 	-- the timings reader's `Reader.parse` is a different module, and calling the
 	-- wrong one here fails closed, which is safe and completely silent about why.
-	local fh = io.open(path, "r")
+	local fh = FileReader.open_source(path)
 	if not fh then
 		Logger.error(LOG, "Cannot open '%s' — masking everything.", path)
 		_declaration = FAIL_CLOSED
 		return _declaration
 	end
-	local content = fh:read("*a")
-	fh:close()
+	local read_ok, content, read_error = pcall(fh.read, fh, "*a")
+	local close_ok, closed, close_error = pcall(fh.close, fh)
+	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
+		local detail = not read_ok and content or (not close_ok and closed) or read_error or close_error
+		Logger.error(LOG, "Cannot read and close '%s' — masking everything. (%s)", path, ErrorDescription.describe(detail))
+		_declaration = FAIL_CLOSED
+		return _declaration
+	end
 
-	local ok, parsed = pcall(Reader.decode, content)
-	if not ok or type(parsed) ~= "table" or type(parsed.policy) ~= "table" then
+	local ok, parsed, shapes = pcall(Reader.decode_with_shapes, content)
+	if not ok or type(parsed) ~= "table" or type(parsed.policy) ~= "table"
+		or type(shapes) ~= "table" or type(shapes.arrays) ~= "table" then
 		Logger.error(LOG, "Could not parse '%s' — masking everything. (%s)", path,
-			ok and "malformed" or tostring(parsed))
+			ok and "malformed" or ErrorDescription.describe(parsed))
 		_declaration = FAIL_CLOSED
 		return _declaration
 	end
@@ -109,12 +134,14 @@ local function declaration()
 		return _declaration
 	end
 
+	if not valid_fields(parsed.fields, shapes) then
+		Logger.error(LOG, "The shared field classification is malformed — masking everything.")
+		_declaration = FAIL_CLOSED
+		return _declaration
+	end
+
 	_declaration = { policy = parsed.policy, fields = parsed.fields or {} }
-	Logger.debug(LOG, "Field classification loaded (%d field(s) declared).", (function()
-		local n = 0
-		for _ in pairs(_declaration.fields) do n = n + 1 end
-		return n
-	end)())
+	Logger.debug(LOG, "Field classification loaded (%d field(s) declared).", TableUtil.count(_declaration.fields))
 	return _declaration
 end
 

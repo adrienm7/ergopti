@@ -10,12 +10,15 @@
 
 #Requires AutoHotkey v2.0
 
-_LLM_Menu_BeginOllamaAux(Kind, Identity := "") {
-	global LLM_OLLAMA_BASE_URL
-	return LLM_AuxBegin(Kind, Map(
-		"backend", "ollama",
-		"endpoint", LLM_OLLAMA_BASE_URL,
-		"identity", Identity))
+_LLM_Menu_BeginOllamaAux(Kind, Identity := "", Custody := 0) {
+	if Custody != 0 && !HasMethod(Custody, "Call")
+		throw TypeError("Ollama origin custody must be callable or zero.")
+	Context := Map("backend", "ollama",
+		"endpoint", Custody != 0 ? Custody.Call("origin") : LLM_OllamaRequestOrigin(),
+		"identity", Identity)
+	if Custody != 0
+		Context["origin_custody"] := Custody
+	return LLM_AuxBegin(Kind, Context)
 }
 
 _LLM_Menu_AuxOwnerIsCurrent(Owner, Backend := "ollama") {
@@ -198,8 +201,8 @@ _LLM_Menu_OnInstalledTagsProbeDone(tags, Owner := 0, BuildFn := 0) {
 	if MustResumeBridge {
 		if IsSet(LLM_Menu_EnsureModelReady)
 			LLM_Menu_EnsureModelReady()
-		if IsSet(LLM_Menu_TryStartBridge)
-			LLM_Menu_TryStartBridge()
+		if IsSet(LLM_Menu_ResumeBackendLifecycleAfterTags)
+			LLM_Menu_ResumeBackendLifecycleAfterTags()
 	}
 	if Changed
 		_LLM_Menu_AuxBuild(BuildFn)

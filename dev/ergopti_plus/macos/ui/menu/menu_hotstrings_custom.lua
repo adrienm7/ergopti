@@ -23,6 +23,7 @@ local dialog = require("infra.dialog_util")
 local Chord = require("chord")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local ManifestMenu = require("infra.manifest_menu")
+local TableUtil = require("table_util")
 
 
 
@@ -171,8 +172,9 @@ end
 --- @param group_names table Native registry category ids.
 --- @param enabled boolean Explicit requested posture.
 --- @param admission function|nil Current exclusive personal-file owner check.
+--- @param excluded table|nil group -> { section = true } another submenu draws.
 --- @return function
-function M.category_scope_fn(ctx, group_names, enabled, admission)
+function M.category_scope_fn(ctx, group_names, enabled, admission, excluded)
 	local file_checks = {}
 	for _, name in ipairs(group_names) do
 		if PersonalFiles.components(name) then
@@ -201,7 +203,7 @@ function M.category_scope_fn(ctx, group_names, enabled, admission)
 				for _, name in ipairs(group_names) do ctx.state.hotstrings[name] = enabled end
 				if ctx.save_prefs() ~= true then return false end
 				return true
-			end)
+			end, excluded)
 			scope_committed = result == true
 			return result
 		end, function() ctx.updateMenu() end)
@@ -255,7 +257,7 @@ end
 --- @return table Provider row.
 function M.all_sections_row(ctx, group_names, set_fn)
 	local all_on = M.all_sections_on(ctx, group_names)
-	local row = ManifestMenu.check_row("hotstring_scope_checkbox", "hotstring_scope_all_sections",
+	local row = ManifestMenu.check_row("hotstring_scope_checkbox", require("config_keys").COMMAND.HOTSTRING_SCOPE_ALL_SECTIONS,
 		{ hotstring_scope_all_sections = function() return false end },
 		{ hotstring_scope_all_on = function() return all_on end })
 	if not row then return nil end
@@ -427,13 +429,14 @@ function M.build_custom(ctx, counts)
 			current_str = table.concat(coerce_mods(state.custom_editor_shortcut.mods), "+")
 				.. "+" .. tostring(state.custom_editor_shortcut.key or "")
 		end
+		local ok_label = i18n.get("button.ok")
 		local ok_p, btn, raw = pcall(dialog.text_prompt,
 			i18n.get("hotstrings.shortcut_custom"),
 			i18n.get("menu.hotstrings.shortcut_prompt"),
-			current_str, "OK", i18n.get("common.cancel")
+			current_str, ok_label, i18n.get("common.cancel")
 		)
-		if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return false end
-		raw = raw:match("^%s*(.-)%s*$"):lower()
+		if not ok_p or btn ~= ok_label or type(raw) ~= "string" then return false end
+		raw = text_utils.trim(raw):lower()
 		if raw == "" then return apply_shortcut(nil, nil) end
 		local chord_input = raw:find("+", 1, true) and raw or ("ctrl+" .. raw)
 		local parsed = Chord.parse(chord_input)
@@ -482,10 +485,9 @@ function M.build_custom(ctx, counts)
 						and sec.description or tostring(sec.name):gsub("_", " ")
 					lbl = ctx.applyTriggerChar(lbl)
 					local sname = sec.name
-					table.insert(cat_choices, {
-						label   = lbl,
-						checked = (state.custom_default_section == sname) or nil,
-						action      = function()
+					local selected = (state.custom_default_section == sname) or nil
+					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION, {
+						[require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION] = function()
 							state.custom_default_section = sname
 							if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
 								pcall(ctx.hotstring_editor.set_default_section, sname)
@@ -493,14 +495,19 @@ function M.build_custom(ctx, counts)
 							if ctx.save_prefs() ~= true then return false end
 							ctx.updateMenu()
 						end,
+					}, {
+						personal_default_section_label = function() return lbl end,
+						personal_default_section_selected = function() return selected end,
 					})
+					if type(choice) ~= "table" then return nil end
+					table.insert(cat_choices, choice)
 				end
 			end
 		end
 	end
 
 	local cat_menu = ManifestMenu.template_rows("hotstring_personal_default_frame", {
-		["personal_default_none"] = none_action,
+		[require("config_keys").COMMAND.PERSONAL_DEFAULT_NONE] = none_action,
 	}, {
 		["personal_default_unset"] = function() return not state.custom_default_section end,
 		["personal_default_boundary"] = function() return #cat_choices > 0 end,
@@ -541,13 +548,22 @@ function M.build_custom(ctx, counts)
 				local lbl = (type(sec.description) == "string" and sec.description ~= "")
 					and sec.description or tostring(sec.name):gsub("_", " ")
 				lbl = ctx.applyTriggerChar(lbl)
-				target[#target + 1] = {
-					label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
-					checked  = sec_on or nil,
-					action       = (group_enabled and not paused)
-							   and toggleSectionFn(ctx, group_name, sec.name, lbl, admission) or nil,
-					disabled = not group_enabled or paused or nil,
-				}
+				local ready = group_enabled and not paused
+				local caption = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl
+				-- The original factory only allocates this closure; native effects run on delivery.
+				local action = toggleSectionFn(ctx, group_name, sec.name, lbl, admission)
+				local row = ManifestMenu.check_row("hotstring_personal_section_choice", require("config_keys").COMMAND.PERSONAL_SECTION_TOGGLE, {
+					personal_section_toggle = action,
+				}, {
+					personal_section_label = function() return caption end,
+					personal_section_selected = function() return sec_on end,
+					personal_section_ready = function() return ready end,
+				})
+				if type(row) ~= "table" then return false end
+				-- Preserve the native nil fields of the original inert and unchecked leaves.
+				if not ready then row.action = nil end
+				if row.checked == false then row.checked = nil end
+				target[#target + 1] = row
 			end
 			::continue_sec::
 		end
@@ -570,7 +586,7 @@ function M.build_custom(ctx, counts)
 			if editor_ready() then pcall(ctx.hotstring_editor.open) end
 		end, "menu_hotstrings_custom.open_editor")
 	end
-	local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
+	local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("config_keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
 		{ personal_hotstring_open_editor = open_editor },
 		{ personal_hotstring_editor_ready = editor_ready })
 	local close_action = function()
@@ -597,8 +613,8 @@ function M.build_custom(ctx, counts)
 		{ personal_default_caption = function() return cat_menu end })
 	if type(default_parent) ~= "table" or #default_parent ~= 1 then return nil end
 	local controls = ManifestMenu.template_rows("hotstring_personal_controls_frame", {
-		["hotstring_file_open"] = function() open_toml_path(toml_path_for_group(ctx, "personal")) end,
-		["personal_close_on_add"] = close_action,
+		[require("config_keys").COMMAND.HOTSTRING_FILE_OPEN] = function() open_toml_path(toml_path_for_group(ctx, "personal")) end,
+		[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = close_action,
 	}, {
 		["hotstring_file_ready"] = function() return not paused end,
 		["personal_open_present"] = function() return true end,
@@ -606,7 +622,7 @@ function M.build_custom(ctx, counts)
 		["personal_controls_tail_boundary"] = function() return false end,
 		["personal_preferences_present"] = function() return true end,
 		["personal_controls_ready"] = function() return not paused end,
-		["personal_close_on_add"] = function() return state.custom_close_on_add == true end,
+		[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = function() return state.custom_close_on_add == true end,
 	}, {
 		["personal_editor"] = function() return editor_row and { editor_row } or {} end,
 		["personal_default_parent"] = function() return default_parent end,
@@ -625,8 +641,8 @@ function M.build_custom(ctx, counts)
 	local function scope_menu(names, file_rows, section_rows)
 		return ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
 			{ commands = {
-				["hotstring_category_enable_all"] = M.category_scope_fn(ctx, names, true),
-				["hotstring_category_disable_all"] = M.category_scope_fn(ctx, names, false),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = M.category_scope_fn(ctx, names, true),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = M.category_scope_fn(ctx, names, false),
 			} }, {
 				["hotstring_category_file"] = function() return file_rows end,
 				["hotstring_category_sections"] = function() return section_rows end,
@@ -635,7 +651,7 @@ function M.build_custom(ctx, counts)
 	local function file_menu_for_group(gname, rows, check, readonly)
 		local path = toml_path_for_group(ctx, gname)
 		local file_rows = ManifestMenu.template_rows("hotstring_personal_file_frame", {
-			["hotstring_file_open"] = function() open_toml_path(path) end,
+			[require("config_keys").COMMAND.HOTSTRING_FILE_OPEN] = function() open_toml_path(path) end,
 		}, {
 			["hotstring_file_ready"] = function() return true end,
 			["personal_file_open_present"] = function() return path ~= nil end,
@@ -648,8 +664,8 @@ function M.build_custom(ctx, counts)
 
 		local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
 			{ commands = {
-				["hotstring_category_enable_all"] = M.category_scope_fn(ctx, { gname }, true, check),
-				["hotstring_category_disable_all"] = M.category_scope_fn(ctx, { gname }, false, check),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = M.category_scope_fn(ctx, { gname }, true, check),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = M.category_scope_fn(ctx, { gname }, false, check),
 			} }, {
 				["hotstring_category_file"] = function() return file_rows end,
 				["hotstring_category_sections"] = function() return rows end,
@@ -698,10 +714,7 @@ function M.build_custom(ctx, counts)
 		})
 	end
 	local function sorted_keys(tbl)
-		local keys = {}
-		for key in pairs(type(tbl) == "table" and tbl or {}) do keys[#keys + 1] = key end
-		table.sort(keys)
-		return keys
+		return TableUtil.sorted_keys(type(tbl) == "table" and tbl or {})
 	end
 	-- Sum all hotstring counts inside a node and its sub-nodes recursively.
 	local function node_total(node)

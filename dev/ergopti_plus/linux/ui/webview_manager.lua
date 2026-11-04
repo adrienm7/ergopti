@@ -20,13 +20,14 @@
 ---    operations work without leaking resources.
 --- 3. Shared HTML loading: delegates to webkit_host.build_app_html() for
 ---    asset inlining and i18n injection.
---- 4. Daemon state injection: passes engine, keylogger, hotstrings_config, and
+--- 4. Daemon state injection: passes engine, keystats, hotstrings_config, and
 ---    LLM references to bridge handlers so UIs can query/control daemon state.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
 local Monotonic = require("infra.monotonic")
 local LOG = "ui.webview_manager"
 
@@ -37,6 +38,91 @@ local UNFOCUSED_APPS = { error_dialog = true }
 -- The generated shared policy owns branding for every native host.
 local WindowTitles = require("window_titles")
 
+-- These receipts prepare page content only; GTK keeps the app's generic caption.
+local ContextLookupOwner = rawget(WindowTitles, "presentation_for_app")
+local ContextComposeOwner = rawget(WindowTitles, "compose")
+local ContextKeyOwner = rawget(WindowTitles, "key_for_app")
+local ContextPresentation = require("webview.presentation")
+local ContextPrepareOwner = rawget(ContextPresentation, "prepare_contextual_title")
+local _contextual_title_receipts = setmetatable({}, { __mode = "k" })
+local ContextPrepareApi, ContextFieldsApi, ContextCurrentApi, ContextShowOwner, ContextCreateOwner, ContextWindowTitleOwner
+
+--- Prepares declared page-title content through this manager's genuine receipt.
+--- @param presentation_id string Declared action_picker context.
+--- @param suffix string Ordinary one-line display data, never binding authority.
+--- @param source_opts table Actual plain picker request retained for title-only custody.
+--- @return table|nil Opaque empty receiving receipt.
+function M.prepare_app_contextual_title(presentation_id, suffix, source_opts)
+	if type(source_opts) ~= "table" or getmetatable(source_opts) ~= nil
+		or rawget(source_opts, "presentation_id") ~= presentation_id
+		or rawget(source_opts, "presentation_suffix") ~= suffix
+		or rawget(source_opts, "title") ~= nil or rawget(source_opts, "label") ~= nil then return nil end
+	local Presentation = ContextPresentation
+	local I18n, Locale = require("infra.i18n"), require("infra.locale")
+	local Core = require("locale.core")
+	if type(I18n) ~= "table" or type(Locale) ~= "table" or type(Core) ~= "table" then return nil end
+	local prepare, translate = ContextPrepareOwner, rawget(I18n, "get")
+	local locale_get, locale_current = rawget(Locale, "get"), rawget(Locale, "current_locale")
+	local core_get, core_current = rawget(Core, "get"), rawget(Core, "current_locale")
+	local function owners_live()
+		return getmetatable(source_opts) == nil
+			and rawget(source_opts, "presentation_id") == presentation_id
+			and rawget(source_opts, "presentation_suffix") == suffix
+			and rawget(source_opts, "title") == nil and rawget(source_opts, "label") == nil
+			and getmetatable(M) == nil and rawget(package.loaded, "ui.webview_manager") == M
+			and getmetatable(WindowTitles) == nil and rawget(package.loaded, "window_titles") == WindowTitles
+			and getmetatable(Presentation) == nil and rawget(package.loaded, "webview.presentation") == Presentation
+			and getmetatable(I18n) == nil and rawget(package.loaded, "infra.i18n") == I18n
+			and getmetatable(Locale) == nil and rawget(package.loaded, "infra.locale") == Locale
+			and getmetatable(Core) == nil and rawget(package.loaded, "locale.core") == Core
+			and rawget(WindowTitles, "presentation_for_app") == ContextLookupOwner
+			and rawget(WindowTitles, "compose") == ContextComposeOwner
+			and rawget(WindowTitles, "key_for_app") == ContextKeyOwner
+			and rawget(M, "window_title") == ContextWindowTitleOwner
+			and rawget(Presentation, "prepare_contextual_title") == prepare and type(prepare) == "function"
+			and rawget(I18n, "get") == translate and rawget(Locale, "get") == locale_get
+			and rawget(Locale, "current_locale") == locale_current
+			and rawget(Core, "get") == core_get and rawget(Core, "current_locale") == core_current
+			and rawget(M, "prepare_app_contextual_title") == ContextPrepareApi
+			and rawget(M, "contextual_title_fields") == ContextFieldsApi
+			and rawget(M, "contextual_title_current") == ContextCurrentApi
+			and rawget(M, "show") == ContextShowOwner and rawget(M, "_create_gtk_window") == ContextCreateOwner
+	end
+	if not owners_live() then return nil end
+	local ok, prepared = pcall(prepare, WindowTitles, I18n, Locale, "action_picker",
+		presentation_id, "linux", suffix, owners_live)
+	if not ok or type(prepared) ~= "table" or getmetatable(prepared) ~= nil
+		or type(rawget(prepared, "current")) ~= "function" or not owners_live()
+		or prepared.current() ~= true then return nil end
+	local receipt = {}
+	_contextual_title_receipts[receipt] = { title = prepared.title, current = prepared.current }
+	return receipt
+end
+
+--- Authenticates only receipts minted here against the retained Source cohort.
+--- @param receipt table Opaque empty receiving receipt.
+--- @return boolean current
+function M.contextual_title_current(receipt)
+	if type(receipt) ~= "table" or getmetatable(receipt) ~= nil or next(receipt) ~= nil
+		or rawget(M, "contextual_title_current") ~= ContextCurrentApi then return false end
+	local retained = _contextual_title_receipts[receipt]
+	if retained == nil then return false end
+	local ok, current = pcall(retained.current)
+	return ok and current == true
+end
+
+--- Returns the prepared page title; it does not change any native window caption.
+--- @param receipt table Opaque empty receiving receipt.
+--- @return string|nil title
+function M.contextual_title_fields(receipt)
+	if not ContextCurrentApi(receipt) then return nil end
+	return _contextual_title_receipts[receipt].title
+end
+
+local function contextual_title_live(app_name, receipt)
+	return receipt == nil or (app_name == "action_picker" and ContextCurrentApi(receipt))
+end
+
 -- webkit_host provides HTML building and bridge name registry.
 local webkit_host = require("ui.webkit_host")
 
@@ -45,6 +131,7 @@ local webkit_host = require("ui.webkit_host")
 -- every object a page posted became nil and no reply reached a page, so the
 -- metrics windows stayed empty and the editors' buttons did nothing.
 local Json = require("json")
+local ConfigKeys = require("config_keys")
 
 
 -- =========================================
@@ -67,6 +154,7 @@ local _lgi = nil
 
 -- Native GTK window references: { [app_name] = { window, webview } }
 local _gtk_windows = {}
+local _gtk_pump_registered = false
 local _native_ready = false
 local _native_query_generation = 0
 local _shutting_down = false
@@ -76,8 +164,8 @@ local _shutting_down = false
 -- replacement.
 local _next_window_epoch = 0
 
--- Only the actual Versions and network progress producers require this protocol.
-local DOCUMENT_APPS = { changelog = true, download_window = true }
+-- Deferred producers publish only into their exact acknowledged document.
+local DOCUMENT_APPS = { changelog = true, download_window = true, model_browser = true }
 local _document_windows, _document_debts = {}, {}
 
 --- Announces a native initialization error without writing to the failed page.
@@ -93,7 +181,7 @@ local function notify_document_refusal(private_current)
 			and private_current() == true
 	end
 	local loaded, admitted = pcall(function()
-		local I18n, Notifier = require("infra.i18n"), require("adapters.notifier")
+		local I18n, Notifier = require("infra.i18n"), require("adapters.application_notifier")
 		if type(Notifier.send_owned) ~= "function" or not admit() then return false end
 		local title, message = I18n.get("error_dialog.heading"), I18n.get("error_dialog.intro")
 		if type(title) ~= "string" or title == "" or title == "error_dialog.heading"
@@ -220,9 +308,10 @@ local function _driver_root()
 	-- the driver's UI was reorganised by feature to match macOS and Windows, and a
 	-- stale depth here resolves to a directory that exists but holds nothing —
 	-- which is how every other wrong-depth path in this driver failed.
-	return (src:match("^(.*)[/\\\\]ui[/\\\\]webview_manager%.lua$")
-		or src:match("^(.*)[/\\\\]ui$")
-		or "."):gsub("\\", "/")
+	-- A backslash is a Linux filename byte: it neither splits nor is rewritten.
+	if NativePath.basename(src) == "webview_manager.lua" then src = NativePath.dirname(src) or "" end
+	if NativePath.basename(src) ~= "ui" then return "." end
+	return NativePath.dirname(src) or "."
 end
 
 --- Where each shared-UI app's bridge lives, as an explicit table rather than a
@@ -369,7 +458,8 @@ end
 --- @param app_name string The shared UI app directory name (e.g. "action_picker").
 --- @param active_locale string|nil Locale code (default: the interface's).
 --- @return boolean true if the window was opened or brought to front.
-function M.show(app_name, active_locale)
+function M.show(app_name, active_locale, contextual_receipt)
+	if not contextual_title_live(app_name, contextual_receipt) then return false end
 	if _shutting_down then return false end
 	if type(app_name) ~= "string" or app_name == "" then
 		Logger.error(LOG, "show(): app_name is required.")
@@ -381,9 +471,11 @@ function M.show(app_name, active_locale)
 		local ok, I18n = pcall(require, "infra.i18n")
 		active_locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 		if type(active_locale) ~= "string" or active_locale == "" then
-			active_locale = require("infra.manifest_reader").default_for("script.locale")
+			active_locale = require("infra.manifest_reader").default_for(ConfigKeys.KEY.SCRIPT_LOCALE)
 		end
 	end
+
+	if not contextual_title_live(app_name, contextual_receipt) then return false end
 
 	-- If window already exists, bring to front.
 	if _windows[app_name] then
@@ -395,13 +487,11 @@ function M.show(app_name, active_locale)
 			local replacement = _windows[app_name]
 			if replacement then
 				if replacement.acquiring or replacement.closing or replacement.failed or replacement.debt then return false end
-				M.bring_to_front(app_name)
-				return _windows[app_name] == replacement
+				return M.bring_to_front(app_name) == true and _windows[app_name] == replacement
 			end
 		else
 			Logger.debug(LOG, "Window '%s' already open — bringing to front.", app_name)
-			M.bring_to_front(app_name)
-			return true
+			return M.bring_to_front(app_name) == true
 		end
 	end
 
@@ -418,6 +508,8 @@ function M.show(app_name, active_locale)
 		Logger.error(LOG, "show(): app '%s' has no valid owned bridge.", app_name)
 		return false
 	end
+
+	if not contextual_title_live(app_name, contextual_receipt) then return false end
 
 	-- Store window state.
 	_next_window_epoch = _next_window_epoch + 1
@@ -446,7 +538,8 @@ function M.show(app_name, active_locale)
 	-- inject a native boundary without weakening the production contract.
 	local creation_owner = _windows[app_name]
 	local create_ok, created, create_err = xpcall(function()
-		return M._create_gtk_window(app_name, html, handler)
+		if not contextual_title_live(app_name, contextual_receipt) then return false end
+		return M._create_gtk_window(app_name, html, handler, contextual_receipt)
 	end, debug.traceback)
 	owned.acquiring = false
 	if not create_ok or created ~= true or owned.cancelled or _windows[app_name] ~= owned then
@@ -523,15 +616,16 @@ end
 
 --- Brings an existing window to the front.
 --- @param app_name string The app name.
+--- @return boolean presented The exact page survived native presentation.
 function M.bring_to_front(app_name)
-	if not _windows[app_name] then return end
-	_windows[app_name].visible = true
-	-- GTK window focus is handled by _create_gtk_window on first show;
-	-- subsequent front-bringing needs GTK API (not available in pure Lua).
-	if _gtk_available then
-		M._focus_gtk_window(app_name)
-	end
+	local owned = _windows[app_name]
+	if not owned or not M.page_current(app_name, owned.epoch) then return false end
+	if M._focus_gtk_window(app_name) ~= true then return false end
+	-- GTK presentation can synchronously close the page or open a successor.
+	if _windows[app_name] ~= owned or not M.page_current(app_name, owned.epoch) then return false end
+	owned.visible = true
 	Logger.debug(LOG, "Window '%s' brought to front.", app_name)
+	return true
 end
 
 --- Returns true if a window is currently visible.
@@ -539,6 +633,47 @@ end
 --- @return boolean
 function M.is_visible(app_name)
 	return _windows[app_name] ~= nil and _windows[app_name].visible == true
+end
+
+--- True when the app's native window holds the keyboard focus (GTK is-active).
+--- A failed lookup reads as not frontmost, so a toggle presents the window
+--- rather than closing one the user may not see.
+--- @param app_name string The app name.
+--- @return boolean
+function M.is_frontmost(app_name)
+	return M.is_visible(app_name) and M._gtk_window_active(app_name) == true
+end
+
+--- Reads GTK's is-active flag of the app's native window (Linux only).
+--- @param app_name string The app name.
+--- @return boolean
+function M._gtk_window_active(app_name)
+	local wref = _gtk_windows[app_name]
+	if not wref or not wref.window then return false end
+	local ok, active = pcall(function() return wref.window.is_active end)
+	return ok and active == true
+end
+
+--- Toggles one page window for the shared `open_*` window actions
+--- (_shared/modules/actions/actions.toml, group "UI"): closed opens and
+--- focuses it, open but hidden or behind another window brings it to the
+--- front, open and frontmost closes it. The window pool is the only state read.
+--- @param app_name string The app name.
+--- @param open_fn function|nil The page's own opener, when it is not show().
+--- @return boolean committed The requested transition committed.
+function M.toggle(app_name, open_fn)
+	local owned = _windows[app_name]
+	if owned == nil then
+		Logger.debug(LOG, "Toggle '%s': closed, opening.", app_name)
+		if open_fn ~= nil then return open_fn() == true end
+		return M.show(app_name) == true
+	end
+	if not M.is_frontmost(app_name) then
+		Logger.debug(LOG, "Toggle '%s': open but not frontmost, bringing to front.", app_name)
+		return M.bring_to_front(app_name) == true
+	end
+	Logger.debug(LOG, "Toggle '%s': frontmost, closing.", app_name)
+	return M.hide(app_name, owned.epoch) == true
 end
 
 --- Composes a native window title. The product name is added here only, so
@@ -580,7 +715,7 @@ end
 
 --- Registers daemon state that bridge handlers can access to query/control
 --- the running daemon.
---- @param state table { engine, keylogger, config, llm, layout }
+--- @param state table { engine, keystats, config, llm, layout }
 function M.set_daemon_state(state)
 	_daemon_state = type(state) == "table" and state or {}
 	Logger.debug(LOG, "Daemon state registered for bridge handlers.")
@@ -630,11 +765,23 @@ function M.eval_js(app_name, js_code)
 		Logger.debug(LOG, "eval_js: no live webview for '%s' — nothing to push to.", app_name)
 		return false
 	end
+	local owned = _windows[app_name]
+	local function current()
+		return owned ~= nil and _windows[app_name] == owned and _gtk_windows[app_name] == wref
+			and owned.epoch == wref.epoch and not owned.debt and not owned.failed
+			and not owned.closing and not owned.cancelled and not wref.cancelled
+			and not wref.retiring and not wref.settled and not wref.view_settled
+			and wref.registration == true and wref.signal_id ~= nil
+	end
+	-- A failed close retains native resources for retry, never page admission.
+	-- A live acquiring page still needs its synchronous ready response.
+	if not current() then return false end
 	local ok, err = pcall(function() wref.webview:run_javascript(js_code, nil, nil, nil) end)
 	if not ok then
 		Logger.error(LOG, "eval_js: run_javascript failed for '%s': %s", app_name, tostring(err))
 		return false
 	end
+	if not current() then return false end
 	Logger.debug(LOG, "eval_js: pushed %d char(s) to '%s'.", #js_code, app_name)
 	return true
 end
@@ -675,7 +822,11 @@ function M.route_message(app_name, bridge_name, payload, source_epoch)
 		return nil
 	end
 
-	local handler = _windows[app_name] and _windows[app_name].handler or _load_handler(app_name)
+	local owned = _windows[app_name]
+	-- Cleanup debt retains resource ownership, never permission to mutate settings.
+	-- Initial ready messages remain admitted while a live page is acquiring.
+	if source_epoch ~= nil and owned and (owned.debt or owned.failed or owned.closing or owned.cancelled) then return nil end
+	local handler = owned and owned.handler or _load_handler(app_name)
 	if not handler or handler.bridge_name ~= expected_bridge
 		or type(handler.on_message) ~= "function" then
 		Logger.warn(LOG, "Owned handler for '%s' is unavailable or mismatched.", app_name)
@@ -820,6 +971,13 @@ local function _app_title(app_name)
 end
 M._app_title = _app_title
 
+--- Composes a manifest app's native caption: its translated name, branded once.
+--- @param app_name string The app directory name.
+--- @return string
+function M.app_caption(app_name)
+	return M.window_title(_app_title(app_name))
+end
+
 
 -- =========================================
 -- ======= 7/ GTK Window Operations ========
@@ -860,7 +1018,8 @@ end
 --- @param handler table|nil The bridge handler module.
 --- @return boolean true only after the native window is tracked.
 --- @return string|nil error_message Exact refusal reason.
-function M._create_gtk_window(app_name, html, handler)
+function M._create_gtk_window(app_name, html, handler, contextual_receipt)
+	if not contextual_title_live(app_name, contextual_receipt) then return false, "page title admission refused" end
 	if not _gtk_available or not _lgi then return false, "GTK/WebKit unavailable" end
 	if _gtk_windows[app_name] then return false, "native acquisition already owned" end
 	local window_epoch = M.current_epoch(app_name) or 0
@@ -875,9 +1034,15 @@ function M._create_gtk_window(app_name, html, handler)
 		-- Read geometry from the single-source manifest.
 		local geometry = _read_app_geometry(app_name)
 
+		if not contextual_title_live(app_name, contextual_receipt) then return false, "page title admission refused" end
+
+		-- Contextual content never changes this generic native app caption.
+		local caption = M.app_caption(app_name)
+		if not contextual_title_live(app_name, contextual_receipt) then return false, "page title admission refused" end
+
 		-- ── Create the GTK window ──
 		local window = Gtk.Window({
-			title            = M.window_title(_app_title(app_name)),
+			title            = caption,
 			default_width    = geometry.width,
 			default_height   = geometry.height,
 			window_position  = Gtk.WindowPosition.CENTER,
@@ -887,7 +1052,8 @@ function M._create_gtk_window(app_name, html, handler)
 		})
 
 		attempt.window = window
-		if window == nil or window == false or attempt.cancelled then return false, "native acquisition revoked" end
+		if window == nil or window == false or attempt.cancelled
+			or not contextual_title_live(app_name, contextual_receipt) then return false, "native acquisition revoked" end
 
 		-- Set minimum size if supported.
 		local ok_size, size_err = pcall(function()
@@ -921,8 +1087,9 @@ function M._create_gtk_window(app_name, html, handler)
 			local js_value = js_result:get_js_value()
 			local payload = _js_value_to_lua(js_value)
 			local response, document_owner = M.route_message(app_name, bridge_name, payload, window_epoch)
-			if response ~= nil and _gtk_windows[app_name] and _gtk_windows[app_name].webview then
-				_send_response_to_js(_gtk_windows[app_name].webview, bridge_name, response, app_name, document_owner)
+			if response ~= nil and _gtk_windows[app_name] == attempt and not attempt.cancelled
+				and M.current_epoch(app_name) == window_epoch and attempt.webview then
+				_send_response_to_js(attempt.webview, bridge_name, response, app_name, document_owner)
 			end
 		end
 
@@ -1082,26 +1249,21 @@ function M._create_gtk_window(app_name, html, handler)
 			return M._handle_delete_event(app_name, window_epoch)
 		end
 
-		-- A renderer crash can bypass blur/delete-event while leaving the native
-		-- window object alive. Release only the epoch owned by this WebView.
+		-- A renderer crash retires the complete exact page, including ordinary
+		-- windows. Keeping its registry entry would refocus a dead view on retry.
 		pcall(function()
 			webview.on_web_process_terminated = function()
-				if document_entry then
-					-- A process crash does not acknowledge view/signal/window cleanup.
-					retire_document_entry(document_entry, true)
-					attempt.cancelled = true
-					local owned = _windows[app_name]
-					if owned and owned.epoch == window_epoch then
-						owned.cancelled = true
-						if not owned.acquiring and not owned.closing then M.hide(app_name, window_epoch) end
-					elseif not attempt.acquiring and not attempt.retiring then
-						M._destroy_gtk_window(app_name, window_epoch)
-					end
-					Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
-				else
-					Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
-					_release_app_ownership(app_name, window_epoch)
+				-- Process death does not acknowledge view/signal/window cleanup.
+				retire_document_entry(document_entry, true)
+				attempt.cancelled = true
+				local owned = _windows[app_name]
+				if owned and owned.epoch == window_epoch then
+					owned.cancelled = true
+					if not owned.acquiring and not owned.closing then M.hide(app_name, window_epoch) end
+				elseif not attempt.acquiring and not attempt.retiring then
+					M._destroy_gtk_window(app_name, window_epoch)
 				end
+				Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
 			end
 		end)
 
@@ -1116,23 +1278,28 @@ function M._create_gtk_window(app_name, html, handler)
 
 		Logger.success(LOG, "GTK window '%s' created (%dx%d).", app_name, geometry.width, geometry.height)
 
-		-- Pump GTK events: if the daemon has a luv event loop, integrate.
-		local ok_pump, pump_err = pcall(function()
-			local event_loop = require("adapters.event_loop")
-			if event_loop and event_loop.add_idle_handler then
-				event_loop.add_idle_handler(function()
+		-- All WebViews share one GTK context. Per-window handlers survive a close
+		-- in the event loop, so reopening a page accumulated an unbounded number
+		-- of dispatches and document polls on each keyboard tick.
+		if not _gtk_pump_registered then
+			local ok_pump = pcall(function()
+				local event_loop = require("adapters.event_loop")
+				assert(type(event_loop.add_idle_handler) == "function", "GTK event pump unavailable")
+				local accepted = event_loop.add_idle_handler(function()
 					poll_documents()
-					if _gtk_windows[app_name] then
+					if next(_gtk_windows) ~= nil then
 						local ctx = GLib.MainContext.default()
 						if ctx then ctx:iteration(false) end
 					end
 				end)
+				assert(accepted ~= false, "GTK event pump refused")
+			end)
+			if not ok_pump then
+				-- A mapped window without event-loop integration cannot be used.
+				Logger.error(LOG, "GTK event pump could not be attached for '%s'.", app_name)
+				return false, "GTK event pump unavailable"
 			end
-		end)
-		if not ok_pump then
-			-- Without this integration the window paints once and then freezes.
-			Logger.error(LOG, "GTK event pump could not be attached for '%s': %s.", app_name,
-				tostring(pump_err))
+			_gtk_pump_registered = true
 		end
 		return true
 	end)
@@ -1209,19 +1376,22 @@ end
 
 --- Focuses a GTK window, bringing it to the front (Linux only).
 --- @param app_name string The app name.
+--- @return boolean presented Native presentation retained the exact window.
 function M._focus_gtk_window(app_name)
-	if not _gtk_available or not _lgi then return end
+	if not _gtk_available or not _lgi then return false end
 	local wref = _gtk_windows[app_name]
 	if not wref or not wref.window then
 		Logger.debug(LOG, "GTK window '%s' not found — cannot focus.", app_name)
-		return
+		return false
 	end
 	local ok, err = pcall(M._present_gtk_window, wref.window, true)
 	if not ok then
 		Logger.error(LOG, "GTK window '%s' could not be presented: %s.", app_name, tostring(err))
-		return
+		return false
 	end
+	if _gtk_windows[app_name] ~= wref then return false end
 	Logger.debug(LOG, "GTK window '%s' focused.", app_name)
+	return true
 end
 
 
@@ -1294,6 +1464,13 @@ function M.shutdown()
 	if retired then Logger.info(LOG, "WebView manager shut down.") end
 	return retired
 end
+
+ContextPrepareApi = M.prepare_app_contextual_title
+ContextFieldsApi = M.contextual_title_fields
+ContextCurrentApi = M.contextual_title_current
+ContextShowOwner = M.show
+ContextCreateOwner = M._create_gtk_window
+ContextWindowTitleOwner = M.window_title
 
 -- Auto-init on module load so the GTK probe runs once.
 M.init()

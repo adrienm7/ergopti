@@ -106,6 +106,30 @@ helpers.describe("shared_proxy_policy: independent admission vectors", function(
 			helpers.assert_eq(module.new(inventory), nil)
 		end
 	end)
+
+	-- (pac-unavailable-fallback) The direct fallback of an unusable PAC follows
+	-- the canonical stage list only, and the policy refuses to widen it.
+	helpers.it("(pac-unavailable-fallback) only the listed lookup stages go direct", function()
+		local inventory = data()
+		local active = assert(module.new(inventory))
+		for _, stage in ipairs(inventory.pac_unavailable_fallback.stages) do
+			helpers.assert_true(active.falls_back_direct(stage), stage)
+		end
+		for _, stage in ipairs({ "native_proxy_dictionary", "native_session_terminal", "", false }) do
+			helpers.assert_eq(active.falls_back_direct(stage), false, tostring(stage))
+		end
+		for _, mutate in ipairs({
+			function(value) value.pac_unavailable_fallback = nil end,
+			function(value) value.pac_unavailable_fallback.route = "proxy" end,
+			function(value) value.pac_unavailable_fallback.explicit_environment_relay = "direct" end,
+			function(value) value.pac_unavailable_fallback.pac_selected_relay_failure = "direct" end,
+			function(value) value.pac_unavailable_fallback.stages = {} end,
+			function(value) value.pac_unavailable_fallback.stages[1] = "proxy_connect" end,
+		}) do
+			local changed = data(); mutate(changed)
+			helpers.assert_eq(module.new(changed), nil)
+		end
+	end)
 end)
 
 end

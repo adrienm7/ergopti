@@ -34,13 +34,14 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 ; The shared page's id in _shared/ui/apps.manifest.json.
 global LAYER_EDITOR_APP_ID := "layer_editor"
 global LAYER_EDITOR_OS := "windows"
-; The largest layers.toml the editor accepts, in UTF-8 bytes; the Lua hosts'
-; MAX_TEXT_BYTES (_shared/lua/keymap/layer_editor.lua), pinned by the suite.
-global LAYER_EDITOR_MAX_TEXT_BYTES := 65536
+; The largest layers.toml the editor accepts is [limits] layer_file_bytes of the
+; shared timing registry, read by LayerEditor_Validate at call time (a global
+; initializer runs before TimingsLoadShared) and by the Lua hosts.
 ; The error codes this host adds to the loader's.
 global LAYER_EDITOR_INVALID_PAYLOAD := "invalid_payload"
 global LAYER_EDITOR_WRITE_FAILED := "write_failed"
@@ -111,13 +112,14 @@ _LayerEditor_Error(Code, Detail) {
  * @returns {Array} What is wrong; empty when every OS loads it cleanly.
  */
 LayerEditor_Validate(Text, Ctx) {
-	global LAYER_EDITOR_MAX_TEXT_BYTES, LAYER_EDITOR_INVALID_PAYLOAD
+	global LAYER_EDITOR_INVALID_PAYLOAD
 	if !(Text is String)
 		return [_LayerEditor_Error(LAYER_EDITOR_INVALID_PAYLOAD, "the save carries no layer file text")]
+	MaxBytes := TimingsGet("limits", "layer_file_bytes")
 	Bytes := StrPut(Text, "UTF-8") - 1
-	if (Bytes > LAYER_EDITOR_MAX_TEXT_BYTES)
+	if (Bytes > MaxBytes)
 		return [_LayerEditor_Error(LAYER_EDITOR_INVALID_PAYLOAD,
-			"the layer file is " . Bytes . " bytes, more than " . LAYER_EDITOR_MAX_TEXT_BYTES)]
+			"the layer file is " . Bytes . " bytes, more than " . MaxBytes)]
 	return _LayerEditor_ErrorsOnEveryOs(Text, Ctx)
 }
 
@@ -129,23 +131,45 @@ LayerEditor_Validate(Text, Ctx) {
  * @returns {Map} saved (Boolean), path, errors (Array).
  */
 LayerEditor_Save(Text, Ctx, ConfigDir) {
-	global LAYER_EDITOR_WRITE_FAILED
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LayerEditor_Save(Text, Ctx, ConfigDir)
+		finally Critical(InheritedCritical)
+	}
 	Path := KeymapLayers_UserFilePath(Ctx, ConfigDir)
-	Errors := LayerEditor_Validate(Text, Ctx)
-	if (Errors.Length > 0)
-		return Map("saved", false, "path", Path, "errors", Errors)
-	Stage := Path . ".tmp"
-	if !FSWriteDurable(Stage, Text) {
-		try FSDeleteStrict(Stage)
-		return Map("saved", false, "path", Path, "errors",
-			[_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, "'" . Stage . "' could not be written")])
-	}
-	if !FSAtomicMoveReplace(Stage, Path) {
-		try FSDeleteStrict(Stage)
-		return Map("saved", false, "path", Path, "errors",
-			[_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, "'" . Path . "' could not be replaced")])
-	}
-	return Map("saved", true, "path", Path, "errors", [])
+	if A_IsSuspended
+		return _LayerEditor_SaveRefused(Path, "the driver is suspended")
+	Owner := _ConfigWriteLeaseTryAcquire(Path, "layer-editor")
+	if !(Owner is Object)
+		return _LayerEditor_SaveRefused(Path, "another configuration transaction owns publication")
+	; This native guard closes admission even when pause arrives during loading,
+	; validation or staging. Only the final rename uses a short Critical span.
+	Admission := () => !A_IsSuspended && _ConfigWriteLeaseOwns(Owner, Path)
+	try {
+		Errors := LayerEditor_Validate(Text, Ctx)
+		if (Errors.Length > 0)
+			return Map("saved", false, "path", Path, "errors", Errors)
+		if !Admission.Call()
+			return _LayerEditor_SaveRefused(Path, "the configuration write is no longer admitted")
+		Stage := Path . ".tmp"
+		if !FSWriteDurable(Stage, Text) {
+			try FSDeleteStrict(Stage)
+			return _LayerEditor_SaveRefused(Path, "'" . Stage . "' could not be written")
+		}
+		if !FSConfigAtomicMoveReplace(Stage, Path, , Admission) {
+			try FSDeleteStrict(Stage)
+			return _LayerEditor_SaveRefused(Path, "'" . Path . "' could not be replaced")
+		}
+		return Map("saved", true, "path", Path, "errors", [])
+	} finally _ConfigWriteLeaseRelease(Owner)
+}
+
+; Keep pre-publication refusal in the same envelope as native write failure.
+_LayerEditor_SaveRefused(Path, Detail) {
+	global LAYER_EDITOR_WRITE_FAILED
+	return Map("saved", false, "path", Path, "errors",
+		[_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, Detail)])
 }
 
 
@@ -183,29 +207,42 @@ LayerEditor_LegendText(Text) {
 LayerEditor_CurrentEmulation() {
 	global Features
 	Layout := (IsSet(Features) && Features is Map && Features.Has("layout")) ? Features["layout"] : Map()
-	Registry := KeylayoutEmulation_LayerIsActive("ergopti_base")
-	Ergopti := !Registry && Layout.Get("ergopti_base", false) == true
-	Digits := NumberRowPolicyMode(Layout.Get("direct_access_digits", "")) == "digits"
-	return Map("active", Registry || Ergopti,
-		"character", _LayerEditor_EmulatedCharacter.Bind(Registry, Ergopti, Digits))
+	Registry := KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE)
+	Ergopti := !Registry && Layout.Get(ConfigLeaf.ERGOPTI_BASE, false) == true
+	; The ordering in effect: a stored choice that is inert on this layout types
+	; nothing. A registry layout types its own « symbols first » levels.
+	Mode := NumberRowEffectiveMode()
+	Ordering := Mode == "digits" ? true : Mode == "symbols" && !Registry ? "symbols" : false
+	return Map("active", Registry || Ergopti || Ordering == "symbols",
+		"character", _LayerEditor_EmulatedCharacter.Bind(Registry, Ergopti, Ordering))
 }
 
 ; What the emulation types unshifted on scan code Sc, in the order its hotkeys
 ; win: the digit row (direct_access_digits, over any layout), a registry layout
 ; (keylayout_emulation.ahk), then the Ergopti base layer, whose characters and
 ; dead keys come from its .keylayout (layout_ergopti.ahk).
+; Digits: true for « digits first », "symbols" for « symbols first » on a row
+; no registry layout owns, false otherwise.
 _LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
-	global KLE_Model, KLE_LevelIndex, KLE_KeyCodes, KS_DIGIT_ROW_KEYS
+	global KLE_Model, KLE_LevelIndex, KLE_KeyCodes, KS_DIGIT_ROW_KEYS, ERGOPTI_NUMBER_ROW
 	Code := Integer("0x" . SubStr(Sc, 3))
-	if Digits {
+	; « Also reorder the three edge keys » types the other level.
+	Edge := NumberRowEdgeText(Code, false, NumberRowForegroundLayout(), false)
+	if Edge != ""
+		return Edge
+	if (Digits is String) && Digits == "symbols" {
+		Text := NumberRowSymbolsFirstText(Code, false, NumberRowForegroundLayout(), false)
+		if Text != ""
+			return Text
+	} else if Digits {
 		for _, Key in KS_DIGIT_ROW_KEYS {
 			if (Key[2] == Code)
 				return Chr(Key[1])
 		}
-		Edges := ErgoptiNumberRowEdgeMapping()
-		if Edges.Has(Code)
-			return Edges[Code]
 	}
+	; A row switched off is the OS layout's (LayoutRowIsEmulated).
+	if !LayoutRowIsEmulated(Sc)
+		return ""
 	if Registry {
 		Shift := false
 		if NumberRowEffectiveMode() == "symbols" && NumberRowSymbolsCapable(false) {
@@ -220,6 +257,9 @@ _LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
 		return ""
 	Spec := ErgoptiLayout_Spec()
 	Base := Spec["levels"]["base"]
+	; The number row types the Ergopti row (RegisterBuiltinNumberRow).
+	if !Base.Has(Sc) && ERGOPTI_NUMBER_ROW.Has(Sc)
+		Base := Spec["number_row_base"]
 	if !Base.Has(Sc)
 		return ""
 	Descriptor := Base[Sc]
@@ -518,7 +558,19 @@ _LayerEditor_OnMessage(Host, Payload, ApplyFn := ReloadPreservingSuspend) {
  */
 LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn) {
 	global LAYER_EDITOR_WRITE_FAILED
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn)
+		finally Critical(InheritedCritical)
+	}
+	if A_IsSuspended
+		return _LayerEditor_SaveRefused("", "the driver is suspended")
 	LoggerStart("LayerEditor", "Saving the navigation layer…")
+	if A_IsSuspended {
+		LoggerError("LayerEditor", "The navigation layer was not saved: {1}.", "the driver is suspended")
+		return _LayerEditor_SaveRefused("", "the driver is suspended")
+	}
 	try {
 		Ctx := KeymapLayers_LoadContext(SharedDir)
 	} catch as Err {
@@ -536,7 +588,10 @@ LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn) {
 	LoggerSuccess("LayerEditor", "Navigation layer saved to '{1}'; reloading to apply it.", Result["path"])
 	; A reload that goes through never returns here; a refused one says why in
 	; its own log and leaves the saved file for the next start.
-	Result["applied"] := ApplyFn.Call() ? true : false
+	; The writer released its lease before Reload can acquire the terminal
+	; barrier. A pause during the completion log keeps the durable save but
+	; cannot authorize a fresh apply request. Never report that save as undone.
+	Result["applied"] := !A_IsSuspended && ApplyFn.Call() ? true : false
 	if !Result["applied"]
 		LoggerError("LayerEditor", "The saved navigation layer is not applied: the reload was refused.")
 	return Result

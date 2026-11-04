@@ -15,7 +15,7 @@
 --- recogniser nothing fed, a stub whose `hs.keycodes` lacked the one function the
 --- module called.
 ---
---- `tests/unit/meta/test_fakes_match_adapters.lua` is what makes these
+--- `tests/meta/harness/test_fakes_match_adapters.lua` is what makes these
 --- trustworthy: it asserts every function the REAL adapter exports exists on the
 --- fake. A fake that falls behind fails the suite instead of quietly testing a
 --- contract nobody has.
@@ -67,9 +67,15 @@ function M.uinput_writer(opts)
 			if #bytes ~= 24 then return false end
 			local kind, code, value = uint(bytes, 17, 2), uint(bytes, 19, 2), uint(bytes, 21, 4)
 			if kind == 1 then pending = { code = code, value = value }; return true end
+			-- A relative report: the value is a signed 32-bit delta.
+			if kind == 2 then
+				if value >= 0x80000000 then value = value - 0x100000000 end
+				pending = { code = code, value = value, relative = true }
+				return true
+			end
 			if kind ~= 0 or code ~= 0 or not pending then return false end
 			local row = pending; pending = nil
-			if opts.on_emit and opts.on_emit(row.code, row.value) ~= true then return false end
+			if not row.relative and opts.on_emit and opts.on_emit(row.code, row.value) ~= true then return false end
 			fake.events[#fake.events + 1] = row
 			return true
 		end,
@@ -95,7 +101,7 @@ function M.uinput_writer(opts)
 	function fake.test.pressed()
 		local out = {}
 		for _, e in ipairs(fake.events) do
-			if e.value == 1 then out[#out + 1] = e.code end
+			if e.value == 1 and not e.relative then out[#out + 1] = e.code end
 		end
 		return out
 	end
@@ -103,10 +109,11 @@ function M.uinput_writer(opts)
 end
 
 --- An in-memory evdev reader that replays a scripted event list.
---- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, drain_status?, drain_reason? }
+--- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, event_capabilities?, drain_status?, drain_reason? }
 --- @return table
 function M.evdev_reader(opts)
 	opts = opts or {}
+	local opens = {}
 	local fake = {
 		queued = opts.events or {},
 		cursor = 0,
@@ -124,7 +131,11 @@ function M.evdev_reader(opts)
 	function fake.event_view() return nil end
 	function fake.source_current() return false end
 	function fake.capture_source_owner() return nil end
-	function fake.source_owner_current() return false end
+	function fake.source_owner_current(_, observer, capture, current, retire)
+		if observer == nil and capture == nil and current == nil and retire == nil then return false end
+		return false, false, false -- No native input, cleanup or per-open identity.
+	end
+	function fake.reconcile_sources(_slots, _restore, _originals) return false end
 	function fake.retire_source() return false end
 	function fake.capture_pressed_keys() return nil end
 	function fake.pressed_keys_current() return false end
@@ -134,12 +145,41 @@ function M.evdev_reader(opts)
 	function fake.is_available() return true end
 	function fake.open(path, slot)
 		if opts.open_fails then return false end
-		fake.open_slots[slot or fake.KEYBOARD] = path
+		slot = slot or fake.KEYBOARD
+		fake.open_slots[slot], opens[slot] = path, {}
 		return true
 	end
-	function fake.close(slot) fake.open_slots[slot or fake.KEYBOARD] = nil ; return true end
+	function fake.close(slot)
+		slot = slot or fake.KEYBOARD
+		fake.open_slots[slot], opens[slot] = nil, nil
+		return true
+	end
 	function fake.is_open(slot) return fake.open_slots[slot or fake.KEYBOARD] ~= nil end
 	function fake.device_path(slot) return fake.open_slots[slot or fake.KEYBOARD] end
+	-- A scripted descriptor names no device unless the test gives it a number.
+	function fake.device_identity(slot)
+		local path = fake.open_slots[slot or fake.KEYBOARD]
+		if path == nil then return nil, "device is not open" end
+		local numbers = opts.device_numbers or {}
+		if numbers[path] == nil then return nil, "no device-number port" end
+		return numbers[path]
+	end
+	function fake.event_capabilities(slot)
+		slot = slot or fake.KEYBOARD
+		local path, owner = fake.open_slots[slot], opens[slot]
+		if path == nil or owner == nil then return nil, "device is not open" end
+		local provider = opts.event_capabilities
+		local ok, mask, reason = true, provider, nil
+		if type(provider) == "function" then ok, mask, reason = pcall(provider, slot, path)
+		elseif provider == nil then mask = 3 end -- The default scripted keyboard has SYN and KEY.
+		if not ok or opts.event_capabilities ~= provider or fake.open_slots[slot] ~= path or opens[slot] ~= owner then
+			return nil, "event capability query was not acknowledged"
+		end
+		if type(mask) ~= "number" or mask ~= mask or mask < 0 or mask >= 4294967296 or mask % 1 ~= 0 then
+			return nil, type(reason) == "string" and reason or "event capability query was not acknowledged"
+		end
+		return mask
+	end
 	function fake.grab(slot) fake.grabbed[slot or fake.KEYBOARD] = true ; return true end
 	function fake.ungrab(slot) fake.grabbed[slot or fake.KEYBOARD] = nil ; return true end
 	function fake.is_grabbed(slot) return fake.grabbed[slot or fake.KEYBOARD] == true end
@@ -152,6 +192,8 @@ function M.evdev_reader(opts)
 		return opts.active_leds or {}
 	end
 	function fake.wait_readable() return fake.cursor < #fake.queued end
+	--- The multi-source wait: queued events make it ready at once, none is a quiet wait.
+	function fake.wait_any_readable() return fake.cursor < #fake.queued end
 	function fake.read_event()
 		if fake.cursor >= #fake.queued then return nil end
 		fake.cursor = fake.cursor + 1
@@ -207,7 +249,7 @@ function M.shell_runner(opts)
 	-- Delegated, never re-implemented. This one is a pure predicate with no shell
 	-- contact, and a fake that answered differently from the real validator would
 	-- let a test pass on an argv that production refuses -- the exact failure the
-	-- double is supposed to rule out (keylogger-worker-timings-must-be-strings).
+	-- double is supposed to rule out (keystats-worker-timings-must-be-strings).
 	fake.validate_spawn_args = require("adapters.shell_runner").validate_spawn_args
 	function fake.run(command) fake.commands[#fake.commands + 1] = command ; return true end
 	function fake.exec(command)
@@ -474,7 +516,14 @@ function M.clipboard(opts)
 		if opts.available == false then return false, "", "clipboard unavailable" end
 		return true, fake.contents, nil
 	end
-	function fake.write(text) fake.contents = tostring(text) ; return true end
+	-- The change counter moves on every write, even of the same text, as the X11
+	-- owner's TIMESTAMP does; unavailable is the Wayland answer.
+	fake.counter = 0
+	function fake.write(text) fake.contents = tostring(text) ; fake.counter = fake.counter + 1 ; return true end
+	function fake.change_counter()
+		if opts.available == false then return nil, "unsupported" end
+		return fake.counter
+	end
 	-- The PRIMARY selection: what the application published, never written here.
 	function fake.read_primary()
 		if opts.available == false then return false, "", "clipboard unavailable" end
@@ -531,6 +580,8 @@ function M.clipboard(opts)
 		fake.last_pasted = replacement
 		return true
 	end
+
+	require("tests.fakes.clipboard_stage").install(fake, opts)
 
 	return fake
 end
@@ -620,7 +671,7 @@ end
 -- =============================================
 -- =============================================
 
---- An in-memory stand-in for the keylogger's SQLite writer.
+--- An in-memory stand-in for the keystats's SQLite writer.
 ---
 --- Every export answers plausibly and records what it was handed, so a caller
 --- can assert on what would have been persisted without a database — and, more
@@ -636,23 +687,28 @@ end
 ---
 --- @param opts table|nil { available = boolean } — false to model a machine
 ---        with no sqlite3, which is the common case in CI.
+---        media_commit=false models media transaction refusal only; it executes no SQL.
 --- @return table
 function M.sqlite_writer(opts)
 	opts = opts or {}
 	local available = opts.available ~= false
 	local system_day_paths = {}
 	local fake = {
-		typing = {}, hotstrings = {}, shortcuts = {}, app_switches = {},
+		typing = {}, hotstrings = {}, shortcuts = {}, llm = {}, app_switches = {}, window_switches = {},
+		session_events = {}, system_events = {},
 		app_days = {}, ngrams = {}, scancodes = {},
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
 		titles = {}, layouts = {}, kc_hold = {}, system_days = {},
-		categories = {},
+		media_events = {}, media_rebuilds = {}, media_projections = {},
 		devices = {}, meta = {}, revision = 0, executed = {}, path = nil,
 	}
 
 	function fake.is_available() return available end
+	function fake.flush_transport_available() return available end
+	function fake.has_private_file_debt() return false end
 	function fake.open_db(path) fake.path = path ; return available end
+	function fake.ensure_token_encoding() return true end
 	function fake.close_db() fake.path = nil ; return true end
 	function fake.get_db_path() return fake.path end
 	function fake.get_revision() return fake.revision end
@@ -674,9 +730,29 @@ function M.sqlite_writer(opts)
 			return true
 		end
 	end
-	fake.insert_typing_events = collect(fake.typing)
+	local record_typing = collect(fake.typing)
+	function fake.insert_typing_events(device_id, rows, derived)
+		if derived then
+			for _, group in ipairs(derived.ngrams) do
+				fake.upsert_ngrams(device_id, group.date, group.app, group.ngrams, group.table_name)
+			end
+			local methods = {
+				chars_class = "upsert_chars_class", errors = "upsert_errors", hourly = "upsert_hourly",
+				hourly_min5 = "upsert_hourly_min5", app_buckets = "upsert_app_bucket", bursts = "upsert_burst",
+				sessions = "upsert_session", ergo = "upsert_ergo", layouts = "upsert_layout",
+			}
+			for family, entries in pairs(derived.daily) do
+				for _, row in ipairs(entries) do fake[assert(methods[family])](device_id, row) end
+			end
+		end
+		return record_typing(device_id, rows)
+	end
 	fake.insert_hotstring_events = collect(fake.hotstrings)
 	fake.insert_shortcut_events = collect(fake.shortcuts)
+	fake.insert_llm_events = collect(fake.llm)
+	fake.insert_window_switch_events = collect(fake.window_switches)
+	fake.insert_session_events = collect(fake.session_events)
+	fake.insert_system_events = collect(fake.system_events)
 	fake.insert_app_switch_events = collect(fake.app_switches)
 
 	function fake.upsert_app_day(device_id, date, app, fields)
@@ -746,10 +822,86 @@ function M.sqlite_writer(opts)
 		return nil, true
 	end
 
-	function fake.set_app_category(device_id, app_name, category, score)
-		fake.categories[#fake.categories + 1] = {
-			device_id = device_id, app = app_name, category = category, score = score,
-		}
+	function fake.drop_legacy_category_scores()
+		return true
+	end
+
+	-- These are in-memory transaction outcomes, never SQLite/native receipts.
+	local media_history, media_store, media_policy = {}, nil, nil
+	local function media_ready()
+		if not available or type(fake.path) ~= "string" or fake.path == "" or opts.media_commit == false then return false end
+		if media_policy then return true end
+		local ok, store, policy = pcall(function()
+			local shared = require("keystats.media_store")
+			local json = require("json")
+			local path = require("tests.helpers").driver_root() .. "/../_shared/data/keycodes/metrics_media_keys.json"
+			local file = assert(io.open(path, "rb"))
+			local read, body = pcall(file.read, file, "*a")
+			local closed, acknowledged = pcall(file.close, file)
+			assert(read and type(body) == "string" and closed and acknowledged)
+			return shared, shared.policy(json.decode(body))
+		end)
+		if not ok then return false end
+		media_store, media_policy = store, policy
+		return true
+	end
+	local function copy(value)
+		if type(value) ~= "table" then return value end
+		local out = {}; for key, child in pairs(value) do out[key] = copy(child) end
+		return out
+	end
+	local function publish_media(device_id, events, batch)
+		local path = fake.path
+		media_history[path] = media_history[path] or {}
+		media_history[path][device_id] = { events = events, batch = batch }
+		fake.media_projections[path] = fake.media_projections[path] or {}
+		fake.media_projections[path][device_id] = copy(batch)
+		fake.revision = fake.revision + 1
+	end
+	function fake.media_available() return media_ready() end
+	function fake.insert_media_events(device_id, events, threshold_ms)
+		if not media_ready() then return false end
+		local previous = media_history[fake.path] and media_history[fake.path][device_id]
+		local ok, captured, batch = pcall(function()
+			assert(type(events) == "table" and #events > 0)
+			for key in pairs(events) do assert(type(key) == "number" and key % 1 == 0 and key >= 1 and key <= #events) end
+			local rows = {}
+			for index = 1, #events do
+				assert(type(events[index]) == "table")
+				local row = {}; for key, value in pairs(events[index]) do row[key] = value end
+				rows[index] = row
+				media_store.raw_sql(device_id, index, row, require("json").encode)
+			end
+			local aggregate = previous and copy(previous.batch) or { media_ngram = {}, media_hold = {} }
+			media_store.replay(media_policy, aggregate, rows, threshold_ms)
+			return rows, aggregate
+		end)
+		if not ok then return false end
+		local history = previous and copy(previous.events) or {}
+		for _, row in ipairs(captured) do
+			-- Persist only the same scalar vocabulary used by raw media metadata.
+			local saved = {}
+			for _, key in ipairs({ "action", "timestamp", "capture", "device", "app", "media_id" }) do saved[key] = row[key] end
+			if row.action == "physical_media_release" then saved.hold_ms = row.hold_ms end
+			history[#history + 1] = saved
+			fake.media_events[#fake.media_events + 1] = { device_id = device_id, path = fake.path, row = copy(saved) }
+		end
+		publish_media(device_id, history, batch)
+		return true
+	end
+	function fake.rebuild_media(device_id, threshold_ms)
+		if not media_ready() then return false end
+		local previous = media_history[fake.path] and media_history[fake.path][device_id]
+		local events = previous and previous.events or {}
+		local ok, batch = pcall(function()
+			media_store.rebuild_sql(device_id, threshold_ms)
+			local aggregate = { media_ngram = {}, media_hold = {} }
+			media_store.replay(media_policy, aggregate, events, threshold_ms)
+			return aggregate
+		end)
+		if not ok then return false end
+		publish_media(device_id, events, batch)
+		fake.media_rebuilds[#fake.media_rebuilds + 1] = { path = fake.path, device_id = device_id, threshold_ms = threshold_ms }
 		return true
 	end
 
@@ -757,7 +909,15 @@ function M.sqlite_writer(opts)
 	function fake.query_rows() return {} end
 	function fake.get_meta(key) return fake.meta[key] end
 	function fake.set_meta(key, value) fake.meta[key] = value ; return true end
+	function fake.upsert_open_walk(device_id, encoded)
+		fake.meta["open_walk:" .. device_id] = encoded ; return true
+	end
+	function fake.read_open_walk(device_id)
+		if not available then return nil, false end
+		return fake.meta["open_walk:" .. device_id], true
+	end
 
+	require("tests.support.sqlite_flush_fake").attach(fake)
 	return fake
 end
 

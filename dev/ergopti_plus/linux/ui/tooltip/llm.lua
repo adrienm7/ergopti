@@ -14,6 +14,8 @@ local Logger = require("logger.shim")
 local Config = require("ui.tooltip.config")
 local DisplaySettings = require("modules.llm.display_settings")
 local LlmLine = require("tooltip.llm_line")
+local ConfigKeys = require("config_keys")
+local InfoBar = require("llm.request_plan.info_bar")
 
 local LOG = "ui.tooltip.llm"
 
@@ -24,21 +26,10 @@ local _screen_provider = nil
 local _candidates = {}
 local _active_index = 1
 local _meta = {}
-
-local function modifier_label(modifiers)
-	local labels = { alt = "Alt", ctrl = "Ctrl", shift = "Shift", cmd = "Super", super = "Super" }
-	local parts = {}
-	for _, name in ipairs(modifiers or {}) do
-		parts[#parts + 1] = labels[name] or tostring(name)
-	end
-	return table.concat(parts, "+")
-end
-
-local function validation_label(index, modifiers)
-	local prefix = modifier_label(modifiers)
-	local digit = index == 10 and "0" or tostring(index)
-	return prefix ~= "" and (prefix .. "+" .. digit) or digit
-end
+-- The hotstring preview sharing the window: { rows = fn, showing = fn,
+-- covered = fn }. rows() answers the preview rows to draw above the
+-- suggestions (llm.trigger.while_hotstring_tooltip = "both"), nil otherwise.
+local _companion = nil
 
 --- The pieces a candidate's line reads, each with its role.
 ---
@@ -65,8 +56,9 @@ end
 ---
 --- A prediction row is a prefix and coloured segments, as on macOS: the mark
 --- in front of the selected line, the typed text grey, the corrections green
---- and the continuation orange on it, every other line grey, and the
---- validation chord after each line.
+--- and the continuation orange on it, every other line grey, and the chord
+--- that inserts each line right-aligned in a muted column
+--- (_shared/modules/tooltip/constants.toml [llm_ui]).
 --- @param candidates table Array of { to_type, chunks?, nw?, has_corrections? }.
 --- @param active_index integer
 --- @param meta table { model?, profile?, validation_modifiers?, loading? }
@@ -86,7 +78,7 @@ function M.build_rows(candidates, active_index, meta)
 	local selected_prefix, unselected_prefix
 	if chrome then
 		selected_prefix, unselected_prefix = LlmLine.prefixes(
-			DisplaySettings.get("pred_indent") or 0, #shown, chrome.mark, chrome.align)
+			DisplaySettings.get(ConfigKeys.LEAF.PRED_INDENT) or 0, #shown, chrome.mark, chrome.align)
 	end
 	for _, entry in ipairs(shown) do
 		local active = entry.index == active_index
@@ -99,12 +91,6 @@ function M.build_rows(candidates, active_index, meta)
 				color = active and chrome.colors[segment.role] or chrome.colors.typed,
 			}
 		end
-		segments[#segments + 1] = {
-			text = chrome.label_gap .. validation_label(entry.index, meta.validation_modifiers),
-			role = "label",
-			small = true,
-			color = active and chrome.colors.label_selected or chrome.colors.label_unselected,
-		}
 		rows[#rows + 1] = {
 			-- The mark is drawn on the selected line only; elsewhere the prefix
 			-- is spacing, of the width its characters would take.
@@ -112,17 +98,21 @@ function M.build_rows(candidates, active_index, meta)
 			prefix_color = active and chrome.colors.cursor or nil,
 			segments = segments,
 			selected = active,
+			label = LlmLine.shortcut_label(entry.index, meta.validation_modifiers, chrome.shortcut_spec),
+			label_color = chrome.colors.label,
 		}
 	end
 	if meta.loading == true and #rows == 0 then
 		rows[1] = { text = "…", label = "", dimmed = true }
 	end
-	if DisplaySettings.get("show_info_bar") and #rows > 0 then
-		local info = {}
-		if type(meta.model) == "string" and meta.model ~= "" then info[#info + 1] = meta.model end
-		if type(meta.profile) == "string" and meta.profile ~= "" then info[#info + 1] = meta.profile end
-		if #candidates > 1 then info[#info + 1] = string.format("%d/%d", active_index, #candidates) end
-		if #info > 0 then rows[#rows + 1] = { text = table.concat(info, " · "), dimmed = true } end
+	if DisplaySettings.get(ConfigKeys.LEAF.SHOW_INFO_BAR) and #rows > 0 then
+		-- The pieces and the short prompt name are the shared plan's; the separator and
+		-- the i/n position (candidates are cycled here, listed on macOS) are Linux's.
+		local info = InfoBar.parts({
+			model = meta.model, profile_label = meta.profile,
+			position = { index = active_index, count = #candidates },
+		})
+		if info then rows[#rows + 1] = { text = table.concat(info, " · "), dimmed = true } end
 	end
 	return rows
 end
@@ -140,6 +130,7 @@ function M.init(opts)
 	end
 	_anchor_provider = opts.anchor_provider
 	_screen_provider = opts.screen_provider
+	_companion = type(opts.companion) == "table" and opts.companion or nil
 	if type(_style) ~= "table" or type(_renderer) ~= "table" then
 		Logger.error(LOG, "Suggestion overlay initialisation failed: style or renderer unavailable.")
 		return false
@@ -147,10 +138,38 @@ function M.init(opts)
 	return true
 end
 
+--- The preview rows drawn above the suggestions, nil when they are drawn alone.
+--- @return table|nil
+local function companion_rows()
+	if not _companion or type(_companion.rows) ~= "function" then return nil end
+	local ok, rows = pcall(_companion.rows)
+	if not ok then
+		Logger.warn(LOG, "Hotstring rows unavailable: %s", tostring(rows))
+		return nil
+	end
+	return type(rows) == "table" and #rows > 0 and rows or nil
+end
+
+--- Whether the hotstring preview holds the window now.
+--- @return boolean
+local function companion_showing()
+	if not _companion or type(_companion.showing) ~= "function" then return false end
+	local ok, showing = pcall(_companion.showing)
+	return ok and showing == true
+end
+
 local function draw()
 	if type(_renderer) ~= "table" or type(_renderer.show) ~= "function" then return false end
 	local rows = M.build_rows(_candidates, _active_index, _meta)
 	if #rows == 0 then M.hide(); return false end
+	local preview_rows = companion_rows()
+	if preview_rows then
+		-- One stack: the hotstring rows that can still expand, then the suggestions.
+		for index = #preview_rows, 1, -1 do table.insert(rows, 1, preview_rows[index]) end
+	elseif companion_showing() and _companion and type(_companion.covered) == "function" then
+		-- Drawn alone over the preview, which then no longer owns the window.
+		pcall(_companion.covered)
+	end
 	local anchor = type(_anchor_provider) == "function" and _anchor_provider() or nil
 	local screen = type(_screen_provider) == "function" and _screen_provider()
 		or { x = 0, y = 0, w = 1920, h = 1080 }
@@ -198,12 +217,25 @@ function M.active_index()
 	return _active_index
 end
 
+--- Draws the shown candidates again, with or without the hotstring rows as
+--- they stand now. Does nothing while no candidate is shown.
+--- @return boolean drawn
+function M.redraw()
+	if #_candidates == 0 then return false end
+	return draw()
+end
+
 --- Hides and forgets every candidate.
 function M.hide()
-	if _renderer and type(_renderer.hide) == "function" and _renderer.hide() ~= true then return false end
+	-- The preview drawn over the suggestions keeps the window; it hides itself.
+	if not companion_showing() and _renderer and type(_renderer.hide) == "function"
+		and _renderer.hide() ~= true then return false end
+	local shared = #_candidates > 0 and companion_rows() ~= nil
 	_candidates = {}
 	_active_index = 1
 	_meta = {}
+	-- Shown together, the preview stays on screen alone.
+	if shared and _companion and type(_companion.redraw) == "function" then pcall(_companion.redraw) end
 	return true
 end
 

@@ -21,9 +21,11 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local AgentSettings = require("modules.llm.agent_settings")
+local COMMAND = require("config_keys").COMMAND
 
 local LOG = "ui.menu.agent_rows"
 
@@ -42,16 +44,6 @@ end
 --- @return string
 local function fill(template, values)
 	return (template:gsub("{(%d+)}", function(index) return tostring(values[tonumber(index)] or "") end))
-end
-
---- Appends provider row data rendered by the shared renderer.
---- @param target table The native rows the renderer is building.
---- @param row table Row data { label, items?, action?, disabled? }.
---- @param id string Diagnostic id.
-local function append(target, row, id)
-	for _, rendered in ipairs(require("infra.manifest_menu").render_rows({ row }, id)) do
-		target[#target + 1] = rendered
-	end
 end
 
 
@@ -86,7 +78,7 @@ local function system_rows(system, dialogs, changed)
 	local function store(value)
 		if AgentSettings.set_spec(system, value) then changed() end
 	end
-	local off = require("infra.manifest_menu").check_row("agent_system_controls", "agent_system_off", {
+	local off = require("infra.manifest_menu").check_row("agent_system_controls", require("config_keys").COMMAND.AGENT_SYSTEM_OFF, {
 		agent_system_off = function()
 			if AgentSettings.set_spec(system, "") ~= true then return false end
 			changed()
@@ -102,7 +94,7 @@ local function system_rows(system, dialogs, changed)
 		local value, label = choice.value, choice.label
 		local record = ManifestMenu.template_rows("agent_linux_system_backend_record", {
 			-- A new backend starts on its default model.
-			["agent_system_backend"] = function() store(value) end,
+			[require("config_keys").COMMAND.AGENT_SYSTEM_BACKEND] = function() store(value) end,
 		}, {
 			agent_system_backend_label = function() return label end,
 			agent_system_backend_selected = function() return parsed ~= nil and parsed.backend == value end,
@@ -113,13 +105,13 @@ local function system_rows(system, dialogs, changed)
 	local resolved = AgentSettings.resolve(system)
 	local model = resolved and resolved.model or (parsed and parsed.model) or ""
 	local model_rows = ManifestMenu.template_rows("agent_system_model_controls", {
-		["agent_system_model"] = function()
+		[require("config_keys").COMMAND.AGENT_SYSTEM_MODEL] = function()
 			if not parsed then return end
 			local backend = parsed.backend
 			local answer = dialogs.prompt(tr("menu.agent.title"),
 				fill(tr("dialog.agent.model_prompt"), { current_label }), parsed.model or "")
 			if answer == nil then return end
-			answer = answer:match("^%s*(.-)%s*$")
+			answer = TextUtils.trim(answer)
 			local value = answer == "" and backend or (backend .. "|" .. answer)
 			if not AgentSettings.is_valid_spec(value) then
 				Logger.warn(LOG, "Agent %s model refused: not a model name.", system)
@@ -193,7 +185,7 @@ local function disabled_app_rows(llm, dialogs, changed)
 	local removed = {}
 	for _, app in ipairs(apps) do
 		local rows = ManifestMenu.template_rows("agent_linux_disabled_app_remove", {
-			["agent_disabled_app_remove"] = function()
+			[require("config_keys").COMMAND.AGENT_DISABLED_APP_REMOVE] = function()
 				local list = {}
 				for _, existing in ipairs(AgentSettings.get_disabled_apps()) do
 					if existing ~= app then list[#list + 1] = existing end
@@ -206,12 +198,12 @@ local function disabled_app_rows(llm, dialogs, changed)
 	end
 	local last = llm and type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app() or nil
 	local rows = ManifestMenu.template_rows("agent_linux_disabled_apps_children", {
-		["agent_disabled_app_current"] = function() add(last) end,
-		["agent_disabled_app_add"] = function()
+		[require("config_keys").COMMAND.AGENT_DISABLED_APP_CURRENT] = function() add(last) end,
+		[require("config_keys").COMMAND.AGENT_DISABLED_APP_ADD] = function()
 			local answer = dialogs.prompt(tr("menu.agent.title"), tr("app_picker.search_placeholder"), "", false,
 				running_apps(excluded))
 			if answer == nil then return end
-			answer = answer:match("^%s*(.-)%s*$")
+			answer = TextUtils.trim(answer)
 			if answer == "" then return end
 			add(answer)
 		end,
@@ -249,43 +241,43 @@ function M.build(ctx, dialogs)
 	local function changed()
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
-	local handlers = {}
+	local providers = {}
+	-- The three rows are declared `list` rows: each provider returns the row
+	-- DATA of its declared frame and the shared renderer draws it in place.
 	for _, system in ipairs({ "system1", "system2" }) do
-		handlers["agent_" .. system] = function(target)
+		providers["agent_" .. system] = function()
 			local current, rows = system_rows(system, dialogs, changed)
-			if not rows then return end
+			if not rows then return {} end
 			local frame
 			if system == "system1" then
 				frame = ManifestMenu.template_rows("agent_linux_system1_frame", {}, {
 					agent_system_backend_current_caption = function() return current end,
 				}, {
-					["agent_system1"] = function() return rows end,
+					[require("config_keys").LEAF.AGENT_SYSTEM1] = function() return rows end,
 				})
 			else
 				frame = ManifestMenu.template_rows("agent_linux_system2_frame", {}, {
 					agent_system_backend_current_caption = function() return current end,
 				}, {
-					["agent_system2"] = function() return rows end,
+					[require("config_keys").LEAF.AGENT_SYSTEM2] = function() return rows end,
 				})
 			end
-			if not frame then return end
-			for _, row in ipairs(frame) do append(target, row, "agent_" .. system) end
+			return frame or {}
 		end
 	end
-	handlers["agent_disabled_apps"] = function(target)
+	providers[require("config_keys").COMMAND.AGENT_DISABLED_APPS] = function()
 		local count, rows = disabled_app_rows(llm, dialogs, changed)
-		if not rows then return end
+		if not rows then return {} end
 		local frame = ManifestMenu.template_rows("agent_linux_disabled_apps_frame", {}, {
 			agent_disabled_apps_count = function() return tostring(count) end,
 		}, {
-			["agent_disabled_apps"] = function() return rows end,
+			[require("config_keys").LEAF.AGENT_DISABLED_APPS] = function() return rows end,
 		})
-		if not frame then return end
-		for _, row in ipairs(frame) do append(target, row, "agent_disabled_apps") end
+		return frame or {}
 	end
 	local menu_ctx = {
 		commands = {
-			agent_mode = function(id)
+			[COMMAND.AGENT_MODE] = function(id)
 				if not llm or type(llm.set_agent_mode) ~= "function" then return false end
 				local committed = llm.set_agent_mode(id) == true
 				if committed then changed() end
@@ -293,11 +285,11 @@ function M.build(ctx, dialogs)
 			end,
 		},
 		state_getters = {
-			["llm.agent_mode"] = AgentSettings.get_mode,
+			[require("config_keys").KEY.LLM_AGENT_MODE] = AgentSettings.get_mode,
 			agent_mode_ready = function() return llm ~= nil and type(llm.set_agent_mode) == "function" end,
 		},
 	}
-	local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})
+	local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers)
 	return NativeParent.finish(parent, children)
 end
 

@@ -1,0 +1,24 @@
+# _shared/tests/corpus/config_migrations/shipped_keyboard_slot_parameters_on_linux/input.toml
+
+[_meta]
+schema_version = 14
+
+[shortcuts.keyboard]
+ctrl_g = "open_url"
+ctrl_shift_k = "send_text"
+super_r = "run_program"
+super_shift_t = "send_text"
+alt_x = "open_url"
+
+[gesture_parameters]
+# Saved by the shortcut parameter dialogs.
+keyboard__ctrl_g__open_url = "https://example.org/g"
+keyboard__ctrl_shift_k__send_text = "Best regards"
+keyboard__super_r__run_program = "xdg-open ~/Notes"
+keyboard__super_shift_t__send_text = "TODO: "
+keyboard__alt_x__open_url = "https://example.org/x"
+keyboard__physical_none_KeyJ__open_url = "https://example.org/j"
+
+[linux.action_parameters]
+keyboard__ctrl_o__open_url = "https://example.org/legacy"
+keyboard__super_e__send_text = "legacy"

@@ -122,7 +122,8 @@ end
 --- refusing non-object root elements rather than offering their nested objects.
 --- @param json string Raw JSON array string
 --- @return table Array of object-JSON strings
-function M.split_releases_array(json)
+--- @return table|nil decoded The decoded list the spans were checked against.
+local function split(json)
 	local out = {}
 	if type(json) ~= "string" or json == "" then return out end
 	local trimmed = json:match("^%s*(.*)$") or json
@@ -156,7 +157,34 @@ function M.split_releases_array(json)
 		pos = pos + 1
 	end
 	if #out ~= #decoded then return {} end
-	return out
+	return out, decoded
+end
+
+--- Splits a complete top-level array of release objects into exact raw spans.
+--- @param json string Raw JSON array string
+--- @return table Array of object-JSON strings
+function M.split_releases_array(json)
+	return (split(json))
+end
+
+--- Indexes a release list from one decode: the raw span of every release and
+--- its own tag and publication time, exactly what split_releases_array then
+--- parse_tag and parse_published_at give for each span, without decoding each
+--- span again (the Windows updater's release list index is the same contract).
+--- @param json string Raw JSON array string
+--- @return table chunks Array of object-JSON strings
+--- @return table records Array of { tag, published_at } strings ("" when absent)
+function M.index_releases(json)
+	local chunks, decoded = split(json)
+	local records = {}
+	for index = 1, #chunks do
+		local release = type(decoded[index]) == "table" and decoded[index] or {}
+		records[index] = {
+			tag = type(release.tag_name) == "string" and release.tag_name or "",
+			published_at = type(release.published_at) == "string" and release.published_at or "",
+		}
+	end
+	return chunks, records
 end
 
 

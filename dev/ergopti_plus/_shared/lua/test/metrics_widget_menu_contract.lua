@@ -31,17 +31,28 @@ function M.register(helpers, options)
 				local state = {}
 				for index, key in ipairs(fixture.fields) do state[key] = vector.state[index] end
 				local items = options.build(state)
+				-- With metrics off the category-off rule appends its reason to each caption.
+				local reason = options.translate("menu.category_off_reason")
+				local cut = reason:find(":", 1, true) or reason:find("\239\188\154", 1, true)
+				local suffix = " — " .. (cut and reason:sub(1, cut - 1) or reason):match("^%s*(.-)%s*$")
+				local function caption(row)
+					local title = row.title
+					if type(title) == "string" and title:sub(-#suffix) == suffix then
+						return title:sub(1, -#suffix - 1)
+					end
+					return title
+				end
 				local start, count = nil, 0
 				local anchor = options.translate(fixture.rows[1].i18n)
 				for position, row in ipairs(items) do
-					if row.title == anchor then start, count = position, count + 1 end
+					if caption(row) == anchor then start, count = position, count + 1 end
 				end
 				helpers.assert_eq(count, 1, "the floating widget group is drawn once")
 				for index, spec in ipairs(fixture.rows) do
 					local label = options.translate(spec.i18n)
 					local found = items[start + index - 1]
 					helpers.assert_true(type(found) == "table", spec.id .. " occupies its declared position")
-					helpers.assert_eq(found.title, label, spec.id .. " has the shared label in the same group order")
+					helpers.assert_eq(caption(found), label,spec.id .. " has the shared label in the same group order")
 					helpers.assert_eq(found.checked == true, vector.checked[index], spec.id .. " preserves its stored check")
 					helpers.assert_eq(found.disabled == true, vector.disabled[index], spec.id .. " follows the shared gate")
 					if not vector.disabled[index] then

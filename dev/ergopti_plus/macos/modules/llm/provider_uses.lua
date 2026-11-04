@@ -12,7 +12,8 @@
 ---    catalogue appears in every list its format serves without a driver edit.
 --- 2. "decisions" (TypeSafe's Jev) is not a chat model: it only triages, so it
 ---    serves the agent's System 1 alone. "backboard" answers text but carries no
----    image, so it serves every text use and no vision request.
+---    image, so it serves every text use and no vision request; so does
+---    "perplexity_agent", whose image input takes a URL, not a screenshot.
 --- 3. Pure and stateless: the lists read a catalogue passed in (api_remote's
 ---    PROVIDERS and PROVIDER_ORDER), so callers and tests share one rule.
 --- ==============================================================================
@@ -30,6 +31,7 @@ local FORMAT_USES = {
 	openai    = { prediction = true, system1 = true, system2 = true, vision = true },
 	anthropic = { prediction = true, system1 = true, system2 = true, vision = true },
 	gemini    = { prediction = true, system1 = true, system2 = true, vision = true },
+	perplexity_agent = { prediction = true, system1 = true, system2 = true, vision = false },
 	backboard = { prediction = true, system1 = true, system2 = true, vision = false },
 	decisions = { prediction = false, system1 = true, system2 = false, vision = false },
 }

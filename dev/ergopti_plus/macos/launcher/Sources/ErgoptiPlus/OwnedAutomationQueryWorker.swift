@@ -1,6 +1,7 @@
 // Sources/ErgoptiPlus/OwnedAutomationQueryWorker.swift
 // Signed bounded read-only Shortcuts query with exact native group retirement.
 
+import AppKit
 import CPOSIXCompatibility
 import Carbon
 import CoreFoundation
@@ -454,7 +455,7 @@ enum OwnedAutomationQueryWorker {
 				if result < 0 && errno != EINTR { ownershipLost = true }
 			}
 			// Unknown child ownership retains debt; never signal a reused PID.
-			usleep(20_000)
+			usleep(LauncherTimings.automationGuardianPoll.microseconds)
 		}
 	}
 
@@ -512,7 +513,7 @@ enum OwnedAutomationQueryWorker {
 		closeUnused()
 		guard spawned == 0 else { return refuseBeforeGuardian(spawned) }
 		// An impossible PID cannot authorize a numeric signal; retain ownership debt.
-		guard guardian > 1, guardian != getpid() else { while true { usleep(20_000) } }
+		guard guardian > 1, guardian != getpid() else { while true { usleep(LauncherTimings.automationGuardianPoll.microseconds) } }
 		guard LeaseExecutableIdentity.capture(at: executable) == expected, image.stoppedChildMatches(guardian),
 			nonblocking(STDIN_FILENO), nonblocking(inputDescriptor),
 			ProcessInfo.processInfo.systemUptime < deadline else {
@@ -594,7 +595,7 @@ enum OwnedAutomationQueryWorker {
 			if let status = guardianStatus, resultEOF {
 				// EOF or a normal helper exit alone cannot acknowledge an inner group.
 				guard status == 0, let terminal = transcript.terminal, closeAcknowledged else {
-					usleep(20_000); continue
+					usleep(LauncherTimings.automationGuardianPoll.microseconds); continue
 				}
 				guard streamValid, output.buffered.isEmpty else { return 70 }
 				for fact in transcript.setup { guard marker(fact) else { return 74 } }
@@ -611,6 +612,50 @@ enum OwnedAutomationQueryWorker {
 		}
 	}
 
+	/// Shared budget for starting the on-demand target and asking again.
+	static let targetLaunchSeconds: TimeInterval = 4
+
+	/// Shortcuts Events is a background agent that macOS starts on demand, and
+	/// the no-prompt permission query answers procNotFound (-600) for a target
+	/// that is not running. Discovery then refused on every fresh session. Start
+	/// the target once and ask again until it registers or the budget ends; any
+	/// other answer, including a consent refusal, is returned unchanged.
+	static func determinePermission(deadline: TimeInterval, now: () -> TimeInterval,
+		query: () -> OSStatus, launch: () -> Bool, pause: () -> Void) -> OSStatus {
+		var status = query()
+		guard status == OSStatus(procNotFound), launch() else { return status }
+		repeat {
+			status = query()
+			if status != OSStatus(procNotFound) { return status }
+			pause()
+		} while now() < deadline
+		return status
+	}
+
+	/// LaunchServices starts the target without sending it an AppleEvent, so no
+	/// Automation consent is involved and nothing is brought to the foreground.
+	private static func launchShortcutsEvents(until deadline: TimeInterval) -> Bool {
+		guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.shortcuts.events") else {
+			return false
+		}
+		let configuration = NSWorkspace.OpenConfiguration()
+		configuration.activates = false
+		configuration.addsToRecentItems = false
+		configuration.promptsUserIfNeeded = false
+		let finished = DispatchSemaphore(value: 0)
+		let lock = NSLock()
+		var launched = false
+		// The completion handler runs on a concurrent queue, never this thread.
+		NSWorkspace.shared.openApplication(at: url, configuration: configuration) { application, error in
+			lock.lock(); launched = application != nil && error == nil; lock.unlock()
+			finished.signal()
+		}
+		let remaining = max(0, deadline - ProcessInfo.processInfo.systemUptime)
+		guard finished.wait(timeout: .now() + remaining) == .success else { return false }
+		lock.lock(); defer { lock.unlock() }
+		return launched
+	}
+
 	/// Read-only AppleEvents stay isolated from the interactive Hammerspoon runloop.
 	private static func queryRole(arguments: [String]) -> Int32 {
 		let operation = arguments[2], nonce = Int64(arguments[3])!
@@ -623,7 +668,7 @@ enum OwnedAutomationQueryWorker {
 			_ = sentinel.withUnsafeBytes { Darwin.write(STDERR_FILENO, $0.baseAddress, sentinel.count) }
 			return 0
 		}
-		if operation == "fixture-wait" { usleep(30_000_000); return 0 }
+		if operation == "fixture-wait" { usleep(LauncherTimings.automationFixtureWait.microseconds); return 0 }
 		if operation == "fixture" {
 			let packet: [String: Any] = ["version": 1, "nonce": nonce, "operation": "discover", "status": "observed",
 				"rows": [["id": "11111111-1111-1111-1111-111111111111", "name": "日本 e\u{301}\n", "accepts_input": false]],
@@ -652,7 +697,12 @@ enum OwnedAutomationQueryWorker {
 		}
 		guard addressError == noErr else { return publish(refusal("native_refused")) }
 		defer { AEDisposeDesc(&target) }
-		let permission = AEDeterminePermissionToAutomateTarget(&target, typeWildCard, typeWildCard, false)
+		let started = ProcessInfo.processInfo.systemUptime
+		let permission = determinePermission(deadline: started + targetLaunchSeconds,
+			now: { ProcessInfo.processInfo.systemUptime },
+			query: { AEDeterminePermissionToAutomateTarget(&target, typeWildCard, typeWildCard, false) },
+			launch: { launchShortcutsEvents(until: started + targetLaunchSeconds) },
+			pause: { usleep(LauncherTimings.automationPermissionPoll.microseconds) })
 		guard permission == noErr else {
 			return publish(refusal(permission == -1743 || permission == -1744
 				? "automation_permission_refused" : "native_refused"))

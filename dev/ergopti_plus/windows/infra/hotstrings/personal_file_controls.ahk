@@ -16,15 +16,15 @@ class PersonalFileControls {
 
 	/** Read physical identity from an open handle, including hard-link aliases. */
 	static Physical(Path) {
-		File := FSOpenReadStrict(Path)
-		if !IsObject(File)
+		Handle := FSOpenReadStrict(Path)
+		if !IsObject(Handle)
 			throw Error("The personal hotstring file is unreadable.")
 		try {
-			Snapshot := FSHandleSnapshot(File.Handle)
+			Snapshot := FSHandleSnapshot(Handle.Handle)
 			if !Snapshot.Get("ok", false)
 				throw Error("The personal hotstring file identity is unavailable.")
 			return Snapshot["volume"] . ":" . Snapshot["index_high"] . ":" . Snapshot["index_low"]
-		} finally File.Close()
+		} finally Handle.Close()
 	}
 
 	/** Parsing excludes the UTF-8 BOM; ownership retains it in the exact source receipt. */
@@ -84,11 +84,17 @@ class PersonalFileControls {
 			global HS_TOML_SECTION_HEADER_PATTERN, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
 			ExactContent := Packs[Index].Get("content", "")
 			try {
-				TOML_ParseDocument(ExactContent, &ParsedRecords, &PhysicalRecords)
+				Document := TOML_ParseDocument(ExactContent, &ParsedRecords, &PhysicalRecords)
 				for PhysicalRecord in PhysicalRecords {
 					if PhysicalRecord.Kind == "opaque"
 						throw Error("The source has an unaddressable TOML record.")
 				}
+				; The adopted owner answers every metadata-availability question of
+				; this exact content from this one parse. A menu render asks four
+				; per section, and reparsing a whole personal file for each one
+				; made the tray take seconds to minutes (perf-personal-metadata-2026-10-17).
+				Record["parsed"] := Map("content", ExactContent, "document", Document,
+					"records", ParsedRecords, "physical", PhysicalRecords)
 			} catch {
 				Record["admitted"] := false
 				Record["exclusive"] := false
@@ -132,9 +138,12 @@ class PersonalFileControls {
 	static Refresh() {
 		global ConfigurationFile
 		Inventory := this.Scan(), Owners := Map()
-		Stored := TOML_ParseFreshFileTyped(ConfigurationFile)
-		if TOML_ReadFailed(ConfigurationFile)
+		Content := FileExist(ConfigurationFile) ? FSReadUtf8Exact(ConfigurationFile) : ""
+		if !(Content is String)
 			throw Error("The personal-file activation configuration is unreadable.")
+		; Dynamic choices may be dotted assignments or inline containers. Read
+		; their typed semantic tree without publishing another boot snapshot.
+		Stored := ConfigTomlDecodeSnapshot(Content).Document
 		for Record in Inventory {
 			if Record["admitted"] && Record["exclusive"] {
 				Owner := PersonalFileAdoptedOwner(Record, Stored)
@@ -170,23 +179,31 @@ class PersonalFileControls {
 		Count := 0
 		for Id, Owner in this.owners
 			Count += Owner.ActiveCount()
-		; Sources without an exclusive gate retain their generic registration.
-		for Record in this.inventory {
-			if !this.owners.Has(Record["owner"])
-				Count += Record.Get("count", 0)
-		}
 		return Count
 	}
 
-	/** Load real native mappings through an explicit owner, retaining generic unavailable packs. */
+	/**
+	 * The identity gate the live engine and the preview share: only a source the
+	 * adoption admitted with an exclusive owner is active. A refused source (an
+	 * alias of the primary or of another file, an ambiguous or unreadable one)
+	 * stays unavailable, as on macOS and Linux; loading it as a whole-file pack
+	 * fired the primary's mappings a second time, past the personal category gate.
+	 */
+	static ActiveOwner(Record) {
+		return this.owners.Get(Record["owner"], 0)
+	}
+
+	/** Load real native mappings only through their adopted owner. */
 	static Register() {
 		this.Refresh()
 		for Record in this.inventory {
 			Pack := Record["pack"]
-			if this.owners.Has(Record["owner"])
-				LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"], this.owners[Record["owner"]])
+			Owner := this.ActiveOwner(Record)
+			if Owner
+				LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"], Owner)
 			else
-				LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"])
+				LoggerWarn("PersonalFiles", "Personal hotstring file '{1}' is not loaded ({2}): it stays unavailable until its identity is unique and readable.",
+					Pack["Path"], Record.Get("reason", "unavailable-owner"))
 		}
 	}
 
@@ -194,12 +211,24 @@ class PersonalFileControls {
 	static BuildPreview(Index, TriggerSet) {
 		for Record in this.inventory {
 			Pack := Record["pack"]
-			if this.owners.Has(Record["owner"])
-				_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], Index, TriggerSet, "", Pack["PersonalSource"], this.owners[Record["owner"]])
-			else
-				_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], Index, TriggerSet, "", Pack["PersonalSource"])
+			if Owner := this.ActiveOwner(Record)
+				_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], Index, TriggerSet, "", Pack["PersonalSource"], Owner)
 		}
 	}
+}
+
+/**
+ * Whether a raw header names a table ReadMetadata reads: the same key-path test
+ * it applies, so the section-filtered parse keeps exactly the tables it used.
+ * @param {String} Header - Raw header text of the flat parse.
+ * @returns {Boolean} True for `_meta` and every table below it.
+ */
+_PersonalFileMetadataHeader(Header) {
+	try Parts := TOML_ParseKeyPath(Header, true)
+	catch
+		return false
+	; Case-insensitive, as ReadMetadata's own `!=` test.
+	return Parts.Length > 0 && Parts[1] = "_meta"
 }
 
 /** A captured owner is a generation-bound capability, not a transport descriptor. */
@@ -211,10 +240,17 @@ class PersonalFileAdoptedOwner {
 		if !(this.content is String) || !(this.content == Record["content"])
 			|| PersonalFileControls.Physical(this.path) != this.physical
 			throw Error("The adopted personal source is unreadable.")
+		; Discovery parsed exactly these bytes; an owner without that parse was
+		; never admitted, so its absence is a contract breach, not a cache miss.
+		if !Record.Has("parsed") || !(Record["parsed"]["content"] == this.content)
+			throw Error("The adopted personal source has no parse of its admitted content.")
+		this.parsed := Record["parsed"]
 		this.parsedContent := PersonalFileControls.ParseContent(this.content)
 		this.config := this.ReadMetadata(this.parsedContent)
-		this.groups := Stored.Get("hotstrings.groups", Map())
-		this.sections := Stored.Get("hotstrings.modules." . TOML_RenderKey(this.id), Map())
+		Groups := _TOML_DocumentLookup(Stored, ["hotstrings", "groups"])
+		Sections := _TOML_DocumentLookup(Stored, ["hotstrings", "modules", this.id])
+		this.groups := Groups.Get("value", 0) is Map ? Groups["value"] : Map()
+		this.sections := Sections.Get("value", 0) is Map ? Sections["value"] : Map()
 		this.sectionNames := Map(), this.counts := Map(), Current := ""
 		global HS_TOML_SECTION_HEADER_PATTERN, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
 		loop parse, this.parsedContent, "`n", "`r" {
@@ -272,19 +308,21 @@ class PersonalFileAdoptedOwner {
 	/** Resolve source metadata after adoption; the package tier never derives from its label. */
 	Resolve(Section := "") {
 		global GLOBAL_DEFAULT_COLOR, HSE_PRIORITY_PACKAGE
-		File := this.config
-		Sec := File.Sections.Get(Section, { Delay: "", Color: "", ShowTooltip: "", Priority: "" })
-		return { Delay: Sec.Delay != "" ? Sec.Delay : (File.Delay != "" ? File.Delay : PersonalFileDefaultDelay()),
-			Color: Sec.Color != "" ? Sec.Color : (File.Color != "" ? File.Color : GLOBAL_DEFAULT_COLOR),
-			ShowTooltip: Sec.ShowTooltip != "" ? Sec.ShowTooltip : (File.ShowTooltip != "" ? File.ShowTooltip : true),
-			Priority: Sec.Priority != "" ? Sec.Priority : (File.Priority != "" ? File.Priority : HSE_PRIORITY_PACKAGE),
+		ConfigFile := this.config
+		Sec := ConfigFile.Sections.Get(Section, { Delay: "", Color: "", ShowTooltip: "", Priority: "" })
+		return { Delay: Sec.Delay != "" ? Sec.Delay : (ConfigFile.Delay != "" ? ConfigFile.Delay : PersonalFileDefaultDelay()),
+			Color: Sec.Color != "" ? Sec.Color : (ConfigFile.Color != "" ? ConfigFile.Color : GLOBAL_DEFAULT_COLOR),
+			ShowTooltip: Sec.ShowTooltip != "" ? Sec.ShowTooltip : (ConfigFile.ShowTooltip != "" ? ConfigFile.ShowTooltip : true),
+			Priority: Sec.Priority != "" ? Sec.Priority : (ConfigFile.Priority != "" ? ConfigFile.Priority : HSE_PRIORITY_PACKAGE),
 			HasOverride: false }
 	}
 
 	/** Parse only source metadata, retaining quoted keys and metadata after arrays of tables. */
 	ReadMetadata(Content) {
 		Config := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
-		Parsed := _ParseTomlFileImpl(this.path, false, false, Content, true)
+		; Only the [_meta] tables are read: decoding every hotstring row of the file
+		; as well cost about 130 ms per 35 KB file at each boot.
+		Parsed := _ParseTomlFileImpl(this.path, false, false, Content, true, , _PersonalFileMetadataHeader)
 		for Header, Fields in Parsed {
 			try Parts := TOML_ParseKeyPath(Header, true)
 			catch
@@ -314,49 +352,84 @@ class PersonalFileAdoptedOwner {
 		return Config
 	}
 
-	/** Losslessly patch only the admitted metadata zone, quoting arbitrary section names. */
-	PatchMetadata(Section, Field, Value, Content) {
+	/** Refuse source metadata whose exact spelling aliases a folded native owner. */
+	MetadataAvailable(Section, Field, Content := unset) {
 		Target := Section == "" ? ["_meta"] : ["_meta", "sections", Section]
-		Header := Section == "" ? "[_meta]" : "[_meta.sections." . TOML_RenderKey(Section) . "]"
-		Out := [], InTarget := false, Found := false, Done := false
-		for LineNumber, Line in StrSplit(Content, "`n", "`r") {
-			; The physical BOM belongs to the exact source/output receipt, but
-			; cannot hide the first owned metadata header from lexical recognition.
-			Recognition := LineNumber == 1 ? PersonalFileControls.ParseContent(Line) : Line
-			Trimmed := Trim(TOML_StripInlineComment(Recognition))
-			if RegExMatch(Trimmed, "^\[+([^\[\]]+)\]+$", &Match) {
-				if InTarget && !Done
-					Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
-				try Parts := TOML_ParseKeyPath(Match[1], true)
-				catch
-					Parts := []
-				InTarget := Parts.Length == Target.Length
-				if InTarget {
-					for Index, Part in Target {
-						if !(Parts[Index] == Part)
-							InTarget := false
-					}
-				}
-				if InTarget
-					Found := true, Done := false
+		try {
+			; The owner's own content is immutable for its generation and was parsed
+			; once at discovery; only a candidate patch needs a fresh parse.
+			if IsSet(Content)
+				Document := TOML_ParseDocument(Content, &Records, &Physical)
+			else
+				Document := this.parsed["document"], Records := this.parsed["records"],
+					Physical := this.parsed["physical"]
+			for Record in Physical {
+				if Record.Kind != "header"
+					continue
+				Parts := TOML_ParseKeyPath(Record.Section, true)
+				if this.FoldedPath(Parts, Target) && !this.ExactPath(Parts, Target)
+					return false
 			}
-			if InTarget && RegExMatch(Trimmed, "^" . Field . "\s*=") {
-				if !Done
-					Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
-				Done := true
-			} else
-				Out.Push(Line)
+			Target.Push(Field)
+			Stored := _TOML_DocumentLookup(Document, Target)
+			if Stored["blocked"] || (Stored["found"] && !this.MetadataValueValid(Field, Stored["value"]))
+				return false
+			for Record in Records {
+				if this.FoldedPath(Record.Path, Target) && !this.ExactPath(Record.Path, Target)
+					return false
+			}
+			return true
+		} catch {
+			return false
 		}
-		if InTarget && !Done
-			Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
-		if !Found {
-			Out.Push("")
-			Out.Push(Header)
-			Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
+	}
+
+	/** Classify stored values before allowing a field's native editor to replace them. */
+	MetadataValueValid(Field, Value) {
+		if Field == "delay"
+			return TickTryDurationMsFromSeconds(Value, &DelayMs)
+		if Field == "priority"
+			return HotstringsTryPriority(Value, &Priority)
+		if Field == "show_tooltip"
+			return Value is TOML_Bool
+		return Field == "color" && Value is String && RegExMatch(Value, "^#?[0-9A-Fa-f]{6}$")
+	}
+
+	/** Compare semantic segments without granting a case-folded writer authority. */
+	FoldedPath(Parts, Target) {
+		if Parts.Length != Target.Length
+			return false
+		for Index, Part in Target {
+			if StrLower(Parts[Index]) != StrLower(Part)
+				return false
 		}
-		Result := ""
-		for Index, Line in Out
-			Result .= (Index > 1 ? "`n" : "") . Line
+		return true
+	}
+
+	/** Preserve the original spelling of every owned semantic path segment. */
+	ExactPath(Parts, Target) {
+		if Parts.Length != Target.Length
+			return false
+		for Index, Part in Target {
+			if !(Parts[Index] == Part)
+				return false
+		}
+		return true
+	}
+
+	/** Patch one semantic leaf through the existing lossless document owner. */
+	PatchMetadata(Section, Field, Value, Content) {
+		if !this.MetadataAvailable(Section, Field, Content)
+			throw ValueError("The personal metadata field has an ambiguous source owner.")
+		Header := Section == "" ? "_meta" : "_meta.sections." . TOML_RenderKey(Section)
+		StoredValue := Field == "show_tooltip" ? TOML_Bool(Value) : Value
+		Candidate := TOML_BuildConfigDocumentCandidate(Content,
+			[{ Section: Header, Key: Field, Value: StoredValue }], [])
+		Result := Candidate["content"]
+		; The generic configuration owner emits a BOM. Personal sources retain
+		; their captured physical encoding posture instead of acquiring one.
+		if SubStr(Content, 1, 1) != Chr(0xFEFF) && SubStr(Result, 1, 1) == Chr(0xFEFF)
+			Result := SubStr(Result, 2)
 		return Result
 	}
 
@@ -389,7 +462,7 @@ class PersonalFileAdoptedOwner {
 			throw ValueError("Invalid personal-file delay.")
 		else if Field == "priority" && !HotstringsTryPriority(Value, &Priority)
 			throw ValueError("Invalid personal-file priority.")
-		else if Field == "show_tooltip" && !HotstringsTryBooleanOverride(Value, &Tooltip)
+		else if Field == "show_tooltip" && !HotstringsTryBooleanOverride(Value, &ShowTooltip)
 			throw ValueError("Invalid personal-file tooltip preference.")
 		else if Field == "color" && (!(Value is String) || !RegExMatch(Value, "^#?[0-9A-Fa-f]{6}$"))
 			throw ValueError("Invalid personal-file color.")

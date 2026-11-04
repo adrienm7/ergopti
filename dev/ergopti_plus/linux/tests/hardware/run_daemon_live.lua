@@ -127,13 +127,9 @@ end
 -- own virtual keyboard keeps the production name, and the two must not be
 -- confused. The daemon is pinned to this one with --device, because the
 -- finder rightly skips uinput devices as synthetic.
-local DeviceNames = require("infra.device_names")
-local production_name = DeviceNames.VIRTUAL_KEYBOARD
-DeviceNames.VIRTUAL_KEYBOARD = TEST_KEYBOARD
-package.loaded["adapters.uinput_writer"] = nil
-local Keyboard = require("adapters.uinput_writer")
-DeviceNames.VIRTUAL_KEYBOARD = production_name
-package.loaded["adapters.uinput_writer"] = nil
+-- Keyboard-only: the production device also carries the navigation wheel's
+-- relative axes, which the daemon's grab policy refuses on a source.
+local Keyboard = require("tests.hardware.keyboard_source_writer").load(TEST_KEYBOARD)
 
 if not Keyboard.is_available() then abort("/dev/uinput is not writable") end
 Keyboard.use_ffi_backend()
@@ -200,7 +196,7 @@ local function dump_log()
 		lines[#lines + 1] = line
 		local lower = line:lower()
 		if lower:find("secure") or lower:find("focus") or lower:find("at%-spi") or lower:find("withheld")
-			or lower:find("match") or lower:find("inject") or lower:find("capture") or lower:find("keylogger")
+			or lower:find("match") or lower:find("inject") or lower:find("capture") or lower:find("keystats")
 			or lower:find("error") or lower:find("predict") or lower:find("llm") or lower:find("api") then
 			print("  " .. line)
 		end
@@ -265,11 +261,71 @@ sleep(1.5)
 
 -- Re-resolved rather than reused: the daemon may recreate its virtual keyboard
 -- after startup, and the node number moves with it.
+-- Focus priming deliberately leaves the preceding text unknown. A word-only
+-- first trigger needs a real separator, acknowledged on this same output Reader.
+-- This is part of the original output admission window, not a second wait.
+local boundary_rows = { { 1, 57, 1 }, { 0, 0, 0 }, { 1, 57, 0 }, { 0, 0, 0 } }
+local boundary_output, boundary_error = nil, nil
+local boundary_emitted, boundary_count = false, 0
+local function refuse_boundary(reason)
+	boundary_error = reason
+	return "boundary-refused"
+end
+local function admit_output()
+	if not boundary_output then
+		local node = node_for(DAEMON_OUTPUT)
+		if not node or EvdevReader.open(node, out_slot) ~= true then return nil end
+		boundary_output = node
+	end
+	if EvdevReader.device_path(out_slot) ~= boundary_output
+		or node_for(DAEMON_OUTPUT) ~= boundary_output then
+		return refuse_boundary("the original output path changed")
+	end
+	if not boundary_emitted then
+		local before, status = EvdevReader.read_event(out_slot)
+		local held = EvdevReader.pressed_keys(out_slot, 767)
+		if before ~= nil or status ~= "would_block" or type(held) ~= "table" or next(held) ~= nil then
+			return refuse_boundary("the output was not clear before the separator")
+		end
+		boundary_emitted = true
+		local down_called, down = pcall(Keyboard.emit, KEY_SPACE, 1)
+		local up_called, up = pcall(Keyboard.emit, KEY_SPACE, 0)
+		if not down_called or down ~= true or not up_called or up ~= true then
+			return refuse_boundary("the separator writes were not acknowledged")
+		end
+	end
+	-- Four expected rows and one terminal read: extra/repeat/drop rows refuse.
+	for _ = 1, 5 do
+		local event, status = EvdevReader.read_event(out_slot)
+		if event == nil then
+			if status ~= "would_block" then return refuse_boundary("the output read failed") end
+			if boundary_count ~= #boundary_rows then return nil end
+			local held = EvdevReader.pressed_keys(out_slot, 767)
+			if type(held) ~= "table" or next(held) ~= nil then
+				return refuse_boundary("the separator left an unavailable or held key")
+			end
+			return boundary_output
+		end
+		local expected = boundary_rows[boundary_count + 1]
+		if status ~= "event" or type(event) ~= "table" or not expected
+			or event.type ~= expected[1] or event.code ~= expected[2] or event.value ~= expected[3] then
+			return refuse_boundary("the separator event census differed")
+		end
+		boundary_count = boundary_count + 1
+	end
+	return refuse_boundary("the separator drain did not terminate")
+end
 local opened_output = await(function()
-	local node = node_for(DAEMON_OUTPUT)
-	return node and EvdevReader.open(node, out_slot) and node or nil
+	local called, result = pcall(admit_output)
+	if not called then return refuse_boundary("the native admission operation raised") end
+	return result
 end, 10)
-if not opened_output then
+if not opened_output or boundary_error then
+	local close_called, closed = pcall(EvdevReader.close, out_slot)
+	if not close_called or closed ~= true then
+		print("  FAIL the boundary output Reader close was not acknowledged")
+	end
+	print("  FAIL native word-boundary admission: " .. (boundary_error or "original 10-second admission exhausted"))
 	dump_log()
 	stop_daemon()
 	os.execute("ls -l /dev/input; cat /proc/bus/input/devices | grep -A5 -i ergopti")
@@ -326,15 +382,17 @@ local function read_output(seconds)
 	return table.concat(text), table.concat(trail, " "), alt_chords
 end
 
-type_text("adn ")
+-- Startup focus admission deliberately forgets any unobserved suffix. Type a
+-- real separator rather than treating the fixture's empty field as engine proof.
+type_text(" adn ")
 local got, trail = read_output(3)
 print(string.format("  the desktop received %q", got))
 print("  key events: " .. trail)
 local failures = {}
-if got == "ADN " then
-	print("  ok   typing \"adn \" on the keyboard reached the desktop as \"ADN \"")
+if got == " ADN " then
+	print("  ok   typing \" adn \" on the keyboard reached the desktop as \" ADN \"")
 else
-	failures[#failures + 1] = "expected \"ADN \""
+	failures[#failures + 1] = "expected \" ADN \""
 end
 
 
@@ -471,7 +529,10 @@ end
 
 -- The rewrite prompt, bound to Super+Space by the live preferences: the
 -- sentence being typed is sent as TAIL, and accepting the rewrite erases it
--- whole before typing the rewritten one.
+-- whole before typing the rewritten one. The AI keeps its own typing context
+-- (e934ae45c8): the accepted prediction above belongs to the same unbroken
+-- sentence, so the TAIL is "bonjour <prediction> ok pr jd", not only the last
+-- words typed after it.
 if LLM_PORT and LLM_REWRITE_REPLY then
 	local Json = require("json")
 	--- The user turn of the first rewrite request after `from`, if one arrived.
@@ -487,6 +548,7 @@ if LLM_PORT and LLM_REWRITE_REPLY then
 		end
 		return nil
 	end
+	local sentence = "bonjour " .. (LLM_REPLY:gsub("^%s+", "")) .. " ok pr jd"
 	local before = #api_requests()
 	type_text(" ok pr jd")
 	read_output(1)
@@ -496,8 +558,8 @@ if LLM_PORT and LLM_REWRITE_REPLY then
 		failures[#failures + 1] = "Super+Space sent no rewrite request to the API"
 	else
 		print("  the API received the user turn: " .. turn)
-		if turn:sub(-#'TAIL: "ok pr jd"') ~= 'TAIL: "ok pr jd"' then
-			failures[#failures + 1] = "the rewrite request did not send the sentence as TAIL"
+		if turn:sub(-#('TAIL: "' .. sentence .. '"')) ~= 'TAIL: "' .. sentence .. '"' then
+			failures[#failures + 1] = "the rewrite request did not send the whole sentence as TAIL"
 		end
 		sleep(1.5)
 		Keyboard.emit(KEY_1, 1)
@@ -509,9 +571,9 @@ if LLM_PORT and LLM_REWRITE_REPLY then
 		for event in rewrite_trail:gmatch("%S+") do
 			if event == EvdevCodes.KEY_BACKSPACE .. "↓" then erased = erased + 1 end
 		end
-		if erased ~= #"ok pr jd" then
+		if erased ~= #sentence then
 			failures[#failures + 1] = string.format("the rewrite erased %d character(s), not the sentence's %d",
-				erased, #"ok pr jd")
+				erased, #sentence)
 		end
 		local expected = LLM_REWRITE_REPLY:gsub("^REWRITE:%s*", "")
 		if rewritten ~= expected then

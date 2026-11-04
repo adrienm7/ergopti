@@ -82,7 +82,7 @@ This communicates "this option exists but is not active" without hiding it.
 
 The canonical algorithm is implemented in `tint.js:mixTint()`. Every driver
 MUST use this exact formula. Test coverage is provided via
-`macos/tests/unit/ui/test_tooltip_tint_contract.lua` on the Hammerspoon side;
+`macos/tests/unit/ui/tooltip/test_tooltip_tint_contract.lua` on the Hammerspoon side;
 the reference vectors live in `tint.js:tintTestVectors()`.
 
 ### Algorithm
@@ -264,7 +264,25 @@ canvas_h = pad_y + preds_h + line_spacing
 
 Prediction lines stack as one text block: no per-line padding and no rule
 between them. `preds_w` is the widest line over every highlighted row, so
-navigating never resizes the panel. The footer never widens the panel while its
+navigating never resizes the panel.
+
+Each line that carries a prediction ends with the chord that inserts it, in a
+shortcut column: `preds_w = max_line_w + label_gap + max_shortcut_w` when any
+row has a chord, each chord right-aligned against the inner edge, bottom
+aligned with its line at the hint size, in `cmd_dim` on every row. The chord is
+the validation modifiers in `shortcut_modifier_order`, each named by the shared
+key name table (its glyph on macOS, its translated name elsewhere) and joined
+by the OS's `shortcut_joiner_*`, then the row's digit (0 for the
+tenth row, nothing beyond); no modifier means the bare digit. The rule is
+`_shared/lua/tooltip/llm_line.lua` `shortcut_label`, pinned by
+`_shared/tests/corpus/tooltip/llm_shortcut_vectors.json`. The column hangs from
+the panel, `canvas_w − pad_x − shortcut_w`, whatever widened it: Windows and
+Linux draw each chord there, macOS draws a second text element over the same
+frame, right-aligned, whose rows repeat the lines invisibly so they keep the
+lines' heights. `preds_w` stops at `llm_max_content_width`; a longer line ends
+in an ellipsis at `canvas_w − 2 × pad_x − label_gap − max_shortcut_w`.
+`shortcut_column` and `column_placement` in the same file hold the arithmetic,
+pinned by `_shared/tests/corpus/tooltip/llm_column_vectors.json`. The footer never widens the panel while its
 combined row fits (`combined_w ≤ preds_w`); otherwise it wraps into a hint row
 and an info row, and only the wider of those may widen it. Width is sized with
 the worst-case timing line so a later TTLT never clips.

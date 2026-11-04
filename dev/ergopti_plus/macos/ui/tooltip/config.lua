@@ -46,6 +46,9 @@
 
 local M = {}
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
+local LlmLine = require("tooltip.llm_line")
+local KeyNames = require("keycodes.key_names")
 local LOG = "tooltip_config"
 
 -- Populated strictly from _shared/modules/tooltip/constants.toml at require-time (fail fast).
@@ -211,10 +214,10 @@ local function load_from_shared()
 	-- macos/ui/tooltip/config.lua → macos/ui/tooltip → macos/ui → macos → ergopti_plus → shared
 	local shared_path = (function()
 		local src = debug.getinfo(1, "S").source:gsub("^@", "")
-		local dir = src:match("^(.*)[/\\][^/\\]+$") or src
-		dir = dir:match("^(.*)[/\\][^/\\]+$") or dir
-		dir = dir:match("^(.*)[/\\][^/\\]+$") or dir
-		local ergopti_plus = dir:match("^(.*)[/\\][^/\\]+$") or dir
+		local dir = NativePath.dirname(src) or src
+		dir = NativePath.dirname(dir) or dir
+		dir = NativePath.dirname(dir) or dir
+		local ergopti_plus = NativePath.dirname(dir) or dir
 		return ergopti_plus .. "/_shared"
 	end)()
 
@@ -281,6 +284,8 @@ local function load_from_shared()
 	M.layout.hint_spacing  = require_key("layout", "hint_spacing")
 	M.layout.screen_margin = require_key("layout", "screen_margin")
 	M.layout.corner_radius = require_key("layout", "corner_radius")
+	M.layout.label_gap     = require_key("layout", "label_gap")
+	M.layout.llm_max_content_width = require_key("layout", "llm_max_content_width")
 
 	-- [positioning]
 	M.layout.caret_offset_x      = require_key("positioning", "caret_offset_x")
@@ -307,7 +312,6 @@ local function load_from_shared()
 	M.colors.nw_sel     = rgba_from_table(require_key("llm_colors", "nw_sel"),     "llm_colors", "nw_sel")
 	M.colors.unsel_gray = rgba_from_table(require_key("llm_colors", "unsel_gray"), "llm_colors", "unsel_gray")
 	M.colors.cursor     = rgba_from_table(require_key("llm_colors", "cursor"),     "llm_colors", "cursor")
-	M.colors.cmd_sel    = rgba_from_table(require_key("llm_colors", "cmd_sel"),    "llm_colors", "cmd_sel")
 	M.colors.cmd_dim    = rgba_from_table(require_key("llm_colors", "cmd_dim"),    "llm_colors", "cmd_dim")
 	M.colors.loading    = rgba_from_table(require_key("llm_colors", "loading"),    "llm_colors", "loading")
 
@@ -325,17 +329,23 @@ local function load_from_shared()
 		inactive_align_char  = require_key("llm_ui", "inactive_align_char"),
 		footer_space_divider = require_key("llm_ui", "footer_space_divider"),
 		footer_combined_sep  = require_key("llm_ui", "footer_combined_separator"),
-		shortcut_label_gap   = require_key("llm_ui", "shortcut_label_gap"),
-		hint_accept_single   = require_key("llm_ui", "hint_accept_single"),
-		hint_nav_left        = require_key("llm_ui", "hint_nav_left"),
-		hint_nav_right       = require_key("llm_ui", "hint_nav_right"),
-		hint_accept_center   = require_key("llm_ui", "hint_accept_center"),
+		-- The shortcut column's modifiers (_shared/lua/tooltip/llm_line.lua), as
+		-- the glyphs of the shared key name table.
+		shortcut_spec        = LlmLine.shortcut_spec(require_key("llm_ui", "shortcut_modifier_order"),
+			require_key("llm_ui", "shortcut_joiner_hs"), KeyNames.macos_symbol),
+		-- The footer's keys, as key name ids; its words are locale text
+		-- (tooltip_llm.lua footer_hints).
+		hint_accept_key      = require_key("llm_ui", "hint_accept_key"),
+		hint_nav_left_keys   = require_key("llm_ui", "hint_nav_left_keys"),
+		hint_nav_right_keys  = require_key("llm_ui", "hint_nav_right_keys"),
 		hint_arrow_left      = require_key("llm_ui", "hint_arrow_left"),
 		hint_arrow_right     = require_key("llm_ui", "hint_arrow_right"),
-		hint_or              = require_key("llm_ui", "hint_or"),
 		hint_arrow_sep_left  = require_key("llm_ui", "hint_arrow_sep_left"),
 		hint_arrow_sep_right = require_key("llm_ui", "hint_arrow_sep_right"),
 	}
+	if not M.llm_ui.shortcut_spec then
+		error("[tooltip/config] [llm_ui].shortcut_modifier_order and shortcut_joiner_hs must declare the shortcut column")
+	end
 
 	-- [tint]
 	M.tint_config.lightness  = require_key("tint", "lightness")

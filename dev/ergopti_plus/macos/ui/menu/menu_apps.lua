@@ -22,6 +22,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
@@ -50,10 +51,12 @@ local _scan_failures = {}
 --- @return table|nil paths Nil on failure, including partial command output.
 local function scan_paths(directory, pattern, category)
 	local ok, output, succeeded, kind, code = pcall(hs.execute, string.format(
-		"find %s -maxdepth 1 -name %s 2>/dev/null",
+		"find %s -maxdepth 1 -name %s -print0 2>/dev/null",
 		text_utils.shell_quote(directory), text_utils.shell_quote(pattern)
 	))
-	if not ok or type(output) ~= "string" or succeeded ~= true or kind ~= "exit" or code ~= 0 then
+	if not ok or type(output) ~= "string" or succeeded ~= true or kind ~= "exit" or code ~= 0
+		or (output ~= "" and output:sub(-1) ~= "\0")
+		or output:sub(1, 1) == "\0" or output:find("\0\0", 1, true) then
 		if not _scan_failures[category] then
 			_scan_failures[category] = true
 			Logger.warn(LOG, "Bundled app %s scan failed (details withheld; repeats suppressed).", category)
@@ -62,7 +65,8 @@ local function scan_paths(directory, pattern, category)
 	end
 	_scan_failures[category] = nil
 	local paths = {}
-	for path in output:gmatch("[^\n]+") do paths[#paths + 1] = path end
+	-- A native pathname may contain LF; only NUL is excluded by the filesystem.
+	for path in output:gmatch("([^%z]+)%z") do paths[#paths + 1] = path end
 	table.sort(paths)
 	return paths
 end
@@ -72,8 +76,11 @@ end
 -- text is resolved when the submenu is built: resolved here, at module load, it
 -- was frozen in the session cache and stayed in the old language after a
 -- language change until the next reload.
+-- The bundled app whose helpers need the managed Python (ui/app_cloner_python_offer.lua).
+local APP_CLONER = "App Cloner"
+
 local APP_DESCRIPTION_KEYS = {
-	["App Cloner"] = "menu.apps.clone_desc",
+	[APP_CLONER] = "menu.apps.clone_desc",
 	["Encryptor"]  = "menu.apps.encrypt_desc",
 }
 
@@ -94,7 +101,7 @@ local function apps_dir(ctx)
 	-- in both repo and deployed setups where the apps bundles are colocated.
 	local base = ctx and type(ctx.base_dir) == "string" and ctx.base_dir or nil
 	if base and base ~= "" then
-		base = base:gsub("[/\\]+$", "")
+		base = NativePath.without_trailing_separators(base)
 		local candidate = base .. "/apps"
 		local ok, attr = pcall(hs.fs.attributes, candidate)
 		if ok and type(attr) == "table" and attr.mode == "directory" then
@@ -104,7 +111,7 @@ local function apps_dir(ctx)
 
 	-- Fallback for legacy layouts where hs.configdir directly contains apps/.
 	if hs and hs.configdir and hs.configdir ~= "" then
-		return hs.configdir:gsub("[/\\]+$", "") .. "/apps"
+		return NativePath.without_trailing_separators(hs.configdir) .. "/apps"
 	end
 
 	return nil
@@ -338,29 +345,42 @@ function M.build(ctx)
 				-- are injected directly into the launched app's environment.
 				-- `setEnvironment` on the `open` process itself does not propagate
 				-- to the app it spawns; `--env KEY=VALUE` does.
-				local task
-				task = TaskLifecycle.native(
-					"Bundled app launch",
-					"/usr/bin/open",
-					function(code, _, stderr)
-						if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
-						if code ~= 0 then
-							Logger.error(LOG, "open '%s' exited %d: %s.", app_name, code, stderr)
-						end
-					end,
-					function() return false end,
-					{
+				local function launch(extra_environment)
+					local arguments = {
 						"-n",
 						"--env", "ERGOPTI_LOCALE="     .. locale_code,
 						"--env", "ERGOPTI_LOCALES_DIR=" .. locales_dir,
-						app_path,
 					}
-				)
-				if not task then return end
-				M._active_tasks[task] = true
-				if not TaskLifecycle.start(task, "Bundled app launch") then
-					M._active_tasks[task] = nil
+					for _, entry in ipairs(extra_environment) do
+						arguments[#arguments + 1] = "--env"
+						arguments[#arguments + 1] = entry
+					end
+					arguments[#arguments + 1] = app_path
+					local task
+					task = TaskLifecycle.native(
+						"Bundled app launch",
+						"/usr/bin/open",
+						function(code, _, stderr)
+							if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
+							if code ~= 0 then
+								Logger.error(LOG, "open '%s' exited %d: %s.", app_name, code, stderr)
+							end
+						end,
+						function() return false end,
+						arguments
+					)
+					if not task then return end
+					M._active_tasks[task] = true
+					if not TaskLifecycle.start(task, "Bundled app launch") then
+						M._active_tasks[task] = nil
+					end
 				end
+				-- App Cloner's helpers run on Ergopti's managed Python and its
+				-- pinned PyObjC, installed on the user's first agreement.
+				if app_name == APP_CLONER then
+					return require("ui.app_cloner_python_offer").open(require("modules.llm.managed_pyobjc").default(), launch)
+				end
+				launch({})
 			end,
 		})
 	end

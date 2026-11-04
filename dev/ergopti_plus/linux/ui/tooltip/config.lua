@@ -26,6 +26,8 @@ local M = {}
 local Logger = require("logger.shim")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
+local LlmLine = require("tooltip.llm_line")
+local KeyNames = require("keycodes.key_names")
 
 local LOG = "ui.tooltip.config"
 
@@ -133,6 +135,7 @@ function M.load()
 			line_spacing     = require_key("layout", "line_spacing"),
 			hint_spacing     = require_key("layout", "hint_spacing"),
 			label_gap        = require_key("layout", "label_gap"),
+			llm_max_content_width = require_key("layout", "llm_max_content_width"),
 			corner_radius    = require_key("layout", "corner_radius"),
 			separator_height = require_key("layout", "separator_height"),
 			-- SPEC.md files this under [positioning]; the TOML declares it under
@@ -179,21 +182,30 @@ local _llm_line = nil
 --- Apart from M.load() because the suggestion overlay builds its rows before
 --- any panel style reaches it, and what a line reads must not depend on which
 --- renderer draws it.
---- @return table { mark, align, label_gap, colors = { typed, corrected, next,
----   cursor, label_selected, label_unselected } }
+--- @return table { mark, align, shortcut_spec, colors = { typed, corrected,
+---   next, cursor, label } }
 function M.llm_line()
 	if _llm_line then return _llm_line end
+	-- The shortcut column's modifiers (_shared/lua/tooltip/llm_line.lua), named
+	-- by the shared key name table in the active language (« Ctrl+Maj+3 »).
+	local shortcut_spec = LlmLine.shortcut_spec(require_key("llm_ui", "shortcut_modifier_order"),
+		require_key("llm_ui", "shortcut_joiner_linux"), function(name)
+			return KeyNames.label(name, "linux", require("infra.i18n").get)
+		end)
+	if not shortcut_spec then
+		error("[llm_ui].shortcut_modifier_order and shortcut_joiner_linux must declare the shortcut column")
+	end
 	_llm_line = {
-		mark      = require_key("llm_ui", "active_prefix"),
-		align     = require_key("llm_ui", "inactive_align_char"),
-		label_gap = require_key("llm_ui", "shortcut_label_gap"),
+		mark          = require_key("llm_ui", "active_prefix"),
+		align         = require_key("llm_ui", "inactive_align_char"),
+		shortcut_spec = shortcut_spec,
 		colors = {
-			typed            = parse_hex(require_key("llm_colors", "unsel_gray_hex")),
-			corrected        = parse_hex(require_key("llm_colors", "corr_sel_hex")),
-			next             = parse_hex(require_key("llm_colors", "nw_sel_hex")),
-			cursor           = parse_hex(require_key("llm_colors", "cursor_hex")),
-			label_selected   = parse_hex(require_key("llm_colors", "cmd_sel_hex")),
-			label_unselected = parse_hex(require_key("llm_colors", "cmd_dim_hex")),
+			typed     = parse_hex(require_key("llm_colors", "unsel_gray_hex")),
+			corrected = parse_hex(require_key("llm_colors", "corr_sel_hex")),
+			next      = parse_hex(require_key("llm_colors", "nw_sel_hex")),
+			cursor    = parse_hex(require_key("llm_colors", "cursor_hex")),
+			-- The shortcut column is muted on every row, the selected one included.
+			label     = parse_hex(require_key("llm_colors", "cmd_dim_hex")),
 		},
 	}
 	return _llm_line

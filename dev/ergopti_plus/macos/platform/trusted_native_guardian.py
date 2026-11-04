@@ -94,7 +94,7 @@ class TrustedNativeGuardian:
         if self.engine._resolve_worker() != str(self.path):
             raise GuardianRefusal("helper")
         held = os.fstat(self._descriptor)
-        named = self.path.stat(follow_symlinks=False)
+        named = os.stat(self.path, follow_symlinks=False)
         if (
             not stat.S_ISREG(held.st_mode)
             or held.st_uid not in (0, os.geteuid())
@@ -105,7 +105,7 @@ class TrustedNativeGuardian:
             or identity(named) != identity(held)
             or self._hash(progress) != self._digest
             or identity(os.fstat(self._descriptor)) != identity(self._initial)
-            or identity(self.path.stat(follow_symlinks=False)) != identity(self._initial)
+            or identity(os.stat(self.path, follow_symlinks=False)) != identity(self._initial)
         ):
             raise GuardianRefusal("helper")
         progress()

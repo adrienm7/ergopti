@@ -3,9 +3,9 @@
 ; ==============================================================================
 ; MODULE: Metrics Privacy Filters
 ; DESCRIPTION:
-; Persists and evaluates the privacy filters that gate the keylogger hot
+; Persists and evaluates the privacy filters that gate the keystats hot
 ; path: private browsing detection, system-auth dialogs, and a per-app
-; exclusion list. Mirrors the « FILTRES DE CONFIDENTIALITÉ » section of
+; exclusion list. Mirrors the « Filtres de confidentialité » section of
 ; the Hammerspoon menu_metrics.lua.
 ;
 ; FEATURES & RATIONALE:
@@ -13,8 +13,8 @@
 ;    the [filters] / [disabled_apps] sections so they survive restarts.
 ; 2. Defaults safe: private + system-auth filters default to ON. Users
 ;    have to explicitly turn them OFF, never the other way around — same
-;    contract as the global keylogger toggle.
-; 3. Single chokepoint: KL_AppendLog() in modules/keylogger.ahk calls
+;    contract as the global keystats toggle.
+; 3. Single chokepoint: KL_AppendLog() in modules/keystats.ahk calls
 ;    MF_ShouldFilter() before any disk I/O, so every event source
 ;    (typing flush, shortcuts, hotstrings, system events, …) inherits
 ;    the filter for free.
@@ -29,6 +29,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -78,10 +79,10 @@ class MetricsFilters {
 ; the failure this function exists to make impossible to have unnoticed.
 MetricsFiltersApplyManifestDefaults() {
 		Pairs := Map(
-			"private_browsing", "metrics.private_filter_enabled",
-			"secure_field",     "metrics.secure_filter_enabled",
-			"system_auth",      "metrics.system_auth_filter_enabled",
-			"encrypt",          "metrics.encrypt"
+			"private_browsing", ConfigKey.METRICS_PRIVATE_FILTER_ENABLED,
+			"secure_field",     ConfigKey.METRICS_SECURE_FILTER_ENABLED,
+			"system_auth",      ConfigKey.METRICS_SYSTEM_AUTH_FILTER_ENABLED,
+			"encrypt",          ConfigKey.METRICS_ENCRYPT
 		)
 		for Prop, Path in Pairs {
 				Entry := ManifestFindEntryByPath(Path)
@@ -129,9 +130,9 @@ MF_SaveBuiltToIni(Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
 
 _MF_FilterConfigKey(Prop) {
 	static Keys := Map(
-		"private_browsing", "private_filter_enabled",
-		"secure_field",     "secure_filter_enabled",
-		"system_auth",      "system_auth_filter_enabled"
+		"private_browsing", ConfigLeaf.PRIVATE_FILTER_ENABLED,
+		"secure_field",     ConfigLeaf.SECURE_FILTER_ENABLED,
+		"system_auth",      ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED
 	)
 	return Keys.Get(Prop, "")
 }
@@ -141,12 +142,12 @@ _MF_PublishFlagCandidate(Prop, Target) {
 }
 
 _MF_BuildFilterTogglePlan(Prop) {
-	ConfigKey := _MF_FilterConfigKey(Prop)
-	if (ConfigKey = "")
+	FilterConfigKey := _MF_FilterConfigKey(Prop)
+	if (FilterConfigKey = "")
 		throw ValueError("Unknown metrics-filter property '" . Prop . "'.")
 	Target := !MetricsFilters.%Prop%
 	return {
-		updates: [{ Section: "metrics", Key: ConfigKey, Value: Target }],
+		updates: [{ Section: "metrics", Key: FilterConfigKey, Value: Target }],
 		publish: _MF_PublishFlagCandidate.Bind(Prop, Target)
 	}
 }
@@ -176,7 +177,7 @@ _MF_BuildEncryptionTogglePlan(Outcome, ApplyFn := 0, AvailableFn := 0) {
 	OldValue := !!MetricsFilters.encrypt
 	Target := !OldValue
 	if Target && !_MF_EncryptionCandidateAvailable(AvailableFn) {
-		try LoggerError("Keylogger", "At-rest encryption requested but no key can be derived - staying off.")
+		try LoggerError("Keystats", "At-rest encryption requested but no key can be derived - staying off.")
 		return { noop: true }
 	}
 	Outcome["accepted"] := true
@@ -243,7 +244,7 @@ _MF_BuildDisabledAppsPlan(Selected, Receipt := 0) {
 		Persisted.Push(Key)
 	}
 	return {
-		updates: [{ Section: "metrics", Key: "metrics_disabled_apps",
+		updates: [{ Section: "metrics", Key: ConfigLeaf.DISABLED_APPS,
 			Value: Persisted }],
 		publish: _MF_PublishDisabledAppsCandidate.Bind(Candidate)
 	}
@@ -270,12 +271,22 @@ MF_CommitDisabledApps(Selected, WriterFn := 0, NotifyFn := 0, Receipt := 0) {
 ; =================================================
 
 ; One canonical focused-window snapshot feeds both the privacy predicate and
-; the keylogger’s app/title projection. The 50 ms freshness gate remains below
+; the keystats’s app/title projection. The 50 ms freshness gate remains below
 ; realistic inter-keystroke intervals. SetTimer callbacks share the same AHK
 ; thread as keyboard dispatch, so the adapter performs no target-thread message
 ; and caches process metadata behind a retained identity handle. Partial results
 ; still fail privacy closed.
 global MF_FOCUS_TTL_MS := 50
+
+; Focus changes are pushed by the system (foreground window and window-title events);
+; the repeating poll below is only the safety net for an event that never arrives.
+; Polling every 50 ms woke the driver 20 times a second all day: 2.7 million probes in
+; two days, some of them 500 ms stalls on the keystroke thread.
+global MF_FOCUS_FALLBACK_POLL_MS := 2000
+global MF_EVENT_SYSTEM_FOREGROUND := 0x0003
+global MF_EVENT_OBJECT_NAMECHANGE := 0x800C
+; A burst of events (a page that rewrites its title) is served by one refresh.
+global MF_FOCUS_EVENT_COALESCE_MS := 5
 
 class MetricsFocusCache {
 	; Build-then-swap keeps every reader on one complete identity. `valid=false`
@@ -298,6 +309,12 @@ class MetricsFocusCache {
 	static lifecycle_generation := 0
 	static running := false
 	static timer_fn := 0
+	; System focus events: hook handles, the native callback, and whether the safety net
+	; may run slowly because the hooks are live.
+	static hooks := []
+	static event_callback := 0
+	static event_mode := false
+	static event_refresh_pending := false
 }
 
 ; Returns the current tick through an injectable seam used by the interleaving
@@ -413,18 +430,40 @@ _MF_CommitFocusRefresh(RequestGeneration, Candidate) {
 	}
 }
 
-; Captures one stable reference for both metrics and keylogger consumers.
+; Captures one stable reference for both metrics and keystats consumers.
 MF_GetFocusSnapshot() {
+	; With events driving the cache, a foreground change that has not been delivered yet is
+	; caught here at the next read, which is exactly when the verdict matters: one cheap
+	; call instead of trusting the 2 s safety net.
+	; An invalid snapshot (hwnd 0) is already fail-closed and is not re-probed per read: a
+	; protected foreground window would otherwise cost a failing probe on every keystroke.
+	if MetricsFocusCache.event_mode && MetricsFocusCache.state.hwnd
+			&& MetricsFocusCache.state.hwnd != WIGetForegroundHwnd() {
+		PerfCount("metrics.focus_read_refresh")
+		try MF_RefreshFocus(true)
+	}
 	return MetricsFocusCache.state
 }
+
+; Focus moving during the capture (Alt+Tab) and no foreground window at all (a
+; lock screen, the desktop, a tray menu) are ordinary desktop transitions the
+; next refresh resolves: they are INFO. The other reasons, a process, class or
+; title the driver cannot read, stay WARNING because they need a look.
+global MF_FOCUS_TRANSIENT_FAILURES := Map("focus_changed", true, "no_foreground_window", true)
 
 _MF_ReportFocusProbeResult(PublishResult, Candidate) {
 	if !PublishResult.published
 		return
 	if !Candidate.valid && PublishResult.diagnostic_changed {
-		try LoggerWarn("MetricsFilters",
-			"Bounded focus snapshot unavailable ({1}); privacy filtering is fail-closed.",
-			Candidate.failure_reason)
+		if MF_FOCUS_TRANSIENT_FAILURES.Has(Candidate.failure_reason) {
+			try LoggerInfo("MetricsFilters",
+				"Bounded focus snapshot unavailable ({1}); privacy filtering is fail-closed.",
+				Candidate.failure_reason)
+		} else {
+			try LoggerWarn("MetricsFilters",
+				"Bounded focus snapshot unavailable ({1}); privacy filtering is fail-closed.",
+				Candidate.failure_reason)
+		}
 	} else if Candidate.valid && PublishResult.became_valid {
 		try LoggerInfo("MetricsFilters", "Bounded focus snapshot recovered ({1}).",
 			Candidate.process_name)
@@ -502,7 +541,7 @@ _MF_FocusTimerTick(OwnerGeneration) {
 }
 
 _MF_CancelFocusTimerNative(FocusTimerFn) {
-	SetTimer(FocusTimerFn, 0)
+	TimerSetCallback(FocusTimerFn, 0)
 }
 
 
@@ -573,8 +612,10 @@ MF_StartFocusRefresh() {
 
 	; Timer mutation stays outside Critical. The BoundFunc identity lets failure
 	; cleanup cancel only this start attempt, never a newer owner’s timer.
-	try SetTimer(FocusTimerFn, MF_FOCUS_TTL_MS)
+	EventsLive := _MF_StartFocusWinEvents()
+	try TimerSetCallback(FocusTimerFn, EventsLive ? MF_FOCUS_FALLBACK_POLL_MS : MF_FOCUS_TTL_MS)
 	catch as Err {
+		_MF_StopFocusWinEvents()
 		PreviousCritical := Critical("On")
 		try {
 			if MetricsFocusCache.lifecycle_generation = StartGeneration
@@ -599,11 +640,11 @@ MF_StartFocusRefresh() {
 		&& ObjPtr(MetricsFocusCache.timer_fn) = ObjPtr(FocusTimerFn))
 	finally Critical(PreviousCritical)
 	if !StillOwned {
-		try SetTimer(FocusTimerFn, 0)
+		try TimerSetCallback(FocusTimerFn, 0)
 		return false
 	}
 
-	; Seed before any keylogger callback can consume the cache. The resident path
+	; Seed before any keystats callback can consume the cache. The resident path
 	; uses only system-owned window metadata and cached process identity.
 	try MF_RefreshFocus(true)
 	catch as Err
@@ -617,9 +658,104 @@ MF_StartFocusRefresh() {
 	finally Critical(PreviousCritical)
 	if !StillOwned
 		return false
-	try LoggerTrace("MetricsFilters", "Bounded focus-cache refresh started ({1} ms).",
-		MF_FOCUS_TTL_MS)
+	try LoggerTrace("MetricsFilters", "Bounded focus-cache refresh started ({1} ms, {2}).",
+		EventsLive ? MF_FOCUS_FALLBACK_POLL_MS : MF_FOCUS_TTL_MS,
+		EventsLive ? "driven by system focus events" : "polling")
 	return true
+}
+
+; Installs the foreground and title event hooks. Returns false (the caller then keeps the
+; 50 ms poll) when they cannot be installed, under the dry-run harness, or already live.
+_MF_StartFocusWinEvents(AllowUnderHarness := false) {
+	if IsSet(_AHK_DRY_RUN) && !AllowUnderHarness
+		return false
+	if MetricsFocusCache.event_mode
+		return true
+	Callback := 0
+	try Callback := CallbackCreate(_MF_FocusWinEvent, "F", 7)
+	catch as Err {
+		try LoggerError("MetricsFilters", "Focus event callback could not be created: {1}; polling instead.", Err.Message)
+		return false
+	}
+	Hooks := []
+	for Event in [MF_EVENT_SYSTEM_FOREGROUND, MF_EVENT_OBJECT_NAMECHANGE] {
+		Hook := 0
+		try Hook := WIInstallEventHook(Event, Callback)
+		catch as Err
+			try LoggerError("MetricsFilters", "SetWinEventHook raised for event 0x{1:X}: {2}.", Event, Err.Message)
+		if !Hook {
+			try LoggerError("MetricsFilters", "Focus event 0x{1:X} could not be hooked; polling instead.", Event)
+			for Done in Hooks
+				try WIRemoveEventHook(Done)
+			try CallbackFree(Callback)
+			return false
+		}
+		Hooks.Push(Hook)
+	}
+	PreviousCritical := Critical("On")
+	try {
+		MetricsFocusCache.hooks := Hooks
+		MetricsFocusCache.event_callback := Callback
+		MetricsFocusCache.event_mode := true
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+; Removes the hooks. A hook that refuses to unhook keeps its callback allocated: freeing
+; a callback the system can still invoke would crash the driver.
+_MF_StopFocusWinEvents() {
+	PreviousCritical := Critical("On")
+	try {
+		Hooks := MetricsFocusCache.hooks
+		Callback := MetricsFocusCache.event_callback
+		MetricsFocusCache.event_mode := false
+		MetricsFocusCache.event_refresh_pending := false
+		MetricsFocusCache.hooks := []
+		MetricsFocusCache.event_callback := 0
+	} finally {
+		Critical(PreviousCritical)
+	}
+	AllRemoved := true
+	for Hook in Hooks {
+		Removed := false
+		try Removed := WIRemoveEventHook(Hook)
+		catch as Err
+			try LoggerWarn("MetricsFilters", "Focus event hook teardown failed: {1}.", Err.Message)
+		AllRemoved := AllRemoved && Removed
+	}
+	if Callback && AllRemoved
+		try CallbackFree(Callback)
+	return AllRemoved
+}
+
+; Runs on the keystroke thread for every foreground change and window-name change in the
+; session, so it only filters and schedules; the probe itself happens in the coalesced timer.
+_MF_FocusWinEvent(WinEventHook, Event, Hwnd, ObjectId, ChildId, EventThread, EventTime) {
+	if A_IsSuspended || !MetricsFocusCache.running
+		return
+	if Event == MF_EVENT_OBJECT_NAMECHANGE {
+		; Only the title of the foreground top-level window matters; child controls rename
+		; themselves constantly.
+		if ObjectId != 0 || Hwnd != WIGetForegroundHwnd()
+			return
+	}
+	PerfCount("metrics.focus_event")
+	if MetricsFocusCache.event_refresh_pending
+		return
+	MetricsFocusCache.event_refresh_pending := true
+	TimerArmOneShotMs(_MF_FocusEventRefresh, MF_FOCUS_EVENT_COALESCE_MS)
+}
+
+_MF_FocusEventRefresh() {
+	MetricsFocusCache.event_refresh_pending := false
+	if A_IsSuspended || !MetricsFocusCache.running
+		return
+	PerfCount("metrics.focus_event_refresh")
+	try MF_RefreshFocus(true)
+	catch as Err
+		try LoggerError("MetricsFilters", "Event-driven focus refresh failed: {1}.", Err.Message)
 }
 
 ; Disarm the focus-cache poll. Required because MF_RefreshFocus is a REPEATING
@@ -645,7 +781,10 @@ MF_StopFocusRefresh(NativeCancelFn := 0) {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	EventsRemoved := _MF_StopFocusWinEvents()
 	ProcessCacheStopped := _WIResetFocusProcessCache()
+	if !EventsRemoved
+		try LoggerError("MetricsFilters", "Focus event hooks could not be removed.")
 	if !IsObject(FocusTimerFn)
 		return ProcessCacheStopped
 	try NativeCancelFn.Call(FocusTimerFn)
@@ -683,7 +822,7 @@ MF_StopFocusRefresh(NativeCancelFn := 0) {
 	return true
 }
 
-; Returns true when the keylogger should DROP the current event because one of
+; Returns true when the keystats should DROP the current event because one of
 ; the privacy filters matches, or because focus could not be classified safely.
 MF_ShouldFilter() {
 		; Last window title the private-browsing pattern scan ran on, with its
@@ -711,7 +850,7 @@ MF_ShouldFilter() {
 				return true
 
 		; 2. Password field — relies on the UIA-backed detector in
-		;    modules/keylogger.ahk §13. Wrapped in try because the function
+		;    modules/keystats.ahk §13. Wrapped in try because the function
 		;    is loaded later in the include order and an early caller (e.g.
 		;    boot-time metrics) might race ahead of it.
 		if MetricsFilters.secure_field {
@@ -839,7 +978,7 @@ _MF_BuildDisabledAppTogglePlan(ProcessName, Outcome) {
 	for Name, _ in Candidate
 		Persisted.Push(Name)
 	return {
-		updates: [{ Section: "metrics", Key: "metrics_disabled_apps",
+		updates: [{ Section: "metrics", Key: ConfigLeaf.DISABLED_APPS,
 			Value: Persisted }],
 		publish: _MF_PublishDisabledAppsCandidate.Bind(Candidate)
 	}

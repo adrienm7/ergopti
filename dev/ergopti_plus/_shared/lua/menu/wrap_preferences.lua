@@ -5,6 +5,7 @@ local M = {}
 local Codec = require("toml_codec.codec")
 local LeafRows = require("toml_codec.leaf_rows")
 local Utf8 = require("compat.utf8")
+local ConfigKeys = require("config_keys")
 
 M.locations = {
 	wrap_symbol_states = { sec = "shortcuts", key = "wrap_symbols.states" },
@@ -44,13 +45,13 @@ function M.project(document, shapes, take, outdated)
 	take, outdated = take or function() end, outdated or function() end
 	local wrap, ready = source_wrap(document, shapes)
 	if not ready then
-		outdated({ "shortcuts", "wrap_symbols" }, "Wrap preferences require a dictionary")
+		outdated({ "shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS }, "Wrap preferences require a dictionary")
 		return {}
 	end
 	if wrap == nil then return {} end
 	for key in pairs(wrap) do
 		if key ~= "states" and key ~= "custom" then
-			outdated({ "shortcuts", "wrap_symbols", key }, "No Wrap preference of this build declares this field")
+			outdated({ "shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, key }, "No Wrap preference of this build declares this field")
 		end
 	end
 	local flat = {}
@@ -60,19 +61,19 @@ function M.project(document, shapes, take, outdated)
 			for symbol, enabled in pairs(wrap.states) do
 				if type(symbol) == "string" and symbol ~= "" and type(enabled) == "boolean" then
 					flat.wrap_symbol_states[symbol] = enabled
-					take("shortcuts", "wrap_symbols", "states", symbol)
+					take("shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, "states", symbol)
 				else
-					outdated({ "shortcuts", "wrap_symbols", "states", symbol }, "Wrap symbol choices require strict booleans")
+					outdated({ "shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, "states", symbol }, "Wrap symbol choices require strict booleans")
 				end
 			end
-			if next(wrap.states) == nil then take("shortcuts", "wrap_symbols", "states") end
-		else outdated({ "shortcuts", "wrap_symbols", "states" }, "Wrap symbol choices require a dictionary") end
+			if next(wrap.states) == nil then take("shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, "states") end
+		else outdated({ "shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, "states" }, "Wrap symbol choices require a dictionary") end
 	end
 	if wrap.custom ~= nil then
 		if custom_array(wrap.custom, shapes) then
 			flat.custom_wrap_symbols = LeafRows.clone_value(wrap.custom)
-			take("shortcuts", "wrap_symbols", "custom")
-		else outdated({ "shortcuts", "wrap_symbols", "custom" }, "Custom Wrap symbols require an ordered pair array") end
+			take("shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, "custom")
+		else outdated({ "shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, "custom" }, "Custom Wrap symbols require an ordered pair array") end
 	end
 	return flat
 end
@@ -122,11 +123,11 @@ function M.prepare(content, flat)
 			for symbol, enabled in pairs(states) do
 				local prior = wrap.states and wrap.states[symbol]
 				assert(prior == nil or type(prior) == "boolean", "Wrap state leaf is obsolete; explicit cleanup is required")
-				operations[#operations + 1] = { path = { "shortcuts", "wrap_symbols", "states", symbol }, value = enabled }
+				operations[#operations + 1] = { path = { "shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, "states", symbol }, value = enabled }
 			end
 			for symbol, enabled in pairs(wrap.states or {}) do
 				if type(enabled) == "boolean" and states[symbol] == nil then
-					operations[#operations + 1] = { path = { "shortcuts", "wrap_symbols", "states", symbol }, delete = true }
+					operations[#operations + 1] = { path = { "shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, "states", symbol }, delete = true }
 				end
 			end
 		end
@@ -139,7 +140,7 @@ function M.prepare(content, flat)
 			for _, pair in ipairs(custom) do
 				local origin = LeafRows.source_origin(pair)
 				local selected
-				if origin and origin.path[1] == "shortcuts" and origin.path[2] == "wrap_symbols"
+				if origin and origin.path[1] == "shortcuts" and origin.path[2] == ConfigKeys.LEAF.WRAP_SYMBOLS
 					and origin.path[3] == "custom" and type(origin.path[4]) == "number" then
 					if origin.source ~= content then
 						local previous, previous_shapes = LeafRows.decode_source(origin.source)
@@ -170,10 +171,10 @@ function M.prepare(content, flat)
 				else desired[#desired + 1] = LeafRows.clone_value(pair) end
 			end
 			if wrap.custom == nil or LeafRows.value_literal(desired) ~= LeafRows.value_literal(wrap.custom) then
-				operations[#operations + 1] = { path = { "shortcuts", "wrap_symbols", "custom" }, value = desired }
+				operations[#operations + 1] = { path = { "shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, "custom" }, value = desired }
 			end
 		elseif wrap.custom ~= nil then
-			operations[#operations + 1] = { path = { "shortcuts", "wrap_symbols", "custom" }, delete = true }
+			operations[#operations + 1] = { path = { "shortcuts", ConfigKeys.LEAF.WRAP_SYMBOLS, "custom" }, delete = true }
 		end
 	end
 	return LeafRows.prepare(content, operations)

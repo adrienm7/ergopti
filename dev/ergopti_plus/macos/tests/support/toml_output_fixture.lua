@@ -3,20 +3,20 @@
 --- ==============================================================================
 --- MODULE: Owned TOML Output Fixture
 --- DESCRIPTION:
---- Reclaims test output and its stable writer sidecar after the transaction.
+--- Reclaims test output and its stable writer lock after the transaction.
 --- ==============================================================================
 
 local M = {}
-local WRITE_LOCK_SUFFIX = ".ergoptiplus-write-lock-v1"
+local WriteLockPath = require("adapters.write_lock_path")
 
 --- Runs real writer/reader work against one owned temporary pathname.
---- @param callback function Receives the output path and its lock sidecar path.
+--- @param callback function Receives the output path and its writer lock path.
 --- @return ... Callback results.
 function M.with_output(callback)
 	assert(type(callback) == "function", "TOML fixture callback must be a function")
 	local remove = os.remove
 	local path = assert(os.tmpname()):gsub("\\", "/")
-	local lock_path = path .. WRITE_LOCK_SUFFIX
+	local lock_path = assert(WriteLockPath.for_canonical(path, os.getenv("HOME")))
 	local outcome = table.pack(pcall(callback, path, lock_path))
 	local cleanup_errors = {}
 	-- The writer must retain this inode between transactions. Only the fixture

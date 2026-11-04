@@ -10,6 +10,7 @@
 
 #Requires AutoHotkey v2.0
 #Include local_server_auth.ahk
+#Include local_server_fingerprint.ahk
 
 
 
@@ -25,13 +26,17 @@
 class LocalServerDiscoveryController {
 
 	/**
-	 * @param {Map} Options Order, clock, max_age and optional observer ports.
+	 * @param {Map} Options Order, clock, max_age and optional observer ports;
+	 * "identities" is LocalServerFingerprintParse's, without it no row is
+	 * fingerprinted or merged.
 	 */
 	__New(Options) {
 		if !(Options is Map) || !(Options.Get("order", 0) is Array)
 				|| !HasMethod(Options.Get("clock", 0), "Call")
 				|| !HasMethod(Options.Get("max_age", 0), "Call")
 			throw TypeError("Local discovery requires order, clock and cache age ports.")
+		if Options.Has("identities") && !(Options["identities"] is Map)
+			throw TypeError("Local discovery identities must be a Map.")
 		this.Options := Options.Clone()
 		this.Order := Options["order"].Clone()
 		this.Results := Map()
@@ -52,6 +57,10 @@ class LocalServerDiscoveryController {
 		Status := Response.Get("status", 0)
 		if Status == 401 || Status == 403
 			return Map("status", "needs_key", "models", [])
+		if Response.Has("ok") && Response["ok"] is Integer && Response["ok"] == false
+				&& Response.Has("status") && Response["status"] is Integer && Response["status"] == 0
+				&& Response.Get("probe_error", 0) is Integer && Response.Get("probe_error", 0) == true
+			return Map("status", "unavailable", "models", [])
 		Models := LocalServerAuthModelsReceipt(Response)
 		return Map("status", Models is Array ? "up" : "down",
 			"models", Models is Array ? Models : [])
@@ -80,7 +89,7 @@ class LocalServerDiscoveryController {
 				throw TypeError("Local discovery target must be a map.")
 			Captured.Push(Target.Clone())
 		}
-		Sweep := Map("generation", 0, "fresh", Map(), "pending", Captured.Length)
+		Sweep := Map("generation", 0, "fresh", Map(), "identified", Map(), "pending", Captured.Length)
 		HasObserver := HasMethod(OnDone, "Call")
 		PreviousCritical := Critical("On")
 		try {
@@ -128,7 +137,7 @@ class LocalServerDiscoveryController {
 		Results := this.Results
 		for Id in this.Order {
 			Verdict := Results.Get(Id, 0)
-			if Verdict is Map && !(Verdict["status"] == "down")
+			if Verdict is Map && ((Verdict["status"] == "up") || (Verdict["status"] == "needs_key"))
 				Ids.Push(Id)
 		}
 		return Ids
@@ -158,6 +167,43 @@ class LocalServerDiscoveryController {
 			if !this.HasCheckedAt
 				return true
 			return Now - this.CheckedAt >= Age
+		} finally Critical(PreviousCritical)
+	}
+
+	/**
+	 * @param {Array} Order Copied unique logical identities.
+	 * @param {Boolean} Refresh Revokes same-membership provenance when requested.
+	 * @returns {Boolean} Logical state changed; native retirement remains owned.
+	 */
+	SetOrder(Order, Refresh := false) {
+		if !(Order is Array) || !(Refresh is Integer) || (Refresh != 0 && Refresh != 1)
+			throw TypeError("Local discovery order requires an array and a typed refresh flag.")
+		Captured := [], Seen := Map()
+		Seen.CaseSense := "On"
+		for Id in Order {
+			if !(Id is String) || Id == "" || Seen.Has(Id)
+				throw ValueError("Local discovery order requires unique nonempty identities.")
+			Seen[Id] := true
+			Captured.Push(Id)
+		}
+		PreviousCritical := Critical("On")
+		try {
+			Equal := this.Order.Length == Captured.Length
+			if Equal {
+				for Index, Id in Captured {
+					if !(this.Order[Index] == Id)
+						Equal := false
+				}
+			}
+			if Equal && !Refresh
+				return false
+			this.Order := Captured
+			this.Generation += 1
+			this.Active := false
+			this.CheckedAt := 0
+			this.HasCheckedAt := false
+			this.Results := Map()
+			return true
 		} finally Critical(PreviousCritical)
 	}
 
@@ -196,12 +242,17 @@ class LocalServerDiscoveryController {
 		; generation and record still own this pending response.
 		Verdict := LocalServerDiscoveryController.Classify(Response)
 		Verdict["base_url"] := Record["base_url"]
+		Named := ""
+		if Verdict["status"] == "up" && this.Options.Has("identities")
+			Named := LocalServerFingerprintIdentify(Response["body"], Record["id"], this.Options["identities"])["server"]
 		PreviousCritical := Critical("On")
 		try {
 			if Sweep["generation"] != this.Generation || Record["settled"]
 				return
 			Record["settled"] := true
 			Sweep["fresh"][Record["id"]] := Verdict
+			if Named != ""
+				Sweep["identified"][Record["id"]] := Named
 			Sweep["pending"] -= 1
 			Complete := Sweep["pending"] == 0
 		} finally Critical(PreviousCritical)
@@ -223,6 +274,7 @@ class LocalServerDiscoveryController {
 			Before := this.Results
 		} finally Critical(PreviousCritical)
 		Fresh := Sweep["fresh"]
+		this._ResolveShared(Fresh, Sweep["identified"])
 		Changed := false
 		for Id in this.Order
 			if this._VerdictChanged(Before.Get(Id, 0), Fresh.Get(Id, 0))
@@ -257,12 +309,57 @@ class LocalServerDiscoveryController {
 		}
 	}
 
+	/**
+	 * Keeps one row per answering shared address and names the server that answered.
+	 * Among the rows of one address group that answered at the same address in one
+	 * sweep, the row the fingerprint names wins, else the address's default row; the
+	 * others become down with shadowed_by naming the winner. A winner whose response
+	 * names another row of its group carries server = that row, for the menu's name.
+	 */
+	_ResolveShared(Fresh, Identified) {
+		if !this.Options.Has("identities")
+			return
+		Identities := this.Options["identities"]
+		Buckets := Map(), Keys := []
+		for Id in this.Order {
+			Identity := Identities.Get(Id, 0), Verdict := Fresh.Get(Id, 0)
+			if (Identity is Map) && (Verdict is Map) && (Verdict["status"] == "up" || Verdict["status"] == "needs_key") {
+				Key := Identity["group"][1] . "`n" . Verdict["base_url"]
+				if !Buckets.Has(Key) {
+					Buckets[Key] := []
+					Keys.Push(Key)
+				}
+				Buckets[Key].Push(Id)
+			}
+		}
+		for Key in Keys {
+			Members := Buckets[Key], Named := ""
+			for Id in Members {
+				if Identified.Has(Id) {
+					Named := Identified[Id]
+					break
+				}
+			}
+			Winner := Members[1]
+			for Id in Members
+				if Id == Named
+					Winner := Id
+			for Id in Members
+				if !(Id == Winner)
+					Fresh[Id] := Map("status", "down", "base_url", Fresh[Id]["base_url"], "models", [], "shadowed_by", Winner)
+			if Named != "" && !(Named == Winner)
+				Fresh[Winner]["server"] := Named
+		}
+	}
+
 	_VerdictChanged(Before, After) {
 		if !(Before is Map) || !(After is Map)
 			return (Before is Map) != (After is Map)
 		if !(Before["status"] == After["status"])
 				|| !(Before["base_url"] == After["base_url"])
 				|| Before["models"].Length != After["models"].Length
+				|| !(Before.Get("server", "") == After.Get("server", ""))
+				|| !(Before.Get("shadowed_by", "") == After.Get("shadowed_by", ""))
 			return true
 		for Index, Model in Before["models"]
 			if !(Model == After["models"][Index])

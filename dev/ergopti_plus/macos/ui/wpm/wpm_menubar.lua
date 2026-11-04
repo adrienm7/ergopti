@@ -8,14 +8,14 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Unobtrusive: Only appears when the user is actively typing.
---- 2. Decoupled: Polls the core keylogger engine autonomously.
+--- 2. Decoupled: Polls the core keystats engine autonomously.
 --- 3. Dynamic Styling: Matches widget coloring dynamically with a background.
 --- ==============================================================================
 
 local M = {}
 
 local hs        = hs
-local keylogger = require("modules.keylogger")
+local keystats = require("modules.keystats")
 local WPMShared = require("ui.wpm.shared")
 local Logger    = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -75,7 +75,7 @@ end
 
 --- Actual menubar-update body, wrapped by update_menubar() above.
 update_menubar_body = function(generation)
-	local stats = keylogger.get_live_stats()
+	local stats = keystats.get_live_stats()
 	if not is_current(generation) then return false end
 	local display_wpm = stats.wpm or 0
 	local now = hs.timer.absoluteTime() / 1000000000
@@ -207,11 +207,16 @@ end
 function M.stop()
 	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
 	-- Nothing to tear down means nothing to log — return before the start/stop banner.
-	if not _running and not _timer and not _menubar then return true end
+	if not _running and not _timer and not _menubar then
+		-- A sink may cancel startup before it acquires its first native handle.
+		_generation = _generation + 1
+		return true
+	end
 	_running = false
 	_generation = _generation + 1
 	local generation, handle, item = _generation, _timer, _menubar
 	local timer_stopped = release_timer(handle)
+	if generation ~= _generation then return false end
 	if item then
 		local ok = pcall(item.delete, item)
 		if not ok then
@@ -228,7 +233,7 @@ function M.stop()
 		return false
 	end
 	Logger.info(LOG, "WPM menubar widget stopped.")
-	return true
+	return generation == _generation and not _running
 end
 
 function M.is_running()

@@ -5,9 +5,10 @@
 --- DESCRIPTION:
 --- Read-only environment probes for the boot diagnostic snapshot: macOS and
 --- Hammerspoon versions, architecture, screens, keyboard input source and the
---- process owner; and the system time zone the AI agent resolves dates in. Kept in the adapter layer so the collector in
---- infra/diagnostic_snapshot.lua stays free of hs.* calls and is testable with
---- a plain table.
+--- process owner; the system time zone the AI agent resolves dates in; and how
+--- long the user's input devices have been idle. Kept in the adapter layer so
+--- the collector in infra/diagnostic_snapshot.lua and the remap layer stay free
+--- of hs.* calls and are testable with a plain table.
 ---
 --- FEATURES & RATIONALE:
 --- 1. No subprocess: every probe is an in-process Hammerspoon query, so the
@@ -87,6 +88,17 @@ function M.time_zone()
 	return probe(function()
 		local target = hs.fs.pathToAbsolute("/etc/localtime")
 		return type(target) == "string" and target:match("/zoneinfo/(.+)$") or nil
+	end)
+end
+
+--- Seconds since the last keyboard, mouse or trackpad event, from the IOKit
+--- HID idle time: a registry read, no event tap. The remap layer waits for a
+--- short quiet period before Karabiner reloads its configuration.
+--- @return number|nil Idle seconds, nil when the probe is unavailable.
+function M.input_idle_seconds()
+	return probe(function()
+		local idle = hs.host.idleTime()
+		return type(idle) == "number" and idle >= 0 and idle or nil
 	end)
 end
 

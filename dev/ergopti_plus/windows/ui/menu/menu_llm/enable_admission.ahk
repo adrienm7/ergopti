@@ -17,7 +17,7 @@ global _LLM_Menu_EnableAdmission := 0
 _LLM_Menu_EnableSnapshot() {
 	global _LLM_Menu, LLM_OLLAMA_BASE_URL
 	return Map("backend", _LLM_Menu.Get("backend", ""),
-		"model", _LLM_Menu.Get("model", ""), "origin", LLM_OLLAMA_BASE_URL,
+		"model", _LLM_Menu.Get("model", ""), "origin", LLM_OllamaRequestOrigin(),
 		"generation", LLM_AuxGeneration(), "enabled", _LLM_Menu.Get("enabled", true),
 		"paused", A_IsSuspended ? true : false,
 		"blocked", !LLM_AuxRetryCleanupDebt() || !LLM_CurlRetryCleanupDebt())
@@ -69,7 +69,11 @@ LLM_Menu_CancelEnableAdmission() {
 	if !(Request is Map)
 		return true
 	Request["active"] := false
-	if Request.Get("aux", 0) is Map
+	AuxOwner := Request.Get("aux", 0)
+	; A native delivery ticket can retain this inactive caller as cleanup drains.
+	; Release the caller's reverse ownership before cancelling native custody.
+	Request["aux"] := 0
+	if AuxOwner is Map
 		LLM_AuxRetirePrefix("ollama_enable_admission")
 	return LLM_AuxRetryCleanupDebt() && LLM_CurlRetryCleanupDebt()
 }
@@ -114,8 +118,22 @@ LLM_Menu_RequestEnableAdmission(Port := 0, CancelPending := true) {
 	return true
 }
 
-_LLM_Menu_EnableProbe(Callback, Owner) {
-	return LLM_OllamaIsRunning_Async(Callback, Owner, true)
+/** Only Ergopti's live daemon can admit an enable; otherwise it starts first. */
+_LLM_Menu_EnableProbe(Callback, Owner, ProbeFn := 0, StartOwnedFn := 0, OwnedFn := 0) {
+	if HasMethod(OwnedFn, "Call") ? OwnedFn.Call() : LLM_OllamaManagedOriginRequired() {
+		Probe := HasMethod(ProbeFn, "Call") ? ProbeFn : LLM_OllamaIsRunning_Async
+		return Probe.Call(Callback, Owner, true)
+	}
+	Start := HasMethod(StartOwnedFn, "Call") ? StartOwnedFn : _LLM_Menu_EnableStartOwned
+	return Start.Call()
+}
+
+/** Retires the pending request, then re-requests it once the daemon is READY. */
+_LLM_Menu_EnableStartOwned() {
+	global _LLM_Menu
+	LLM_Menu_CancelEnableAdmission()
+	return LLM_Deps_CheckAndInstall(_LLM_Menu.Get("model", ""),
+		(*) => LLM_Menu_RequestEnableAdmission(0, false))
 }
 
 ; This writer runs inside the actual borrowed config lease, after full-save
@@ -129,8 +147,42 @@ _LLM_Menu_EnableWrite(Request, Path, Updates) {
 		return false
 	if !_LLM_Menu_EnableStillCurrent(Request)
 		return false
-	Writer := _LLM_Menu_EnablePort(Request["port"], "writer", TOML_BatchWrite)
-	return Writer.Call(Path, Updates)
+	Writer := _LLM_Menu_EnablePort(Request["port"], "writer", TOML_ConfigBatchWrite)
+	global _LLM_ManagedBootstrap
+	Flow := _LLM_ManagedBootstrap
+	Token := 0
+	if IsObject(Flow) && Flow.Ready && Flow.HasOwnProp("MenuIntent") && !Flow.MenuIntent["enabled"] {
+		; Render before publication from the exact source held by this request.
+		Built := TOML_BuildConfigUpdatedContent(Path, Updates)
+		if !(Built is Map) || Built.Get("status", "") != "ok"
+				|| !_LLM_Menu_EnableSourceMatches(Request["source"], ReadSource.Call())
+			return false
+		Content := Built["content"]
+		; The shared renderer returns the complete image, including its BOM.
+		Bytes := FSUtf8Bytes(Content)
+		Token := Flow.PrepareEnableHandoff(Request["source"], Map("path", Path, "bytes", Bytes))
+		if !(Token is Map)
+			return false
+		Request["managed_handoff"] := Map("flow", Flow, "token", Token)
+	}
+	Written := false
+	try {
+		Written := Writer.Call(Path, Updates)
+		return Written
+	} finally {
+		if Token is Map && (!(Written is Integer) || Written != true)
+			Flow.AbortEnableHandoff(Token)
+	}
+}
+
+_LLM_Menu_EnableApplyOwned(Request, Candidate) {
+	if Request.Has("managed_handoff") {
+		Handoff := Request["managed_handoff"]
+		if !Handoff["flow"].FinishEnableHandoff(Handoff["token"])
+			return false
+	}
+	Apply := _LLM_Menu_EnablePort(Request["port"], "apply", _LLM_Menu_EnableApplyCommitted)
+	return Apply.Call(Candidate)
 }
 
 _LLM_Menu_EnableCandidate(Request, Candidate) {
@@ -171,13 +223,17 @@ _LLM_Menu_EnableOnReceipt(Request, Receipt) {
 		Port := Request["port"]
 		return LLM_Menu_CommitMutation("the confirmed LLM enabled-state change",
 			_LLM_Menu_EnableCandidate.Bind(Request),
-			_LLM_Menu_EnablePort(Port, "apply", _LLM_Menu_EnableApplyCommitted),
+			_LLM_Menu_EnableApplyOwned.Bind(Request),
 			_LLM_Menu_EnableWrite.Bind(Request),
 			_LLM_Menu_EnablePort(Port, "persistence_notify", 0),
 			_LLM_Menu_EnablePort(Port, "acquire", 0),
 			_LLM_Menu_EnablePort(Port, "settle", 0),
 			_LLM_Menu_EnablePort(Port, "collect", 0))
 	} finally {
+		if Request.Has("managed_handoff") {
+			Handoff := Request["managed_handoff"]
+			Handoff["flow"].AbortEnableHandoff(Handoff["token"])
+		}
 		Request["active"] := false
 		Owned := (_LLM_Menu_EnableAdmission is Map)
 			&& ObjPtr(_LLM_Menu_EnableAdmission) == ObjPtr(Request)

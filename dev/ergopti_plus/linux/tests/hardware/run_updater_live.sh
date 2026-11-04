@@ -50,9 +50,13 @@ finish() {
 trap finish EXIT
 DRIVER="$(cd "$(dirname "$0")/../.." && pwd -P)" || exit 2
 REPO="$(cd "${DRIVER}/../../.." && pwd -P)" || exit 2
-for tool in luajit tar curl sha256sum; do
+for tool in luajit curl sha256sum; do
 	command -v "${tool}" >/dev/null 2>&1 || { CAUSE_STATUS=$?; echo "ENVIRONMENT: ${tool} is missing" >&2; exit 2; }
 done
+# Probed by name: the portable-commands gate reads a literal probe, not a loop
+# variable, and neither ships on every minimal image.
+command -v tar >/dev/null 2>&1 || { CAUSE_STATUS=$?; echo "ENVIRONMENT: tar is missing" >&2; exit 2; }
+command -v pkill >/dev/null 2>&1 || { CAUSE_STATUS=$?; echo "ENVIRONMENT: pkill is missing" >&2; exit 2; }
 luajit -e 'require("luv")' 2>/dev/null || { CAUSE_STATUS=$?; echo "ENVIRONMENT: lua-luv is missing" >&2; exit 2; }
 
 WORK="$(mktemp -d)"
@@ -62,8 +66,10 @@ mkdir -p "${WORK}/home/.cache" "${WORK}/unpacked"
 PHASE=build
 ERGOPTI_BUILD_VERSION=0.0.0-dev.1 bash "${REPO}/tools/build/build-linux-driver.sh" --skip-smoke \
 	> "${WORK}/build.log" 2>&1 || { CAUSE_STATUS=$?; tail -20 "${WORK}/build.log"; echo "FAIL the build failed"; exit 1; }
-tar -czf "${WORK}/old.tar.gz" -C "${REPO}/build/linux" linux _shared bin install.sh
-tar -xzf "${WORK}/old.tar.gz" -C "${WORK}/unpacked"
+(cd -- "${REPO}/build/linux" && tar -czf - linux _shared bin install.sh) > "${WORK}/old.tar.gz" \
+	|| { CAUSE_STATUS=$?; echo "FAIL the release archive could not be created"; exit 1; }
+(cd -- "${WORK}/unpacked" && tar -xzf -) < "${WORK}/old.tar.gz" \
+	|| { CAUSE_STATUS=$?; echo "FAIL the release archive could not be unpacked"; exit 1; }
 
 export HOME="${WORK}/home"
 export XDG_CONFIG_HOME="${HOME}/.config" XDG_DATA_HOME="${HOME}/.local/share" XDG_CACHE_HOME="${HOME}/.cache"

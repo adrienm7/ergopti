@@ -20,7 +20,7 @@
 ---    (ui.healthcheck.probes) and push their answers into that window only.
 --- 4. The module contract check stays: a developer section of the page. Its
 ---    `wired` flag is a build-time fact kept honest by
----    tests/meta/test_adapter_wiring_reachability.lua.
+---    tests/meta/architecture/test_adapter_wiring_reachability.lua.
 --- ==============================================================================
 
 local M = {}
@@ -33,6 +33,9 @@ local Snapshot = require("healthcheck.snapshot")
 local Cleanup = require("healthcheck.cleanup")
 local Actions  = require("healthcheck.actions")
 local TimerScheduler = require("adapters.timer_scheduler")
+local DeferredWork = require("infra.deferred_work")
+local TableUtil = require("table_util")
+local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 
 local LOG = "healthcheck"
 
@@ -55,6 +58,9 @@ local _load_time = os.time()
 -- The documents of the diagnostics window, loaded once
 local _config = nil
 
+-- The last synchronous collection: its duration, budget and collector costs
+local _last_phase_a = nil
+
 -- The menu state the last opening handed over, for the features section
 local _menu_state = nil
 
@@ -66,6 +72,7 @@ local _session = nil
 local _continuation_timers = {}
 local _closing_window = nil
 local _focus_owner = nil
+local _open_revision = 0
 
 --- Returns an isolated description of the live eventtap telemetry contract.
 --- @param runtime_version string|nil Hammerspoon version reported at runtime.
@@ -93,11 +100,23 @@ function M.event_tap_telemetry(runtime_version)
 	}
 end
 
+--- Invalidates action ownership before native cancellation can reenter the bridge.
+--- @param session table Exact retained page session.
+local function cancel_action(session)
+	session.action_epoch = (session.action_epoch or 0) + 1
+	local epoch = session.action_epoch
+	local previous = session.action_request
+	session.action_request = nil
+	if previous then previous.cancel() end
+	return epoch
+end
+
 --- Stops a page session's probes and releases its message controller.
 --- @param session table|nil
 local function retire_session(session)
 	if not session then return end
 	if _session == session then _session = nil end
+	cancel_action(session)
 	if session.probes then
 		session.probes.cancel()
 		session.probes = nil
@@ -114,9 +133,14 @@ end
 
 --- Cancels every delayed window continuation independently.
 --- @return boolean settled True only when all exact handles were released.
-local function stop_continuations()
+local function continuation_snapshot()
 	local snapshot = {}
 	for handle in pairs(_continuation_timers) do snapshot[#snapshot + 1] = handle end
+	return snapshot
+end
+
+local function stop_continuations(snapshot)
+	snapshot = snapshot or continuation_snapshot()
 	local settled = true
 	for _, handle in ipairs(snapshot) do
 		local ok, cancelled = xpcall(function()
@@ -139,23 +163,34 @@ end
 --- @return boolean settled True only when the window and its runtime settled.
 local function close_owned_window(webview, reason)
 	if _window ~= webview then return true end
+	if _closing_window ~= nil then return false end
+	local session, generation = _session, _window_generation
+	local consumed = session and session.native_delete_metatable ~= nil and getmetatable(webview) == nil
+	if session and session.native_delete_pending and not consumed then return false end
+	local continuations = continuation_snapshot()
 	_focus_owner = nil
-	if type(webview.delete) ~= "function" then
-		Logger.error(LOG, "Healthcheck %s refused; owned WebView has no delete method.", reason)
-		return false
-	end
-	_closing_window = webview
-	local ok, result = xpcall(function() return webview:delete() end, debug.traceback)
-	if _closing_window == webview then _closing_window = nil end
-	if not ok or result == false then
-		Logger.error(LOG, "Healthcheck %s did not commit; exact WebView retained: %s.",
-			reason, tostring(result))
-		return false
+	if not consumed then
+		local delete = webview.delete
+		if type(delete) ~= "function" then
+			Logger.error(LOG, "Healthcheck %s refused; owned WebView has no delete method.", reason)
+			return false
+		end
+		_closing_window = webview
+		session.native_delete_metatable = getmetatable(webview)
+		session.native_delete_pending = session.presentation_attempted == true
+		local ok, result = xpcall(function() return delete(webview) end, debug.traceback)
+		consumed = session.native_delete_metatable ~= nil and getmetatable(webview) == nil
+		if not consumed and (not ok or result == false) then
+			pcall(Logger.error, LOG, "Healthcheck %s did not commit; exact WebView retained: %s.", reason, tostring(result))
+			if _closing_window == webview then _closing_window = nil end
+			return false
+		end
+		if _closing_window == webview then _closing_window = nil end
 	end
 	if _window == webview then _window = nil end
-	_window_generation = _window_generation + 1
-	retire_session(_session)
-	local continuations_stopped = stop_continuations()
+	if _window_generation == generation then _window_generation = generation + 1 end
+	retire_session(session)
+	local continuations_stopped = stop_continuations(continuations)
 	if not continuations_stopped then
 		Logger.error(LOG, "Healthcheck %s retained timer cleanup debt.", reason)
 	end
@@ -222,7 +257,7 @@ end
 -- adapter that is NOT wired can load fine and expose every method yet still be
 -- completely unreachable from any real feature — the migration onto the port/
 -- adapter architecture is incomplete for it. Keeping this flag in lock-step with
--- reality is enforced by tests/meta/test_adapter_wiring_reachability.lua, which
+-- reality is enforced by tests/meta/architecture/test_adapter_wiring_reachability.lua, which
 -- greps production sources for a require("adapters.<id>") call site and fails if
 -- the flag disagrees with what it finds.
 local ADAPTER_SPECS = {
@@ -234,7 +269,55 @@ local ADAPTER_SPECS = {
 	},
 	{
 		id       = "adapters.apple_shortcuts_native",
-		contract = { "available", "create", "is_chosen_program", "revalidate_program" },
+		contract = { "available", "create", "is_chosen_program", "revalidate_program", "cli_identity" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.apple_shortcuts_cli",
+		contract = { "parse_list", "reply", "observed_rows", "bounded_list_command", "list_blocking", "ports" },
+		-- The run_apple_shortcut action and its editor list and run through it.
+		wired    = true,
+	},
+	{
+		id       = "adapters.field_check_ports",
+		contract = { "new" },
+		-- The Debug menu's field checks build their ports on click.
+		wired    = true,
+	},
+	{
+		id       = "adapters.field_probe_ports",
+		contract = { "new" },
+		-- Merged into the field check ports; only the field run's probes read it.
+		wired    = true,
+	},
+	{
+		id       = "adapters.field_run_ports",
+		contract = { "new" },
+		-- Built by infra/field_run.lua, which starts only in developer source mode.
+		wired    = true,
+	},
+	{
+		id       = "adapters.runtime_owner_ports",
+		contract = { "new", "unpinned_count" },
+		-- Required only by the remap bridge after the hidden `runtime = "owned"` opt-in.
+		wired    = true,
+	},
+	{
+		id       = "adapters.runtime_capture_port",
+		contract = { "new" },
+		-- Built by the owned runtime ports; dormant at default boot.
+		wired    = true,
+	},
+	{
+		id       = "adapters.installed_physical_source",
+		contract = { "new", "module_path" },
+		-- Built by the owned runtime's capture port and the owned runtime field check.
+		wired    = true,
+	},
+	{
+		id       = "adapters.karabiner_coexistence",
+		contract = { "new" },
+		-- Built by the owned runtime ports and the field check; acts only when consented.
 		wired    = true,
 	},
 	{
@@ -253,9 +336,48 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.physical_history_context",
+		contract = { "new" },
+		-- Explicit retained history uses this factory; loading never enables capture.
+		wired    = true,
+	},
+	{
+		id       = "adapters.physical_lifecycle_event",
+		contract = { "classify" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.physical_context_probe",
+		contract = { "snapshot" },
+		-- Reached by the explicit fenced sampler; loading performs no native read.
+		wired    = true,
+	},
+	{
+		id       = "adapters.physical_observation_clock",
+		contract = { "now" },
+		-- Reached by explicit configuration binding; loading never samples time.
+		wired    = true,
+	},
+	{
+		id       = "adapters.power_source",
+		contract = { "on_battery" },
+		-- Read by the keystats aggregate recovery, which paces its slices by it.
+		wired    = true,
+	},
+	{
 		id       = "adapters.managed_ollama_hint",
 		contract = { "get", "cancel" },
 		-- Structural dispatch wiring; source and image admission stay independent.
+		wired    = true,
+	},
+	{
+		id       = "adapters.managed_ollama_bootstrap",
+		contract = { "prepare" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.managed_ollama_daemon",
+		contract = { "new", "prepare" },
 		wired    = true,
 	},
 	{
@@ -275,6 +397,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.prediction_tooltip_port",
+		contract = { "wrap" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.program_providers",
 		contract = { "create" },
 		wired    = true,
@@ -287,6 +414,11 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.keyboard_source_probe",
 		contract = { "current_source_id", "request" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.input_source_selector",
+		contract = { "command", "command_named", "upgrade" },
 		wired    = true,
 	},
 	{
@@ -306,6 +438,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.privacy_settings",
+		contract = { "url", "url_for", "os_major" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.tcc_grant",
 		contract = { "bundle_id", "reset" },
 		wired    = true,
@@ -313,6 +450,18 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.app_launcher",
 		contract = { "launch", "launchWithArgs", "isRunning" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.running_application",
+		contract = { "by_name", "by_bundle_id", "current" },
+		-- Every application lookup goes through it; none scans windows.
+		wired    = true,
+	},
+	{
+		id       = "adapters.own_window",
+		contract = { "webview_window_number", "for_webview", "console", "is_webview_focused" },
+		-- Every webview and console window lookup; none scans other applications.
 		wired    = true,
 	},
 	{
@@ -331,6 +480,16 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.reload_breadcrumb",
+		contract = { "record", "record_boot", "path" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.keyboard_layout_files",
+		contract = { "write_new", "remove" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.crypto",
 		contract = { "sha256" },
 		wired    = true,
@@ -341,6 +500,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.event_clock",
+		contract = { "lateness_ms", "duration_ms" },
+		-- The keymap taps and the physical fence read every key event's lateness.
+		wired    = true,
+	},
+	{
 		id       = "adapters.keyboard_geometry",
 		contract = { "initialize", "event_type", "form", "native_code", "physical_code" },
 		wired    = true,
@@ -348,6 +513,29 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.file_system",
 		contract = { "read", "write", "exists", "prepare_parent_for_create" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.foreign_ledger_snapshot",
+		contract = { "open", "advance", "start", "poll", "close" },
+		-- Metrics foreign sync verifies source receipts before admitting SQL batches.
+		wired    = true,
+	},
+	{
+		id       = "adapters.ledger_append",
+		contract = { "cleanup", "recover", "flush" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.write_lock_path",
+		contract = { "for_canonical" },
+		-- Every cooperative publication and removal of adapters.file_system.
+		wired    = true,
+	},
+	{
+		id       = "adapters.metadata_command_stats",
+		contract = { "clock", "record", "snapshot" },
+		-- Slow ingest and slow preferences save reports count the metadata forks.
 		wired    = true,
 	},
 	{
@@ -461,11 +649,22 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.synthetic_input_loopback_owner",
+		contract = { "new" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.managed_ollama_pull",
 		contract = {
 			"handles", "prepare", "prepare_owned", "mark_start_attempted",
 			"rollback", "retire", "prepare_cleanup", "finish_cleanup",
 		},
+		wired    = true,
+	},
+	{
+		id       = "adapters.system_curl",
+		contract = { "check", "message_for", "parse_version", "verdict_for" },
+		-- Every curl start goes through ShellRunner.spawn or TaskLifecycle.native.
 		wired    = true,
 	},
 	{
@@ -476,6 +675,12 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.task_lifecycle",
 		contract = { "guard_callback", "create", "native", "start" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.task_output_turn",
+		contract = { "request" },
+		-- The Karabiner lease ACK deadlines prove a task output turn before failing.
 		wired    = true,
 	},
 	{
@@ -501,6 +706,12 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.tray_menu",
 		contract = { "setIcon", "setMenu", "setTooltip", "destroy" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.unicode_carrier",
+		contract = { "note_physical_key", "keycode" },
+		-- The keymap taps report held keys; every synthetic text event asks it.
 		wired    = true,
 	},
 	{
@@ -552,29 +763,99 @@ local function level_name()
 	return nil
 end
 
---- The module contract check: every adapter loads and exposes its contract.
---- @return table ok Adapter ids that passed.
---- @return table failed Adapter ids that did not, with the reason.
-local function check_modules()
-	local ok_list, failed = {}, {}
-	for _, spec in ipairs(ADAPTER_SPECS) do
-		local loaded, mod = pcall(require, spec.id)
-		if not loaded then
-			failed[#failed + 1] = spec.id .. " (load failed)"
-			Logger.warn(LOG, "Adapter '%s' could not be loaded: %s.", spec.id, tostring(mod))
-		else
-			local complete = true
-			for _, method in ipairs(spec.contract) do
-				if type(mod[method]) ~= "function" then
-					complete = false
-					Logger.warn(LOG, "Adapter '%s' missing contract method '%s'.", spec.id, method)
-				end
-			end
-			if complete then ok_list[#ok_list + 1] = spec.id
-			else failed[#failed + 1] = spec.id .. " (contract incomplete)" end
+--- One adapter of the module contract check: it loads and exposes its contract.
+--- @param spec table One ADAPTER_SPECS entry.
+--- @param ok_list table Receives the id when it passed.
+--- @param failed table Receives the id and the reason when it did not.
+local function check_adapter(spec, ok_list, failed)
+	local loaded, mod = pcall(require, spec.id)
+	if not loaded then
+		failed[#failed + 1] = spec.id .. " (load failed)"
+		Logger.warn(LOG, "Adapter '%s' could not be loaded: %s.", spec.id, tostring(mod))
+		return
+	end
+	local complete = true
+	for _, method in ipairs(spec.contract) do
+		if type(mod[method]) ~= "function" then
+			complete = false
+			Logger.warn(LOG, "Adapter '%s' missing contract method '%s'.", spec.id, method)
 		end
 	end
-	return ok_list, failed
+	if complete then ok_list[#ok_list + 1] = spec.id
+	else failed[#failed + 1] = spec.id .. " (contract incomplete)" end
+end
+
+--- The facts phase A leaves to the local_state probe, as ordered steps: the
+--- Wi-Fi signal (hs.wifi.interfaceDetails, about 50 ms of CoreWLAN queries on
+--- the Mac) and one module contract check per adapter (requiring an adapter
+--- not loaded yet compiles it: 30 to 65 ms in all). Together they held the
+--- synchronous diagnostics at 90 to 150 ms against its 5 ms budget
+--- (field report 2026-10-31); as steps, the probe runs them in slices that
+--- each fit that budget, between run-loop turns.
+--- The versions, the keyboard state and the USB devices come first: 5.9, 5.2
+--- and 7.2 ms of the 21.5 ms phase A still took (field report 2026-11-03).
+--- @param snapshot table|nil The phase A snapshot: whether details are
+---   included, and the peripherals the bluetooth probe may already have added.
+--- @return table steps Functions run in order, each a bounded main-thread read.
+--- @return table sections { versions, input, peripherals = { items },
+---   network = { wifi_signal }, developer = { modules_ok, modules_failed } }
+function M.local_state_steps(snapshot)
+	local detailed = type(snapshot) == "table" and snapshot.detailed == true
+	local ok_list, failed = {}, {}
+	local sections = {
+		versions    = {},
+		input       = {},
+		peripherals = {},
+		network     = {},
+		developer   = { modules_ok = ok_list, modules_failed = failed },
+	}
+	local function fill(target, values)
+		for key, value in pairs(values) do target[key] = value end
+	end
+	local steps = {
+		function() fill(sections.versions, H.collect_versions()) end,
+		function() fill(sections.input, H.collect_input()) end,
+		function()
+			local items = H.collect_peripherals(detailed).items
+			-- The bluetooth probe may have answered first; its devices stay listed
+			local current = type(snapshot) == "table" and type(snapshot.sections) == "table"
+				and snapshot.sections.peripherals and snapshot.sections.peripherals.items or {}
+			for _, item in ipairs(current) do
+				if item.bus == "bluetooth" then items[#items + 1] = item end
+			end
+			sections.peripherals.items = items
+		end,
+		function() sections.network.wifi_signal = H.collect_network().wifi_signal end,
+	}
+	for _, spec in ipairs(ADAPTER_SPECS) do
+		steps[#steps + 1] = function() check_adapter(spec, ok_list, failed) end
+	end
+	return steps, sections
+end
+
+--- Runs the local_state steps at once, for a report collected without a page
+--- (Debug > Report a bug, the field run): after phase A was measured, like
+--- its configuration.
+--- @param snapshot table The phase A snapshot, completed in place.
+local function complete_local_state(snapshot)
+	local started = hs.timer.absoluteTime()
+	local steps, sections = M.local_state_steps(snapshot)
+	local failures = {}
+	for index, step in ipairs(steps) do
+		local ok, err = pcall(step)
+		if not ok then
+			failures[#failures + 1] = tostring(err):match("^[^\n]*")
+			Logger.error(LOG, "Local state step %d raised: %s.", index, tostring(err))
+		end
+	end
+	for id, values in pairs(sections) do
+		for key, value in pairs(values) do snapshot.sections[id][key] = value end
+	end
+	snapshot.probes.local_state = {
+		state   = #failures == 0 and "ok" or "error",
+		cleanup = "settled",
+		ms      = math.floor((hs.timer.absoluteTime() - started) / 1e6 + 0.5),
+	}
 end
 
 --- The warnings and errors: the logger's session counters, its last error and
@@ -598,13 +879,11 @@ local function collect_issues()
 	}
 end
 
---- The developer section: the module check, the log level and the ring.
+--- The developer section: the log level and the ring; the module check is the
+--- local_state probe's.
 --- @return table
 local function collect_developer()
-	local ok_list, failed = check_modules()
 	return {
-		modules_ok          = ok_list,
-		modules_failed      = failed,
 		modules_disabled    = {},
 		log_level           = level_name(),
 		ring_lines          = #(Logger.ring_buffer_snapshot() or {}),
@@ -612,27 +891,43 @@ local function collect_developer()
 	}
 end
 
+--- The last synchronous collection's duration, its budget and each collector's
+--- cost, for the field run, which reports them without a person reading the log.
+--- @return table|nil { ms, budget_ms, collectors = { { name, ms } } }, nil before any.
+function M.last_phase_a()
+	if _last_phase_a == nil then return nil end
+	local collectors = {}
+	for index, entry in ipairs(_last_phase_a.collectors) do
+		collectors[index] = { name = entry.name, ms = entry.ms }
+	end
+	return { ms = _last_phase_a.ms, budget_ms = _last_phase_a.budget_ms, collectors = collectors }
+end
+
 --- Collects the synchronous (phase A) snapshot: memory, Hammerspoon queries
 --- and small files only; the probes fill the rest.
---- @param opts table|nil { detailed = boolean }
+--- @param opts table|nil { detailed = boolean, extensive = boolean, state = menu state|nil }
 --- @return table The version 2 snapshot.
 function M.run(opts)
 	opts = type(opts) == "table" and opts or {}
 	local detailed = opts.detailed == true
 	local extensive = opts.extensive == true
+	-- Debug > Report a bug collects without the window, so it hands the menu
+	-- state here rather than to show_window
+	if type(opts.state) == "table" then _menu_state = opts.state end
 	Logger.start(LOG, "Collecting the diagnostics…")
 	-- The budget is the collection's: the shared documents load once per
 	-- session, before the clock starts
 	local schema = M.config().schema
 	local started = hs.timer.absoluteTime()
-	local permission_ids = {}
-	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
-	table.sort(permission_ids)
+	local permission_ids = TableUtil.sorted_keys(schema.permissions[M.DRIVER] or {})
 
 	-- Each collector is isolated: a report exists to be read when things are
 	-- broken, so one collector raising costs its own section, never the window
+	local timings = {}
 	local function section(name, collector)
+		local section_started = hs.timer.absoluteTime()
 		local ok, value = pcall(collector)
+		timings[#timings + 1] = { name = name, ms = (hs.timer.absoluteTime() - section_started) / 1e6 }
 		if not ok then
 			Logger.error(LOG, "Diagnostics collector '%s' raised: %s — section left empty.", name, tostring(value))
 			return {}
@@ -642,16 +937,23 @@ function M.run(opts)
 
 	local sections = {
 		paths       = section("paths", function() return H.collect_paths(schema.report.subdir) end),
-		versions    = section("versions", H.collect_versions),
+		-- The versions, the keyboard state and the USB devices are the
+		-- local_state probe's: together they held phase A 18 of its 21.5 ms
+		versions    = {},
 		hardware    = section("hardware", H.collect_hardware),
 		system      = section("system", function() return H.collect_system(detailed, os.time() - _load_time) end),
-		input       = section("input", H.collect_input),
+		input       = {},
 		features    = section("features", function() return H.collect_features(_menu_state) end),
+		-- Filled by the configuration probe: reading and decoding the files is far
+		-- over the phase A budget
+		configuration_files = { items = {} },
+		configuration = { items = {} },
 		unavailable = section("platform_coverage", H.collect_unavailable),
 		ai          = section("ai", H.collect_ai),
-		network     = section("network", H.collect_network),
+		-- Filled by the local_state probe with the developer section's module check
+		network     = {},
 		permissions = section("permissions", function() return H.collect_permissions(permission_ids) end),
-		peripherals = section("peripherals", function() return H.collect_peripherals(detailed) end),
+		peripherals = { items = {} },
 		issues      = section("issues", collect_issues),
 		developer   = section("developer", collect_developer),
 	}
@@ -667,11 +969,12 @@ function M.run(opts)
 
 	local elapsed = (hs.timer.absoluteTime() - started) / 1e6
 	sections.developer.phase_a_ms = elapsed
+	_last_phase_a = { ms = elapsed, budget_ms = schema.phase_a_budget_ms, collectors = timings }
 	-- Not a warning: the next snapshot would count it among the session's
 	-- problems. The report's developer section carries the duration.
 	if elapsed > schema.phase_a_budget_ms then
-		Logger.info(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget.", elapsed,
-			schema.phase_a_budget_ms)
+		Logger.info(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget%s.", elapsed,
+			schema.phase_a_budget_ms, Snapshot.slowest_collectors(timings, schema.phase_a_slowest_named))
 	end
 	local undeclared = Snapshot.check_fields(snapshot, schema)
 	if #undeclared > 0 then
@@ -679,6 +982,14 @@ function M.run(opts)
 			table.concat(undeclared, ", "))
 	end
 	Logger.success(LOG, "Diagnostics collected in %.1f ms.", elapsed)
+	-- A report from the Debug menu has no page to keep responsive: its
+	-- configuration is collected now, after phase A was measured
+	if opts.complete_local == true then
+		local err = require("healthcheck.configuration").complete(snapshot,
+			H.configuration_context(schema, opts.configuration))
+		if err then Logger.error(LOG, "The configuration could not be collected: %s.", err) end
+		complete_local_state(snapshot)
+	end
 	return snapshot
 end
 
@@ -725,8 +1036,8 @@ end
 local function start_probes(session)
 	Cleanup.archive(session)
 	Cleanup.refresh(session)
-	if session.snapshot.extensive ~= true then return end
 	local captured = session.snapshot
+	-- Without the extensive opt-in only the local probes run (the configuration)
 	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot,
 		function(id, result, sections)
 			if _session ~= session or session.snapshot ~= captured then return end
@@ -736,7 +1047,7 @@ local function start_probes(session)
 				for key, value in pairs(values) do target[key] = value end
 			end
 			send(session, { type = "probe", id = id, result = result, sections = sections })
-		end)
+		end, { local_only = session.snapshot.extensive ~= true })
 end
 
 --- The page's first message: its configuration and the first snapshot.
@@ -744,13 +1055,15 @@ end
 --- @return table
 local function init_message(session)
 	local documents = M.config()
+	session.snapshot.export_revision = session.snapshot.export_revision or 1
 	return {
 		type = "init",
 		config = {
 			schema    = documents.schema,
 			redaction = documents.redaction,
 			context   = require("ui.healthcheck.report").redaction_context(),
-			mode      = session.mode,
+			-- The guided diagnostic collection is a Windows host action only.
+			capabilities = { diagnostic_collection = false },
 		},
 		snapshot = session.snapshot,
 	}
@@ -761,12 +1074,37 @@ end
 --- @param action table From healthcheck.actions.validate.
 --- @param documents table M.config().
 local function perform_action(session, action, documents)
+	local epoch = cancel_action(session)
+	if _session ~= session or _window ~= session.webview then return end
 	Cleanup.refresh(session)
+	if _session ~= session or _window ~= session.webview or session.action_epoch ~= epoch then return end
 	if action.action == "export_snapshot" then
+		if not require("healthcheck.share").capture_page_checks(session.snapshot, action) then
+			send(session, { type = "action", action = "export_snapshot", ok = false, export_sequence = action.export_sequence })
+			return
+		end
 		send(session, { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
 			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key)).text })
+				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text })
+	elseif action.action == "day_log" then
+		-- Opt-in: ticking collects and redacts today's log; unticking drops it
+		local DayLogHost = require("healthcheck.day_log")
+		if not action.enabled then
+			DayLogHost.discard(session.snapshot)
+			send(session, { type = "action", action = "day_log", ok = true, state = "off" })
+			return
+		end
+		Logger.start(LOG, "Collecting today's log for the report…")
+		Logger.flush_repeats(true)
+		local reply = DayLogHost.prepare(session.snapshot, documents, require("ui.healthcheck.report").redaction_context(),
+			function(cap) return DayLogHost.read_file(Logger.today_log_path(), cap) end)
+		if reply.state == "ready" then
+			Logger.success(LOG, "Today's log is ready: %d lines, %d bytes.", reply.lines, reply.bytes)
+		else
+			Logger.warn(LOG, "Today's log is not attachable: %s.", tostring(reply.state))
+		end
+		send(session, reply)
 	elseif action.action == "close" then
 		close_owned_window(session.webview, "page close")
 	elseif action.action == "cancel" then
@@ -775,16 +1113,33 @@ local function perform_action(session, action, documents)
 	elseif action.action == "refresh" then
 		Cleanup.archive(session)
 		session.detailed = action.detailed
+		local revision = (session.snapshot.export_revision or 1) + 1
 		session.snapshot = M.run({ detailed = action.detailed, extensive = action.extensive })
+		session.snapshot.export_revision = revision
 		Cleanup.refresh(session)
 		send(session, { type = "snapshot", snapshot = session.snapshot })
 		start_probes(session)
 	else
 		local Report = require("ui.healthcheck.report")
-		local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot)
-		result.type = "action"
-		result.action = action.action
-		send(session, result)
+		local snapshot = session.snapshot
+		local revision, generation = snapshot.export_revision, session.generation
+		local function current()
+			return package.loaded["ui.healthcheck.core"] == M and _session == session and _window == session.webview and _closing_window ~= session.webview and not session.native_delete_pending
+				and session.action_epoch == epoch and session.snapshot == snapshot
+				and snapshot.export_revision == revision and session.generation == generation
+		end
+		local completed = false
+		local request = Report.perform(action, snapshot.sections.paths, documents, Report.redaction_context(), nil, snapshot, {
+			current = current,
+			complete = function(result)
+				if not current() then return end
+				completed = true
+				session.action_request = nil
+				result.type, result.action = "action", action.action
+				send(session, result)
+			end,
+		})
+		if current() and not completed then session.action_request = request else request.cancel() end
 	end
 end
 
@@ -792,7 +1147,7 @@ end
 --- @param session table
 --- @param message table The usercontent message ({ body = … }).
 local function on_page_message(session, message)
-	if _session ~= session or _window ~= session.webview or _closing_window == session.webview then return end
+	if _session ~= session or _window ~= session.webview or _closing_window == session.webview or session.native_delete_pending then return end
 	local body = type(message) == "table" and message.body or nil
 	if body == "ready" then
 		Logger.info(LOG, "Diagnostics page ready.")
@@ -840,12 +1195,27 @@ local function inject_strings(webview)
 	if not ok then Logger.error(LOG, "The diagnostics page's strings were refused: %s.", tostring(err)) end
 end
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _window end
+
+--- Closes the open diagnostics window, for ui/window_toggle.
+--- @return boolean committed
+function M.close_window()
+	if _window == nil then return true end
+	return close_owned_window(_window, "toggle close")
+end
+
 --- Opens the diagnostics window. Replaces any existing window (singleton).
---- @param opts table|nil { mode = "report"|nil, state = menu state|nil }
+--- @param opts table|nil { state = menu state|nil }
 --- @return boolean opened
 function M.show_window(opts)
+	if NativeClose.retry_cleanup() ~= true then return false end
+	_open_revision = _open_revision + 1
+	local revision = _open_revision
 	opts = type(opts) == "table" and opts or {}
 	Logger.start(LOG, "Opening the diagnostics window…")
+	if revision ~= _open_revision or package.loaded["ui.healthcheck.core"] ~= M then return false end
 	if type(opts.state) == "table" then _menu_state = opts.state end
 
 	if _window then
@@ -856,6 +1226,7 @@ function M.show_window(opts)
 		return false
 	end
 
+	if revision ~= _open_revision or package.loaded["ui.healthcheck.core"] ~= M then return false end
 	local ok_snap, snapshot = pcall(M.run)
 	if not ok_snap or type(snapshot) ~= "table" then
 		Logger.error(LOG, "The diagnostics could not be collected: %s.", tostring(snapshot))
@@ -909,7 +1280,6 @@ function M.show_window(opts)
 		controller = controller,
 		snapshot   = snapshot,
 		detailed   = false,
-		mode       = opts.mode,
 	}
 	_session = session
 	local function abandon_open_window(label, detail)
@@ -917,6 +1287,13 @@ function M.show_window(opts)
 		close_owned_window(wv, "open-failure rollback")
 		return false
 	end
+
+	local policy_ok, policy_error = xpcall(function()
+		NativeClose.disarm(wv)
+		assert(wv:allowNewWindows(false) == wv, "native child-window policy was not acknowledged")
+		assert(wv:allowNewWindows() == false, "native child windows remain enabled")
+	end, debug.traceback)
+	if not policy_ok then return abandon_open_window("The diagnostics native window policy was refused", policy_error) end
 
 	local ok_cb, cb_err = pcall(function()
 		controller:setCallback(function(message) on_page_message(session, message) end)
@@ -935,25 +1312,23 @@ function M.show_window(opts)
 	end
 	pcall(function() wv:windowTitle(title) end)
 	pcall(function() wv:allowTextEntry(true) end)
-	pcall(function() wv:allowNewWindows(false) end)
 	pcall(function() wv:allowGestures(false) end)
 
 	local ok_wcb, wcb_err = pcall(function()
-		wv:windowCallback(function(action)
+		NativeClose.bind(wv, function()
 			if generation ~= _window_generation or _window ~= wv then return end
 			if _closing_window == wv then return end
-			Logger.debug(LOG, "Window callback: action='%s'.", tostring(action))
-			if action == "closing" or action == "closed" then
-				_window = nil
-				_window_generation = _window_generation + 1
-				retire_session(session)
-				if not stop_continuations() then
-					Logger.error(LOG, "Healthcheck close retained timer cleanup debt.")
-				end
+			local continuations = continuation_snapshot()
+			_window = nil
+			_window_generation = _window_generation + 1
+			retire_session(session)
+			if not stop_continuations(continuations) then
+				Logger.error(LOG, "Healthcheck close retained timer cleanup debt.")
 			end
+			Logger.debug(LOG, "Window closing callback received.")
 		end)
 	end)
-	if not ok_wcb then Logger.warn(LOG, "windowCallback() failed: %s.", tostring(wcb_err)) end
+	if not ok_wcb then return abandon_open_window("The diagnostics close owner was refused", wcb_err) end
 
 	local ok_ncb, ncb_err = pcall(function()
 		wv:navigationCallback(function(action)
@@ -968,6 +1343,9 @@ function M.show_window(opts)
 		return abandon_open_window("wv:html() failed", h_result)
 	end
 
+	-- Before this boundary no native show can have created a fade owner.
+	-- Mark first: show itself may mutate and then raise.
+	session.presentation_attempted = true
 	local ok_sh, show_result = xpcall(function() return wv:show() end, debug.traceback)
 	if ok_sh ~= true or show_result == nil or show_result == false then
 		return abandon_open_window("wv:show() failed — window will not appear", show_result)

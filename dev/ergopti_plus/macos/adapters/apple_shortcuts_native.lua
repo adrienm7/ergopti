@@ -48,6 +48,13 @@ local function identity(path)
 	return ok and token and { executable = path, token = token } or nil
 end
 
+--- The identity of the system Shortcuts command line tool: its path and a
+--- fingerprint of the file, nil when it is absent or not a plain executable.
+--- The command-line transport (adapters/apple_shortcuts_cli.lua) checks it
+--- before and after every query and run, as this transport does.
+--- @return table|nil identity { executable, token }
+function M.cli_identity() return identity() end
+
 local function query_helper()
 	local ok, launcher = pcall(Helper.resolve)
 	if not ok or type(launcher) ~= "string" or launcher:sub(-12) ~= "/ErgoptiPlus" then return nil end
@@ -100,7 +107,9 @@ local function query(request, done, admitted)
 		if not current or current.token ~= captured_helper.token then return false end
 		if type(admitted) ~= "function" then return true end
 		local called, ready = pcall(admitted)
-		return called and ready == true and not cancelled
+		if not called or ready ~= true or cancelled then return false end
+		local after = identity(helper)
+		return after and after.token == captured_helper.token and not cancelled
 	end
 	local function line(value)
 		rows = rows + 1
@@ -153,6 +162,13 @@ local function query(request, done, admitted)
 	raw.onSettled(function() physical = true; notify() end)
 	function handle.start()
 		if started or cancelled or not allowed() then cancel(); return false end
+		-- Construction refusal has no native retirement stream. Only the original
+		-- ShellRunner's settled, never-attempted handle permits this no-start close;
+		-- a completed leader after any launch attempt still owes the protocol ACK.
+		if physical and type(raw.wasStartAttempted) == "function"
+			and raw.wasStartAttempted() == false and raw.isSettled() == true then
+			cancel(); return false
+		end
 		starting, started = true, true
 		local accepted = raw.start() == true
 		starting = false
@@ -207,21 +223,23 @@ end
 --- @return table|nil handle Exact native query owner.
 function M.revalidate_program(executable, arguments, terminal, admitted)
 	local scalar = Json.encode({ version = 1, executable = executable, arguments = Json.array(arguments) })
-	if not Parameter.parse(scalar, "hs") or not M.is_chosen_program(executable, arguments)
+	if not Parameter.parse(scalar, "posix") or not M.is_chosen_program(executable, arguments)
 		or #arguments ~= 2 or not Owner.valid_identifier(arguments[2]) then return nil end
 	local captured = identity()
 	if not captured then return nil end
 	local function allowed()
 		local current = identity()
 		local ok, ready = pcall(admitted)
-		return current and current.token == captured.token and ok and ready == true
+		if not current or current.token ~= captured.token or not ok or ready ~= true then return false end
+		local after = identity()
+		return after and after.token == captured.token
 	end
 	return query({ nonce = 1, operation = "revalidate", id = arguments[2] }, function(code, raw)
 		-- Even observed ID presence cannot authorize remote automation execution.
 		local packet = code == 0 and Owner.validate_reply(raw, {
 			nonce = 1, operation = "revalidate", id = arguments[2],
 		})
-		local verified = packet ~= nil and allowed()
+		local verified = type(packet) == "table" and allowed()
 		terminal(false, nil, verified and "service_retirement_unqualified" or "query_refused")
 	end, allowed)
 end

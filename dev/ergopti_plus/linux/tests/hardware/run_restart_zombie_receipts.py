@@ -37,6 +37,20 @@ def zombie(pid):
     return "\nState:\tZ" in pathlib.Path(f"/proc/{pid}/status").read_text()
 
 
+def owned_children():
+    children = []
+    for process in pathlib.Path("/proc").iterdir():
+        if not process.name.isdigit():
+            continue
+        try:
+            records = (process / "status").read_text().splitlines()
+        except (FileNotFoundError, PermissionError):
+            continue
+        if f"PPid:\t{os.getpid()}" in records:
+            children.append(int(process.name))
+    return children
+
+
 def check_case(root, interpreter, name, state):
     wrapper, receipt = root / "wrapper", root / "receipt"
     wrapper.write_text('#!/bin/sh\nprintf "%s" "$1" > "$2"\n')
@@ -56,7 +70,7 @@ def check_case(root, interpreter, name, state):
         os._exit(0)
     os.close(ready_write)
     os.close(release_read)
-    relay = None
+    relay = relay_group = None
     try:
         assert os.read(ready_read, 1) == b"R", "native prctl setup failed"
         if state == "zombie":
@@ -75,16 +89,21 @@ def check_case(root, interpreter, name, state):
         command = subprocess.check_output(
             [interpreter, "-e", WORKER], env=env, text=True, timeout=5
         )
-        # Observe the exact background PID without changing the relay script.
-        launch = subprocess.run(
-            ["sh", "-c", command + '\nprintf "%s\\n" "$!"'],
+        # The foreground dispatcher admits the detached shell before returning.
+        # Its forked relay is adopted by this fixture's native subreaper; unlike
+        # the dispatcher, the relay need not itself be its process-group leader.
+        subprocess.run(
+            ["sh", "-c", command],
             capture_output=True,
             text=True,
             timeout=5,
             check=True,
         )
-        relay = int(launch.stdout.strip())
-        wait_for(lambda: os.getpgid(relay) == relay, "owned relay did not detach")
+        adopted = [pid for pid in owned_children() if pid != target]
+        assert len(adopted) == 1, "dispatcher did not leave exactly one owned relay"
+        relay = adopted[0]
+        relay_group = os.getpgid(relay)
+        assert relay_group != os.getpgrp(), "owned relay did not detach"
         if state == "alive":
             time.sleep(0.3)
             assert not receipt.exists(), "relay started the wrapper before the target exited"
@@ -102,8 +121,8 @@ def check_case(root, interpreter, name, state):
             os.close(release_write)
         if relay is not None:
             try:
-                assert os.getpgid(relay) == relay, "refuse to signal an unowned process group"
-                os.killpg(relay, signal.SIGTERM)
+                assert os.getpgid(relay) == relay_group, "refuse to signal an unowned process group"
+                os.killpg(relay_group, signal.SIGTERM)
             except ProcessLookupError:
                 pass
         os.waitpid(target, 0)

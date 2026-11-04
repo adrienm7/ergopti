@@ -18,7 +18,7 @@
 --- retention purge and errors/topical fan-out. The split is not cosmetic: the
 --- core's half is replayed against a cross-driver corpus so all three drivers are
 --- held to ONE implementation of those rules, and this half is pinned as
---- behaviour by tests/unit/lib/test_logger_file_sinks.lua.
+--- behaviour by tests/unit/infra/logger/test_logger_file_sinks.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Level Filtering: Avoids console noise in production while preserving full
@@ -51,8 +51,78 @@
 --- ==============================================================================
 
 local M = {}
-local _scope_busy = false
-local _scope_owner, _scope_generation, _scope_receipts = nil, 0, setmetatable({}, { __mode = "k" })
+
+local Redact = require("diagnostics.redact")
+local NativePath = require("native_path")
+local Json = require("json")
+local ErrorDescription = require("error_description")
+local PhaseStats = require("infra.phase_stats")
+local _redact_message = nil
+-- The configuration directory the user chose, followed for the redactor: its
+-- folder and file names are personal, and the user may move it at runtime.
+local _config_dir = nil
+
+--- Captures canonical privacy rules before bootstrap permits any log output.
+--- The entry point owns the shared path; this constructor does not resolve paths
+--- through infra.paths, whose diagnostics depend on this logger.
+--- @param raw_policy string Immutable canonical redaction JSON.
+--- @param supplied table|nil Explicit account identity for portable fixtures.
+function M.initialize_privacy(raw_policy, supplied)
+	assert(_redact_message == nil, "logger: privacy already initialized")
+	assert(type(raw_policy) == "string", "logger: canonical privacy policy unavailable")
+	local context = supplied or { home = os.getenv("HOME"), user = os.getenv("USER") or os.getenv("LOGNAME") }
+	assert(type(context) == "table" and type(context.home) == "string" and context.home ~= ""
+		and type(context.user) == "string" and context.user ~= "", "logger: privacy identity unavailable")
+	local captured = { home = context.home, user = context.user, case_insensitive = true }
+	local decoded, rules = pcall(Json.decode, raw_policy)
+	assert(decoded and type(rules) == "table", "logger: canonical privacy policy invalid")
+	for _, key in ipairs({ "home_placeholder", "account_placeholder", "secret_placeholder" }) do
+		assert(type(rules[key]) == "string" and rules[key] ~= "", "logger: canonical privacy placeholder invalid")
+	end
+	for _, key in ipairs({ "min_account_name_length", "bearer_min_length" }) do
+		assert(type(rules[key]) == "number" and rules[key] >= 1 and rules[key] == math.floor(rules[key]),
+			"logger: canonical privacy bound invalid")
+	end
+	assert(type(rules.token_prefixes) == "table" and type(rules.secret_keys) == "table",
+		"logger: canonical privacy inventory invalid")
+	assert(pcall(Redact.apply, "", rules, captured), "logger: canonical privacy rules invalid")
+	_redact_message = function(text)
+		return Redact.apply(text, rules, {
+			home = captured.home, user = captured.user, case_insensitive = captured.case_insensitive,
+			config_dir = _config_dir,
+		})
+	end
+end
+
+--- Follows the configuration directory the redactor masks. The path owner calls
+--- it at initialization and after each committed move, so a line written after
+--- the user changes folders hides the new folder's names, not the old ones.
+--- Independent of privacy admission: it records a value the redactor reads.
+--- @param dir string|nil Absolute directory, or nil/"" while none is resolved.
+function M.follow_config_dir(dir)
+	if dir ~= nil and type(dir) ~= "string" then
+		error("logger: the followed configuration directory must be a path", 2)
+	end
+	_config_dir = (dir ~= nil and dir ~= "") and dir or nil
+end
+
+--- Redacts unformatted free text for the owned log sinks and boot journal.
+--- @param text string Message body, including multiline errors.
+--- @return string Redacted text under the captured canonical policy.
+function M.redact_message(text)
+	assert(_redact_message ~= nil, "logger: privacy not initialized")
+	assert(type(text) == "string", "logger: privacy requires message text")
+	return _redact_message(text)
+end
+
+--- Preserves only the actual core-owned timestamp, severity and module prefix.
+--- @param line string Formatted record or unformatted legacy text.
+--- @return string Redacted record.
+local function private_line(line)
+	local prefix, message = line:match("^(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d %[[A-Z]+%] %[[^%]]*%] )(.*)$")
+	return prefix and (prefix .. M.redact_message(message)) or M.redact_message(line)
+end
+local _scope = require("scope_owner").new({ name = "infra.logger", module = M })
 
 -- socket.gettime() gives sub-second precision for the millisecond component.
 -- Loaded via pcall so headless unit tests that lack the hs sandbox still work.
@@ -165,7 +235,7 @@ end
 -- Everything the core deliberately has no opinion about stays here: the unified
 -- daily file, the errors-only mirror, the topical fan-out, the level-aware flush
 -- policy, and the print() tee. That half is pinned by
--- tests/unit/lib/test_logger_file_sinks.lua as BEHAVIOUR rather than as source
+-- tests/unit/infra/logger/test_logger_file_sinks.lua as BEHAVIOUR rather than as source
 -- text, which is what made this migration provable instead of merely plausible.
 --
 -- LIFETIME: the core is required under a BARE name, so tests/run.lua's
@@ -521,7 +591,7 @@ function M.init_log_path(log_dir, max_age_days)
 	if type(log_dir) ~= "string" or log_dir == "" then
 		return false, "log_dir must be a non-empty string"
 	end
-	if not log_dir:match("[/\\]$") then log_dir = log_dir .. "/" end
+	log_dir = NativePath.with_trailing_separator(log_dir)
 
 	-- Created in-process, not by forking /bin/sh.
 	--
@@ -810,8 +880,7 @@ end
 --- Sets the active log level. Messages below this threshold are silently dropped.
 --- @param level number|string Numeric constant (M.LEVELS.DEBUG) or name ("DEBUG", …).
 function M.set_level(level)
-	if _scope_owner ~= nil then return false end
-	_scope_generation = _scope_generation + 1
+	if not _scope.admit_change() then return false end
 	if type(level) == "number" then
 		M.current_level = level
 	elseif type(level) == "string" then
@@ -860,6 +929,46 @@ local function _console_out(line)
 	local p = _orig_print or print
 	pcall(p, line)
 	_emitting = false
+end
+
+-- Channels whose refusal was already reported; cleared by the next success so a
+-- full disk prints one line per episode rather than one per lost log line.
+local _refused_channels = {}
+
+--- Reports one refused synchronous log channel on the console. Never through
+--- the logger: the line would go back to the very file that refused it.
+--- @param channel string Channel name ("unified", "topical", "errors-only").
+--- @param detail any Native refusal message.
+local function _report_sink_refusal(channel, detail)
+	if _refused_channels[channel] then return end
+	_refused_channels[channel] = true
+	_console_out(private_line("[logger] " .. channel .. " log write refused: " .. tostring(detail)))
+end
+
+--- Ends a reported refusal episode once the channel accepts a line again.
+--- @param channel string Channel name.
+local function _sink_accepted(channel)
+	_refused_channels[channel] = nil
+end
+
+--- Runs native file operations and returns the first refusal message, or nil.
+--- ENOSPC often surfaces only at flush or close, from the stdio buffer.
+--- @param fn function Performs the operations; returns a message on refusal.
+--- @return string|nil detail
+local function _sink_refusal(fn)
+	local ok, detail = pcall(fn)
+	if not ok then return tostring(detail) end
+	return detail
+end
+
+--- Returns nil for a successful file method result, else its refusal message.
+--- Real Lua files return a value on success and nil plus a message on refusal.
+--- @param result any First value returned by write/flush/close.
+--- @param message any Second value.
+--- @return string|nil
+local function _refused(result, message)
+	if result == nil then return tostring(message or "operation refused") end
+	return nil
 end
 
 
@@ -919,16 +1028,24 @@ local function _ensure_log_file()
 		pcall(function() _file_handle:close() end)
 		_file_handle = nil
 	end
-	local ok, fh = pcall(io.open, _unified_path, "a")
-	if not ok or not fh then return nil end
+	local ok, fh, open_err = pcall(io.open, _unified_path, "a")
+	if not ok or not fh then
+		_report_sink_refusal("unified", ok and open_err or fh)
+		return nil
+	end
+	-- Session boundary marker so tailing reveals where HS restarted
+	local refusal = _sink_refusal(function()
+		local wrote, write_err = fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
+		return _refused(wrote, write_err) or _refused(fh:flush())
+	end)
+	if refusal then
+		pcall(function() fh:close() end)
+		_report_sink_refusal("unified", refusal)
+		return nil
+	end
 	_file_handle   = fh
 	_last_log_date = today
 	_last_log_path = _unified_path
-	-- Session boundary marker so tailing reveals where HS restarted
-	pcall(function()
-		fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
-		fh:flush()
-	end)
 	if previous_date and previous_date ~= today and _log_retention_days then
 		_schedule_log_purge(_log_dir, _log_retention_days, false)
 	end
@@ -996,19 +1113,24 @@ local function _write_to_file(line, immediate)
 	local full = line .. "\n"
 	local fh = _ensure_log_file()
 	if fh then
-		pcall(function()
-			fh:write(full)
+		local refusal = _sink_refusal(function()
+			local wrote, write_err = fh:write(full)
+			if wrote == nil then return _refused(wrote, write_err) end
 			if immediate == false then
 				_unflushed_debug = _unflushed_debug + 1
-				if _unflushed_debug >= FLUSH_EVERY_N_DEBUG then
-					fh:flush()
-					_unflushed_debug = 0
-				end
-			else
-				fh:flush()
-				_unflushed_debug = 0
+				if _unflushed_debug < FLUSH_EVERY_N_DEBUG then return nil end
 			end
+			_unflushed_debug = 0
+			return _refused(fh:flush())
 		end)
+		if refusal then
+			-- Retire the refusing handle; the next line reopens a repaired file.
+			if _file_handle == fh then _file_handle = nil end
+			pcall(function() fh:close() end)
+			_report_sink_refusal("unified", refusal)
+		else
+			_sink_accepted("unified")
+		end
 	end
 	-- Fan-out to topical sub-files.
 	--
@@ -1026,8 +1148,8 @@ local function _write_to_file(line, immediate)
 	local today = os.date("%Y-%m-%d")
 	for _, sub in ipairs(SUB_LOG_NAMES) do
 		if _matches_any(line, sub.patterns) then
-			pcall(function()
-				local path = _log_dir .. sub.name
+			local path = _log_dir .. sub.name
+			local refusal = _sink_refusal(function()
 				local mode = _sub_file_mode(path, today)
 				local entry = _sub_handles[path]
 				-- Re-open when the mode changes: "w" means a new calendar day has
@@ -1037,14 +1159,24 @@ local function _write_to_file(line, immediate)
 					entry = nil
 				end
 				if not entry then
-					local fh = io.open(path, mode)
-					if not fh then return end
+					local fh, open_err = io.open(path, mode)
+					if not fh then return _refused(fh, open_err) end
 					entry = { fh = fh, mode = "a" }
 					_sub_handles[path] = entry
 				end
-				entry.fh:write(full)
-				if immediate ~= false then entry.fh:flush() end
+				local wrote, write_err = entry.fh:write(full)
+				if wrote == nil then return _refused(wrote, write_err) end
+				if immediate ~= false then return _refused(entry.fh:flush()) end
+				return nil
 			end)
+			if refusal then
+				local entry = _sub_handles[path]
+				_sub_handles[path] = nil
+				if entry then pcall(function() entry.fh:close() end) end
+				_report_sink_refusal("topical", refusal)
+			else
+				_sink_accepted("topical")
+			end
 		end
 	end
 end
@@ -1093,6 +1225,7 @@ _driver_sink = function(line, variant)
 		return
 	end
 
+	line = private_line(line)
 	local level = Core.level_of(variant) or Core.LEVELS.INFO
 
 	-- Routed through _console_out so the print() tee (Section 7) does not
@@ -1113,13 +1246,18 @@ _driver_sink = function(line, variant)
 	-- without drowning in the full daily unified log.
 	if level >= Core.LEVELS.WARNING then
 		local err_full = line .. "\n"
-		pcall(function()
-			local f = io.open(_errors_path, "a")
-			if f then
-				f:write(err_full)
-				f:close()
-			end
+		local refusal = _sink_refusal(function()
+			local f, open_err = io.open(_errors_path, "a")
+			if not f then return _refused(f, open_err) end
+			local wrote, write_err = f:write(err_full)
+			local closed, close_err = f:close()
+			return _refused(wrote, write_err) or _refused(closed, close_err)
 		end)
+		if refusal then
+			_report_sink_refusal("errors-only", refusal)
+		else
+			_sink_accepted("errors-only")
+		end
 	end
 end
 
@@ -1132,7 +1270,8 @@ local function _deliver_async_record(record)
 	if type(record) ~= "table" or type(record.line) ~= "string" then
 		return false, "asynchronous log record is malformed"
 	end
-	_console_out(record.line)
+	local line = record.rejected == true and private_line(record.line) or record.line
+	_console_out(line)
 	local notification = record.notification
 	if type(notification) == "table" and _error_notification_handler then
 		local notified, delivered_or_err, notification_err = xpcall(
@@ -1196,15 +1335,18 @@ function M.start_async_sink(scheduler, transport_overrides)
 		scheduler = scheduler,
 		log_dir = _log_dir,
 		retention_days = _log_retention_days or DEFAULT_LOG_RETENTION_DAYS,
+		prepare_line = private_line,
 		route_line = _route_line,
 		route_overlap_bytes = ROUTE_OVERLAP_BYTES,
 		on_delivered = _deliver_async_record,
 		on_rejected = _deliver_async_record,
 		on_failed = function(detail) _on_async_sink_failed(detail, owner) end,
 		-- A stall the worker recovered from is not fatal any more, so it has to
-		-- stay visible in the log it delayed.
+		-- stay visible in the log it delayed. The ACK is read on the main run loop,
+		-- so a busy boot or menu rebuild also "stalls" it; that is only a warning
+		-- once lines were actually shed (issue #95: nine WARN lines, none shed).
 		on_stall_recovered = function(stalled_ms, shed)
-			_log("WARNING", "logger", "Native logger stalled %d ms before acknowledging; "
+			_log(shed > 0 and "WARNING" or "INFO", "logger", "Native logger stalled %d ms before acknowledging; "
 				.. "%d DEBUG/TRACE/DONE line(s) were shed meanwhile.", stalled_ms, shed)
 		end,
 	}
@@ -1349,7 +1491,13 @@ Core.set_level(Core.LEVELS.DEBUG)
 ---   decision, so a deduped line does not produce a side effect the log suppressed.
 _log = function(variant_key, module_name, msg, ...)
 	local variant = VARIANTS[variant_key]
-	if not variant or variant.level < M.current_level then return false end
+	if not variant then return false end
+	if variant.level < M.current_level then
+		-- This dispatcher is the driver's one severity filter (the core's stays at
+		-- its floor), so the refusal is counted here for the log-volume figures.
+		Core.note_dropped()
+		return false
+	end
 
 	local core_fn = Core[CORE_VARIANT[variant_key]]
 	if not core_fn then return false end
@@ -1405,6 +1553,21 @@ function M.start(module_name, msg, ...) _log("START", module_name, msg, ...) end
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
 function M.success(module_name, msg, ...) _log("SUCCESS", module_name, msg, ...) end
+
+--- Logs an evidence record (spec § 4.3): an INFO line that neither the
+--- consecutive dedup nor the repeat collapser ever withholds. For the result
+--- lines of a field check or a diagnostics probe a person is asked to send back.
+--- Subject to the same level threshold as INFO.
+--- @param module_name string Short module identifier.
+--- @param msg string Message or format string.
+--- @param ... any Optional format arguments.
+function M.evidence(module_name, msg, ...)
+	if VARIANTS.INFO.level < M.current_level then
+		Core.note_dropped()
+		return false
+	end
+	return Core.evidence(module_name, msg, ...) ~= nil
+end
 
 --- Logs a WARNING message — unexpected condition; execution continues but must be investigated.
 --- @param module_name string Short module identifier.
@@ -1510,6 +1673,15 @@ function M.dedup_suppressed_count() return Core.dedup_suppressed_count() end
 --- and "Last recorded error" read this, not the 200-line ring.
 --- @return table { warn_count, err_count, last_error }
 function M.session_issues() return Core.session_issues() end
+
+--- Log-volume figures since the previous call (spec § 5.3); the totals are untouched.
+--- @return table Lines per level plus dropped, suppressed and collapsed.
+function M.volume_interval() return Core.volume_interval() end
+
+--- Renders log-volume figures as the text of an evidence record.
+--- @param counters table Figures from volume_interval().
+--- @return string
+function M.volume_text(counters) return Core.volume_text(counters) end
 
 --- Clock used to measure the dedup and repeat windows, in seconds.
 --- Replaceable so a test can drive the five-second window without sleeping for
@@ -1656,6 +1828,182 @@ end
 -- One-shot guard so the constructors are patched exactly once.
 local _capture_installed = false
 
+-- A timer callback that holds the main thread this long delays every event
+-- tap, the Karabiner lease heartbeat and each typed key behind it. macOS
+-- disables an event tap that waits about a second, so a shorter hold is
+-- invisible to the user and a longer one is named in the log.
+local SLOW_TIMER_CALLBACK_REPORT_MS = require("infra.main_thread_hold").REPORT_MS
+local SLOW_TIMER_CALLBACK_COUNT_MS = require("infra.main_thread_hold").COUNT_MS
+-- One report per callback site per minute: a callback that stalls on every
+-- tick would otherwise write a line per tick.
+local SLOW_TIMER_CALLBACK_REPEAT_SEC = 60
+local NANOSECONDS_PER_MILLISECOND = 1000000
+local MILLISECONDS_PER_SECOND = 1000
+-- Monotonic nanosecond clock captured at install; nil without hs.timer.
+local _callback_clock = nil
+local _slow_callback_reported_at = {}
+-- The longest hold of the session, with its callback site: the field run names
+-- it (ledger L16, L18, L24) without a person reading the log.
+local _worst_hold = nil
+-- Total nanoseconds spent waiting for a person inside a modal dialog since
+-- install. A callback that opens a dialog is not stalled by the time the user
+-- takes to answer it, so the slow-callback report subtracts this wait.
+local _modal_wait_ns = 0
+
+--- Runs a call that waits for a person (a modal dialog) and records how long
+--- it waited, so a timer callback that merely hosts the dialog is not reported
+--- as a main-thread stall (issue #101 named three dialog callbacks as 1.7 s to
+--- 4.5 s holds). Errors propagate after the wait is recorded.
+--- @param fn function The blocking call.
+--- @param ... any Arguments for fn.
+--- @return any ... Whatever fn returns.
+function M.run_modal(fn, ...)
+	if type(fn) ~= "function" then error("Logger.run_modal: a function is required", 2) end
+	local started = nil
+	if _callback_clock then
+		local ok_start, value = pcall(_callback_clock)
+		if ok_start and type(value) == "number" then started = value end
+	end
+	local function settle(ok, ...)
+		if started then
+			local ok_end, finished = pcall(_callback_clock)
+			if ok_end and type(finished) == "number" and finished > started then
+				_modal_wait_ns = _modal_wait_ns + (finished - started)
+			end
+		end
+		if not ok then error((...), 0) end
+		return ...
+	end
+	return settle(pcall(fn, ...))
+end
+
+--- Names the source line of the function a timer callback runs.
+--- adapters/timer_scheduler.lua wraps every owner's callback in a closure of
+--- its own, so its site names nothing: the first function upvalue defined in
+--- another file is the owner's callback.
+--- @param fn function Callback handed to the hs.timer constructor.
+--- @return string site "path:line" of the owner's function.
+local function describe_callback_site(fn)
+	local info = debug.getinfo(fn, "S")
+	local site = info and (tostring(info.short_src) .. ":" .. tostring(info.linedefined)) or "?"
+	if not (info and tostring(info.short_src):find("timer_scheduler", 1, true)) then return site end
+	for index = 1, 16 do
+		local name, value = debug.getupvalue(fn, index)
+		if name == nil then break end
+		if type(value) == "function" then
+			local inner = debug.getinfo(value, "S")
+			if inner and not tostring(inner.short_src):find("timer_scheduler", 1, true) then
+				return tostring(inner.short_src) .. ":" .. tostring(inner.linedefined)
+			end
+		end
+	end
+	return site
+end
+
+--- The session's longest timer-callback hold of 250 ms or more.
+--- @return table|nil hold { ms, site } where site is "path:line", nil before any.
+function M.worst_timer_hold()
+	if _worst_hold == nil then return nil end
+	return { ms = _worst_hold.ms, site = _worst_hold.site }
+end
+
+-- Timer-callback time per site while an accounting window is open, nil when
+-- none is: the field run's idle check names the callbacks that wake the app.
+local _callback_accounting = nil
+-- Site of each callback seen in the window: naming walks debug info, and a
+-- pump that ticks every 250 ms would pay it on every tick.
+local _accounting_sites = setmetatable({}, { __mode = "k" })
+
+--- Opens the timer-callback accounting window. One window at a time: a second
+--- opener would read the first one's callbacks as its own.
+function M.begin_callback_accounting()
+	if _callback_accounting ~= nil then
+		error("Logger.begin_callback_accounting: an accounting window is already open", 2)
+	end
+	_callback_accounting = {}
+end
+
+--- Closes the accounting window and returns what ran in it.
+--- @return table sites { { site = "path:line", count, ms } }, most time first.
+function M.end_callback_accounting()
+	local sites = _callback_accounting
+	if sites == nil then error("Logger.end_callback_accounting: no accounting window is open", 2) end
+	_callback_accounting = nil
+	local list = {}
+	for site, entry in pairs(sites) do
+		list[#list + 1] = { site = site, count = entry.count, ms = entry.ns / NANOSECONDS_PER_MILLISECOND }
+	end
+	table.sort(list, function(a, b)
+		if a.ms ~= b.ms then return a.ms > b.ms end
+		return a.site < b.site
+	end)
+	return list
+end
+
+--- Adds one timer callback to the open accounting window.
+--- @param fn function The callback that ran.
+--- @param started integer Monotonic start, nanoseconds.
+--- @param modal_before integer Modal wait total when the callback started.
+local function account_timer_callback(fn, started, modal_before)
+	local ok_now, now = pcall(_callback_clock)
+	if not ok_now or type(now) ~= "number" then return end
+	local site = _accounting_sites[fn]
+	if site == nil then
+		local ok_site, described = pcall(describe_callback_site, fn)
+		site = ok_site and described or "?"
+		_accounting_sites[fn] = site
+	end
+	local entry = _callback_accounting[site]
+	if entry == nil then
+		entry = { count = 0, ns = 0 }
+		_callback_accounting[site] = entry
+	end
+	entry.count = entry.count + 1
+	entry.ns = entry.ns + math.max(0, now - started - (_modal_wait_ns - modal_before))
+end
+
+--- Reports one timer callback that held the main thread past the threshold.
+--- @param fn function The callback that ran.
+--- @param kind string Timer family label.
+--- @param started integer Monotonic start, nanoseconds.
+--- @param modal_before integer Modal wait total when the callback started.
+--- @param heap_before_kb number Lua heap when the callback started: a drop
+---   says a garbage collection ran inside the hold.
+local function report_slow_timer_callback(fn, kind, started, modal_before, heap_before_kb)
+	local ok_now, now = pcall(_callback_clock)
+	if not ok_now or type(now) ~= "number" then return end
+	local held_ms = (now - started - (_modal_wait_ns - modal_before)) / NANOSECONDS_PER_MILLISECOND
+	-- Shorter holds are counted for the phase summary: 250 ms is where key
+	-- events start arriving late at the taps.
+	if held_ms >= SLOW_TIMER_CALLBACK_COUNT_MS then
+		PhaseStats.count(held_ms >= SLOW_TIMER_CALLBACK_REPORT_MS and "runtime.timer_hold_over_1000ms"
+			or "runtime.timer_hold_over_250ms")
+	end
+	if held_ms < SLOW_TIMER_CALLBACK_COUNT_MS then return end
+	local ok_site, site = pcall(describe_callback_site, fn)
+	site = ok_site and site or "?"
+	if _worst_hold == nil or held_ms > _worst_hold.ms then _worst_hold = { ms = held_ms, site = site } end
+	local previous = _slow_callback_reported_at[site]
+	local now_sec = now / NANOSECONDS_PER_MILLISECOND / MILLISECONDS_PER_SECOND
+	if previous and now_sec - previous < SLOW_TIMER_CALLBACK_REPEAT_SEC then return end
+	_slow_callback_reported_at[site] = now_sec
+	local phases = PhaseStats.recent_since(started)
+	local heap = string.format(" Lua heap %d->%d MB.", math.floor((heap_before_kb or 0) / 1024),
+		math.floor(collectgarbage("count") / 1024))
+	phases = (phases and (" Phases inside the hold: " .. phases .. ".") or "") .. heap
+	if held_ms < SLOW_TIMER_CALLBACK_REPORT_MS then
+		-- The Mac counted 7 to 18 such holds per 5 minutes with no site: key
+		-- events arrive late from 250 ms on, so each one is named once a minute.
+		-- Evidence, not info: one template for every site would be collapsed.
+		M.evidence("runtime", "Main-thread hold of %d ms in an hs.timer.%s callback (%s).%s",
+			math.floor(held_ms), kind, site, phases)
+		return
+	end
+	M.warn("runtime",
+		"An hs.timer.%s callback (%s) held the main thread for %d ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.%s",
+		kind, site, math.floor(held_ms), phases)
+end
+
 --- Wraps a timer callback so an uncaught error is logged WITH a traceback
 --- instead of vanishing into the Hammerspoon Console. hs.timer ignores callback
 --- return values, so discarding them here changes nothing.
@@ -1677,11 +2025,55 @@ local _capture_installed = false
 local function _guard_timer_cb(fn, kind)
 	if type(fn) ~= "function" then return fn end
 	return function(...)
+		local started = nil
+		local modal_before = _modal_wait_ns
+		local heap_before_kb = collectgarbage("count")
+		if _callback_clock then
+			local ok_start, value = pcall(_callback_clock)
+			if ok_start and type(value) == "number" then started = value end
+		end
 		local ok, err = xpcall(fn, debug.traceback, ...)
 		if not ok then
-			M.error("runtime", "Uncaught error in hs.timer.%s callback: %s", kind, tostring(err))
+			-- Never tostring() a caught object: its own __tostring may raise again.
+			M.error("runtime", "Uncaught error in hs.timer.%s callback: %s", kind, ErrorDescription.describe(err))
+		end
+		-- A main-thread hold has no error to report, yet it is what disabled the
+		-- event taps and cost the Karabiner lease in issue #99 (13.4 s inside one
+		-- ingest flush). Naming the callback makes the next log say which one.
+		if started and _callback_accounting ~= nil then
+			local accounted, account_err = pcall(account_timer_callback, fn, started, modal_before)
+			if not accounted then
+				M.error("runtime", "Timer callback accounting failed: %s", ErrorDescription.describe(account_err))
+			end
+		end
+		if started then
+			local reported, report_err = pcall(report_slow_timer_callback, fn, kind, started, modal_before, heap_before_kb)
+			if not reported then
+				M.error("runtime", "Slow timer callback report failed: %s", ErrorDescription.describe(report_err))
+			end
 		end
 	end
+end
+
+--- Names the program a synchronous shell command runs, for a phase name. Only a
+--- plain basename of the first word is kept (`mkdir`, `ls`, `uname`); anything
+--- else, such as a user script name with spaces or symbols, reads `other`, so
+--- no path or argument reaches the log.
+--- @param command any The hs.execute command.
+--- @return string label
+local function shell_program_label(command)
+	if type(command) ~= "string" then return "other" end
+	local first = command:match("^%s*([^%s]+)")
+	while first and first:find("=", 1, true) do
+		-- Skip leading environment assignments such as LC_ALL=C.
+		command = command:gsub("^%s*[^%s]+", "", 1)
+		first = command:match("^%s*([^%s]+)")
+	end
+	-- A quoted or escaped first word is a caller-built path: never name it.
+	if not first or not first:match("^[%w_%-%./]+$") then return "other" end
+	local base = NativePath.basename(first)
+	if base and #base <= 24 and base:match("^[%w_%-%.]+$") then return base end
+	return "other"
 end
 
 --- Installs process-wide capture so EVERY diagnostic — including errors that
@@ -1732,7 +2124,7 @@ function M.install_runtime_error_capture()
 							_async_sink_state.last_error = tostring(queued and enqueue_err or record_or_err)
 						end
 					else
-						pcall(_write_to_file, line)
+						pcall(_write_to_file, private_line(line))
 					end
 				end
 			end
@@ -1743,6 +2135,7 @@ function M.install_runtime_error_capture()
 	local hs_ref = rawget(_G, "hs")
 	if type(hs_ref) == "table" and type(hs_ref.timer) == "table" then
 		local timer = hs_ref.timer
+		if type(timer.absoluteTime) == "function" then _callback_clock = timer.absoluteTime end
 		if type(timer.doAfter) == "function" then
 			local orig = timer.doAfter
 			timer.doAfter = function(delay, fn, ...) return orig(delay, _guard_timer_cb(fn, "doAfter"), ...) end
@@ -1761,130 +2154,37 @@ function M.install_runtime_error_capture()
 		end
 	end
 
-	_log("INFO", "logger", "Runtime error capture installed (hs.timer guards + console tee).")
+	-- 3) Time every synchronous shell command. hs.execute forks from the
+	-- Hammerspoon process and blocks the main thread; on the Mac one fork took
+	-- about 40 ms, and several per tick made the holds no other phase named.
+	-- Each call becomes phase `shell.<program>`, so a slow-callback report
+	-- lists the forks inside its hold and the phase summary counts them.
+	if type(hs_ref) == "table" and type(hs_ref.execute) == "function" then
+		local orig = hs_ref.execute
+		hs_ref.execute = function(command, ...)
+			local started = _callback_clock and _callback_clock() or nil
+			local results = table.pack(orig(command, ...))
+			if started then
+				local elapsed = _callback_clock() - started
+				pcall(PhaseStats.add, "shell." .. shell_program_label(command), elapsed)
+			end
+			return table.unpack(results, 1, results.n)
+		end
+	end
+
+	_log("INFO", "logger",
+		"Runtime error capture installed (hs.timer guards with slow-callback reports, shell timing + console tee).")
 end
 
---- Reads only the logger state this module owns; no persistence occurs here.
-local function scope_state()
-	return { module = package.loaded["infra.logger"], level = M.current_level }
-end
-
-local function scope_equal(left, right)
-	return rawequal(left.module, right.module) and left.level == right.level
-end
-
---- Acquires the declared runtime field for one primary transaction token.
---- @param owner table Exact token; pending() describes primary compensation only.
---- @return boolean acquired
-function M.scope_acquire(owner)
-	if type(owner) ~= "table" or type(owner.pending) ~= "function" or _scope_owner ~= nil or _scope_busy
-		or not rawequal(package.loaded["infra.logger"], M) then return false end
-	_scope_owner = owner
-	return true
-end
-
---- Releases the admission gate while retaining opaque inverse receipts.
---- @param owner table Exact token.
---- @return boolean released
-function M.scope_release(owner)
-	if _scope_busy or not rawequal(_scope_owner, owner) or owner.pending() ~= false then return false end
-	_scope_owner = nil
-	return true
-end
-
---- Captures an opaque, source-bound runtime inverse under the native claim.
---- @param owner table Exact token.
---- @return table|nil receipt
-local function scope_capture_impl(owner)
-	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["infra.logger"], M) then return nil end
-	local generation = _scope_generation
-	local receipt, before = {}, scope_state()
-	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["infra.logger"], M) or _scope_generation ~= generation then return nil end
-	_scope_receipts[receipt] = { owner = owner, before = before, expected = before, generation = _scope_generation }
-	return receipt
-end
-
-function M.scope_capture(owner)
-	if _scope_busy then return nil end
-	_scope_busy = true
-	local called, result = pcall(scope_capture_impl, owner)
-	_scope_busy = false
-	if not called then return nil end
-	return result
-end
-
---- Applies one canonical value after proving the captured runtime still owns it.
---- @param owner table Exact token.
---- @param receipt table Native opaque receipt.
---- @param value string Canonical declared log token.
---- @return boolean applied
-local function scope_apply_impl(owner, receipt, value)
-	local data = _scope_receipts[receipt]
-	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.attempted
-		or data.generation ~= _scope_generation or not scope_equal(scope_state(), data.expected)
-		or not rawequal(package.loaded["infra.logger"], M) then return false end
-	if type(value) ~= "string" or type(M.LEVELS[value]) ~= "number" then return false end
-	local next_value = { module = M, level = M.LEVELS[value] }
-	_scope_generation = _scope_generation + 1
-	data.generation, data.expected, data.attempted = _scope_generation, next_value, true
-	local called = pcall(function()
-		M.current_level = next_value.level
-	end)
-	local observed = scope_state()
-	return called and scope_equal(observed, next_value) and rawequal(_scope_owner, owner)
-		and rawequal(package.loaded["infra.logger"], M) and data.generation == _scope_generation
-end
-
-function M.scope_apply(owner, receipt, value)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, result = pcall(scope_apply_impl, owner, receipt, value)
-	_scope_busy = false
-	if not called then return false end
-	return result
-end
-
---- Restores only this receipt's acknowledged or interrupted scalar publication.
---- @param owner table Exact token.
---- @param receipt table Native opaque receipt.
---- @return boolean restored
-local function scope_restore_impl(owner, receipt)
-	local data = _scope_receipts[receipt]
-	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.generation ~= _scope_generation then return false end
-	local current = scope_state()
-	if not rawequal(current.module, M) or not rawequal(package.loaded["infra.logger"], M) or not (current.level == data.before.level or current.level == data.expected.level) then return false end
-	if not data.attempted or data.restored then return scope_equal(current, data.before) end
-	local called = pcall(function()
-		M.current_level = data.before.level
-	end)
-	local observed = scope_state()
-	if not called or not scope_equal(observed, data.before) or not rawequal(_scope_owner, owner)
-		or not rawequal(package.loaded["infra.logger"], M) or data.generation ~= _scope_generation then return false end
-	_scope_generation = _scope_generation + 1
-	data.generation, data.expected, data.restored = _scope_generation, data.before, true
-	return true
-end
-
-function M.scope_restore(owner, receipt)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, result = pcall(scope_restore_impl, owner, receipt)
-	_scope_busy = false
-	if not called then return false end
-	return result
-end
-
---- Forgets only a finalized inverse, without changing live native state.
---- @param owner table Exact primary token.
---- @param receipt table Native opaque receipt.
---- @return boolean forgotten
-function M.scope_forget(owner, receipt)
-	local data = _scope_receipts[receipt]
-	if _scope_busy or rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or owner.pending() ~= false then return false end
-	if data.forgotten then return true end
-	data.before, data.expected, data.generation = nil, nil, nil
-	data.forgotten = true
-	return true
-end
+_scope.install({
+	-- Reads only the logger state this module owns; no persistence occurs here.
+	state = function() return { level = M.current_level } end,
+	published = { "level" },
+	accept = function(value)
+		if type(value) ~= "string" or type(M.LEVELS[value]) ~= "number" then return nil end
+		return { level = M.LEVELS[value] }
+	end,
+	publish = function(target) M.current_level = target.level end,
+})
 
 return M

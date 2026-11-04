@@ -31,6 +31,8 @@
 ; part of the same compilation unit before ``RegisterAltGrLayer`` is called.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -51,7 +53,7 @@ global ALTGR_BASE_ROWS := ""
 global CTRL_ALT_NUMPAD := ""
 
 ; The physical-state port is shared by captured criteria and direct gate calls.
-global _ALTGR_PHYSICAL_STATE_QUERY := KS_IsDown
+global _ALTGR_PHYSICAL_STATE_QUERY := KS_IsHeld
 
 ; ``{Plain, Shifted}`` callables of every key of two parallel spec tables.
 _AltGrTableFromSpec(Plain, Shifted, DeadTables) {
@@ -364,8 +366,12 @@ RegisterAltGrLayer(HotkeyFn := Hotkey, HotIfFn := HotIf, DispatchFn := AltGrShif
     ; reset leaks it into every later Hotkey() call in the driver — silently
     ; gating unrelated layers behind this condition.
     try {
+        ; Each key stands down while its row is switched off (LayoutRowIsEmulated,
+        ; read from the hotkey name the criterion receives): the OS layout types it.
+
         ; --- ErgoptiPlus overrides (registered first, lowest precedence) ---
-        HotIfFn.Call((*) => ErgoptiLayout_PlusIsActive() and RealAltGrFn.Call())
+        HotIfFn.Call((Name := "", *) => ErgoptiLayout_PlusIsActive() and RealAltGrFn.Call()
+            and LayoutRowIsEmulatedHotkey(Name))
         for SC in ALTGR_PLUS_OVERRIDES {
             HotkeyFn.Call("SC138 & " . SC, DispatchFn.Bind(SC, ALTGR_PLUS_OVERRIDES), "I2")
         }
@@ -374,20 +380,23 @@ RegisterAltGrLayer(HotkeyFn := Hotkey, HotIfFn := HotIf, DispatchFn := AltGrShif
         ; Note: ergopti_base is intentionally NOT required here — superscripts,
         ; subscripts and the € sign are layout-independent and must work even when
         ; the Ergopti keyboard emulation is off.
-        HotIfFn.Call((*) => Features["layout"]["ergopti_alt_gr"] and RealAltGrFn.Call())
+        HotIfFn.Call((Name := "", *) => Features["layout"][ConfigLeaf.ERGOPTI_ALT_GR] and RealAltGrFn.Call()
+            and LayoutRowIsEmulatedHotkey(Name))
         for SC in ALTGR_NUMBER_ROW {
             HotkeyFn.Call("SC138 & " . SC, DispatchFn.Bind(SC, ALTGR_NUMBER_ROW), "I2")
         }
         ; A real Ctrl+Alt chord, never the AltGr key: under the AltGr gate above
         ; these needed the physical AltGr, which a Ctrl+Alt chord never holds,
         ; so they were dead on standard layouts and QWERTY.
-        HotIfFn.Call((*) => Features["layout"]["ergopti_alt_gr"] and IsCtrlAltNotAltGr())
+        HotIfFn.Call((Name := "", *) => Features["layout"][ConfigLeaf.ERGOPTI_ALT_GR] and IsCtrlAltNotAltGr()
+            and LayoutRowIsEmulatedHotkey(Name))
         for SC, Combo in CTRL_ALT_NUMPAD {
             HotkeyFn.Call("^!" . SC, CtrlAltDispatch.Bind(Combo), "I2")
         }
 
         ; --- ErgoptiAltGr base rows (registered last, highest precedence) ---
-        HotIfFn.Call((*) => Features["layout"]["ergopti_alt_gr"] and RealAltGrFn.Call())
+        HotIfFn.Call((Name := "", *) => Features["layout"][ConfigLeaf.ERGOPTI_ALT_GR] and RealAltGrFn.Call()
+            and LayoutRowIsEmulatedHotkey(Name))
         for SC in ALTGR_BASE_ROWS {
             HotkeyFn.Call("SC138 & " . SC, DispatchFn.Bind(SC, ALTGR_BASE_ROWS), "I2")
         }

@@ -10,6 +10,6 @@
 # tag; the size only drives the download progress bar, the digest gates use.
 # ============================================================================
 
-OLLAMA_RELEASE_VERSION="0.24.0"
-OLLAMA_DARWIN_TGZ_SHA256="e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38"
-OLLAMA_DARWIN_TGZ_BYTES="133395504"
+OLLAMA_RELEASE_VERSION="0.40.4"
+OLLAMA_DARWIN_TGZ_SHA256="a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58"
+OLLAMA_DARWIN_TGZ_BYTES="167884528"

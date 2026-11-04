@@ -10,6 +10,18 @@
 			"height_ratio": 0.75
 		}
 	},
+	"native_presentations": {
+		"profile_shortcut_dialog": {
+			"kind": "dialog",
+			"title_key": "menu.profiles.shortcut_title",
+			"platforms": ["hs"]
+		},
+		"magic_key_source_notice": {
+			"kind": "notification",
+			"title_key": "dialog.magic_key_source.title",
+			"platforms": ["linux"]
+		}
+	},
 	"apps": {
 		"config_cleanup": {
 			"title_key": "dialog.unused_keys.title",
@@ -25,7 +37,44 @@
 			"height": 560,
 			"min_width": 360,
 			"min_height": 360,
-			"vhost": "ergopti.actionpicker"
+			"vhost": "ergopti.actionpicker",
+			"presentations": {
+				"keyboard_slot_selection": {
+					"title_key": "dialog.keyboard_shortcut.title_prefix",
+					"label_key": "dialog.keyboard_shortcut.prompt",
+					"platforms": ["hs"]
+				},
+				"keyboard_slot_action": {
+					"kind": "contextual_title",
+					"title_key": "dialog.keyboard_shortcut.title_prefix",
+					"platforms": ["hs"]
+				},
+				"tap_hold_action": {
+					"kind": "contextual_title",
+					"title_key": "tap_hold.picker.title_prefix",
+					"platforms": ["linux", "hs"]
+				},
+				"tap_hold_hold_action": {
+					"kind": "contextual_title",
+					"title_key": "tap_hold.picker.hold_title_prefix",
+					"platforms": ["linux", "hs"]
+				},
+				"key_combination_chord_action": {
+					"kind": "contextual_title",
+					"title_key": "menu.shortcuts.key_combinations_chord_title_prefix",
+					"platforms": ["hs"]
+				},
+				"key_combination_tap_action": {
+					"kind": "contextual_title",
+					"title_key": "menu.shortcuts.key_combinations_hold_tap_title_prefix",
+					"platforms": ["hs"]
+				},
+				"key_combination_hold_action": {
+					"kind": "contextual_title",
+					"title_key": "menu.shortcuts.key_combinations_hold_hold_title_prefix",
+					"platforms": ["hs", "linux"]
+				}
+			}
 		},
 		"changelog": {
 			"title_key": "changelog_window.window_title",
@@ -169,14 +218,21 @@
 			"height": 155,
 			"min_width": 720,
 			"min_height": 155,
-			"vhost": "ergopti.tokenprompt"
+			"vhost": "ergopti.tokenprompt",
+			"presentations": {
+				"hf_login": {
+					"kind": "window_title",
+					"title_key": "mlx.hf_login_title",
+					"platforms": ["hs"]
+				}
+			}
 		},
 		"update_check": {
 			"title_key": "update_check.window_title",
 			"width": 480,
-			"height": 320,
+			"height": 440,
 			"min_width": 400,
-			"min_height": 260,
+			"min_height": 340,
 			"vhost": "ergopti.updatecheck"
 		},
 		"physical_shortcuts": {

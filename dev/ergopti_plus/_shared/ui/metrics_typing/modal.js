@@ -24,21 +24,21 @@
 
 // Color palette for app icon fallback badges
 const APP_BADGE_COLORS = [
-	'#007AFF',
-	'#34C759',
-	'#FF3B30',
-	'#FF9500',
-	'#AF52DE',
-	'#FF2D55',
-	'#5AC8FA',
-	'#FFCC00',
-	'#4CD964',
-	'#FF6B00',
-	'#30B0C7',
-	'#FF6961',
-	'#77DD77',
-	'#AEC6CF',
-	'#CB99C9'
+	ThemeTokens.color('blue'),
+	ThemeTokens.color('green'),
+	ThemeTokens.color('red'),
+	ThemeTokens.color('orange'),
+	ThemeTokens.color('hue-af52de'),
+	ThemeTokens.color('hue-ff2d55'),
+	ThemeTokens.color('hue-5ac8fa'),
+	ThemeTokens.color('yellow'),
+	ThemeTokens.color('hue-4cd964'),
+	ThemeTokens.color('hue-ff6b00'),
+	ThemeTokens.color('hue-30b0c7'),
+	ThemeTokens.color('hue-ff6961'),
+	ThemeTokens.color('hue-77dd77'),
+	ThemeTokens.color('hue-aec6cf'),
+	ThemeTokens.color('hue-cb99c9')
 ];
 
 /**
@@ -72,14 +72,20 @@ function update_app_btn_text() {
 	const sel = app_state.selected_apps.size;
 	const tot = app_state.available_apps.length;
 
-	if (sel === tot) {
+	if (sel === tot && app_state.app_selection_mode !== APP_SELECTION_MODE.NONE) {
 		btn.innerText = _t('ui_typing.apps_all');
 		btn.classList.add('active');
 	} else {
-		btn.innerText = sel === 0 ? _t('ui_typing.apps_none') : `Apps (${sel}/${tot})`;
+		btn.innerText =
+			sel === 0
+				? _t('ui_typing.apps_none')
+				: _t('ui_typing.apps_some').replace('{n}', sel).replace('{total}', tot);
 		btn.classList.remove('active');
 	}
 }
+
+// Locale application rewrites declared labels before this dynamic caption is restored.
+document.addEventListener('i18n:applied', update_app_btn_text);
 
 // ======================================
 // ======================================
@@ -166,7 +172,8 @@ function render_app_list() {
 		if (!app.toLowerCase().includes(query)) return;
 
 		const checked = app_state.selected_apps.has(app) ? 'checked' : '';
-		const icon_src = window.app_icons?.[app];
+		const icon_src =
+			window.app_icons && Object.hasOwn(window.app_icons, app) ? window.app_icons[app] : null;
 		const icon_html = icon_src
 			? `<img src="${icon_src}" class="app-icon-img" alt="${escape_html(app)}" />`
 			: `<div class="app-icon-div" style="background-color:${get_app_color(app)}">${app.charAt(0).toUpperCase()}</div>`;

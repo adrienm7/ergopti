@@ -65,10 +65,12 @@ check(
     ((6, 0, 0, 0), {"hotstring": 2, "llm": 2, "other": 2}),
 )
 a, b = row(second, "owned-manual")
+# The walk context carries across flushes: the second manual keystroke's real
+# delay since the first one is one timed delay (cd), whatever its length (td).
 check(
     "manual scalar and synthetic absence",
-    (a, b.get("none"), sum(b.values())),
-    ((2, 0, 0, 0), None, 0),
+    (a[0], a[2], a[3], type(a[1]) is int and a[1] >= 0, b.get("none"), sum(b.values())),
+    (2, 1, 0, True, None, 0),
 )
 a, b = row(second, "owned-direct", "AND device_id='owned-direct' AND date='2000-01-01'")
 check("unrelated exact scalar columns", a, (11, 20, 5, 3))

@@ -14,6 +14,7 @@ foreach ($Name in @('Get-OwnedFixtureTokenElevation', 'Assert-OwnedFixtureRootSc
     . ([scriptblock]::Create($Functions[0].Extent.Text))
 }
 & (Join-Path $PSScriptRoot 'managed_remote_snapshot_control.ps1') -SourcePath $SourcePath
+& (Join-Path $PSScriptRoot 'managed_remote_native_directory_control.ps1') -SourcePath $SourcePath
 $SavedActions = $env:GITHUB_ACTIONS
 $SavedRunner = $env:RUNNER_ENVIRONMENT
 $script:Reads = 0

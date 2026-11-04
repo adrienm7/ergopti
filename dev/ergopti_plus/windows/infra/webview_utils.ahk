@@ -34,6 +34,32 @@ global _WebView_SharedEnvRetired := false
 global WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS := 15000
 global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS := 5000
 
+/** Compare native Core identity without interning vendor wrappers or trusting a raw Ptr. */
+WebView_SameCore(Sender, Expected) {
+	if !IsObject(Sender) || !IsObject(Expected)
+		return false
+	CoreAvailable := IsSet(WebView2) && HasProp(WebView2, "Core")
+	SenderIsCore := CoreAvailable && (Sender is WebView2.Core)
+	ExpectedIsCore := CoreAvailable && (Expected is WebView2.Core)
+	; Passive headless views keep exact identity without native-property reads.
+	; Even an identical native wrapper must still own a usable Core pointer.
+	if !SenderIsCore && !ExpectedIsCore
+		return Sender == Expected
+	if !SenderIsCore || !ExpectedIsCore || !Sender.Ptr || !Expected.Ptr
+		return false
+	try {
+		; IUnknown is COM's canonical identity. Retain both queried references
+		; until comparison; interface addresses and AHK wrapper objects can differ.
+		IUnknown := "{00000000-0000-0000-C000-000000000046}"
+		SenderUnknown := ComObjQuery(Sender, IUnknown)
+		ExpectedUnknown := ComObjQuery(Expected, IUnknown)
+		return ComObjValue(SenderUnknown) == ComObjValue(ExpectedUnknown)
+	} catch as Err {
+		try LoggerWarn("WebView", "Browser identity query refused: {1}.", Err.Message)
+		return false
+	}
+}
+
 /** Invalidate virtual-host subresources before reusing a native document host. */
 WebView_ClearDocumentCache(WebView) {
 	global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS
@@ -44,6 +70,20 @@ WebView_ClearDocumentCache(WebView) {
 		throw Err
 	}
 	LoggerDone("WebView", "Retained browser document cache invalidated.")
+}
+
+/**
+ * Resizes a controller's host control to its window's client area, then fills it.
+ *
+ * Controller.Fill() only copies the client rect of the controller's parent
+ * window. Hosts parent the controller to a placeholder Text control created at
+ * the default size, which no layout ever grows, so filling it alone kept the
+ * page at its opening size however far the window was widened.
+ * @param Controller {WebView2.Controller} The controller to fit.
+ */
+WebView_FitToWindow(Controller) {
+	WMFitChildToParentClient(Controller.ParentWindow)
+	Controller.Fill()
 }
 
 ; One stable user-data folder for the whole session. Unlike the former per-open
@@ -161,15 +201,60 @@ WebView_AvailRamMb() {
 	return NumGet(MemStatus, 16, "UInt64") / 1048576   ; ullAvailPhys
 }
 
-; True when free RAM is too low to comfortably boot Chromium, so a WebView window
-; should use its native fallback. An unknown reading never gates (returns false),
-; leaving the WebView path to be attempted as before.
-WebView_ShouldUseNativeFallback(AvailRamFn := 0) {
+; The oldest Evergreen runtime the pages run on: the first with
+; SetVirtualHostNameToFolderMapping (ICoreWebView2_3), which every page needs.
+global WEBVIEW_MIN_RUNTIME_VERSION := "87.0.664.8"
+; The runtime's EdgeUpdate client, where Microsoft documents its version.
+global WEBVIEW_RUNTIME_CLIENT := "Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+global _WebView_RuntimeRefusalShown := false
+
+; The installed Evergreen runtime's version, per machine then per user.
+; @returns {String} "" when none is installed.
+WebView_RuntimeVersion() {
+	global WEBVIEW_RUNTIME_CLIENT
+	for Root in ["HKLM\SOFTWARE\WOW6432Node\", "HKLM\SOFTWARE\", "HKCU\Software\"] {
+		Version := RegRead(Root . WEBVIEW_RUNTIME_CLIENT, "pv", "")
+		if (Version != "" && Version != "0.0.0.0")
+			return Version
+	}
+	return ""
+}
+
+; Refuses a runtime below the minimum, saying so once per run: the pages would
+; break on a missing interface. No runtime at all is not a refusal: creating the
+; web view fails as before and each window falls back on its own.
+; @param VersionFn {Func} Test seam, WebView_RuntimeVersion by default.
+; @param NoticeFn {Func} Test seam taking the text, a tooltip by default.
+; @returns {Boolean} True when the runtime is too old.
+WebView_RuntimeIsRefused(VersionFn := 0, NoticeFn := 0) {
+	global WEBVIEW_MIN_RUNTIME_VERSION, _WebView_RuntimeRefusalShown
+	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : WebView_RuntimeVersion()
+	if (Version == "" || VerCompare(Version, WEBVIEW_MIN_RUNTIME_VERSION) >= 0)
+		return false
+	if !_WebView_RuntimeRefusalShown {
+		_WebView_RuntimeRefusalShown := true
+		LoggerError("WebView", "The WebView2 Runtime {1} is below the minimum {2}: native windows only.",
+			Version, WEBVIEW_MIN_RUNTIME_VERSION)
+		Text := StrReplace(StrReplace(t("webview.runtime_too_old"), "{1}", WEBVIEW_MIN_RUNTIME_VERSION), "{2}", Version)
+		if HasMethod(NoticeFn, "Call")
+			NoticeFn.Call(Text)
+		else
+			TooltipShow({ Text: Text, DurationSec: UI_HOTSTRING_TIMEOUT_SEC }, UI_HOTSTRING_TIMEOUT_SEC)
+	}
+	return true
+}
+
+; True when a WebView window should use its native fallback: the runtime is too
+; old, or free RAM is too low to comfortably boot Chromium. An unknown reading
+; never gates (returns false), leaving the WebView path to be attempted as before.
+WebView_ShouldUseNativeFallback(AvailRamFn := 0, RefusedFn := 0) {
 	global WEBVIEW_MIN_AVAIL_RAM_MB, _WebView_SharedEnv
 	; A warm environment already owns the browser process; this open needs only
 	; a controller, so the cold-start RAM heuristic must not suppress it.
 	if _WebView_SharedEnv
 		return false
+	if (HasMethod(RefusedFn, "Call") ? RefusedFn.Call() : WebView_RuntimeIsRefused())
+		return true
 	Avail := HasMethod(AvailRamFn, "Call") ? AvailRamFn.Call() : WebView_AvailRamMb()
 	if Avail < 0
 		return false
@@ -201,6 +286,9 @@ class WebViewHost {
 		; sentinel makes both the load-once guard and the ``is Map`` read safe.
 		static _ManifestCache := ""
 		static _Instances      := Map()   ; AppId → WebViewHost (singleton tracking)
+		; Only an admitted ready signal refused under pause owns pending init.
+		; Subclass singletons need not live in _Instances; these receipts own resume.
+		static _PendingReady   := Map()
 
 		; ── Instance fields ──────────────────────────────────────────────────────
 		AppId      := ""
@@ -213,17 +301,20 @@ class WebViewHost {
 		ReadyFired := false   ; guards against double OnReady ("ready" msg + NavCompleted)
 		Queue      := []
 		ResetDone  := false
+		BuildActive := false
+		CloseRequested := false
 		Epoch      := 0      ; invalidates deferred callbacks after close/reset
 		SafetyTimer := 0      ; BoundFunc for the safety flush; cancelled on teardown
 		Opts       := unset
 
 		; --------------------------------------------------------------------------
 		; Factory: opens (or reuses) a WebView2 window for AppId.
-		; Returns a WebViewHost instance on success, or "" (falsy) on fallback.
+		; Returns a host for an opened or user-cancelled request, or "" on fallback.
 		; The caller checks the return value: if falsy, build the native fallback.
 		;
 		; Opts keys (all optional unless noted):
-		;   Title (required)     — window title string
+		;   Title                — brandless contextual caption label; default is the
+		;                          manifest title_key translated. Gui_Create brands it.
 		;   OnMessage (required) — (Host, Payload) => void; called with parsed JSON
 		;   OnReady              — (Host) => void; called once when page is ready
 		;   MinSize              — override manifest min-size ("WxH"); auto-computed
@@ -246,34 +337,38 @@ class WebViewHost {
 						WebViewHost._LoadManifest()
 				}
 
-				; ── Singleton: reuse existing window ─────────────────────────────────
-				if !(Opts.Has("AllowMultiple") && Opts["AllowMultiple"]) {
-						if WebViewHost._Instances.Has(AppId) {
+				; Reserve the singleton before Show or controller creation can pump a
+				; second opening. Lookup and publication share one RAM-only section;
+				; native presentation stays outside it.
+				AllowMultiple := Opts.Get("AllowMultiple", false)
+				Reused := false
+				PreviousCritical := Critical("On")
+				try {
+						if !AllowMultiple && WebViewHost._Instances.Has(AppId) {
 								Existing := WebViewHost._Instances[AppId]
-								if (Existing.Gui != 0) {
-										WMPresentWindow(Existing.Gui)
-										return Existing
+								if Existing.BuildActive || (!Existing.ResetDone && !Existing.CloseRequested) {
+										Host := Existing
+										Reused := true
 								}
-								; Stale entry — remove and fall through to create a new one
-								WebViewHost._Instances.Delete(AppId)
 						}
+						if !Reused {
+								Host := WebViewHost()
+								Host.AppId := AppId
+								Host.Opts := Opts
+								if !AllowMultiple
+										WebViewHost._Instances[AppId] := Host
+						}
+				} finally Critical(PreviousCritical)
+				if Reused {
+						if Existing.Gui != 0 && !Existing.CloseRequested
+								WMPresentWindow(Existing.Gui)
+						return Existing
 				}
 
-				; ── Create the host instance ─────────────────────────────────────────
-				Host := WebViewHost()
-				Host.AppId := AppId
-				Host.Opts  := Opts
-
-				; ── Build the window ─────────────────────────────────────────────────
-				if !Host._Build() {
-						return ""
-				}
-
-				; ── Register singleton ───────────────────────────────────────────────
-				if !(Opts.Has("AllowMultiple") && Opts["AllowMultiple"]) {
-						WebViewHost._Instances[AppId] := Host
-				}
-
+				; _Build retires this exact reservation on fallback, cancellation or
+				; failure. A late return cannot overwrite a replacement's ownership.
+				if !Host._Build()
+						return Host.CloseRequested ? Host : ""
 				return Host
 		}
 
@@ -297,6 +392,27 @@ class WebViewHost {
 				} catch as Err {
 						try LoggerWarn("WebViewHost", "Failed to parse apps.manifest.json: {1}", Err.Message)
 				}
+		}
+
+		/**
+		 * Resolves required app dimensions through the existing lazy manifest owner.
+		 * @param {String} AppId Exact shared app identifier.
+		 * @returns {Object} Positive integer dimensions, without a fallback geometry.
+		 */
+		static AppGeometry(AppId) {
+				if !(AppId is String) || AppId == ""
+						throw ValueError("An app geometry identifier is required.")
+				if WebViewHost._ManifestCache == ""
+						WebViewHost._LoadManifest()
+				Apps := WebViewHost._ManifestCache
+				if !(Apps is Map) || !Apps.Has(AppId) || !(Apps[AppId] is Map)
+						throw ValueError("Missing app geometry: " . AppId . ".")
+				Entry := Apps[AppId]
+				for Name in ["width", "height"] {
+						if !Entry.Has(Name) || !(Entry[Name] is Integer) || Entry[Name] <= 0
+								throw ValueError("Invalid app geometry " . AppId . "." . Name . ".")
+				}
+				return {w: Entry["width"], h: Entry["height"]}
 		}
 
 		; --------------------------------------------------------------------------
@@ -334,13 +450,27 @@ class WebViewHost {
 		}
 
 		/**
+		 * Returns the brandless label of this window's caption. The manifest owns it;
+		 * a caller supplies Title only for a contextual label. Gui_Create adds the
+		 * product name, so a label that already carries it would show it twice.
+		 * @returns {string} The translated, brandless caption label.
+		 */
+		_CaptionLabel() {
+				if this.Opts.Has("Title")
+						return this.Opts["Title"]
+				Entry := this._ManifestEntry()
+				if !Entry.Has("title_key") || Entry["title_key"] == ""
+						throw ValueError("WebViewHost: the manifest declares no title_key for this window.", -1, this.AppId)
+				return t(Entry["title_key"])
+		}
+
+		/**
 		 * Creates the native host window before attaching the WebView controller.
 		 * @param {string} MinSize - The manifest's minimum window dimensions.
 		 * @returns {Gui} The window with a shared-policy caption.
 		 */
 		_NewWindow(MinSize) {
-				Title := this.Opts.Get("Title", "")
-				return Gui_Create("+Resize +MinSize" . MinSize, Title)
+				return Gui_Create("+Resize +MinSize" . MinSize, this._CaptionLabel())
 		}
 
 		; --------------------------------------------------------------------------
@@ -349,6 +479,35 @@ class WebViewHost {
 		; Returns true on success, false on fallback.
 		; --------------------------------------------------------------------------
 		_Build() {
+				if this.BuildActive || this.ResetDone
+						throw Error("WebViewHost cannot build an active or retired host.")
+				this.BuildActive := true
+				Completed := false
+				try {
+						Completed := this._BuildOwned()
+						return Completed && !this.CloseRequested
+				} finally {
+						this.BuildActive := false
+						if !Completed || this.CloseRequested
+								this.Close()
+				}
+		}
+
+		/**
+		 * Shows the native parent before controller creation reads its client rect.
+		 */
+		_ShowWindow(Window, Options) {
+				Window.Show(Options)
+		}
+
+		/**
+		 * Acquires a controller while the native parent remains owned by the build.
+		 */
+		_CreateController(PlaceholderHwnd, Loader) {
+				return WebView2.create(PlaceholderHwnd, , WebView_SharedEnvironment(Loader))
+		}
+
+		_BuildOwned() {
 				global _VendorDir, _SharedDir, _I18nLocale
 				this.Epoch += 1
 
@@ -360,6 +519,7 @@ class WebViewHost {
 
 				; ── Gui ──────────────────────────────────────────────────────────────
 				g := this._NewWindow(MinSize)
+				this.Gui := g
 				g.BackColor := BackColor
 				g.MarginX   := 0
 				g.MarginY   := 0
@@ -368,29 +528,30 @@ class WebViewHost {
 				g.OnEvent("Size",  this._OnResize.Bind(this))
 
 				; Show BEFORE creating the control — a hidden Gui has a zero client rect
-				g.Show((Opts.Get("NoActivate", false) ? "NoActivate " : "") . "w" . Geo.w . " h" . Geo.h . " Center")
-				this.Gui := g
+				this._ShowWindow(g, (Opts.Get("NoActivate", false) ? "NoActivate " : "") . "w" . Geo.w . " h" . Geo.h . " Center")
+				if this.CloseRequested
+						return false
 
 				; ── WebView2 create ──────────────────────────────────────────────────
 				loader := _VendorDir . "\64bit\WebView2Loader.dll"
 				if !IsSet(WebView2) || !FileExist(loader) {
 						try LoggerWarn("WebViewHost", "WebView2 unavailable for '{1}'.", this.AppId)
-						try g.Destroy()
-						this.Gui := 0
 						return false
 				}
 				try {
-						this.Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
+						this.Controller := this._CreateController(Placeholder.Hwnd, loader)
 				} catch as Err {
+						if this.CloseRequested
+								return false
 						try LoggerError("WebViewHost", "WebView2 create failed for '{1}': {2} — falling back.", this.AppId, Err.Message)
-						try g.Destroy()
-						this._Reset(false)
-						this.Gui := 0
 						return false
 				}
 
-				this.WebView   := this.Controller.CoreWebView2
-				this.ResetDone := false
+				if this.CloseRequested
+						return false
+				this.WebView := this.Controller.CoreWebView2
+				if this.CloseRequested
+						return false
 
 				; ── Harden settings ──────────────────────────────────────────────────
 				try {
@@ -402,19 +563,33 @@ class WebViewHost {
 						s.IsSwipeNavigationEnabled         := false
 				}
 
+				if this.CloseRequested
+						return false
+
 				; ── JS ↔ AHK bridge subscriptions ────────────────────────────────────
 				this.MsgSub := this.WebView.WebMessageReceived(this._OnWebMessage.Bind(this))
+				if this.CloseRequested
+						return false
 				this.NavSub := this.WebView.NavigationCompleted(this._OnNavigationCompleted.Bind(this))
+				if this.CloseRequested
+						return false
 
 				; ── Virtual host mapping ─────────────────────────────────────────────
 				try this.WebView.SetVirtualHostNameToFolderMapping(Vhost, _SharedDir, 1)
+				if this.CloseRequested
+						return false
 				; Extra vhosts (e.g. onboarding maps a second host to _StaticDir)
 				if Opts.Has("ExtraVhosts") && Opts["ExtraVhosts"] is Array {
 						for _, Ev in Opts["ExtraVhosts"] {
+								if this.CloseRequested
+										return false
 								if (Ev is Map && Ev.Has("host") && Ev.Has("path"))
 										try this.WebView.SetVirtualHostNameToFolderMapping(Ev["host"], Ev["path"], 1)
 						}
 				}
+
+				if this.CloseRequested
+						return false
 
 				; ── i18n seed ────────────────────────────────────────────────────────
 				if !(Opts.Has("SkipI18nSeed") && Opts["SkipI18nSeed"]) {
@@ -422,12 +597,18 @@ class WebViewHost {
 						Seed := "window.__i18n_base='https://" . Vhost . "/data/locales/';"
 								. "window._i18n_locale='" . Loc . "';"
 						try this.WebView.AddScriptToExecuteOnDocumentCreated(Seed)
+						if this.CloseRequested
+								return false
 				}
 
 				; ── Navigate ─────────────────────────────────────────────────────────
 				HtmlPath := Opts.Has("CustomHtmlPath") ? Opts["CustomHtmlPath"] : ("/ui/" . this.AppId . "/index.html")
 				try this.WebView.Navigate("https://" . Vhost . HtmlPath . "?cb=" . A_TickCount)
+				if this.CloseRequested
+						return false
 				try this.Controller.Fill()
+				if this.CloseRequested
+						return false
 
 				; ── Safety flush: if the page never posts "ready", flush after 2.5 s ─
 				; Keep the BoundFunc itself: SetTimer RETURNS an empty string, so
@@ -435,7 +616,7 @@ class WebViewHost {
 				; and the teardown below silently called SetTimer("", 0) inside a bare
 				; try. SetTimer keys on the callback object, so that is what to hold.
 				this.SafetyTimer := this._SafetyFlush.Bind(this)
-				SetTimer(this.SafetyTimer, -2500)
+				SetTimer(this.SafetyTimer, -TimingsGet("ui", "webview_host_safety_flush_ms"))
 
 				try LoggerSuccess("WebViewHost", "{1} shown via WebView2.", this.AppId)
 				return true
@@ -443,7 +624,7 @@ class WebViewHost {
 
 		; ── WebMessageReceived callback (COM) ────────────────────────────────────
 		_OnWebMessage(Handler, Args) {
-				if A_IsSuspended
+				if A_IsSuspended || this.ResetDone || this.CloseRequested
 						return
 				try Msg := Args.TryGetWebMessageAsString()
 				if !IsSet(Msg)
@@ -468,16 +649,20 @@ class WebViewHost {
 		}
 
 		_DispatchMessage(CallbackEpoch, Payload) {
-				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch)
+				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch) || this.CloseRequested
 						return
-				try this.Opts["OnMessage"](this, Payload)
+				; Timer callbacks report failures through the global error owner.
+				this.Opts["OnMessage"](this, Payload)
 		}
 
 		; ── NavigationCompleted callback ─────────────────────────────────────────
 		_OnNavigationCompleted(Handler, Args) {
-				if A_IsSuspended || this.ResetDone
+				if this.ResetDone || this.CloseRequested
 						return
-				this._FlushQueue()
+				; Navigation authorizes init even while paused. User scripts stay
+				; queued; only the admitted ready callback can resume later.
+				if !A_IsSuspended
+						this._FlushQueue()
 				this._FireOnReady()
 		}
 
@@ -485,22 +670,87 @@ class WebViewHost {
 		; "ready" postMessage and NavigationCompleted can trigger this; the
 		; ReadyFired flag guarantees the module's init-data push runs at most once.
 		_FireOnReady() {
-				if this.ReadyFired
+				if this.ReadyFired || this.ResetDone || this.CloseRequested
 						return
 				this.ReadyFired := true
 				if this.Opts.Has("OnReady")
-						SetTimer(this._DispatchReady.Bind(this, this.Epoch), -1)
+						this._ScheduleReady()
+		}
+
+		; Initial delivery and resume share one exact native timer boundary.
+		_ScheduleReady() {
+				SetTimer(this._DispatchReady.Bind(this, this.Epoch), -1)
+		}
+
+		; Admission and the native one-shot arm are bounded; no COM or I/O runs
+		; here. A repeated resume cannot arm the same receipt a second time.
+		_ArmReady(Pending) {
+				PreviousCritical := Critical("On")
+				try {
+						if A_IsSuspended || this.ResetDone || this.CloseRequested
+								|| Pending.Epoch != this.Epoch || Pending.Scheduled
+								|| WebViewHost._PendingReady.Get(this, 0) != Pending
+								return false
+						Pending.Scheduled := true
+						try this._ScheduleReady()
+						catch as Err {
+								Pending.Scheduled := false
+								throw Err
+						}
+						return true
+				} finally Critical(PreviousCritical)
 		}
 
 		_DispatchReady(CallbackEpoch) {
-				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch)
-						return
-				try this.Opts["OnReady"](this)
+				PreviousCritical := Critical("On")
+				try {
+						if this.ResetDone || this.CloseRequested || CallbackEpoch != this.Epoch
+								return
+						Pending := WebViewHost._PendingReady.Get(this, 0)
+						if A_IsSuspended {
+								; Only a previously admitted ready event can retain init;
+								; neither a safety flush nor a user command creates one.
+								if !this.ReadyFired || !this.Opts.Has("OnReady")
+										return
+								if !IsObject(Pending) {
+										Pending := {Epoch: CallbackEpoch, Callback: this.Opts["OnReady"], Scheduled: false}
+										WebViewHost._PendingReady[this] := Pending
+								} else if Pending.Epoch == CallbackEpoch
+										Pending.Scheduled := false
+								return
+						}
+						if IsObject(Pending) {
+								if Pending.Epoch != CallbackEpoch
+										return
+								; Consume before the callout. It may submit a script before
+								; throwing; a later resume cannot authorize replay.
+								WebViewHost._PendingReady.Delete(this)
+								Callback := Pending.Callback
+						} else
+								Callback := this.Opts["OnReady"]
+						; A navigation admitted under pause did not flush user Queue.
+						; Permit its init callback to submit fresh scripts after resume.
+						this.Ready := true
+				} finally Critical(PreviousCritical)
+				Callback.Call(this)
+		}
+
+		static ResumeReady() {
+				PreviousCritical := Critical("On")
+				try {
+						Pending := []
+						for Host, Receipt in WebViewHost._PendingReady
+								Pending.Push({Host: Host, Receipt: Receipt})
+				} finally Critical(PreviousCritical)
+				for Item in Pending
+						Item.Host._ArmReady(Item.Receipt)
 		}
 
 		; ── Queue-based eval ─────────────────────────────────────────────────────
 		; Evaluates JS in the page, queuing until the page signals ready.
 		Eval(Js) {
+				if A_IsSuspended || this.ResetDone || this.CloseRequested
+						return
 				if (this.Ready && this.HasOwnProp("WebView")) {
 						SetTimer(this._RunScript.Bind(this, Js), -1)
 				} else {
@@ -511,12 +761,16 @@ class WebViewHost {
 		}
 
 		_RunScript(Js) {
-				if !this.HasOwnProp("WebView")
+				; Suspend leaves native timers armed, including scripts admitted before
+				; the pause. Refuse at delivery as well as at queue admission.
+				if A_IsSuspended || !this.HasOwnProp("WebView") || this.ResetDone || this.CloseRequested
 						return
 				WebView_RunScriptAsync(this.WebView, Js, "WebViewHost." . this.AppId)
 		}
 
 		_FlushQueue() {
+				if this.ResetDone || this.CloseRequested
+						return
 				this.Ready := true
 				for _, Js in this.Queue {
 						if this.HasOwnProp("WebView")
@@ -526,7 +780,7 @@ class WebViewHost {
 		}
 
 		_SafetyFlush() {
-				if A_IsSuspended || this.ResetDone
+				if A_IsSuspended || this.ResetDone || this.CloseRequested
 						return
 				if (!this.Ready) {
 						try LoggerWarn("WebViewHost", "{1}: page did not signal ready within timeout — flushing.", this.AppId)
@@ -536,18 +790,30 @@ class WebViewHost {
 
 		; ── Window events ────────────────────────────────────────────────────────
 		_OnResize(GuiObj, MinMax, Width, Height) {
-				if A_IsSuspended || this.ResetDone || (MinMax == -1)
+				if A_IsSuspended || this.ResetDone || (MinMax == -1) || this.CloseRequested
 						return
 				if this.HasOwnProp("Controller")
-						try this.Controller.Fill()
+						try WebView_FitToWindow(this.Controller)
 		}
 
 		_OnClose(*) {
 				this.Close()
+				return true
 		}
 
 		; ── Public: close and destroy the window ─────────────────────────────────
 		Close() {
+				if this.BuildActive {
+						; Native creation pumps GUI events. Keep its HWND alive until the
+						; pending controller returns, while revoking all callback effects.
+						if !this.CloseRequested {
+								this.CloseRequested := true
+								this.Epoch += 1
+						}
+						if this.Gui != 0
+								this.Gui.Hide()
+						return
+				}
 				Saved := (this.Gui != 0) ? this.Gui : 0
 				this._Reset(true)
 				try {
@@ -555,17 +821,26 @@ class WebViewHost {
 								Saved.Destroy()
 				}
 				this.Gui := 0
-				; Remove from singleton registry
+				; Multiple hosts and late close events cannot unregister another owner.
 				if WebViewHost._Instances.Has(this.AppId)
+						&& WebViewHost._Instances[this.AppId] == this
 						WebViewHost._Instances.Delete(this.AppId)
 		}
 
 		; ── Teardown — release subs before Controller.Close, idempotent ──────────
 		_Reset(CloseController := true) {
-				if this.ResetDone
-						return
-				this.ResetDone := true
-				this.Epoch += 1
+				PreviousCritical := Critical("On")
+				try {
+						if this.ResetDone
+								return
+						this.ResetDone := true
+						this.Epoch += 1
+						; Keep the detached callback alive until after Critical and all
+						; teardown callouts. A late timer cannot borrow another receipt.
+						RetiredReady := WebViewHost._PendingReady.Get(this, 0)
+						if IsObject(RetiredReady)
+								WebViewHost._PendingReady.Delete(this)
+				} finally Critical(PreviousCritical)
 
 				; Cancel the safety-flush timer so it never fires on a dead window.
 				; Guarded on the BoundFunc existing: passing the old empty-string
@@ -573,6 +848,8 @@ class WebViewHost {
 				; graph alive for up to 2.5 s after Close().
 				if (this.SafetyTimer)
 						try SetTimer(this.SafetyTimer, 0)
+				; The BoundFunc captures this host; cancellation alone leaves a cycle.
+				this.SafetyTimer := 0
 
 				try {
 						this.MsgSub := unset
@@ -590,6 +867,14 @@ class WebViewHost {
 
 
 ; ── Standalone helpers (used by modules alongside WebViewHost) ───────────────
+
+/** Services only readiness receipts admitted before native Suspend was lifted. */
+WebViewHost_OnSuspendResume() {
+	if A_IsSuspended
+		return false
+	WebViewHost.ResumeReady()
+	return true
+}
 
 ; Returns a quoted, escaped JS string literal for safe interpolation.
 ; Centralised here so every module that builds JSON or init-payload JS can reuse

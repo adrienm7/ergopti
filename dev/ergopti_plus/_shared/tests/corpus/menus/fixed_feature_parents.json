@@ -1,0 +1,212 @@
+{
+	"basis": "Original 98572fe resources and source callsites; no new implementation or generator involved. Captions preserved from original 21 locale resources; count examples hand-authored from original formatting.",
+	"original_sha": "98572fe1a57dde86c6e8591e79112fc5400ec819",
+	"captions": {
+		"ar": {
+			"keyboard_layout": "🌐 تخطيط لوحة المفاتيح",
+			"hotstrings": "⚡ سلاسل نصية",
+			"shortcuts": "🎯 اختصارات",
+			"tap_holds": "⌨️ نقر-ضغط",
+			"gestures": "🖐️ إيماءات"
+		},
+		"cs": {
+			"keyboard_layout": "🌐 Rozložení klávesnice",
+			"hotstrings": "⚡ Hotstring",
+			"shortcuts": "🎯 Zkratky",
+			"tap_holds": "⌨️ Klepnutí-Přidržení",
+			"gestures": "🖐️ Gesta"
+		},
+		"da": {
+			"keyboard_layout": "🌐 Tastaturlayout",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 Genveje",
+			"tap_holds": "⌨️ Tap-Holds",
+			"gestures": "🖐️ Gestus"
+		},
+		"de": {
+			"keyboard_layout": "🌐 Tastaturbelegung",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 Tastenkürzel",
+			"tap_holds": "⌨️ Tap-Holds",
+			"gestures": "🖐️ Gesten"
+		},
+		"en": {
+			"keyboard_layout": "🌐 Keyboard layout",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 Shortcuts",
+			"tap_holds": "⌨️ Tap-Holds",
+			"gestures": "🖐️ Gestures"
+		},
+		"es": {
+			"keyboard_layout": "🌐 Disposición del teclado",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 Atajos",
+			"tap_holds": "⌨️ Tap-Holds",
+			"gestures": "🖐️ Gestos"
+		},
+		"fr": {
+			"keyboard_layout": "🌐 Disposition clavier",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 Raccourcis",
+			"tap_holds": "⌨️ Tap-Holds",
+			"gestures": "🖐️ Gestes"
+		},
+		"he": {
+			"keyboard_layout": "🌐 פריסת מקלדת",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 קיצורים",
+			"tap_holds": "⌨️ Tap-Holds",
+			"gestures": "🖐️ מחוות"
+		},
+		"hi": {
+			"keyboard_layout": "🌐 कीबोर्ड लेआउट",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 शॉर्टकट",
+			"tap_holds": "⌨️ Tap-Holds",
+			"gestures": "🖐️ इशारे"
+		},
+		"it": {
+			"keyboard_layout": "🌐 Layout tastiera",
+			"hotstrings": "⚡ Hotstring",
+			"shortcuts": "🎯 Scorciatoie",
+			"tap_holds": "⌨️ Tap-Hold",
+			"gestures": "🖐️ Gesti"
+		},
+		"ja": {
+			"keyboard_layout": "🌐 キーボードレイアウト",
+			"hotstrings": "⚡ ホットストリング",
+			"shortcuts": "🎯 ショートカット",
+			"tap_holds": "⌨️ タップホールド",
+			"gestures": "🖐️ ジェスチャー"
+		},
+		"ko": {
+			"keyboard_layout": "🌐 키보드 레이아웃",
+			"hotstrings": "⚡ 핫스트링",
+			"shortcuts": "🎯 단축키",
+			"tap_holds": "⌨️ 탭-홀드",
+			"gestures": "🖐️ 제스처"
+		},
+		"nl": {
+			"keyboard_layout": "🌐 Toetsenbordindeling",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 Sneltoetsen",
+			"tap_holds": "⌨️ Tik-vasthouden",
+			"gestures": "🖐️ Gebaren"
+		},
+		"no": {
+			"keyboard_layout": "🌐 Tastaturoppsett",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 Snarveier",
+			"tap_holds": "⌨️ Tap-Holds",
+			"gestures": "🖐️ Gester"
+		},
+		"pl": {
+			"keyboard_layout": "🌐 Układ klawiatury",
+			"hotstrings": "⚡ Hotstring'i",
+			"shortcuts": "🎯 Skróty",
+			"tap_holds": "⌨️ Dotknięcie-Przytrzymanie",
+			"gestures": "🖐️ Gesty"
+		},
+		"pt": {
+			"keyboard_layout": "🌐 Layout do teclado",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 Atalhos",
+			"tap_holds": "⌨️ Tap-Holds",
+			"gestures": "🖐️ Gestos"
+		},
+		"ru": {
+			"keyboard_layout": "🌐 Раскладка клавиатуры",
+			"hotstrings": "⚡ Хотстринги",
+			"shortcuts": "🎯 Сочетания клавиш",
+			"tap_holds": "⌨️ Касание-Удержание",
+			"gestures": "🖐️ Жесты"
+		},
+		"sv": {
+			"keyboard_layout": "🌐 Tangentbordslayout",
+			"hotstrings": "⚡ Hotstrings",
+			"shortcuts": "🎯 Genvägar",
+			"tap_holds": "⌨️ Tap-Holds",
+			"gestures": "🖐️ Gester"
+		},
+		"tr": {
+			"keyboard_layout": "🌐 Klavye düzeni",
+			"hotstrings": "⚡ Kısaltmalar",
+			"shortcuts": "🎯 Kısayollar",
+			"tap_holds": "⌨️ Dokunma-Basılı Tutma",
+			"gestures": "🖐️ Hareketler"
+		},
+		"uk": {
+			"keyboard_layout": "🌐 Розкладка клавіатури",
+			"hotstrings": "⚡ Хотстринги",
+			"shortcuts": "🎯 Скорочення",
+			"tap_holds": "⌨️ Натискання-Утримання",
+			"gestures": "🖐️ Жести"
+		},
+		"zh": {
+			"keyboard_layout": "🌐 键盘布局",
+			"hotstrings": "⚡ 热字符串",
+			"shortcuts": "🎯 快捷键",
+			"tap_holds": "⌨️ 点按/长按",
+			"gestures": "🖐️ 手势"
+		}
+	},
+	"count_cases": [
+		{
+			"driver": "ahk",
+			"aggregate_available": true,
+			"total": 0,
+			"suffix": " (0)"
+		},
+		{
+			"driver": "ahk",
+			"aggregate_available": true,
+			"total": 1234,
+			"suffix": " (1 234)"
+		},
+		{
+			"driver": "hs",
+			"aggregate_available": false,
+			"total": 0,
+			"suffix": ""
+		},
+		{
+			"driver": "hs",
+			"aggregate_available": true,
+			"total": 0,
+			"suffix": " (0)"
+		},
+		{
+			"driver": "hs",
+			"aggregate_available": true,
+			"total": 1234,
+			"suffix": " (1 234)"
+		},
+		{
+			"driver": "linux",
+			"aggregate_available": true,
+			"total": 0,
+			"suffix": ""
+		},
+		{
+			"driver": "linux",
+			"aggregate_available": true,
+			"total": 1234,
+			"suffix": " (1234)"
+		},
+		{
+			"driver": "linux",
+			"aggregate_available": false,
+			"total": 0,
+			"suffix": ""
+		}
+	],
+	"absent_contracts": {
+		"linux_hotstrings": "Visible plain-caption parent, actual inert absent rows child; checked field absent.",
+		"linux_shortcuts": "Visible plain-caption parent, actual inert absent rows child; checked field absent.",
+		"linux_gestures": "Visible plain-caption parent, actual inert absent rows child; checked field absent.",
+		"linux_tap_holds": "Visible disabled plain-caption leaf with NO submenu, NO action, checked field absent; cannot silently become an empty group.",
+		"mac_shortcuts_absent": "Existing production returns nil if shortcuts absent; do not invent a missing native owner.",
+		"windows_shortcuts_tap_holds_missing": "Stage functions log and return when SubMenus entry absent; preserve native initialization failure contract."
+	},
+	"field_presence": "Lua singleton getter nil retains absent checked field; preserve each actual caller old false/nil conventions, not uniformly coerce old nil to false."
+}

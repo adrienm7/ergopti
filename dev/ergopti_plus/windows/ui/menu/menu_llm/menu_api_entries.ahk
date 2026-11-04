@@ -4,8 +4,9 @@
 ; MODULE: LLM Tray — Remote API entries
 ; DESCRIPTION:
 ; Manages the user-defined list of remote API endpoints (OpenAI, Anthropic,
-; Google Gemini, OpenAI-compatible). When backend = "api", the model picker
-; becomes an "API endpoints" picker built from this list. Includes the
+; Google Gemini, OpenAI-compatible). The model selector page lists them and
+; runs their selection, test, edit and removal (ui/model_browser/init.ahk);
+; the tray builds no list of them since 2026-10-27. Includes the
 ; create/edit dialog flow, the JSON persistence layer (api_entries.json
 ; alongside config.toml), DPAPI token encryption, and complete schema
 ; validation before publication.
@@ -27,98 +28,17 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
 
 
-; ======================================
-; ======================================
-; ======= 1/ API Entries Submenu =======
-; ======================================
-; ======================================
-
-; Build the "API endpoints" submenu shown when backend == "api". When the user
-; has no entries yet, the menu carries a single greyed-out hint plus the
-; "+ Add" action so the next click takes them straight to the entry dialog.
-_LLM_Menu_BuildApiEntriesMenu() {
-	m := Menu()
-	MenuRenderer_FillFromList(m, "llm_menu", "llm_model", (*) => _LLM_Menu_ApiEntriesRows())
-	return m
-}
-
-; The same list as row DATA. It stands in for the model picker's rows when the
-; backend is remote, which is why it renders under that same list id.
-_LLM_Menu_ApiEntriesRows() {
-	global _LLM_Menu
-	Rows := []
-	entries := _LLM_Menu["api_entries"]
-	if (Type(entries) != "Array" or entries.Length == 0) {
-		EmptyRows := MenuRenderer_TemplateRows("llm_api_empty_status", Map(), Map(), Map())
-		if !(EmptyRows is Array)
-			return []
-		for Row in EmptyRows
-			Rows.Push(Row)
-	} else {
-		active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
-		Names := _LLM_Menu_ApiEntryNameList(entries)
-		for Index, entry in entries {
-			id   := _LLM_MenuApiEntryGet(entry, "Id",   "")
-			Rows.Push(Map(
-				"label",   Names[Index],
-				"checked", (id == active_id),
-				"action",  _LLM_Menu_MakeSelectApiEntryHandler(entry)))
-		}
-	}
-	; Add sits before the separator so creating an entry is one glance
-	; away; the separator only appears with the management rows, never
-	; dangling when no entry exists.
-	AddRows := MenuRenderer_TemplateRows("llm_api_add_command",
-		Map("api_add_entry", (*) => _LLM_Menu_PromptApiEntry("")), Map(), Map())
-	if !(AddRows is Array)
-		return []
-	for Row in AddRows
-		Rows.Push(Row)
-	if (Type(entries) == "Array" and entries.Length > 0) {
-		; Management rows: most frequent first, destructive delete last.
-		Separators := MenuRenderer_TemplateRows("llm_api_add_separator", Map(), Map(), Map())
-		if !(Separators is Array)
-			return []
-		for Row in Separators
-			Rows.Push(Row)
-		Commands := Map("api_test_active", (*) => _LLM_Menu_TestActiveApiEntry(),
-			"api_remove_active", (*) => _LLM_Menu_RemoveActiveApiEntry())
-		Getters := Map("llm_api_active_ready", _LLM_Menu_ActiveApiCommandsReady)
-		for Declaration in _MR_GetMenuDef("llm_api_active_commands") {
-			; Keep the existing lazy Edit owner immediately before removal.
-			if Declaration["id"] == "api_remove_active" {
-				EditRows := MenuRenderer_TemplateRows("llm_api_edit_command",
-					Map("api_edit_entry", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])), Map(), Map())
-				if !(EditRows is Array)
-					return []
-				for EditRow in EditRows
-					Rows.Push(EditRow)
-			}
-			Row := MenuRenderer_CommandRow("llm_api_active_commands", Declaration["id"], Commands, Getters)
-			if Row is Map
-				Rows.Push(Row)
-		}
-	}
-	return Rows
-}
-
-/**
- * Reads the existing active API owner before a retained menu command runs.
- * @returns {Boolean} Whether the current entry is available to the configuration command.
- */
-_LLM_Menu_ActiveApiCommandsReady() {
-	global _LLM_Menu
-	if !_LLM_Menu.Has("api_entry_id") || !(_LLM_Menu["api_entry_id"] is String)
-			|| _LLM_Menu["api_entry_id"] == ""
-			|| !_LLM_Menu.Has("api_entries") || !(_LLM_Menu["api_entries"] is Array)
-		return false
-	return _LLM_Menu_ApiEntryIdCount(_LLM_Menu["api_entries"], _LLM_Menu["api_entry_id"]) == 1
-}
+; ==================================
+; ==================================
+; ======= 1/ API Entry Names =======
+; ==================================
+; ==================================
 
 ; The host an entry sends to, with its port, lowercase: "https://api.x.ai/v1"
 ; gives "api.x.ai". Port of api_entry_names.lua's M.host.
@@ -305,14 +225,31 @@ _LLM_Menu_BuildApiProviderChoices(providers, order := 0) {
 }
 
 
-_LLM_Menu_PromptApiEntry(EditId) {
+_LLM_Menu_PromptApiEntry(EditId, Port := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _LLM_Menu_PromptApiEntry(EditId)
+		try return _LLM_Menu_PromptApiEntry(EditId, Port)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu, LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_LOCAL_API_SERVERS
+	; Every modal can pump a later menu/source publication. Keep the originating
+	; private files and RAM through the existing retained two-target transaction.
+	if !((Port is Integer) && Port == 0) && !(Port is Map)
+		throw TypeError("API entry prompts require an optional native port Map.")
+	Options := Port is Map ? Port : Map()
+	InputFn := Options.Get("input", Ui_InputBox)
+	if !HasMethod(InputFn, "Call")
+		throw TypeError("The API entry input port is not callable.")
+	SourceOptions := Options.Get("source_options", Map())
+	if !(SourceOptions is Map)
+		throw TypeError("API entry source options must be a native Map.")
+	Owner := LLM_Menu_ApiPrivateSourceOwner(SourceOptions)
+	NotifyFn := Options.Get("notify", SourceOptions.Get("notify", 0))
+	Receipt := Owner.Capture()
+	if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+			"the originating private configuration is unavailable")
 	existing := ""
 	if (EditId != "") {
 		for e in _LLM_Menu["api_entries"] {
@@ -326,47 +263,114 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	; Step 1 — provider id.
 	provider_choices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER)
 	def_provider := existing != "" ? _LLM_MenuApiEntryGet(existing, "Provider", "openai") : "openai"
-	ib := Ui_InputBox(
+	ib := InputFn.Call(
 		Format(t("menu.llm.api_prompt_provider"), provider_choices),
 		t("menu.llm.api_window_title"), "w520 h150", def_provider)
 	if (ib.Result != "OK")
-		return
+		return false
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+			"the originating private configuration changed during a prompt")
 	if LLM_API_PROVIDERS.Count == 0 {
 		try LoggerError("LLM.menu",
 			"Cannot add an API entry: the provider catalogue is empty (api_providers.json failed to load).")
 		try Ui_MsgBox(t("menu.llm.api_providers_unavailable"), t("menu.llm.api_window_title"), "Iconx")
-		return
+		return false
 	}
 	if !_LLM_Menu_TryProviderPrompt(ib.Result, ib.Value,
-			LLM_API_PROVIDERS, &provider_id)
-		return
+			LLM_API_PROVIDERS, &provider_id, NotifyFn)
+		return false
 	provider := LLM_API_PROVIDERS[provider_id]
 
-	; Step 2 — base URL (prefilled with the provider default).
-	def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
-	ib := Ui_InputBox(t("menu.llm.api_prompt_url"), t("menu.llm.api_window_title"),
-		"w520 h130", def_url)
-	if (ib.Result != "OK")
-		return
-	new_url := Trim(ib.Value)
+	; Step 2 — base URL (prefilled with the provider default). A new entry of a
+	; per-account provider asks one value per placeholder of its address instead.
+	Template := ApiUrlTemplateFields(provider["BaseUrl"])
+	if (existing == "" && Template["fields"].Length > 0) {
+		Values := Map()
+		for Name in Template["fields"] {
+			ib := InputFn.Call(t("menu.llm.api_prompt_field." . Name), t("menu.llm.api_window_title"),
+				"w520 h130", "")
+			if (ib.Result != "OK")
+				return false
+			if !Owner.Current(Receipt)
+				return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+					"the originating private configuration changed during a prompt")
+			Values[Name] := Trim(ib.Value)
+			if !ApiUrlTemplateValidValue(Values[Name]) {
+				LoggerError("LLM.menu", "API entry address refused: the '{1}' value cannot fill it.", Name)
+				Body := t("menu.llm.api_prompt_field_invalid"), Title := t("common.error_title")
+				if HasMethod(NotifyFn, "Call")
+					NotifyFn.Call(Body, Title)
+				else
+					Ui_MsgBox(Body, Title, "Icon!")
+				return false
+			}
+		}
+		new_url := ApiUrlTemplateExpand(provider["BaseUrl"], Values)["url"]
+		LoggerInfo("LLM.menu", "API entry address filled for provider '{1}' ({2} account field(s)).",
+			provider_id, Template["fields"].Length)
+	} else if (existing == "" && provider.Get("OptionalAddress", "") is Map) {
+		; The catalogue's address works; one optional value replaces it.
+		Optional := provider["OptionalAddress"]
+		ib := InputFn.Call(t("menu.llm.api_prompt_field." . Optional["field"]), t("menu.llm.api_window_title"),
+			"w520 h130", "")
+		if (ib.Result != "OK")
+			return false
+		if !Owner.Current(Receipt)
+			return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+				"the originating private configuration changed during a prompt")
+		Filled := ApiUrlTemplateOptionalUrl(Optional, Trim(ib.Value))
+		if !(Filled is String) {
+			LoggerError("LLM.menu", "API entry address refused: the '{1}' value cannot fill it.", Optional["field"])
+			Body := t("menu.llm.api_prompt_field_invalid." . Optional["field"]), Title := t("common.error_title")
+			if HasMethod(NotifyFn, "Call")
+				NotifyFn.Call(Body, Title)
+			else
+				Ui_MsgBox(Body, Title, "Icon!")
+			return false
+		}
+		new_url := Filled == "" ? provider["BaseUrl"] : Filled
+		LoggerInfo("LLM.menu", "API entry address for provider '{1}': {2}.", provider_id,
+			Filled == "" ? "the catalogue's" : "the optional field's")
+	} else {
+		def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
+		ib := InputFn.Call(t("menu.llm.api_prompt_url"), t("menu.llm.api_window_title"),
+			"w520 h130", def_url)
+		if (ib.Result != "OK")
+			return false
+		if !Owner.Current(Receipt)
+			return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+				"the originating private configuration changed during a prompt")
+		new_url := Trim(ib.Value)
+	}
 
 	; Step 3 — token. InputBox does not natively mask, so we use the Hide
 	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
 	def_token := existing != "" ? _LLM_MenuApiEntryGet(existing, "Token", "") : ""
-	KeyPrompt := LocalServerAuthTokenAllowed(provider_id, "", LLM_LOCAL_API_SERVERS)
+	KeyPrompt := LocalServerAuthEntryTokenAllowed(provider_id, "", new_url, LLM_LOCAL_API_SERVERS)
 		? Format(t("dialog.local_servers.key_prompt"), provider["Label"]) : t("menu.llm.api_prompt_token")
-	ib := Ui_InputBox(KeyPrompt, t("menu.llm.api_window_title"),
+	ib := InputFn.Call(KeyPrompt, t("menu.llm.api_window_title"),
 		"w520 h130 Password", def_token)
 	if (ib.Result != "OK")
-		return
+		return false
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+			"the originating private configuration changed during a prompt")
 	new_token := ib.Value   ; do NOT Trim — leading/trailing chars are part of the secret
+	; Vertex AI's key is a credentials file, pasted with its line breaks
+	if provider.Get("Auth", "") is Map
+		new_token := LLM_TokenExchange_NormalizeKey(new_token)
 
 	; Step 4 — model.
 	def_model := existing != "" ? _LLM_MenuApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
-	ib := Ui_InputBox(t("menu.llm.api_prompt_model"), t("menu.llm.api_window_title"),
+	ib := InputFn.Call(t("menu.llm.api_prompt_model"), t("menu.llm.api_window_title"),
 		"w420 h130", def_model)
-	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_model)
-		return
+	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_model, NotifyFn)
+		return false
+
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+			"the originating private configuration changed during a prompt")
 
 	; Persist. Name holds the automatic name only because builds before
 	; 2026-10 refuse an entry without one; no build reads it any more.
@@ -382,51 +386,102 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		(existing != "") ? "the LLM API-entry edit"
 			: "the LLM API-entry creation",
 		(Candidate) => _LLM_Menu_UpsertApiEntryCandidate(Candidate,
-			new_entry, EditId), _LLM_Menu_ApplyApiEntriesCommitted)
-	if !Committed
+			new_entry, EditId),
+		SourceOptions.Get("apply", _LLM_Menu_ApplyApiEntriesCommitted), Owner.Port,
+		NotifyFn, SourceOptions.Get("acquire", 0), SourceOptions.Get("settle", 0),
+		SourceOptions.Get("collect", 0), SourceOptions.Get("build_config", 0),
+		SourceOptions.Get("serialize", 0), SourceOptions.Get("pause", 0),
+		Receipt, Owner, (*) => true)
+	if !((Committed is Integer) && Committed == 1)
 		return false
-	new_name := _LLM_Menu_ApiEntryDisplayName(new_entry)
-
-	; Creation only: offer the full end-to-end probe on the just-saved
-	; entry, so a bad token or model surfaces here with its server message
-	; instead of mid-typing. A declined offer keeps the save. The entry is
-	; named: a decisions entry does not become the active one.
-	if (EditId == "") {
-		try {
-			if _LLM_Menu_AskTestNewApiEntry()
-				_LLM_Menu_TestActiveApiEntry(0, new_entry["Id"])
-		} catch as AskErr {
-			try LoggerWarn("LLM", "Post-creation API test skipped: {1}.",
-				AskErr.Message)
-		}
-	}
-
-	; Token validation: hit the provider's /models endpoint once with the
-	; freshly-saved credentials so the user finds out NOW (with an explicit
-	; TrayTip) instead of mid-typing with an empty tooltip and no idea why.
-	; This MUST be async: the synchronous LLM_RemoteIsReady ran a blocking
-	; WinHTTP GET on the main thread, freezing the whole driver (and dropping
-	; the user's next keystrokes via LowLevelHooksTimeout) for up to 2 s when
-	; the BaseUrl was unreachable. LLM_RemoteIsReady_Async polls instead, so
-	; the save path returns immediately and the result is surfaced from the
-	; poll callback once it resolves.
-	if !LLM_RemoteHasReadyPing(provider_id) {
-		try LoggerInfo("LLM", "API entry '{1}' saved: {2} has no reachability ping, the Test action probes it.",
-			new_name, provider_id)
-		return true
-	}
+	; The optional post-save question must not re-authorize credentials after
+	; a later API publication or lifecycle transition has retired this save.
+	MenuOwner := _LLM_Menu
+	Generation := LLM_AuxGeneration()
 	ValidationOwner := LLM_AuxBegin("api_validation:" . new_entry["Id"], Map(
 		"backend", "api",
 		"endpoint", new_entry["BaseUrl"],
 		"identity", new_entry["Id"]))
-	try LLM_RemoteIsReady_Async(new_entry,
-		_LLM_Menu_MakeApiValidationHandler(new_name, new_entry["Id"],
-			ValidationOwner), ValidationOwner)
-	catch as Err {
-		LLM_AuxFinish(ValidationOwner)
-		try LoggerError("LLM", "Remote API validation dispatch failed: {1}.", Err.Message)
+	HandedOff := false
+	try {
+		if !_LLM_Menu_SavedApiEntryCurrent(ValidationOwner, MenuOwner, new_entry, Generation)
+			return true
+		new_name := _LLM_Menu_ApiEntryDisplayName(new_entry)
+
+		; Creation only: offer the full end-to-end probe on the just-saved
+		; entry, so a bad token or model surfaces here with its server message
+		; instead of mid-typing. A declined offer keeps the save. The entry is
+		; named: a decisions entry does not become the active one.
+		if (EditId == "") {
+			try {
+				AskFn := Options.Get("ask_test", 0)
+				TestFn := Options.Get("test_entry", 0)
+				Ask := HasMethod(AskFn, "Call") ? AskFn.Call() : _LLM_Menu_AskTestNewApiEntry()
+				if (Ask is Integer) && Ask == 1
+						&& _LLM_Menu_SavedApiEntryCurrent(ValidationOwner, MenuOwner, new_entry, Generation) {
+					if HasMethod(TestFn, "Call")
+						TestFn.Call(0, new_entry["Id"])
+					else
+						_LLM_Menu_TestActiveApiEntry(0, new_entry["Id"])
+				}
+			} catch as AskErr {
+				try LoggerWarn("LLM", "Post-creation API test skipped: {1}.",
+					AskErr.Message)
+			}
+		}
+
+		; Token validation: hit the provider's /models endpoint once with the
+		; freshly-saved credentials so the user finds out NOW (with an explicit
+		; TrayTip) instead of mid-typing with an empty tooltip and no idea why.
+		; This MUST be async: the synchronous LLM_RemoteIsReady ran a blocking
+		; WinHTTP GET on the main thread, freezing the whole driver (and dropping
+		; the user's next keystrokes via LowLevelHooksTimeout) for up to 2 s when
+		; the BaseUrl was unreachable. LLM_RemoteIsReady_Async polls instead, so
+		; the save path returns immediately and the result is surfaced from the
+		; poll callback once it resolves.
+		if !LLM_RemoteHasReadyPing(provider_id) {
+			try LoggerInfo("LLM", "API entry '{1}' saved: {2} has no reachability ping, the Test action probes it.",
+				new_name, provider_id)
+			return true
+		}
+		if !_LLM_Menu_SavedApiEntryCurrent(ValidationOwner, MenuOwner, new_entry, Generation)
+			return true
+		ReadyFn := Options.Get("ready", LLM_RemoteIsReady_Async)
+		try ReadyFn.Call(new_entry,
+			_LLM_Menu_MakeApiValidationHandler(new_name, new_entry["Id"],
+				ValidationOwner), ValidationOwner)
+		catch as Err {
+			try LoggerError("LLM", "Remote API validation dispatch failed: {1}.", Err.Message)
+			return true
+		}
+		HandedOff := true
+		return true
+	} finally {
+		if !HandedOff
+			_LLM_AuxRetireOwner(ValidationOwner, true)
 	}
-	return true
+}
+
+_LLM_Menu_SavedApiEntryCurrent(Owner, MenuOwner, Expected, Generation) {
+	global _LLM_Menu
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || _LLM_Menu != MenuOwner || Generation != LLM_AuxGeneration()
+				|| !LLM_AuxIsCurrent(Owner) || !(Expected is Map)
+			return false
+		Matches := 0
+		for Entry in _LLM_Menu.Get("api_entries", []) {
+			if _LLM_MenuApiEntryGet(Entry, "Id", "") != Expected["Id"]
+				continue
+			Matches += 1
+			for Field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
+				Value := _LLM_MenuApiEntryGet(Entry, Field, 0)
+				if !(Value is String) || !(Expected[Field] is String) || !(Value == Expected[Field])
+					return false
+			}
+		}
+		return Matches == 1
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, EditId) {
@@ -509,24 +564,49 @@ _LLM_Menu_OnApiValidationDone(reachable, Name, EntryId, Owner, NotifyFn := 0) {
 			TrayTip(StrReplace(t("menu.llm.api_validated_body"), "%s", CurrentName),
 				t("menu.llm.api_validated_title"), "Iconi")
 		} else {
-			TrayTip(StrReplace(t("menu.llm.api_unreachable_body"), "%s", CurrentName),
-				t("menu.llm.api_unreachable_title"), "Icon!")
+			Prefix := _LLM_Menu_ApiValidationFailurePrefix(Owner)
+			TrayTip(StrReplace(t(Prefix . "body"), "%s", CurrentName),
+				t(Prefix . "title"), "Icon!")
 		}
 		return true
 	} finally Critical(PreviousCritical)
 }
 
-_LLM_Menu_RemoveActiveApiEntry() {
+; Names a refused key instead of a silent endpoint: a 401/403 is an answer, and
+; "did not respond" sent the user chasing the URL instead of the key.
+; @param Owner Map|any Readiness owner carrying the probe's HTTP status.
+; @returns {String} Locale key prefix of the failure notice.
+_LLM_Menu_ApiValidationFailurePrefix(Owner) {
+	Status := Owner is Map ? Owner.Get("http_status", 0) : 0
+	return (Status == 401 || Status == 403) ? "menu.llm.api_key_refused_" : "menu.llm.api_unreachable_"
+}
+
+_LLM_Menu_RemoveActiveApiEntry(Port := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _LLM_Menu_RemoveActiveApiEntry()
+		try return _LLM_Menu_RemoveActiveApiEntry(Port)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
+	if !((Port is Integer) && Port == 0) && !(Port is Map)
+		throw TypeError("API entry removal requires an optional native port Map.")
+	Options := Port is Map ? Port : Map()
+	ConfirmFn := Options.Get("confirm", Ui_MsgBox)
+	if !HasMethod(ConfirmFn, "Call")
+		throw TypeError("The API entry confirmation port is not callable.")
+	SourceOptions := Options.Get("source_options", Map())
+	if !(SourceOptions is Map)
+		throw TypeError("API entry source options must be a native Map.")
+	Owner := LLM_Menu_ApiPrivateSourceOwner(SourceOptions)
+	NotifyFn := Options.Get("notify", SourceOptions.Get("notify", 0))
+	Receipt := Owner.Capture()
+	if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry removal", NotifyFn,
+			"the originating private configuration is unavailable")
 	active_id := _LLM_Menu["api_entry_id"]
 	if (active_id == "")
-		return
+		return false
 	; Confirm before destroying the entry — the saved token is gone for
 	; good once we delete it. Worth one extra click, especially because
 	; the user is one stray click away in a small menu.
@@ -538,16 +618,26 @@ _LLM_Menu_RemoveActiveApiEntry() {
 		}
 	}
 	entry_name := (active_entry != "") ? _LLM_Menu_ApiEntryDisplayName(active_entry) : active_id
-	confirm := Ui_MsgBox(
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry removal", NotifyFn,
+			"the originating private configuration changed before confirmation")
+	confirm := ConfirmFn.Call(
 		t("menu.llm.api_remove_confirm_body"),
 		StrReplace(t("menu.llm.api_remove_confirm_title"), "%s", entry_name),
 		"4 48"  ; Yes/No + warning icon
 	)
 	if (confirm != "Yes")
-		return
+		return false
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry removal", NotifyFn,
+			"the originating private configuration changed during confirmation")
 	return LLM_Menu_CommitApiEntriesMutation("the LLM API-entry removal",
 		(Candidate) => _LLM_Menu_RemoveApiEntryCandidate(Candidate, active_id),
-		_LLM_Menu_ApplyApiEntriesCommitted)
+		SourceOptions.Get("apply", _LLM_Menu_ApplyApiEntriesCommitted), Owner.Port,
+		NotifyFn, SourceOptions.Get("acquire", 0), SourceOptions.Get("settle", 0),
+		SourceOptions.Get("collect", 0), SourceOptions.Get("build_config", 0),
+		SourceOptions.Get("serialize", 0), SourceOptions.Get("pause", 0),
+		Receipt, Owner, (*) => true)
 }
 
 _LLM_Menu_RemoveApiEntryCandidate(Candidate, EntryId) {
@@ -618,22 +708,47 @@ _LLM_Menu_ApiTestProgressText(Name, ElapsedMs, BudgetMs) {
 ; is modeless (the request runs on timers) with a pulse bar, a live elapsed
 ; label and a Cancel button. Everything UI is try-wrapped: headless or not,
 ; the state map is always set so Hide/Cancel stay consistent.
-_LLM_Menu_ApiTestProgressShow(EntryId, Name) {
+_LLM_Menu_ApiTestProgressShow(EntryId, Name, Owner := "") {
 	global _LLM_Menu_ApiTestProgress, LLM_API_TEST_TIMEOUT_MS
-	_LLM_Menu_ApiTestProgressHide()
 	State := Map("entry", EntryId, "name", Name, "req_id", 0,
-		"owner", "", "start", A_TickCount, "budget", LLM_API_TEST_TIMEOUT_MS)
-	_LLM_Menu_ApiTestProgress := State
+		"owner", Owner, "start", A_TickCount, "budget", LLM_API_TEST_TIMEOUT_MS)
+	PreviousCritical := Critical("On")
+	try {
+		Retired := _LLM_Menu_ApiTestProgress
+		_LLM_Menu_ApiTestProgress := State
+		SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+	} finally Critical(PreviousCritical)
+	; Publish the reservation before native destruction can open a successor.
+	if Retired.Has("gui")
+		try Retired["gui"].Destroy()
+	if !_LLM_Menu_ApiTestProgressIsCurrent(State) {
+		_LLM_Menu_ApiTestProgressHide(State)
+		return false
+	}
 	try {
 		Worker := Gui_Create("", t("menu.llm.api_window_title"))
+		State["gui"] := Worker
+		if !_LLM_Menu_ApiTestProgressIsCurrent(State) {
+			try Worker.Destroy()
+			_LLM_Menu_ApiTestProgressHide(State)
+			return false
+		}
 		State["label"] := Worker.Add("Text", "w300",
 			_LLM_Menu_ApiTestProgressText(Name, 0, State["budget"]))
 		State["bar"] := Worker.Add("Progress", "w300 h16 Range0-100", 0)
 		CancelBtn := Worker.Add("Button", "w300", t("common.cancel"))
-		CancelBtn.OnEvent("Click",
-			(*) => _LLM_Menu_ApiTestProgressCancel())
+		CancelFn := _LLM_Menu_ApiTestProgressCancel.Bind(State)
+		CancelBtn.OnEvent("Click", CancelFn)
+		Worker.OnEvent("Close", CancelFn)
+		Worker.OnEvent("Escape", CancelFn)
+		; Native Show can pump cancellation. Publish its exact window and owner
+		; first, and never rearm the pulse after that state has been retired.
 		Worker.Show("AutoSize Center")
-		State["gui"] := Worker
+		if !_LLM_Menu_ApiTestProgressIsCurrent(State) {
+			try Worker.Destroy()
+			_LLM_Menu_ApiTestProgressHide(State)
+			return false
+		}
 		; Named callback (not a closure) so the fast-timer inventory can pin
 		; this 150 ms pulse by name; the tick itself reads the global state.
 		SetTimer(_LLM_Menu_ApiTestProgressTick, 150)
@@ -641,7 +756,15 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name) {
 		try LoggerWarn("LLM", "API test progress unavailable: {1}.",
 			Err.Message)
 	}
-	return true
+	return _LLM_Menu_ApiTestProgressIsCurrent(State)
+}
+
+_LLM_Menu_ApiTestProgressIsCurrent(State) {
+	global _LLM_Menu_ApiTestProgress
+	if _LLM_Menu_ApiTestProgress != State
+		return false
+	Owner := State.Get("owner", "")
+	return Owner == "" || LLM_AuxIsCurrent(Owner)
 }
 
 ; Progress tick: fills the bar with the elapsed share of the budget and
@@ -667,16 +790,23 @@ _LLM_Menu_ApiTestProgressTick(NowTick?) {
 ; Hides the probe progress if one is showing. Silent and total: timer off,
 ; window destroyed, state cleared.
 ; @return boolean True when something was showing.
-_LLM_Menu_ApiTestProgressHide() {
+_LLM_Menu_ApiTestProgressHide(ExpectedProgress := unset) {
 	global _LLM_Menu_ApiTestProgress
-	if !(_LLM_Menu_ApiTestProgress is Map)
-		|| !_LLM_Menu_ApiTestProgress.Has("entry")
-		return false
-	State := _LLM_Menu_ApiTestProgress
-	try SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+	PreviousCritical := Critical("On")
+	try {
+		if !(_LLM_Menu_ApiTestProgress is Map)
+			|| !_LLM_Menu_ApiTestProgress.Has("entry")
+			return false
+		State := _LLM_Menu_ApiTestProgress
+		if IsSet(ExpectedProgress) && State != ExpectedProgress
+			return false
+		; Retire publication and the pulse before native destruction can pump
+		; another opening. Its replacement must keep both its state and timer.
+		_LLM_Menu_ApiTestProgress := Map()
+		SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+	} finally Critical(PreviousCritical)
 	if State.Has("gui")
 		try State["gui"].Destroy()
-	_LLM_Menu_ApiTestProgress := Map()
 	return true
 }
 
@@ -684,12 +814,14 @@ _LLM_Menu_ApiTestProgressHide() {
 ; completion stays silent, hides the progress. Closing the window IS the
 ; feedback — no popup for an action the user just chose.
 ; @return boolean True when a probe was showing.
-_LLM_Menu_ApiTestProgressCancel() {
+_LLM_Menu_ApiTestProgressCancel(ExpectedProgress := unset, *) {
 	global _LLM_Menu_ApiTestProgress
 	if !(_LLM_Menu_ApiTestProgress is Map)
 		|| !_LLM_Menu_ApiTestProgress.Has("entry")
 		return false
 	State := _LLM_Menu_ApiTestProgress
+	if IsSet(ExpectedProgress) && State != ExpectedProgress
+		return false
 	ReqId := State.Get("req_id", 0)
 	if IsInteger(ReqId) && ReqId > 0
 		try LLM_RemoteCancelAsync(ReqId)
@@ -697,7 +829,7 @@ _LLM_Menu_ApiTestProgressCancel() {
 	if Owner != ""
 		try LLM_AuxFinish(Owner)
 	Name := State.Get("name", "")
-	_LLM_Menu_ApiTestProgressHide()
+	_LLM_Menu_ApiTestProgressHide(State)
 	try LoggerInfo("LLM", "API test for '{1}' cancelled by the user.", Name)
 	return true
 }
@@ -804,8 +936,11 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 	StartedTick := A_TickCount
 	; Immediate visible feedback at click time; the Cancel button and the
 	; request id are attached below once dispatch owns them.
-	_LLM_Menu_ApiTestProgressShow(EntryId, Name)
-	_LLM_Menu_ApiTestProgress["owner"] := Owner
+	if !_LLM_Menu_ApiTestProgressShow(EntryId, Name, Owner) {
+		try LLM_AuxFinish(Owner)
+		return false
+	}
+	Progress := _LLM_Menu_ApiTestProgress
 	OnSucc := (Text, Usage) => _LLM_Menu_OnApiTestDone(true, Text,
 		EntryId, Name, StartedTick, Owner, NotifyFn)
 	OnFail := (Info := "") => _LLM_Menu_OnApiTestDone(false, "",
@@ -815,6 +950,13 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 	; be told apart from a handler failure. No token, no prompt content.
 	try LoggerInfo("LLM", "API test dispatched for '{1}' (model {2}).",
 		Name, snapshot["Model"])
+	if !LLM_AuxIsCurrent(Owner) || Progress.Get("owner", "") != Owner
+			|| !_LLM_Menu_ApiTestProgressIsCurrent(Progress) {
+		if Progress.Get("owner", "") == Owner
+			_LLM_Menu_ApiTestProgressHide(Progress)
+		try LLM_AuxFinish(Owner)
+		return false
+	}
 	try {
 		; Tag the reservation with the owned-probe kind so the engine's
 		; keystroke cancels (ResetPredictions, CancelInflight) spare it, and
@@ -833,11 +975,17 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 				spec["max_tokens"], LLM_REMOTE_KIND_API_TEST,
 				LLM_API_TEST_TIMEOUT_MS)
 		}
-		_LLM_Menu_ApiTestProgress["req_id"] := ReqId
+		if _LLM_Menu_ApiTestProgressIsCurrent(Progress)
+			Progress["req_id"] := ReqId
+		else if IsInteger(ReqId) && ReqId > 0
+			try LLM_RemoteCancelAsync(ReqId)
 	} catch as Err {
+		WasCurrent := _LLM_Menu_ApiTestProgressIsCurrent(Progress)
 		try LLM_AuxFinish(Owner)
+		if !WasCurrent
+			return false
 		try LoggerError("LLM", "API test dispatch failed: {1}.", Err.Message)
-		_LLM_Menu_ApiTestProgressHide()
+		_LLM_Menu_ApiTestProgressHide(Progress)
 		Tip := _LLM_Menu_ApiTestTip(false, Name, 0, "")
 		_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"], "Icon!", false, NotifyFn)
 		return false
@@ -845,7 +993,7 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 	; A synchronously failed dispatch already ran the completion above: never
 	; leave a progress behind it.
 	if !LLM_AuxIsCurrent(Owner)
-		_LLM_Menu_ApiTestProgressHide()
+		_LLM_Menu_ApiTestProgressHide(Progress)
 	return true
 }
 
@@ -866,6 +1014,8 @@ _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info := "") {
 	NetworkKey := Info is Map ? ManagedNetworkFailureWindows_MessageKey(Info.Get("network_report", 0)) : ""
 	if NetworkKey != ""
 		Body .= "`n" . t(NetworkKey)
+	if Info is Map && Info.Get("reason", "") == "token_exchange"
+		Body .= "`n" . t("menu.llm.api_token_exchange_failed")
 	ServerLine := _LLM_Menu_ApiTestServerLine(Info)
 	if (ServerLine != "")
 		Body .= "`n" . ServerLine
@@ -969,6 +1119,8 @@ _LLM_Menu_ApiEntryFieldsAreSafe(Entry) {
 ; Parses and validates the complete persisted image before any row becomes
 ; visible. A malformed sibling invalidates the whole authority: publishing a
 ; prefix would make selection and credential identity depend on parser order.
+; A well-formed row naming a provider this build no longer lists is the one
+; exception: it is returned in "retired", never usable, and written back as is.
 ; Name stays a required field so a file this build writes still loads in the
 ; builds before 2026-10; its value, a name the user typed in those builds, is
 ; never read: every row shows the automatic name.
@@ -976,7 +1128,7 @@ _LLM_Menu_ParseAndValidateApiEntries(Raw, Providers := unset, DecryptFn := 0) {
 	global LLM_API_PROVIDERS
 	if !IsSet(Providers)
 		Providers := LLM_API_PROVIDERS
-	Result := Map("ok", false, "entries", [], "reason", "")
+	Result := Map("ok", false, "entries", [], "retired", [], "reason", "")
 	try Parsed := JsonParse(Raw)
 	catch as Err {
 		Result["reason"] := "invalid JSON: " . Err.Message
@@ -1019,10 +1171,20 @@ _LLM_Menu_ParseAndValidateApiEntries(Raw, Providers := unset, DecryptFn := 0) {
 			return Result
 		}
 		ProviderId := Entry["Provider"]
-		if Trim(ProviderId) == "" || !Providers.Has(ProviderId) {
-			Result["reason"] := "entry " . Index
-				. " names unknown provider '" . ProviderId . "'"
+		if Trim(ProviderId) == "" {
+			Result["reason"] := "entry " . Index . " has an empty provider"
 			return Result
+		}
+		if !Providers.Has(ProviderId) {
+			; A provider this build no longer lists is outdated, not corrupt:
+			; the row is kept as stored (token still encrypted) so the next save
+			; writes it back, and the rest of the file stays usable.
+			Retired := Map()
+			for Field in RequiredFields
+				Retired[Field] := Entry[Field]
+			SeenIds[EntryId] := true
+			Result["retired"].Push(Retired)
+			continue
 		}
 		Candidate := Map()
 		for Field in RequiredFields
@@ -1065,6 +1227,20 @@ _LLM_Menu_ReportApiEntriesLoadFailure(Reason, ReportFn := 0) {
 }
 
 
+; One WARNING per outdated row, naming it as Linux does, so the user can fix the
+; entry by hand: api_entries.json has no cleanup offer.
+; @param Path {String} The api_entries.json the rows came from.
+; @param Retired {Array} The rows _LLM_Menu_ParseAndValidateApiEntries kept aside.
+; @param WarnFn {Func|Integer} Test seam for the log sink.
+_LLM_Menu_ReportRetiredApiEntries(Path, Retired, WarnFn := 0) {
+	Sink := HasMethod(WarnFn, "Call") ? WarnFn : (Message, Args*) => LoggerWarn("LLM", Message, Args*)
+	for Row in Retired
+		ConfigOutdatedReportInFile(Path, "entries[id=" . Row["Id"] . "]",
+			"this build no longer lists its provider '" . Row["Provider"]
+			. "'; the entry is not usable and is written back unchanged", Sink)
+}
+
+
 ; Read api_entries.json on startup and publish only one completely validated
 ; authority. A missing file is normal first-run state; unreadable or corrupt
 ; files are reported and retained byte-for-byte for recovery.
@@ -1087,6 +1263,7 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	if !Parsed["ok"]
 		return _LLM_Menu_ReportApiEntriesLoadFailure(Parsed["reason"], ReportFn)
 	entries := Parsed["entries"]
+	_LLM_Menu_ReportRetiredApiEntries(path, Parsed["retired"])
 	; Re-anchor the active id only if it still exists; otherwise pick the
 	; first entry so a corrupted ``api_entry_id`` does not leave the user
 	; with "no active entry" while entries exist on disk.
@@ -1111,6 +1288,7 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	PreviousCritical := Critical("On")
 	try {
 		_LLM_Menu["api_entries"] := entries
+		_LLM_Menu["api_entries_retired"] := Parsed["retired"]
 		_LLM_Menu["api_entry_id"] := active
 		_LLM_Menu_ApiPrivateAuthorityGeneration += 1
 	} finally Critical(PreviousCritical)
@@ -1130,7 +1308,6 @@ _LLM_Menu_ApiEntriesFieldsOwned(Entry) {
 }
 
 _LLM_Menu_ApiSourceOwned(Raw) {
-	global LLM_API_PROVIDERS
 	try Entries := JsonParse(Raw)
 	catch
 		return false
@@ -1138,7 +1315,6 @@ _LLM_Menu_ApiSourceOwned(Raw) {
 		return false
 	for Entry in Entries {
 		if !_LLM_Menu_ApiEntriesFieldsOwned(Entry)
-				|| !LLM_API_PROVIDERS.Has(Entry["Provider"])
 			return false
 	}
 	return true
@@ -1176,6 +1352,22 @@ _LLM_Menu_SerializeApiEntries(MenuState, EncryptFn := 0) {
 			}
 			fields.Push('"' . field . '":"' . _LLM_MenuApiJsonEscape(val) . '"')
 		}
+		lines.Push("{" . _LLM_MenuJoin(fields, ",") . "}")
+	}
+	; Retired rows follow the live ones byte-for-byte as loaded (token still
+	; encrypted); a live id that collides with one would make the image ambiguous.
+	Retired := MenuState.Get("api_entries_retired", [])
+	if !(Retired is Array)
+		return false
+	LiveIds := Map()
+	for e in entries
+		LiveIds[_LLM_MenuApiEntryGet(e, "Id", "")] := true
+	for e in Retired {
+		if !_LLM_Menu_ApiEntriesFieldsOwned(e) || LiveIds.Has(e["Id"])
+			return false
+		fields := []
+		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"]
+			fields.Push('"' . field . '":"' . _LLM_MenuApiJsonEscape(e[field]) . '"')
 		lines.Push("{" . _LLM_MenuJoin(fields, ",") . "}")
 	}
 	return "[" . _LLM_MenuJoin(lines, ",`n  ") . "]"
@@ -1335,15 +1527,19 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		this.Bundle := 0
 		this.BoundReceipt := 0
 		this.Writing := false
+		this.RegistryProof := { registry: 0, shadow: 0 }
+		this.SweepAdmission := false
 	}
 
 	/** Returns native ports without exporting private snapshots through the receipt. */
 	Ports() {
 		return Map("capture_source", ObjBindMethod(this, "Capture"),
-			"source_current", ObjBindMethod(this, "Current"),
+			"source_current", ObjBindMethod(this, "SweepCurrent"),
 			"entry", ObjBindMethod(this, "Entry"),
 			"entry_bound", ObjBindMethod(this, "EntryBound"),
-			"admit", ObjBindMethod(this, "Admit"),
+			"entries_bound", ObjBindMethod(this, "EntriesBound"),
+			"views_bound", ObjBindMethod(this, "ViewsBound"),
+			"admit", ObjBindMethod(this, "SweepAdmit"),
 			"apply", ObjBindMethod(this, "Apply"))
 	}
 
@@ -1354,10 +1550,44 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		finally Critical(PreviousCritical)
 	}
 
+	; Every source operation compares the whole migration registry, so a changed
+	; registry never mints currentness, and that comparison arms the proof below.
+	; Only the local server sweep's own ports (SweepAdmit, SweepCurrent), which
+	; revalidate hundreds of times (18 ms, 1,500 times in one join) and can write
+	; nothing, reuse the proof; each sweep's Capture compares again, and so does a
+	; bound bundle's admission and the transaction's own port.
 	_AdmitNonCritical() {
+		if A_IsSuspended
+			return false
+		Standing := this.RegistryProof
+		if !this.SweepAdmission || (this.Bundle is Object)
+			Standing.registry := 0, Standing.shadow := 0
+		if !ConfigMigrateWithRegistryProof(ConfigFullStateCanPersist, Standing)
+			return false
+		return this._AdmitContextNonCritical()
+	}
+
+	/** Admit for a local server sweep: reuses the proof of its last full comparison. */
+	SweepAdmit() {
+		return this._WithSweepAdmission(ObjBindMethod(this, "Admit"))
+	}
+
+	/** Current for a local server sweep: reuses the proof of its last full comparison. */
+	SweepCurrent(Receipt) {
+		return this._WithSweepAdmission(ObjBindMethod(this, "Current", Receipt))
+	}
+
+	_WithSweepAdmission(Operation) {
+		Previous := this.SweepAdmission
+		this.SweepAdmission := true
+		try return Operation.Call()
+		finally this.SweepAdmission := Previous
+	}
+
+	; This context fence grants no schema or source permission by itself.
+	_AdmitContextNonCritical() {
 		global _LLM_Menu_Loaded, _LifecycleLatestTransition
-		if A_IsSuspended || !ConfigFullStateCanPersist()
-				|| !IsSet(_LLM_Menu_Loaded) || !_LLM_Menu_Loaded
+		if A_IsSuspended || !IsSet(_LLM_Menu_Loaded) || !_LLM_Menu_Loaded
 				|| ReloadTerminalHandoffActive()
 				|| _LLM_Menu_ApiPrivateLifecycleState()["attempt"] != 0
 			return false
@@ -1405,14 +1635,16 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			"default_backend", LLM_Defaults["llm_backend"],
 			"backend", _LLM_Menu["backend"], "active_id", _LLM_Menu["api_entry_id"],
 			"entries", LLM_Menu_DeepClone(_LLM_Menu["api_entries"]))
-		if !this._NativeCurrent(Held)
+		; Admit above ran the full schema/persistence admission; nothing but RAM
+		; reads separates it from this context fence.
+		if !this._NativeContextCurrent(Held)
 			return false
 		try {
 			ConfigImage := this._Snapshot(Held["config_path"])
-			if !(ConfigImage is Map) || !this._NativeCurrent(Held)
+			if !(ConfigImage is Map) || !this._NativeContextCurrent(Held)
 				return false
 			ApiImage := this._Snapshot(Held["api_path"])
-			if !(ApiImage is Map) || !this._NativeCurrent(Held)
+			if !(ApiImage is Map) || !this._NativeContextCurrent(Held)
 				return false
 			if ApiImage["present"] {
 				if !_LLM_Menu_ApiSourceOwned(ApiImage["content"])
@@ -1470,7 +1702,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
 			throw Error("The private API source authority is unavailable.")
 		Held := this._Held(Receipt)
-		if !(ProviderId is String) || !Held["servers"].Has(ProviderId)
+		if !(ProviderId is String) || !this._ViewAllowed(Held, ProviderId)
 			throw ValueError("The requested local server is outside the native catalogue.")
 		Entry := this._EntryFrom(Held, ProviderId)
 		if !this.Current(Receipt)
@@ -1494,7 +1726,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		Held := this._Held(Receipt)
 		if !(Held is Map)
 			throw Error("The private API source receipt is unavailable.")
-		if !(ProviderId is String) || !Held["servers"].Has(ProviderId)
+		if !(ProviderId is String) || !this._ViewAllowed(Held, ProviderId)
 			throw ValueError("The requested local server is outside the native catalogue.")
 		if !this.Current(Receipt)
 			throw Error("The private API source authority changed during resolution.")
@@ -1503,6 +1735,40 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		if !this.Current(Receipt)
 			throw Error("The private API source authority changed during resolution.")
 		return Detached
+	}
+
+	/** Returns one detached provider batch fenced by the same originating source. */
+	EntriesBound(ProviderIds, Receipt) {
+		PreviousCritical := Critical("Off")
+		try {
+			global _LLM_Menu_ApiPrivateAuthorityGeneration
+			Held := this._Held(Receipt)
+			if !(Held is Map)
+				return false
+			if !(ProviderIds is Array) || ProviderIds.Length == 0
+				throw TypeError("Private API entry projection requires a provider batch.")
+			CapturedIds := ProviderIds.Clone()
+			Seen := Map()
+			for Id in CapturedIds {
+				if !(Id is String) || !this._ViewAllowed(Held, Id) || Seen.Has(Id)
+					throw ValueError("Private API entry projection refuses an unknown or duplicate provider.")
+				Seen[Id] := true
+			}
+			Authority := _LLM_Menu_ApiPrivateAuthorityGeneration
+			if !this.Current(Receipt)
+				return false
+			Entries := Map()
+			for Id in CapturedIds {
+				Entry := this._EntryFrom(Held, Id)
+				Entries[Id] := Entry is Map ? LLM_Menu_DeepClone(Entry) : 0
+			}
+			Projection := Map("source", Receipt, "entries", Entries, "backend", Held["backend"],
+				"active_id", Held["active_id"], "menu_owner", Held["menu"], "authority", Authority)
+			if !this.Current(Receipt) || this._Held(Receipt) != Held
+					|| _LLM_Menu_ApiPrivateAuthorityGeneration != Authority
+				return false
+			return Projection
+		} finally Critical(PreviousCritical)
 	}
 
 	/** Applies exact configured fields through the existing joint WAL and native lifecycle. */
@@ -1518,16 +1784,17 @@ class LLM_Menu_ApiPrivateSourceOwner {
 				|| !this.Current(Receipt)
 			return false
 		Held := this._Held(Receipt)
-		if !(ProviderId is String) || !Held["servers"].Has(ProviderId)
+		if !(ProviderId is String) || !this._ViewAllowed(Held, ProviderId)
 			return false
 		for Key in ["base_url", "token", "model"] {
 			if !Fields.Has(Key) || !(Fields[Key] is String)
 					|| !_LLMRemote_ConfigScalarIsSafe(Fields[Key])
 				return false
 		}
+		Dynamic := SubStr(ProviderId, 1, 11) == "configured:"
 		if Fields.Count != 3 || Trim(Fields["model"]) == ""
 				|| !RegExMatch(Fields["base_url"], "i)^https?://[^[:space:]]+$")
-				|| !LocalServerAuthTokenAllowed(ProviderId, Fields["token"], Held["servers"])
+				|| (!Dynamic && !LocalServerAuthTokenAllowed(ProviderId, Fields["token"], Held["servers"]))
 			return false
 		OldEntry := this._EntryFrom(Held, ProviderId)
 		if !SelectModel && (!(OldEntry is Map) || !(Fields["model"] == OldEntry["Model"]))
@@ -1539,6 +1806,13 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		NewEntry["BaseUrl"] := Fields["base_url"]
 		NewEntry["Token"] := Fields["token"]
 		NewEntry["Model"] := Fields["model"]
+		; A generic row keeps its saved provider. Reject address/key edits that
+		; would leave its catalogue affinity or actual provider policy before WAL.
+		if !(NewEntry["Provider"] == ProviderId)
+				&& ((!Dynamic && !LocalServerAuthEntryMatches(NewEntry["Provider"], NewEntry["BaseUrl"], ProviderId, Held["servers"]))
+					|| (Dynamic && !(_LocalServerAuthLoopbackIdentity(NewEntry["BaseUrl"]) is Map))
+					|| !LocalServerAuthEntryTokenAllowed(NewEntry["Provider"], NewEntry["Token"], NewEntry["BaseUrl"], Held["servers"]))
+			return false
 		this.Writing := true
 		try {
 			Committed := LLM_Menu_CommitApiEntriesMutation("the local AI server selection",
@@ -1699,8 +1973,8 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		; This private mutation owns API fields only. Establish unchanged picker
 		; selections outside Critical; the ordinary publisher's no-change branch
 		; has exactly the two native Map assignments performed below.
-		if !(Stamp is Map) || !AppPicker_SelectionsEqual(Held["menu"].Get("disabled_apps", []),
-				CandidateMenu.Get("disabled_apps", []))
+		if !(Stamp is Map) || !AppPicker_SelectionsEqual(Held["menu"].Get(ConfigLeaf.DISABLED_APPS, []),
+				CandidateMenu.Get(ConfigLeaf.DISABLED_APPS, []))
 				|| !this.CandidateAdmitted(Capability, AdmissionFn)
 			return false
 		PreviousCritical := Critical("On")
@@ -1743,7 +2017,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			"lifecycle", Held["lifecycle"], "lifecycle_generation", Held["lifecycle_generation"],
 			"held", Held, "source", Candidate["source"], "bundle", Candidate["bundle"],
 			"llm", Llm, "models", Models, "entries", _LLM_Menu.Get("api_entries", 0),
-			"disabled_apps", _LLM_Menu.Get("disabled_apps", 0),
+			ConfigLeaf.DISABLED_APPS, _LLM_Menu.Get(ConfigLeaf.DISABLED_APPS, 0),
 			"lease_state", LeaseState, "lease_owners", LeaseState.owners,
 			"config_token", ConfigToken, "api_token", ApiToken, "locator_token", LocatorToken,
 			"refusals", Refusals, "refusal_key", RefusalKey,
@@ -1786,7 +2060,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			&& LLM_Defaults == Held["defaults"] && LLM_Defaults.Get("llm_backend", 0) == Held["default_backend"]
 			&& _LLM_Menu.Get("backend", 0) == Held["backend"] && _LLM_Menu.Get("api_entry_id", 0) == Held["active_id"]
 			&& _LLM_Menu.Get("api_entries", 0) == Stamp["entries"]
-			&& _LLM_Menu.Get("disabled_apps", 0) == Stamp["disabled_apps"]
+			&& _LLM_Menu.Get(ConfigLeaf.DISABLED_APPS, 0) == Stamp[ConfigLeaf.DISABLED_APPS]
 	}
 
 	_Held(Receipt) {
@@ -1803,7 +2077,17 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		if !(Llm is Map) || !(Llm.Get("models", 0) is Map)
 				|| !(Llm["models"].Get("selected", 0) == Held["backend"])
 			return false
-		return this.Admit() && Features == Held["features"] && _LLM_Menu == Held["menu"]
+		return this.Admit() && this._NativeContextCurrent(Held)
+	}
+
+	_NativeContextCurrent(Held) {
+		global ConfigurationFile, _PathsFile, Features, _LLM_Menu
+		global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS, LLM_Defaults
+		Llm := Features.Get("llm", 0)
+		if !(Llm is Map) || !(Llm.Get("models", 0) is Map)
+				|| !(Llm["models"].Get("selected", 0) == Held["backend"])
+			return false
+		return this._AdmitContextNonCritical() && Features == Held["features"] && _LLM_Menu == Held["menu"]
 			&& ConfigurationFile == Held["config_path"] && _PathsFile == Held["locator"]
 			&& _LLM_Menu_ApiEntriesPath() == Held["api_path"]
 			&& LLM_API_PROVIDERS == Held["providers"] && LLM_LOCAL_API_SERVERS == Held["servers"]
@@ -1824,12 +2108,19 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		; Classified second reads fence mutations during snapshot/hash/decrypt. This
 		; is current-at-check authority; the WAL owns the final expected-image claim.
 		Images := IsSet(Expected) ? Expected : Held
+		; The full schema/persistence admission (a fresh registry comparison,
+		; about 25 ms) closes the operation below, after every read: a refusal
+		; that appears while the files are read is still refused there. Opening
+		; with it too doubled the cost of every check, which a menu build pays
+		; seven times (llm-source-current-single-admission).
+		if !this._NativeContextCurrent(Held)
+			return false
 		loop 2 {
-			if !this._NativeCurrent(Held)
+			if !this._NativeContextCurrent(Held)
 				return false
 			for Key in ["config", "api"] {
 				Observed := this._Snapshot(Held[Key . "_path"])
-				if !(Observed is Map) || !this._NativeCurrent(Held)
+				if !(Observed is Map) || !this._NativeContextCurrent(Held)
 						|| !_ConfigTransitionSnapshotMatches(Observed, Images[Key]["present"], Images[Key]["hash"])
 					return false
 			}
@@ -1921,7 +2212,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 					return false
 				if Path.Length >= 2 && Path[2] == "models" {
 					if Path.Length < 3 || (Path[3] == "selected"
-							&& (!(Record.NativeSection == "llm.models") || !(Record.NativeKey == "selected")))
+							&& (!(Record.NativeSection == ConfigKey.LLM_MODELS) || !(Record.NativeKey == "selected")))
 						return false
 				}
 				if Path.Length >= 2 && Path[2] == "api_entry_id"
@@ -1939,17 +2230,67 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		return true
 	}
 
+	/** Projects view membership and entries through the exact originating receipt. */
+	ViewsBound(Receipt, BaseOrder) {
+		PreviousCritical := Critical("Off")
+		try {
+			Held := this._Held(Receipt)
+			if !(Held is Map) || !(BaseOrder is Array)
+				return false
+			Order := BaseOrder.Clone(), Servers := Map()
+			for Id in Order {
+				if !(Id is String) || !Held["servers"].Has(Id) || Servers.Has(Id)
+					throw ValueError("Private configured views require the original local catalogue order.")
+				Servers[Id] := Held["servers"][Id].Clone()
+			}
+			Configured := LocalServerAuthConfiguredViews(Held["entries"], Held["servers"], Held["providers"])
+			for Id in Configured["order"] {
+				Order.Push(Id)
+				Servers[Id] := Configured["views"][Id].Clone()
+			}
+			Projection := this.EntriesBound(Order, Receipt)
+			if !(Projection is Map)
+				return false
+			Projection["order"] := Order
+			Projection["servers"] := Servers
+			return Projection
+		} finally Critical(PreviousCritical)
+	}
+
+	_ViewAllowed(Held, Id) {
+		if Held["servers"].Has(Id)
+			return true
+		return SubStr(Id, 1, 11) == "configured:" && this._EntryFrom(Held, Id) is Map
+	}
+
 	_EntryFrom(Held, ProviderId) {
-		First := false
-		for Entry in Held["entries"] {
-			if Entry["Provider"] != ProviderId
-				continue
-			if Entry["Id"] == Held["active_id"]
-				return Entry
-			if !(First is Map)
-				First := Entry
+		if SubStr(ProviderId, 1, 11) == "configured:" {
+			EntryId := SubStr(ProviderId, 12)
+			for Entry in Held["entries"] {
+				if Entry["Id"] == EntryId && Held["providers"].Has(Entry["Provider"])
+						&& ((Entry["Provider"] == "openai") || (Entry["Provider"] == "openai_compat"))
+						&& _LocalServerAuthLoopbackIdentity(Entry["BaseUrl"]) is Map
+					return Entry
+			}
+			return false
 		}
-		return First
+		; Explicit catalogue identities remain authoritative over generic aliases,
+		; including when a generic entry happens to be the active API selection.
+		for ExactProvider in [true, false] {
+			First := false
+			for Entry in Held["entries"] {
+				if (Entry["Provider"] == ProviderId) != ExactProvider
+						|| !LocalServerAuthEntryMatches(Entry["Provider"], Entry["BaseUrl"], ProviderId, Held["servers"])
+					continue
+				if Entry["Id"] == Held["active_id"]
+					return Entry
+				if !(First is Map)
+					First := Entry
+			}
+			if First is Map
+				return First
+		}
+		return false
 	}
 
 	_Mutate(Candidate, NewEntry, EditId, SelectModel) {
@@ -1997,4 +2338,198 @@ _LLM_Menu_ShowApiManagedFailure(Owner, Info, NotifyFn := 0, PresentFn := 0) {
 	return ManagedNetworkTerminalFailure.Publish("api_test", Info.Get("network_report", 0),
 		() => _LLM_Menu_ApiFailureCurrent(Owner), "menu.llm.api_unreachable_title",
 		() => _LLM_Menu_TestActiveApiEntry(NotifyFn, EntryId), PresentFn)
+}
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 6/ Model Selector Page Rows =======
+; ===========================================
+; ===========================================
+
+/**
+ * The model selector page's API rows: one per model the entry's provider
+ * listed, or, while that listing is pending, refused or unavailable, the
+ * provider's known models and a typed-id row with the reason as its hint
+ * (LLM_ApiListingPlan, the port of _shared/lua/llm/api_model_listing.lua). An
+ * entry without its key keeps one greyed row that offers the edit setting it.
+ * @param {Map} Rows Page rows by "<backend>`n<name>", filled.
+ * @param {Array} Models Row JSON, filled.
+ * @param {Map|Integer} Listings Listing state by entry id; 0 when never asked.
+ */
+_LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) {
+	global _LLM_Menu, LLM_LOCAL_API_SERVERS, LLM_API_PROVIDERS
+	Entries := _LLM_Menu.Has("api_entries") && _LLM_Menu["api_entries"] is Array ? _LLM_Menu["api_entries"] : []
+	ActiveId := _LLM_Menu.Get("api_entry_id", "")
+	if Entries.Length == 0
+		return
+	Names := _LLM_Menu_ApiEntryNameList(Entries)
+	; Two entries of one provider and host can share a model name: each entry's
+	; own model wins, then the first entry keeps a shared known model or
+	; typed-id row (_LLM_Menu_ApiPageRow keeps the first name).
+	Later := []
+	for Index, Entry in Entries {
+		Id := _LLM_MenuApiEntryGet(Entry, "Id", "")
+		ProviderId := _LLM_MenuApiEntryGet(Entry, "Provider", "")
+		; The same token rule as the request path: an entry its endpoint
+		; would refuse is greyed and offers only the edit that sets the key.
+		KeyMissing := !LocalServerAuthEntryTokenAllowed(ProviderId,
+			_LLM_MenuApiEntryGet(Entry, "Token", ""), _LLM_MenuApiEntryGet(Entry, "BaseUrl", ""),
+			LLM_LOCAL_API_SERVERS)
+		Configured := _LLM_Menu_ResolveApiEntry(Entry)["model"]
+		if KeyMissing {
+			RowActions := Map("set_key", _LLM_Menu_PromptApiEntry.Bind(Id))
+			_LLM_Menu_ApiPageRow(Rows, Models, Names[Index], Configured, ProviderId, RowActions,
+				"{id:" . JsonStringLiteral("set_key") . ",text:" . JsonStringLiteral(t("menu.llm.api_edit_entry")) . "}",
+				0, ",available:false,hint_key:" . JsonStringLiteral("model_browser.hint_api_no_key"))
+			continue
+		}
+		Provider := LLM_API_PROVIDERS.Has(ProviderId) ? LLM_API_PROVIDERS[ProviderId] : Map()
+		Extras := []
+		for ExtraId in Provider.Get("ModelExtras", Map())
+			Extras.Push(ExtraId)
+		Plan := LLM_ApiListingPlan(Map("model", Configured, "default_model", Provider.Get("DefaultModel", ""),
+			"extras", Extras, "format", Provider.Get("Format", "")),
+			Listings is Map ? Listings.Get(Id, 0) : 0)
+		Parts := LLM_ApiListingNameParts(Names[Index], Configured)
+		for Item in Plan["models"] {
+			Model := Item["model"]
+			RowActions := Map(), ActionsJson := ""
+			if (Id == ActiveId && Model == Configured) {
+				for Pair in [["test", t("menu.llm.api_test_entry"), (*) => _LLM_Menu_TestActiveApiEntry()],
+						["edit", t("menu.llm.api_edit_entry"), (*) => _LLM_Menu_PromptApiEntry(ActiveId)],
+						["remove", t("menu.llm.api_remove_entry"), (*) => _LLM_Menu_RemoveActiveApiEntry()]] {
+					RowActions[Pair[1]] := _LLM_Menu_ApiActiveEntryAction.Bind(ActiveId, Pair[3])
+					ActionsJson .= (ActionsJson == "" ? "" : ",") . "{id:" . JsonStringLiteral(Pair[1]) . ",text:" . JsonStringLiteral(Pair[2]) . "}"
+				}
+			}
+			Select := Model == Configured ? _LLM_Menu_ApiPageSelectAction(Entry) : _LLM_Menu_ApiPageModelAction(Id, Model)
+			Args := [Parts[1] . "/" . Model . Parts[2], Model, ProviderId, RowActions, ActionsJson, Select, ""]
+			if (Model == Configured)
+				_LLM_Menu_ApiPageRow(Rows, Models, Args*)
+			else
+				Later.Push(Args)
+		}
+		if (Plan["typed_hint"] != "") {
+			; Not a model: the place to type one the provider serves, with the
+			; reason its list is missing. Named by the provider (and the entry's
+			; host), it cannot collide with a "<provider>/<model>" row.
+			Later.Push([Parts[1] . Parts[2], Configured, ProviderId,
+				Map("other_model", _LLM_Menu_PromptApiPageModel.Bind(Id, Configured)),
+				"{id:" . JsonStringLiteral("other_model") . ",text:" . JsonStringLiteral(t("model_browser.api_other_model")) . "}",
+				0, ",available:false,typed:true,hint_key:" . JsonStringLiteral(Plan["typed_hint"])])
+		}
+	}
+	for Args in Later
+		_LLM_Menu_ApiPageRow(Rows, Models, Args*)
+}
+
+; Registers one API row of the page and its JSON. Two entries of one provider
+; can share a known model or the typed-id row: the first entry keeps that name.
+_LLM_Menu_ApiPageRow(Rows, Models, Name, Model, ProviderId, RowActions, ActionsJson, Select, ExtraJson) {
+	if Rows.Has("api`n" . Name)
+		return false
+	Row := Map("backend", "api", "name", Name, "installed", true, "row_actions", RowActions)
+	if HasMethod(Select, "Call")
+		Row["select"] := Select
+	Row["json"] := "{backend:" . JsonStringLiteral("api") . ",name:" . JsonStringLiteral(Name)
+		. ",runtime_name:" . JsonStringLiteral(Model) . ",provider:" . JsonStringLiteral(ProviderId)
+		. ExtraJson . ",installed:true,actions:[" . ActionsJson . "]}"
+	Models.Push(Row["json"])
+	Rows["api`n" . Name] := Row
+}
+
+/** A listed model other than the entry's own: the entry takes it, then the API backend. */
+_LLM_Menu_ApiPageModelAction(EntryId, Model) {
+	return (*) => _LLM_Menu_SetApiEntryModel(EntryId, Model)
+}
+
+/**
+ * Asks for a model id the provider serves but did not list, then makes it the
+ * entry's model.
+ * @returns {Boolean|Integer} The selection's result, false when cancelled or refused.
+ */
+_LLM_Menu_PromptApiPageModel(EntryId, Configured, InputFn := Ui_InputBox) {
+	ib := InputFn.Call(t("menu.llm.api_prompt_model"), t("menu.llm.api_window_title"), "w420 h130", Configured)
+	if !IsObject(ib) || ib.Result != "OK"
+		return false
+	return _LLM_Menu_SetApiEntryModel(EntryId, Trim(ib.Value))
+}
+
+/**
+ * Makes one model the entry's own and the entry the active one, in one
+ * private-entries transaction, then selects the API backend.
+ * @param {String} EntryId The entry.
+ * @param {String} Model A model id LLM_ApiListingValidId admits.
+ * @returns {Boolean|Integer} 1 or true when committed, false when refused.
+ */
+_LLM_Menu_SetApiEntryModel(EntryId, Model) {
+	global _LLM_Menu
+	if !LLM_ApiListingValidId(Model) {
+		try LoggerWarn("LLM", "Refused an API model id from the selector page: it is not a model id.")
+		return false
+	}
+	Owner := LLM_Menu_ApiPrivateSourceOwner(Map())
+	Receipt := Owner.Capture()
+	if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry model", 0,
+			"the originating private configuration is unavailable")
+	Committed := LLM_Menu_CommitApiEntriesMutation("the LLM API-entry model",
+		(Candidate) => _LLM_Menu_SetApiEntryModelCandidate(Candidate, EntryId, Model),
+		_LLM_Menu_ApplyApiEntriesCommitted, Owner.Port, 0, 0, 0, 0, 0, 0, 0, Receipt, Owner, (*) => true)
+	if !((Committed is Integer) && Committed == 1)
+		return false
+	try LoggerInfo("LLM", "API entry '{1}' model set from the selector page: {2}.", EntryId, Model)
+	if (_LLM_Menu.Get("backend", "") != "api")
+		return LLM_Menu_SetBackend("api")
+	return true
+}
+
+_LLM_Menu_SetApiEntryModelCandidate(Candidate, EntryId, Model) {
+	if !_LLM_Menu_SelectApiEntryCandidate(Candidate, EntryId)
+		return false
+	for Index, Entry in Candidate["api_entries"] {
+		if _LLM_MenuApiEntryGet(Entry, "Id", "") != EntryId
+			continue
+		if !(Entry is Map)
+			return false
+		Copy := LLM_Menu_DeepClone(Entry)
+		Copy["Model"] := Model
+		if !_LLM_Menu_ApiEntryFieldsAreSafe(Copy)
+			return false
+		Candidate["api_entries"][Index] := Copy
+		return true
+	}
+	return false
+}
+
+/**
+ * Runs an active-entry action only while that entry is still the active one:
+ * a page drawn before a switch or removal cannot act on its successor.
+ * @returns {Boolean|Integer} The action's result, false when refused.
+ */
+_LLM_Menu_ApiActiveEntryAction(EntryId, Action, *) {
+	global _LLM_Menu
+	if (_LLM_Menu.Get("api_entry_id", "") != EntryId) {
+		try LoggerWarn("LLM", "Refused an action on API entry '{1}': it is no longer active.", EntryId)
+		return false
+	}
+	return Action.Call()
+}
+
+/** The API entry selection, after the API backend when another one is active. */
+_LLM_Menu_ApiPageSelectAction(Entry) {
+	return (*) => _LLM_Menu_ApiPageSelect(Entry)
+}
+
+_LLM_Menu_ApiPageSelect(Entry) {
+	global _LLM_Menu
+	if !_LLM_Menu_SelectApiEntry(Entry)
+		return false
+	if (_LLM_Menu.Get("backend", "") != "api")
+		return LLM_Menu_SetBackend("api")
+	return true
 }

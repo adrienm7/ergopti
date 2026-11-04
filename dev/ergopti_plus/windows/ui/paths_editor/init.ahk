@@ -88,46 +88,122 @@ _PathsEdWeb_TryOpen() {
 	g.OnEvent("Close", _PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_OnClose))
 	g.OnEvent("Size",  _PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_OnResize))
 
+	; Publish the native owner before Show can dispatch Close. Its existing
+	; handler must be able to destroy this exact window during the Show pump.
+	_PathsEdWeb_Gui := g
 	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
 	; the control lays out blank and never recovers.
 	g.Show("w720 h440 Center")
-	_PathsEdWeb_Gui := g
+	if !_PathsEdWeb_StartupCurrent(SessionEpoch, g) {
+		try g.Destroy()
+		return true
+	}
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
+	Installed := false
 	try {
-		_PathsEdWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
-	} catch as Err {
-		try LoggerError("PathsEditor", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
-		try g.Destroy()
-		_PathsEdWeb_Reset()
-		_PathsEdWeb_Gui := 0
-		return false
+		try {
+			; Both the shared environment and controller await can dispatch Close.
+			Environment := WebView_SharedEnvironment(loader)
+			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			Controller := WebView2.create(Placeholder.Hwnd, , Environment)
+		} catch as Err {
+			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try LoggerError("PathsEditor", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
+			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try g.Destroy()
+			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			; This failed opening has published no controller or subscriptions.
+			_PathsEdWeb_Reset()
+			FallbackReady := false
+			PreviousCritical := Critical("On")
+			try {
+				if _PathsEdWeb_Gui == g && _PathsEdWeb_ResetDone
+						&& _PathsEdWeb_SessionEpoch == SessionEpoch + 1 {
+					_PathsEdWeb_Gui := 0
+					FallbackReady := true
+				}
+			} finally Critical(PreviousCritical)
+			return !FallbackReady
+		}
+		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		View := Controller.CoreWebView2
+		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+			return true
+
+		try {
+			s := View.Settings
+			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			s.AreDevToolsEnabled := false
+			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			s.AreDefaultContextMenusEnabled := false
+			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			s.IsStatusBarEnabled := false
+			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			s.AreBrowserAcceleratorKeysEnabled := false
+			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			s.IsSwipeNavigationEnabled := false
+		}
+		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+			return true
+
+		MsgSub := View.WebMessageReceived(_PathsEdWeb_OnWebMessage.Bind(SessionEpoch))
+		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		NavSub := View.NavigationCompleted(_PathsEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
+		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		try View.SetVirtualHostNameToFolderMapping(PATHSED_VHOST, _SharedDir, PATHSED_HOST_ACCESS_ALLOW)
+
+		; The globals retain the subscription handles before local aliases leave
+		; this RAM-only transaction, so Close can release them before the browser.
+		PreviousCritical := Critical("On")
+		try {
+			if _PathsEdWeb_StartupCurrent(SessionEpoch, g) {
+				_PathsEdWeb_Controller := Controller
+				_PathsEdWeb_WebView := View
+				_PathsEdWeb_MsgSub := MsgSub
+				_PathsEdWeb_NavSub := NavSub
+				MsgSub := unset
+				NavSub := unset
+				Installed := true
+			}
+		} finally Critical(PreviousCritical)
+		if !Installed || !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+			return true
+
+		; Navigation can synchronously deliver callbacks. Only this frame's
+		; captured view and controller may be used after that boundary.
+		try View.Navigate(_PathsEdWeb_HtmlUrl())
+		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		try Controller.Fill()
+		if _PathsEdWeb_StartupCurrent(SessionEpoch, g)
+			try LoggerSuccess("PathsEditor", "Config-folder editor shown via WebView2.")
+		return true
+	} finally {
+		if !Installed {
+			; A canceled opening is consumed, and retires only its private browser.
+			; It cannot Reset a replacement or ask the public caller for a fallback.
+			MsgSub := unset
+			NavSub := unset
+			if IsSet(Controller) {
+				try Controller.Close()
+				catch as Err
+					try LoggerError("PathsEditor", "Retired browser cleanup failed: {1}.", Err.Message)
+			}
+		}
 	}
-
-	_PathsEdWeb_WebView := _PathsEdWeb_Controller.CoreWebView2
-	; This controller/webview pair is fresh — re-arm the Reset() guard so this
-	; session's close actually tears it down instead of short-circuiting on a
-	; flag left behind by an earlier _PathsEdWeb_Reset() call.
-
-	try {
-		s := _PathsEdWeb_WebView.Settings
-		s.AreDevToolsEnabled               := false
-		s.AreDefaultContextMenusEnabled    := false
-		s.IsStatusBarEnabled               := false
-		s.AreBrowserAcceleratorKeysEnabled := false
-		s.IsSwipeNavigationEnabled         := false
-	}
-
-	; Store the subscription handles in persistent globals (see header note).
-	global _PathsEdWeb_MsgSub := _PathsEdWeb_WebView.WebMessageReceived(_PathsEdWeb_OnWebMessage.Bind(SessionEpoch))
-	global _PathsEdWeb_NavSub := _PathsEdWeb_WebView.NavigationCompleted(_PathsEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
-
-	try _PathsEdWeb_WebView.SetVirtualHostNameToFolderMapping(PATHSED_VHOST, _SharedDir, PATHSED_HOST_ACCESS_ALLOW)
-	try _PathsEdWeb_WebView.Navigate(_PathsEdWeb_HtmlUrl())
-	try _PathsEdWeb_Controller.Fill()
-
-	try LoggerSuccess("PathsEditor", "Config-folder editor shown via WebView2.")
-	return true
 }
 
 
@@ -186,6 +262,13 @@ _PathsEdWeb_SessionCurrent(SessionEpoch) {
 	return SessionEpoch == _PathsEdWeb_SessionEpoch
 }
 
+; Admission after a browser callout must retain the exact native singleton.
+_PathsEdWeb_StartupCurrent(SessionEpoch, Window) {
+	global _PathsEdWeb_Gui, _PathsEdWeb_ResetDone
+	return _PathsEdWeb_SessionCurrent(SessionEpoch) && !_PathsEdWeb_ResetDone
+		&& _PathsEdWeb_Gui == Window
+}
+
 _PathsEdWeb_SessionCall(SessionEpoch, Callback, Params*) {
 	if !_PathsEdWeb_SessionCurrent(SessionEpoch)
 		return false
@@ -199,19 +282,57 @@ _PathsEdWeb_PushInitData() {
 
 ; Opens the native folder picker and hands the chosen path back to the page.
 ; @param Target {String} "logs" for the logs folder, else the configuration folder.
-_PathsEdWeb_Browse(Target := "config") {
-	global _ConfigDir
+_PathsEdWeb_Browse(Target := "config", PickFn := Ui_DirSelect, EvalFn := _PathsEdWeb_Eval) {
+	global _ConfigDir, _PathsEdWeb_SessionEpoch
 	if A_IsSuspended
 		return false
+	SessionEpoch := _PathsEdWeb_SessionEpoch
 	StartDir := StrReplace(Trim(Target == "logs" ? LoggerLogsDir() : _ConfigDir), "/", "\")
-	Picked := Ui_DirSelect("*" . StartDir, 1, t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)
-	if (Picked == "")
-		return
+	Picked := PickFn.Call("*" . StartDir, 1, t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)
+	; Native modals pump close/reopen and pause callbacks before returning.
+	if (Picked == "" || A_IsSuspended || !_PathsEdWeb_SessionCurrent(SessionEpoch))
+		return false
 	Fwd := StrReplace(Picked, "\", "/")
 	if !RegExMatch(Fwd, "/$")
 		Fwd .= "/"
-	_PathsEdWeb_Eval("if(window.applyBrowseResult)window.applyBrowseResult("
+	EvalFn.Call("if(window.applyBrowseResult)window.applyBrowseResult("
 		. _PathsEdWeb_JsStr(Fwd) . "," . _PathsEdWeb_JsStr(Target) . ")")
+}
+
+; The default Gui Close action only hides the window and keeps its controls
+; alive. Explicit cancellation retires that HWND while a folder modal pumps.
+_PathsEdNative_BindCancellation(Window) {
+	for EventName in ["Close", "Escape"]
+		Window.OnEvent(EventName, _PathsEdNative_Cancel)
+}
+
+_PathsEdNative_Cancel(Window, *) {
+	Window.Destroy()
+	return true
+}
+
+; The native fallback owns a concrete control rather than a WebView epoch.
+; Closing its window while the picker pumps must not write the dead control.
+_PathsEdNative_Browse(Window, Edit, PickFn := Ui_DirSelect, ExistsFn := WMHandleExists) {
+	if A_IsSuspended
+		return false
+	try Hwnd := Window.Hwnd
+	catch
+		return false
+	if !Hwnd || !ExistsFn.Call(Hwnd)
+		return false
+	Picked := PickFn.Call("*" . StrReplace(Trim(Edit.Value), "/", "\"), 1,
+		t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)
+	if Picked == "" || A_IsSuspended
+		return false
+	try {
+		if Window.Hwnd != Hwnd || !ExistsFn.Call(Hwnd)
+			return false
+	} catch {
+		return false
+	}
+	Edit.Value := StrReplace(Picked, "\", "/")
+	return true
 }
 
 ; The LogsDirPath a save must store: "" for the default, the resolved folder
@@ -447,7 +568,7 @@ _PathsEdWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_PathsEdWeb_Controller)
-		try _PathsEdWeb_Controller.Fill()
+		try WebView_FitToWindow(_PathsEdWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) and the frontend "cancel" button both land here.
@@ -459,11 +580,17 @@ _PathsEdWeb_Close() {
 	global _PathsEdWeb_Gui
 	saved := (_PathsEdWeb_Gui != 0) ? _PathsEdWeb_Gui : 0
 	_PathsEdWeb_Reset()
+	; Native destruction can dispatch another public open. Retire only this
+	; captured slot after controller teardown, before that request can reenter.
+	PreviousCritical := Critical("On")
+	try {
+		if _PathsEdWeb_Gui == saved
+			_PathsEdWeb_Gui := 0
+	} finally Critical(PreviousCritical)
 	try {
 		if saved
 			saved.Destroy()
 	}
-	_PathsEdWeb_Gui := 0
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide

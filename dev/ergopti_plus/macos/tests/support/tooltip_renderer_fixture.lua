@@ -13,8 +13,24 @@ local OWNERS = {
 	"adapters.json_codec",
 	"infra.logger", "infra.i18n", "infra.paths", "infra.text_utils", "text_utils",
 	"infra.toml.reader", "toml_codec.reader", "toml_codec.basic_string", "toml_codec.bom",
-	"toml_codec.key_path",
-	"infra.vscode_bridge", "tooltip.layout", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
+	"toml_codec.key_path", "toml_codec.record_scanner",
+	-- The real TOML reader opens its source through this shared owner.
+	"toml_codec.source_open",
+	-- The record scanner memoizes one text's scans through this owner.
+	"toml_codec.source_memo",
+	-- The real logger records its phase counters into this owner.
+	"infra.phase_stats",
+	-- The phase counters' bookkeeping, shared with the Linux driver.
+	"phase_stats_core",
+	-- The renderer configuration and the paths walk split paths through this pure owner.
+	"native_path",
+	-- The renderer asks it which applications answer Accessibility; it
+	-- captures hs at require time, so each scenario loads it afresh.
+	"adapters.accessibility_permission",
+	"infra.vscode_bridge", "tooltip.layout", "tooltip.llm_line", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
+	-- The configuration names the shortcut column's modifiers through the key
+	-- name table, which it loads with its data and sorting helper.
+	"keycodes.key_names", "keycodes.key_names_data", "table_util",
 }
 
 --- Loads a fresh production renderer with an observable file-logger surface.
@@ -31,6 +47,7 @@ function M.load()
 	package.loaded["ui.tooltip.config"] = nil
 	package.loaded["toml_codec.reader"] = nil
 	package.loaded["infra.toml.reader"] = nil
+	package.loaded["adapters.accessibility_permission"] = nil
 	return helpers.load_with_stubs("ui.tooltip.renderer"), errors
 end
 

@@ -3,6 +3,7 @@
 --- Canonical config-backed ordered pairs. Runtime selection and publication
 --- retain separate exact leases; unknown/future pairs are never rewritten here.
 local Shared = require("tap_hold.key_combinations")
+local TableUtil = require("table_util")
 local Codec = require("toml_codec")
 local Files = require("adapters.file_system")
 local ConfigPaths = require("infra.config_paths")
@@ -11,6 +12,7 @@ local HoldOptions = require("tap_hold.hold_options")
 local Features = require("infra.manifest_reader")
 local ModuleSource = require("module_source_identity")
 local ModuleDirectory = require("module_source_directory")
+local ConfigKeys = require("config_keys")
 local original_debug_info = debug.getinfo
 local module_directory = ModuleDirectory.capture()
 local manager_source = ModuleSource.sibling(original_debug_info(1,"S").source,
@@ -18,7 +20,7 @@ local manager_source = ModuleSource.sibling(original_debug_info(1,"S").source,
 
 local original_default, original_find = Features.default_for, Features.find_entry_by_path
 local declarations = {}
-for _,path in ipairs({"mod_combos.simultaneous_threshold_ms","mod_combos.symmetric"}) do
+for _,path in ipairs({ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS,ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC}) do
 	local called,entry=pcall(original_find,path)
 	if called and type(entry)=="table" then
 		declarations[path]={entry=entry,type=entry.type,default=entry.default}
@@ -30,25 +32,25 @@ local function declared_settings()
 	if next(declarations)==nil then return nil end
 	assert(Features.default_for==original_default and Features.find_entry_by_path==original_find,"chord declaration getter changed")
 	local values={}
-	for _,path in ipairs({"mod_combos.simultaneous_threshold_ms","mod_combos.symmetric"}) do
+	for _,path in ipairs({ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS,ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC}) do
 		local captured=assert(declarations[path],"incomplete Linux chord declaration")
 		local entry=original_find(path)
 		assert(entry==captured.entry and entry.type==captured.type and entry.default==captured.default,"chord declaration changed")
 		values[path]=original_default(path)
 		assert(values[path]==captured.default,"chord default getter disagrees with declaration")
 	end
-	assert(declarations["mod_combos.simultaneous_threshold_ms"].type=="number"
-		and declarations["mod_combos.symmetric"].type=="boolean","typed Linux chord declaration required")
-	local settings=Shared.chord_settings({simultaneous_threshold_ms=values["mod_combos.simultaneous_threshold_ms"],
-		combo_symmetric=values["mod_combos.symmetric"]})
+	assert(declarations[ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS].type=="number"
+		and declarations[ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC].type=="boolean","typed Linux chord declaration required")
+	local settings=Shared.chord_settings({simultaneous_threshold_ms=values[ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS],
+		combo_symmetric=values[ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC]})
 	assert(Features.default_for==original_default and Features.find_entry_by_path==original_find,"chord declaration getter changed during read")
 	return settings
 end
 local M, instance = {}, nil
+local original_pair, original_pair_separator = Shared.pair, Shared.PAIR_SEPARATOR
+local identity_receipts = setmetatable({}, { __mode = "k" })
 local buffered_settings = setmetatable({}, {__mode="k"})
-local function clone(map)
-	local result = {}; for key, value in pairs(map) do result[key] = value end; return result
-end
+local clone = TableUtil.shallow_copy
 local function equal(left, right)
 	for key, value in pairs(left) do if right[key] ~= value then return false end end
 	for key in pairs(right) do if left[key] == nil then return false end end
@@ -59,12 +61,16 @@ function M.new(options)
 	local files = options.files or Files
 	local route = options.route or function() return ConfigPaths.config("config.toml") end
 	local key_ids, known, holds = {}, {}, { none = true }
+	local pair = Shared.pair
+	local original_policy = rawequal(rawget(package.loaded, "tap_hold.key_combinations"), Shared)
+		and getmetatable(Shared) == nil and pair == original_pair
+		and rawget(Shared, "PAIR_SEPARATOR") == original_pair_separator
 	for _, key in ipairs(options.keys) do
 		assert(type(key.id) == "string" and type(key.key) == "string", "Linux physical catalogue required")
 		key_ids[#key_ids + 1] = key.id
 	end
 	for _, first in ipairs(key_ids) do for _, second in ipairs(key_ids) do
-		if first ~= second then known[Shared.pair(first, second)] = true end
+		if first ~= second then known[pair(first, second)] = true end
 	end end
 	for _, hold in ipairs(HoldOptions.build(options.hold_picker)) do
 		if hold.kind ~= "none" then holds[hold.id] = true end
@@ -124,7 +130,7 @@ function M.new(options)
 				local row=namespace(configured[pair])
 				local action=row.combo
 				if action==nil then action="none" end
-				assert(action=="none" or type(action)=="string" and action~="one_shot_shift" and action~="caps_word"
+				assert(action=="none" or type(action)=="string" and action~="one_shot_shift"
 					and catalogue.is_assignable(action)==true,"invalid known chord slot")
 				chords[pair]=action; explicit=explicit or row.combo~=nil
 			end
@@ -189,7 +195,7 @@ function M.new(options)
 	function owner.configuration_entries()
 		local entries={}
 		for _,first in ipairs(key_ids) do for _,second in ipairs(key_ids) do
-			if first~=second then entries[#entries+1]={id=Shared.pair(first,second),first=first,second=second} end
+			if first~=second then entries[#entries+1]={id=pair(first,second),first=first,second=second} end
 		end end
 		return entries
 	end
@@ -220,6 +226,29 @@ function M.new(options)
 		end
 		if receipt.guard() ~= true then return nil end
 		return receipt
+	end
+	--- Captures every ordered/third-slot claim from this installed source owner.
+	function owner.capture_collision_inventory()
+		if not rawequal(instance, owner) then return nil end
+		local source = owner.capture_edit_source()
+		if not source then return nil end
+		local captured, revision = state, generation
+		local entries = owner.configuration_entries()
+		local claims = {}
+		for _, entry in ipairs(entries) do
+			if state.enabled and (state.taps[entry.id] ~= "none" or state.holds[entry.id] ~= "none"
+				or state.chord_enabled and owner.get_chord(entry.id) ~= "none") then
+				claims[#claims + 1] = { binding = "combination__" .. entry.id, first = entry.first, second = entry.second }
+			end
+		end
+		local function current()
+			return rawequal(instance, owner) and state == captured and generation == revision
+				and source.guard() == true and rawequal(instance, owner) and state == captured and generation == revision
+		end
+		if not current() then return nil end
+		return { claims = claims, path = source.path, content = source.content, status = source.status, current = current,
+			sealed = function() return rawequal(instance, owner) and state == captured and generation == revision
+				and not busy and lease == nil and delivery_fence == nil end }
 	end
 	function owner.engine_options(thresholds)
 		local configured = { keys = clone(key_ids), taps = clone(state.taps), holds = clone(state.holds), thresholds = clone(thresholds),
@@ -334,7 +363,7 @@ function M.new(options)
 		if kind == "tap" then return value == "none" or catalogue.is_assignable(value) == true end
 		if kind == "combo" then
 			local declared=pcall(declared_settings)
-			return declared and next(declarations)~=nil and (value=="none" or value~="one_shot_shift" and value~="caps_word" and value~="run_program" and value~="alt_tab_monitor" and catalogue.is_assignable(value)==true)
+			return declared and next(declarations)~=nil and (value=="none" or value~="one_shot_shift" and value~="run_program" and value~="alt_tab_monitor" and catalogue.is_assignable(value)==true)
 		end
 		if kind == "hold" then return holds[value] == true end
 		return false
@@ -399,7 +428,38 @@ function M.new(options)
 		busy = false
 		return ok and installed == true
 	end
+	-- A logical identity receipt observes the actual private constructor result;
+	-- it never enrolls an active assignment or changes native/input admission.
+	identity_receipts[owner] = { keys = clone(key_ids), known = clone(known), original_policy = original_policy }
 	return owner
+end
+--- Pure logical identity of the published owner; no runtime or file port runs.
+--- @param owner table Exact Manager-issued combinations owner.
+--- @param keys table Complete immutable key source saved by its actual issuer.
+--- @return boolean current
+function M.instance_is_current(owner, keys)
+	local receipt = type(owner) == "table" and identity_receipts[owner] or nil
+	if not rawequal(instance, owner) or receipt == nil or type(keys) ~= "table" or getmetatable(keys) ~= nil
+		or receipt.original_policy ~= true
+		or not rawequal(rawget(package.loaded, "tap_hold.key_combinations"), Shared)
+		or getmetatable(Shared) ~= nil or rawget(Shared, "pair") ~= original_pair
+		or rawget(Shared, "PAIR_SEPARATOR") ~= original_pair_separator then return false end
+	local ids, count = {}, 0
+	for index, key in next, keys do
+		if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(key) ~= "table"
+			or getmetatable(key) ~= nil or type(rawget(key, "id")) ~= "string"
+			or receipt.keys[index] ~= rawget(key, "id") then return false end
+		ids[index], count = key.id, count + 1
+	end
+	if count ~= #receipt.keys then return false end
+	for index = 1, count do if ids[index] == nil then return false end end
+	local expected = {}
+	for _, first in ipairs(ids) do
+		for _, second in ipairs(ids) do
+			if first ~= second then expected[first .. original_pair_separator .. second] = true end
+		end
+	end
+	return equal(receipt.known, expected)
 end
 function M.set_instance(owner)
 	if type(owner) ~= "table" or type(owner.capture_runtime) ~= "function" then return false end
@@ -411,7 +471,7 @@ function M.install(options)
 	return true
 end
 for _, name in ipairs({"get_action","get_hold","get_chord","chord_pair","chord_settings","configuration_entries","is_enabled","capture_edit_source","has_bindings","configuration_domain","capture_action","engine_options",
-	"capture_runtime","capture_chord","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","configuration_pending","owns_configuration","validate_slot","acquire_configuration","release_configuration","configuration_snapshot","configuration_source","configuration_source_matches","configuration_candidate","apply_configuration"}) do
+	"capture_runtime","capture_chord","capture_collision_inventory","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","configuration_pending","owns_configuration","validate_slot","acquire_configuration","release_configuration","configuration_snapshot","configuration_source","configuration_source_matches","configuration_candidate","apply_configuration"}) do
 	M[name] = function(...)
 		if not instance then return name == "get_action" and "none" or nil end
 		return instance[name](...)

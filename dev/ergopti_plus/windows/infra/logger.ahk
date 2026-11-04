@@ -32,6 +32,8 @@
 ;    changing arguments, into its first occurrence plus one timed summary.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -107,9 +109,14 @@ global LOGGER_ERRORS_LOG_PATH := ""
 ; compares this against today and re-resolves on a change.
 global _LOGGER_PATH_DATE := ""
 
-; Retention window for dated log files, in days. Single source of truth: both
-; LoggerInit and the midnight rollover in _LoggerFlush purge with this value.
-global LOGGER_RETENTION_DAYS := 14
+; Retention window for dated log files, in days. Both LoggerInit and the
+; midnight rollover in _LoggerFlush purge with this value, which LoggerLoadTimings
+; reassigns at boot from the shared registry ([logger] retention_days), the
+; number macOS and Linux read too. The sentinel 0 means "not loaded yet": a purge
+; is skipped rather than run with a guessed window, because _LoggerPurgeOldLogs
+; with 0 days treats every dated file as expired. Only the fatal-path LoggerInit
+; of infra/error_net.ahk can run that early.
+global LOGGER_RETENTION_DAYS := 0
 
 ; Fixed-name diagnostic files used by detached helpers cannot participate in
 ; the dated-log retention sweep. Keep one current file plus one rotated archive,
@@ -140,6 +147,11 @@ global _LOGGER_FORCE_FLUSH_PENDING := False
 global _LOGGER_APPEND_DEBTS := Map()
 global _LOGGER_APPEND_DEBT_REPAIRS := Map()
 global _LOGGER_APPEND_OWNERS := Map()
+; The stage of the latest refused append, from a closed set (never log text),
+; so a shutdown refusal can say why queued lines stayed unwritten.
+global _LOGGER_LAST_APPEND_FAILURE := "none"
+; Successor flushes LoggerPrepareShutdown runs while lines keep arriving.
+global LOGGER_SHUTDOWN_SUCCESSOR_FLUSHES := 8
 
 ; Hard ceiling on a pending queue, enforced only on the requeue path. A failed
 ; A failed append re-injects its whole snapshot ahead of lines emitted meanwhile,
@@ -157,6 +169,22 @@ global LOGGER_PENDING_CAP := 5000
 ; counter exists to keep the loss fail-fast without logging while the sink is
 ; dead (which would be the very recursion the cap is defending against).
 global _LOGGER_DROPPED_LINES := 0
+
+; Log-volume counters (spec section 5.3): the lines written per level and the
+; lines that never were, in the one order every driver prints them. dropped is
+; removed by the severity threshold, suppressed swallowed by the consecutive dedup
+; and collapsed withheld by the repeat collapser. A summary line counts as a written
+; line of its level: the figures describe the log a user can open. _MARK holds the
+; totals at the last interval report.
+global LOGGER_VOLUME_FIELDS := ["debug", "info", "warn", "error", "dropped", "suppressed", "collapsed"]
+global LOGGER_VOLUME_BUCKET := Map(
+		"DEBUG", "debug", "TRACE", "debug", "DONE", "debug",
+		"INFO", "info", "START", "info", "SUCCESS", "info",
+		"WARNING", "warn", "ERROR", "error",
+)
+global _LOGGER_VOLUME := Map("debug", 0, "info", 0, "warn", 0, "error", 0,
+		"dropped", 0, "suppressed", 0, "collapsed", 0)
+global _LOGGER_VOLUME_MARK := _LOGGER_VOLUME.Clone()
 
 ; Sub-file fan-out: each entry maps a filename suffix to a list of tag substrings.
 ; Lines whose [Tag] matches any pattern are appended to that sub-file in addition
@@ -334,6 +362,111 @@ LoggerCrashReportsDir() {
 		return LoggerLogsDir() . AppDirsCrashReportsDir() . "\"
 }
 
+
+/** Owns the admitted policy and immutable platform identity before sink effects. */
+_LoggerPrivacyState() {
+	static State := Map("config", 0, "root", "")
+	return State
+}
+
+/**
+ * The admitted policy with the live configuration directory. Boot reads paths.toml
+ * after the first possible admission (a bootstrap line) and a transition can move
+ * the directory, so a copy taken at admission would mask the wrong one or none.
+ */
+_LoggerPrivacyConfig() {
+	global _ConfigDir
+	Config := _LoggerPrivacyAdmitted()
+	if Config is Map
+		Config["context"]["config_dir"] := (IsSet(_ConfigDir) && _ConfigDir is String) ? _ConfigDir : ""
+	return Config
+}
+
+/** The name a line prints in place of a bare name the user chose, which is no path to mask. */
+LoggerUserNamePlaceholder() {
+	Config := _LoggerPrivacyConfig()
+	if !(Config is Map)
+		throw Error("Logger privacy policy is not initialized.")
+	return Config["rules"]["config_name_placeholder"]
+}
+
+/**
+ * Masks a name the user chose for a log line, the twin of the Lua drivers'
+ * diagnostics/private_label.lua. The redactor masks such a name only as a path
+ * component under the configuration directory: a bare name, or a file elsewhere,
+ * needs the placeholder at the point of emission.
+ * @param Name {String} The name or path; only its type is checked, never its content.
+ * @returns {String} Always the policy's placeholder.
+ */
+LoggerMaskUserName(Name) {
+	if !(Name is String)
+		throw TypeError("The user-chosen name to mask must be a string.")
+	return LoggerUserNamePlaceholder()
+}
+
+/** Returns zero only before the shared source exists; invalid admission throws. */
+_LoggerPrivacyAdmitted() {
+	global _SharedDir
+	State := _LoggerPrivacyState()
+	if !IsSet(_SharedDir) || (_SharedDir is String && _SharedDir == "") {
+		if State["config"] is Map
+			throw Error("Logger privacy source disappeared after admission.")
+		return 0
+	}
+	if !(_SharedDir is String)
+		throw TypeError("Logger privacy source is invalid.")
+	if State["config"] is Map {
+		if !(State["root"] == _SharedDir)
+			throw Error("Logger privacy source changed after admission.")
+		return State["config"]
+	}
+	Rules := JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\redaction.json"))
+	Context := Map("home", EnvGet("USERPROFILE"), "user", A_UserName, "case_insensitive", true)
+	if Context["home"] == "" || Context["user"] == ""
+		throw Error("Logger privacy identity is unavailable.")
+	Redact_Apply("", Rules, Context) ; Validate the real canonical rule owner before publication.
+	Config := Map("rules", Rules, "context", Context)
+	State["root"] := _SharedDir
+	State["config"] := Config
+	return Config
+}
+
+/** Preserves core metadata while applying canonical redaction to every body. */
+_LoggerPrivacyBlob(Blob, Config, Records := 0) {
+	if !(Records is Array)
+		return Redact_Apply(Blob, Config["rules"], Config["context"])
+	Original := "", Result := ""
+	for Record in Records {
+		if !(Record is String)
+			throw TypeError("Logger source record is invalid.")
+		Original .= Record . "`r`n"
+		; Only the first prefix belongs to this detached queue entry. A body may
+		; contain newlines and prefix-like text, which remain untrusted together.
+		if RegExMatch(Record, "s)^([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(?::[0-9]{3})? \[(?:DEBUG|TRACE|DONE|INFO|START|SUCCESS|WARNING|ERROR)\] \[[^\]\r\n]+\] )(.*)$", &Parts)
+			Result .= Parts[1] . Redact_Apply(Parts[2], Config["rules"], Config["context"]) . "`r`n"
+		else if RegExMatch(Record, "^===== [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{3} " . Chr(0x2014) . " ErgoptiPlus session opened =====$")
+			Result .= Record . "`r`n"
+		else
+			Result .= Redact_Apply(Record, Config["rules"], Config["context"]) . "`r`n"
+	}
+	if !(Original == Blob)
+		throw Error("Logger batch differs from its source-owned entries.")
+	return Result
+}
+
+/** Early mutex outcomes are closed technical data; untrusted detail is withheld. */
+_LoggerBootstrapMessage(Severity, Source, Message) {
+	if !(Severity == "WARNING" || Severity == "ERROR") || !(Source == "ErgoptiPlus" || Source == "ConfigTransition")
+		throw ValueError("Bootstrap metadata is outside its closed owner set.")
+	Config := _LoggerPrivacyConfig()
+	if Config is Map
+		return Redact_Apply(Message, Config["rules"], Config["context"])
+	if Source == "ErgoptiPlus" && (Severity == "WARNING" || Severity == "ERROR")
+		&& RegExMatch(Message, "^(?:Another instance owns the single-owner mutex after [0-9]+ ms|Single-owner mutex acquisition failed \(wait=0x[0-9A-F]{8}, error=[0-9]+\)); terminating without registering any hook\.$")
+		return Message
+	return "Bootstrap detail withheld: log privacy policy is not initialized."
+}
+
 ; Appends one line to bootstrap.log, the sink for what happens before
 ; paths.toml is read and before LoggerInit may run: a second instance yielding
 ; to the live owner, a refused configuration transition. LogsDirPath is not
@@ -345,12 +478,13 @@ LoggerCrashReportsDir() {
 ; @param Message {String} The line, without timestamp.
 ; @returns {String} The file written.
 LoggerAppendBootstrapLine(Severity, Source, Message) {
+		Message := _LoggerBootstrapMessage(Severity, Source, Message)
 		global _DefaultLogsDir
 		Dir := (IsSet(_DefaultLogsDir) && (_DefaultLogsDir is String) && _DefaultLogsDir != "")
 				? _DefaultLogsDir : LoggerDefaultLogsDir()
 		if !DirExist(Dir)
 				DirCreate(Dir)
-		BootstrapLog := Dir . "bootstrap.log"
+		BootstrapLog := Dir . AppDirsLogBootstrapName()
 		FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . " [" . Severity . "] ["
 				. Source . "] " . Message . "`r`n", BootstrapLog, "UTF-8")
 		return BootstrapLog
@@ -375,6 +509,19 @@ _LoggerResolveDatedPaths() {
 		return LogDir
 }
 
+; Reassign the retention window from the shared registry ([logger] retention_days).
+; AHK v2 runs global initializers before the auto-execute body, so the sentinel
+; above cannot call TimingsGet itself; infra/boot.ahk calls this right after
+; TimingsLoadShared(), before LoggerInit purges. Fail-fast: TimingsGet throws on
+; a missing key, and a window under one day would purge today's own files.
+LoggerLoadTimings() {
+		global LOGGER_RETENTION_DAYS
+		Days := TimingsGet("logger", "retention_days")
+		if (Days < 1)
+				throw ValueError(Format("[logger] retention_days must be at least 1 day, got {1}.", Days))
+		LOGGER_RETENTION_DAYS := Days
+}
+
 ; Initialise the logger. Reads the minimum level from the ini and resolves the
 ; log file path. Safe to call multiple times — later calls just refresh the
 ; minimum level (e.g. after the user changes it via the menu).
@@ -383,8 +530,13 @@ LoggerInit() {
 		global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir, _AhkSubDir, _LOGGER_PENDING
 		global LOGGER_RETENTION_DAYS
 
+		if !(_LoggerPrivacyConfig() is Map)
+				throw Error("Logger privacy policy is not initialized.")
 		LogDir := _LoggerResolveDatedPaths()
-		_LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
+		if (LOGGER_RETENTION_DAYS > 0)
+				_LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
+		else
+				LoggerDebug("Logger", "Log retention is not loaded yet; the purge waits for the next rollover.")
 		; Sub-file routing comes from _generated/logger_sub_files.ahk, generated from
 		; _shared/modules/logger/sub_files.toml — adding a topical log is a TOML edit
 		; plus a codegen run, never a parser change in two drivers.
@@ -392,11 +544,30 @@ LoggerInit() {
 		LOGGER_SUB_FILES := LoggerSubFilesData()
 		_LoggerInitSubFiles(LogDir)
 		LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
-		if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
-				try {
-						Value := TOML_Read(ConfigurationFile, "script", "log_level", LOGGER_DEFAULT_LEVEL)
-						if LOGGER_SEVERITY.Has(Value) {
-								LOGGER_MIN_LEVEL := Value
+		Value := LOGGER_DEFAULT_LEVEL
+		if IsSet(ConfigurationFile) {
+				if ConfigMigrateBoot(ConfigurationFile, "known") {
+						; Normal boot and menu updates retain the canonical source
+						; generation, including its original native presence.
+						Cache := ConfigTomlReadSnapshot(ConfigurationFile).Cache
+						Value := IniCacheGet(Cache, ConfigKey.SCRIPT, ConfigLeaf.LOG_LEVEL, LOGGER_DEFAULT_LEVEL)
+				} else if FileExist(ConfigurationFile) {
+						; Fatal startup recovery can initialize logging before the
+						; configuration constructor admits a source; no cache exists yet.
+						try {
+								Content := FSReadStrict(ConfigurationFile)
+								Cache := ConfigTomlDecodeSnapshot(Content).Cache
+								Value := IniCacheGet(Cache, "script", ConfigLeaf.LOG_LEVEL, LOGGER_DEFAULT_LEVEL)
+						}
+				}
+		}
+		; Enum admission accepts case variants; native severity keys are exact.
+		; Resolve with the same comparison and publish the owning native name.
+		if Value is String {
+				for Level in LOGGER_SEVERITY {
+						if Level = Value {
+								LOGGER_MIN_LEVEL := Level
+								break
 						}
 				}
 		}
@@ -521,7 +692,7 @@ _LoggerRepairAppendDebt(Path, FlushFn, TruncateFn) {
 ; Injectable seams make short writes and failed stable flushes deterministic in
 ; regression tests without weakening the production filesystem boundary.
 _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
-		FlushFn := 0, TruncateFn := 0, WriteFn := 0) {
+		FlushFn := 0, TruncateFn := 0, WriteFn := 0, SourceRecords := 0, MaxBytes := 0) {
 	global _LOGGER_APPEND_OWNERS
 	if !(Path is String) or Path = "" or !(Blob is String)
 		return false
@@ -532,6 +703,7 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 	FileObject := 0
 	Boundary := 0
 	RollbackSucceeded := false
+	Stage := "owner"
 	; Native sharing protects file identity, but a replacement can reuse its path.
 	; Reserve the debt key until the exact writer has closed or transferred debt.
 	Key := StrLower(Path)
@@ -542,24 +714,38 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 		_LOGGER_APPEND_OWNERS[Key] := true
 	} finally Critical(PreviousCritical)
 	try {
-		if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
-			return false
+		Stage := "privacy_config"
+		Config := _LoggerPrivacyConfig()
+		if !(Config is Map)
+			return _LoggerRefuseAppend(Stage)
+		Stage := "redaction"
+		Blob := _LoggerPrivacyBlob(Blob, Config, SourceRecords)
+		Stage := "debt_repair"
+		if MaxBytes {
+			if !_LoggerPrepareBoundedAppend(Path, Blob, MaxBytes, ResolvedFlush, ResolvedTruncate)
+				return _LoggerRefuseAppend(Stage)
+		} else if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
+			return _LoggerRefuseAppend(Stage)
 		; Another writer must not commit bytes that this owner's rollback can erase
+		Stage := "open"
 		FileObject := ResolvedOpen.Call(Path, "a-w", "UTF-8-RAW")
 		if !IsObject(FileObject)
-			return false
+			return _LoggerRefuseAppend(Stage)
+		Stage := "write"
 		Boundary := FileObject.Pos
 		; Include the new-file BOM in the same checked native receipt and rollback
 		; boundary as the payload; FileOpen must not buffer it independently.
 		Payload := (Boundary = 0 ? Chr(0xFEFF) : "") . Blob
 		if !_FSWriteUtf8Bytes(FileObject, Payload, WriteFn)
 			throw Error("logger native append was incomplete")
+		Stage := "flush"
 		if ForceFlush && ResolvedFlush.Call(FileObject) != true
 			throw Error("logger stable flush failed")
 		FileObject.Close()
 		FileObject := 0
-		return true
+		return !MaxBytes || FileGetSize(Path) <= MaxBytes
 	} catch {
+		_LoggerRefuseAppend(Stage)
 		if IsObject(FileObject)
 			try RollbackSucceeded := ResolvedTruncate.Call(FileObject, Boundary,
 				ResolvedFlush) == true
@@ -668,20 +854,30 @@ _LoggerRepairShutdownDebts() {
 ; Optional refusal evidence contains only a detached snapshot of native owner
 ; counters; inspecting it never flushes, repairs, or releases logger ownership.
 ; @param Refusal {Map|Integer} Receives primitive refusal evidence, or zero on success.
+; @param FlushFn {Func|Integer} Test seam replacing _LoggerFlush; zero uses it.
 ; @returns {Boolean} True only after the existing durable shutdown boundary.
-LoggerPrepareShutdown(&Refusal := 0) {
+LoggerPrepareShutdown(&Refusal := 0, FlushFn := 0) {
 	Refusal := 0
+	Flush := HasMethod(FlushFn, "Call") ? FlushFn : _LoggerFlush
 	if !_LoggerRepairShutdownDebts() {
 		Refusal := _LoggerShutdownRefusalSnapshot("repair")
 		return false
 	}
-	if !_LoggerFlush(true) {
+	if !Flush.Call(true) {
 		Refusal := _LoggerShutdownRefusalSnapshot("flush")
 		return false
 	}
-	if _LoggerHasPendingDebt() && !_LoggerFlush(true) {
-		Refusal := _LoggerShutdownRefusalSnapshot("successor_flush")
-		return false
+	; Timers still running at shutdown can log while a flush writes outside
+	; Critical, so one successor flush could leave a burst queued. Drain again
+	; within a fixed bound; a sink that refuses every append still ends in the
+	; pending-debt refusal below.
+	loop LOGGER_SHUTDOWN_SUCCESSOR_FLUSHES {
+		if !_LoggerHasPendingDebt()
+			break
+		if !Flush.Call(true) {
+			Refusal := _LoggerShutdownRefusalSnapshot("successor_flush")
+			return false
+		}
 	}
 	if _LoggerHasPendingDebt() {
 		Refusal := _LoggerShutdownRefusalSnapshot("pending_debt")
@@ -690,10 +886,37 @@ LoggerPrepareShutdown(&Refusal := 0) {
 	return true
 }
 
+; True once no thread holds a flush, an append or a repair: the only state a
+; shutdown refusal can be waiting for without a sink having refused anything.
+; @returns {Boolean} False while an interrupted owner still has to resume.
+LoggerFlushSettled() {
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_APPEND_OWNERS, _LOGGER_APPEND_DEBT_REPAIRS
+	PreviousCritical := Critical("On")
+	try return !_LOGGER_FLUSH_ACTIVE && _LOGGER_APPEND_OWNERS.Count == 0
+		&& _LOGGER_APPEND_DEBT_REPAIRS.Count == 0
+	finally Critical(PreviousCritical)
+}
+
+; An owner under OnExit can only resume once OnExit returns, so such a refusal
+; ends by itself. A sink that refused holds no owner and is a real refusal.
+; @param Refusal {Map|Integer} The evidence LoggerPrepareShutdown returned.
+; @returns {Boolean} True when the refusal names an interrupted owner.
+LoggerShutdownRefusalSettles(Refusal) {
+	return (Refusal is Map) && (Refusal["flush_active"] || Refusal["append_owners"] > 0
+		|| Refusal["append_repairs"] > 0)
+}
+
 ; Sample existing ownership and queue counts at the refusing caller's boundary.
 ; Paths, queue names, message bodies, file objects, and handles never leave here.
+; Records the closed stage of a refused append and returns false.
+_LoggerRefuseAppend(Stage) {
+	global _LOGGER_LAST_APPEND_FAILURE
+	_LOGGER_LAST_APPEND_FAILURE := Stage
+	return false
+}
+
 _LoggerShutdownRefusalSnapshot(Phase) {
-	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_LAST_APPEND_FAILURE
 	global _LOGGER_APPEND_OWNERS, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
 	PreviousCritical := Critical("On")
@@ -711,7 +934,8 @@ _LoggerShutdownRefusalSnapshot(Phase) {
 			"main_lines", _LOGGER_PENDING.Length,
 			"error_lines", _LOGGER_PENDING_ERRORS.Length,
 			"topical_queues", _LOGGER_SUB_PENDING.Count,
-			"topical_lines", TopicalLines)
+			"topical_lines", TopicalLines,
+			"last_append_failure", _LOGGER_LAST_APPEND_FAILURE)
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -745,7 +969,9 @@ _LoggerFlushOwned(ForceFlush := false) {
 	; file the operator reads as today's.
 	if (_LOGGER_PATH_DATE != "" and _LOGGER_PATH_DATE != FormatTime(, "yyyy-MM-dd")) {
 		RolledDir := _LoggerResolveDatedPaths()
-		_LoggerPurgeOldLogs(RolledDir, LOGGER_RETENTION_DAYS)
+		; Same sentinel guard as LoggerInit: a window not loaded yet purges nothing.
+		if (LOGGER_RETENTION_DAYS > 0)
+			_LoggerPurgeOldLogs(RolledDir, LOGGER_RETENTION_DAYS)
 		_LoggerInitSubFiles(RolledDir)
 	}
 
@@ -803,7 +1029,7 @@ _LoggerFlushOwned(ForceFlush := false) {
 						if SubBlob == ""
 										continue
 						SubWritten := _LoggerAppendComplete(
-								_LOGGER_SUB_PATHS[Name], SubBlob, ForceFlush)
+								_LOGGER_SUB_PATHS[Name], SubBlob, ForceFlush, 0, 0, 0, 0, Lines)
 						if !SubWritten
 										_LoggerRequeueSub(Name, Lines)
 	}
@@ -866,7 +1092,7 @@ _LoggerAppendDatedQueue(Lines, ErrorsOnly, FallbackDate, ForceFlush) {
 		for _, Line in DatedLines
 			Blob .= Line . "`r`n"
 		Path := _LoggerDatedPathForDate(Date, ErrorsOnly)
-		if (Path != "" && _LoggerAppendComplete(Path, Blob, ForceFlush)) {
+		if (Path != "" && _LoggerAppendComplete(Path, Blob, ForceFlush, 0, 0, 0, 0, DatedLines)) {
 			Result["wrote"] := true
 			continue
 		}
@@ -889,6 +1115,7 @@ _LoggerEmitDroppedSummary() {
 	Word := (Count == 1) ? "line" : "lines"
 	MsgLine := Format("[WARNING] [logger] {1} pending {2} dropped: a queue hit the {3}-line cap while the sink was failing.", Count, Word, LOGGER_PENDING_CAP)
 	Line := WallClockTimestamp() . " " . MsgLine
+	_LoggerCountWritten("WARNING")
 	_LoggerPushRing(Line)
 	if _LOGGER_TEST_SINK != 0 {
 		try _LOGGER_TEST_SINK(Line)
@@ -984,7 +1211,7 @@ _LoggerRefreshFastFlags() {
 _LoggerDropPreInitBelowLevel() {
 		global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_MIN_LEVEL
 		Before := _LOGGER_PENDING.Length
-		_LOGGER_PENDING := _LoggerFilterQueueByLevel(_LOGGER_PENDING)
+		_LOGGER_PENDING := _LoggerFilterQueueByLevel(_LOGGER_PENDING, true)
 		_LOGGER_PENDING_ERRORS := _LoggerFilterQueueByLevel(_LOGGER_PENDING_ERRORS)
 		Dropped := Before - _LOGGER_PENDING.Length
 		if (Dropped > 0) {
@@ -998,8 +1225,12 @@ _LoggerDropPreInitBelowLevel() {
 ; "yyyy-MM-dd HH:mm:ss:fff [LEVEL] [Tag] body", so the first "[WORD] [" pair is
 ; always the level; anything without one is structural (the blank separator, the
 ; session banner) and is always kept.
-_LoggerFilterQueueByLevel(Queue) {
-		global LOGGER_SEVERITY, _LOGGER_MIN_SEVERITY
+; @param Queue {Array} Formatted lines.
+; @param CountDropped {Boolean} True for the unified queue: a removed line was
+;   counted as written when it was emitted and now moves to the dropped figure.
+; @returns {Array} The lines kept.
+_LoggerFilterQueueByLevel(Queue, CountDropped := false) {
+		global LOGGER_SEVERITY, _LOGGER_MIN_SEVERITY, _LOGGER_VOLUME, LOGGER_VOLUME_BUCKET
 		Kept := []
 		for _, Line in Queue {
 				if !RegExMatch(Line, "\[([A-Z]+)\] \[", &M) {
@@ -1012,6 +1243,9 @@ _LoggerFilterQueueByLevel(Queue) {
 				}
 				if (LOGGER_SEVERITY[M[1]] >= _LOGGER_MIN_SEVERITY) {
 						Kept.Push(Line)
+				} else if CountDropped {
+						_LOGGER_VOLUME[LOGGER_VOLUME_BUCKET[M[1]]] -= 1
+						_LOGGER_VOLUME["dropped"] += 1
 				}
 		}
 		return Kept
@@ -1021,8 +1255,9 @@ _LoggerFilterQueueByLevel(Queue) {
 ; Short-circuits on the cached flag so disabled DEBUG collapses to a
 ; single boolean test, no Format / FileAppend cost on the hot path.
 LoggerDebug(Tag, Msg, Args*) {
-		global _LOGGER_DEBUG_ENABLED
+		global _LOGGER_DEBUG_ENABLED, _LOGGER_VOLUME
 		if !_LOGGER_DEBUG_ENABLED {
+				_LOGGER_VOLUME["dropped"] += 1
 				return
 		}
 		_LoggerEmit("DEBUG", Tag, Msg, Args*)
@@ -1051,46 +1286,47 @@ LoggerAppendBoundedDebug(Path, Line, MaxBytes := 0) {
 		MaxBytes := LOGGER_AUXILIARY_LOG_MAX_BYTES
 	if Type(MaxBytes) != "Integer" || MaxBytes < 4
 		return false
-	Payload := Line . "`r`n"
-	PayloadBytes := StrPut(Payload, "UTF-8") - 1
-	; AHK writes a three-byte UTF-8 BOM when creating a new text file.
-	if PayloadBytes + 3 > MaxBytes
+	; Admission and rotation consume the exact redacted bytes inside the append
+	; owner. Measuring the raw line can undercount expansions or reject a secret
+	; whose redacted replacement would fit; redacting here would run it twice.
+	return _LoggerAppendComplete(Path, Line . "`r`n", false,
+		0, 0, 0, 0, 0, MaxBytes)
+}
+
+; Called only after the sink has admitted its privacy policy and reserved Path.
+; Repair precedes every size decision so rotation never moves an unpaid native
+; rollback boundary to a different owner. The byte cap includes a new-file BOM.
+_LoggerPrepareBoundedAppend(Path, Blob, MaxBytes, FlushFn, TruncateFn) {
+	PayloadBytes := StrPut(Blob, "UTF-8") - 1
+	BomBytes := StrPut(Chr(0xFEFF), "UTF-8") - 1
+	if PayloadBytes + BomBytes > MaxBytes
 		return false
 	ArchivePath := Path . ".1"
-	try {
-		; A size decision must use repaired bytes, and rotation must never move
-		; an outstanding rollback boundary onto a different file owner
-		for RepairPath in [Path, ArchivePath] {
-			if !_LoggerRepairAppendDebt(RepairPath,
-					FSFlushFileBuffers, _LoggerTruncateAppend)
-				return false
-		}
-		if FileExist(ArchivePath) && FileGetSize(ArchivePath) > MaxBytes
-			FileDelete(ArchivePath)
-		CurrentBytes := FileExist(Path) ? FileGetSize(Path) : 0
-		NextBytes := CurrentBytes + PayloadBytes + (CurrentBytes == 0 ? 3 : 0)
-		if NextBytes > MaxBytes {
-			if FileExist(ArchivePath)
-				FileDelete(ArchivePath)
-			; A legacy file may already exceed the newly enforced cap. Rotating that
-			; debt would merely preserve an oversized owner, so discard it once.
-			if CurrentBytes > MaxBytes
-				FileDelete(Path)
-			else if FileExist(Path)
-				FileMove(Path, ArchivePath, true)
-		}
-		if !_LoggerAppendComplete(Path, Payload)
+	for RepairPath in [Path, ArchivePath] {
+		if !_LoggerRepairAppendDebt(RepairPath, FlushFn, TruncateFn)
 			return false
-		return FileGetSize(Path) <= MaxBytes
-	} catch {
-		return false
 	}
+	if FileExist(ArchivePath) && FileGetSize(ArchivePath) > MaxBytes
+		FileDelete(ArchivePath)
+	CurrentBytes := FileExist(Path) ? FileGetSize(Path) : 0
+	NextBytes := CurrentBytes + PayloadBytes + (CurrentBytes == 0 ? BomBytes : 0)
+	if NextBytes > MaxBytes {
+		if FileExist(ArchivePath)
+			FileDelete(ArchivePath)
+		; A legacy file above the cap cannot become a bounded archive.
+		if CurrentBytes > MaxBytes
+			FileDelete(Path)
+		else if FileExist(Path)
+			FileMove(Path, ArchivePath, true)
+	}
+	return true
 }
 
 ; Start of a routine internal operation (debug granularity). Pair with Done.
 LoggerTrace(Tag, Msg, Args*) {
-		global _LOGGER_DEBUG_ENABLED
+		global _LOGGER_DEBUG_ENABLED, _LOGGER_VOLUME
 		if !_LOGGER_DEBUG_ENABLED {
+				_LOGGER_VOLUME["dropped"] += 1
 				return
 		}
 		_LoggerEmit("TRACE", Tag, Msg, Args*)
@@ -1098,8 +1334,9 @@ LoggerTrace(Tag, Msg, Args*) {
 
 ; Successful end of a routine internal operation. Pair with Trace.
 LoggerDone(Tag, Msg, Args*) {
-		global _LOGGER_DEBUG_ENABLED
+		global _LOGGER_DEBUG_ENABLED, _LOGGER_VOLUME
 		if !_LOGGER_DEBUG_ENABLED {
+				_LOGGER_VOLUME["dropped"] += 1
 				return
 		}
 		_LoggerEmit("DONE", Tag, Msg, Args*)
@@ -1107,18 +1344,35 @@ LoggerDone(Tag, Msg, Args*) {
 
 ; General status worth knowing — config loaded, feature toggled, model changed.
 LoggerInfo(Tag, Msg, Args*) {
-		global _LOGGER_INFO_ENABLED
+		global _LOGGER_INFO_ENABLED, _LOGGER_VOLUME
 		if !_LOGGER_INFO_ENABLED {
+				_LOGGER_VOLUME["dropped"] += 1
 				return
 		}
 		_LoggerEmit("INFO", Tag, Msg, Args*)
 }
 
+; Evidence record (spec section 4.3): an INFO line, rendered [INFO], that neither
+; the consecutive dedup nor the repeat collapser ever withholds. For the result
+; lines of a field check or a diagnostics probe that a person is asked to send
+; back, where records share one template and differ by arguments and the same
+; check may run again minutes later. Not a lifecycle half and not a substitute
+; for LoggerInfo: use it only for data meant to be read back.
+LoggerEvidence(Tag, Msg, Args*) {
+		global _LOGGER_INFO_ENABLED, _LOGGER_VOLUME
+		if !_LOGGER_INFO_ENABLED {
+				_LOGGER_VOLUME["dropped"] += 1
+				return
+		}
+		_LoggerEmitBody("INFO", Tag, Msg, _LoggerFormatBody(Msg, Args), true)
+}
+
 ; Start of a significant action (init, HTTP request, user-triggered op).
 ; Pair with Success — a missing Success in the logs flags a silent failure.
 LoggerStart(Tag, Msg, Args*) {
-		global _LOGGER_INFO_ENABLED
+		global _LOGGER_INFO_ENABLED, _LOGGER_VOLUME
 		if !_LOGGER_INFO_ENABLED {
+				_LOGGER_VOLUME["dropped"] += 1
 				return
 		}
 		_LoggerEmit("START", Tag, Msg, Args*)
@@ -1126,8 +1380,9 @@ LoggerStart(Tag, Msg, Args*) {
 
 ; Successful completion of a significant action. Pair with Start.
 LoggerSuccess(Tag, Msg, Args*) {
-		global _LOGGER_INFO_ENABLED
+		global _LOGGER_INFO_ENABLED, _LOGGER_VOLUME
 		if !_LOGGER_INFO_ENABLED {
+				_LOGGER_VOLUME["dropped"] += 1
 				return
 		}
 		_LoggerEmit("SUCCESS", Tag, Msg, Args*)
@@ -1135,8 +1390,9 @@ LoggerSuccess(Tag, Msg, Args*) {
 
 ; Unexpected condition the code can recover from; must be investigated.
 LoggerWarn(Tag, Msg, Args*) {
-		global _LOGGER_WARN_ENABLED
+		global _LOGGER_WARN_ENABLED, _LOGGER_VOLUME
 		if !_LOGGER_WARN_ENABLED {
+				_LOGGER_VOLUME["dropped"] += 1
 				return
 		}
 		_LoggerEmit("WARNING", Tag, Msg, Args*)
@@ -1144,11 +1400,56 @@ LoggerWarn(Tag, Msg, Args*) {
 
 ; Unrecoverable failure; execution should stop or degrade gracefully.
 LoggerError(Tag, Msg, Args*) {
-		global _LOGGER_ERROR_ENABLED
+		global _LOGGER_ERROR_ENABLED, _LOGGER_VOLUME
 		if !_LOGGER_ERROR_ENABLED {
+				_LOGGER_VOLUME["dropped"] += 1
 				return
 		}
 		_LoggerEmit("ERROR", Tag, Msg, Args*)
+}
+
+; The log-volume totals since the process started (spec section 5.3).
+; @returns {Map} A fresh copy, one entry per LOGGER_VOLUME_FIELDS name.
+LoggerVolume() {
+	global _LOGGER_VOLUME
+	return _LOGGER_VOLUME.Clone()
+}
+
+; What was counted since the previous call, starting the next interval. The totals
+; are untouched, so a periodic reporter and a diagnostic never disturb each other.
+; @returns {Map} Same names as LoggerVolume.
+LoggerVolumeInterval() {
+	global _LOGGER_VOLUME, _LOGGER_VOLUME_MARK, LOGGER_VOLUME_FIELDS
+	PreviousCritical := Critical("On")
+	try {
+		Delta := Map()
+		for Field in LOGGER_VOLUME_FIELDS {
+			Delta[Field] := _LOGGER_VOLUME[Field] - _LOGGER_VOLUME_MARK[Field]
+			_LOGGER_VOLUME_MARK[Field] := _LOGGER_VOLUME[Field]
+		}
+		return Delta
+	} finally Critical(PreviousCritical)
+}
+
+; Renders counters as the text of an evidence record, byte for byte what the Lua
+; core's volume_text prints.
+; @param Counters {Map} From LoggerVolume or LoggerVolumeInterval; a missing name is 0.
+; @returns {String} "debug=N info=N warn=N error=N dropped=N suppressed=N collapsed=N".
+LoggerVolumeText(Counters) {
+	global LOGGER_VOLUME_FIELDS
+	Text := ""
+	for Field in LOGGER_VOLUME_FIELDS
+		Text .= (Text == "" ? "" : " ") . Field . "=" . Counters.Get(Field, 0)
+	return Text
+}
+
+; Zeroes the counters. For tests; the running driver never calls it.
+LoggerResetVolume() {
+	global _LOGGER_VOLUME, _LOGGER_VOLUME_MARK, LOGGER_VOLUME_FIELDS
+	for Field in LOGGER_VOLUME_FIELDS {
+		_LOGGER_VOLUME[Field] := 0
+		_LOGGER_VOLUME_MARK[Field] := 0
+	}
 }
 
 ; Registers a callable that receives every formatted log line (as a string).
@@ -1200,18 +1501,32 @@ LoggerRingBufferSnapshot() {
 ; ===================================
 ; ===================================
 
+; Counts one line that reaches the log under the volume figure of its level.
+; @param Level {String} Key of LOGGER_VOLUME_BUCKET.
+_LoggerCountWritten(Level) {
+	global _LOGGER_VOLUME, LOGGER_VOLUME_BUCKET
+	_LOGGER_VOLUME[LOGGER_VOLUME_BUCKET[Level]] += 1
+}
+
 ; Format and emit a log line if the current level allows it. Best-effort —
 ; never raises so a logging failure cannot break the driver. Hot-path-safe.
 _LoggerEmit(Level, Tag, Msg, Args*) {
-		global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
-		global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
-		global _LOGGER_REPEAT_ENABLED, _LOGGER_STAMP_FN
+		global LOGGER_SEVERITY
 		; Safety net for unknown levels — the public wrappers already short-circuit
 		; on the per-level fast-path flags, so a severity comparison here would be
 		; a redundant second filter. Only guard against a completely unrecognised Level.
 		if !LOGGER_SEVERITY.Has(Level) {
 				return
 		}
+		_LoggerEmitBody(Level, Tag, Msg, _LoggerFormatBody(Msg, Args), false)
+}
+
+; Substitutes Args into the {N} template Msg. A bad format string must not
+; break the driver, and the failure is recorded on the returned text itself.
+; @param Msg {String} Template.
+; @param Args {Array} Values; an empty array returns Msg unchanged.
+; @returns {String} The formatted body.
+_LoggerFormatBody(Msg, Args) {
 		Body := Msg
 		if Args.Length > 0 {
 				try {
@@ -1228,6 +1543,21 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 								. " — " . Args.Length . " arg(s) not substituted]"
 				}
 		}
+		return Body
+}
+
+; Writes one already formatted line through both suppression layers, the ring,
+; the sinks and the fan-out. Best-effort — never raises. Hot-path-safe.
+; @param Level {String} Key of LOGGER_SEVERITY.
+; @param Tag {String} Module tag.
+; @param Msg {String} The unformatted template (the INFO/DEBUG repeat key).
+; @param Body {String} The formatted body.
+; @param Exempt {Boolean} True for an evidence record (spec section 4.3): neither
+;   the consecutive dedup nor the repeat collapser may withhold it.
+_LoggerEmitBody(Level, Tag, Msg, Body, Exempt) {
+		global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
+		global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+		global _LOGGER_REPEAT_ENABLED, _LOGGER_STAMP_FN, _LOGGER_VOLUME
 		; The shared wall-clock helper caches the second-resolution text while
 		; sampling seconds and milliseconds from one non-interruptible SYSTEMTIME.
 		; The test clock face, when installed, replaces that one sample.
@@ -1249,15 +1579,21 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		; recurring line is de-bounced, not permanently silenced (logger-dedup-tick): a
 		; streak that outlives the window re-surfaces. When the streak ends a single
 		; "N identical lines suppressed" summary is emitted. Mirrors the macOS driver.
-		if (MsgLine == _LOGGER_DEDUP_KEY and ((Now - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
+		; An evidence record is accepted like any line (it ends an open dedup streak
+		; below) but is never itself withheld: it is the data a person was asked to
+		; send back, so a shared template or an immediate rerun must not fold it.
+		if (!Exempt and MsgLine == _LOGGER_DEDUP_KEY and (Now - _LastErrTime) < LOGGER_DEDUP_WINDOW_MS) {
 				_LOGGER_DEDUP_COUNT += 1
+				_LOGGER_VOLUME["suppressed"] += 1
 				return
 		}
 		; ── Repeat collapsing ──
 		; Only what the dedup let through reaches this layer, so a burst is reported
 		; once, promptly, by the dedup summary and never counted twice.
-		if (_LOGGER_REPEAT_ENABLED and _LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now))
+		if (!Exempt and _LOGGER_REPEAT_ENABLED and _LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now)) {
+				_LOGGER_VOLUME["collapsed"] += 1
 				return
+		}
 		if (_LOGGER_DEDUP_COUNT > 0) {
 				_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
 		}
@@ -1266,6 +1602,7 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		_LOGGER_DEDUP_COUNT := 0
 		_LastErrTime := Now
 
+		_LoggerCountWritten(Level)
 		_LoggerPushRing(Line)
 		if _LOGGER_TEST_SINK != 0 {
 				try _LOGGER_TEST_SINK(Line)
@@ -1314,6 +1651,7 @@ _LoggerEmitDedupSummary(Level, Count) {
 	Word := (Count == 1) ? "line" : "lines"
 	MsgLine := Format("[{1}] [logger] {2} {3} identical {4} suppressed", Level, Chr(0x2191), Count, Word)
 	Line := WallClockTimestamp() . " " . MsgLine
+	_LoggerCountWritten(Level)
 	_LoggerPushRing(Line)
 	if _LOGGER_TEST_SINK != 0 {
 		try _LOGGER_TEST_SINK(Line)
@@ -1556,6 +1894,7 @@ _LoggerEmitRepeatSummary(Streak, Stamp) {
 	Line := Stamp . " [" . Streak.Level . "] [" . Streak.Tag . "] " . Chr(0x2191) . ' "' . Streak.Text
 		. '" repeated ' . Streak.Count . " more " . Times . " between " . Streak.FirstStamp
 		. " and " . Streak.LastStamp . Last . "."
+	_LoggerCountWritten(Streak.Level)
 	_LoggerPushRing(Line)
 	if _LOGGER_TEST_SINK != 0 {
 		try _LOGGER_TEST_SINK(Line)

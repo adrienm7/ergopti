@@ -153,14 +153,14 @@ helpers.describe("gesture Actions search acquisition epoch", function()
 		helpers.assert_eq(actions.set_action_parameter(
 			"tap_3", "search_web", "https://example.test/?q=%s"), true)
 		helpers.assert_eq(actions.set_action_parameter(
-			"keyboard__cmd_1", "search_web", "https://example.test/?q=%s"), true)
+			"keyboard__primary_1", "search_web", "https://example.test/?q=%s"), true)
 		helpers.assert_eq(actions.execute_single("search_web", "tap_3"), false)
 		local restore_calls = calls.clipboard_restore_calls
 		helpers.assert_eq(calls.clipboard_text(), "selected words")
 
 		controls.search_restore_mode = nil
 		helpers.assert_eq(actions.execute_single(
-			"search_web", "keyboard__cmd_1"), true,
+			"search_web", "keyboard__primary_1"), true,
 			"the registered sibling action remains owned when foreign debt refuses its work")
 		helpers.assert_eq(calls.clipboard_restore_calls, restore_calls,
 			"a sibling action may observe but never settle foreign recovery debt")

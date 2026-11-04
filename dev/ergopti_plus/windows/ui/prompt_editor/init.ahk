@@ -28,6 +28,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -71,6 +72,7 @@ global _PromptEdWeb_InitBatch  := false
 ; the same profile cannot make an old callback current again.
 global _PromptEdWeb_ContextEpoch := 0
 global _PromptEdWeb_EpochSerial  := 0
+global _PromptEdWeb_OpeningSource := 0
 
 ; Injectable boundaries keep the scheduler race deterministic in the headless
 ; suite while production continues to use SetTimer, WebView2 and the real sinks.
@@ -96,111 +98,226 @@ _PromptEdWeb_Available() {
 }
 
 ; Captures one immutable display identity and its initial form projection.
-_PromptEdWeb_BeginContext(Existing) {
+_PromptEdWeb_BeginContext(Existing, Source := 0, ExpectedContext := 0) {
 	global _PromptEdWeb_IsEdit, _PromptEdWeb_EditId
 	global _PromptEdWeb_InitName, _PromptEdWeb_InitPrompt, _PromptEdWeb_InitBatch
-	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_EpochSerial
+	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_EpochSerial, _PromptEdWeb_OpeningSource
 
 	IsEdit := IsObject(Existing)
-	_PromptEdWeb_IsEdit     := IsEdit
-	_PromptEdWeb_EditId     := (IsEdit && Existing.Has("id")) ? Existing["id"] : ""
-	_PromptEdWeb_InitName   := (IsEdit && Existing.Has("label")) ? Existing["label"] : ""
-	_PromptEdWeb_InitPrompt := (IsEdit && Existing.Has("system_single"))
-		? Existing["system_single"]
-		: t("prompt_editor.placeholder_prompt")
-	_PromptEdWeb_InitBatch  := (IsEdit && Existing.Has("batch") && Existing["batch"] == true)
-
-	_PromptEdWeb_EpochSerial += 1
-	_PromptEdWeb_ContextEpoch := _PromptEdWeb_EpochSerial
-	return { EditId: _PromptEdWeb_EditId, Epoch: _PromptEdWeb_ContextEpoch }
+	EditId := (IsEdit && Existing.Has("id")) ? Existing["id"] : ""
+	InitName := (IsEdit && Existing.Has("label")) ? Existing["label"] : ""
+	InitPrompt := (IsEdit && Existing.Has("system_single"))
+		? Existing["system_single"] : t("prompt_editor.placeholder_prompt")
+	InitBatch := IsEdit && Existing.Has("batch") && Existing["batch"] == true
+	PreviousCritical := Critical("On")
+	try {
+		if ExpectedContext is Object
+				&& (ExpectedContext.Serial != _PromptEdWeb_EpochSerial || ExpectedContext.Epoch != _PromptEdWeb_ContextEpoch)
+			return false
+		if Source is Map && !_LLM_Menu_ProfileSourceBound(Source)
+			return false
+		_PromptEdWeb_IsEdit := IsEdit
+		_PromptEdWeb_EditId := EditId
+		_PromptEdWeb_InitName := InitName
+		_PromptEdWeb_InitPrompt := InitPrompt
+		_PromptEdWeb_InitBatch := InitBatch
+		_PromptEdWeb_EpochSerial += 1
+		_PromptEdWeb_ContextEpoch := _PromptEdWeb_EpochSerial
+		_PromptEdWeb_OpeningSource := Source
+		return { EditId: EditId, Epoch: _PromptEdWeb_ContextEpoch }
+	} finally Critical(PreviousCritical)
 }
 
 ; Attempts to show the prompt editor in a WebView2 window. Returns true on success
 ; (the caller must NOT also build the native InputBox wizard), false to fall back.
 ; Existing is the user profile Map to edit, or 0 for a new profile.
-_PromptEdWeb_TryOpen(Existing) {
+_PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 	global _PromptEdWeb_Gui, _PromptEdWeb_Controller, _PromptEdWeb_WebView
 	global _PromptEdWeb_MsgSub, _PromptEdWeb_NavSub, _PromptEdWeb_ResetDone, _VendorDir, _SharedDir
 	global _PromptEdWeb_IsEdit, _PromptEdWeb_EditId
-	global _PromptEdWeb_InitName, _PromptEdWeb_InitPrompt, _PromptEdWeb_InitBatch
+	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_EpochSerial
 
+	ExpectedContext := { Serial: _PromptEdWeb_EpochSerial, Epoch: _PromptEdWeb_ContextEpoch }
 	if !_PromptEdWeb_Available()
 		return false
-
-	; Capture the open context FIRST. This used to sit below the singleton
-	; early-return, so re-opening the editor for a different profile while one was
-	; already open kept the OLD _PromptEdWeb_EditId — the window merely gained
-	; focus, still bound to the previous profile, and saving overwrote that one
-	; with what the user believed were the new profile's edits. Silent because the
-	; title bar was set at first open and never updated.
-	; A new profile pre-fills the editor with the placeholder example (mirrors the
-	; macOS host); an edit reads system_single.
-	Context := _PromptEdWeb_BeginContext(Existing)
-
-	; Singleton — re-point the existing editor at the newly captured context and
-	; bring it to the front, rather than silently ignoring the new request.
-	if (_PromptEdWeb_Gui != 0) {
-		try LoggerDebug("PromptEditor", "Re-using open editor for profile '{1}' (edit={2}).",
-			_PromptEdWeb_EditId, _PromptEdWeb_IsEdit ? "yes" : "no")
-		try _PromptEdWeb_Gui.Title := WindowTitle(_PromptEdWeb_IsEdit
-			? t("prompt_editor.title_edit")
-			: t("prompt_editor.title_new"))
-		try _PromptEdWeb_PushInit(Context.EditId, Context.Epoch)
-		WMPresentWindow(_PromptEdWeb_Gui)
+	Source := OpeningSource is Map ? OpeningSource : _LLM_Menu_CaptureProfileSource()
+	if !(Source is Map) || !_LLM_Menu_ProfileSourceBound(Source) {
+		ConfigReportPersistenceFailure("the LLM prompt editor", 0,
+			"the opening configuration source is unavailable")
 		return true
 	}
+	Context := _PromptEdWeb_BeginContext(Existing, Source, ExpectedContext)
+	if !IsObject(Context)
+		return true
+
+	; A profile switch reuses the native host, including a pending constructor.
+	; Its page/source context advances independently of that exact GUI's lifetime.
+	if (_PromptEdWeb_Gui != 0) {
+		Window := _PromptEdWeb_Gui
+		if !_PromptEdWeb_StartupCurrent(Window)
+			return true
+		try LoggerDebug("PromptEditor", "Re-using open editor for profile '{1}' (edit={2}).",
+			_PromptEdWeb_EditId, _PromptEdWeb_IsEdit ? "yes" : "no")
+		if !_PromptEdWeb_StartupCurrent(Window)
+			return true
+		try Window.Title := WindowTitle(_PromptEdWeb_IsEdit
+			? t("prompt_editor.title_edit") : t("prompt_editor.title_new"))
+		if !_PromptEdWeb_StartupCurrent(Window)
+			return true
+		try _PromptEdWeb_PushInit(Context.EditId, Context.Epoch)
+		if _PromptEdWeb_StartupCurrent(Window)
+			WMPresentWindow(Window)
+		return true
+	}
+	PreviousCritical := Critical("On")
+	try {
+		if _PromptEdWeb_Gui != 0 || !_PromptEdWeb_IsCurrentContext(Context.EditId, Context.Epoch)
+			return true
+		_PromptEdWeb_ResetDone := false
+	} finally Critical(PreviousCritical)
 
 	g := Gui_Create("+Resize +MinSize480x360", _PromptEdWeb_IsEdit ? t("prompt_editor.title_edit") : t("prompt_editor.title_new"))
-	g.BackColor := "0x1e1e1e"
-	g.MarginX   := 0
-	g.MarginY   := 0
-	Placeholder := g.Add("Text", "x0 y0 w" . PROMPTED_WIDTH . " h" . PROMPTED_HEIGHT, "")
-	g.OnEvent("Close", _PromptEdWeb_OnClose)
-	g.OnEvent("Size",  _PromptEdWeb_OnResize)
-
-	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
-	; the control lays out blank and never recovers.
-	g.Show("w" . PROMPTED_WIDTH . " h" . PROMPTED_HEIGHT . " Center")
-	_PromptEdWeb_Gui := g
-	; Re-arm before create so its failure path can invalidate this context even
-	; when the prior session left the idempotence flag set.
-	_PromptEdWeb_ResetDone := false
-
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
+	Installed := false, FactoryFailed := false, ResetForFallback := false
 	try {
-		_PromptEdWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
-	} catch as Err {
-		try LoggerError("PromptEditor", "WebView2 create failed: {1} — falling back to native wizard.", Err.Message)
-		try g.Destroy()
-		_PromptEdWeb_Reset()
-		_PromptEdWeb_Gui := 0
-		return false
+		if !_PromptEdWeb_OpeningCurrent(Context)
+			return true
+		g.BackColor := "0x1e1e1e"
+		g.MarginX := 0
+		g.MarginY := 0
+		Placeholder := g.Add("Text", "x0 y0 w" . PROMPTED_WIDTH . " h" . PROMPTED_HEIGHT, "")
+		g.OnEvent("Close", _PromptEdWeb_OnClose)
+		g.OnEvent("Size", _PromptEdWeb_OnResize)
+		Published := false
+		PreviousCritical := Critical("On")
+		try {
+			if _PromptEdWeb_OpeningCurrent(Context) {
+				_PromptEdWeb_Gui := g
+				Published := true
+			}
+		} finally Critical(PreviousCritical)
+		if !Published || !_PromptEdWeb_StartupCurrent(g)
+			return true
+		g.Show("w" . PROMPTED_WIDTH . " h" . PROMPTED_HEIGHT . " Center")
+		if !_PromptEdWeb_StartupCurrent(g)
+			return true
+
+		loader := _VendorDir . "\64bit\WebView2Loader.dll"
+		try {
+			Environment := WebView_SharedEnvironment(loader)
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			Controller := WebView2.create(Placeholder.Hwnd, , Environment)
+		} catch as Err {
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			try LoggerError("PromptEditor", "WebView2 create failed: {1} — falling back to native wizard.", Err.Message)
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			FactoryFailed := true
+		}
+		if !FactoryFailed {
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			View := Controller.CoreWebView2
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			try {
+				Settings := View.Settings
+				if !_PromptEdWeb_StartupCurrent(g)
+					return true
+				Settings.AreDevToolsEnabled := false
+				if !_PromptEdWeb_StartupCurrent(g)
+					return true
+				Settings.AreDefaultContextMenusEnabled := false
+				if !_PromptEdWeb_StartupCurrent(g)
+					return true
+				Settings.IsStatusBarEnabled := false
+				if !_PromptEdWeb_StartupCurrent(g)
+					return true
+				Settings.AreBrowserAcceleratorKeysEnabled := false
+				if !_PromptEdWeb_StartupCurrent(g)
+					return true
+				Settings.IsSwipeNavigationEnabled := false
+			}
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			MsgSub := View.WebMessageReceived(_PromptEdWeb_OnWebMessage)
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			NavSub := View.NavigationCompleted(_PromptEdWeb_OnNavigationCompleted.Bind(g))
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			try View.SetVirtualHostNameToFolderMapping(PROMPTED_VHOST, _SharedDir, PROMPTED_HOST_ACCESS_ALLOW)
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			Seed := _PromptEdWeb_I18nSeed()
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			try View.AddScriptToExecuteOnDocumentCreated(Seed)
+			PreviousCritical := Critical("On")
+			try {
+				if _PromptEdWeb_StartupCurrent(g) {
+					_PromptEdWeb_Controller := Controller
+					_PromptEdWeb_WebView := View
+					_PromptEdWeb_MsgSub := MsgSub
+					_PromptEdWeb_NavSub := NavSub
+					; Globals retain the subscriptions before their local aliases go.
+					MsgSub := unset
+					NavSub := unset
+					Installed := true
+				}
+			} finally Critical(PreviousCritical)
+			if !Installed || !_PromptEdWeb_StartupCurrent(g)
+				return true
+			Url := _PromptEdWeb_HtmlUrl()
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			try View.Navigate(Url)
+			if !_PromptEdWeb_StartupCurrent(g)
+				return true
+			try Controller.Fill()
+			if _PromptEdWeb_StartupCurrent(g)
+				try LoggerSuccess("PromptEditor", "Prompt editor shown via WebView2 (edit={1}).", _PromptEdWeb_IsEdit)
+			return true
+		}
+	} finally {
+		if !Installed {
+			ResetForFallback := _PromptEdWeb_Reset(g)
+			try MsgSub := unset
+			try NavSub := unset
+			if IsSet(Controller) {
+				try Controller.Close()
+				catch as Err
+					try LoggerError("PromptEditor", "Retired browser cleanup failed: {1}.", Err.Message)
+			}
+			try g.Destroy()
+		}
 	}
+	; A failed old profile cannot borrow a later context's fallback authority.
+	return !(FactoryFailed && ResetForFallback && _PromptEdWeb_FallbackCurrent(Context, Source))
+}
 
-	_PromptEdWeb_WebView := _PromptEdWeb_Controller.CoreWebView2
 
-	try {
-		s := _PromptEdWeb_WebView.Settings
-		s.AreDevToolsEnabled               := false
-		s.AreDefaultContextMenusEnabled    := false
-		s.IsStatusBarEnabled               := false
-		s.AreBrowserAcceleratorKeysEnabled := false
-		s.IsSwipeNavigationEnabled         := false
-	}
 
-	; Store the subscription handles in persistent globals (see header note).
-	global _PromptEdWeb_MsgSub := _PromptEdWeb_WebView.WebMessageReceived(_PromptEdWeb_OnWebMessage)
-	global _PromptEdWeb_NavSub := _PromptEdWeb_WebView.NavigationCompleted(_PromptEdWeb_OnNavigationCompleted)
+; Native host custody is distinct from the scalar profile/page consent epoch.
+; A profile repoint may keep this same GUI while its browser is still awaiting.
+_PromptEdWeb_OpeningCurrent(Context) {
+	global _PromptEdWeb_Gui, _PromptEdWeb_ResetDone
+	return _PromptEdWeb_IsCurrentContext(Context.EditId, Context.Epoch)
+		&& !_PromptEdWeb_ResetDone && _PromptEdWeb_Gui == 0
+}
 
-	; Map the virtual host BEFORE navigating; seed the i18n base + active locale
-	; before page scripts run so the shared i18n.js fetches the right locale JSON.
-	try _PromptEdWeb_WebView.SetVirtualHostNameToFolderMapping(PROMPTED_VHOST, _SharedDir, PROMPTED_HOST_ACCESS_ALLOW)
-	try _PromptEdWeb_WebView.AddScriptToExecuteOnDocumentCreated(_PromptEdWeb_I18nSeed())
-	try _PromptEdWeb_WebView.Navigate(_PromptEdWeb_HtmlUrl())
-	try _PromptEdWeb_Controller.Fill()
+_PromptEdWeb_StartupCurrent(Window) {
+	global _PromptEdWeb_Gui, _PromptEdWeb_ResetDone
+	return !_PromptEdWeb_ResetDone && _PromptEdWeb_Gui == Window
+}
 
-	try LoggerSuccess("PromptEditor", "Prompt editor shown via WebView2 (edit={1}).", _PromptEdWeb_IsEdit)
-	return true
+_PromptEdWeb_FallbackCurrent(Context, Source) {
+	global _PromptEdWeb_Gui, _PromptEdWeb_ResetDone, _PromptEdWeb_EpochSerial
+	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_OpeningSource
+	return _PromptEdWeb_EpochSerial == Context.Epoch && _PromptEdWeb_ContextEpoch == 0
+		&& _PromptEdWeb_OpeningSource == 0 && _PromptEdWeb_ResetDone && _PromptEdWeb_Gui == 0
+		&& _LLM_Menu_ProfileSourceBound(Source)
 }
 
 
@@ -260,11 +377,18 @@ _PromptEdWeb_HandlePayload(Payload, Action := "") {
 	_PromptEdWeb_Defer(_PromptEdWeb_Save.Bind(EditId, Epoch, Name, Batch, Prompt))
 }
 
-; Push the init payload once the page has finished loading.
-_PromptEdWeb_OnNavigationCompleted(Handler, Args) {
+; A navigation owns its native window, independently of profile repoints on
+; that same host. An in-flight old callback cannot borrow a successor's context.
+_PromptEdWeb_OnNavigationCompleted(Window, Handler, Args) {
 	global _PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch
-	_PromptEdWeb_Defer(_PromptEdWeb_PushInit.Bind(
-		_PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch))
+	PreviousCritical := Critical("On")
+	try {
+		if !(Window is Gui) || !_PromptEdWeb_StartupCurrent(Window)
+			return false
+		Initialize := _PromptEdWeb_PushInit.Bind(_PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch)
+	} finally Critical(PreviousCritical)
+	_PromptEdWeb_Defer(Initialize)
+	return true
 }
 
 ; Build and push the init({...}) payload consumed by the frontend.
@@ -328,15 +452,15 @@ _PromptEdWeb_Save(EditId, Epoch, Name, Batch, Prompt) {
 ; Applies form values to one detached menu candidate. The explicit target keeps
 ; nested profile Maps isolated until the strict writer has made them durable.
 _PromptEdWeb_ApplyProfile(MenuState, EditId, Name, Batch, Prompt) {
-	if !(MenuState is Map) || !MenuState.Has("user_profiles")
-			|| !(MenuState["user_profiles"] is Array)
+	if !(MenuState is Map) || !MenuState.Has(ConfigLeaf.USER_PROFILES)
+			|| !(MenuState[ConfigLeaf.USER_PROFILES] is Array)
 		return false
 	if (EditId != "") {
-		for i, p in MenuState["user_profiles"] {
+		for i, p in MenuState[ConfigLeaf.USER_PROFILES] {
 			if (p.Has("id") && p["id"] == EditId) {
-				MenuState["user_profiles"][i]["label"]         := Name
-				MenuState["user_profiles"][i]["system_single"] := Prompt
-				MenuState["user_profiles"][i]["batch"]         := Batch
+				MenuState[ConfigLeaf.USER_PROFILES][i]["label"]         := Name
+				MenuState[ConfigLeaf.USER_PROFILES][i]["system_single"] := Prompt
+				MenuState[ConfigLeaf.USER_PROFILES][i]["batch"]         := Batch
 				return true
 			}
 		}
@@ -350,7 +474,7 @@ _PromptEdWeb_ApplyProfile(MenuState, EditId, Name, Batch, Prompt) {
 			"system_multi",  "",
 			"batch",         Batch
 		)
-		MenuState["user_profiles"].Push(new_profile)
+		MenuState[ConfigLeaf.USER_PROFILES].Push(new_profile)
 		MenuState["profile_id"] := pid
 	}
 	return true
@@ -372,8 +496,9 @@ _PromptEdWeb_ApplyCommitted(*) {
 ; checked inside the mutation callback, after terminal acquisition and any WAL
 ; recovery, so a queued WebView callback cannot pass an early check and mutate
 ; a newer editor context while admission yields.
-_PromptEdWeb_PersistProfile(EditId, Epoch, Name, Batch, Prompt) {
-	global _PromptEdWeb_PersistHook, _LLM_Menu
+_PromptEdWeb_PersistProfile(EditId, Epoch, Name, Batch, Prompt, Port := 0) {
+	global _PromptEdWeb_PersistHook, _LLM_Menu, _PromptEdWeb_OpeningSource
+	Source := _PromptEdWeb_OpeningSource
 
 	if IsObject(_PromptEdWeb_PersistHook) {
 		; The hook represents the durable writer in behavioural tests. Preserve
@@ -395,9 +520,12 @@ _PromptEdWeb_PersistProfile(EditId, Epoch, Name, Batch, Prompt) {
 		return true
 	}
 
+	Options := _LLM_Menu_ProfilePorts(Port)
 	return LLM_Menu_CommitMutation("the LLM prompt-editor profile save",
 		(Candidate) => _PromptEdWeb_ApplyProfileForContext(Candidate,
-			EditId, Epoch, Name, Batch, Prompt), _PromptEdWeb_ApplyCommitted)
+			EditId, Epoch, Name, Batch, Prompt), Options.Get("apply", _PromptEdWeb_ApplyCommitted),
+		_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
 }
 
 
@@ -514,12 +642,12 @@ _PromptEdWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_PromptEdWeb_Controller)
-		try _PromptEdWeb_Controller.Fill()
+		try WebView_FitToWindow(_PromptEdWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) and the frontend "cancel" button both land here.
-_PromptEdWeb_OnClose(*) {
-	_PromptEdWeb_Close()
+_PromptEdWeb_OnClose(Window, *) {
+	return _PromptEdWeb_Close(Window)
 }
 
 ; Closes only when the deferred page action still owns the displayed context.
@@ -538,54 +666,61 @@ _PromptEdWeb_CloseForContext(EditId, Epoch) {
 	return true
 }
 
-_PromptEdWeb_Close() {
+_PromptEdWeb_Close(ExpectedWindow := unset) {
 	global _PromptEdWeb_Gui
-	saved := (_PromptEdWeb_Gui != 0) ? _PromptEdWeb_Gui : 0
-	_PromptEdWeb_Reset()
+	PreviousCritical := Critical("On")
 	try {
-		if saved
-			saved.Destroy()
-	}
-	_PromptEdWeb_Gui := 0
+		Window := IsSet(ExpectedWindow) ? ExpectedWindow : _PromptEdWeb_Gui
+		if !IsObject(Window) || _PromptEdWeb_Gui != Window
+			return false
+	} finally Critical(PreviousCritical)
+	if !_PromptEdWeb_Reset(Window)
+		return false
+	try Window.Destroy()
+	return true
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
 ; whether to destroy the window). Idempotent: a second call (e.g. the native
 ; Close event firing after "save"/"cancel" already tore the same window down)
 ; is a true no-op instead of touching the globals again.
-_PromptEdWeb_Reset() {
-	global _PromptEdWeb_Controller, _PromptEdWeb_WebView, _PromptEdWeb_MsgSub, _PromptEdWeb_NavSub
-	global _PromptEdWeb_ResetDone, _PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch
+_PromptEdWeb_Reset(ExpectedWindow := unset) {
+	global _PromptEdWeb_Gui, _PromptEdWeb_Controller, _PromptEdWeb_WebView
+	global _PromptEdWeb_MsgSub, _PromptEdWeb_NavSub, _PromptEdWeb_ResetDone
+	global _PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch, _PromptEdWeb_OpeningSource
 
-	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
-	; Completed against this controller. Re-running the unset lines below would
-	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
-	; has already torn down (Controller.Close() releases CoreWebView2's underlying
-	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
-	if _PromptEdWeb_ResetDone
-		return
-	_PromptEdWeb_ResetDone := true
-	; Invalidate before any COM teardown can yield so already-queued page actions
-	; cannot become current after the window has gone away.
-	_PromptEdWeb_EditId       := ""
-	_PromptEdWeb_ContextEpoch := 0
-
-	; The whole teardown runs under one try: a hard COM access violation can
-	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
-	; exceptions — it does NOT catch that class of failure, but wrapping the
-	; sequence still protects the *other* lines from a preceding non-fatal COM
-	; error so the globals below are always cleared even when the unsubscribe
-	; itself fails.
+	PreviousCritical := Critical("On")
 	try {
-		; Release the subscriptions FIRST, while the controller is still alive. Their
-		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-		; Controller.Close() raises a COM error that — uncaught in the window's
-		; Close-event thread — terminates the entire AHK script.
+		if IsSet(ExpectedWindow) && _PromptEdWeb_Gui != ExpectedWindow
+			return false
+		if _PromptEdWeb_ResetDone
+			return false
+		; Retain every old reference before detaching its globals. Last-reference
+		; release and native destruction happen after the RAM transaction.
+		RetiredWindow := _PromptEdWeb_Gui
+		RetiredSource := _PromptEdWeb_OpeningSource
+		if IsSet(_PromptEdWeb_Controller)
+			RetiredController := _PromptEdWeb_Controller
+		if IsSet(_PromptEdWeb_WebView)
+			RetiredView := _PromptEdWeb_WebView
+		if IsSet(_PromptEdWeb_MsgSub)
+			RetiredMsgSub := _PromptEdWeb_MsgSub
+		if IsSet(_PromptEdWeb_NavSub)
+			RetiredNavSub := _PromptEdWeb_NavSub
+		_PromptEdWeb_ResetDone := true
+		_PromptEdWeb_EditId := ""
+		_PromptEdWeb_ContextEpoch := 0
+		_PromptEdWeb_OpeningSource := 0
+		_PromptEdWeb_Gui := 0
 		_PromptEdWeb_MsgSub := unset
 		_PromptEdWeb_NavSub := unset
-		if IsSet(_PromptEdWeb_Controller)
-			_PromptEdWeb_Controller.Close()
-	}
-	_PromptEdWeb_Controller := unset
-	_PromptEdWeb_WebView    := unset
+		_PromptEdWeb_Controller := unset
+		_PromptEdWeb_WebView := unset
+	} finally Critical(PreviousCritical)
+	; These callouts may open a successor; only captured old objects are touched.
+	try RetiredMsgSub := unset
+	try RetiredNavSub := unset
+	if IsSet(RetiredController)
+		try RetiredController.Close()
+	return true
 }

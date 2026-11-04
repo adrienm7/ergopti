@@ -14,9 +14,11 @@
 --- 1. The layer_active contract is unchanged: every manipulator fires only while
 ---    the layer variable is 1, whatever modifier is held, and the generator
 ---    scopes the variable to the lease like every other rule.
---- 2. Keys resolve through the physical-key registry for Ergopti's ISO board
----    (KEYBOARD_FORM), the board the hand-written layer was written on: on it
----    Karabiner swaps the key left of 1 and the key left of Z.
+--- 2. Inputs and outputs both use the registry's ISO projection
+---    (KEYBOARD_FORM): the ANSI virtual keyboard (the Automatic choice) passes
+---    the ISO pair through unswapped, so an output reaches the keycode the
+---    physical key itself produces (#99). The ISO product swaps the pair, so
+---    outputs are renamed for it (modules/keymap/layout.lua product_key_name).
 --- 3. F1-F12 reach the function keys in either top-row mode: sent plain while
 ---    macOS uses them as standard keys, with Fn added while it treats the row as
 ---    media keys (Karabiner's system.use_fkeys_as_standard_function_keys).
@@ -39,8 +41,37 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
+local Layout = require("modules.keymap.layout")
 
 local LOG = "karabiner.nav_layer"
+
+-- Configured input observations originate in the same acknowledged load. They
+-- reserve mapping inputs only; no Karabiner installation or lease is admitted.
+local Json = require("json")
+local TomlCodec = require("toml_codec")
+local Layers = require("keymap.layers")
+local Writer = require("toml_codec.writer")
+local TableUtil = require("table_util")
+local original_read, original_json, original_toml = Writer.read_classified, Json.decode, TomlCodec.decode
+local source_records = setmetatable({}, { __mode = "k" })
+local layer_ports = {}
+for _, name in ipairs({ "load_context", "load_user_file", "user_file_path", "new_context", "load", "format_resolution" }) do
+	layer_ports[name] = Layers[name]
+end
+local original_load, original_build, original_wheel, original_capture
+
+local function source_ports_current()
+	if package.loaded["platform.remap.nav_layer"] ~= M or getmetatable(M) ~= nil
+		or M.load ~= original_load or M.build_rule ~= original_build or M.wheel_slots ~= original_wheel
+		or M.capture_configured_inputs ~= original_capture
+		or package.loaded["json"] ~= Json or getmetatable(Json) ~= nil or Json.decode ~= original_json
+		or package.loaded["toml_codec"] ~= TomlCodec or getmetatable(TomlCodec) ~= nil or TomlCodec.decode ~= original_toml
+		or package.loaded["toml_codec.writer"] ~= Writer or getmetatable(Writer) ~= nil or Writer.read_classified ~= original_read
+		or package.loaded["keymap.layers"] ~= Layers or getmetatable(Layers) ~= nil then return false end
+	for name, port in pairs(layer_ports) do if type(port) ~= "function" or Layers[name] ~= port then return false end end
+	return true
+end
 
 -- The layer a tap-hold key's hold_layer "nav" enters
 -- (_shared/tap_hold/defaults.toml [tap_hold.hold_picker].layers).
@@ -51,8 +82,6 @@ M.NAV_LAYER_ID = "nav"
 M.HOLD_ACTION_ID = "layer"
 
 local OS = "macos"
--- errno for a path that does not exist, as io.open reports it.
-local ENOENT = 2
 
 
 
@@ -118,7 +147,8 @@ local function karabiner_event(code, registry)
 	local entry = registry.keys[code]
 	if type(entry) ~= "table" then error("nav_layer: " .. tostring(code) .. " is not in the physical-key registry", 3) end
 	local source = entry.karabiner
-	local override = type(entry["macos_" .. KEYBOARD_FORM]) == "table" and entry["macos_" .. KEYBOARD_FORM].karabiner
+	local override = type(entry["macos_" .. KEYBOARD_FORM]) == "table"
+		and entry["macos_" .. KEYBOARD_FORM].karabiner
 	if type(override) == "table" then source = override end
 	-- json.lua decodes a JSON null to a sentinel table, so check for a real field.
 	if type(source) == "table" then
@@ -138,11 +168,14 @@ end
 --- The `to` events of a keystroke, with Fn added to every function key when asked.
 --- @param chords table Resolved chords { mods, key }.
 --- @param add_fn boolean Whether F1-F12 are sent with Fn.
+--- @param product string Deployed virtual keyboard product, "ansi" or "iso".
 --- @return table events
-local function keystroke_events(chords, registry, add_fn)
+local function keystroke_events(chords, registry, add_fn, product)
 	local events = {}
 	for _, chord in ipairs(chords) do
 		local event = karabiner_event(chord.key, registry)
+		-- The virtual keyboard product renames the ISO pair it receives.
+		if event.key_code ~= nil then event.key_code = Layout.product_key_name(event.key_code, product) end
 		local mods, has_fn = {}, false
 		for _, mod in ipairs(chord.mods) do
 			local name = KARABINER_MODIFIERS[mod]
@@ -229,20 +262,20 @@ end
 
 --- The manipulators of one bound key.
 --- @return table manipulators
-local function manipulators_for(code, resolution, registry)
+local function manipulators_for(code, resolution, registry, product)
 	local label = "Navigation layer: " .. code .. " — " .. resolution_label(resolution)
 	if resolution.kind == "keystroke" then
 		if not sends_function_key(resolution.chords, registry) then
 			local manipulator = base_manipulator(code, registry, label)
-			manipulator.to = keystroke_events(resolution.chords, registry, false)
+			manipulator.to = keystroke_events(resolution.chords, registry, false, product)
 			return { manipulator }
 		end
 		local media = base_manipulator(code, registry, label .. " (Fn added: the top row is media keys)",
 			{ type = "variable_unless", name = FKEYS_STANDARD_VAR_NAME, value = true })
-		media.to = keystroke_events(resolution.chords, registry, true)
+		media.to = keystroke_events(resolution.chords, registry, true, product)
 		local standard = base_manipulator(code, registry, label .. " (the top row is standard function keys)",
 			{ type = "variable_if", name = FKEYS_STANDARD_VAR_NAME, value = true })
-		standard.to = keystroke_events(resolution.chords, registry, false)
+		standard.to = keystroke_events(resolution.chords, registry, false, product)
 		return { media, standard }
 	end
 	if resolution.kind == "none" then
@@ -263,10 +296,15 @@ end
 --- Builds the Karabiner rule of the navigation layer.
 --- @param bindings table Key code -> resolution, resolved for macOS.
 --- @param registry table Decoded physical_keys.json.
+--- @param product string Deployed virtual keyboard product, "ansi" or "iso": the outputs name the
+---   ISO pair for it (inputs are the physical device's usages, whatever the product).
 --- @return table|nil rule { description, manipulators }, nil when nothing is bound.
-function M.build_rule(bindings, registry)
+function M.build_rule(bindings, registry, product)
 	if type(bindings) ~= "table" or type(registry) ~= "table" or type(registry.keys) ~= "table" then
 		error("nav_layer.build_rule needs the bindings and the physical-key registry", 2)
+	end
+	if product ~= "ansi" and product ~= "iso" then
+		error("nav_layer.build_rule needs the virtual keyboard product, ansi or iso, got " .. tostring(product), 2)
 	end
 	local codes = {}
 	for code in pairs(bindings) do
@@ -280,7 +318,7 @@ function M.build_rule(bindings, registry)
 	table.sort(codes)
 	local manipulators = {}
 	for _, code in ipairs(codes) do
-		for _, manipulator in ipairs(manipulators_for(code, bindings[code], registry)) do
+		for _, manipulator in ipairs(manipulators_for(code, bindings[code], registry, product)) do
 			manipulators[#manipulators + 1] = manipulator
 		end
 	end
@@ -305,7 +343,7 @@ end
 --- @return table|nil strokes Array of { system = "SOUND_UP" } or
 ---   { mods = { "cmd", … }, keycode = n }; empty for `none`.
 --- @return string|nil problem Why the binding cannot run on the wheel.
-local function wheel_strokes(code, resolution, registry)
+local function wheel_strokes(code, resolution, registry, form)
 	if resolution.kind == "none" then return {} end
 	if resolution.kind == "call" and Brightness.actions[resolution.handler] then
 		return { { system = Brightness.actions[resolution.handler].macos_system } }
@@ -320,7 +358,7 @@ local function wheel_strokes(code, resolution, registry)
 			strokes[#strokes + 1] = { system = system }
 		else
 			local entry = registry.keys[chord.key]
-			local override = type(entry) == "table" and entry["macos_" .. KEYBOARD_FORM]
+			local override = type(entry) == "table" and entry["macos_" .. form]
 			local keycode = type(override) == "table" and override.hs or (type(entry) == "table" and entry.hs)
 			if type(keycode) ~= "number" then
 				return nil, tostring(chord.key) .. " has no macOS keycode to send for " .. code
@@ -336,15 +374,20 @@ end
 --- The wheel bindings of a layer, by axis and direction.
 --- @param bindings table Key code -> resolution, resolved for macOS.
 --- @param registry table Decoded physical_keys.json.
+--- @param form string|nil Captured active layout convention for Quartz output.
 --- @return table slots { vertical = { [1] = slot, [-1] = slot }, horizontal = … },
 ---   a slot being { code, strokes }; a direction the layer leaves unbound, or
 ---   binds to what a wheel turn cannot send (logged), has none.
-function M.wheel_slots(bindings, registry)
+function M.wheel_slots(bindings, registry, form)
+	if form ~= nil then
+		assert(form == "ansi" or form == "iso", "wheel output requires the declared virtual keyboard convention")
+	end
 	local slots = { vertical = {}, horizontal = {} }
 	for code, resolution in pairs(bindings) do
 		local entry = registry.keys[code]
 		if type(entry) == "table" and entry.kind == WHEEL_KIND then
-			local strokes, problem = wheel_strokes(code, resolution, registry)
+			form = form or Layout.keyboard_form()
+			local strokes, problem = wheel_strokes(code, resolution, registry, form)
 			if strokes and slots[entry.axis] then
 				slots[entry.axis][entry.direction] = { code = code, strokes = strokes }
 			else
@@ -365,25 +408,20 @@ end
 -- ===============================
 -- ===============================
 
---- Reads a whole shipped file; raises when it cannot.
-local function read_shipped(path)
-	local fh, err = io.open(path, "rb")
-	if not fh then error("nav_layer: cannot read " .. path .. ": " .. tostring(err)) end
-	local content = fh:read("*a")
-	fh:close()
-	return content
+--- Reads the user's layer file: only genuine absence is nil; failed read or
+--- close acknowledgement must not lend its bytes to the navigation loader.
+local function read_user_file(path, remember, reader)
+	local content, status, detail = (reader or require("toml_codec.writer").read_classified)(path)
+	if remember then remember(path, content, status) end
+	if status == "ok" and type(content) == "string" then return content end
+	if status == "absent" and content == nil then return nil end
+	error("nav_layer: cannot read " .. path .. ": " .. tostring(detail or "source read was not acknowledged"), 0)
 end
 
---- Reads the user's layer file: nil when it does not exist, raises when it cannot be read.
-local function read_user_file(path)
-	local fh, err, code = io.open(path, "rb")
-	if not fh then
-		if code == ENOENT then return nil end
-		error(tostring(err))
-	end
-	local content = fh:read("*a")
-	fh:close()
-	if content == nil then error("cannot read " .. path) end
+--- Shipped context has no optional-file contract: even genuine absence is fatal.
+local function read_shipped(path, remember, reader)
+	local content = read_user_file(path, remember, reader)
+	if content == nil then error("nav_layer: cannot read " .. path .. ": source is absent", 0) end
 	return content
 end
 
@@ -396,34 +434,119 @@ local function error_where(err)
 	return #parts > 0 and table.concat(parts, ".") or "the whole file"
 end
 
+local function project_configured_inputs(layer)
+	if type(layer) ~= "table" or getmetatable(layer) ~= nil or type(layer.bindings) ~= "table"
+		or getmetatable(layer.bindings) ~= nil or type(layer.registry) ~= "table"
+		or getmetatable(layer.registry) ~= nil or type(layer.registry.keys) ~= "table"
+		or getmetatable(layer.registry.keys) ~= nil then return nil end
+	local inputs, codes, seen = {}, {}, {}
+	local function compiled_input(rule)
+		local result
+		if type(rule) ~= "table" or type(rule.manipulators) ~= "table" or #rule.manipulators == 0 then return nil end
+		for _, manipulator in ipairs(rule.manipulators) do
+			local from, event = manipulator.from, nil
+			if type(from) ~= "table" then return nil end
+			for _, field in ipairs(EVENT_FIELDS) do
+				if from[field] ~= nil then
+					if event ~= nil or type(from[field]) ~= "string" then return nil end
+					event = field .. "=" .. from[field]
+				end
+			end
+			local modifiers = from.modifiers
+			if event == nil or type(modifiers) ~= "table" or modifiers.mandatory ~= nil
+				or type(modifiers.optional) ~= "table" or #modifiers.optional ~= 1
+				or modifiers.optional[1] ~= "any" then return nil end
+			if result ~= nil and result ~= event then return nil end
+			result = event
+		end
+		return result
+	end
+	for code, resolution in pairs(layer.bindings) do
+		local entry = layer.registry.keys[code]
+		if type(code) ~= "string" or type(resolution) ~= "table" or getmetatable(resolution) ~= nil
+			or type(entry) ~= "table" or getmetatable(entry) ~= nil then return nil end
+		local kind = rawget(resolution, "kind")
+		if kind == "keystroke" then
+			local chords = rawget(resolution, "chords")
+			if type(chords) ~= "table" or getmetatable(chords) ~= nil then return nil end
+			local count = 0
+			for index, chord in pairs(chords) do
+				if type(index) ~= "number" or index % 1 ~= 0 or index < 1
+					or type(chord) ~= "table" or getmetatable(chord) ~= nil or type(rawget(chord, "key")) ~= "string"
+					or type(rawget(chord, "mods")) ~= "table" or getmetatable(chord.mods) ~= nil then return nil end
+				local modifiers = 0
+				for item, mod in pairs(chord.mods) do
+					if type(item) ~= "number" or item % 1 ~= 0 or item < 1 or type(mod) ~= "string" or HS_MODIFIERS[mod] == nil then return nil end
+					modifiers = modifiers + 1
+				end
+				for item = 1, modifiers do if rawget(chord.mods, item) == nil then return nil end end
+				count = count + 1
+			end
+			if count == 0 then return nil end
+			for index = 1, count do if rawget(chords, index) == nil then return nil end end
+		elseif kind ~= "none" and kind ~= "call" then return nil end
+		if kind == "call" and type(rawget(resolution, "handler")) ~= "string" then return nil end
+		local native, compiled
+		if entry.kind == "key" then
+			local override = rawget(entry, "macos_" .. KEYBOARD_FORM)
+			if override ~= nil and (type(override) ~= "table" or getmetatable(override) ~= nil) then return nil end
+			native = type(override) == "table" and rawget(override, "hs") or rawget(entry, "hs")
+			if type(native) ~= "number" or native ~= native or native % 1 ~= 0 or native < 0 then return nil end
+			-- The real rule compiler validates this exact input and its resolution.
+			-- Only the input is read back, and the product never changes an input.
+			compiled = compiled_input(original_build({ [code] = resolution }, layer.registry, "ansi"))
+			if compiled == nil then return nil end
+			if not seen[native] then codes[#codes + 1] = native; seen[native] = true end
+		end
+		inputs[code] = { native = native, compiled = compiled, resolution = layer_ports.format_resolution(resolution) }
+	end
+	table.sort(codes)
+	return inputs, codes
+end
+
 --- Loads the navigation layer's bindings from the user's layers.toml.
 --- @param opts table|nil { shared_root, config_dir }; each defaults to the driver's own.
 --- @return table layer { bindings = key code -> resolution for macOS, registry =
 ---   physical_keys.json, wheel = M.wheel_slots of the bindings }
 function M.load(opts)
+	local eligible, sources = source_ports_current(), {}
+	local observing = eligible
+	local reader = observing and original_read or Writer.read_classified
+	local json_decode = observing and original_json or Json.decode
+	local toml_decode = observing and original_toml or TomlCodec.decode
+	local load_context = observing and layer_ports.load_context or Layers.load_context
+	local load_user_file = observing and layer_ports.load_user_file or Layers.load_user_file
+	local function rejoin() if not source_ports_current() then eligible = false end end
+	local function invoke(port, ...)
+		rejoin()
+		local result = port(...)
+		rejoin()
+		return result
+	end
+	local function remember(path, content, status)
+		rejoin()
+		sources[#sources + 1] = { path = path, content = content, status = status }
+	end
 	opts = opts or {}
 	local shared_root = opts.shared_root or require("infra.paths").shared_root()
 	local config_dir = opts.config_dir or require("infra.config_paths").get_config_dir()
 	if type(shared_root) ~= "string" then error("nav_layer: the _shared tree is unreachable", 2) end
 	if type(config_dir) ~= "string" then error("nav_layer: the configuration folder is unknown", 2) end
-	local Json = require("json")
-	local TomlCodec = require("toml_codec")
-	local Layers = require("keymap.layers")
 	-- The shipped registry and vocabulary first: a broken copy raises before this
 	-- load has started, and the regeneration logs that failure.
-	local ctx = Layers.load_context({
+	local ctx = invoke(load_context, {
 		shared_root = shared_root,
-		json_decode = Json.decode,
-		toml_decode = TomlCodec.decode,
-		read_file   = read_shipped,
+		json_decode = function(text) return invoke(json_decode, text) end,
+		toml_decode = function(text) return invoke(toml_decode, text) end,
+		read_file = function(path) return read_shipped(path, remember, reader) end,
 	})
 	Logger.start(LOG, "Loading the navigation layer from '%s'…", config_dir)
-	local result = Layers.load_user_file({
+	local result = invoke(load_user_file, {
 		config_dir  = config_dir,
 		os          = OS,
 		ctx         = ctx,
-		toml_decode = TomlCodec.decode,
-		read_file   = read_user_file,
+		toml_decode = function(text) return invoke(toml_decode, text) end,
+		read_file = function(path) return read_user_file(path, remember, reader) end,
 	})
 	for _, err in ipairs(result.errors) do
 		Logger.warn(LOG, "%s: %s (%s) — %s.", result.path, tostring(err.code), error_where(err), tostring(err.detail))
@@ -441,12 +564,64 @@ function M.load(opts)
 		end
 	end
 	local bindings = result.layers[M.NAV_LAYER_ID] or {}
-	local count = 0
-	for _ in pairs(bindings) do count = count + 1 end
+	local count = TableUtil.count(bindings)
 	local wheel = M.wheel_slots(bindings, ctx.registry)
 	Logger.success(LOG, "Navigation layer loaded: %d key(s) bound.", count)
-	return { bindings = bindings, registry = ctx.registry, wheel = wheel }
+	local layer = { bindings = bindings, registry = ctx.registry, wheel = wheel }
+	local observation
+	if eligible and source_ports_current() and #sources == 3
+		and sources[1].path == NativePath.without_trailing_separators(shared_root) .. "/data/keycodes/physical_keys.json"
+		and sources[2].path == NativePath.without_trailing_separators(shared_root) .. "/keymap/layer_actions.toml"
+		and sources[3].path == result.path then
+		local complete = sources[1].status == "ok" and sources[2].status == "ok"
+		for _, source in ipairs(sources) do
+			if type(source.path) ~= "string" or not (source.status == "ok" and type(source.content) == "string"
+				or source.status == "absent" and source.content == nil) then complete = false end
+		end
+		local projected, inputs, codes = pcall(project_configured_inputs, layer)
+		if complete and projected and inputs ~= nil and eligible and source_ports_current() then
+			observation = {}
+			source_records[observation] = { layer = layer, sources = sources, inputs = inputs, codes = codes }
+		end
+	end
+	return layer, observation
 end
+
+--- Captures the genuine load's configured physical inputs without native authority.
+--- The exact bound code, resolution and ISO input projection remain joined to
+--- those original registry/vocabulary/user bytes, including explicit None.
+--- @param layer table Original first return of load.
+--- @param observation table Opaque second return from that same load.
+--- @return table|nil inventory Detached codes with current and sealed joins.
+function M.capture_configured_inputs(layer, observation)
+	local record = source_records[observation]
+	if not record or record.layer ~= layer or not source_ports_current() then return nil end
+	local inputs, codes = record.inputs, {}
+	for index, code in ipairs(record.codes) do codes[index] = code end
+	local function sealed()
+		if not source_ports_current() or getmetatable(observation) ~= nil or next(observation) ~= nil
+			or source_records[observation] ~= record then return false end
+		local ok, actual = pcall(project_configured_inputs, layer)
+		if not ok or actual == nil or not source_ports_current() then return false end
+		for code, item in pairs(inputs) do
+			local other = actual[code]
+			if not other or other.native ~= item.native or other.compiled ~= item.compiled or other.resolution ~= item.resolution then return false end
+		end
+		for code in pairs(actual) do if inputs[code] == nil then return false end end
+		return true
+	end
+	local function current()
+		if not sealed() then return false end
+		for _, source in ipairs(record.sources) do
+			local content, status = original_read(source.path)
+			if content ~= source.content or status ~= source.status or not sealed() then return false end
+		end
+		return sealed()
+	end
+	if not current() then return nil end
+	return { codes = codes, current = current, sealed = sealed }
+end
+original_load, original_build, original_wheel, original_capture = M.load, M.build_rule, M.wheel_slots, M.capture_configured_inputs
 
 
 

@@ -76,10 +76,12 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 		; ":flags:B0O:abbrev" string — both pure boot-time waste. The ternaries
 		; short-circuit, so neither is constructed unless a recorder is present.
 		Rec := _HotstringRegistrar
+		EndsWithMagic := InStr(Flags, "*") > 0
 		Meta := _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult,
 				TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
 				(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
-				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
+				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset,
+				EndsWithMagic)
 		; Personal-info previews must render the value snapshot carried by the
 		; registered Spec, not re-read the mutable PersonalInformation Map.  The
 		; editor publishes that Map before its terminal Reload, so a second read in
@@ -94,10 +96,11 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 				and options["PreviewValues"] is Array) {
 			Meta.PreviewValues := options["PreviewValues"].Clone()
 		}
+		_HSE_WithPreviewOutput(Meta, IsSet(options) ? options.Get("PreviewOutput", "") : "")
 		_RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags), Abbreviation,
 				Rec ? (":" Flags "B0O:" Abbreviation) : "",
-				Rec ? _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
+				Rec ? _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate, EndsWithMagic) : 0,
 				Meta
 		)
 }
@@ -120,7 +123,7 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 		; The callback IS the dispatch here (HSE_DispatchMatch routes RawCallback specs
 		; to it), so it is always passed; only the recorder string is gated on Rec.
 		Rec := _HotstringRegistrar
-		Meta := { RawCallback: true, TimeActivationSeconds: TimeActivationSeconds, PrevCharKey: _TextPenultimateCodepoint(Abbreviation), Category: Category, Section: Section, Priority: Priority }
+		Meta := { RawCallback: true, TimeActivationSeconds: TimeActivationSeconds, PrevCharKey: HSE_TimeGateReferenceChar(Abbreviation, InStr(Flags, "*") > 0), Category: Category, Section: Section, Priority: Priority }
 		if IsSet(options) && options.Has("SupportsPreparation") {
 			SupportsPreparation := options["SupportsPreparation"]
 			if !(SupportsPreparation is Integer) || (SupportsPreparation != false && SupportsPreparation != true)
@@ -152,7 +155,7 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 ; field the value came from, so a sink that tried to decide for itself would be
 ; guessing from the text. HSE_Register copies every Meta field onto the Spec, so
 ; the flag reaches HSEMatch.IsPrivate at each of the three fire paths.
-_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10, IsPrivate := false, Group := unset, PersonalSource := unset) {
+_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10, IsPrivate := false, Group := unset, PersonalSource := unset, EndsWithMagic := false) {
 		Meta := {
 				Replacement: Replacement,
 				Trigger: Abbreviation,
@@ -160,7 +163,7 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 				OnlyText: OnlyText,
 				FinalResult: FinalResult,
 				TimeActivationSeconds: TimeActivationSeconds,
-				PrevCharKey: _TextPenultimateCodepoint(Abbreviation),
+				PrevCharKey: HSE_TimeGateReferenceChar(Abbreviation, EndsWithMagic),
 				IsRepeat: IsRepeat,
 				Category: Category,
 				Section: Section,
@@ -176,14 +179,26 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 		return Meta
 }
 
+; Carries the text an output with keys types, for the preview: the Replacement of
+; such an output is a Send string the bubble cannot show. An output of keys alone
+; types nothing, so it keeps no row.
+; @param Meta {Object} The dispatch metadata.
+; @param PreviewOutput {String} The typed text, "" when there is none.
+; @returns {Object} Meta.
+_HSE_WithPreviewOutput(Meta, PreviewOutput) {
+		if PreviewOutput != ""
+				Meta.PreviewOutput := PreviewOutput
+		return Meta
+}
+
 ; Builds the per-keystroke callback for a single hotstring variant. Computes
 ; ``BackSpaceSeq`` / ``PrevCharKey`` once at registration time and closes
 ; over both plus the positional option booleans. Each call produces a fresh
 ; closure with its own captures — safe to call in a loop over variants.
-_MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category := "", Section := "", IsPrivate := false) {
+_MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category := "", Section := "", IsPrivate := false, EndsWithMagic := false) {
 		BackSpaceSeq := "{BackSpace " . _TextCodepointLength(Abbreviation) . "}"
 		AbbreviationLen := StrLen(Abbreviation)
-		PrevCharKey := _TextPenultimateCodepoint(Abbreviation)
+		PrevCharKey := HSE_TimeGateReferenceChar(Abbreviation, EndsWithMagic)
 		return (*) => _HotstringDispatch(Replacement, A_EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult,
 				TimeActivationSeconds, AbbreviationLen, Abbreviation, Category, Section, IsPrivate)
 }
@@ -222,13 +237,13 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 				try PrefixWatcherSuppress(true)
 		}
 
-		; Tag the backspace+replacement burst as synthetic so the keylogger keeps
+		; Tag the backspace+replacement burst as synthetic so the keystats keeps
 		; it out of the manual `chars` count and attributes the resulting n-grams
 		; to the hotstring source (esrc). Released on the same deferred timer as
 		; the prefix-watcher suppression so it covers the OS message-loop flush.
 		;
 		; IsPrivate travels with it: the sends below are observed by the
-		; keylogger's InputHook character by character, so without the flag the
+		; keystats's InputHook character by character, so without the flag the
 		; typing row keeps the replacement this path redacts from the fire row.
 		SyntheticOwner := 0
 		try SyntheticOwner := KL_MarkSynthetic("hotstring", IsPrivate)
@@ -271,14 +286,14 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 				; clipboard path which is slower than the direct event injection.
 				if IsSet(PrefixWatcherSuppress) {
 						if Fired
-								SetTimer((*) => PrefixWatcherSuppress(false), -60)
+								SetTimer((*) => PrefixWatcherSuppress(false), -TimingsGet("hotstrings", "synthetic_clear_ms"))
 						else
 								PrefixWatcherSuppress(false)
 				}
 				; Release the synthetic flag on the same flush window — clearing it
 				; inline would let trailing replacement keystrokes look manual.
 				if Fired
-						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -60)
+						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -TimingsGet("hotstrings", "synthetic_clear_ms"))
 				else
 						KL_ClearSynthetic(SyntheticOwner)
 		}
@@ -344,6 +359,21 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds, NowTick 
 ; the engine in both directions. Bundled categories always short-circuit into the
 ; cache registrar, so only the two least-covered paths were affected.
 HSE_RegisterFromTomlFlags(IsCaseSensitive, Flags, Trigger, Output, Options) {
+		; A TOML output is the grammar of send_input_parameter.ahk, which every loader
+		; reaches through here: with no answer from them the factories default to
+		; OnlyText = true, and {Text} typed {Left} and {U+27C3} as characters. A caller
+		; that names OnlyText has already decided what its output is.
+		if (!Options.Has("OnlyText") and RegExMatch(Output, "[{`r`n`t]")) {
+				Parsed := SendInputParseOutput(Output)
+				if Parsed["has_keys"] {
+						Options := Options.Clone()
+						Options["OnlyText"] := false
+						Options["PreviewOutput"] := Parsed["text"]
+						Output := SendInputOutputPayload(Parsed)
+				} else {
+						Output := Parsed["text"]
+				}
+		}
 		if IsCaseSensitive {
 				CreateHotstring(Flags, Trigger, Output, Options)
 				return
@@ -372,6 +402,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				: _HSE_ResolveRegistrationPriority(Category, Section)
 
 		Rec := _HotstringRegistrar
+		PreviewOutput := IsSet(options) ? options.Get("PreviewOutput", "") : ""
 
 		; Order matters: nbsp abbreviations must trigger before bare punctuation
 		; so the engine can delete the preceding non-breaking space correctly.
@@ -379,11 +410,12 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 		; a bare ' inside Map() as a string delimiter, causing a parse error.
 		static UppercasedSymbols := _BuildUppercasedSymbols()
 
-		; Only the lowercase forms are needed to decide and take the case-conform fast
-		; path below; the Title / UPPER forms (4 StrXxx calls) serve solely the
-		; explicit-variant path, so they are computed only after the conform return.
+		; Only the lowercase trigger is needed to decide and take the case-conform fast
+		; path below; the Title / UPPER forms serve solely the explicit-variant path,
+		; so they are computed only after the conform return. The replacement is never
+		; lowercased: a lower-case typing emits it as written, so a capitalised output
+		; ("ppt" -> "PowerPoint") keeps its capitals, as on macOS and Linux.
 		AbbreviationLowerCase := StrLower(Abbreviation)
-		ReplacementLowerCase := StrLower(Replacement)
 
 		; ── Case-conform fast path ──────────────────────────────────────────────
 		; For a star trigger with no shift-symbol char (the common case — every
@@ -407,16 +439,17 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				ConformOneChar := StrLen(RTrim(Abbreviation, ScriptInformation["MagicKey"])) == 1
 				; Drop the "C" flag so any-case typing matches the single registered spec.
 				ConformFlags := StrReplace(Flags, "C")
-				ConformMeta := _MakeHotstringMeta(ReplacementLowerCase, AbbreviationLowerCase, OnlyText,
+				ConformMeta := _MakeHotstringMeta(Replacement, AbbreviationLowerCase, OnlyText,
 						FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
 						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
-				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
+				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset, true)
 				ConformMeta.CaseConform := true
 				ConformMeta.ConformOneChar := ConformOneChar
+				_HSE_WithPreviewOutput(ConformMeta, PreviewOutput)
 				_RegisterHotstringFast(
 						Rec, _HseFlagSubset(ConformFlags), AbbreviationLowerCase,
 						Rec ? (":" ConformFlags "B0O:" AbbreviationLowerCase) : "",
-						Rec ? _MakeHotstringCallback(ReplacementLowerCase, AbbreviationLowerCase, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
+						Rec ? _MakeHotstringCallback(Replacement, AbbreviationLowerCase, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate, true) : 0,
 						ConformMeta
 				)
 				return
@@ -431,7 +464,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 		AbbreviationTitleCase := StrTitle(Abbreviation)
 		AbbreviationUpperCase := StrUpper(Abbreviation)
 		FirstChar := SubStr(Abbreviation, 1, 1)
-		ReplacementTitleCase := StrTitle(Replacement)
+		ReplacementTitleCase := _HSE_ReplTitle(Replacement)
 		ReplacementUpperCase := StrUpper(Replacement)
 
 		; Helper closure: installs one hotstring variant with positional args
@@ -439,34 +472,37 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 		; ``_HotstringDispatch`` skips the StrLen + SubStr work on every firing.
 		; Must be a fat-arrow lambda so it closes over the outer locals; nested
 		; ``f() {}`` functions in AHK v2 do not capture the enclosing scope.
-		RegisterVariant := (Abbr, Repl) => _RegisterHotstringFast(
+		RegisterVariant := (Abbr, Repl, Preview) => _RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags "C"), Abbr,
 				Rec ? (FlagsPortion Abbr) : "",
-				Rec ? _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
-				_MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
+				Rec ? _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate, InStr(Flags, "*") > 0) : 0,
+				_HSE_WithPreviewOutput(_MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
 						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
-				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
+				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset,
+				InStr(Flags, "*") > 0), Preview)
 		)
+		PreviewTitleCase := _HSE_ReplTitle(PreviewOutput)
+		PreviewUpperCase := StrUpper(PreviewOutput)
 
-		RegisterVariant(AbbreviationLowerCase, ReplacementLowerCase)
+		RegisterVariant(AbbreviationLowerCase, Replacement, PreviewOutput)
 
 		; When an abbreviation is only one character, titlecase = uppercase
 		if StrLen(RTrim(Abbreviation, ScriptInformation["MagicKey"])) == 1 {
-				RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase)
+				RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase, PreviewTitleCase)
 				return
 		}
 
 		if (StrLen(Abbreviation) >= 2) {
 				for _, variant in GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
-						RegisterVariant(variant, ReplacementUpperCase)
+						RegisterVariant(variant, ReplacementUpperCase, PreviewUpperCase)
 				}
 
 				; Titlecase: first letter uppercase, rest lowercase
 				if !(StrLower(FirstChar) == StrUpper(FirstChar)) {
-						RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase)
+						RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase, PreviewTitleCase)
 				} else if UppercasedSymbols.Has(FirstChar) {
 						for _, UppercasedSymbol in UppercasedSymbols[FirstChar] {
-								RegisterVariant(UppercasedSymbol . SubStr(AbbreviationLowerCase, 2), ReplacementTitleCase)
+								RegisterVariant(UppercasedSymbol . SubStr(AbbreviationLowerCase, 2), ReplacementTitleCase, PreviewTitleCase)
 						}
 				}
 		}
@@ -519,13 +555,25 @@ StrTitle(Text) {
 		}
 }
 
+; The Title form of a REPLACEMENT: its first character upper-cased, the rest kept
+; as written (the shared text_utils.repl_title). StrTitle lowercases the rest,
+; which is right for a trigger variant but turned "PowerPoint" into "Powerpoint".
+_HSE_ReplTitle(Text) {
+		if (Text == "")
+				return Text
+		FirstLen := (Ord(Text) > 0xFFFF) ? 2 : 1
+		return StrUpper(SubStr(Text, 1, FirstLen)) . SubStr(Text, FirstLen + 1)
+}
+
 ; Case-conform a replacement to the way the user actually typed the trigger. This
 ; replaces the old explicit lower/UPPER/Title variant registrations:
 ; CreateCaseSensitiveHotstrings now registers ONE case-insensitive spec (for star
 ; triggers without a shift-symbol char), and HSE_DispatchMatch calls this at fire
 ; time to pick the output casing — roughly halving the magic-key registration
 ; (~2119 -> ~1000 specs) with no observable change.
-;   - ``Repl``      the registered (lowercase) replacement.
+;   - ``Repl``      the registered replacement, in the casing it was written:
+;                   a lower-case typing emits it unchanged, Title capitalises
+;                   only its first letter, UPPER upper-cases all of it.
 ;   - ``Typed``     the trigger exactly as typed (the matched buffer suffix).
 ;   - ``Canonical`` the registered (lowercase) trigger.
 ;   - ``OneChar``   true when the abbreviation is a single character before the
@@ -544,10 +592,10 @@ _HSE_ConformReplacement(Repl, Typed, Canonical, OneChar, &DoFire) {
 		; "!==" is case-SENSITIVE inequality — plain "!=" is case-insensitive in AHK v2
 		; and would treat "Ab" and "ab" as equal, collapsing the Title branch.
 		if (Typed == TitleForm and TitleForm !== Canonical) {
-				return StrTitle(Repl)
+				return _HSE_ReplTitle(Repl)
 		}
 		if (Typed == StrUpper(Canonical)) {
-				return OneChar ? StrTitle(Repl) : StrUpper(Repl)
+				return OneChar ? _HSE_ReplTitle(Repl) : StrUpper(Repl)
 		}
 		DoFire := false
 		return ""

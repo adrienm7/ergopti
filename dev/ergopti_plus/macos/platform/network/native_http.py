@@ -5,20 +5,74 @@ This engine has no Python HTTP or TLS dependency. Foundation owns the network;
 the caller owns redirects, output descriptors, integrity and publication.
 """
 
+import importlib.util
 import json
 import math
 import os
 from pathlib import Path
+import plistlib
+import re
 import selectors
 import stat
 import struct
 import subprocess
+import tempfile
 import time
+
+
+# Retain the actual constructor class for opt-in registered role acquisition.
+# The legacy unregistered transport still uses its original call unchanged.
+_ROLE_POPEN = subprocess.Popen
 
 
 MAX_FRAME_BYTES = 65536
 MAX_REQUEST_BYTES = 65536
 WORKER_FLAG = "--managed-http-worker"
+
+
+# BEGIN GENERATED NATIVE HTTP FAILURE STAGES
+# Generated from static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json; do not edit this span.
+FAILURE_STAGES = {
+    "native_policy_load": frozenset(["unavailable"]),
+    "native_selection_bound": frozenset(["unavailable"]),
+    "native_proxy_lookup": frozenset(["unavailable"]),
+    "native_proxy_budget": frozenset(["unavailable"]),
+    "native_proxy_candidates": frozenset(["unavailable"]),
+    "native_pac_download": frozenset(["unavailable"]),
+    "native_pac_evaluation": frozenset(["unavailable"]),
+    "native_proxy_routes": frozenset(["unavailable"]),
+    "native_wpad_discovery": frozenset(["unavailable"]),
+    "native_proxy_dictionary": frozenset(["proxy"]),
+    "native_route_empty": frozenset(["unavailable"]),
+    "native_certificate_load": frozenset(["certificate"]),
+    "native_lookup_deadline": frozenset(["deadline"]),
+    "native_dispatch_deadline": frozenset(["deadline"]),
+    "native_session_terminal": frozenset(
+        [
+            "deadline",
+            "cancelled",
+            "offline",
+            "certificate",
+            "proxy",
+            "connect",
+            "unavailable",
+            "protocol",
+            "content_encoding",
+        ]
+    ),
+}
+# END GENERATED NATIVE HTTP FAILURE STAGES
+
+
+_FALLBACK_MARKER = re.compile(
+    r"^# native_http_proxy_fallback route=direct reason=(native_[a-z_]{1,63})$", re.MULTILINE
+)
+# The kind of the route each attempt dispatched on; the last one carried the answer.
+_ROUTE_MARKER = re.compile(
+    r"^# native_http_route kind=(direct|http|https|socks|other) attempt=\d{1,3}/\d{1,3}$",
+    re.MULTILINE,
+)
+
 REASONS = frozenset(
     (
         "complete",
@@ -52,12 +106,55 @@ def _positive_timeout(value):
     )
 
 
+def _dev_source_names(root):
+    """The developer source-mode names declared once in _shared/data/identifiers.json."""
+    path = root.parent / "_shared/data/identifiers.py"
+    spec = importlib.util.spec_from_file_location("_ergopti_identifiers", path)
+    if spec is None or spec.loader is None:
+        raise NativeHTTPError("unavailable")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except OSError:
+        raise NativeHTTPError("unavailable") from None
+    return module.DEV_SOURCE
+
+
+def _developer_launcher(root):
+    """Return the launcher of a developer app that runs this clone.
+
+    A developer build (ERGOPTI_DEV_SOURCE=1) runs the Lua of a clone, so its
+    launcher cannot be derived from this file's path. The launcher's sealed
+    Info.plist records the clone root instead: the exported launcher is admitted
+    only when its own bundle names exactly the clone this file runs from. The
+    device and inode proof in _resolve_worker still applies. Anything else is
+    refused as unavailable, as a driver outside a bundle always was.
+    """
+    names = _dev_source_names(root)
+    clone = os.environ.get(names["environment"])
+    if not clone or str(root) != clone + "/static/ergopti_plus/macos":
+        raise NativeHTTPError("unavailable")
+    launcher = os.environ.get("ERGOPTI_LAUNCHER_EXECUTABLE") or ""
+    suffix = "/Contents/MacOS/ErgoptiPlus"
+    if not launcher.endswith(suffix) or not launcher[: -len(suffix)].endswith(".app"):
+        raise NativeHTTPError("unavailable")
+    try:
+        with open(launcher[: -len(suffix)] + "/Contents/Info.plist", "rb") as handle:
+            info = plistlib.load(handle)
+    except (OSError, plistlib.InvalidFileException, ValueError):
+        raise NativeHTTPError("unavailable") from None
+    if not isinstance(info, dict) or info.get(names["plist_key"]) != clone:
+        raise NativeHTTPError("unavailable")
+    return launcher
+
+
 def _resolve_worker():
     root = Path(__file__).absolute().parents[2]
     suffix = "/Contents/Resources/static/ergopti_plus/macos"
-    if not str(root).endswith(suffix):
-        raise NativeHTTPError("unavailable")
-    expected = str(root)[: -len(suffix)] + "/Contents/MacOS/ErgoptiPlus"
+    if str(root).endswith(suffix):
+        expected = str(root)[: -len(suffix)] + "/Contents/MacOS/ErgoptiPlus"
+    else:
+        expected = _developer_launcher(root)
     if os.environ.get("ERGOPTI_LAUNCHER_EXECUTABLE") != expected:
         raise NativeHTTPError("unavailable")
     try:
@@ -117,21 +214,34 @@ class NativeHTTPResponse:
                 timeout,
                 idle_timeout,
             )
+            self._diagnostic_stage = "native_head"
             self._receive_http_head(tag, payload)
-        except NativeHTTPError:
-            self.close()
+        except NativeHTTPError as failure:
+            self._close_for_failure(failure)
             raise
-        except (OSError, ValueError, TypeError):
-            self.close()
-            raise NativeHTTPError("unavailable") from None
-        except BaseException:
+        except (OSError, ValueError, TypeError) as source:
+            failure = NativeHTTPError("unavailable")
+            self._close_for_failure(failure, source)
+            raise failure from None
+        except BaseException as failure:
             # Role-specific initial validation still belongs to the constructor.
-            self.close()
+            self._close_for_failure(failure)
             raise
 
     _terminal_reasons = REASONS
 
-    def _open_wire(self, request_bytes, arguments, timeout, idle_timeout):
+    def _open_wire(
+        self,
+        request_bytes,
+        arguments,
+        timeout,
+        idle_timeout,
+        *,
+        register=None,
+        absolute_deadline=None,
+        progress=None,
+        pre_acquire=None,
+    ):
         """Open a private bounded role request and return its first frame.
 
         The signed worker identity and physical lifecycle are shared by native
@@ -152,8 +262,51 @@ class NativeHTTPResponse:
         self._closed = False
         self._terminal_value = None
         self._process = None
-        self._selector = selectors.DefaultSelector()
+        self._selector = None
+        self._role_progress = None
+        self._role_process_constructor = False
+        self._role_process_complete = False
+        self._stderr_file = None
+        self._route_fallback = None
+        self._route_kind = None
         try:
+            if absolute_deadline is not None:
+                if not _positive_timeout(absolute_deadline):
+                    raise NativeHTTPError("protocol")
+                self._absolute = absolute_deadline
+            if progress is not None and not callable(progress):
+                raise NativeHTTPError("protocol")
+            self._role_progress = progress
+            if pre_acquire is not None and not callable(pre_acquire):
+                raise NativeHTTPError("protocol")
+            if register is not None:
+                if not callable(register) or register(self) is not True:
+                    raise NativeHTTPError("protocol")
+                # A registration callback may revoke/close synchronously. It
+                # cannot leave a closed owner while we acquire new resources.
+                if (
+                    self._closed is not False
+                    or self._selector is not None
+                    or self._process is not None
+                ):
+                    raise NativeHTTPError("protocol")
+            # The retained role is registered before selector or child acquisition.
+            if (
+                register is not None
+                or absolute_deadline is not None
+                or progress is not None
+                or pre_acquire is not None
+            ):
+                self._remaining()
+                # progress() is an external callback and can close this empty
+                # response normally. Refuse before acquiring any successor.
+                if (
+                    self._closed is not False
+                    or self._selector is not None
+                    or self._process is not None
+                ):
+                    raise NativeHTTPError("protocol")
+            self._selector = selectors.DefaultSelector()
             if timeout is not None and not _positive_timeout(timeout):
                 raise NativeHTTPError("protocol")
             if not _positive_timeout(idle_timeout):
@@ -177,18 +330,67 @@ class NativeHTTPResponse:
             for value in arguments[1:]:
                 if value != "none" and not _positive_timeout(float(value)):
                     raise NativeHTTPError("protocol")
+            self._diagnostic_stage = "native_identity"
             executable = _resolve_worker()
-            self._process = subprocess.Popen(
-                [executable, *arguments],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                bufsize=0,
-                close_fds=True,
-            )
+            if (
+                register is not None
+                or absolute_deadline is not None
+                or progress is not None
+                or pre_acquire is not None
+            ):
+                acquired_selector = self._selector
+                if (
+                    self._closed is not False
+                    or acquired_selector is None
+                    or self._process is not None
+                ):
+                    raise NativeHTTPError("protocol")
+                # The source owner supplies its original full admission once at
+                # acquisition. Recurring progress retains the lighter liveness
+                # check; neither port renews the original absolute deadline.
+                if pre_acquire is not None:
+                    pre_acquire()
+                self._remaining()
+                # The exact already-acquired selector must survive the callback;
+                # a closed or replaced owner cannot acquire a native child.
+                if (
+                    self._closed is not False
+                    or self._selector is not acquired_selector
+                    or self._process is not None
+                ):
+                    raise NativeHTTPError("protocol")
+            self._diagnostic_stage = "native_spawn"
+            # The worker writes one closed fallback marker to stderr. A file keeps
+            # it readable without a pipe that could block the worker.
+            self._stderr_file = tempfile.TemporaryFile()
+            if register is not None:
+                # A real Popen constructor can raise after child creation. Keep
+                # its exact object reachable before entering that constructor.
+                self._process = _ROLE_POPEN.__new__(_ROLE_POPEN)
+                self._role_process_constructor = True
+                self._process.__init__(
+                    [executable, *arguments],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=self._stderr_file,
+                    bufsize=0,
+                    close_fds=True,
+                )
+                self._role_process_complete = True
+            else:
+                self._process = subprocess.Popen(
+                    [executable, *arguments],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=self._stderr_file,
+                    bufsize=0,
+                    close_fds=True,
+                )
+            self._diagnostic_stage = "native_pipe_setup"
             os.set_blocking(self._process.stdin.fileno(), False)
             os.set_blocking(self._process.stdout.fileno(), False)
             self._selector.register(self._process.stdin, selectors.EVENT_WRITE)
+            self._diagnostic_stage = "native_write"
             offset = 0
             while offset < len(request_bytes):
                 self._ready()
@@ -202,18 +404,39 @@ class NativeHTTPResponse:
             self._selector.unregister(self._process.stdin)
             self._process.stdin.close()
             self._selector.register(self._process.stdout, selectors.EVENT_READ)
+            self._diagnostic_stage = "native_first_frame"
             return self._frame()
-        except NativeHTTPError:
-            self.close()
+        except NativeHTTPError as failure:
+            self._close_initial_role_failure(register is not None, failure)
             raise
-        except (OSError, ValueError, TypeError):
-            self.close()
-            raise NativeHTTPError("unavailable") from None
-        except BaseException:
+        except (OSError, ValueError, TypeError) as source:
+            failure = NativeHTTPError("unavailable")
+            self._close_initial_role_failure(register is not None, failure, source)
+            raise failure from None
+        except BaseException as failure:
             # A signal/KeyboardInterrupt can arrive before a response context
             # exists. Retire the exact constructor child before propagating it.
-            self.close()
+            self._close_initial_role_failure(register is not None, failure)
             raise
+
+    def _close_initial_role_failure(self, registered, failure=None, source=None):
+        if not registered:
+            if failure is None:
+                self.close()
+            else:
+                self._close_for_failure(failure, source)
+            return
+        try:
+            self.close()
+        except BaseException as refused:
+            # The captured registered close records its exact failure; _closed
+            # remains false. Preserve the primary without granting retirement.
+            if failure is not None:
+                self._observe_failure(refused, "native_cleanup")
+        if failure is not None:
+            self._observe_failure(
+                failure, getattr(self, "_diagnostic_stage", "native_request"), source
+            )
 
     def _receive_http_head(self, tag, payload):
         """Validate the existing generic H schema for HTTP-bearing native roles."""
@@ -242,6 +465,9 @@ class NativeHTTPResponse:
         self.headers = metadata["headers"]
 
     def _remaining(self):
+        progress = getattr(self, "_role_progress", None)
+        if progress is not None:
+            progress()
         now = time.monotonic()
         deadline = self._idle_deadline
         if self._absolute is not None:
@@ -313,8 +539,18 @@ class NativeHTTPResponse:
             raise NativeHTTPError("protocol")
 
     def _validate_terminal(self, value):
-        """The generic HTTP role permits exactly its original three C fields."""
-        if set(value) != {"version", "success", "reason"}:
+        """Only failed generic C frames may carry a closed passive stage code."""
+        fields = set(value)
+        if fields == {"version", "success", "reason"}:
+            return
+        if fields != {"version", "success", "reason", "native_refusal_stage"}:
+            raise NativeHTTPError("protocol")
+        stage = value["native_refusal_stage"]
+        if (
+            value.get("success") is not False
+            or type(stage) is not str
+            or value.get("reason") not in FAILURE_STAGES.get(stage, ())
+        ):
             raise NativeHTTPError("protocol")
         self._validate_completion(value)
 
@@ -323,6 +559,7 @@ class NativeHTTPResponse:
         return NativeHTTPError(reason)
 
     def _terminal(self, payload):
+        self._diagnostic_stage = "native_terminal"
         value = self._json(payload)
         self._validate_terminal(value)
         # Extension validators cannot bypass the shared completion semantics.
@@ -333,11 +570,12 @@ class NativeHTTPResponse:
             code = self._process.wait(timeout=self._remaining())
         except subprocess.TimeoutExpired:
             raise NativeHTTPError("deadline") from None
+        # This is observed only after validated terminal, EOF and exact wait.
+        self._terminal_value = value
         if not value["success"]:
             raise self._terminal_error(value["reason"])
         if code != 0:
             raise NativeHTTPError("protocol")
-        self._terminal_value = value
         self._complete = True
 
     def read(self, maximum=MAX_FRAME_BYTES - 1):
@@ -346,6 +584,7 @@ class NativeHTTPResponse:
         try:
             if self._complete and not self._pending:
                 return b""
+            self._diagnostic_stage = "native_body"
             self._remaining()
             if not self._pending and not self._complete:
                 tag, payload = self._frame()
@@ -357,18 +596,122 @@ class NativeHTTPResponse:
                     raise NativeHTTPError("protocol")
             result, self._pending = self._pending[:maximum], self._pending[maximum:]
             return result
-        except NativeHTTPError:
-            self.close()
+        except NativeHTTPError as failure:
+            self._close_for_failure(failure)
             raise
-        except (OSError, ValueError, TypeError):
+        except (OSError, ValueError, TypeError) as source:
+            failure = NativeHTTPError("protocol")
+            self._close_for_failure(failure, source)
+            raise failure from None
+
+    def _close_for_failure(self, failure, source=None):
+        """Retire through the original owner before projecting fixed observations."""
+        try:
             self.close()
-            raise NativeHTTPError("protocol") from None
+        except BaseException as refused:
+            self._observe_failure(refused, "native_cleanup")
+            raise
+        # A refusal after a direct fallback still names the lookup step that gave up.
+        fallback = getattr(self, "_route_fallback", None)
+        if fallback is not None:
+            failure.native_route_fallback = fallback
+        self._observe_failure(failure, getattr(self, "_diagnostic_stage", "native_request"), source)
+
+    def _observe_failure(self, failure, stage, source=None):
+        if hasattr(failure, "native_diagnostic"):
+            return
+        if source is not None and hasattr(source, "native_diagnostic"):
+            failure.native_diagnostic = source.native_diagnostic.copy()
+            return
+        observed = failure if source is None else source
+        kind = "other"
+        for cls in (
+            NativeHTTPError,
+            subprocess.TimeoutExpired,
+            OSError,
+            ValueError,
+            TypeError,
+            AttributeError,
+        ):
+            if isinstance(observed, cls):
+                kind = cls.__name__
+                break
+        process = getattr(self, "_process", None)
+        retired = getattr(self, "_closed", False) is True
+        if process is not None:
+            retired = (
+                retired
+                and type(getattr(process, "returncode", None)) is int
+                and all(
+                    stream is None or stream.closed for stream in (process.stdin, process.stdout)
+                )
+            )
+        pid = getattr(process, "pid", None) if retired else None
+        status = getattr(process, "returncode", None) if retired else None
+        terminal = getattr(self, "_terminal_value", None) if retired else None
+        reason = terminal.get("reason") if type(terminal) is dict else None
+        if type(terminal) is dict and stage == "native_terminal":
+            refusal_stage = terminal.get("native_refusal_stage")
+            if type(refusal_stage) is str and reason in FAILURE_STAGES.get(refusal_stage, ()):
+                stage = refusal_stage
+        failure.native_diagnostic = {
+            "stage": stage,
+            "exception_class": kind,
+            "native_child_pid": pid if type(pid) is int and pid > 0 else None,
+            "native_child_status": status if type(status) is int else None,
+            "native_receipt_reason": reason if type(reason) is str and reason in REASONS else None,
+            "cleanup": "confirmed" if retired else "unconfirmed",
+        }
+
+    @property
+    def route_fallback(self):
+        """Stage code of the lookup step that made the worker go direct, or None.
+
+        Only a marker naming an allowlisted stage is accepted, so a URL or any
+        other worker text can never reach a log through this value.
+        """
+        if self._route_fallback is None and self._stderr_file is not None:
+            try:
+                text = os.pread(self._stderr_file.fileno(), 4096, 0).decode("ascii", "replace")
+            except (OSError, ValueError):
+                return None
+            match = _FALLBACK_MARKER.search(text)
+            if match is not None and match.group(1) in FAILURE_STAGES:
+                self._route_fallback = match.group(1)
+        return self._route_fallback
+
+    @property
+    def route_kind(self):
+        """Kind of the route the worker's last attempt used, or None.
+
+        A closed token (direct, http, https, socks, other) from the worker's own
+        marker: a lookup that answered DIRECT by itself leaves no fallback stage,
+        and only this tells it from a relay (ledger L42).
+        """
+        if self._route_kind is None and self._stderr_file is not None:
+            try:
+                text = os.pread(self._stderr_file.fileno(), 4096, 0).decode("ascii", "replace")
+            except (OSError, ValueError):
+                return None
+            kinds = _ROUTE_MARKER.findall(text)
+            if kinds:
+                self._route_kind = kinds[-1]
+        return self._route_kind
 
     def close(self):
         if self._closed:
             return
-        self._selector.close()
+        if self._selector is not None:
+            self._selector.close()
         if self._process is not None:
+            if (
+                getattr(self, "_role_process_constructor", False)
+                and not self._role_process_complete
+                and getattr(self._process, "_child_created", False) is not True
+            ):
+                # No complete constructor or exact child receipt proves that
+                # partial descriptors retired. Keep this registered debt.
+                raise NativeHTTPError("unavailable")
             if self._process.poll() is None:
                 self._process.kill()
             for stream in (self._process.stdin, self._process.stdout):
@@ -376,6 +719,12 @@ class NativeHTTPResponse:
                     stream.close()
             # No successor/publication may race the physical native process.
             self._process.wait()
+        # Read the markers once the child has retired, then release the file.
+        _ = self.route_fallback
+        _ = self.route_kind
+        if self._stderr_file is not None:
+            self._stderr_file.close()
+            self._stderr_file = None
         self._closed = True
 
     def __enter__(self):

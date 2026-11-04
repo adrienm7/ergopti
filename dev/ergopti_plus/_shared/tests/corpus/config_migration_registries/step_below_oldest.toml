@@ -1,0 +1,17 @@
+# _shared/tests/corpus/config_migration_registries/step_below_oldest.toml
+#
+# A step below oldest_version survived the squash.
+
+[registry]
+current_version = 2
+unstamped_version = 1
+oldest_version = 2
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: one delete."
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+]

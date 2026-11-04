@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 M.bridge_name = "prompt_bridge"
 
 local Json = require("json")
@@ -32,7 +33,7 @@ local function translated(key)
 end
 
 local function trim(value)
-	return type(value) == "string" and value:match("^%s*(.-)%s*$") or nil
+	return type(value) == "string" and TextUtils.trim(value) or nil
 end
 
 local function next_profile_id()
@@ -62,7 +63,8 @@ local function close_session(session, state, context)
 		Logger.error(LOG, "Prompt editor close refused; session %d retained.", session.epoch)
 		return false
 	end
-	_active_session = nil
+	-- Native close may have synchronously opened the next editor.
+	if _active_session == session then _active_session = nil end
 	Logger.info(LOG, "Prompt editor session %d closed.", session.epoch)
 	return true
 end
@@ -82,6 +84,40 @@ local function push_init(session, state, context)
 	return ok_push and pushed == true, session.payload
 end
 
+--- Reports a refused save only while its exact native editor still owns the draft.
+--- @param session table
+--- @param state table
+--- @return boolean requested
+local function notify_save_refused(session, state)
+	if _active_session ~= session or session.settled or type(state) ~= "table"
+		or type(state.notify_error) ~= "function" then return false end
+	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local current = manager and manager.page_current
+	local epoch, notify = session.window_epoch, state.notify_error
+	if type(current) ~= "function" or type(epoch) ~= "number" then return false end
+	local checked, live = pcall(current, APP_NAME, epoch)
+	if not checked or live ~= true or _active_session ~= session or session.settled
+		or session.window_epoch ~= epoch or manager.page_current ~= current
+		or state.notify_error ~= notify then return false end
+	return pcall(notify, "prompt_editor.save_failed")
+end
+
+--- Keeps noneditable profile options detached from both seeds and save callbacks.
+--- @param profile table|nil
+--- @return table
+local function copy_options(profile)
+	local copy = {}
+	if type(profile) ~= "table" then return copy end
+	for _, field in ipairs({ "system_single", "system_multi", "system_multi_template", "raw_prompt" }) do
+		if type(profile[field]) == "string" then copy[field] = profile[field] end
+	end
+	if type(profile.stop_sequences) == "table" then
+		copy.stop_sequences = Json.array({})
+		for index, value in ipairs(profile.stop_sequences) do copy.stop_sequences[index] = value end
+	end
+	return copy
+end
+
 local function new_session(existing, on_save, opts)
 	opts = type(opts) == "table" and opts or {}
 	_session_serial = _session_serial + 1
@@ -92,15 +128,16 @@ local function new_session(existing, on_save, opts)
 	local profile_id = edit_id ~= "" and edit_id
 		or (requested_id and requested_id:match("^user_[%w_%-]+$") and requested_id)
 		or next_profile_id()
-	local prompt = seeded and type(existing.system_single) == "string"
-		and existing.system_single or translated("prompt_editor.placeholder_prompt")
+	local options = copy_options(existing)
+	local raw_mode = type(options.raw_prompt) == "string" and options.raw_prompt ~= ""
+	local prompt = raw_mode and options.raw_prompt
+		or options.system_single or translated("prompt_editor.placeholder_prompt")
 	return {
 		epoch = _session_serial,
 		edit_id = edit_id,
 		profile_id = profile_id,
-		system_multi_template = seeded
-			and type(existing.system_multi_template) == "string"
-			and existing.system_multi_template or nil,
+		options = options,
+		raw_mode = raw_mode,
 		on_save = on_save,
 		settled = false,
 		saving = false,
@@ -134,24 +171,31 @@ function M.open(existing, on_save, opts)
 	end
 
 	if _active_session then
+		local previous = _active_session
 		local visible = type(manager.is_visible) == "function"
 			and manager.is_visible(APP_NAME) == true
+		if _active_session ~= previous then return false end
 		if visible and manager.hide(APP_NAME) ~= true then
 			Logger.error(LOG, "Prompt editor replacement refused; prior session retained.")
 			return false
 		end
+		if _active_session ~= previous then return false end
 		_active_session = nil
 	end
 
 	local session = new_session(existing, on_save, opts)
 	_active_session = session
-	if manager.show(APP_NAME) ~= true then
+	local shown = manager.show(APP_NAME)
+	if _active_session ~= session then return false end
+	if shown ~= true then
 		_active_session = nil
 		Logger.error(LOG, "Prompt editor native window could not be opened.")
 		return false
 	end
-	session.window_epoch = type(manager.current_epoch) == "function"
+	local window_epoch = type(manager.current_epoch) == "function"
 		and manager.current_epoch(APP_NAME) or nil
+	if _active_session ~= session then return false end
+	session.window_epoch = window_epoch
 	Logger.info(LOG, "Prompt editor session %d opened for '%s'.",
 		session.epoch, session.profile_id)
 	return true
@@ -217,17 +261,20 @@ function M.on_message(payload, state, context)
 	end
 
 	session.saving = true
-	local ok_save, accepted = pcall(session.on_save, {
-		id = session.profile_id,
-		label = name,
-		system_single = prompt,
-		system_multi_template = session.system_multi_template,
-		batch = payload.batch == true,
-	})
+	local candidate = copy_options(session.options)
+	candidate.id, candidate.label, candidate.batch = session.profile_id, name, payload.batch
+	if session.raw_mode then
+		-- Raw prompts are the active verbatim text; the hidden template stays intact.
+		candidate.raw_prompt = payload.prompt
+	else
+		candidate.system_single = prompt
+	end
+	local ok_save, accepted = pcall(session.on_save, candidate)
 	session.saving = false
 	if not ok_save or accepted ~= true then
 		Logger.error(LOG, "Prompt editor save was refused; session remains retryable: %s.",
 			tostring(accepted))
+		notify_save_refused(session, state)
 		return { saved = false, closed = false }
 	end
 

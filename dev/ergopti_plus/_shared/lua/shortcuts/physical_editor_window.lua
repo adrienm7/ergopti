@@ -30,6 +30,8 @@ function M.new(options)
 		assert(type(options[name]) == "function", "physical window port is incomplete")
 	end
 	local window, editor, ready, busy, retired = {}, nil, false, false, false
+	local close_requested, editor_closed, editor_retiring, native_closed = false, false, false, false
+	local native_close = options.close
 	local function current() return not retired and options.page_current() == true end
 	local ports = {}
 	for key, value in pairs(options) do ports[key] = value end
@@ -45,11 +47,21 @@ function M.new(options)
 		return options.send("captured", packet) == true and current()
 	end
 	editor = Editor.new(ports)
+	local editor_close = editor.close
+	local function retire_editor()
+		if editor_closed then return true end
+		if editor_retiring then return false end
+		editor_retiring = true
+		local called, acknowledged = pcall(editor_close)
+		editor_retiring = false
+		if called and acknowledged == true then editor_closed = true end
+		return editor_closed
+	end
 	--- Routes closed shared-page operations to their exact native session.
 	--- @param message table Closed editor, position observation or retirement request.
 	--- @return boolean handled
 	function window.receive(message)
-		if busy or not current() or type(message) ~= "table" then return false end
+		if busy or type(message) ~= "table" then return false end
 		local fields = { ready = { action = true }, choose = { action = true, request = true },
 			capture_position = { action = true, request = true }, cancel_position = { action = true },
 			save = { action = true, token = true }, remove = { action = true, slot = true }, close = { action = true } }
@@ -57,6 +69,7 @@ function M.new(options)
 		if not allowed then return false end
 		for key in pairs(message) do if not allowed[key] then return false end end
 		if message.action == "close" then return window.close() end
+		if not current() then return false end
 		if message.action == "ready" then
 			if ready then return false end
 			busy = true
@@ -95,22 +108,30 @@ function M.new(options)
 		if called and type(result.entries) == "table" then result.entries = Json.array(result.entries) end
 		return options.send("result", called and result or { committed = false, reason = "save_failed" }) == true
 	end
-	--- Retires the exact native page only after its close acknowledges completion.
-	--- @return boolean closed
+	--- Closes only after original observation and native-page retirement acknowledge.
+	--- Refusal retains the exact remaining operation; commands stay revoked.
+	--- @return boolean closed Both original owners acknowledged retirement.
 	function window.close()
-		if busy or retired or not current() then return false end
+		if busy or native_closed then return false end
+		-- Reserve before the page getter or either retirement callback can reenter.
 		busy = true
-		local called, closed = pcall(options.close)
+		if not close_requested then
+			local called, owned = pcall(current)
+			if not called or owned ~= true or retired then busy = false; return false end
+		end
+		close_requested, retired = true, true
+		if retire_editor() ~= true then busy = false; return false end
+		local called, acknowledged = pcall(native_close)
+		if called and acknowledged == true then native_closed = true end
 		busy = false
-		if not called or closed ~= true then return false end
-		retired = true
-		editor.close()
-		return true
+		return native_closed
 	end
-	--- Revokes a native closed page without acquiring or publishing configuration.
+	--- Revokes the page and retries only its original observation retirement.
+	--- This does not acknowledge native-page destruction.
+	--- @return boolean retired Original editor retirement acknowledged.
 	function window.retire()
 		retired = true
-		editor.close()
+		return retire_editor()
 	end
 	return window
 end

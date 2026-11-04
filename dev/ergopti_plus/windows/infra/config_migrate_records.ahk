@@ -216,16 +216,54 @@ _ConfigMigrateRecordBlock(Section, Updates, Eol) {
 	return Block
 }
 
+; Only the existing loader's unknown, unconsumed leaves can stay opaque.
+_ConfigMigrateCurrentOpaqueRecord(Record, Document, Seed) {
+	Parts := Record.Header is Object ? Record.Header.Parts.Clone() : []
+	for Part in Record.KeyParts
+		Parts.Push(Part)
+	Actual := _TOML_DocumentLookup(Document, Parts)
+	if !Actual["found"]
+		return false
+	Unconsumed(Value, Path) {
+		if Value is Map {
+			for Key, Child in Value {
+				ChildPath := Path.Clone()
+				ChildPath.Push(Key)
+				if !Unconsumed(Child, ChildPath)
+					return false
+			}
+			return true
+		}
+		Section := _ConfigTomlSection(Path), Key := Path[Path.Length]
+		return TomlConfigSectionSkipKind(Section == "" ? TOML_RenderKey(Key) : Section) == ""
+			&& TomlConfigUnknownKind(Seed, Section, Key, &ForeignOwner) != ""
+			&& ForeignOwner == ""
+	}
+	return Unconsumed(Actual["value"], Parts)
+}
+
 ; The typed reader does not decode multiline strings. A header or assignment
 ; inside one can fabricate a source value, or overwrite an earlier real one.
 ; Migration refuses that unrepresentable model instead of publishing a copy.
 ; Every other model cell must belong to an actual physical assignment under
 ; the native reader's raw header/key identity; foreign root records stay opaque.
-_ConfigMigrateRecordValidateModel(Scan, Before) {
-	Physical := Map()
+_ConfigMigrateRecordValidateModel(Scan, Before, CurrentOpaqueStrings := false, Document := unset) {
+	Physical := Map(), Continuations := Map()
+	Seed := 0
 	for Record in Scan.Records {
-		if Record.MultilineString
-			throw Error("the native TOML reader cannot represent multiline string ownership")
+		if Record.MultilineString {
+			if !CurrentOpaqueStrings
+				throw Error("the native TOML reader cannot represent multiline string ownership")
+			if !(Seed is Map) {
+				if !ManifestEnsureLoaded()
+					throw Error("the opaque physical ownership manifest is unavailable")
+				Seed := ManifestBuildFeaturesMap()
+			}
+			if !IsSet(Document) || !_ConfigMigrateCurrentOpaqueRecord(Record, Document, Seed)
+				throw Error("the native multiline string model has consumed physical ownership")
+			loop Record.Last - Record.First
+				Continuations[Record.First + A_Index] := true
+		}
 		Header := Record.Header
 		if !(Header is Object)
 			continue
@@ -235,6 +273,16 @@ _ConfigMigrateRecordValidateModel(Scan, Before) {
 		if !Physical.Has(Header.ModelSection)
 			Physical[Header.ModelSection] := Map()
 		Physical[Header.ModelSection][Key] := true
+	}
+	if Continuations.Count {
+		; A current file needs no migration of opaque strings. Its native model
+		; must still be identical when their continuation lines cannot supply
+		; headers, assignments or overwrites to the legacy reader.
+		PhysicalSource := Scan.Bom
+		for Index, Line in Scan.Lines
+			PhysicalSource .= (Continuations.Has(Index) ? "" : Line.Text) . Line.Eol
+		if !ConfigMigrateSameModel(Before, _ConfigMigrateParse(PhysicalSource, "physical current ownership"))
+			throw Error("the native multiline string model contains values outside physical ownership")
 	}
 	for Section, Entries in Before {
 		for Key in Entries {
@@ -264,6 +312,19 @@ _ConfigMigrateRecordValidateSources(Scan, Before, Registry, Driver, FromVersion)
 		for Op in Step["ops"] {
 			if Op["op"] == "set_if_absent" || Op["op"] == "delete"
 				continue
+			if Op["op"] == "rename_prefix" {
+				; Only the prefixed keys of the one named section are read.
+				if !Before.Has(Op["section"])
+					continue
+				Prefix := Op["prefix"]
+				for Key in Before[Op["section"]] {
+					if !(SubStr(Key, 1, StrLen(Prefix)) == Prefix)
+						continue
+					if !(Addressable.Has(Op["section"]) && Addressable[Op["section"]].Has(Key))
+						throw Error("the migration source is not an addressable physical TOML record")
+				}
+				continue
+			}
 			for Section, Entries in Before {
 				if Op.Has("key") ? !(Section == Op["section"]) : !_ConfigMigrateRecordUnder(Section, Op["section"])
 					continue
@@ -436,14 +497,14 @@ _ConfigMigrateRenderRecords(Source, Updates, DropSections, Scan := 0) {
 		else if !Dropped.Has(Index)
 			Content .= Line.Text . Line.Eol
 		if AfterLine.Has(Index) {
-			if Content != "" && !RegExMatch(Content, "[\r\n]$")
+			if Content != "" && !TOML_EndsWithLineBreak(Content)
 				Content .= Scan.Eol
 			Content .= AfterLine[Index]
 		}
 	}
 	for Block in Appended {
 		if Content != "" {
-			if !RegExMatch(Content, "[\r\n]$")
+			if !TOML_EndsWithLineBreak(Content)
 				Content .= Scan.Eol
 			Content .= Scan.Eol
 		}

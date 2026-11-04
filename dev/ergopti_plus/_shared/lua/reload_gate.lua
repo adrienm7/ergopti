@@ -27,6 +27,8 @@
 
 local M = {}
 
+local NativePath = require("native_path")
+
 
 
 
@@ -125,7 +127,7 @@ end
 --- @param dir string
 --- @return string|nil Parent path, or nil at the root.
 local function parent_of(dir)
-	local parent = dir:match("^(.*)/[^/]+$")
+	local parent = NativePath.dirname(dir)
 	if not parent or parent == "" then return nil end
 	return parent
 end
@@ -139,7 +141,7 @@ end
 local function resolve_git_dir(fs, start_dir)
 	if type(start_dir) ~= "string" or start_dir == "" then return nil end
 
-	local dir   = (start_dir:gsub("[/\\]+$", ""))
+	local dir   = NativePath.without_trailing_separators(start_dir)
 	local depth = 0
 	while dir and dir ~= "" and depth < MAX_WALK_DEPTH do
 		depth = depth + 1
@@ -156,7 +158,7 @@ local function resolve_git_dir(fs, start_dir)
 			local pointer = content:match("^gitdir:%s*(.-)%s*$")
 			if pointer and pointer ~= "" then
 				if pointer:sub(1, 1) ~= "/" then pointer = dir .. "/" .. pointer end
-				return (pointer:gsub("[/\\]+$", ""))
+				return NativePath.without_trailing_separators(pointer)
 			end
 		end
 

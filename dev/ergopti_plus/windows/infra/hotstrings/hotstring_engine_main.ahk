@@ -27,15 +27,19 @@
 ;        buffer is reset and the « before-the-cursor was a terminator » flag
 ;        is set true (because the just-typed terminator now sits there).
 ;      - Backspace decrements the buffer (one char off the right end).
-;        When the buffer is already empty, it instead sets the boundary flag
-;        to false because we just deleted into unknown territory.
+;        The one that erases its last typed char puts the caret back at a
+;        word start. When the buffer is already empty, it instead sets the
+;        boundary flag to false because we just deleted into unknown
+;        territory, unless the buffer started an empty terminal prompt.
+;      - Ctrl+Backspace deletes the previous word: the next char starts one.
 ;      - Arrows / Home / End / PgUp / PgDn / Insert / Delete / Escape /
 ;        mouse click / disruptive Ctrl combos (X / V / Z / Y) reset the
 ;        buffer and set the boundary flag to false (cursor moved or context
 ;        rewritten — we cannot know whether the new cursor position is at a
 ;        word boundary).
 ;      - Ctrl+A is a special case: it replaces the entire selection with the
-;        next typed char, so the new context starts at a word boundary.
+;        next typed char, so the new context starts at a word boundary, in
+;        an empty field (as Ctrl+L in a browser's address bar).
 ; 3. O(1) match lookup keyed by trigger's last char. Each keystroke only
 ;    scans the bucket of triggers that end with the just-typed char (or the
 ;    just-typed end character).
@@ -137,6 +141,8 @@ _HSE_SourcePriority(CategoryName) {
 ; HSE_FeedBackspace (chop one char), HSE_FeedReset (clear), and
 ; HSE_ApplyExpansion (replace trigger suffix by replacement).
 global HSE_Buffer := ""
+global HSE_FinalNoOpPending := false
+global HSE_FinalNoOpFound := false
 
 ; True when the character immediately to the left of HSE_Buffer is known to
 ; be a word terminator (or there is no character at all — start of input).
@@ -145,6 +151,16 @@ global HSE_Buffer := ""
 ; the buffer (BeforeLen == 0) — without this flag we could not distinguish
 ; « fresh document » from « cursor moved mid-word and buffer was reset ».
 global HSE_StartIsWordBoundary := true
+
+; True when the left edge of HSE_Buffer is known to be the start of an empty
+; input line, so a Backspace that finds the buffer empty deletes nothing and
+; the word start stands. Only a bare Enter in a terminal publishes it: the shell
+; or TUI prompt that follows is empty and its line editor ignores a Backspace
+; at its start. Meaningful only while HSE_StartIsWordBoundary is true; every
+; other reset clears it. Without it, one Backspace too many after « c★ » in an
+; empty Claude Code prompt made the next « C » a mid-word letter and its
+; word-start hotstring stayed silent (typing ledger of 2026-10-21).
+global HSE_StartIsLineStart := false
 
 ; Map(LastChar -> Array of HSE_Trigger objects). Each entry owns the
 ; trigger string, the callback, and parsed flags (case-sensitive, in-word
@@ -255,6 +271,29 @@ global HSE_LastEndChar := ""
 ; When false the engine-level repeat-key fallback (HSE_TryRepeatKey) is
 ; disabled — typed <x>★ sequences fall through unchanged.
 global HSE_RepeatEnabled := true
+
+; hotstrings.idle_reset_seconds and hotstrings.click_resets_word as the loader
+; (ReadScriptConfig) and the menu publish them. "" means not loaded yet: the
+; readers below then answer the manifest default, the single source of both
+; defaults, which this file cannot read at include time.
+global HSE_IdleResetSeconds := ""
+global HSE_ClickResetsWord := ""
+
+; hotstrings.cascade_max_arrows, published the same way: how many expansions
+; (arrows) a chain of hotstrings may hold, 1 = a single expansion. "" reads the
+; manifest default (HSE_CascadeMaxArrowsCurrent, in hotstring_cascade.ahk). The
+; bounds sit here so they exist before any include runs.
+global HSE_CascadeMaxArrows := ""
+global HSE_CASCADE_MIN_ARROWS := 1
+global HSE_CASCADE_MAX_ARROWS := 10
+
+; hotstrings.arrow_resets_word, hotstrings.shortcut_resets_word and
+; hotstrings.tap_hold_resets_word, published the same way: whether an arrow
+; key, a shortcut, or a tap-hold key's own output starts a new word. "" reads
+; the manifest default (HSE_WordResetFlagCurrent).
+global HSE_ArrowResetsWord := ""
+global HSE_ShortcutResetsWord := ""
+global HSE_TapHoldResetsWord := ""
 
 ; When false the engine-level @-combo resolver (HSE_TryPersonalInfoCombo) is
 ; disabled — typed @<letters>★ sequences fall through unchanged. Mirrors
@@ -801,15 +840,20 @@ HSE_Size() {
 
 ; Bound trigger context independently from its one- or two-character framing.
 _HSE_TrimBufferToCapacity() {
-		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_WORD_TERMINATORS
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_MAX_BUFFER_LEN, HSE_WORD_TERMINATORS
 		BufferLength := StrLen(HSE_Buffer)
 		if (BufferLength <= HSE_MAX_BUFFER_LEN)
 				return
 		; Completion framing is not trigger text. Retain an in-progress nbsp too,
 		; because its punctuation arrives in a separate character notification.
-		LastChar := SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1))
-		FramingLength := (InStr(HSE_WORD_TERMINATORS, LastChar)
-				or LastChar == Chr(0xA0) or LastChar == Chr(0x202F)) ? StrLen(LastChar) : 0
+		LastChar := _TextCompleteTailScalar(HSE_Buffer)
+		FramingLength := (LastChar != "" && (InStr(HSE_WORD_TERMINATORS, LastChar)
+				or LastChar == Chr(0xA0) or LastChar == Chr(0x202F))) ? StrLen(LastChar) : 0
+		LastUnit := NumGet(StrPtr(HSE_Buffer), (BufferLength - 1) * 2, "UShort")
+		; Keep the possible completion's high unit outside trigger capacity until
+		; the next callback proves its full scalar and delimiter membership.
+		if LastUnit >= 0xD800 && LastUnit <= 0xDBFF
+				FramingLength := 1
 		if (LastChar == ":" or LastChar == ";") {
 				PreviousChar := SubStr(HSE_Buffer, -2, 1)
 				if (PreviousChar == Chr(0xA0) or PreviousChar == Chr(0x202F))
@@ -822,8 +866,10 @@ _HSE_TrimBufferToCapacity() {
 		; The last discarded character is known: trimming must not turn a real
 		; word boundary into unknown context, or invent one after a word character.
 		DiscardedStart := _TextCodepointStart(HSE_Buffer, DropCount)
-		DiscardedChar := SubStr(HSE_Buffer, DiscardedStart, DropCount - DiscardedStart + 1)
-		HSE_StartIsWordBoundary := InStr(_HSE_WordBoundarySet(), DiscardedChar) > 0
+		DiscardedChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, DiscardedStart, DropCount - DiscardedStart + 1))
+		HSE_StartIsWordBoundary := DiscardedChar != "" && InStr(_HSE_WordBoundarySet(), DiscardedChar) > 0
+		; The buffer now starts after typed text, never at the line start.
+		HSE_StartIsLineStart := false
 		HSE_Buffer := Tail
 }
 
@@ -845,38 +891,69 @@ _HSE_TrimBufferToCapacity() {
 ; Returns the matching Spec object or "" when nothing matched. The
 ; associated end character is exposed via HSE_LastEndChar — empty for
 ; star triggers, the just-typed terminator for end-char-gated triggers.
+;
+; The newline of the Enter that published HSE_StartIsLineStart submitted the
+; terminal's line: it is not text left of the caret, so it does not enter the
+; buffer (nothing could match before it either).
 HSE_FeedChar(Char, IsPhysical := false) {
-		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_MAX_BUFFER_LEN
 		global HSE_LastMatch, HSE_LastEndChar, HSE_Suppressed
+		global HSE_FinalNoOpPending, HSE_FinalNoOpFound
 		HSE_LastMatch := ""
 		HSE_LastEndChar := ""
 		if ((HSE_Suppressed and !IsPhysical) or (Char == "")) {
 				return ""
 		}
+		if (HSE_Buffer == "" and HSE_StartIsLineStart and (Char == "`n" or Char == "`r"))
+				return ""
 
 		HSE_Buffer .= Char
 		_HSE_TrimBufferToCapacity()
 
-		Match := HSE_FindMatchAtEnd(Char)
+		; A final entry that changed nothing claims its text for one key only, so
+		; typing on (a longer word, another trigger) is judged afresh.
+		TextIsClaimed := HSE_FinalNoOpPending
+		Match := HSE_FindMatchAtEnd(Char, TextIsClaimed)
+		HSE_FinalNoOpPending := HSE_FinalNoOpFound
 		HSE_LastMatch := Match
 		return Match
 }
 
-; Backspace: chop the last character off the buffer. When the buffer is
-; already empty, instead flip HSE_StartIsWordBoundary to false because the
-; user has just deleted a character that lived to the LEFT of the buffer's
-; start, into territory we never observed — we can no longer guarantee the
-; new cursor position abuts a word boundary.
-HSE_FeedBackspace(IsPhysical := false) {
-		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
+; Backspace: chop the last character off the buffer.
+;
+; A Backspace that erases the last character typed since the buffer started
+; (ErasesTypedText) puts the caret back where that typing began, so the next
+; character starts a word: « ab », Backspace, Backspace, « c★ » expands even
+; when the buffer had started at an unknown position. A correction that
+; leaves characters in the buffer keeps the word open. The driver's own
+; temporary edits (a probe Space it erases again) pass false and leave the
+; word-start state as it was.
+;
+; When the buffer is already empty the Backspace deleted a character that
+; lived to the LEFT of the buffer's start, into territory never observed, so
+; the word start becomes unknown, unless that start is the beginning of an
+; empty input line (HSE_StartIsLineStart), where there was nothing to delete.
+; @param IsPhysical {Boolean} The deletion really happened on screen, so it
+;        applies even inside a suppression window.
+; @param ErasesTypedText {Boolean} The user's own Backspace (physical, or one a
+;        remap or a tap-hold sends for the user), not an internal edit.
+HSE_FeedBackspace(IsPhysical := false, ErasesTypedText := false) {
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_Suppressed
+		global HSE_FinalNoOpPending
 		if HSE_Suppressed and !IsPhysical {
 				return
 		}
+		HSE_FinalNoOpPending := false
 		if (HSE_Buffer != "") {
 				HSE_Buffer := SubStr(HSE_Buffer, 1, StrLen(HSE_Buffer) - _TextTailCodeUnits(HSE_Buffer, 1))
+				if (HSE_Buffer == "" and ErasesTypedText)
+						HSE_StartIsWordBoundary := true
 				return
 		}
+		if (HSE_StartIsLineStart and HSE_StartIsWordBoundary)
+				return
 		HSE_StartIsWordBoundary := false
+		HSE_StartIsLineStart := false
 }
 
 ; Generic reset. KnownTerminatorBefore declares whether the caller can
@@ -887,13 +964,18 @@ HSE_FeedBackspace(IsPhysical := false) {
 ;   - false for destructive or content-replacing operations where the
 ;     buffer content to the left is completely unknown: Ctrl+X (cut),
 ;     Ctrl+V (paste), Ctrl+Z/Y (undo/redo), backspace on empty buffer.
-HSE_FeedReset(KnownTerminatorBefore := false, IsPhysical := false) {
-		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
+; AtLineStart further declares that the caret sits at the start of an empty
+; input line (HSE_StartIsLineStart); it holds only with a known boundary.
+HSE_FeedReset(KnownTerminatorBefore := false, IsPhysical := false, AtLineStart := false) {
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_Suppressed
+		global HSE_FinalNoOpPending
 		if HSE_Suppressed and !IsPhysical {
 				return
 		}
+		HSE_FinalNoOpPending := false
 		HSE_Buffer := ""
 		HSE_StartIsWordBoundary := !!KnownTerminatorBefore
+		HSE_StartIsLineStart := HSE_StartIsWordBoundary and !!AtLineStart
 }
 
 ; Suppress / un-suppress feeds for the duration of an internal SendEvent
@@ -920,9 +1002,94 @@ HSE_Suppress(YesNo) {
 ; sit flush at the start of the new buffer will refuse to fire until a
 ; word terminator has been observed.
 HSE_HardReset() {
-		global HSE_Buffer, HSE_StartIsWordBoundary
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_FinalNoOpPending
 		HSE_Buffer := ""
 		HSE_StartIsWordBoundary := false
+		HSE_StartIsLineStart := false
+		HSE_FinalNoOpPending := false
+}
+
+; Forgets a final expansion's output from the matcher: nothing may complete a
+; trigger through it, on any later key. Only what the output says about the word
+; start survives. A caller holds the buffer transaction open (Critical). macOS
+; (commit_suppress_rescan) and Linux (engine:reset) do the same.
+; @param Effect {Object} The committed effect, for KnownBoundaryAfter.
+_HSE_ForgetFinalOutput(Effect) {
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_FinalNoOpPending
+		HSE_Buffer := ""
+		HSE_StartIsWordBoundary := Effect.KnownBoundaryAfter
+		HSE_StartIsLineStart := false
+		HSE_FinalNoOpPending := false
+}
+
+; Whether a value is a valid hotstrings.idle_reset_seconds: a finite
+; non-negative number of seconds, 0 meaning the reset is disabled. Same rule as
+; the shared Lua engine's valid_idle_reset_seconds.
+; @param Value {Any} Candidate read from config.toml or a menu prompt.
+; @returns {Boolean}
+HSE_ValidIdleResetSeconds(Value) {
+		if !((Value is Integer) or (Value is Float))
+				return false
+		; NaN compares unequal to itself; an infinity survives no subtraction.
+		return Value == Value and Value >= 0 and (Value - Value) == 0
+}
+
+; Whether the pause before the current keystroke starts a new word.
+;
+; Without it the buffer kept the last word for as long as the user stayed
+; away, so the first key typed after a pause was read as the middle of that
+; word and every word-start hotstring stayed silent until a delimiter. Mirrors
+; the shared Lua engine's idle_resets_word; A_TickCount is millisecond-exact
+; for this purpose, so no clock resolution is subtracted.
+; @param LastTick {Integer|String} Tick of the previous keystroke, "" before any.
+; @param NowTick {Integer} Tick of the current keystroke.
+; @param IdleSeconds {Number} hotstrings.idle_reset_seconds; 0 disables the reset.
+; @returns {Boolean}
+HSE_IdleResetsWord(LastTick, NowTick, IdleSeconds) {
+		if !HSE_ValidIdleResetSeconds(IdleSeconds)
+				throw ValueError("HSE_IdleResetsWord: the idle delay must be a non-negative number of seconds.")
+		if (IdleSeconds == 0 or LastTick == "")
+				return false
+		return NowTick - LastTick >= IdleSeconds * 1000
+}
+
+; The idle delay in force: the published value, or the manifest default before
+; the loader ran (unit harness, early boot).
+; @returns {Number}
+HSE_IdleResetSecondsCurrent() {
+		global HSE_IdleResetSeconds
+		return HSE_IdleResetSeconds == ""
+				? ManifestDefaultFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS)
+				: HSE_IdleResetSeconds
+}
+
+; Whether a mouse click starts a new word: the published value, or the
+; manifest default before the loader ran.
+; @returns {Boolean}
+HSE_ClickResetsWordCurrent() {
+		global HSE_ClickResetsWord
+		Value := HSE_ClickResetsWord == ""
+				? ManifestDefaultFor(ConfigKey.HOTSTRINGS_CLICK_RESETS_WORD)
+				: HSE_ClickResetsWord
+		return Value ? true : false
+}
+
+; Whether one of the event word-reset settings is on: the published value, or
+; the manifest default before the loader ran.
+; @param Key {String} "arrow_resets_word", "shortcut_resets_word" or
+;        "tap_hold_resets_word".
+; @returns {Boolean}
+HSE_WordResetFlagCurrent(Key) {
+		global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
+		switch Key {
+				case ConfigLeaf.ARROW_RESETS_WORD: Value := HSE_ArrowResetsWord
+				case ConfigLeaf.SHORTCUT_RESETS_WORD: Value := HSE_ShortcutResetsWord
+				case ConfigLeaf.TAP_HOLD_RESETS_WORD: Value := HSE_TapHoldResetsWord
+				default: throw ValueError("Unknown word-reset setting: " . Key)
+		}
+		if (Value == "")
+				Value := ManifestDefaultFor("hotstrings." . Key)
+		return Value ? true : false
 }
 
 ; Apply an expansion to the buffer to mirror the screen change a hotstring
@@ -933,16 +1100,19 @@ HSE_HardReset() {
 ; sits behind » exactly, regardless of whether the end char was a word
 ; terminator (the new HSE_FeedChar keeps terminators in the buffer too,
 ; so triggers that span them — e.g. « ,a → ja » — can still match).
-HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false) {
+;
+; A final entry (Spec.FinalResult, or the final last link of a chain: ChainIsFinal)
+; is the end of it: its output leaves the matcher (_HSE_ForgetFinalOutput).
+HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false, ExtraStrip := 0, ChainIsFinal := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
-		global HSE_CONSUMED_DELIMITERS
 
-		StripLen := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
-		EmittedEndChar := (EndChar != "" and !ForceConsumeEndChar
-				and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
+		StripLen := _HSE_ExpansionStripUnits(Spec.Length + ExtraStrip, EndChar, HSE_TypoNbspStripped)
+		EmittedEndChar := HSE_PlanTail(_HSE_ExpansionPath(EndChar),
+				_HSE_EndCharConsumed(EndChar, ForceConsumeEndChar), EndChar)
 		ClearAll := Spec.HasOwnProp("OnlyText") and !Spec.OnlyText
 		InsertedText := ClearAll ? "" : Replacement . EmittedEndChar
 		Effect := {
+				IsPrivate: Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
 				ClearAll: ClearAll,
 				DeleteFromEnd: StripLen,
 				InsertedText: InsertedText,
@@ -982,9 +1152,31 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 		HSE_Buffer .= Effect.InsertedText
 
 		_HSE_TrimBufferToCapacity()
+		if (ChainIsFinal or (Spec.HasOwnProp("FinalResult") and Spec.FinalResult))
+				_HSE_ForgetFinalOutput(Effect)
 		return Effect
 }
 
+
+; Whether one character is part of a word, the rule macOS and Linux share
+; (text_utils.is_hotstring_word_char in _shared/lua/text_utils/init.lua): every
+; non-ASCII character, "@", letters, digits and "_". The shared repeat_key
+; corpus pins the three drivers to it.
+; @param Ch {String} One character (a surrogate pair counts as one).
+; @returns {Boolean}
+HSE_IsWordChar(Ch) {
+		if (Ch == "")
+				return false
+		if (Ord(Ch) > 127)
+				return true
+		return Ch == "@" or RegExMatch(Ch, "^[A-Za-z0-9_]$") > 0
+}
+
+; A word character for the repeat: the shared rule, minus any delimiter the user
+; added to the word delimiters (a custom delimiter ends a word on Windows).
+_HSE_RepeatWordChar(Ch) {
+		return HSE_IsWordChar(Ch) and InStr(_HSE_WordBoundarySet(), Ch) = 0
+}
 
 ; Attempt the magic-key repeat: when the user types <x><MagicKey> and x is
 ; preceded by at least one non-terminator letter (i.e. x is not the first
@@ -1025,9 +1217,10 @@ HSE_TryRepeatKey(MagicKey) {
 		; The char being repeated is immediately before the magic key.
 		RepeatCharEnd := BufLen - MkLen
 		RepeatCharPos := _TextCodepointStart(HSE_Buffer, RepeatCharEnd)
-		RepeatChar := SubStr(HSE_Buffer, RepeatCharPos, RepeatCharEnd - RepeatCharPos + 1)
-		; Refuse to repeat whitespace or terminators.
-		if (RepeatChar == "" or InStr(_HSE_WordBoundarySet(), RepeatChar) > 0) {
+		RepeatChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, RepeatCharPos, RepeatCharEnd - RepeatCharPos + 1))
+		; Only a word character repeats (HSE_IsWordChar, the shared rule), and never
+		; the magic key itself: two keys in a row are a second trigger, not a repeat.
+		if (RepeatChar == "" or RepeatChar == MagicKey or !_HSE_RepeatWordChar(RepeatChar)) {
 				return ""
 		}
 		; The char before RepeatChar must exist and be a non-terminator — this ensures
@@ -1039,11 +1232,11 @@ HSE_TryRepeatKey(MagicKey) {
 				return ""
 		}
 		PredStart := _TextCodepointStart(HSE_Buffer, PredPos)
-		PredChar := SubStr(HSE_Buffer, PredStart, PredPos - PredStart + 1)
-		; Boundary set, not terminator set: after an opening quote the char is the
-		; FIRST letter of its word, so doubling it is meaningless and the real
-		; expansion must be allowed to win instead.
-		if (InStr(_HSE_WordBoundarySet(), PredChar) > 0) {
+		PredChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, PredStart, PredPos - PredStart + 1))
+		; Word character, not "not a terminator": after an opening quote, a
+		; parenthesis or a hyphen the char is the FIRST letter of its word, so
+		; doubling it is meaningless and the real expansion must win instead.
+		if (PredChar == "" or !_HSE_RepeatWordChar(PredChar)) {
 				return ""
 		}
 		; When PredChar starts at position 1 of the buffer (PredStart == 1) and the buffer
@@ -1159,7 +1352,7 @@ HSE_TryPersonalInfoCombo(MagicKey) {
 		; own data and must not reach the metrics row or the fire trace.
 		; FinalResult routes the send through SendFinalResult (SendInput), which is
 		; what every other @ registration uses — measured, it is the path the
-		; keylogger's InputHook does not observe.
+		; keystats's InputHook does not observe.
 		return {
 				Trigger:     TriggerStr,
 				Length:      StrLen(TriggerStr),
@@ -1184,10 +1377,10 @@ HSE_TryPersonalInfoCombo(MagicKey) {
 ; its side effects, while guessing its verdict would recreate a second engine.
 ; @return A canonical decision object, or "" when the actual dispatch would decline.
 HSE_PreviewNextDecision(Buffer, NextChar) {
-		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_LastMatch, HSE_LastEndChar
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_LastMatch, HSE_LastEndChar
 		global HSE_TypoNbspStripped, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 		global HSE_RegistryTransitionDepth
-		global HSE_RebuildInProgress, ScriptInformation
+		global HSE_RebuildInProgress, ScriptInformation, HSE_FinalNoOpPending
 		if !(Buffer is String) or !(NextChar is String) or NextChar == ""
 				return ""
 
@@ -1201,9 +1394,11 @@ HSE_PreviewNextDecision(Buffer, NextChar) {
 		}
 		SavedBuffer := HSE_Buffer
 		SavedStartBoundary := HSE_StartIsWordBoundary
+		SavedStartLineStart := HSE_StartIsLineStart
 		SavedLastMatch := HSE_LastMatch
 		SavedLastEndChar := HSE_LastEndChar
 		SavedTypoNbsp := HSE_TypoNbspStripped
+		SavedFinalNoOpPending := HSE_FinalNoOpPending
 		RegistryGeneration := HSE_RegistryGeneration
 		RuntimeDecisionGeneration := HSE_RuntimeDecisionGeneration
 		Match := ""
@@ -1229,9 +1424,11 @@ HSE_PreviewNextDecision(Buffer, NextChar) {
 		} finally {
 				HSE_Buffer := SavedBuffer
 				HSE_StartIsWordBoundary := SavedStartBoundary
+				HSE_StartIsLineStart := SavedStartLineStart
 				HSE_LastMatch := SavedLastMatch
 				HSE_LastEndChar := SavedLastEndChar
 				HSE_TypoNbspStripped := SavedTypoNbsp
+				HSE_FinalNoOpPending := SavedFinalNoOpPending
 				Critical(PreviousCritical)
 		}
 		if !IsObject(Match)
@@ -1282,4 +1479,6 @@ HSE_PreviewNextMatch(Buffer, NextChar) {
 }
 
 #Include hotstring_match.ahk
+#Include hotstring_injection_plan.ahk
 #Include hotstring_dispatch.ahk
+#Include hotstring_cascade.ahk

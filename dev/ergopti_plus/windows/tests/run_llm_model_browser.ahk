@@ -17,6 +17,8 @@ SetWorkingDir(A_ScriptDir)
 #Include test_framework.ahk
 #Include ../vendor/Promise.ahk
 #Include ../infra/webview_script.ahk
+; Browser messages and JavaScript payloads share the actual native JSON owner.
+#Include ../infra/json.ahk
 
 ; --- Globals the browser module reads ---
 global _LLM_Menu   := Map("model", "Qwen3.5-2B")
@@ -35,11 +37,13 @@ LoggerError(args*)     => ""
 LoggerDebug(args*)     => ""
 LoggerStart(args*)     => ""
 LoggerWarn(args*)      => ""
-JsonParse(s)           => Map()
-JsonStringLiteral(s, escapeHtml := false) {
-	return Chr(34) . StrReplace(s, Chr(34), Chr(92) . Chr(34)) . Chr(34)
+global _MBW_SelectedModels := []
+LLM_Menu_SetModel(n) {
+	global _MBW_SelectedModels
+	_MBW_SelectedModels.Push(n)
+	; Recording the effect port does not create or tear down a native WebView.
+	return false
 }
-LLM_Menu_SetModel(n)   => ""
 LLM_Deps_IsReady()     => _MBW_DepsReady
 LLM_OllamaListModels() {
 	global _MBW_OllamaListHits
@@ -53,9 +57,40 @@ LLM_OllamaListModels() {
 ; nothing invoked this file: the orphan-runner gate added alongside this fix is
 ; what stops a runner drifting out of the code again.
 LLM_SetInstalledTagsCache(tags) => ""
-_LLM_GetInstalledTagsCached()   => ["qwen3.5:2b"]
+global _MBW_Tags := ["qwen3.5:2b"]
+_LLM_GetInstalledTagsCached()   => _MBW_Tags
 LLM_GetModelIndex()    => _TestIndex
 LLM_GetModelInfo(n)    => (_TestIndex.Has(n) ? _TestIndex[n] : Map())
+; The selector payload (2026-10-27) also reads the menu's caption, port
+; defaults, brands, API rows and local servers; none of them is under test here.
+LoggerInfo(args*)      => ""
+LLM_Deps_HasFailed()   => false
+global _MBW_DepsChecking := false
+LLM_Deps_IsChecking()  => _MBW_DepsChecking
+; The owned install the page's button runs, and the backend it must leave alone.
+global _MBW_Installs := [], _MBW_InstallThrows := false, _MBW_BackendSets := []
+LLM_Deps_CheckAndInstall(Model, OnReady, OnFailed) {
+	global _MBW_Installs, _MBW_InstallThrows
+	if _MBW_InstallThrows
+		throw Error("no bootstrap owner")
+	_MBW_Installs.Push(Model)
+}
+LLM_Menu_SetBackend(Id) {
+	global _MBW_BackendSets
+	_MBW_BackendSets.Push(Id)
+	return false
+}
+; No managed runtime is published under this folder name on a test runner.
+AppDirsWindowsManagedOllamaFolderName() => "ErgoptiModelBrowserRunnerNoManagedOllama"
+_LLM_Menu_ModelDisplayText() => ""
+_LLM_DefaultFor(Key, Default := "") => (Key == "llm_ollama_owned_port" ? 11435 : Default)
+_LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) => ""
+LLM_Menu_LocalServersLiveRows() => []
+_LLM_Menu_ConfigBlockReason() => ""
+LLM_GetBackendBrands() => Map(
+	"ollama", Map("brand", "Ollama", "emoji", "o", "kind", "local"),
+	"mlx", Map("brand", "MLX", "emoji", "m", "kind", "local"),
+	"api", Map("brand", "API", "emoji", "a", "kind", "remote"))
 
 ; Minimal WebView2 stand-in so IsSet(WebView2) resolves and the class reference in
 ; the (never-called here) ShowWeb path loads. The tests never create a webview.
@@ -98,10 +133,8 @@ _MBNum_NonNumber() {
 }
 Test("LLM_MBW_Num: non-number defaults to 0", _MBNum_NonNumber)
 
-_MBJsStr_Escapes() {
-	AssertEqual('"a\"b"', _LLM_MBW_JsStr('a"b'))
-}
-Test("LLM_MBW_JsStr: escapes double quotes", _MBJsStr_Escapes)
+; The page's own string helper is gone: every string goes through the shared
+; JsonStringLiteral (infra/json.ahk), defined once.
 
 class _MBSessionFakeWebView {
 	Executed := []
@@ -210,6 +243,9 @@ _MBInject_BuildsCatalogue() {
 	AssertContains(js, "active_b:2")        ; gemma active
 	AssertContains(js, "is_moe:true")       ; gemma is MoE
 	AssertContains(js, "installed:true")    ; Qwen tag qwen3.5:2b is in the installed list
+	; model-selector-install-button: an installed Ollama greys its install; MLX cannot run here.
+	AssertContains(js, 'install:{state:"installed"}')
+	AssertContains(js, 'install:{state:"unsupported",reason_key:"model_browser.reason_mlx_unsupported_os"}')
 }
 Test("LLM_MBW_InjectCatalogue: builds the injectModels() payload", _MBInject_BuildsCatalogue)
 
@@ -233,10 +269,208 @@ _MBInject_DisabledStillListsAllModels() {
 	js := _LLM_MBW_Queue[1].Js
 	AssertContains(js, '"Qwen3.5-2B"')        ; every model is still listed…
 	AssertContains(js, '"gemma-4-E2B-it"')
-	AssertContains(js, "installed:false")     ; …just without the installed dot
-	Assert(!InStr(js, "installed:true"), "no model may be flagged installed while the daemon is not scanned")
+	AssertContains(js, "installed:false")     ; …gemma from the async snapshot
 	AssertEqual(0, _MBW_OllamaListHits, "the blocking /api/tags probe must NOT run when the daemon is not ready")
 }
 Test("LLM_MBW_InjectCatalogue: lists all models without probing when the feature is off", _MBInject_DisabledStillListsAllModels)
+
+
+; These independent literals exercise the browser adapter rather than a second
+; quote-only encoder. A valid JavaScript string must retain every source unit.
+_MBW_JsonEscaping(Value, Expected) {
+	Row := _LLM_MBW_LocalRow(Value, "fixture-tag", Map(), false, false, true, false)
+	AssertTrue(Row is Map, "the actual row builder must retain its structured result")
+	AssertEqual(Value, Row["name"], "serialization must retain the original model identity")
+	AssertContains(Row["json"], ",name:" . Expected . ",runtime_name:",
+		"the production browser row must encode every model-name code unit")
+}
+for Fixture in [
+	["plain", "model", '"model"'],
+	["quote", 'a"b', '"a\"b"'],
+	["unicode", "é" . Chr(0x1F600), '"é' . Chr(0x1F600) . '"'],
+	["backslash", 'a\b', '"a\\b"'],
+	["line feed", "a`nb", '"a\nb"'],
+	["carriage return", "a`rb", '"a\rb"'],
+	["tab", "a`tb", '"a\tb"'],
+	["backspace", "a" . Chr(8) . "b", '"a\bb"'],
+	["form feed", "a" . Chr(12) . "b", '"a\fb"']
+]
+	Test("model browser JSON: " . Fixture[1] . " uses the real codec (model-browser-native-json)",
+		_MBW_JsonEscaping.Bind(Fixture[2], Fixture[3]))
+
+class _MBW_MessageArgs {
+	__New(Text) => this.Text := Text
+	TryGetWebMessageAsString() => this.Text
+}
+
+_MBW_BridgeRoutesRealMessages(Message, Expected) {
+	global _TestIndex, _MBW_SelectedModels, _LLM_MBW_SessionEpoch
+	SavedIndex := _TestIndex, SavedSelections := _MBW_SelectedModels
+	SavedEpoch := _LLM_MBW_SessionEpoch
+	PreviousCritical := Critical("Off")
+	Fence := {Done: false}
+	MarkFence := (*) => Fence.Done := true
+	try {
+		_TestIndex := Map("Qwen3.5-2B", Map(), 'model\path', Map())
+		_MBW_SelectedModels := []
+		_LLM_MBW_SessionEpoch += 1
+		_LLM_MBW_OnWebMessage(_LLM_MBW_SessionEpoch, 0, _MBW_MessageArgs(Message))
+		AssertEqual(0, _MBW_SelectedModels.Length, "the actual COM callback must defer model application")
+		SetTimer(MarkFence, -50)
+		Started := A_TickCount
+		while !Fence.Done && A_TickCount - Started < 2000
+			Sleep(10)
+		AssertTrue(Fence.Done, "the actual native deferred queue must progress")
+		AssertEqual(Expected == "" ? 0 : 1, _MBW_SelectedModels.Length,
+			"only actual catalogue selection messages reach the model effect port")
+		if Expected != ""
+			AssertEqual(Expected, _MBW_SelectedModels[1], "decoded JSON must retain the exact catalogue identity")
+	} finally {
+		SetTimer(MarkFence, 0)
+		_TestIndex := SavedIndex
+		_MBW_SelectedModels := SavedSelections
+		_LLM_MBW_SessionEpoch := SavedEpoch
+		Critical(PreviousCritical)
+	}
+}
+for Fixture in [
+	["valid ASCII", '{"action":"select_model","name":"Qwen3.5-2B"}', "Qwen3.5-2B"],
+	["valid escaped identity", '{"action":"select_model","name":"model\\path"}', 'model\path'],
+	["unknown model", '{"action":"select_model","name":"absent"}', ""],
+	["numeric model", '{"action":"select_model","name":1}', ""],
+	["array message", '[]', ""],
+	["malformed message", '{"action":', ""],
+	["unknown action", '{"action":"unknown","name":"Qwen3.5-2B"}', ""]
+]
+	Test("model browser JSON: " . Fixture[1] . " reaches the actual bridge (model-browser-native-json)",
+		_MBW_BridgeRoutesRealMessages.Bind(Fixture[2], Fixture[3]))
+; model-selector-install-flow: a fresh machine (no owned runtime, no answering
+; server, no model) greys every Ollama row and offers the install; a running
+; bootstrap shows it running.
+_MBInject_FreshMachineOffersInstall() {
+	global _TestIndex, _LLM_MBW_Queue, _LLM_MBW_Ready, _MBW_DepsReady, _MBW_Tags, _MBW_DepsChecking
+	_TestIndex := Map("Qwen3.5-2B", Map("params_b", 2.0, "ram_gb", 1.8, "type", "chat", "ollama", "qwen3.5:2b"))
+	_MBW_DepsReady := false
+	_MBW_Tags := []
+	try {
+		_LLM_MBW_Ready := false
+		_LLM_MBW_Queue := []
+		_LLM_MBW_InjectCatalogue()
+		js := _LLM_MBW_Queue[1].Js
+		AssertContains(js, 'id:"ollama"')
+		AssertContains(js, 'available:false,reason_key:"model_browser.reason_ollama_missing"')
+		AssertContains(js, 'install:{state:"available"}')
+		_MBW_DepsChecking := true
+		_LLM_MBW_Queue := []
+		_LLM_MBW_InjectCatalogue()
+		AssertContains(_LLM_MBW_Queue[1].Js, 'install:{state:"running"}')
+	} finally {
+		_MBW_DepsChecking := false
+		_MBW_Tags := ["qwen3.5:2b"]
+		_MBW_DepsReady := true
+	}
+}
+Test("LLM_MBW_InjectCatalogue: a fresh machine greys Ollama and offers its install", _MBInject_FreshMachineOffersInstall)
+
+; Sends one page message through the real COM callback and drains its deferral.
+_MBW_SendAndDrain(Message) {
+	global _LLM_MBW_SessionEpoch
+	PreviousCritical := Critical("Off")
+	Fence := {Done: false}
+	MarkFence := (*) => Fence.Done := true
+	try {
+		_LLM_MBW_OnWebMessage(_LLM_MBW_SessionEpoch, 0, _MBW_MessageArgs(Message))
+		SetTimer(MarkFence, -50)
+		Started := A_TickCount
+		while !Fence.Done && A_TickCount - Started < 2000
+			Sleep(10)
+		AssertTrue(Fence.Done, "the deferred page action must have run")
+	} finally {
+		SetTimer(MarkFence, 0)
+		Critical(PreviousCritical)
+	}
+}
+
+_MBW_InstallPayload() {
+	global _LLM_MBW_Queue, _LLM_MBW_Ready
+	_LLM_MBW_Ready := false
+	_LLM_MBW_Queue := []
+	_LLM_MBW_InjectCatalogue()
+	return _LLM_MBW_Queue[_LLM_MBW_Queue.Length].Js
+}
+
+; model-selector-install-click: the button went through the backend selection,
+; which with another backend active restarts Ollama silently or, with the AI off,
+; does nothing: the click must reach the visible owned install either way, and
+; change no backend.
+_MBClick_ReachesTheInstallOnEveryBackend(Backend) {
+	global _TestIndex, _MBW_DepsReady, _MBW_Tags, _MBW_Installs, _MBW_BackendSets, _LLM_Menu
+	_TestIndex := Map("Qwen3.5-2B", Map("ollama", "qwen3.5:2b"))
+	_MBW_DepsReady := false, _MBW_Tags := [], _MBW_Installs := [], _MBW_BackendSets := []
+	_LLM_Menu["backend"] := Backend
+	try {
+		_MBW_InstallPayload()
+		_MBW_SendAndDrain('{"action":"group_action","backend":"ollama","id":"install"}')
+		AssertEqual(1, _MBW_Installs.Length, "the click must reach the owned install")
+		AssertEqual(0, _MBW_BackendSets.Length, "an install selects no backend")
+	} finally {
+		_LLM_Menu.Delete("backend")
+		_MBW_Tags := ["qwen3.5:2b"], _MBW_DepsReady := true
+	}
+}
+for Backend in ["ollama", "api"]
+	Test("model browser: an install click reaches the owned install with backend " . Backend,
+		_MBClick_ReachesTheInstallOnEveryBackend.Bind(Backend))
+
+; model-selector-install-refusal: a click that did not start says so in words.
+_MBClick_RefusalIsStatedAndForgotten() {
+	global _TestIndex, _MBW_DepsReady, _MBW_Tags, _MBW_Installs, _MBW_InstallThrows
+	_TestIndex := Map("Qwen3.5-2B", Map("ollama", "qwen3.5:2b"))
+	_MBW_DepsReady := false, _MBW_Tags := [], _MBW_Installs := [], _MBW_InstallThrows := true
+	try {
+		_MBW_InstallPayload()
+		_MBW_SendAndDrain('{"action":"group_action","backend":"ollama","id":"install"}')
+		AssertContains(_MBW_InstallPayload(),
+			'install:{state:"available",failed_key:"model_browser.install_not_started"}')
+		_MBW_InstallThrows := false
+		_MBW_SendAndDrain('{"action":"group_action","backend":"ollama","id":"install"}')
+		AssertEqual(1, _MBW_Installs.Length)
+		AssertContains(_MBW_InstallPayload(), 'install:{state:"available"}')
+	} finally {
+		_MBW_InstallThrows := false, _MBW_Tags := ["qwen3.5:2b"], _MBW_DepsReady := true
+	}
+}
+Test("model browser: an install that did not start is offered again with its reason", _MBClick_RefusalIsStatedAndForgotten)
+
+; A paused driver greys the install with that reason and installs nothing; an
+; installed runtime keeps stating that it is installed.
+_MBClick_PausedDriverStatesThePause() {
+	global _TestIndex, _MBW_DepsReady, _MBW_Tags, _MBW_Installs
+	_TestIndex := Map("Qwen3.5-2B", Map("ollama", "qwen3.5:2b"))
+	_MBW_DepsReady := false, _MBW_Tags := [], _MBW_Installs := []
+	Suspend(true)
+	try {
+		AssertContains(_MBW_InstallPayload(),
+			'install:{state:"unsupported",reason_key:"model_browser.install_paused"}')
+		_MBW_SendAndDrain('{"action":"group_action","backend":"ollama","id":"install"}')
+		AssertEqual(0, _MBW_Installs.Length, "a paused driver installs nothing")
+		_MBW_DepsReady := true
+		AssertContains(_MBW_InstallPayload(), 'install:{state:"installed"}')
+	} finally {
+		Suspend(false)
+		_MBW_Tags := ["qwen3.5:2b"], _MBW_DepsReady := true
+	}
+}
+Test("model browser: a paused driver states the pause on the install button", _MBClick_PausedDriverStatesThePause)
+
+; model-selector-provider-sections: the page groups Ollama rows by the catalogue
+; provider, as the Lua drivers send it; the user's own model carries none.
+_MBInject_RowsNameTheirProvider() {
+	Listed := _LLM_MBW_LocalRow("Qwen3.5-2B", "qwen3.5:2b", Map("provider", "Alibaba"), false, false, false, false)
+	AssertContains(Listed["json"], ',provider:"Alibaba",')
+	Own := _LLM_MBW_LocalRow("my-tag", "my-tag", Map(), true, false, true, false)
+	AssertContains(Own["json"], ',provider:"",')
+}
+Test("model browser: a catalogue row names its provider, a custom one none", _MBInject_RowsNameTheirProvider)
 
 RunTests()

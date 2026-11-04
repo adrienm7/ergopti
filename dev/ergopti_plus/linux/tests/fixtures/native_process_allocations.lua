@@ -13,7 +13,7 @@ assert(foreign.armed); uv.unref(foreign.timer)
 local originals = { new_pipe = uv.new_pipe, new_timer = uv.new_timer, spawn = uv.spawn }
 local checks, failures = 0, 0
 for _, mode in ipairs({ "raised", "nil" }) do
-	for _, slot in ipairs({ 2, 3 }) do
+	for _, slot in ipairs({ 2, 3, 4 }) do
 		checks = checks + 1
 		local allocated, calls, spawns, callbacks, result = {}, 0, 0, 0, nil
 		local function allocate(method, ...)
@@ -34,7 +34,9 @@ for _, mode in ipairs({ "raised", "nil" }) do
 			local dispatched = Process.run("/bin/sh", { "-c", "printf native" }, {}, function(receipt)
 				callbacks, result = callbacks + 1, receipt
 			end)
-			assert(not dispatched and callbacks == 1 and result.exit_code == -1
+			assert(not dispatched and callbacks == 0, "partial handles cannot publish before close ACK")
+			for _ = 1, 3 do uv.run("nowait") end
+			assert(callbacks == 1 and result.exit_code == -1
 				and result.error == "libuv handle allocation failed" and result.stdout == "" and result.stderr == "",
 				"constructor refusal changed the dispatch/callback receipt")
 			assert(spawns == 0, "constructor refusal acquired a child")
@@ -79,6 +81,6 @@ assert(uv.is_active(foreign.timer) and Timers.activeCount() == 1)
 assert(Timers.cancel(foreign)); uv.run()
 local handles = 0; uv.walk(function() handles = handles + 1 end)
 assert(handles == 0, "fixture left native handles")
-assert(checks == 4, "all native allocation controls must run")
+assert(checks == 6, "all native allocation controls must run")
 print(string.format("ProcessRunner native allocation: %d checks, %d failures; actual output/reaping and foreign timer pass", checks, failures))
 if failures > 0 then os.exit(1) end

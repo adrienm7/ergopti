@@ -10,8 +10,74 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 global _ConfigTomlSnapshots := Map()
+
+; Monotonic count of snapshot reads. Each one compares the whole snapshot with
+; its shadow, so tests pin how many a step spends.
+global _ConfigTomlSnapshotReads := 0
+
+/**
+ * Reads manifest intent only from the published native bootstrap cache. Detached
+ * runtime candidates have no source provenance and keep their strict readers.
+ * Outdated authored values use the manifest default without mutating the raw
+ * cache; the canonical loader retains ownership of diagnostics and cleanup.
+ * @returns {Boolean} Whether Cache has the actual bootstrap source owner.
+ */
+ConfigTomlTryReadBootValue(Cache, Section, Key, &Value) {
+	Snapshot := ConfigTomlBootSnapshot(Cache)
+	if !IsObject(Snapshot)
+		return false
+	return ConfigTomlBootSnapshotValue(Snapshot, Section, Key, &Value)
+}
+
+/**
+ * The admitted snapshot behind the published bootstrap cache, read once for a
+ * caller that looks up several values in one synchronous step. Every snapshot
+ * read compares the whole snapshot with its private shadow twice (about 20 ms
+ * each on a maintainer-sized config.toml), so four lookups through
+ * ConfigTomlTryReadBootValue paid eight comparisons for one unchanged image.
+ * @param {Map} Cache - The cache the caller was handed.
+ * @returns {Object|Integer} The snapshot, or 0 when Cache is not the bootstrap cache.
+ */
+ConfigTomlBootSnapshot(Cache) {
+	global ConfigurationFile, _ParseTomlCache
+	if !IsSet(ConfigurationFile) || ConfigurationFile == ""
+			|| !IsSet(_ParseTomlCache) || !_ParseTomlCache.Has(ConfigurationFile)
+			|| _ParseTomlCache[ConfigurationFile] != Cache
+		return 0
+	Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
+	if Snapshot.Cache != Cache
+		throw Error("The early configuration reader lost its admitted cache")
+	return Snapshot
+}
+
+/**
+ * One manifest value from a snapshot ConfigTomlBootSnapshot returned. Outdated
+ * authored values read as the manifest default, as ConfigTomlTryReadBootValue.
+ * @param {Object} Snapshot - The admitted bootstrap snapshot.
+ * @param {String} Section - Manifest section.
+ * @param {String} Key - Manifest key.
+ * @param {Any} Value - Receives the stored or default value.
+ * @returns {Boolean} Always true: the snapshot is the bootstrap source owner.
+ */
+ConfigTomlBootSnapshotValue(Snapshot, Section, Key, &Value) {
+	Path := Section . "." . Key
+	Entry := ManifestFindEntryByPath(Path)
+	if !(Entry is Map) || !Entry.Has("default")
+		throw Error("Missing required feature manifest default: " . Path)
+	Value := Entry["default"]
+	for Row in Snapshot.Rows {
+		if Row.Section != Section || Row.Key != Key
+			continue
+		if TomlConfigValueMatchesManifest(Section, Key, Row.Value,
+				&ExpectedType, TOML_StripInlineComment(Row.Raw))
+			Value := Row.Value
+		return true
+	}
+	return true
+}
 
 /** Converts typed values at the native reader boundary, retaining nested shape. */
 _ConfigTomlNativeValue(Value, NativeBooleans := true) {
@@ -56,11 +122,31 @@ _ConfigTomlArrayMember(Document, Parts) {
 
 /**
  * Builds detached cache/feature projections using the actual typed document owner.
+ * ArrayRows names each outermost ``[[x]]`` table array once, by the section and
+ * key that hold it, so the loader and the cleanup judge it like any other row;
+ * its generations never enter Cache or Rows.
  * @param {String} Source - Exact source admitted by the configuration reader.
- * @returns {Object} Source, Document, Cache, Rows and SkippedRecords.
+ * @returns {Object} Source, Document, Cache, Rows, ArrayRows and SkippedRecords.
  */
 ConfigTomlDecodeSnapshot(Source) {
-	Document := TOML_ParseDocument(Source, &Records)
+	Document := TOML_ParseDocument(Source, &Records, &Physical)
+	ArrayRows := [], ArrayPaths := Map()
+	ArrayPaths.CaseSense := "On"
+	for Record in Physical {
+		if Record.Kind != "header" || SubStr(LTrim(Record.Text), 1, 2) != "[["
+			continue
+		Parts := TOML_ParseKeyPath(Record.Section, true)
+		Name := _TOML_ConfigPathName(Parts)
+		if ArrayPaths.Has(Name) || _ConfigTomlArrayMember(Document, Parts)
+			continue
+		ArrayPaths[Name] := true
+		Value := _TOML_DocumentLookup(Document, Parts)["value"]
+		if !(Value is Array)
+			throw ValueError("Configuration table-array header has no array owner")
+		ArrayRows.Push({ Section: _ConfigTomlSection(Parts), Key: Parts[Parts.Length],
+			Value: _ConfigTomlNativeValue(Value), Typed: _ConfigTomlNativeValue(Value, false),
+			Raw: TOML_RenderValue(Value) })
+	}
 	Cache := Map(), Rows := [], SkippedRecords := 0
 	Cache.CaseSense := "On"
 	Namespaces := Map()
@@ -86,7 +172,40 @@ ConfigTomlDecodeSnapshot(Source) {
 			Namespaces, Cache, Rows)
 	}
 	return { Source: Source, Document: Document, Cache: Cache,
-		Rows: Rows, SkippedRecords: SkippedRecords }
+		Rows: Rows, ArrayRows: ArrayRows, SkippedRecords: SkippedRecords }
+}
+
+/**
+ * Decodes an exact source once for READ-ONLY consumers of its Cache, Rows or
+ * Document. Keyed by the whole source text and by the identity of the loaded
+ * manifest feature list (the projection reads it), so a changed file or a
+ * reloaded manifest is decoded afresh. The result is shared and must not be
+ * mutated; ConfigTomlReadSnapshot keeps its own independent decodes because it
+ * compares a snapshot against a private shadow.
+ * @param {String} Source - Exact source text.
+ * @returns {Object} The shared snapshot described by ConfigTomlDecodeSnapshot.
+ */
+ConfigTomlDecodeSnapshotShared(Source) {
+	static Entries := []
+	static MAX_ENTRIES := 4
+	static MAX_SOURCE_CHARS := 262144
+	if !(Source is String)
+		throw TypeError("Configuration source must be a String")
+	Manifest := ObjPtr(ManifestFeatures())
+	for Entry in Entries {
+		if Entry.Manifest == Manifest && Entry.Source == Source {
+			PerfCount("config.snapshot_shared_hit")
+			return Entry.Snapshot
+		}
+	}
+	PerfCount("config.snapshot_shared_miss")
+	Snapshot := ConfigTomlDecodeSnapshot(Source)
+	if StrLen(Source) <= MAX_SOURCE_CHARS {
+		Entries.Push({ Source: Source, Manifest: Manifest, Snapshot: Snapshot })
+		while Entries.Length > MAX_ENTRIES
+			Entries.RemoveAt(1)
+	}
+	return Snapshot
 }
 
 ; Reuses the actual inline-table owner to preserve each child literal spelling.
@@ -147,21 +266,64 @@ _ConfigTomlProjectRecord(Parts, Value, Raw, Namespaces, Cache, Rows) {
  * @returns {Object} Typed snapshot; native or semantic failures throw.
  */
 ConfigTomlReadSnapshot(Path) {
-	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshotReads
+	_ConfigTomlSnapshotReads += 1
+	PerfCount("config.snapshot_read")
 	global _TomlReadFailures, _TomlUnreadableFiles
-	if _ConfigTomlSnapshots.Has(Path) {
-		Previous := _ConfigTomlSnapshots[Path]
-		if _ParseTomlCache.Has(Path) && _ParseTomlCache[Path] == Previous.Cache
+	static Generations := Map()
+	static DecodeOwner := ConfigTomlDecodeSnapshot, JournalOwner := ConfigMigrateBoot
+	static CompareOwner := _ConfigTomlSnapshotEqual
+	for Owner in [DecodeOwner, JournalOwner, CompareOwner]
+		if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			throw Error("The native configuration snapshot callable was replaced")
+	Key := _ConfigWriteLeaseKey(Path)
+	if DecodeOwner != ConfigTomlDecodeSnapshot || JournalOwner != ConfigMigrateBoot
+			|| CompareOwner != _ConfigTomlSnapshotEqual
+		throw Error("The native configuration snapshot producer was replaced")
+	if Generations.Has(Key) {
+		Generation := Generations[Key], Previous := Generation.snapshot
+		; Native publication retains one private admitted generation even if the
+		; physical file changes between consumers. Public equivalent Maps alone
+		; cannot issue it. Retirement of an actual cache identity observes anew.
+		if CompareOwner.Call(Previous, Generation.shadow)
+				&& _ConfigTomlSnapshots.Has(Path) && _ConfigTomlSnapshots[Path] == Previous
+				&& _ParseTomlCache.Has(Path) && _ParseTomlCache[Path] == Previous.Cache
 				&& (!IsSet(_TomlFileCache) || (_TomlFileCache.Has(Path)
-					&& StrCompare(_TomlFileCache[Path], Previous.Source, true) == 0))
-			return Previous
+					&& StrCompare(_TomlFileCache[Path], Generation.source, true) == 0)) {
+			try {
+				if Generation.admission.Call(Generation.source, Generation.present)
+						&& CompareOwner.Call(Previous, Generation.shadow)
+					return Previous
+			} catch {
+			}
+		}
+		Generations.Delete(Key)
+	}
+	if _ConfigTomlSnapshots.Has(Path)
 		_ConfigTomlSnapshots.Delete(Path)
+	ReadAdmission := JournalOwner.Call(Path, "capture_read")
+	if !HasMethod(ReadAdmission, "Call") {
+		; Only the same original private journal may attest a real failed native
+		; open/probe. Public refusal maps/errors are never diagnostic authority.
+		ObservedFailure := JournalOwner.Call(Path, "consume_read_failure")
+		if (ObservedFailure is Integer) && (ObservedFailure == 1 || ObservedFailure == 2) {
+			_TomlReadFailures[Path] := true
+			if ObservedFailure == 2
+				_TomlUnreadableFiles[Path] := true
+		}
+		throw Error("The genuine configuration constructor did not admit this source")
 	}
 	if _TomlReadFailures.Has(Path)
 		_TomlReadFailures.Delete(Path)
 	if !FileExist(Path) {
 		Snapshot := ConfigTomlDecodeSnapshot("")
 		Snapshot.Present := false
+		if !ReadAdmission.Call("", 0)
+			throw Error("The configuration absence lost its native source admission")
+		Shadow := DecodeOwner.Call("")
+		Shadow.Present := false
+		Generations[Key] := { snapshot: Snapshot, source: "", present: 0,
+			admission: ReadAdmission, shadow: Shadow }
 		return Snapshot
 	}
 	try Source := FSReadStrict(Path)
@@ -175,6 +337,12 @@ ConfigTomlReadSnapshot(Path) {
 		_TomlUnreadableFiles.Delete(Path)
 	Snapshot := ConfigTomlDecodeSnapshot(Source)
 	Snapshot.Present := true
+	if !ReadAdmission.Call(Source, 1)
+		throw Error("The configuration read lost its native source admission")
+	Shadow := DecodeOwner.Call(Source)
+	Shadow.Present := true
+	Generations[Key] := { snapshot: Snapshot, source: Source, present: 1,
+		admission: ReadAdmission, shadow: Shadow }
 	return Snapshot
 }
 
@@ -197,10 +365,16 @@ ParseConfigTomlFile(Path) {
 	}
 	; Admitted absence is a boot generation too. The existing writer retires
 	; this identity when first-use settings are actually published.
-	_ParseTomlCache[Path] := Snapshot.Cache
-	if IsSet(_TomlFileCache)
-		_TomlFileCache[Path] := Snapshot.Source
-	_ConfigTomlSnapshots[Path] := Snapshot
+	PreviousCritical := Critical("On")
+	try {
+		_TOML_InvalidateParseCache(Path)
+		_ParseTomlCache[Path] := Snapshot.Cache
+		if IsSet(_TomlFileCache) {
+			_TomlLoaderInvalidateCacheRead(Path)
+			_TomlFileCache[Path] := Snapshot.Source
+		}
+		_ConfigTomlSnapshots[Path] := Snapshot
+	} finally Critical(PreviousCritical)
 	return Snapshot.Cache
 }
 
@@ -208,15 +382,16 @@ ParseConfigTomlFile(Path) {
 ; loader. Language gate augmentation stays with the feature loader owner.
 TomlConfigStaticForeignOwnershipRegistry() {
 	static Registry := Map(
-		"category_enabled", Map(
+		ConfigLeaf.CATEGORY_ENABLED, Map(
 			"autocorrection", "FeatureState",
-			"distances_reduction", "FeatureState",
-			"magic_key", "FeatureState",
+			ConfigLeaf.DISTANCES_REDUCTION, "FeatureState",
+			ConfigLeaf.MAGIC_KEY, "FeatureState",
 			"rolls", "FeatureState",
-			"sfbs_reduction", "FeatureState"),
+			ConfigLeaf.SFBS_REDUCTION, "FeatureState"),
 		"hotstrings", Map(
 			"terminators", "TerminatorRecords",
-			"terminator_states", "TerminatorRecords"),
+			"terminator_states", "TerminatorRecords",
+			"terminator_consume", "TerminatorRecords"),
 		"gestures", Map(
 			"auto_configure_on_next_start", "Gestures"),
 		"personal_editor", Map(
@@ -226,10 +401,10 @@ TomlConfigStaticForeignOwnershipRegistry() {
 		"llm", Map(
 			"api_entry_id", "LLMMenu",
 			"ollama_port", "LLMMenu"),
-		"llm.navigation", Map(
-			"nav_modifiers", "LLMMenu"),
-		"llm.trigger", Map(
-			"disabled_apps", "LLMMenu"))
+		ConfigKey.LLM_NAVIGATION, Map(
+			ConfigLeaf.NAV_MODIFIERS, "LLMMenu"),
+		ConfigKey.LLM_TRIGGER, Map(
+			ConfigLeaf.DISABLED_APPS, "LLMMenu"))
 	return Registry
 }
 
@@ -238,4 +413,96 @@ TomlConfigStaticForeignOwnershipRegistry() {
 _ConfigTomlDynamicPersonal(Parts) {
 	return Parts is Array && Parts.Length >= 2
 		&& Parts[1] == "hotstrings" && Parts[2] == "personal"
+}
+
+
+; Exact native decoder output is compared to a detached private shadow. This
+; rejects in-place source/cache/row mutation without granting write authority.
+; Every snapshot read walks the whole snapshot twice, so this walk avoids the
+; work that cost per node without changing a verdict: a case-sensitive Right is
+; searched as it is instead of being copied, a scalar child is compared in its
+; parent's loop, and an object's fields are collected for Right only.
+; test_config_snapshot_equal.ahk holds it to the plain definition.
+_ConfigTomlSnapshotEqual(Left, Right) {
+	static MapBase := Map.Prototype, ArrayBase := Array.Prototype
+	static ObjectBase := Object.Prototype, BoolBase := TOML_Bool.Prototype
+	static Describe := Object.Prototype.GetOwnPropDesc, Absent := {}
+	if Type(Left) != Type(Right)
+		return false
+	if Left is Map {
+		if ObjGetBase(Left) != MapBase || ObjGetBase(Right) != MapBase
+				|| ObjOwnPropCount(Left) || ObjOwnPropCount(Right)
+				|| Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
+			return false
+		ExactRight := Right
+		if Right.CaseSense != "On" {
+			ExactRight := Map()
+			ExactRight.CaseSense := "On"
+			for Name, Value in Right
+				ExactRight[Name] := Value
+		}
+		for Name, Value in Left {
+			Other := ExactRight.Get(Name, Absent)
+			if IsObject(Other) && Other == Absent
+				return false
+			if IsObject(Value) {
+				if !_ConfigTomlSnapshotEqual(Value, Other)
+					return false
+			} else if Type(Value) != Type(Other)
+					|| (Value is String ? StrCompare(Value, Other, true) != 0 : !(Value == Other))
+				return false
+		}
+		return true
+	}
+	if Left is Array {
+		if ObjGetBase(Left) != ArrayBase || ObjGetBase(Right) != ArrayBase
+				|| ObjOwnPropCount(Left) || ObjOwnPropCount(Right)
+				|| Left.Length != Right.Length
+			return false
+		loop Left.Length {
+			if !Left.Has(A_Index) || !Right.Has(A_Index)
+				return false
+			Value := Left[A_Index], Other := Right[A_Index]
+			if IsObject(Value) {
+				if !_ConfigTomlSnapshotEqual(Value, Other)
+					return false
+			} else if Type(Value) != Type(Other)
+					|| (Value is String ? StrCompare(Value, Other, true) != 0 : !(Value == Other))
+				return false
+		}
+		return true
+	}
+	if IsObject(Left) {
+		ExpectedBase := Left is TOML_Bool ? BoolBase : ObjectBase
+		if ObjGetBase(Left) != ExpectedBase || ObjGetBase(Right) != ExpectedBase
+				|| ObjOwnPropCount(Left) != ObjOwnPropCount(Right)
+				|| (Left is TOML_Bool && ObjOwnPropCount(Left) != 1)
+			return false
+		; Property names fold case while the field maps do not: Right's spellings
+		; are kept so a field renamed by case still differs.
+		RightFields := Map()
+		RightFields.CaseSense := "On"
+		for Name in ObjOwnProps(Right) {
+			Descriptor := Describe.Call(Right, Name)
+			if !Descriptor.HasOwnProp("Value")
+				return false
+			RightFields[Name] := Descriptor.Value
+		}
+		for Name in ObjOwnProps(Left) {
+			Descriptor := Describe.Call(Left, Name)
+			if !Descriptor.HasOwnProp("Value")
+				return false
+			Value := Descriptor.Value
+			Other := RightFields.Get(Name, Absent)
+			if IsObject(Other) && Other == Absent
+				return false
+			if Left is TOML_Bool {
+				if !(Name == "Value") || !(Value is Integer) || !(Value == Other)
+					return false
+			} else if !_ConfigTomlSnapshotEqual(Value, Other)
+				return false
+		}
+		return true
+	}
+	return Left is String ? StrCompare(Left, Right, true) == 0 : Left == Right
 }

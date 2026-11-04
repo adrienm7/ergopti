@@ -49,6 +49,7 @@
 
 local M = {}
 local original_source_owner_ports = {}
+local original_reconciliation_ports = {}
 
 local Logger = require("logger.shim")
 local InputEvent = require("infra.input_event")
@@ -82,6 +83,8 @@ local IOC_READ = 0x80000000
 local EVDEV_IOCTL_TYPE = 0x45
 local EVIOCGKEY_NR = 0x18
 local EVIOCGLED_NR = 0x19
+local EVIOCGBIT_NR = 0x20
+local EVENT_TYPE_BYTES = 4 -- EV_MAX is 0x1f: one complete event-type bitmap.
 
 -- poll(2) event mask for "there is something to read".
 local POLLIN = 0x001
@@ -134,6 +137,7 @@ local EVENT_FIELDS = { "type", "code", "value", "seconds", "microseconds", "time
 local EVENT_FIELD_SET = {}
 for _, field in ipairs(EVENT_FIELDS) do EVENT_FIELD_SET[field] = true end
 local SYN_DROPPED = 3
+local SYN_REPORT = 0
 
 -- Open descriptors, by caller-owned slot. A machine may expose several physical
 -- keyboards and pointers; slots keep their handles and grab state independent.
@@ -141,6 +145,9 @@ local SYN_DROPPED = 3
 -- drain are identical; the hook decides which keyboard slots are grabbed and
 -- keeps pointer slots read-only.
 local _slots = {}
+
+-- Descriptors handed to the multi-source wait, reused so a wait allocates nothing.
+local _wait_fds = {}
 
 --- The state for a slot, created on first use.
 --- @param slot string|nil Defaults to the keyboard.
@@ -160,9 +167,11 @@ end
 --- A backend implements:
 ---   open(path, flags)        → handle|nil, err
 ---   ioctl(handle, req, arg)  → boolean
+---   read_event_bits(fd, req, count) → string|nil (full event-type bitmap)
 ---   read(handle, count)      → string|nil, "would_block"|"fatal"|nil, reason
 ---   poll(handle, timeout_ms) → boolean      (true when readable)
 ---   close(handle)            → true|nil on completion, false, reason on failure
+---   device_number(handle)    → integer|nil (st_rdev of a character device; optional)
 --- A normally returning void backend acknowledges completion. Exceptions and
 --- explicit failures retire the handle and fence its slot until process restart;
 --- close(2) may have released it already, so retrying could close a reused fd.
@@ -228,6 +237,8 @@ local function build_ffi_backend()
 	local size = _codec.native_size()
 	local buf  = ffi.new("char[?]", size)
 	local pfd  = ffi.new("struct pollfd[1]")
+	local many_capacity = 8
+	local many = ffi.new("struct pollfd[?]", many_capacity)
 	local native_open, native_close, native_ioctl = ffi.C.open, ffi.C.close, ffi.C.ioctl
 	local native_read, native_poll = ffi.C.read, ffi.C.poll
 	local native_cast, native_new, native_string, native_errno = ffi.cast, ffi.new, ffi.string, ffi.errno
@@ -254,6 +265,12 @@ local function build_ffi_backend()
 			if copied ~= count then return nil, "pressed-key ioctl did not acknowledge the full bitset" end
 			return native_string(bits, count)
 		end,
+		read_event_bits = function(fd, request, count)
+			local bits = native_new("uint8_t[?]", count)
+			local copied = tonumber(native_ioctl(fd, request, bits))
+			if copied ~= count then return nil, "event-type ioctl did not acknowledge the full bitset" end
+			return native_string(bits, count)
+		end,
 		read = function(fd, count)
 			local got = tonumber(native_read(fd, buf, count))
 			if not got then return nil, "fatal", "read returned no result" end
@@ -277,9 +294,32 @@ local function build_ffi_backend()
 			local rc = tonumber(native_poll(pfd, 1, timeout_ms))
 			return rc ~= nil and rc > 0
 		end,
+		-- Waits for any of several descriptors; the idle loop sleeps here instead
+		-- of waking to find nothing. One array, regrown on demand, so a wait
+		-- allocates nothing in steady state.
+		poll_many = function(fds, count, timeout_ms)
+			if count > many_capacity then
+				many_capacity = count * 2
+				many = native_new("struct pollfd[?]", many_capacity)
+			end
+			for index = 1, count do
+				many[index - 1].fd = fds[index]
+				many[index - 1].events = POLLIN
+				many[index - 1].revents = 0
+			end
+			local rc = tonumber(native_poll(many, count, timeout_ms))
+			return rc ~= nil and rc > 0
+		end,
 		close = function(fd)
 			if native_close(fd) == 0 then return true end
 			return false, "close failed (errno=" .. tostring(native_errno()) .. ")"
+		end,
+		-- fstat(2) through libuv, which takes the same integer descriptor and
+		-- spares this module the per-architecture struct stat layout.
+		device_number = function(fd)
+			local stat = require("luv").fs_fstat(fd)
+			if type(stat) ~= "table" or stat.type ~= "char" then return nil end
+			return stat.rdev
 		end,
 	}
 end
@@ -298,7 +338,7 @@ function M.use_ffi_backend()
 	end
 	_backend, _native_backend = backend, backend
 	_native_ports = {}
-	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "read_owned_key_bits", "poll", "close" }) do
+	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "read_owned_key_bits", "read_event_bits", "poll", "close" }) do
 		_native_ports[name] = rawget(backend, name)
 	end
 	pcall(Logger.debug, LOG, "FFI backend bound.")
@@ -316,8 +356,8 @@ end
 -- ===========================================
 
 --- True when this reader could plausibly open a device: a backend exists and the
---- node is readable. Deliberately opens nothing — a probe with side effects on
---- an input device is a grab nobody asked for.
+--- node is readable. The temporary read probe never blocks, grabs or retains
+--- a descriptor; only open() below owns a live device stream.
 --- @param path string Device path, e.g. "/dev/input/event3".
 --- @return boolean available, string|nil reason
 function M.is_available(path)
@@ -327,11 +367,10 @@ function M.is_available(path)
 	if type(path) ~= "string" or path == "" then
 		return false, "no device path"
 	end
-	local fh = io.open(path, "rb")
-	if not fh then
+	local readable = require("infra.device_access").readable(path)
+	if not readable then
 		return false, path .. " is not readable (is this user in the input group?)"
 	end
-	fh:close()
 	return true
 end
 
@@ -369,6 +408,7 @@ function M.open(path, slot)
 	_generation = _generation + 1
 	st.fd, st.path, st.grabbed = fd, path, false
 	st.generation, st.read_epoch, st.synchronized = _generation, 0, true
+	st.recovery_kind, st.recovery_ready = nil, false
 	st.native = rawequal(backend, _native_backend) and type(fd) == "number"
 		and fd >= 0 and fd <= 2147483647 and fd % 1 == 0
 	st.native_grab = false
@@ -378,6 +418,23 @@ function M.open(path, slot)
 	pcall(Logger.success, LOG, "Reading %s (non-blocking).", path)
 	_busy = false
 	return true
+end
+
+--- The owned descriptor's device number (st_rdev, read by fstat on the open
+--- descriptor), as the decimal string the shared media contract stores: the
+--- device the descriptor reads, never a path or an event-node number.
+--- @param slot string|nil
+--- @return string|nil device, string|nil reason
+function M.device_identity(slot)
+	local st = state(slot)
+	if st.fd == nil or st.close_error then return nil, "device is not open" end
+	local port = _backend and rawget(_backend, "device_number")
+	if type(port) ~= "function" then return nil, "no device-number port" end
+	local called, number = pcall(port, st.fd)
+	if not called or type(number) ~= "number" or number < 1 or number % 1 ~= 0 or number >= 2 ^ 53 then
+		return nil, "the descriptor names no character device"
+	end
+	return string.format("%.0f", number)
 end
 
 --- Takes EVIOCGRAB, so the desktop stops receiving this device entirely.
@@ -404,6 +461,7 @@ function M.grab(slot)
 	end
 	st.grabbed = true
 	st.native_grab = st.native and acknowledged == true
+	if st.recovery_kind == "ungrab" then st.recovery_ready = true end
 	pcall(Logger.success, LOG, "Grabbed %s — the desktop no longer sees this device.", tostring(st.path))
 	_busy = false
 	return true
@@ -416,6 +474,7 @@ function M.ungrab(slot)
 	local st = state(slot)
 	if st.fd == nil or not st.grabbed then return true end
 	st.native_grab = false
+	st.synchronized, st.recovery_kind, st.recovery_ready = false, "ungrab", false
 	_generation = _generation + 1
 	st.generation = _generation
 	_busy = true
@@ -487,6 +546,42 @@ local function ioctl_read_request(number, count)
 	return IOC_READ + count * 0x10000 + EVDEV_IOCTL_TYPE * 0x100 + number
 end
 
+--- Queries event types on the acquired descriptor, independently of its pathname.
+--- An eventN can be reused between proc discovery and open; its fd identifies
+--- the device whose complete stream EVIOCGRAB would remove from the desktop.
+--- @param slot string|nil Reader slot.
+--- @return number|nil mask, string|nil reason
+function M.event_capabilities(slot)
+	if _busy or _native_debt then return nil, "capability query is unavailable" end
+	local st = state(slot)
+	if st.fd == nil or st.close_error then return nil, "device is not open" end
+	local backend, fd, generation = _backend, st.fd, st.generation
+	local query = type(backend) == "table" and rawget(backend, "read_event_bits")
+	if type(query) ~= "function" or st.native and query ~= _native_ports.read_event_bits then
+		return nil, "backend cannot query original event capabilities"
+	end
+	local function current()
+		if not rawequal(_backend, backend) or rawget(backend, "read_event_bits") ~= query
+			or st.fd ~= fd or st.generation ~= generation or st.close_error then return false end
+		if st.native then
+			for name, port in pairs(_native_ports) do
+				if rawget(backend, name) ~= port then return false end
+			end
+		end
+		return true
+	end
+	if not current() then return nil, "original capability provider is unavailable" end
+	_busy = true
+	local called, bytes = pcall(query, fd, ioctl_read_request(EVIOCGBIT_NR, EVENT_TYPE_BYTES), EVENT_TYPE_BYTES)
+	_busy = false
+	if not called or type(bytes) ~= "string" or #bytes ~= EVENT_TYPE_BYTES or not current() then
+		return nil, "event capability query was not acknowledged"
+	end
+	local mask = 0
+	for i = 1, EVENT_TYPE_BYTES do mask = mask + bytes:byte(i) * 256 ^ (i - 1) end
+	return mask
+end
+
 local function bit_snapshot(slot, number, max_code)
 	if _busy then return nil, "native operation is unavailable" end
 	local st = state(slot)
@@ -556,16 +651,48 @@ function M.wait_readable(timeout_ms, slot)
 	return ok and readable == true
 end
 
+--- Blocks until any open source has data, or the timeout expires.
+---
+--- The daemon's idle loop calls it with every keyboard, pointer and touchpad
+--- open, so an idle daemon wakes once per timeout instead of spinning, and a key
+--- wakes it at once. Nothing is read: the pump still owns every event.
+--- @param timeout_ms integer Milliseconds; 0 returns at once.
+--- @return boolean|nil ready True when a source is readable (or in error, so the
+---   pump sees and retires it); false on timeout; nil when no wait is possible
+---   (busy reader, no open source, or a backend without a multi-descriptor wait),
+---   so the caller yields another way instead of treating it as a quiet wait.
+function M.wait_any_readable(timeout_ms)
+	if _busy or _native_debt or not _backend then return nil end
+	local many = rawget(_backend, "poll_many")
+	if type(many) ~= "function" then return nil end
+	local count = 0
+	for _, st in pairs(_slots) do
+		if st.fd ~= nil then
+			count = count + 1
+			_wait_fds[count] = st.fd
+		end
+	end
+	if count == 0 then return nil end
+	for index = count + 1, #_wait_fds do _wait_fds[index] = nil end
+	_busy = true
+	local ok, ready = pcall(many, _wait_fds, count, timeout_ms)
+	_busy = false
+	if not ok then return nil end
+	return ready == true
+end
+
 --- Checks private provider/session identity, not an unobserved kernel state lease.
 --- @param record table Private original event record.
 --- @return boolean current
-local function native_session_current(record)
+local function native_session_current(record, staging)
 	local st = record.state
-	if _busy or _native_debt or not rawequal(_slots[record.slot], st)
+	if not staging and (_busy or st.synchronized ~= true
+		or record.reconciliation and record.reconciliation.committed ~= true) then return false end
+	if _native_debt or not rawequal(_slots[record.slot], st)
 		or not rawequal(_backend, record.backend) or not rawequal(_backend, _native_backend)
 		or st.fd ~= record.fd or st.generation ~= record.generation
 		or st.native ~= true or st.native_grab ~= true or st.grabbed ~= true
-		or st.synchronized ~= true or st.close_error ~= nil then return false end
+		or st.close_error ~= nil then return false end
 	for name, port in pairs(_native_ports or {}) do
 		if not rawequal(rawget(record.backend, name), port) then return false end
 	end
@@ -573,6 +700,37 @@ local function native_session_current(record)
 		if not rawequal(rawget(InputEvent, name), port) then return false end
 	end
 	return true
+end
+
+--- Constructs an opaque source owner without publishing input currency.
+--- @param key string|table Original slot.
+--- @param st table Private native state.
+--- @return table|nil lease Opaque original descriptor identity, never its fd.
+--- @return function|nil observer Original private issuer/port/lifetime RAM join.
+local function source_owner(key, st)
+	local owner = st.descriptor_owner
+	local lease = {}
+	local record = { state = st, slot = key, descriptor = owner, backend = owner.backend,
+		fd = owner.fd, generation = st.generation, input = st.grabbed == true and st.native_grab == true }
+	_source_owners[lease] = record
+	local open_observer = function(original, capture, current, retire)
+		if not rawequal(original, lease) or _source_owners[original] ~= record
+			or getmetatable(original) ~= nil or next(original) ~= nil
+			or capture ~= original_source_owner_ports.capture or current ~= original_source_owner_ports.current
+			or retire ~= original_source_owner_ports.retire
+			or rawget(M, "capture_source_owner") ~= capture or rawget(M, "source_owner_current") ~= current
+			or rawget(M, "retire_source") ~= retire or _busy or _native_debt
+			or owner.state ~= "open" or not rawequal(_slots[key], st) or not rawequal(st.descriptor_owner, owner)
+			or st.fd ~= owner.fd
+			or not rawequal(_backend, owner.backend) or not rawequal(_native_backend, owner.backend) then return false end
+		for name, port in pairs(_native_ports or {}) do
+			if not rawequal(rawget(owner.backend, name), port) then return false end
+		end
+		return true
+	end
+	local observer = function(...) return open_observer(...) and st.generation == record.generation end
+	record.open_observer, record.observer = open_observer, observer
+	return lease, observer
 end
 
 --- Captures only this genuine native descriptor's original open lifetime.
@@ -589,27 +747,7 @@ function M.capture_source_owner(slot)
 		or st.fd ~= owner.fd or st.native ~= true or not rawequal(_backend, owner.backend)
 		or not rawequal(_native_backend, owner.backend) then return nil end
 	for name, port in pairs(_native_ports or {}) do if not rawequal(rawget(owner.backend, name), port) then return nil end end
-	local lease = {}
-	local record = { state = st, slot = key, descriptor = owner, backend = owner.backend,
-		fd = owner.fd, generation = st.generation, input = st.grabbed == true and st.native_grab == true }
-	_source_owners[lease] = record
-	local observer = function(original, capture, current, retire)
-		if not rawequal(original, lease) or _source_owners[original] ~= record
-			or getmetatable(original) ~= nil or next(original) ~= nil
-			or capture ~= original_source_owner_ports.capture or current ~= original_source_owner_ports.current
-			or retire ~= original_source_owner_ports.retire
-			or rawget(M, "capture_source_owner") ~= capture or rawget(M, "source_owner_current") ~= current
-			or rawget(M, "retire_source") ~= retire or _busy or _native_debt
-			or owner.state ~= "open" or not rawequal(_slots[key], st) or not rawequal(st.descriptor_owner, owner)
-			or st.fd ~= owner.fd or st.generation ~= record.generation
-			or not rawequal(_backend, owner.backend) or not rawequal(_native_backend, owner.backend) then return false end
-		for name, port in pairs(_native_ports or {}) do
-			if not rawequal(rawget(owner.backend, name), port) then return false end
-		end
-		return true
-	end
-	record.observer = observer
-	return lease, observer
+	return source_owner(key, st)
 end
 
 --- Observes the original grabbed input session without querying a native provider.
@@ -620,6 +758,7 @@ end
 --- @param retire function|nil Construction-captured original retirement port.
 --- @return boolean current Native input currency; not physical-device proof.
 --- @return boolean|nil cleanup Optional original cleanup currency, never input rights.
+--- @return boolean|nil same_open Original descriptor lifetime only; ignores retired input generations.
 function M.source_owner_current(lease, observer, capture, current, retire)
 	local record = _source_owners[lease]
 	local input = record ~= nil and getmetatable(lease) == nil and next(lease) == nil and record.input
@@ -631,7 +770,10 @@ function M.source_owner_current(lease, observer, capture, current, retire)
 	local cleanup = record ~= nil and record.observer == observer and type(observer) == "function"
 		and capture == original_source_owner_ports.capture and current == original_source_owner_ports.current
 		and retire == original_source_owner_ports.retire and observer(lease, capture, current, retire) == true
-	return input and cleanup, cleanup
+	local same_open = record ~= nil and record.observer == observer and type(observer) == "function"
+		and capture == original_source_owner_ports.capture and current == original_source_owner_ports.current
+		and retire == original_source_owner_ports.retire and record.open_observer(lease, capture, current, retire) == true
+	return input and cleanup, cleanup, same_open
 end
 
 --- Retires only the original descriptor; a reopened slot/FD remains untouched.
@@ -714,6 +856,109 @@ function M.pressed_keys_view(capability)
 		max_code = record.max_code, down = down, origin = "native-evdev" }
 end
 
+--- Stages fresh native state without admitting any source until restoration acknowledges it.
+--- The caller must also keep its logical cohort unpublished throughout the callback.
+--- @param slots table Dense native reader slot list, including a recovered source.
+--- @param restore function Receives detached snapshots with pending source/held leases.
+--- @param originals table|nil Dense original per-open leases, independent of revoked input generations.
+--- @return boolean committed
+function M.reconcile_sources(slots, restore, originals)
+	if _busy or _native_debt or type(slots) ~= "table" or getmetatable(slots) ~= nil
+		or #slots == 0 or type(restore) ~= "function" then return false end
+	for key in pairs(slots) do
+		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #slots then return false end
+	end
+	for index = 1, #slots do if rawget(slots, index) == nil then return false end end
+	if originals ~= nil then
+		if type(originals) ~= "table" or getmetatable(originals) ~= nil or #originals ~= #slots then return false end
+		for key in pairs(originals) do
+			if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #slots then return false end
+		end
+		for index = 1, #slots do if rawget(originals, index) == nil then return false end end
+	end
+	local transaction, records, snapshots, seen, recovering = {}, {}, {}, {}, false
+	for index, slot in ipairs(slots) do
+		local st = _slots[slot]
+		if seen[slot] or not st then return false end
+		seen[slot] = true
+		local record = { state = st, slot = slot, backend = _backend, fd = st.fd,
+			generation = st.generation, path = st.path, read_epoch = st.read_epoch,
+			max_code = 0x2ff, reconciliation = transaction }
+		if originals then
+			local lease = rawget(originals, index)
+			local origin = _source_owners[lease]
+			if not origin or getmetatable(lease) ~= nil or next(lease) ~= nil
+				or not rawequal(origin.slot, slot) or not rawequal(origin.state, st)
+				or not rawequal(origin.descriptor, st.descriptor_owner) or origin.fd ~= st.fd
+				or origin.descriptor.state ~= "open" or not rawequal(origin.backend, _backend) then return false end
+			-- A native ungrab/drop revokes generation, not the original per-open
+			-- descriptor. Retain this private join independently of input currency.
+			record.original_lease, record.original_owner = lease, origin
+		end
+		if not native_session_current(record, true) then return false end
+		if st.synchronized ~= true then
+			if st.recovery_ready ~= true then return false end
+			recovering = true
+		end
+		records[index] = record
+	end
+	if not recovering then return false end
+	_busy = true
+	local function current()
+		for name, port in pairs(original_reconciliation_ports) do
+			if rawget(M, name) ~= port then return false end
+		end
+		for _, record in ipairs(records) do
+			local origin, lease = record.original_owner, record.original_lease
+			if origin and (_source_owners[lease] ~= origin or getmetatable(lease) ~= nil or next(lease) ~= nil
+				or not rawequal(origin.state, _slots[record.slot]) or not rawequal(origin.slot, record.slot)
+				or not rawequal(origin.descriptor, record.state.descriptor_owner)
+				or origin.descriptor.state ~= "open" or origin.fd ~= record.state.fd
+				or not rawequal(origin.backend, _backend)) then return false end
+			if record.read_epoch ~= record.state.read_epoch
+				or record.query_epoch and record.query_epoch ~= record.state.key_query_epoch
+				or not native_session_current(record, true) then return false end
+		end
+		return true
+	end
+	local called, acknowledged = pcall(function()
+		for index, record in ipairs(records) do
+			local st = record.state
+			st.key_query_epoch = (st.key_query_epoch or 0) + 1
+			record.query_epoch = st.key_query_epoch
+			local bytes = _native_ports.read_owned_key_bits(record.fd, ioctl_read_request(EVIOCGKEY_NR, 96), 96)
+			local leds = _native_ports.read_owned_key_bits(record.fd, ioctl_read_request(EVIOCGLED_NR, 2), 2)
+			if type(bytes) ~= "string" or #bytes ~= 96 or type(leds) ~= "string" or #leds ~= 2
+				or not current() then return false end
+			local keys, active, down = {}, {}, {}
+			for code = 0, record.max_code do
+				if math.floor(bytes:byte(math.floor(code / 8) + 1) / (2 ^ (code % 8))) % 2 == 1 then
+					keys[code], down[#down + 1] = true, code
+				end
+			end
+			for code = 0, 15 do
+				if math.floor(leds:byte(math.floor(code / 8) + 1) / (2 ^ (code % 8))) % 2 == 1 then active[code] = true end
+			end
+			record.down = down
+			local held = {}; _held_receipts[held] = record
+			local lease, observer = source_owner(record.slot, st)
+			_source_owners[lease].reconciliation = transaction
+			snapshots[index] = { slot = record.slot, source = record.path, keys = keys, leds = active,
+				held = held, lease = lease, observer = observer, current = current }
+		end
+		return restore(snapshots) == true and current()
+	end)
+	if called and acknowledged == true then
+		for _, record in ipairs(records) do
+			record.state.synchronized = true
+			record.state.recovery_kind, record.state.recovery_ready = nil, false
+		end
+		transaction.committed = true
+	end
+	_busy = false
+	return transaction.committed == true
+end
+
 --- Rejects replaced, remapped or mutated decoded objects without metatable callbacks.
 --- @param record table Private original event record.
 --- @return boolean original
@@ -782,8 +1027,11 @@ function M.read_event(slot)
 	row.timestamp_us = row.seconds * 1000000 + row.microseconds
 	if row.type == _codec.EV_SYN and row.code == SYN_DROPPED then
 		st.synchronized = false
+		st.recovery_kind, st.recovery_ready = "drop", false
 		_generation = _generation + 1
 		st.generation = _generation
+	elseif row.type == _codec.EV_SYN and row.code == SYN_REPORT and st.recovery_kind == "drop" then
+		st.recovery_ready = true
 	end
 	_busy = false
 	if row.type == _codec.EV_KEY and row.code >= 1 and row.code <= 0x2ff
@@ -911,5 +1159,9 @@ M.EVIOCGLED_NR = EVIOCGLED_NR
 original_source_owner_ports.capture = M.capture_source_owner
 original_source_owner_ports.current = M.source_owner_current
 original_source_owner_ports.retire = M.retire_source
+for _, name in ipairs({ "capture_source_owner", "source_owner_current", "retire_source", "reconcile_sources",
+	"capture_pressed_keys", "pressed_keys_view", "pressed_keys_current" }) do
+	original_reconciliation_ports[name] = rawget(M, name)
+end
 
 return M
