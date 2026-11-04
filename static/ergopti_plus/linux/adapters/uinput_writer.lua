@@ -311,7 +311,7 @@ local function emit_relative_owned(capability, axis, value)
 	if _busy or _debt or _transaction ~= nil or not output_identity(output)
 		or not rawequal(capability, output.capability) then return false end
 	if not RELATIVE_AXIS[axis] or type(value) ~= "number" or value ~= math.floor(value)
-		or value < -RELATIVE_VALUE_LIMIT or value > RELATIVE_VALUE_LIMIT then return false end
+		or value < -RELATIVE_VALUE_LIMIT - 1 or value > RELATIVE_VALUE_LIMIT then return false end
 	_busy = true
 	output.write_epoch = output.write_epoch + 1
 	local called, acknowledged = pcall(function()
@@ -899,7 +899,7 @@ function M.emit_relative(axis, value)
 	if _dispatch or _busy or _debt or _transaction ~= nil then return false end
 	if _output ~= nil then return emit_relative_owned(_output.capability, axis, value) end
 	if not RELATIVE_AXIS[axis] or type(value) ~= "number" or value ~= math.floor(value)
-		or value < -RELATIVE_VALUE_LIMIT or value > RELATIVE_VALUE_LIMIT then
+		or value < -RELATIVE_VALUE_LIMIT - 1 or value > RELATIVE_VALUE_LIMIT then
 		Logger.error(LOG, "emit_relative(): invalid arguments — axis=%s value=%s.", tostring(axis), tostring(value))
 		return false
 	end
