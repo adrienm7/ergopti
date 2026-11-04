@@ -433,6 +433,12 @@ local _log_dir = nil
 
 -- SQLite database path (primary persistence).
 local _sqlite_path = nil
+local _sqlite_admitted = false
+
+-- Availability alone does not acknowledge migration and device registration.
+local function sqlite_available()
+	return _sqlite_admitted and SqliteWriter and SqliteWriter.is_available() == true
+end
 
 -- Device identifier for SQLite registration (derived from hostname).
 local _device_id = "linux-unknown"
@@ -660,9 +666,13 @@ function M.init(opts)
 	hostname = hostname:gsub("%s+", "")
 	_device_id = "linux-" .. hostname
 
-	-- Open the SQLite database (bootstraps schema on first run).
-	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) and SqliteWriter.ensure_token_encoding() then
-		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
+	-- A usable writer must also acknowledge migration and actual registration.
+	_sqlite_admitted = false
+	local sqlite_opened = SqliteWriter and SqliteWriter.open_db(_sqlite_path) == true
+	local sqlite_ready = sqlite_opened and SqliteWriter.ensure_token_encoding() == true
+		and SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname) == true
+	if sqlite_ready then
+		_sqlite_admitted = true
 		if SqliteReader then migrate_legacy_categories() end
 		-- A live walk owns the record; only a fresh process reads back what the
 		-- previous one left open when it stopped without its final flush.
@@ -688,6 +698,10 @@ function M.init(opts)
 		end
 		Logger.info(LOG, "SQLite persistence active: %s", _sqlite_path)
 	else
+		if sqlite_opened then
+			local closed, detail = pcall(SqliteWriter.close_db)
+			if not closed or detail == false then Logger.error(LOG, "SQLite cleanup after failed admission was refused.") end
+		end
 		Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
 	end
 
@@ -1422,7 +1436,7 @@ end
 --- @return table manifest Persisted manifest, partial when a query failed.
 --- @return boolean complete Whether every native query was accepted.
 local function persisted_manifest()
-	if not (SqliteWriter and SqliteWriter.is_available() and SqliteReader) then return {}, true end
+	if not (sqlite_available() and SqliteReader) then return {}, true end
 	local revision = SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
 	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
 		return _manifest_cache.manifest, true
@@ -1553,7 +1567,7 @@ function M.get_dashboard_payload(opts)
 	if not SqliteReader then return nil, "SQLite projection unavailable" end
 	local options = type(opts) == "table" and opts or {}
 	local categories = {}
-	if SqliteWriter and SqliteWriter.is_available() then
+	if sqlite_available() then
 		local model = AppCategoryFile.load()
 		if model == nil then return nil, "app category file unavailable" end
 		categories = AppCategoryStore.projection(model)
@@ -1584,7 +1598,7 @@ function M.get_range_payload(start_date, end_date, apps)
 	local clock = observe_calendar()
 	local bounds = SqliteReader.split_bounds(start_date, end_date, clock.date)
 	local payload, complete = { historical = empty_ngrams(), today = {} }, true
-	if SqliteWriter and SqliteWriter.is_available() then
+	if sqlite_available() then
 		payload, complete = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps, bounds.today)
 	end
 	-- The page shows the partial counts and says the history is incomplete
@@ -2785,7 +2799,7 @@ local function flush_dispatch(close_session)
 		end
 		return M.pump_flush()
 	end
-	if SqliteWriter and SqliteWriter.is_available() then return dispatch_flush(close_session) end
+	if sqlite_available() then return dispatch_flush(close_session) end
 	_last_flush_committed = false
 	flush_json()
 	return false
@@ -2857,7 +2871,7 @@ function M.stop()
 	end
 	if _stop_final_dispatched then return true end
 	_stop_final_dispatched = true
-	if SqliteWriter and SqliteWriter.is_available() then
+	if sqlite_available() then
 		if dispatch_flush() then return true end
 		if _flush_state then return M.stop() end
 		if SqliteWriter.flush_transport_available() then
@@ -2926,7 +2940,7 @@ end
 --- @return boolean acknowledged False while persistence is refused or pending.
 reset_session_step = function()
 	if _session_reset_attempt or M.has_flush_debt() or _flush_stopping then return false end
-	if not (SqliteWriter and SqliteWriter.is_available()) then
+	if not (sqlite_available()) then
 		Logger.error(LOG, "Metrics session reset refused: durable SQLite persistence is unavailable.")
 		return false
 	end

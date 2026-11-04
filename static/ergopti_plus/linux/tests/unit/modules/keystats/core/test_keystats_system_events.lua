@@ -131,3 +131,38 @@ helpers.describe("keystats system events: the writer", function()
 		if not ok then error(failure, 0) end
 	end)
 end)
+
+for _, failure in ipairs({ "migration", "registration" }) do
+	it("metrics do not use SQLite after failed " .. failure, function()
+		local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system_metrics" }
+		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		local starts, closes, registers = 0, 0, 0
+		local writer = setmetatable({
+			open_db = function() return true end,
+			ensure_token_encoding = function() return failure ~= "migration" end,
+			register_device = function() registers = registers + 1; return failure ~= "registration" end,
+			read_open_walk = function() return nil, true end,
+			is_available = function() return true end,
+			close_db = function() closes = closes + 1; return true end,
+		}, { __index = Fakes.sqlite_writer() })
+		require("tests.support.sqlite_flush_fake").attach(writer)
+		local start = writer.start_flush
+		writer.start_flush = function(...) starts = starts + 1; return start(...) end
+		package.loaded[names[1]], package.loaded[names[2]] = writer, nil
+		package.loaded[names[3]] = { bind = function() end, bind_event_capture = function() end,
+			current = function() return nil end, snapshot = function() return { values = {}, owners = {} } end,
+			acknowledge = function() end, take_events = function() return {} end }
+		local called, detail = pcall(function()
+			local keystats = require(names[2])
+			keystats.init(Home.options())
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			keystats.on_keydown("a", 1000, "owned-app")
+			keystats.flush()
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		assert(called, detail)
+		helpers.assert_eq(starts, 0, "unadmitted SQLite must never accept a flush")
+		helpers.assert_eq(closes, 1, "failed SQLite initialization releases the store")
+		helpers.assert_eq(registers, failure == "registration" and 1 or 0)
+	end)
+end
