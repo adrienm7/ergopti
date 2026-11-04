@@ -188,4 +188,13 @@ $reportDir = $transportReportsDir
 [IO.Directory]::CreateDirectory($reportDir) | Out-Null
 Remove-CrashTransportFields $snapshot
 $reportPath = Write-CrashDocument $reportDir ([string]$snapshot.timestamp) (ConvertTo-CrashDocument $snapshot)
-Write-Output ("OK:" + $reportPath)
+# This receipt contains a native Unicode path. Its explicit byte preamble lets
+# the parent's FileRead detect UTF-8 regardless of console/ANSI code pages.
+$ReceiptEncoding = [Text.UTF8Encoding]::new($true)
+[byte[]]$ReceiptBytes = $ReceiptEncoding.GetPreamble() +
+	$ReceiptEncoding.GetBytes("OK:" + $reportPath + [Environment]::NewLine)
+$ReceiptOutput = [Console]::OpenStandardOutput()
+try {
+	$ReceiptOutput.Write($ReceiptBytes, 0, $ReceiptBytes.Length)
+	$ReceiptOutput.Flush()
+} finally { $ReceiptOutput.Dispose() }
