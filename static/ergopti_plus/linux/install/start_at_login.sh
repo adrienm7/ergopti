@@ -29,6 +29,22 @@ fi
 DESKTOP_FILE="$CONFIG_ROOT/autostart/$DESKTOP_NAME"
 USER_UNIT="$CONFIG_ROOT/systemd/user/ergopti-hotstrings.service"
 
+# systemd expands %h from the account database, not from an arbitrary HOME in
+# this process. Admit the documented manual unit only when that physical prefix
+# is the one this installation actually owns.
+startup_manual_unit_matches() {
+	"$receipt_allowed" || return 1
+	local uid entry name password account_uid group_id comment account_home shell prefix
+	uid="$(id -u)" || return 1
+	entry="$(getent passwd "$uid")" || return 1
+	case "$entry" in *$'\n'*) return 1 ;; esac
+	IFS=: read -r name password account_uid group_id comment account_home shell <<< "$entry"
+	[ -n "$name" ] && [ "$account_uid" = "$uid" ] || return 1
+	case "$account_home" in /*) ;; *) return 1 ;; esac
+	IFS= read -r -d '' prefix < <(CDPATH= cd -Pe -- "$account_home/.local" && printf '%s\0' "$PWD") || return 1
+	[ "$prefix/bin/ergopti-hotstrings" = "$LAUNCHER" ]
+}
+
 # A same-named user unit can belong to a second installation. Never disable it
 # merely because systemd lists the name; only admit an unambiguous launcher.
 startup_user_unit_compatible() {
@@ -42,6 +58,7 @@ startup_user_unit_compatible() {
 				count=$((count + 1))
 				case "$line" in
 					"$expected"|"ExecStart=$LAUNCHER --tray"|"ExecStart=$LAUNCHER --service --tray") ;;
+					'ExecStart=%h/.local/bin/ergopti-hotstrings --tray') startup_manual_unit_matches || return 1 ;;
 					*) return 1 ;;
 				esac ;;
 		esac
