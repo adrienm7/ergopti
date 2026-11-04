@@ -108,7 +108,7 @@ TapHoldRollUndecided() {
 	global _KeyCombinationChordBusy
 	; A key waiting for its chord partner holds the next characters the same way.
 	State := _TapHoldRollState()
-	return (IsSet(_KeyCombinationChordBusy) && _KeyCombinationChordBusy)
+	return KeyCombinationChordIsBusy()
 		|| (State["key"] != "" && TapHoldOwnerCurrent(State["owner"]))
 }
 
@@ -357,7 +357,7 @@ TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 		throw ValueError("A typing-key roll hotkey must be named by its scan code.", -1, Name)
 	Sc := Integer("0x" . Found[1])
 	global _KeyCombinationChordBusy
-	if (IsSet(_KeyCombinationChordBusy) && _KeyCombinationChordBusy) {
+	if KeyCombinationChordIsBusy() {
 		KeyCombinationChordInterrupt(Sc)
 		return
 	}
