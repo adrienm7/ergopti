@@ -55,14 +55,17 @@ const FAIL_SYMBOL = '✗';
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const WINDOWS_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows');
 
-// A WebView2 controller being closed. Matches both the global-variable hosts
+// A WebView2 controller being closed. Keep its complete property path so
+// Host.controller cannot borrow releases from an unrelated local Controller.
+// Matches both the global-variable hosts
 // (`_HsEdWeb_Controller.Close()`) and the class-based factory
 // (`this.Controller.Close()`).
-const CLOSE_RE = /(\w+)\.Close\(\)/;
+const CLOSE_RE = /([\w.]+)\.Close\(\)/;
 // A subscription handle being released. The name is what the thqby binding
 // returns from add_WebMessageReceived / add_NavigationCompleted, so it always
-// carries "Sub" — `_OnbWeb_MsgSub`, `this.NavSub`.
-const RELEASE_RE = /(?:this\.)?(\w*Sub)\s*:=\s*unset/;
+// carries "Sub" — `_OnbWeb_MsgSub`, `this.NavSub` — or lives in an
+// explicit retired owner's subscription field. Zero also releases an object.
+const RELEASE_RE = /((?:\w+\.)?(?:\w*Sub|subscription))\s*:=\s*(?:unset|0)\b/;
 // A function or method definition, at any indentation: `Name(args) {`.
 const FUNC_DEF_RE = /^\s*\w+\([^)]*\)\s*\{/;
 
@@ -92,7 +95,7 @@ function walk(dir, acc = []) {
  * @returns {string} Prefix shared with its controller's name.
  */
 function subscriptionOwner(name) {
-	return name.replace(/[A-Z]?[a-z]*Sub$/, '');
+	return name.replace(/(?:[A-Z]?[a-z]*Sub|subscription)$/, '');
 }
 
 let total_pass = 0;
@@ -141,7 +144,9 @@ for (const abs of walk(WINDOWS_DIR)) {
 	// A host with no subscription handles has no ordering to get wrong — the
 	// keystats's abort path closes a controller it was handed and subscribes to
 	// nothing.
-	const declaresSubs = lines.some((l) => !l.trim().startsWith(';') && /\w*Sub\s*:=/.test(l));
+	const declaresSubs = lines.some(
+		(l) => !l.trim().startsWith(';') && /(?:\w*Sub|subscription)\s*:=/.test(l)
+	);
 	if (!declaresSubs) {
 		pass(`${rel} — closes a controller, stores no subscription handle`);
 		continue;
@@ -168,7 +173,9 @@ for (const abs of walk(WINDOWS_DIR)) {
 				(l, i) =>
 					i > firstFuncLine &&
 					!l.trim().startsWith(';') &&
-					[...l.matchAll(/(?<![\w.])(\w*Sub)\s*:=/g)].some((m) => subscriptionOwner(m[1]) === owner)
+					[...l.matchAll(/(?<![\w.])((?:\w+\.)?(?:\w*Sub|subscription))\s*:=/g)].some(
+						(m) => subscriptionOwner(m[1]) === owner
+					)
 			);
 			if (stores) {
 				fail(
