@@ -791,7 +791,7 @@ function selfSignedCertificate(commonName, algorithm = 'ed25519') {
  * hash to the manifest's digest, as in the macOS field run of 2026-10-31.
  * @param {object} [options]
  * @param {'ok'|'digest_mismatch'} [options.mode] The blob behaviour.
- * @returns {Promise<object>} { port, sha256, requests, serverNames, setMode, close }.
+ * @returns {Promise<object>} { port, cert, sha256, requests, serverNames, setMode, close }.
  */
 async function startFakeRegistry({ mode = 'ok' } = {}) {
 	const state = { mode };
@@ -870,6 +870,7 @@ async function startFakeRegistry({ mode = 'ok' } = {}) {
 	});
 	return {
 		port: server.address().port,
+		cert: identity.cert,
 		sha256: identity.sha256,
 		requests,
 		serverNames,

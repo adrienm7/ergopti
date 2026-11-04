@@ -15,6 +15,7 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from urllib.parse import urlsplit
 
 
 ROOT = Path(
@@ -828,7 +829,12 @@ class OllamaBlobHost(unittest.TestCase):
         self.assertIn("step blob_host pass registry_served", self.run_blob(blob=(200, None))[0])
 
     def test_the_inventory_plans_the_registry_and_its_blob_host(self):
-        self.assertTrue(self.registry.startswith("https://registry.ollama.ai"))
+        registry = urlsplit(self.registry)
+        self.assertEqual(
+            (registry.scheme, registry.hostname, registry.path),
+            ("https", "registry.ollama.ai", ""),
+            "the registry is the HTTPS origin of registry.ollama.ai",
+        )
         self.assertGreaterEqual(len(self.planned), 2)
 
 
