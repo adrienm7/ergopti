@@ -36,6 +36,7 @@ local ConfigOutdated = require("config_outdated")
 local Json = require("json")
 local Vision = require("llm.vision")
 local Agent = require("llm.agent")
+local AppIdentity = require("llm.app_identity")
 local Manifest = require("infra.manifest_reader")
 local ConfigKeys = require("config_keys")
 
@@ -306,9 +307,10 @@ end
 --- @param app string|nil
 --- @return boolean
 function M.is_app_disabled(app)
-	if type(app) ~= "string" or app == "" then return false end
+	local key = AppIdentity.normalize(app)
+	if not key then return false end
 	for _, disabled in ipairs(M.get_disabled_apps()) do
-		if disabled == app then return true end
+		if AppIdentity.normalize(disabled) == key then return true end
 	end
 	return false
 end
