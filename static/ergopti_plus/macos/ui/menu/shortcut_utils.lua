@@ -116,12 +116,31 @@ function M.parse_shortcut_input(raw, default_mods)
 	return M.normalize_shortcut(mods, key, default_mods)
 end
 
+--- Copies a dense modifier list before formatting untrusted saved shortcuts.
+--- @param mods any Persisted modifier array, or nil.
+--- @return table|nil copy Nil when the saved array is malformed.
+local function formatting_modifiers(mods)
+	if mods == nil then return {} end
+	if type(mods) ~= "table" then return nil end
+	local count, length, copy = 0, #mods, {}
+	for index, value in pairs(mods) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length
+			or type(value) ~= "string" then return nil end
+		count = count + 1
+		copy[index] = value
+	end
+	if count ~= length then return nil end
+	return copy
+end
+
 --- Converts a shortcut table to a config-friendly string.
 --- @param sc table|nil Shortcut definition.
 --- @return string String representation for input fields.
 function M.shortcut_to_config_string(sc)
 	if type(sc) ~= "table" then return "" end
-	local mods = type(sc.mods) == "table" and table.concat(sc.mods, "+") or ""
+	local values = formatting_modifiers(sc.mods)
+	if not values then return "" end
+	local mods = table.concat(values, "+")
 	local key = type(sc.key) == "string" and sc.key or ""
 	if mods ~= "" and key ~= "" then return mods .. "+" .. key end
 	if key ~= "" then return key end
@@ -138,8 +157,8 @@ function M.shortcut_to_label(sc, none_label)
 	-- menu_settings.ahk, Linux in ui/menu/builder.lua). A literal is a translation of
 	-- exactly one of the twenty-one languages the menu is drawn in.
 	if type(sc) ~= "table" then return none_label or i18n.get("common.none") end
-	local ordered_mods = {}
-	for _, m in ipairs(sc.mods or {}) do table.insert(ordered_mods, m) end
+	local ordered_mods = formatting_modifiers(sc.mods)
+	if not ordered_mods or type(sc.key) ~= "string" then return none_label or i18n.get("common.none") end
 	sort_modifiers(ordered_mods)
 
 	local mods_cap = {}
