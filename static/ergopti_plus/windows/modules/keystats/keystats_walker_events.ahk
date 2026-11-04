@@ -41,19 +41,19 @@ KLW_WalkShortcut(entry) {
 		app := KLW_GetMap(entry, "app", "Unknown")
 		ts := KLW_GetMap(entry, "timestamp", "")
 		date_str := (ts != "") ? SubStr(ts, 1, 10) : KL_Today()
-		app_day_key := date_str . Chr(1) . app
+		app_day_key := KLW_Key(date_str, app)
 		ctx := KLW_GetAppCtx(app)
 		prev_sc := ctx["prev_sc"]
 		sc_tbl := KLW.batch["sc_ngram"]["ngram_shortcuts"]
 		scbg_tbl := KLW.batch["sc_ngram"]["ngram_shortcut_bigrams"]
-		sk := app_day_key . Chr(1) . shortcut_key
+		sk := app_day_key . Chr(1) . KLW_KeyPart(shortcut_key)
 		if !sc_tbl.Has(sk)
 				sc_tbl[sk] := Map("date", date_str, "app", app,
 						"token", shortcut_key, "count", 0)
 		sc_tbl[sk]["count"] += 1
 		if (prev_sc != "") {
 				bgt := prev_sc . "→" . shortcut_key
-				bk := app_day_key . Chr(1) . bgt
+				bk := app_day_key . Chr(1) . KLW_KeyPart(bgt)
 				if !scbg_tbl.Has(bk)
 						scbg_tbl[bk] := Map("date", date_str, "app", app,
 								"token", bgt, "count", 0)
@@ -118,9 +118,9 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 		current_hour := TimeBucket["hour"]
 		current_min5 := TimeBucket["min5"]
 
-		app_day_key := date_str . Chr(1) . app
-		hourly_key  := app_day_key . Chr(1) . current_hour
-		min5_key    := app_day_key . Chr(1) . current_min5
+		app_day_key := KLW_Key(date_str, app)
+		hourly_key  := app_day_key . Chr(1) . KLW_KeyPart(current_hour)
+		min5_key    := app_day_key . Chr(1) . KLW_KeyPart(current_min5)
 		app_category := KLW_GetMap(entry, "app_category", "")
 		if (app_category != "") {
 				if !KLW.batch["app_day"].Has(app_day_key)
@@ -167,7 +167,7 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 		; Layout tag.
 		layout := KLW_GetMap(entry, "layout", "")
 		if (layout != "") {
-				lk := app_day_key . Chr(1) . layout
+				lk := app_day_key . Chr(1) . KLW_KeyPart(layout)
 				if !KLW.batch["layouts"].Has(lk)
 						KLW.batch["layouts"][lk] := Map("date", date_str, "app", app,
 								"layout", layout, "count", 0)
@@ -177,7 +177,7 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 		; Window-title tag (count bump; ms credited via window_switch).
 		title := KLW_GetMap(entry, "title", "")
 		if (title != "") {
-				tk := app_day_key . Chr(1) . title
+				tk := app_day_key . Chr(1) . KLW_KeyPart(title)
 				if !KLW.batch["titles"].Has(tk)
 						KLW.batch["titles"][tk] := Map("date", date_str, "app", app,
 								"title", title, "c", 0, "ms", 0)
@@ -200,14 +200,14 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 						; Shortcuts: indexed separately, no n-gram chain participation.
 						sc_tbl   := KLW.batch["sc_ngram"]["ngram_shortcuts"]
 						scbg_tbl := KLW.batch["sc_ngram"]["ngram_shortcut_bigrams"]
-						sk := app_day_key . Chr(1) . shortcut_key
+						sk := app_day_key . Chr(1) . KLW_KeyPart(shortcut_key)
 						if !sc_tbl.Has(sk)
 								sc_tbl[sk] := Map("date", date_str, "app", app,
 										"token", shortcut_key, "count", 0)
 						sc_tbl[sk]["count"] += 1
 						if (prev_sc != "") {
 								bgt := prev_sc . "→" . shortcut_key
-								bk := app_day_key . Chr(1) . bgt
+								bk := app_day_key . Chr(1) . KLW_KeyPart(bgt)
 								if !scbg_tbl.Has(bk)
 										scbg_tbl[bk] := Map("date", date_str, "app", app,
 												"token", bgt, "count", 0)
@@ -374,7 +374,7 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 										; time / credited buckets.
 										for _, bucketMs in KLWConst.UI_PAUSE_BUCKETS_MS {
 												if (delay <= bucketMs) {
-														bkey := app_day_key . Chr(1) . String(bucketMs)
+														bkey := app_day_key . Chr(1) . KLW_KeyPart(String(bucketMs))
 														if !KLW.batch["app_buckets"].Has(bkey) {
 																KLW.batch["app_buckets"][bkey] := Map(
 																		"date", date_str, "app", app, "bucket_ms", bucketMs,
@@ -520,7 +520,7 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 				if !is_synthetic {
 						kc := KLW_GetMap(meta, "kc", "")
 						if (kc != "" && IsNumber(kc)) {
-								kk := app_day_key . Chr(1) . String(kc)
+								kk := app_day_key . Chr(1) . KLW_KeyPart(String(kc))
 								if !KLW.batch["kc_ngram"].Has(kk)
 										KLW.batch["kc_ngram"][kk] := Map("date", date_str, "app", app,
 												"keycode", Integer(kc), "count", 0)
@@ -531,7 +531,7 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 						; so we use a distinct identifier here.
 						sk_code := KLW_GetMap(meta, "sk", "")
 						if (sk_code != "" && IsNumber(sk_code)) {
-								skey := app_day_key . Chr(1) . String(sk_code)
+								skey := app_day_key . Chr(1) . KLW_KeyPart(String(sk_code))
 								if !KLW.batch["sc_kb_ngram"].Has(skey)
 										KLW.batch["sc_kb_ngram"][skey] := Map("date", date_str, "app", app,
 												"scancode", Integer(sk_code), "count", 0)
@@ -553,7 +553,7 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 KLW_BumpInputBuckets(date_str, app, trigger_delay, kind, app_day_key) {
 		for _, bucketMs in KLWConst.UI_PAUSE_BUCKETS_MS {
 				if (trigger_delay <= bucketMs) {
-						bkey := app_day_key . Chr(1) . String(bucketMs)
+						bkey := app_day_key . Chr(1) . KLW_KeyPart(String(bucketMs))
 						if !KLW.batch["app_buckets"].Has(bkey) {
 								KLW.batch["app_buckets"][bkey] := Map(
 										"date", date_str, "app", app, "bucket_ms", bucketMs,
@@ -590,14 +590,14 @@ KLW_WalkAppSwitch(entry) {
 		date_str := (ts != "") ? SubStr(ts, 1, 10) : KL_Today()
 		duration := KLW_GetMap(entry, "duration_ms", 0)
 
-		key := date_str . Chr(1) . prev_app
+		key := KLW_Key(date_str, prev_app)
 		if !KLW.batch["app_time"].Has(key)
 				KLW.batch["app_time"][key] := Map("date", date_str, "app", prev_app, "ms", 0)
 		KLW.batch["app_time"][key]["ms"] += duration
 
 		next_app := KLW_GetMap(entry, "next_app", "")
 		if (next_app != "") {
-				sk := date_str . Chr(1) . prev_app . Chr(1) . next_app
+				sk := KLW_Key(date_str, prev_app, next_app)
 				if !KLW.batch["switches_to"].Has(sk)
 						KLW.batch["switches_to"][sk] := Map("date", date_str,
 								"app_from", prev_app, "app_to", next_app, "count", 0)
@@ -613,7 +613,7 @@ KLW_WalkWindowSwitch(entry) {
 		date_str := (ts != "") ? SubStr(ts, 1, 10) : KL_Today()
 		app := KLW_GetMap(entry, "app", "Unknown")
 		duration := KLW_GetMap(entry, "duration_ms", 0)
-		tk := date_str . Chr(1) . app . Chr(1) . prev_title
+		tk := KLW_Key(date_str, app, prev_title)
 		if !KLW.batch["titles"].Has(tk)
 				KLW.batch["titles"][tk] := Map("date", date_str, "app", app,
 						"title", prev_title, "c", 0, "ms", 0)
@@ -630,7 +630,7 @@ KLW_WalkSystemEvent(entry) {
 				if (kc != "" && IsNumber(kc)) {
 						app := KLW_GetMap(entry, "app", "Unknown")
 						hold := KLW_GetMap(entry, "hold_ms", 0)
-						key := date_str . Chr(1) . app . Chr(1) . String(kc)
+						key := KLW_Key(date_str, app, String(kc))
 						if !KLW.batch["kc_hold"].Has(key)
 								KLW.batch["kc_hold"][key] := Map(
 										"date", date_str, "app", app, "keycode", Integer(kc),

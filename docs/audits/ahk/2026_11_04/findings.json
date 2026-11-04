@@ -422,6 +422,17 @@
 			"root_cause": "_PersonalTomlWriteAtomic and _PersonalInfoReplaceUnchanged in infra/hotstrings/personal_toml_io.ahk restore interruption after their pure authority checks, then invoke unguarded FSAtomicMoveReplace. The final native producer never resamples the revocable facts. Metadata patches also omit their already-issued owner from that final boundary.",
 			"silent_failure": "A cancelled or paused save can still replace the personal file and publish a stale intention after the editor or path authority has retired. This differs from AHK-014 external source-byte mutation: the violated facts here are in-process owner, pause, configured identity and session authority.",
 			"regression_test": "Thirteen reachable personal native final admission cases use real private files, durable stages, actual GUI/source and lease owners, a declared interruptible internal cutpoint, and the genuine native rename producer. Three controls prove actual successful replacement; ten withdrawal variants require original target bytes, no publication and cleaned stage. Existing arbitrary two-argument ReplaceFn ports stay outside Critical. The fixed native branch uses FSConfigAtomicMoveReplace with a pure final guard; external-process filesystem compare-and-swap is outside this guarantee. Post-fix native qualification is pending."
+		},
+		{
+			"id": "AHK-039",
+			"title": "Walker composite keys merge distinct literal application and token values",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Push literal tokens a and a+NUL+b through the genuine Windows n-gram producer, or push tuples (day,A+Chr1+B,C) and (day,A,B+Chr1+C), then flush through the actual SQL builder to native SQLite. Native run41896696315 atbe1e23b2047ebd958ed2d147c2a616c493c22a61 reproduces all three producer/replay probes alone and reversed: expected3 rows become2; genuine typing replay expected2 becomes1.",
+			"root_cause": "Windows walker constructors concatenate unescaped fields using Chr1 and then store that text in AutoHotkey Maps, whose string keys end at NUL. N-gram SQL reconstructs original field values by splitting the already ambiguous key. Other projection and per-application context constructors share that identity assumption.",
+			"silent_failure": "Accepted replay data silently combines independent counts and delays and can persist truncated or reassigned application/token values. This concerns supported literal replay/JSON values; no physical-keyboard NUL sequence is claimed.",
+			"regression_test": "Three native fail-before probes retain literal SQL hex(app)/hex(token), repeated additive controls and a genuine typing replay. The fix escapes only internal tuple fields and preserves raw row values for SQL. Five further cases cover shared array byte vectors, real JSON context roundtrip and legacy retirement, cache17 refusal, checkpoint3 restart and obsolete stage cleanup. Existing aggregation, distribution merge, rollover and current checkpoint controls remain. Cache18/checkpoint4 force reconstruction without changing raw ledgers or persisted token encoding2. Scope is Windows: the separately measured shared Lua Chr1 collision and Linux aggregate-history migration remain open outside this OS correction; no Lua source is changed. Post-fix native qualification is pending."
 		}
 	]
 }

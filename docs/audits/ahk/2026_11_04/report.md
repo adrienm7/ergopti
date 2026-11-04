@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **38 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **39 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -675,3 +675,17 @@ Consequence: A cancelled or paused save can still replace the personal file and 
 Regression: Thirteen reachable personal native final admission cases use real private files, durable stages, actual GUI/source and lease owners, a declared interruptible internal cutpoint, and the genuine native rename producer. Three controls prove actual successful replacement; ten withdrawal variants require original target bytes, no publication and cleaned stage. Existing arbitrary two-argument ReplaceFn ports stay outside Critical. The fixed native branch uses FSConfigAtomicMoveReplace with a pure final guard; external-process filesystem compare-and-swap is outside this guarantee. Post-fix native qualification is pending.
 
 The ongoing register now contains **38 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-039: Walker composite keys merge distinct literal application and token values
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+Windows walker constructors concatenate unescaped fields using Chr1 and then store that text in AutoHotkey Maps, whose string keys end at NUL. N-gram SQL reconstructs original field values by splitting the already ambiguous key. Other projection and per-application context constructors share that identity assumption.
+
+Reproduction: Push literal tokens a and a+NUL+b through the genuine Windows n-gram producer, or push tuples (day,A+Chr1+B,C) and (day,A,B+Chr1+C), then flush through the actual SQL builder to native SQLite. Native run41896696315 atbe1e23b2047ebd958ed2d147c2a616c493c22a61 reproduces all three producer/replay probes alone and reversed: expected3 rows become2; genuine typing replay expected2 becomes1.
+
+Consequence: Accepted replay data silently combines independent counts and delays and can persist truncated or reassigned application/token values. This concerns supported literal replay/JSON values; no physical-keyboard NUL sequence is claimed.
+
+Regression: Three native fail-before probes retain literal SQL hex(app)/hex(token), repeated additive controls and a genuine typing replay. The fix escapes only internal tuple fields and preserves raw row values for SQL. Five further cases cover shared array byte vectors, real JSON context roundtrip and legacy retirement, cache17 refusal, checkpoint3 restart and obsolete stage cleanup. Existing aggregation, distribution merge, rollover and current checkpoint controls remain. Cache18/checkpoint4 force reconstruction without changing raw ledgers or persisted token encoding2. Scope is Windows: the separately measured shared Lua Chr1 collision and Linux aggregate-history migration remain open outside this OS correction; no Lua source is changed. Post-fix native qualification is pending.
+
+The ongoing register now contains **39 distinct new findings**. The requested target of 1,000 remains unmet.
