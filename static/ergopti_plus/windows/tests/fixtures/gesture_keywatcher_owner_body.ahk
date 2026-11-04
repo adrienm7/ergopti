@@ -176,8 +176,8 @@ _GKO_NativeRetry() {
 		_GKO.RefuseUp := "Left"
 		SendLevel(0)
 		SetKeyDelay(0, 0)
-		Keys := _GKO.Mode == "native-retry-three" ? "abc" : "a"
-		Typed := ""
+		Keys := _GKO.Mode == "native-retry-long" ? "abcdefgh" : (_GKO.Mode == "native-retry-three" ? "abc" : "a")
+		Typed := "", TextStayedEmpty := true
 		for Key in StrSplit(Keys) {
 			Before := _GKO.Refused
 			AdmittedTarget()
@@ -190,13 +190,17 @@ _GKO_NativeRetry() {
 			; OnKeyDown notification is posted. That is the candidate transition,
 			; not a missing acquisition prerequisite: witness the exact input and
 			; continue to the independent next-key recovery assertion below.
-			CompletedAtLimit := _GKO.Mode == "native-retry-three" && Typed == "abc"
+			CompletedAtLimit := _GKO.Mode != "native-retry-one" && Typed == "abc"
 				&& !_GKO.OwnerB.InProgress && _GKO.OwnerB.EndReason == "Max" && _GKO.OwnerB.Input == Typed
 			_GKO.Logs.Push("typed=" . Typed . " refused_before=" . Before . " refused_after=" . _GKO.Refused
 				. " in_progress=" . _GKO.OwnerB.InProgress . " end_reason=" . _GKO.OwnerB.EndReason . " input=" . _GKO.OwnerB.Input)
-			_GKO_Observe("native-key-observed-" . StrLen(Typed))
+			TextStayedEmpty := TextStayedEmpty && _GKO.OwnerB.Input == ""
+			if StrLen(Typed) <= 3 || Typed == Keys
+				_GKO_Observe("native-key-observed-" . StrLen(Typed))
 			_GKO_Require(_GKO.Refused > Before || CompletedAtLimit,
 				"each sent key must reach its native notification or complete the exact three-character capture")
+			if CompletedAtLimit
+				break
 		}
 		Retained := _GKO.OwnerB.InProgress
 		_GKO.Logs.Push("before-retry in_progress=" . Retained . " end_reason=" . _GKO.OwnerB.EndReason . " input=" . _GKO.OwnerB.Input)
@@ -211,6 +215,12 @@ _GKO_NativeRetry() {
 		_GKO_Require(!GestureLeftClickHeld && GestureKeyboardHook == 0,
 			"the key after refused releases must still reach the live watcher and discharge its held-button debt")
 		_GKO_Require(Retained, "the actual watcher must stay armed while any refused Button Up remains owed")
+		_GKO_Require(Typed == Keys && TextStayedEmpty && _GKO.OwnerB.Input == "",
+			"the native observer must keep release recovery alive without collecting any typed text")
+		Started := A_TickCount
+		while Editor.Value != Keys . "d" && A_TickCount - Started < 500
+			Sleep(5)
+		_GKO_Require(Editor.Value == Keys . "d", "all observed native keys must pass through normally to the owned Edit")
 		_GKO_Released()
 	} finally {
 		SendLevel(PreviousLevel)

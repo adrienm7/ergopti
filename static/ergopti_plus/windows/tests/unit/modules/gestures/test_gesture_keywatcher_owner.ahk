@@ -59,7 +59,9 @@ _GKO_Source(OwnerReceipt) {
 	Bound := StrReplace(Bound, "Hook.Stop()", "_GKO_Stop(Hook)", true, &StopBindings)
 	AssertEqual(ClickSites, ClickBindings, "no additional mouse site may be changed in comments or strings")
 	AssertEqual(StopSites, StopBindings, "no additional Stop site may be changed in comments or strings")
-	AssertTrue(InStr(Bound, 'Hook := InputHook(', true) > 0, "InputHook construction remains native; its actual class and lifetime are checked below")
+	AssertTrue(InStr(Bound, 'InputHook("V L0")', true) > 0
+		&& InStr(Bound, 'Hook.KeyOpt("{All}", "NI")', true) > 0,
+		"Native construction must observe without collecting text or imposing a character limit")
 	OwnerReceipt["click_owner"] := Owner
 	OwnerReceipt["click_owner_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(Owner))
 	OwnerReceipt["click_bindings"] := ClickBindings
@@ -195,6 +197,6 @@ for _GKO_Mode in ["retired-left-right", "retired-right-left", "current-left-righ
 	"paused-left-up-refusal", "paused-right-up-refusal"]
 	Test("Gesture watcher ownership: " . _GKO_Mode . " (gesture-keywatcher-owner)", _GKO_Case.Bind(_GKO_Mode))
 
-for _GKO_LimitMode in ["native-retry-one", "native-retry-three"]
+for _GKO_LimitMode in ["native-retry-one", "native-retry-three", "native-retry-long"]
 	Test("Gesture watcher length: " . _GKO_LimitMode . " keeps keyboard release recovery alive (gesture-keywatcher-length)",
 		_GKO_Case.Bind(_GKO_LimitMode))
