@@ -55,7 +55,7 @@ reuses for its own file.
   `remap-runtime-v16.3.0-ergopti.3` and written by the `apply` command of
   `tools/build/remap_runtime_publish.py`; `runtime_artifact_fetch.lua`
   downloads and verifies it into
-  `~/Library/Application Support/ErgoptiPlus/RemapRuntime/` on the first
+  `~/Library/Application Support/Ergopti/RemapRuntime/` on the first
   admission and reuses it after. A missing runtime is offered once by itself:
   the launcher's install role (`platform/remap/runtime_install.lua`) runs that
   helper behind one administrator prompt, which publishes the files, starts the

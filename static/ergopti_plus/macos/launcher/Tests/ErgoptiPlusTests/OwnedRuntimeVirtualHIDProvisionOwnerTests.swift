@@ -18,7 +18,7 @@ final class OwnedRuntimeVirtualHIDProvisionOwnerTests: XCTestCase {
 	func testTheKeptDriverPackageIsReadFromThePinOnly() throws {
 		let home = FileManager.default.temporaryDirectory.appendingPathComponent("vhid-pin-" + UUID().uuidString)
 		defer { try? FileManager.default.removeItem(at: home) }
-		let folder = home.appendingPathComponent("Library/Application Support/ErgoptiPlus/RemapRuntime/VirtualHIDDevice/8.5.0")
+		let folder = home.appendingPathComponent(OwnedRuntimeDownloadedHelper.artifactHomeRelative + "/VirtualHIDDevice/8.5.0")
 		try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 		let digest = String(repeating: "a", count: 64)
 		func manifest(team: String = "G43BCU2T37", name: String = "Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg") throws -> Data {
