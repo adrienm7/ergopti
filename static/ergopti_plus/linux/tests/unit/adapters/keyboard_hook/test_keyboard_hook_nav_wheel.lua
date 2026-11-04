@@ -167,6 +167,25 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		helpers.assert_eq(reports, { { "dropped", 3, 0, source }, { "frame", 0, 0, source },
 			{ "reset", nil, nil, source } })
 	end)
+
+	helpers.it("does not recursively notify a failing pointer reset observer", function()
+		local resets = 0
+		drive("mouse", {}, {}, nil, function(kind)
+			if kind == "reset" then
+				resets = resets + 1
+				if resets <= 5 then error("controlled reset failure") end
+			end
+		end)
+		helpers.assert_eq(resets, 1, "cleanup cannot repeatedly reenter its reset observer")
+	end)
+
+	helpers.it("reports one reset when a grabbed pointer reader fails", function()
+		local resets = 0
+		drive("mouse", HOLD, { { EV_KEY, BTN_LEFT, 1, 3000 } }, nil, function(kind)
+			if kind == "reset" then resets = resets + 1 end
+		end, true)
+		helpers.assert_eq(resets, 1, "fatal read and emergency cleanup refer to the same closed source")
+	end)
 	for _, failure in ipairs({ "refusal", "exception" }) do
 		helpers.it("stops a grabbed mouse after relative output " .. failure, function()
 			local emitted, _, _, running = drive("mouse", HOLD, {

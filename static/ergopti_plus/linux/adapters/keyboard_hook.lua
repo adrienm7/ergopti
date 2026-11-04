@@ -3080,6 +3080,9 @@ end
 local function _close_paths(paths, slot_for, tx)
 	for _, path in ipairs(paths) do
 		local slot = slot_for(path)
+		-- A failed observer may reenter cleanup after this descriptor closed;
+		-- that nested pass must not send another reset for the same lifetime.
+		local pointer_open = slot_for == pointer_slot and EvdevReader.is_open(slot)
 		if tx and tx.authority then
 			local lease = tx.close_owners[slot]
 			if lease then _input_reader_ports.retire_source(lease) end
@@ -3091,7 +3094,7 @@ local function _close_paths(paths, slot_for, tx)
 			if lease then _input_reader_ports.retire_source(lease) end
 		else EvdevReader.close(slot) end
 		_pending_events[slot] = nil
-		if slot_for == pointer_slot and _on_pointer_event then
+		if pointer_open and _on_pointer_event then
 			_call_callback("pointer event callback", _on_pointer_event, "reset", nil, nil, slot)
 		end
 	end
