@@ -88,7 +88,8 @@ enum ReleaseRenameWorker {
 	}
 
 	/// Parent descriptors bind both native names for one exclusive same-filesystem rename.
-	static func move(source: String, destination: String) -> Int32 {
+	static func move(source: String, destination: String,
+		closeDescriptor: (Int32) -> Int32 = { Darwin.close($0) }) -> Int32 {
 		guard let (sourceParent, sourceName) = location(source),
 			let (destinationParent, destinationName) = location(destination) else { return 1 }
 		let sourceFD = Darwin.open(sourceParent, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
@@ -97,9 +98,14 @@ enum ReleaseRenameWorker {
 		guard destinationFD >= 0 else { _ = Darwin.close(sourceFD); return 2 }
 		let result = rename(sourceFD: sourceFD, sourceName: sourceName,
 			destinationFD: destinationFD, destinationName: destinationName)
-		let sourceClosed = Darwin.close(sourceFD) == 0
-		let destinationClosed = Darwin.close(destinationFD) == 0
-		return sourceClosed && destinationClosed ? result : 2
+		let sourceClosed = closeDescriptor(sourceFD) == 0
+		let destinationClosed = closeDescriptor(destinationFD) == 0
+		if !sourceClosed || !destinationClosed {
+			LauncherLog.write("Release rename descriptor close failed after the rename attempt")
+		}
+		// The rename result owns the filesystem outcome. In particular, reporting
+		// failure after a committed rename would make the shell skip rollback.
+		return result
 	}
 
 	private static func rename(sourceFD: Int32, sourceName: String,
