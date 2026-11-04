@@ -44,7 +44,7 @@ function M.show(origin, replacements, modal_observer, runtime_note)
 	if choices then
 		command = command .. " --column='' --column='' --hide-column=1 --print-column=1"
 			.. " --ok-label=" .. Shell.quote(I18n.get("llm.unreachable.apply"))
-			.. " --cancel-label=" .. Shell.quote(keep_off) .. " retry " .. Shell.quote(retry)
+			.. " --cancel-label=" .. Shell.quote(keep_off) .. " -- retry " .. Shell.quote(retry)
 	else
 		command = command .. " --ok-label=" .. Shell.quote(retry) .. " --cancel-label=" .. Shell.quote(keep_off)
 	end

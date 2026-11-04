@@ -76,13 +76,18 @@ local LIST_DEFAULT_WIDTH, LIST_DEFAULT_HEIGHT = 420, 360
 function M.parse(argv)
 	assert(type(argv) == "table", "argv must be a table")
 	local request = { kind = nil, options = {}, columns = {}, values = {} }
-	local index = 1
+	local index, positional = 1, false
 	while index <= #argv do
 		local word = argv[index]
 		if type(word) ~= "string" then return nil, "argument " .. index .. " is not a string" end
-		local name, value = word:match("^%-%-([%a][%w%-]*)=(.*)$")
-		if not name then name = word:match("^%-%-([%a][%w%-]*)$") end
-		if name == nil then
+		local name, value
+		if not positional then
+			name, value = word:match("^%-%-([%a][%w%-]*)=(.*)$")
+			if not name then name = word:match("^%-%-([%a][%w%-]*)$") end
+		end
+		if not positional and word == "--" then
+			positional = true
+		elseif name == nil then
 			request.values[#request.values + 1] = word
 		elseif M.KINDS[name] and value == nil then
 			if request.kind then return nil, "two dialog kinds: " .. request.kind .. " and " .. name end
