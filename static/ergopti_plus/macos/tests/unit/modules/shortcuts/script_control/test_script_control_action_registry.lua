@@ -25,6 +25,14 @@ local SC = Fixture.SC
 -- =====================================
 
 helpers.describe("ScriptControl ACTIONS / ACTION_LABELS", function()
+	helpers.it("exposes the actual action snapshot through the shortcuts facade", function()
+		helpers.with_stub_scope({ "modules.shortcuts" }, function()
+			package.loaded["modules.shortcuts"] = nil
+			local facade = require("modules.shortcuts")
+			helpers.assert_eq(facade.get_shortcut_actions, SC.get_shortcut_actions)
+			helpers.assert_type(facade.get_shortcut_actions(), "table")
+		end)
+	end)
 	helpers.it("ACTIONS is a non-empty list of strings", function()
 		helpers.assert_true(type(SC.ACTIONS) == "table" and #SC.ACTIONS > 0)
 		for _, id in ipairs(SC.ACTIONS) do
