@@ -171,9 +171,9 @@ function M.get_native_app_category(app_name)
 		local app_path = app:path()
 		if type(app_path) == "string" then
 			local info = hs.application.infoForBundlePath(app_path)
-			if info then
+			if type(info) == "table" then
 				bundle_was_readable = true
-				if info.LSApplicationCategoryType then
+				if type(info.LSApplicationCategoryType) == "string" and info.LSApplicationCategoryType ~= "" then
 					local raw = info.LSApplicationCategoryType:gsub("public%.app%-category%.", "")
 					raw = raw:gsub("%-", " ")
 					local cap = raw:sub(1, 1):upper() .. raw:sub(2)

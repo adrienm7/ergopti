@@ -162,6 +162,11 @@ function Owner:modifier_edge(keycode, flags, stamp)
 	if flag == nil then
 		-- Caps Lock, Fn: part of a chord, never a watched tap.
 		if self.candidate then self.candidate.clean = false end
+		if self.released then
+			local released = self.released
+			self.released = nil
+			self:report_missing(released, "another modifier came first")
+		end
 		return
 	end
 	if not self.down[keycode] and type(flags) == "table" and flags[flag] == true then
@@ -197,6 +202,11 @@ end
 --- Observes a click: whatever modifier is down is used with it.
 function Owner:activity()
 	if self.candidate then self.candidate.clean = false end
+	if self.released then
+		local released = self.released
+		self.released = nil
+		self:report_missing(released, "a click came first")
+	end
 end
 
 --- Whether a key-down matters to the watch: a modifier is down or a watched

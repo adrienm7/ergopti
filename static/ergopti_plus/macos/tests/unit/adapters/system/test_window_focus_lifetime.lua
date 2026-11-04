@@ -48,16 +48,20 @@ local function with_windows(options, callback)
 				orderedWindows = function() return { candidate, healthy } end,
 			},
 			application = {
-				frontmostApplication = function() return { pid = function() return 101 end } end,
+				frontmostApplication = function()
+					if options.no_frontmost then return nil end
+					return { pid = function() return 101 end }
+				end,
 			},
-			processInfo = { processID = 999 },
+			processInfo = options.no_own_pid and {} or { processID = 999 },
 		})
 		callback({
 			manager = manager,
 			record = { window = candidate, id = 22, pid = 202, minimized = false },
 			focused = focused,
-			switch = function()
+			switch = function(least_recent)
 				local switch = require("modules.gestures.app_switch")
+				if least_recent then return switch.least_recent_app() end
 				return switch.previous_app(switch.SCOPE_ALL_SCREENS)
 			end,
 		})
@@ -96,6 +100,22 @@ helpers.describe("window focus refuses a detached native window", function()
 			helpers.assert_eq(f.switch(), true)
 			helpers.assert_eq(f.focused, { 33 },
 				"a chainable no-op must not suppress the healthy fallback application")
+		end)
+	end)
+
+	helpers.it("does not select an unknown frontmost application as its own predecessor", function()
+		with_windows({ no_frontmost = true }, function(f)
+			helpers.assert_eq(f.switch(), false)
+			helpers.assert_eq(f.switch(true), false)
+			helpers.assert_eq(f.focused, {}, "no candidate can be excluded without the frontmost pid")
+		end)
+	end)
+
+	helpers.it("does not switch when the runtime cannot exclude its own windows", function()
+		with_windows({ no_own_pid = true }, function(f)
+			helpers.assert_eq(f.switch(), false)
+			helpers.assert_eq(f.switch(true), false)
+			helpers.assert_eq(f.focused, {}, "the runtime itself must never be a candidate")
 		end)
 	end)
 
