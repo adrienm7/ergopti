@@ -49,7 +49,8 @@ StartActivitySimulation(*) {
 		}
 		ActivitySimulation := True
 		; Capture the current cursor position as the jitter origin
-		MouseGetPos(&AwakeOriginX, &AwakeOriginY)
+		Position := MCGetPos()
+		AwakeOriginX := Position["x"], AwakeOriginY := Position["y"]
 		; Reset the user-move baseline so the first tick never self-cancels
 		SimulateActivity(True)
 		SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
@@ -162,7 +163,8 @@ AwakeCheckMouseMoved() {
 		global ActivitySimulation, AwakeOriginX, AwakeOriginY
 		if not ActivitySimulation
 				return
-		MouseGetPos(&CurX, &CurY)
+		Position := MCGetPos()
+		CurX := Position["x"], CurY := Position["y"]
 		if (Abs(CurX - AwakeOriginX) > AWAKE_JITTER_PX or Abs(CurY - AwakeOriginY) > AWAKE_JITTER_PX) {
 				SetTimer(StopActivitySimulation, -1)
 		}
@@ -236,7 +238,8 @@ SimulateActivity(ResetOnly := False) {
 
 		; If the cursor moved more than AWAKE_JITTER_PX from where we left it,
 		; the user touched the mouse or touchpad -- stop without moving again.
-		MouseGetPos(&CurX, &CurY)
+		Position := MCGetPos()
+		CurX := Position["x"], CurY := Position["y"]
 		if (LastX != -1 and (Abs(CurX - LastX) > AWAKE_JITTER_PX or Abs(CurY - LastY) > AWAKE_JITTER_PX)) {
 				StopActivitySimulation()
 				return

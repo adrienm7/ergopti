@@ -1,6 +1,6 @@
 ﻿; tests/fixtures/keepawake_timer_owner_body.ahk
 
-; Native session hooks and Start/Stop are real. Only the two position samples
+; Native session hooks and Start/Stop are real. Only the physical position samples
 ; and all subject timer calls are bound with consistent callback identity. Delivery is a real SetTimer,
 ; with controlled coordinates and no physical mouse displacement.
 global _KATO := {Mode: A_Args[1], X: 100, Y: 200, Samples: 0, Timers: Map(), Hooks: [],
@@ -18,10 +18,10 @@ _KATO_Log(Line) {
 		_KATO.Logs.Push(Line)
 }
 
-_KATO_MouseGetPos(&X, &Y) {
+_KATO_GetPos() {
 	global _KATO
 	_KATO.Samples += 1
-	X := _KATO.X, Y := _KATO.Y
+	return Map("x", _KATO.X, "y", _KATO.Y)
 }
 
 _KATO_Timer(Callback, Period, Priority := unset) {
