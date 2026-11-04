@@ -94,3 +94,32 @@ helpers.describe("Parser.split_blocks", function()
 		helpers.assert_eq(b[2], "b")
 	end)
 end)
+
+helpers.describe("Parser diff resource admission", function()
+	helpers.it("refuses a long model word before quadratic alignment", function()
+		local original = string.rep("a", 500)
+		local corrected = string.rep("a", 8000)
+		local result = Parser.process_prediction(original, original,
+			"TAIL_CORRECTED: " .. corrected .. "\nNEXT_WORDS: suite", { min_words = 1, max_words = 15 })
+		helpers.assert_nil(result)
+		helpers.assert_nil(Parser.process_prediction("hello", "hello",
+			"TAIL_CORRECTED: hello\nNEXT_WORDS: " .. corrected, { min_words = 1, max_words = 15 }))
+		helpers.assert_nil(Parser.process_prediction("hello", "hello", corrected, { min_words = 1, max_words = 15 }))
+		helpers.assert_nil(Parser.process_prediction("hello", "hello",
+			"REWRITE: " .. corrected, { min_words = 1, max_words = 15 }))
+	end)
+
+	helpers.it("revalidates copied spacing before the actual diff allocation", function()
+		local original = "a" .. string.rep(" ", 1024) .. "a" .. string.rep(" ", 2048)
+		helpers.assert_nil(Parser.process_prediction(original, original,
+			"TAIL_CORRECTED: aa\nNEXT_WORDS: world", { min_words = 1, max_words = 15 }))
+	end)
+
+	helpers.it("preserves an ordinary continuation under the same policy", function()
+		local result = Parser.process_prediction("hello", "hello",
+			"TAIL_CORRECTED: hello\nNEXT_WORDS: world", { min_words = 1, max_words = 15 })
+		helpers.assert_true(type(result) == "table")
+		helpers.assert_eq(result.deletes, 0)
+		helpers.assert_eq(result.nw, " world")
+	end)
+end)

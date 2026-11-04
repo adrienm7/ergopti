@@ -197,3 +197,53 @@ TestLLMParser_UnfinishedThinking() {
 	AssertEqual(0, LLM_Parser_ParseResponse("<thinking>private", "", "", 1, 0, true, 2).Length)
 }
 Test("LLM parser: unfinished thinking stays private (llm-truncated-thinking)", TestLLMParser_UnfinishedThinking)
+
+TestLLMParser_ResourcePolicy() {
+	global _SharedDir
+	Limits := JsonParse(FSReadStrict(_SharedDir . "\modules\llm\parser_limits.json"))
+	Small := "hello"
+	AtBytes := Limits["max_operand_bytes"]
+	Long := ""
+	Loop AtBytes
+		Long .= "a"
+	AssertTrue(_LLM_Parser_DiffWithinLimits("", Long), "the operand byte limit is inclusive")
+	AssertFalse(_LLM_Parser_DiffWithinLimits("", Long . "a"), "one more byte is refused before tokenization")
+	Row := Floor(Sqrt(Limits["max_grid_cells"])) - 1
+	Square := ""
+	Loop Row
+		Square .= "b"
+	AssertTrue(_LLM_Parser_DiffWithinLimits(Square, Square), "a grid at the inclusive cell bound is admitted")
+	AssertFalse(_LLM_Parser_DiffWithinLimits(Square . "b", Square), "a grid above the cell bound is refused")
+	Utf8 := ""
+	Loop AtBytes // 2
+		Utf8 .= "é"
+	AssertTrue(_LLM_Parser_DiffWithinLimits("", Utf8), "byte accounting admits complete multibyte text at the limit")
+	AssertFalse(_LLM_Parser_DiffWithinLimits("", Utf8 . "é"), "the canonical byte limit is independent of UTF-16 units")
+	Original := ""
+	Loop 500
+		Original .= "a"
+	Corrected := ""
+	Loop 8000
+		Corrected .= "a"
+	Prediction := LLM_Parser_ProcessPrediction(Original, Original,
+		"TAIL_CORRECTED: " . Corrected . "`nNEXT_WORDS: suite", 1, 15)
+	AssertFalse(Prediction is Map, "one oversized model word must be refused instead of entering quadratic DP")
+	AssertFalse(LLM_Parser_ProcessPrediction("hello", "hello",
+		"TAIL_CORRECTED: hello`nNEXT_WORDS: " . Corrected, 1, 15) is Map,
+		"next words cannot bypass the same resource admission through tokenization")
+	AssertFalse(LLM_Parser_ProcessPrediction("hello", "hello", Corrected, 1, 15) is Map,
+		"raw mode must refuse oversized text before character-array cleanup")
+	Prediction := LLM_Parser_ProcessPrediction("hello", "hello", "REWRITE: " . Corrected, 1, 15)
+	AssertFalse(Prediction is Map, "rewrite has the same resource admission as continuation")
+	Spaces := ""
+	Loop 2048
+		Spaces .= " "
+	Padded := "a" . SubStr(Spaces, 1, 1024) . "a" . Spaces
+	AssertTrue(_LLM_Parser_DiffWithinLimits(Padded, "aa"), "the raw short correction fits the first admission")
+	AssertFalse(LLM_Parser_ProcessPrediction(Padded, Padded,
+		"TAIL_CORRECTED: aa`nNEXT_WORDS: world", 1, 15) is Map,
+		"copied trailing spacing must be re-admitted before the actual diff allocation")
+	AssertTrue(LLM_Parser_ProcessPrediction(Small, Small,
+		"TAIL_CORRECTED: hello`nNEXT_WORDS: world", 1, 15) is Map, "ordinary continuation remains functional")
+}
+Test("LLM parser: shared byte and diff work limits refuse oversized model words", TestLLMParser_ResourcePolicy)
