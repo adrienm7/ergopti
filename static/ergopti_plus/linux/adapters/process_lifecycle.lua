@@ -156,7 +156,10 @@ local function _snapshot_processes()
 				if not read_ok or not close_ok or closed ~= true then return nil end
 				if line == nil then
 					if read_errno ~= ESRCH then return nil end
-				elseif line ~= "" then
+				elseif line == "" then
+					-- An incomplete record is not proof that the process exited.
+					return nil
+				else
 					local name, state = _parse_stat(line)
 					if name == nil then return nil end
 					if name ~= "" and state ~= "Z" and state ~= "X" and state ~= "x" then snapshot[name] = true end
