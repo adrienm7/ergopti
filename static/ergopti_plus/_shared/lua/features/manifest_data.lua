@@ -873,10 +873,10 @@ M.features = {
 		path = "gestures.modes.swipe_3_right", id = "swipe_3_right", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_right", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_up", id = "swipe_3_up", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_up", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_up", id = "swipe_3_up", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_3_up", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
-		path = "gestures.modes.swipe_3_down", id = "swipe_3_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_down", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
+		path = "gestures.modes.swipe_3_down", id = "swipe_3_down", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes.swipe_3_down", platforms = { "hs" }, recommended = "x1", family = "setting", enum_values = { "x1", "incremental" },
 	},
 	{
 		path = "gestures.modes.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.modes", default = "incremental", type = "enum", description_key = "menu.gestures.modes.swipe_3_left_down", platforms = { "hs" }, recommended = "incremental", family = "setting", enum_values = { "x1", "incremental" },
