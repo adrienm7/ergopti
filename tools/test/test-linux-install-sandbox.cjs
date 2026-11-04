@@ -140,6 +140,13 @@ function runInstaller(scenario) {
 			`for arg in "$@"; do case "$arg" in ${temporary}) exit 1 ;; esac; done\nexec /usr/bin/chmod "$@"`
 		);
 	}
+	if (scenario.protectSystemPrefix) {
+		stub(
+			stubs,
+			'install',
+			'for arg in "$@"; do case "$arg" in /usr|/usr/*) exit 77 ;; esac; done\nexec /usr/bin/install "$@"'
+		);
+	}
 	if (process.platform === 'win32') {
 		stub(
 			stubs,
@@ -381,6 +388,31 @@ if (process.platform === 'linux') {
 }
 
 const errors = [];
+
+// Standalone installs under a system root cannot be removed by the standalone
+// uninstaller and must not write into an OS package's namespace.
+for (const candidate of ['/usr', '/usr/', 'system-alias']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		prefixArgument: candidate,
+		fromHome: candidate === 'system-alias',
+		protectSystemPrefix: true,
+		seed(home) {
+			if (candidate === 'system-alias') fs.symlinkSync('/usr', path.join(home, candidate));
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0);
+		assert.match(run.output, /Refusing a system installation prefix/);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
 
 // A service entry cannot encode control characters in the launcher path. The
 // installer must discover that before copying a payload or asking for access.
