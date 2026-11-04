@@ -367,7 +367,11 @@ function M.open(ctx)
 	-- A click while the window shows an answer checks again, over the updater
 	-- and hooks of the menu that asked; the replaced session's late answer is
 	-- ignored
-	if _session ~= nil then _session.retire() end
+	local previous = _session
+	if previous ~= nil then
+		previous.retire()
+		if _session ~= previous then return false end
+	end
 	_ctx = ctx
 	local session = new_session(ctx.updater)
 	_session = session
@@ -397,8 +401,9 @@ end
 
 --- Forgets the session when the user closes the window with its close box.
 function M.on_window_closed()
-	if _session ~= nil then _session.retire() end
+	local previous = _session
 	_session = nil
+	if previous ~= nil then previous.retire() end
 end
 
 --- Test seam: forgets the session and the context.

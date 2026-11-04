@@ -62,7 +62,11 @@ local function load_bridge(answer)
 		complete = function(id, ok, message) context.completed[#context.completed + 1] = { id, ok, message } end,
 	}
 	package.loaded["ui.error_dialog.bridge"] = {
-		report = function(record, complete) context.reports[#context.reports + 1] = record; complete(true) end,
+		report = function(record, complete)
+			context.reports[#context.reports + 1] = record
+			if context.on_report then return context.on_report() end
+			complete(true)
+		end,
 	}
 	package.loaded["ui.changelog.bridge"] = {
 		push_subscribed_channel = function(id) context.channel_pushes[#context.channel_pushes + 1] = id end,
@@ -145,6 +149,30 @@ helpers.describe("update-check window bridge (Linux)", function()
 			bridge.on_message("ready")
 			helpers.assert_true(#context.pushed > before, "the replacement still answers")
 		end)
+		end)
+	end
+
+	for _, operation in ipairs({ "close", "replace", "page-close" }) do
+		helpers.it("(update-check-retire-owner) preserves replacement during " .. operation, function()
+			scenario(function(channel) return { state = "error", channel = channel, current = "0.0.0-dev.144", others = {} } end,
+				function(bridge, context)
+					bridge.open(context.ctx)
+					context.on_report = function()
+						return { cancel = function()
+							context.on_report = nil
+							helpers.assert_true(bridge.open(context.ctx))
+						end }
+					end
+					bridge.on_message({ action = "report" })
+					if operation == "close" then bridge.on_window_closed()
+					elseif operation == "page-close" then bridge.on_message({ action = "close" })
+					else bridge.open(context.ctx) end
+					local before = #context.pushed
+					bridge.on_message("ready")
+					helpers.assert_true(#context.pushed > before, "replacement remains active")
+					helpers.assert_eq(#context.checks, 2, "old operation must not start another check")
+					helpers.assert_eq(context.hidden, 0, "old operation must not hide the replacement")
+				end)
 		end)
 	end
 
