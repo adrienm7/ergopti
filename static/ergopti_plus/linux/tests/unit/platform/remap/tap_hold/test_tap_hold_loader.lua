@@ -88,6 +88,11 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		helpers.assert_eq(tap, "copy", "the fallback threshold must admit a short tap")
 	end)
 
+	helpers.it("rejects a quoted key threshold as the wrong TOML type", function()
+		local loaded = load('[tap_hold]\ntime_activation_seconds = 0.4\n[tap_hold.keys.left_shift]\ntime_activation_seconds = "0.1"\n')
+		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, 0.4)
+	end)
+
 	helpers.it("disables a key with a field of the wrong type", function()
 		local loaded = load('[tap_hold.keys.left_shift]\ntap_action = 3\n')
 		helpers.assert_eq(loaded.keys.left_shift.enabled, false)
