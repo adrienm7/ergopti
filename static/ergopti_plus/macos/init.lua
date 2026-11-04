@@ -2439,11 +2439,16 @@ require("infra.driver_control").start({
 		return TerminationCoordinator.request_reload_owned(reason, on_aborted)
 	end,
 })
--- The developer field run (tools/dev/collect-macos-field-report.sh): only a
--- developer app runs it, so a packaged runtime never even loads the module.
-if require("infra.dev_source").is_active() then
+-- The field run (tools/dev/collect-macos-field-report.sh): a developer app
+-- runs it for its clone, and an installed signed app only when the collector
+-- opened it with that clone (the launcher admits ERGOPTI_FIELD_RUN_ROOT only
+-- for a folder of this user holding the declaration); otherwise a packaged
+-- runtime never even loads the module.
+local field_run_root = require("infra.dev_source").is_active() and require("infra.dev_source").root()
+	or os.getenv(require("identifiers").field_report.environment)
+if type(field_run_root) == "string" and field_run_root ~= "" then
 	require("infra.field_run").start({
-		root = require("infra.dev_source").root(),
+		root = field_run_root,
 		pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
 	})
 end

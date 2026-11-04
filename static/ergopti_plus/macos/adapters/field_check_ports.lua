@@ -401,6 +401,22 @@ local function owned_activation()
 		fetch = function(callback) require("adapters.runtime_owner_ports").fetch_artifact(callback) end,
 		other_active = function(callback) require("adapters.karabiner_coexistence").new().detect(callback) end,
 		marker = function() return require("adapters.runtime_owner_ports").marker().get() end,
+		-- The first install with no confirmation dialog: the field run is the request.
+		install_reasons = function() return Remap().OWNED_INSTALL_REASONS end,
+		install = function(callback)
+			if Remap().install_owned_runtime(callback) ~= true then callback(false, "install_not_offered") end
+		end,
+		driver_active = function(callback)
+			exec("/usr/bin/systemextensionsctl", { "list" }, 5, function(code, output)
+				local version = require("adapters.runtime_owner_ports").virtual_hid_version()
+				if code ~= 0 or type(version) ~= "string" then return callback(nil) end
+				local Vhid = require("platform.remap.runtime_vhid")
+				callback(Vhid.assess(Vhid.parse(output), version).ok == true)
+			end)
+		end,
+		open_driver_pane = function()
+			return hs.urlevent.openURL(require("platform.remap.ke_paths").EXTENSIONS_SETTINGS_URL)
+		end,
 	}
 end
 

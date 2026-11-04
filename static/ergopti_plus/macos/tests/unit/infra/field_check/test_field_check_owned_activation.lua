@@ -74,6 +74,60 @@ local function run(check, ports)
 	return steps, result
 end
 
+--- Adds the install ports to a fake Mac.
+--- @param ports table Ports of mac().
+--- @param options table install_ok, active (list of answers), reason.
+--- @return table world { installs, panes }
+local function with_install(ports, options)
+	local world = { installs = 0, panes = 0, looks = 0 }
+	local port = ports.owned_activation
+	port.install_reasons = function() return { runtime_not_installed = true } end
+	port.install = function(callback)
+		world.installs = world.installs + 1
+		if options.install_ok == false then return callback(false, "install_cancelled") end
+		callback(true)
+	end
+	port.driver_active = function(callback)
+		world.looks = world.looks + 1
+		local answers = options.active or { true }
+		callback(answers[math.min(world.looks, #answers)])
+	end
+	port.open_driver_pane = function() world.panes = world.panes + 1 end
+	return world
+end
+
+helpers.describe("field run: the owned runtime's first install with no click of Ergopti's", function()
+	-- The field run needed a person to find the install row; the admin prompt is now the only human step.
+	helpers.it("installs a missing runtime, opens the driver pane once and waits for the approval", function()
+		local ports = mac({ state = "unavailable", reason = "runtime_not_installed" })
+		local world = with_install(ports, { active = { false, false, true } })
+		local steps, result = run("owned_install", ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.install_needed.value, "yes:runtime_not_installed")
+		helpers.assert_eq(steps.installed.state, "pass")
+		helpers.assert_eq(steps.driver_active.state, "pass")
+		helpers.assert_eq(world.installs, 1)
+		helpers.assert_eq(world.panes, 1)
+	end)
+
+	helpers.it("names a refused install and a driver never approved, and installs nothing it does not need", function()
+		local refused = mac({ state = "unavailable", reason = "runtime_not_installed" })
+		with_install(refused, { install_ok = false })
+		local steps, result = run("owned_install", refused)
+		helpers.assert_eq(result.passed, false)
+		helpers.assert_eq(steps.installed.value, "install_cancelled")
+		helpers.assert_eq(steps.driver_active.value, "not_installed")
+		local waiting = mac({ state = "unavailable", reason = "virtual_hid_not_active" })
+		local world = with_install(waiting, { active = { false } })
+		steps = run("owned_install", waiting)
+		helpers.assert_eq(world.installs, 0)
+		helpers.assert_eq(steps.installed.value, "not_needed")
+		helpers.assert_eq(steps.driver_active.value, "not_approved")
+		local shared = run("owned_install", (mac({ owned = false })))
+		helpers.assert_eq(shared.installed.value, "shared_runtime")
+	end)
+end)
+
 helpers.describe("field run: Ergopti runs, so its runtime closes the user's Karabiner", function()
 	helpers.it("passes a verified, ready runtime holding the user's Karabiner closed", function()
 		local steps, result = run("owned_start", (mac({ marker = true, others = 0 })))
