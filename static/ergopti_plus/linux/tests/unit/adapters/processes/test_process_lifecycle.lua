@@ -89,6 +89,36 @@ local AC = { "a", "c" }
 -- process_every = floor(2.0 / 0.25) = 8: the process poll runs on these ticks.
 local PROCESS_TICK = 8
 
+helpers.describe("linux-process-reentrant-stop", function()
+	helpers.it("linux-process-reentrant-stop: stopping during focus notification prevents later listeners", function()
+		local original = package.loaded["adapters.window_info"]
+		local app, delivered = "old", 0
+		package.loaded["adapters.window_info"] = { focused_snapshot = function() return { appId = app, windowTitle = "" }, "x11:1" end }
+		local ok, failure = pcall(function()
+			with_proc(AB, function(lifecycle)
+				lifecycle.onFocusChange(function() lifecycle.stop() end)
+				lifecycle.onFocusChange(function() delivered = delivered + 1 end)
+				lifecycle.start(); app = "new"; lifecycle.tick(1)
+				helpers.assert_eq(delivered, 0, "a stopped poll must not deliver to later listeners")
+			end)
+		end)
+		package.loaded["adapters.window_info"] = original
+		if not ok then error(failure, 0) end
+	end)
+
+	helpers.it("linux-process-reentrant-stop: restarting during a launch callback keeps the new process baseline", function()
+		with_proc(AB, function(lifecycle, proc, launched, quit)
+			lifecycle.onAppLaunch(function(name)
+				if name == "c" then lifecycle.stop(); proc.set(AC); lifecycle.start() end
+			end)
+			lifecycle.start(); proc.set(ABC); lifecycle.tick(PROCESS_TICK)
+			lifecycle.tick(PROCESS_TICK * 2)
+			helpers.assert_eq(launched, { "c" })
+			helpers.assert_eq(quit, {}, "the retired tick cannot overwrite the new baseline")
+		end)
+	end)
+end)
+
 helpers.describe("linux-process-poll-demand", function()
 	local function with_demand(body)
 		local names = { "adapters.window_info", "infra.native_directory", "adapters.process_lifecycle" }
