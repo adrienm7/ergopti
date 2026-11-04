@@ -404,8 +404,12 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 		or not bundle_name:match("^Ergopti_v[%d%.]+%.bundle$") then
 		return nil, "bundle name is invalid"
 	end
-	local launcher = os.getenv("ERGOPTI_LAUNCHER_EXECUTABLE")
-	if type(launcher) ~= "string" or launcher:sub(1, 1) ~= "/" then
+	-- The path will also run under administrator privileges for a system
+	-- install. Admit only the executable bound to this running app and its
+	-- exported device/inode, not an arbitrary environment-supplied program.
+	local resolver = require("platform.remap.lease_helper")
+	local resolved, launcher = pcall(resolver.resolve)
+	if not resolved or type(launcher) ~= "string" or launcher:sub(1, 1) ~= "/" then
 		return nil, "native exclusive rename unavailable; launch ErgoptiPlus to install keyboard layouts", "launcher_unavailable"
 	end
 

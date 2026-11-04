@@ -9,6 +9,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local original_resolver = package.loaded["platform.remap.lease_helper"]
+package.loaded["platform.remap.lease_helper"] = {
+	resolve = function() return os.getenv("ERGOPTI_LAUNCHER_EXECUTABLE") end,
+}
 local original_getenv = os.getenv
 os.getenv = function(name)
 	if name == "ERGOPTI_LAUNCHER_EXECUTABLE" then return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end
@@ -143,6 +147,24 @@ helpers.describe("layout_install: transactional replacement", function()
 			helpers.assert_eq(prompts, 0)
 		end, debug.traceback)
 		os.getenv = getenv
+		if not ok then error(err, 0) end
+	end)
+
+
+	helpers.it("refuses an unverified launcher before administrator authorization", function()
+		local previous = package.loaded["platform.remap.lease_helper"]
+		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil, "identity mismatch" end }
+		local ok, err = xpcall(function()
+			local prompts = 0
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				osascript = { applescript = function() prompts = prompts + 1; return true end },
+			})
+			local installed, reason = install.install_system("/tmp/source", "Ergopti_v2.2.0.bundle")
+			helpers.assert_eq(installed, false)
+			helpers.assert_eq(reason, "launcher_unavailable")
+			helpers.assert_eq(prompts, 0, "an unverified executable must never reach the administrator prompt")
+		end, debug.traceback)
+		package.loaded["platform.remap.lease_helper"] = previous
 		if not ok then error(err, 0) end
 	end)
 
@@ -564,3 +586,5 @@ helpers.describe("layout_install: missing optional directories", function()
 		if not ok then error(err, 0) end
 	end)
 end)
+
+package.loaded["platform.remap.lease_helper"] = original_resolver
