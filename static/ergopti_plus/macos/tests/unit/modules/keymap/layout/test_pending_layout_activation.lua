@@ -44,7 +44,7 @@ local function load(live)
 		end,
 		encode_json = Json.encode,
 		decode_json = Json.decode,
-		now = function() return 1800000000 end,
+		now = function() return state.now or 1800000000 end,
 		reason = "macos_requires_logout",
 	})
 	return Pending, state
@@ -142,6 +142,34 @@ helpers.describe("pending layout activation (composer-macos26)", function()
 		helpers.assert_eq(Pending.resume().unreadable, 1)
 		helpers.assert_not_nil(Pending.pending("composed"))
 		helpers.assert_eq(Pending.request_select("other"), false)
+	end)
+
+	helpers.it("refuses malformed pending entries without changing them (pending-layout-malformed)", function()
+		for _, raw in ipairs({
+			'{"schema":1,"layouts":{"first":false}}',
+			'{"schema":1,"layouts":{"first":{"keyboard_name":5,"select":false,"recorded_at":1}}}',
+			'{"schema":1,"layouts":{"first":{"keyboard_name":"First","select":"yes","recorded_at":1}}}',
+			'{"schema":1,"layouts":{"first":{"keyboard_name":"First","select":true,"recorded_at":1e100}}}',
+			'{"schema":2,"layouts":{}}',
+		}) do
+			local Pending, state = load({})
+			state.stored[Pending.STORAGE_KEY] = raw
+			local ok, summary = pcall(Pending.resume)
+			helpers.assert_true(ok, "invalid stored data must not crash startup")
+			helpers.assert_eq(summary.unreadable, 1)
+			helpers.assert_eq(Pending.record("second", "Second"), false)
+			helpers.assert_eq(state.stored[Pending.STORAGE_KEY], raw, "unreadable data must remain recoverable")
+			helpers.assert_eq(#state.selected, 0)
+		end
+	end)
+
+	helpers.it("refuses to create malformed pending entries (pending-layout-malformed)", function()
+		local Pending, state = load({})
+		helpers.assert_eq(Pending.record("", "First"), false)
+		helpers.assert_eq(Pending.record("first", ""), false)
+		state.now = 1e100
+		helpers.assert_eq(Pending.record("first", "First"), false)
+		helpers.assert_nil(state.stored[Pending.STORAGE_KEY])
 	end)
 
 	helpers.it("does not overwrite pending requests when the stored record is unreadable (pending-layout-read-failure)", function()

@@ -130,6 +130,16 @@ helpers.describe("config_paths: logs folder override (config-paths-logs-dir)", f
 		helpers.assert_contains(written, 'ConfigDirPath = "/fixture/cfg2/"')
 	end)
 
+	helpers.it("refuses false instead of clearing the saved configuration path (config-path-false)", function()
+		local paths, observations = fresh_resolver('ConfigDirPath = "/fixture/cfg/"\n')
+		local before = #observations.writes
+		local changed, reason = paths.set_config_dir(false)
+		helpers.assert_eq(changed, false)
+		helpers.assert_true(type(reason) == "string" and reason:find("must be a string", 1, true) ~= nil)
+		helpers.assert_eq(paths.get_config_dir(), "/fixture/cfg/")
+		helpers.assert_eq(#observations.writes, before, "invalid input must not clear the persisted override")
+	end)
+
 	helpers.it("clears an override equal to the default", function()
 		local ConfigPaths, observations = fresh_resolver('LogsDirPath = "/fixture/sync/ergopti_plus/"\n')
 		local changed = ConfigPaths.set_paths(nil, DEFAULT_LOGS)

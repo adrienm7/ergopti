@@ -368,7 +368,7 @@ function M.build(ctx)
 
 		local slot_commands = {
 			[require("config_keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
-				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
+				return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
 					function() open_action_chooser(slot, names, current) end,
 					"menu_gestures.action_chooser")
 			end,

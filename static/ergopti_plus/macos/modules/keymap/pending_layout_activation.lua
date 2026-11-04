@@ -45,6 +45,15 @@ local function require_init(name)
 	if _deps == nil then error("pending_layout_activation." .. name .. " called before init()", 3) end
 end
 
+--- Whether a timestamp can be rendered by this host's UTC date formatter.
+--- @param value any Candidate Unix timestamp.
+--- @return boolean valid
+local function valid_timestamp(value)
+	if type(value) ~= "number" or value ~= value or value % 1 ~= 0 then return false end
+	local ok, rendered = pcall(os.date, "!%Y-%m-%dT%H:%M:%SZ", value)
+	return ok and type(rendered) == "string"
+end
+
 --- The stored entries, keyed by layout id: { keyboard_name, select, recorded_at }.
 --- @return table|nil entries
 --- @return string|nil error
@@ -54,8 +63,15 @@ local function read_entries()
 	if raw == nil then return {}, nil end
 	if type(raw) ~= "string" then return nil, "the stored record is not a JSON string" end
 	local ok, decoded = pcall(_deps.decode_json, raw)
-	if not ok or type(decoded) ~= "table" or type(decoded.layouts) ~= "table" then
+	if not ok or type(decoded) ~= "table" or decoded.schema ~= 1 or type(decoded.layouts) ~= "table" then
 		return nil, "the stored record is not a pending-layout record"
+	end
+	for id, entry in pairs(decoded.layouts) do
+		if type(id) ~= "string" or id == "" or type(entry) ~= "table"
+			or type(entry.keyboard_name) ~= "string" or entry.keyboard_name == ""
+			or type(entry.select) ~= "boolean" or not valid_timestamp(entry.recorded_at) then
+			return nil, "the stored record contains an invalid layout entry"
+		end
 	end
 	return decoded.layouts, nil
 end
@@ -113,16 +129,25 @@ function M.is_initialized() return _deps ~= nil end
 --- @return boolean recorded
 function M.record(id, keyboard_name)
 	require_init("record")
+	if type(id) ~= "string" or id == "" or type(keyboard_name) ~= "string" or keyboard_name == "" then
+		Logger.error(LOG, "Cannot record a pending layout with an invalid identity.")
+		return false
+	end
 	local entries, err = read_entries()
 	if not entries then
 		Logger.error(LOG, "The '%s' layout could not be recorded as pending: %s.", tostring(id), tostring(err))
 		return false
 	end
 	local previous = entries[id]
+	local recorded_at = _deps.now()
+	if not valid_timestamp(recorded_at) then
+		Logger.error(LOG, "Cannot record a pending layout with an invalid timestamp.")
+		return false
+	end
 	entries[id] = {
 		keyboard_name = keyboard_name,
 		select = previous ~= nil and previous.select == true,
-		recorded_at = _deps.now(),
+		recorded_at = recorded_at,
 	}
 	-- Fence an earlier selection before storage can re-enter or return an
 	-- unreadable receipt: the write may have committed even when proof failed.

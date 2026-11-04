@@ -796,7 +796,7 @@ end
 --- @return boolean changed True when the stored value actually moved.
 --- @return string|nil error_message Validation or publication failure.
 function M.set_config_dir(new_dir)
-	return M.set_paths(new_dir or "", nil)
+	return M.set_paths(new_dir == nil and "" or new_dir, nil)
 end
 
 --- Metrics store directory of a configuration directory. The single rule shared

@@ -21,6 +21,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local ErrorDescription = require("error_description")
 
 local LOG = "adapters.process_lifecycle"
 
@@ -60,7 +61,7 @@ local function invoke_callback(callback, callback_class, ...)
 		return callback(table.unpack(args, 1, args.n))
 	end, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "%s subscriber raised: %s.", callback_class, tostring(err))
+		Logger.error(LOG, "%s subscriber raised: %s.", callback_class, ErrorDescription.describe(err))
 	end
 	return ok
 end

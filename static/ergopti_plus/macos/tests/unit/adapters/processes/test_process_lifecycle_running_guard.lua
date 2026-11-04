@@ -308,6 +308,19 @@ end)
 -- ===========================================================
 
 helpers.describe("process_lifecycle: subscriber errors stay visible", function()
+	helpers.it("continues sibling delivery when a subscriber error cannot be formatted (process-callback-error-object)", function()
+		local adapter, ctx = load_adapter()
+		local hostile = setmetatable({}, { __tostring = function() error("formatting failed") end })
+		local healthy_calls = 0
+		adapter.onAppActivate(function() error(hostile) end)
+		adapter.onAppActivate(function() healthy_calls = healthy_calls + 1 end)
+		helpers.assert_true(adapter.start())
+		ctx.callbacks[1]("Safari", 3, {})
+		helpers.assert_eq(healthy_calls, 1)
+		helpers.assert_contains(ctx.errors[1], "error object (table)")
+		helpers.assert_true(adapter.stop())
+	end)
+
 	helpers.it("logs one throwing subscriber and continues healthy siblings (process-lifecycle-callback-visible)", function()
 		local adapter, ctx = load_adapter()
 		local healthy_calls = 0

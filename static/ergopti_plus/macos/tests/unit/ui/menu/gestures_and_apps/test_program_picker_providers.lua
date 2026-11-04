@@ -89,7 +89,10 @@ local function with_provider(kind, options, body)
 		package.loaded["infra.dialog_util"].block_alert = function(_, reason) fixture.warning = reason end
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
 		package.loaded["adapters.apple_shortcuts_native"] = nil
-		package.loaded["infra.deferred_work"] = { after = function(_, callback) callback(); return true end }
+		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+			if options.reject_schedule then return false end
+			callback(); return true
+		end }
 		package.loaded["ui.action_picker"] = { open = function(settings, callback)
 			helpers.assert_eq(settings.items[1].id, selected)
 			helpers.assert_eq(settings.items[1].disabled, options.unavailable and true or nil, "program selection must follow registration readiness")
@@ -195,6 +198,13 @@ for _, kind in ipairs({ "keyboard", "tap", "script" }) do
 	local binding = kind == "keyboard" and "keyboard__primary_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
 	helpers.describe("program transaction through actual " .. kind .. " provider", function()
 		if kind == "script" then
+			helpers.it("reports refusal to schedule a script action parameter", function()
+				with_provider(kind, { reject_schedule = true }, function(fixture)
+					helpers.assert_eq(fixture.action_receipt, false)
+					helpers.assert_eq(fixture.action, "none")
+					helpers.assert_eq(fixture.saves, 0)
+				end)
+			end)
 			helpers.it("refuses a plain action when its runtime setter refuses", function()
 				with_provider(kind, { action = "save", assign = "false" }, function(fixture, _, state)
 					helpers.assert_eq(fixture.action_receipt, false)

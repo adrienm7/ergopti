@@ -666,9 +666,9 @@ function M.build(ctx)
 								if type(prefix) ~= "string" then
 									Logger.error(LOG, "The script binding prefix is missing — refusing to "
 										.. "store '%s' under a binding key dispatch will not read.", tostring(a))
-									return
+									return false
 								end
-								DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+								return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 									local mutation = {
 										section = require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL, key = slot_id,
 										read = function()
@@ -693,7 +693,6 @@ function M.build(ctx)
 										ctx.updateMenu()
 									end
 								end, "menu_shortcuts.action_parameter")
-								return
 							end
 
 							return assign()
