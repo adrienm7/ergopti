@@ -92,10 +92,13 @@ local SYSTEM_MOUNTS = "^(/|/boot|/boot/efi|/usr|/var|/home|\\[SWAP\\])$"
 M.EJECT_ALL_DISKS = 'lsblk -nrpo NAME,TYPE,RM,HOTPLUG 2>/dev/null | while read -r dev kind rm hot; do'
 	.. ' [ "$kind" = disk ] || continue;'
 	.. ' [ "$rm" = 1 ] || [ "$hot" = 1 ] || continue;'
-	.. " lsblk -nrpo MOUNTPOINT \"$dev\" | grep -qE '" .. SYSTEM_MOUNTS .. "' && continue;"
-	.. ' lsblk -nrpo NAME,MOUNTPOINT "$dev" | while read -r part mnt; do'
-	.. ' [ -n "$mnt" ] && udisksctl unmount -b "$part" </dev/null; done;'
-	.. ' udisksctl power-off -b "$dev" </dev/null; done'
+	.. ' mounts=$(lsblk -nrpo MOUNTPOINT "$dev") || continue;'
+	.. " printf '%s\\n' \"$mounts\" | grep -qE '" .. SYSTEM_MOUNTS .. "' && continue;"
+	.. ' parts=$(lsblk -nrpo NAME,MOUNTPOINT "$dev") || continue;'
+	.. ' printf "%s\\n" "$parts" | while read -r part mnt; do'
+	.. ' [ -n "$mnt" ] || continue; udisksctl unmount -b "$part" </dev/null || exit 1; done'
+	.. ' && udisksctl power-off -b "$dev" </dev/null; done'
+
 
 --- Every action this module runs as one fixed shell command, by action id.
 M.COMMANDS = {

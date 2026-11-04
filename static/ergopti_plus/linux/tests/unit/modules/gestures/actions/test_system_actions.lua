@@ -414,6 +414,22 @@ helpers.describe("Linux system actions", function()
 			})
 		end)
 
+	for _, fault in ipairs({ "mount query", "partition query", "unmount" }) do
+		helpers.it("does not power off a disk after " .. fault .. " fails", function()
+			local lsblk = table.concat({
+				'case "$*" in',
+				'  "-nrpo NAME,TYPE,RM,HOTPLUG") printf "%s\\n" "/dev/sdb disk 1 1";;',
+				'  "-nrpo MOUNTPOINT /dev/sdb") ' .. (fault == "mount query" and "exit 1" or 'printf "%s\\n" "/media/ana/KEY"') .. ';;',
+				'  "-nrpo NAME,MOUNTPOINT /dev/sdb") ' .. (fault == "partition query" and "exit 1" or 'printf "%s\\n" "/dev/sdb1 /media/ana/KEY"') .. ';;',
+				'esac',
+			}, "\n")
+			local log = run_with_stubs(backgrounded(Gestures, "eject_all_disks"), {
+				lsblk = lsblk, udisksctl = fault == "unmount" and 'exit 1' or ':',
+			})
+			helpers.assert_true(not log:find("udisksctl power%-off"), "unsafe power-off after " .. fault .. ": " .. log)
+		end)
+	end
+
 	helpers.it("open_emoji_picker chains the installed choosers and logs when there is none (action-parity-linux-system)",
 		function()
 			local installed = { ibus = true, smile = true }
