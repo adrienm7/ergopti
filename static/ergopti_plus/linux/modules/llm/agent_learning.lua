@@ -140,13 +140,20 @@ local function source_current(path)
 		and _source.status == "ok" and text == _source.content
 end
 
+--- Retains a timer when its cancellation has not been acknowledged.
+local function cancel_save_timer()
+	if not _save_timer then return true end
+	local scheduler = _scheduler or require("adapters.timer_scheduler")
+	local called, cancelled = pcall(scheduler.cancel, _save_timer)
+	if not called or cancelled ~= true then return false end
+	_save_timer = nil
+	return true
+end
+
 --- Writes the map now: a temporary file, then a rename.
 --- @return boolean saved
 function M.flush()
-	if _save_timer then
-		(_scheduler or require("adapters.timer_scheduler")).cancel(_save_timer)
-		_save_timer = nil
-	end
+	cancel_save_timer()
 	if _load_blocked then return false end
 	if not _map then return true end
 	local path = state_path()
@@ -196,11 +203,14 @@ end
 --- Schedules a save.
 local function schedule_save()
 	local scheduler = _scheduler or require("adapters.timer_scheduler")
-	if _save_timer then scheduler.cancel(_save_timer) end
-	_save_timer = scheduler.after(SAVE_DEBOUNCE_SEC, function()
+	if not cancel_save_timer() then return end
+	local timer
+	timer = scheduler.after(SAVE_DEBOUNCE_SEC, function()
+		if _save_timer ~= timer then return end
 		_save_timer = nil
 		M.flush()
 	end)
+	_save_timer = timer
 	if type(_save_timer) ~= "table" or _save_timer.armed ~= true then
 		_save_timer = nil
 		M.flush()
