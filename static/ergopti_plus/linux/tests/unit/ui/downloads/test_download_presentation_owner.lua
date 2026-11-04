@@ -64,6 +64,24 @@ local function certificate()
 end
 
 helpers.describe("download fresh presentation preserves original operation consent", function()
+	for _, opened in ipairs({ false, true }) do
+		helpers.it("an old opening cannot erase its reentrant successor: " .. tostring(opened), function()
+		with_session(function(bridge, document, world)
+			world.ready()
+			helpers.assert_true(bridge.complete(world.id, true, "done"))
+			local manager, original, successor = document.manager, document.manager.show, nil
+			manager.show = function(app)
+				manager.show = original
+				helpers.assert_true(bridge.complete(world.id + 1, true, "done"))
+				successor = assert(world.show("successor"))
+				return opened
+			end
+			helpers.assert_nil(world.show("superseded"))
+			helpers.assert_true(bridge.update(successor, 33, "successor progress"))
+		end)
+		end)
+	end
+
 	helpers.it("reopened real document displays retained terminal data under its own lease", function()
 		with_session(function(bridge, document, world)
 			helpers.assert_true(world.ready().pushed)

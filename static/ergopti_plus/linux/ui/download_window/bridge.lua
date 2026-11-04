@@ -273,10 +273,11 @@ function M.show(opts)
 	}
 	_session = session
 	if host.show(APP_NAME) ~= true then
-		_session = nil
+		if _session == session then _session = nil end
 		Logger.error(LOG, "Download progress native window could not be opened.")
 		return nil
 	end
+	if _session ~= session then return nil end
 	session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
 	return session.id
 end
