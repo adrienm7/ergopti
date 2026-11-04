@@ -56,6 +56,7 @@ local function load_bridge(answer)
 			return true
 		end,
 		eval_js = function(app, js)
+			if context.on_push then context.on_push() end
 			local payload = js:match("receiveUpdateCheck%((.*)%)$")
 			context.pushed[#context.pushed + 1] = { app = app, message = payload and Json.decode(payload) }
 			return true
@@ -209,6 +210,21 @@ helpers.describe("update-check window bridge (Linux)", function()
 			local before = #context.pushed
 			bridge.on_message("ready")
 			helpers.assert_true(#context.pushed > before, "the successor remains active")
+		end)
+	end)
+
+	helpers.it("(update-check-start-owner) retired session cannot start a check after reentrant publication", function()
+		scenario(available, function(bridge, context)
+			context.on_push = function()
+				context.on_push = nil
+				bridge.on_window_closed()
+				helpers.assert_true(bridge.open(context.ctx))
+			end
+			helpers.assert_eq(bridge.open(context.ctx), false)
+			helpers.assert_eq(#context.checks, 1, "only the replacement may start its check")
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "the replacement session remains active")
 		end)
 	end)
 
