@@ -28,8 +28,8 @@
 #              ~/Library/Logs/Ergopti/ (Console.app reads logs there) and
 #              ~/Library/Caches/Ergopti/ (the OS may purge caches).
 #   - Windows  %LOCALAPPDATA%\Ergopti\ (paths.toml, config\, logs\, cache\,
-#              control\, bundle\, updater\). The managed Ollama runtime keeps a
-#              separate protected sibling, see [runtime.windows].
+#              control\, bundle\, updater\, ollama\). The managed Ollama
+#              runtime folder keeps its own protected ACL, see [runtime.windows].
 #   - Linux    $XDG_CONFIG_HOME/ergopti, $XDG_STATE_HOME/ergopti (logs and
 #              state), $XDG_CACHE_HOME/ergopti, $XDG_DATA_HOME/ergopti and
 #              $XDG_RUNTIME_DIR/ergopti.
@@ -191,11 +191,11 @@ paths_file = ["{app}", "paths.toml"]
 # =====================================
 
 [runtime.windows]
-# A separate direct child of LocalApplicationData owns the runtime-only ACL:
-# ollama_managed_files.ps1 admits only a root whose parent is
-# LocalApplicationData itself and creates it with a protected DACL, so the
-# managed Ollama runtime is the one sibling of the Ergopti root.
-managed_ollama_folder_name = "Ergopti-ollama"
+# The managed Ollama runtime folder inside the Ergopti root. ollama_managed_files.ps1
+# creates it with a protected DACL (the user and SYSTEM only) and admits it only
+# below a direct LocalApplicationData child that grants no write, delete or
+# re-permission right to another principal, held open without DELETE sharing.
+managed_ollama_folder_name = "ollama"
 
 [owned_runtime.macos]
 # The owned Karabiner runtime (ADR 011) is compiled with this folder name: the
@@ -252,8 +252,10 @@ legacy_config = [".config", "ergopti_plus"]
 # The old LocalAppData folder: each of its entries (logs, cache, updater, ...)
 # moves to the same entry of the root.
 legacy_local_folder = "ergopti_plus"
-# The old managed Ollama runtime folder, renamed to [runtime.windows].
-legacy_ollama_folder = "ergopti_plus_ollama"
+# The old managed Ollama runtime folders, direct LocalApplicationData children,
+# moved in this order into [runtime.windows]: the first build's folder, then the
+# protected sibling of the single-name builds before it moved inside the root.
+legacy_ollama_folders = ["ergopti_plus_ollama", "Ergopti-ollama"]
 
 [migration.linux]
 # $XDG_CONFIG_HOME/<legacy_folder>, $XDG_STATE_HOME/<legacy_folder> and

@@ -10,9 +10,9 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. One Root: paths.toml, the configuration, the cache, the updater state and
-;    the bundle all live under one folder; the managed Ollama runtime is the one
-;    sibling, because its protected ACL needs a direct LocalApplicationData
-;    child (app_dirs.toml [runtime.windows]).
+;    the bundle and the managed Ollama runtime all live under one folder; the
+;    runtime folder keeps its own protected ACL (app_dirs.toml
+;    [runtime.windows], modules/llm/ollama_managed_files.ps1).
 ; 2. Fail Fast: an empty base variable raises instead of resolving a folder
 ;    relative to the working directory.
 ; 3. Functions, not globals: boot reads them before most includes have run.
@@ -66,8 +66,8 @@ AppFoldersCacheDir() {
 		return AppFoldersBase(AppDirsWindowsCacheBaseEnv()) . "\" . AppDirsWindowsCacheRelative() . "\"
 }
 
-; The protected managed Ollama root, %LOCALAPPDATA%\Ergopti-ollama.
+; The protected managed Ollama root, %LOCALAPPDATA%\Ergopti\ollama.
 ; @returns {String} Absolute folder without a trailing backslash.
 AppFoldersManagedOllamaRoot() {
-		return AppFoldersBase("LOCALAPPDATA") . "\" . AppDirsWindowsManagedOllamaFolderName()
+		return AppFoldersRoot() . AppDirsWindowsManagedOllamaFolderName()
 }

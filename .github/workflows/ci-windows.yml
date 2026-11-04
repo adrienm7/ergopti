@@ -642,12 +642,12 @@ jobs:
               Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "ERGOPTI_FILE_COMPONENT_TEST_ROOT=$testRoot"
               Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "ERGOPTI_FILE_COMPONENT_SOURCE_ROOT=$sourceRoot"
               if ($nativeExit -ne 0 -or $stderr.Length -ne 0 -or
-                  @($stdout -split '\r?\n' | Where-Object { $_ -cmatch '^PASS ' }).Count -ne 31 -or
-                  $stdout -cnotmatch '(?m)^RESULT passed=31 failed=0 skipped=0\r?$') {
+                  @($stdout -split '\r?\n' | Where-Object { $_ -cmatch '^PASS ' }).Count -ne 35 -or
+                  $stdout -cnotmatch '(?m)^RESULT passed=35 failed=0 skipped=0\r?$') {
                   throw 'Exact native file component acceptance refused; raw evidence retained.'
               }
               [ordered]@{ schema = 1; source_sha = '${{ github.sha }}'; native_exit = $nativeExit;
-                  passed = 31; failed = 0; skipped = 0; native_file_component = $true;
+                  passed = 35; failed = 0; skipped = 0; native_file_component = $true;
                   acquisition_qualified = $false; runtime_executed = $false } |
                   ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'receipt.json') -Encoding utf8
           } finally { $env:PSModulePath = $oldModulePath }

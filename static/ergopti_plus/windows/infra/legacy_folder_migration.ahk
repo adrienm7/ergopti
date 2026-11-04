@@ -7,7 +7,8 @@
 ; into %LOCALAPPDATA%\Ergopti: the Roaming paths.toml, the default
 ; configuration folder %USERPROFILE%\.config\<old>, every entry of the old
 ; LocalAppData folder (logs, cache, control, updater, diagnostics) and the old
-; managed Ollama folder. A paths.toml that named an old default folder is
+; managed Ollama folders (the first build's, then the protected sibling), each
+; into %LOCALAPPDATA%\Ergopti\ollama. A paths.toml that named an old default folder is
 ; rewritten to the new one, after a backup of its previous text.
 ;
 ; FEATURES & RATIONALE:
@@ -259,8 +260,12 @@ LegacyFolderMigrationRun(PathsFile) {
 		LegacyFolderRemoveIfEmpty(LegacyPathsDir, Report)
 		LegacyFolderMoveEntry(LegacyConfig, NewConfig, Backup . "\" . AppDirsMigrationWindowsLegacyConfigRelative(), Report)
 		LegacyFolderMergeEntries(LegacyLocal, Root, Backup . "\" . AppDirsMigrationWindowsLegacyLocalFolder(), Report)
-		LegacyFolderMoveEntry(LocalAppData . "\" . AppDirsMigrationWindowsLegacyOllamaFolder(),
-				AppFoldersManagedOllamaRoot(), Backup . "\" . AppDirsMigrationWindowsLegacyOllamaFolder(), Report)
+		; A rename keeps the runtime folder's protected ACL and file identity, which
+		; its root-owner.json receipt records; the second old folder, when the first
+		; one already moved, goes to the backup.
+		for LegacyOllama in AppDirsMigrationWindowsLegacyOllamaFolders()
+				LegacyFolderMoveEntry(LocalAppData . "\" . LegacyOllama, AppFoldersManagedOllamaRoot(),
+						Backup . "\" . LegacyOllama, Report)
 		Rewrites := [
 				Map("key", "ConfigDirPath", "old", [LegacyConfig], "new", NewConfig),
 				Map("key", AppDirsLogsOverrideKey(), "old", [LegacyLocal . "\logs"], "new", RTrim(LoggerDefaultLogsDir(), "\"))

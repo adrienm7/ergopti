@@ -97,7 +97,7 @@ function oldSpellings() {
 		throw new Error(
 			'the gate exempts the owned runtime only while it keeps the old support folder'
 		);
-	add(windows.legacy_ollama_folder, `${escape(windows.legacy_ollama_folder)}(?![\\w-])`);
+	for (const folder of windows.legacy_ollama_folders) add(folder, `${escape(folder)}(?![\\w-])`);
 	add(
 		`%${windows.legacy_paths_file_base}%\\${windows.legacy_paths_file.join('\\')}`,
 		`(?<!LOCAL)${escape(windows.legacy_paths_file_base)}%?${SEP}${windows.legacy_paths_file.map(escape).join(SEP)}`
@@ -143,6 +143,7 @@ for (const planted of [
 	'~/Library/Application Support/ergopti_plus/control',
 	'~/Library/Application Support/ErgoptiPlus/paths.toml',
 	'%LOCALAPPDATA%\\ergopti_plus_ollama',
+	'%LOCALAPPDATA%\\Ergopti-ollama\\versions',
 	'%APPDATA%\\Ergopti\\paths.toml',
 	'EnvGet("LOCALAPPDATA") . "\\ergopti_plus\\cache"',
 	'path.join(process.env.LOCALAPPDATA, "ergopti_plus", "logs")',
@@ -156,7 +157,7 @@ for (const allowed of [
 	'~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json',
 	'~/Library/Application Support/Ergopti/config',
 	'%LOCALAPPDATA%\\Ergopti\\logs',
-	'%LOCALAPPDATA%\\Ergopti-ollama',
+	'%LOCALAPPDATA%\\Ergopti\\ollama',
 	'~/.local/state/ergopti/logs',
 	'static/ergopti_plus/_shared',
 	'layout = "ergopti_plus"'

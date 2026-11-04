@@ -19,9 +19,9 @@ AppDirsFolderName() {
 	return "Ergopti"
 }
 
-; Separate direct LocalApplicationData child for the managed Windows runtime.
+; Protected managed Windows runtime folder inside the Ergopti root.
 AppDirsWindowsManagedOllamaFolderName() {
-	return "Ergopti-ollama"
+	return "ollama"
 }
 
 ; paths.toml key of the optional logs-folder override.
@@ -139,7 +139,8 @@ AppDirsMigrationWindowsLegacyLocalFolder() {
 	return "ergopti_plus"
 }
 
-; Legacy managed Ollama folder, renamed to the managed runtime folder.
-AppDirsMigrationWindowsLegacyOllamaFolder() {
-	return "ergopti_plus_ollama"
+; Legacy managed Ollama folders, LocalApplicationData children moved in order
+; into the managed runtime folder.
+AppDirsMigrationWindowsLegacyOllamaFolders() {
+	return ["ergopti_plus_ollama", "Ergopti-ollama"]
 }

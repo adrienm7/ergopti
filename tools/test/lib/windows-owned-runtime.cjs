@@ -10,9 +10,11 @@
  * ollama-runtime-launch.ps1 starts it under the shape ShellRunner gives it.
  *
  * FEATURES & RATIONALE:
- * 1. The managed root must be a direct child of the user's LocalApplicationData
- *    (Open-OllamaManagedRoot refuses anything else), so the profile is a private
- *    ergopti-relay-e2e-<random> folder there, never the driver's Ergopti-ollama.
+ * 1. The managed root must be one folder inside a direct child of the user's
+ *    LocalApplicationData (Open-OllamaManagedRoot refuses anything else), so
+ *    the profile is a private ergopti-relay-e2e-<random> folder there, standing
+ *    for the Ergopti root, with the managed root inside it, never the driver's
+ *    own runtime folder.
  * 2. Exactly one production file differs: the WinINet reader in a private copy of
  *    the vendor folder answers the fake network's settings, because the real one
  *    reads the user's proxy settings. Everything after it (route lookup, PAC
@@ -30,6 +32,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 
+const AppDirs = require('./app-dirs.cjs');
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
@@ -153,13 +156,17 @@ function prepareVendor(directory) {
  */
 function createProfile({ stubExecutable, releaseDirectory }) {
 	const local = process.env.LOCALAPPDATA;
-	const managedRoot = path.join(
+	const profileHome = path.join(
 		local,
 		`ergopti-relay-e2e-${crypto.randomBytes(16).toString('hex')}`
 	);
+	const managedRoot = path.join(
+		profileHome,
+		AppDirs.data.runtime.windows.managed_ollama_folder_name
+	);
 	const work = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-relay-e2e-'));
 	const dispose = () => {
-		fs.rmSync(managedRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+		fs.rmSync(profileHome, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 		fs.rmSync(work, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 	};
 	try {
