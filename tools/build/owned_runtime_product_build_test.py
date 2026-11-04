@@ -273,6 +273,8 @@ class DaemonReportBuildControls(unittest.TestCase):
                 "CoreLaunchctl",
                 "CorePlistCustody",
                 "CoreExitObservation",
+                # WP8: the first install also loads the VirtualHIDDevice daemon job.
+                "VirtualHIDProvisionOwner",
             )
         )
         self.assertEqual(product.IDLE_CORE_SWIFT_SOURCES, expected)

@@ -17,10 +17,10 @@ struct OwnedRuntimeInstallerMain {
 		#endif
 		guard CommandLine.arguments.count == 2, CommandLine.arguments[1] == "--owned-install-first" else { Darwin.exit(64) }
 		#if ERGOPTI_OWNED_IDLE_CORE
-		// The live helper also provisions and starts the idle Core control service (ADR 011, WP6 install half).
+		// The live helper also starts the idle Core control service and loads the VirtualHIDDevice daemon job (ADR 011, WP8).
 		let result = OwnedRuntimeIdleServiceEntry.runFirstInstallation()
 		switch result {
-		case .idleCoreObservedStagingRetired, .filesPublishedServiceCleanupPending: report(result.rawValue)
+		case .servicesObservedStagingRetired, .filesPublishedServiceCleanupPending: report(result.rawValue)
 		case .refused: Darwin.exit(77)
 		case .cleanupPending: Darwin.exit(75)
 		}
