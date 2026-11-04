@@ -30,7 +30,7 @@
  * @param {string} text
  * @returns {string}
  */
-LLM_Parser_StripThinking(text) {
+LLM_Parser_StripThinking(text, streaming := false) {
 	if (Type(text) != "String")
 		return ""
 	out := text
@@ -43,6 +43,18 @@ LLM_Parser_StripThinking(text) {
 	out := RegExReplace(out, "si)<think>.*?</think>\s*", "")
 	; Strip any unclosed </think> remnant.
 	out := RegExReplace(out, "i)</think>\s*", "")
+	; An unfinished block is private too, including when a response is truncated.
+	out := RegExReplace(out, "si)<think(?:ing)?>.*$", "")
+	; While streaming, keep a partial opening tag out of the selectable preview.
+	if streaming {
+		for tag in ["<think>", "<thinking>"] {
+			Loop StrLen(tag) - 1 {
+				prefix := SubStr(tag, 1, A_Index)
+				if (StrLen(out) >= StrLen(prefix) && StrLower(SubStr(out, StrLen(out) - StrLen(prefix) + 1)) == prefix)
+					out := SubStr(out, 1, StrLen(out) - StrLen(prefix))
+			}
+		}
+	}
 	return out
 }
 
