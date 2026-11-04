@@ -534,6 +534,7 @@ function M.caffeinate_cb(event)
 			return true
 		end
 		local now = hs.timer.absoluteTime() / 1000000
+		local passive_now = TimerScheduler.hotstring_time() * 1000
 		if event == hs.caffeinate.watcher.systemWillSleep
 		or event == hs.caffeinate.watcher.screensDidSleep
 		then
@@ -542,7 +543,7 @@ function M.caffeinate_cb(event)
 			-- Keep its first timestamp so the display-off period is not lost.
 			if _state.passive_kind ~= "lock" then
 				if _state.passive_kind ~= "sleep" or _state.passive_started_at == nil then
-					_state.passive_started_at = now
+					_state.passive_started_at = passive_now
 				end
 				_state.passive_kind = "sleep"
 			end
@@ -563,7 +564,7 @@ function M.caffeinate_cb(event)
 			if _state.passive_started_at then
 				LogManager.log_passive_period(
 					_state.passive_kind or "sleep",
-					math.floor(now - _state.passive_started_at)
+					math.floor(passive_now - _state.passive_started_at)
 				)
 				_state.passive_started_at = nil
 				_state.passive_kind       = nil
@@ -573,7 +574,7 @@ function M.caffeinate_cb(event)
 
 		elseif event == hs.caffeinate.watcher.screensDidLock then
 			LogManager.log_system_event("lock")
-			_state.passive_started_at = now
+			_state.passive_started_at = passive_now
 			_state.passive_kind       = "lock"
 			if _state.active_app_name then
 				LogManager.log_app_switch(
@@ -588,7 +589,7 @@ function M.caffeinate_cb(event)
 			if _state.passive_started_at then
 				LogManager.log_passive_period(
 					_state.passive_kind or "lock",
-					math.floor(now - _state.passive_started_at)
+					math.floor(passive_now - _state.passive_started_at)
 				)
 				_state.passive_started_at = nil
 				_state.passive_kind       = nil
@@ -741,6 +742,11 @@ function M.stop_hardware_watchers()
 	_hardware_watchers_enabled = false
 	_hardware_generation = _hardware_generation + 1
 	_context_refresh_generation = _context_refresh_generation + 1
+	-- A stopped watcher can miss the matching wake or unlock. Never carry an
+	-- unfinished interval into a later generation or charge disabled time to it.
+	_state.passive_started_at, _state.passive_kind = nil, nil
+	-- Pointer movement while stopped must not be charged to the next run.
+	_state.last_mouse_pos = nil
 	local timers_stopped = cancel_context_refresh_timers()
 	local watchers_stopped = cleanup_hardware_resources()
 	local settled = timers_stopped and watchers_stopped

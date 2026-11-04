@@ -176,7 +176,7 @@ class WireReceiving(unittest.TestCase):
         self.assertEqual(caught.exception.reason, "protocol")
         self.assertEqual(self.children, [])
 
-    def request(self):
+    def request(self, progress=None):
         body = '{"model":"fixture"}'
         headers = [
             ["Accept-Encoding", "identity"],
@@ -198,6 +198,7 @@ class WireReceiving(unittest.TestCase):
             body,
             2,
             1,
+            progress=progress,
         )
 
     def test_discovery_line_and_public_argv_publish_only_reaped_identity(self):
@@ -322,6 +323,23 @@ class WireReceiving(unittest.TestCase):
             self.assertEqual(response.read(), b'{"status":"success"}\n')
         self.assertIsNotNone(self.children[0].returncode)
         self.assertFalse(response._complete)
+
+    def test_progress_close_does_not_deliver_buffered_response(self):
+        os.environ["ERGOPTI_PEER_MODE"] = "body_wait"
+        response = None
+        cancel = False
+
+        def progress():
+            if cancel:
+                response.close()
+
+        response = self.request(progress=progress)
+        self.assertEqual(response.read(1), b"{")
+        cancel = True
+        with self.assertRaises(self.api.ENGINE.NativeHTTPError):
+            response.read(1)
+        self.assertTrue(response._closed)
+        self.assertIsNotNone(self.children[0].returncode)
 
     def test_read_progress_failure_retires_child_before_propagating(self):
         os.environ["ERGOPTI_PEER_MODE"] = "body_wait"

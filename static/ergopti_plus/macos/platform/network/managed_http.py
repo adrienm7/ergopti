@@ -152,13 +152,22 @@ class ManagedHTTPTransport(httpx.BaseTransport):
         idle = timeouts.get("read") if isinstance(timeouts, dict) else None
         if idle is None:
             idle = self.idle_timeout
+        combined = {}
+        for raw_name, raw_value in request.headers.raw:
+            name, value = raw_name.decode("ascii"), raw_value.decode("latin-1")
+            key = name.lower()
+            if key == "accept-encoding":
+                continue
+            if key not in combined:
+                combined[key] = [name, []]
+            combined[key][1].append(value)
         headers = [
-            (name.decode("ascii"), value.decode("latin-1")) for name, value in request.headers.raw
+            (name, ("; " if key == "cookie" else ", ").join(values))
+            for key, (name, values) in combined.items()
         ]
         # Foundation owns content decoding. Identity keeps HTTPX's raw stream
         # and HF's range/integrity contract byte-exact; a violating origin is
         # refused by the native receiver before body delivery.
-        headers = [(name, value) for name, value in headers if name.lower() != "accept-encoding"]
         headers.append(("Accept-Encoding", "identity"))
         with self.lock:
             if self.closed:
@@ -178,6 +187,13 @@ class ManagedHTTPTransport(httpx.BaseTransport):
             # transport shutdown can retry a refused close.
             stream = _NativeStream(response, request, self._retired)
             self.active.add(stream)
+            try:
+                headers = httpx.Headers(response.headers, encoding="latin-1")
+            except UnicodeEncodeError:
+                stream.close()
+                raise httpx.RemoteProtocolError(
+                    "Managed network response contains an invalid header", request=request
+                ) from None
             if response.status in (301, 302, 303, 307, 308):
                 # HTTPX otherwise drains the redirect body before dispatching
                 # its successor. Retire the exact native child at headers so a
@@ -185,13 +201,13 @@ class ManagedHTTPTransport(httpx.BaseTransport):
                 stream.close()
                 return httpx.Response(
                     response.status,
-                    headers=response.headers,
+                    headers=headers,
                     stream=httpx.ByteStream(b""),
                     extensions={"ergopti_native": True},
                 )
         return httpx.Response(
             response.status,
-            headers=response.headers,
+            headers=headers,
             stream=stream,
             extensions={"ergopti_native": True},
         )

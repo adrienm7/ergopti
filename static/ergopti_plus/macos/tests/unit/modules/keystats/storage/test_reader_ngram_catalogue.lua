@@ -37,6 +37,20 @@ end
 helpers.describe("macOS n-gram reads: the shared catalogue", function()
 	local Queries = require("keystats.queries")
 
+	helpers.it("does not issue per-day projections for an empty bounded range", function()
+		local reader, statements = reader_with({})
+		local out, complete = reader.read_ngrams("/declared/db.sqlite", "2025-01-01", "2025-12-31", nil,
+			{pause = function() end})
+		helpers.assert_eq(complete, true)
+		helpers.assert_eq(out, {c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {},
+			w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {}}, "the returned empty projection is unchanged")
+		local projections = 0
+		for _, sql in ipairs(statements) do
+			if sql:find("GROUP BY", 1, true) then projections = projections + 1 end
+		end
+		helpers.assert_eq(projections, 0, "an empty database needs no daily projection queries")
+	end)
+
 	helpers.it("marks non-finite SQL totals incomplete instead of returning infinite metrics", function()
 		for _, counter in ipairs({math.huge, -math.huge, 0/0}) do
 			local reader = reader_with({{token = "a", c = counter, td = 1, e = 0, esrc_json = "{}"}})

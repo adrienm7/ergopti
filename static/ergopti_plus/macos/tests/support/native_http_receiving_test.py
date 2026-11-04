@@ -49,6 +49,8 @@ def frame(tag,payload):
     else: os.write(1,framed)
 headers=[]
 status=200
+if mode=='latin1-header': headers=[['X-Example','caf\u00e9']]
+if mode=='nonlatin-header': headers=[['X-Example','\u6f22']]
 if mode=='redirect':
     status=302; headers=[['Location','https://second.example/next?route=two']]
 if mode=='downgrade':
@@ -298,6 +300,47 @@ class ActualHTTPXReceiving(unittest.TestCase):
         self.environment.stop()
         self.native_resolver.stop()
         NativePipeReceiving.tearDown(self)
+
+    def test_duplicate_request_headers_are_coalesced_for_the_native_worker(self):
+        import httpx
+
+        ledger = Path(self.temporary.name) / "requests.jsonl"
+        os.environ["RECEIVING_LEDGER"] = str(ledger)
+        with httpx.Client(transport=self.managed.ManagedHTTPTransport(1)) as client:
+            response = client.get(
+                "https://first.example/ok",
+                headers=[
+                    ("Cookie", "a=1"),
+                    ("cookie", "b=2"),
+                    ("X-Example", "a"),
+                    ("x-example", "b"),
+                ],
+            )
+            self.assertEqual(response.content, b"N\x00LF")
+        headers = json.loads(ledger.read_text().splitlines()[0])["headers"]
+        cookies = [value for name, value in headers if name.lower() == "cookie"]
+        examples = [value for name, value in headers if name.lower() == "x-example"]
+        self.assertEqual(cookies, ["a=1; b=2"])
+        self.assertEqual(examples, ["a, b"])
+
+    def test_httpx_accepts_latin1_response_header_without_losing_worker(self):
+        import httpx
+
+        owner = self.managed.ManagedHTTPTransport(1)
+        with httpx.Client(transport=owner) as client:
+            response = client.get("https://first.example/latin1-header")
+            self.assertEqual(response.headers["X-Example"], "café")
+            self.assertEqual(response.content, b"N\x00LF")
+        self.assertEqual(owner.active, set())
+
+    def test_httpx_rejects_unrepresentable_header_and_retires_worker(self):
+        import httpx
+
+        owner = self.managed.ManagedHTTPTransport(1)
+        with httpx.Client(transport=owner) as client:
+            with self.assertRaises(httpx.RemoteProtocolError):
+                client.get("https://first.example/nonlatin-header")
+            self.assertEqual(owner.active, set())
 
     def test_actual_httpx_redirect_uses_full_target_and_strips_cross_origin_auth(self):
         import httpx

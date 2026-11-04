@@ -581,6 +581,27 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 				"an arbitrary multi-codepoint suffix must not acquire terminator or magic identity")
 			helpers.assert_eq(#effects.emitted, 0,
 				"rejecting magic identity must not fall through to a looser terminator tail probe")
+
+			reset_context()
+			Keymap.set_repeat_feature_enabled(false)
+			Keymap.set_trigger_char(":")
+			for _, character in ipairs({ "p", "l", "a", "i", "n" }) do press(character) end
+			press(NBSP)
+			drain_immediate_timers(hs_stub)
+			helpers.assert_true(type(effects.rows) == "table" and effects.rows[1].text == "PLAIN_END",
+				"preview and magic action must resolve the same trigger")
+			helpers.assert_eq(press(":"), true, "magic colon must find the trigger before separately typed spacing")
+			helpers.assert_eq(effects.emitted, { "PLAIN_END" })
+
+			Keymap.add("plain" .. NBSP, "LITERAL_SPACE_END", {
+				auto_expand = false, is_case_sensitive = true, is_case_sensitive_strict = true,
+			})
+			Keymap.sort_mappings()
+			reset_context()
+			for _, character in ipairs({ "p", "l", "a", "i", "n" }) do press(character) end
+			press(NBSP)
+			helpers.assert_eq(press(":"), true, "literal space-ending triggers must remain available")
+			helpers.assert_eq(effects.emitted, { "LITERAL_SPACE_END" }, "the longer literal trigger keeps priority")
 		end, debug.traceback)
 
 		-- The terminator catalogue is process-global; restore both runtime knobs even

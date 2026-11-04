@@ -177,6 +177,25 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("requires system curl only for an explicit proxy route", function()
+		local previous = package.loaded["adapters.system_curl"]
+		local checks, starts = 0, 0
+		package.loaded["adapters.system_curl"] = { check = function() checks = checks + 1; return false end }
+		Installer._spawn = function() return { start = function() starts = starts + 1; return true end } end
+		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
+		local ok, err = pcall(function()
+			helpers.assert_true(Installer.stage(asset, function() end), "native stage does not run curl")
+			helpers.assert_eq(checks, 0)
+			env.https_proxy = "http://proxy.example:3128"
+			helpers.assert_eq(Installer.stage(asset, function() end), false, "the explicit proxy uses curl")
+			helpers.assert_eq(checks, 1)
+			helpers.assert_eq(starts, 1)
+		end)
+		env.https_proxy = nil
+		package.loaded["adapters.system_curl"] = previous
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("arms the replacement detached, with the previous app kept aside", function()
 		local ran, observed = {}, {}
 		Installer._run = function(executable, args, completed)

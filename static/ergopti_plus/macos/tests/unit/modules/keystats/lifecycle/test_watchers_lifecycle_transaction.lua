@@ -129,7 +129,7 @@ local function with_fixture(options, scenario)
 
 	local hs_stub = {
 		timer = { absoluteTime = function() return fixture.now_ms * 1000000 end },
-		mouse = { absolutePosition = function() return { x = 0, y = 0 } end },
+		mouse = { absolutePosition = function() return fixture.mouse_position or { x = 0, y = 0 } end },
 		caffeinate = {
 			watcher = {
 				systemWillSleep = 1,
@@ -193,6 +193,7 @@ local function with_fixture(options, scenario)
 		start = function() return false end,
 	}
 	local scheduler = {}
+	function scheduler.hotstring_time() return (fixture.elapsed_ms or fixture.now_ms) / 1000 end
 	function scheduler.after(_, callback)
 		local mode = options.after_mode or "commit"
 		if mode == "throw" then error("context timer constructor exploded") end
@@ -273,6 +274,48 @@ end
 -- =================================================
 
 helpers.describe("keystats hardware watchers form one exact transaction", function()
+	helpers.it("does not count pointer travel while watchers are stopped", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.mouse_position = { x = 0, y = 0 }
+			watchers.perform_maintenance()
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+			fixture.mouse_position = { x = 300, y = 400 }
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			watchers.perform_maintenance()
+			helpers.assert_eq(state.mouse_distance_px, 0)
+			fixture.mouse_position = { x = 303, y = 404 }
+			watchers.perform_maintenance()
+			helpers.assert_eq(state.mouse_distance_px, 5)
+		end)
+	end)
+
+	helpers.it("forgets an open lock across watcher shutdown and restart", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms = 1000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.screensDidLock)
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms = 5000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemDidWake)
+			helpers.assert_eq(state.passive_kind, nil)
+			helpers.assert_eq(fixture.passive_period, nil)
+			helpers.assert_eq(#fixture.timers, 1)
+		end)
+	end)
+
+	helpers.it("includes suspended time in a sleep interval", function()
+		with_fixture({}, function(watchers, fixture)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms, fixture.elapsed_ms = 1000, 1000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemWillSleep)
+			fixture.now_ms, fixture.elapsed_ms = 1100, 61000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemDidWake)
+			helpers.assert_eq(fixture.passive_period.duration, 60000)
+		end)
+	end)
+
 	helpers.it("keeps a lock interval open when the system wakes before screen unlock", function()
 		with_fixture({}, function(watchers, fixture, state)
 			helpers.assert_eq(watchers.init_hardware_watchers(), true)

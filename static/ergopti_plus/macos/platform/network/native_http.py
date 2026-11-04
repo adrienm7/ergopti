@@ -499,6 +499,8 @@ class NativeHTTPResponse:
         progress = getattr(self, "_role_progress", None)
         if progress is not None:
             progress()
+            if self._closed:
+                raise NativeHTTPError("protocol")
         now = time.monotonic()
         deadline = self._idle_deadline
         if self._absolute is not None:

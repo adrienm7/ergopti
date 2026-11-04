@@ -572,6 +572,10 @@ local function finite_number(value, fallback)
 end
 
 local function finite_sum(left, right)
+	if math.type(left) == "integer" and math.type(right) == "integer" then
+		assert(not (right > 0 and left > math.maxinteger - right)
+			and not (right < 0 and left < math.mininteger - right), "n-gram integer overflow")
+	end
 	return finite_number(left + right, 0)
 end
 
@@ -626,6 +630,10 @@ local function _ngram_days(db, start_date, end_date)
 		end)
 		if accepted ~= true then complete = false end
 	end
+	-- An explicit filter cannot create data in an empty database. Without this
+	-- check, a years-long range schedules every daily query despite no rows.
+	if not lo and not hi then return {}, complete end
+	if not lo or not hi then return {}, false end
 	if start_date and start_date ~= "" and (not lo or start_date > lo) then lo = start_date end
 	if end_date and end_date ~= "" and (not hi or end_date < hi) then hi = end_date end
 	local days = {}
@@ -779,12 +787,14 @@ function M.merge_ngrams(into, from, pacer)
 				target = { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 				bucket[token] = target
 			end
-			target.c   = target.c   + item.c
-			target.t   = target.t   + item.t
-			target.e   = target.e   + item.e
-			target.hs  = target.hs  + item.hs
-			target.llm = target.llm + item.llm
-			target.o   = target.o   + item.o
+			local c = finite_sum(target.c, item.c)
+			local t = finite_sum(target.t, item.t)
+			local e = finite_sum(target.e, item.e)
+			local hs_count = finite_sum(target.hs, item.hs)
+			local llm = finite_sum(target.llm, item.llm)
+			local other = finite_sum(target.o, item.o)
+			target.c, target.t, target.e = c, t, e
+			target.hs, target.llm, target.o = hs_count, llm, other
 		end
 	end
 	return into
