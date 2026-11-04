@@ -2644,7 +2644,10 @@ local function main()
 				-- suggestion in the same turn.
 				on_hidden = function()
 					TimerScheduler.after(0, function()
-						if llm_overlay then llm_overlay.redraw() end
+						if rawequal(package.loaded["ui.tooltip.preview"], tooltip_preview)
+							and llm_overlay and type(llm_overlay.redraw_if_preview_hidden) == "function" then
+							llm_overlay.redraw_if_preview_hidden()
+						end
 					end)
 				end,
 			})
