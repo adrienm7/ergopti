@@ -94,6 +94,14 @@ helpers.describe("prefix expansions: what is built", function()
 				.. "every non-French form expects")
 	end)
 
+	helpers.it("international phone prefixes remove the national trunk zero", function()
+		for _, trigger in ipairs({ "+3307", "+33750" }) do
+			local mapping = by_trigger(trigger)
+			helpers.assert_not_nil(mapping)
+			helpers.assert_eq(mapping.replacement, "+33750399576")
+		end
+	end)
+
 	helpers.it("gives back the form the user started typing", function()
 		-- The shortest prefix holding five non-space characters, which for
 		-- "1 99 99 99…" runs to the seventh byte. Taken from the shared helper
