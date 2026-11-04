@@ -31,6 +31,7 @@ local function load_fixture()
 	replace("adapters.http_client", {
 		delete_owned = function(url, headers, body, options, callback)
 			local operation = { started = true, closed = false, cancelled = false, listeners = {} }
+			if transport.refuse_start then operation.started = false end
 			function operation:is_settled() return self.closed end
 			function operation:on_settled(listener)
 				if self.closed then listener() else self.listeners[#self.listeners + 1] = listener end
@@ -144,6 +145,23 @@ helpers.describe("Ollama model delete: owned removal", function()
 			helpers.assert_eq(outcomes, 0)
 			helpers.assert_eq(Delete.is_active(), false)
 			helpers.assert_true(Delete.cancel())
+		end)
+	end)
+
+	helpers.it("linux-model-delete: refused start retains its slot until physical settlement", function()
+		run(function(Delete, transport)
+			local outcomes = 0
+			transport.refuse_start = true
+			helpers.assert_eq(Delete.start("http://127.0.0.1:11434", "qwen:2b", function() outcomes = outcomes + 1 end), false)
+			helpers.assert_true(Delete.is_active())
+			helpers.assert_eq(Delete.start("http://127.0.0.1:11434", "other:1b", function() end), false)
+			helpers.assert_eq(#transport.deletes, 1)
+			transport.deletes[1].callback({ ok = false, status = 0 })
+			transport.deletes[1].operation:settle()
+			helpers.assert_eq(outcomes, 0)
+			helpers.assert_eq(Delete.is_active(), false)
+			transport.refuse_start = false
+			helpers.assert_true(Delete.start("http://127.0.0.1:11434", "other:1b", function() end))
 		end)
 	end)
 end)
