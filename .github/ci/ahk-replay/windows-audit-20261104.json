@@ -1,61 +1,45 @@
 {
-	"expected_count": 39,
+	"expected_count": 23,
 	"filters": [
 		{
-			"contains": "wpm-recovery-owner",
+			"contains": "Model browser selection: native-refused ",
+			"expected_count": 1
+		},
+		{
+			"contains": "Model browser selection: native-paused ",
+			"expected_count": 1
+		},
+		{
+			"contains": "Keep-awake timer ownership: retired-keyboard ",
+			"expected_count": 1
+		},
+		{
+			"contains": "token-status-classification",
 			"expected_count": 6
 		},
 		{
-			"contains": "locale-equal-second",
-			"expected_count": 1
-		},
-		{
-			"contains": "model-browser-close-pause-owner",
-			"expected_count": 6
-		},
-		{
-			"contains": "error-dialog-startup-owner",
-			"expected_count": 7
-		},
-		{
-			"contains": "shell runner: environment overrides refuse NUL values",
-			"expected_count": 1
-		},
-		{
-			"contains": "shell runner: a valid Unicode environment reaches the native child unchanged",
-			"expected_count": 1
-		},
-		{
-			"contains": "crash report: logical processors include every physical socket",
-			"expected_count": 1
-		},
-		{
-			"contains": "ahk-005-crash-worker-transport",
-			"expected_count": 1
-		},
-		{
-			"contains": "diagnostics-pac-encoding",
-			"expected_count": 4
-		},
-		{
-			"contains": "LLM parser: shared byte and diff work limits refuse oversized model words",
-			"expected_count": 1
-		},
-		{
-			"contains": "meta: windows/ OS-call purity ratchet — modules + lib",
-			"expected_count": 1
-		},
-		{
-			"contains": "Keystats native64: a retired synthetic key clock preserves accepted periodic authority",
-			"expected_count": 1
-		},
-		{
-			"contains": "keepawake-timer-owner",
+			"contains": "token-status-authentication",
 			"expected_count": 3
 		},
 		{
-			"contains": "roi-halflife-native64-owner",
-			"expected_count": 5
+			"contains": "token-status-readiness",
+			"expected_count": 2
+		},
+		{
+			"contains": "log-openers-buffered-owner",
+			"expected_count": 6
+		},
+		{
+			"contains": "log openers: a missing errors file is announced",
+			"expected_count": 1
+		},
+		{
+			"contains": "log openers: an undelivered no-errors notice is a failure",
+			"expected_count": 1
+		},
+		{
+			"contains": "log openers: the folder and today's log come from the resolver",
+			"expected_count": 1
 		}
 	]
 }
