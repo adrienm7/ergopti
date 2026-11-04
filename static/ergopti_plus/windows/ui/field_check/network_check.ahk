@@ -148,7 +148,7 @@ NetworkCheck_JudgePac(Status, Bytes) {
 	if Status != 200 || !(Bytes is Buffer) || Bytes.Size == 0 || Bytes.Size > NetworkCheck_PacMaxBytes()
 		return "error"
 	Source := _HC_PacDecodeSource(Bytes, NetworkCheck_PacMaxBytes())
-	return !Source.Has("error") && InStr(Source["body"], "FindProxyForURL") ? "ok" : "error"
+	return !Source.Has("error") && InStr(Source["body"], "FindProxyForURL", true) ? "ok" : "error"
 }
 
 /**

@@ -213,6 +213,17 @@
 			"root_cause": "static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:_HealthCheck_Hardware and infra/diagnostic_snapshot.ahk:DiagSnapshot_Collect: A_Is64bitOS is converted to x64, although it expresses width rather than native machine architecture.",
 			"silent_failure": "Both diagnostic collectors label the ARM64 host x64.",
 			"regression_test": "Use a native architecture port and test machine ARM64 with process x64, native x64, and supported x86."
+		},
+		{
+			"id": "AHK-020",
+			"title": "PAC diagnostics accept an incorrectly cased entry point",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Judge HTTP200 body function findproxyforurl(){return 'DIRECT';}, then repeat mixed and upper case variants.",
+			"root_cause": "static/ergopti_plus/windows/ui/field_check/network_check.ahk:NetworkCheck_JudgePac and ui/healthcheck/probes.ahk:_HC_PacAnswer use the default case-insensitive InStr search. JavaScript and the shared Lua judge require the exact FindProxyForURL identifier.",
+			"silent_failure": "Windows reports a valid PAC even though its required entry point is absent.",
+			"regression_test": "Require rejection of lower, upper and mixed case variants in both Windows judges; retain exact-case positive controls."
 		}
 	]
 }

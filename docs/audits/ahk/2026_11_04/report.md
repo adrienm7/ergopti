@@ -253,3 +253,27 @@ Consequence: Both diagnostic collectors label the ARM64 host x64.
 Regression: Use a native architecture port and test machine ARM64 with process x64, native x64, and supported x86.
 
 Cross-midnight partitioning and detached-worker foreground overlays remain unconfirmed candidates and are not counted. The keep-awake timer rearming hypothesis also remains uncounted. The requested total of 100 remains unmet.
+
+## Fourth sweep and current qualification
+
+The register now contains **20 distinct new findings** against the same audited
+revision. The current requested target is **1,000**; it is not reached. Individual
+assertions and encoding variants are not counted as separate defects.
+
+### AHK-020: PAC diagnostics accept an incorrectly cased entry point
+
+Severity: medium. Confidence: high. Evidence: source-derived, native Windows
+execution pending.
+
+Both `NetworkCheck_JudgePac` and `_HC_PacAnswer` use a case-insensitive `InStr`
+lookup for `FindProxyForURL`. A script defining only `findproxyforurl` is declared
+valid, although JavaScript's identifier and the shared Lua check are case
+sensitive. Regressions reject lower, upper and mixed case variants in both
+Windows judges while retaining the exact-case positive control.
+
+The AHK-008 correction was exercised through the production shared Lua modules
+using Lua 5.4: 17 focused cases passed, including valid UTF-16 in either byte
+order, surrogate pairs, malformed inputs, NUL, raw byte boundaries and normalized
+UTF-8 expansion beyond the limit. This is not a native AHK or full cross-driver
+suite pass. AHK-005, AHK-013 and AHK-019 also have source fixes and regression
+coverage committed; their native execution remains pending.

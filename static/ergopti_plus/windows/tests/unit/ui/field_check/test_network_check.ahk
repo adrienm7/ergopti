@@ -105,6 +105,15 @@ Test("NetworkCheck: the proxy kinds are named from the settings and the environm
 _TNC_PacVerdict() {
 	Good := _TNC_Bytes("function FindProxyForURL(url, host) { return 'DIRECT'; }")
 	AssertEqual("ok", NetworkCheck_JudgePac(200, Good))
+	for WrongName in ["findproxyforurl", "FINDPROXYFORURL", "FindProxyForUrl"] {
+		Script := "function " . WrongName . "(){return 'DIRECT';}"
+		AssertEqual("error", NetworkCheck_JudgePac(200, _TNC_Bytes(Script)),
+			"PAC entry point is case sensitive: " . WrongName)
+		AssertEqual("error", _HC_PacAnswer(200, Script)["result"]["state"],
+			"health diagnostics use the same exact entry point")
+	}
+	AssertEqual("ok", _HC_PacAnswer(200, "function FindProxyForURL(){return 'DIRECT';}")["result"]["state"])
+
 	AssertEqual("error", NetworkCheck_JudgePac(404, Good), "a non-200 answer is an error")
 	AssertEqual("error", NetworkCheck_JudgePac(0, ""), "a failed request is an error")
 	AssertEqual("error", NetworkCheck_JudgePac(200, Buffer(0)), "an empty PAC is an error")

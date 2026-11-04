@@ -291,7 +291,7 @@ _HC_PacAnswer(Status, Body) {
 		return Map("result", Map("state", "error", "detail", Status > 0 ? "PAC download: HTTP " . Status : "PAC download failed"))
 	if (Body == "")
 		return Map("result", Map("state", "error", "detail", "PAC is empty"))
-	if !InStr(Body, "FindProxyForURL")
+	if !InStr(Body, "FindProxyForURL", true)
 		return Map("result", Map("state", "error", "detail", "PAC does not define FindProxyForURL"))
 	Value := "HTTP 200, " . StrLen(Body) . " characters, FindProxyForURL found"
 	return Map("result", Map("state", "ok"), "sections", Map("network", Map("proxy_pac", Value)))
