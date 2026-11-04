@@ -244,10 +244,15 @@ function M.show(opts)
 	end
 	if _session then
 		local previous = _session
+		local epoch = previous.page_epoch
+		local closed = epoch == nil or host.hide(APP_NAME, epoch) == true
+		if _session ~= previous then return nil end
+		if not closed then
+			Logger.warn(LOG, "The previous download window could not close; its session is retained.")
+			return nil
+		end
 		invalidate_failure(previous)
 		previous.retired = true
-		host.hide(APP_NAME)
-		if _session ~= previous then return nil end
 	end
 	contract()
 

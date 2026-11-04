@@ -124,6 +124,19 @@ helpers.describe("download fresh presentation preserves original operation conse
 		end)
 	end)
 
+	helpers.it("refused terminal close retains the old session and refuses replacement", function()
+		with_session(function(bridge, document, world)
+			world.ready()
+			helpers.assert_true(bridge.complete(world.id, true, "done"))
+			local manager, original = document.manager, document.manager.hide
+			manager.hide = function() return false end
+			local replacement = world.show("replacement")
+			manager.hide = original
+			helpers.assert_nil(replacement)
+			helpers.assert_true(bridge.focus(world.id), "the original terminal session remains owned")
+		end)
+	end)
+
 	helpers.it("reopened real document displays retained terminal data under its own lease", function()
 		with_session(function(bridge, document, world)
 			helpers.assert_true(world.ready().pushed)
