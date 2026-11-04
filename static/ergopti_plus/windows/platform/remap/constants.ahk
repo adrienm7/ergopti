@@ -183,6 +183,10 @@ global _TH_TapHoldTrackState := Map()
 ; already-running KeyWait pseudo-thread, so its normal finally can be seconds
 ; too late and the synthetic modifier would alter physical input while paused.
 global _TH_SyntheticHeldKeys := Map()
+; Teardown revokes complete gestures, including frames that have not sent Down.
+global _TH_SyntheticEpoch := 0
+global _TH_ModifierOwners := Map()
+global _TH_TabAltOwner := 0
 ; A zero-count key whose final Up was not proven must remain owned separately
 ; from active reference counts. Lifecycle cleanup retries this ledger instead
 ; of forgetting an OS-level modifier that may still be logically down.
@@ -476,10 +480,27 @@ _TapHoldModifierIsSuspended() {
 ; so it is sent whenever the held modifier includes Alt or Win.
 ; @param ModKey {String|Array} The owned modifier key name, or a combination.
 ; @return {Boolean} True when the release was proven.
-_TapHoldReleaseOwnedModifier(ModKey) {
-	if !_TH_MaskMenuModifierRelease(ModKey)
+_TapHoldReleaseOwnedModifier(ModKey, Owner := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(Owner) {
+			if !TapHoldOwnerCurrent(Owner)
+				return false
+			if Owner.Closed
+				return Owner.ReleaseOk
+		}
+		MaskSent := _TH_MaskMenuModifierRelease(ModKey)
+	} finally Critical(PreviousCritical)
+	if !MaskSent
 		try LoggerError("TapHoldDispatch", "Menu mask before releasing '{1}' could not be sent.", _TH_SyntheticKeyLabel(ModKey))
-	return TapHoldSyntheticKeyUp(ModKey)
+	return TapHoldSyntheticKeyUp(ModKey, Owner)
+}
+
+; The native Tab-up fallback and its waiting Down frame share one receipt.
+_TapHoldReleaseTabAltOwner() {
+	global _TH_TabAltOwner
+	Owner := _TH_TabAltOwner
+	return IsObject(Owner) ? _TapHoldReleaseOwnedModifier("LAlt", Owner) : false
 }
 
 ; Send the menu mask once when Key (a name or a combination) includes an Alt or
@@ -527,6 +548,37 @@ _TapHoldEndPressClaim(KeyId) {
 		_TH_OwnedPresses.Delete(KeyId)
 }
 
+; One physical gesture owns one acquisition and one acknowledged release.
+TapHoldNewOwner() {
+	global _TH_SyntheticEpoch
+	return {Epoch: _TH_SyntheticEpoch, Held: false, Closed: false,
+		ReleaseOk: false, Retracted: false}
+}
+
+TapHoldOwnerCurrent(Owner) {
+	global _TH_SyntheticEpoch
+	return IsObject(Owner) && Owner.Epoch == _TH_SyntheticEpoch
+}
+
+; Publishing the name and its authority is one bounded RAM transaction.
+_TapHoldPublishModifierOwner(KeyId, ModKey, Owner) {
+	global _TH_OwnedModifiers, _TH_ModifierOwners
+	PreviousCritical := Critical("On")
+	try {
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return false
+		if Owner.Closed
+			return Owner.Retracted && _TH_ModifierOwners.Has(KeyId) && _TH_ModifierOwners[KeyId] == Owner
+		if _TH_ModifierOwners.Has(KeyId) && _TH_ModifierOwners[KeyId] != Owner
+				&& TapHoldOwnerCurrent(_TH_ModifierOwners[KeyId])
+			return false
+		Owner.Held := true
+		_TH_OwnedModifiers[KeyId] := ModKey
+		_TH_ModifierOwners[KeyId] := Owner
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 ; Own one configured synthetic-modifier gesture from physical key-down through
 ; release. The Down is published before the first interruptible wait, so the
 ; first chord belongs to the hold. Activity cancels only the eventual tap; it
@@ -541,7 +593,13 @@ _TapHoldEndPressClaim(KeyId) {
 TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	WaitReleaseFn := 0, KeyIsDownFn := 0, TickNowFn := 0,
 	KeyDownFn := 0, KeyUpFn := 0, CancelTapFn := 0,
-	PhysicalModifierPassthrough := false, IsSuspendedFn := 0) {
+	PhysicalModifierPassthrough := false, IsSuspendedFn := 0, Owner := 0) {
+	global _TH_ModifierOwners, _TH_OwnedModifiers
+	if !IsObject(Owner)
+		Owner := TapHoldNewOwner()
+	if !TapHoldOwnerCurrent(Owner)
+		return Map("activated", false, "released", false, "tap", false, "elapsed_ms", 0)
+	Owner.KeyId := KeyId
 	if !IsObject(WaitReleaseFn)
 		WaitReleaseFn := _TapHoldModifierWaitRelease
 	if !IsObject(KeyIsDownFn)
@@ -549,9 +607,9 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	if !IsObject(TickNowFn)
 		TickNowFn := _TapHoldModifierTickNow
 	if !IsObject(KeyDownFn)
-		KeyDownFn := TapHoldSyntheticKeyDown
+		KeyDownFn := (Key) => TapHoldSyntheticKeyDown(Key, Owner)
 	if !IsObject(KeyUpFn)
-		KeyUpFn := _TapHoldReleaseOwnedModifier
+		KeyUpFn := (Key) => _TapHoldReleaseOwnedModifier(Key, Owner)
 	if !IsObject(CancelTapFn)
 		CancelTapFn := TapHoldShouldCancelTap
 	if !IsObject(IsSuspendedFn)
@@ -573,6 +631,8 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 		_TapHoldClaimPress(KeyId)
 	try {
 		StartedAt := TickNowFn.Call()
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return Map("activated", false, "released", false, "tap", false, "elapsed_ms", 0)
 		if OwnerPresses {
 			if !KeyDownFn.Call(ModKey) {
 				return Map("activated", false, "released", false,
@@ -580,20 +640,24 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			}
 			; Published so the press can be handed back mid-hold when it turns
 			; out to be AltGr's fake LCtrl (TapHoldAltGrTakesItsLCtrl).
-			_TH_OwnedModifiers[KeyId] := ModKey
+			if !_TapHoldPublishModifierOwner(KeyId, ModKey, Owner) {
+				if TapHoldOwnerCurrent(Owner)
+					KeyUpFn.Call(ModKey)
+				return Map("activated", false, "released", false, "tap", false, "elapsed_ms", 0)
+			}
 		}
 
 		Released := false
 		ReleaseProved := false
 		try {
 			loop {
-				if IsSuspendedFn.Call()
+				if !TapHoldOwnerCurrent(Owner) || IsSuspendedFn.Call()
 					break
 				if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
 					Released := true
 					break
 				}
-				if IsSuspendedFn.Call()
+				if !TapHoldOwnerCurrent(Owner) || IsSuspendedFn.Call()
 					break
 				if !KeyIsDownFn.Call(KeyName) {
 					Released := true
@@ -606,12 +670,16 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			; second synthetic Down would race the following key's hotkey admission.
 			; A hold handed back mid-press was released then, and its press was
 			; AltGr's, never a tap; the LCtrl given to that AltGr ends with it.
-			Retracted := _TH_TakeRetractedOwner(KeyId)
-			if !OwnerPresses or Retracted
+			Retracted := _TH_TakeRetractedOwner(KeyId, Owner)
+			if !TapHoldOwnerCurrent(Owner)
+				ReleaseProved := false
+			else if !OwnerPresses
 				ReleaseProved := true
+			else if Retracted
+				ReleaseProved := Owner.ReleaseOk
 			else
 				ReleaseProved := KeyUpFn.Call(ModKey)
-			if !_TH_ReleaseAltGrLCtrl(KeyId)
+			if !_TH_ReleaseAltGrLCtrl(KeyId, Owner)
 				ReleaseProved := false
 		}
 
@@ -623,26 +691,34 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			GuardMs := 250
 		Suspended := IsSuspendedFn.Call()
 		CancelReason := ""
-		if (Released and ReleaseProved and !Suspended and !A_IsSuspended)
+		if (Released and ReleaseProved and !Suspended and !A_IsSuspended and TapHoldOwnerCurrent(Owner))
 			CancelReason := CancelTapFn.Call(KeyId, GuardMs)
 		; A release sooner than the shared tap minimum is a key bounce: CapsLock held
 		; as Ctrl typed its tap on a 20 ms brush (tap_hold/decision_vectors.json).
 		; Owned here so no hold-modifier hotkey can miss it, as Linux does in its engine.
 		TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended and !Retracted
+			and TapHoldOwnerCurrent(Owner)
 			and ElapsedMs >= TapMinDurationMs() and ElapsedMs <= TapMaxMs and CancelReason == ""
 		if LoggerIsDebugEnabled() {
 			LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",
 				KeyId, _TH_SyntheticKeyLabel(ModKey), PhysicalModifierPassthrough ? "physical_passthrough" : "synthetic",
 				Released ? "true" : "false", ElapsedMs, TapAllowed ? "true" : "false")
 		}
+		TapAllowed := TapAllowed && TapHoldOwnerCurrent(Owner) && !A_IsSuspended
 		return Map(
 			"activated", true,
 			"released", ReleaseProved,
 			"tap", TapAllowed,
 			"elapsed_ms", ElapsedMs)
 	} finally {
-		if _TH_OwnedModifiers.Has(KeyId)
-			_TH_OwnedModifiers.Delete(KeyId)
+		PreviousCritical := Critical("On")
+		try {
+			if _TH_ModifierOwners.Has(KeyId) && _TH_ModifierOwners[KeyId] == Owner {
+				_TH_ModifierOwners.Delete(KeyId)
+				if _TH_OwnedModifiers.Has(KeyId)
+					_TH_OwnedModifiers.Delete(KeyId)
+			}
+		} finally Critical(PreviousCritical)
 		if Claimed
 			_TapHoldEndPressClaim(KeyId)
 	}
@@ -812,8 +888,9 @@ TapHoldReleasePhysicalKey(Key) {
 ; counting keeps independently overlapping tap-hold branches from releasing a
 ; key another branch still owns; the physical Send happens only on the 0->1 and
 ; 1->0 transitions of each INDIVIDUAL key (see _TH_SyntheticKeyList).
-TapHoldSyntheticKeyDown(Key) {
+TapHoldSyntheticKeyDown(Key, Owner := 0) {
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
+	global _TH_ModifierOwners, _TH_OwnedModifiers
 	Keys := _TH_SyntheticKeyList(Key)
 	if (Keys.Length = 0 or (Keys.Length = 1 and Keys[1] == "")) {
 		try LoggerError("TapHoldDispatch", "Cannot arm an empty synthetic modifier — the hold resolver must return a key name.")
@@ -831,6 +908,16 @@ TapHoldSyntheticKeyDown(Key) {
 	RollbackFailedKeys := []
 	PressedKeys := []
 	try {
+		if IsObject(Owner) {
+			if !TapHoldOwnerCurrent(Owner) || Owner.Closed
+				return false
+			if Owner.Held
+				return true
+			if Owner.HasOwnProp("KeyId") && _TH_ModifierOwners.Has(Owner.KeyId)
+					&& _TH_ModifierOwners[Owner.KeyId] != Owner
+					&& TapHoldOwnerCurrent(_TH_ModifierOwners[Owner.KeyId])
+				return false
+		}
 		if A_IsSuspended {
 			Ok := false
 			FailureKind := "suspended"
@@ -886,6 +973,15 @@ TapHoldSyntheticKeyDown(Key) {
 					_TH_SyntheticHeldKeys[Name] := _TH_SyntheticHeldKeys.Get(Name, 0) + 1
 				for _, Name in UserHeld
 					_TH_SyntheticUserHeldKeys[Name] := true
+				if IsObject(Owner) {
+					Owner.Held := true
+					; A DEBUG callout below may deliver AltGr's handback. Publish
+					; its exact parent before releasing the native admission fence.
+					if Owner.HasOwnProp("KeyId") {
+						_TH_OwnedModifiers[Owner.KeyId] := Key
+						_TH_ModifierOwners[Owner.KeyId] := Owner
+					}
+				}
 			}
 		}
 	}
@@ -912,7 +1008,7 @@ TapHoldSyntheticKeyDown(Key) {
 	return Ok
 }
 
-TapHoldSyntheticKeyUp(Key) {
+TapHoldSyntheticKeyUp(Key, Owner := 0) {
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
 	Keys := _TH_SyntheticKeyList(Key)
 	if (Keys.Length = 0 or (Keys.Length = 1 and Keys[1] == "")) {
@@ -926,6 +1022,16 @@ TapHoldSyntheticKeyUp(Key) {
 	SkippedKeys := []
 	ReleasedKeys := []
 	try {
+		if IsObject(Owner) {
+			if !TapHoldOwnerCurrent(Owner)
+				return false
+			if Owner.Closed
+				return Owner.ReleaseOk
+			Owner.Closed := true
+			if !Owner.Held
+				return false
+			Owner.Held := false
+		}
 		for _, Name in Keys {
 			; A tracked pending release is safe and necessary even during
 			; Suspend. Only the untracked fallback is forbidden while paused.
@@ -975,6 +1081,8 @@ TapHoldSyntheticKeyUp(Key) {
 				FailedKeys.Push(Name)
 			}
 		}
+		if IsObject(Owner)
+			Owner.ReleaseOk := Ok
 	}
 	finally {
 		Critical(PreviousCritical)
@@ -995,12 +1103,18 @@ TapHoldReleaseSyntheticKeys() {
 	; the first yielding key-release operation of suspend or shutdown.
 	TapCopyCheckStop()
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	global _TH_SyntheticEpoch, _TH_OwnedModifiers, _TH_ModifierOwners, _TH_AltGrLCtrlOwners
+	global LayerEnabled, _TH_LayerOwner, NumberOfRepetitions, _TH_TabAltOwner
 	Keys := []
 	Seen := Map()
 	FailedKeys := []
 	MaskSent := true
 	PreviousCritical := Critical("On")
 	try {
+		_TH_SyntheticEpoch += 1
+		LayerWasEnabled := IsSet(LayerEnabled) && LayerEnabled
+		LayerEnabled := false, _TH_LayerOwner := 0, NumberOfRepetitions := 1
+		_TH_OwnedModifiers := Map(), _TH_ModifierOwners := Map(), _TH_AltGrLCtrlOwners := Map(), _TH_TabAltOwner := 0
 		UserKeys := []
 		for Name in _TH_SyntheticHeldKeys {
 			Seen[Name] := true
@@ -1038,6 +1152,12 @@ TapHoldReleaseSyntheticKeys() {
 	}
 	finally {
 		Critical(PreviousCritical)
+	}
+
+	if LayerWasEnabled && IsSet(UpdateCapsLockLED) {
+		try UpdateCapsLockLED()
+		catch as Err
+			try LoggerWarn("TapHoldDispatch", "Could not refresh the navigation layer indicator after input retirement: {1}.", Err.Message)
 	}
 
 	if !MaskSent
@@ -1742,23 +1862,38 @@ TapHoldUserLCtrlHeld(KeyIsDownFn := 0, RealPressFn := 0) {
 ; Its owner then releases nothing more and dispatches no tap.
 ; @param KeyId {String} Tap-hold key id.
 ; @return {Boolean} True when a hold was handed back.
-TapHoldRetractOwnedModifier(KeyId) {
-	global _TH_OwnedModifiers, _TH_RetractedOwners
-	if !_TH_OwnedModifiers.Has(KeyId) or _TH_RetractedOwners.Has(KeyId)
-		return false
-	_TH_RetractedOwners[KeyId] := true
-	if !_TapHoldReleaseOwnedModifier(_TH_OwnedModifiers[KeyId])
+TapHoldRetractOwnedModifier(KeyId, ExpectedOwner := 0) {
+	global _TH_OwnedModifiers, _TH_ModifierOwners, _TH_RetractedOwners
+	PreviousCritical := Critical("On")
+	try {
+		if !_TH_OwnedModifiers.Has(KeyId) || !_TH_ModifierOwners.Has(KeyId)
+			return false
+		Owner := _TH_ModifierOwners[KeyId]
+		if IsObject(ExpectedOwner) && Owner != ExpectedOwner
+			return false
+		if !TapHoldOwnerCurrent(Owner) || Owner.Retracted
+			return false
+		ModKey := _TH_OwnedModifiers[KeyId]
+		Owner.Retracted := true
+		_TH_RetractedOwners[KeyId] := Owner
+	} finally Critical(PreviousCritical)
+	if !_TapHoldReleaseOwnedModifier(ModKey, Owner)
 		try LoggerError("TapHoldDispatch", "Could not hand back the hold of '{1}'.", KeyId)
 	return true
 }
 
 ; Whether KeyId's hold was handed back during this press; clears the mark.
-_TH_TakeRetractedOwner(KeyId) {
+_TH_TakeRetractedOwner(KeyId, ExpectedOwner := 0) {
 	global _TH_RetractedOwners
-	if !_TH_RetractedOwners.Has(KeyId)
-		return false
-	_TH_RetractedOwners.Delete(KeyId)
-	return true
+	PreviousCritical := Critical("On")
+	try {
+		if !_TH_RetractedOwners.Has(KeyId)
+			return false
+		if IsObject(ExpectedOwner) && _TH_RetractedOwners[KeyId] != ExpectedOwner
+			return false
+		_TH_RetractedOwners.Delete(KeyId)
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 ; On a standard AltGr layout every AltGr press starts with a fake LCtrl, which
@@ -1776,23 +1911,44 @@ _TH_TakeRetractedOwner(KeyId) {
 ;        AltGr key holds another modifier (its owner presses that one).
 ; @return {Boolean} True when the press was AltGr's.
 TapHoldAltGrTakesItsLCtrl(AsAltGr) {
-	global _TapHoldKeyIsDown, _TH_OwnedModifiers, _TH_AltGrLCtrlOwners, _TH_AltGrPresses
+	global _TapHoldKeyIsDown, _TH_OwnedModifiers, _TH_ModifierOwners, _TH_AltGrLCtrlOwners, _TH_AltGrPresses
+	Companion := TapHoldNewOwner()
 	if !KS_AltGrAddsFakeLCtrl()
 		return false
 	if !_TapHoldKeyIsDown.Call("SC01D", "P")
 		return false
-	; Whatever the left_ctrl tap-hold holds, this LCtrl press was AltGr's: it is
-	; no Ctrl the user typed (see _TH_TakeAltGrPress).
-	_TH_AltGrPresses["left_ctrl"] := true
-	if !_TH_OwnedModifiers.Has("left_ctrl")
-		return true
-	TapHoldRetractOwnedModifier("left_ctrl")
-	if (AsAltGr and !_TH_AltGrLCtrlOwners.Has("left_ctrl")) {
-		; An unproven Down leaves this AltGr press without its LCtrl; the
-		; sender has logged why, and the hold was handed back all the same.
-		if !TapHoldSyntheticKeyDown("LCtrl")
+	PreviousCritical := Critical("On")
+	try {
+		if !TapHoldOwnerCurrent(Companion) || A_IsSuspended
 			return true
-		_TH_AltGrLCtrlOwners["left_ctrl"] := true
+		_TH_AltGrPresses["left_ctrl"] := true
+		if !_TH_OwnedModifiers.Has("left_ctrl") || !_TH_ModifierOwners.Has("left_ctrl")
+			return true
+		Parent := _TH_ModifierOwners["left_ctrl"]
+		if !TapHoldOwnerCurrent(Parent) || Companion.Epoch != Parent.Epoch
+			return true
+	} finally Critical(PreviousCritical)
+	TapHoldRetractOwnedModifier("left_ctrl", Parent)
+	if !AsAltGr
+		return true
+	PreviousCritical := Critical("On")
+	try {
+		if !TapHoldOwnerCurrent(Parent) || !_TH_ModifierOwners.Has("left_ctrl")
+				|| _TH_ModifierOwners["left_ctrl"] != Parent || _TH_AltGrLCtrlOwners.Has("left_ctrl")
+			return true
+		Companion.Parent := Parent
+		_TH_AltGrLCtrlOwners["left_ctrl"] := Companion
+	} finally Critical(PreviousCritical)
+	try {
+		if !TapHoldSyntheticKeyDown("LCtrl", Companion)
+			return true
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			if (!TapHoldOwnerCurrent(Companion) || !Companion.Held)
+					&& _TH_AltGrLCtrlOwners.Has("left_ctrl") && _TH_AltGrLCtrlOwners["left_ctrl"] == Companion
+				_TH_AltGrLCtrlOwners.Delete("left_ctrl")
+		} finally Critical(PreviousCritical)
 	}
 	return true
 }
@@ -1825,12 +1981,18 @@ TapHoldRecordLCtrlPress() {
 
 ; End the LCtrl held for AltGr by KeyId's press, if any.
 ; @return {Boolean} False only when its release could not be proven.
-_TH_ReleaseAltGrLCtrl(KeyId) {
+_TH_ReleaseAltGrLCtrl(KeyId, ExpectedParent := 0) {
 	global _TH_AltGrLCtrlOwners
-	if !_TH_AltGrLCtrlOwners.Has(KeyId)
-		return true
-	_TH_AltGrLCtrlOwners.Delete(KeyId)
-	return TapHoldSyntheticKeyUp("LCtrl")
+	PreviousCritical := Critical("On")
+	try {
+		if !_TH_AltGrLCtrlOwners.Has(KeyId)
+			return true
+		Owner := _TH_AltGrLCtrlOwners[KeyId]
+		if IsObject(ExpectedParent) && Owner.Parent != ExpectedParent
+			return true
+		_TH_AltGrLCtrlOwners.Delete(KeyId)
+	} finally Critical(PreviousCritical)
+	return TapHoldSyntheticKeyUp("LCtrl", Owner)
 }
 
 ; A key-down the hook passed to the system, seen by HookDispatcher: an AltGr

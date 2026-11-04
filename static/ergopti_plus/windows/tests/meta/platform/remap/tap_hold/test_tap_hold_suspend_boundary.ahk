@@ -212,8 +212,10 @@ _THSB_EverySyntheticDownCallerConsumesTheVerdict() {
 	while Found := RegExMatch(Src, Needle, &Match, Pos) {
 		Line := Match[0]
 		Pos := Found + Match.Len
-		if InStr(Line, "TapHoldSyntheticKeyDown(Key) {")
+		if RegExMatch(Line, "^\s*TapHoldSyntheticKeyDown\([^{}]*\)\s*\{")
 			continue
+		if RegExMatch(Line, "^\s*KeyDownFn\s*:=\s*\(Key\)\s*=>\s*TapHoldSyntheticKeyDown\(Key, Owner\)")
+			continue ; The unchanged verdict is consumed by the common owner below.
 		CallCount++
 		Assert(RegExMatch(Line, "i)^\s*if\b[^`r`n]*!\s*TapHoldSyntheticKeyDown\("),
 			"every synthetic Down caller must stop when ownership is not proven: " . Line)

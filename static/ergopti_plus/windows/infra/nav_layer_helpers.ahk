@@ -38,34 +38,45 @@
 ; hardcoded number on release, permanently clobbering the boot-time raise on
 ; every hold cycle.
 global NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL := 1000
+global _TH_LayerOwner := 0
 
-ActivateLayer() {
-	; A hold-layer KeyWait can outlive the hotkey that started it: Suspend only
-	; disarms future hotkeys, not an already-running pseudo-thread.  This is the
-	; common final activation boundary for every hold-layer variant, so reject a
-	; stale candidate here before mutating LayerEnabled or its tray indicator.
-	if A_IsSuspended {
-		try LoggerDebug("NavLayer", "Ignoring layer activation while the driver is suspended.")
-		return false
-	}
-	global LayerEnabled := True
-	; Bursts happen WHILE the layer is held active (rapid nav/scroll
-	; keystrokes fire back-to-back), so the ceiling must be RAISED on
-	; activation, not lowered.
-	A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
-	ResetNumberOfRepetitions()
+ActivateLayer(Owner := 0) {
+	global LayerEnabled, _TH_LayerOwner
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || (IsObject(Owner) && (!TapHoldOwnerCurrent(Owner) || Owner.Closed))
+			return false
+		LayerEnabled := true
+		_TH_LayerOwner := Owner
+		if IsObject(Owner)
+			Owner.Held := true
+		A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
+		ResetNumberOfRepetitions()
+	} finally Critical(PreviousCritical)
 	UpdateCapsLockLED()
-	return true
+	return LayerEnabled && !A_IsSuspended
+		&& (!IsObject(Owner) || (TapHoldOwnerCurrent(Owner) && _TH_LayerOwner == Owner))
 }
 
-DisableLayer() {
-	global LayerEnabled := False
-	; Restore the same raised ceiling nav_layer.ahk set at boot rather than a
-	; different hardcoded number — a burst can still be in flight at the exact
-	; moment the hold key is released (e.g. a trailing wheel event), and there
-	; is no separate "idle" ceiling single-sourced anywhere in this codebase.
-	A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
+DisableLayer(Owner := 0) {
+	global LayerEnabled, _TH_LayerOwner
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(Owner) {
+			if !TapHoldOwnerCurrent(Owner)
+				return false
+			if Owner.Closed
+				return Owner.ReleaseOk
+			if _TH_LayerOwner != Owner
+				return false
+			Owner.Held := false, Owner.Closed := true, Owner.ReleaseOk := true
+		}
+		LayerEnabled := false
+		_TH_LayerOwner := 0
+		A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
+	} finally Critical(PreviousCritical)
 	UpdateCapsLockLED()
+	return true
 }
 
 ; Publishes the layer's translated status through the tray presentation owner.
@@ -126,7 +137,12 @@ _TapHoldLayerIsSuspended() {
 ; @param KeyName {String} Key name the release wait watches.
 TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec, WaitReleaseFn := 0,
 	KeyIsDownFn := 0, TickNowFn := 0, ActivateFn := 0, DisableFn := 0,
-	IsSuspendedFn := 0) {
+	IsSuspendedFn := 0, Owner := 0) {
+	if !IsObject(Owner)
+		Owner := TapHoldNewOwner()
+	if !TapHoldOwnerCurrent(Owner)
+		return Map("activated", false, "tap", false, "elapsed_ms", 0)
+	DefaultDisable := !IsObject(DisableFn)
 	if !IsObject(WaitReleaseFn)
 		WaitReleaseFn := _TapHoldLayerWaitRelease
 	if !IsObject(KeyIsDownFn)
@@ -134,28 +150,32 @@ TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec, WaitReleaseFn := 0,
 	if !IsObject(TickNowFn)
 		TickNowFn := _TapHoldLayerTickNow
 	if !IsObject(ActivateFn)
-		ActivateFn := ActivateLayer
+		ActivateFn := () => ActivateLayer(Owner)
 	if !IsObject(DisableFn)
-		DisableFn := DisableLayer
+		DisableFn := () => DisableLayer(Owner)
 	if !IsObject(IsSuspendedFn)
 		IsSuspendedFn := _TapHoldLayerIsSuspended
 
 	_TapHoldClaimPress(KeyId)
 	try {
 		StartedAt := TickNowFn.Call()
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return Map("activated", false, "tap", false, "elapsed_ms", 0)
 		if !ActivateFn.Call()
 			return Map("activated", false, "tap", false, "elapsed_ms", 0)
 
-		Released := false
+		if !TapHoldOwnerCurrent(Owner)
+			return Map("activated", false, "tap", false, "elapsed_ms", 0)
+		Released := false, ReleaseProved := false
 		try {
 			loop {
-				if IsSuspendedFn.Call()
+				if !TapHoldOwnerCurrent(Owner) || IsSuspendedFn.Call()
 					break
 				if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
 					Released := true
 					break
 				}
-				if IsSuspendedFn.Call()
+				if !TapHoldOwnerCurrent(Owner) || IsSuspendedFn.Call()
 					break
 				if !KeyIsDownFn.Call(KeyName) {
 					Released := true
@@ -163,15 +183,18 @@ TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec, WaitReleaseFn := 0,
 				}
 			}
 		} finally {
-			DisableFn.Call()
+			if TapHoldOwnerCurrent(Owner) {
+				Disabled := DisableFn.Call()
+				ReleaseProved := !DefaultDisable || ((Disabled is Integer) && Disabled == 1)
+			}
 		}
 
 		ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
 		Suspended := IsSuspendedFn.Call()
 		return Map(
 			"activated", true,
-			"tap", Released and !Suspended
-				and ElapsedMs <= TapThresholdSec * 1000,
+			"tap", Released and ReleaseProved and !Suspended and !A_IsSuspended
+				and TapHoldOwnerCurrent(Owner) and ElapsedMs <= TapThresholdSec * 1000,
 			"elapsed_ms", ElapsedMs)
 	} finally {
 		_TapHoldEndPressClaim(KeyId)

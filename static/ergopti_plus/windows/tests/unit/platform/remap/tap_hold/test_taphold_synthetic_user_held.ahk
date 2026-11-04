@@ -21,28 +21,47 @@
 global _TSUH_Sent := []
 global _TSUH_Logical := Map()
 global _TSUH_Physical := Map()
+global _TSUH_OwnerState := 0
 
 _TSUH_Begin(Logical, Physical) {
-	global _AHK_SendInput, _TapHoldKeyIsDown, _TSUH_Sent, _TSUH_Logical, _TSUH_Physical
+	global _AHK_SendInput, _TapHoldKeyIsDown, _TSUH_Sent, _TSUH_Logical, _TSUH_Physical, _TSUH_OwnerState
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
-	_TSUH_Sent := []
-	_TSUH_Logical := Logical
-	_TSUH_Physical := Physical
-	_TH_SyntheticHeldKeys := Map()
-	_TH_SyntheticReleasePendingKeys := Map()
-	_TH_SyntheticUserHeldKeys := Map()
+	global _TH_OwnedModifiers, _TH_ModifierOwners, _TH_OwnedPresses, _TH_RetractedOwners, _TH_AltGrLCtrlOwners
+	global _TH_AltGrPresses, _TH_TabAltOwner, _TH_LayerOwner, LayerEnabled, NumberOfRepetitions
+	AssertFalse(IsObject(_TSUH_OwnerState), "A foreign synthetic-key fixture cannot be replaced")
+	AssertEqual(0, _TH_SyntheticHeldKeys.Count + _TH_SyntheticReleasePendingKeys.Count,
+		"A foreign native acquisition or release debt cannot be parked")
+	AssertEqual(0, _TH_ModifierOwners.Count + _TH_OwnedPresses.Count + _TH_AltGrLCtrlOwners.Count,
+		"A foreign live gesture cannot be parked across teardown")
+	AssertFalse(IsObject(_TH_LayerOwner) || IsObject(_TH_TabAltOwner))
+	_TSUH_OwnerState := {Send: _AHK_SendInput, KeyState: _TapHoldKeyIsDown,
+		Held: _TH_SyntheticHeldKeys, Pending: _TH_SyntheticReleasePendingKeys, User: _TH_SyntheticUserHeldKeys,
+		Names: _TH_OwnedModifiers, Owners: _TH_ModifierOwners, Presses: _TH_OwnedPresses,
+		Retracted: _TH_RetractedOwners, AltCtrl: _TH_AltGrLCtrlOwners, AltPress: _TH_AltGrPresses,
+		Tab: _TH_TabAltOwner, LayerOwner: _TH_LayerOwner, Layer: LayerEnabled, Repetitions: NumberOfRepetitions}
+	_TSUH_Sent := [], _TSUH_Logical := Logical, _TSUH_Physical := Physical
+	_TH_SyntheticHeldKeys := Map(), _TH_SyntheticReleasePendingKeys := Map(), _TH_SyntheticUserHeldKeys := Map()
+	_TH_OwnedModifiers := Map(), _TH_ModifierOwners := Map(), _TH_OwnedPresses := Map(), _TH_RetractedOwners := Map()
+	_TH_AltGrLCtrlOwners := Map(), _TH_AltGrPresses := Map(), _TH_TabAltOwner := 0, _TH_LayerOwner := 0
+	LayerEnabled := false, NumberOfRepetitions := 1
 	_AHK_SendInput := (Keys) => _TSUH_Sent.Push(Keys)
 	_TapHoldKeyIsDown := _TSUH_KeyIsDown
 }
 
 _TSUH_End() {
-	global _AHK_SendInput, _TapHoldKeyIsDown
+	global _AHK_SendInput, _TapHoldKeyIsDown, _TSUH_OwnerState
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
-	_AHK_SendInput := (Keys) => 0
-	_TapHoldKeyIsDown := (Name, Mode) => (Mode == "") ? GetKeyState(Name) : GetKeyState(Name, Mode)
-	_TH_SyntheticHeldKeys := Map()
-	_TH_SyntheticReleasePendingKeys := Map()
-	_TH_SyntheticUserHeldKeys := Map()
+	global _TH_OwnedModifiers, _TH_ModifierOwners, _TH_OwnedPresses, _TH_RetractedOwners, _TH_AltGrLCtrlOwners
+	global _TH_AltGrPresses, _TH_TabAltOwner, _TH_LayerOwner, LayerEnabled, NumberOfRepetitions
+	Saved := _TSUH_OwnerState
+	_AHK_SendInput := Saved.Send, _TapHoldKeyIsDown := Saved.KeyState
+	_TH_SyntheticHeldKeys := Saved.Held, _TH_SyntheticReleasePendingKeys := Saved.Pending, _TH_SyntheticUserHeldKeys := Saved.User
+	_TH_OwnedModifiers := Saved.Names, _TH_ModifierOwners := Saved.Owners, _TH_OwnedPresses := Saved.Presses
+	_TH_RetractedOwners := Saved.Retracted, _TH_AltGrLCtrlOwners := Saved.AltCtrl, _TH_AltGrPresses := Saved.AltPress
+	_TH_TabAltOwner := Saved.Tab, _TH_LayerOwner := Saved.LayerOwner
+	LayerEnabled := Saved.Layer, NumberOfRepetitions := Saved.Repetitions
+	; Epochs stay monotone. Preconditions above exclude any live foreign owner.
+	_TSUH_OwnerState := 0
 }
 
 _TSUH_KeyIsDown(Name, Mode) {
@@ -165,3 +184,134 @@ _TSUH_RetiredOwnerPreservesSuccessor() {
 }
 Test("taphold-synthetic: a retired modifier owner preserves a post-resume acquisition (synthetic-owner-epoch)",
 	_TSUH_RetiredOwnerPreservesSuccessor)
+
+_TSUH_OwnerReleaseIsOnce() {
+	global _TH_SyntheticHeldKeys
+	_TSUH_Begin(Map(), Map())
+	try {
+		A := TapHoldNewOwner(), B := TapHoldNewOwner()
+		AssertTrue(TapHoldSyntheticKeyDown("LCtrl", A))
+		AssertTrue(TapHoldSyntheticKeyDown("LCtrl", B))
+		AssertEqual(2, _TH_SyntheticHeldKeys["LCtrl"])
+		AssertTrue(TapHoldSyntheticKeyUp("LCtrl", A))
+		AssertTrue(TapHoldSyntheticKeyUp("LCtrl", A), "A repeated release must retain its acknowledged verdict")
+		AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"], "The same gesture cannot consume B's reference on a second terminal path")
+		AssertEqual(0, _TSUH_Count("{LCtrl Up}"))
+		AssertFalse(TapHoldSyntheticKeyDown("LCtrl", A), "A completed owner cannot acquire again")
+		AssertTrue(TapHoldSyntheticKeyUp("LCtrl", B))
+		AssertTrue(TapHoldSyntheticKeyUp("LCtrl", A))
+		AssertEqual(1, _TSUH_Count("{LCtrl Up}"), "Only B's final balancing release may reach the sender")
+		AssertEqual(0, _TH_SyntheticHeldKeys.Count)
+	} finally _TSUH_End()
+}
+Test("taphold-synthetic: repeated owner release preserves its receipt and peer reference (synthetic-owner-once)", _TSUH_OwnerReleaseIsOnce)
+
+_TSUH_RevokedBeforeDown() {
+	global _TH_SyntheticHeldKeys
+	_TSUH_Begin(Map(), Map())
+	WasSuspended := A_IsSuspended, Waits := 0
+	Now() {
+		Suspend(true)
+		try AssertTrue(TapHoldReleaseSyntheticKeys())
+		finally Suspend(false)
+		AssertTrue(TapHoldSyntheticKeyDown("LCtrl"))
+		return 1000
+	}
+	Wait(*) {
+		Waits += 1
+		return true
+	}
+	try {
+		Suspend(false)
+		Result := TapHoldOwnImmediateModifier("caps_lock", "CapsLock", "LCtrl", 0.2,
+			Wait, (*) => false, Now, 0, 0, (*) => "")
+		AssertFalse(Result["activated"])
+		AssertFalse(Result["tap"])
+		AssertEqual(0, Waits, "A producer revoked before Down must not start its release wait")
+		AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"], "Only the fresh B acquisition may remain")
+		AssertEqual(1, _TSUH_Count("{LCtrl Down}"))
+		AssertEqual(0, _TSUH_Count("{LCtrl Up}"), "The old frame must not release the fresh key on early refusal")
+		AssertFalse(TapHoldPressIsOwned("caps_lock"))
+		AssertTrue(TapHoldSyntheticKeyUp("LCtrl"))
+	} finally {
+		Suspend(WasSuspended)
+		_TSUH_End()
+	}
+}
+Test("taphold-synthetic: teardown before the first Down rejects the old producer (synthetic-owner-before-down)", _TSUH_RevokedBeforeDown)
+
+_TSUH_RetiredOwnerLeavesNewPhysicalKey() {
+	global _TSUH_Logical, _TSUH_Physical
+	_TSUH_Begin(Map(), Map())
+	WasSuspended := A_IsSuspended, Clock := 900
+	Wait(*) {
+		Suspend(true)
+		try AssertTrue(TapHoldReleaseSyntheticKeys())
+		finally Suspend(false)
+		; This is an explicit key-state observation port, not injected desktop input.
+		_TSUH_Logical["LCtrl"] := true, _TSUH_Physical["LCtrl"] := true
+		return true
+	}
+	try {
+		Suspend(false)
+		Result := TapHoldOwnImmediateModifier("caps_lock", "CapsLock", "LCtrl", 0.2,
+			Wait, (*) => false, (*) => (Clock += 100), 0, 0, (*) => "")
+		AssertFalse(Result["tap"])
+		AssertEqual(1, _TSUH_Count("{LCtrl Up}"),
+			"Only teardown may release A; an untracked old Up must never lift the newly delivered physical key")
+		AssertTrue(_TSUH_Logical.Has("LCtrl") && _TSUH_Physical.Has("LCtrl"))
+	} finally {
+		Suspend(WasSuspended)
+		_TSUH_End()
+	}
+}
+Test("taphold-synthetic: a revoked frame cannot release a new physical key observation (synthetic-owner-physical)", _TSUH_RetiredOwnerLeavesNewPhysicalKey)
+
+_TSUH_OwnerFailureRetainsDebt() {
+	global _AHK_SendInput, _TSUH_Sent, _TH_SyntheticReleasePendingKeys, _TH_SyntheticHeldKeys
+	_TSUH_Begin(Map(), Map())
+	FailUp(Keys) {
+		_TSUH_Sent.Push(Keys)
+		if InStr(Keys, " Up}")
+			throw Error("Controlled owner release refusal")
+	}
+	try {
+		A := TapHoldNewOwner(), B := TapHoldNewOwner()
+		AssertTrue(TapHoldSyntheticKeyDown("LCtrl", A))
+		_AHK_SendInput := FailUp
+		AssertFalse(TapHoldSyntheticKeyUp("LCtrl", A))
+		AssertTrue(_TH_SyntheticReleasePendingKeys.Has("LCtrl"), "A consumed reference must transfer its unproved native Up to the actual debt ledger")
+		_AHK_SendInput := (Keys) => _TSUH_Sent.Push(Keys)
+		AssertTrue(TapHoldSyntheticKeyDown("LCtrl", B), "B must repair the native debt before acquiring the key")
+		AssertFalse(_TH_SyntheticReleasePendingKeys.Has("LCtrl"))
+		Before := _TSUH_Count("{LCtrl Up}")
+		AssertFalse(TapHoldSyntheticKeyUp("LCtrl", A), "A repeated refused receipt must not fabricate success or consume B")
+		AssertEqual(Before, _TSUH_Count("{LCtrl Up}"))
+		AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"])
+		AssertTrue(TapHoldSyntheticKeyUp("LCtrl", B))
+		AssertEqual(Before + 1, _TSUH_Count("{LCtrl Up}"))
+	} finally _TSUH_End()
+}
+Test("taphold-synthetic: consumed owner release retains native debt without consuming its successor (synthetic-owner-debt)", _TSUH_OwnerFailureRetainsDebt)
+
+_TSUH_TabFallbackAndFinallyShareReceipt() {
+	global _TH_TabAltOwner, _TH_SyntheticHeldKeys
+	_TSUH_Begin(Map(), Map())
+	Saved := _TH_TabAltOwner
+	try {
+		A := TapHoldNewOwner(), B := TapHoldNewOwner()
+		_TH_TabAltOwner := A
+		AssertTrue(TapHoldSyntheticKeyDown("LAlt", A))
+		AssertTrue(TapHoldSyntheticKeyDown("LAlt", B))
+		AssertTrue(_TapHoldReleaseTabAltOwner(), "The actual static Up fallback must acknowledge A")
+		AssertTrue(_TapHoldReleaseOwnedModifier("LAlt", A), "The waiting frame must read the same acknowledged receipt")
+		AssertEqual(1, _TH_SyntheticHeldKeys["LAlt"])
+		AssertEqual(0, _TSUH_Count("{LAlt Up}"), "The two terminal paths must leave B's Alt held")
+		AssertTrue(_TapHoldReleaseOwnedModifier("LAlt", B))
+		AssertEqual(1, _TSUH_Count("{LAlt Up}"))
+	} finally {
+		_TH_TabAltOwner := Saved
+		_TSUH_End()
+	}
+}
+Test("taphold-synthetic: Tab Up and its waiting frame share one acknowledged release (synthetic-owner-tab)", _TSUH_TabFallbackAndFinallyShareReceipt)

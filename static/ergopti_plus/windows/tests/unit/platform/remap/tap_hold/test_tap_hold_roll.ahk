@@ -318,12 +318,12 @@ Test("tap-hold roll: the six typing keys own their hold through the roll owner (
 ; nothing that captures or waits unbounded.
 _THR_HoldStaysTheSharedOwners() {
 	Modifier := _DriverFuncBody("TapHoldOwnHoldModifier")
-	Assert(InStr(Modifier, "return TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec)") > 0,
+	Assert(InStr(Modifier, "return TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,") > 0,
 		"a key that is not a typing key takes its modifier at key-down through the shared owner")
 	Assert(InStr(_DriverFuncBody("_TapHoldRollOwnModifier"), "TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,") > 0,
 		"a decided typing key hands its modifier to the same shared owner")
 	Layer := _DriverFuncBody("TapHoldOwnHoldLayer")
-	Assert(InStr(Layer, "return TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec)") > 0,
+	Assert(InStr(Layer, "return TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec,") > 0,
 		"a key that is not a typing key enters the layer at key-down through the shared owner")
 	Assert(InStr(_DriverFuncBody("_TapHoldRollOwnLayer"), "TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec,") > 0,
 		"a decided typing key hands the layer to the same shared owner")
@@ -428,3 +428,72 @@ _THR_PauseBetweenReplayedKeys() {
 }
 Test("tap-hold roll: pause during replay cancels the remaining keys (tap-hold-roll-pause)",
 	_THR_PauseBetweenReplayedKeys)
+
+_THR_RetiredDecisionEmitsNothing() {
+	_TSUH_Begin(Map(), Map())
+	Paused := A_IsSuspended
+	Replace(W) {
+		Suspend(true)
+		try AssertTrue(TapHoldReleaseSyntheticKeys())
+		finally Suspend(false)
+	}
+	try {
+		Suspend(false)
+		World := _THR_World()
+		Result := _THR_Run(World, Replace, false)
+		AssertEqual("", World.Joined(), "A revoked undecided gesture must neither tap, acquire nor replay after resume")
+		AssertFalse(Result["activated"])
+		AssertFalse(Result["tap"])
+		AssertFalse(TapHoldRollUndecided(), "A revoked criterion must never intercept fresh typing")
+		AssertFalse(TapHoldPressIsOwned("space"))
+	} finally {
+		Suspend(Paused)
+		_TSUH_End()
+	}
+}
+Test("tap-hold roll: teardown during the wait cannot acquire after resume (synthetic-owner-roll)", _THR_RetiredDecisionEmitsNothing)
+
+_THR_ReplayRetiresAcrossPauseResume() {
+	_TSUH_Begin(Map(), Map())
+	Paused := A_IsSuspended, Sent := []
+	Send(Payload) {
+		Sent.Push(Payload)
+		Suspend(true)
+		try AssertTrue(TapHoldReleaseSyntheticKeys())
+		finally Suspend(false)
+	}
+	try {
+		Suspend(false)
+		_TapHoldRollReplay([0x10, 0x11], Send)
+		AssertEqual(1, Sent.Length, "The admitted first key must not authorize another replay key after teardown and resume")
+		AssertContains(Sent[1], "SC010")
+	} finally {
+		Suspend(Paused)
+		_TSUH_End()
+	}
+}
+Test("tap-hold roll: a replay callout cannot continue after pause and resume (synthetic-owner-roll)", _THR_ReplayRetiresAcrossPauseResume)
+
+_THR_ExpiredModifierCannotAdoptSuccessor() {
+	global _TH_SyntheticHeldKeys, _TH_OwnedModifiers
+	_TSUH_Begin(Map(), Map())
+	Paused := A_IsSuspended
+	try {
+		Suspend(false)
+		A := TapHoldNewOwner(), A.KeyId := "space"
+		Suspend(true)
+		try AssertTrue(TapHoldReleaseSyntheticKeys())
+		finally Suspend(false)
+		B := TapHoldNewOwner()
+		AssertTrue(TapHoldSyntheticKeyDown("LCtrl", B))
+		AssertFalse(_TapHoldRollPressModifier("space", "LCtrl", A), "The roll must retain its pre-wait authority instead of adopting B's generation")
+		AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"])
+		AssertFalse(_TH_OwnedModifiers.Has("space"))
+		AssertEqual(1, _TSUH_Count("{LCtrl Down}"))
+		AssertTrue(TapHoldSyntheticKeyUp("LCtrl", B))
+	} finally {
+		Suspend(Paused)
+		_TSUH_End()
+	}
+}
+Test("tap-hold roll: a revoked modifier press cannot adopt a fresh acquisition (synthetic-owner-roll)", _THR_ExpiredModifierCannotAdoptSuccessor)
