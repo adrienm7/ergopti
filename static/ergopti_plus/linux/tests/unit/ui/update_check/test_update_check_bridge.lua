@@ -45,7 +45,11 @@ local function load_bridge(answer)
 	Installation.is_source_run = function() return context.source_run end
 	package.loaded["ui.update_check.bridge"] = nil
 	package.loaded["ui.webview_manager"] = {
-		show = function(app) context.shown[#context.shown + 1] = app; return true end,
+		show = function(app)
+			context.shown[#context.shown + 1] = app
+			if context.on_show then return context.on_show(app) end
+			return true
+		end,
 		hide = function() context.hidden = context.hidden + 1; return true end,
 		eval_js = function(app, js)
 			local payload = js:match("receiveUpdateCheck%((.*)%)$")
@@ -127,6 +131,23 @@ end
 local function last(context) return context.pushed[#context.pushed].message end
 
 helpers.describe("update-check window bridge (Linux)", function()
+	for _, old_result in ipairs({ false, true }) do
+		helpers.it("(update-check-open-owner) old opening preserves replacement when result is " .. tostring(old_result), function()
+		scenario(available, function(bridge, context)
+			context.on_show = function()
+				context.on_show = nil
+				bridge.on_window_closed()
+				helpers.assert_true(bridge.open(context.ctx))
+				return old_result
+			end
+			helpers.assert_eq(bridge.open(context.ctx), false)
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "the replacement still answers")
+		end)
+		end)
+	end
+
 	for _, kind in ipairs({ "fifo", "regular" }) do
 		helpers.it("(update-log-fifo) inspects " .. kind .. " logs without blocking", function()
 			if package.config:sub(1, 1) == "\\" then return end
