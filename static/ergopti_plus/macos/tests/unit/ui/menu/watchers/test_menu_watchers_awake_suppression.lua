@@ -175,11 +175,11 @@ local function with_menu(body)
 							return native
 						end,
 					}
-					host.execute = function(command)
-						assert(command == "open /virtual/init.lua" or command == "open /virtual/config.toml",
+					package.loaded["adapters.shell_runner"].open = function(path)
+						assert(path == "/virtual/init.lua" or path == "/virtual/config.toml",
 							"only the actual deferred file-open commands may cross this boundary")
-						world.opened[#world.opened + 1] = command
-						return "", true, "exit", 0
+						world.opened[#world.opened + 1] = path
+						return world.launch_accepts ~= false
 					end
 					host.pathwatcher = { new = function(path, callback)
 						local watcher = { path = path, fn = callback, active = false, stops = 0 }
@@ -340,6 +340,18 @@ end
 
 
 helpers.describe("actual menu producers and watcher share one awake suppression domain", function()
+	helpers.it("opens menu files through the asynchronous launcher and propagates refusal", function()
+		with_menu(function(world)
+			local actions = world.fixture.global_actions()
+			for _, name in ipairs({ "open_script_source", "open_personal_hotstrings", "open_personal_info", "open_config" }) do
+				helpers.assert_true(actions[name]())
+			end
+			helpers.assert_eq(world.opened, { "/virtual/init.lua", "/virtual/config.toml",
+				"/virtual/config.toml", "/virtual/config.toml" })
+			world.launch_accepts = false
+			helpers.assert_eq(actions.open_config(), false)
+		end)
+	end)
 	for _, producer in ipairs({ "boot", "open_init", "open_config" }) do
 		local boundary = producer == "boot" and 5 or 8
 		helpers.it(producer .. " suppresses an edit inside its healthy window", function()

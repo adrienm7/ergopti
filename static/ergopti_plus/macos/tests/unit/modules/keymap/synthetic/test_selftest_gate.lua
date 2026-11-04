@@ -30,6 +30,8 @@ local function with_gate(world, body)
 		package.loaded["infra.logger"] = logger
 		package.loaded["adapters.synthetic_input"] = {
 			defer_after_callback = function(_, fn)
+				if world.refuse_defer == "raise" then error("scheduler failed") end
+				if world.refuse_defer then return false end
 				log.deferred[#log.deferred + 1] = fn
 				return true
 			end,
@@ -132,6 +134,20 @@ helpers.describe("keymap selftest gate", function()
 			Gate.admits(selftest_key())
 			helpers.assert_eq(#log.deferred, 2, "the next run logs its own first refusal")
 		end)
+	end)
+
+	helpers.it("retries the refusal diagnostic when deferral is refused (selftest-gate-defer-retry)", function()
+		for _, refusal in ipairs({ true, "raise" }) do
+			local world = { dev = true, focused = 7, refuse_defer = refusal }
+			with_gate(world, function(Gate, Publisher, log)
+				Publisher.publish(SCRATCH_WINDOW)
+				helpers.assert_eq(select(2, Gate.admits(selftest_key())), "other_window")
+				helpers.assert_eq(#log.deferred, 0)
+				world.refuse_defer = false
+				helpers.assert_eq(select(2, Gate.admits(selftest_key())), "other_window")
+				helpers.assert_eq(#log.deferred, 1, "an unqueued diagnostic must not consume the one log")
+			end)
+		end
 	end)
 
 	helpers.it("the publisher keeps one owner and refuses a stale retraction", function()
