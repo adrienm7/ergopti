@@ -4,8 +4,8 @@
 ; MODULE: Windows Registry Abstraction Tests
 ; DESCRIPTION:
 ; Unit-tests for the fail-safe wrapper functions in infra/registry.ahk.
-; Tests use well-known read-only system keys that exist on every Windows
-; installation, so no writes are needed and the suite is safe on any CI runner.
+; System reads use well-known keys. Binary round-trips own a unique HKCU test
+; key, removed in finally, and never modify any installed application state.
 ; ==============================================================================
 
 
@@ -153,3 +153,29 @@ _Reg_EnumSubKeysMissingKey() {
 	AssertEqual(0, Results.Length)
 }
 Test("Reg_EnumSubKeys: missing key returns empty array", _Reg_EnumSubKeysMissingKey)
+
+
+_Reg_BinaryBufferRoundtrip() {
+	Path := "HKCU\Software\ErgoptiTests\Binary_" . ProcessExist() . "_" . A_TickCount . "_" . Random(1000, 9999)
+	try {
+		RegWrite("00A9FF77", "REG_BINARY", Path, "native")
+		Read := Reg_ReadBinary(Path, "native")
+		AssertTrue(Read is Buffer, "the adapter exposes bytes, not native hexadecimal text")
+		AssertEqual(4, Read.Size)
+		Expected := [0, 0xA9, 0xFF, 0x77]
+		for Index, Value in Expected
+			AssertEqual(Value, NumGet(Read, Index - 1, "UChar"))
+		AssertTrue(Reg_WriteBinary(Path, "roundtrip", Read))
+		AssertEqual("00A9FF77", RegRead(Path, "roundtrip"), "native reading independently verifies encoded bytes")
+		AssertTrue(Reg_WriteBinary(Path, "empty", Buffer(0)))
+		AssertEqual("", RegRead(Path, "empty"))
+		AssertEqual(0, Reg_ReadBinary(Path, "missing").Size)
+		RegWrite(42, "REG_DWORD", Path, "number")
+		AssertEqual(0, Reg_ReadBinary(Path, "number").Size, "a numeric registry value is not binary text")
+		AssertFalse(Reg_WriteBinary(Path, "bad", "00AA"), "the adapter rejects a string where bytes are required")
+	} finally {
+		if Reg_KeyExists(Path)
+			RegDeleteKey(Path)
+	}
+}
+Test("registry: binary values round-trip Buffers (registry-binary-buffer-contract)", _Reg_BinaryBufferRoundtrip)

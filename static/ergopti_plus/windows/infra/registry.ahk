@@ -108,7 +108,13 @@ Reg_ReadDword(keyPath, valueName, fallback := 0) {
 Reg_ReadBinary(keyPath, valueName) {
 	try {
 		val := RegRead(keyPath, valueName)
-		return val
+		; AutoHotkey represents REG_BINARY as hexadecimal text at its native API.
+		if !(val is String) || Mod(StrLen(val), 2) || !RegExMatch(val, "i)^[0-9a-f]*\z")
+			throw TypeError("Registry binary data must be hexadecimal text.")
+		Bytes := Buffer(StrLen(val) // 2, 0)
+		Loop Bytes.Size
+			NumPut("UChar", Integer("0x" . SubStr(val, 2 * A_Index - 1, 2)), Bytes, A_Index - 1)
+		return Bytes
 	} catch as e {
 		LoggerDebug("registry", "Reg_ReadBinary failed — {1}\{2}: {3}", keyPath, valueName, e.Message)
 		return Buffer(0)
@@ -191,7 +197,12 @@ Reg_WriteExpandString(keyPath, valueName, value) {
 ; Returns boolean - True on success, false on error.
 Reg_WriteBinary(keyPath, valueName, buf) {
 	try {
-		RegWrite(buf, "REG_BINARY", keyPath, valueName)
+		if !(buf is Buffer)
+			throw TypeError("Registry binary writes require a Buffer.")
+		Hex := ""
+		Loop buf.Size
+			Hex .= Format("{:02X}", NumGet(buf, A_Index - 1, "UChar"))
+		RegWrite(Hex, "REG_BINARY", keyPath, valueName)
 		LoggerDebug("registry", "Reg_WriteBinary: {1}\{2} ({3} bytes).", keyPath, valueName, buf.Size)
 		return true
 	} catch as e {
