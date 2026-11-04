@@ -940,24 +940,25 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 
 These are native key identities, not missing-capability claims: Command/Option and Win/AltGr differ between keyboards. Hold-action picker contents are reviewed separately in the platform parity audit.
 
-| Key                    | Windows     | macOS               | Linux       |
-| ---------------------- | ----------- | ------------------- | ----------- |
-| tap_hold.escape        | escape      | escape              | escape      |
-| tap_hold.tab           | tab         | tab                 | tab         |
-| tap_hold.caps_lock     | caps_lock   | caps_lock           | caps_lock   |
-| tap_hold.left_shift    | left_shift  | left_shift          | left_shift  |
-| tap_hold.fn            | —           | fn                  | —           |
-| tap_hold.left_ctrl     | left_ctrl   | left_control        | left_ctrl   |
-| tap_hold.win           | win         | —                   | win         |
-| tap_hold.left_option   | —           | left_option         | —           |
-| tap_hold.left_alt      | left_alt    | —                   | left_alt    |
-| tap_hold.left_command  | —           | left_command        | —           |
-| tap_hold.space         | space       | spacebar            | space       |
-| tap_hold.alt_gr        | alt_gr      | —                   | alt_gr      |
-| tap_hold.right_command | —           | right_command       | —           |
-| tap_hold.right_option  | —           | right_option        | —           |
-| tap_hold.right_ctrl    | right_ctrl  | —                   | right_ctrl  |
-| tap_hold.right_shift   | right_shift | right_shift         | right_shift |
-| tap_hold.enter         | enter       | return_or_enter     | enter       |
-| tap_hold.backspace     | backspace   | delete_or_backspace | backspace   |
-| tap_hold.delete        | delete      | —                   | delete      |
+| Key | Windows | macOS | Linux |
+| --- | --- | --- | --- |
+| tap_hold.escape | escape | escape | escape |
+| tap_hold.tab | tab | tab | tab |
+| tap_hold.caps_lock | caps_lock | caps_lock | caps_lock |
+| tap_hold.left_shift | left_shift | left_shift | left_shift |
+| tap_hold.fn | — | fn | — |
+| tap_hold.left_ctrl | left_ctrl | left_control | left_ctrl |
+| tap_hold.win | win | — | win |
+| tap_hold.left_option | — | left_option | — |
+| tap_hold.left_alt | left_alt | — | left_alt |
+| tap_hold.left_command | — | left_command | — |
+| tap_hold.space | space | spacebar | space |
+| tap_hold.alt_gr | alt_gr | — | alt_gr |
+| tap_hold.right_command | — | right_command | — |
+| tap_hold.right_option | — | right_option | — |
+| tap_hold.right_ctrl | right_ctrl | — | right_ctrl |
+| tap_hold.right_shift | right_shift | right_shift | right_shift |
+| tap_hold.enter | enter | return_or_enter | enter |
+| tap_hold.backspace | backspace | delete_or_backspace | backspace |
+| tap_hold.delete | delete | — | delete |
+

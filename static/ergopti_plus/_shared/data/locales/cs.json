@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Klepnutí-přidržení pozastaveno: povolte ovladač virtuální klávesnice Karabiner v Nastavení systému",
 	"menu.tapholds.vhid_update": "Aktualizovat ovladač Karabiner pro Ergopti…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-holdy jsou vypnuté: přemapovací jádro Ergopti zatím není na tomto Macu nainstalováno",
-	"menu.tapholds.owned_install": "Nainstalovat přemapovací jádro Ergopti…",
+	"menu.tapholds.owned_install": "Zkusit znovu nainstalovat přemapovací jádro Ergopti…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holdy jsou vypnuté: běží jiný Karabiner; zaškrtněte řádek níže nebo ho ukončete",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holdy jsou vypnuté: váš Karabiner-Elements nešlo zavřít; ukončete ho z jeho ikony na řádku nabídek",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holdy jsou vypnuté: přemapovací jádro Ergopti nešlo stáhnout; zkontrolujte připojení a znovu načtěte Ergopti",

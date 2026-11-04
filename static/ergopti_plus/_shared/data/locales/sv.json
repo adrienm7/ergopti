@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds är pausade: tillåt Karabiners virtuella tangentbordsdrivrutin i Systeminställningar",
 	"menu.tapholds.vhid_update": "Uppdatera Karabiner-drivrutinen för Ergopti…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-holds är av: Ergoptis tangentomläggningsmotor är inte installerad på den här Macen än",
-	"menu.tapholds.owned_install": "Installera Ergoptis ommappningsmotor…",
+	"menu.tapholds.owned_install": "Försök installera Ergoptis ommappningsmotor igen…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holds är av: en annan Karabiner körs; markera raden nedan eller avsluta den",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holds är av: din Karabiner-Elements kunde inte stängas; avsluta den från dess symbol i menyraden",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holds är av: Ergoptis tangentomläggningsmotor kunde inte hämtas; kontrollera anslutningen och läs in Ergopti igen",

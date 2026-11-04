@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds em pausa: permita o driver de teclado virtual do Karabiner nos Ajustes do Sistema",
 	"menu.tapholds.vhid_update": "Atualizar o driver do Karabiner para o Ergopti…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-holds desativados: o motor de remapeamento do Ergopti ainda não está instalado neste Mac",
-	"menu.tapholds.owned_install": "Instalar o motor de remapeamento do Ergopti…",
+	"menu.tapholds.owned_install": "Tentar de novo instalar o motor de remapeamento do Ergopti…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holds desativados: outro Karabiner está em execução; marque a linha abaixo ou feche-o",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holds desativados: não foi possível fechar o seu Karabiner-Elements; feche-o pelo ícone na barra de menus",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holds desativados: não foi possível transferir o motor de remapeamento do Ergopti; verifique a ligação e recarregue o Ergopti",

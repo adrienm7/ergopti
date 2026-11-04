@@ -503,8 +503,8 @@
 		"path": "tap_hold_owned_install_rows.tap_hold_owned_install",
 		"visibility": "hide",
 		"labels": {
-			"fr": "Installer le moteur de remappage d’Ergopti…",
-			"en": "Install Ergopti’s remapping engine…"
+			"fr": "Réessayer l’installation du moteur de remappage d’Ergopti…",
+			"en": "Retry installing Ergopti’s remapping engine…"
 		},
 		"platforms": { "windows": false, "macos": true, "linux": false },
 		"reasons": { "windows": { "en": "", "fr": "" }, "linux": { "en": "", "fr": "" } }

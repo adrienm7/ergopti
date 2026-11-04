@@ -2193,7 +2193,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds are off: allow the Karabiner virtual keyboard driver in System Settings",
 	"menu.tapholds.vhid_update": "Update the Karabiner driver for Ergopti…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-holds are off: Ergopti’s remapping engine is not installed on this Mac yet",
-	"menu.tapholds.owned_install": "Install Ergopti’s remapping engine…",
+	"menu.tapholds.owned_install": "Retry installing Ergopti’s remapping engine…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holds are off: another Karabiner is running; tick the row below or quit it",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holds are off: your Karabiner-Elements could not be closed; quit it from its menu bar icon",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holds are off: Ergopti’s remapping engine could not be downloaded; check the connection, then reload Ergopti",

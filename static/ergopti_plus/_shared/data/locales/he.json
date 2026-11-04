@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds מושהים: אשר את מנהל ההתקן של המקלדת הווירטואלית של Karabiner בהגדרות המערכת",
 	"menu.tapholds.vhid_update": "עדכון מנהל ההתקן של Karabiner עבור Ergopti…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-holds כבויים: מנוע מיפוי המקשים של Ergopti עדיין לא מותקן ב-Mac הזה",
-	"menu.tapholds.owned_install": "התקנת מנוע המיפוי של Ergopti…",
+	"menu.tapholds.owned_install": "ניסיון חוזר להתקנת מנוע המיפוי של Ergopti…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holds כבויים: Karabiner אחר פועל; סמנו את השורה שלמטה או סגרו אותו",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holds כבויים: לא ניתן היה לסגור את Karabiner-Elements שלכם; סגרו אותו מהסמל שלו בשורת התפריטים",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holds כבויים: לא ניתן היה להוריד את מנוע מיפוי המקשים של Ergopti; בדקו את החיבור וטענו מחדש את Ergopti",

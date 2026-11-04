@@ -107,6 +107,34 @@ helpers.describe("owned runtime ports", function()
 		helpers.assert_eq(#shown, 2)
 	end)
 
+	helpers.it("offers the first install once by itself and leaves other blocks to the notice", function()
+		-- WP8: a missing runtime waited for the user to find a submenu row.
+		load_ports(function() return 0, "" end)
+		local Ports = package.loaded["adapters.runtime_owner_ports"]
+		local saved = {}
+		for _, name in ipairs({ "platform.remap", "infra.deferred_work", "ui.owned_runtime_install" }) do
+			saved[name] = package.loaded[name]
+		end
+		local offers, deferred, shown = 0, {}, {}
+		package.loaded["platform.remap"] = { OWNED_INSTALL_REASONS = { runtime_not_installed = true } }
+		package.loaded["infra.deferred_work"] = { after = function(_, fn) deferred[#deferred + 1] = fn; return true end }
+		package.loaded["ui.owned_runtime_install"] = { open = function() offers = offers + 1; return true end }
+		local ok, failure = pcall(function()
+			local observe = Ports.automatic_observer(function(text) shown[#shown + 1] = text end)
+			observe("unavailable", "runtime_not_installed")
+			helpers.assert_eq(#deferred, 1, "the offer waits for the scheduler, never inside the observer")
+			helpers.assert_eq(offers, 0)
+			deferred[1]()
+			helpers.assert_eq(offers, 1)
+			helpers.assert_eq(#shown, 0, "the offer is the notice")
+			observe("unavailable", "runtime_not_installed")
+			helpers.assert_eq(#deferred, 1, "one offer per launch")
+			helpers.assert_eq(shown, { "notify.karabiner.owned_blocked" })
+		end)
+		for name, value in pairs(saved) do package.loaded[name] = value end
+		assert(ok, failure)
+	end)
+
 	helpers.it("hands the owner the shipped pin: the driver version and the capture declaration", function()
 		local ports = load_ports(function() return 0, "" end)
 		local pinned, reason = ports.artifact.pinned()

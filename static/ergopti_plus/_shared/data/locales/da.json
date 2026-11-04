@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds er sat på pause: tillad Karabiners virtuelle tastaturdriver i Systemindstillinger",
 	"menu.tapholds.vhid_update": "Opdater Karabiner-driveren til Ergopti…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-holds er slået fra: Ergoptis tastaturomlægningsmotor er endnu ikke installeret på denne Mac",
-	"menu.tapholds.owned_install": "Installer Ergoptis omtildelingsmotor…",
+	"menu.tapholds.owned_install": "Prøv at installere Ergoptis omtildelingsmotor igen…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holds er slået fra: en anden Karabiner kører; sæt flueben i rækken nedenfor eller luk den",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holds er slået fra: din Karabiner-Elements kunne ikke lukkes; luk den fra dens ikon i menulinjen",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holds er slået fra: Ergoptis tastaturomlægningsmotor kunne ikke hentes; tjek forbindelsen, og genindlæs Ergopti",

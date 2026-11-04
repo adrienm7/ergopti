@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ 点按/长按已暂停：请在系统设置中允许 Karabiner 虚拟键盘驱动",
 	"menu.tapholds.vhid_update": "为 Ergopti 更新 Karabiner 驱动…",
 	"menu.tapholds.owned_not_installed": "⚠️ 点按-按住已关闭：此 Mac 尚未安装 Ergopti 的按键重映射引擎",
-	"menu.tapholds.owned_install": "安装 Ergopti 的重映射引擎…",
+	"menu.tapholds.owned_install": "重试安装 Ergopti 的重映射引擎…",
 	"menu.tapholds.owned_other_running": "⚠️ 点按-按住已关闭：另一个 Karabiner 正在运行；请勾选下方一行或退出它",
 	"menu.tapholds.owned_close_failed": "⚠️ 点按-按住已关闭：无法关闭你的 Karabiner-Elements；请从其菜单栏图标退出",
 	"menu.tapholds.owned_fetch_failed": "⚠️ 点按-按住已关闭：无法下载 Ergopti 的按键重映射引擎；请检查网络连接，然后重新载入 Ergopti",

@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ タップホールドは一時停止中：システム設定で Karabiner の仮想キーボードドライバを許可してください",
 	"menu.tapholds.vhid_update": "Ergopti 用に Karabiner ドライバを更新…",
 	"menu.tapholds.owned_not_installed": "⚠️ タップホールドはオフです：Ergopti のキー割り当てエンジンがこの Mac にまだインストールされていません",
-	"menu.tapholds.owned_install": "Ergopti のリマップエンジンをインストール…",
+	"menu.tapholds.owned_install": "Ergopti のリマップエンジンのインストールを再試行…",
 	"menu.tapholds.owned_other_running": "⚠️ タップホールドはオフです：別の Karabiner が動作中です。下の行にチェックを入れるか、終了してください",
 	"menu.tapholds.owned_close_failed": "⚠️ タップホールドはオフです：Karabiner-Elements を終了できませんでした。メニューバーのアイコンから終了してください",
 	"menu.tapholds.owned_fetch_failed": "⚠️ タップホールドはオフです：Ergopti のキー割り当てエンジンをダウンロードできませんでした。接続を確認してから Ergopti を再読み込みしてください",

@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ نقر-ضغط متوقف: اسمح بتعريف لوحة المفاتيح الافتراضية لـ Karabiner في إعدادات النظام",
 	"menu.tapholds.vhid_update": "تحديث برنامج تشغيل Karabiner لـ Ergopti…",
 	"menu.tapholds.owned_not_installed": "⚠️ النقر المطوّل متوقف: محرّك إعادة تعيين المفاتيح في Ergopti غير مثبّت على هذا الـ Mac بعد",
-	"menu.tapholds.owned_install": "تثبيت محرك إعادة التعيين الخاص بـ Ergopti…",
+	"menu.tapholds.owned_install": "إعادة محاولة تثبيت محرك إعادة التعيين الخاص بـ Ergopti…",
 	"menu.tapholds.owned_other_running": "⚠️ النقر المطوّل متوقف: يعمل Karabiner آخر؛ فعّل السطر أدناه أو أغلقه",
 	"menu.tapholds.owned_close_failed": "⚠️ النقر المطوّل متوقف: تعذّر إغلاق Karabiner-Elements الخاص بك؛ أغلقه من أيقونته في شريط القوائم",
 	"menu.tapholds.owned_fetch_failed": "⚠️ النقر المطوّل متوقف: تعذّر تنزيل محرّك إعادة تعيين المفاتيح في Ergopti؛ تحقّق من الاتصال ثم أعد تحميل Ergopti",
