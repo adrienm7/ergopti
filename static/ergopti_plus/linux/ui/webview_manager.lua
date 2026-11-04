@@ -865,7 +865,7 @@ function M.route_message(app_name, bridge_name, payload, source_epoch)
 	end
 	local ok, result = pcall(handler.on_message, payload, _daemon_state, context)
 	if not ok then
-		Logger.error(LOG, "Bridge '%s' handler error: %s", bridge_name, tostring(result))
+		Logger.error(LOG, "Bridge '%s' handler raised; details withheld.", bridge_name)
 		return nil
 	end
 

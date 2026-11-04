@@ -149,6 +149,21 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("personal_info_editor_bridge", function()
     local handler = helpers.load_module("ui.personal_info_editor.bridge")
 
+		helpers.it("(personal-save-private-error) never logs a persistence exception containing a field", function()
+			local logger, lines = require("logger.shim"), {}
+			local original = logger.error
+			logger.error = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
+			local ok, err = pcall(function()
+				local result = handler.on_message({ action = "save", values = { first_name = "secret-canary" } }, {
+					dyn_hotstrings = { save_info = function(values) error("write failed: " .. values.first_name) end },
+				})
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_true(not table.concat(lines, "\n"):find("secret-canary", 1, true))
+			end)
+			logger.error = original
+			if not ok then error(err, 0) end
+		end)
+
     local function personal_state(save_result, reload_result)
       local captured = { close_count = 0, reload_count = 0 }
       local state = build_mock_state()
