@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/install/desktop_entry.sh"
 # Load the complete catalogue before uninstallation retires its owned files.
 source "$SCRIPT_DIR/install/messages.sh"
-PREFIX="${HOME}/.local"
+PREFIX="${HOME:+${HOME}/.local}"
 source "$SCRIPT_DIR/install/config_home.sh"
 ergopti_resolve_config_home CONFIG_ROOT
 PACKAGE_NAME=ergopti
@@ -453,7 +453,7 @@ fi
 # A terminal-launched daemon is not owned by systemd. Hold the same singleton
 # lock as every Linux entry point until removal finishes, so its live files are
 # never unlinked and a new session cannot start midway through removal.
-lock_root="${XDG_RUNTIME_DIR:-$HOME/.cache}"
+lock_root="${XDG_RUNTIME_DIR:-${HOME:+$HOME/.cache}}"
 case "$lock_root" in /*) ;; *) uninstall_record invalid-source lock "$lock_root"; exit 1 ;; esac
 lock_root="$lock_root/ergopti"
 install -d -m 700 "$lock_root"

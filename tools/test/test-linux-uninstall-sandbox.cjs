@@ -132,6 +132,75 @@ try {
 	);
 	const ownershipPath = path.join(library, '.ergopti-owned-files');
 	const validOwnership = fs.readFileSync(ownershipPath, 'utf8');
+	{
+		const noHome = spawnSync(
+			bashExecutable(),
+			[bashPath(script), '--prefix', bashPath(prefix), '--check'],
+			{
+				encoding: 'utf8',
+				timeout: 15000,
+				env: {
+					PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
+					XDG_CONFIG_HOME: bashPath(path.join(home, '.config'))
+				}
+			}
+		);
+		assert.equal(noHome.status, 0, `explicit prefix without HOME: ${noHome.stderr}`);
+		if (process.platform === 'linux') {
+			const otherPrefix = path.join(sandbox, 'no-home-prefix');
+			const otherLibrary = path.join(otherPrefix, 'lib/ergopti');
+			const otherWrapper = path.join(otherPrefix, 'bin/ergopti-hotstrings');
+			const driver = path.join(otherLibrary, 'linux/ergopti_hotstrings.lua');
+			const locale = path.join(otherLibrary, '_shared/data/locales/en.json');
+			for (const file of [driver, locale, otherWrapper])
+				fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(driver, 'driver');
+			fs.writeFileSync(locale, 'locale');
+			fs.writeFileSync(
+				otherWrapper,
+				`DRIVER_ROOT="${otherLibrary}/linux"\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
+			);
+			const row = (file, relative) =>
+				`${createHash('sha256').update(fs.readFileSync(file)).digest('hex')}\t${relative}\n`;
+			fs.writeFileSync(
+				path.join(otherLibrary, '.ergopti-owned-files'),
+				row(driver, 'linux/ergopti_hotstrings.lua') +
+					row(locale, '_shared/data/locales/en.json') +
+					row(otherWrapper, '@wrapper')
+			);
+			const runtime = path.join(sandbox, 'no-home-runtime');
+			fs.mkdirSync(runtime);
+			const noRuntime = spawnSync(
+				bashExecutable(),
+				[bashPath(script), '--prefix', bashPath(otherPrefix), '--yes'],
+				{
+					encoding: 'utf8',
+					timeout: 15000,
+					env: {
+						PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
+						XDG_CONFIG_HOME: bashPath(path.join(home, '.config'))
+					}
+				}
+			);
+			assert.notEqual(noRuntime.status, 0, 'removal without a lock root must fail');
+			assert.ok(fs.existsSync(otherWrapper), 'failed lock admission preserves the installation');
+			const removed = spawnSync(
+				bashExecutable(),
+				[bashPath(script), '--prefix', bashPath(otherPrefix), '--yes'],
+				{
+					encoding: 'utf8',
+					timeout: 15000,
+					env: {
+						PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
+						XDG_CONFIG_HOME: bashPath(path.join(home, '.config')),
+						XDG_RUNTIME_DIR: bashPath(runtime)
+					}
+				}
+			);
+			assert.equal(removed.status, 0, `explicit removal without HOME: ${removed.stderr}`);
+			assert.equal(fs.existsSync(otherWrapper), false);
+		}
+	}
 	fs.writeFileSync(ownershipPath, validOwnership.slice(0, -1));
 	assert.equal(run('--check').status, 0, 'a complete final record is valid without a newline');
 	fs.writeFileSync(ownershipPath, '');
