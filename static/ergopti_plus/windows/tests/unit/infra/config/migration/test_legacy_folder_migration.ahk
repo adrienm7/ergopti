@@ -23,10 +23,12 @@ _LFM_Local(Root, Path) {
 }
 
 ; Every file and folder below Root, spelled as the vectors spell them.
+; A_LoopFilePath keeps Root as spelled; A_LoopFileFullPath expands a short
+; 8.3 A_Temp (C:\Users\RUNNER~1 on CI), which shifted the prefix cut.
 _LFM_Snapshot(Root, &Files, &Dirs) {
 	Files := Map(), Dirs := Map()
 	loop files, Root . "\*", "FDR" {
-		Path := StrReplace(SubStr(A_LoopFileFullPath, StrLen(Root) + 1), "\", "/")
+		Path := StrReplace(SubStr(A_LoopFilePath, StrLen(Root) + 1), "\", "/")
 		if InStr(A_LoopFileAttrib, "D")
 			Dirs[Path . "/"] := true
 		else
@@ -148,7 +150,7 @@ Test("legacy folder migration: paths.toml is backed up before it is rewritten (l
 ; Boot runs the migration before anything reads paths.toml, and never under
 ; the startup smoke, which must not touch the real user folders.
 _LFM_BootRunsItFirstAndNeverUnderTheSmoke() {
-	Source := FileRead(A_ScriptDir . "\..\infra\boot.ahk", "UTF-8")
+	Source := _DriverFileSource("boot.ahk")
 	RunAt := InStr(Source, "LegacyFolderMigrationRun(_PathsFile)")
 	Assert(RunAt > 0, "boot runs the migration")
 	Assert(RunAt < InStr(Source, "ConfigTransitionRecoverAtBootOrThrow(_PathsFile)"), "before the transition recovery")

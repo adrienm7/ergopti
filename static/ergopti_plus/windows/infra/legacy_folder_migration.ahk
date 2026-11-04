@@ -50,8 +50,8 @@ LegacyFolderRenameInto(From, To) {
 						DirCreate(Parent)
 				if InStr(FileExist(From), "D")
 						DirMove(From, To)
-				else
-						FileMove(From, To)
+				else if !FSMove(From, To)
+						throw Error("The file could not be renamed.")
 		} catch as MoveError {
 				return MoveError.Message
 		}
@@ -211,7 +211,7 @@ LegacyFolderRewritePathsText(Text, Rewrites) {
 LegacyFolderRewritePathsFile(Path, Rewrites) {
 		if !FileExist(Path)
 				return "absent"
-		try Text := FileRead(Path, "UTF-8")
+		try Text := FSReadStrict(Path)
 		catch
 				return "backup_refused"
 		Rewritten := LegacyFolderRewritePathsText(Text, Rewrites)
@@ -220,12 +220,9 @@ LegacyFolderRewritePathsFile(Path, Rewrites) {
 		Backup := Path . AppDirsMigrationBackupSuffix()
 		if FileExist(Backup)
 				return "backup_refused"
-		try {
-				FileCopy(Path, Backup)
-				File := FileOpen(Path, "w", "UTF-8-RAW")
-				File.Write(Rewritten)
-				File.Close()
-		} catch
+		; The adapter writes UTF-8 without a BOM and removes a partial file; the
+		; verified backup beside it still holds the previous text.
+		if !FSCopyCreateVerified(Path, Backup) || !FSWrite(Path, Rewritten)
 				return "backup_refused"
 		return "rewritten"
 }
