@@ -1046,7 +1046,7 @@ local function main()
 	-- reader, whose lifecycle is its own: a reader that fails and stops must not
 	-- take the tap actions with it.
 	local action_catalogue = gestures
-	privacy_owners.tap_hold_initialized = TapHold.init({
+	privacy_owners.tap_hold_called, privacy_owners.tap_hold_initialized = pcall(function() return TapHold.init({
 		keyboard_hook = keyboard_hook,
 		dry_run = opts.dry_run,
 		execute_action = function(action, binding)
@@ -1073,7 +1073,11 @@ local function main()
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
 	})
-	if privacy_owners.tap_hold_initialized ~= true then
+	end)
+	if not privacy_owners.tap_hold_called or privacy_owners.tap_hold_initialized ~= true then
+		if not privacy_owners.tap_hold_called then
+			Logger.error(LOG, "Tap-hold initialization failed: %s.", tostring(privacy_owners.tap_hold_initialized))
+		end
 		shutdown.request("tap-hold startup refused", "tap-hold startup refused")
 		if shutdown.is_pending() then
 			event_loop.run({ onIdle = shutdown.poll, onPeriodic = shutdown.poll, periodSec = 0.25 })
