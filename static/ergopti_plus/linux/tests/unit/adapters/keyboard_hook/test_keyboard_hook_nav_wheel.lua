@@ -112,7 +112,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 			onEmitRaw = function(code, value) emitted[#emitted + 1] = "key:" .. code .. ":" .. value; return true end,
 			onEmitRelative = function(axis, value)
 				emitted[#emitted + 1] = "rel:" .. axis .. ":" .. value
-				if on_relative then on_relative(kh, keyboard, pointer, second, grabs, emitted) end
+				if on_relative and on_relative(kh, keyboard, pointer, second, grabs, emitted) == false then return false end
 				return true
 			end,
 			onClick = function() end,
@@ -167,6 +167,19 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		helpers.assert_eq(reports, { { "dropped", 3, 0, source }, { "frame", 0, 0, source },
 			{ "reset", nil, nil, source } })
 	end)
+	for _, failure in ipairs({ "refusal", "exception" }) do
+		helpers.it("stops a grabbed mouse after relative output " .. failure, function()
+			local emitted, _, _, running = drive("mouse", HOLD, {
+				{ EV_KEY, BTN_LEFT, 1, 2500 }, { EV_REL, REL_X, 1, 3000 }, { EV_REL, REL_X, 2, 4000 },
+			}, function()
+				if failure == "exception" then error("controlled output failure") end
+				return false
+			end)
+			helpers.assert_eq(running, false, "a grabbed mouse cannot keep running without output")
+			helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":0"), "the virtual button is retired")
+			helpers.assert_true(not has(emitted, "rel:" .. REL_X .. ":2"))
+		end)
+	end
 	helpers.it("compiles a wheel direction under its own code, never a key's", function()
 		local layer = wheel_layer()
 		local up = layer[InputEvent.wheel_layer_code("vertical", 1)]
