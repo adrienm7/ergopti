@@ -429,9 +429,13 @@ end
 function M.device_identity(slot)
 	local st = state(slot)
 	if st.fd == nil or st.close_error then return nil, "device is not open" end
-	local port = _backend and rawget(_backend, "device_number")
+	local backend, fd, generation = _backend, st.fd, st.generation
+	local port = backend and rawget(backend, "device_number")
 	if type(port) ~= "function" then return nil, "no device-number port" end
-	local called, number = pcall(port, st.fd)
+	local called, number = pcall(port, fd)
+	if _native_debt or not rawequal(_backend, backend) or not rawequal(_slots[slot or M.KEYBOARD], st)
+		or not rawequal(st.fd, fd) or st.generation ~= generation or st.close_error
+		or rawget(backend, "device_number") ~= port then return nil, "device changed during identity query" end
 	if not called or type(number) ~= "number" or number < 1 or number % 1 ~= 0 or number >= 2 ^ 53 then
 		return nil, "the descriptor names no character device"
 	end
