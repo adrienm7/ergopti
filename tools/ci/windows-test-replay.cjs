@@ -50,6 +50,11 @@ function selectTests(plan, selection) {
 			typeof selection.native_http_client_e2e === 'boolean',
 			'native HTTP E2E selection must be Boolean'
 		);
+	if (Object.hasOwn(selection, 'native_hotstring_e2e'))
+		demand(
+			typeof selection.native_hotstring_e2e === 'boolean',
+			'native hotstring E2E selection must be Boolean'
+		);
 	demand(
 		Number.isSafeInteger(selection.expected_count) && selection.expected_count > 0,
 		'invalid total expected_count'
@@ -300,6 +305,13 @@ async function selfTest() {
 		]);
 	for (const invalid of ['true', 1, null])
 		assert.throws(() => selectTests(plan, { ...selection, native_http_client_e2e: invalid }));
+	for (const selected of [true, false])
+		assert.deepEqual(selectTests(plan, { ...selection, native_hotstring_e2e: selected }), [
+			'Alpha (one)',
+			'Beta (two)'
+		]);
+	for (const invalid of ['false', 0, null])
+		assert.throws(() => selectTests(plan, { ...selection, native_hotstring_e2e: invalid }));
 	assert.deepEqual(
 		selectTests([...plan, ...parsePlan('core\ta\tUnselected\ncore\tb\tunselected\n')], selection),
 		['Alpha (one)', 'Beta (two)']
