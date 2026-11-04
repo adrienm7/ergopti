@@ -135,6 +135,8 @@ local function load_coordinator(options)
 			-- The reload deadline has its own bound; it never joins the call order
 			if delay == 30 then
 				calls.reload_deadline_callback = callback
+				if options.reload_deadline_inline then callback() end
+				if options.reload_deadline_throw_after then error("schedule failed after callback") end
 				if options.reload_timer_raises then error("timer unavailable") end
 				if options.reload_timer_refused then return false end
 				if options.reload_timer ~= nil then return options.reload_timer end
@@ -947,6 +949,46 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_eq(calls.teardowns, 0)
 	end)
 
+	helpers.it("does not fence after an inline reload deadline has already fired (reload-deadline-inline)", function()
+		for _, options in ipairs({
+			{ reload_deadline_inline = true },
+			{ reload_deadline_inline = true, reload_deadline_throw_after = true },
+			{ reload_deadline_inline = true, reload_raises = true },
+		}) do
+			local coordinator, calls = load_coordinator(options)
+			helpers.assert_eq(coordinator.request_reload("inline_deadline"), not options.reload_raises)
+			helpers.assert_eq(calls.reloads, 1)
+			helpers.assert_eq(calls.lease_requests, 0, "the expired transaction cannot request a lease")
+			helpers.assert_eq(coordinator.is_pending(), false)
+			if not options.reload_deadline_throw_after then
+				helpers.assert_true(calls.reload_deadline_stopped, "the late returned handle must be retired")
+			end
+		end
+	end)
+
+	helpers.it("retains an inline deadline whose native stop refuses until retry (reload-deadline-cleanup)", function()
+		for _, failure in ipairs({ "false", "nil", "throw" }) do
+			local stops = 0
+			local timer = { stop = function()
+				stops = stops + 1
+				if stops == 1 then
+					if failure == "throw" then error("stop failed") end
+					if failure == "nil" then return nil end
+					return false
+				end
+				return true
+			end }
+			local coordinator, calls = load_coordinator({ reload_deadline_inline = true, reload_timer = timer })
+			helpers.assert_true(coordinator.request_reload("inline_cleanup"))
+			helpers.assert_eq(stops, 1)
+			helpers.assert_eq(calls.lease_requests, 0)
+			helpers.assert_true(coordinator.request_exit("retry_cleanup"), "a later request retries the retained timer")
+			helpers.assert_eq(stops, 2)
+			helpers.assert_true(coordinator.retry_deadline_cleanup())
+			helpers.assert_eq(stops, 2, "a settled timer must not be stopped twice")
+		end
+	end)
+
 	helpers.it("refuses reload before fencing if its deadline cannot be armed (reload-deadline-unavailable)", function()
 		for _, options in ipairs({ { reload_timer_raises = true }, { reload_timer_refused = true },
 			{ reload_timer = true }, { reload_timer = {} } }) do
@@ -966,7 +1008,7 @@ helpers.describe("controlled termination coordinator", function()
 		local timer = assert(io.tmpfile())
 		timer:close()
 		local stopped = false
-		debug.setmetatable(timer, { __index = { stop = function() stopped = true end } })
+		debug.setmetatable(timer, { __index = { stop = function(self) stopped = true; return self end } })
 		local coordinator, calls = load_coordinator({ reload_timer = timer })
 		helpers.assert_true(coordinator.request_reload_owned("userdata_timer", function() end))
 		calls.lease_callback(false, "refused")
