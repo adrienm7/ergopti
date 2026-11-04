@@ -130,6 +130,23 @@ helpers.describe("personal editor opening-source admission", function()
 		end)
 	end
 
+	for _, mode in ipairs({ "missing", "empty", "invalid" }) do
+		helpers.it("(personal-save-trigger) refuses a " .. mode .. " trigger without erasing its row", function()
+			with_opening_file(function(f)
+				helpers.assert_true(f.ready())
+				local data = opening_model("edited")
+				local entry = data.sections.english.entries[1]
+				if mode == "missing" then entry.trigger = nil
+				elseif mode == "empty" then entry.trigger = ""
+				else entry.trigger = 12 end
+				local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
 	helpers.it("refuses a foreign section added after the actual displayed model", function()
 		with_opening_file(function(f)
 			helpers.assert_eq(f.ready(), true)

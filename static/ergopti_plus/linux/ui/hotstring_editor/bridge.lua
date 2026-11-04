@@ -364,7 +364,7 @@ local function save_all(state, data, context)
 		for entry_index = 1, #entries do
 			local entry = entries[entry_index]
 			if type(entry) ~= "table" then return false end
-			if type(entry.trigger) == "string" and entry.trigger ~= "" and type(entry.output) ~= "string" then return false end
+			if type(entry.trigger) ~= "string" or entry.trigger == "" or type(entry.output) ~= "string" then return false end
 			for _, flag in ipairs({ "is_word", "auto_expand", "is_case_sensitive", "final_result", "is_case_sensitive_strict" }) do
 				if entry[flag] ~= nil and type(entry[flag]) ~= "boolean" then return false end
 			end

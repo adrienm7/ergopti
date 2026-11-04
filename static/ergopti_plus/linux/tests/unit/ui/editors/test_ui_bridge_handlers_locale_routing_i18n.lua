@@ -597,7 +597,7 @@ helpers.describe("ui.bridge_handlers", function()
         helpers.assert_eq(entries[1].trigger, "ty", "and it must be the entry it sent")
       end)
     end)
-    helpers.it("'save' drops an entry with no trigger instead of writing it", function()
+    helpers.it("'save' refuses a model containing an entry with no trigger", function()
       local reader, writer, captured = make_spies(true)
       with_opened_spies(reader, writer, state, function(h, context)
         local result = h.on_message({
@@ -610,11 +610,8 @@ helpers.describe("ui.bridge_handlers", function()
             } } },
           },
         }, state, context)
-        helpers.assert_true(result.saved, "the genuine writer must acknowledge the displayed model")
-        local entries = captured.data.sections.work.entries
-        helpers.assert_eq(#entries, 1,
-          "a triggerless entry can never fire, and on disk it is a row nobody can delete from the UI")
-        helpers.assert_eq(entries[1].trigger, "ok", "the real entry survives")
+        helpers.assert_eq(result.saved, false, "an incomplete row must not erase the existing file")
+        helpers.assert_eq(captured.data, nil, "the writer must not receive a partial model")
       end)
     end)
     helpers.it("'save' reports failure when the write fails", function()
