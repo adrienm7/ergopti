@@ -25,6 +25,21 @@ local function load_transaction()
 end
 
 helpers.describe("retryable local teardown transaction", function()
+	helpers.it("rejects sparse step lists before cleanup or finalization (teardown-sparse-steps)", function()
+		local transaction = load_transaction()
+		local calls = 0
+		local function step(name)
+			return { name = name, run = function() calls = calls + 1 end }
+		end
+		for _, steps in ipairs({ { [2] = step("hidden") }, { step("first"), [3] = step("hidden") },
+			{ step("first"), extra = step("hidden") } }) do
+			local state = transaction.new_state()
+			helpers.assert_eq(transaction.run(state, steps), false)
+			helpers.assert_eq(transaction.run_with_finalizer(state, steps, step("finalizer")), false)
+			helpers.assert_eq(calls, 0, "an incomplete list must not commit any cleanup")
+		end
+	end)
+
 	helpers.it("continues healthy siblings and retries only unproven steps", function()
 		local transaction, errors = load_transaction()
 		local state = transaction.new_state()
