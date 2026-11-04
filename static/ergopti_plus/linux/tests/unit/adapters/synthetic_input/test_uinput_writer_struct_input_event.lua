@@ -296,6 +296,19 @@ end)
 -- ====================================================
 
 helpers.describe("uinput_writer: emission", function()
+	for _, mode in ipairs({ "direct", "owned" }) do
+		helpers.it("forwards the signed 32-bit minimum relative delta on " .. mode .. " output (relative-int32-min)", function()
+			local U, rec
+			if mode == "owned" then U, rec = owned_channel()
+			else U = helpers.load_module("adapters.uinput_writer"); rec = recorder(); U._set_backend(rec.backend); assert(U.open()) end
+			local before = #rec.writes
+			local accepted = U.emit_relative(0, -2147483648)
+			local event = rec.writes[before + 1]
+			U._reset_backend()
+			helpers.assert_true(accepted, "the minimum signed 32-bit event is valid")
+			helpers.assert_eq(le(event, U.INPUT_EVENT_SIZE - 3, 4), 0x80000000)
+		end)
+	end
 	helpers.it("forwards relative dial reports from a grabbed composite mouse (uinput-relative-dial)", function()
 		local U = helpers.load_module("adapters.uinput_writer")
 		local rec = recorder()
