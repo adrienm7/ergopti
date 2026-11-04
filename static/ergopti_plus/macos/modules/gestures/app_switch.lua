@@ -69,6 +69,10 @@ end
 local function other_applications(screen_id)
 	local front_pid = WindowManager.frontmost_pid()
 	local own_pid = WindowManager.own_pid()
+	if type(front_pid) ~= "number" or type(own_pid) ~= "number" then
+		Logger.warn(LOG, "Cannot identify the frontmost application or this runtime — no application switch.")
+		return {}
+	end
 	local seen, records = {}, {}
 	for _, record in ipairs(WindowManager.ordered_windows()) do
 		if record.standard and not record.minimized and record.pid ~= nil

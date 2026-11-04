@@ -135,6 +135,8 @@ local function load_coordinator(options)
 			-- The reload deadline has its own bound; it never joins the call order
 			if delay == 30 then
 				calls.reload_deadline_callback = callback
+				if options.reload_timer_raises then error("timer unavailable") end
+				if options.reload_timer_refused then return false end
 				if options.reload_timer ~= nil then return options.reload_timer end
 				return { stop = function() calls.reload_deadline_stopped = true; return true end }
 			end
@@ -943,6 +945,20 @@ helpers.describe("controlled termination coordinator", function()
 		calls.lease_callback(true, "late")
 		helpers.assert_eq(calls.reloads, 1)
 		helpers.assert_eq(calls.teardowns, 0)
+	end)
+
+	helpers.it("refuses reload before fencing if its deadline cannot be armed (reload-deadline-unavailable)", function()
+		for _, options in ipairs({ { reload_timer_raises = true }, { reload_timer_refused = true } }) do
+			local aborts = 0
+			options.capture_publication_admission = function()
+				return { current = function() return true end, abort = function() aborts = aborts + 1; return true end }
+			end
+			local coordinator, calls = load_coordinator(options)
+			helpers.assert_eq(coordinator.request_reload("no_deadline"), false)
+			helpers.assert_eq(calls.lease_requests, 0, "a reload without a deadline must not revoke the lease")
+			helpers.assert_eq(aborts, 1, "the acquired publication admission must be released")
+			helpers.assert_eq(coordinator.is_pending(), false)
+		end
 	end)
 
 	helpers.it("stops a userdata reload deadline when its transaction aborts (reload-userdata-timer)", function()

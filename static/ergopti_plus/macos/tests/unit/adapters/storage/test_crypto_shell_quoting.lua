@@ -114,7 +114,7 @@ local NI
 		}
 	end
 
-	helpers.it("returns '' when the native digest is empty (no nil-index crash)", function()
+	helpers.it("returns nil when the native digest is empty", function()
 		NI = load_network_info({
 			wifi = {
 				currentNetwork = function() return "MySSID" end,
@@ -123,21 +123,17 @@ local NI
 		})
 		local ok, result = pcall(function() return NI.getSsidHash() end)
 		helpers.assert_true(ok, "getSsidHash() must not raise on an empty native digest")
-		-- Result is nil (no SSID returned because sha256_hex returned "")
-		-- The contract says nil when hash cannot be computed OR "" — both are acceptable
-		helpers.assert_true(result == nil or result == "",
-			"getSsidHash() must return nil or '' on an empty native digest, got: " .. tostring(result))
+		helpers.assert_eq(result, nil, "an empty digest must be reported as unavailable")
 	end)
 
-	helpers.it("returns '' when the native digest has no hex pattern", function()
+	helpers.it("returns nil when the native digest has no hex pattern", function()
 		NI = load_network_info({
 			wifi = { currentNetwork = function() return "TestNet" end },
 			hash = native_hash("Error: digest unavailable ZZZ"),
 		})
 		local ok, result = pcall(function() return NI.getSsidHash() end)
 		helpers.assert_true(ok, "getSsidHash() must not raise on a non-hex native digest")
-		helpers.assert_true(result == nil or result == "",
-			"getSsidHash() must return nil or '' when no hex digest found")
+		helpers.assert_eq(result, nil, "an invalid digest must be reported as unavailable")
 	end)
 
 	helpers.it("returns the hash when the native digest succeeds", function()

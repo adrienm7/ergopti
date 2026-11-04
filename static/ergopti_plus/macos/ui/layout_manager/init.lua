@@ -193,8 +193,10 @@ function M.open()
 		return false
 	end
 	if _webview ~= nil then
-		ui_builder.force_focus(_webview, false)
-		return true
+		local view = _webview
+		return ui_builder.force_focus(view, false, { is_current = function()
+			return rawequal(_webview, view)
+		end }) ~= false
 	end
 	_opening_window = true
 	Logger.start(LOG, "Opening the layout manager…")

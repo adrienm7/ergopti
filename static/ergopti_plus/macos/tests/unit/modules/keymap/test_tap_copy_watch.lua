@@ -194,6 +194,21 @@ helpers.describe("tap-hold copy watch (tap-copy-verified)", function()
 		helpers.assert_eq(w.watch:statistics().sent, 0)
 	end)
 
+	helpers.it("does not attribute a copy after an intervening click or modifier (tap-copy-intervening-input)", function()
+		for _, interrupt in ipairs({
+			function(w) w.watch:activity() end,
+			function(w) w.watch:modifier_edge(57, { capslock = true }, 92) end,
+		}) do
+			local w = world()
+			w.shift(0, 90)
+			interrupt(w)
+			w.cmd_c(93)
+			w.flush()
+			helpers.assert_eq(w.counter_reads, 0, "intervening input breaks attribution")
+			helpers.assert_eq(w.watch:statistics().sent, 0)
+		end
+	end)
+
 	helpers.it("a key whose tap is not copy is never logged or checked (tap-copy-verified)", function()
 		local w = world({ tap = "none" })
 		w.shift(0, 100)

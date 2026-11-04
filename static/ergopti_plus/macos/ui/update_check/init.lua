@@ -254,7 +254,9 @@ function M.open(ctx)
 	if revision ~= _open_revision or package.loaded["ui.update_check"] ~= M then return false end
 	if _webview ~= nil then
 		local view = _webview
-		ui_builder.force_focus(view, false)
+		ui_builder.force_focus(view, false, { is_current = function()
+			return rawequal(_webview, view)
+		end })
 		if revision ~= _open_revision or _webview ~= view then return false end
 		retire_session()
 		if revision ~= _open_revision or _webview ~= view then return false end

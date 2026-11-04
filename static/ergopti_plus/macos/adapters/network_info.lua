@@ -52,12 +52,14 @@ local PING_TIMEOUT_SEC = 1
 -- =========================================
 -- =========================================
 
---- Computes the SHA-256 hex digest of a string via macOS openssl.
---- Returns "" on any failure.
+--- Computes the SHA-256 hex digest of a string via the native hash adapter.
+--- Returns nil on failure, as required by the network information contract.
 --- @param s string Input string.
---- @return string
+--- @return string|nil
 local function sha256_hex(s)
-	return Crypto.sha256(s)
+	local digest = Crypto.sha256(s)
+	if digest == "" then return nil end
+	return digest
 end
 
 --- Returns whether an ifconfig snapshot contains an up utun interface carrying

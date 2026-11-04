@@ -611,10 +611,12 @@ local function arm_reload_deadline(transaction)
 		local ok, err = xpcall(expire_reload, debug.traceback, transaction)
 		if not ok then pcall(Logger.error, LOG, "Controlled reload deadline raised: %s.", tostring(err)) end
 	end)
-	if armed and timer ~= nil then
+	if armed and timer then
 		transaction.reload_deadline = timer
+		return true
 	else
 		pcall(Logger.error, LOG, "Controlled reload deadline could not be armed: %s.", tostring(timer))
+		return false
 	end
 end
 
@@ -687,7 +689,11 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 	}
 	_transaction = transaction
 	breadcrumb(transaction, "accepted")
-	if kind == "reload" then arm_reload_deadline(transaction) end
+	if kind == "reload" and not arm_reload_deadline(transaction) then
+		-- Without the deadline, a lost fence or drain can strand the driver with
+		-- remaps revoked indefinitely. Refuse while rollback is still safe.
+		return abort_transaction(transaction, "reload deadline unavailable", false)
+	end
 	-- Who asked is the first question about any reload or quit in a user log, and
 	-- the reason was stored on the transaction without ever being written out.
 	-- Protected: a failing logger has no other sink to report to, and must never

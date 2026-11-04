@@ -37,7 +37,7 @@ local NOT_RUNNING   = "AppNotRunning"
 
 --- Loads keystats.export with hs.application instrumented.
 --- @return table Export, function probe_count
-local function load_export()
+local function load_export(category)
 	package.loaded["modules.keystats.export"] = nil
 	package.loaded["infra.logger"] = nil
 	_ = helpers.load_with_stubs("infra.logger")
@@ -74,7 +74,7 @@ local function load_export()
 			infoForBundlePath = function(path)
 				probes.info = probes.info + 1
 				if path:find(CATEGORISED, 1, true) then
-					return { LSApplicationCategoryType = "public.app-category.productivity" }
+					return { LSApplicationCategoryType = category or "public.app-category.productivity" }
 				end
 				-- Installed, readable, and simply carries no category key.
 				return {}
@@ -122,6 +122,16 @@ helpers.describe("app category: a bundle with no category is probed once", funct
 		Export.get_native_app_category(CATEGORISED)
 		helpers.assert_eq(probes().info, after_first,
 			"the case that already worked must keep working")
+	end)
+
+	helpers.it("treats a malformed category as uncategorised (keystats-invalid-app-category)", function()
+		for _, category in ipairs({ true, 42, {}, "" }) do
+			local Export, probes = load_export(category)
+			helpers.assert_eq(Export.get_native_app_category(CATEGORISED), "metrics_apps.general_category")
+			local count = probes().info
+			helpers.assert_eq(Export.get_native_app_category(CATEGORISED), "metrics_apps.general_category")
+			helpers.assert_eq(probes().info, count, "a readable bundle is probed once")
+		end
 	end)
 
 end)
