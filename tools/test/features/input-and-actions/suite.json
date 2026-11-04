@@ -762,6 +762,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-editor-trailing-enter.cjs"],
 			"repro": "node tools/test/test-hotstring-editor-trailing-enter.cjs"
+		},
+		{
+			"id": "js-hotstring-editor-token-literals",
+			"ordinal": 580,
+			"name": "hotstring editor preserves literal brace groups and prototype names",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-editor-token-literals.cjs"],
+			"repro": "node tools/test/test-hotstring-editor-token-literals.cjs"
 		}
 	]
 }

@@ -2307,6 +2307,11 @@ local function update_shift_side()
 	end
 end
 
+local function reset_shift_side()
+	_shift_left_down, _shift_right_down, _shift_last_side = false, false, nil
+	update_shift_side()
+end
+
 shift_tap = eventtap.new(
 	{ eventtap.event.types.flagsChanged },
 	function(e)
@@ -2337,17 +2342,26 @@ shift_tap = eventtap.new(
 				pcall(_tap_copy.modifier_edge, _tap_copy, kc, f, stamp)
 			end
 
-			-- The keycode on a flagsChanged event identifies which modifier
-			-- just toggled. We flip the matching side's flag, then resync
-			-- against the aggregate f.shift at the end as a safety net in
-			-- case the watcher missed a release.
-			if kc == SHIFT_KC_LEFT then
+			local masks = eventtap.event.rawFlagMasks
+			local raw_ok, raw = pcall(function() return e:rawFlags() end)
+			raw = raw_ok and math.tointeger(raw) or nil
+			local left_mask = type(masks) == "table" and math.tointeger(masks.deviceLeftShift) or nil
+			local right_mask = type(masks) == "table" and math.tointeger(masks.deviceRightShift) or nil
+			local sided = raw ~= nil and left_mask and left_mask > 0 and right_mask and right_mask > 0
+				and ((raw & (left_mask | right_mask)) ~= 0 or not f.shift)
+			if sided then
+				local left, right = (raw & left_mask) ~= 0, (raw & right_mask) ~= 0
+				if kc == SHIFT_KC_LEFT and left and not _shift_left_down then _shift_last_side = "left" end
+				if kc == SHIFT_KC_RIGHT and right and not _shift_right_down then _shift_last_side = "right" end
+				_shift_left_down, _shift_right_down = left, right
+			elseif kc == SHIFT_KC_LEFT then
 				_shift_left_down = not _shift_left_down
 				if _shift_left_down then _shift_last_side = "left" end
 			elseif kc == SHIFT_KC_RIGHT then
 				_shift_right_down = not _shift_right_down
 				if _shift_right_down then _shift_last_side = "right" end
-			elseif kc == CAPS_LOCK_KC and f.ctrl then
+			end
+			if kc == CAPS_LOCK_KC and f.ctrl then
 				CapsLockChordEvidence.note_press()
 			end
 
@@ -2625,6 +2639,7 @@ tap_watchdog = function(timer, generation)
 	end
 	local function revive(name, t)
 		if t and not eventtap_is_enabled(name, t) then
+			if name == "flagsChanged" then reset_shift_side() end
 			-- The passive mouse tap only resets predictive state and its recovery never
 			-- interrupts typing, so reserve WARNING for the typing-critical taps
 			local recovery_logger = name == "mouse" and Logger.debug or Logger.warn
@@ -2840,6 +2855,7 @@ function M.stop(teardown)
 	end
 	CoreState.lifecycle_generation = (CoreState.lifecycle_generation or 0) + 1
 	_started = false
+	reset_shift_side()
 	if _one_shot_shift then _one_shot_shift.reset() end
 	if _tap_copy then _tap_copy:stop() end
 	local listener_stopped = true

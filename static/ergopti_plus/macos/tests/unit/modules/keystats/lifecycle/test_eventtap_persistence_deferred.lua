@@ -238,7 +238,7 @@ local function load_fixture(options)
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "foreign", nil end,
 	}
-	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
+	package.loaded["modules.keymap"] = { get_shift_side = function() return options.shift_side or "none" end }
 	package.loaded["infra.manifest_reader"] = { default_for = function() return true end }
 	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_eventtap_deferred" end,
@@ -433,6 +433,17 @@ end
 
 
 helpers.describe("keystats persistence stays outside eventtaps", function()
+	helpers.it("requires a Shift flag before using the cached side, while preserving Caps Lock (keystats-shift-flag)", function()
+		with_fixture({ shift_side = "left" }, function(fixture)
+			local types = fixture.hs.eventtap.event.types
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a", {}))
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "A", { shift = true }))
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "A", { capslock = true }))
+			helpers.assert_eq(fixture.state.buffer_events[1][3].ss, "none")
+			helpers.assert_eq(fixture.state.buffer_events[2][3].ss, "left")
+			helpers.assert_eq(fixture.state.buffer_events[3][3].ss, "capslock")
+		end)
+	end)
 	helpers.it("bins a deferred midnight tail by its first keystroke", function()
 		local before_midnight = os.time({
 			year = 2026, month = 8, day = 27, hour = 23, min = 59, sec = 50,

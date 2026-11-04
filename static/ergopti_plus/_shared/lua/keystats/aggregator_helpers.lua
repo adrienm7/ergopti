@@ -242,8 +242,15 @@ end
 --- @param is_error    boolean True if this is an error event.
 --- @param synth_type  string Synthetic type tag.
 function M.push_ngram(agg_batch, table_name, date_str, app, token, delay, is_error, synth_type)
-	local key = date_str .. "\1" .. app .. "\1" .. token
+	-- Ordinary keys keep their established form. A separator in the app needs
+	-- a disjoint length-delimited key and the original tuple for both writers.
+	local has_separator = app:find("\1", 1, true) ~= nil
+	local key = has_separator
+		and ("\2" .. #date_str .. ":" .. date_str .. #app .. ":" .. app .. token)
+		or (date_str .. "\1" .. app .. "\1" .. token)
 	M.add_ngram_metric(agg_batch, table_name, key, delay, is_error, synth_type)
+	local row = agg_batch.ngram[table_name] and agg_batch.ngram[table_name][key]
+	if has_separator and row then row.identity = { date = date_str, app = app, token = token } end
 end
 
 -- ============================================================================

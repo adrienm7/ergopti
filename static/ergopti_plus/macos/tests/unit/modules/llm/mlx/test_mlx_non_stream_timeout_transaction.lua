@@ -69,3 +69,35 @@ helpers.describe("MLX non-stream request requires a committed deadline", functio
 		if not ok then error(err) end
 	end)
 end)
+
+helpers.describe("MLX inference error privacy", function()
+	helpers.it("does not log a provider error body that echoes private text", function()
+		package.loaded["modules.llm.api_mlx_inference"] = nil
+		local inference = helpers.load_with_stubs("modules.llm.api_mlx_inference")
+		local scheduler = assert(get_upvalue(inference.post_and_parse, "TimerScheduler"))
+		local client = assert(get_upvalue(inference.post_and_parse, "_infer_client"))
+		local logger = assert(get_upvalue(inference.post_and_parse, "Logger"))
+		local after, cancel, post, log_error = scheduler.after, scheduler.cancel, client.post, logger.error
+		local messages, failed = {}, 0
+		scheduler.after = function() return {}, true end
+		scheduler.cancel = function() return true end
+		client.post = function(_, _, _, done) done({ status = 500, body = "private-provider-echo" }) end
+		logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
+		local ok, err = xpcall(function()
+			inference.init({ stream = {}, cancel_streaming = function() return true end,
+				completions_endpoint = function() return "http://fixture/completions" end,
+				chat_endpoint = function() return "http://fixture/chat" end,
+				read_active_model_arg = function() return "fixture/model" end,
+				server_model_id = function() return nil end, model_hf_path = function() return nil end })
+			inference.post_and_parse("fixture", "", "sensitive", "", 0.2, 8, 1, false,
+				function() error("unexpected success") end, function() failed = failed + 1 end, {}, false)
+			helpers.assert_eq(failed, 1)
+			helpers.assert_true(#messages > 0)
+			for _, message in ipairs(messages) do
+				helpers.assert_true(not message:find("private-provider-echo", 1, true))
+			end
+		end, debug.traceback)
+		scheduler.after, scheduler.cancel, client.post, logger.error = after, cancel, post, log_error
+		if not ok then error(err, 0) end
+	end)
+end)

@@ -154,7 +154,13 @@ local function _make_handler(generation)
 			local ok_len, n = pcall(utf8.len, char)
 			if ok_len then char_codepoints = n end
 		end
-		if char_codepoints == 1 then
+		local codepoint = char_codepoints == 1 and utf8.codepoint(char) or nil
+		-- AppKit represents navigation and function keys in U+F700–U+F8FF;
+		-- control characters such as Tab and Return are not printable either.
+		local printable = codepoint ~= nil and codepoint >= 32
+			and not (codepoint >= 0x7F and codepoint <= 0x9F)
+			and not (codepoint >= 0xF700 and codepoint <= 0xF8FF)
+		if printable then
 			-- Printable character path
 			if _on_char then
 				Logger.pcall(LOG, _on_char, {

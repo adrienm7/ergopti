@@ -746,3 +746,19 @@ helpers.describe("native JSON fallback completion", function()
 		end)
 	end
 end)
+
+helpers.describe("ngram walker: compound application identity", function()
+	it("preserves separator-bearing applications independently of token bytes", function()
+		local shared = require("keystats.aggregator_helpers")
+		local batch = shared.new_batch()
+		shared.push_ngram(batch, "ngram_chars", "2026-10-17", "App\1Part", "x", 0, false, "none")
+		shared.push_ngram(batch, "ngram_chars", "2026-10-17", "App", "x", 0, false, "none")
+		local groups = Walker.batches_for_writer(batch)
+		local found = {}
+		for _, group in ipairs(groups) do
+			if group.table_name == "ngram_chars" then found[group.app] = group.ngrams end
+		end
+		helpers.assert_eq(found["App\1Part"].x.c, 1)
+		helpers.assert_eq(found.App.x.c, 1)
+	end)
+end)

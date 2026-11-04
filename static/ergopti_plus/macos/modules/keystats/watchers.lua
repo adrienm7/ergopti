@@ -65,6 +65,12 @@ local _battery_watcher      = nil
 local _spaces_watcher       = nil
 local _audio_watcher_active = false
 local _audio_callback_installed = false
+local _audio_device = nil
+local _audio_device_busy = false
+local _audio_rearm_needed = false
+local _audio_rearm_reported = false
+local _audio_rearm_version = 0
+local reconcile_audio_device
 local _hardware_watchers_enabled = false
 local _hardware_generation = 0
 local _context_refresh_generation = 0
@@ -212,6 +218,9 @@ end
 --- Logs micro-idle events and clears abandoned sessions.
 function M.check_idle()
 	if not require_state("check_idle") then return end
+	if _hardware_watchers_enabled and _audio_rearm_needed and reconcile_audio_device then
+		reconcile_audio_device(_hardware_generation)
+	end
 	if _is_paused() then return end
 	local now = hs.timer.absoluteTime() / 1000000
 
@@ -451,6 +460,26 @@ local function stop_object_watcher(handle, clear)
 	return true
 end
 
+--- Stops the exact device watcher; an ambiguous native result remains retryable.
+local function stop_audio_device()
+	local owner = _audio_device
+	if not owner then return true end
+	owner.committed = false
+	if owner.may_run then
+		local ok, result = pcall(function() return owner.device:watcherStop() end)
+		local checked, running = pcall(function() return owner.device:watcherIsRunning() end)
+		if not ok or not rawequal(result, owner.device) or not checked or running ~= false then return false end
+		owner.may_run = false
+	end
+	if owner.callback_installed then
+		local ok, result = pcall(function() return owner.device:watcherCallback(nil) end)
+		if not ok or not rawequal(result, owner.device) then return false end
+		owner.callback_installed = false
+	end
+	if _audio_device == owner then _audio_device = nil end
+	return true
+end
+
 --- Stops the singleton audio watcher and removes its installed callback.
 --- @return boolean settled True only when both resources are released.
 local function stop_audio_watcher()
@@ -488,6 +517,7 @@ end
 --- @return boolean settled True only when every exact capability was released.
 local function cleanup_hardware_resources()
 	local settled = true
+	if _audio_device_busy or not stop_audio_device() then settled = false end
 	if not stop_audio_watcher() then settled = false end
 	if not stop_object_watcher(_spaces_watcher, function() _spaces_watcher = nil end) then
 		settled = false
@@ -522,6 +552,55 @@ local function start_object_watcher(label, constructor, publish)
 			tostring(ok_start and result or result))
 		return false
 	end
+	return true
+end
+
+--- Replaces the exact output-device watcher after the previous one settles.
+--- A failed cleanup/acquisition stays pending for the next idle maintenance tick.
+reconcile_audio_device = function(generation)
+	if _audio_device_busy then return false end
+	_audio_device_busy = true
+	local version = _audio_rearm_version
+	local ok, result = pcall(function()
+		if not stop_audio_device() then return false end
+		local device = hs.audiodevice.defaultOutputDevice()
+		if not device then return false end
+		local uid = device:uid()
+		if uid ~= nil and (type(uid) ~= "string" or uid == "") then return false end
+		local owner = { device = device, uid = uid, committed = false,
+			callback_installed = true, may_run = false }
+		_audio_device = owner
+		local callback = function(event_uid, event_code, scope)
+			if _audio_device ~= owner or not owner.committed or event_uid ~= uid
+				or (event_code ~= "vmvc" and event_code ~= "mute")
+				or (scope ~= "outp" and scope ~= "glob") then return end
+			run_hardware_callback("Audio device", generation, function()
+				local current = hs.audiodevice.defaultOutputDevice()
+				if not current or current ~= device or _audio_device ~= owner then return end
+				local volume, muted = device:volume(), device:muted()
+				_state.current_audio_volume = volume
+				LogManager.log_system_event("audio_change", { volume = volume, muted = muted, event_code = event_code })
+			end)
+		end
+		if not rawequal(device:watcherCallback(callback), device) then return false end
+		owner.may_run = true
+		if not rawequal(device:watcherStart(), device) or device:watcherIsRunning() ~= true then return false end
+		local current = hs.audiodevice.defaultOutputDevice()
+		if _audio_device ~= owner or generation ~= _hardware_generation or not current or current ~= device then return false end
+		owner.committed = true
+		return true
+	end)
+	_audio_device_busy = false
+	if not ok or result ~= true then
+		_audio_rearm_needed = true
+		if not _audio_rearm_reported then
+			_audio_rearm_reported = true
+			Logger.error(LOG, "Audio output device watcher could not settle; retry remains pending.")
+		end
+		return false
+	end
+	_audio_rearm_reported = false
+	_audio_rearm_needed = version ~= _audio_rearm_version
 	return true
 end
 
@@ -688,6 +767,11 @@ function M.init_hardware_watchers()
 			-- function and then throw, leaving rollback as the only remover
 			_audio_callback_installed = true
 			watcher.setCallback(function(event_code)
+				if event_code == "dOut" and _hardware_watchers_enabled and generation == _hardware_generation then
+					_audio_rearm_version = _audio_rearm_version + 1
+					_audio_rearm_needed = true
+					reconcile_audio_device(generation)
+				end
 				run_hardware_callback("Audio", generation, function()
 					-- The global Hammerspoon watcher reports default output changes
 					-- as dOut; vOut/mOut belong to device-specific notifications.
@@ -713,9 +797,13 @@ function M.init_hardware_watchers()
 			if watcher.isRunning() ~= true then error("audio watcher did not start") end
 
 			local ok_device, device = pcall(hs.audiodevice.defaultOutputDevice)
-			if ok_device and device then
+			if not ok_device then error("default output device could not be read") end
+			if device then
+				if not reconcile_audio_device(generation) then error("audio device watcher refused startup") end
 				local ok_volume, volume = pcall(function() return device:volume() end)
 				if ok_volume then _state.current_audio_volume = volume end
+			else
+				_audio_rearm_needed = true
 			end
 		end
 	end, debug.traceback)
@@ -744,6 +832,7 @@ function M.stop_hardware_watchers()
 	_hardware_watchers_enabled = false
 	_hardware_generation = _hardware_generation + 1
 	_context_refresh_generation = _context_refresh_generation + 1
+	_audio_rearm_needed = false
 	-- A stopped watcher can miss the matching wake or unlock. Never carry an
 	-- unfinished interval into a later generation or charge disabled time to it.
 	_state.passive_started_at, _state.passive_kind = nil, nil
@@ -774,7 +863,7 @@ local function physical_lifecycle_snapshot(initial)
 		local refreshing = next(_context_refresh_timers) ~= nil
 		local function cleanup_pending()
 			return not hardware and (_wifi_watcher ~= nil or _battery_watcher ~= nil
-				or _spaces_watcher ~= nil or _audio_watcher_active or _audio_callback_installed)
+				or _spaces_watcher ~= nil or _audio_watcher_active or _audio_callback_installed or _audio_device ~= nil)
 		end
 		local cleanup_owed = cleanup_pending()
 		if type(pause_port) ~= "function" then return {} end

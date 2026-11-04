@@ -159,12 +159,16 @@ function M.flush()
 
 	for tbl_name, tbl in pairs(S.agg_batch.ngram) do
 		for key, item in pairs(tbl) do
-			local s, e = key:find("\1")
-			local date_str = key:sub(1, s - 1)
-			local rest = key:sub(e + 1)
-			local s2, e2 = rest:find("\1")
-			local app = rest:sub(1, s2 - 1)
-			local token = rest:sub(e2 + 1)
+			local date_str, app, token
+			if item.identity then
+				date_str, app, token = item.identity.date, item.identity.app, item.identity.token
+			else
+				local s, e = key:find("\1")
+				date_str = key:sub(1, s - 1)
+				local rest = key:sub(e + 1)
+				local s2, e2 = rest:find("\1")
+				app, token = rest:sub(1, s2 - 1), rest:sub(e2 + 1)
+			end
 			local ok = exec(Queries.render("agg.ngram", "native", {
 				table = tbl_name, device_id = tostring(S.device_id), date = date_str, app = app, token = token,
 				c = i(item.c), td = i(item.td), cd = i(item.cd), e = i(item.e),

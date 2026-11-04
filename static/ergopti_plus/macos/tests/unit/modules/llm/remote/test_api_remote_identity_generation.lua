@@ -320,3 +320,28 @@ helpers.describe("Actual provider catalogue publication", function()
 		end
 	end)
 end)
+
+helpers.describe("remote inference error privacy", function()
+	helpers.it("does not log a provider error body that echoes private text", function()
+		local client = assert(get_upvalue(ApiRemote.cancel_streaming, "_infer_client"))
+		local logger = require("infra.logger")
+		local old_post, old_error = client.post, logger.error
+		local callback, messages, failed = nil, {}, 0
+		client.post = function(_, _, _, done) callback = done end
+		logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
+		local ok, err = xpcall(function()
+			ApiRemote.set_entries({ entry_a }); ApiRemote.set_active_entry_id(entry_a.id)
+			ApiRemote.fetch_batch("sensitive", "", "model-a", 0.2, 8, 1, { batch = false },
+				function() error("unexpected success") end, function() failed = failed + 1 end)
+			helpers.assert_eq(type(callback), "function")
+			callback({ ok = false, status = 401, body = "private-provider-echo" })
+			helpers.assert_eq(failed, 1)
+			helpers.assert_true(#messages > 0)
+			for _, message in ipairs(messages) do
+				helpers.assert_true(not message:find("private-provider-echo", 1, true))
+			end
+		end, debug.traceback)
+		client.post, logger.error = old_post, old_error
+		if not ok then error(err, 0) end
+	end)
+end)

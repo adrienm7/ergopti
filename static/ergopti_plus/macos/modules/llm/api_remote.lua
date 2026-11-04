@@ -2620,8 +2620,8 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 				if thinking_retry.resend(on_response) then return end
 			end
 			if not r.ok then
-				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
-					model, req_id, tostring(status), (body or ""):sub(1, 200))
+				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s (response body withheld).",
+					model, req_id, tostring(status))
 				-- Log the failure so the audit trail shows it instead of
 				-- silently dropping. Same envelope as keystats.log_llm
 				-- but routed to log_llm_failed; the engine doesn't need

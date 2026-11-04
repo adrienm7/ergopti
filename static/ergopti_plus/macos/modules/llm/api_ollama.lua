@@ -1596,7 +1596,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 				Logger.debug(LOG, "[%s] #%d HTTP_RESPONSE status=%d, body_len=%d", model_name, req_id, status or -1, #(body or ""))
 
 				if not status or status ~= 200 then
-					Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%d: %s", model_name, req_id, status or -1, (body or ""):sub(1, 200))
+					Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%d (response body withheld).", model_name, req_id, status or -1)
 					if keystats and type(keystats.log_llm_failed) == "function" then
 						pcall(keystats.log_llm_failed, full_text, nil, {
 							backend        = "ollama",

@@ -295,11 +295,18 @@ _ConfigBackup_Load(ConfigDir, Id, Rules) {
 		if !Record.Has(Field) || !(Record[Field] is String)
 			return 0
 	}
+	if !RegExMatch(Record["created_at"], "^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+		return 0
 	Files := []
+	Seen := Map()
+	Seen.CaseSense := "Off"
 	for _, BackupFile in Record["files"] {
 		if !(BackupFile is Map) || !BackupFile.Has("root") || BackupFile["root"] != "config" || !BackupFile.Has("path")
 				|| !ConfigBackup_IsContained(BackupFile["path"])
 			return 0
+		if Seen.Has(BackupFile["path"])
+			return 0
+		Seen[BackupFile["path"]] := true
 		Files.Push(BackupFile["path"])
 	}
 	return Map("id", Id, "path", BackupPath, "kind", Record["kind"],
