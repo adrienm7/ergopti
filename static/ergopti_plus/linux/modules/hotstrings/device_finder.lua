@@ -125,12 +125,14 @@ function M.parse_devices(text)
 				if ev_hex then
 					current.ev_mask = tonumber(ev_hex, 16) or 0
 				end
-				-- The low 48 key bits fit exactly in Lua's number type on both
-				-- 32- and 64-bit procfs word formats, regardless of grouping.
+				-- Procfs separates kernel words with spaces but does not pad each
+				-- word. Never concatenate them: that can turn a high-word bit
+				-- into an unrelated low key. A short final word is conservative
+				-- on 32-bit kernels, where KEY_Z lives in the preceding word.
 				local key_hex = line:match("^B:%s*KEY=([%x%s]+)$")
 				if key_hex then
-					key_hex = key_hex:gsub("%s", "")
-					current.key_mask_low = tonumber(key_hex:sub(-12), 16) or 0
+					local last = key_hex:match("(%x+)%s*$")
+					current.key_mask_low = last and tonumber(last:sub(-12), 16) or 0
 				end
 
 				-- H: Handlers=kbd event3 ...

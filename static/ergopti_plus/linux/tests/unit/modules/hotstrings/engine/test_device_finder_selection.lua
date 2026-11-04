@@ -214,12 +214,22 @@ helpers.describe("device_finder: ranking when no remap daemon is running", funct
 		local unnamed = block({ name = "ZSA Moonlander Mark I", sysfs = "/devices/pci0000:00/usb1/input/input4",
 			ev = "120013", handlers = "sysrq kbd event4 leds" })
 		-- Q, A and Z are keyboard keys; the bitmap is the actual procfs KEY syntax.
-		for _, bitmap in ipairs({ "100040010000", "1000 40010000" }) do
+		for _, bitmap in ipairs({ "100040010000", "7 100040010000" }) do
 			local described = unnamed:gsub("\n\n$", "\nB: KEY=" .. bitmap .. "\n\n")
 			local paths = finder.select_keyboards(finder.parse_devices(PHYSICAL_KEYBOARD .. described .. POWER_BUTTON))
 			helpers.assert_eq(paths, { "/dev/input/event3", "/dev/input/event4" },
 				"a second keyboard must not bypass capture merely because its product name omits keyboard")
 		end
+	end)
+
+	helpers.it("does not join separate procfs key words into a keyboard (keyboard-capability-selection)", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local other = block({ name = "Auxiliary input", sysfs = "/devices/pci0000:00/usb1/input/input4",
+			ev = "120013", handlers = "kbd event4" })
+		-- On a 64-bit kernel the high word names key 76, not KEY_Z (44).
+		other = other:gsub("\n\n$", "\nB: KEY=1000 40010000\n\n")
+		local paths = finder.select_keyboards(finder.parse_devices(PHYSICAL_KEYBOARD .. other))
+		helpers.assert_eq(paths, { "/dev/input/event3" }, "a high-word key cannot masquerade as KEY_Z")
 	end)
 
 	helpers.it("returns every physical keyboard when no consolidated remap output exists", function()
