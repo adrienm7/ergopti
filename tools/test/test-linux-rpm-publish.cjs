@@ -256,6 +256,40 @@ if (path.basename(process.argv[1]) === 'rpm') {
 		options.readIdentity = (filename) =>
 			filename.includes('.ergopti-rpm-publish-') ? debug : read(filename);
 	});
+	{
+		const options = fixture('retry-after-link-failure', [expected]);
+		const originalLink = fs.linkSync;
+		try {
+			fs.linkSync = () => {
+				throw new Error('injected publication failure');
+			};
+			assert.throws(() => publishRpmPackage(options), /injected publication failure/);
+		} finally {
+			fs.linkSync = originalLink;
+		}
+		assert.deepEqual(
+			fs.readdirSync(options.publishedRoot),
+			[],
+			'failed link must leave no empty output'
+		);
+		const retried = publishRpmPackage(options);
+		assert.ok(fs.existsSync(retried.artifact), 'publication can be retried without manual cleanup');
+	}
+	{
+		const options = fixture('foreign-during-link-failure', [expected]);
+		const originalLink = fs.linkSync;
+		const foreign = path.join(options.publishedRoot, expected.arch, 'foreign');
+		try {
+			fs.linkSync = () => {
+				fs.writeFileSync(foreign, 'keep');
+				throw new Error('injected publication failure');
+			};
+			assert.throws(() => publishRpmPackage(options), /publication and cleanup failed/);
+		} finally {
+			fs.linkSync = originalLink;
+		}
+		assert.equal(fs.readFileSync(foreign, 'utf8'), 'keep', 'foreign content must survive refusal');
+	}
 	const positive = fixture('valid-debug-and-main', [
 		debug,
 		{ ...expected, name: expected.name + '-debugsource' },
