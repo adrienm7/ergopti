@@ -476,6 +476,12 @@ between workers) green alone. All live checks pass, typed by the harness.
   stepping would need a new path in `linux/modules/gestures/manager.lua`). Not small: the mode settings, their menu
   rows and the step accounting are macOS-only today. Linux recommends no swipe anyway (the desktop acts on them), so
   this is for users who bind one.
+- **Tooling found on the way (4 November).** `tools/ci/seal-windows-updater-original-source.cjs --write` leaves
+  about 90 MB in the temp folder per run; remove it on exit. On the Windows PC these fail on a clean `dev` for
+  environment reasons, so only CI proves them: `test-site-github-release` and the site deploy admission controls
+  ("file changed before capture"), `test-keylayout-row-options` (different Lua keyboard ids),
+  `test-linux-field-report-contract` (setup error), `test-menu-manifest` in a worktree (a `node_modules` junction
+  copy fails with `EPERM`). Make each one pass locally or skip with a stated reason.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).
@@ -506,6 +512,9 @@ Each closes on a named green hosted or native run, recorded here.
       model loading on macOS (Linux done).
 - [ ] **Carbon and daemon-report Swift.** Carbon fixture compilation and both-architecture receipts; daemon-report
       allocation failures on Intel and Apple silicon.
+- [ ] **First `main` push after 1.0.9.** CodeQL scans `main` only: the 32 alerts fixed on dev on 4 November
+      (a3d69950e5..89b0b774c8) close only once that scan accepts the fixes. The Deploy site workflow runs from
+      `main`'s definition, so the superseded-push skip (bc14746520) works only from then on; check that one run.
 - [ ] **CodeQL Go.** After the `native_http` Go module is published, re-enable Go and check a non-empty analysis.
 - [ ] **Native Windows TLS fixture.** `X509Store.Add` on the CurrentUser root store blocks on the Windows security
       warning (`docs/memory/windows-ahk.md`), so these cases need a click; hosted lanes pass in LocalMachine scope.
