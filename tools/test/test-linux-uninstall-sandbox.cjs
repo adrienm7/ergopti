@@ -46,6 +46,28 @@ try {
 	const stubs = path.join(sandbox, 'stubs');
 	let configHome = null;
 	fs.mkdirSync(stubs);
+	if (process.platform === 'linux') {
+		const waitStubs = path.join(sandbox, 'owner-wait-stubs');
+		const sleeps = path.join(sandbox, 'owner-wait-sleeps');
+		fs.mkdirSync(waitStubs);
+		fs.writeFileSync(path.join(waitStubs, 'cat'), '#!/bin/bash\nexit 1\n', { mode: 0o755 });
+		fs.writeFileSync(
+			path.join(waitStubs, 'sleep'),
+			`#!/bin/bash\nprintf . >> ${JSON.stringify(sleeps)}\n`,
+			{ mode: 0o755 }
+		);
+		const failedReads = spawnSync(
+			bashExecutable(),
+			[bashPath(script), '--wait-owner', `${process.pid}:1`, '--check'],
+			{
+				encoding: 'utf8',
+				timeout: 15000,
+				env: { HOME: home, PATH: `${waitStubs}:/usr/bin:/bin`, LANG: 'C' }
+			}
+		);
+		assert.equal(failedReads.status, 1, failedReads.stderr);
+		assert.equal(fs.readFileSync(sleeps, 'utf8').length, 300, 'each refused read waits');
+	}
 	fs.writeFileSync(path.join(stubs, 'systemctl'), '#!/bin/bash\nexit 0\n', { mode: 0o755 });
 	const run = (...args) =>
 		spawnSync(bashExecutable(), [bashPath(script), '--prefix', bashPath(prefix), ...args], {
