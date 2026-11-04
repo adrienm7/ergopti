@@ -139,6 +139,7 @@ end
 local scripted_writer, injected_refusal = nil, false
 local callbacks = {}
 local queued_during_output = false
+local ai_characters = {}
 package.preload["adapters.uinput_writer"] = function()
 	-- Actual Writer transactions over controlled byte ports, never native input.
 	scripted_writer = require("tests.fakes").uinput_writer({
@@ -170,6 +171,14 @@ end
 local hook = require("adapters.keyboard_hook")
 hook.start = function(options)
 	callbacks = options
+	if os.getenv("ERGOPTI_E2E_QUEUE_OUTPUT") == "1" then
+		local prediction = require("modules.llm.prediction_engine")
+		local original = prediction.on_char
+		prediction.on_char = function(ch, ...)
+			ai_characters[#ai_characters + 1] = ch
+			return original(ch, ...)
+		end
+	end
 	if CONFIG:match("[/\\]daemon_keys%.toml$") then
 		local config = require("modules.hotstrings.hotstrings_config")
 		assert(config.set_all_sections("daemon_keys", true), "the scripted catalogue must be explicitly selected")
@@ -693,4 +702,5 @@ end
 -- A screen receipt is useful only after Main and native owners exit cleanly.
 assert(type(final_screen) == "string", "the scripted screen was never observed")
 print(final_screen)
+if os.getenv("ERGOPTI_E2E_QUEUE_OUTPUT") == "1" then print("QUEUE_AI " .. table.concat(ai_characters)) end
 print("E2E_CLEAN_EXIT")

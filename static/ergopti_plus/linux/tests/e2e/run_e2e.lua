@@ -478,7 +478,7 @@ local DAEMON_SCENARIOS = {
 	{ name = "an end-char trigger expands and keeps its terminator", keys = " adn ", screen = " ADN " },
 	{ name = "Enter is a terminator", keys = " adn{ENTER}", screen = " ADN\n" },
 	{ name = "an auto-expanding trigger fires on its last character", keys = "pk★", screen = "parce que" },
-	{ name = "input queued during an expansion can complete the next trigger", keys = "pk★z", screen = "parce queMATCH", queue_output = true },
+	{ name = "input queued during an expansion can complete the next trigger", keys = "pk★z", screen = "parce queMATCH", queue_output = true, llm = true, queue_ai = "pk★xz" },
 	-- "adn " → "ADN ", and the Backspace removes the REPLAYED space: undo must
 	-- count it, or the first character of the replacement stays ("Aadn").
 	{ name = "Backspace after an end-char expansion restores the trigger", keys = " adn {BS}", screen = " adn" },
@@ -720,6 +720,11 @@ do
 			local output, status = ChildCapture.run(command)
 			local expected_after = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local completed = ChildCapture.accepted(output, status, scenario.magic_repeat == "injection")
+			if scenario.queue_ai then
+				local receipt = output:match("QUEUE_AI ([^\r\n]+)")
+				if receipt == scenario.queue_ai then pass(prefix .. scenario.name .. " (AI input order)")
+				else fail(prefix .. scenario.name .. " (AI input order)", scenario.queue_ai, receipt or "absent") end
+			end
 			if scenario.tap_collision_receipt then
 				local receipt = output:match("TAP_COLLISION ([^\r\n]+)")
 				if receipt == scenario.tap_collision_receipt then
