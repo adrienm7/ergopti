@@ -1,19 +1,219 @@
 {
-	"expected_count": 13,
+	"expected_count": 53,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "personal native final admission:",
-			"expected_count": 5
+			"contains": "personal-toml-atomic-replace: failures preserve the old durable file",
+			"expected_count": 1
 		},
 		{
-			"contains": "personal metadata native final admission:",
-			"expected_count": 2
+			"contains": "personal-toml-atomic-replace: production writer routes through atomic publisher",
+			"expected_count": 1
 		},
 		{
-			"contains": "personal information native final admission:",
-			"expected_count": 6
+			"contains": "personal-toml-write-lease: aliases share one owner and stale releases fail",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-pre-rename-guard: authorization is last and refusal preserves target",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-pre-rename-guard: epoch or suspend changes during writer refuse publication",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-pre-rename-guard: opaque source refuses before staging and releases ownership",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-stage-hygiene: a refused cleanup is visible",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-stage-hygiene: every invocation owns a unique local sequence",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal TOML: structural section identifiers are rejected",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal TOML: full-model payload enforces its field schema",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-cache-race: a pre-publish read cannot survive the rename",
+			"expected_count": 1
+		},
+		{
+			"contains": "hcw-personal-meta-transaction: ownership precedes the read and rejects reentry",
+			"expected_count": 1
+		},
+		{
+			"contains": "hcw-personal-meta-transaction: every pre-publish failure preserves target bytes",
+			"expected_count": 1
+		},
+		{
+			"contains": "hcw-personal-meta-transaction: success uses one same-directory atomic replace",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-live-transaction: reentry cannot publish a stale registry suffix",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-live-transaction: Suspend refuses admission and post-stage publication",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-live-transaction: exact path is revalidated after every durable yield",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-live-transaction: deferred reload failure is visible and retains owned resync",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-live-transaction: native and WebView saves share one gateway",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal TOML: priority domain rejects invalid writer candidates",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: actual owner refuses foreign",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: actual owner refuses appeared",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: actual owner refuses stage-foreign",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: actual owner refuses authorize-foreign",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: actual owner refuses stage-close",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: opening model bypasses stale ordinary cache",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: own A then deferred B keeps exact publication lineage",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: saved but reload refused retains own image for resync retry",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: foreign replacement refuses before owned resync mutates runtime",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: actual no-delete handle refuses rename without source advancement",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: actual owner refuses deleted consent",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: actual owner refuses new-session consent",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: actual owner refuses copied-receipt consent",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: actual owner refuses invalid-presence consent",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: own image preserves all four file and section metadata neighbors",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal native final admission: live",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal native final admission: close",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal native final admission: pause",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal native final admission: released",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal native final admission: relocated",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal metadata native final admission: live",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal metadata native final admission: pause",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal information native final admission: live",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal information native final admission: pause",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal information native final admission: released",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal information native final admission: relocated",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal information native final admission: retired-editor",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal information native final admission: new-resident",
+			"expected_count": 1
+		},
+		{
+			"contains": "filesystem native guard: integer zero refuses actual rename and noop",
+			"expected_count": 1
+		},
+		{
+			"contains": "filesystem native guard: integer two refuses actual rename and noop",
+			"expected_count": 1
+		},
+		{
+			"contains": "filesystem native guard: string one refuses actual rename and noop",
+			"expected_count": 1
+		},
+		{
+			"contains": "filesystem native guard: exceptions refuse and restore native interruption state",
+			"expected_count": 1
+		},
+		{
+			"contains": "filesystem native guard: actual acknowledged rename consumes the verified stage",
+			"expected_count": 1
 		}
 	]
 }
