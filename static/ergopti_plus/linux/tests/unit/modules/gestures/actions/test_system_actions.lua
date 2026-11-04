@@ -310,7 +310,8 @@ helpers.describe("Linux system actions", function()
 		helpers.it("refuses make-executable when focus changes " .. boundary, function()
 			local Open = require("modules.shortcuts.open_selection")
 			local app, combos = "nautilus", {}
-			Open._set_deps_for_test({ focused_app = function() return app end })
+			Open._set_deps_for_test({ focused_app = function() return app end,
+				focused_identity = function() return "test:file-manager-window" end })
 			local ok, err = pcall(function()
 				with_modules({
 					["adapters.clipboard"] = { read_selection_uri_list = function(emit)

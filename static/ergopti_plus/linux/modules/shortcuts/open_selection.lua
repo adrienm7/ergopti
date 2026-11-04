@@ -62,6 +62,15 @@ local DEFAULT_DEPS = {
 	message = function(key) return require("infra.i18n").get(key) end,
 	getenv = os.getenv,
 	focused_app = function() return require("adapters.window_info").getFocused().appId end,
+	focused_identity = function()
+		local identity = require("adapters.window_info").focused_identity()
+		if identity then return identity end
+		local snapshot = require("adapters.atspi_focus").get_context_snapshot()
+		if snapshot and type(snapshot.window_bus_name) == "string" and type(snapshot.window_object_path) == "string" then
+			return "atspi:" .. snapshot.window_bus_name .. ":" .. snapshot.window_object_path
+		end
+		return nil
+	end,
 	-- Bounded helper process with a hard deadline; needs a desktop session.
 	active_frame_app = function()
 		local snapshot = require("adapters.atspi_focus").get_context_snapshot()
@@ -141,17 +150,25 @@ local function is_file_manager(app)
 	return FILE_MANAGERS[id] == true or FILE_MANAGERS[id:match("([^.]+)$")] == true
 end
 
+local function capture_manager(app)
+	local captured, identity = pcall(deps.focused_identity)
+	if not captured or type(identity) ~= "string" or identity == "" then return nil end
+	return function()
+		local current = deps.focused_app()
+		if type(current) ~= "string" or current == "" then current = deps.active_frame_app() end
+		if current ~= app or not is_file_manager(current) then return false end
+		local ok, observed = pcall(deps.focused_identity)
+		return ok and observed == identity
+	end
+end
+
 --- Retains the currently focused known file manager for a later copy chord.
---- @return function|nil Checks that the same application is still focused.
+--- @return function|nil Checks that the same native window is still focused.
 function M.capture_file_manager()
 	local app = deps.focused_app()
 	if type(app) ~= "string" or app == "" then app = deps.active_frame_app() end
 	if not is_file_manager(app) then return nil end
-	return function()
-		local current = deps.focused_app()
-		if type(current) ~= "string" or current == "" then current = deps.active_frame_app() end
-		return current == app and is_file_manager(current)
-	end
+	return capture_manager(app)
 end
 
 --- Copies the file manager's selected paths to the clipboard.
@@ -159,6 +176,7 @@ end
 ---   no file is selected (the caller then opens the primary selection).
 local function copy_file_selection(admitted)
 	local ok, uri_list, reason = deps.read_uri_list(admitted)
+	if admitted() ~= true then return false end
 	if not ok then
 		if reason == "no_file_selection" then return nil end
 		Logger.error(LOG, "copy_selected_path: the file manager's selection could not be read (%s).", tostring(reason))
@@ -239,11 +257,12 @@ function M.copy_selected_path(read_primary)
 		end
 	end
 	if is_file_manager(app) then
-		local copied = copy_file_selection(function()
-			local current = deps.focused_app()
-			if type(current) ~= "string" or current == "" then current = deps.active_frame_app() end
-			return current == app and is_file_manager(current)
-		end)
+		local admitted = capture_manager(app)
+		if not admitted then
+			Logger.warn(LOG, "copy_selected_path: the file-manager window identity is unavailable.")
+			return false
+		end
+		local copied = copy_file_selection(admitted)
 		if copied ~= nil then return copied end
 		Logger.info(LOG, "copy_selected_path: no file is selected in %s — opening the primary selection.", app)
 	end

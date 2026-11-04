@@ -79,6 +79,7 @@ local function record_in(app, read, frame_app)
 		message = function(key) return key == "shortcuts.copy_path_notif" and "Path copied: %s" or key end,
 		getenv = function(name) return ({ HOME = "/home/ada" })[name] end,
 		focused_app = function() return app end,
+		focused_identity = function() return "test:file-manager-window" end,
 		active_frame_app = function()
 			world.frame_queries = world.frame_queries + 1
 			return frame_app
@@ -183,6 +184,53 @@ end)
 helpers.describe("copy_selected_path copies the selected files' paths in a file manager (linux-copy-path-file-manager)", function()
 	local NAUTILUS_COPY = "file:///home/ada/Docs/r%C3%A9sum%C3%A9.pdf\r\nfile:///home/ada/My%20Folder\r\n"
 
+	helpers.it("refuses to copy after focus moves to another window of the same manager (copy-same-app-window)", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local window, presses = "x11:first", 0
+		Subject._set_deps_for_test({ focused_app = function() return "nautilus" end,
+			focused_identity = function() return window end,
+			read_uri_list = function(admitted)
+				window = "x11:second"
+				if admitted() then presses = presses + 1 end
+				return false, "", "copy_chord_failed"
+			end })
+		local retained = assert(Subject.capture_file_manager())
+		local result = Subject.copy_selected_path(function() return "" end)
+		local still_current = retained()
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(presses, 0, "the second window did not authorize Ctrl+C")
+		helpers.assert_eq(still_current, false, "deferred file actions must also lose authority")
+	end)
+
+	helpers.it("does not publish a file selection after the manager window changes (copy-same-app-window)", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local window, written = "x11:first", 0
+		Subject._set_deps_for_test({ focused_app = function() return "nautilus" end,
+			focused_identity = function() return window end,
+			read_uri_list = function(admitted)
+				assert(admitted()); window = "x11:second"
+				return true, "file:///tmp/a\n"
+			end,
+			write_clipboard = function() written = written + 1; return true end })
+		local result = Subject.copy_selected_path(function() return "" end)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(written, 0)
+	end)
+
+	helpers.it("refuses a file-manager copy without a native window identity (copy-same-app-window)", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local reads = 0
+		Subject._set_deps_for_test({ focused_app = function() return "nautilus" end,
+			focused_identity = function() return nil end,
+			read_uri_list = function() reads = reads + 1; return false end })
+		local result = Subject.copy_selected_path(function() error("must not fall back to another selection") end)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(reads, 0)
+	end)
+
 	helpers.it("(linux-copy-path-file-manager) copies the decoded paths, one per line, and opens nothing", function()
 		local world, Subject, primary = record_in("nautilus", { ok = true, uri_list = NAUTILUS_COPY })
 		local done = Subject.copy_selected_path(primary)
@@ -208,6 +256,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		local app, emitted, written = "nautilus", 0, 0
 		Subject._set_deps_for_test({
 			focused_app = function() return app end,
+			focused_identity = function() return "test:file-manager-window" end,
 			read_uri_list = function(admitted)
 				app = "gnome-terminal-server"
 				helpers.assert_type(admitted, "function")
@@ -236,7 +285,8 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		end }
 		package.loaded[names[2]] = { press = function() emitted = emitted + 1; return true end }
 		package.loaded[names[3]] = { sleep_ms = function() return true end }
-		Subject._set_deps_for_test({ focused_app = function() return app end })
+		Subject._set_deps_for_test({ focused_app = function() return app end,
+			focused_identity = function() return "test:file-manager-window" end })
 		local ok, err = pcall(function() helpers.assert_eq(Subject.copy_selected_path(function() return "" end), false) end)
 		Subject._set_deps_for_test(nil)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
@@ -260,7 +310,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 			local done = Subject.copy_selected_path(primary)
 			Subject._set_deps_for_test(nil)
 			helpers.assert_true(done)
-			helpers.assert_eq(world.frame_queries, 1)
+			helpers.assert_eq(world.frame_queries, 2, "the active frame is checked again before publication")
 			helpers.assert_eq(world.written, { "/tmp/a b" }, frame .. " selection is copied, not opened")
 			helpers.assert_eq(world.opened, {})
 		end
@@ -269,7 +319,8 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 	helpers.it("retains the active Wayland file manager and revokes it on focus change", function()
 		local Subject = require("modules.shortcuts.open_selection")
 		local frame = "nautilus"
-		Subject._set_deps_for_test({ focused_app = function() return "" end, active_frame_app = function() return frame end })
+		Subject._set_deps_for_test({ focused_app = function() return "" end, active_frame_app = function() return frame end,
+			focused_identity = function() return "test:file-manager-window" end })
 		local admitted = Subject.capture_file_manager()
 		helpers.assert_type(admitted, "function")
 		helpers.assert_eq(admitted(), true)
