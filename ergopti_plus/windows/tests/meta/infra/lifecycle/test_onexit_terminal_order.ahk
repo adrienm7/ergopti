@@ -44,7 +44,7 @@ _OTO_RefusalKeepsGestureHookLive() {
 		&& InStr(FlushFailureTail, _SHUTDOWN_REFUSAL_MARKER, true) > 0,
 		"an active detached flush must refuse OnExit and withdraw the reversible lease")
 	CommitPos := InStr(ShutdownBody, "ReloadTerminalHandoffCommit(", true)
-	LoggerReadyPos := InStr(ShutdownBody, "LoggerPrepareShutdown()", true)
+	LoggerReadyPos := InStr(ShutdownBody, "LoggerPrepareShutdown(", true)
 	FinalExitPos := InStr(ShutdownBody, "_Updater_SignalFinalExitForIntent()", true)
 	TransferPos := InStr(ShutdownBody,
 		"_Updater_TransferExitIntentAfterShutdownGates()", true)

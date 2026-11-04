@@ -22,6 +22,10 @@ function M.attach(writer)
 		for family, method in pairs(raw_methods) do
 			if #(payload.raw[family] or {}) > 0 and writer[method](device, payload.raw[family]) == false then ok = false end
 		end
+		if #(payload.raw.media or {}) > 0
+			and writer.insert_media_events(device, payload.raw.media, payload.media_threshold_ms) == false then
+			ok = false
+		end
 		for _, entry in ipairs(payload.upserts) do
 			local args = { device }
 			for _, value in ipairs(entry.args) do args[#args + 1] = value end

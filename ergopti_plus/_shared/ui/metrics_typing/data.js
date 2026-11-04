@@ -1056,7 +1056,7 @@ function render_repetitions_kpi() {
 	const doublings = [];
 
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		total_count += item.count || 0;
 		// Bigram is a "doubling" when both grapheme clusters are identical
 		if (chars.length === 2 && chars[0] === chars[1]) {
@@ -1270,7 +1270,7 @@ function render_sfb_kpi() {
 	let bigram_total = 0;
 
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const count = item.count || 0;
 		bigram_total += count;
@@ -1346,7 +1346,7 @@ function render_sfb_kpi() {
 	let sfb_avoided_hs = 0;
 	let bg_hs_total = 0;
 	Object.entries(hs_bg).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const count = item.count || 0;
 		bg_hs_total += count;
@@ -1590,7 +1590,7 @@ function render_distance_kpi() {
 	const char_to_kc = _build_char_to_kc_map();
 	const kc_bigram = {}; // kc_a → kc_b → count
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const kc_a = char_to_kc[chars[0].toLowerCase()];
 		const kc_b = char_to_kc[chars[1].toLowerCase()];
@@ -1985,7 +1985,7 @@ function render_ergo_bigram_kpi() {
 		top_roll_out = [];
 
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const count = item.count || 0;
 		if (count <= 0) return;
@@ -2178,7 +2178,7 @@ function render_ergo_trigram_kpi() {
 		top_bad_redir = [];
 
 	Object.entries(tg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 3) return;
 		const count = item.count || 0;
 		if (count <= 0) return;
@@ -2313,7 +2313,7 @@ function render_errors_kpi() {
 		total_errs = 0;
 	const rows = [];
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		// Skip bigrams whose second char is a control / bracket marker (already
 		// represented by [BS] / [ENTER] etc.) — they're not "user-correctable" pairs.
@@ -3057,7 +3057,7 @@ function render_charmix_kpi() {
 			(s) =>
 				`<div title="${s.label || (s.label || '') + ' ' + s.pct.toFixed(2) + '%'}" ` +
 				`style="flex-basis:${s.pct}%;background:${s.color};display:flex;align-items:center;justify-content:center;` +
-				`color:#0f172a;font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;">${s.label}</div>`
+				`color:${ThemeTokens.color('hue-0f172a')};font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;">${s.label}</div>`
 		)
 		.join('');
 	container.innerHTML =
@@ -3679,7 +3679,12 @@ function request_range_data(show_loader = true) {
 				return;
 			}
 		}
-		window._lua_request = JSON.stringify(req);
+		// Naming the history this page holds lets the macOS host omit it when
+		// unchanged: resending it each minute held its main thread 250 ms.
+		window._lua_request = JSON.stringify({
+			...req,
+			historical_serial: app_state.historical_serial ?? null
+		});
 	};
 	setTimeout(dispatch, DISPATCH_DELAY_MS);
 }
@@ -3713,18 +3718,36 @@ function mark_incomplete_read(part, incomplete) {
  * Receives the decoded n-gram payload from the Lua backend and triggers the
  * local filter/render pipeline.
  * @param {Object} payload - Contains { historical, today } n-gram dictionaries,
- *     plus `incomplete: true` when the host read missed rows.
+ *     plus `incomplete: true` when the host read missed rows. A host may name
+ *     its history with `historical_serial`, and then replace `historical` with
+ *     `historical_reused: true` when the request named that same serial.
  * @param {number|null} [request_id=null] - Native request ownership token.
  * @returns {boolean} Whether the payload was current and rendered.
  */
 function receive_range_data(payload, request_id = null) {
 	if (!can_receive_range_data(request_id)) return false;
-	if (request_id !== null && !complete_range_request(request_id, payload ? 'ok' : 'failed')) {
+	const serial = Number.isSafeInteger(payload?.historical_serial)
+		? payload.historical_serial
+		: null;
+	// A reuse of a history this page no longer holds cannot render: fail it
+	const reuse_refused =
+		payload?.historical_reused === true &&
+		(serial === null || serial !== app_state.historical_serial || !app_state.historical_cache);
+	const usable = Boolean(payload) && !reuse_refused;
+	if (request_id !== null && !complete_range_request(request_id, usable ? 'ok' : 'failed')) {
+		return false;
+	}
+	if (reuse_refused) {
+		app_state.historical_serial = null;
+		console.error('receive_range_data: the host reused a history this page does not hold.');
 		return false;
 	}
 	if (!payload) return false;
 	invalidate_typing_projection_cache();
-	app_state.historical_cache = payload.historical;
+	if (payload.historical_reused !== true) {
+		app_state.historical_cache = payload.historical;
+		app_state.historical_serial = serial;
+	}
 	app_state.today_live_data = payload.today;
 	mark_incomplete_read('range', payload.incomplete === true);
 	apply_local_filters();

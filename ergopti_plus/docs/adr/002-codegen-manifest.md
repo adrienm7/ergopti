@@ -39,7 +39,13 @@ The build script (`tools/build/build-features-manifest.js`, exposed as
   macOS and Linux share, written once; each driver's
   `_generated/features_manifest.lua` projects it through
   `features.manifest` when it loads
-- Per-driver `_generated/config_template.toml` — ready-to-copy user config
+- `static/ergopti_plus/_shared/_generated/config_template.toml` — the default
+  user config of the three drivers, written once: shared keys appear once,
+  driver-only keys as `platform.<driver>.<key>`, each driver's table order in
+  `[platform.<driver>] sections`
+- Per-driver `_generated/config_template.toml` — that driver's projection of
+  the shared template (`tools/lib/config-template-projection.cjs`), kept as a
+  file because packaging ships it byte for byte
 - Per-driver `_generated/tap_hold_template.toml`
 
 Files under `_generated/` are never edited by hand; they are committed to the

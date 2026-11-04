@@ -66,6 +66,8 @@ local function menu_controls(paused, relabel, magic_relabel, presence_options)
 	local ctx = {
 		paused = paused,
 		config = {
+			-- Hotstrings on: an off category greys its submenu (category-off rule).
+			any_enabled = function() return true end,
 			get_groups = function() return {} end,
 			get_categories = function() return {} end,
 			language_packs = function() return {} end,
@@ -79,7 +81,7 @@ local function menu_controls(paused, relabel, magic_relabel, presence_options)
 		on_quit = function() end,
 	}
 	ctx.is_paused = function() return ctx.paused end
-	local passed, rows = pcall(function() return helpers.load_module("ui.menu.menu_builder").build(ctx) end)
+	local passed, rows = pcall(function() return helpers.load_module("ui.menu.builder").build(ctx) end)
 	package.loaded["infra.manifest_menu"] = original
 	if not passed then error(rows, 0) end
 	local function find(items)

@@ -123,9 +123,9 @@ _LCC_ReportContract() {
 	catch
 		Threw := true
 	AssertTrue(Threw, "an unknown state is a bug")
-	Text := ComposerCheck_Text(Report, (Key) => "<" . Key . ">")
-	AssertEqual("<field_check.verdict_fail>`n`n[OK] <field_check.step.a>`n[i] <field_check.step.b> : fresh`n"
-		. "[-] <field_check.step.c> : kept`n[X] <field_check.step.d> : redacted", Text, "one line per step")
+	Text := ComposerCheck_Text(Report, (Key) => Key == "common.label_value" ? "{1} = {2}" : "<" . Key . ">")
+	AssertEqual("<field_check.verdict_fail>`n`n[OK] <field_check.step.a>`n[i] <field_check.step.b> = fresh`n"
+		. "[-] <field_check.step.c> = kept`n[X] <field_check.step.d> = redacted", Text, "one line per step, joined the locale's way")
 }
 Test("composer check: the record and the window text list every step once (composer-check)", _LCC_ReportContract)
 

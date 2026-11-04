@@ -52,7 +52,17 @@ function M.register(helpers, paths)
 				helpers.assert_true(result ~= nil, vector.name .. " converts: " .. tostring(err))
 				helpers.assert_eq(result.symbols_text, vector.symbols, vector.name .. " symbols")
 				helpers.assert_eq(result.compose_text, vector.compose, vector.name .. " compose")
+				helpers.assert_eq(#result.unplaced, 0, vector.name .. " places every key")
 			end
+		end)
+
+		helpers.it("reports the keys the keycode table cannot place, keypad and controls aside", function()
+			local vector = assert(Json.decode(read_all(paths.vectors))).vectors[1]
+			local extra = '<key code="93" output="&#x00A5;"/><key code="94" action="a"/>'
+				.. '<key code="82" output="0"/><key code="95" output="&#x0001;"/>'
+			local text = vector.keylayout:gsub('(<keyMap index="0">)', function(open) return open .. extra end, 1)
+			local result = assert(Converter.convert(assert(Keylayout.parse(text)), options_of(vector)))
+			helpers.assert_eq(table.concat(result.unplaced, ","), "93,94")
 		end)
 
 		helpers.it("refuses a layout id the XKB section cannot carry", function()

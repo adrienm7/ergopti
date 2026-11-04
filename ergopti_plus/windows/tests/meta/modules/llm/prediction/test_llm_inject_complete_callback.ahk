@@ -44,10 +44,8 @@
 ; =================================================
 ; =================================================
 
-_LICC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_LICC_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -58,7 +56,7 @@ _LICC_ReadSource(RelPath) {
 ; ===================================================
 
 _LICC_CheckCallbackWired() {
-	Src := _LICC_ReadSource("modules/keymap/llm_bridge.ahk")
+	Src := _LICC_ReadSource("llm_bridge.ahk")
 	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
 
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
@@ -74,7 +72,7 @@ _LICC_CheckCallbackWired() {
 }
 
 _LICC_CheckCompleteFnExists() {
-	Src := _LICC_ReadSource("modules/keymap/llm_bridge.ahk")
+	Src := _LICC_ReadSource("llm_bridge.ahk")
 	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_Bridge_OnInjectComplete")
@@ -92,7 +90,7 @@ _LICC_CheckCompleteFnExists() {
 }
 
 _LICC_CheckNoFixedTimerForClear() {
-	Src := _LICC_ReadSource("modules/keymap/llm_bridge.ahk")
+	Src := _LICC_ReadSource("llm_bridge.ahk")
 	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
 
 	Body := _DriverFuncBody("LLM_Bridge_OnAccept")

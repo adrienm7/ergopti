@@ -75,13 +75,15 @@ local LEASE_RECOVERY_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
 local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
 local LEASE_GUARDIAN_STATUS_POLL_SEC = 3.0
 local LEASE_GUARDIAN_PROBE_TIMEOUT_SEC = 2.0
--- The launcher's registration role runs at most five bounded launchctl steps
--- (3 s each plus a 0.25 s termination grace) and two 3 s guardian health waits
--- (a loaded job whose health check fails is booted out and bootstrapped again):
--- 22.25 s. The deadline keeps 2 s over that for the pipe and the main thread;
--- at 20 s it killed a slow registration that was still inside its own budget
+-- The launcher's registration role runs at most eight bounded launchctl steps
+-- (3 s each plus a 0.25 s termination grace) and four 3 s waits: an ad hoc
+-- build's reset (legacy removal, then the old guardian's exit), the modern
+-- health wait, and the legacy path's two health waits (a loaded job whose
+-- health check fails is booted out and bootstrapped again): 38 s. The deadline
+-- keeps 2 s over that for the pipe and the main thread; at 20 s it killed a
+-- slow registration still inside its own budget
 -- (hardening-d-native-timeout-contract).
-local LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC = 25.0
+local LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC = 40.0
 local FIRST_RUN_WIZARD_DELAY_SEC = Timings.sec("ui", "onboarding_startup_delay_ms")
 local FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS = 3
 -- A retained input-source event is an ordering barrier for lease recovery: the
@@ -209,7 +211,7 @@ local _state = nil
 -- present only after an explicit opt-in with `[karabiner] runtime = "owned"`;
 -- default boot never requires that module. `paths` is the runtime-selected
 -- path table.
-M._owned = { owner = nil, paths = require("platform.remap.ke_paths") }
+M._owned = { owner = nil, activation = nil, paused = false, paths = require("platform.remap.ke_paths") }
 
 --- True when this boot opted in to the owned runtime.
 --- @return boolean owned
@@ -373,12 +375,13 @@ end
 --- is off. Needs no lease, token or Karabiner process; personal rules keep their
 --- exact bytes and an unprovable file is left untouched.
 --- @param context string Stable diagnostic label.
+--- @param path string|nil The karabiner.json to clean; this boot's output when nil.
 --- @return boolean removed True when no marked rule remains.
 --- @return string detail `absent`, `unchanged`, `removed`, or the refusal.
 --- @return integer removed_count Number of rules removed.
-local function remove_managed_rules(context)
+local function remove_managed_rules(context, path)
 	local call_ok, removed, detail, removed_count = xpcall(function()
-		return ManagedRuleRemoval.remove_managed_rules(KARABINER_OUT)
+		return ManagedRuleRemoval.remove_managed_rules(path or KARABINER_OUT)
 	end, debug.traceback)
 	if not call_ok then
 		Logger.error(LOG, "%s: managed-rule removal raised: %s.", context, tostring(removed))
@@ -4189,9 +4192,11 @@ local function publish_settings_state(candidate)
 	_state.tap_hold_config = candidate.tap_hold_config
 	_state.mod_combos_config = candidate.mod_combos_config
 	_state.tap_hold_timeout_ms = candidate.tap_hold_timeout_ms
+	_state.lone_modifier_tap_max_ms = candidate.lone_modifier_tap_max_ms
 	_state.sticky_timeout_ms = candidate.sticky_timeout_ms
 	_state.simultaneous_threshold_ms = candidate.simultaneous_threshold_ms
 	_state.combo_symmetric = candidate.combo_symmetric
+	_state.close_other_instances = candidate.close_other_instances
 end
 
 --- Persists and then publishes one detached settings candidate.
@@ -4232,6 +4237,7 @@ local REGENERATION_REFUSED_BEFORE_DEPLOY = {
 	["pause-intent-pending"] = true,
 	["token-unavailable"] = true,
 	["layout-refresh-exhausted"] = true,
+	["owned-runtime-not-admitted"] = true,
 }
 
 --- Completes the original bulk caller exactly once.
@@ -4734,6 +4740,18 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 		)
 		return true
 	end
+	-- Ergopti's own runtime not admitted yet (not installed, a user Karabiner
+	-- running, no network...): the regeneration would be refused before any
+	-- deploy, and Restore recommended reverted its saved edit behind a blocking
+	-- dialog. The admission's own regeneration builds from what is saved here.
+	if M._owned.selected() and not (M._owned.owner and M._owned.owner.admitted()) then
+		settle_bulk_settings_saved_for_later(
+			transaction,
+			"persisted-owned-runtime-not-admitted",
+			"when Ergopti's own Karabiner runtime is admitted"
+		)
+		return true
+	end
 
 	transaction.phase = "candidate-regeneration-pending"
 	return dispatch_bulk_regeneration(transaction, label .. " regeneration",
@@ -5052,6 +5070,31 @@ function M.set_tap_hold_timeout(ms)
 	return committed
 end
 
+--- Returns how long a modifier key pressed alone still types its tap.
+--- @return number milliseconds 0 for the strict tap-hold.
+function M.get_lone_modifier_tap_max_ms()
+	if not require_state("get_lone_modifier_tap_max_ms") then return nil end
+	return _state.lone_modifier_tap_max_ms
+end
+
+--- Sets the lone modifier tap window and persists it.
+--- Logs an error and returns without saving if the value is invalid.
+--- Does NOT regenerate — call M.regenerate() explicitly when ready.
+--- @param ms number 0 (the strict tap-hold) or a positive whole number of milliseconds.
+function M.set_lone_modifier_tap_max_ms(ms)
+	if not require_state("set_lone_modifier_tap_max_ms") then return false end
+	local valid, value = pcall(require("tap_hold.lone_tap").validate, ms)
+	if not valid then
+		Logger.error(LOG, "set_lone_modifier_tap_max_ms: invalid value '%s' — ignoring.", tostring(ms))
+		return false
+	end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.lone_modifier_tap_max_ms = value
+	end, nil, require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
+	if committed then Logger.debug(LOG, "Lone modifier tap window: %d ms.", value) end
+	return committed
+end
+
 --- Returns the sticky/one-shot modifier timeout in milliseconds.
 --- @return number milliseconds
 function M.get_sticky_timeout()
@@ -5149,6 +5192,85 @@ function M.set_tap_holds_enabled(value)
 		candidate.tap_holds_enabled = value
 	end, nil, require("config_keys").KEY.TAP_HOLDS_ENABLED)
 	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
+	return committed
+end
+
+--- Whether this boot runs Ergopti's own Karabiner runtime, for the menu rows
+--- that only exist with it.
+--- @return boolean owned
+function M.owned_runtime_selected()
+	return M._owned.selected()
+end
+
+--- The owned runtime owner's state and stable reason, for the menu row that
+--- explains a block (the one-driver-version rule of the VirtualHIDDevice).
+--- @return table|nil status { state, reason } or nil when no owner is bound.
+function M.owned_runtime_status()
+	local owner = M._owned.owner
+	if not owner then return nil end
+	local status = owner.status()
+	return { state = status.state, reason = status.reason }
+end
+
+--- The driver version the owned runtime needs, for the update offer of an
+--- incompatible VirtualHIDDevice.
+--- @return string|nil version Nil when the manifest pins none.
+function M.owned_virtual_hid_version()
+	return require("adapters.runtime_owner_ports").virtual_hid_version()
+end
+
+--- Replaces an incompatible VirtualHIDDevice with the pinned driver after the
+--- user confirmed it. The caller reloads after telling the user, so the next
+--- owner admits the new driver or names the System Settings approval macOS
+--- may still wait for (ui/virtual_hid_update.lua).
+--- @param on_done function fn(ok, reason|nil, explanation|nil) called once.
+--- @return boolean started False when no incompatible driver blocks the owned runtime.
+function M.update_virtual_hid_driver(on_done)
+	assert(type(on_done) == "function", "update_virtual_hid_driver(): a completion callback is required")
+	local status = M.owned_runtime_status()
+	if not M._owned.selected() or type(status) ~= "table"
+		or status.reason ~= require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE then
+		Logger.error(LOG, "VirtualHIDDevice update refused: no incompatible driver blocks the owned runtime.")
+		return false
+	end
+	require("adapters.runtime_owner_ports").update_virtual_hid(on_done)
+	return true
+end
+
+--- Whether Ergopti closed the user's own Karabiner-Elements and has not given
+--- it back yet, for the menu row that says so.
+--- @return boolean closed
+function M.user_karabiner_closed()
+	if not M._owned.selected() then return false end
+	return require("adapters.runtime_owner_ports").marker().get() == true
+end
+
+--- The user's consent to closing their own Karabiner while Ergopti runs.
+--- @return boolean consent
+function M.get_close_other_instances()
+	if not require_state("get_close_other_instances") then return false end
+	return _state.close_other_instances == true
+end
+
+--- Sets and persists `[karabiner] close_other_instances`, then applies the
+--- activation rule so a runtime that waited on the consent starts.
+--- @param value boolean Desired consent.
+--- @return boolean committed
+function M.set_close_other_instances(value)
+	if not require_state("set_close_other_instances") then return false end
+	if type(value) ~= "boolean" then
+		Logger.error(LOG, "set_close_other_instances(): value must be a boolean.")
+		return false
+	end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.close_other_instances = value
+	end)
+	if committed then
+		Logger.info(LOG, "Close other Karabiner instances: %s.", value and "on" or "off")
+		if M._owned.selected() and M._owned.reconcile() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime could not follow the close option.")
+		end
+	end
 	return committed
 end
 
@@ -5390,6 +5512,7 @@ local function clone_persisted_settings(source)
 		or type(source.enabled) ~= "boolean"
 		or type(source.tap_hold_timeout_ms) ~= "number"
 		or type(source.sticky_timeout_ms) ~= "number"
+		or (source.lone_modifier_tap_max_ms ~= nil and type(source.lone_modifier_tap_max_ms) ~= "number")
 		or type(source.simultaneous_threshold_ms) ~= "number"
 		or type(source.combo_symmetric) ~= "boolean"
 		or (source.mod_combos_enabled ~= nil and type(source.mod_combos_enabled) ~= "boolean") then
@@ -5403,6 +5526,7 @@ local function clone_persisted_settings(source)
 		tap_hold_config = detached.tap_hold_config,
 		mod_combos_config = detached.mod_combos_config,
 		tap_hold_timeout_ms = detached.tap_hold_timeout_ms,
+		lone_modifier_tap_max_ms = detached.lone_modifier_tap_max_ms,
 		sticky_timeout_ms = detached.sticky_timeout_ms,
 		simultaneous_threshold_ms = detached.simultaneous_threshold_ms,
 		combo_symmetric = detached.combo_symmetric == true,
@@ -5748,6 +5872,7 @@ function M.restore_settings(snapshot, on_done, layer_receipt)
 		candidate.tap_hold_config = restored.tap_hold_config
 		candidate.mod_combos_config = restored.mod_combos_config
 		candidate.tap_hold_timeout_ms = restored.tap_hold_timeout_ms
+		candidate.lone_modifier_tap_max_ms = restored.lone_modifier_tap_max_ms
 		candidate.sticky_timeout_ms = restored.sticky_timeout_ms
 		candidate.simultaneous_threshold_ms = restored.simultaneous_threshold_ms
 		candidate.combo_symmetric = restored.combo_symmetric
@@ -5921,13 +6046,19 @@ function M.apply_scope(request, on_done)
 			candidate.combo_symmetric = target.combo_symmetric
 			return #M.MOD_COMBOS
 		end
+		-- The manifest rows of the scope, each with its state field.
+		local fields = {
+			[require("config_keys").KEY.TAP_HOLDS_ENABLED] = "tap_holds_enabled",
+			-- config-key-literal-ok: the value is the remap state field, named like its leaf
+			[require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = "lone_modifier_tap_max_ms",
+		}
 		for _, row in ipairs(Manifest.scope_plan(request.scope, request.mode).operations) do
 			local path = row.section .. "." .. row.key
-			assert(path == require("config_keys").KEY.TAP_HOLDS_ENABLED, "tap-hold scope row has no remap owner: " .. path)
+			local field = assert(fields[path], "tap-hold scope row has no remap owner: " .. path)
 			if row.delete then
-				candidate.tap_holds_enabled = Manifest.default_for(path)
+				candidate[field] = Manifest.default_for(path)
 			else
-				candidate.tap_holds_enabled = row.value
+				candidate[field] = row.value
 			end
 		end
 		candidate.tap_hold_config = target.tap_hold_config
@@ -5952,6 +6083,7 @@ function M.reset_to_defaults(on_done, scope)
 		candidate.tap_holds_enabled         = defaults.tap_holds_enabled
 		candidate.tap_hold_config           = defaults.tap_hold_config
 		candidate.tap_hold_timeout_ms       = defaults.tap_hold_timeout_ms
+		candidate.lone_modifier_tap_max_ms  = defaults.lone_modifier_tap_max_ms
 		candidate.sticky_timeout_ms         = defaults.sticky_timeout_ms
 		if not includes_combos then return #M.TAP_HOLD_KEYS end
 		candidate.mod_combos_enabled        = defaults.mod_combos_enabled
@@ -6237,10 +6369,15 @@ function M.regenerate(
 	-- Cheap enough to do unconditionally: load_available_actions memoises the
 	-- built list, so this walks the logical_char entries and mutates their key
 	-- codes in place rather than rebuilding 673 action tables.
+	-- Each stage is a phase: a late run loop or a hold names the stage that cost
+	-- (2026-10-31: 360 ms for a layout-settle regeneration that changed nothing).
+	local Phases = require("infra.phase_stats")
+	local stage_started = Phases.now()
 	if M.AVAILABLE_ACTIONS then
 		local layout_ok = resolve_current_layout_actions("Karabiner regeneration layout-action resolution")
 		if not layout_ok then return fail("layout-resolution-failed") end
 	end
+	Phases.stop("karabiner.layout_actions", stage_started)
 	context.built_layout_serial = _layout_event_serial
 	context.built_after_tis_settle = _layout_settled_serial >= context.built_layout_serial
 
@@ -6254,6 +6391,7 @@ function M.regenerate(
 
 	-- The navigation layer is data: layers.toml is read again for every
 	-- regeneration, so an edited file applies with the next one.
+	stage_started = Phases.now()
 	local ok_nav, nav_layer, nav_observation = pcall(NavLayer.load)
 	if not ok_nav then
 		Logger.error(LOG, "The navigation layer could not be read: %s.", tostring(nav_layer))
@@ -6273,6 +6411,8 @@ function M.regenerate(
 		_state.script_chords = chords
 	end
 
+	Phases.stop("karabiner.inputs", stage_started)
+	stage_started = Phases.now()
 	local ok_build, result, build_err, legacy_rules, legacy_context = pcall(
 		Generator.build_karabiner_json,
 		_state,
@@ -6288,8 +6428,10 @@ function M.regenerate(
 		return fail("generation-failed")
 	end
 
+	Phases.stop("karabiner.build", stage_started)
 	-- Counted before the call: a failed deploy may still have written.
 	_deploy_serial = _deploy_serial + 1
+	stage_started = Phases.now()
 	local deploy_ok, deployed, deploy_detail, _, deploy_refusal = xpcall(function()
 		if M._owned.selected() then
 			return Generator.deploy_owned_config(result, KARABINER_OUT)
@@ -6301,6 +6443,7 @@ function M.regenerate(
 			legacy_context
 		)
 	end, debug.traceback)
+	Phases.stop("karabiner.deploy", stage_started)
 	if not deploy_ok or deployed ~= true then
 		local deploy_failure = deploy_ok and deploy_detail or deployed
 		Logger.error(LOG, "Karabiner deploy failed → '%s': %s.",
@@ -6579,6 +6722,11 @@ end
 --- @param on_done function|nil Callback fn(ok, reason) after PAUSED or failure.
 --- @param onboarding_gate table|nil Private exact-settlement continuation token.
 function M.pause(on_done, onboarding_gate)
+	if onboarding_gate == nil and M._owned.selected() and M._owned.paused ~= true then
+		-- Ergopti paused: its own runtime stops and a Karabiner it closed comes back.
+		M._owned.paused = true
+		if M._owned.reconcile() ~= true then Logger.error(LOG, "Owned Karabiner runtime could not follow the pause.") end
+	end
 	if not _state or not _state.enabled then
 		invoke_public_callback("pause", on_done, false, "integration-disabled")
 		return false
@@ -6690,6 +6838,11 @@ end
 --- acknowledgement names the same ACTIVE token.
 --- @param on_done function|nil Callback fn(ok, reason) after the full transaction.
 function M.resume(on_done)
+	if M._owned.selected() and M._owned.paused == true then
+		-- Ergopti resumes: its own runtime runs again and closes the user's Karabiner.
+		M._owned.paused = false
+		if M._owned.reconcile() ~= true then Logger.error(LOG, "Owned Karabiner runtime could not follow the resume.") end
+	end
 	if not _state or not _state.enabled then
 		invoke_public_callback("resume", on_done, false, "integration-disabled")
 		return false
@@ -6762,44 +6915,77 @@ end
 -- ============================
 -- ============================
 
---- Binds the owned runtime owner to the real Mac ports and admits the runtime.
---- Admission failure is reported by the owner with a named reason and leaves the
---- bridge fail-closed: nothing falls back to the shared runtime. When admission
---- succeeds, the configuration is generated and deployed to the owned path.
---- @return boolean started False when the owner could not be bound.
-function M._owned.start()
+--- Binds the owned runtime owner and its activation rule once, to the real Mac
+--- ports. Nothing is started here.
+--- @return table|nil activation Nil when the owner could not be bound.
+function M._owned.bind()
+	if M._owned.activation then return M._owned.activation end
 	local Owner = require("platform.remap.runtime_owner")
-	Logger.start(LOG, "Opting in to the owned Karabiner runtime…")
-	local ports_ok, ports = pcall(function() return require("adapters.runtime_owner_ports").new() end)
+	Logger.start(LOG, "Binding the owned Karabiner runtime…")
+	local OwnerPorts = require("adapters.runtime_owner_ports")
+	local ports_ok, ports = pcall(OwnerPorts.new)
 	if not ports_ok then
 		Logger.error(LOG, "Owned Karabiner runtime ports could not be built: %s.", tostring(ports))
-		return false
+		return nil
 	end
 	if not Owner.init(ports) then
 		Logger.error(LOG, "Owned Karabiner runtime owner was already bound; the bridge stays fail-closed.")
-		return false
+		return nil
 	end
 	M._owned.owner = Owner
-	local epoch = _lifecycle_epoch
-	-- The user's consent to closing an official Karabiner is the hidden key, whose
-	-- absent default is the decided `true`; it is never assumed here.
-	local accepted = Owner.start({ close_other_instances = _state.close_other_instances == true },
-		function(admitted, reason, explanation)
-			if epoch ~= _lifecycle_epoch or not _running then return end
-			if admitted ~= true then
-				Logger.error(LOG, "Owned Karabiner runtime refused (%s): %s Remapping stays off.",
-					tostring(reason), tostring(explanation))
-				return
-			end
-			if _state.enabled == true and not M.regenerate() then
-				Logger.error(LOG, "Owned Karabiner runtime was admitted but its configuration could not be requested.")
-			end
-		end)
-	if accepted ~= true then
-		Logger.error(LOG, "Owned Karabiner runtime admission could not start.")
-		return false
+	-- A second capture cannot start in this Lua VM, so a resume reloads the driver.
+	M._owned.activation = require("platform.remap.runtime_activation").new(OwnerPorts.activation(Owner,
+		function() return _state ~= nil and _state.close_other_instances == true end,
+		function()
+			Logger.info(LOG, "Reloading so that Ergopti's own Karabiner runtime starts again.")
+			hs.reload()
+		end))
+	Logger.success(LOG, "Owned Karabiner runtime bound.")
+	return M._owned.activation
+end
+
+--- Removes the rules an earlier shared-mode build merged into the user's own
+--- `~/.config/karabiner/karabiner.json`. An owned boot writes its own file, so
+--- those rules would keep remapping inside the user's Karabiner-Elements, which
+--- the user gets back on a pause or a quit, with a lease nobody renews. Only
+--- rules carrying the exact ErgoptiPlus marker go, by byte-span surgery; personal
+--- rules keep their bytes, and an unprovable file stays untouched and is logged.
+--- @return boolean retired True when no marked rule remains in the shared file.
+function M._owned.retire_shared_rules()
+	local shared = M._owned.shared_config
+	if type(shared) ~= "string" or shared == "" then
+		-- ERGOPTI_KARABINER_OUT redirects this boot: the user's own file is not ours to read.
+		Logger.info(LOG, "Shared karabiner.json left alone: this boot's output path is overridden.")
+		return true
 	end
-	Logger.success(LOG, "Owned Karabiner runtime admission requested.")
+	local removed, detail, count = remove_managed_rules("Owned runtime migration", shared)
+	if removed and count > 0 then
+		Logger.info(LOG, "Removed %d rule(s) an earlier build merged into '%s'.", count, shared)
+	elseif removed then
+		Logger.debug(LOG, "No earlier ErgoptiPlus rule in '%s' (%s).", shared, detail)
+	end
+	return removed
+end
+
+--- Applies the activation rule (platform/remap/runtime_activation.lua): while
+--- Ergopti runs and is not paused its own runtime is active and closes the
+--- user's Karabiner; paused, it stops and gives back a Karabiner it closed. Admission
+--- failure is reported by the owner with a named reason and leaves the bridge
+--- fail-closed: nothing falls back to the shared runtime. When admission
+--- succeeds, the configuration is generated and deployed to the owned path.
+--- @return boolean applied False when the owner could not be bound.
+function M._owned.reconcile()
+	local activation = M._owned.bind()
+	if not activation then return false end
+	local epoch = _lifecycle_epoch
+	local lifecycle = { running = _running == true and not _shutdown_requested, paused = M._owned.paused == true }
+	local action = activation.reconcile(require("platform.remap.runtime_activation").wanted(lifecycle), function()
+		if epoch ~= _lifecycle_epoch or not _running then return end
+		if _state.enabled == true and not M.regenerate() then
+			Logger.error(LOG, "Owned Karabiner runtime was admitted but its configuration could not be requested.")
+		end
+	end)
+	Logger.info(LOG, "Owned Karabiner runtime activation: %s.", action)
 	return true
 end
 
@@ -6874,7 +7060,10 @@ function M.init(file_system)
 	end
 	if runtime == M._owned.paths.RUNTIME_OWNED then
 		Logger.warn(LOG, "Opted in to the owned Karabiner runtime (not shipped; hidden preference).")
+		M._owned.shared_config = nil
 		if not (env_override and env_override ~= "") then
+			-- Still the shared path here: the migration cleans it once this boot is owned.
+			M._owned.shared_config = KARABINER_OUT
 			KARABINER_OUT = file_system.expand_path(M._owned.paths.config_file_for(runtime))
 			Logger.info(LOG, "Owned KE config path resolved: '%s'.", KARABINER_OUT)
 		end
@@ -6947,6 +7136,7 @@ function M.init(file_system)
 		tap_hold_config           = user_cfg.tap_hold_config,
 		mod_combos_config         = user_cfg.mod_combos_config,
 		tap_hold_timeout_ms       = user_cfg.tap_hold_timeout_ms,
+		lone_modifier_tap_max_ms  = user_cfg.lone_modifier_tap_max_ms,
 		sticky_timeout_ms         = user_cfg.sticky_timeout_ms,
 		simultaneous_threshold_ms = user_cfg.simultaneous_threshold_ms,
 		combo_symmetric           = user_cfg.combo_symmetric,
@@ -7160,10 +7350,11 @@ function M.init(file_system)
 	-- hs.reload() within the same Hammerspoon session.
 	-- The owned runtime is installed by its own installer, not by the wizard that
 	-- offers the official application.
-	if M._owned.selected() and _state.enabled then
-		if M._owned.start() ~= true then
-			Logger.error(LOG, "Owned Karabiner runtime could not be started; remapping stays off.")
+	if M._owned.selected() then
+		if M._owned.reconcile() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime could not be bound; remapping stays off.")
 		end
+		M._owned.retire_shared_rules()
 	end
 	if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session then
 		_wizard_ran_this_session = true
@@ -7197,7 +7388,14 @@ local function stop_local_resources()
 			Logger.error(LOG, "Owned Karabiner runtime is still retained after teardown.")
 			all_stopped = false
 		else
-			M._owned.owner = nil
+			-- Ours no longer runs. On a quit a Karabiner Ergopti closed is given
+			-- back; a reload brings ours straight back and must not hand the
+			-- keyboards to theirs in between. The marker survives a quit that ends
+			-- before this settles, and the next boot with Tap-Hold off restores it.
+			if M._owned.activation and M._owned.teardown_reason ~= "hammerspoon_reload" then
+				M._owned.activation.restore_if_closed()
+			end
+			M._owned.owner, M._owned.activation = nil, nil
 		end
 	end
 	-- The module-level contract owns timers, installer tasks, partials, and mounts
@@ -7276,6 +7474,8 @@ end
 --- @param on_done function|nil Callback fn(fenced, reason).
 --- @return boolean True when exact revocation was accepted.
 function M.revoke(reason, on_done)
+	-- A reload starts the same rule again at once; only a quit gives a closed Karabiner back.
+	M._owned.teardown_reason = reason
 	if _enabled_transition ~= nil and _enabled_transition.file ~= nil then
 		local transaction = _enabled_transition
 		if transaction.before_lifecycle() ~= true then

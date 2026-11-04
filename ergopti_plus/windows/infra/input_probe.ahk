@@ -807,14 +807,14 @@ _IP_HookInject(Target, Mode) {
 		Reason := _IP_TargetAdmission(Target)
 		if Reason != ""
 			return Map("seen", _InputProbeHookSeen, "fired", _InputProbeHookFired, "reason", Reason)
-		Sleep(10)
+		Sleep(TimingsGet("adapters", "input_probe_step_ms"))
 	}
 	Reason := _IP_TargetAdmission(Target)
 	if Reason != ""
 		return Map("seen", _InputProbeHookSeen, "fired", _InputProbeHookFired, "reason", Reason)
 	; A key that AutoHotkey let through reaches the test hook within the same
 	; send; the extra pause only lets a late callback land.
-	Sleep(40)
+	Sleep(TimingsGet("adapters", "input_probe_settle_ms"))
 	Reason := _IP_TargetAdmission(Target)
 	return Map("seen", _InputProbeHookSeen, "fired", _InputProbeHookFired, "reason", Reason)
 }

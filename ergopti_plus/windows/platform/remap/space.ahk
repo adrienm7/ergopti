@@ -10,6 +10,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -108,7 +109,7 @@ _SpaceTap() {
 						return true
 				if Fired {
 						HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
-								? "repeat_key"
+								? MenuCommand.REPEAT_KEY
 								: (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
 						HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
 						HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger

@@ -35,39 +35,39 @@ body {
 	--sub: var(--theme-sub);
 	--hint: var(--theme-gray);
 	--accent: var(--theme-accent);
-	--accent2: #5856d6;
+	--accent2: var(--theme-hue-5856d6);
 	--danger: var(--theme-danger);
 	--row-sep: var(--theme-gray6);
 	--shadow: 0 1px 3px rgba(0, 0, 0, 0.09);
 	--tag-bg: var(--theme-gray6);
-	--tag-on: #ddeeff;
+	--tag-on: var(--theme-hue-ddeeff);
 	--tag-on-c: var(--theme-blue);
-	--chip-bg: #ddeeff;
-	--chip-c: #1a4bbf;
-	--cmd-hover-bg: #f1f1f1;
+	--chip-bg: var(--theme-hue-ddeeff);
+	--chip-c: var(--theme-hue-1a4bbf);
+	--cmd-hover-bg: var(--theme-grey-f1f1f1);
 	--chip-bd: rgba(26, 75, 191, 0.22);
-	--row-hover: #f5f8ff;
+	--row-hover: var(--theme-hue-f5f8ff);
 	--warning: var(--theme-orange);
-	--warning-bg: #fff8ee;
+	--warning-bg: var(--theme-hue-fff8ee);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--surface: #242424;
-		--hint: #a2a2a2;
+		--surface: var(--theme-grey-242424);
+		--hint: var(--theme-grey-a2a2a2);
 		--accent2: var(--theme-purple-dark);
 		--row-sep: var(--theme-gray4-dark);
 		--shadow: none;
 		--tag-bg: var(--theme-gray4-dark);
-		--tag-on: #0a3a6e;
-		--tag-on-c: #64b5f6;
-		--chip-bg: #5e5f60;
-		--chip-c: #cfe0ff;
-		--cmd-hover-bg: #131313;
+		--tag-on: var(--theme-hue-0a3a6e);
+		--tag-on-c: var(--theme-hue-64b5f6);
+		--chip-bg: var(--theme-hue-5e5f60);
+		--chip-c: var(--theme-hue-cfe0ff);
+		--cmd-hover-bg: var(--theme-grey-131313);
 		--chip-bd: rgba(147, 184, 248, 0.28);
-		--row-hover: #333335;
+		--row-hover: var(--theme-hue-333335);
 		--warning: var(--theme-orange-dark);
-		--warning-bg: #2a2000;
+		--warning-bg: var(--theme-hue-2a2000);
 	}
 }
 
@@ -219,13 +219,13 @@ body {
 }
 
 .sec-del:hover {
-	background: #ffe5e3;
+	background: var(--theme-hue-ffe5e3);
 	color: var(--danger);
 }
 
 @media (prefers-color-scheme: dark) {
 	.sec-del:hover {
-		background: #4a1c1a;
+		background: var(--theme-hue-4a1c1a);
 		color: var(--danger);
 	}
 }
@@ -302,7 +302,7 @@ body {
 @media (prefers-color-scheme: dark) {
 	.trig-lbl {
 		background: var(--theme-gray5-dark);
-		border-color: #48484a;
+		border-color: var(--theme-hue-48484a);
 	}
 }
 
@@ -612,7 +612,7 @@ body {
 	.fg input[type='text'],
 	.fg input[type='number'] {
 		background: var(--theme-gray4-dark);
-		border-color: #5a5a5c;
+		border-color: var(--theme-hue-5a5a5c);
 	}
 }
 
@@ -784,7 +784,7 @@ body {
 @media (prefers-color-scheme: dark) {
 	.trig-editor {
 		background: var(--theme-gray4-dark);
-		border-color: #5a5a5c;
+		border-color: var(--theme-hue-5a5a5c);
 	}
 }
 
@@ -853,7 +853,7 @@ body {
 @media (prefers-color-scheme: dark) {
 	.output-editor {
 		background: var(--theme-gray4-dark);
-		border-color: #5a5a5c;
+		border-color: var(--theme-hue-5a5a5c);
 	}
 }
 

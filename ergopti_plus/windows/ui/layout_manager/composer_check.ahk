@@ -163,7 +163,7 @@ ComposerCheck_Text(Report, TranslateFn) {
 	for Step in Report["steps"] {
 		Line := Marks.Get(Step["state"], "[-]") . " " . TranslateFn.Call("field_check.step." . Step["id"])
 		if Step["value"] != ""
-			Line .= " : " . Step["value"]
+			Line := LabelValue(Line, Step["value"], TranslateFn)
 		Text .= "`n" . Line
 	}
 	return Text

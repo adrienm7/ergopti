@@ -26,19 +26,19 @@ global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
 
 global ScriptInformation := Map(
-		"MagicKey", _FeatureStateRequireManifestDefault("hotstrings.trigger_char"),
+		"MagicKey", _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_TRIGGER_CHAR),
 		; The physical key remapped to ★, as the shared [hotstrings]
 		; magic_key_source names it on every driver: a KeyboardEvent.code, or the
 		; manifest default "auto" that leaves the key to the layout.
 		"MagicKeySource", _FeatureStateRequireManifestDefault(
-			"hotstrings.magic_key_source"),
+			ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE),
 		; Its scan code, resolved once at boot by LayoutRegistry_MagicKeySource
 		; (ErgoptiPlus.ahk) before any hotkey registers on it.
 		"MagicKeySourceScan", "",
 		; The character whose key the boot looks for on the OS layout when no key
 		; is chosen and no emulated layout declares one.
 		"MagicKeySourceChar", _FeatureStateRequireManifestDefault(
-			"hotstrings.magic_key_source_char"),
+			ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE_CHAR),
 		; Whether config.toml names the source key: the user's choice then wins
 		; over the active layout's declared key and over any detection.
 		"MagicKeySourceChosen", false,
@@ -55,7 +55,7 @@ global ScriptInformation := Map(
 		; explicitly set to true or false; "auto" (or absent) defers to the
 		; probe. Kept as an escape hatch in case the probe ever misfires on an
 		; exotic layout.
-		"AltGrIsKanaRemap", _FeatureStateRequireManifestDefault("script.alt_gr_is_kana_remap"),
+		"AltGrIsKanaRemap", _FeatureStateRequireManifestDefault(ConfigKey.SCRIPT_ALT_GR_IS_KANA_REMAP),
 		; Configurable file paths — all derived from _ConfigDir set above.
 		; AHK-specific files (.ahk, AHK config.toml) go under ``autohotkey/`` so
 		; the folder can be safely shared with the Hammerspoon driver via cloud
@@ -109,7 +109,7 @@ global SCRIPT_SHORTCUT_LABELS := Map(
 		"script_altgr_delete",    "sg_labels.script_altgr_delete",
 		"script_altgr_escape",    "sg_labels.script_altgr_escape",
 )
-global SCRIPT_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection("shortcuts.script_control")
+global SCRIPT_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection(ConfigKey.SHORTCUTS_SCRIPT_CONTROL)
 global SCRIPT_SHORTCUT_FALLBACKS := Map(
 		"script_altgr_enter", "{Enter}",
 		"script_altgr_backspace", "{BackSpace}",
@@ -131,10 +131,10 @@ for _FeatureStateIndex, _FeatureStateSlot in SCRIPT_SHORTCUT_SLOTS {
 }
 
 ; Configurable keyboard shortcuts — Ctrl/Win/Alt × a-z, 0-9 and special keys.
-; Each slot id matches a GESTURE_ACTIONS key (e.g. "win_a", "ctrl_b").
+; Each slot id is a neutral chord id (e.g. "meta_a", "primary_b").
 ; Defaults below mirror the legacy hard-coded shortcuts so a fresh install
 ; behaves identically to before while giving the user full control via the menu.
-global KEYBOARD_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection("shortcuts.keyboard")
+global KEYBOARD_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection(ConfigKey.SHORTCUTS_KEYBOARD)
 global KeyboardShortcutAssignments := Map()
 
 ; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in
@@ -190,7 +190,7 @@ global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER := Map(
 ReadCategoryEnabled(Cache) {
 		global CategoryEnabled
 		for Category, _Default in CategoryEnabled {
-				Raw := _FeatureStateIniGet(Cache, "category_enabled", _FeatureStateCategoryKey(Category))
+				Raw := _FeatureStateIniGet(Cache, ConfigLeaf.CATEGORY_ENABLED, _FeatureStateCategoryKey(Category))
 				if (Raw == "_") {
 						continue
 				}
@@ -217,7 +217,7 @@ IsCategoryGated(Category) {
 
 ReadScriptConfig(Cache) {
 		; MagicKey lives in [hotstrings] trigger_char in the v2 TOML.
-		Raw := _FeatureStateIniGet(Cache, "hotstrings", "trigger_char")
+		Raw := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.TRIGGER_CHAR)
 		if Raw != "_"
 				ScriptInformation["MagicKey"] := _FeatureStateValidateTriggerChar(Raw)
 		; Source key for the J→★ remap, named by its KeyboardEvent.code so the one
@@ -225,49 +225,49 @@ ReadScriptConfig(Cache) {
 		; no candidate is outdated configuration: the loader reports it and the
 		; cleanup offers it, so it reads as the automatic key here, never as a
 		; boot failure.
-		RawSource := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source")
+		RawSource := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.MAGIC_KEY_SOURCE)
 		ScriptInformation["MagicKeySource"] := _FeatureStateMagicKeySource(RawSource)
 		ScriptInformation["MagicKeySourceChosen"] := ScriptInformation["MagicKeySource"]
-			!== _FeatureStateRequireManifestDefault("hotstrings.magic_key_source")
-		RawChar := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_char")
+			!== _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
+		RawChar := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.MAGIC_KEY_SOURCE_CHAR)
 		if RawChar != "_"
 				ScriptInformation["MagicKeySourceChar"] :=
 					_FeatureStateValidateCodePoint(RawChar,
-						"hotstrings.magic_key_source_char")
+						ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE_CHAR)
 		; AltGr-as-Kana manual override. Default "auto" defers to the reverse
 		; VK_RMENU→SC probe in HotstringEngineInit(); "true" / "false" force the
 		; respective mode. Lives in [script] so the user can lock it once per
 		; machine if auto-detection misfires on an exotic layout.
-		RawKana := _FeatureStateIniGet(Cache, "script", "alt_gr_is_kana_remap")
+		RawKana := _FeatureStateIniGet(Cache, "script", ConfigLeaf.ALT_GR_IS_KANA_REMAP)
 		if RawKana != "_"
 				ScriptInformation["AltGrIsKanaRemap"] :=
 					_FeatureStateReadKanaOverride(Cache, RawKana)
 		; Missing repeat-key intent restores the same neutral baseline as first boot.
 		global HSE_RepeatEnabled
-		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", "repeat_key_enabled")
+		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.REPEAT_KEY_ENABLED)
 		if RawRepeat != "_"
 				HSE_RepeatEnabled := _FeatureStateValidateBoolean(
-					RawRepeat, "hotstrings.repeat_key_enabled")
+					RawRepeat, ConfigKey.HOTSTRINGS_REPEAT_KEY_ENABLED)
 		else
-				HSE_RepeatEnabled := ManifestDefaultFor("hotstrings.repeat_key_enabled")
+				HSE_RepeatEnabled := ManifestDefaultFor(ConfigKey.HOTSTRINGS_REPEAT_KEY_ENABLED)
 		; When the engine forgets the current word: after a pause, after a click.
 		global HSE_IdleResetSeconds, HSE_ClickResetsWord
 		HSE_IdleResetSeconds := _FeatureStateIdleResetSeconds(
-			_FeatureStateIniGet(Cache, "hotstrings", "idle_reset_seconds"))
+			_FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.IDLE_RESET_SECONDS))
 		global HSE_CascadeMaxArrows
 		HSE_CascadeMaxArrows := _FeatureStateCascadeMaxArrows(
 			_FeatureStateIniGet(Cache, ConfigKey.HOTSTRINGS, ConfigLeaf.CASCADE_MAX_ARROWS))
-		RawClick := _FeatureStateIniGet(Cache, "hotstrings", "click_resets_word")
+		RawClick := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.CLICK_RESETS_WORD)
 		if RawClick != "_"
 				HSE_ClickResetsWord := _FeatureStateValidateBoolean(
-					RawClick, "hotstrings.click_resets_word")
+					RawClick, ConfigKey.HOTSTRINGS_CLICK_RESETS_WORD)
 		else
-				HSE_ClickResetsWord := ManifestDefaultFor("hotstrings.click_resets_word")
+				HSE_ClickResetsWord := ManifestDefaultFor(ConfigKey.HOTSTRINGS_CLICK_RESETS_WORD)
 		; ...and after an arrow key, a shortcut, a tap-hold key's own output.
 		global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
-		HSE_ArrowResetsWord := _FeatureStateWordResetFlag(Cache, "arrow_resets_word")
-		HSE_ShortcutResetsWord := _FeatureStateWordResetFlag(Cache, "shortcut_resets_word")
-		HSE_TapHoldResetsWord := _FeatureStateWordResetFlag(Cache, "tap_hold_resets_word")
+		HSE_ArrowResetsWord := _FeatureStateWordResetFlag(Cache, ConfigLeaf.ARROW_RESETS_WORD)
+		HSE_ShortcutResetsWord := _FeatureStateWordResetFlag(Cache, ConfigLeaf.SHORTCUT_RESETS_WORD)
+		HSE_TapHoldResetsWord := _FeatureStateWordResetFlag(Cache, ConfigLeaf.TAP_HOLD_RESETS_WORD)
 		; The preview-bubble switches: the stored value, or the manifest default.
 		global HSE_PreviewSwitches
 		HSE_PreviewSwitches := Map()
@@ -302,7 +302,7 @@ _FeatureStateValidateBoolean(Value, Path) {
 ; @param Raw {Any} The raw TOML value, "_" when absent.
 ; @returns {Number} Seconds; 0 disables the idle reset.
 _FeatureStateIdleResetSeconds(Raw) {
-	Default := ManifestDefaultFor("hotstrings.idle_reset_seconds")
+	Default := ManifestDefaultFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS)
 	if Raw == "_"
 		return Default
 	; HSE_ValidIdleResetSeconds's rule, restated because this reader also boots
@@ -347,7 +347,7 @@ _FeatureStateValidateKanaOverride(Value) {
 		throw ValueError("script.alt_gr_is_kana_remap must be 'auto' or a TOML boolean")
 	}
 	return _FeatureStateValidateBoolean(Value,
-		"script.alt_gr_is_kana_remap")
+		ConfigKey.SCRIPT_ALT_GR_IS_KANA_REMAP)
 }
 
 ; The configured magic-key source in its manifest spelling, or the manifest
@@ -355,10 +355,10 @@ _FeatureStateValidateKanaOverride(Value) {
 ; rule (TomlConfigValueMatchesManifest compares with AHK's case-insensitive =),
 ; so a value the loader applies is never read here as another key.
 _FeatureStateMagicKeySource(Raw) {
-	Default := _FeatureStateRequireManifestDefault("hotstrings.magic_key_source")
+	Default := _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	if Raw == "_" || !(Raw is String)
 		return Default
-	Entry := ManifestFindEntryByPath("hotstrings.magic_key_source")
+	Entry := ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	if !(Entry is Map) || !Entry.Has("enum_values")
 		throw Error("Missing required feature manifest candidates: hotstrings.magic_key_source")
 	for Allowed in Entry["enum_values"] {
@@ -378,7 +378,7 @@ _FeatureStateValidateCodePoint(Value, Path) {
 
 _FeatureStateValidateTriggerChar(Value) {
 	; Keep the runtime boundary aligned with config.schema.json.
-	return _FeatureStateValidateCodePoint(Value, "hotstrings.trigger_char")
+	return _FeatureStateValidateCodePoint(Value, ConfigKey.HOTSTRINGS_TRIGGER_CHAR)
 }
 
 ; IniCacheGet belongs to the configuration-loader boundary.  It is included

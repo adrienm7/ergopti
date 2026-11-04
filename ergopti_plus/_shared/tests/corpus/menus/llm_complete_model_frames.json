@@ -23,7 +23,7 @@
 				"separator": true
 			},
 			{
-				"label": "— SPECIFICATIONS —",
+				"label": "— Specifications —",
 				"action": false,
 				"disabled": true
 			},
@@ -47,7 +47,7 @@
 				"separator": true
 			},
 			{
-				"label": "— CAPABILITIES —",
+				"label": "— Capabilities —",
 				"action": false,
 				"disabled": true
 			},
@@ -63,7 +63,7 @@
 				"separator": true
 			},
 			{
-				"label": "— REQUIREMENTS (Ollama 🦙) —",
+				"label": "— Requirements (Ollama 🦙) —",
 				"action": false,
 				"disabled": true
 			},
@@ -97,7 +97,7 @@
 				"separator": true
 			},
 			{
-				"label": "— SPÉCIFICATIONS —",
+				"label": "— Spécifications —",
 				"action": false,
 				"disabled": true
 			},
@@ -121,7 +121,7 @@
 				"separator": true
 			},
 			{
-				"label": "— CAPACITÉS —",
+				"label": "— Capacités —",
 				"action": false,
 				"disabled": true
 			},
@@ -137,7 +137,7 @@
 				"separator": true
 			},
 			{
-				"label": "— CONFIGURATION REQUISE (Ollama 🦙) —",
+				"label": "— Configuration requise (Ollama 🦙) —",
 				"action": false,
 				"disabled": true
 			},

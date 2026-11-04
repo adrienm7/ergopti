@@ -1,5 +1,7 @@
 ﻿; adapters/http_client.ahk
 
+#Include %A_LineFile%\..\proxy_override.ahk
+
 ; ==============================================================================
 ; MODULE: HttpClient Adapter (AutoHotkey)
 ; DESCRIPTION:
@@ -67,11 +69,17 @@ global _HTTP_CURL_ABORT_TIMER := 0
 ; worked in the browser. Mirrors release_sources.proxy_resolve_timeout_sec in
 ; _shared/modules/updater/defaults.json (pinned by the JS drift gate).
 global SYSTEM_PROXY_RESOLVE_TIMEOUT_MS := 10000
+; Copy of [limits] process_output_bytes: a request can run before the registry loads (pinned by test-keystats-timings-single-source.cjs).
+global SYSTEM_PROXY_WORKER_MAX_OUTPUT_BYTES := 65536
 ; PAC answers resolved this session, keyed by exact destination URL ("" = direct).
 global _SYSTEM_PROXY_PAC_CACHE := Map()
 ; Every waiter of the in-flight PAC resolution (0 = none running).
 global _SYSTEM_PROXY_PAC_PENDING := 0
 global _SYSTEM_PROXY_PAC_CONFIG := ""
+; The proxy variables curl reads per destination scheme, from proxy_policy.json
+; environment_precedence on first use (0 = not read yet).
+global _SYSTEM_PROXY_ENV_PRECEDENCE := 0
+global _SYSTEM_PROXY_LOOPBACK := 0
 
 
 
@@ -133,6 +141,57 @@ _HTTP_CurlRuntimeLimitSupported(CurlExe, VersionFn := 0) {
 		return false
 	return _HTTP_CurlVersionAtLeast(Version,
 		HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION)
+}
+
+; The system curl the loopback requests start. Ergopti+ keeps it rather than
+; pinning a copy (maintainer decision): the start check below refuses in words.
+; @returns {String} Its absolute path.
+HTTP_SystemCurlPath() {
+	return A_WinDir . "\System32\curl.exe"
+}
+
+; Schedules the check below when the AI is on: the boot once it is ready, and the
+; toggle that turns the AI on. Only the AI's requests need curl, so with the AI off
+; nothing is checked and no dialog opens (maintainer decision).
+; @param AiOn {Boolean} Whether the AI is on.
+; @param ScheduleFn {Func} Test seam taking the check, a one-shot timer by default.
+; @returns {Boolean} True when a check was scheduled.
+HTTP_ScheduleCurlCheck(AiOn, ScheduleFn := 0) {
+	if !AiOn
+		return false
+	if HasMethod(ScheduleFn, "Call")
+		ScheduleFn.Call(HTTP_CheckCurlAtStart)
+	else
+		SetTimer(HTTP_CheckCurlAtStart, -1)
+	return true
+}
+
+; Says at start, in words, that the local AI requests cannot run, instead of each
+; request's bare refusal. The version comes from the file: starting the program
+; would cost a process at every start of the driver. Scheduled after the boot is
+; ready, since a modal dialog freezes the auto-execute thread under it.
+; @param VersionFn {Func} Test seam taking the path, FileGetVersion by default; it
+;        throws for a file missing or without a version.
+; @param NoticeFn {Func} Test seam taking the text, a dialog by default.
+; @returns {Boolean} True when the version is usable.
+HTTP_CheckCurlAtStart(VersionFn := 0, NoticeFn := 0) {
+	global HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION
+	CurlExe := HTTP_SystemCurlPath()
+	if _HTTP_CurlRuntimeLimitSupported(CurlExe, VersionFn)
+		return true
+	Version := ""
+	try Version := IsObject(VersionFn) ? VersionFn.Call(CurlExe) : FileGetVersion(CurlExe)
+	catch as Err
+		LoggerWarn("HttpClient", "Could not read the version of curl: {1}.", Err.Message)
+	LoggerError("HttpClient", "curl {1} or later is required, found '{2}'.",
+		HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION, Version)
+	Text := StrReplace(t(Version == "" ? "startup.curl_missing" : "startup.curl_too_old"), "{1}", CurlExe)
+	Text := StrReplace(StrReplace(Text, "{2}", Version), "{3}", HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION)
+	if HasMethod(NoticeFn, "Call")
+		NoticeFn.Call(Text)
+	else
+		Ui_MsgBox(Text, t("startup.curl_title"), "Icon!")
+	return false
 }
 
 
@@ -337,7 +396,7 @@ class CurlAsyncRequest {
 	; Routes the request through an explicit proxy URL ("" = direct). Proxy
 	; authentication uses the signed-in Windows account (SSPI), like a browser.
 	SetProxy(Proxy) {
-		if !(Proxy is String) || (Proxy != "" && !SystemProxy_IsValidProxyUrl(Proxy))
+		if !(Proxy is String) || (Proxy != "" && !SystemProxy_IsValidProxyUrl(Proxy) && !ProxyOverride_IsValidRelay(Proxy))
 			throw ValueError("HTTP proxy must be an http, https or socks URL.")
 		this.Proxy := Proxy
 		this.ProxySelected := true
@@ -396,7 +455,7 @@ class CurlAsyncRequest {
 		Input .= ',"connect_timeout_ms":' . this.ConnectTimeoutMs
 		Input .= ',"revocation_best_effort":' . (this.RevocationBestEffort ? "true" : "false")
 		if !this.ManagedRouting && this.ProxySelected
-			Input .= ',"fixed_proxy":' . JsonStringLiteral(this.Proxy)
+			Input .= ',"fixed_proxy":' . JsonStringLiteral(ProxyOverride_CarriesCredentials(this.Proxy) ? "override" : this.Proxy)
 		if IsObject(this.ManagedSettingsReader) {
 			Settings := this.ManagedSettingsReader.Call()
 			if !(Settings is Map)
@@ -429,7 +488,7 @@ class CurlAsyncRequest {
 		SpawnFn := this._DispatchPortFn("spawn")
 		Handle := IsObject(SpawnFn)
 			? SpawnFn.Call(Executable, Args, ObjBindMethod(this, "_OnManagedDone"), 0, 0, 8192)
-			: ShellRunner_SpawnTreeOwned(Executable, Args, ObjBindMethod(this, "_OnManagedDone"), 0, 0, 8192)
+			: ProxyOverride_SpawnWorker(Executable, Args, ObjBindMethod(this, "_OnManagedDone"), 0, 0, 8192)
 		this.Handle := Handle
 		if !this._ManagedIsLive() {
 			this.Completed := false
@@ -482,7 +541,14 @@ class CurlAsyncRequest {
 				return this.Abort()
 			; Reserve once before filesystem calls can pump this timer again. Only
 			; a capability receipt from this exact live Job admits secret staging.
-			this.ManagedPayloadPublished := true
+			; A second poll may have interrupted the reads above and published
+			; already, leaving no image: staging again would refuse a live request.
+			PreviousCritical := Critical("On")
+			try {
+				if this.ManagedPayloadPublished
+					return
+				this.ManagedPayloadPublished := true
+			} finally Critical(PreviousCritical)
 			PayloadImage := this.ManagedTransportImage
 			StagedPath := Directory . "transport.pending"
 			if !FSWrite(StagedPath, PayloadImage)
@@ -527,6 +593,10 @@ class CurlAsyncRequest {
 					&& Receipt.Get("child_quiesced", false) is Integer
 					&& Receipt["child_quiesced"] == true {
 				this.NativeReceipt := Receipt.Get("receipt", Map())
+				; proxy_policy.json pac_unavailable_fallback: the stage is a closed token.
+				if Receipt.Has("pac_fallback_stage")
+					LoggerWarn("Network", "Automatic proxy configuration unusable at {1}; this request goes direct.",
+						Receipt["pac_fallback_stage"])
 				if !this.ManagedPayloadPublished && Receipt.Get("ok", 0) is Integer && Receipt.Get("ok", 0) == false
 						&& Receipt.Get("status", -1) is Integer && Receipt.Get("status", -1) == 0
 					this._MarkNativeDispatchRefused()
@@ -829,6 +899,31 @@ _SystemProxy_UrlParts(Url) {
 	return Map("scheme", StrLower(M[1]), "host", StrLower(Trim(M[2], "[]")))
 }
 
+; Returns the proxy variables curl reads for a destination scheme, in its
+; order. proxy_policy.json environment_precedence is their one declaration
+; (test-proxy-policy-single-source.cjs refuses a hand-typed copy here).
+; @param {String} Scheme "http" or "https".
+; @returns {Array} The variable names.
+; @throws {Error} The policy is unreadable or holds no list for the scheme.
+_SystemProxy_EnvironmentPrecedence(Scheme) {
+	global _SYSTEM_PROXY_ENV_PRECEDENCE, _SharedDir
+	if !(_SYSTEM_PROXY_ENV_PRECEDENCE is Map) {
+		Lists := JsonParse(FSReadStrict(_SharedDir . "\modules\network\proxy_policy.json"))
+			.Get("environment_precedence", 0)
+		if !(Lists is Map)
+			throw ValueError("proxy_policy.json holds no environment_precedence.")
+		for Name in ["http", "https"] {
+			if !(Lists.Get(Name, 0) is Array) || Lists[Name].Length == 0
+				throw ValueError("proxy_policy.json environment_precedence." . Name . " must be a non-empty list.")
+			for Variable in Lists[Name]
+				if !(Variable is String) || !RegExMatch(Variable, "^[A-Za-z_]+$")
+					throw ValueError("proxy_policy.json environment_precedence." . Name . " holds an invalid name.")
+		}
+		_SYSTEM_PROXY_ENV_PRECEDENCE := Map("http", Lists["http"], "https", Lists["https"])
+	}
+	return _SYSTEM_PROXY_ENV_PRECEDENCE[Scheme]
+}
+
 ; Adds the scheme WinINet omits ("host:port" means an HTTP proxy) and
 ; validates the result. Returns "" for an entry curl could not use.
 _SystemProxy_NormalizeEndpoint(Endpoint, DefaultScheme) {
@@ -935,6 +1030,12 @@ SystemProxy_ForUrl(Url, ReaderFn := 0, SpawnFn := 0) {
 	; WinINet proxies only govern http(s); any other scheme connects as given.
 	if !(Url is String) || !RegExMatch(Url, "i)^https?://")
 		return ""
+	Override := _SystemProxy_OverrideRoute(Url)
+	if Override is Map {
+		if !Override["ok"]
+			throw ValueError("The stored proxy override is refused.")
+		return Override["proxy"]
+	}
 	Config := _SystemProxy_Config(ReaderFn)
 	_SystemProxy_RefreshCache(Config)
 	Selection := SystemProxy_SelectStatic(Config, Url)
@@ -959,6 +1060,11 @@ SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0, Strict := 
 	if Strict && !(Budget is Map)
 		Budget := Map("start", A_TickCount)
 	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING
+	OverrideAnswer := _SystemProxy_OverrideAnswer(Urls)
+	if OverrideAnswer is Map {
+		Callback.Call(OverrideAnswer)
+		return true
+	}
 	Config := _SystemProxy_Config(ReaderFn, Strict)
 	ConfigIdentity := _SystemProxy_RefreshCache(Config)
 	Result := Map("_proxy_resolved", true, "_proxy_receipts", Map(), "_proxy_config_identity", ConfigIdentity)
@@ -1036,7 +1142,7 @@ SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0, Strict := 
 			: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", Command]
 		PacRun.Handle := IsObject(SpawnFn)
 			? SpawnFn.Call(Exe, Args, OnDone)
-			: ShellRunner_SpawnTreeOwned(Exe, Args, OnDone, 0, 0, 65536)
+			: ShellRunner_SpawnTreeOwned(Exe, Args, OnDone, 0, 0, SYSTEM_PROXY_WORKER_MAX_OUTPUT_BYTES)
 		if !(IsObject(PacRun.Handle) && PacRun.Handle.start())
 			throw Error("the PowerShell child did not start")
 	} catch as Err {
@@ -1269,21 +1375,149 @@ _SystemProxy_CleanupInput(PacRun) {
 	return false
 }
 
+; The override's route for one URL, 0 when it leaves the choice to the system.
+; A loopback destination stays direct whatever the override, as in the shared policy.
+_SystemProxy_OverrideRoute(Url) {
+	Choice := ProxyOverride_Current()
+	if !(Choice is Map)
+		return Map("ok", false, "proxy", "")
+	if Choice["mode"] == "automatic"
+		return 0
+	if SystemProxy_IsLoopbackUrl(Url)
+		return Map("ok", true, "proxy", "")
+	return Map("ok", true, "proxy", Choice["mode"] == "relay" ? Choice["relay"] : "")
+}
+
+; Whether a URL names this machine, by the shared policy's loopback rows.
+SystemProxy_IsLoopbackUrl(Url) {
+	return _SystemProxy_IsLoopbackHost(_SystemProxy_UrlParts(Url)["host"])
+}
+
+; proxy_policy.json loopback, the rule network_proxy_policy.py and the Lua policy apply.
+_SystemProxy_LoopbackPolicy() {
+	global _SYSTEM_PROXY_LOOPBACK, _SharedDir
+	if !(_SYSTEM_PROXY_LOOPBACK is Map) {
+		Policy := JsonParse(FSReadStrict(_SharedDir . "\modules\network\proxy_policy.json")).Get("loopback", 0)
+		if !(Policy is Map)
+			throw ValueError("proxy_policy.json holds no loopback rows.")
+		Networks := []
+		for Cidr in Policy["ipv4_cidrs"] {
+			Parts := StrSplit(Cidr, "/")
+			Address := _SystemProxy_Ipv4Number(Parts[1])
+			if Parts.Length != 2 || Address < 0 || !IsInteger(Parts[2]) || Integer(Parts[2]) > 32
+				throw ValueError("proxy_policy.json holds an invalid IPv4 loopback range.")
+			Networks.Push([Address, (0xFFFFFFFF << (32 - Integer(Parts[2]))) & 0xFFFFFFFF])
+		}
+		Addresses := []
+		for Address in Policy["ipv6_addresses"] {
+			Groups := _SystemProxy_Ipv6Key(Address)
+			if Groups == ""
+				throw ValueError("proxy_policy.json holds an invalid IPv6 loopback address.")
+			Addresses.Push(Groups)
+		}
+		_SYSTEM_PROXY_LOOPBACK := Map("hosts", Policy["dns_hosts"], "suffixes", Policy["dns_suffixes"],
+			"ipv4", Networks, "ipv6", Addresses)
+	}
+	return _SYSTEM_PROXY_LOOPBACK
+}
+
+_SystemProxy_IsLoopbackHost(Host) {
+	Policy := _SystemProxy_LoopbackPolicy()
+	for Name in Policy["hosts"]
+		if Host == Name
+			return true
+	for Suffix in Policy["suffixes"]
+		if StrLen(Host) > StrLen(Suffix) && SubStr(Host, -StrLen(Suffix)) == Suffix
+			return true
+	Address := _SystemProxy_Ipv4Number(Host)
+	if Address >= 0 {
+		for Network in Policy["ipv4"]
+			if (Address & Network[2]) == Network[1]
+				return true
+		return false
+	}
+	Groups := _SystemProxy_Ipv6Key(Host)
+	if Groups != ""
+		for Loopback in Policy["ipv6"]
+			if Groups == Loopback
+				return true
+	return false
+}
+
+; Dotted decimal to a number, -1 for anything else. A leading zero is refused, as
+; Python's ipaddress does: resolvers read it as octal.
+_SystemProxy_Ipv4Number(Text) {
+	if !RegExMatch(Text, "^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})$", &M)
+		return -1
+	Packed := 0
+	loop 4 {
+		if Integer(M[A_Index]) > 255
+			return -1
+		Packed := (Packed << 8) | Integer(M[A_Index])
+	}
+	return Packed
+}
+
+; One spelling for an IPv6 address (eight colon-separated numbers), "" when it is not one.
+_SystemProxy_Ipv6Key(Text) {
+	if !RegExMatch(Text, "^[0-9A-Fa-f:]{2,39}$") || InStr(Text, ":::") || StrSplit(Text, "::").Length > 2
+		return ""
+	Sides := StrSplit(Text, "::")
+	Head := Sides[1] == "" ? [] : StrSplit(Sides[1], ":")
+	Tail := Sides.Length == 1 || Sides[2] == "" ? [] : StrSplit(Sides[2], ":")
+	Missing := 8 - Head.Length - Tail.Length
+	if (Sides.Length == 1 ? Missing != 0 : Missing < 1)
+		return ""
+	Key := ""
+	for Side in [Head, 0, Tail] {
+		if !IsObject(Side) {
+			loop Sides.Length == 1 ? 0 : Missing
+				Key .= "0:"
+			continue
+		}
+		for Group in Side {
+			if !RegExMatch(Group, "^[0-9A-Fa-f]{1,4}$")
+				return ""
+			Key .= Integer("0x" . Group) . ":"
+		}
+	}
+	return Key
+}
+
+; The answer of SystemProxy_ResolveAsync under an override, 0 when automatic.
+_SystemProxy_OverrideAnswer(Urls) {
+	Answer := Map("_proxy_resolved", true, "_proxy_receipts", Map(), "_proxy_config_identity", "override")
+	for Url in Urls {
+		Route := _SystemProxy_OverrideRoute(Url)
+		if !(Route is Map)
+			return 0
+		Answer[Url] := Route["proxy"]
+		Answer["_proxy_receipts"][Url] := Map("source", Route["ok"] ? "override" : "override_refused", "native_error", 0)
+		if !Route["ok"]
+			Answer["_proxy_resolved"] := false
+	}
+	return Answer
+}
+
 ; Explicit environment relay configuration wins over GUI settings, as curl's
 ; inherited environment does. Empty system DIRECT remains an explicit answer.
 SystemProxy_ResolveCurlAsync(Url, Callback, ReaderFn := 0, SpawnFn := 0, EnvFn := EnvGet) {
 	Parts := _SystemProxy_UrlParts(Url)
-	Host := Parts["host"]
-	if Host == "localhost" || Host == "127.0.0.1" || Host == "::1" {
+	if _SystemProxy_IsLoopbackHost(Parts["host"]) {
 		Callback.Call(Map("ok", true, "inherit", false, "proxy", "", "source", "loopback", "native_error", 0))
+		return true
+	}
+	; The user's override is the most explicit choice: it wins over an exported
+	; relay and the PAC lookup never runs (proxy_policy.lua policy.route).
+	Override := _SystemProxy_OverrideRoute(Url)
+	if Override is Map {
+		Callback.Call(Map("ok", Override["ok"], "inherit", false, "proxy", Override["proxy"],
+			"source", Override["ok"] ? "override" : "override_refused", "native_error", 0))
 		return true
 	}
 	; Mirror curl's destination-specific environment precedence. Windows
 	; environment lookup is case-insensitive, as curl's native getenv is.
-	Names := Parts["scheme"] == "https"
-		? ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
-		: ["http_proxy", "all_proxy", "ALL_PROXY"]
-	for Name in Names {
+	for Name in _SystemProxy_EnvironmentPrecedence(Parts["scheme"]) {
 		if EnvFn.Call(Name) != "" {
 			Callback.Call(Map("ok", true, "inherit", true, "proxy", "", "source", "environment", "native_error", 0))
 			return true
@@ -1305,11 +1539,7 @@ _SystemProxy_PublishCurlSelection(Url, Callback, ReaderFn, EnvFn, Resolved) {
 }
 
 _SystemProxy_CurlSelectionIsCurrent(Url, ReaderFn, EnvFn, Identity) {
-	Parts := _SystemProxy_UrlParts(Url)
-	Names := Parts["scheme"] == "https"
-		? ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
-		: ["http_proxy", "all_proxy", "ALL_PROXY"]
-	for Name in Names
+	for Name in _SystemProxy_EnvironmentPrecedence(_SystemProxy_UrlParts(Url)["scheme"])
 		if EnvFn.Call(Name) != ""
 			return false
 	Config := _SystemProxy_Config(ReaderFn, true)
@@ -1437,7 +1667,7 @@ _HTTP_ManagedWait(Request) {
 			Request.Abort()
 			return false
 		}
-		Sleep(10)
+		Sleep(TimingsGet("adapters", "http_managed_wait_poll_ms"))
 	}
 	return !Request.Aborted && !A_IsSuspended && Request._Remaining() > 0
 }

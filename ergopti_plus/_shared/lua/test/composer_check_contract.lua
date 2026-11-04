@@ -192,6 +192,25 @@ return function(helpers, Json, ports)
 			helpers.assert_true(not result.passed)
 		end)
 
+		-- Linux installs through Ergopti's own Python, downloaded on consent. A
+		-- run without it (a headless field run, a failed download) did not test
+		-- the composer: a skip carrying the download's own closed reason.
+		if ports.prerequisite_code ~= nil then
+			helpers.it("skips with the reason when the install prerequisite is missing (composer-prerequisite)", function()
+				local registry, deps, state = fresh()
+				local missing = setmetatable({
+					composer_save = function(_, on_done)
+						on_done(false, ports.prerequisite_code, "python_download_failed: offline")
+					end,
+				}, { __index = registry })
+				local steps, result, line = run_check(registry, deps, state, { registry = missing })
+				helpers.assert_eq(steps, "composer_fixture=pass composer_mode=info:fresh "
+					.. "composer_install=skip:python_download_failed composer_cleanup=pass")
+				helpers.assert_eq(result.not_run, Check.PREREQUISITE_MISSING)
+				helpers.assert_true(line:find("verdict=skip", 1, true) ~= nil, line)
+			end)
+		end
+
 		helpers.it("fails before touching the host when the shipped files are missing (composer-check)", function()
 			local registry, deps, state = fresh()
 			local calls = 0

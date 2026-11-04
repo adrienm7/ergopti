@@ -52,6 +52,31 @@ helpers.describe("keyboard_hook: a printable keydown resolves to a character and
 		helpers.assert_eq(physical[1].char, "a", "hardware callback keeps the resolved output separate")
 	end)
 
+	helpers.it("names the source of a media key to both callbacks, and its device number (linux-media-key-metrics)", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local physical, holds, token = {}, {}, {}
+		-- code 164 = KEY_PLAYPAUSE, pressed then released.
+		kh._test_drive({ { type = 1, code = 164, value = 1 }, { type = 1, code = 164, value = 0 } }, {
+			onChar = function() end,
+			onPhysical = function(scancode, _, _, value, source)
+				physical[#physical + 1] = { scancode = scancode, value = value, source = source,
+					device = kh.source_device_identity(source) }
+			end,
+			onHold = function(scancode, held_ms, source)
+				holds[#holds + 1] = { scancode = scancode, held_ms = held_ms, source = source }
+			end,
+			onHoldAdmission = function() return token end,
+			deviceNumber = function() return 3393 end,
+			onEmitRaw = function() return true end,
+		}, true)
+		helpers.assert_eq(#physical, 2, "the press and the release")
+		helpers.assert_eq({ physical[1].scancode, physical[1].value, physical[1].source, physical[1].device },
+			{ 164, 1, "/dev/input/test", "3393" })
+		helpers.assert_eq(#holds, 1, "the release measures the hold")
+		helpers.assert_eq({ holds[1].scancode, holds[1].source }, { 164, "/dev/input/test" })
+		helpers.assert_eq({ kh.source_device_identity(nil) }, { nil, "no source" })
+	end)
+
 	helpers.it("does not dispatch on a key release (value 0)", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local received = {}

@@ -137,6 +137,10 @@ local _paused = false        -- The daemon's pause.
 local _combinations = nil
 local _installed_engine = nil
 local _generation = 0        -- Revokes queued actions across runtime installations.
+local _tap_copy = nil        -- Checks each tap's copy (platform/remap/tap_copy.lua).
+
+-- The catalogue action whose tap is checked against the clipboard.
+local COPY_ACTION = "copy"
 local managed_options = setmetatable({}, { __mode = "k" })
 local managed_owners = setmetatable({}, { __mode = "k" })
 
@@ -207,8 +211,51 @@ local function _run_tap(action, binding)
 	Logger.debug(LOG, "Tap action '%s'.", action)
 	if pair_current and not pair_current() then return end
 	if tap_current and not tap_current() then return end
-	local ok, err = pcall(execute, action, binding or "tap_hold")
+	local source = binding or "tap_hold"
+	local ok, err
+	-- A dry run keeps the physical remap and touches no clipboard at all, not
+	-- even its counter: the copy is sent unchecked there.
+	if action == COPY_ACTION and _tap_copy and not _dry_run then
+		-- The copy is checked against the clipboard's change counter and sent
+		-- once more when it did not land (platform/remap/tap_copy.lua).
+		ok, err = pcall(_tap_copy.run, _tap_copy, source, function()
+			local sent, send_err = pcall(execute, action, source)
+			if not sent then error(send_err, 0) end
+		end)
+	else
+		ok, err = pcall(execute, action, source)
+	end
 	if not ok then Logger.error(LOG, "Tap action '%s' failed: %s.", action, tostring(err)) end
+end
+
+--- Builds the copy owner over the live clipboard, timer and notifier.
+--- @param execute function The catalogue executor init() was handed.
+--- @return table owner platform/remap/tap_copy.lua
+local function build_tap_copy(execute)
+	return require("platform.remap.tap_copy").new({
+		verify_ms = Timings.ms("tap_hold", "copy_verify_ms"),
+		read_counter = function() return require("adapters.clipboard").change_counter() end,
+		-- The retry runs on a timer: only while this initialisation still owns the
+		-- executor and the daemon is not paused.
+		send_copy = function()
+			if not _initialized or _paused or _execute_action ~= execute then return false end
+			local sent = pcall(execute, COPY_ACTION, "tap_hold")
+			return sent
+		end,
+		after = function(delay_ms, callback)
+			local handle = require("adapters.timer_scheduler").after(delay_ms / MS_PER_SECOND, callback)
+			return handle.armed == true and handle or nil
+		end,
+		cancel = function(handle) require("adapters.timer_scheduler").cancel(handle) end,
+		log = function(level, fmt, ...) Logger[level](LOG, fmt, ...) end,
+		warn_user = function()
+			local sent_ok, sent = pcall(require("adapters.notifier").send,
+				require("infra.i18n").get("notify.tap_hold.copy_failed"), { level = "warning" })
+			if not sent_ok or sent == false then
+				Logger.error(LOG, "Copy failure notice was not delivered: %s.", tostring(sent))
+			end
+		end,
+	})
 end
 
 --- Reads what the one-shot Shift types for a character, from the table the
@@ -514,6 +561,8 @@ local function _build(loaded, boot)
 		roll_keys = loaded.roll_keys,
 		nav_layer = nav_layer,
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
+		-- tap_hold.toml's [tap_hold] lone_modifier_tap_max_ms, or the manifest's default.
+		lone_tap_max_ms = loaded.lone_tap_max_ms,
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
@@ -624,6 +673,7 @@ function M.init(opts)
 	_execute_action = opts.execute_action
 	_action_names = opts.action_names
 	_on_text_injected = opts.on_text_injected
+	_tap_copy = build_tap_copy(opts.execute_action)
 	_defaults_path = opts.defaults_path
 	_user_path = opts.user_path
 	_enabled, _paused = true, false
@@ -714,11 +764,31 @@ function M.set_enabled(enabled)
 	return installed
 end
 
+--- How long a modifier key pressed alone still taps, in milliseconds (0 = strict):
+--- the value of the configuration in force, read from tap_hold.toml.
+--- @return number
+function M.lone_tap_max_ms()
+	_require_init()
+	return _loaded.lone_tap_max_ms
+end
+
+--- Sets how long a modifier key pressed alone still taps: written to
+--- tap_hold.toml by the writer, which reloads this manager, so the file stays
+--- the one source of the value.
+--- @param ms number 0 (strict) or a positive whole number of milliseconds.
+--- @param guard function|nil Original deferred editor, strict true required.
+--- @return boolean True when the new engine is in force.
+function M.set_lone_tap_max_ms(ms, guard)
+	_require_init()
+	return require("platform.remap.tap_hold_writer").set_lone_tap_max_ms(ms, guard)
+end
+
 --- Follows the daemon's pause: a paused script remaps nothing.
 --- @param paused boolean
 function M.set_paused(paused)
 	_require_init()
 	_paused = paused == true
+	if _paused and _tap_copy then _tap_copy:stop() end
 	return _apply()
 end
 
@@ -938,6 +1008,8 @@ function M._reset_for_test()
 	if _hook and _hook.set_remapper(nil) == false then return false end
 	_initialized, _hook, _execute_action, _action_names, _loaded, _engine = false, nil, nil, nil, nil, nil
 	_on_text_injected = nil
+	if _tap_copy then _tap_copy:stop() end
+	_tap_copy = nil
 	_combinations, _installed_engine = nil, nil
 	_enabled, _paused = true, false
 	_dry_run = false

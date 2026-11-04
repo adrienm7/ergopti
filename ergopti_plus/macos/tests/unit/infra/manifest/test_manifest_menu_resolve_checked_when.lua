@@ -28,8 +28,8 @@ local fixture = require("tests.support.manifest_menu_fixture")
 local MANIFEST = [[
 {
 	"test_menu": [
-		{ "type": "dynamic", "id": "two_key_item", "checked_when": ["filter_on", "master_on"] },
-		{ "type": "dynamic", "id": "no_predicate_item" }
+		{ "type": "action", "id": "two_key_item", "checked_when": ["filter_on", "master_on"] },
+		{ "type": "action", "id": "no_predicate_item" }
 	]
 }
 ]]

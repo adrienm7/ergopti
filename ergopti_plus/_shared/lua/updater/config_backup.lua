@@ -437,6 +437,12 @@ function M.new(options)
 			local dir_ok, dir_err = io_port.make_dir(parent(destination))
 			local written, write_err = false, dir_err
 			if dir_ok then written, write_err = io_port.replace(destination, copies[index]) end
+			-- POSIX renames by name and neither OS denies a same-user process the
+			-- staging name, so a swap before the rename cannot be refused. Reading
+			-- the file back is what keeps a substituted file from reporting success.
+			if written and io_port.read(destination) ~= copies[index] then
+				written, write_err = false, "the published file does not hold the restored bytes"
+			end
 			if not written then
 				Logger.error(LOG, "Restore failed writing %s: %s; the replaced configuration is in %s.",
 					destination, tostring(write_err), pre.path)

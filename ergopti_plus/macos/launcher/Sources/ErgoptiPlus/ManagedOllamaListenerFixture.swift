@@ -113,7 +113,7 @@ enum ManagedOllamaListenerFixture {
 				// This exact child remains unreaped, hence its PID is reserved.
 				timedOut = true; _ = Darwin.kill(child, SIGTERM)
 			}
-			usleep(10_000)
+			usleep(LauncherTimings.ollamaFixtureReapPoll.microseconds)
 		}
 		guard Darwin.close(descriptor) == 0 else { return 74 }; retained = false
 		do { try alias.retire(); aliasRetired = true } catch { return failure(stage: 4, error: EIO) }
@@ -198,8 +198,8 @@ enum ManagedOllamaListenerFixture {
 				} else { payloads = [Data(response.utf8)] }
 				var physicallyClosed = false
 				for (part, payload) in payloads.enumerated() {
-					if part > 0 && mode == "progress" { usleep(400_000) }
-					if part > 1 && mode == "stall" { usleep(1_500_000) }
+					if part > 0 && mode == "progress" { usleep(LauncherTimings.ollamaFixtureProgressPart.microseconds) }
+					if part > 1 && mode == "stall" { usleep(LauncherTimings.ollamaFixtureStallPart.microseconds) }
 					var offset = 0
 					while offset < payload.count {
 						guard ready(peer, Int16(POLLOUT)) else { _ = Darwin.close(peer); return 124 }

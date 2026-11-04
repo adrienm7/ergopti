@@ -191,7 +191,8 @@ _PSAB_NativeOwner(Symbol) {
 		if !_DriverIsProductionSource(A_LoopFileFullPath)
 			continue
 		Source := FileRead(A_LoopFileFullPath, "UTF-8")
-		if IsObject(_DriverFindFunctionDefinition(&Source, Symbol))
+		; A definition needs the exact "Symbol(" text, so a miss skips the scanner.
+		if InStr(Source, Symbol . "(") && IsObject(_DriverFindFunctionDefinition(&Source, Symbol))
 			Owners.Push(A_LoopFileFullPath)
 	}
 	AssertEqual(1, Owners.Length, "the private child must include the sole real owner of " . Symbol)

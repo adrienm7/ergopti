@@ -20,7 +20,11 @@ local MODULES = { "infra.logger", "infra.i18n", "infra.field_check", "infra.fiel
 local function with_window(body)
 	helpers.with_stub_scope(MODULES, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return "[" .. key .. "]" end }
+		-- The label-value join is the locale's own template (common.label_value).
+		package.loaded["infra.i18n"] = { get = function(key)
+			if key == "common.label_value" then return "{1} : {2}" end
+			return "[" .. key .. "]"
+		end }
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		package.loaded["ui.field_check"] = nil
@@ -64,8 +68,12 @@ helpers.describe("field check menu rows", function()
 		local manifest = hs.json.decode(file:read("*a"))
 		file:close()
 		local rows = {}
-		for _, row in ipairs(manifest.debug_menu) do
+		for _, row in ipairs(manifest.debug_tests_menu) do
 			if row.id and row.id:find("^field_check_") then rows[row.id] = row end
+		end
+		for _, row in ipairs(manifest.debug_menu) do
+			helpers.assert_true(not (row.id and row.id:find("^field_check_")),
+				"a field check hangs in the Tests submenu, not among the Debug rows")
 		end
 		-- The one unit that dispatches the field checks, found by its dispatch call
 		-- rather than by its path.

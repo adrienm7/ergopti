@@ -112,9 +112,9 @@ func staleEmbeddedRuntimes(
 }
 
 /// A launcher being replaced by an update relaunch may still hold the lock for
-/// a moment; a genuine second launcher keeps it. 50 tries of 100 ms tell them apart.
+/// a moment; a genuine second launcher keeps it. 50 tries, [launcher]
+/// instance_lock_retry_ms apart (100 ms), tell them apart.
 let kLauncherLockRetryAttempts = 50
-let kLauncherLockRetryIntervalSeconds = 0.1
 /// Time a leftover embedded runtime gets to run its own teardown after a
 /// normal terminate request before it is force-terminated.
 let kStaleRuntimeTerminateGraceSeconds = 3.0

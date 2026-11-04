@@ -97,7 +97,7 @@ helpers.describe("bounded actual ordered-pair menu",function()
 			helpers.assert_eq(#state.hold.items,#state.holds-1,"every hold option but the picker's own none row")
 			for index,item in ipairs(state.hold.items) do
 				helpers.assert_eq(item.id,state.holds[index+1].id)
-				helpers.assert_eq(item.label,HoldOptions.label(state.holds[index+1],state.translate))
+				helpers.assert_eq(item.label,HoldOptions.label(state.holds[index+1],state.translate,"linux"))
 			end
 			helpers.assert_eq(state.hold.current,Shared.NONE,"an empty slot marks the none row")
 			helpers.assert_eq(#state.edits,0,"opening writes nothing")
@@ -241,10 +241,12 @@ local function check_locale_matrix(state, rows, strings)
 		for _, second in ipairs(EXPECTED_LINUX_KEYS) do
 			if first ~= second then
 				cursor = cursor + 1
-				local first_label, second_label = strings["tap_hold.group." .. first], strings["tap_hold.group." .. second]
+				local KeyNames = require("keycodes.key_names")
+				local first_label = strings[KeyNames.i18n(first, "linux")]
+				local second_label = strings[KeyNames.i18n(second, "linux")]
 				helpers.assert_true(type(first_label) == "string" and first_label ~= "")
 				helpers.assert_true(type(second_label) == "string" and second_label ~= "")
-				local label = first_label .. " → " .. second_label
+				local label = first_label .. " + " .. second_label
 				helpers.assert_eq(actual[cursor].title, label .. "  :  " .. strings["tap_hold.tap.none"] .. "  /  " .. strings["tap_hold.hold.none"])
 				helpers.assert_eq(actual[cursor].menu[2].title, "-", "the separator below the clear row is drawn on Linux too")
 				helpers.assert_true(actual[cursor].menu[3].disabled ~= true, "real source receipt admits the tap picker")

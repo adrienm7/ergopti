@@ -29,7 +29,7 @@
 ; =================================
 
 global LLV_SENTENCE := "on se voit demain"
-global LLV_BINDING := "keyboard__ctrl_shift_l"
+global LLV_BINDING := "keyboard__primary_shift_l"
 
 ; The menu of test_llm_prompt_prediction.ahk, and an engine whose debounce and
 ; minimum word count differ from live.json's so each request shows whose it is.
@@ -202,7 +202,7 @@ _LLV_Type(Text) {
 ; Fires an armed debounce as its timer would, with the rate floor open.
 _LLV_Fire(Armed) {
 	global _LLM_Engine
-	_LLM_Engine["last_request_tick"] := 0
+	_LLM_Engine_Plan().LastSentMs := ""
 	_LLM_Engine["timer_active"] := false
 	Armed["fn"].Call()
 }
@@ -228,7 +228,10 @@ _LLV_CaptureRealTimer(Action) {
 			_LLM_Bridge_RunPrefixObserver(Owner)
 		}
 		Captured := { Fn: _LLM_Engine["pending_timer"], Active: _LLM_Engine["timer_active"] }
-		LLM_Engine_CancelTimer()
+		; Only the native timer stops: the plan keeps the token this callback carries.
+		if Captured.Active
+			SetTimer(Captured.Fn, 0)
+		_LLM_Engine["timer_active"] := false
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -367,6 +370,26 @@ _LLV_MinimumWordsAreLiveOnes() {
 	}
 }
 Test("LLM live mode: the minimum word count is live.json's", _LLV_MinimumWordsAreLiveOnes)
+
+; request_plan_live_vectors.json: a deleted prompt stops live mode and asks for
+; nothing. It used to stay on and refuse every later keystroke with a warning.
+_LLV_DeletedPromptStopsLiveMode() {
+	_LLV_Run("bonjour", _Body)
+	_Body(Calls, Lines, Builds) {
+		global _LLM_Menu, _LLM_Engine
+		Profile := Map("id", "user_live_1", "label", "Suite",
+			"system_single", "Continue: {context}", "batch", false)
+		_LLM_Menu["user_profiles"] := [Profile]
+		_LLM_Engine["user_profiles"] := [Profile]
+		AssertTrue(_LLV_Toggle("user_live_1|1"))
+		_LLM_Menu["user_profiles"] := []
+		_LLM_Engine["user_profiles"] := []
+		_LLV_Fire(_LLV_Type(" Marc"))
+		AssertEqual(0, Calls.Length, "a deleted prompt asks for nothing")
+		AssertFalse(LLM_Engine_LiveIsActive(), "and live mode stops")
+	}
+}
+Test("LLM live mode: a deleted prompt stops it", _LLV_DeletedPromptStopsLiveMode)
 
 ; A new keystroke supersedes the live request in flight.
 _LLV_SupersededRequestIsIgnored() {
@@ -586,7 +609,7 @@ _LLV_GenerationRoute(Groups, Build) {
 	Bound := _LLV_ExecutableStatement(Groups,
 		'm)^[ \t]*(return) Map\([^)]*"llm_generation_settings", LLM_Menu_BuildGenerationMenu\)', 1)
 	Draw := _LLV_ExecutableStatement(Build,
-		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*"", Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
+		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", Map\(\), _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
 	return Bound && Draw
 }
 
@@ -770,7 +793,7 @@ _LLV_ExplicitActionsTakeOver() {
 		AssertTrue(_LLV_Toggle("translate_en|1"), "live mode on")
 		_LLV_Fire(_LLV_Type(" de"))
 		AssertEqual(1, Calls.Length, "a live request is in flight")
-		_LLM_Engine["last_request_tick"] := 0
+		_LLM_Engine_Plan().LastSentMs := ""
 		AssertTrue(LLM_Menu_TriggerPredictionWith("basic", 1), "an explicit prompt prediction runs")
 		AssertEqual(2, Calls.Length, "with its own request")
 		AssertEqual(_LLV_System("basic", 1, 8), Calls[2]["system"],

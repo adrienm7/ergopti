@@ -18,6 +18,8 @@ for _, key in ipairs({ "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XD
 end
 local Shell, Json, uv = require("adapters.shell_runner"), require("json"), require("luv")
 local ConfigPaths = require("infra.config_paths")
+-- Ergopti's own Python is installed: the record fixture never downloads it.
+package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, "python3") end }
 local Registry, Runner = require("modules.keymap.layout_registry"), require("adapters.process_runner")
 local Reader, Native = require("infra.regular_file_reader"), require("infra.regular_file_writer")
 local open, rename, reader_open, native_open = io.open, os.rename, Reader.open, Native.open

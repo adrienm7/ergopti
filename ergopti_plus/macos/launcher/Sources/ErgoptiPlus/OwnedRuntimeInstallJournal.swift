@@ -7,7 +7,7 @@ import Security
 
 /// Dormant privileged role: packaging must provide this distinct minimal helper before production acquisition.
 final class OwnedRuntimeInstallJournal {
-	private static let identifier = "com.ergoptiplus.app.runtime-installer"
+	private static let identifier = Identifiers.SigningIds.runtimeInstaller
 	private static let parentURL = URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus", isDirectory: true)
 	private static let journalName = ".runtime-install-journal"
 	private struct Record: Codable {

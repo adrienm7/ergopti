@@ -107,7 +107,7 @@ func validateUninstallBundle(
 func waitForUninstallLeaseRetirement(
 	isEmpty: () throws -> Bool,
 	now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-	pause: () -> Void = { usleep(10_000) },
+	pause: () -> Void = { usleep(LauncherTimings.uninstallLeasePoll.microseconds) },
 	timeout: TimeInterval = 5
 ) throws -> Bool {
 	let deadline = now() + timeout

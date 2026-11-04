@@ -21,10 +21,8 @@
 
 #Requires AutoHotkey v2.0
 
-_THCA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_THCA_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _THCA_StripLineComments(Src) {
@@ -47,7 +45,7 @@ _THCA_StripLineComments(Src) {
 ; ===============================================================
 
 _THCA_AbortBeforeZero() {
-	Src := _THCA_StripLineComments(_THCA_ReadSource("adapters/http_client.ahk"))
+	Src := _THCA_StripLineComments(_THCA_ReadSource("http_client.ahk"))
 	Assert(Src != "", "adapters/http_client.ahk must be readable")
 
 	Body := _DriverFuncBody("HTTPCancel")

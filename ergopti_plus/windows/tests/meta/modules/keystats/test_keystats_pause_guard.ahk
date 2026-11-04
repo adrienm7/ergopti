@@ -32,10 +32,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_KLPG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_KLPG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -49,7 +47,7 @@ _KLPG_ReadSource(RelPath) {
 ; ==================================================
 
 _KLPG_AppendLogHasPauseGuard() {
-	Src := _KLPG_ReadSource("modules/keystats/keystats.ahk")
+	Src := _KLPG_ReadSource("keystats.ahk")
 	Seg := _DriverFuncBody("KL_AppendLog")
 	Assert(Seg != "", "KL_AppendLog(entry) declaration must exist in keystats.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
@@ -58,7 +56,7 @@ _KLPG_AppendLogHasPauseGuard() {
 Test("keystats: KL_AppendLog has an A_IsSuspended pause guard (chokepoint)", _KLPG_AppendLogHasPauseGuard)
 
 _KLPG_AppendLogExemptsSystemEvent() {
-	Src := _KLPG_ReadSource("modules/keystats/keystats.ahk")
+	Src := _KLPG_ReadSource("keystats.ahk")
 	Seg := _DriverFuncBody("KL_AppendLog")
 	Assert(InStr(Seg, "system_event") > 0,
 		"KL_AppendLog pause guard must exempt type system_event so the pause/resume lifecycle markers still log while suspended")

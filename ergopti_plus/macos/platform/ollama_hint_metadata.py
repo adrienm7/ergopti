@@ -2,7 +2,6 @@
 """Bounded nonblocking native regular-file reads for asynchronous selection hints."""
 
 import os
-from pathlib import Path
 import signal
 import stat
 
@@ -48,7 +47,9 @@ def read_regular(path, maximum, *, progress):
             count += len(piece)
         progress()
         after = os.fstat(descriptor)
-        named = Path(path).stat(follow_symlinks=False)
+        # os.stat, not Path.stat: follow_symlinks on Path needs Python 3.10, and
+        # the system Python 3.9 raised TypeError here (field run 2026-10-30 17:19).
+        named = os.stat(path, follow_symlinks=False)
         if (
             count > maximum
             or count != before.st_size

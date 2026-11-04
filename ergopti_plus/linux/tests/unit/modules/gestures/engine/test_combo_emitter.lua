@@ -120,4 +120,15 @@ helpers.describe("combo emitter: every catalogue combo resolves", function()
 				.. table.concat(unresolved, ", "))
 	end)
 
+	helpers.it("goes back and forward in the browser history with Alt+arrow (action-parity-nav-history)", function()
+		-- nav_back and nav_forward were Windows-only, though Firefox, Chromium
+		-- and the GNOME and KDE file managers answer Alt+Left and Alt+Right.
+		local rows = dofile(helpers.driver_root() .. "/_generated/gesture_emit_actions.lua")
+		helpers.assert_eq(rows.nav_back, "alt+Left", "nav_back combo")
+		helpers.assert_eq(rows.nav_forward, "alt+Right", "nav_forward combo")
+		for _, id in ipairs({ "nav_back", "nav_forward" }) do
+			helpers.assert_true(Emitter.parse(rows[id]) ~= nil, id .. " must resolve to evdev codes")
+		end
+	end)
+
 end)

@@ -1,5 +1,5 @@
 {
-	"_comment": "The diagnostics window's snapshot, version 2, produced by the three drivers and rendered and exported by the shared page (_shared/ui/healthcheck/model.js). A snapshot is { schema_version, driver, generated_at (UTC, ISO 8601), detailed, sections: { <section id>: { <field id>: value } or { items: [ ... ] } }, probes: { <probe id>: { state, ms, detail } } }. Sections render in this order; a section or a field whose `platforms` omits the driver is neither collected nor shown there. Labels come from the locales: healthcheck.section.<id>, healthcheck.field.<id>, healthcheck.column.<section>.<column>. Field types: text, path (the page offers Open; the host opens it by field id only, never by a path the page sends), count, bytes, seconds, ms, percent (0 to 100, of the whole machine's processor capacity), bool (true, or 1 from the AHK writer), list, log (an H3 and a block), enum (translated through enum_key + value). A field with `probe` is filled by that asynchronous probe and reads as pending until the probe answers; `probe` is a probe id, or a map from driver to probe id when only some drivers need one; show_ms appends the probe's duration. The cpu_load probe takes two samples sample_ms apart, on a timer. An items section with `probe` lists what phase A read and says its list is incomplete until that probe answers with the whole list (macOS reads its Bluetooth devices with system_profiler). A field marked opt_in, and an items column in opt_in_columns, is collected and shown only when the user ticks 'Include details'. Phase A, the synchronous collection, must stay under phase_a_budget_ms and may only read memory, cached values and small files: every subprocess, network request or slow system query is a probe bounded by its timeout_ms. `permissions` lists, per driver, the permission ids the host reports, the system settings page it opens for one (by id) and whether a fix hint (healthcheck.permission_fix.<id>) exists. `report` bounds the Markdown file the page asks the host to save under the logs folder. `configuration.files` lists, per driver, the configuration files in the order they apply (the section configuration_files reports each as ok, missing, unreadable or invalid), and the section configuration holds the manifest-declared settings of config.toml as { setting, type, value } rows: booleans, numbers and manifest enum values exactly, any other string only its length and any list only its item count (the setting_row sharing rule drops a row whose value is outside the grammar of its type). Both sections are filled by the local probe configuration (a probe with local: true reads only the user's own files, so it runs without the extensive opt-in, off phase A, on a timer after the snapshot is out): until it answers the sections are empty and the probe note says so, and an answer later than its timeout_ms is discarded as a timeout.",
+	"_comment": "The diagnostics window's snapshot, version 2, produced by the three drivers and rendered and exported by the shared page (_shared/ui/healthcheck/model.js). A snapshot is { schema_version, driver, generated_at (UTC, ISO 8601), detailed, sections: { <section id>: { <field id>: value } or { items: [ ... ] } }, probes: { <probe id>: { state, ms, detail } } }. Sections render in this order; a section or a field whose `platforms` omits the driver is neither collected nor shown there. Labels come from the locales: healthcheck.section.<id>, healthcheck.field.<id>, healthcheck.column.<section>.<column>. Field types: text, path (the page offers Open; the host opens it by field id only, never by a path the page sends), count, bytes, seconds, ms, percent (0 to 100, of the whole machine's processor capacity), bool (true, or 1 from the AHK writer), list, log (an H3 and a block), enum (translated through enum_key + value). A field with `probe` is filled by that asynchronous probe and reads as pending until the probe answers; `probe` is a probe id, or a map from driver to probe id when only some drivers need one; show_ms appends the probe's duration. The cpu_load probe takes two samples sample_ms apart, on a timer. An items section with `probe` lists what phase A read and says its list is incomplete until that probe answers with the whole list (macOS reads its Bluetooth devices with system_profiler). A field marked opt_in, and an items column in opt_in_columns, is collected and shown only when the user ticks 'Include details'. Phase A, the synchronous collection, must stay under phase_a_budget_ms (a slower one logs its phase_a_slowest_named slowest collectors) and may only read memory, cached values and small files: every subprocess, network request or slow system query is a probe bounded by its timeout_ms. `permissions` lists, per driver, the permission ids the host reports, the system settings page it opens for one (by id) and whether a fix hint (healthcheck.permission_fix.<id>) exists. `report` bounds the Markdown file the page asks the host to save under the logs folder. `configuration.files` lists, per driver, the configuration files in the order they apply (the section configuration_files reports each as ok, missing, unreadable or invalid), and the section configuration holds the manifest-declared settings of config.toml as { setting, type, value } rows: booleans, numbers and manifest enum values exactly, any other string only its length and any list only its item count (the setting_row sharing rule drops a row whose value is outside the grammar of its type). Both sections are filled by the local probe configuration (a probe with local: true reads only the user's own files, so it runs without the extensive opt-in, off phase A, on a timer after the snapshot is out): until it answers the sections are empty and the probe note says so, and an answer later than its timeout_ms is discarded as a timeout.",
 	"schema_version": 2,
 	"diagnostic_checks": {
 		"items": [
@@ -42,6 +42,7 @@
 		}
 	},
 	"phase_a_budget_ms": 5,
+	"phase_a_slowest_named": 3,
 	"max_export_bytes": 2097152,
 	"report": {
 		"subdir": "diagnostics",
@@ -80,6 +81,11 @@
 		},
 		"bluetooth": {
 			"timeout_ms": 10000,
+			"platforms": ["macos"]
+		},
+		"local_state": {
+			"timeout_ms": 2000,
+			"local": true,
 			"platforms": ["macos"]
 		},
 		"appleevent_transport": {
@@ -206,12 +212,6 @@
 					"id": "webview",
 					"type": "text",
 					"platforms": ["windows", "linux"]
-				},
-				{
-					"id": "kanata",
-					"type": "text",
-					"platforms": ["linux"],
-					"probe": "system_details"
 				}
 			]
 		},
@@ -520,7 +520,10 @@
 				{
 					"id": "wifi_signal",
 					"type": "text",
-					"platforms": ["macos"]
+					"platforms": ["macos"],
+					"probe": {
+						"macos": "local_state"
+					}
 				}
 			]
 		},
@@ -572,7 +575,10 @@
 			"fields": [
 				{
 					"id": "modules_failed",
-					"type": "list"
+					"type": "list",
+					"probe": {
+						"macos": "local_state"
+					}
 				},
 				{
 					"id": "modules_disabled",
@@ -580,7 +586,10 @@
 				},
 				{
 					"id": "modules_ok",
-					"type": "list"
+					"type": "list",
+					"probe": {
+						"macos": "local_state"
+					}
 				},
 				{
 					"id": "log_level",
@@ -928,9 +937,6 @@
 									"kind": "version"
 								},
 								"webview": {
-									"kind": "version"
-								},
-								"kanata": {
 									"kind": "version"
 								},
 								"commit": {
@@ -1543,6 +1549,81 @@
 								}
 							}
 						},
+						"local_state": {
+							"kind": "object",
+							"fields": {
+								"state": {
+									"kind": "enum",
+									"values": [
+										"pending",
+										"ok",
+										"error",
+										"timeout",
+										"disabled",
+										"unsupported",
+										"not_run",
+										"cancelled",
+										"unknown"
+									],
+									"default": "unknown"
+								},
+								"cleanup": {
+									"kind": "enum",
+									"values": ["pending", "settled", "unknown"],
+									"default": "unknown"
+								},
+								"ms": {
+									"kind": "number"
+								},
+								"native_status": {
+									"kind": "integer",
+									"minimum": -2147483648,
+									"maximum": 2147483647
+								},
+								"source_sha256": {
+									"kind": "hash"
+								},
+								"runtime_source_sha256": {
+									"kind": "hash"
+								},
+								"receiver_source_sha256": {
+									"kind": "hash"
+								},
+								"sender_source_sha256": {
+									"kind": "hash"
+								},
+								"sender_context": {
+									"kind": "enum",
+									"values": ["driver_spawned_osascript"]
+								},
+								"qualification_scope": {
+									"kind": "enum",
+									"values": ["local_runtime_nonce"]
+								},
+								"detail": {
+									"kind": "enum",
+									"values": [
+										"probe_busy",
+										"cleanup_debt",
+										"clock_refused",
+										"deadline_expired",
+										"unsupported",
+										"opt_in_required",
+										"not_embedded",
+										"isolated_environment_required",
+										"cancelled",
+										"native_refused",
+										"invalid_frame",
+										"transport_refused"
+									]
+								},
+								"runtime_pid": {
+									"kind": "integer",
+									"minimum": 1,
+									"maximum": 2147483647
+								}
+							}
+						},
 						"appleevent_transport": {
 							"kind": "object",
 							"fields": {
@@ -2079,6 +2160,81 @@
 										}
 									},
 									"bluetooth": {
+										"kind": "object",
+										"fields": {
+											"state": {
+												"kind": "enum",
+												"values": [
+													"pending",
+													"ok",
+													"error",
+													"timeout",
+													"disabled",
+													"unsupported",
+													"not_run",
+													"cancelled",
+													"unknown"
+												],
+												"default": "unknown"
+											},
+											"cleanup": {
+												"kind": "enum",
+												"values": ["pending", "settled", "unknown"],
+												"default": "unknown"
+											},
+											"ms": {
+												"kind": "number"
+											},
+											"native_status": {
+												"kind": "integer",
+												"minimum": -2147483648,
+												"maximum": 2147483647
+											},
+											"source_sha256": {
+												"kind": "hash"
+											},
+											"runtime_source_sha256": {
+												"kind": "hash"
+											},
+											"receiver_source_sha256": {
+												"kind": "hash"
+											},
+											"sender_source_sha256": {
+												"kind": "hash"
+											},
+											"sender_context": {
+												"kind": "enum",
+												"values": ["driver_spawned_osascript"]
+											},
+											"qualification_scope": {
+												"kind": "enum",
+												"values": ["local_runtime_nonce"]
+											},
+											"detail": {
+												"kind": "enum",
+												"values": [
+													"probe_busy",
+													"cleanup_debt",
+													"clock_refused",
+													"deadline_expired",
+													"unsupported",
+													"opt_in_required",
+													"not_embedded",
+													"isolated_environment_required",
+													"cancelled",
+													"native_refused",
+													"invalid_frame",
+													"transport_refused"
+												]
+											},
+											"runtime_pid": {
+												"kind": "integer",
+												"minimum": 1,
+												"maximum": 2147483647
+											}
+										}
+									},
+									"local_state": {
 										"kind": "object",
 										"fields": {
 											"state": {

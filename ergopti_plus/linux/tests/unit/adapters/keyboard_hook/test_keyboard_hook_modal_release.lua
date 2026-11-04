@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: A Dialog Gets The Keyboard
 --- DESCRIPTION:
---- Tray dialogs (zenity) run inside a menu callback and block the event loop,
+--- Tray dialogs (the owned dialog host) run inside a menu callback and block the event loop,
 --- which is the only path from the grabbed keyboard to the desktop. Nothing
 --- could be typed into them: not an API key, not a delay. The hook now hands
 --- the keyboard back for the dialog's lifetime and takes it again afterwards,

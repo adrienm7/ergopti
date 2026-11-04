@@ -13,9 +13,8 @@
 local helpers = require("tests.helpers")
 local Json = require("json")
 local Paths = require("infra.paths")
-local driver_root = helpers.driver_root()
-local module = dofile(driver_root .. "/infra/managed_http.lua")
-local policy_module = dofile(assert(Paths.shared("lua/network/proxy_policy.lua")))
+local module = helpers.fresh_module("infra.managed_http")
+local policy_module = helpers.fresh_module("network.proxy_policy")
 local file = assert(io.open(assert(Paths.shared("modules/network/proxy_policy.json")), "rb"))
 local data = Json.decode(file:read("*a")); file:close()
 

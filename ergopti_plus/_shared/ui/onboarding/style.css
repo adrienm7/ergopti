@@ -84,7 +84,7 @@ body {
 }
 
 .step-dot {
-	background: #d0d0d5;
+	background: var(--theme-hue-d0d0d5);
 	border-radius: 50%;
 	height: 7px;
 	transition:
@@ -132,10 +132,10 @@ h1 {
 }
 
 .warning {
-	background: #fff8e1;
-	border: 1px solid #f0c040;
+	background: var(--theme-hue-fff8e1);
+	border: 1px solid var(--theme-hue-f0c040);
 	border-radius: 6px;
-	color: #7a5500;
+	color: var(--theme-hue-7a5500);
 	font-size: 11px;
 	line-height: 1.5;
 	margin: 0 0 12px;
@@ -144,10 +144,10 @@ h1 {
 }
 
 .note {
-	background: #eef4ff;
-	border: 1px solid #c6d8f5;
+	background: var(--theme-hue-eef4ff);
+	border: 1px solid var(--theme-hue-c6d8f5);
 	border-radius: 6px;
-	color: #2a4a7a;
+	color: var(--theme-hue-2a4a7a);
 	font-size: 12px;
 	line-height: 1.5;
 	margin: 0 0 12px;
@@ -169,7 +169,7 @@ h1 {
 .lang-item {
 	align-items: center;
 	background: var(--theme-white);
-	border-bottom: 1px solid #f0f0f0;
+	border-bottom: 1px solid var(--theme-grey-f0f0f0);
 	cursor: pointer;
 	display: flex;
 	gap: 10px;
@@ -188,11 +188,11 @@ h1 {
 }
 
 .lang-item:hover {
-	background: #f0f4ff;
+	background: var(--theme-hue-f0f4ff);
 }
 
 .lang-item.selected {
-	background: #e8f0ff;
+	background: var(--theme-hue-e8f0ff);
 }
 
 .lang-item.selected .lang-name {
@@ -237,7 +237,7 @@ h1 {
 
 #config-input {
 	background: var(--theme-white);
-	border: 1.5px solid #d0d0d0;
+	border: 1.5px solid var(--theme-grey-d0d0d0);
 	border-radius: 7px 0 0 7px;
 	border-right: none;
 	color: var(--theme-label);
@@ -312,8 +312,8 @@ h1 {
 }
 
 .radio-card:hover {
-	background: #f5f8ff;
-	border-color: #a0bfff;
+	background: var(--theme-hue-f5f8ff);
+	border-color: var(--theme-hue-a0bfff);
 }
 
 .radio-card input[type='radio'] {
@@ -351,7 +351,7 @@ h1 {
 
 .magic-input {
 	background: var(--theme-white);
-	border: 1.5px solid #d0d0d0;
+	border: 1.5px solid var(--theme-grey-d0d0d0);
 	border-radius: 7px;
 	color: var(--theme-label);
 	font-family: 'SF Mono', Monaco, Consolas, monospace;
@@ -368,7 +368,7 @@ h1 {
 }
 
 .magic-input.invalid {
-	border-color: #d11;
+	border-color: var(--theme-hue-dd1111);
 	box-shadow: 0 0 0 3px rgba(221, 17, 17, 0.15);
 }
 
@@ -495,7 +495,7 @@ button:hover {
 
 /* Windows touchpad registration panel of the gestures page. */
 .gesture-register {
-	border-top: 1px solid #e8e8e8;
+	border-top: 1px solid var(--theme-grey-e8e8e8);
 	margin: 0 0 12px;
 	padding-top: 12px;
 }
@@ -523,9 +523,9 @@ button:hover {
 }
 
 .register-status.register-ok {
-	color: #1a8c3a;
+	color: var(--theme-hue-1a8c3a);
 }
 
 .register-status.register-err {
-	color: #d11;
+	color: var(--theme-hue-dd1111);
 }

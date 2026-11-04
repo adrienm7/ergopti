@@ -80,6 +80,8 @@ TestTimings_TapHoldsSourced() {
     AssertEqual(100, KEY_REPEAT_INTERVAL_MS, "KEY_REPEAT_INTERVAL_MS")
     AssertEqual(2.0, ONE_SHOT_SHIFT_TIMEOUT_SEC, "ONE_SHOT_SHIFT_TIMEOUT_SEC")
     AssertEqual(0.2, TAPHOLD_DEFAULT_ACTIVATION_SECONDS, "TAPHOLD_DEFAULT_ACTIVATION_SECONDS is the registry global delay")
+    global TAP_COPY_VERIFY_MS
+    AssertEqual(TimingsGet("tap_hold", "copy_verify_ms"), TAP_COPY_VERIFY_MS, "TAP_COPY_VERIFY_MS is the registry copy wait")
 }
 Test("Timings: tap-hold constants sourced from the registry", TestTimings_TapHoldsSourced)
 

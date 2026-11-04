@@ -276,6 +276,18 @@ function M.resolve_wrap_pair(value)
 	return WrapPair.parse(value, WRAP_PAIR_LIST)
 end
 
+--- Types a text at the text destination focused now, as send_text does: the
+--- run_command and its output use it once their child has finished.
+--- @param text string Text to type.
+--- @param publication table|nil A destination already captured (send_text).
+--- @return boolean typed
+function M.insert_text(text, publication)
+	publication = publication or capture_text_destination()
+	if not publication then Logger.warn(LOG, "Text insertion refused: no retained text destination."); return false end
+	local result = Injector.inject(0, text, false, nil, publication)
+	return type(result) == "table" and result.ok == true
+end
+
 --- The vocabulary of the send_text, send_key and send_shortcut parameters,
 --- read once from _shared/modules/actions/send_keys.json. A missing or
 --- malformed file raises: every send_* binding would otherwise refuse its value
@@ -696,8 +708,7 @@ function M.action_handlers()
 			if not publication then Logger.warn(LOG, "Text insertion refused: no retained text destination."); return false end
 			local parsed = M.parse_send_input("text", parameter)
 			if not parsed then return false end
-			local result = Injector.inject(0, parsed.text, false, nil, publication)
-			return type(result) == "table" and result.ok == true
+			return M.insert_text(parsed.text, publication)
 		end,
 		["send_key"] = function(_, parameter)
 			local parsed = SendInput.parse_key(parameter, key_vocabulary)

@@ -30,9 +30,8 @@
 ; =============================================================
 ; =============================================================
 
-_KHT_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_KHT_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _KHT_StripComments(Src) {
@@ -45,7 +44,7 @@ _KHT_StripComments(Src) {
 }
 
 _KHT_OnCharWrapped() {
-	Src := _KHT_StripComments(_KHT_ReadSource("modules/keystats/keystats_hook.ahk"))
+	Src := _KHT_StripComments(_KHT_ReadSource("keystats_hook.ahk"))
 	Body := _DriverFuncBody("KL_Hook_OnChar")
 
 	Assert(Body != "", "KL_Hook_OnChar must exist in keystats_hook.ahk")
@@ -73,7 +72,7 @@ Test("keystats_hook: KL_Hook_OnChar body wrapped in global try/catch (keystats-h
 ; =================================================================
 
 _KHT_OnKeyDownWrapped() {
-	Src := _KHT_StripComments(_KHT_ReadSource("modules/keystats/keystats_hook.ahk"))
+	Src := _KHT_StripComments(_KHT_ReadSource("keystats_hook.ahk"))
 	Body := _DriverFuncBody("KL_Hook_OnKeyDown")
 
 	Assert(Body != "", "KL_Hook_OnKeyDown must exist in keystats_hook.ahk")

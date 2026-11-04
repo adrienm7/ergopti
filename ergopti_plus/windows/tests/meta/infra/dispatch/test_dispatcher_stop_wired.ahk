@@ -33,10 +33,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_DSW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_DSW_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Returns the function body from its declaration to the first flush-left closing
@@ -71,7 +69,7 @@ _DSW_OnExitWiresStop() {
 Test("ErgoptiPlus: OnExit wires HookDispatcher.Stop (dispatcher-stop-not-wired-and-leaks)", _DSW_OnExitWiresStop)
 
 _DSW_StopClearsSubscribers() {
-	Src := _DSW_ReadSource("infra/hook_dispatcher.ahk")
+	Src := _DSW_ReadSource("hook_dispatcher.ahk")
 	Seg := _DSW_FuncBody(Src, "static Stop() {")
 	Assert(Seg != "", "HookDispatcher.Stop() must exist in hook_dispatcher.ahk")
 	Assert(InStr(Seg, "_subscribers := Map()") > 0,

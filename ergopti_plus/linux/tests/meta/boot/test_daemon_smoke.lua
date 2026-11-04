@@ -377,9 +377,9 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local expiry_call = "ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),"
       helpers.assert_true(src:find(expiry_call, 1, true) ~= nil,
         "expiry must evaluate the last-letter-to-expander interval against the stamping clock's resolution")
-      local gate = io.open(driver_root .. "/modules/hotstrings/expansion_delay.lua", "r")
-      helpers.assert_true(gate ~= nil, "expansion delay gate is readable")
-      local gate_src = gate:read("*a"); gate:close()
+      -- modules/hotstrings/expansion_delay, selected by a declaration unique to it.
+      local gate_src = helpers.read_driver_unit("function M.allows(")
+      helpers.assert_true(gate_src ~= nil, "expansion delay gate is readable")
       helpers.assert_true(gate_src:find("Engine.within_expansion_delay(result, delay_sec, resolution_ms, factor)", 1, true) ~= nil,
         "the gate must hand the stamping clock's resolution to the shared engine rule")
       helpers.assert_true(src:find("_last_key_ms", 1, true) == nil,
@@ -488,6 +488,29 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         assert(src:find("local function handle_physical", 1, true)) - 1)
       helpers.assert_true(handle_char:find("record_correction", 1, true) == nil,
         "the text callback never records a correction, so a press is counted once")
+    end)
+
+    helpers.it("counts a media key under its semantic identity, never on the heatmap (linux-media-key-metrics)", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+      local physical_at = assert(src:find("local function handle_physical(scancode, _key_name, _char, value, source)", 1, true),
+        "the physical callback takes the source the hook names")
+      local physical = src:sub(physical_at, assert(src:find("\n\tend\n", physical_at, true)))
+      local media_at = physical:find("keystats.record_media_press(app_id, scancode, keyboard_hook.source_device_identity(source))", 1, true)
+      local heatmap_at = physical:find("keystats.record_physical_key(", 1, true)
+      helpers.assert_true(media_at ~= nil and heatmap_at ~= nil and media_at < heatmap_at,
+        "a media press is routed, with its device, before the heatmap is reached")
+      helpers.assert_true(physical:sub(media_at, heatmap_at):find("return", 1, true) ~= nil,
+        "and returns before the heatmap counts it")
+      local hold_at = assert(src:find("local function handle_hold(scancode, held_ms, source)", 1, true))
+      local hold = src:sub(hold_at, assert(src:find("\n\tend\n", hold_at, true)))
+      local release_at = hold:find("keystats.record_media_release(scancode, keyboard_hook.source_device_identity(source), held_ms)", 1, true)
+      local kc_hold_at = hold:find("keystats.record_hold(", 1, true)
+      helpers.assert_true(release_at ~= nil and kc_hold_at ~= nil and release_at < kc_hold_at,
+        "a media release records its hold under the press, not on the numeric hold table")
     end)
 
     helpers.it("routes recurring pumps through the runtime failure guard", function()

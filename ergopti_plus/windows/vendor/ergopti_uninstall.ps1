@@ -54,8 +54,15 @@ function Invoke-ErgoptiRemoval {
 	Assert-ErgoptiRemovalTarget $Path $Hash
 	if (-not (& $Authorize)) { return $false }
 	if (-not (& $WaitOwner)) { throw 'The application did not finish shutting down.' }
-	Assert-ErgoptiRemovalTarget $Path $Hash
-	& $Unregister $Path
+	# The last check and the unregistration run under a handle that denies write,
+	# rename and delete: a pathname hash alone left the shortcut work, which takes
+	# COM calls, free to swap the image that the recycle then selected. Windows
+	# cannot recycle a pinned file, so the pin ends on the statement before it.
+	$pin = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+	try {
+		Assert-ErgoptiRemovalTarget $Path $Hash
+		& $Unregister $Path
+	} finally { $pin.Dispose() }
 	& $Recycle $Path
 	return $true
 }

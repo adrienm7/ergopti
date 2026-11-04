@@ -379,8 +379,8 @@ for _, stale in ipairs({ false, true }) do
 		v.on_log=function(template)
 			if template:find('Local Ollama repair refused',1,true)then logs=logs+1 end
 		end
-		local file=assert(io.open(helpers.driver_root()..'/modules/llm/prediction_engine.lua','rb'))
-		local text=file:read('*a');file:close()
+		-- modules/llm/prediction_engine, selected by a declaration unique to it.
+		local text=assert(helpers.read_driver_unit('local function SYSTEM_CLOCK('))
 		local callback=assert(text:match('request:on_result%((function%(result%).-\n\t\t\t\tend)%)'), 'actual production runtime failure observer')
 		local env={type=type,tostring=tostring,require=require,Logger=logger,LOG='runtime-notice-test',
 			owner={source=v.source},handle=v.handle,I18n=require('infra.i18n')}

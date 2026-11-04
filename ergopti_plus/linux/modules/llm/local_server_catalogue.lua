@@ -13,6 +13,7 @@ local Paths = require("infra.paths")
 local Logger = require("logger.shim")
 local Policy = require("llm.local_server_auth")
 local PortPolicy = require("llm.local_server_ports")
+local Fingerprint = require("llm.local_server_fingerprint")
 local Reader = require("infra.regular_file_reader")
 
 --- Reads only admitted regular sources whose read and close both acknowledge.
@@ -36,20 +37,23 @@ end
 --- @return table discovery Server id -> validated discovery descriptor; a server
 ---         without one is never probed (modules/llm/local_servers.lua).
 --- @return table request_fields Body fields of every request to a local server.
+--- @return table dialect The reasoning controls of every request to a local server.
+--- @return table identities Server id -> the address group and fingerprint of a
+---         row whose default address another row shares (llm.local_server_fingerprint).
 function M.load(occupied)
 	local path = Paths.shared("modules/llm/local_servers.json")
 	local raw = read_source(path)
 	local root = type(raw) == "string" and Json.decode(raw) or nil
 	if type(root) ~= "table" then
 		Logger.error("llm.local_server_catalogue", "The local API catalogue is unavailable; optional authentication is refused.")
-		return {}, {}, false, {}, {}
+		return {}, {}, false, {}, {}, {}, {}
 	end
 	-- Storage and transport consult the same authoritative cloud identities.
 	-- A local descriptor cannot shadow a registered cloud provider.
 	local cloud_path = Paths.shared("modules/llm/api_providers.json")
 	local cloud_raw = read_source(cloud_path)
 	local cloud = type(cloud_raw) == "string" and Json.decode(cloud_raw) or nil
-	if type(cloud) ~= "table" or type(cloud.providers) ~= "table" then return {}, {}, false, {}, {} end
+	if type(cloud) ~= "table" or type(cloud.providers) ~= "table" then return {}, {}, false, {}, {}, {}, {} end
 	local claimed = {}
 	for id in pairs(cloud.providers) do claimed[id] = true end
 	for id in pairs(occupied or {}) do claimed[id] = true end
@@ -61,7 +65,19 @@ function M.load(occupied)
 		if descriptor then discovery[id] = descriptor
 		else Logger.error("llm.local_server_catalogue", "local_servers.json: %s; that server is never probed.", reason) end
 	end
-	return order, servers, published, discovery, Policy.request_fields(root)
+	-- The family controls a local server carries, on top of request_fields
+	local dialect, dialect_reason = require("llm.thinking_off").parse_dialect(root.thinking_dialect)
+	if not dialect then
+		Logger.error("llm.local_server_catalogue", "local_servers.json thinking_dialect is invalid (%s); only request_fields apply.",
+			tostring(dialect_reason))
+		dialect = {}
+	end
+	-- A refused fingerprint leaves its row to its address's default row
+	local identities, refused = Fingerprint.parse(root, order)
+	for _, reason in ipairs(refused) do
+		Logger.error("llm.local_server_catalogue", "local_servers.json: %s; that row is not fingerprinted.", reason)
+	end
+	return order, servers, published, discovery, Policy.request_fields(root), dialect, identities
 end
 
 return M

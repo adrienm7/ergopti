@@ -294,6 +294,33 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 		end)
 	end)
 
+	helpers.it("(ollama-tags-outage-once) logs one error per model-list outage and its recovery", function()
+		-- Field log 2026-10-30 17:37: the daemon was down and every poll logged
+		-- the same /api/tags error, 20 lines in 38 s.
+		with_owned_responses(function(api, fixture)
+			for index = 1, 3 do
+				api.refresh_local_models()
+				fixture.gets[index].done({ status = 0, body = "",
+					error = "Could not connect to the server." })
+			end
+			api.refresh_local_models()
+			fixture.tags(4, { { name = "qwen2.5:7b" } })
+			api.refresh_local_models()
+			fixture.gets[5].done({ status = 0, body = "" })
+			local errors, recoveries = 0, 0
+			for _, entry in ipairs(fixture.logs) do
+				if entry.kind == "error" and entry.text:find("model list is unavailable", 1, true) then
+					errors = errors + 1
+				end
+				if entry.kind == "info" and entry.text:find("available again after 3 failed read", 1, true) then
+					recoveries = recoveries + 1
+				end
+			end
+			helpers.assert_eq(errors, 2, "one error per outage, and a new outage after a recovery")
+			helpers.assert_eq(recoveries, 1, "the recovery names the failed reads it ends")
+		end)
+	end)
+
 	helpers.it("(ollama-inventory-withdrawal) refuses final tags delivery withdrawn inside its last source read", function()
 		for _, operation in ipairs({ "refresh", "verify" }) do
 			with_owned_responses(function(api, fixture)
@@ -642,6 +669,37 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			helpers.assert_true(api.stop_owned_server())
 			helpers.assert_eq(original.input_closes, 1, "the original EOF remains a once-only request")
 			helpers.assert_true(api.migration_idle())
+		end)
+	end)
+
+	-- The root teardown called stop_owned_server once and refused while the
+	-- daemon ran, so every reload failed its teardown (field run 2026-10-31).
+	helpers.it("(ollama-teardown-awaits-retirement) calls back once the daemon's exact retirement settles", function()
+		with_startup({}, function(api, fixture)
+			helpers.assert_true(api.ensure_running())
+			local original = fixture.tasks[1]
+			original.emit(original.frame("ACTIVE") .. original.frame("READY"))
+			local results = {}
+			local accepted, state = api.retire_owned_server(function(settled, detail)
+				results[#results + 1] = { settled = settled, detail = detail }
+			end)
+			helpers.assert_true(accepted, "a retained daemon is awaited, not refused")
+			helpers.assert_eq(state, "pending")
+			helpers.assert_eq(original.input_closes, 1)
+			helpers.assert_eq(#results, 0, "stdin EOF alone does not settle the retirement")
+			original.emit(original.frame("RETIRED 0"))
+			helpers.assert_eq(#results, 0, "the receipt cannot substitute for physical exit")
+			original.complete(0)
+			helpers.assert_eq(#results, 1, "the exact native retirement calls back once")
+			helpers.assert_true(results[1].settled)
+			helpers.assert_true(api.migration_idle())
+			original.complete(0)
+			helpers.assert_eq(#results, 1)
+
+			local again, again_state = api.retire_owned_server(function() error("must not be retained") end)
+			helpers.assert_true(again)
+			helpers.assert_eq(again_state, "settled", "nothing left to retire settles at once")
+			helpers.assert_eq(api.retire_owned_server(nil), false, "a missing callback is a caller bug")
 		end)
 	end)
 

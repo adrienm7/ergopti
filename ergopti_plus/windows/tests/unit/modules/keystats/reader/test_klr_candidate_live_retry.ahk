@@ -10,6 +10,7 @@
 _KLRCLR_RejectedDrain() {
 	SavedBatch := KLW.batch
 	SavedDevice := Keystats._device_id_lit
+	SavedDeviceId := Keystats.device_id
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	KLW_ResetBatch()
@@ -20,6 +21,7 @@ _KLRCLR_RejectedDrain() {
 		AssertTrue(Db != 0)
 		AssertFalse(KLRCache.disposable)
 		Keystats._device_id_lit := "'dev-one'"
+		Keystats.device_id := "dev-one"
 		KLW.batch["app_day"]["pending"] := Map("date", "2026-01-01", "app", "fixture.exe", "time_ms", 7)
 		KLW.batch["system_day"]["pending"] := Map("date", "2026-01-01",
 			"space_switches", 1, "audio_muted_ms", 0, "passive_count", 0, "night_wake_count", 0)
@@ -71,6 +73,7 @@ _KLRCLR_RejectedDrain() {
 		_KLRDC_Cleanup()
 		KLW.batch := SavedBatch
 		Keystats._device_id_lit := SavedDevice
+		Keystats.device_id := SavedDeviceId
 	}
 }
 Test("KLR candidate: rejected live drain preserves raw tail and batch for retry (klr-candidate-live-retry)",

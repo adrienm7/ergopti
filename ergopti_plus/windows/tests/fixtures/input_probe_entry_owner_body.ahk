@@ -18,6 +18,9 @@ _IPES_Require(Condition, Message) {
 		throw Error(Message)
 }
 
+; The probe's two pauses; this fixture does not load the timing registry.
+TimingsGet(Section, Key) => 1
+
 t(Key) {
 	global _IPES
 	return Key == "input_probe.title" ? _IPES.Title : Key

@@ -55,14 +55,14 @@ end
 
 helpers.describe("keyboard shortcuts: which slots exist", function()
 
-	helpers.it("names the modifiers and the special keys of a label through the catalogue", function()
+	helpers.it("names the modifiers and the special keys of a label through the key name table", function()
 		local shortcuts = load_over_config()
 		local space = with_marked_translations(function() return shortcuts.get_slot_label("primary_space") end)
 		local enter = with_marked_translations(function() return shortcuts.get_slot_label("alt_enter") end)
 		drop_config()
-		helpers.assert_eq(space, "<layer_editor.key.ctrl> <layer_editor.key.space>",
+		helpers.assert_eq(space, "<key_name.ctrl> + <key_name.space>",
 			"a French literal here would show Espace to every language")
-		helpers.assert_eq(enter, "<layer_editor.key.alt> <layer_editor.key.enter>")
+		helpers.assert_eq(enter, "<key_name.alt> + <key_name.enter>")
 	end)
 
 	helpers.it("offers a slot per key from the shared catalogue", function()
@@ -79,8 +79,8 @@ helpers.describe("keyboard shortcuts: which slots exist", function()
 		local shortcuts = load_over_config()
 		local label = with_marked_translations(function() return shortcuts.get_slot_label("primary_shift_p") end)
 		drop_config()
-		helpers.assert_true(label:find("<layer_editor.key.ctrl>", 1, true) ~= nil, "the label must name the modifier")
-		helpers.assert_true(label:find("<layer_editor.key.shift>", 1, true) ~= nil,
+		helpers.assert_true(label:find("<key_name.ctrl>", 1, true) ~= nil, "the label must name the modifier")
+		helpers.assert_true(label:find("<key_name.shift>", 1, true) ~= nil,
 			"and both of them: a label that shows only the first modifier describes "
 				.. "a different chord from the one that fires")
 	end)
@@ -89,7 +89,7 @@ helpers.describe("keyboard shortcuts: which slots exist", function()
 		local shortcuts = load_over_config()
 		local label = with_marked_translations(function() return shortcuts.get_slot_label("primary_shift_a") end)
 		drop_config()
-		helpers.assert_true(label:find("<layer_editor.key.shift>", 1, true) ~= nil,
+		helpers.assert_true(label:find("<key_name.shift>", 1, true) ~= nil,
 			"'primary_shift_a' also starts with 'ctrl_', so a shorter prefix reached "
 				.. "first resolves the wrong chord — which is why the prefix list is "
 				.. "ordered and walked with ipairs")
@@ -499,7 +499,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 	local function with_editor(initial, body, writes_fail)
 		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
 		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
-		local saved_builder = package.loaded["ui.menu.menu_builder"]
+		local saved_builder = package.loaded["ui.menu.builder"]
 		local gestures = require("modules.gestures.manager")
 		local saved_execute = gestures.execute_action
 		local state = { trigger = "★", generation = 1, master = true, paused = false, inhibited = false,
@@ -523,7 +523,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 		gestures.execute_action = saved_execute
 		package.loaded["modules.hotstrings.magic_key_source"] = saved_source
 		package.loaded["modules.hotstrings.magic_key"] = saved_magic
-		package.loaded["ui.menu.menu_builder"] = saved_builder
+		package.loaded["ui.menu.builder"] = saved_builder
 		drop_config()
 		if not ok then error(err, 0) end
 	end
@@ -556,7 +556,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 	helpers.it("(magic-editor-broker) exposes the ordinary contextual action and durable clearing in the tray", function()
 		with_editor(nil, function(shortcuts, config, state)
 			local changed = 0
-			local builder = helpers.load_module("ui.menu.menu_builder")
+			local builder = helpers.load_module("ui.menu.builder")
 			local i18n = require("infra.i18n")
 			local function contextual(items)
 				for _, row in ipairs(items or {}) do
@@ -565,15 +565,17 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 					if found then return found end
 				end
 			end
+			-- The menu reads the Shortcuts category on: an off category greys every
+			-- row of its submenu (category-off rule), so the slot names no reason.
 			local function build()
-				return builder.build({ shortcuts = setmetatable({ is_enabled = function() return false end },
+				return builder.build({ shortcuts = setmetatable({ is_enabled = function() return true end },
 					{ __index = require("modules.shortcuts.manager") }), on_quit = function() end,
 					on_menu_changed = function() changed = changed + 1 end })
 			end
 			local group = contextual(build())
 			helpers.assert_type(group, "table", "the stable logical slot must be visible through the ordinary menu provider")
 			helpers.assert_eq(#group.menu, 1)
-			helpers.assert_eq(group.menu[1].title, "Super + ★ (" .. i18n.get("menu.shortcuts.keyboard.magic_editor_reason.shortcuts_disabled") .. ") → " .. require("modules.gestures.manager").get_action_label("open_hotstrings_editor"))
+			helpers.assert_eq(group.menu[1].title, "Super + ★ → " .. require("modules.gestures.manager").get_action_label("open_hotstrings_editor"))
 			helpers.assert_type(group.menu[1].menu[1].fn, "function", "the ordinary action picker offers reassignment")
 			helpers.assert_eq(group.menu[1].menu[2].title, i18n.get("dialog.action_picker.disabled"))
 			group.menu[1].menu[2].fn()

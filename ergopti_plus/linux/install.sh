@@ -61,6 +61,21 @@ fi
 # shellcheck source=install/messages.sh
 source "${SRC_DRIVER}/install/messages.sh"
 
+# The external hosts are declared once, in _shared/data/identifiers.json. Both
+# layouts carry the generated shell copy in the _shared tree beside the driver.
+. "${DRIVERS_ROOT}/_shared/data/identifiers.sh"
+
+# A release tarball carries the private runtime prefix every package runs
+# (linux/runtime: LuaJIT, luv, luafilesystem, luaposix, curl, sqlite3, openssl,
+# zstd; tools/build/build-linux-bundle-archive.sh). Its environment puts those
+# first for every probe below, so none of them is installed from the host, and
+# the copy of the driver tree installs the runtime with it. A checkout has
+# none and keeps the host packages (a source install, logged by the daemon).
+if [ -e "${SRC_DRIVER}/runtime" ] || [ -L "${SRC_DRIVER}/runtime" ]; then
+	# shellcheck source=/dev/null
+	source "${SRC_DRIVER}/network-runtime-env.sh" "${SRC_DRIVER}/runtime" "${SRC_DRIVER}" || exit 1
+fi
+
 # Prints a section title between its bars.
 # @param $1 Message name, then its arguments.
 _section() {
@@ -374,14 +389,16 @@ _required_dependency_package() {
 		pacman:sqlite3) echo "sqlite" ;;
 		xbps:sqlite3) echo "sqlite" ;;
 		apk:sqlite3) echo "sqlite" ;;
-		# The tray's dialogs: every prompt (a delay, a link, an API key) and
-		# every confirmation is a zenity window. KDE and minimal images lack it.
-		apt:zenity) echo "zenity" ;;
-		dnf:zenity) echo "zenity" ;;
-		zypper:zenity) echo "zenity" ;;
-		pacman:zenity) echo "zenity" ;;
-		xbps:zenity) echo "zenity" ;;
-		apk:zenity) echo "zenity" ;;
+		# Remote API keys live in the desktop secret service, through
+		# secret-tool (modules/llm/api_token_store.lua); without it a key is
+		# refused, never written in plaintext. Only Debian and openSUSE split the
+		# command from the library.
+		apt:secret-tool) echo "libsecret-tools" ;;
+		dnf:secret-tool) echo "libsecret" ;;
+		zypper:secret-tool) echo "secret-tool" ;;
+		pacman:secret-tool) echo "libsecret" ;;
+		xbps:secret-tool) echo "libsecret" ;;
+		apk:secret-tool) echo "libsecret" ;;
 		# The tray icon. platform/tray/appindicator.lua binds this library
 		# through FFI; without it --tray has nothing to host the icon in.
 		apt:tray) echo "libayatana-appindicator3-1" ;;
@@ -524,7 +541,7 @@ _network_source_build_packages() {
 		*) return 1 ;;
 	esac
 }
-NATIVE_LUV_SOURCE_URL="https://github.com/luvit/luv.git"
+NATIVE_LUV_SOURCE_URL="https://$ERGOPTI_HOST_GITHUB/luvit/luv.git"
 NATIVE_LUV_SOURCE_REVISION="26e62e49b0230891ece45a78cc1f63c074e60020"
 NATIVE_LUV_CMAKE_OPTIONS=("-DLUA_BUILD_TYPE=System" "-DWITH_LUA_ENGINE=LuaJIT" "-DBUILD_MODULE=ON" "-DBUILD_SHARED_LIBS=OFF" "-DBUILD_STATIC_LIBS=OFF" "-DWITH_SHARED_LIBUV=OFF")
 # END GENERATED LINUX SOURCE NETWORK BUILD
@@ -591,7 +608,7 @@ _section install.section_dependency_check "${ERGOPTI_VERSION}"
 # forked once per event, which is what made the keyboard grab unaffordable.
 _check_or_install luajit
 _check_or_install notify-send
-_check_or_install zenity
+_check_or_install secret-tool
 _check_or_install sqlite3
 _check_or_install openssl
 _check_or_install sha256sum

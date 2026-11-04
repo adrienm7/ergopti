@@ -54,7 +54,7 @@ helpers.describe("bindings — disable persists across stop/start (shortcuts-bin
 		-- Selected by a declaration unique to modules/shortcuts/bindings.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function get_frontmost_app_name")
+		local src = helpers.read_driver_source("local _chatgpt_url = nil")
 		helpers.assert_true(src ~= nil, "modules/shortcuts/bindings.lua source must be locatable")
 		return src
 	end
@@ -231,17 +231,16 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		end
 	end)
 
-	helpers.it("lists the ChatGPT and Cmd+* switches that are not catalogue actions", function()
+	helpers.it("lists the Cmd+* switch that is not a catalogue action", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
-		helpers.assert_true(seen.ctrl_g, "missing shortcut: ctrl_g")
 		helpers.assert_true(seen.cmd_star, "missing shortcut: cmd_star")
 	end)
 
 	helpers.it("no longer lists the switches that became role-named slots", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
-		for _, id in ipairs({ "ctrl_a", "ctrl_d", "ctrl_e", "ctrl_h", "ctrl_i", "ctrl_m", "ctrl_o", "ctrl_p", "ctrl_s", "ctrl_t", "ctrl_u", "ctrl_w", "ctrl_x", "ctrl_capslock", "ctrl_l", "ctrl_period", "ctrl_quote", "cmd_shift_v" }) do
+		for _, id in ipairs({ "ctrl_a", "ctrl_d", "ctrl_e", "ctrl_h", "ctrl_i", "ctrl_m", "ctrl_o", "ctrl_p", "ctrl_s", "ctrl_t", "ctrl_u", "ctrl_w", "ctrl_x", "ctrl_capslock", "ctrl_l", "ctrl_period", "ctrl_quote", "cmd_shift_v", "ctrl_g" }) do
 			helpers.assert_nil(seen[id], "retired switch still listed: " .. id)
 		end
 	end)
@@ -255,10 +254,11 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		helpers.assert_nil(seen.layer_scroll, "Layer + Scroll is retired: the layer's wheel replaces it")
 	end)
 
-	helpers.it("orders ctrl_* entries before cmd_* entries", function()
-		local idx = {}
-		for i, entry in ipairs(list) do idx[entry.id] = i end
-		helpers.assert_true(idx.ctrl_g < idx.cmd_star)
+	-- Schema v20 made Ctrl+G the secondary_g slot: no fixed Ctrl chord remains.
+	helpers.it("lists no fixed ctrl_* entry", function()
+		for _, entry in ipairs(list) do
+			helpers.assert_true(entry.id:sub(1, 5) ~= "ctrl_", "fixed Ctrl chord still listed: " .. entry.id)
+		end
 	end)
 
 	helpers.it("orders cmd_* entries before the catch-all bucket", function()
@@ -285,33 +285,33 @@ helpers.describe("shortcuts.bindings: enable/disable", function()
 	require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 
 	helpers.it("is_bound is false before enable(), while the preference is on", function()
-		helpers.assert_eq(B.is_bound("ctrl_g"), false)
-		helpers.assert_eq(B.is_enabled("ctrl_g"), true)
+		helpers.assert_eq(B.is_bound("cmd_star"), false)
+		helpers.assert_eq(B.is_enabled("cmd_star"), true)
 	end)
 
 	helpers.it("enable() binds the hotkey and keeps the preference on", function()
-		helpers.assert_eq(B.enable("ctrl_g"), true)
-		helpers.assert_eq(B.is_enabled("ctrl_g"), true)
-		helpers.assert_eq(B.is_bound("ctrl_g"), true)
+		helpers.assert_eq(B.enable("cmd_star"), true)
+		helpers.assert_eq(B.is_enabled("cmd_star"), true)
+		helpers.assert_eq(B.is_bound("cmd_star"), true)
 	end)
 
 	helpers.it("enable() is idempotent — re-enabling does not crash", function()
-		B.enable("ctrl_g")
-		B.enable("ctrl_g")
-		helpers.assert_eq(B.is_enabled("ctrl_g"), true)
-		helpers.assert_eq(B.is_bound("ctrl_g"), true)
+		B.enable("cmd_star")
+		B.enable("cmd_star")
+		helpers.assert_eq(B.is_enabled("cmd_star"), true)
+		helpers.assert_eq(B.is_bound("cmd_star"), true)
 	end)
 
 	helpers.it("disable() unbinds the hotkey and switches the preference off", function()
-		helpers.assert_eq(B.disable("ctrl_g"), true)
-		helpers.assert_eq(B.is_enabled("ctrl_g"), false)
-		helpers.assert_eq(B.is_bound("ctrl_g"), false)
+		helpers.assert_eq(B.disable("cmd_star"), true)
+		helpers.assert_eq(B.is_enabled("cmd_star"), false)
+		helpers.assert_eq(B.is_bound("cmd_star"), false)
 	end)
 
 	helpers.it("disable() is idempotent — disabling an inactive id does nothing", function()
-		B.disable("ctrl_g")
-		helpers.assert_eq(B.is_enabled("ctrl_g"), false)
-		helpers.assert_eq(B.is_bound("ctrl_g"), false)
+		B.disable("cmd_star")
+		helpers.assert_eq(B.is_enabled("cmd_star"), false)
+		helpers.assert_eq(B.is_bound("cmd_star"), false)
 	end)
 end)
 
@@ -366,96 +366,50 @@ end)
 -- ==========================================================================================
 -- ==========================================================================================
 
--- Guards F-HIGH-3: ctrl_g used to always open M.DEFAULT_CHATGPT_URL, ignoring the
+-- Guards F-HIGH-3: Ctrl+G used to always open M.DEFAULT_CHATGPT_URL, ignoring the
 -- URL the user persisted via the menu to config.toml. The fix adds set_chatgpt_url()
--- (mirroring set_wrap_pairs_getter) and makes ctrl_g read the live value.
+-- (mirroring set_wrap_pairs_getter); since schema v20 the open_chatgpt action reads
+-- get_chatgpt_url() on every run (test_apps_layer_actions.lua pins that read).
 helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-config regression)", function()
-
-	-- Builds a fresh Bindings instance with hs.hotkey.bind stubbed to capture the
-	-- ctrl_g callback, and hs.urlevent.openURL stubbed to record the URL it opened.
-	local function make_bindings_with_ctrl_g_spy()
-		package.loaded["infra.keycodes"] = {
-			F18_WAKE_OS                = 79,
-			F19_LAYER_NAV_EXITED       = 80,
-			to_name = function(code)
-				local MAP = { [79] = "f18", [80] = "f19" }
-				return MAP[code] or ("keycode_" .. tostring(code))
-			end,
-		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+	local function fresh_bindings()
 		package.loaded["modules.shortcuts.bindings"] = nil
-		-- apps.lua captures `local urlevent = hs.urlevent` at module load time, so a
-		-- cached instance from an earlier test would still call the OLD hs stub's
-		-- openURL, not the spy installed below — force it to reload under this stub.
-		package.loaded["modules.shortcuts.actions.apps"] = nil
-
-		local captured_ctrl_g = nil
-		local opened_urls = {}
-
-		local B = helpers.load_with_stubs("modules.shortcuts.bindings", {
-			hotkey = {
-				bind = function(_mods, key, fn)
-					if key == "g" then captured_ctrl_g = fn end
-					return { delete = function() return true end }
-				end,
-			},
-			urlevent = {
-				bind    = function() end,
-				openURL = function(url) table.insert(opened_urls, url) end,
-			},
-			-- bind_log's get_frontmost_app_name() calls app:title(); the base stub's
-			-- frontmostApplication() only exposes name(), not title()
-			application = {
-				frontmostApplication = function() return { title = function() return "TestApp" end } end,
-			},
-		})
-
-		require("tests.support.shortcut_bindings_fixture").prefer_all(B)
-		B.start()
-		return B, captured_ctrl_g, opened_urls
-	end
-
-	helpers.it("exposes set_chatgpt_url as a function", function()
 		local B = helpers.load_with_stubs("modules.shortcuts.bindings")
 		require("tests.support.shortcut_bindings_fixture").prefer_all(B)
+		return B
+	end
+
+	helpers.it("exposes set_chatgpt_url and get_chatgpt_url as functions", function()
+		local B = fresh_bindings()
 		helpers.assert_eq(type(B.set_chatgpt_url), "function")
+		helpers.assert_eq(type(B.get_chatgpt_url), "function")
 	end)
 
-	helpers.it("ctrl_g opens M.DEFAULT_CHATGPT_URL when set_chatgpt_url was never called", function()
-		local B, ctrl_g, opened_urls = make_bindings_with_ctrl_g_spy()
-		helpers.assert_true(type(ctrl_g) == "function", "ctrl_g callback must have been captured")
-		ctrl_g()
-		helpers.assert_eq(#opened_urls, 1, "ctrl_g must open exactly one URL")
-		helpers.assert_eq(opened_urls[1], B.DEFAULT_CHATGPT_URL)
+	helpers.it("reads M.DEFAULT_CHATGPT_URL when set_chatgpt_url was never called", function()
+		local B = fresh_bindings()
+		helpers.assert_eq(B.get_chatgpt_url(), B.DEFAULT_CHATGPT_URL)
 	end)
 
-	helpers.it("ctrl_g opens the configured URL, NOT the hardcoded default, after set_chatgpt_url()", function()
-		local B, ctrl_g, opened_urls = make_bindings_with_ctrl_g_spy()
+	helpers.it("reads the configured URL, NOT the hardcoded default, after set_chatgpt_url()", function()
+		local B = fresh_bindings()
 		local configured_url = "https://chatgpt.example.test/configured"
-
-		B.set_chatgpt_url(configured_url)
-		ctrl_g()
-
-		helpers.assert_eq(#opened_urls, 1, "ctrl_g must open exactly one URL")
-		helpers.assert_eq(opened_urls[1], configured_url,
-			"ctrl_g must open the user-configured URL, not M.DEFAULT_CHATGPT_URL (F-HIGH-3)")
-		helpers.assert_true(opened_urls[1] ~= B.DEFAULT_CHATGPT_URL,
+		helpers.assert_eq(B.set_chatgpt_url(configured_url), true)
+		helpers.assert_eq(B.get_chatgpt_url(), configured_url,
+			"the action must open the user-configured URL, not M.DEFAULT_CHATGPT_URL (F-HIGH-3)")
+		helpers.assert_true(configured_url ~= B.DEFAULT_CHATGPT_URL,
 			"the configured URL in this test is deliberately different from the default")
 	end)
 
 	helpers.it("set_chatgpt_url(nil) falls back to M.DEFAULT_CHATGPT_URL", function()
-		local B, ctrl_g, opened_urls = make_bindings_with_ctrl_g_spy()
+		local B = fresh_bindings()
 		B.set_chatgpt_url("https://chatgpt.example.test/configured")
 		B.set_chatgpt_url(nil)
-		ctrl_g()
-		helpers.assert_eq(opened_urls[1], B.DEFAULT_CHATGPT_URL)
+		helpers.assert_eq(B.get_chatgpt_url(), B.DEFAULT_CHATGPT_URL)
 	end)
 
 	helpers.it("set_chatgpt_url(\"\") falls back to M.DEFAULT_CHATGPT_URL (empty string is not a valid URL)", function()
-		local B, ctrl_g, opened_urls = make_bindings_with_ctrl_g_spy()
+		local B = fresh_bindings()
 		B.set_chatgpt_url("")
-		ctrl_g()
-		helpers.assert_eq(opened_urls[1], B.DEFAULT_CHATGPT_URL)
+		helpers.assert_eq(B.get_chatgpt_url(), B.DEFAULT_CHATGPT_URL)
 	end)
 end)
 

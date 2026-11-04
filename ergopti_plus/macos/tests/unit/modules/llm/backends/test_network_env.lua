@@ -166,3 +166,112 @@ helpers.describe("managed-network-children", function()
 	end)
 
 end)
+
+--- Loads network_env over a storage double holding `stored` as the proxy override.
+--- @param stored any
+--- @return table NetworkEnv, function restore
+local function with_override(stored)
+	local saved = package.loaded["adapters.storage"]
+	package.loaded["adapters.storage"] = { get = function(key, default)
+		if key == "network.proxy_override" then return stored end
+		return default
+	end }
+	package.loaded["modules.llm.network_env"] = nil
+	local NetworkEnv = require("modules.llm.network_env")
+	return NetworkEnv, function()
+		package.loaded["adapters.storage"] = saved
+		package.loaded["modules.llm.network_env"] = nil
+	end
+end
+
+helpers.describe("managed-network-children: the proxy override (Issue #101 point 2)", function()
+	local exported = "env -u https_proxy -u all_proxy -u ALL_PROXY -u SSL_CERT_FILE -u SSL_CERT_DIR "
+		.. "HTTPS_PROXY=http://exported.corp:3129 http_proxy=http://exported.corp:3129 NO_PROXY= no_proxy= "
+		.. "ERGOPTI_PROXY_OVERRIDE=direct bash -c "
+	local report = 'printf "%s|%s|%s|%s" "${HTTPS_PROXY:-}" "${https_proxy:-}" "${HTTP_PROXY:-}" "$NO_PROXY"'
+
+	helpers.it("leads every prelude, assigned even when automatic so an inherited value never applies", function()
+		local NetworkEnv, restore = with_override(nil)
+		local ok, failure = pcall(function()
+			for _, prelude in ipairs({ assert(NetworkEnv.prelude("TEST")), assert(NetworkEnv.opaque_prelude("TEST")) }) do
+				helpers.assert_eq(prelude:sub(1, 27), "ERGOPTI_PROXY_OVERRIDE=''; ")
+			end
+			if POSIX then
+				-- The exported relay still wins over the system settings when automatic.
+				local output = run(exported .. sh_quote(assert(NetworkEnv.prelude("TEST")) .. report))
+				helpers.assert_true(output:find("http://exported.corp:3129|", 1, true) == 1, output)
+			end
+		end)
+		restore()
+		assert(ok, failure)
+	end)
+
+	helpers.it("a relay override replaces the exported relay and keeps the loopback exclusion", function()
+		local NetworkEnv, restore = with_override("http://override.corp:8080")
+		local ok, failure = pcall(function()
+			local prelude = assert(NetworkEnv.prelude("TEST"))
+			helpers.assert_eq(prelude:sub(1, 50), "ERGOPTI_PROXY_OVERRIDE='http://override.corp:8080'")
+			if POSIX then
+				local output = run(exported .. sh_quote(prelude .. report))
+				helpers.assert_true(output:find(
+					"http://override.corp:8080|http://override.corp:8080|http://override.corp:8080|localhost,127.0.0.1,::1",
+					1, true) ~= nil, output)
+				helpers.assert_true(output:find("relay the proxy override", 1, true) ~= nil, output)
+			end
+		end)
+		restore()
+		assert(ok, failure)
+	end)
+
+	helpers.it("a direct override drops every relay without reading the system settings", function()
+		local NetworkEnv, restore = with_override("direct")
+		local ok, failure = pcall(function()
+			for _, prelude in ipairs({ assert(NetworkEnv.prelude("TEST")), assert(NetworkEnv.opaque_prelude("TEST")) }) do
+				if POSIX then
+					-- No scutil on PATH: a read of the system settings would refuse the opaque client.
+					local output = run("PATH=/usr/bin:/bin " .. exported .. sh_quote(prelude .. report .. "; echo; echo admitted"))
+					helpers.assert_true(output:find("|||*", 1, true) ~= nil, output)
+					helpers.assert_true(output:find("admitted", 1, true) ~= nil, output)
+					helpers.assert_true(output:find("go direct: the proxy override", 1, true) ~= nil, output)
+					-- An installer script that sources the policy again keeps the direct route.
+					local clean = exported:gsub("ERGOPTI_PROXY_OVERRIDE=direct ", ""):gsub("^env ", "env -u ERGOPTI_PROXY_OVERRIDE ")
+					local nested = run("PATH=/usr/bin:/bin " .. clean .. sh_quote(prelude
+						.. "bash -c " .. sh_quote("log_info() { :; }; log_error() { :; }; . " .. sh_quote(NetworkEnv.policy_path())
+						.. " && apply_system_network opaque && " .. report)))
+					helpers.assert_true(nested:find("|||*", 1, true) ~= nil, nested)
+				end
+			end
+		end)
+		restore()
+		assert(ok, failure)
+	end)
+
+	helpers.it("an override takes the environment-driven path instead of the native worker", function()
+		local NetworkEnv, restore = with_override("socks5h://127.0.0.1:1080")
+		local ok, failure = pcall(function()
+			helpers.assert_eq(NetworkEnv.uses_managed_transport(), false)
+			helpers.assert_eq(assert(NetworkEnv.managed_http_prelude("TEST")), assert(NetworkEnv.opaque_prelude("TEST")))
+			helpers.assert_eq(assert(NetworkEnv.bootstrap_prelude("TEST", "/usr/bin/python3")),
+				assert(NetworkEnv.opaque_prelude("TEST")))
+		end)
+		restore()
+		assert(ok, failure)
+		NetworkEnv, restore = with_override("")
+		helpers.assert_eq(NetworkEnv.uses_managed_transport(), true)
+		restore()
+	end)
+
+	helpers.it("refuses every prelude when the stored override is not valid", function()
+		local NetworkEnv, restore = with_override("proxy.corp:3128")
+		local ok, failure = pcall(function()
+			for _, build in ipairs({ NetworkEnv.prelude, NetworkEnv.opaque_prelude, NetworkEnv.managed_http_prelude }) do
+				local prelude, err = build("TEST")
+				helpers.assert_eq(prelude, nil)
+				helpers.assert_eq(err, "the proxy override in the settings is not valid")
+			end
+			helpers.assert_eq(NetworkEnv.uses_managed_transport(), nil)
+		end)
+		restore()
+		assert(ok, failure)
+	end)
+end)

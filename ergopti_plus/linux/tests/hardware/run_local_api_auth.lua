@@ -13,6 +13,9 @@ if native_cpath and native_cpath ~= "" then package.cpath = native_cpath end
 local available, uv = pcall(require, "luv")
 if not available then io.stderr:write("ENVIRONMENT: native lua-luv is required\n"); os.exit(2) end
 require("compat.utf8").install()
+-- API keys live in the desktop secret service: give this process the in-memory
+-- one the unit runner uses, never the developer's keyring or a missing tool.
+require("tests.support.secret_service_fake").isolate()
 local Http = require("adapters.http_client")
 local EventLoop = require("adapters.event_loop")
 local Remote = require("modules.llm.api_remote")
@@ -150,7 +153,10 @@ check(run_until(function() return not Http.isActive() end) and not Remote.is_act
 local Entries = require("modules.llm.api_entries")
 local private_path = os.tmpname(); os.remove(private_path)
 Entries._set_path_for_test(private_path)
-for _, id in ipairs({ "omlx", "lmstudio", "llamacpp", "jan" }) do
+-- The catalogue lists more servers than these four; only the ones given an
+-- entry at the fixture's URL are probed, the others have no result.
+local NATIVE_IDS = { "omlx", "lmstudio", "llamacpp", "jan" }
+for _, id in ipairs(NATIVE_IDS) do
 	check(Entries.add({ provider = id, label = id, token = "", model = "before", base_url = base_url }) ~= nil,
 		"native discovery stores the configured " .. id .. " source through its private owner")
 end
@@ -219,7 +225,21 @@ discovery_done = false
 local configured_before = #requests
 Servers.rescan(function() return true end, function() discovery_done = true end)
 check(run_until(function() return discovery_done end), "actual configured discovery jointly settles all six curl owners")
-check(#Servers.order() == 6 and #requests == configured_before + 6, "actual configured endpoints append exactly two owned probes without port scanning")
+-- The four catalogue entries plus the two configured views this fixture probes.
+local function probed_ids()
+	local ids = {}
+	for _, id in ipairs(NATIVE_IDS) do ids[#ids + 1] = id end
+	for _, configured in ipairs(configured_entries) do ids[#ids + 1] = "configured:" .. configured.id end
+	return ids
+end
+local function lists_all(order, ids)
+	local listed = {}
+	for _, id in ipairs(order) do listed[id] = true end
+	for _, id in ipairs(ids) do if not listed[id] then return false end end
+	return true
+end
+check(lists_all(Servers.order(), probed_ids()) and #requests == configured_before + 6,
+	"actual configured endpoints append exactly two owned probes without port scanning")
 for index, configured in ipairs(configured_entries) do
 	local id = "configured:" .. configured.id
 	local verdict = Servers.result(id)
@@ -280,7 +300,7 @@ response = { status = 200, body = '{"object":"list","data":[]}' }
 discovery_done = false
 Servers.rescan(function() return true end, function() discovery_done = true end)
 check(run_until(function() return discovery_done end), "actual empty OpenAI lists jointly settle all six native probes")
-for _, id in ipairs(Servers.order()) do
+for _, id in ipairs(probed_ids()) do
 	local verdict = Servers.result(id)
 	check(verdict and verdict.status == "up" and #verdict.models == 0,
 		id .. " valid empty models list is reachable without selectable model IDs")
@@ -312,7 +332,7 @@ for _, control in ipairs({
 	discovery_done = false
 	Servers.rescan(function() return true end, function() discovery_done = true end)
 	check(run_until(function() return discovery_done end), control.label .. " native negative control settles")
-	for _, id in ipairs(Servers.order()) do
+	for _, id in ipairs(probed_ids()) do
 		check(Servers.result(id).status == "down", id .. " " .. control.label .. " is down, never unavailable")
 	end
 	check(#Servers.detected() == 0, control.label .. " cannot publish reachable or selectable model rows")

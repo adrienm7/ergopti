@@ -133,7 +133,7 @@ end)
 -- ===========================================================
 
 helpers.describe("startup: duplicate shortcuts.bindings start() does not WARN (bindings-quiet-restart)", function()
-	local src = read_code("local function get_frontmost_app_name") -- modules/shortcuts/bindings.lua
+	local src = read_code("local _chatgpt_url = nil") -- modules/shortcuts/bindings.lua
 
 	helpers.it("the already-started guard logs at DEBUG, not WARNING", function()
 		-- init.lua starts the bindings early, then menu_state re-starts them to

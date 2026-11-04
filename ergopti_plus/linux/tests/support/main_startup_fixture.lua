@@ -182,11 +182,24 @@ function M.run(options)
 				record("signals.stop"); observed.signal_stops = observed.signal_stops + 1
 				observed.signals_active = false; return true
 			end }
+		elseif name == "infra.gui_stack" then
+			-- The desktop toolkit is present: its refusal has its own cases
+			-- (tests/unit/infra/lifecycle/test_gui_stack.lua).
+			return { check_at_start = function() record("gui_stack"); return nil end }
 		elseif name == "infra.driver_control" then
 			-- The local reload control starts once the daemon is ready.
 			return { start = function(control_options)
 				observed.driver_control = control_options
 				return { handle = function() return false end, stop = function() return true end }
+			end }
+		elseif name == "infra.reload_timing" then
+			-- The Reload this boot completes is reported once the boot is complete.
+			return { complete = function() record("reload.complete"); return nil end }
+		elseif name == "infra.field_run" then
+			-- The collector's no-click field run starts beside the reload control.
+			return { start = function(field_options)
+				observed.field_run = field_options
+				return { stop = function() return true end }
 			end }
 		elseif name == "luv" then
 			return { os_getpid = function() return 4242 end }

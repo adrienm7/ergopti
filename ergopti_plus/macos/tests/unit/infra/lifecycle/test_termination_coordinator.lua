@@ -45,6 +45,7 @@ local function load_coordinator(options)
 		"before init nothing owns the process, and the query must not raise")
 	local initialized = coordinator.init({
 		capture_publication_admission = options.capture_publication_admission,
+		record_stage = options.record_stage,
 		request_lease = function(reason, callback)
 			calls.lease_requests = calls.lease_requests + 1
 			calls.reason = reason
@@ -131,12 +132,18 @@ local function load_coordinator(options)
 		end,
 		fatal_exit_code = 70,
 		schedule = function(delay, callback)
+			-- The reload deadline has its own bound; it never joins the call order
+			if delay == 30 then
+				calls.reload_deadline_callback = callback
+				return { stop = function() calls.reload_deadline_stopped = true; return true end }
+			end
 			calls.watchdog_delay = delay
 			calls.watchdog_callback = callback
 			append("arm-watchdog")
 			return { stop = function() calls.watchdog_stopped = true; return true end }
 		end,
 		user_exit_deadline_seconds = 12,
+		reload_deadline_seconds = 30,
 		mark_reload = function()
 			calls.marks = calls.marks + 1
 			append("mark-reload")
@@ -365,7 +372,7 @@ helpers.describe("controlled termination coordinator", function()
 
 	helpers.it("fails once only after an exact pending teardown refusal (HS-008)", function()
 		local coordinator, calls = load_coordinator({ teardown_deferred = true })
-		helpers.assert_true(coordinator.request_reload("mlx_cleanup_refused"))
+		helpers.assert_true(coordinator.request_exit("mlx_cleanup_refused", 0))
 		calls.lease_callback(true, "stopped")
 
 		helpers.assert_eq(calls.fatal_exits, 0,
@@ -374,13 +381,26 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_true(exact_callback(false, "listener still present") == false)
 		helpers.assert_eq(calls.teardowns, 1)
 		helpers.assert_eq(calls.drains, 0)
-		helpers.assert_eq(calls.reloads, 0)
+		helpers.assert_eq(calls.exits, 0)
 		helpers.assert_eq(calls.fatal_exits, 1)
 		helpers.assert_true(not coordinator.is_pending())
 
 		exact_callback(false, "duplicate refusal")
 		helpers.assert_eq(calls.fatal_exits, 1,
 			"a duplicate refusal cannot invoke the fatal backstop twice")
+
+		-- A reload refused the same way replaces its Lua state natively, once
+		local reload, reload_calls = load_coordinator({ teardown_deferred = true })
+		helpers.assert_true(reload.request_reload("mlx_cleanup_refused"))
+		reload_calls.lease_callback(true, "stopped")
+		local reload_callback = reload_calls.teardown_callback
+		helpers.assert_true(reload_callback(false, "listener still present") == false)
+		helpers.assert_eq(reload_calls.drains, 0)
+		helpers.assert_eq(reload_calls.reloads, 1)
+		helpers.assert_eq(reload_calls.fatal_exits, 0)
+		reload_callback(false, "duplicate refusal")
+		helpers.assert_eq(reload_calls.reloads, 1, "a duplicate refusal cannot reload twice")
+		helpers.assert_true(not reload.is_pending())
 	end)
 
 	helpers.it("retries a pending reload teardown with the latest exit intent (HS-008)", function()
@@ -699,11 +719,9 @@ helpers.describe("controlled termination coordinator", function()
 
 	helpers.it("exits non-zero after a throwing post-fence teardown", function()
 		local teardown_failure, teardown_calls = load_coordinator({ teardown_raises = true })
-		helpers.assert_true(teardown_failure.request_reload("raising_teardown"))
+		helpers.assert_true(teardown_failure.request_exit("raising_teardown", 0))
 		teardown_calls.lease_callback(true, "stopped")
-		helpers.assert_eq(teardown_calls.reloads, 0)
-		helpers.assert_eq(teardown_calls.clears, 1,
-			"a failed teardown must not leave the next real quit marked as reload")
+		helpers.assert_eq(teardown_calls.exits, 0)
 		helpers.assert_eq(teardown_calls.fatal_exits, 1,
 			"post-fence teardown failure cannot return as a live driver")
 		helpers.assert_eq(teardown_calls.fatal_exit_code, 70)
@@ -715,18 +733,51 @@ helpers.describe("controlled termination coordinator", function()
 			teardown_result = false,
 			partial_teardown = true,
 		})
-		helpers.assert_true(false_teardown.request_reload("false_teardown"))
+		helpers.assert_true(false_teardown.request_exit("false_teardown", 0))
 		false_calls.lease_callback(true, "stopped")
 		helpers.assert_true(false_calls.first_owner_stopped,
 			"the causal fixture must prove local teardown already mutated live state")
-		helpers.assert_eq(false_calls.reloads, 0,
+		helpers.assert_eq(false_calls.exits, 0,
 			"an explicit false teardown result must not execute the terminal action")
-		helpers.assert_eq(false_calls.clears, 1)
 		helpers.assert_eq(false_calls.fatal_exits, 1,
 			"an irreversibly partial teardown must invoke the native EOF backstop once")
 		helpers.assert_eq(false_calls.fatal_exit_code, 70)
 		helpers.assert_true(not false_teardown.is_pending(),
 			"the broken environment must never be republished as live")
+	end)
+
+	-- Both reloads of the 2026-10-31 field run failed their local teardown, and
+	-- the fatal exit lost the app: Hammerspoon reports status 0, so the launcher
+	-- quit with it and nothing came back for 57 s and 170 s.
+	helpers.it("reloads natively when a reload's local teardown fails (reload-teardown-failed)", function()
+		for _, options in ipairs({
+			{ teardown_raises = true },
+			{ teardown_result = false, partial_teardown = true },
+		}) do
+			local stages = {}
+			options.record_stage = function(_, stage) stages[#stages + 1] = stage end
+			local coordinator, calls = load_coordinator(options)
+			helpers.assert_true(coordinator.request_reload("watcher"))
+			calls.lease_callback(true, "stopped")
+			helpers.assert_eq(calls.drains, 0, "a failed teardown never reaches the log drain")
+			helpers.assert_eq(calls.finalizers, 0)
+			helpers.assert_eq(calls.reloads, 1, "the failed reload replaces its Lua state natively")
+			helpers.assert_eq(calls.fatal_exits, 0, "a reload must not lose the app")
+			helpers.assert_eq(calls.clears, 0,
+				"the sentinel stays marked so the shutdown callback sees a reload")
+			helpers.assert_true(not coordinator.is_pending())
+			helpers.assert_eq(stages[#stages - 1], "reload_after_failed_teardown")
+			helpers.assert_eq(stages[#stages], "hs_reload_called")
+			calls.lease_callback(true, "duplicate stopped")
+			helpers.assert_eq(calls.reloads, 1)
+			helpers.assert_eq(calls.teardowns, 1)
+		end
+
+		-- A native reload that raises still takes the fatal backstop
+		local raising, raising_calls = load_coordinator({ teardown_raises = true, reload_raises = true })
+		helpers.assert_true(raising.request_reload("watcher"))
+		raising_calls.lease_callback(true, "stopped")
+		helpers.assert_eq(raising_calls.fatal_exits, 1)
 	end)
 
 	helpers.it("exits non-zero when the fenced callback raises before local teardown", function()
@@ -804,5 +855,160 @@ helpers.describe("controlled termination coordinator", function()
 		local coordinator, calls = load_coordinator()
 		helpers.assert_true(coordinator.request_exit("invalid", 256) == false)
 		helpers.assert_eq(calls.lease_requests, 0)
+	end)
+
+	-- The field run's timed reload of 2026-10-30 21:06 lost the app after its
+	-- lease revocation was requested; its queued log lines were lost with it.
+	helpers.it("names every reload stage to the breadcrumb before it runs (reload-breadcrumb)", function()
+		local stages = {}
+		-- Declared first: the doubles' order table is read from inside the breadcrumb
+		local coordinator, calls
+		coordinator, calls = load_coordinator({ record_stage = function(kind, stage)
+			stages[#stages + 1] = kind .. ":" .. stage
+			calls.order[#calls.order + 1] = "stage-" .. stage
+		end })
+		helpers.assert_true(coordinator.request_reload("field_run"))
+		helpers.assert_eq(stages, { "reload:accepted", "reload:lease_fence_requested" },
+			"a lost fence leaves the request as the last stage")
+		calls.lease_callback(true, "stopped")
+		helpers.assert_eq(calls.reloads, 1)
+		helpers.assert_eq(stages, {
+			"reload:accepted", "reload:lease_fence_requested", "reload:lease_fenced",
+			"reload:input_drain_started", "reload:input_drained", "reload:reload_marked",
+			"reload:teardown_attempt", "reload:teardown_completed", "reload:log_drain_started",
+			"reload:log_drained", "reload:finalized", "reload:hs_reload_called", "reload:hs_reload_returned",
+		})
+		local function before(first, second)
+			local a, b
+			for index, entry in ipairs(calls.order) do
+				if entry == first and not a then a = index end
+				if entry == second and not b then b = index end
+			end
+			return a ~= nil and b ~= nil and a < b
+		end
+		helpers.assert_true(before("stage-lease_fence_requested", "request-lease"))
+		helpers.assert_true(before("stage-teardown_attempt", "teardown-reload"))
+		helpers.assert_true(before("stage-hs_reload_called", "reload"))
+	end)
+
+	helpers.it("names a refused fence, an upgrade to exit and a raising breadcrumb changes nothing (reload-breadcrumb)", function()
+		local stages = {}
+		local coordinator, calls = load_coordinator({ record_stage = function(kind, stage)
+			stages[#stages + 1] = kind .. ":" .. stage
+		end })
+		helpers.assert_true(coordinator.request_reload_owned("first", function() end))
+		calls.lease_callback(false, "refused")
+		helpers.assert_eq(stages[#stages - 1], "reload:lease_fence_refused")
+		helpers.assert_eq(stages[#stages], "reload:aborted")
+
+		stages = {}
+		local upgraded, upgrade_calls = load_coordinator({ record_stage = function(kind, stage)
+			stages[#stages + 1] = kind .. ":" .. stage
+		end })
+		helpers.assert_true(upgraded.request_reload("first"))
+		helpers.assert_true(upgraded.request_exit("quit", 0))
+		helpers.assert_eq(stages[#stages], "exit:upgraded_to_exit")
+		upgrade_calls.lease_callback(true, "stopped")
+		helpers.assert_eq(upgrade_calls.exits, 1)
+
+		local raising, raising_calls = load_coordinator({ record_stage = function() error("disk full") end })
+		helpers.assert_true(raising.request_reload("first"))
+		raising_calls.lease_callback(true, "stopped")
+		helpers.assert_eq(raising_calls.reloads, 1, "a failing breadcrumb never blocks the reload")
+		helpers.assert_eq(raising_calls.fatal_exits, 0)
+	end)
+
+	-- A reload whose fence never answered left the app up with its Karabiner
+	-- remaps revoked, forever: only a user quit had a deadline (reload-deadline).
+	helpers.it("reloads natively when a controlled reload's fence never settles (reload-deadline)", function()
+		local stages = {}
+		local coordinator, calls = load_coordinator({ record_stage = function(_, stage) stages[#stages + 1] = stage end })
+		helpers.assert_true(coordinator.request_reload("field_run_timed_reload", "argument"))
+		helpers.assert_eq(type(calls.reload_deadline_callback), "function", "the reload arms its own deadline")
+		helpers.assert_nil(calls.watchdog_callback, "the user-quit watchdog is not armed by a reload")
+		helpers.assert_eq(calls.reloads, 0)
+
+		calls.reload_deadline_callback()
+		helpers.assert_eq(calls.reloads, 1, "the stuck reload reloads natively")
+		helpers.assert_eq(calls.reload_arguments[1], "argument")
+		helpers.assert_eq(calls.marks, 1, "the next boot still knows it follows a reload")
+		helpers.assert_eq(calls.teardowns, 0, "no local teardown runs without the exact fence")
+		helpers.assert_eq(calls.fatal_exits, 0)
+		helpers.assert_true(not coordinator.is_pending())
+		helpers.assert_eq(stages[#stages - 1], "reload_deadline")
+		helpers.assert_eq(stages[#stages], "hs_reload_called")
+
+		-- The fence answering late is inert
+		calls.lease_callback(true, "late")
+		helpers.assert_eq(calls.reloads, 1)
+		helpers.assert_eq(calls.teardowns, 0)
+	end)
+
+	helpers.it("disarms the reload deadline once the reload settles, aborts or becomes an exit (reload-deadline)", function()
+		local settled, settled_calls = load_coordinator()
+		helpers.assert_true(settled.request_reload("menu"))
+		settled_calls.lease_callback(true, "stopped")
+		helpers.assert_eq(settled_calls.reloads, 1)
+		helpers.assert_true(settled_calls.reload_deadline_stopped == true)
+		settled_calls.reload_deadline_callback()
+		helpers.assert_eq(settled_calls.reloads, 1, "a late deadline after the reload is inert")
+
+		local aborted, aborted_calls = load_coordinator()
+		helpers.assert_true(aborted.request_reload_owned("menu", function() end))
+		aborted_calls.lease_callback(false, "refused")
+		helpers.assert_true(aborted_calls.reload_deadline_stopped == true)
+		aborted_calls.reload_deadline_callback()
+		helpers.assert_eq(aborted_calls.reloads, 0)
+
+		local upgraded, upgraded_calls = load_coordinator()
+		helpers.assert_true(upgraded.request_reload("menu"))
+		helpers.assert_true(upgraded.request_exit("quit", 0))
+		helpers.assert_true(upgraded_calls.reload_deadline_stopped == true)
+		upgraded_calls.reload_deadline_callback()
+		helpers.assert_eq(upgraded_calls.reloads, 0, "an exit is never turned back into a reload")
+		helpers.assert_true(upgraded.is_pending())
+	end)
+
+	-- A refused fence aborted the reload and kept this VM, whose remaps the
+	-- revocation had already stopped for good (reload-fence-refused).
+	helpers.it("reloads natively when an unowned reload's fence is refused (reload-fence-refused)", function()
+		local stages = {}
+		local coordinator, calls = load_coordinator({ record_stage = function(_, stage) stages[#stages + 1] = stage end })
+		helpers.assert_true(coordinator.request_reload("watcher"))
+		calls.lease_callback(false, "timeout waiting for STOPPED")
+		helpers.assert_eq(calls.reloads, 1, "the refused reload reloads natively")
+		helpers.assert_eq(calls.marks, 1)
+		helpers.assert_eq(calls.teardowns, 0, "no local teardown runs without the exact fence")
+		helpers.assert_eq(calls.fatal_exits, 0)
+		helpers.assert_true(not coordinator.is_pending())
+		helpers.assert_true(calls.reload_deadline_stopped == true)
+		helpers.assert_eq(stages[#stages - 1], "reload_fence_refused")
+		helpers.assert_eq(stages[#stages], "hs_reload_called")
+
+		-- A refused exit still aborts and keeps the VM
+		local quit, quit_calls = load_coordinator()
+		helpers.assert_true(quit.request_exit("menu", 0))
+		quit_calls.lease_callback(false, "refused")
+		helpers.assert_eq(quit_calls.reloads, 0)
+		helpers.assert_eq(quit_calls.exits, 0)
+		helpers.assert_true(not quit.is_pending())
+
+		-- A native reload that raises takes the fatal backstop
+		local raising, raising_calls = load_coordinator({ reload_raises = true })
+		helpers.assert_true(raising.request_reload("watcher"))
+		raising_calls.lease_callback(false, "refused")
+		helpers.assert_eq(raising_calls.fatal_exits, 1)
+	end)
+
+	helpers.it("refuses initialization without a positive reload deadline (reload-deadline)", function()
+		package.loaded["infra.termination_coordinator"] = nil
+		local coordinator = require("infra.termination_coordinator")
+		local noop = function() return true end
+		helpers.assert_eq(coordinator.init({
+			request_lease = noop, drain_input = noop, teardown = noop, begin_drain = noop,
+			finalize_teardown = noop, reload = noop, exit = noop, fatal_exit = noop,
+			mark_reload = noop, clear_reload = noop, schedule = noop, fatal_exit_code = 70,
+			user_exit_deadline_seconds = 12,
+		}), false)
 	end)
 end)

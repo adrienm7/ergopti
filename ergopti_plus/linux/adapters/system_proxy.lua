@@ -21,12 +21,13 @@ local LibuvExit = require("infra.libuv_exit")
 local NativeTimer = require("infra.native_timer")
 local ShellRunner = require("adapters.shell_runner")
 local Logger = require("logger.shim")
+local Timings = require("infra.timings")
 local LOG = "adapters.system_proxy"
 local loaded, luv = pcall(require, "luv")
 if not loaded then luv = nil end
 
 local _owned = {}
-local MAX_PACKET_BYTES = 65536
+local MAX_PACKET_BYTES = Timings.count("limits", "proxy_packet_bytes")
 
 
 -- =========================================

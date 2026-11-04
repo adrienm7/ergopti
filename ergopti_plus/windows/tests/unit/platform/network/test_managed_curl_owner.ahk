@@ -103,6 +103,41 @@ _ManagedCurlControlAckPublicationBoundary() {
 Test("managed curl owner: a poll during ACK staging cannot observe partial admission (managed-ack-publication)",
 	_ManagedCurlControlAckPublicationBoundary)
 
+; The admission timer fired while a direct poll was between its first check and
+; its reservation: the interrupted poll staged the released, empty image, its
+; rename met the published transport, and the live request was refused. Seen once
+; in about ten LLM custody runs, because that timer is armed with -1 at dispatch.
+_ManagedCurlControlPollInterruptedAfterPublication() {
+	State := _ManagedCurlControlState()
+	Request := _ManagedCurlControlNew(State)
+	Armed := false, Interrupted := 0
+	Request.ManagedOwnerCurrent := Interrupt
+	try {
+		AssertTrue(Request.Send("private-user-payload"))
+		; The real -1 timer must not publish first on a slow runner: the direct poll
+		; below has to be the one the second poll interrupts.
+		Critical("On")
+		_ManagedCurlControlAck(State)
+		Armed := true
+		Request._PollManagedAdmission()
+		Critical("Off")
+		AssertEqual(1, Interrupted, "the second poll must complete inside the first one's checks")
+		AssertFalse(Request.Aborted, "an interrupted poll leaves the published request live")
+		AssertFalse(FileExist(State["directory"] . "transport.pending"), "the interrupted poll stages nothing more")
+		Published := JsonParse(FileRead(State["directory"] . "transport.json", "UTF-8"))
+		AssertEqual("private-user-payload", Published["body"], "the first publication stays whole")
+	} finally _ManagedCurlControlRelease(State)
+	Interrupt() {
+		if Armed {
+			Armed := false, Interrupted += 1
+			Request._PollManagedAdmission()
+		}
+		return true
+	}
+}
+Test("managed curl owner: a poll interrupted by a publishing poll leaves the request live (managed-ack-publication)",
+	_ManagedCurlControlPollInterruptedAfterPublication)
+
 _ManagedCurlControlSecretsWaitForNativeAdmission() {
 	State := _ManagedCurlControlState()
 	Request := _ManagedCurlControlNew(State)

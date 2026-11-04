@@ -259,8 +259,11 @@ _LPI_Expand(State) {
 		State["effect_private_present"] := Effect.HasOwnProp("IsPrivate")
 		State["effect_clear_all"] := Effect.ClearAll
 		State["effect_contains_marker"] := InStr(Effect.InsertedText, _LPI_Marker) > 0
-		AssertEqual(State["only_text"] ? "Before " . _LPI_Marker : "", HSE_Buffer,
-			"AI privacy must not alter the canonical screen/matching buffer")
+		; A final output leaves the matcher in every posture (_HSE_ForgetFinalOutput), yet
+		; its effect still reaches the AI context: the cases below hold that to its privacy.
+		AssertEqual("", HSE_Buffer, "A final output leaves the matcher whatever its AI privacy")
+		AssertEqual(State["only_text"] ? _LPI_Marker : "", Effect.InsertedText,
+			"AI privacy must not alter the committed literal effect")
 		return Effect
 	} finally {
 		HSE_RegistryByGroup := Saved[1]
@@ -328,7 +331,7 @@ _LPI_AgentCase(Private, OnlyText) {
 	Run(State) {
 		_AHK04_RunIsolated(Dispatch)
 		Dispatch() {
-			_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), Body)
+			_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), Body)
 		}
 		Body(Fx, Lines, Sent) {
 			global _LLM_Bridge_Active, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding, _LPI_Marker

@@ -139,7 +139,7 @@ _LMDG_ToggleRoute(Build, Render, Getters) {
 	Reader := _LMDG_Statement(Build,
 		'm)^[ \t]*(StateGetters) := _LLM_Menu_StateGetters\(\)[ \t]*$', 2)
 	Publish := _LMDG_Statement(Build,
-		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*"", Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
+		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", Map\(\), _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
 	; The factored getter must retain both pause and genuine full-state admission.
 	Ready := _LMDG_Statement(Getters,
 		'm)^[ \t]*(return) Map\("llm_enabled", \(\) => _LLM_Menu\["enabled"\],[ \t]*\n[ \t]*"llm_toggle_ready", \(\) => !A_IsSuspended && ConfigFullStateCanPersist\(\),[ \t]*$', 1)
@@ -200,7 +200,7 @@ _LMDG_ToggleRouteRefusesDecoy(Kind) {
 	else if Kind == "string-renderer"
 		Render := "Decoy() {`nAudit := '(`nif ItemType == " . Chr(34) . "toggle" . Chr(34) . " {`nItemCount += _MR_RenderToggle(Result, Item, ManifestKey, Commands, StateGetters)`n}`n)'`n}"
 	else if Kind == "wrong-target"
-		Build := StrReplace(Build, '"", Commands, StateGetters, StagedHandle, GroupDisabled)', '"", Commands, StateGetters, OtherHandle, GroupDisabled)')
+		Build := StrReplace(Build, 'ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled)', 'ListProviders, Commands, StateGetters, OtherHandle, GroupDisabled)')
 	else if Kind == "early-return"
 		Build := StrReplace(Build, 'Commands["llm_toggle"] := LLM_Menu_OnToggle', 'if !_LLM_Menu["enabled"]`nreturn StagedHandle`nCommands["llm_toggle"] := LLM_Menu_OnToggle')
 	else if Kind == "comment-renderer"

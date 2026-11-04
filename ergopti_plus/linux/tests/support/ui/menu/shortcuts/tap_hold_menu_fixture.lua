@@ -75,7 +75,7 @@ local function build(calls, picked, user_text)
 			return true
 		end,
 	}
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local changed = 0
 	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = Manager, is_paused = function() return false end,
 		on_menu_changed = function() changed = changed + 1 end })
@@ -94,11 +94,14 @@ local function restore(Manager)
 	package.loaded[PICKER] = nil
 end
 
---- The rows of a section that open a per-key submenu.
+--- The rows of a section that open a per-key submenu. The lone modifier tap
+--- window (tap_holds.lone_modifier_tap_max_ms) is the one other submenu of the
+--- section: its choices are no key.
 local function key_rows(section)
+	local lone_tap = string.format(require("infra.i18n").get("menu.tapholds.lone_tap_title"), "")
 	local rows = {}
 	for _, row in ipairs(section.menu or {}) do
-		if type(row.menu) == "table" then rows[#rows + 1] = row end
+		if type(row.menu) == "table" and row.title:sub(1, #lone_tap) ~= lone_tap then rows[#rows + 1] = row end
 	end
 	return rows
 end

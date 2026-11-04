@@ -56,6 +56,7 @@ local PhysicalSlots = require("shortcuts.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
 local ConfigKeys = require("config_keys")
+local KeyNames = require("keycodes.key_names")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
@@ -87,23 +88,14 @@ local MOD_LABELS = {
 	meta = "Super",
 }
 
--- The localized key names a menu row shows, from the catalogue the layer
--- editor already uses. `meta` stays "Super": the desktops name that key so.
--- MOD_LABELS above is the chord's recorded identity (chord_name), not a label.
-local MOD_LABEL_KEYS = {
-	ctrl = "layer_editor.key.ctrl",
-	shift = "layer_editor.key.shift",
-	alt = "layer_editor.key.alt",
-}
-
---- The text a menu row uses for one modifier, in the active language.
---- @param name string "ctrl", "shift", "alt" or "meta".
+--- The text a menu row uses for one modifier or named key, in the active
+--- language: the shared key name table's (`meta` reads Super, as the desktops
+--- name that key). MOD_LABELS above is the chord's recorded identity
+--- (chord_name), not a label.
+--- @param name string "ctrl", "shift", "alt", "meta", "space"…
 --- @return string
-local function mod_label(name)
-	if name == "meta" or name == "super" then return MOD_LABELS.meta end
-	local key = MOD_LABEL_KEYS[name]
-	if key == nil then return name end
-	return require("infra.i18n").get(key)
+local function key_name(name)
+	return KeyNames.label(name, "linux", require("infra.i18n").get)
 end
 
 -- The slot suffix of a key the hook reports by the character it types.
@@ -114,10 +106,9 @@ local SUFFIX_OF_IDENTITY = {
 	["\r"] = "enter",
 }
 
--- Suffixes that name a key rather than spelling it.
-local SPECIAL_KEYS = {
-	space = "layer_editor.key.space",
-	enter = "layer_editor.key.enter",
+-- Suffixes that spell a sign rather than a letter; a named key (Space, Enter)
+-- reads as the key name table names it.
+local SIGN_KEYS = {
 	period = ".",
 	comma = ",",
 }
@@ -131,6 +122,18 @@ M.SLOT_GROUPS = {
 	{ prefix = "alt_", group_key = "menu.shortcuts.alt_group", add_key = "menu.shortcuts.alt_add" },
 	{ prefix = "meta_", group_key = "menu.shortcuts.super_group", add_key = "menu.shortcuts.super_add" },
 }
+
+--- The heading of one group's submenu: the contextual group's own title, a
+--- modifier group's template filled with its modifiers by the shared key name
+--- table (« Raccourcis Ctrl + Maj »), never the template's own spelling.
+--- @param group table An entry of M.SLOT_GROUPS.
+--- @return string
+function M.get_group_label(group)
+	local translate = require("infra.i18n").get
+	if group.add_key == nil then return translate(group.group_key) end
+	local modifiers = KeyNames.modifiers_label(SlotRoles.family_modifiers("linux", group.prefix), "linux", translate)
+	return KeyNames.fill(group.group_key, modifiers, translate)
+end
 
 -- The manifest section whose entries are this driver's shipped slot bindings
 -- (Super+Space generates an AI prediction).
@@ -299,12 +302,13 @@ local function split_slot(slot_id)
 	return nil, nil
 end
 
---- The label a menu row shows for a slot, e.g. "Ctrl Maj P".
+--- The label a menu row shows for a slot, e.g. "Ctrl + Maj + P", the way the
+--- Windows menu names it.
 --- @param slot_id string
 --- @return string
 function M.get_slot_label(slot_id, reason)
 	if slot_id == MagicEditor.SLOT_ID then
-		local label = mod_label("meta") .. " + " .. require("modules.hotstrings.magic_key").get()
+		local label = key_name("meta") .. " + " .. require("modules.hotstrings.magic_key").get()
 		if reason then label = label .. " (" .. require("infra.i18n").get("menu.shortcuts.keyboard.magic_editor_reason." .. reason) .. ")" end
 		return label
 	end
@@ -312,26 +316,24 @@ function M.get_slot_label(slot_id, reason)
 	if physical then
 		local parts = {}
 		for _, name in ipairs(PhysicalSlots.modifiers()) do
-			if physical.mods[name] then parts[#parts + 1] = mod_label(name) end
+			if physical.mods[name] then parts[#parts + 1] = key_name(name) end
 		end
-		parts[#parts + 1] = physical.code
+		parts[#parts + 1] = KeyNames.physical_label(physical.code, "linux", require("infra.i18n").get)
 		return table.concat(parts, " + ")
 	end
 	local mods, suffix = split_slot(slot_id)
 	if not mods then return tostring(slot_id) end
 	local parts = {}
-	for _, mod in ipairs(mods) do parts[#parts + 1] = mod_label(mod) end
-	local key_label = SPECIAL_KEYS[suffix]
-	if key_label ~= nil and key_label:find("^layer_editor%.key%.") then
-		key_label = require("infra.i18n").get(key_label)
-	end
+	for _, mod in ipairs(mods) do parts[#parts + 1] = key_name(mod) end
+	local key_label = SIGN_KEYS[suffix]
+	if not key_label and KeyNames.canonical(suffix) then key_label = key_name(suffix) end
 	if not key_label then
 		for _, entry in ipairs(catalogue_keys() or {}) do
 			if entry.id == suffix then key_label = entry.label end
 		end
 	end
 	parts[#parts + 1] = key_label or (suffix:sub(1, 1):upper() .. suffix:sub(2))
-	return table.concat(parts, " ")
+	return table.concat(parts, " + ")
 end
 
 --- The modifier set a chord must hold EXACTLY for a slot to match.

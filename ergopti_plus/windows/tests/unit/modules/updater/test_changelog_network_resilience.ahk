@@ -538,6 +538,33 @@ _CNR_CurlAdmissionKeepsEnvironmentAndLoopback() {
 }
 Test("system proxy: explicit relay wins and loopback stays direct", _CNR_CurlAdmissionKeepsEnvironmentAndLoopback)
 
+; The relay variables curl inherits are proxy_policy.json's, read once (the JS
+; gate test-proxy-policy-single-source.cjs refuses a hand-typed copy): every
+; name the policy lists for a scheme suppresses the GUI lookup, as curl would.
+_CNR_CurlRelayNamesFollowThePolicy() {
+	Https := _SystemProxy_EnvironmentPrecedence("https")
+	AssertEqual("https_proxy", Https[1], "curl reads the lower-case https name first")
+	AssertTrue(Https.Length >= 4, "the https precedence holds its upper-case and all_proxy names")
+	AssertTrue(_SystemProxy_EnvironmentPrecedence("http").Length >= 3, "the http precedence is read too")
+	for Scheme in ["http", "https"]
+		for Name in _SystemProxy_EnvironmentPrecedence(Scheme)
+			_CNR_AssertRelayNameInherited(Scheme, Name)
+}
+
+_CNR_AssertRelayNameInherited(Scheme, Name) {
+	Results := []
+	SystemProxy_ResolveCurlAsync(Scheme . "://remote.invalid/api", (R) => Results.Push(R),
+		(*) => Assert(false, "a policy relay variable must avoid GUI discovery"), 0,
+		_CNR_OnlyVariable.Bind(Name))
+	AssertEqual(1, Results.Length)
+	AssertTrue(Results[1]["inherit"], Scheme . ": " . Name . " is inherited by curl")
+}
+
+_CNR_OnlyVariable(Selected, Asked) {
+	return Asked == Selected ? "http://selected.corp:80" : ""
+}
+Test("system proxy: the inherited relay variables are proxy_policy.json's (PAR-71)", _CNR_CurlRelayNamesFollowThePolicy)
+
 
 _CNR_StrictAdmissionResolvesWpadAndRefusesFailure() {
 	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING, _SYSTEM_PROXY_PAC_CONFIG
@@ -758,7 +785,7 @@ _CNR_ControlledNativePacFixture() {
 				_DriverDir . "\tests\fixtures\system_proxy_native.ps1", "-WorkerPath",
 				_VendorDir . "\ergopti_system_proxy_worker.ps1", "-EntryInputPath", Capture["TmpFile"]],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
-		AssertTrue(Handle.start(), "controlled native WinHTTP fixture must actually start")
+		AssertTrue(Handle.start(), "controlled native PAC fixture must actually start")
 		Started := A_TickCount
 		while Observed.Length == 0 && !TickExpired64(Started, 30000) {
 			_SR_TreePoll()
@@ -767,11 +794,9 @@ _CNR_ControlledNativePacFixture() {
 		AssertEqual(1, Observed.Length, "owned native fixture must settle within its bounded test budget")
 		if Observed[1]["exit"] != 0
 			try _CNR_NativePacDiagnostic(Observed[1])
-		AssertEqual(0, Observed[1]["exit"], "real WinHTTP PAC ABI and destination policy must agree")
+		AssertEqual(0, Observed[1]["exit"], "the production worker and the destination policy must agree")
 		AssertEqual("", Observed[1]["stderr"], "native fixture must expose no hidden failure")
-		AssertContains(Observed[1]["stdout"], "[OK] 11 controlled native WinHTTP PAC fixtures")
-		AssertTrue(InStr(Observed[1]["stdout"], "native_failover=first_only") > 0
-			|| InStr(Observed[1]["stdout"], "native_failover=list_two") > 0, "the actual native failover representation must be explicitly qualified")
+		AssertContains(Observed[1]["stdout"], "[OK] 7 controlled native PAC worker fixtures")
 	} finally {
 		Retired := IsObject(Handle) ? Handle.terminate() : true
 		AssertTrue(Retired, "the exact native fixture tree must physically settle")
@@ -779,7 +804,7 @@ _CNR_ControlledNativePacFixture() {
 			AssertEqual(0, _SR_CaptureRemove(Capture), "fixture private input must be removed after exact tree retirement")
 	}
 }
-Test("system proxy native: actual WinHTTP PAC evaluates HTTP full URL, HTTPS native scope and DIRECT", _CNR_ControlledNativePacFixture)
+Test("system proxy native: the production worker evaluates a PAC on the full URL, DIRECT and refused scripts", _CNR_ControlledNativePacFixture)
 
 _CNR_NativeEndpointPolicy() {
 	AssertEqual("http://selected.invalid:3128", _SystemProxy_UsableNativeProxy("selected.invalid:3128", "https"))
@@ -820,7 +845,7 @@ _CNR_NativePacEntryDiagnosticFact(Out) {
 _CNR_NativePacDiagnosticFact(Out) {
 	if !(Out is String) || StrLen(Out) > 8192
 		return ""
-	Pattern := "m)^PROXY_NATIVE_DIAG stage=(source_load|source_parse|native_compile|fixture_compile|abi|server_setup|native_call|native_cases|https_scope|direct|bad_script|missing_script|failover|entrypoint_input|entrypoint_start|entrypoint_wait|entrypoint_read|entrypoint_process|entrypoint_privacy|entrypoint_parse|entrypoint_frame|server_receipt|cleanup) passed=([0-9]|10|11) family=(win32|command_missing|io|argument|invalid_operation|timeout|runtime|other) code=(-?(?:0|[1-9][0-9]{0,9}))`r?$"
+	Pattern := "m)^PROXY_NATIVE_DIAG stage=(fixture_compile|server_setup|entrypoint_input|entrypoint_start|entrypoint_wait|entrypoint_read|entrypoint_process|entrypoint_privacy|entrypoint_parse|entrypoint_frame|server_receipt|cleanup) passed=([0-9]|10|11) family=(win32|command_missing|io|argument|invalid_operation|timeout|runtime|other) code=(-?(?:0|[1-9][0-9]{0,9}))`r?$"
 	if !RegExMatch(Out, Pattern, &Fact)
 		return ""
 	Prefix := "m)^PROXY_NATIVE_DIAG "
@@ -834,11 +859,11 @@ _CNR_NativePacDiagnosticFact(Out) {
 }
 
 _CNR_NativePacDiagnosticProtocol() {
-	Early := "PROXY_NATIVE_DIAG stage=native_compile passed=0 family=runtime code=-2146233087"
-	AssertEqual("stage=native_compile passed=0 family=runtime code=-2146233087", _CNR_NativePacDiagnosticFact(Early))
-	AssertEqual("stage=native_call passed=5 family=win32 code=12180", _CNR_NativePacDiagnosticFact("PROXY_NATIVE_DIAG stage=native_call passed=5 family=win32 code=12180`r`n"))
+	Early := "PROXY_NATIVE_DIAG stage=fixture_compile passed=0 family=runtime code=-2146233087"
+	AssertEqual("stage=fixture_compile passed=0 family=runtime code=-2146233087", _CNR_NativePacDiagnosticFact(Early))
+	AssertEqual("stage=entrypoint_wait passed=5 family=win32 code=12180", _CNR_NativePacDiagnosticFact("PROXY_NATIVE_DIAG stage=entrypoint_wait passed=5 family=win32 code=12180`r`n"))
 	AssertEqual("stage=cleanup passed=11 family=io code=-2147483648", _CNR_NativePacDiagnosticFact("PROXY_NATIVE_DIAG stage=cleanup passed=11 family=io code=-2147483648"))
-	for Refused in [StrReplace(Early, "native_compile", "private_url"), StrReplace(Early, "family=runtime", "family=secret"),
+	for Refused in [StrReplace(Early, "fixture_compile", "private_url"), StrReplace(Early, "family=runtime", "family=secret"),
 		StrReplace(Early, "passed=0", "passed=12"), StrReplace(Early, "code=-2146233087", "code=2147483648"),
 		StrReplace(Early, "code=-2146233087", "code=-2147483649"), StrReplace(Early, "code=-2146233087", "code=01"),
 		StrReplace(Early, "code=-2146233087", "code=-0"), Early . "`n" . Early,

@@ -341,13 +341,14 @@ KL_FlushHandoffSettled(Port := 0) {
 
 ; Calls OnSettled once the flush handoff settles, polling every PollMs, or
 ; OnExpired when A_TickCount reaches DeadlineTick first. Exactly one of them
-; runs, once. ArmFn(Callback, DelayMs) schedules the next poll.
-KL_AwaitFlushHandoff(OnSettled, OnExpired, DeadlineTick, PollMs, ArmFn := TimerArmOneShotMs, Port := 0) {
-	if KL_FlushHandoffSettled(Port)
+; runs, once. ArmFn(Callback, DelayMs) schedules the next poll. SettledFn replaces
+; the keystats question for the shutdown's other gates that settle by themselves.
+KL_AwaitFlushHandoff(OnSettled, OnExpired, DeadlineTick, PollMs, ArmFn := TimerArmOneShotMs, Port := 0, SettledFn := 0) {
+	if (HasMethod(SettledFn, "Call") ? SettledFn.Call() : KL_FlushHandoffSettled(Port))
 		return OnSettled.Call()
 	if (A_TickCount >= DeadlineTick)
 		return OnExpired.Call()
-	ArmFn.Call(KL_AwaitFlushHandoff.Bind(OnSettled, OnExpired, DeadlineTick, PollMs, ArmFn, Port), PollMs)
+	ArmFn.Call(KL_AwaitFlushHandoff.Bind(OnSettled, OnExpired, DeadlineTick, PollMs, ArmFn, Port, SettledFn), PollMs)
 }
 
 ; Publishes the current RAM queue to the append-only JSONL journal. A true

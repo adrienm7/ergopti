@@ -556,6 +556,23 @@ Test("LLM API entries: a retired provider row is kept and written back "
 	. "(api-entry-retired-provider-row)",
 	_LMT_RetiredProviderRowIsKeptNotFatal)
 
+_LMT_RetiredProviderRowsWarnOneByOne() {
+	Lines := []
+	Sink := (Message, Args*) => Lines.Push(Format(Message, Args*))
+	Path := A_Temp . "\ergopti-api-entries-retired-" . A_TickCount . ".json"
+	Rows := [Map("Id", "old_one", "Provider", "gone"), Map("Id", "old_two", "Provider", "gone_too")]
+	_LLM_Menu_ReportRetiredApiEntries(Path, Rows, Sink)
+	AssertEqual(2, Lines.Length, "one warning per outdated row, not one count")
+	AssertContains(Lines[1], "entries[id=old_one]")
+	AssertContains(Lines[1], "gone")
+	AssertContains(Lines[2], "entries[id=old_two]")
+	_LLM_Menu_ReportRetiredApiEntries(Path, Rows, Sink)
+	AssertEqual(2, Lines.Length, "a reload does not repeat them")
+}
+Test("LLM API entries: each retired provider row gets its own warning "
+	. "(api-entry-retired-provider-row)",
+	_LMT_RetiredProviderRowsWarnOneByOne)
+
 
 Test("LLM API entries: strict parser preserves escaped strings and braces "
 	. "(api-entry-identity-cardinality)",
@@ -708,7 +725,7 @@ _LMT_ApiSemanticDetachedBuilder() {
 	OldRead := _ConfigBootReadFailed, OldRejected := _ConfigBootRejectedOverrides
 	OldOutdated := _ConfigBootOutdatedEntries
 	Source := '_meta.schema_version = ' . ConfigMigrateCurrentVersion() . '`nllm = {enabled = false, api_entry_id = "api_old", future = "retain"}`n[future]`nold = "retain" # user data`n'
-	Expected := Chr(0xFEFF) . '_meta.schema_version = ' . ConfigMigrateCurrentVersion() . '`nllm = {enabled = true, api_entry_id = "api_new", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	Expected := '_meta.schema_version = ' . ConfigMigrateCurrentVersion() . '`nllm = {enabled = true, api_entry_id = "api_new", future = "retain"}`n[future]`nold = "retain" # user data`n'
 	try {
 		_ConfigBootReadFailed := false
 		_ConfigBootRejectedOverrides := 0

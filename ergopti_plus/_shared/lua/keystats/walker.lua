@@ -31,6 +31,7 @@ local M = {}
 
 local Helpers = require("keystats.aggregator_helpers")
 local Utils = require("keystats.utils")
+local Encoding = require("keystats.token_encoding")
 
 -- Every timing the walk compares against. Each driver reads them from its own
 -- timing registry (the shared [keystats] canon) and hands them over, so the
@@ -358,7 +359,8 @@ function M.new(config)
 					local ngram_delay = delay < T.max_keystroke_delay_ms and delay or 0
 					local previous = { ctx.p1, ctx.p2, ctx.p3, ctx.p4, ctx.p5, ctx.p6 }
 					local marks = {}
-					local token = char
+					local encoded = Encoding.event_token(char)
+					local token = encoded
 					for length, family in ipairs(FAMILIES) do
 						if length > 1 then
 							local before = previous[length - 1]
@@ -452,7 +454,7 @@ function M.new(config)
 						ctx.cur_word = ctx.cur_word .. char
 					end
 					remember(ctx, marks)
-					ctx.p6, ctx.p5, ctx.p4, ctx.p3, ctx.p2, ctx.p1 = ctx.p5, ctx.p4, ctx.p3, ctx.p2, ctx.p1, char
+					ctx.p6, ctx.p5, ctx.p4, ctx.p3, ctx.p2, ctx.p1 = ctx.p5, ctx.p4, ctx.p3, ctx.p2, ctx.p1, encoded
 				end
 			end
 

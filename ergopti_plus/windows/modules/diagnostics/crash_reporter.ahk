@@ -22,8 +22,11 @@
 ; 4. Logs-scoped directory: reports live in <logs>\crash_reports\
 ;    (LoggerCrashReportsDir), beside the daily log that explains them, and
 ;    follow a LogsDirPath override.
-; 5. Structured output: reports are written as JSON for easy machine and human
-;    readability, one file per incident.
+; 5. One document with macOS and Linux: the fields, their order and defaults, the
+;    file name and the cap of _shared/lua/crash_report.lua, replayed from
+;    _shared/tests/corpus/diagnostics/crash_report_vectors.json. What only this
+;    driver knows (the AHK error object's parts, the hardware, the held modifiers)
+;    follows the shared fields, so a reader never branches on the driver.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -37,6 +40,31 @@
 ; ======= 1/ Constants =======
 ; ============================
 ; ============================
+
+; The number of reports kept in the crash folder, newest first.
+; Single source of the value: _shared/lua/crash_report.lua MAX_REPORTS, pinned by
+; the shared vectors.
+global CRASH_REPORT_MAX_REPORTS := 20
+
+; The fields of a report, in the order they are written, with their defaults: what
+; a driver that cannot know a field records. The same table as FIELDS in
+; _shared/lua/crash_report.lua, pinned by the shared vectors.
+global CRASH_REPORT_FIELDS := [
+	["version", "unknown"], ["driver", "unknown"], ["timestamp", ""], ["module", ""],
+	["error_msg", ""], ["stack_trace", ""], ["os_version", "unknown"], ["hs_version", "unknown"],
+	["screen_res", "unknown"], ["locale", "unknown"], ["config_dir", ""], ["script_dir", ""],
+	["git_hash", "unknown"], ["commit_source", "unknown"], ["active_app", ""], ["active_title", ""],
+	["uptime_sec", "0"], ["adapters_ok", ""], ["adapters_failed", ""], ["session_warnings", "0"],
+	["session_errors", "0"], ["log_tail", ""],
+]
+
+; What only this driver records, written after the shared fields when known.
+global CRASH_REPORT_WINDOWS_FIELDS := [
+	"error_type", "error_extra", "error_what", "error_file", "error_line",
+	"os_build", "os_arch", "ahk_bitness",
+	"cpu_name", "cpu_cores", "ram_total_gb", "ram_free_gb",
+	"dpi", "dpi_scale", "stuck_modifiers", "keystats_initialized",
+]
 
 ; Modifier keys to inspect for stuck state at crash time.
 global _CrashReporter_Modifiers := [
@@ -196,25 +224,26 @@ CrashReport_Build(ErrorObj) {
 		"error_line",           ErrorLine,
 		"stack_trace",          StackTrace,
 		; ── System environment (full, mirrors healthcheck) ──
-		"os_name",              Sys.Get("os_name", ""),
+		"os_version",           Sys.Get("os_name", ""),
 		"os_build",             Sys.Get("os_build", ""),
 		"os_arch",              Sys.Get("os_arch", ""),
-		"ahk_version",          Sys.Get("ahk_version", ""),
+		"hs_version",           Sys.Get("ahk_version", ""),
 		"ahk_bitness",          Sys.Get("ahk_bitness", ""),
 		"cpu_name",             Sys.Get("cpu_name", ""),
 		"cpu_cores",            String(Sys.Get("cpu_cores", "")),
 		"ram_total_gb",         String(Sys.Get("ram_total_gb", "")),
 		"ram_free_gb",          String(Sys.Get("ram_free_gb", "")),
-		"screen_resolution",    Sys.Get("screen_res", ""),
+		"screen_res",           Sys.Get("screen_res", ""),
 		"dpi",                  String(Sys.Get("dpi", "")),
 		"dpi_scale",            String(Sys.Get("dpi_scale", "")),
 		"locale",               Sys.Get("locale", ""),
 		"script_dir",           A_ScriptDir,
 		"git_hash",             Sys.Get("git_hash", ""),
+		"commit_source",        Sys.Get("commit_source", "unknown"),
 		; ── Runtime context ──
 		"uptime_sec",           String(UptimeSec),
-		"active_window_title",  ActiveWindowTitle,
-		"active_window_process", ActiveWindowProcess,
+		"active_title",         ActiveWindowTitle,
+		"active_app",           ActiveWindowProcess,
 		"stuck_modifiers",      StuckModsStr,
 		; ── Adapter / session health ──
 		"adapters_ok",          AdaptersOk,
@@ -252,29 +281,82 @@ CrashReport_Save(Report, WriterFn := 0) {
 	try DirCreate(ReportDir)
 
 	Ts   := Report.Has("timestamp") ? Report["timestamp"] : _CrashReport_IsoTimestamp()
-	Base := ReportDir . StrReplace(Ts, ":", "-") . "_" . _CrashReport_NextFileIdentity()
-	FName := Base . ".json"
-	n := 1
-	while FileExist(FName) {
-		FName := Base . "_" . n . ".json"
-		n += 1
-	}
-
-	JsonStr := _CrashReport_ToJson(Report)
-	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteCreateDurable
+	; A path probe is not a reservation: the serializer and the writer can pump a
+	; second crash, so the name stays reserved in this process until the write ends.
+	; CREATE_NEW protects against other processes racing the final creation.
+	Stem := _CrashReport_Stem(Ts)
+	PreviousCritical := Critical("On")
+	try {
+		Attempt := 1
+		FName := ReportDir . _CrashReport_FileName(Stem, Attempt)
+		while FileExist(FName) || _CrashReport_ReservedPaths().Has(FName) {
+			Attempt += 1
+			FName := ReportDir . _CrashReport_FileName(Stem, Attempt)
+		}
+		_CrashReport_ReservedPaths()[FName] := true
+	} finally Critical(PreviousCritical)
 
 	try {
+		JsonStr := _CrashReport_ToJson(Report)
+		ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteCreateDurable
 		; A crash artifact is acknowledged only after its complete UTF-8 image has
 		; crossed the stable-storage boundary. A short write must remove its partial
 		; JSON rather than publishing a plausible path to an unreadable report.
 		if ResolvedWriter.Call(FName, JsonStr) != true
 			throw Error("durable crash report write was refused")
 		try LoggerSuccess("CrashReporter", "Crash report saved: {1}.", FName)
+		try CrashReport_PruneReports()
 		return FName
 	} catch as WriteErr {
 		try LoggerError("CrashReporter", "Write failed for '{1}': {2}.", FName, WriteErr.Message)
 		return ""
+	} finally _CrashReport_ReservedPaths().Delete(FName)
+}
+
+; Deletes the oldest reports past the cap. Only files carrying the report name are
+; ever selected, so a stray file the user put in the folder is never deleted.
+; @return {Integer} The number of reports deleted.
+CrashReport_PruneReports() {
+	Dir := LoggerCrashReportsDir()
+	Names := []
+	Loop Files Dir . "*.json", "F"
+		Names.Push(A_LoopFileName)
+	Deleted := 0
+	for _, Name in CrashReport_ExpiredNames(Names) {
+		try {
+			FileDelete(Dir . Name)
+			Deleted += 1
+		} catch as DeleteErr {
+			try LoggerError("CrashReporter", "Old crash report '{1}' could not be deleted: {2}.", Name, DeleteErr.Message)
+		}
 	}
+	if Deleted
+		try LoggerInfo("CrashReporter", "Deleted {1} old crash report(s) past the cap.", Deleted)
+	return Deleted
+}
+
+; The reports to delete so that at most Limit remain, oldest first.
+; @param Names {Array} File names found in the crash folder.
+; @param Limit {Integer} Reports to keep.
+; @return {Array} Names to delete, oldest first.
+CrashReport_ExpiredNames(Names, Limit := CRASH_REPORT_MAX_REPORTS) {
+	Keys := ""
+	Count := 0
+	for _, Name in Names {
+		Parsed := _CrashReport_ParseName(Name)
+		if !Parsed
+			continue
+		; Fixed-width keys: a suffix must sort numerically after its plain name.
+		Keys .= Parsed["stem"] . Format("{:010}", Parsed["attempt"]) . "|" . Name . "`n"
+		Count += 1
+	}
+	Expired := []
+	for _, Line in StrSplit(Sort(RTrim(Keys, "`n")), "`n") {
+		if (A_Index > Count - Limit)
+			break
+		Expired.Push(SubStr(Line, InStr(Line, "|") + 1))
+	}
+	return Expired
 }
 
 ; Saves the crash report immediately (no confirmation) then shows the user a
@@ -311,19 +393,38 @@ CrashReport_PromptUser(Report) {
 ; ==========================
 ; ==========================
 
-; A path probe is not a reservation. Allocate a process-local identity before
-; serialization or writers can pump a second crash; CREATE_NEW protects against
-; other processes racing the final native creation.
-_CrashReport_NextFileIdentity() {
-	static Serial := 0
-	PreviousCritical := Critical("On")
-	try {
-		Next := Serial + 1
-		if Next <= Serial
-			throw Error("Crash report file identities are exhausted.")
-		Serial := Next
-		return DllCall("GetCurrentProcessId", "UInt") . "_" . Serial
-	} finally Critical(PreviousCritical)
+; The paths a save in this process is still writing.
+_CrashReport_ReservedPaths() {
+	static Paths := Map()
+	return Paths
+}
+
+; The file stem of a report: its UTC timestamp with colons made portable.
+; @param Timestamp {String} "YYYY-MM-DDTHH:MM:SSZ".
+; @return {String} "YYYY-MM-DDTHH-MM-SSZ".
+_CrashReport_Stem(Timestamp) {
+	if !RegExMatch(Timestamp, "^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+		throw ValueError("A crash report timestamp is YYYY-MM-DDTHH:MM:SSZ, got '" . Timestamp . "'.")
+	return StrReplace(Timestamp, ":", "-")
+}
+
+; The file name of a report.
+; @param Stem {String} From _CrashReport_Stem.
+; @param Attempt {Integer} 1 for the plain name, n >= 2 for a collision.
+; @return {String}
+_CrashReport_FileName(Stem, Attempt := 1) {
+	return Stem . (Attempt == 1 ? "" : "-" . Attempt) . ".json"
+}
+
+; Splits a file name into its stem and attempt.
+; @param Name {String} File name without directory.
+; @return {Map|Integer} { stem, attempt }, 0 when the name is not a report name.
+_CrashReport_ParseName(Name) {
+	if !RegExMatch(Name, "^(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)(?:-([0-9]+))?\.json$", &Match)
+		return 0
+	if (Match[2] == "")
+		return Map("stem", Match[1], "attempt", 1)
+	return Integer(Match[2]) >= 2 ? Map("stem", Match[1], "attempt", Integer(Match[2])) : 0
 }
 
 ; Returns a Map with full OS, CPU, RAM, screen, AHK, and git fields.
@@ -396,31 +497,23 @@ _CrashReport_IsoTimestamp() {
 	return FormatTime(A_NowUTC, "yyyy-MM-ddTHH:mm:ss") . "Z"
 }
 
+; Every field a report can hold: the shared ones, then this driver's own.
+; @return {Array} Field names, in the order they are written.
 _CrashReport_CanonicalFields() {
-	return [
-		"version", "driver", "timestamp",
-		"error_type", "error_msg", "error_extra", "error_what",
-		"error_file", "error_line", "stack_trace",
-		"os_name", "os_build", "os_arch",
-		"ahk_version", "ahk_bitness",
-		"cpu_name", "cpu_cores",
-		"ram_total_gb", "ram_free_gb",
-		"screen_resolution", "dpi", "dpi_scale",
-		"locale", "script_dir", "git_hash",
-		"uptime_sec", "active_window_title", "active_window_process",
-		"stuck_modifiers",
-		"adapters_ok", "adapters_failed",
-		"session_warnings", "session_errors",
-		"keystats_initialized", "config_dir",
-		"log_tail"
-	]
+	Fields := []
+	for _, Field in CRASH_REPORT_FIELDS
+		Fields.Push(Field[1])
+	for _, Name in CRASH_REPORT_WINDOWS_FIELDS
+		Fields.Push(Name)
+	return Fields
 }
 
-; Serialises a crash report Map to a formatted JSON string.
+; Serialises a crash report Map as the shared document: every shared field, its
+; default when unknown, then this driver's own fields when known.
 ; @param Report {Map}
-; @return {String} Pretty-printed JSON string.
+; @return {String} Pretty JSON object, no trailing newline.
 _CrashReport_ToJson(Report) {
-	return _CrashReport_EncodeFields(Report, _CrashReport_CanonicalFields())
+	return _CrashReport_EncodeFields(Report, [])
 }
 
 ; The isolated worker needs two raw paths to perform its local git probe and
@@ -428,32 +521,36 @@ _CrashReport_ToJson(Report) {
 ; are removed by both worker implementations before the canonical artifact is
 ; written; the report fields travel whole, as the local report keeps them.
 _CrashReport_ToWorkerJson(Report) {
-	Fields := _CrashReport_CanonicalFields()
-	for Key in ["_transport_script_dir", "_transport_reports_dir"] {
-		if Report.Has(Key)
-			Fields.Push(Key)
-	}
-	return _CrashReport_EncodeFields(Report, Fields)
+	return _CrashReport_EncodeFields(Report, ["_transport_script_dir", "_transport_reports_dir"])
 }
 
-_CrashReport_EncodeFields(Report, Fields) {
+; @param Report {Map}
+; @param Trailing {Array} Further fields written when the report holds them.
+; @return {String}
+_CrashReport_EncodeFields(Report, Trailing) {
 	Parts := []
-	for _, Key in Fields {
-		Val := Report.Has(Key) ? String(Report[Key]) : ""
-		; Native string replacement stops at embedded NUL. The canonical encoder
-		; preserves the complete stored text for both local artifacts and IPC.
-		Parts.Push("  " . JsonStringLiteral(Key) . ": " . JsonStringLiteral(Val))
+	; Native string replacement stops at embedded NUL. The canonical encoder
+	; preserves the complete stored text for both local artifacts and IPC.
+	for _, Field in CRASH_REPORT_FIELDS {
+		Val := Report.Has(Field[1]) ? String(Report[Field[1]]) : Field[2]
+		Parts.Push("  " . JsonStringLiteral(Field[1]) . ": " . JsonStringLiteral(Val))
 	}
-	return "{`r`n" . _CrashReport_JoinParts(Parts) . "`r`n}"
+	for _, Names in [CRASH_REPORT_WINDOWS_FIELDS, Trailing] {
+		for _, Key in Names {
+			if Report.Has(Key)
+				Parts.Push("  " . JsonStringLiteral(Key) . ": " . JsonStringLiteral(String(Report[Key])))
+		}
+	}
+	return "{`n" . _CrashReport_JoinParts(Parts) . "`n}"
 }
 
-; Joins an array of strings with ",`r`n" separators.
+; Joins an array of strings with ",`n" separators.
 ; @param Parts {Array}
 ; @return {String}
 _CrashReport_JoinParts(Parts) {
 	Result := ""
 	for Idx, Item in Parts
-		Result .= (Idx > 1 ? ",`r`n" : "") . Item
+		Result .= (Idx > 1 ? ",`n" : "") . Item
 	return Result
 }
 

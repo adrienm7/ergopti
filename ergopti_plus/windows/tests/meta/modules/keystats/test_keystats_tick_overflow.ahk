@@ -26,9 +26,8 @@
 ; =================================================
 ; =================================================
 
-_KLTO_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_KLTO_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _KLTO_StripComments(Src) {
@@ -180,7 +179,7 @@ Test("keystats: physical activity retains native64 delay ownership (keystats-hoo
 ; ======================================================
 
 _KLTO_WatchersStopNative64(Stop, Close) {
-	_KLTO_UniqueCode(Stop, "im)^\h*if\h+!\h*_KL_Watchers_CloseSession\h*\(\h*EndTick\h*,\h*EndTick\h*\)\h*$",
+	_KLTO_UniqueCode(Stop, "im)^\h*return\h+_KL_Watchers_CloseSession\h*\(\h*SessionEnd\h*,\h*IdleEnd\h*\)\h*$",
 		"shutdown must delegate both selected boundaries to the retained close owner")
 	_KLTO_Native64Calls(Close, 2)
 	for Endpoint in ["IdleEndTick", "SessionEndTick"] {
@@ -192,7 +191,7 @@ _KLTO_WatchersStopNative64(Stop, Close) {
 }
 
 _KLTO_WatchersStopDrainMasked() {
-	Stop := _DriverFuncBody("KL_Watchers_Stop")
+	Stop := _DriverFuncBody("KL_Watchers_CloseOnStop")
 	Close := _DriverFuncBody("_KL_Watchers_CloseSession")
 	Assert(RegExMatch(_DriverMaskNonCode(&Stop), "\{\s*[^}\s]"), "the shutdown owner must contain executable code")
 	Assert(RegExMatch(_DriverMaskNonCode(&Close), "\{\s*[^}\s]"), "the retained close owner must contain executable code")
@@ -244,15 +243,15 @@ _KLTO_Native64Mutations() {
 	Changed[2] := StrReplace(Inputs[2], "IdleEndTick)", "SessionEndTick)", false, &Count)
 	AssertEqual(1, Count)
 	_KLTO_AssertRefused(_KLTO_WatchersNative64.Bind(Changed*))
-	Stop := _DriverFuncBody("KL_Watchers_Stop")
+	Stop := _DriverFuncBody("KL_Watchers_CloseOnStop")
 	_KLTO_WatchersStopNative64(Stop, Inputs[2])
-	for Replacement in ["(EndTick, 0)", "(0, EndTick)", "(EndTick, EndTick + 1)"] {
-		ChangedStop := StrReplace(Stop, "(EndTick, EndTick)", Replacement, false, &Count)
+	for Replacement in ["(SessionEnd, 0)", "(0, IdleEnd)", "(SessionEnd, IdleEnd + 1)"] {
+		ChangedStop := StrReplace(Stop, "(SessionEnd, IdleEnd)", Replacement, false, &Count)
 		AssertEqual(1, Count, "shutdown has one selected boundary delegation")
 		_KLTO_AssertRefused(_KLTO_WatchersStopNative64.Bind(ChangedStop, Inputs[2]))
 	}
-	ChangedStop := StrReplace(Stop, "_KL_Watchers_CloseSession(EndTick, EndTick)",
-		"'_KL_Watchers_CloseSession(EndTick, EndTick)'", false, &Count)
+	ChangedStop := StrReplace(Stop, "_KL_Watchers_CloseSession(SessionEnd, IdleEnd)",
+		"'_KL_Watchers_CloseSession(SessionEnd, IdleEnd)'", false, &Count)
 	AssertEqual(1, Count)
 	_KLTO_AssertRefused(_KLTO_WatchersStopNative64.Bind(ChangedStop, Inputs[2]))
 	_KLTO_WatchersStopNative64(StrUpper(Stop), Inputs[2])
@@ -272,7 +271,7 @@ Test("keystats: native clock source guards reject narrowed or absent owners (key
 ; =========================================================================
 
 _KLTO_HookContextAtWrapSafe() {
-	Raw := _KLTO_ReadSource("modules/keystats/keystats_hook.ahk")
+	Raw := _KLTO_ReadSource("keystats_hook.ahk")
 	Src := _KLTO_StripComments(Raw)
 	Assert(Src != "", "modules/keystats/keystats_hook.ahk must be readable")
 

@@ -75,10 +75,17 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 	private static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
 	private static func appleQuote(_ value: String) -> String { "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
 	private func prepareAndPrompt() {
-		guard sourceCurrent(), let resources = Bundle.main.resourceURL else { lock.lock(); refused = true; lock.unlock(); return }
+		guard sourceCurrent() else { lock.lock(); refused = true; lock.unlock(); return }
 		var selfImage = ergopti_vhd_report_self_image()
 		guard ergopti_vhd_report_self_image_capture(&selfImage) == 0, selfImage.pid == creator, sourceCurrent() else { markRefused(); return }
-		let helper = resources.appendingPathComponent("OwnedRuntimeInstaller/ErgoptiPlus-Runtime-Installer.app")
+		// The helper of the verified download only (ADR 011 WP5), never the bundle's copy.
+		let helper: URL
+		switch OwnedRuntimeDownloadedHelper.current() {
+		case .success(let located): helper = located
+		case .failure(let refusal):
+			LauncherLog.write("owned runtime: installer helper refused (\(refusal.rawValue)): \(refusal.explanation).")
+			markRefused(); return
+		}
 		var helperIdentity = stat(); let helperStatus = lstat(helper.path, &helperIdentity), helperError = errno
 		guard helperStatus == 0, helperIdentity.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else { _ = helperError; markRefused(); return }
 		lock.lock(); sourceAttempted = true; lock.unlock()
@@ -101,7 +108,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 			let expectation = HelperExpectation(issuer: issuer, channel: channel, hashes: Set(hashes), stage: stage)
 			let leafHash = Insecure.SHA1.hash(data: leaf).map { String(format: "%02x", $0) }.joined()
 			let codeHashes = hashes.map { "cdhash H\"" + $0.map { String(format: "%02x", $0) }.joined() + "\"" }.sorted().joined(separator: " or ")
-			let requirement = "identifier \"com.ergoptiplus.app.runtime-installer\" and certificate leaf = H\"" + leafHash + "\" and (" + codeHashes + ")"
+			let requirement = "identifier \"" + Identifiers.SigningIds.runtimeInstaller + "\" and certificate leaf = H\"" + leafHash + "\" and (" + codeHashes + ")"
 			let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
 			guard source.releaseOwnedDescriptors(), sourceCurrent(), channel.current() else { markRefused(); return }
 			lock.lock(); sourceClosed = true; self.expectation = expectation; lock.unlock()
@@ -219,7 +226,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 			guard OwnedVirtualHIDDaemonReportClock.remains(began) else {
 				_ = ergopti_owned_program_cancel(owned); return false // Retained native owner remains explicit cleanup debt.
 			}
-			Thread.sleep(forTimeInterval: 0.01)
+			Thread.sleep(forTimeInterval: LauncherTimings.vhidReportQueryPoll.seconds)
 		}
 		return false
 	}
@@ -309,7 +316,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 		let owner = acquire(); _ = owner.start()
 		while true {
 			switch owner.poll() {
-			case .pending: Thread.sleep(forTimeInterval: 0.02)
+			case .pending: Thread.sleep(forTimeInterval: LauncherTimings.vhidReportMainPoll.seconds)
 			case .historical(let values):
 				let fields = [values.driverActivated, values.driverConnected, values.driverVersionMismatched, values.virtualHIDKeyboardReady, values.virtualHIDPointingReady]
 				let bytes = Data(("OWNED_VHD_DAEMON_REPORT|1|historical-observer-connection|" + fields.map { $0 ? "1" : "0" }.joined(separator: "|") + "|remote-cleanup-unobserved\n").utf8)

@@ -58,7 +58,7 @@ private final class ManagedOllamaTestSession {
 				}
 				throw Failure.process
 			}
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		}
 		guard let value else {
 			peer.terminate(); peer.waitUntilExit()
@@ -153,7 +153,7 @@ private final class ManagedOllamaTestSession {
 			if count > 0 { bytes.append(contentsOf: buffer.prefix(count)) }
 			else if count == 0 { eof = true }
 			else if ![EINTR, EAGAIN, EWOULDBLOCK].contains(errno) { process.terminate(); process.waitUntilExit(); throw Failure.process }
-			usleep(1_000)
+			usleep(LauncherTimings.testFastPoll.microseconds)
 		}
 		guard eof && !process.isRunning else { process.terminate(); process.waitUntilExit(); throw Failure.deadline }
 		process.waitUntilExit(); try output.fileHandleForReading.close()
@@ -178,7 +178,7 @@ private final class ManagedOllamaTestSession {
 	}
 	func finish() throws {
 		let deadline = ProcessInfo.processInfo.systemUptime + 5
-		while peer.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(10_000) }
+		while peer.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(LauncherTimings.testPoll.microseconds) }
 		guard !peer.isRunning else { peer.terminate(); peer.waitUntilExit(); throw Failure.deadline }
 		peer.waitUntilExit(); guard peer.terminationStatus == 0 else { throw Failure.process }
 		try peerDiagnostics.fileHandleForReading.close()
@@ -190,7 +190,7 @@ private final class ManagedOllamaTestSession {
 			if FileManager.default.fileExists(atPath: root.appendingPathComponent("closed-\(index)").path) {
 				return try Data(contentsOf: root.appendingPathComponent("request-\(index).bin"))
 			}
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		}
 		throw Failure.deadline
 	}
@@ -327,7 +327,7 @@ final class ManagedOllamaAPIWorkerTests: XCTestCase {
 		XCTAssertEqual(frames.filter { $0.0 == 68 }.reduce(Data()) { $0 + $1.1 }, Data("oneTWO".utf8))
 		_ = try session.captured(1)
 		let deadline = ProcessInfo.processInfo.systemUptime + 5
-		while session.peer.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(10_000) }
+		while session.peer.isRunning && ProcessInfo.processInfo.systemUptime < deadline { usleep(LauncherTimings.testPoll.microseconds) }
 		XCTAssertFalse(session.peer.isRunning); session.peer.waitUntilExit()
 		let receipt = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: session.root.appendingPathComponent("retained-image.json"))) as? [String: Any])
 		XCTAssertEqual(receipt["read_only"] as? Bool, true); XCTAssertEqual(receipt["reaped"] as? Bool, true)

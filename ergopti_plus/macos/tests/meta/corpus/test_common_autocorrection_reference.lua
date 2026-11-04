@@ -346,7 +346,9 @@ local function shipped_split_registry(only)
 			end
 			helpers.assert_eq(canonical_count, ({ names = 34, abbreviations = 95, technical_terms = 11 })[only] or 140)
 			helpers.assert_eq(alias_count, ({ names = 2, abbreviations = 0, technical_terms = 4 })[only] or 6)
-			helpers.assert_eq(state.groups.autocorrection.delay_metadata.delay, expected.meta.delay)
+			helpers.assert_eq(state.groups.autocorrection.delay_metadata.delay,
+				require("test.common_autocorrection_split_contract").SHIPPED_DELAY,
+				"the split file's category delay reaches the registry")
 			local Expander = helpers.load_with_stubs("modules.keymap.expander")
 			helpers.assert_true(Expander.init(state, Registry, {}))
 			for _, case in ipairs({

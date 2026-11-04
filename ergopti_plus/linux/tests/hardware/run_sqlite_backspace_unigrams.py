@@ -79,7 +79,8 @@ check(
         db.execute(
             "SELECT token,c,json_extract(esrc_json,'$.other') FROM ngram_chars WHERE app='literal' ORDER BY token"
         ).fetchall(),
-        [("B", 1, 1), ("S", 1, 1), ("[", 1, 1), ("]", 1, 1)],
+        # Stored version 2 keys escape a typed bracket as [[.
+        [("B", 1, 1), ("S", 1, 1), ("[[", 1, 1), ("]", 1, 1)],
     ),
 )
 check(

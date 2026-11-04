@@ -811,6 +811,18 @@ function M.inverse_table(require_source)
 	return detached, nil, receipt
 end
 
+--- The 1-based XKB group (layout index plus one) an inverse receipt was taken
+--- in: the group the text model must read for the same keymap.
+--- @param receipt table Receipt returned by inverse_table.
+--- @return integer|nil group, string|nil err
+function M.inverse_receipt_group(receipt)
+	local record = _inverse_receipts[receipt]
+	if type(record) ~= "table" or type(record.group) ~= "number" or record.group < 0 or record.group % 1 ~= 0 then
+		return nil, "inverse-receipt-unknown"
+	end
+	return record.group + 1, nil
+end
+
 --- Checks an exact inverse receipt against its original reconstructed source.
 --- Ordinary key transitions preserve it; observed group ABA and reload retire it.
 --- @param receipt table Opaque receipt returned by inverse_table().

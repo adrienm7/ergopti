@@ -37,7 +37,7 @@ _KLRUnicode_StorageContract(Fixture, Spec) {
 		AssertEqual(Spec["events"].Length, App["chars"], "the fixture contains independent scalar events")
 		AssertEqual(Spec["manifest"][Day][Fixture["app"]]["chars"], App["chars"])
 		Db := _KLRShortcut_OpenFixture()
-		AssertTrue(SQLite_Exec(Db, KLW_BuildBatchSql(SQLite_Q("unicode-contract"), false)))
+		AssertTrue(SQLite_Exec(Db, KLW_BuildBatchSql("unicode-contract", false)))
 		Expected := Spec["range"]["historical"]
 		Historical := JsonParse(KLR_BuildNgramsJson(Db, Day, Day, [Fixture["app"]]))
 		_KLRUnicode_AssertProjection(Historical, Expected)

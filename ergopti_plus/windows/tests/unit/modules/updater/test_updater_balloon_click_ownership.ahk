@@ -76,8 +76,10 @@ _UBCO_UpdaterNonOfferBalloonsReleaseTheClaim() {
 	AssertTrue(InStr(Body, "UpdateCheck_ShowResult(") > 0, "the manual check shows its answer in the window")
 	Offer := _DriverFuncBody("_Updater_HandleBackgroundResult")
 	ClaimAt := InStr(Offer, "_Updater_ClaimBalloon()")
-	TipAt := InStr(Offer, "TrayTip(", , ClaimAt)
-	Assert(ClaimAt > 0 and TipAt > ClaimAt, "the update offer claims the balloon right before its TrayTip")
+	TipAt := InStr(Offer, "_Updater_ShowReleaseBalloon(", , ClaimAt)
+	Assert(ClaimAt > 0 and TipAt > ClaimAt, "the update offer claims the balloon right before showing it")
+	AssertTrue(InStr(_DriverFuncBody("_Updater_ShowReleaseBalloon"), "TrayTip(") > 0,
+		"the one balloon helper is what shows the offer's TrayTip")
 }
 Test("Updater balloon: the manual check shows no balloon, the offer claims its own", _UBCO_UpdaterNonOfferBalloonsReleaseTheClaim)
 

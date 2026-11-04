@@ -31,10 +31,8 @@
 ; ==================================================
 ; ==================================================
 
-_GSBlk_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_GSBlk_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -48,7 +46,7 @@ _GSBlk_ReadSource(RelPath) {
 
 ; The public capture API must arm a timer rather than call blocking ClipWait.
 _GSBlk_GetSelectionIsTimerDriven() {
-	Src := _GSBlk_ReadSource("infra/hotstrings/hotstring_engine.ahk")
+	Src := _GSBlk_ReadSource("hotstring_engine.ahk")
 	Seg := _DriverFuncBody("GetSelectionAsync")
 	Assert(Seg != "", "GetSelectionAsync() declaration must exist in hotstring_engine.ahk")
 	Assert(InStr(Seg, "SetTimer(Job[") > 0,

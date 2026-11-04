@@ -19,6 +19,7 @@
 ;    containing French letters (e.g. ``IÉ``) with lowercase TOML keys.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include ../hotstrings/common_autocorrection_migration.ahk
 
 ; Holds the raw UTF-8 content of every TOML file that has been read this
@@ -353,6 +354,23 @@ _ParseTomlGroupConfig_ResolveFile(CategoryName, FilePath := "") {
 		return HotstringsBundledTomlPath(LowerCat)
 }
 
+; The name a log line may print for a hotstring category: the category itself when
+; the driver ships it, the redaction policy's name placeholder when the user chose
+; it (an extension or a personal file wherever it sits, a personal owner backed by
+; no shipped file). The logger cannot do this at write time, because a bare name is
+; not a path. Only a file of the shared folder proves the driver ships the category.
+; @param Category {String} Category identity; may be empty.
+; @returns {String} What the line may print.
+HotstringCategoryLogName(Category) {
+		global _SharedDir
+		if (Category == "")
+				return Category
+		Path := _ParseTomlGroupConfig_ResolveFile(Category)
+		if (InStr(Path, _SharedDir . "\") != 1 || !FileExist(Path))
+				return LoggerMaskUserName(Category)
+		return Category
+}
+
 ; Evict all cache entries for a given file path so that the next call to
 ; ParseTomlGroupConfig or ReadTomlFile re-reads from disk. Called after
 ; _HCW_PatchTomlMeta writes changes to a personal TOML file.
@@ -425,11 +443,11 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				if FeatureConfig.Has("enabled") {
 						_V1Compat.Enabled := FeatureConfig["enabled"]
 				}
-				if FeatureConfig.Has("time_activation_seconds") {
-						_V1Compat.TimeActivationSeconds := FeatureConfig["time_activation_seconds"]
+				if FeatureConfig.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS) {
+						_V1Compat.TimeActivationSeconds := FeatureConfig[ConfigLeaf.TIME_ACTIVATION_SECONDS]
 				}
-				if FeatureConfig.Has("pattern_max_length") {
-						_V1Compat.PatternMaxLength := FeatureConfig["pattern_max_length"]
+				if FeatureConfig.Has(ConfigLeaf.PATTERN_MAX_LENGTH) {
+						_V1Compat.PatternMaxLength := FeatureConfig[ConfigLeaf.PATTERN_MAX_LENGTH]
 				}
 				FeatureConfig := _V1Compat
 		}
@@ -467,7 +485,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 		and StrLower(CategoryName) != "personal"
 		and _GENERATED_HOTSTRINGS.Has(LoaderKey)) {
 				try LoggerTrace("TomlLoader", "Using generated loader for [{1}.{2}].",
-						CategoryName, SectionName)
+						HotstringCategoryLogName(CategoryName), SectionName)
 				GeneratedFn := _GENERATED_HOTSTRINGS[LoaderKey]
 				; Thread the section/file/source-resolved priority into the cache registrar
 				; so a cached entry with no individual override registers at the SAME
@@ -476,7 +494,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				; could resolve different collision priorities for the same TOML.
 				GeneratedFn(FeatureConfig, ExtraOptions, ResolvedPriority)
 				try LoggerDone("TomlLoader", "Generated section [{1}.{2}] loaded.",
-						CategoryName, SectionName)
+						HotstringCategoryLogName(CategoryName), SectionName)
 				return
 		}
 
@@ -491,10 +509,10 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 		}
 		if !FileExist(FilePath) {
 				try LoggerWarn("TomlLoader", "Section [{1}.{2}]: file {3} not found.",
-						CategoryName, SectionName, FilePath)
+						HotstringCategoryLogName(CategoryName), SectionName, LoggerMaskUserName(FilePath))
 				return
 		}
-		try LoggerTrace("TomlLoader", "Loading section [{1}.{2}]…", CategoryName, SectionName)
+		try LoggerTrace("TomlLoader", "Loading section [{1}.{2}]…", HotstringCategoryLogName(CategoryName), SectionName)
 		Loaded := 0
 
 		TimeActivationSeconds := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
@@ -564,7 +582,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				Loaded += 1
 		}
 		try LoggerDone("TomlLoader", "Section [{1}.{2}]: {3} entry(ies) loaded.",
-				CategoryName, SectionName, Loaded)
+				HotstringCategoryLogName(CategoryName), SectionName, Loaded)
 }
 
 ; Register admitted sections together so physical TOML order survives boundaries.
@@ -614,10 +632,10 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 		if !FileExist(FilePath) {
 				if SelectedSection != ""
 						throw Error("The selected extension source is unavailable: " . FilePath)
-				try LoggerWarn("TomlLoader", "Extension TOML '{1}' not found — skipped.", FilePath)
+				try LoggerWarn("TomlLoader", "Extension TOML '{1}' not found — skipped.", LoggerMaskUserName(FilePath))
 				return
 		}
-		try LoggerStart("TomlLoader", "Loading extension TOML '{1}'…", FilePath)
+		try LoggerStart("TomlLoader", "Loading extension TOML '{1}'…", LoggerMaskUserName(FilePath))
 		TotalLoaded := 0
 		CurrentSection := ""
 		SplitPath FilePath, , , , &CategoryName
@@ -732,7 +750,9 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 		}
 		if SelectedSection != "" && !SelectedFound
 				throw Error("The selected extension section is unavailable: " . SelectedSection)
-		try LoggerSuccess("TomlLoader", "Extension TOML '{1}': {2} entry(ies) loaded.", CategoryLabel, TotalLoaded)
+		; Neither the label nor the file: both carry a name the user chose, and the
+		; redactor only masks a path under the configuration directory.
+		try LoggerSuccess("TomlLoader", "Extension TOML '{1}': {2} entry(ies) loaded.", LoggerMaskUserName(FilePath), TotalLoaded)
 		return TotalLoaded
 }
 

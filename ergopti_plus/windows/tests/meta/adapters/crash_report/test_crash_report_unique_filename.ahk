@@ -153,12 +153,10 @@ _CRUN_DefaultWriterPreservesExternalCollision() {
 		_LogsDir := Root
 		Baseline := CrashReport_Save(Map("timestamp", Timestamp, "error_msg", "baseline incident"))
 		AssertTrue(Baseline != "" && FileExist(Baseline), "the default writer must first acknowledge a genuine baseline artifact")
-		AssertTrue(RegExMatch(Baseline, "_([0-9]+)_([0-9]+)\.json$", &Identity),
-			"the public acknowledged filename must expose its process-local identity")
-		Prefix := LoggerCrashReportsDir() . "2026-10-25T17-00-00Z_"
-		AssertEqual(Prefix . DllCall("GetCurrentProcessId", "UInt") . "_" . Identity[2] . ".json", Baseline,
+		Prefix := LoggerCrashReportsDir() . "2026-10-25T17-00-00Z"
+		AssertEqual(Prefix . ".json", Baseline,
 			"prediction must qualify against the actual default-writer baseline path")
-		CollisionPath := Prefix . Identity[1] . "_" . (Integer(Identity[2]) + 1) . ".json"
+		CollisionPath := Prefix . "-2.json"
 		AssertFalse(FileExist(CollisionPath), "the predicted next public filename must initially be absent")
 		Report := _CRUN_ExternalCollisionReport(Timestamp, CollisionPath, Sentinel)
 		Result := CrashReport_Save(Report)

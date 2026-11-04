@@ -6,7 +6,7 @@
 --- Replays _shared/tests/corpus/action_parameters/llm_prompt_vectors.json, which
 --- the macOS and Windows suites and the picker page replay too, through the
 --- gesture validator, and pins what the binding editors receive for the kind:
---- the zenity prompt listing the prompts, its refusal, and the picker page's
+--- the native prompt listing the prompts, its refusal, and the picker page's
 --- payload (prompt choices, menu count, "edit the current action").
 ---
 --- ROOT CAUSE ENCODED:
@@ -77,7 +77,7 @@ helpers.describe("llm_prompt_prediction parameter replays the shared llm_prompt 
 end)
 
 helpers.describe("llm_prompt_prediction parameter: what the binding editors show", function()
-	helpers.it("the zenity prompt lists every prompt as '<id> — <label>'", function()
+	helpers.it("the native prompt lists every prompt as '<id> — <label>'", function()
 		with_profiles(function()
 			local prompt = Gestures.get_action_parameter_prompt(ACTION)
 			helpers.assert_true(prompt:find("{1}", 1, true) == nil, "the placeholder is filled: " .. prompt)

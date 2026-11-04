@@ -25,14 +25,6 @@ local function load_contract_entry(id)
 	error("contract entry not found: " .. id)
 end
 
-local function preferences_source()
-	return helpers.driver_root() .. "infra/preferences.lua"
-end
-
-local function driver_init_source()
-	return helpers.driver_root() .. "init.lua"
-end
-
 local function normalize_toml_array(v)
 	if type(v) == "table" then
 		local out = {}
@@ -173,118 +165,33 @@ helpers.describe("LLM menu regressions — Hammerspoon", function()
 		os.remove(tmp)
 	end)
 
-	helpers.it("preferences.lua maps llm_val_modifiers (persist path, not actions)", function()
-		local fh = io.open(preferences_source(), "r")
-		helpers.assert_true(fh ~= nil, "preferences.lua missing")
-		local body = fh:read("*a")
-		fh:close()
-		helpers.assert_true(body:find("llm_val_modifiers", 1, true) ~= nil,
-			"preferences.lua must wire llm_val_modifiers")
-		-- macOS has no menu_llm/actions.ahk; guard against duplicating persist in wrong layer.
-		helpers.assert_true(body:find("KEY_MAP", 1, true) ~= nil,
-			"preferences.lua must use KEY_MAP for flat persistence")
-	end)
-
-	helpers.it("driver init gates LLM backend bootstrap on the boot enabled flag", function()
-		local fh = io.open(driver_init_source(), "r")
-		helpers.assert_true(fh ~= nil, "init.lua missing")
-		local body = fh:read("*a")
-		fh:close()
-		helpers.assert_true(body:find("LLM boot disabled at startup", 1, true) ~= nil,
-			"init.lua must keep an explicit disabled-boot LLM skip path")
-		helpers.assert_true(body:find("start_background_network_bootstrap", 1, true) ~= nil,
-			"init.lua must explicitly opt into the core LLM network bootstrap only when boot LLM is enabled")
+	helpers.it("preferences own llm_val_modifiers at its persisted path", function()
+		local prefs = helpers.load_with_stubs("infra.preferences")
+		helpers.assert_eq(prefs.flat_key_for("llm.navigation.val_modifiers"), "llm_val_modifiers",
+			"the validation modifiers must persist through the preference owner")
 	end)
 
 end)
 
 
---- Reads the independent generation boundary expectations from the shared corpus.
---- @return table expected
-local function generation_boundary_contract()
-	local file = assert(io.open(helpers.shared("tests/corpus/menus/generation_boundaries.json"), "r"))
-	local raw = file:read("*a"); file:close()
-	return hs.json.decode(raw)
-end
+helpers.describe("Generation groups (ai-generation-groups)", function()
+	local captions = {
+		count = "menu.llm.num_predictions_label", min_words = "menu.llm.min_words_label",
+		max_words = "menu.llm.max_words_label", context = "menu.llm.context_length_label",
+		clear_context = "menu.llm.reset_on_nav",
+	}
 
-helpers.describe("Generation numeric boundaries", function()
-	helpers.it("the genuine numeric owner consumes its shared count boundary (generation-boundaries)", function()
-		with_count_menu(function(menu, state, calls, set_outcome)
-			local expected = generation_boundary_contract()
-			local ManifestMenu = require("infra.manifest_menu")
-			local frame = ManifestMenu.get_array(expected.boundaries.count.section)
-			local original = frame[1]
-			local ok, detail = xpcall(function()
-				local rows = generation_rows(menu)
-				helpers.assert_eq(rows[1].title, "menu.llm.num_predictions_label")
-				helpers.assert_eq(rows[2].title, "-", "the native count group retains its separator")
-				helpers.assert_eq(rows[3].title, "menu.llm.context_length_label")
-				helpers.assert_eq(rows[4].title, "menu.llm.reset_on_nav")
-				helpers.assert_eq(rows[5].title, "menu.llm.min_words_label")
-				helpers.assert_eq(rows[6].title, "menu.llm.max_words_label")
-				helpers.assert_eq(#calls, 0, "presentation cannot submit a setting transaction")
-				frame[1] = { type = expected.published_marker.type,
-					id = expected.published_marker.id, i18n = expected.published_marker.i18n,
-					platforms = { "ahk", "hs" }, unavailable = "hide" }
-				state.llm_num_predictions = 7
-				rows = generation_rows(menu)
-				helpers.assert_eq(rows[2].title, "menu.llm.reset_label", "the native optional reset precedes the boundary")
-				helpers.assert_eq(rows[3].title, expected.published_marker_key,
-					"the real allocator consumes the current shared presentation")
-				helpers.assert_eq(rows[3].disabled, true)
-				helpers.assert_nil(rows[3].fn)
-				helpers.assert_eq(rows[4].title, "menu.llm.context_length_label")
-				helpers.assert_eq(rows[5].title, "menu.llm.reset_on_nav")
-				helpers.assert_eq(#rows[1].menu, 10)
-				set_outcome(false)
-				helpers.assert_eq(rows[1].menu[4].fn(), false, "the unchanged count callback propagates refusal")
-				helpers.assert_eq(#calls, 1)
-				helpers.assert_eq(calls[1].key, "llm_num_predictions")
-				helpers.assert_eq(calls[1].value, 4)
-				helpers.assert_eq(calls[1].runtime_fn, "set_llm_num_predictions")
-				helpers.assert_eq(state.llm_num_predictions, 7)
-			end, debug.traceback)
-			frame[1] = original
-			if not ok then error(detail, 0) end
+	helpers.it("draws the count and the words, one separator, then the context", function()
+		with_count_menu(function(menu)
+			require("test.ai_menu_layout_contract").assert_generation(helpers, generation_rows(menu), captions, "defaults")
 		end)
 	end)
 
-	helpers.it("a withdrawn boundary refuses without a native fallback or settings effects (generation-boundaries)", function()
-		with_count_menu(function(menu, state, calls)
-			local expected = generation_boundary_contract()
-			local frame = require("infra.manifest_menu").get_array(expected.boundaries.count.section)
-			local original = frame[1]
-			local before = state.llm_num_predictions
-			local ok, detail = xpcall(function()
-				frame[1] = { type = "command", id = "unowned_generation_boundary",
-					i18n = expected.published_marker_key, platforms = { "ahk", "hs" }, unavailable = "hide" }
-				helpers.assert_eq(menu.build_item(), {}, "a refused presentation has no native fallback")
-				helpers.assert_eq(#calls, 0)
-				helpers.assert_eq(state.llm_num_predictions, before)
-			end, debug.traceback)
-			frame[1] = original
-			if not ok then error(detail, 0) end
-			helpers.assert_eq(generation_rows(menu)[2].title, "-", "repair restores the same real provider")
-			helpers.assert_eq(#calls, 0)
-		end)
-	end)
-
-	helpers.it("the actual shared renderer preserves both non-applicable projections (generation-boundaries)", function()
-		with_count_menu(function()
-			local expected = generation_boundary_contract()
-			local Renderer = require("menu.renderer")
-			local NativeJson = require("adapters.json_codec")
-			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(Renderer.new({ platform = platform,
-					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-					json_decode = NativeJson.decode, i18n = require("infra.i18n"),
-					logger = require("infra.logger") }))
-				for _, key in ipairs({ "count", "context", "words" }) do
-					local boundary = expected.boundaries[key]
-					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}),
-						boundary.projections[platform], platform .. ": independent boundary " .. key)
-				end
-			end
+	helpers.it("keeps one separator with every reset row drawn", function()
+		with_count_menu(function(menu, state)
+			state.llm_num_predictions, state.llm_context_length = 7, 321
+			state.llm_min_words, state.llm_max_words = 2, 9
+			require("test.ai_menu_layout_contract").assert_generation(helpers, generation_rows(menu), captions, "resets")
 		end)
 	end)
 end)

@@ -35,8 +35,35 @@ local Native = require("adapters.owned_process")
 local Timings = require("infra.timings")
 local Engine, Profiles
 local chronological, native_services = {}, {}
+-- Timestamped step lines name the step a stalled run is waiting on. They carry
+-- hosts and program names only, never a URL path, query or model text.
+local trace_origin = uv.hrtime()
+local function trace(step)
+	print(string.format("ACCEPTANCE_TRACE %d %s", math.floor((uv.hrtime() - trace_origin) / 1e6), step))
+	io.stdout:flush()
+end
+local function host_of(url) return tostring(type(url) == "string" and url:match("^%a+://([^/]+)") or "?") end
+local SystemProxy = require("adapters.system_proxy")
+local original_lookup_owned = SystemProxy.lookup_owned
+SystemProxy.lookup_owned = function(url, options, callback)
+	trace("proxy-lookup-start " .. host_of(url))
+	return original_lookup_owned(url, options, function(...)
+		trace("proxy-lookup-end " .. host_of(url))
+		return callback(...)
+	end)
+end
 local original_native_start = Native.start
 Native.start = function(executable, arguments, options, callback)
+	local program = tostring(executable):match("[^/]+$") or "?"
+	local verb = type(arguments) == "table" and tostring(arguments[1] or "") or ""
+	trace("process-start " .. program .. " " .. verb)
+	local inner = callback
+	if type(callback) == "function" then
+		callback = function(...)
+			trace("process-end " .. program .. " " .. verb)
+			return inner(...)
+		end
+	end
 	local operation = original_native_start(executable, arguments, options, callback)
 	if arguments[1] == "serve" then native_services[#native_services + 1] = { operation = operation, executable = executable, timeout = options.timeout_ms } end
 	return operation
@@ -58,7 +85,9 @@ Http.get_owned = function(url, headers, options, callback)
 		archive_options = { url = url, https_only = options.https_only, bytes = options.max_download_bytes }
 	end
 	observed_urls[#observed_urls + 1] = url
+	trace("http-start " .. host_of(url) .. (options.output_path and " archive" or ""))
 	local operation = original_get_owned(url, headers, options, function(result)
+		trace("http-end " .. host_of(url) .. " status=" .. tostring(type(result) == "table" and result.status or "?"))
 		local typed = require("llm.enable_admission").receipt(result)
 		if typed then
 			chronological[#chronological + 1] = { kind = "typed_version", engine = Engine.is_enabled(),
@@ -75,7 +104,11 @@ Http.download_output_owned = function(url, headers, target, options, callback)
 	archive_dispatches = archive_dispatches + 1
 	archive_options = { url = url, https_only = options.https_only, bytes = options.max_download_bytes }
 	observed_urls[#observed_urls + 1] = url
-	local operation = original_download_output_owned(url, headers, target, options, callback)
+	trace("download-start " .. host_of(url))
+	local operation = original_download_output_owned(url, headers, target, options, function(...)
+		trace("download-end " .. host_of(url))
+		return callback(...)
+	end)
 	owned_get_operations[#owned_get_operations + 1] = operation
 	archive_operation = operation
 	return operation
@@ -89,7 +122,9 @@ Digest.native = function(...)
 	local start = worker.start
 	observed_digest_workers[#observed_digest_workers + 1] = { owner = worker, start = start }
 	worker.start = function(fd, length, current, deadline, callback)
+		trace("digest-start bytes=" .. tostring(length))
 		return start(fd, length, current, deadline, function(digest, receipt)
+			trace("digest-end")
 			checksum_receipt = { accepted = false, bytes = length, digest = digest, receipt = receipt }
 			return callback(digest, receipt)
 		end)
@@ -102,7 +137,9 @@ Archive.native_ollama_artifact = function(...)
 		local seal = factory.seal_and_adopt
 		observed_artifact_factories[#observed_artifact_factories + 1] = { owner = factory, seal = seal }
 		factory.seal_and_adopt = function(brand, completion, expected, deadline, callback)
+			trace("seal-start")
 			return seal(brand, completion, expected, deadline, function(path, refusal, receipt)
+				trace("seal-end refusal=" .. tostring(refusal))
 				if checksum_receipt then
 					checksum_receipt.accepted = type(path) == "string" and path ~= ""
 						and refusal == nil and receipt == nil and checksum_receipt.receipt == nil
@@ -344,6 +381,7 @@ assert(not Download.is_active() and not Engine.runtime_pending(), "model HTTP an
 if #native_services == 1 then assert(native_services[1].operation:is_settled() == true, "exact owned serve physically retired") end
 Http.get_owned, Http.postStream, Http.post_stream_owned = original_get_owned, original_post, original_owned_post
 Http.download_output_owned = original_download_output_owned
+SystemProxy.lookup_owned = original_lookup_owned
 Digest.native, Archive.native_ollama_artifact = original_digest_native, original_artifact_new
 for _, item in ipairs(observed_digest_workers) do item.owner.start = item.start end
 for _, item in ipairs(observed_artifact_factories) do item.owner.seal_and_adopt = item.seal end

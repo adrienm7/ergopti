@@ -12,6 +12,13 @@
 ; rehook: it swallows F24, so the owner can only count that key while it is
 ; again the first hook. F23 and F24 have no function on any layout, and the
 ; probe key never reaches an application.
+;
+; With the owner first again, the same chain proves the press ledger: edges
+; carrying the owner's replay marker, as a terminal replay sends them, on the two
+; keys the driver asks about for AltGr (right Alt, by both of its names) and on
+; Shift. AutoHotkey reads them as not physical; the ledger holds them until their
+; release. The foreign hook swallows them right behind the owner, so no
+; application receives an AltGr or a Shift.
 ; Usage: AutoHotkey64.exe hook_front_reassert.ahk <dll path>
 ; ==============================================================================
 
@@ -25,6 +32,10 @@ global WaitMs := 2000
 global PROBE_VK := 0x87
 global BURST_VK := 0x86
 global STATS_SIZE := 48
+global REPLAY_MARKER := 0x4552475054524D31
+global KEY_RIGHT_ALT := 0x138
+global KEY_LEFT_SHIFT := 0x02A
+global KEY_HIDDEN := 0x02
 
 HookOut(Text) {
 	FileAppend(Text . "`n", "*", "UTF-8-RAW")
@@ -50,12 +61,14 @@ HookStats() {
 
 ; The foreign hook: swallows the probe key, counts its presses.
 HookForeign(Code, WParam, LParam) {
-	global ForeignSeen, PROBE_VK
+	global ForeignSeen, PROBE_VK, REPLAY_MARKER
 	if (Code >= 0 && NumGet(LParam, 0, "UInt") == PROBE_VK) {
 		if (WParam == 0x100 || WParam == 0x104)
 			ForeignSeen += 1
 		return 1
 	}
+	if (Code >= 0 && NumGet(LParam, 24, "UPtr") == REPLAY_MARKER)
+		return 1
 	return DllCall("CallNextHookEx", "Ptr", 0, "Int", Code, "Ptr", WParam, "Ptr", LParam, "Ptr")
 }
 
@@ -77,6 +90,46 @@ HookPhase(Name, Before, After) {
 		. ',"armed_delta":' . (After["armed"] - Before["armed"])
 		. ',"failures":' . After["failures"] . ',"error":' . After["error"]
 		. ',"foreign_seen":' . ForeignSeen . '}')
+}
+
+; One edge as the owner's terminal replay sends it: by scan code, with its marker.
+HookReplayEdge(Sc, KeyUp) {
+	global REPLAY_MARKER
+	Packet := Buffer(40, 0)
+	NumPut("UInt", 1, Packet, 0)
+	NumPut("UShort", Sc & 0xFF, Packet, 10)
+	NumPut("UInt", 0x8 | (Sc > 0xFF ? 0x1 : 0) | (KeyUp ? 0x2 : 0), Packet, 12)
+	NumPut("UPtr", REPLAY_MARKER, Packet, 24)
+	if DllCall("SendInput", "UInt", 1, "Ptr", Packet, "Int", 40, "UInt") != 1
+		throw OSError(A_LastError, "SendInput")
+}
+
+; Flags and press number of one key in the real ledger.
+HookLedger(Sc) {
+	Press := Buffer(24, 0)
+	NumPut("UInt", 24, Press, 0)
+	QueryStatus := HookNative("QueryKeyPress", "UShort", Sc, "Ptr", Press)
+	if QueryStatus != 0
+		throw Error("QueryKeyPress failed with status " . QueryStatus)
+	return { flags: NumGet(Press, 4, "UInt"), sequence: NumGet(Press, 8, "UInt64") }
+}
+
+; Holds a replayed key and reports what each source says about it.
+HookLedgerPhase(Name, Sc, AhkNames) {
+	global KEY_HIDDEN
+	HookReplayEdge(Sc, false)
+	Sleep(30)
+	Held := HookLedger(Sc)
+	Physical := 0
+	for KeyName in AhkNames
+		Physical += GetKeyState(KeyName, "P") ? 1 : 0
+	HookReplayEdge(Sc, true)
+	Sleep(30)
+	After := HookLedger(Sc)
+	HookOut('{"phase":"' . Name . '","hidden_while_held":' . ((Held.flags & KEY_HIDDEN) ? 1 : 0)
+		. ',"sequence_while_held":' . Held.sequence
+		. ',"physical_while_held":' . Physical
+		. ',"flags_after":' . After.flags . '}')
 }
 
 if A_Args.Length != 1 || A_AhkVersion != "2.0.26" || A_PtrSize != 8
@@ -113,7 +166,11 @@ try {
 	Sleep(150)
 	Stop := HookStats()
 	HookPhase("owner_first", Start, Stop)
-	HookWait((S) => S["reinstalls"] >= Start["reinstalls"] + 2)
+		HookWait((S) => S["reinstalls"] >= Start["reinstalls"] + 2)
+	; Without AutoHotkey's own hook its "P" mode is only the logical state.
+	InstallKeybdHook()
+	HookLedgerPhase("ledger_altgr", KEY_RIGHT_ALT, ["SC138", "RAlt"])
+	HookLedgerPhase("ledger_shift", KEY_LEFT_SHIFT, ["LShift", "SC02A"])
 } finally {
 	if Hook
 		DllCall("UnhookWindowsHookEx", "Ptr", Hook)

@@ -320,10 +320,23 @@ function M.new(deps, presets, ram_getter)
 		return true
 	end
 
-	local function update_progress_ui(owner, pct, message)
+	local function update_progress_ui(owner, pct, message, bytes_done, bytes_total)
 		if not owns_progress_ui(owner) then return end
 		if type(message) ~= "string" or message == "" then return end
-		pcall(download_window.update, tonumber(pct) or 0, nil, nil, message)
+		pcall(download_window.update, tonumber(pct) or 0, bytes_done, bytes_total, message)
+	end
+
+	--- The byte counts of the managed pull's last "OLLAMA_PULL_BYTES <done> <total>"
+	--- line (managed_ollama_pull.py), or nil when the chunk carries none.
+	--- @param text string Sanitized stream chunk.
+	--- @return number|nil done, number|nil total
+	local function last_pull_bytes(text)
+		local done, total
+		for d, t in text:gmatch("OLLAMA_PULL_BYTES (%d+) (%d+)") do
+			done, total = tonumber(d), tonumber(t)
+		end
+		if not done or not total or total <= 0 or done > total then return nil, nil end
+		return done, total
 	end
 
 	local function complete_progress_ui(owner, success, title, error_kind)
@@ -1275,10 +1288,10 @@ function M.new(deps, presets, ram_getter)
 			model = target_model,
 			messages = {{ role = "user", content = "ok" }},
 			stream = false,
-			think = false,
+			-- Its one token must not open a reasoning block
+			think = require("modules.llm.thinking_families").ollama_think(target_model),
 			options = {
 				num_predict = 1,
-				think = false,
 				thinking_budget = 0,
 			},
 		}
@@ -1442,6 +1455,15 @@ function M.new(deps, presets, ram_getter)
 			if foreign_daemon then
 				network, network_err = NetworkEnv.prelude("OLLAMA-PULL")
 			else
+				-- The daemon Ergopti started runs without its proxy after a refused
+				-- sign-in: the models on disk work, and only the pull is refused.
+				local refusal_key, refusal = require("modules.llm.proxy_relay_receipt").pull_refusal()
+				if refusal_key then
+					Logger.error(LOG, "The Ollama model pull is refused: the proxy sign-in relay refused (%s).", refusal)
+					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get(refusal_key), "error")
+					settle_cancel("proxy_relay_refused")
+					return false
+				end
 				-- The daemon Ergopti started reads only HTTPS_PROXY: a company PAC is
 				-- resolved for the registry by the launcher instead of refusing the pull.
 				network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL",
@@ -1482,10 +1504,11 @@ function M.new(deps, presets, ram_getter)
 			end
 			local join = owner.start_attempted == true
 				and ManagedPullReceipt.retire or ManagedPullReceipt.rollback
-			local joined, retired = pcall(join, task, callback_status)
+			local joined, retired, refusal = pcall(join, task, callback_status)
 			owner.receipt_joining = false
 			if joined ~= true or retired ~= true then
-				Logger.error(LOG, "Managed model pull retirement is pending; exact task slot retained.")
+				Logger.error(LOG, "Managed model pull retirement is pending (%s); exact task slot retained.",
+					joined and tostring(refusal or "no reason given") or "the receipt check raised")
 				return false
 			end
 			owner.task_settled = true
@@ -1674,8 +1697,16 @@ function M.new(deps, presets, ram_getter)
 			local authorized = owner.authorized == true
 				and owner.start_committed == true
 			if settle_pull_task(code) ~= true then
-				Logger.error(LOG, "The Ollama pull of %s ended (code %s) but its task could not be settled.",
-					tostring(target_model), tostring(code))
+				-- The helper's own refusal line is the only trace of why it left no
+				-- retirement receipt (field run of 2026-10-30 20:47: nothing named it).
+				local helper_said = ""
+				local tail = pull_output .. sanitize_terminal_stream((stdout or "") .. (stderr or ""))
+				for line in tail:gmatch("[^\r\n]+") do
+					if line:match("%S") then helper_said = line end
+				end
+				Logger.error(LOG, "The Ollama pull of %s ended (code %s) but its task could not be settled; last output: %s.",
+					tostring(target_model), tostring(code),
+					helper_said ~= "" and helper_said:sub(1, 300) or "none")
 				owner.authorized = false
 				owner.completion_dispatching = false
 				complete_progress_ui(owner, false, target_model)
@@ -1745,6 +1776,17 @@ function M.new(deps, presets, ram_getter)
 				-- notice below says so: not an error window on top of it (#101). A
 				-- network report outranks it, as in the notice.
 				local requires_upgrade = network_report == nil and needs_ollama_upgrade(pull_output)
+				-- The worker's closing OUTCOME line only says that a row failed: the
+				-- class of that row and the stage it ended on are the cause (field run
+				-- 2026-11-01 logged "error_row" and nothing else).
+				local managed_error, managed_stage = nil, nil
+				for line in pull_output:gmatch("[^\r\n]+") do
+					managed_error = line:match("^OLLAMA_PULL_ERROR (%S+)") or managed_error
+					managed_stage = line:match("^OLLAMA_PULL_STATUS (%S+)") or managed_stage
+				end
+				if managed_error ~= nil then
+					last_line = string.format("OLLAMA_PULL_ERROR %s after %s", managed_error, tostring(managed_stage))
+				end
 				local pull_cause = last_line ~= "" and last_line:sub(1, 300) or "no output"
 				if requires_upgrade then
 					Logger.warn(LOG, "The Ollama pull of %s was refused: the installed Ollama is too old (code %s): %s.",
@@ -1754,7 +1796,12 @@ function M.new(deps, presets, ram_getter)
 						tostring(code), pull_cause)
 				end
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
-				
+				-- Ollama deletes a layer whose sha256 does not match before it
+				-- reports the mismatch, so one more pull downloads it afresh
+				-- (field run 2026-10-31: a fresh 366 MB layer failed its check).
+				local digest_mismatch = pull_output:find("OLLAMA_PULL_ERROR digest_mismatch", 1, true) ~= nil
+				local digest_retried = type(opts) == "table" and opts.digest_mismatch_retried == true
+
 				if network_report then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"),
 						i18n.get(network_report.message_key), "error")
@@ -1764,6 +1811,25 @@ function M.new(deps, presets, ram_getter)
 						i18n.get("ollama.upgrade_required_body"), "warning")
 				elseif connection_error then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.service_disconnected"), "error")
+					complete_progress_ui(owner, false, target_model)
+				elseif digest_mismatch and not digest_retried then
+					local retry_opts = {}
+					for key, value in pairs(type(opts) == "table" and opts or {}) do retry_opts[key] = value end
+					retry_opts.digest_mismatch_retried = true
+					opts = retry_opts
+					if do_retry() == true then
+						Logger.warn(LOG, "The Ollama pull of %s failed its digest check; Ollama removed the layer, so it is pulled once more.",
+							tostring(target_model))
+					else
+						Logger.error(LOG, "The Ollama pull of %s failed its digest check and its single retry could not start.",
+							tostring(target_model))
+						pcall(notifications.notify, i18n.get("ollama.fail_title"),
+							string.format(i18n.get("ollama.digest_mismatch"), target_model), "error")
+						complete_progress_ui(owner, false, target_model)
+					end
+				elseif digest_mismatch then
+					pcall(notifications.notify, i18n.get("ollama.fail_title"),
+						string.format(i18n.get("ollama.digest_mismatch"), target_model), "error")
 					complete_progress_ui(owner, false, target_model)
 				elseif pac_fallback then
 					-- Both causes: the PAC could not be used, then the direct try failed too.
@@ -1801,8 +1867,14 @@ function M.new(deps, presets, ram_getter)
 				for line in out:gmatch("([^\n]+)") do
 					if line:len() > 0 then last_line = line end
 				end
-				if last_line ~= "" then update_progress_ui(owner, 0, last_line) end
-				print("[Ollama Pull] " .. out)
+				-- The managed pull reports bytes, not a percent: the window
+				-- computes the percent, speed and time left from them
+				local done, total = last_pull_bytes(out)
+				local pct = done and (done * 100 / total) or 0
+				-- No print here: the console tee logged every chunk, about one each
+				-- 60 ms (1508 of a 4736-line field log, 2026-10-31); the window shows
+				-- the progress and the end-of-pull line names the last output
+				if last_line ~= "" then update_progress_ui(owner, pct, last_line, done, total) end
 			end
 			return true
 		end
@@ -2071,6 +2143,22 @@ function M.new(deps, presets, ram_getter)
 					return false
 				end
 				owner.start_committed = true
+				if managed_handle ~= nil then
+					-- A streaming task keeps stdin open after setInput, and the pull
+					-- owner reads its request to EOF: without this close it waited
+					-- its 30 s admission budget and refused (field run 2026-10-30 20:47).
+					local closed, result = pcall(function() return task:closeInput() end)
+					if not closed or result == nil or result == false then
+						Logger.error(LOG, "The managed Ollama pull's request input could not be closed: %s.",
+							tostring(result))
+						owner.authorized = false
+						owner.cancel_requested = true
+						cancel_current_pull()
+						complete_progress_ui(owner, false, target_model)
+						settle_cancel("managed_input_close_refused")
+						return false
+					end
+				end
 				local committed_chunks = pending_chunks
 				pending_chunks = {}
 				for _, chunk in ipairs(committed_chunks) do
@@ -2123,8 +2211,13 @@ function M.new(deps, presets, ram_getter)
 			end
 			return false
 		end
-		pcall(hs.urlevent.openURL, OllamaBinary.DOWNLOAD_PAGE_URL)
-		pcall(notifications.notify, i18n.get("ollama.not_detected_title"), i18n.get("ollama.not_detected_body"), "warning")
+		-- Only Ergopti's own runtime is ever used: the notice carries the click
+		-- that offers its install, never the stock Ollama download page
+		-- (owned-runtimes row "Ollama", PIN).
+		local ok, err = pcall(function()
+			return require("ui.menu.menu_llm.runtime_install_offer").notify_if_missing("ollama")
+		end)
+		if not ok then Logger.error(LOG, "The missing Ollama runtime notice raised: %s.", tostring(err)) end
 		return false
 	end
 

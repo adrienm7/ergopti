@@ -311,7 +311,7 @@ _MAOG_Case(Mode) {
 	World.Action := _MAOG_Act.Bind(World), Deadline := _MAOG_Deadline.Bind(World)
 	Monitor := _MAOG_Shown.Bind(World), CommandMonitor := _MAOG_Command.Bind(World), Timer := (*) => 0
 	Owned := false, Installed := false, Primary := 0, CleanupError := 0, Hooked := false, CommandHooked := false
-	Original := '{"audit.exe":"productive"}' . "`n"
+	Original := '{"audit.exe":{"type":"productive","score":0}}' . "`n"
 	try {
 		AssertFalse(A_IsSuspended, "native UI controls cannot borrow a suspended driver's admission")
 		AssertTrue(SavedCategory.Get("write_owner", 0) is Integer && SavedCategory.Get("write_owner", 0) == 0)

@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 
-helpers.describe("modules/shortcuts/manager.lua", function()
+helpers.describe("modules.shortcuts.manager", function()
 
   -- ==========================================================================
   -- 1. Module structural
@@ -242,10 +242,8 @@ helpers.describe("modules/shortcuts/manager.lua", function()
   end)
 
   helpers.it("routes desktop interaction through portable adapters", function()
-	local path = helpers.driver_root() .. "/modules/shortcuts/manager.lua"
-	local file = assert(io.open(path, "r"))
-	local source = file:read("*a")
-	file:close()
+	-- modules/shortcuts/manager, selected by a declaration unique to it.
+	local source = assert(helpers.read_driver_unit("local function capture_text_destination("))
 	for _, forbidden in ipairs({ "xdotool", "xclip", "io.popen", "os.execute" }) do
 		helpers.assert_true(source:find(forbidden, 1, true) == nil,
 			"the shortcuts manager must not bypass adapters with " .. forbidden)
@@ -272,12 +270,12 @@ helpers.describe("modules/shortcuts/manager.lua", function()
   -- ==========================================================================
 
   helpers.it("menu_builder renders shortcuts section when context present", function()
-    local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
-    -- Asserted, not skipped. ui/menu/menu_builder.lua ships with this driver, so
+    local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
+    -- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
     -- "not available" can only mean it stopped loading — and the skip made that
     -- indistinguishable from a pass in six cases across three files.
     helpers.assert_true(ok_mb and menu_builder ~= nil,
-      "ui.menu.menu_builder must load: " .. tostring(menu_builder))
+      "ui.menu.builder must load: " .. tostring(menu_builder))
 
     M.enable()
     local items = menu_builder.build({
@@ -299,12 +297,12 @@ helpers.describe("modules/shortcuts/manager.lua", function()
   end)
 
   helpers.it("menu_builder handles nil shortcuts gracefully", function()
-    local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
-    -- Asserted, not skipped. ui/menu/menu_builder.lua ships with this driver, so
+    local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
+    -- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
     -- "not available" can only mean it stopped loading — and the skip made that
     -- indistinguishable from a pass in six cases across three files.
     helpers.assert_true(ok_mb and menu_builder ~= nil,
-      "ui.menu.menu_builder must load: " .. tostring(menu_builder))
+      "ui.menu.builder must load: " .. tostring(menu_builder))
 
     local items = menu_builder.build({
       _version  = "3.0.0",
@@ -410,7 +408,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 		for _, outcome in ipairs({ "committed", "false", "nil", "number", "throw" }) do
 			helpers.it("ties the real menu to durable master publication " .. outcome .. " from " .. tostring(initial), function()
 				with_master(initial, function(manager, path, source)
-					local builder = helpers.load_module("ui.menu.menu_builder")
+					local builder = helpers.load_module("ui.menu.builder")
 					local redraws, attempts, notices, releases = 0, 0, {}, 0
 					local tree = builder.build({ shortcuts = manager, _version = "9.9.9",
 						on_menu_changed = function() redraws = redraws + 1 end })
@@ -437,7 +435,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 					end
 					modal.run = function(callback) releases = releases + 1; return callback() end
 					os.execute = function(command)
-						if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+						if command:find("dialog_host.lua", 1, true) then notices[#notices + 1] = command; return 0 end
 						return execute(command)
 					end
 					local called, receipt = pcall(action)

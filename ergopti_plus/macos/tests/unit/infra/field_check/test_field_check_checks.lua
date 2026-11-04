@@ -16,7 +16,8 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
+local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths",
+	"platform.remap.lease_memory_snapshot" }
 
 --- Builds scripted ports; `world` records every command.
 --- @param overrides table|nil Fields replacing the defaults.
@@ -37,6 +38,8 @@ local function make_ports(overrides)
 			return { credit_source = "legacy", capture_loaded = false, ledger_drained = 0 }
 		end,
 		health_counts = function() return { lease = {}, ups_without_down = 0, downs_without_up = 0, stuck = 0 } end,
+		swallowed_keys = function() return 0 end,
+		deploy_facts = function() return nil end,
 		count_keys = function(_, callback) callback({ tap_running = true, presses = 10 }) end,
 		owned_readiness = function(callback)
 			callback({ unpinned = 6, source = false, helper_present = false, active = 0 })
@@ -108,6 +111,74 @@ helpers.describe("lease check", function()
 		helpers.assert_eq(steps.lease_failures.state, "fail")
 		helpers.assert_eq(steps.lease_failures.value, "3")
 		helpers.assert_eq(steps.key_losses.value, "3")
+		helpers.assert_eq(steps.lease_failure_kinds.state, "info")
+		helpers.assert_eq(steps.lease_failure_kinds.value, "pong:1+ready_timeout:2",
+			"the field run names which lease answers timed out (117/140)")
+	end)
+
+	helpers.it("fails on a key consumed and never delivered (lease-swallowed-keys)", function()
+		local ports, world = make_ports({ swallowed_keys = function() return 2 end })
+		world.existing[CLI] = true
+		world.outputs[CLI .. " --version"] = { 0, "16.0.0\n" }
+		local steps, result = run("lease", ports)
+		helpers.assert_eq(steps.swallowed_keys.state, "fail")
+		helpers.assert_eq(steps.swallowed_keys.value, "2")
+		helpers.assert_true(not result.passed, "a dropped letter the driver saw fails the lease check")
+		helpers.assert_eq(steps.lease_failure_kinds.value, "none")
+	end)
+
+	helpers.it("names the last karabiner.json write, size and time (lease-deploy-write)", function()
+		local ports, world = make_ports({ deploy_facts = function() return { bytes = 760832, write_ms = 41.6 } end })
+		world.existing[CLI] = true
+		local steps = run("lease", ports)
+		helpers.assert_eq(steps.deploy_write_ms.state, "info")
+		helpers.assert_eq(steps.deploy_write_ms.value, "42")
+		helpers.assert_eq(steps.deploy_kb.value, "743")
+		helpers.assert_eq(steps.deploy_fork_ms.value, "none", "a write without its fork share names none")
+		-- (lease-deploy-fork-share) the part of the write an asynchronous
+		-- publication could take off the main thread is named.
+		local forked = make_ports({ deploy_facts = function()
+			return { bytes = 760832, write_ms = 254.2, fork_ms = 181.6, forks = 1 }
+		end })
+		helpers.assert_eq(run("lease", forked).deploy_fork_ms.value, "182")
+		local quiet = make_ports()
+		helpers.assert_eq(run("lease", quiet).deploy_write_ms.value, "none", "no deploy this session is named")
+	end)
+
+	helpers.it("decides whether karabiner.json must shrink from its write time (lease-deploy-verdict)", function()
+		local hold = require("infra.main_thread_hold").COUNT_MS
+		local function verdict(write_ms)
+			local ports, world = make_ports({ deploy_facts = function() return { bytes = 760832, write_ms = write_ms } end })
+			world.existing[CLI] = true
+			return run("lease", ports).deploy_write_verdict
+		end
+		local short = verdict(41.6)
+		helpers.assert_eq(short.state, "pass")
+		helpers.assert_eq(short.value, "keep")
+		local long = verdict(hold)
+		helpers.assert_eq(long.state, "fail")
+		helpers.assert_eq(long.value, "shrink")
+		local quiet = run("lease", make_ports()).deploy_write_verdict
+		helpers.assert_eq(quiet.state, "info")
+		helpers.assert_eq(quiet.value, "none")
+	end)
+
+	helpers.it("names the free memory, for the starvation hypothesis (lease-memory-free)", function()
+		local ports, world = make_ports()
+		world.existing[CLI] = true
+		world.outputs[CLI .. " --version"] = { 0, "16.0.0\n" }
+		world.outputs["/usr/bin/memory_pressure"] = { 0,
+			"The system has 17179869184 (1048576 pages with a page size of 16384).\n"
+				.. "Pages free: 12345\nSystem-wide memory free percentage: 37%\n" }
+		local steps, result = run("lease", ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.memory_free_percent.state, "info")
+		helpers.assert_eq(steps.memory_free_percent.value, "37")
+		world.outputs["/usr/bin/memory_pressure"] = { nil, "" }
+		helpers.assert_eq(run("lease", ports).memory_free_percent.value, "timeout")
+		local no_cli = make_ports()
+		helpers.assert_eq(run("lease", no_cli).memory_free_percent.state, "info",
+			"the reading also runs when the command line tool is missing")
 	end)
 
 	-- Field run 2026-10-27 22:32: the check ran while this lifecycle's guardian
@@ -223,12 +294,63 @@ helpers.describe("owned runtime check", function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.field_check_checks"] = nil
 			local Checks = require("infra.field_check_checks")
-			helpers.assert_eq(Checks.parse_driver_state("nothing here\n"), "absent")
-			helpers.assert_eq(Checks.parse_driver_state("x org.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1/1) [activated waiting for user]"),
-				"activated_waiting_for_user")
-			helpers.assert_eq(Checks.parse_driver_state("org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"), "unknown")
 			helpers.assert_eq(Checks.parse_version("karabiner_cli 16.0.0 (x)"), "16.0.0")
 		end)
+	end)
+
+	--- Runs the check over one driver listing and one pinned driver version.
+	--- @param code integer|nil systemextensionsctl exit status.
+	--- @param listing string Its output.
+	--- @param pinned string|nil Manifest version of the driver.
+	--- @return table steps
+	local function driver_steps(code, listing, pinned)
+		local ports, world = make_ports({ owned_readiness = function(callback)
+			callback({ unpinned = 6, source = false, helper_present = false, active = 0, virtual_hid_version = pinned })
+		end })
+		world.outputs["/usr/bin/systemextensionsctl list"] = { code, listing }
+		return (run("owned_runtime", ports))
+	end
+
+	local HEADER = "1 extension(s)\n--- com.apple.system_extension.driver_extension\n"
+		.. "enabled\tactive\tteamID\tbundleID (version)\tname\t[state]\n"
+	local function line(flags, team, version, state)
+		return flags .. "\t" .. team .. "\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice (" .. version .. "/" .. version
+			.. ")\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice\t[" .. state .. "]\n"
+	end
+
+	-- (field-driver-owner-parser) The check once read the first listed copy with its
+	-- own parser, so an older copy macOS keeps until reboot hid the active driver
+	-- the owner's admission reads.
+	helpers.it("reads the active driver the owner reads, not an older listed copy", function()
+		local listing = HEADER .. line("\t", "G43BCU2T37", "5.0.0", "terminated waiting to uninstall on reboot")
+			.. line("*\t*", "G43BCU2T37", "8.5.0", "activated enabled")
+		local steps = driver_steps(0, listing, "8.5.0")
+		helpers.assert_eq(steps.driver_state.value, "activated_enabled")
+		helpers.assert_eq(steps.driver_verdict.value, "compatible")
+		helpers.assert_eq(steps.driver_verdict.state, "info")
+	end)
+
+	helpers.it("names the owner's refusal of the installed driver", function()
+		local function verdict(code, listing, pinned) return driver_steps(code, listing, pinned).driver_verdict.value end
+		helpers.assert_eq(verdict(0, HEADER .. line("*\t*", "G43BCU2T37", "1.8.0", "activated enabled"), "8.5.0"),
+			"virtual_hid_incompatible")
+		helpers.assert_eq(verdict(0, HEADER .. line("*\t*", "ABCDEFGHIJ", "8.5.0", "activated enabled"), "8.5.0"),
+			"virtual_hid_incompatible")
+		helpers.assert_eq(verdict(0, HEADER .. line("*\t", "G43BCU2T37", "8.5.0", "activated waiting for user"), "8.5.0"),
+			"virtual_hid_not_active")
+		helpers.assert_eq(verdict(0, "0 extension(s)\n", "8.5.0"), "virtual_hid_absent")
+		helpers.assert_eq(verdict(0, "garbage\n", "8.5.0"), "virtual_hid_unreadable")
+		helpers.assert_eq(verdict(1, "", "8.5.0"), "unreadable")
+		helpers.assert_eq(verdict(0, HEADER .. line("*\t*", "G43BCU2T37", "8.5.0", "activated enabled"), nil),
+			"unpinned")
+	end)
+
+	helpers.it("reports the driver listing state in the owner's words", function()
+		helpers.assert_eq(driver_steps(0, "0 extension(s)\n", "8.5.0").driver_state.value, "absent")
+		helpers.assert_eq(driver_steps(0, "garbage\n", "8.5.0").driver_state.value, "unreadable")
+		helpers.assert_eq(driver_steps(nil, "", "8.5.0").driver_state.value, "unreadable")
+		helpers.assert_eq(driver_steps(0, HEADER .. line("*\t", "G43BCU2T37", "8.5.0", "activated waiting for user"),
+			"8.5.0").driver_state.value, "activated_waiting_for_user")
 	end)
 end)
 
@@ -280,6 +402,7 @@ helpers.describe("field check commands are read-only", function()
 			["/usr/bin/systemextensionsctl list"] = true,
 			["/usr/bin/pgrep -f org.pqrs/Karabiner"] = true,
 			["/usr/bin/pgrep -f ErgoptiPlus/Runtime"] = true,
+			["/usr/bin/memory_pressure "] = true,
 		}
 		helpers.assert_true(#world.commands >= 5)
 		for _, command in ipairs(world.commands) do

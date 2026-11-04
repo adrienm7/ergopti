@@ -97,7 +97,7 @@ helpers.describe("storage concurrent backup ownership", function()
 				end,
 			}
 			local ok, err = xpcall(function()
-				local mover = assert(loadfile("infra/no_replace_move.lua"))()
+				local mover = helpers.fresh_module("infra.no_replace_move")
 				local moved, failure = mover.move("source", "backup")
 				helpers.assert_eq(moved, result == "success")
 				local expected_failure

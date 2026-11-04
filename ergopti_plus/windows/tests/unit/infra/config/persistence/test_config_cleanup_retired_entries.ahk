@@ -50,7 +50,7 @@ _CUK_RetiredPrefixActualCleanup() {
 		. "[AHK.layout]`n" . 'keep = "case"' . "`n`n"
 		. "[future_extension]`nkeep = 42 # preserve exact comment`n"
 	Source := Retired . Kept
-	Expected := Chr(0xFEFF) . "# Retired namespace preview.`n`n`n`n`n" . Kept
+	Expected := "# Retired namespace preview.`n`n`n`n`n" . Kept
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
 		_CUK_AdmitCurrentSource(Path)
@@ -90,7 +90,7 @@ _CUK_RetiredEmptyTablesActualCleanup() {
 	Folder := _CUK_RetiredNewDir()
 	Path := Folder . "\config.toml"
 	Source := "[ahk]`n`n[ahk.empty]`n`n[updater]`n" . 'channel = "stable"' . "`n" . _CUK_CurrentMetadata()
-	Expected := Chr(0xFEFF) . "`n`n[updater]`n" . 'channel = "stable"' . "`n" . _CUK_CurrentMetadata()
+	Expected := "`n`n[updater]`n" . 'channel = "stable"' . "`n" . _CUK_CurrentMetadata()
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
 		_CUK_AdmitCurrentSource(Path)
@@ -119,6 +119,26 @@ _CUK_RetiredEmptyTablesActualCleanup() {
 }
 Test("config cleanup: empty retired tables use real preview backup and semantic deletion "
 	. "(config-retired-explicit-cleanup)", _CUK_RetiredEmptyTablesActualCleanup)
+
+; The writer keeps the source's byte order mark and adds none: the source decides.
+_CUK_RetiredCleanupKeepsSourceBom() {
+	Folder := _CUK_RetiredNewDir()
+	Path := Folder . "\config.toml"
+	Kept := "`n`n[updater]`n" . 'channel = "stable"' . "`n" . _CUK_CurrentMetadata()
+	Source := Chr(0xFEFF) . "[ahk]`n`n[ahk.empty]" . Kept
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual("ahk.=section|ahk.empty.=section", _CUK_Join(_CUK_Ids(Rows)))
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000201", 0, 0, Source)
+		AssertEqual("removed", Result["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Result["backup"]))
+		AssertEqual(Chr(0xFEFF) . Kept, FSReadUtf8Exact(Path), "a source with a byte order mark keeps it")
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: retired tables leave a source's byte order mark in place (config-retired-explicit-cleanup)",
+	_CUK_RetiredCleanupKeepsSourceBom)
 
 _CUK_RetiredEmptyTableCannotOwnLateChild(ChildSource) {
 	Folder := _CUK_RetiredNewDir()

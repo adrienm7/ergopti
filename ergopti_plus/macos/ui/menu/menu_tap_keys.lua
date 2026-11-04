@@ -20,6 +20,7 @@ local M = {}
 local ParameterLabel = require("action_parameter_label")
 
 local i18n              = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local Logger            = require("infra.logger")
 local DeferredWork      = require("infra.deferred_work")
 local InputSourceBroker = require("adapters.input_source_broker")
@@ -37,6 +38,8 @@ local SUBSCRIBER_ID = "menu.tap_keys"
 -- The latest menu rebuild function, read by the input-source callback.
 local _update_menu = nil
 local _subscribed = false
+-- What the last rendered rows depend on: the input source and the key names.
+local _rendered_signature = nil
 
 
 
@@ -114,13 +117,32 @@ end
 -- ==========================================
 -- ==========================================
 
+--- Identifies what the rendered menu shows of the input source: its id (the
+--- layout submenu ticks it) and the character each tap key types.
+--- @return string signature
+local function input_source_signature()
+	local ok, source_id = pcall(hs.keycodes.currentSourceID)
+	local parts = { ok and tostring(source_id) or "?" }
+	for _, key in ipairs(TapKeys.keys()) do parts[#parts + 1] = TapKeys.display_name(key.id, i18n) end
+	return table.concat(parts, "\0")
+end
+
 --- Rebuilds the menu when the input source changes, so the key names follow it.
---- Subscribed once; the callback reads the latest rebuild function.
+--- macOS also notifies without a change: the 2026-10-30 field report shows 26
+--- notifications in 3.5 min all naming the same layout, and each one rebuilt
+--- the whole menu (300 to 650 ms on the main thread). Only a change of what the
+--- menu shows asks for a rebuild. Subscribed once; the callback reads the
+--- latest rebuild function.
 local function watch_input_source()
 	if _subscribed then return end
 	Logger.start(LOG, "Watching input-source changes for the tap-key names…")
 	local ok = InputSourceBroker.subscribe(SUBSCRIBER_ID, function()
-		if type(_update_menu) == "function" then _update_menu() end
+		if type(_update_menu) ~= "function" then return end
+		if _rendered_signature ~= nil and input_source_signature() == _rendered_signature then
+			Logger.debug(LOG, "Input-source notification without a visible change — menu kept.")
+			return
+		end
+		_update_menu()
 	end)
 	if ok ~= true then
 		Logger.error(LOG, "Input-source watch refused — tap-key names refresh on the next menu build only.")
@@ -144,6 +166,7 @@ function M.provide_rows(ctx, disabled)
 	_update_menu = ctx.updateMenu
 	watch_input_source()
 	TapKeys.ensure_loaded(gestures.is_assignable)
+	_rendered_signature = input_source_signature()
 	local rows = {}
 	for _, key in ipairs(TapKeys.keys()) do
 		local action = TapKeys.get_action(key.id)
@@ -152,7 +175,7 @@ function M.provide_rows(ctx, disabled)
 		action_label = ParameterLabel.for_binding(action_label, gestures, TapKeys.binding_id(key.id), action)
 		local name = TapKeys.display_name(key.id, i18n)
 		rows[#rows + 1] = {
-			label    = name .. " : " .. action_label,
+			label    = LabelValue.compose(i18n.get, name, action_label),
 			disabled = disabled or nil,
 			action   = function() choose_action_for(key.id, name, ctx) end,
 		}

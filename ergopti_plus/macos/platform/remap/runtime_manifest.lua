@@ -9,11 +9,13 @@
 --- it must start. Pure data checks; no file is read here.
 ---
 --- FEATURES & RATIONALE:
---- 1. Unpinned Is A Named Refusal: the digest of the runtime tarball and the
----    designated requirement exist only after the hosted build produced and
----    signed the artifact. Until then every one of those fields is null and the
----    verdict names the first missing path, so the owner reports
----    `artifact_unpinned` with a sentence instead of guessing a version.
+--- 1. Unpinned Is A Named Refusal: the digest of the runtime tarball exists
+---    only after the hosted build produced and signed the artifact. Until then
+---    those fields are null and the verdict names the first missing path, so
+---    the owner reports `artifact_unpinned` with a sentence instead of guessing
+---    a version. The capture requirement is the launcher's designated
+---    requirement under the stable signing identity, pinned from a release
+---    build log.
 --- 2. One Field List: M.FIELDS is the single list of what a complete pin
 ---    contains. The build gate (tools/test/test-remap-runtime-manifest.cjs)
 ---    reads this list from this file, so the gate and the runtime cannot
@@ -128,6 +130,19 @@ function M.pinned(manifest)
 			history_capacity = manifest.capture.history_capacity,
 		},
 	}
+end
+
+--- The VirtualHIDDevice version the manifest pins, before the runtime itself is
+--- built. The driver group is pinned from the pqrs release alone, so the field
+--- check can judge the installed driver with the owner's own verdict while the
+--- runtime and the capture requirement still wait for the hosted build.
+--- @param manifest any Decoded manifest.
+--- @return string|nil version Nil unless every virtual_hid_device field is pinned.
+function M.virtual_hid_version(manifest)
+	for _, path in ipairs(M.unpinned(manifest)) do
+		if path:find("^virtual_hid_device%.") then return nil end
+	end
+	return manifest.virtual_hid_device.version
 end
 
 return M

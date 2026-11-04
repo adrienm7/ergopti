@@ -411,7 +411,6 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			end,
 		}
 		package.loaded["ui.menu.menu_llm.menu_layout"] = {
-			row_ids = function() return {} end,
 			row_disabled = function() return false end,
 			title_health_dot = function() return nil end,
 		}

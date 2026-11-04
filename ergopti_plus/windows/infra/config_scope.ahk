@@ -9,6 +9,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_shared\ahk\config_obsolete_parents.ahk
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 /**
  * Starts one scoped configuration transition without claiming reload completion.
@@ -27,7 +28,7 @@ ConfigScopeApply(ScopeId, Mode, Providers, Options := unset) {
 	Plan := ManifestScopePlan(ScopeId, Mode, [], Owners)
 	PresetOwner := Options.Get("preset_owner", 0)
 	if Plan.presets.Length {
-		if !(PresetOwner is TapHoldScopeOwner) || ScopeId != "tap_holds"
+		if !(PresetOwner is TapHoldScopeOwner) || ScopeId != ConfigLeaf.TAP_HOLDS
 				|| Plan.presets.Length != 1 || Plan.presets[1].preset != "tap_hold"
 				|| PresetOwner.mode != Mode
 			throw ValueError("This scope requires its matching separate-file preset owner.")
@@ -252,7 +253,7 @@ ConfigFullSnapshotCaptureObsoleteSource(Source) {
 		Meta := Snapshot.Document["_meta"]
 		if !(Meta is Map)
 			throw TypeError("The full configuration schema metadata is not a table.")
-		if Meta.Has("schema_version") {
+		if Meta.Has(ConfigLeaf.SCHEMA_VERSION) {
 			Outcome := ConfigMigrateClassify(Snapshot.Document, ConfigMigrateShippedRegistry(), &Version)
 			if Outcome != "current"
 				throw Error("The full configuration schema stamp is not current: " . Outcome)
@@ -337,6 +338,6 @@ ConfigScopeActionParameterPaths() {
 ConfigScopeMenuCommands(ScopeId, Providers, Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
-		"scope_restore", (*) => ConfigScopeApply(ScopeId, "recommended", Providers, OwnedOptions),
-		"scope_clear", (*) => ConfigScopeApply(ScopeId, "clear", Providers, OwnedOptions))
+		MenuCommand.SCOPE_RESTORE, (*) => ConfigScopeApply(ScopeId, "recommended", Providers, OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => ConfigScopeApply(ScopeId, "clear", Providers, OwnedOptions))
 }

@@ -168,7 +168,7 @@ local function install_subject_stubs(native)
 		pause_warmup = function() return true end,
 		resume_warmup = function() return true end,
 	}
-	package.loaded["modules.llm.mlx_deps_checker"] = {}
+	package.loaded["modules.llm.mlx_deps_checker"] = { import_probe = require("tests.support.modules.llm.mlx_import_probe").read }
 	package.loaded["modules.llm"] = {
 		BUILTIN_PROFILES = {},
 		DEFAULT_STATE = { llm_num_predictions = 1 },

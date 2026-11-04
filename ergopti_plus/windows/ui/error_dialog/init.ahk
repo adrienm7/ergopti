@@ -41,7 +41,7 @@ global ED_HOST_ACCESS_ALLOW := 1
 
 ; The Debug menu setting, as the features manifest declares it
 global ED_SETTING_SECTION := "script"
-global ED_SETTING_KEY     := "show_error_dialog"
+global ED_SETTING_KEY     := ConfigLeaf.SHOW_ERROR_DIALOG
 
 ; How often a window decided during boot checks again whether the driver is ready
 global ED_BOOT_RETRY_MS := 500
@@ -229,7 +229,7 @@ _ErrorDialog_PushFolded(Epoch) {
 ; ===============================
 
 ; The report of one error, from the diagnostics snapshot.
-; @param Record {Map} { kind, module, message, time, log_path?, open_id? }
+; @param Record {Map} { kind, module, message, time }
 ; @param SnapshotFn {Func} Snapshot collector; tests supply an inert producer.
 ; @returns {Map} { report, snapshot, paths, config, log_path, open_id }
 _ErrorDialog_BuildReport(Record, SnapshotFn := HealthCheck_Run) {
@@ -257,10 +257,6 @@ _ErrorDialog_BuildReport(Record, SnapshotFn := HealthCheck_Run) {
 		"message", Record["message"], "time", Record["time"], "recent", Recent), Identity)
 	Paths := Sections.Get("paths", Map()).Clone()
 	OpenId := "errors_today"
-	if (Record["kind"] == "crash") {
-		OpenId := "crash_report"
-		Paths["crash_report"] := Record["log_path"]
-	}
 	if !Paths.Has(OpenId) || (Paths[OpenId] == "")
 		throw Error("The file this error is logged in is unknown.")
 	return Map("report", Report, "snapshot", Snapshot, "paths", Paths, "config", Config, "log_path", Paths[OpenId], "open_id", OpenId)

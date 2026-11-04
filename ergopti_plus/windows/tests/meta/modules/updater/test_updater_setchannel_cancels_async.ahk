@@ -125,16 +125,29 @@ Test("updater AHK-31: deferred Reload requires full quiescence and recovery (upd
 	_USCA_DeferredReloadRequiresFullQuiescence)
 
 _USCA_ChannelEpochRejectsABA() {
-	Builder := _DriverFuncBody("_Updater_NewRequestContext")
-	Validator := _DriverFuncBody("_Updater_RequestContextValid")
-	Policy := _DriverFuncBody("_Updater_RequestPolicy")
-	Assert(InStr(Builder, "Channel:") > 0 and InStr(Builder, "ChannelEpoch:") > 0
-		and InStr(Validator, 'HasProp("Channel")') > 0
-		and InStr(Validator, 'HasProp("ChannelEpoch")') > 0
-		and InStr(Policy, "Request.ChannelEpoch != _UpdaterChannelEpoch") > 0,
-		"immutable channel identity plus monotone epoch must reject main-dev-main ABA work")
+	global _UpdaterChannelEpoch, UPDATER_CHANNEL
+	global UPDATER_REQUEST_ORIGIN_MANUAL, UPDATER_REQUEST_POLICY_ALLOW, UPDATER_REQUEST_POLICY_DROP
+	SavedEpoch := _UpdaterChannelEpoch
+	SavedChannel := UPDATER_CHANNEL
+	try {
+		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false, "main")
+		AssertTrue(_Updater_RequestContextValid(Request), "a new request carries a valid channel identity")
+		AssertEqual(UPDATER_REQUEST_POLICY_ALLOW, _Updater_RequestPolicy(Request, false),
+			"a request of the current epoch is allowed")
+		; main -> dev -> main: the channel text matches again, the epoch does not.
+		_UpdaterChannelEpoch += 2
+		AssertEqual("main", Request.Channel, "the request keeps the channel it was born on")
+		AssertEqual(UPDATER_REQUEST_POLICY_DROP, _Updater_RequestPolicy(Request, false),
+			"immutable channel identity plus monotone epoch must reject main-dev-main ABA work")
+		Malformed := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false, "main")
+		Malformed.DeleteProp("ChannelEpoch")
+		AssertFalse(_Updater_RequestContextValid(Malformed), "a request without its epoch is invalid")
+	} finally {
+		_UpdaterChannelEpoch := SavedEpoch
+		UPDATER_CHANNEL := SavedChannel
+	}
 }
-Test("updater AHK-31: request provenance owns channel epoch (updater-channel-replacement-transaction)",
+Test("updater AHK-31: request provenance owns channel epoch (updater-admission-behaviour)",
 	_USCA_ChannelEpochRejectsABA)
 
 _USCA_BackgroundTimerUsesExactOwnerEpoch() {
@@ -219,14 +232,26 @@ Test("updater AHK-31: recovery handoff is atomic and class-wide (updater-channel
 	_USCA_RecoveryHandoffIsAtomicAndClassWide)
 
 _USCA_ActionAdmissionIsExclusive() {
-	Acquire := _DriverFuncBody("_Updater_AcquireAsyncActionLease")
-	BeginBoundary := _DriverFuncBody("_Updater_BeginAsyncAdmissionBoundary")
-	Assert(Acquire != "" and BeginBoundary != "",
-		"action and channel admission helpers must remain defined")
-	Assert(InStr(Acquire, "_UpdaterAsyncActionLeases.Count > 0") > 0,
-		"a second updater action must be refused while an exact sibling lease is live")
-	Assert(InStr(BeginBoundary, "_UpdaterAsyncActionLeases.Count == 0") > 0,
-		"channel admission must be mutually exclusive with every updater action lease")
+	First := _Updater_AcquireAsyncActionLease("first action")
+	AssertTrue(IsObject(First), "an idle updater admits an action")
+	Boundary := 0
+	try {
+		AssertFalse(IsObject(_Updater_AcquireAsyncActionLease("second action")),
+			"a second updater action must be refused while an exact sibling lease is live")
+		AssertEqual(0, _Updater_BeginAsyncAdmissionBoundary("channel switch"),
+			"channel admission must be mutually exclusive with every updater action lease")
+		AssertTrue(_Updater_ReleaseAsyncActionLease(First), "the exact owner releases its lease")
+		First := 0
+		Boundary := _Updater_BeginAsyncAdmissionBoundary("channel switch")
+		AssertTrue(IsObject(Boundary), "a released lease lets the channel boundary in")
+		AssertFalse(IsObject(_Updater_AcquireAsyncActionLease("late action")),
+			"no action is admitted while the channel boundary is open")
+	} finally {
+		if IsObject(First)
+			_Updater_ReleaseAsyncActionLease(First)
+		if IsObject(Boundary)
+			_Updater_EndAsyncAdmissionBoundary(Boundary)
+	}
 }
-Test("updater AHK-31: updater action admission is exclusive (updater-channel-replacement-transaction)",
+Test("updater AHK-31: updater action admission is exclusive (updater-admission-behaviour)",
 	_USCA_ActionAdmissionIsExclusive)

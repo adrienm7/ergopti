@@ -39,6 +39,8 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "diagnostics"))
 		helpers.assert_true(position(state.events, "layout.publish") < position(state.events, "boot.complete"))
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "hook.pump"))
+		-- (linux-reload-budget) The Reload this boot ends is measured to its completion.
+		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "reload.complete"))
 		helpers.assert_eq(state.pumps, 1)
 		helpers.assert_eq(state.pump_services, true)
 		helpers.assert_eq(state.loop_after_complete, false)
@@ -47,6 +49,8 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_eq(state.driver_control and state.driver_control.pid, 4242)
 		helpers.assert_type(state.driver_control.reload, "function")
 		helpers.assert_type(state.callbacks.on_usr1, "function")
+		-- The collector's field run session starts with the daemon's own pid.
+		helpers.assert_eq(state.field_run and state.field_run.pid, 4242)
 	end)
 	helpers.it("(signal-census) the E2E children expect every native signal Main installs", function()
 		-- The E2E children count the active libuv signal handles before playing a
@@ -1152,7 +1156,7 @@ helpers.describe("native signal owner", function()
 			if options.missing then error("explicit missing native dependency") end
 			return uv
 		end }, { __index = _G })
-		local path = helpers.driver_root() .. "/infra/signal_handlers.lua"
+		local path = assert(package.searchpath("infra.signal_handlers", package.path))
 		local chunk = assert(loadfile(path))
 		if setfenv then setfenv(chunk, env) else chunk = assert(loadfile(path, "t", env)) end
 		local owner = chunk()
@@ -1527,6 +1531,8 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 			modules[name] = {}
 		end
 		modules["infra.session_lock"] = { protect = function() return true end }
+		-- Main lets config.toml's [script] rows win before the error window starts.
+		modules["infra.script_scope"] = { adopt_configured = function() return {} end }
 		-- Main writes a pre-sink fatal record only when startup is refused.
 		modules["infra.bootstrap_log"] = { append = function(reason) error("isolated Main must not refuse startup: " .. tostring(reason)) end }
 		modules["compat.utf8"] = { install = function() return false end }

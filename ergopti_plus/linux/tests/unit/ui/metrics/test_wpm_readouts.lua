@@ -368,6 +368,17 @@ local function with_storage(initial, body)
 	if not ok then error(err, 0) end
 end
 
+--- A stored choice of the compact pill, merged into extra stored values. The
+--- graph ships on (decision of 2026-11-03), so a test measuring the compact pill
+--- states that choice instead of relying on the default.
+--- @param extra table|nil Further stored values.
+--- @return table initial
+local function compact(extra)
+	local initial = { ["metrics.wpm_widget_graph"] = false }
+	for key, value in pairs(extra or {}) do initial[key] = value end
+	return initial
+end
+
 helpers.describe("wpm readouts: the floating widget", function()
 	helpers.it("refuses native hide before changing the persisted visibility", function()
 		with_storage({}, function(_, preferences)
@@ -385,10 +396,11 @@ helpers.describe("wpm readouts: the floating widget", function()
 	end)
 
 	helpers.it("captures and reapplies its exact frame without preference writes", function()
-		with_storage({}, function(_, preferences)
+		with_storage(compact(), function(_, preferences)
 			local Widget = require("ui.wpm.widget")
 			local surface = fake_surface()
 			Widget._set_surface(surface)
+			Widget.restore()
 			helpers.assert_true(Widget.start())
 			Widget.tick(stats(42), 10)
 			local before = Widget.configuration_snapshot()
@@ -406,10 +418,11 @@ helpers.describe("wpm readouts: the floating widget", function()
 	end)
 
 	helpers.it("draws the pill in the bottom-right corner while the user types", function()
-		with_storage({}, function()
+		with_storage(compact(), function()
 			local Widget = require("ui.wpm.widget")
 			local surface = fake_surface()
 			Widget._set_surface(surface)
+			Widget.restore()
 			helpers.assert_true(Widget.start())
 			Widget.tick(stats(42), 10)
 			helpers.assert_eq(#surface.draws, 1, "the widget really asks for a drawing")
@@ -449,10 +462,11 @@ helpers.describe("wpm readouts: the floating widget", function()
 	end)
 
 	helpers.it("keeps the place the user drags it to, across a restart", function()
-		with_storage({}, function(store)
+		with_storage(compact(), function(store)
 			local Widget = require("ui.wpm.widget")
 			local surface = fake_surface()
 			Widget._set_surface(surface)
+			Widget.restore()
 			Widget.start()
 			Widget.tick(stats(42), 10)
 			surface.moved(640, 360)
@@ -473,7 +487,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 
 	for _, operation in ipairs({ "drag", "reset" }) do
 		helpers.it("keeps the complete WPM position when the second scalar " .. operation .. " publication refuses", function()
-			with_storage({ ["wpm_widget.pos_x"] = "120", ["wpm_widget.pos_y"] = "180" }, function(store)
+			with_storage(compact({ ["wpm_widget.pos_x"] = "120", ["wpm_widget.pos_y"] = "180" }), function(store)
 				local Widget = require("ui.wpm.widget")
 				local surface = fake_surface()
 				Widget._set_surface(surface)
@@ -517,7 +531,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 
 	for _, refusal in ipairs({ "false", "throw", "missing" }) do
 		helpers.it("keeps both saved WPM coordinates after a " .. refusal .. " batch refusal", function()
-			with_storage({ ["wpm_widget.pos_x"] = "120", ["wpm_widget.pos_y"] = "180" }, function(store)
+			with_storage(compact({ ["wpm_widget.pos_x"] = "120", ["wpm_widget.pos_y"] = "180" }), function(store)
 				local Widget = require("ui.wpm.widget")
 				local surface = fake_surface()
 				Widget._set_surface(surface)
@@ -545,15 +559,24 @@ helpers.describe("wpm readouts: the floating widget", function()
 	end
 
 	helpers.it("draws the graph in graph mode, and keeps that choice", function()
-		with_storage({}, function(_, preferences)
+		with_storage(compact(), function()
 			local Widget = require("ui.wpm.widget")
 			local surface = fake_surface()
 			Widget._set_surface(surface)
+			Widget.restore()
 			Widget.start()
 			helpers.assert_true(Widget.set_graph(true))
 			Widget.tick(stats(42), 10)
 			helpers.assert_eq(surface.draws[1].frame.mode, "graph")
-			helpers.assert_eq(preferences.get("metrics.wpm_widget_graph"), true)
+			-- The choice survives a restart, whether stored or now the default.
+			package.loaded["ui.wpm.widget"] = nil
+			local Restarted = require("ui.wpm.widget")
+			local again = fake_surface()
+			Restarted._set_surface(again)
+			Restarted.restore()
+			Restarted.start()
+			Restarted.tick(stats(42), 20)
+			helpers.assert_eq(again.draws[1].frame.mode, "graph")
 		end)
 	end)
 

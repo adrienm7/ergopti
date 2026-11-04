@@ -327,6 +327,33 @@ _HPLS_DispatchAttributesOneEventInEight() {
 Test("hook dispatcher: one dispatch in eight attributes its time to each named subscriber (hook-subscriber-sampling)",
 	_HPLS_DispatchAttributesOneEventInEight)
 
+; The boot's save is recorded early and written after the ready line, whether or
+; not _DriverReady has already been raised: it stalled the boot's last pump.
+_HPLS_BootTailKeepsTheSaveWaiting() {
+	global _DriverReady, _DriverBootTailPending, CONFIG_SAVE_DEFERRED
+	Counts := _PerfCountersOwner().Counts
+	Admissions := Counts.Get("config_io.full_state_can_persist", 0)
+	Deferred := Counts.Get("config_io.save_retry_deferred_boot_tail", 0)
+	Coordinator := _ConfigFullSaveCoordinator()
+	SavedReady := IsSet(_DriverReady) ? _DriverReady : false
+	SavedTail := IsSet(_DriverBootTailPending) ? _DriverBootTailPending : unset
+	try {
+		_DriverReady := true, _DriverBootTailPending := true
+		AssertEqual(CONFIG_SAVE_DEFERRED, SaveFullConfig(0, (*) => true, false), "a ready driver in its boot tail still waits")
+		AssertEqual(Admissions, Counts.Get("config_io.full_state_can_persist", 0), "and pays no admission")
+		AssertEqual(Deferred + 1, Counts.Get("config_io.save_retry_deferred_boot_tail", 0))
+		_DriverBootTailPending := false
+		SaveFullConfig(0, (*) => true, false)
+		AssertEqual(Deferred + 1, Counts.Get("config_io.save_retry_deferred_boot_tail", 0), "after the ready line the save proceeds")
+		Assert(Counts.Get("config_io.full_state_can_persist", 0) > Admissions, "and reaches its admission")
+	} finally {
+		_DriverReady := SavedReady
+		_DriverBootTailPending := IsSet(SavedTail) ? SavedTail : unset
+		_ConfigFullSaveCoordinator(Coordinator)
+	}
+}
+Test("config full save: the boot's save waits for the ready line (boot-save-after-ready)", _HPLS_BootTailKeepsTheSaveWaiting)
+
 _HPLS_PreReadyRetryDoesNotPayAdmission() {
 	global _DriverReady, CONFIG_SAVE_DEFERRED
 	Counts := _PerfCountersOwner().Counts

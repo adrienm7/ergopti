@@ -57,8 +57,12 @@ local EMPTY_NGRAMS_JSON = PacedJson.encode({
 local _manifest = nil
 
 --- Cached n-gram histories, most recent first:
---- { key, start, through, fingerprint, data, json }.
+--- { key, start, through, fingerprint, data, json, serial }.
 local _ranges = {}
+
+--- Last serial given to an encoded history. Never reset, so a serial a page
+--- still holds can never name a history encoded after a reset.
+local _history_serial = 0
 
 
 
@@ -210,15 +214,20 @@ function M.session(reader, sqlite_path, today, pacer)
 	--- @param start_date string|nil Inclusive lower bound.
 	--- @param end_date string|nil Inclusive upper bound.
 	--- @param apps table|nil Requested apps.
+	--- @param held_serial integer|false|nil Serial of the history the page holds;
+	---     false for a payload saved to disk, which must name no serial: serials
+	---     restart with the process, so a saved one could name another history.
 	--- @return string json Encoded { historical, today }, plus `"incomplete":true`
-	---     when a read missed rows.
+	---     when a read missed rows. A cached history carries `historical_serial`;
+	---     when it equals `held_serial`, `"historical_reused":true` replaces it.
 	--- @return boolean range_complete All requested historical and today reads succeeded.
-	function session.range(start_date, end_date, apps)
+	function session.range(start_date, end_date, apps, held_serial)
 		if start_date == "" then start_date = nil end
 		if end_date == "" then end_date = nil end
 		local through = reader.split_bounds(start_date, end_date, today).historical_end
 		local historical_json = EMPTY_NGRAMS_JSON
 		local history_complete = true
+		local serial = nil
 		if not start_date or start_date <= through then
 			local open_ended = through == yesterday
 			local key = range_key(start_date, open_ended, through, apps)
@@ -229,14 +238,15 @@ function M.session(reader, sqlite_path, today, pacer)
 			-- pause cannot leave merged days under the previous watermark.
 			local data, json
 			if still_valid(cached, through) then
-				data, json = cached.data, cached.json
+				data, json, serial = cached.data, cached.json, cached.serial
 				if cached.through < through then
+					serial = nil
 					local added
 					added, history_complete = reader.read_ngrams(
 						sqlite_path, reader.next_day(cached.through), through, apps, pacer)
 					-- Merged into a copy: a refused day cannot alter the accepted
 					-- history or its watermark, yet its partial counts are shown.
-					data = reader.merge_ngrams(reader.merge_ngrams({}, cached.data), added)
+					data = reader.merge_ngrams(reader.merge_ngrams({}, cached.data, pacer), added, pacer)
 					json = PacedJson.encode(data, pacer)
 					if history_complete == true then
 						Logger.info(LOG, "N-gram history extended from %s to %s.", cached.through, through)
@@ -248,25 +258,40 @@ function M.session(reader, sqlite_path, today, pacer)
 				data, history_complete = reader.read_ngrams(sqlite_path, start_date, through, apps, pacer)
 				json = PacedJson.encode(data, pacer)
 			end
-			if history_complete == true then
-				local entry = { key = key, start = start_date, data = data, json = json,
-					through = through, fingerprint = target_fp }
+			if history_complete == true and target_fp then
 				-- A fingerprint certifies stored rows, not a projection's successful reads.
-				if target_fp then
-					remember_range(entry)
-				else
+				if serial == nil then
+					_history_serial = _history_serial + 1
+					serial = _history_serial
+				end
+				remember_range({ key = key, start = start_date, data = data, json = json,
+					through = through, fingerprint = target_fp, serial = serial })
+			else
+				serial = nil
+				if history_complete == true then
 					for index = #_ranges, 1, -1 do
 						if _ranges[index].key == key then table.remove(_ranges, index) end
 					end
+				else
+					Logger.warn(LOG, "N-gram history read incomplete through %s; partial counts shown, accepted cache unchanged and next request retries.", through)
 				end
-			else
-				Logger.warn(LOG, "N-gram history read incomplete through %s; partial counts shown, accepted cache unchanged and next request retries.", through)
 			end
 			historical_json = json
 		end
 		local today_idx, today_complete = reader.read_today_split(sqlite_path, start_date, end_date, apps, pacer, today)
 		local range_complete = history_complete == true and today_complete == true
-		return '{"historical":' .. historical_json .. ',"today":' .. PacedJson.encode(today_idx, pacer)
+		local historical_member
+		if held_serial == false then serial = nil end
+		if serial ~= nil and serial == held_serial then
+			-- The page holds this exact history: resending it each live update
+			-- held the main thread about 250 ms (field report 2026-11-03).
+			historical_member = string.format('"historical_reused":true,"historical_serial":%d', serial)
+		elseif serial ~= nil then
+			historical_member = '"historical":' .. historical_json .. string.format(',"historical_serial":%d', serial)
+		else
+			historical_member = '"historical":' .. historical_json
+		end
+		return "{" .. historical_member .. ',"today":' .. PacedJson.encode(today_idx, pacer)
 			.. (range_complete and "" or ',"incomplete":true') .. "}", range_complete
 	end
 

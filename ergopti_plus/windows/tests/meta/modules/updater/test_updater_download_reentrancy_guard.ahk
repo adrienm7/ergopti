@@ -71,6 +71,26 @@ _UDRG_AssertReentrancyGuard() {
 Test("updater: Updater_DownloadAndInstall restores Critical before staging dispatch (updater-download-reentrancy)", _UDRG_AssertReentrancyGuard)
 
 
+; What a second "Update now" gets while a download runs: refused, and the running
+; download's request stays the owner.
+_UDRG_SecondDownloadIsRefused() {
+	global _UpdaterDownloadInProgress, _UpdaterDownloadRequest, UPDATER_REQUEST_ORIGIN_MANUAL
+	SavedFlag := _UpdaterDownloadInProgress, SavedRequest := _UpdaterDownloadRequest
+	Owner := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false)
+	Second := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false)
+	_UpdaterDownloadInProgress := true, _UpdaterDownloadRequest := Owner
+	try {
+		Outcome := _Updater_TryReserveDownloadTransaction(Second, false)
+		Assert(Outcome.DuplicateDownload, "the second download is named a duplicate")
+		Assert(!Outcome.Reserved, "the second download reserves nothing")
+		Assert(_UpdaterDownloadRequest == Owner, "the running download keeps its request")
+	} finally {
+		_UpdaterDownloadInProgress := SavedFlag, _UpdaterDownloadRequest := SavedRequest
+	}
+}
+Test("updater: a second download while one runs is refused and owns nothing (updater-download-reentrancy)", _UDRG_SecondDownloadIsRefused)
+
+
 _UDRG_AssertPromptSingleton() {
 	Body := _DriverFuncBody("Updater_ShowUpdatePrompt")
 	Assert(Body != "", "Updater_ShowUpdatePrompt must exist")

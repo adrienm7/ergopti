@@ -156,6 +156,7 @@ ShowUninstallErgopti(*) {
 			throw Error("Could not resume the removal worker")
 		_UninstallAwaitReady(Owner, Info)
 		Owner["Phase"] := "Ready"
+		LifecycleNoteExitRequester("the uninstaller")
 		ExitApp()
 		; ExitApp returns only when an OnExit owner refuses the shutdown.
 		UninstallCancel()

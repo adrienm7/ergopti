@@ -10,18 +10,20 @@
 --- Independent fixture-loader controls; no transport or successor is dispatched.
 local helpers = require("tests.helpers")
 local driver = helpers.driver_root()
+-- The shared proxy policy the managed fixtures load beside their target.
+local POLICY_MODULE = "network.proxy_policy"
 local fixtures = {
-    { path = "tests/support/managed_http_native_ports.lua", exported = true, target = "adapters/http_client.lua", policy = true,
+    { path = "tests/support/managed_http_native_ports.lua", exported = true, target = "adapters.http_client", policy = true,
       names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline", "infra.paths" } },
-    { path = "tests/unit/adapters/network/test_managed_http_public.lua", target = "adapters/http_client.lua", policy = true,
+    { path = "tests/unit/adapters/network/test_managed_http_public.lua", target = "adapters.http_client", policy = true,
       names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline", "infra.paths" } },
-    { path = "tests/unit/infra/network/test_managed_http_queued_deadline.lua", target = "adapters/http_client.lua", policy = true,
+    { path = "tests/unit/infra/network/test_managed_http_queued_deadline.lua", target = "adapters.http_client", policy = true,
       names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline", "infra.paths" } },
-    { path = "tests/unit/adapters/network/test_system_proxy_callbacks.lua", target = "adapters/system_proxy.lua", config = { nil_driver_root = true, logs = true },
+    { path = "tests/unit/adapters/network/test_system_proxy_callbacks.lua", target = "adapters.system_proxy", config = { nil_driver_root = true, logs = true },
       names = { "luv", "infra.paths", "logger.shim" } },
-    { path = "tests/unit/adapters/network/test_system_proxy_runtime_executable.lua", target = "adapters/system_proxy.lua", config = { nil_driver_root = true },
+    { path = "tests/unit/adapters/network/test_system_proxy_runtime_executable.lua", target = "adapters.system_proxy", config = { nil_driver_root = true },
       names = { "luv", "infra.paths" } },
-    { path = "tests/unit/infra/network/test_managed_http_deadline.lua", target = "infra/managed_http_deadline.lua",
+    { path = "tests/unit/infra/network/test_managed_http_deadline.lua", target = "infra.managed_http_deadline",
       names = { "luv", "infra.monotonic", "logger.shim" } },
 }
 
@@ -59,16 +61,15 @@ local function exercise(fixture, fresh, kind, phase)
         elseif kind == "false" then expected[name] = false end
         package.loaded[name] = expected[name]
     end
-    local native_dofile = dofile
+    -- The fixtures load their modules by name, so the selected import fails
+    -- through package.preload, which require consults before any file.
     local marker = { fixed_fixture_import_failure = true }
     local intercepted = 0
-    if phase ~= "success" then
-        _G.dofile = function(path)
-            local selected = phase == "policy_failure" and path:match("/lua/network/proxy_policy%.lua$")
-                or phase == "import_failure" and path == driver .. "/" .. fixture.target
-            if selected then intercepted = intercepted + 1; error(marker, 0) end
-            return native_dofile(path)
-        end
+    local selected = phase == "policy_failure" and POLICY_MODULE
+        or phase == "import_failure" and fixture.target or nil
+    local saved_preload = selected and package.preload[selected]
+    if selected then
+        package.preload[selected] = function() intercepted = intercepted + 1; error(marker, 0) end
     end
     local ok, problem = pcall(function()
         local admitted, result = pcall(fresh, fixture.config or {})
@@ -84,7 +85,7 @@ local function exercise(fixture, fresh, kind, phase)
             helpers.assert_eq(package.loaded[name], expected[name], "Restore exact " .. kind .. " snapshot for " .. name)
         end
     end)
-    _G.dofile = native_dofile
+    if selected then package.preload[selected] = saved_preload end
     for _, name in ipairs(fixture.names) do package.loaded[name] = before[name] end
     if not ok then error(problem, 0) end
 end

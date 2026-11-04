@@ -46,6 +46,8 @@ local function scenario(body)
 				if world.eager then callback(200, Json.encode(catalogue), nil, {})
 				else world.requests[#world.requests + 1] = callback end
 			end },
+			-- Ergopti's own Python is installed (modules/keymap/managed_python.lua).
+			python = function(callback) callback(true, "/fixture/python3") end,
 			run = function(_, args, _, callback)
 				if world.probe_failure then
 					world.probe_failure = false

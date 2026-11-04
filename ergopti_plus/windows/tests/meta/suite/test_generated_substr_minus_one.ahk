@@ -20,10 +20,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TGS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TGS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Strips full-line comment lines so assertions never match an explanatory remark.
@@ -47,7 +45,7 @@ _TGS_StripLineComments(Src) {
 ; =========================================================
 
 _TGS_EngineSubstrMinusOne() {
-	Src := _TGS_StripLineComments(_TGS_ReadSource("infra/hotstrings/hotstring_engine_main.ahk"))
+	Src := _TGS_StripLineComments(_TGS_ReadSource("hotstring_engine_main.ahk"))
 	Assert(Src != "", "hotstring_engine_main.ahk must be readable")
 
 	; The fix: last character of the trigger is extracted with SubStr(Trigger, -1)

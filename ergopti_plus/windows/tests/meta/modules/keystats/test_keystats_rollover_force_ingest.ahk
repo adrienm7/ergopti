@@ -24,9 +24,8 @@
 
 
 ; Read the keystats source relative to the tests/meta directory.
-_KLRD_ReadSource(RelPath) {
-	Root := A_ScriptDir . "\..\..\"
-	return FileRead(Root . RelPath)
+_KLRD_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -41,7 +40,7 @@ _KLRD_ReadSource(RelPath) {
 
 _MetaCheckRolloverForceIngest() {
 	try {
-		Src := _KLRD_ReadSource("modules\keystats\keystats.ahk")
+		Src := _KLRD_ReadSource("keystats.ahk")
 	} catch {
 		; File unreadable — skip rather than fail, test environment issue
 		return
@@ -75,7 +74,8 @@ _MetaCheckRolloverForceIngest() {
 	Assert(StrLen(RolloverBody) > 0,
 		"KL_DayRollover must be present in keystats.ahk")
 
-	Assert(InStr(RolloverBody, "KL_IngestOnce(true)") > 0,
+	; The first argument is the force flag; the rollover also passes its ownership
+	Assert(RegExMatch(RolloverBody, "KL_IngestOnce\(\s*true\b") > 0,
 		"KL_DayRollover must call KL_IngestOnce(true) (not KL_IngestOnce()) — "
 		. "the force flag is mandatory to ensure all pending entries are written "
 		. "to data.sql before today.log is deleted at midnight rollover")
@@ -86,7 +86,7 @@ Test("meta keystats F21: KL_IngestOnce has force parameter and rollover passes t
 
 _MetaCheckRolloverNoBareCall() {
 	try {
-		Src := _KLRD_ReadSource("modules\keystats\keystats.ahk")
+		Src := _KLRD_ReadSource("keystats.ahk")
 	} catch {
 		return
 	}

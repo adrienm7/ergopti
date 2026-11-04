@@ -18,13 +18,9 @@ local helpers, fresh_client =
 
 helpers.describe("http_client: asynchronous curl ownership", function()
 	helpers.it("keeps blocking process APIs out of the LLM transport path", function()
-		local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
-		local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
 		local scanned = 0
-		for _, relative in ipairs({ "adapters/http_client.lua", "modules/llm/api_ollama.lua" }) do
-			local handle = assert(io.open(driver_root .. "/" .. relative, "r"))
-			local source = handle:read("*a")
-			handle:close()
+		for _, relative in ipairs({ "adapters.http_client", "modules.llm.api_ollama" }) do
+			local source = assert(helpers.read_module_source(relative))
 			scanned = scanned + 1
 			helpers.assert_true(source:find("io.popen", 1, true) == nil,
 				relative .. " must never wait for curl on the keyboard event-loop thread")

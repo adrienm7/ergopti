@@ -66,3 +66,40 @@ _SIG_IncompatibleKernelObjectCannotBypassGate() {
 
 Test("boot: incompatible named kernel object fails closed (audit-ahk-005-native)",
 	_SIG_IncompatibleKernelObjectCannotBypassGate)
+
+; A smoke beside a resident doubled every key the maintainer typed.
+_SIG_SmokeNeverOwnsInputBesideResident() {
+	AssertEqual("quarantine", DriverSmokeInput_Decide(false, false, true),
+		"a smoke beside a resident must stay off the session's input")
+	AssertEqual("quarantine", DriverSmokeInput_Decide(false, true, true),
+		"even a CI flag must not hand the input to a second driver")
+	AssertEqual("refuse", DriverSmokeInput_Decide(true, false, true),
+		"an explicit request for live input beside a resident must end the boot")
+	AssertEqual("quarantine", DriverSmokeInput_Decide(false, false, false),
+		"an interactive session can gain a resident at any time: it stays quarantined")
+	AssertEqual("live", DriverSmokeInput_Decide(false, true, false),
+		"a disposable CI session keeps the full input path under test")
+	AssertEqual("live", DriverSmokeInput_Decide(true, false, false),
+		"a live check on a quiet desktop owns the input it asked for")
+}
+
+Test("boot: a smoke never owns input beside a resident (smoke-input-quarantine)",
+	_SIG_SmokeNeverOwnsInputBesideResident)
+
+_SIG_ResidentProbeReadsTheNamedMutex() {
+	Name := "Local\ErgoptiSmokeResident_"
+		. DllCall("kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount
+	AssertFalse(DriverMutex_ResidentLives(Name), "no such mutex proves absence")
+	Handle := DllCall("kernel32\CreateMutexW", "Ptr", 0, "Int", 0, "Str", Name, "Ptr")
+	AssertTrue(Handle != 0, "the fixture must own its mutex")
+	try AssertTrue(DriverMutex_ResidentLives(Name), "a held mutex is a resident")
+	finally DllCall("kernel32\CloseHandle", "Ptr", Handle)
+	EventHandle := DllCall("kernel32\CreateEventW", "Ptr", 0, "Int", 0,
+		"Int", 0, "Str", Name, "Ptr")
+	try AssertTrue(DriverMutex_ResidentLives(Name),
+		"a refusal other than absence must count as a resident")
+	finally DllCall("kernel32\CloseHandle", "Ptr", EventHandle)
+}
+
+Test("boot: the resident probe fails closed (smoke-input-quarantine-probe)",
+	_SIG_ResidentProbeReadsTheNamedMutex)

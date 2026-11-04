@@ -24,7 +24,7 @@ local function with_zenity(body)
 	local previous_modal = package.loaded["ui.modal"]
 	package.loaded["ui.modal"] = { run = function(callback) return callback() end }
 	os.execute = function(command)
-		if command:find("zenity", 1, true) then
+		if command:find("dialog_host.lua", 1, true) then
 			shown[#shown + 1] = command
 			return 0
 		end
@@ -43,8 +43,8 @@ end
 --- @return table|nil row
 local function configuration_row(ctx, row_key)
 	local i18n = require("infra.i18n")
-	package.loaded["ui.menu.menu_builder"] = nil
-	for _, section in ipairs(require("ui.menu.menu_builder").build(ctx)) do
+	package.loaded["ui.menu.builder"] = nil
+	for _, section in ipairs(require("ui.menu.builder").build(ctx)) do
 		if type(section.title) == "string"
 			and section.title:find(i18n.get("menu.configuration.title"), 1, true) == 1 then
 			for _, row in ipairs(section.menu or {}) do
@@ -61,14 +61,14 @@ end
 --- @param report table The report it answers with.
 --- @return table shown Every zenity command the click ran.
 local function click(row_key, committed, report)
-	local names = { "infra.global_scope", "ui.menu.menu_builder" }
+	local names = { "infra.global_scope", "ui.menu.builder" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local shown
 	local ok, err = pcall(function()
 		package.loaded["infra.global_scope"] = {
 			participants = function() return {} end,
-			apply = function() return committed, report end,
+			apply = function(_, _, done) done(committed, report); return true end,
 		}
 		local ctx = { _version = "test", on_quit = function() end, is_paused = function() return false end }
 		local row = configuration_row(ctx, row_key)
@@ -102,7 +102,7 @@ helpers.describe("Configuration restore and clear failure reason (Linux)", funct
 					failed = case.failed, reverted = case.reverted, detail = "refused" }
 				local shown = click(row_key, false, report)
 				helpers.assert_eq(#shown, 1, "one error dialog")
-				helpers.assert_true(shown[1]:find("zenity --error", 1, true) == 1, shown[1])
+				helpers.assert_true(shown[1]:find("dialog_host.lua' --error", 1, true) ~= nil, shown[1])
 				local title, message = ResetFailure.message(report, i18n.get)
 				helpers.assert_eq(zenity_text(shown[1]), message)
 				helpers.assert_true(shown[1]:find(title, 1, true) ~= nil, "the reset failure title")

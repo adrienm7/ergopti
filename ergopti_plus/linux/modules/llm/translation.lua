@@ -13,7 +13,7 @@
 --- 1. The three files are read once and validated as a whole: a missing or
 ---    malformed one is an installation fault, logged once, and the action and
 ---    its parameter refuse to run rather than half-work.
---- 2. The binding editors (the zenity prompt and the picker page) get the same
+--- 2. The binding editors (the native prompt and the picker page) get the same
 ---    choices from choices(), so both offer the one closed list.
 --- ==============================================================================
 

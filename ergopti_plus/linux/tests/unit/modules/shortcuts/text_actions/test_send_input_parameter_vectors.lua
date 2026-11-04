@@ -121,7 +121,7 @@ helpers.describe("send input parameters replay the shared send-input corpus (sen
 
 	-- The picker's own editor edits these three kinds: it is told which rows take
 	-- which, the value the binding holds, the vocabulary it validates with, and
-	-- the prompts and refusals the zenity prompt shows.
+	-- the prompts and refusals the native prompt shows.
 	helpers.it("the picker's editor gets the send-input rows, their values and texts", function()
 		local items = {
 			{ type = "heading", level = 1, text = "Input" },
@@ -134,7 +134,7 @@ helpers.describe("send input parameters replay the shared send-input corpus (sen
 		helpers.assert_eq(items[3].parameter, "url",
 			"a URL row names its kind too, so the page can offer to edit the current one")
 		helpers.assert_eq(fields.parameter_strings.prompts.url, nil,
-			"but the page does not edit a URL: the zenity prompt asks for it")
+			"but the page does not edit a URL: the native prompt asks for it")
 		helpers.assert_eq(items[1].parameter, nil, "a heading takes nothing")
 		helpers.assert_eq(fields.send_vocabulary, Shortcuts.send_vocabulary(), "the drivers' own vocabulary")
 		helpers.assert_eq(fields.parameter_strings.prompts.key, Gestures.get_action_parameter_prompt("send_key"))

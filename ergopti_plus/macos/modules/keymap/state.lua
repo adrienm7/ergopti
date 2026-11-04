@@ -272,10 +272,13 @@ function M.new(defaults, delays_default)
 		return remaining_ms >= 0, math.max(0, remaining_ms) / 1000
 	end
 
+	-- Returns true once committed: the LLM chain arms its fallback only after
+	-- this commit (prediction_engine), and a missing value read as a refusal.
 	s.suppress_rescan_keep_buffer = function(duration)
 		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
 		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_KEEP_SEC)
 		s.no_rescan_keeps_buffer = true
+		return true
 	end
 
 	-- Seed the initial per-group delays from defaults.

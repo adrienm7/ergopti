@@ -111,7 +111,7 @@ _KLSLC_RoundTrip(Name, Encoder) {
 /** Registers one round trip per encoder without publishing loop variables. */
 _KLSLC_RegisterEncoders() {
 	local Name, Encoder
-	for Name, Encoder in Map("SQLite_Q", SQLite_Q, "KL_SqlStr", KL_SqlStr, "KLW_SqlEscape", KLW_SqlEscape)
+	for Name, Encoder in Map("SQLite_Q", SQLite_Q, "KL_SqlStr", KL_SqlStr)
 		Test("SQL literals: " . Name . " keeps NUL and CR byte-exact through exec and the ledger (sql-literal-controls)",
 			_KLSLC_RoundTrip.Bind(Name, Encoder))
 }

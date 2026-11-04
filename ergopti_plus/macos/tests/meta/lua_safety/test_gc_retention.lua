@@ -443,7 +443,7 @@ helpers.describe("GC retention: EVERY native task site in the driver is pinned",
 				local code = src:gsub("%-%-[^\n]*", "")
 				-- TaskLifecycle owns construction only; its callers own the handle and
 				-- pin before start. Judge each caller launch, not the adapter's return.
-				local sites = rel == "adapters/task_lifecycle.lua" and {}
+				local sites = helpers.module_name_of(rel) == "adapters.task_lifecycle" and {}
 					or scan_unpinned_sites(src)
 				if code:find("hs%.task%.new%s*%(")
 						or code:find("pcall%s*%(%s*hs%.task%.new")
@@ -468,7 +468,7 @@ helpers.describe("GC retention: EVERY native task site in the driver is pinned",
 		-- known root file is present holds whichever branch executes here.
 		local saw_root_source = false
 		for _, rel in ipairs(files) do
-			if rel == "init.lua" then saw_root_source = true end
+			if helpers.module_name_of(rel) == "init" then saw_root_source = true end
 		end
 		helpers.assert_true(saw_root_source,
 			"the walk must include root-level sources such as init.lua — otherwise an unpinned "

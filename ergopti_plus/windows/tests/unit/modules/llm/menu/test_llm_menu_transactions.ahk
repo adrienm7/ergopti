@@ -54,7 +54,7 @@ _LMT_Menu() {
 	MenuState["profile_id"] := "user_one"
 	MenuState["nav_modifiers"] := ""
 	MenuState["disabled_apps"] := []
-	MenuState["ollama_port"] := 11434
+	MenuState["ollama_port"] := 11435
 	MenuState["api_entries"] := []
 	MenuState["api_entry_id"] := ""
 	MenuState["app_profile_overrides"] := Map()

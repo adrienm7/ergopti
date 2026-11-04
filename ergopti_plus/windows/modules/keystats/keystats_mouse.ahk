@@ -298,6 +298,7 @@ KL_Mouse_OnLUp(*) {
 				; a password field / disabled app / private window do not accrue into the counts
 				; that later ride into a typing row (mouse-counter-privacy-filter).
 				KL_BumpMouseClick()
+				KL_Watchers_OnPointer()
 				; Use an async one-shot timer so context refresh doesn't block the hook thread
 				try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
 				if (dist >= KLMouseConst.DRAG_MIN_PX) {
@@ -361,6 +362,7 @@ KL_Mouse_OnRUp(*) {
 				; a password field / disabled app / private window do not accrue into the counts
 				; that later ride into a typing row (mouse-counter-privacy-filter).
 				KL_BumpMouseClick()
+				KL_Watchers_OnPointer()
 				; Use an async one-shot timer so context refresh doesn't block the hook thread
 				try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
 				if (dist >= KLMouseConst.DRAG_MIN_PX) {
@@ -421,6 +423,7 @@ KL_Mouse_OnMUp(*) {
 				; a password field / disabled app / private window do not accrue into the counts
 				; that later ride into a typing row (mouse-counter-privacy-filter).
 				KL_BumpMouseClick()
+				KL_Watchers_OnPointer()
 				; Use an async one-shot timer so context refresh doesn't block the hook thread
 				try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
 				KL_Mouse_LogClick("middle", Gesture.x, Gesture.y)
@@ -464,6 +467,7 @@ KL_Mouse_AccumScroll(delta, NowTick?, FilterFn?, FlushFn?, BumpFn?, ArmFn?) {
 				return
 		last := KLMouse.scroll_last
 		now := IsSet(NowTick) ? NowTick : A_TickCount
+		KL_Watchers_OnPointer(0, now)
 		elapsed := TickElapsed64(last, now)
 		if (last > 0 and elapsed > KLMouseConst.SCROLL_BURST_GAP_MS) {
 				if IsSet(FlushFn)
@@ -495,6 +499,7 @@ KL_Mouse_AccumScrollH(delta, NowTick?, FilterFn?, FlushFn?, BumpFn?, ArmFn?) {
 				return
 		last := KLMouse.scroll_last
 		now := IsSet(NowTick) ? NowTick : A_TickCount
+		KL_Watchers_OnPointer(0, now)
 		elapsed := TickElapsed64(last, now)
 		if (last > 0 and elapsed > KLMouseConst.SCROLL_BURST_GAP_MS) {
 				if IsSet(FlushFn)

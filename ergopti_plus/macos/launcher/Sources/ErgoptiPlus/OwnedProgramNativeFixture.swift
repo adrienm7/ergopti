@@ -44,7 +44,7 @@ enum OwnedProgramNativeFixture {
 			guard error == 0 else { return 71 }
 			let ready = location.appendingPathComponent("child.json")
 			let deadline = Date().addingTimeInterval(3)
-			while !FileManager.default.fileExists(atPath: ready.path) && Date() < deadline { usleep(1_000) }
+			while !FileManager.default.fileExists(atPath: ready.path) && Date() < deadline { usleep(LauncherTimings.programFixturePoll.microseconds) }
 			guard FileManager.default.fileExists(atPath: ready.path),
 				let data = try? JSONSerialization.data(withJSONObject: ["pid": getpid(), "child": child])
 			else { return 70 }
@@ -64,7 +64,7 @@ enum OwnedProgramNativeFixture {
 					let count = payload.withUnsafeBytes { bytes in Darwin.write(descriptor, bytes.baseAddress!, bytes.count) }
 					guard count == payload.count else { return 74 }
 				}
-				usleep(1_000)
+				usleep(LauncherTimings.programFixturePoll.microseconds)
 			}
 			return 0
 		default: return 64

@@ -26,10 +26,8 @@
 ; =================================================
 ; =================================================
 
-_NTNC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_NTNC_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -40,7 +38,7 @@ _NTNC_ReadSource(RelPath) {
 ; ===================================================
 
 _NTNC_CheckNgramClearedForColdReplay() {
-	Src := _NTNC_ReadSource("modules/keystats/keystats_reader.ahk")
+	Src := _NTNC_ReadSource("keystats_reader.ahk")
 	Assert(Src != "", "modules/keystats/keystats_reader.ahk must be readable")
 
 	Body := _DriverFuncBody("KLR_ClearAggregates")
@@ -58,7 +56,7 @@ _NTNC_CheckNgramClearedForColdReplay() {
 }
 
 _NTNC_CheckAggStillCleared() {
-	Src := _NTNC_ReadSource("modules/keystats/keystats_reader.ahk")
+	Src := _NTNC_ReadSource("keystats_reader.ahk")
 	Assert(Src != "", "modules/keystats/keystats_reader.ahk must be readable")
 
 	Body := _DriverFuncBody("KLR_ClearAggregates")

@@ -602,6 +602,7 @@ function M.set_llm_app_profile_overrides(text)   return engine.set_llm_app_profi
 function M.set_llm_url_bar_filter_enabled(v)      return engine.set_llm_url_bar_filter_enabled(v)      end
 function M.set_llm_secure_field_filter_enabled(v) return engine.set_llm_secure_field_filter_enabled(v) end
 function M.set_llm_instant_on_word_end(v)         return engine.set_llm_instant_on_word_end(v)         end
+function M.set_llm_while_hotstring_tooltip(v)     return engine.set_llm_while_hotstring_tooltip(v)     end
 function M.set_llm_val_modifiers(mods)      return engine.set_llm_val_modifiers(mods)      end
 function M.set_llm_nav_modifiers(mods)      return engine.set_llm_nav_modifiers(mods)      end
 function M.set_llm_min_words(w)             return engine.set_llm_min_words(w)             end
@@ -1111,7 +1112,11 @@ local function update_preview_body(buf)
 			-- Chain: arm the LLM timer so it fires just as the tooltip window closes.
 			-- An intentionally hidden row has no finite surface to wait for, so it keeps
 			-- the short offset without fabricating a visible suggestion record.
-			if fire_llm_after_hotstring and llm_on then
+			-- Shown together with the rows, the suggestion keeps the keystroke's own
+			-- delay: chaining would show the two one after the other.
+			local shown_together = type(engine.shows_with_hotstring_rows) == "function"
+				and engine.shows_with_hotstring_rows() == true
+			if fire_llm_after_hotstring and llm_on and not shown_together then
 				local chain_delay = (any_enabled and tooltip_timeout < INFINITE_TOOLTIP_SEC)
 					and (tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
 					or HOTSTRING_CHAIN_OFFSET_SEC
@@ -1987,6 +1992,12 @@ function M.request_manual_prediction()
 		return false
 	end
 	return engine.request_manual_prediction()
+end
+
+--- Runs the AI menu's test prediction. The engine logs and shows every refusal.
+--- @return boolean sent True when the request left.
+function M.test_prediction()
+	return engine.test_prediction()
 end
 
 --- Runs a prediction now with a chosen prompt profile and count (the

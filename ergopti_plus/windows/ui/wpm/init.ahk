@@ -33,6 +33,7 @@
 ;    is off — no overhead on the keystroke hot path.
 ; ==============================================================================
 
+#Include wpm_category_color.ahk
 #Include wpm_display.ahk
 #Include wpm_gdiplus_ownership.ahk
 #Include wpm_widget.ahk

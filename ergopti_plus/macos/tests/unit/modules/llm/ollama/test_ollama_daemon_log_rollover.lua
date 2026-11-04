@@ -235,7 +235,7 @@ helpers.describe("Ollama daemon log rollover", function()
 		end)
 	end)
 
-	helpers.it("delegates fresh-install daemon launch to ApiOllama ownership", function()
+	helpers.it("delegates a verified runtime's daemon launch to ApiOllama ownership", function()
 		local Logger = require("infra.logger")
 		helpers.admit_logger_privacy(Logger)
 		local original_log = Logger.today_log_path
@@ -256,8 +256,7 @@ helpers.describe("Ollama daemon log rollover", function()
 			hide = function() end,
 		}
 		package.loaded["modules.llm.ollama_binary"] = {
-			resolve = function() return nil, "not installed", nil end,
-			managed_install_dir = function() return "/fixture/Ergopti/ollama" end,
+			resolve = function() return "/fixture/Ergopti/ollama-native-http/ollama", nil, "native_managed" end,
 		}
 		package.loaded["modules.llm.api_ollama"] = {
 			ensure_running = function()
@@ -287,21 +286,18 @@ helpers.describe("Ollama daemon log rollover", function()
 			"test must control the real bootstrap path resolver")
 
 		local ok, err = pcall(function()
-			-- A fresh install only ever follows the user's Ollama selection.
-			Checker.install_for_selection()
+			-- Ergopti's own runtime is verified, then its daemon goes to ApiOllama.
+			helpers.assert_true(Checker.check_and_install_deps())
 			helpers.assert_true(type(task_args) == "table", "bootstrap task arguments must be captured")
 			helpers.assert_eq(task_args[3], "/bin/bash")
-			helpers.assert_eq(task_args[5], "",
-				"a fresh install passes no resolved executable")
-			helpers.assert_eq(task_args[6], "/fixture/Ergopti/ollama",
-				"the install script receives only the resolver-named install folder")
+			helpers.assert_eq(task_args[5], "/fixture/Ergopti/ollama-native-http/ollama",
+				"the verifier receives the resolved runtime")
+			helpers.assert_eq(task_args[6], "", "no install folder: the verifier never downloads")
 			task_done(0, "", "")
-			helpers.assert_eq(daemon_calls, 0,
-				"a stock installation grants client reuse, never implicit daemon launch ownership")
+			helpers.assert_eq(daemon_calls, 1, "the verified runtime's daemon is launched by ApiOllama")
 			helpers.assert_eq(Checker.get_state(), "ready")
-			helpers.assert_eq(Checker.is_ready(), true, "stock provisioning remains usable by the client")
 			helpers.assert_eq(Checker.get_daemon_state(), "pending")
-			helpers.assert_eq(Checker.is_daemon_ready(), false, "installation alone cannot manufacture daemon readiness")
+			helpers.assert_eq(Checker.is_daemon_ready(), false, "a launch request alone cannot manufacture daemon readiness")
 		end)
 
 		Logger.today_log_path = original_log

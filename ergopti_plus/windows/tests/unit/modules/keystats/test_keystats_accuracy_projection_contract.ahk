@@ -26,7 +26,7 @@ _KLRAccuracy_Contract(Fixture, Spec) {
 		for Counter in ["c", "e"]
 			AssertEqual(Spec[Counter], Rows[Key][Counter], "the native row pins the fixture counter")
 		Db := _KLRShortcut_OpenFixture()
-		AssertTrue(SQLite_Exec(Db, KLW_BuildBatchSql(SQLite_Q("accuracy-contract"), false)))
+		AssertTrue(SQLite_Exec(Db, KLW_BuildBatchSql("accuracy-contract", false)))
 		Historical := JsonParse(KLR_BuildNgramsJson(Db, Day, Day, [Fixture["app"]]))
 		Today := JsonParse(KLR_BuildTodayIdxJson(Db, [Fixture["app"]], true, Day))
 		AssertTrue(Today.Has(Fixture["app"]), "the native today reader must retain its application")

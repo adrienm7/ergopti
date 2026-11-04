@@ -17,10 +17,22 @@
 ; The headless runner deliberately omits tray_menu.ahk's auto-execute block.
 ; Read the real tray and personal-information declarations and feature manifest:
 ; no second curated order or hard-coded live feature map belongs in a fixture.
-_HSCS_TrayMapLiteral(Source, Name) {
+_HSCS_TrayMapLiteral(Source, Name, MinimumConstants := 0) {
 	if !RegExMatch(Source, "ms)^global " . Name . " := Map\((.*?)^\)", &Found)
 		throw Error("The tray boot owner has no Map declaration for " . Name . ".")
-	Values := JsonParse("[" . RegExReplace(Found[1], ",\s*$") . "]")
+	; A real declaration names generated path constants; read each through its owner
+	; so the JSON reading below stays the strict gate for any other non-literal value.
+	Literal := RegExReplace(Found[1], ",\s*$"), Position := 1, Resolved := 0
+	while RegExMatch(Literal, "\b(ConfigKey|ConfigLeaf)\.([A-Z0-9_]+)\b", &Constant, Position) {
+		Owner := Constant[1] == "ConfigKey" ? ConfigKey : ConfigLeaf
+		Value := JsonStringLiteral(Owner.%Constant[2]%)
+		Literal := SubStr(Literal, 1, Constant.Pos - 1) . Value . SubStr(Literal, Constant.Pos + Constant.Len)
+		Position := Constant.Pos + StrLen(Value)
+		Resolved += 1
+	}
+	; PersonalInformation is all literals; the tray maps must prove the scan still sees their constants.
+	Assert(Resolved >= MinimumConstants, "the tray Map declaration must name generated path constants: " . Name)
+	Values := JsonParse("[" . Literal . "]")
 	if !(Values is Array) || Mod(Values.Length, 2)
 		throw Error("The tray boot Map declaration has incomplete pairs: " . Name . ".")
 	Result := Map()
@@ -42,8 +54,8 @@ _HSCS_WithDynamicBootState(Body) {
 	HadOrder := IsSet(_DYNAMIC_HOTSTRINGS_ORDER), OldOrder := HadOrder ? _DYNAMIC_HOTSTRINGS_ORDER : 0
 	try {
 		Source := _StripFullLineComments(FileRead(_DriverDir . "\ui\tray_menu.ahk", "UTF-8"))
-		_LegacyTopCategoryMap := _HSCS_TrayMapLiteral(Source, "_LegacyTopCategoryMap")
-		_V1CatToV2CatMap := _HSCS_TrayMapLiteral(Source, "_V1CatToV2CatMap")
+		_LegacyTopCategoryMap := _HSCS_TrayMapLiteral(Source, "_LegacyTopCategoryMap", 1)
+		_V1CatToV2CatMap := _HSCS_TrayMapLiteral(Source, "_V1CatToV2CatMap", 1)
 		Assert(InStr(Source, "global _LegacyDynamicHotstringsKeyMap := _MR_DynamicHotstringsKeyMap()"),
 			"the real tray must consume the shared family alias owner")
 		Assert(InStr(Source, "global _DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()"),

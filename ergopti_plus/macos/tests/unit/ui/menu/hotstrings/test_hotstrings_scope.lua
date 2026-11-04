@@ -17,7 +17,7 @@ local Languages = require("hotstrings.languages")
 local Extensions = require("hotstrings.extensions")
 
 -- Independently authored current families: never derive this inventory or the
--- expected 0.5/1.0 s delays from the manifest or the implementation under test.
+-- expected 0.5 s delays from the manifest or the implementation under test.
 local COMMON_FAMILIES = { "names", "abbreviations", "technical_terms" }
 
 local ORIGINAL_CONFIG = table.concat({
@@ -436,21 +436,23 @@ helpers.describe("macOS hotstrings scope", function()
 			end)
 		end
 	end
-	helpers.it("restores the recommended 0.5 s where deleting the override would inherit 1.0 s", function()
+	helpers.it("restores the recommended 0.5 s by deleting the override, since each section declares it", function()
 		local f = fixture()
 		assert_family_delays(f, 2.0)
 		assert_family_choices(f, true)
 		helpers.assert_eq(f.owner.apply("recommended"), true)
 		local overrides = f.config.parse_override_content(f.files.overrides)
 		for _, family in ipairs(COMMON_FAMILIES) do
-			helpers.assert_eq(overrides.autocorrection.sections[family].delay_offset, -0.25, "stored as an offset of the 0.75 s base")
-			helpers.assert_eq(overrides.autocorrection.sections[family].color, nil)
+			local section = ((overrides.autocorrection or {}).sections or {})[family] or {}
+			helpers.assert_nil(section.delay_offset, "the declared delay is the recommendation, so none is written: " .. family)
+			helpers.assert_nil(section.delay, family)
+			helpers.assert_nil(section.color, family)
 		end
 		assert_family_delays(f, 0.5)
 		helpers.assert_eq(f.config.scope_snapshot().source.content, f.files.overrides)
 	end)
 
-	helpers.it("clears every override so each section runs its corpus inheritance", function()
+	helpers.it("clears every override so each section waits its declared delay", function()
 		local f = fixture()
 		helpers.assert_eq(f.owner.apply("clear"), true)
 		local overrides = f.config.parse_override_content(f.files.overrides)
@@ -460,7 +462,7 @@ helpers.describe("macOS hotstrings scope", function()
 			helpers.assert_nil(section.color)
 		end
 		helpers.assert_nil((overrides.rolls or {}).priority)
-		assert_family_delays(f, 1.0)
+		assert_family_delays(f, 0.5)
 	end)
 
 	helpers.it("keeps every override field and table the scope does not own, with a verified backup", function()
@@ -510,7 +512,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.km.is_group_enabled("rolls"), true)
 		helpers.assert_eq(f.state.hotstrings.rolls, true)
 		helpers.assert_eq(f.state.delays, { dynamichotstrings = 1.5 })
-		helpers.assert_eq(f.km.delays.autocorrection, 1.0, "the legacy shadow follows the override file")
+		helpers.assert_eq(f.km.delays.autocorrection, 0.5, "the legacy shadow follows the category file's 0.5 s")
 		helpers.assert_eq(f.km.reloads, { "rolls" }, "a changed priority is registered again")
 		helpers.assert_eq(f.engine.stops, 0)
 		helpers.assert_eq(f.prefs.source_snapshot("config").content, f.files.config)
@@ -647,7 +649,7 @@ helpers.describe("macOS hotstrings scope", function()
 		assert_family_delays(f, 2.0)
 		assert_family_choices(f, true)
 		helpers.assert_eq(f.owner.apply("clear"), true)
-		assert_family_delays(f, 1.0)
+		assert_family_delays(f, 0.5)
 	end)
 
 	helpers.it("reverts a committed restore to both files and the runtime, then releases the fence", function()
@@ -763,19 +765,47 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.owner.pending(), false)
 	end)
 
-	helpers.it("creates an absent override file for a recommendation and removes it on rollback", function()
+	helpers.it("keeps an absent override file absent when every declared delay is the recommendation", function()
 		local f = fixture({ overrides = false })
-		f.controls.refuse = "config"
-		helpers.assert_eq(f.owner.apply("recommended"), false)
-		helpers.assert_nil(f.files.overrides)
-		helpers.assert_eq(f.removed, { "overrides" })
-		f.controls.refuse = nil
 		helpers.assert_eq(f.owner.apply("recommended"), true)
-		local overrides = f.config.parse_override_content(f.files.overrides)
-		for _, family in ipairs(COMMON_FAMILIES) do
-			helpers.assert_eq(overrides.autocorrection.sections[family].delay_offset, -0.25, "stored as an offset of the 0.75 s base")
-		end
+		helpers.assert_nil(f.files.overrides, "a sparse restore creates no override file")
+		helpers.assert_eq(f.removed, {})
 		assert_family_delays(f, 0.5)
+	end)
+
+	helpers.it("creates an absent override file for a recommendation and removes it on rollback", function()
+		-- The shipped rows recommend the delay they declare, so this case gives
+		-- the families a recommendation of their own to make a restore write one.
+		local Manifest = require("infra.manifest_reader")
+		local shipped_features = Manifest.features
+		local diverging = {}
+		for index, entry in ipairs(shipped_features()) do
+			local copy = {}
+			for key, value in pairs(entry) do copy[key] = value end
+			for _, family in ipairs(COMMON_FAMILIES) do
+				if entry.path == "hotstrings.autocorrection." .. family then
+					copy.recommended = { enabled = entry.recommended.enabled, time_activation_seconds = 0.25 }
+				end
+			end
+			diverging[index] = copy
+		end
+		Manifest.features = function() return diverging end
+		local ok, failure = pcall(function()
+			local f = fixture({ overrides = false })
+			f.controls.refuse = "config"
+			helpers.assert_eq(f.owner.apply("recommended"), false)
+			helpers.assert_nil(f.files.overrides)
+			helpers.assert_eq(f.removed, { "overrides" })
+			f.controls.refuse = nil
+			helpers.assert_eq(f.owner.apply("recommended"), true)
+			local overrides = f.config.parse_override_content(f.files.overrides)
+			for _, family in ipairs(COMMON_FAMILIES) do
+				helpers.assert_eq(overrides.autocorrection.sections[family].delay_offset, -0.5, "stored as an offset of the 0.75 s base")
+			end
+			assert_family_delays(f, 0.25)
+		end)
+		Manifest.features = shipped_features
+		if not ok then error(failure, 0) end
 	end)
 end)
 

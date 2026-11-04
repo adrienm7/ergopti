@@ -9,6 +9,8 @@
 ; .keylayout (layout/layout_ergopti.ahk); this file owns the hotkeys.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -246,6 +248,12 @@ _LockWorkstationEmit(*) {
 		_ResetPrefixBuffer()
 }
 
+; A Ctrl or Alt chord of a remapped key: the keyboard slot set on it, else the layout's.
+_RemapChordEmit(Variant, SendStr, KeyChar, *) {
+	if !KeyboardShortcutRunLayoutChord(Variant)
+		_RemapEmit(SendStr, KeyChar)
+}
+
 RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	global RemappedList
 	static WinCriteria := Map()
@@ -269,14 +277,16 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	; In theory, * and {Blind} should be sufficient, but it isn't the case when we define custom hotkeys in next sections
 	; For example, a new hotkey for ^b leads to ^t giving ^b in QWERTY
 	; The same happens for Win shortcuts, where we can get the shortcut on the QWERTY layer and not emulated Ergopti layer
+	; A keyboard slot on the same chord asks here: it cannot take a variant the
+	; layout owns (KeyboardShortcutsBindAll).
 	Hotkey(
 		"^" ScanCode,
-		_RemapEmit.Bind("^" Character, Character),
+		_RemapChordEmit.Bind("^" . StrUpper(ScanCode), "^" Character, Character),
 		InputLevel
 	)
 	Hotkey(
 		"!" ScanCode,
-		_RemapEmit.Bind("!" Character, Character),
+		_RemapChordEmit.Bind("!" . StrUpper(ScanCode), "!" Character, Character),
 		"I3" ; Needs to be higher to keep the Alt shortcuts
 	)
 	; Win variants share a broker, so the earlier row passthrough cannot win
@@ -464,7 +474,7 @@ _UIA_SelectionPollTick() {
     ; When the wrap feature is off, skip the COM round-trip entirely so non-users
     ; never pay the per-tick cost or the large-selection keyboard-thread stall
     ; risk (uia-poll-bypasses-suspend).
-    if (!Features.Has("shortcuts") || !Features["shortcuts"].Has("wrap_text_if_selected") || !Features["shortcuts"]["wrap_text_if_selected"]) {
+    if (!Features.Has("shortcuts") || !Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED) || !Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]) {
 		_UIA_SelectionCache := 0
         return
     }
@@ -598,8 +608,8 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 	; path, but it returns an empty Map when the manifest fails to load, and a
 	; raw read here would throw on the keystroke thread.
 	WrapEnabled := Features.Has("shortcuts")
-		and Features["shortcuts"].Has("wrap_text_if_selected")
-		and Features["shortcuts"]["wrap_text_if_selected"]
+		and Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
+		and Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 	if (WrapEnabled and WrapSymbols_IsEnabled(LeftSymbol)) {
 		; Critical is RELEASED across the selection probe and the clipboard
 		; round-trip, then restored.
@@ -768,7 +778,7 @@ try {
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
 ; The character mapping comes from modules/keymap/layout/layout_ergopti.ahk (read from the
 ; .keylayout) so the keystats heatmap reads the same source of truth without drifting.
-if Features["layout"]["ergopti_base"] {
+if Features["layout"][ConfigLeaf.ERGOPTI_BASE] {
 	; A row switched off types what the OS layout types there: its keys pass
 	; through, through variants created before every built-in layer below.
 	RegisterLayoutRowPassthrough()
@@ -826,8 +836,8 @@ _DeadKeyDispatch(BareChar, Mapping, *) {
 ; own magic-key position takes every level of the source character, a key the
 ; user chose only its plain press.
 _MagicKeyHotkeys := LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"],
-	ScriptInformation["MagicKeySourceChosen"], Features["layout"]["ctrl_magic_save"])
-if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
+	ScriptInformation["MagicKeySourceChosen"], Features["layout"][ConfigLeaf.CTRL_MAGIC_SAVE])
+if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
 	for _MagicKeyHotkey in _MagicKeyHotkeys {
 		switch _MagicKeyHotkey["kind"] {
 			case "remap":
@@ -841,7 +851,8 @@ if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
 			case "ctrl_save":
 				; InputLevel 3 overrides the Ctrl+source-scan → "^★" binding
 				; that RemapKey installs at InputLevel 2, routing to Ctrl+S instead.
-				Hotkey(_MagicKeyHotkey["hotkey"], (*) => SendFinalResult("^s"), "I3")
+				Hotkey(_MagicKeyHotkey["hotkey"], (*) => KeyboardShortcutRunLayoutChord("^" . StrUpper(ScriptInformation["MagicKeySourceScan"]))
+					|| SendFinalResult("^s"), "I3")
 		}
 	}
 }
@@ -1040,18 +1051,18 @@ _RegisterRollsAltGrHotkeys()
 ; script's own hook while it sends, so the paste it typed was never observed.
 ; These static contexts precede the dynamic row passthrough: each must stand
 ; down itself when its row belongs to the OS, including modified zoom chords.
-#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and LayoutRowIsEmulatedHotkey(A_ThisHotkey)
+#HotIf IsSet(Features) and Features["layout"][ConfigLeaf.ERGOPTI_BASE] and LayoutRowIsEmulatedHotkey(A_ThisHotkey)
 ^SC02F:: _RemapEmit("^v", "v")
 
 ; The first eligible context wins: leave the general zoom to non-Office hosts
 ; so the Wheel variants below can handle Word, Excel and the other Office apps.
-#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and !MicrosoftApps()
+#HotIf IsSet(Features) and Features["layout"][ConfigLeaf.ERGOPTI_BASE] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and !MicrosoftApps()
 *^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
 *^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf
 
 ; In Microsoft apps like Word or Excel, we can't use Numpad + to zoom
-#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and MicrosoftApps()
+#HotIf IsSet(Features) and Features["layout"][ConfigLeaf.ERGOPTI_BASE] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and MicrosoftApps()
 *^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with (Shift +) Ctrl + %
 *^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf

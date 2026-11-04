@@ -38,6 +38,7 @@ local M = {}
 local Logger         = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local Timings        = require("infra.timings")
+local PerfBudget     = require("perf_budget")
 local Paths          = require("infra.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
@@ -55,6 +56,10 @@ local _warmup_client = _http_adapter.new(_http_options)   -- warmup has independ
 -- Screen reading (modules/llm/screen_answer.lua) names its own provider, which
 -- need not be the active entry: its requests never share the prediction owner
 local _vision_client = _http_adapter.new(_http_options)
+-- The capability listings (llm/model_capabilities.lua): one client per
+-- provider, created at its first fetch, so a background fetch never cancels or
+-- waits for a prediction nor for another provider's listing
+local _capability_clients = {}
 -- The Test-API probe of an entry that is not the prediction backend (a
 -- decisions provider): it must cancel neither a prediction nor an agent request
 local _probe_client = _http_adapter.new(_http_options)
@@ -67,9 +72,17 @@ local ProviderUses   = require("modules.llm.provider_uses")
 local LocalServers   = require("modules.llm.local_servers")
 local LocalServerPorts = require("modules.llm.local_server_ports")
 local AuthPolicy     = require("llm.local_server_auth")
+local LocalServerMenu = require("llm.local_server_menu")
+local ThinkingOff    = require("llm.thinking_off")
+local ThinkingFamilies = require("modules.llm.thinking_families")
+local ModelCapabilities = require("llm.model_capabilities")
+local TableUtil = require("table_util")
+local Storage        = require("adapters.storage")
 local ProviderConfig = require("llm.provider_config_policy")
 local Json           = require("json")
 local ApiModelListing = require("llm.api_model_listing")
+local UrlTemplate    = require("llm.api_url_template")
+local TokenExchange  = require("llm.api_token_exchange")
 local LOG            = "llm.api_remote"
 -- One probe client per local server, created at its first sweep with the
 -- registry's local_server_probe_timeout_ms and pinned for the life of the
@@ -97,7 +110,8 @@ if not ok_kl then keystats = nil end
 --- empty-catalogue equivalents on any failure so that a corrupted JSON file
 --- never aborts the full keymap-engine require chain.
 -- The request formats a provider may declare
-local CATALOG_FORMATS = { openai = true, anthropic = true, gemini = true, backboard = true, decisions = true }
+local CATALOG_FORMATS = { openai = true, anthropic = true, gemini = true, perplexity_agent = true,
+	backboard = true, decisions = true }
 
 local function catalog_descriptor_is_valid(provider_id, desc)
 	if type(desc) ~= "table" then return false end
@@ -106,8 +120,13 @@ local function catalog_descriptor_is_valid(provider_id, desc)
 	end
 	if desc.label:match("^%s*$") then return false end
 	if not CATALOG_FORMATS[desc.format] then return false end
+	-- A refused block refuses the provider whole: its form could not ask the field
+	if UrlTemplate.optional_problem(desc.optional_address) then return false end
+	-- A per-account address (a template the add-entry form fills) leaves the model to the user
+	local fields, malformed = UrlTemplate.fields(desc.base_url)
+	if malformed then return false end
 	if provider_id ~= "openai_compat"
-		and (desc.base_url:match("^%s*$") or desc.default_model:match("^%s*$"))
+		and (desc.base_url:match("^%s*$") or (#fields == 0 and desc.default_model:match("^%s*$")))
 	then
 		return false
 	end
@@ -241,15 +260,32 @@ local function load_api_providers()
 			else
 				seen_providers[pid] = true
 				local desc = p_providers[pid]
+				local thinking_dialect, thinking_reason = nil, nil
+				local auth, auth_reason = nil, nil
+				if type(desc) == "table" then
+					thinking_dialect, thinking_reason = ThinkingOff.parse_dialect(desc.thinking_dialect)
+					auth, auth_reason = TokenExchange.parse(desc.auth)
+				end
 				if not catalog_descriptor_is_valid(pid, desc) then
 					Logger.warn("llm.api_remote", "api_providers.json: providers.%s has an invalid descriptor — skipped.", tostring(pid))
+				elseif auth_reason then
+					-- Sent as Bearer, the stored key itself would be refused: refuse the provider whole
+					Logger.error("llm.api_remote", "api_providers.json: providers.%s.auth is invalid (%s) — skipped.",
+						tostring(pid), tostring(auth_reason))
+				elseif not thinking_dialect then
+					-- A half-read dialect would let some models think: refuse the provider whole
+					Logger.error("llm.api_remote", "api_providers.json: providers.%s.thinking_dialect is invalid (%s) — skipped.",
+						tostring(pid), tostring(thinking_reason))
 				else
 					out_providers[pid] = {
+						auth          = auth,
 						label         = desc.label,
 						base_url      = desc.base_url,
 						default_model = desc.default_model,
 						format        = desc.format,
 						model_extras  = normalize_model_extras(desc.model_extras),
+						optional_address = desc.optional_address,
+						thinking_dialect = thinking_dialect,
 					}
 					out_order[#out_order + 1] = pid
 				end
@@ -295,6 +331,9 @@ local function register_local_servers()
 				default_model = "",
 				format        = "openai",
 				model_extras  = {},
+				-- local_servers.json request_fields turn every model's thinking off;
+				-- its thinking_dialect adds a family's level on top
+				thinking_dialect = LocalServers.THINKING_DIALECT or {},
 				local_server  = true,
 				request_fields = LocalServers.REQUEST_FIELDS,
 			}
@@ -397,6 +436,9 @@ local _token_cache = {}
 local _token_inflight = {}
 local _token_cleanup_debt = false
 local _token_cleanup_in_progress = false
+-- Resolver waiters parked on a pending access-token exchange (waiter -> true):
+-- settled with the Keychain waiters when the remote identity changes
+local _access_waiters = {}
 local _availability_pause_cleanup_pending = false
 local _warmup_client_recovery_token = nil
 -- Entries already named for a provider this build no longer has, so each is
@@ -724,6 +766,20 @@ local function settle_token_resolutions(reason, notify_waiters)
 		}
 	end
 
+	-- An exchange waiter owns no native operation: the exchange itself goes on
+	-- and caches its token, so fencing the waiter settles it
+	local access_waiters = {}
+	for waiter in pairs(_access_waiters) do access_waiters[#access_waiters + 1] = waiter end
+	_access_waiters = {}
+	for _, waiter in ipairs(access_waiters) do
+		if waiter.active == true then
+			waiter.active = false
+			if notify_waiters == true then
+				invoke_token_callback(waiter.callback, false, nil, reason)
+			end
+		end
+	end
+
 	local settled = true
 	for _, owned in ipairs(records) do
 		local cache_key = owned.cache_key
@@ -805,6 +861,10 @@ local function invalidate_identity()
 	end
 end
 
+-- Starts the access-token exchange of the active entry once the identity
+-- settles (assigned below, after the resolver it calls)
+local schedule_access_prewarm
+
 --- Replace the full list of configured API entries. Used at load time from
 --- the persisted JSON sidecar and whenever the tray menu adds / removes one.
 --- @param entries table Array of entry tables. Pass {} to clear.
@@ -816,6 +876,7 @@ function M.set_entries(entries)
 		if type(e) == "table" then table.insert(_entries, e) end
 	end
 	Logger.debug(LOG, "API entries set (%d entry/entries).", #_entries)
+	schedule_access_prewarm()
 end
 
 function M.get_entries()
@@ -841,6 +902,7 @@ function M.set_active_entry_id(id)
 	_active_id = id
 	invalidate_identity()
 	Logger.debug(LOG, "Active API entry id: '%s'.", id)
+	schedule_access_prewarm()
 end
 
 function M.get_active_entry_id()
@@ -871,6 +933,179 @@ end
 --- @return table|nil entry
 function M.get_active_entry()
 	return find_active_entry()
+end
+
+-- Access tokens of the providers that exchange the stored key (auth in
+-- api_providers.json), per provider and cleartext key: { token, expires_at,
+-- pending, waiters, failure, retry_at }. In memory only, and never logged.
+local _access = {}
+local _access_client = _http_adapter.new(_http_options)
+-- Seconds before a failed exchange is tried again, so a refused key does
+-- not reach the token service on every keystroke
+local ACCESS_RETRY_SECONDS = 60
+
+--- The access slot of a provider and cleartext key.
+--- @param provider_id string
+--- @param key string
+--- @return table
+local function access_slot(provider_id, key)
+	local id = tostring(provider_id) .. "\0" .. tostring(key)
+	_access[id] = _access[id] or { waiters = {} }
+	return _access[id]
+end
+
+--- Arms fn for the next timer tick: one slice of a signed assertion
+--- (api_token_exchange.drive).
+--- @param fn function
+--- @return boolean committed
+local function schedule_access_slice(fn)
+	local _, committed = TimerScheduler.after(0, fn)
+	return committed == true
+end
+
+--- Exchanges a cleartext key for an access token, once at a time;
+--- on_done(ok, reason) runs when the exchange settles.
+--- @param provider_id string
+--- @param key string The cleartext stored key.
+--- @param on_done function|nil
+local function refresh_access(provider_id, key, on_done)
+	local provider = M.PROVIDERS[provider_id]
+	local slot = access_slot(provider_id, key)
+	if type(on_done) == "function" then slot.waiters[#slot.waiters + 1] = on_done end
+	if slot.pending then return end
+	local function settle(ok, reason)
+		slot.pending = false
+		local waiters = slot.waiters
+		slot.waiters = {}
+		for _, waiter in ipairs(waiters) do invoke_token_callback(waiter, ok, reason) end
+	end
+	slot.pending = true
+	-- A service-account key's assertion is signed one slice per timer tick
+	-- (api_token_exchange.drive): the pure-Lua signature takes a few hundred
+	-- milliseconds, which would otherwise hold the keyboard's event taps
+	TokenExchange.drive(TokenExchange.begin(provider.auth, key, os.time()), schedule_access_slice,
+		function(request, reason)
+			if not request then
+				slot.failure, slot.retry_at = reason, TimerScheduler.now() + ACCESS_RETRY_SECONDS
+				Logger.error(LOG, "Access token of provider '%s' cannot be asked: %s.", tostring(provider_id), reason)
+				return settle(false, reason)
+			end
+			Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", tostring(provider_id))
+			local dispatched = _access_client.post(request.url, request.headers, request.body, function(r)
+				r = type(r) == "table" and r or {}
+				local raw = type(r.body) == "string" and r.body ~= "" and r.body or r.error_body
+				local decoded_ok, decoded = pcall(JsonCodec.decode, type(raw) == "string" and raw or "")
+				local token, why = TokenExchange.read(provider.auth, r.status, decoded_ok and decoded or nil,
+					TimerScheduler.now())
+				if token then
+					slot.token, slot.expires_at, slot.failure, slot.retry_at = token.token, token.expires_at, nil, nil
+					Logger.success(LOG, "Access token of provider '%s' received (valid %d s).", tostring(provider_id),
+						math.floor(token.expires_at - TimerScheduler.now()))
+					return settle(true, nil)
+				end
+				slot.failure, slot.retry_at = why, TimerScheduler.now() + ACCESS_RETRY_SECONDS
+				Logger.error(LOG, "Access token of provider '%s' refused: %s.", tostring(provider_id), why)
+				return settle(false, why)
+			end)
+			if not dispatched then
+				slot.failure = "the token exchange could not be sent"
+				slot.retry_at = TimerScheduler.now() + ACCESS_RETRY_SECONDS
+				Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.",
+					tostring(provider_id))
+				return settle(false, slot.failure)
+			end
+		end)
+end
+
+--- The access token a provider's requests carry now for a cleartext key,
+--- refreshed in the background when it nears its end.
+--- @param provider_id string
+--- @param key string
+--- @return string|nil token, string|nil reason
+local function access_token(provider_id, key)
+	local provider = M.PROVIDERS[provider_id]
+	local slot = access_slot(provider_id, key)
+	local now = TimerScheduler.now()
+	local usable, refresh = TokenExchange.state(provider.auth, slot.token and slot or nil, now)
+	if refresh and not slot.pending and (slot.retry_at == nil or now >= slot.retry_at) then
+		refresh_access(provider_id, key)
+	end
+	if usable then return slot.token, nil end
+	return nil, slot.failure or "the access token is being fetched: try again in a moment"
+end
+
+--- Fetches the access token of a provider and cleartext key when the
+--- provider exchanges keys, then runs on_ready(ok, reason, token); token is
+--- the key itself for any other provider.
+--- @param provider_id string
+--- @param key string
+--- @param on_ready function
+function M.prepare_access(provider_id, key, on_ready)
+	local provider = M.PROVIDERS[provider_id]
+	if not (provider and provider.auth) then return on_ready(true, nil, key) end
+	local token = access_token(provider_id, key)
+	if token then return on_ready(true, nil, token) end
+	local slot = access_slot(provider_id, key)
+	if not slot.pending and slot.retry_at and TimerScheduler.now() < slot.retry_at then
+		-- A refused exchange waits its pause: the reason answers at once
+		return on_ready(false, slot.failure, nil)
+	end
+	refresh_access(provider_id, key, function(ok, reason)
+		on_ready(ok, reason, ok and access_slot(provider_id, key).token or nil)
+	end)
+end
+
+--- Hands a resolved entry to a resolver callback, its stored key replaced by
+--- the access token when its provider exchanges keys. While that exchange is
+--- pending the callback waits for it, owned by the returned lease, so the
+--- first request after start or a key change is sent rather than refused;
+--- a refused exchange in its retry pause answers at once.
+--- @param callback function
+--- @param copy table The entry with its cleartext key.
+--- @return table lease Cancels a wait; already settled otherwise.
+local function deliver_resolved(callback, copy)
+	local provider = M.PROVIDERS[copy.provider]
+	if not (provider and provider.auth) then
+		invoke_token_callback(callback, true, copy, nil)
+		return settled_token_lease()
+	end
+	local key = copy.token
+	local token, reason = access_token(copy.provider, key)
+	if token then
+		copy.token = token
+		invoke_token_callback(callback, true, copy, nil)
+		return settled_token_lease()
+	end
+	if access_slot(copy.provider, key).pending ~= true then
+		Logger.warn(LOG, "API entry '%s' has no access token: %s.", tostring(copy.id), reason)
+		invoke_token_callback(callback, false, nil, "access_token_unavailable")
+		return settled_token_lease()
+	end
+	local waiter = { callback = callback, active = true, generation = _identity_generation }
+	_access_waiters[waiter] = true
+	Logger.debug(LOG, "API entry '%s' waits for its access token.", tostring(copy.id))
+	refresh_access(copy.provider, key, function(ok, why)
+		if waiter.active ~= true then return end
+		waiter.active = false
+		_access_waiters[waiter] = nil
+		if waiter.generation ~= _identity_generation then
+			return invoke_token_callback(callback, false, nil, "stale_identity")
+		end
+		local fresh = ok == true and access_slot(copy.provider, key).token or nil
+		if type(fresh) ~= "string" or fresh == "" then
+			Logger.warn(LOG, "API entry '%s' has no access token: %s.", tostring(copy.id), tostring(why))
+			return invoke_token_callback(callback, false, nil, "access_token_unavailable")
+		end
+		copy.token = fresh
+		invoke_token_callback(callback, true, copy, nil)
+	end)
+	return {
+		cancel = function()
+			waiter.active = false
+			_access_waiters[waiter] = nil
+			return true
+		end,
+	}
 end
 
 --- Returns a shallow copy whose token is cleartext, leaving the persisted entry
@@ -909,24 +1144,23 @@ function M.resolve_active_entry(callback)
 	-- A local server the user gave no key to is sent the one its own settings
 	-- file holds, else none
 	if type(stored) ~= "string" or stored == "" then
-		invoke_token_callback(callback, true, resolved_copy(LocalServers.discovered_key(entry.provider, entry.base_url)), nil)
-		return settled_token_lease()
+		return deliver_resolved(callback, resolved_copy(LocalServers.discovered_key(entry.provider, entry.base_url)))
 	end
 	if not TokenCrypto.is_encrypted(stored) then
-		invoke_token_callback(callback, true, resolved_copy(stored), nil)
-		return settled_token_lease()
+		return deliver_resolved(callback, resolved_copy(stored))
 	end
 
 	local cache_key = tostring(entry.id) .. "\0" .. stored
 	local cached = _token_cache[cache_key]
 	if type(cached) == "string" and cached ~= "" then
-		invoke_token_callback(callback, true, resolved_copy(cached), nil)
-		return settled_token_lease()
+		return deliver_resolved(callback, resolved_copy(cached))
 	end
 
 	local waiter = { callback = callback, active = true, record = nil }
 	local lease = {}
 	lease.cancel = function()
+		-- Past the Keychain read, the lease owns the access-token wait
+		if waiter.access_lease then return waiter.access_lease.cancel() end
 		if waiter.active ~= true then return true end
 		local record = waiter.record
 		if type(record) ~= "table" or record.done == true then
@@ -999,8 +1233,8 @@ function M.resolve_active_entry(callback)
 		for _, pending_waiter in ipairs(record.waiters) do
 			if pending_waiter.active == true then
 				pending_waiter.active = false
-				invoke_token_callback(pending_waiter.callback,
-					ok, ok and resolved_copy(cleartext) or nil, reason)
+				if ok then pending_waiter.access_lease = deliver_resolved(pending_waiter.callback, resolved_copy(cleartext))
+				else invoke_token_callback(pending_waiter.callback, false, nil, reason) end
 			end
 		end
 	end
@@ -1025,6 +1259,36 @@ function M.resolve_active_entry(callback)
 		end
 	end
 	return lease
+end
+
+-- Whether an access-token prewarm is already scheduled for the next tick
+local _access_prewarm_scheduled = false
+
+schedule_access_prewarm = function()
+	if _access_prewarm_scheduled then return end
+	local entry = find_active_entry()
+	local provider = entry and M.PROVIDERS[entry.provider]
+	if not (provider and provider.auth) then return end
+	-- On the next tick: the menu sets the entries and the active id in turn,
+	-- and the exchange is for the identity they leave
+	_access_prewarm_scheduled = true
+	local _, committed = TimerScheduler.after(0, function()
+		_access_prewarm_scheduled = false
+		local current = find_active_entry()
+		local current_provider = current and M.PROVIDERS[current.provider]
+		if not (current_provider and current_provider.auth) then return end
+		Logger.debug(LOG, "Starting the access-token exchange of API entry '%s'.", tostring(current.id))
+		M.resolve_active_entry(function(ok, _, reason)
+			if ok ~= true and reason ~= "identity_changed" and reason ~= "stale_identity" then
+				Logger.warn(LOG, "Access-token prewarm of API entry '%s' did not complete: %s.",
+					tostring(current.id), tostring(reason))
+			end
+		end)
+	end)
+	if committed ~= true then
+		_access_prewarm_scheduled = false
+		Logger.warn(LOG, "Access-token prewarm of API entry '%s' could not be scheduled.", tostring(entry.id))
+	end
 end
 
 --- Starts a best-effort asynchronous token resolution after persisted state
@@ -1138,6 +1402,10 @@ local function resolve_base_url(entry, provider)
 		local scan = LocalServers.is_local(entry.provider) and LocalServers.port_scan(entry.provider) or nil
 		raw = scan and scan.running and scan.base_url or provider.base_url
 	end
+	-- A per-account address is filled when the entry is added; its template never leaves
+	if UrlTemplate.has_placeholder(raw) then
+		return nil, "the entry has no account address: add it again from the provider list"
+	end
 	return normalize_base_url(raw)
 end
 
@@ -1234,6 +1502,7 @@ local function build_url(base, format, model, token)
 		local enc = _http_adapter.encodeForQuery(token)
 		return base .. "/models/" .. segment .. ":generateContent?key=" .. enc, nil
 	end
+	if format == Formats.AGENT_FORMAT then return base .. Formats.AGENT_PATH, nil end
 	-- OpenAI / OpenAI-compatible
 	return base .. "/chat/completions", nil
 end
@@ -1358,6 +1627,10 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 			generationConfig  = { temperature = temperature, maxOutputTokens = max_tokens },
 		}
 	end
+	if format == Formats.AGENT_FORMAT then
+		return Formats.agent_body({ model = model, system = system_prompt, text = user_prompt or "",
+			max_tokens = max_tokens, temperature = temperature })
+	end
 	-- OpenAI Chat Completions
 	local payload = {
 		model       = model,
@@ -1384,6 +1657,7 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 end
 M.__build_payload_for_test = build_payload
 
+
 -- Byte ceiling of the provider message shown in notifications and logs (Linux: 200).
 local MAX_SERVER_MESSAGE = 200
 
@@ -1407,6 +1681,165 @@ local function extract_server_message(body)
 	return nil
 end
 M.__extract_server_message_for_test = extract_server_message
+
+--- The reasoning control of every model family (thinking_off.json), shared
+--- with every Ollama body (modules/llm/thinking_families.lua).
+local THINKING_FAMILIES = ThinkingFamilies.families()
+
+-- Storage key of the refused thinking fields, kept across restarts
+M.THINKING_REFUSED_KEY = "llm_thinking_refused"
+
+-- Fields a provider refused for a model (HTTP 400 naming them), by
+-- "<provider>|<model>": later requests never send them again. Read from
+-- storage at the first request.
+local _thinking_refused = nil
+
+--- The refusal store, read from storage on first use.
+--- @return table key -> set of field names.
+local function thinking_refused()
+	if _thinking_refused then return _thinking_refused end
+	local ok, stored = Storage.read_exact(M.THINKING_REFUSED_KEY)
+	if not ok then
+		Logger.error(LOG, "The refused thinking fields could not be read; they are learned again.")
+		stored = nil
+	end
+	local dropped
+	_thinking_refused, dropped = ThinkingOff.refusals_parse(stored, os.time(), THINKING_FAMILIES.expiry_sec or 0) -- no families table: nothing is remembered
+	if dropped > 0 then Logger.warn(LOG, "%d malformed refused thinking field entr(ies) dropped.", dropped) end
+	return _thinking_refused
+end
+
+-- The capability listings by provider id (llm/model_capabilities.lua cache)
+local _capabilities = {}
+
+--- The capability check of one provider's model for the resolver: nil when
+--- the provider has no listing.
+--- @param provider_id string
+--- @param model string
+--- @return function|nil lacks (kind, level, template) -> boolean
+local function capability_lacks(provider_id, model)
+	local config = THINKING_FAMILIES.capability
+	if not config or not config.providers[provider_id] then return nil end
+	local record = ModelCapabilities.record(ModelCapabilities.records(_capabilities, provider_id), tostring(model))
+	if not record then return nil end
+	return function(kind, level, template)
+		local lacking = ModelCapabilities.lacks(record, kind, level, template)
+		if lacking then
+			Logger.debug(LOG, "Model %s of provider '%s' lacks the %s control (its listing): skipped.",
+				tostring(model), tostring(provider_id), kind)
+		end
+		return lacking
+	end
+end
+
+--- Fetches a provider's capability listing when it is missing or stale: on a
+--- zero-delay timer and with its own HTTP client, so the request that asked
+--- for it is never delayed. A failed fetch keeps the old listing.
+--- @param provider_id string
+--- @param provider table The catalogue descriptor.
+--- @param base string The provider's base URL.
+--- @param token string The entry's key.
+--- @return boolean scheduled
+local function refresh_capabilities(provider_id, provider, base, token)
+	local config = THINKING_FAMILIES.capability
+	local listing = config and config.providers[provider_id]
+	if not listing or type(base) ~= "string" or base == ""
+		or not ModelCapabilities.needs_fetch(_capabilities, provider_id, os.time(), config.ttl_sec) then
+		return false
+	end
+	local url = build_models_url(base, provider.format, token)
+	local query = config.page_query[listing]
+	if query then url = url .. (url:find("?", 1, true) and "&" or "?") .. query end
+	local headers = build_headers(provider.format, token)
+	ModelCapabilities.begin(_capabilities, provider_id)
+	local function finish(records)
+		ModelCapabilities.finish(_capabilities, provider_id, records, os.time())
+	end
+	local function fetch()
+		Logger.info(LOG, "Capability listing of provider %s requested.", tostring(provider_id))
+		local client = _capability_clients[provider_id] or _http_adapter.new(_http_options)
+		_capability_clients[provider_id] = client
+		local dispatched = client.get(url, headers, function(r)
+			if type(r) ~= "table" or r.ok ~= true then
+				Logger.warn(LOG, "Capability listing of provider %s unavailable (status=%s): kept the old one.",
+					tostring(provider_id), tostring(type(r) == "table" and r.status or nil))
+				return finish(nil)
+			end
+			local decoded_ok, decoded = pcall(JsonCodec.decode, r.body)
+			local records, reason = ModelCapabilities.parse(listing, decoded_ok and decoded or nil)
+			if not records then
+				Logger.warn(LOG, "Capability listing of provider %s could not be read (%s).", tostring(provider_id), tostring(reason))
+				return finish(nil)
+			end
+			Logger.info(LOG, "Capability listing of provider %s: %d model(s) described.", tostring(provider_id),
+				TableUtil.count(records))
+			finish(records)
+		end)
+		if dispatched ~= true then
+			Logger.warn(LOG, "Capability listing of provider %s could not be sent.", tostring(provider_id))
+			finish(nil)
+		end
+	end
+	local _, committed = TimerScheduler.after(0, fetch)
+	if committed ~= true then
+		Logger.warn(LOG, "Capability listing of provider %s could not be scheduled.", tostring(provider_id))
+		finish(nil)
+	end
+	return committed == true
+end
+M.__capabilities_for_test = function() return _capabilities end
+
+--- Turns the model's reasoning off in a request body: its family's control
+--- (thinking_off.json) through the provider's thinking_dialect
+--- (llm/thinking_off.lua). A field the body already sets wins.
+--- @param provider_id string The provider id, for the log and the refusals.
+--- @param provider table The catalogue descriptor.
+--- @param model string The model the body names.
+--- @param body table The request body, changed in place.
+--- @return table body
+--- @return table added Paths added, for refusal_retry.
+local function apply_thinking_off(provider_id, provider, model, body)
+	local family, kind, added = ThinkingOff.apply(THINKING_FAMILIES, provider.thinking_dialect or {}, model, body,
+		thinking_refused()[tostring(provider_id) .. "|" .. tostring(model)], capability_lacks(provider_id, model))
+	if #added > 0 then
+		Logger.debug(LOG, "Thinking off: family %d applies to model %s through provider '%s' (%s).",
+			family, tostring(model), tostring(provider_id), tostring(kind))
+	end
+	-- These models answer HTTP 400 to any temperature but the default
+	if body.temperature ~= nil and ThinkingOff.default_sampling_only(THINKING_FAMILIES, model) then
+		body.temperature = nil
+		Logger.debug(LOG, "Model %s accepts only the default sampling: no temperature is sent.", tostring(model))
+	end
+	return body, added
+end
+
+--- When a provider answered HTTP 400 naming a field apply_thinking_off added,
+--- remembers that field as refused for the provider and model and removes it
+--- from the body, so the caller can send the request once more without it.
+--- @param provider_id string
+--- @param model string
+--- @param status any HTTP status.
+--- @param response_body any The provider's error body.
+--- @param added table apply_thinking_off's paths.
+--- @param body table The request body, changed in place.
+--- @return boolean retry True when a refused field was removed.
+local function thinking_refusal(provider_id, model, status, response_body, added, body)
+	local field = ThinkingOff.refused_field(status, extract_server_message(response_body), added)
+	if not field then return false end
+	if not ThinkingOff.record_refusal(thinking_refused(), tostring(provider_id), tostring(model), field, os.time()) then
+		-- Skipped for this session all the same; only the restart forgets it
+		_thinking_refused[tostring(provider_id) .. "|" .. tostring(model)] = { [field] = os.time() }
+		Logger.warn(LOG, "The refused thinking fields are full: '%s' for model %s is not remembered.", field, tostring(model))
+	elseif Storage.set(M.THINKING_REFUSED_KEY, _thinking_refused) ~= true then
+		Logger.error(LOG, "The refused thinking fields could not be saved; they hold until the next restart.")
+	end
+	ThinkingOff.strip(body, added, field)
+	Logger.warn(LOG, "Provider '%s' refused the thinking field '%s' for model %s: sent once more without it, and never again.",
+		tostring(provider_id), field, tostring(model))
+	return true
+end
+M.__thinking_refused_for_test = function() return thinking_refused() end
+M.__apply_thinking_off_for_test = apply_thinking_off
 
 --- Builds the failure detail a caller shows: the status and the provider's own message.
 --- @param reason string Short reason.
@@ -2163,6 +2596,9 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 
 	--- Handles the provider's answer: the chat completion, or the Backboard message.
 	--- @param r table HTTP response.
+	-- Declared before on_response, which re-sends the payload once when the
+	-- provider refuses a thinking field (filled where the payload is built)
+	local thinking_retry = { added = {}, retried = false, payload = nil, resend = nil }
 	local function on_response(r)
 		if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then
 			Logger.debug(LOG, "[%s] #%d response discarded after remote identity changed.",
@@ -2178,6 +2614,11 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		-- one backend never migrated off that anti-pattern.
 		Logger.pcall(LOG, function()
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+			if not r.ok and not thinking_retry.retried and thinking_retry.payload
+				and thinking_refusal(entry.provider, model, status, body, thinking_retry.added, thinking_retry.payload) then
+				thinking_retry.retried = true
+				if thinking_retry.resend(on_response) then return end
+			end
 			if not r.ok then
 				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
 					model, req_id, tostring(status), (body or ""):sub(1, 200))
@@ -2309,8 +2750,11 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 	end
 
 	local provider_extras = type(provider.model_extras) == "table" and provider.model_extras[model] or nil
-	local payload = build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens,
-		provider_extras, provider.request_fields)
+	local payload, added = apply_thinking_off(entry.provider, provider, model,
+		build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens,
+			provider_extras, provider.request_fields))
+	refresh_capabilities(entry.provider, provider, base, entry.token or "")
+	thinking_retry.added, thinking_retry.payload = added, payload
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "[%s] #%d Payload encode failed — %s", model, req_id, tostring(enc_err))
@@ -2319,6 +2763,15 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 	end
 
 	local headers = build_headers(provider.format, entry.token or "")
+	-- Sends the payload once more, after a refused thinking field
+	thinking_retry.resend = function(callback)
+		local again = JsonCodec.encode(thinking_retry.payload)
+		if not again or not request_authorized("Raw text", current, function(reason)
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", reason) end
+		end) then return false end
+		_infer_client.post(url, headers, again, callback)
+		return true
+	end
 
 	Logger.debug(LOG, "[%s] #%d POST -> %s (provider=%s, %d chars prompt)",
 		model, req_id, redact_url(url), provider.format, #(user_prompt or ""))
@@ -2491,7 +2944,15 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 			fail("invalid_endpoint")
 			return
 		end
-		on_ready(provider, entry, token, base)
+		-- The stored key is exchanged for the short-lived token the requests carry
+		M.prepare_access(provider_id, token, function(ok, reason, access)
+			if not ok then
+				Logger.error(LOG, "%s request for provider '%s' has no access token: %s.", label, provider_id, tostring(reason))
+				fail("access_token_unavailable")
+				return
+			end
+			on_ready(provider, entry, access, base)
+		end)
 	end
 	if type(stored_token) ~= "string" or stored_token == "" then
 		-- key_missing() let it through: a local server given no key, sent the
@@ -2534,6 +2995,7 @@ end
 --- @param with_extras boolean|nil Merge the model's model_extras of
 ---        api_providers.json, and a local server's request_fields of
 ---        local_servers.json, into an OpenAI-shape body, as a prediction does.
+---        The provider's thinking_off rules apply to every body regardless.
 --- @param current function|nil Must still return true immediately before HTTP.
 --- @return boolean sent True when the key resolution started.
 local function request_prebuilt(client, label, use, provider_id, model, body, on_text, on_fail, with_extras, current)
@@ -2572,6 +3034,9 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 		if with_extras and provider.format == "openai" then
 			AuthPolicy.apply_request_fields(body, provider.request_fields)
 		end
+		local _, added = apply_thinking_off(provider_id, provider, model, body)
+		refresh_capabilities(provider_id, provider, base, token)
+		local retried = false
 		local url, url_error = build_url(base, provider.format, model, token)
 		if not url then
 			log_endpoint_refusal(label:lower(), entry, url_error)
@@ -2591,9 +3056,21 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 		-- the action that captured this private request. Check its own authority
 		-- at the actual transport boundary, independently of provider selection.
 		if not request_authorized(label, current, fail) then return end
-		client.post(url, build_headers(provider.format, token), encoded, function(r)
+		--- Sends the body once more, after a refused thinking field.
+		--- @return boolean sent
+		local function resend(callback)
+			local again = JsonCodec.encode(body)
+			if not again or not request_authorized(label, current, fail) then return false end
+			client.post(url, build_headers(provider.format, token), again, callback)
+			return true
+		end
+		local function on_answer(r)
 			Logger.pcall(LOG, function()
 				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+				if not r.ok and not retried and thinking_refusal(provider_id, model, r.status, r.body, added, body) then
+					retried = true
+					if resend(on_answer) then return end
+				end
 				if not r.ok then
 					local message = extract_server_message(r.body)
 					Logger.error(LOG, "%s request to provider '%s' failed in %dms: HTTP %s (%s).",
@@ -2613,9 +3090,12 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 				end
 				Logger.info(LOG, "%s answer of provider '%s' received in %dms (%d char(s)).",
 					label, provider_id, ms, #text)
+				PerfBudget.judge(Logger, LOG, "llm.remote", ms,
+					function() return Timings.ms("budgets", "llm_remote_request_ms") end)
 				ApiCommon.protected_call(on_text, "on_text", text)
 			end)
-		end)
+		end
+		client.post(url, build_headers(provider.format, token), encoded, on_answer)
 	end)
 end
 
@@ -2629,8 +3109,9 @@ end
 --- @param current function|nil Must still return true after a pending key resolves.
 --- @return boolean sent True when the key resolution started.
 function M.request_vision(provider_id, model, body, on_text, on_fail, current)
+	-- A local server's request_fields turn its thinking off for a screenshot too
 	return request_prebuilt(_vision_client, "Vision", ProviderUses.VISION, provider_id, model, body,
-		on_text, on_fail, nil, current)
+		on_text, on_fail, true, current)
 end
 
 --- Posts one prebuilt text chat body (llm/vision.lua build_request without an
@@ -2692,6 +3173,8 @@ function M.request_backboard(provider_id, spec, on_answer, on_fail, use, current
 					return
 				end
 				Logger.info(LOG, "Agent answer of provider '%s' received in %dms.", provider_id, ms)
+				PerfBudget.judge(Logger, LOG, "llm.remote", ms,
+					function() return Timings.ms("budgets", "llm_remote_request_ms") end)
 				ApiCommon.protected_call(on_answer, "on_answer", decoded)
 			end)
 		end, function(reason) fail(reason) end, current)
@@ -2737,6 +3220,8 @@ local function post_decisions(client, provider_id, base, token, body, on_answers
 				return
 			end
 			Logger.info(LOG, "Decisions answer of provider '%s' received in %dms.", provider_id, ms)
+			PerfBudget.judge(Logger, LOG, "llm.remote", ms,
+				function() return Timings.ms("budgets", "llm_remote_request_ms") end)
 			on_answers(answers, ms)
 		end)
 	end)
@@ -2849,30 +3334,44 @@ function M.test_request(entry, spec, on_ok, on_fail)
 		return fail("invalid probe sampling")
 	end
 	local t0 = TimerScheduler.now()
-	local ok_send, send_err = xpcall(function()
-		post_and_parse_resolved(entry,
-			(type(entry.model) == "string" and entry.model ~= "") and entry.model or nil,
-			spec.system_prompt, spec.user_text, "",
-			spec.temperature, spec.max_tokens, 1, false,
-			-- The probe judges the raw reply: the prediction parser applies the
-			-- menu's minimum word count, which refused the one-word "OK" the probe
-			-- asks for, so every real key failed its test.
-			nil,
-			function(detail)
-				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "request_failed", detail) end
-			end,
-			ApiCommon.new_dedup_stats(),
-			function(raw)
-				local text = type(raw) == "string" and text_utils.trim(raw) or ""
-				if text == "" then
-					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "empty_reply") end
-					return
-				end
-				local ms = math.max(0, math.floor((TimerScheduler.now() - t0) * 1000))
-				if type(on_ok) == "function" then ApiCommon.protected_call(on_ok, "test_request_ok", text, ms) end
-			end)
-	end, debug.traceback)
-	if not ok_send then return fail("dispatch_raised: " .. tostring(send_err)) end
+	--- Sends the probe with the key, or the access token, its requests carry.
+	--- @param probe table The entry, its token ready to send.
+	local function send(probe)
+		local ok_send, send_err = xpcall(function()
+			post_and_parse_resolved(probe,
+				(type(entry.model) == "string" and entry.model ~= "") and entry.model or nil,
+				spec.system_prompt, spec.user_text, "",
+				spec.temperature, spec.max_tokens, 1, false,
+				-- The probe judges the raw reply: the prediction parser applies the
+				-- menu's minimum word count, which refused the one-word "OK" the probe
+				-- asks for, so every real key failed its test.
+				nil,
+				function(detail)
+					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "request_failed", detail) end
+				end,
+				ApiCommon.new_dedup_stats(),
+				function(raw)
+					local text = type(raw) == "string" and text_utils.trim(raw) or ""
+					if text == "" then
+						if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "empty_reply") end
+						return
+					end
+					local ms = math.max(0, math.floor((TimerScheduler.now() - t0) * 1000))
+					if type(on_ok) == "function" then ApiCommon.protected_call(on_ok, "test_request_ok", text, ms) end
+				end)
+		end, debug.traceback)
+		if not ok_send then return fail("dispatch_raised: " .. tostring(send_err)) end
+		return true
+	end
+	if not (provider and provider.auth) then return send(entry) end
+	-- The key test waits for the access token, then probes with it
+	M.prepare_access(entry.provider, entry.token, function(ok, reason, access)
+		if not ok then return fail(reason) end
+		local probe = {}
+		for key, value in pairs(entry) do probe[key] = value end
+		probe.token = access
+		send(probe)
+	end)
 	return true
 end
 
@@ -3299,7 +3798,10 @@ function M.local_server_views()
 		if target and descriptor then
 			local scan = M.is_local_server(id) and LocalServers.port_scan(id) or nil
 			local verdict = LocalServers.result(id)
-			local view = { id = id, display_name = descriptor.label, base_url = target.base_url,
+			-- A row whose response names another row of its address shows that name
+			local catalogued = LocalServers.SERVERS[id] ~= nil
+			local view = { id = id, base_url = target.base_url,
+				display_name = catalogued and LocalServerMenu.label_of(LocalServers.SERVERS, id, verdict) or descriptor.label,
 				port = tonumber(target.base_url:match("^%a[%w+.-]*://[^/]-:(%d+)")), port_source = target.port_source }
 			if target.port_source ~= "user" and scan and scan.running == false then
 				view.reason = "not_running"

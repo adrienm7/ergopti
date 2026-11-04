@@ -25,7 +25,7 @@ local function with_native(body)
 			end)
 			io.open = function(path, mode)
 				local handle, detail = saved_open(path, mode)
-				if not handle or path ~= f.path .. native.WRITE_LOCK_SUFFIX or mode ~= "a+" then return handle, detail end
+				if not handle or path ~= native.write_lock_path(f.path) or mode ~= "a+" then return handle, detail end
 				local wrapper = { close = function()
 					f.closes = f.closes + 1
 					if not f.release then return nil, "independent native close refusal" end
@@ -59,7 +59,7 @@ local function with_native(body)
 			local settled = f.Config.reload()
 			io.open, os.rename = saved_open, saved_rename
 			for _, handle in ipairs(f.handles) do pcall(function() handle:close() end) end
-			os.remove(f.path); os.remove(f.path .. native.WRITE_LOCK_SUFFIX)
+			os.remove(f.path); os.remove(native.write_lock_path(f.path))
 			if not ok then error(detail, 0) end
 			helpers.assert_true(settled, "fixture must leave no retained native publication")
 			helpers.assert_eq(f.held, false, "fixture must release the actual injected mutex")

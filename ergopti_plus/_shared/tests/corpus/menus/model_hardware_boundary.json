@@ -26,8 +26,8 @@
 		"ram_gb": 22.8
 	},
 	"header": {
-		"ahk": "REQUIREMENTS (Ollama)",
-		"hs": "— REQUIREMENTS (Ollama 🦙) —"
+		"ahk": "Requirements (Ollama)",
+		"hs": "— Requirements (Ollama 🦙) —"
 	},
 	"marker_key": "button.cancel",
 	"marker_english": "Cancel",

@@ -9,10 +9,12 @@
 --- this module owns its install task, marker parsing, and progress UI.
 ---
 --- FEATURES & RATIONALE:
---- 1. Consent-gated download: an existing Ollama (resolved by ollama_binary)
----    is always reused; the pinned release is downloaded only through
----    install_for_selection(), after the user selected the Ollama backend and
----    accepted the offer. Any other check settles as "missing" instead.
+--- 1. Consent-gated install: Ergopti's own runtime (resolved by ollama_binary)
+---    is always reused; it is installed only through
+---    install_native_for_selection(), after the user selected the Ollama
+---    backend and accepted the offer. Any other check settles as "missing".
+---    The stock official release is never downloaded (owned-runtimes row
+---    "Ollama installers (legacy)", deleted).
 --- 2. Silent fast path: when the executable already exists, provisioning exits
 ---    silently and daemon acquisition remains under the Lua owner.
 --- 3. Granular progress UX: the install marker and Lua-owned daemon transition
@@ -91,6 +93,8 @@ local FAILURE_TAIL_CHARS    = 280
 -- Output lines a failed bootstrap logs, so the log names where it stopped.
 local FAILURE_LOG_LINES     = 12
 local SUCCESS_AUTO_HIDE_SEC = Timings.sec("tooltip", "success_banner_autohide_ms")
+local RUNTIME_METADATA_POLL_SEC = Timings.sec("llm", "ollama_runtime_metadata_poll_ms")
+local RUNTIME_METADATA_BUDGET_SEC = require("modules.llm.bootstrap_retry_generated").admission_seconds
 local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_ms")
 
 -- "pending" until the first check, "ready" once an executable is provisioned,
@@ -101,10 +105,6 @@ local _daemon_state         = "pending"
 local _last_daemon_failure_message = nil
 local _native_pty_preflight_owner = nil
 local _task_running         = false  -- reentrancy guard: prevents duplicate concurrent tasks
--- Download authority. Only install_for_selection() grants it, after the user
--- accepted the offer; the next check consumes it, so a boot, an AI enable with
--- another backend or an update can never start a download.
-local _install_granted      = false
 -- Last failure marker the running script printed, read at its terminal.
 local _observed_failure_marker = nil
 
@@ -530,18 +530,14 @@ local function discard_pending_callbacks()
 	_terminal_outcome = nil
 end
 
---- Asynchronously verifies (and bootstraps) the Ollama backend. Safe to
---- call repeatedly: the underlying script is idempotent and exits silently
---- when nothing needs doing.
+--- Asynchronously verifies the Ollama backend, or installs Ergopti's own
+--- runtime under an issued native choice. Safe to call repeatedly: without a
+--- choice, a resolved runtime is verified and a missing one settles "missing".
 --- @param on_complete function|nil Called exactly once with the terminal result.
 --- @param replay_token table|nil Internal pause-owner replay capability.
+--- @param native_choice table|nil The issued choice of install_native_for_selection().
 --- @return boolean accepted
 function M.check_and_install_deps(on_complete, replay_token, native_choice)
-	-- Every call consumes the selection's grant, whatever path it takes: one
-	-- left behind by a selection that found Ollama would let a later plain
-	-- check download without the offer.
-	local install_granted = _install_granted == true
-	_install_granted = false
 	if not _pause_controller.is_admitted() then
 		Logger.debug(LOG, "Ollama dependency bootstrap rejected by pause admission.")
 		return false
@@ -627,32 +623,24 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 	elseif resolved_bin then
 		Logger.info(LOG, "Ollama executable found (%s): %s", tostring(resolved_source), resolved_bin)
 	else
-		-- Only a replayed download the user accepted may download again; a
-		-- replayed fast path for a found executable never had that consent.
-		-- Any other caller needs the grant install_for_selection() gives.
-		local replaying_install = replay_token ~= nil and type(_resume_intent) == "table"
-			and _resume_intent.kind == "task" and _resume_intent.download == true
-		local install_allowed = install_granted or replaying_install
-		if not install_allowed then
-			Logger.warn(LOG, "Ollama is not installed (%s); no download without the user's consent.",
-				tostring(resolve_err))
-			if _pause_controller.is_current(token, authorization) then
-				_bootstrap_state = "missing"
-				_last_failure_message = i18n.get("ollama.runtime_missing_body")
-				_pause_controller.complete(token)
-			elseif not _pause_controller.is_committed(token) then
-				_pause_controller.complete(token)
-			end
-			settle_registered_callbacks()
-			Logger.success(LOG, "Ollama bootstrap settled without a download (not installed).")
-			return true
+		-- Only install_native_for_selection() installs, under its issued choice.
+		Logger.warn(LOG, "Ergopti's own Ollama is not installed (%s); nothing is downloaded without the offer.",
+			tostring(resolve_err))
+		if _pause_controller.is_current(token, authorization) then
+			_bootstrap_state = "missing"
+			_last_failure_message = i18n.get("ollama.runtime_missing_body")
+			_pause_controller.complete(token)
+		elseif not _pause_controller.is_committed(token) then
+			_pause_controller.complete(token)
 		end
-		install_dir = OllamaBinary.managed_install_dir()
-		if not install_dir then
-			Logger.error(LOG, "HOME is unusable; the Ollama install folder cannot be named.")
-			return settle_preflight_failure(i18n.get("ollama.deps_failed"))
-		end
-		Logger.info(LOG, "Ollama download accepted; installing into %s.", install_dir)
+		settle_registered_callbacks()
+		Logger.success(LOG, "Ollama bootstrap settled without an install (not installed).")
+		return true
+	end
+	-- The managed installer downloads with the system curl, checked at this use.
+	if install_dir ~= nil then
+		local curl_ok, curl_refusal = require("adapters.system_curl").check("the Ollama download")
+		if not curl_ok then return settle_preflight_failure(curl_refusal) end
 	end
 	if not _pause_controller.is_current(token, authorization) then
 		return settle_stale_intent()
@@ -660,7 +648,7 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 	-- A native interpreter keeps the existing PTY wrapper. Without Python,
 	-- the signed guardian runs this exact pinned installer and returns its
 	-- physical closure receipt before provisioning or daemon acquisition.
-	local python_bin, python_state = PythonInterpreter.resolve()
+	local python_bin = PythonInterpreter.resolve()
 	local native_pty, native_context_current, native_bind_environment
 	local function native_context_admitted()
 		if native_choice == nil then return true end
@@ -711,7 +699,6 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 		native_pty, prepared = NativePty.prepare(script_path, environment, BOOTSTRAP_TIMEOUT_SEC * 1000)
 		if prepared ~= true then
 			if native_pty ~= nil and native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
-			if install_granted then require("ui.python_runtime_offer").offer(python_state) end
 			return settle_preflight_failure(i18n.get("ollama.deps_failed"))
 		end
 	end
@@ -871,8 +858,8 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 			if not owner_is_current() then return false end
 		end
 
-		local external_runtime = native_choice == nil and (install_dir ~= nil
-			or resolved_bin ~= nil and require("core.llm.ollama_runtime_choice").classify(resolved_source) == "foreign")
+		local external_runtime = native_choice == nil and resolved_bin ~= nil
+			and require("core.llm.ollama_runtime_choice").classify(resolved_source) == "foreign"
 		local function finish_provisioning(daemon_ready)
 		if not owner_is_current() then return false end
 
@@ -927,23 +914,45 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 			-- Installation presence permits client reuse, not daemon ownership.
 			return finish_provisioning(false)
 		end
-		local daemon_ok, daemon_accepted = xpcall(function()
-			return ApiOllama.ensure_running({
-				is_authorized = owner_is_current,
-				on_settled = function(ready)
-					if not owner_is_current() then return end
-					if ready ~= true then
-						return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon")
-					end
-					return finish_provisioning(true)
-				end,
-			})
-		end, debug.traceback)
-		if not daemon_ok or daemon_accepted ~= true then
-			if owner_is_current() then return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon") end
-			return false
+		local function start_daemon()
+			local daemon_ok, daemon_accepted = xpcall(function()
+				return ApiOllama.ensure_running({
+					is_authorized = owner_is_current,
+					on_settled = function(ready)
+						if not owner_is_current() then return end
+						if ready ~= true then
+							return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon")
+						end
+						return finish_provisioning(true)
+					end,
+				})
+			end, debug.traceback)
+			if not daemon_ok or daemon_accepted ~= true then
+				if owner_is_current() then return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon") end
+				return false
+			end
+			return true
 		end
-		return true
+		-- The runtime metadata is read off the UI thread, and the first read
+		-- after the install is still pending: starting then refused the daemon
+		-- (field run 2026-10-30 16:29). Wait for the read, within its budget.
+		local metadata_deadline = TimerScheduler.awake_time() + RUNTIME_METADATA_BUDGET_SEC
+		local function start_when_metadata_settled()
+			if not owner_is_current() then return false end
+			local candidate_ok, _, _, state = pcall(OllamaBinary.native_candidate)
+			if not candidate_ok or state ~= "pending" then return start_daemon() end
+			if TimerScheduler.awake_time() >= metadata_deadline then
+				Logger.error(LOG, "Owned Ollama runtime metadata still pending after %d s; daemon not started.",
+					RUNTIME_METADATA_BUDGET_SEC)
+				return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon")
+			end
+			if arm_owned_timer("runtime_metadata", RUNTIME_METADATA_POLL_SEC, start_when_metadata_settled,
+				"Ollama runtime metadata wait") ~= true then
+				return publish_failure(i18n.get("ollama.daemon_fail"), -1, "daemon")
+			end
+			return true
+		end
+		return start_when_metadata_settled()
 	end
 
 	local function process_settled_terminal(args)
@@ -1133,7 +1142,7 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 		end
 		return false
 	end
-	_resume_intent = { kind = "task", download = install_dir ~= nil and native_choice == nil }
+	_resume_intent = { kind = "task" }
 	owner.dispatching = false
 	for _, args in ipairs(owner.pending_streams) do
 		if not owner_is_current()
@@ -1213,23 +1222,13 @@ function M.runtime_available()
 	return path ~= nil
 end
 
---- The only download entry: the user selected the Ollama backend and, when no
---- executable exists, accepted the offer. A resolvable executable is reused and
---- the grant is simply consumed without any network access.
---- @param on_complete function|nil Called once with the terminal result.
---- @return boolean accepted
-function M.install_for_selection(on_complete)
-	Logger.info(LOG, "Ollama backend selected; download authorized if Ollama is absent.")
-	-- A running task is either an accepted download or a found executable's
-	-- fast path: joining it needs no grant, and a leftover one must not leak.
-	_install_granted = not _task_running
-	if _bootstrap_state == "failed" or _bootstrap_state == "missing" then
-		_bootstrap_state = "pending"
-		_last_failure_message = nil
-	end
-	local accepted = M.check_and_install_deps(on_complete)
-	if accepted ~= true then _install_granted = false end
-	return accepted
+--- Reports whether the owned runtime's metadata is still being read. Until it
+--- settles runtime_available() answers false on a Mac that has the runtime, so
+--- that answer must not be read as "not installed".
+--- @return boolean pending
+function M.runtime_pending()
+	local path, _, state = OllamaBinary.native_candidate()
+	return path == nil and state == "pending"
 end
 
 --- Installs the separately owned native runtime under this original task owner.

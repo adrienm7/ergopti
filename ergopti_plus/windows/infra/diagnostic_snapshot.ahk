@@ -37,7 +37,7 @@ DiagSnapshot_Fields() {
 	static Fields := [
 		"driver", "version", "commit", "os", "os_version", "arch", "runtime",
 		"elevated", "locale", "keyboard_layout", "monitors", "dpi", "display",
-		"config_dir", "logs_dir", "log_level", "features_enabled", "boot_ms"
+		"config_dir", "logs_dir", ConfigLeaf.LOG_LEVEL, "features_enabled", "boot_ms"
 	]
 	return Fields
 }
@@ -130,7 +130,7 @@ DiagSnapshot_ResidentObservations(Contract := 0) {
 		Rows[2]["values"]["identity_handle_debt"] := _OllamaIdentityPendingHandles.Count
 	} finally Critical(PreviousCritical)
 	CapturedAt := PLC_CurrentFiletime()
-	return Map("schema_version", Contract["resident_observation_schema_version"],
+	return Map(ConfigLeaf.SCHEMA_VERSION, Contract["resident_observation_schema_version"],
 		"captured_at_filetime", CapturedAt, "rows", Rows)
 }
 
@@ -425,7 +425,7 @@ DiagSnapshot_Collect(BootMs) {
 		? DiagSnapshot_RedactHome(_ConfigDir, EnvGet("USERPROFILE")) : ""
 	; Where this report's own logs are, from the logger's one resolver.
 	Values["logs_dir"] := DiagSnapshot_RedactHome(LoggerLogsDir(), EnvGet("USERPROFILE"))
-	Values["log_level"] := IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : ""
+	Values[ConfigLeaf.LOG_LEVEL] := IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : ""
 	if (IsSet(Features) && Features is Map) {
 		Counts := DiagSnapshot_CountFeatures(Features)
 		Values["features_enabled"] := Counts["enabled"] . "/" . Counts["total"]

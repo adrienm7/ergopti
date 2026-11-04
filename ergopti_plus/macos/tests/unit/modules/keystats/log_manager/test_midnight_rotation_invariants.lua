@@ -140,6 +140,48 @@ helpers.describe("keystats: behavioural midnight rotation invariants", function(
 		assert_provenance_unchanged(run, "test.midnight.retry")
 	end)
 
+	helpers.it("(rotation-waits-recovery) says once that a recovery holds the rotation, then completes", function()
+		local stall_warnings, starts, waits, successes = 0, 0, 0, 0
+		local logger = helpers.make_logger_stub()
+		logger.warn = function() stall_warnings = stall_warnings + 1 end
+		logger.start = function(_log, format)
+			if format:find("Midnight rotation", 1, true) then starts = starts + 1 end
+		end
+		logger.info = function() waits = waits + 1 end
+		logger.success = function(_log, format)
+			if format:find("Midnight rotation complete", 1, true) then successes = successes + 1 end
+		end
+		local attempts, recovering = 0, true
+		package.loaded["infra.logger"] = logger
+		package.loaded["modules.keystats.log_manager"] = {
+			ROLLOVER_WAITS_FOR_RECOVERY = "recovering",
+			flush_buffer = function() return true end,
+			day_rollover = function()
+				attempts = attempts + 1
+				if recovering then return false, "recovering" end
+				return true
+			end,
+		}
+		package.loaded["modules.keystats.context_tracker"] = { split_active_app_at_midnight = function() return true end }
+		local watchers = with_date(OLD_DAY, function() return helpers.load_with_stubs("modules.keystats.watchers") end)
+		local previous_index = { sentinel = "index" }
+		local state = { today_idx = previous_index, ngram_context = { sentinel = "ngram" }, is_enabled = true,
+			buffer_events = {}, mouse_distance_px = 0 }
+		watchers.init(state, function() return false end)
+		with_date(NEW_DAY, function()
+			for _ = 1, 24 do watchers.perform_maintenance() end
+			helpers.assert_eq(attempts, 24, "each tick asks again: the recovery's end is not announced")
+			helpers.assert_eq(stall_warnings, 0, "a known recovery is no stall")
+			helpers.assert_eq(waits, 1, "one line for the whole wait")
+			helpers.assert_eq(starts, 1, "one START for the rotation")
+			helpers.assert_true(state.today_idx == previous_index, "the bookmarks stay until the drain")
+			recovering = false
+			watchers.perform_maintenance()
+		end)
+		helpers.assert_eq(successes, 1)
+		helpers.assert_eq(next(state.today_idx), nil, "the rotation completes after the recovery")
+	end)
+
 	helpers.it("does not archive until a failed app interval split can be retried", function()
 		local run = drive_rotation({ true }, false, 2, { "throw", true })
 

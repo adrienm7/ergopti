@@ -12,13 +12,7 @@ local helpers = require("tests.helpers")
 
 local function receive(mode)
 	local actual_uv = require("luv")
-	local path = require("infra.paths").driver_root() .. "/infra/archive_output.lua"
-	local file = assert(io.open(path, "rb"))
-	local source = assert(file:read("*a")); assert(file:close())
-	local first = assert(source:find("local retained_tar_operations =", 1, true))
-	local last = assert(source:find("--- Constructs only the fixed native registry;", first, true))
-	local compile = loadstring or _G.load
-	local construct = assert(compile(source:sub(first, last - 1) .. "\nreturn new_private_tar_feeder\n", "@actual-ollama-zstd-feeder"))()
+	local construct = require("infra.archive_tar_feeder").new
 	local names = { "luv", "infra.managed_http_deadline", "adapters.owned_process" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local pipe, captured, reads = nil, nil, 0
@@ -61,7 +55,8 @@ end
 helpers.describe("Fixed Ollama zstd feeder", function()
 	helpers.it("extracts only the fixed zstd stdin command into the exact stage", function()
 		local result = receive("extract")
-		assert(helpers.deep_equal(result.args, { "--zstd", "--extract", "--file", "-", "--directory",
+		-- The private runtime's zstd (owned-runtimes-zstd), never the host tar's own support.
+		assert(helpers.deep_equal(result.args, { "--use-compress-program=zstd", "--extract", "--file", "-", "--directory",
 			"/controlled/ollama-stage", "--no-same-owner", "--no-same-permissions" }))
 		assert(result.options.max_output_bytes == nil, "existing generic process output bound remains authoritative")
 	end)

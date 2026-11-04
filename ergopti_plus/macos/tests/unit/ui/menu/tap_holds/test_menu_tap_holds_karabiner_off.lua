@@ -48,6 +48,7 @@ local function menu_over_double(integration_enabled)
 		get_combo_hold_action = function() return "none" end,
 		get_tap_hold_timeout = function() return 200 end,
 		get_sticky_timeout = function() return 1000 end,
+		get_lone_modifier_tap_max_ms = function() return 1000 end,
 		get_simultaneous_threshold = function() return 50 end,
 	}
 	return menu, karabiner
@@ -101,11 +102,11 @@ helpers.describe("the macOS Tap-Holds submenu when Ergopti does not use Karabine
 	helpers.it("draws a disabled hint right above the greyed key rows", function()
 		local rows = tap_hold_rows(false)
 		helpers.assert_eq(rows[1].title, "menu.tapholds.enable", "the switch stays the first row")
-		assert_hint_leads(rows, "tap_hold.group.tab")
+		assert_hint_leads(rows, "key_name.tab")
 	end)
 
 	helpers.it("draws the hint above the greyed chord rows, in their Shortcuts group", function()
-		assert_hint_leads(key_combination_rows(false), "tap_hold.group.left_shift + tap_hold.group.right_shift")
+		assert_hint_leads(key_combination_rows(false), "key_name.left_shift + key_name.right_shift")
 	end)
 
 	helpers.it("draws no hint while the integration is on", function()
@@ -156,11 +157,11 @@ helpers.describe("the declared integration-off hint retains cached native childr
 			helpers.assert_eq(#hidden, #before - 1, "platform policy removes the hint, not key data")
 			local keys_before, keys_after = {}, {}
 			for _, item in ipairs(before) do
-				if type(item.title) == "string" and item.title:match("^tap_hold%.group%.") then keys_before[#keys_before + 1] = item end
+				if type(item.title) == "string" and item.title:match("^key_name%.") then keys_before[#keys_before + 1] = item end
 			end
 			for _, item in ipairs(hidden) do
 				helpers.assert_true(item.title ~= HINT)
-				if type(item.title) == "string" and item.title:match("^tap_hold%.group%.") then
+				if type(item.title) == "string" and item.title:match("^key_name%.") then
 					helpers.assert_true(item.disabled)
 					keys_after[#keys_after + 1] = item
 				end

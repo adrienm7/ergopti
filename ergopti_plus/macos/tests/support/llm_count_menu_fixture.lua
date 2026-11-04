@@ -22,6 +22,12 @@ return function(callback, options)
 		local raw = file:read("*a"); file:close()
 		local defaults, state = hs.json.decode(raw), hs.json.decode(raw)
 		state.llm_enabled, state.llm_backend, state.llm_model = true, options.backend or "ollama", ""
+		-- The macOS state keeps these in seconds (modules/llm/init.lua), as the real
+		-- Trigger rows read them (real_trigger_panel).
+		for _, table_ in ipairs({ defaults, state }) do
+			table_.llm_debounce = table_.llm_debounce_ms / 1000
+			table_.llm_min_request_interval = table_.llm_min_request_interval_ms / 1000
+		end
 		local noop = function() end
 		local accept = function() return true end
 		local calls = {}
@@ -36,14 +42,23 @@ return function(callback, options)
 			return options.real_model_selector or key:match("^menu%.profiles%.") or key:match("^llm%.profile%.")
 		end
 		package.loaded["infra.i18n"] = { get = function(key)
+			if options.catalogue then return options.catalogue[key] or key end
 			if real_caption(key) then return real_strings[key] or key end
 			if key == "menu.llm.prediction_count_label_one" then return "%d prediction" end
 			if key == "menu.llm.prediction_count_label_other" then return "%d predictions" end
 			return require("tests.helpers").I18N_PLACEHOLDER_FORMATS[key] or key
-		end, section = function(key) return real_caption(key) and real_strings[key] or key end }
+		end, section = function(key)
+			if options.catalogue then return options.catalogue[key] or key end
+			return real_caption(key) and real_strings[key] or key
+		end }
 		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults,
 			get_backend = function() return state.llm_backend end, set_backend = accept,
-			get_current_model = function() return "" end }
+			get_current_model = function() return "" end,
+			-- What the real Display rows read (real_streaming_panel).
+			streaming_snapshot = function()
+				return { generation = 0, enabled = state.llm_enabled, backend = state.llm_backend,
+					streaming = state.llm_streaming }
+			end }
 		local models = { get_presets = function() return {} end,
 			get_installed_models = function() return {} end,
 			get_actual_model_name = function(name) return name end,
@@ -52,6 +67,7 @@ return function(callback, options)
 		package.loaded["ui.menu.menu_llm.settings_manager"] = { new = function()
 			return { build_nav_modifier_menu = function() return {} end,
 				build_val_modifier_menu = function() return {} end,
+				setting_snapshot = function(key) return { value = state[key], generation = 0, owner = {} } end,
 				set_context_length = unobserved_command,
 				reset_context_length = unobserved_command,
 				set_min_words = unobserved_command,
@@ -64,7 +80,11 @@ return function(callback, options)
 				end }
 		end }
 		for _, name in ipairs({ "temperature_panel", "streaming_panel", "trigger_panel" }) do
-			package.loaded["ui.menu.menu_llm." .. name] = { build = function() return {} end }
+			-- A whole-tray walk reads the real Display and Trigger rows (their label-value joins).
+			if not (name == "streaming_panel" and options.real_streaming_panel)
+				and not (name == "trigger_panel" and options.real_trigger_panel) then
+				package.loaded["ui.menu.menu_llm." .. name] = { build = function() return {} end }
+			end
 		end
 		-- The menu itself must build neither panel: the model selector page
 		-- collects them only when it opens (maintainer, 2026-10-27).

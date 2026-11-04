@@ -1,0 +1,19 @@
+# _shared/tests/corpus/config_migrations/op_encode_value/migrations.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: an array of tables becomes its encoded string."
+ops = [
+	{ op = "encode_value", section = "llm.profiles", key = "user_profiles", to_section = "llm", to_key = "user_profiles", encoding = "user_profile_registry" },
+	{ op = "encode_value", section = "occupied.profiles", key = "user_profiles", to_section = "occupied", to_key = "user_profiles", encoding = "user_profile_registry" },
+	{ op = "encode_value", section = "scalars", key = "text", to_section = "scalars", to_key = "encoded", encoding = "user_profile_registry" },
+	{ op = "encode_value", section = "scalars", key = "empty", to_section = "scalars", to_key = "encoded", encoding = "user_profile_registry" },
+	{ op = "encode_value", section = "scalars", key = "numbers", to_section = "scalars", to_key = "encoded", encoding = "user_profile_registry" },
+	{ op = "encode_value", section = "never.written", key = "user_profiles", to_section = "never", to_key = "user_profiles", encoding = "user_profile_registry" },
+]

@@ -61,10 +61,8 @@
 	},
 	"package_requirements": {
 		"deb": [
-			"luajit (>= 2.1)",
 			"xclip",
 			"libnotify-bin",
-			"curl",
 			"libxkbcommon0",
 			"libxkbcommon-tools",
 			"at-spi2-core",
@@ -72,7 +70,6 @@
 			"kmod",
 			"udev",
 			"libayatana-appindicator3-1",
-			"zenity",
 			"login",
 			"passwd",
 			"util-linux",
@@ -80,16 +77,12 @@
 			"gir1.2-webkit2-4.1",
 			"glib-networking",
 			"gsettings-desktop-schemas",
-			"lua-luv",
-			"openssl",
-			"sqlite3",
-			"xdg-utils"
+			"xdg-utils",
+			"libsecret-tools"
 		],
 		"rpm": [
-			"luajit >= 2.1",
 			"xclip",
 			"libnotify",
-			"curl",
 			"libxkbcommon",
 			"libxkbcommon-utils",
 			"at-spi2-core",
@@ -97,22 +90,16 @@
 			"kmod",
 			"systemd-udev",
 			"libayatana-appindicator-gtk3",
-			"zenity",
 			"shadow-utils",
 			"util-linux",
-			"openssl",
-			"sqlite",
-			"xdg-utils"
+			"xdg-utils",
+			"libsecret"
 		],
 		"arch": [
-			"luajit",
 			"xclip",
 			"libnotify",
-			"curl",
 			"libxkbcommon",
 			"at-spi2-core",
-			"openssl",
-			"sqlite",
 			"xdg-utils",
 			"polkit",
 			"kmod",
@@ -121,10 +108,9 @@
 			"util-linux",
 			"glibc",
 			"libayatana-appindicator",
-			"zenity",
 			"lua51-lgi",
 			"webkit2gtk-4.1",
-			"python"
+			"libsecret"
 		],
 		"nix_library_path": [
 			"libayatana-appindicator",
@@ -219,9 +205,61 @@
 				"glib_networking": {
 					"url": "https://github.com/GNOME/glib-networking.git",
 					"commit": "1417a8dd98c46c208853c5ed95de61c384acea21"
+				},
+				"luafilesystem": {
+					"url": "https://github.com/lunarmodules/luafilesystem.git",
+					"commit": "7c6e1b013caec0602ca4796df3b1d7253a2dd258"
+				},
+				"luaposix": {
+					"url": "https://github.com/luaposix/luaposix.git",
+					"commit": "5a8d8c768fc3c51f42cb591e9523a60399efc6a1"
+				},
+				"sqlite": {
+					"url": "https://www.sqlite.org/2024/sqlite-amalgamation-3460100.zip",
+					"sha256": "77823cb110929c2bcb0f5d48e4833b5c59a8a6e40cdea3936b99e199dbbe5784"
+				},
+				"zstd": {
+					"url": "https://github.com/facebook/zstd/releases/download/v1.5.6/zstd-1.5.6.tar.gz",
+					"sha256": "8c29e06cf42aacc1eafc4077ae2ec6c6fcb96a626157e0593d5e82a34fd403c1"
+				},
+				"openssl": {
+					"url": "https://github.com/openssl/openssl/releases/download/openssl-3.0.15/openssl-3.0.15.tar.gz",
+					"sha256": "23c666d0edf20f14249b3d8f0368acaee9ab585b09e1de82107c66e1f3ec9533"
+				},
+				"luajit": {
+					"url": "https://github.com/LuaJIT/LuaJIT.git",
+					"commit": "ea9eb7edb5eac4a9d175d74523db34fac0fa5180"
 				}
 			},
 			"description": "AppImage copies the actual build-host ELF closure and retains the recipient glibc and certificate trust. Flatpak builds its native modules under /app. Runtime admission proves ABI/schema/backend availability, not desktop/PAC settings or transport delivery."
+		}
+	},
+	"managed_python": {
+		"description": "Ergopti's own Python for the user XKB installer (owned runtimes, PIN): the python-build-standalone build of the shared managed Python release (_shared/modules/llm/managed_python_release.json, same uv release, version and build), downloaded on consent into the private data folder. Each archive is the uv-reviewed install_only_stripped tarball, pinned by SHA-256 and size.",
+		"uv_release": "0.12.21",
+		"version": "3.11.16",
+		"build": "20260929",
+		"archives": {
+			"x86_64-gnu": {
+				"triple": "x86_64-unknown-linux-gnu",
+				"sha256": "f05084f3fbd7a0c7ed762ea6fd2455976a463952bb5c3253fc6cdc777f84728d",
+				"bytes": 30792219
+			},
+			"aarch64-gnu": {
+				"triple": "aarch64-unknown-linux-gnu",
+				"sha256": "0fe7a9925be231f38c7dffc92eb7f5cf47b121661899ffdb9bc77adfdc74ad2f",
+				"bytes": 31101929
+			},
+			"x86_64-musl": {
+				"triple": "x86_64-unknown-linux-musl",
+				"sha256": "88df3ffae0ba380ed54c1f6c08697681ba70612fb44fbe7f2e7d122927c1ae31",
+				"bytes": 29738762
+			},
+			"aarch64-musl": {
+				"triple": "aarch64-unknown-linux-musl",
+				"sha256": "1a38e436fa144149c8d9562ceac8b243c97013058d61903cde591a8216461679",
+				"bytes": 30008097
+			}
 		}
 	},
 	"archive_digest_runtime": {

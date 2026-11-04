@@ -62,6 +62,13 @@ _UWB_WrapResetsBothBuffers() {
 	Assert(EnterCritical > 0 and CommitCall > EnterCritical and LeaveCritical > CommitCall
 		and ResetEngine > 0 and ResetPreview > ResetEngine,
 		"engine and preview buffers must be invalidated before the Critical transaction is released")
+	; A SendEvent bypasses the recording hook the behaviour test drives, and the
+	; caller needs a live UIA selection, so these two stay source-level.
+	Assert(InStr(Body, "SendEvent(") == 0,
+		"UIA wrapping must not erase the physical fallback before clipboard preparation")
+	OnChar := _DriverFuncBody("_OnPrefixChar")
+	Assert(InStr(OnChar, "if _PrefixTryWrapSelection(UIASel, Pair)") > 0,
+		"_OnPrefixChar must fall through to normal character handling when wrapping fails")
 }
 Test("meta hotstrings: the UIA selection-wrap resets both buffers (uia-wrap-resets-only-the-preview-buffer)",
 	_UWB_WrapResetsBothBuffers)

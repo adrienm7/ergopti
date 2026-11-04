@@ -190,6 +190,13 @@ Test("list-providers: no provider names the menu parameter it does not have", _L
 _LPTM_ProvidersReturnRows() {
 	for Name in _LPTM_ProviderNames() {
 		Body := _DriverFuncBodyOrEmpty(Name)
+		; A provider whose whole body hands over one helper's rows is judged by
+		; that helper (the layout feature rows share _LAY_FeatureRows).
+		Code := Trim(_DriverMaskNonCode(&Body), " `t`r`n")
+		if RegExMatch(Code, "^\w+\(\)\s*\{\s*return\s+(\w+)\([^()]*\)\s*\}$", &Delegate) {
+			Body := _DriverFuncBodyOrEmpty(Delegate[1])
+			Assert(Body != "", "list provider '" . Name . "' delegates to '" . Delegate[1] . "', which must exist")
+		}
 		Assert(InStr(Body, "Rows.Push(") or InStr(Body, "return ["),
 			"list provider '" . Name . "' never produces a row — it can only return an empty "
 			. "array, which draws nothing and reports nothing. _HS_CategoryRowsDynamic shipped "

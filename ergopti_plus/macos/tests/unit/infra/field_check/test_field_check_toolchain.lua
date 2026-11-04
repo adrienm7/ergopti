@@ -58,7 +58,7 @@ local function healthy(world)
 	world.outputs[SHORTCUTS .. " list"] = { 0, "Morning\nNight\nWork\n" }
 	world.outputs[SHORTCUTS .. " run ergopti-field-check-absent-shortcut"] = { 1, "" }
 	world.outputs[BREW .. " --version"] = { 0, "Homebrew 4.6.3\n" }
-	world.outputs[BREW .. " list --cask --versions karabiner-elements"] = { 0, "karabiner-elements 15.4.0\n" }
+	world.existing["/opt/homebrew/Caskroom/karabiner-elements"] = true
 	world.outputs[CODESIGN] = { 0, "", APP .. ": valid on disk\n" .. APP .. ": satisfies its Designated Requirement\n" }
 	world.outputs[SPCTL] = { 0, "", APP .. ": accepted\nsource=Notarized Developer ID\n"
 		.. "origin=Developer ID Application: Fumihiko Takayama (G43BCU2T37)\n" }
@@ -159,7 +159,6 @@ helpers.describe("toolchain check", function()
 		world.existing[BREW] = nil
 		world.existing["/usr/local/bin/brew"] = true
 		world.outputs["/usr/local/bin/brew --version"] = { 0, "Homebrew 4.5.0\n" }
-		world.outputs["/usr/local/bin/brew list --cask --versions karabiner-elements"] = { 1, "" }
 		local steps, result = run(ports)
 		helpers.assert_true(result.passed)
 		helpers.assert_eq(steps.brew_version.value, "4.5.0")
@@ -171,12 +170,13 @@ helpers.describe("toolchain check", function()
 		local ports, world = make_ports()
 		healthy(world)
 		world.outputs[BREW .. " --version"] = { nil, "" }
-		world.outputs[BREW .. " list --cask --versions karabiner-elements"] = { nil, "" }
 		world.outputs[CODESIGN] = { 1, "", "" }
 		local steps, result = run(ports)
 		helpers.assert_true(not result.passed)
 		helpers.assert_eq(steps.brew_version.value, "timeout")
-		helpers.assert_eq(steps.karabiner_cask.state, "fail")
+		-- The cask is read from the Caskroom, so a slow brew cannot fail it.
+		helpers.assert_eq(steps.karabiner_cask.state, "info")
+		helpers.assert_eq(steps.karabiner_cask.value, "installed")
 		helpers.assert_eq(steps.karabiner_signature.value, "exit_1:unclassified")
 	end)
 
@@ -194,9 +194,9 @@ helpers.describe("toolchain check", function()
 		local ports, world = make_ports()
 		healthy(world)
 		run(ports)
-		-- shortcuts list and run, brew --version and list, codesign, spctl: the
-		-- timer step is a port of its own, not a command.
-		helpers.assert_eq(#world.commands, 6, "the healthy check runs each of its six commands")
+		-- shortcuts list and run, brew --version, codesign, spctl: the timer
+		-- step and the Caskroom read are ports of their own, not commands.
+		helpers.assert_eq(#world.commands, 5, "the healthy check runs each of its five commands")
 		local forbidden = { install = true, uninstall = true, upgrade = true, update = true, ["-f"] = true, edit = true }
 		for _, command in ipairs(world.commands) do
 			helpers.assert_true(type(command.timeout) == "number" and command.timeout > 0 and command.timeout <= 20,

@@ -167,7 +167,26 @@ function M.new(data)
 		"requires_verified_native_receipt", "connect_requires_actual_proxy_used" }) do
 		if data.failover[key] ~= true then return invalid() end
 	end
+	-- An unusable automatic configuration (PAC, WPAD) sends a download direct
+	-- only at these lookup stages; an exported or PAC-named relay never does.
+	local fallback = data.pac_unavailable_fallback
+	if type(fallback) ~= "table" or fallback.route ~= "direct"
+		or fallback.explicit_environment_relay ~= "no_fallback"
+		or fallback.pac_selected_relay_failure ~= "no_fallback" then return invalid() end
+	local fallback_stages = inventory(fallback.stages)
+	if not fallback_stages then return invalid() end
+	for stage in pairs(fallback_stages) do
+		if not stage:match("^native_[a-z_]+$") then return invalid() end
+	end
 	local policy = {}
+
+	--- Whether a failed route lookup at this closed stage sends the download
+	--- direct (proxy_policy.json "pac_unavailable_fallback").
+	--- @param stage any Closed stage code of the lookup step that gave up.
+	--- @return boolean
+	function policy.falls_back_direct(stage)
+		return type(stage) == "string" and fallback_stages[stage] == true
+	end
 
 	--- Returns only the canonical native environment names, never their values.
 	--- @return table
@@ -183,10 +202,15 @@ function M.new(data)
 	end
 
 	--- Selects an environment/DIRECT fast path or an actual native lookup.
+	--- A loopback host is always direct. The user's proxy override
+	--- (network/proxy_override.lua) comes next: it is the most explicit
+	--- choice, so it wins over an exported relay and skips the system lookup
+	--- (PAC, WPAD) entirely; "automatic" leaves the order below unchanged.
 	--- @param url string
 	--- @param environment table Private native environment snapshot.
+	--- @param override table|nil Parsed override choice { mode, relay }.
 	--- @return table|nil route, string|nil error
-	function policy.route(url, environment)
+	function policy.route(url, environment, override)
 		local scheme, host = authority(url)
 		if not scheme or not env_orders[scheme] or type(environment) ~= "table" then return nil, "proxy-route-invalid" end
 		local local_host = hosts[host] == true
@@ -202,6 +226,16 @@ function M.new(data)
 		local expanded = ipv6(host)
 		if expanded and v6[expanded] then local_host = true end
 		if local_host then return { mode = "direct" } end
+		if override ~= nil then
+			if type(override) ~= "table" then return nil, "proxy-override-invalid" end
+			if override.mode == "direct" then return { mode = "direct", source = "override" } end
+			if override.mode == "relay" then
+				local relay_scheme = type(override.relay) == "string" and authority(override.relay) or nil
+				if not relay_scheme or not schemes[relay_scheme] then return nil, "proxy-override-invalid" end
+				return { mode = "selected", proxy = override.relay, bypass = selected_proxy_bypass, source = "override" }
+			end
+			if override.mode ~= "automatic" then return nil, "proxy-override-invalid" end
+		end
 		for _, name in ipairs(env_orders[scheme]) do
 			local value = environment[name]
 			if type(value) == "string" and value ~= "" then return { mode = "environment" } end

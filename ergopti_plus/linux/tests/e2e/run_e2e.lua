@@ -550,6 +550,19 @@ local TAP_WRAP_SCENARIOS = {
 		receipt = "attempts=1 queued=0 executed=0 reads=2 action=none binding=none" },
 }
 
+-- Built-in dynamic hotstrings fire only at a word start (item 129): with the
+-- date rules on, "td★" after a space expands, which proves they are live, and
+-- the same suffix ending a longer word stays as typed. The date is read
+-- before and after the child, so a run across midnight still has its answer.
+local DYNAMIC_SCENARIOS = {
+	{ name = "a built-in date rule expands at a word start", dynamic = "dates", keys = " td★",
+		screen = function() return " " .. os.date("%Y_%m_%d") end },
+	{ name = "a built-in date rule does not fire at the end of a longer word", dynamic = "dates", keys = " uptd★",
+		screen = " uptd★" },
+	{ name = "\"update\" never proposes \"date\" (dynamic-word-start)", dynamic = "dates", keys = " update★",
+		screen = " update★" },
+}
+
 -- A real consumed down owns repeats only while its native epochs and owners
 -- remain valid. A refused repeat stays swallowed until release, even if the
 -- pause, group or inhibition is restored before the next repeat.
@@ -699,8 +712,11 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_CLOCK", scenario.clock or "system" }
 			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_DYNAMIC", scenario.dynamic or "none" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
+			local expected_before = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local output, status = ChildCapture.run(command)
+			local expected_after = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local completed = ChildCapture.accepted(output, status, scenario.magic_repeat == "injection")
 			if scenario.tap_collision_receipt then
 				local receipt = output:match("TAP_COLLISION ([^\r\n]+)")
@@ -728,10 +744,10 @@ do
 			end
 			local quoted = output:match("SCREEN (%b\"\")")
 			local screen = quoted and (loadstring or load)("return " .. quoted)() or nil
-			if screen == scenario.screen and completed then
+			if (screen == expected_before or screen == expected_after) and completed then
 				pass(prefix .. scenario.name)
 			else
-				fail(prefix .. scenario.name, string.format("%q", scenario.screen),
+				fail(prefix .. scenario.name, string.format("%q", expected_after),
 					screen and string.format("%q (exit %s, receipt %s)", screen, tostring(status), tostring(completed)) or ("no SCREEN line: " .. output:sub(-300)))
 			end
 		end
@@ -739,6 +755,7 @@ do
 	run_key_scenarios(home_env, "")
 	run_key_scenarios(home_env, "", TAP_WRAP_SCENARIOS)
 	run_key_scenarios(home_env, "", MAGIC_REPEAT_SCENARIOS)
+	run_key_scenarios(home_env, "", DYNAMIC_SCENARIOS)
 
 	-- hardening-e-presets: the same keys over the recommended preset, committed
 	-- by a start-up child through the menu's own composition in a folder tree
@@ -784,6 +801,7 @@ do
 	local rows_output, rows_status = ChildCapture.run(daemon_child_command(interpreter, rows_env, device, "a", false))
 	local rows_fh = io.open(rows_file, "r")
 	local rows = rows_fh and tonumber(rows_fh:read("*l")) or nil
+	local agent = rows_fh and rows_fh:read("*l") or nil
 	if rows_fh then rows_fh:close() end
 	os.remove(rows_file)
 	local rows_child_accepted = ChildCapture.accepted(rows_output, rows_status, false)
@@ -795,6 +813,16 @@ do
 		fail("the real tray menu stays navigable", string.format("100 < rows <= %d and an accepted child", MENU_ROW_CEILING),
 			string.format("rows=%s child=%s%s", tostring(rows), rows_child_accepted and "accepted" or "failed",
 				rows_child_accepted and "" or ": " .. rows_output:sub(-300)))
+	end
+	-- Item 121: the unfinished agent is declared unavailable once, in the shared
+	-- manifest; in the composed tray its row says why and runs nothing, while
+	-- the AI submenu beside it keeps its controls.
+	local AGENT_RECEIPT = "agent disabled=true reason=true actions=0 ai_actions=some"
+	if rows_child_accepted and agent == AGENT_RECEIPT then
+		pass("the real tray shows the AI agent unavailable beside a working AI submenu (agent-disabled-root)")
+	else
+		fail("the real tray shows the AI agent unavailable beside a working AI submenu (agent-disabled-root)",
+			AGENT_RECEIPT, tostring(agent))
 	end
 
 	os.remove(device)

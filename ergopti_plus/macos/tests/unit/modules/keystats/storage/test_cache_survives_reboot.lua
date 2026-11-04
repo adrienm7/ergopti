@@ -40,8 +40,9 @@ end
 --- Runs one keystats start over an owned metrics root, cache root and TMPDIR.
 --- @param root string Owned scratch root.
 --- @param prepare function Receives the paths and seeds the scenario.
+--- @param revision string|nil Stored aggregate revision (the current one by default).
 --- @return table observations
-local function start(root, prepare)
+local function start(root, prepare, revision)
 	local metrics, cache, tmpdir = root .. "/metrics/", root .. "/cache", root .. "/tmp"
 	local by_device = metrics .. "by_device/" .. DEVICE_ID .. "/"
 	os.execute(string.format("rm -rf '%s'", root))
@@ -55,17 +56,33 @@ local function start(root, prepare)
 	prepare(paths)
 
 	local seen = { exec = {}, rotation_offset = nil, opened = nil }
+	-- As the real binding: a statement runs until its iterator returns nil, and
+	-- SQLite refuses VACUUM on a connection that still runs one.
+	local running, last_error = 0, ""
 	local db = {
-		exec = function(_, sql) seen.exec[#seen.exec + 1] = sql; return 0 end,
-		errmsg = function() return "" end,
+		exec = function(_, sql)
+			seen.exec[#seen.exec + 1] = sql
+			if sql:find("^VACUUM") and running > 0 then
+				last_error = "cannot VACUUM - SQL statements in progress"
+				return 1
+			end
+			return 0
+		end,
+		errmsg = function() return last_error end,
 		nrows = function(_, sql)
 			local rows = {}
 			if sql:find("key='today_log_offset'", 1, true) then rows = { { value = tostring(SAVED_OFFSET) } }
 			elseif sql:find("key='today_log_date'", 1, true) then rows = { { value = "2026-10-28" } }
-			elseif sql:find("key='aggregate_cache_revision'", 1, true) then rows = { { value = "2" } }
-			elseif sql:find("key='ngram_ctx_json'", 1, true) then rows = { { value = "{}" } } end
+			elseif sql:find("key='aggregate_cache_revision'", 1, true) then rows = { { value = revision or "3" } }
+			elseif sql:find("key='ngram_ctx_json'", 1, true) then rows = { { value = "{}" } }
+			elseif sql:find("key='local_data_sql_outbox'", 1, true) then rows = { { value = "" } } end
 			local index = 0
-			return function() index = index + 1; return rows[index] end
+			running = running + 1
+			return function()
+				index = index + 1
+				if rows[index] == nil and index == #rows + 1 then running = running - 1 end
+				return rows[index]
+			end
 		end,
 	}
 	package.loaded["infra.logger"] = nil
@@ -116,6 +133,7 @@ local function start(root, prepare)
 	end)
 	os.getenv = actual_getenv
 	seen.cache_exists, seen.legacy_exists = exists(paths.cache), exists(paths.legacy)
+	seen.last_error = last_error
 	seen.paths = paths
 	assert(ok, err)
 	return seen
@@ -158,6 +176,21 @@ helpers.describe("keystats cache location: a reboot keeps the cache (L64)", func
 	helpers.it("a cache lost with no TMPDIR copy replays, in the bounded recovery", function()
 		local seen = start(root, function() end)
 		helpers.assert_true(replay_started(seen), "a missing cache must schedule the ledger replay")
+	end)
+
+	helpers.it("a cache of the old n-gram encoding is copied aside before its rebuild", function()
+		local seen = start(root, function(paths)
+			mkdir_p(paths.cache:match("^(.*)/"))
+			write(paths.cache, "cache of revision 2")
+		end, "2")
+		helpers.assert_eq(seen.last_error, "", "no row loop of the start may leave a statement running")
+		local copied, rebuilt = nil, nil
+		for index, sql in ipairs(seen.exec) do
+			if sql:find("VACUUM INTO", 1, true) and sql:find(".pre-ngram-encoding-2.bak", 1, true) then copied = index end
+			if sql:find("aggregate_cache_revision", 1, true) and sql:find("value='3'", 1, true) then rebuilt = index end
+		end
+		helpers.assert_true(copied ~= nil, "the old cache must be copied aside")
+		helpers.assert_true(rebuilt ~= nil and copied < rebuilt, "the rebuild must follow the copy")
 	end)
 
 	helpers.it("the production cache root is the user's Caches folder, from config_paths alone", function()

@@ -49,17 +49,16 @@ while [ "$#" -gt 0 ]; do
 	esac
 done
 
-# Desktops differ in the dialog tool they ship: GNOME has zenity, KDE has
-# kdialog. When neither works the failure must still reach the user, so the
-# last resort is stderr plus a desktop notification when one is available.
+# The failure is shown in Ergopti's own dialog (ui/dialog_host.lua), run by the
+# private runtime's LuaJIT when the package carries one, else the source
+# install's. The report runs after recovery, so the driver tree is back. When
+# the dialog cannot open the failure must still reach the user, so the last
+# resort is stderr plus a desktop notification when one is available.
 show_failure_dialog() {
-	if command -v zenity >/dev/null 2>&1; then
-		if zenity --error --no-markup --title="$GUI_TITLE" --text="$GUI_ERROR"; then
-			return 0
-		fi
-	fi
-	if command -v kdialog >/dev/null 2>&1; then
-		if kdialog --title "$GUI_TITLE" --error "$GUI_ERROR"; then
+	local interpreter="$SCRIPT_DIR/runtime/bin/luajit"
+	[ -x "$interpreter" ] || interpreter="$(command -v luajit || true)"
+	if [ -n "$interpreter" ] && [ -f "$SCRIPT_DIR/ui/dialog_host.lua" ]; then
+		if "$interpreter" "$SCRIPT_DIR/ui/dialog_host.lua" --error --no-markup --title="$GUI_TITLE" --text="$GUI_ERROR"; then
 			return 0
 		fi
 	fi

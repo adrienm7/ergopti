@@ -28,6 +28,8 @@ local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 local DRIVER_ROOT = helpers.driver_root()
+-- The healthcheck owns the adapter specs; named as the code requires it.
+local HEALTHCHECK_CORE = "ui.healthcheck.core"
 
 
 
@@ -73,7 +75,8 @@ end
 --- @return boolean
 local function is_excluded(path, adapter_file)
 	if path:find("/tests/", 1, true) then return true end
-	if path:find("/ui/healthcheck/core.lua", 1, true) then return true end
+	if path:sub(1, #DRIVER_ROOT) == DRIVER_ROOT
+		and helpers.module_name_of(path:sub(#DRIVER_ROOT + 1)) == HEALTHCHECK_CORE then return true end
 	if path == adapter_file then return true end
 	return false
 end
@@ -127,10 +130,9 @@ helpers.describe("meta: adapter wiring reachability (F-HIGH-10)", function()
 	-- ADAPTER_SPECS is module-local (not exported); re-derive the same table by
 	-- re-reading the source file's spec block rather than reaching into module
 	-- internals, so this test does not force core.lua to export test-only state.
-	local core_src_path = DRIVER_ROOT .. "ui/healthcheck/core.lua"
-	local core_src = SourceFile.read(core_src_path)
+	local core_src = helpers.read_module_source(HEALTHCHECK_CORE)
 	helpers.it("ui/healthcheck/core.lua is readable", function()
-		helpers.assert_true(type(core_src) == "string", "cannot open " .. core_src_path)
+		helpers.assert_true(type(core_src) == "string", "cannot read the module " .. HEALTHCHECK_CORE)
 	end)
 
 	--- Extracts { id = "adapters.<name>", wired = true|false } tuples straight

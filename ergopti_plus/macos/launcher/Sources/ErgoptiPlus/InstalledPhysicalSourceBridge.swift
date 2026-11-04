@@ -215,8 +215,13 @@ enum InstalledPhysicalSourceBridge {
 			activated = receipt.active && !receipt.cancelled && receipt.error_code == 0
 			cancelled = !activated || !peer.current() || !image.current()
 		}
-		// Native retirement remains owned even when transport setup refuses.
-		cancelled = cancelled || ![STDIN_FILENO, STDOUT_FILENO, inputDescriptor, output[0], errors[0]].allSatisfy(nonblocking)
+		// Native retirement remains owned even when transport setup refuses. Every
+		// descriptor is made nonblocking even after a refusal: a short-circuited
+		// setup left the pipes blocking, so the first read of a quiet held child
+		// blocked before the loop could send its cancellation.
+		let transportReady = [STDIN_FILENO, STDOUT_FILENO, inputDescriptor, output[0], errors[0]]
+			.map(nonblocking).allSatisfy { $0 }
+		cancelled = cancelled || !transportReady
 		_ = Darwin.signal(SIGPIPE, SIG_IGN)
 		var inputEOF = false, outputEOF = false, errorEOF = false
 		var outbound = Data(), inbound = Data()

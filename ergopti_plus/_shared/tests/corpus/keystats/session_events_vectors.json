@@ -2,6 +2,9 @@
 	"description": "Golden vectors for the events_session rows: a typing session's start and end and the idle spans inside it. Replayed through the shared Lua state machine (_shared/lua/keystats/session_events.lua) the Linux driver runs.",
 	"rule": "A keystroke starts a session; a key or pointer input keeps it alive and ends an idle span, with duration_ms from the span's start (last input + micro_idle_ms) to the input. A tick after more than micro_idle_ms of silence starts an idle span once; after more than session_timeout_ms of silence the session ends, duration_ms from its first to its last input. Pointer input alone starts no session. stop closes an open session.",
 	"timings": { "micro_idle_ms": 30000, "session_timeout_ms": 300000 },
+	"differences": {
+		"windows_idle_end_at_close": "A session that closes during an idle span writes idle_end right before session_end on Windows, so its rows always close what they opened; macOS and Linux drop the open span. No reader sums idle_end. tests/meta/corpus/test_corpus_keystats_session_events.ahk sets that one row aside and replays the rest."
+	},
 	"cases": [
 		{
 			"id": "a_keystroke_starts_a_session",

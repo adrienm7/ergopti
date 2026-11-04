@@ -48,6 +48,8 @@ local _dequeue_timer = nil
 -- also covers an all-infinite stack, which has no dequeue cycle but may still
 -- carry an interceptor/provider action lease.
 local _visible_rows = nil
+-- Set by the tooltip facade while suggestions may own the standard canvas.
+local _standard_canvas_owner = nil
 -- Forward declaration — assigned after M.hide and M.show_stacked are defined.
 local _dequeue_tick
 
@@ -493,8 +495,9 @@ end
 function M.hide_forced()
 	local watchers_stopped = run_boolean_transition(
 		"Hotstring tooltip watcher teardown", stop_watchers)
-	local standard_hidden = run_boolean_transition(
-		"Standard tooltip canvas teardown", Renderer.hide)
+	-- Suggestions drawn under the rows own the standard canvas: only the rows go.
+	local standard_hidden = (_standard_canvas_owner ~= nil and _standard_canvas_owner())
+		or run_boolean_transition("Standard tooltip canvas teardown", Renderer.hide)
 	local stacked_hidden = run_boolean_transition(
 		"Stacked tooltip canvas teardown", Renderer.hide_stacked)
 	-- Visibility follows the native surfaces.  A watcher may remain orphaned and
@@ -655,6 +658,20 @@ end
 
 function M.is_visible()
 	return _state.is_visible
+end
+
+--- Whether hotstring preview rows are on screen. Unlike is_visible(), never
+--- true for the loading indicator or a plain notice drawn by this module.
+--- @return boolean
+function M.has_visible_rows()
+	return _state.is_visible == true and _visible_rows ~= nil
+end
+
+--- Tells this module when another owner holds the standard canvas, so hiding
+--- the hotstring rows leaves it alone (suggestions shown under the rows).
+--- @param predicate function|nil True while that owner holds it; nil for never.
+function M.set_standard_canvas_owner(predicate)
+	_standard_canvas_owner = type(predicate) == "function" and predicate or nil
 end
 
 --- Returns whether the exact leased row is still part of the visible stack.

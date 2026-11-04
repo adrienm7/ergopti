@@ -1,0 +1,405 @@
+{
+	"description": "The grammar of a hotstring output, read the same way by the three drivers: _shared/lua/send_input (parse_output) on macOS and Linux, windows/infra/send_input_parameter.ahk (SendInputParseOutput) on Windows.",
+	"rule": "{name} presses a key of _shared/modules/actions/send_keys.json, by id or alias, in any case. {name N} presses it N times, N from 1 to output_key_max_repeat with no leading zero. {U+XXXX} types that code point, from 1 to 6 hex digits; a surrogate, a value above 10FFFF or a control character is not a code point here. {{} types a left brace and {}} a right brace, which is how a literal {Left} is written: {{}Left}. A line break (CRLF, CR or LF) is the enter key and a tab is the tab key. Everything else is literal text: an unknown {group}, an unmatched brace, and + ^ ! # ~ which have no meaning here. An output with a key token leaves the caret somewhere the engine cannot read, so each driver forgets its typing buffer and the AI context after it, and such an output takes no part in a cascade.",
+	"vectors": [
+		{
+			"id": "plain-text",
+			"output": "bonjour",
+			"tokens": [{ "text": "bonjour" }],
+			"text": "bonjour",
+			"has_keys": false
+		},
+		{ "id": "empty", "output": "", "tokens": [], "text": "", "has_keys": false },
+		{
+			"id": "report-left-after-text",
+			"output": "(){left}",
+			"tokens": [{ "text": "()" }, { "key": "left", "count": 1 }],
+			"text": "()",
+			"has_keys": true
+		},
+		{
+			"id": "left-capitalised",
+			"output": "ab{Left}",
+			"tokens": [{ "text": "ab" }, { "key": "left", "count": 1 }],
+			"text": "ab",
+			"has_keys": true
+		},
+		{
+			"id": "left-uppercase",
+			"output": "ab{LEFT}",
+			"tokens": [{ "text": "ab" }, { "key": "left", "count": 1 }],
+			"text": "ab",
+			"has_keys": true
+		},
+		{
+			"id": "left-mixed-case",
+			"output": "ab{lEfT}",
+			"tokens": [{ "text": "ab" }, { "key": "left", "count": 1 }],
+			"text": "ab",
+			"has_keys": true
+		},
+		{
+			"id": "right",
+			"output": "{right}",
+			"tokens": [{ "key": "right", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "up",
+			"output": "{up}",
+			"tokens": [{ "key": "up", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "down",
+			"output": "{down}",
+			"tokens": [{ "key": "down", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "home",
+			"output": "{home}",
+			"tokens": [{ "key": "home", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "end",
+			"output": "{end}",
+			"tokens": [{ "key": "end", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "enter",
+			"output": "a{enter}b",
+			"tokens": [{ "text": "a" }, { "key": "enter", "count": 1 }, { "text": "b" }],
+			"text": "ab",
+			"has_keys": true
+		},
+		{
+			"id": "return-is-enter",
+			"output": "{Return}",
+			"tokens": [{ "key": "enter", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "tab",
+			"output": "a{Tab}b",
+			"tokens": [{ "text": "a" }, { "key": "tab", "count": 1 }, { "text": "b" }],
+			"text": "ab",
+			"has_keys": true
+		},
+		{
+			"id": "backspace",
+			"output": "{BackSpace}",
+			"tokens": [{ "key": "backspace", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "bs-is-backspace",
+			"output": "{bs}",
+			"tokens": [{ "key": "backspace", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "delete",
+			"output": "{Delete}",
+			"tokens": [{ "key": "delete", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "del-is-delete",
+			"output": "{del}",
+			"tokens": [{ "key": "delete", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "escape",
+			"output": "{Escape}",
+			"tokens": [{ "key": "escape", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "esc-is-escape",
+			"output": "{esc}",
+			"tokens": [{ "key": "escape", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "pgup-and-pgdn",
+			"output": "{pgup}{PgDn}",
+			"tokens": [
+				{ "key": "page_up", "count": 1 },
+				{ "key": "page_down", "count": 1 }
+			],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "insert-and-ins",
+			"output": "{insert}{ins}",
+			"tokens": [
+				{ "key": "insert", "count": 1 },
+				{ "key": "insert", "count": 1 }
+			],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "space",
+			"output": "a{Space}b",
+			"tokens": [{ "text": "a" }, { "key": "space", "count": 1 }, { "text": "b" }],
+			"text": "ab",
+			"has_keys": true
+		},
+		{
+			"id": "function-key",
+			"output": "{F5}",
+			"tokens": [{ "key": "f5", "count": 1 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "repeat-count",
+			"output": "\"\"{Left 2}",
+			"tokens": [{ "text": "\"\"" }, { "key": "left", "count": 2 }],
+			"text": "\"\"",
+			"has_keys": true
+		},
+		{
+			"id": "repeat-upper-bound",
+			"output": "{Left 100}",
+			"tokens": [{ "key": "left", "count": 100 }],
+			"text": "",
+			"has_keys": true
+		},
+		{
+			"id": "repeat-above-bound-is-text",
+			"output": "{Left 101}",
+			"tokens": [{ "text": "{Left 101}" }],
+			"text": "{Left 101}",
+			"has_keys": false
+		},
+		{
+			"id": "repeat-zero-is-text",
+			"output": "{Left 0}",
+			"tokens": [{ "text": "{Left 0}" }],
+			"text": "{Left 0}",
+			"has_keys": false
+		},
+		{
+			"id": "repeat-leading-zero-is-text",
+			"output": "{Left 02}",
+			"tokens": [{ "text": "{Left 02}" }],
+			"text": "{Left 02}",
+			"has_keys": false
+		},
+		{
+			"id": "repeat-two-spaces-is-text",
+			"output": "{Left  2}",
+			"tokens": [{ "text": "{Left  2}" }],
+			"text": "{Left  2}",
+			"has_keys": false
+		},
+		{
+			"id": "unicode-token",
+			"output": "{U+27C3}",
+			"tokens": [{ "text": "⟃" }],
+			"text": "⟃",
+			"has_keys": false
+		},
+		{
+			"id": "unicode-token-lower-case",
+			"output": "a{u+00e9}b",
+			"tokens": [{ "text": "aéb" }],
+			"text": "aéb",
+			"has_keys": false
+		},
+		{
+			"id": "unicode-token-space",
+			"output": "{U+0020}",
+			"tokens": [{ "text": " " }],
+			"text": " ",
+			"has_keys": false
+		},
+		{
+			"id": "unicode-token-astral",
+			"output": "{U+1F600}",
+			"tokens": [{ "text": "😀" }],
+			"text": "😀",
+			"has_keys": false
+		},
+		{
+			"id": "unicode-token-top",
+			"output": "{U+10FFFF}",
+			"tokens": [{ "text": "􏿿" }],
+			"text": "􏿿",
+			"has_keys": false
+		},
+		{
+			"id": "unicode-too-large-is-text",
+			"output": "{U+110000}",
+			"tokens": [{ "text": "{U+110000}" }],
+			"text": "{U+110000}",
+			"has_keys": false
+		},
+		{
+			"id": "unicode-too-long-is-text",
+			"output": "{U+0000041}",
+			"tokens": [{ "text": "{U+0000041}" }],
+			"text": "{U+0000041}",
+			"has_keys": false
+		},
+		{
+			"id": "unicode-surrogate-is-text",
+			"output": "{U+D800}",
+			"tokens": [{ "text": "{U+D800}" }],
+			"text": "{U+D800}",
+			"has_keys": false
+		},
+		{
+			"id": "unicode-control-is-text",
+			"output": "{U+000A}",
+			"tokens": [{ "text": "{U+000A}" }],
+			"text": "{U+000A}",
+			"has_keys": false
+		},
+		{
+			"id": "unicode-not-hex-is-text",
+			"output": "{U+12G4}",
+			"tokens": [{ "text": "{U+12G4}" }],
+			"text": "{U+12G4}",
+			"has_keys": false
+		},
+		{
+			"id": "literal-left-brace",
+			"output": "a{{}b",
+			"tokens": [{ "text": "a{b" }],
+			"text": "a{b",
+			"has_keys": false
+		},
+		{
+			"id": "literal-right-brace",
+			"output": "a{}}b",
+			"tokens": [{ "text": "a}b" }],
+			"text": "a}b",
+			"has_keys": false
+		},
+		{
+			"id": "literal-left-token-written-out",
+			"output": "{{}Left}",
+			"tokens": [{ "text": "{Left}" }],
+			"text": "{Left}",
+			"has_keys": false
+		},
+		{
+			"id": "lone-left-brace",
+			"output": "{",
+			"tokens": [{ "text": "{" }],
+			"text": "{",
+			"has_keys": false
+		},
+		{
+			"id": "lone-right-brace",
+			"output": "}",
+			"tokens": [{ "text": "}" }],
+			"text": "}",
+			"has_keys": false
+		},
+		{
+			"id": "empty-group",
+			"output": "{}",
+			"tokens": [{ "text": "{}" }],
+			"text": "{}",
+			"has_keys": false
+		},
+		{
+			"id": "unclosed-group",
+			"output": "a{Left",
+			"tokens": [{ "text": "a{Left" }],
+			"text": "a{Left",
+			"has_keys": false
+		},
+		{
+			"id": "unknown-group-is-text",
+			"output": "x{foo}y",
+			"tokens": [{ "text": "x{foo}y" }],
+			"text": "x{foo}y",
+			"has_keys": false
+		},
+		{
+			"id": "ahk-only-directive-is-text",
+			"output": "{Ctrl down}",
+			"tokens": [{ "text": "{Ctrl down}" }],
+			"text": "{Ctrl down}",
+			"has_keys": false
+		},
+		{
+			"id": "unknown-then-token",
+			"output": "{foo{Left}",
+			"tokens": [{ "text": "{foo" }, { "key": "left", "count": 1 }],
+			"text": "{foo",
+			"has_keys": true
+		},
+		{
+			"id": "code-is-text",
+			"output": "if (a) { b }",
+			"tokens": [{ "text": "if (a) { b }" }],
+			"text": "if (a) { b }",
+			"has_keys": false
+		},
+		{
+			"id": "send-metacharacters-are-text",
+			"output": "c++ !a #b ^c ~d{Left}",
+			"tokens": [{ "text": "c++ !a #b ^c ~d" }, { "key": "left", "count": 1 }],
+			"text": "c++ !a #b ^c ~d",
+			"has_keys": true
+		},
+		{
+			"id": "accents-around-a-token",
+			"output": "é{Left}è",
+			"tokens": [{ "text": "é" }, { "key": "left", "count": 1 }, { "text": "è" }],
+			"text": "éè",
+			"has_keys": true
+		},
+		{
+			"id": "line-feed-is-enter",
+			"output": "a\nb",
+			"tokens": [{ "text": "a" }, { "key": "enter", "count": 1 }, { "text": "b" }],
+			"text": "ab",
+			"has_keys": true
+		},
+		{
+			"id": "crlf-is-one-enter",
+			"output": "a\r\nb",
+			"tokens": [{ "text": "a" }, { "key": "enter", "count": 1 }, { "text": "b" }],
+			"text": "ab",
+			"has_keys": true
+		},
+		{
+			"id": "carriage-return-is-enter",
+			"output": "a\rb",
+			"tokens": [{ "text": "a" }, { "key": "enter", "count": 1 }, { "text": "b" }],
+			"text": "ab",
+			"has_keys": true
+		},
+		{
+			"id": "tab-character-is-tab",
+			"output": "a\tb",
+			"tokens": [{ "text": "a" }, { "key": "tab", "count": 1 }, { "text": "b" }],
+			"text": "ab",
+			"has_keys": true
+		}
+	]
+}

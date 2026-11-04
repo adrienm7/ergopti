@@ -206,7 +206,7 @@ _HotstringsScopeChoiceOperations(Choices, ExtensionGroups := unset) {
 			Entries.Push(Map("path", _LegacyTopCategoryMap[Id] . "." . Choice["section"],
 				"value", Choice["enabled"]))
 		} else {
-			Rows.Push(_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Id), Choice["enabled"]))
+			Rows.Push(_ConfigSparseOperation(ConfigLeaf.CATEGORY_ENABLED, _CategoryEnabledKey(Id), Choice["enabled"]))
 		}
 	}
 	if _ConfigStageFeatureEntries(Candidate, Entries, Rows) != Entries.Length
@@ -313,8 +313,12 @@ _HotstringsScopeSourceKey(Path) {
 }
 
 
-/** Resolves only source metadata and the base expansion delay, excluding user overrides. */
+/** Resolves the section's declared delay, source metadata and the base, excluding user overrides. */
 _HotstringsScopeInheritedDelay(Category, Section) {
+	; The section's own declaration comes first, as in HotstringsResolve.
+	Declared := HotstringsSectionDeclaredDelay(StrLower(Category), FoldAsciiLower(Section))
+	if Declared != ""
+		return Declared
 	Config := ParseTomlGroupConfig(Category)
 	if Config.Sections.Has(Section) && Config.Sections[Section].Delay != ""
 		return Config.Sections[Section].Delay

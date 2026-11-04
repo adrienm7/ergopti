@@ -1,0 +1,1 @@
+var e=new URL(`../assets/ErgoptiPlus.BbX2CdOc.ahk`,import.meta.url).href;export{e as default};

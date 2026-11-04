@@ -240,6 +240,8 @@ function M.stage(asset, done)
 		Logger.error(LOG, "Cannot encode the chosen release download request.")
 		return false
 	end
+	-- The stage script downloads with the system curl, checked at this use.
+	if not require("adapters.system_curl").check("the release download") then return false end
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
 		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)

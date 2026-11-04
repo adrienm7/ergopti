@@ -10,6 +10,9 @@
 ; Included by modules/llm/prediction_engine.ahk after the keystroke-handler section.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\llm_request_latency.ahk
+
 
 
 
@@ -59,7 +62,7 @@ _LLM_Engine_NormalizePromptOverride(Override) {
 	ProfileId := Override.Get("profile_id", "")
 	if !(ProfileId is String) || ProfileId == ""
 		throw ValueError("A prompt override must name a profile.")
-	Count := Override.Get("num_predictions", 0)
+	Count := Override.Get(ConfigLeaf.NUM_PREDICTIONS, 0)
 	if !(Count is Integer) || (Count != 0
 			&& (Count < LLM_PROMPT_ACTION_MIN_PREDICTIONS
 				|| Count > LLM_PROMPT_ACTION_MAX_PREDICTIONS))
@@ -67,7 +70,7 @@ _LLM_Engine_NormalizePromptOverride(Override) {
 	Live := Override.Get("live", false)
 	if !(Live is Integer) || (Live != 0 && Live != 1)
 		throw TypeError("A prompt override's live flag must be a Boolean.")
-	Checked := Map("profile_id", ProfileId, "num_predictions", Count, "live", Live ? true : false)
+	Checked := Map("profile_id", ProfileId, ConfigLeaf.NUM_PREDICTIONS, Count, "live", Live ? true : false)
 	if Override.Has("translation_target") {
 		Target := Override["translation_target"]
 		if (!(ProfileId == "translate") || !LLM_Translate_IsValid(Target))
@@ -78,21 +81,52 @@ _LLM_Engine_NormalizePromptOverride(Override) {
 }
 
 /**
- * Per-call output-token budget for a backend request, given the shared
- * PromptBuilder per-prediction budget and how many predictions THIS call yields
- * (1 for a sequential-variant call, N for a single batch call that returns all
- * N predictions in one response). Mirrors the macOS fetch_batch formula
- * ``max_predict * num_predictions + num_predictions * 5`` so the AHK batch path
- * is no longer under-budgeted (it previously sent the single-prediction cap for
- * an N-prediction response, truncating it).
- * @param {integer} maxTokens     Shared PromptBuilder per-prediction budget.
+ * Per-call output-token budget for a backend request, the twin of
+ * _shared/lua/llm/request_plan/token_budget.lua `for_call`: a call returning one
+ * prediction keeps the base budget; a batch call returning N gets N * (base + 5),
+ * the five being a variant's numbering and separator.
+ * @param {integer} maxTokens     Shared PromptBuilder per-prediction budget (>= 1).
  * @param {integer} predsPerCall  Predictions produced by this one call (>= 1).
  * @returns {integer} The num_predict / max_tokens cap to send.
  */
 _LLM_Engine_CallTokenBudget(maxTokens, predsPerCall) {
 	global LLM_PRED_TOKEN_OVERHEAD
-	n := (predsPerCall is Integer and predsPerCall >= 1) ? predsPerCall : 1
-	return Max(5, maxTokens * n + n * LLM_PRED_TOKEN_OVERHEAD)
+	if !(maxTokens is Integer) || maxTokens < 1
+		throw ValueError("base_tokens must be a whole number from 1")
+	if !(predsPerCall is Integer) || predsPerCall < 1
+		throw ValueError("per_call must be a whole number from 1")
+	return Max(5, predsPerCall == 1 ? maxTokens : predsPerCall * (maxTokens + LLM_PRED_TOKEN_OVERHEAD))
+}
+
+/**
+ * Output token limit of a retried call: token_budget.lua `for_retry`.
+ * @param {integer} callTokens   The failed call's budget (>= 1).
+ * @param {integer} extraTokens  The retry policy's extra tokens (>= 0).
+ * @returns {integer} The num_predict / max_tokens cap of the retry.
+ */
+_LLM_Engine_RetryTokenBudget(callTokens, extraTokens) {
+	if !(callTokens is Integer) || callTokens < 1
+		throw ValueError("call_tokens must be a whole number from 1")
+	if !(extraTokens is Integer) || extraTokens < 0
+		throw ValueError("extra_tokens must be a whole number from 0")
+	return callTokens + extraTokens
+}
+
+/**
+ * Arms the next attempt as a retry of the one that yielded nothing, with the
+ * shared policy's extra room and temperature: a first answer cut short needs
+ * room to finish, and repeating the same call would repeat its failure. The
+ * attempt count stays the budget of inference.json, max_multiplier attempts per
+ * requested prediction.
+ * @param {Map} state The per-request state carried by the callback.
+ */
+_LLM_Engine_ArmRetry(state) {
+	if !state.Has("sent_tokens")
+		return
+	Policy := LLM_ApiCommon_GetRetryPolicy()
+	state["retry_call"] := Map(
+		"tokens", _LLM_Engine_RetryTokenBudget(state["sent_tokens"], Policy[3]),
+		"temp", Min(_LLM_Common_Cfg("diversity_temperature", "max_temperature"), state["sent_temp"] + Policy[2]))
 }
 
 ; Return a detached, fail-closed acceptance-source snapshot. Timer callers pass
@@ -171,7 +205,7 @@ _LLM_Engine_AppIsExcluded(AppId, Apps) {
 ; tests cannot disagree about invalid state, focus lookup, or name matching.
 _LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
 	global _LLM_Engine
-	Apps := _LLM_Engine.Get("disabled_apps", [])
+	Apps := _LLM_Engine.Get(ConfigLeaf.DISABLED_APPS, [])
 	if !(Apps is Array) {
 		try LoggerError("LLM",
 			"Prediction suppressed because disabled-app state is not a validated array.")
@@ -213,6 +247,18 @@ _LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
 }
 
 /**
+ * The plan's floor decision for a request of this Override: a prompt action the
+ * user triggered is explicit, live mode's automatic trigger is not.
+ * @param {Map|Integer} Override FirePrediction's Override.
+ * @param {Number} NowMs The monotonic clock in milliseconds.
+ * @returns {Map} One send, or one defer.
+ */
+_LLM_Engine_DispatchDecision(Override, NowMs) {
+	Explicit := Override is Map && !Override.Get("live", false)
+	return _LLM_Engine_Plan().OnDispatch(Map("explicit", Explicit), NowMs)[1]
+}
+
+/**
  * Fires the actual LLM call after the debounce period expires.
  * Skips the call if context is identical to the last result's context.
  * @param {string} buffer - Full typed buffer captured at debounce arm time.
@@ -221,8 +267,9 @@ _LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
  *     llm_prompt_prediction action): Map("profile_id", Id, "num_predictions",
  *     Count or 0 for the menu's). It wins over the active and per-app profiles
  *     and never changes them. With "live" (live mode's automatic trigger) the
- *     minimum word count is live.json's, and the request waits while a
- *     hotstring tooltip is shown. 0 for an ordinary request.
+ *     minimum word count is live.json's, and the request always waits while a
+ *     hotstring tooltip is shown. 0 for an ordinary request, which waits too
+ *     unless llm.trigger.while_hotstring_tooltip is "both".
  */
 LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	global _LLM_Engine
@@ -256,15 +303,17 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; The AI preview switch (hotstrings.preview_ai_enabled) governs the automatic
 	; typing-triggered bubble on every driver. A request the user asked for by
 	; name (a prompt action, live mode) carries an Override and is not a preview.
-	if !(Override is Map) && !HSE_PreviewSwitchCurrent("preview_ai_enabled") {
+	if !(Override is Map) && !HSE_PreviewSwitchCurrent(ConfigLeaf.PREVIEW_AI_ENABLED) {
 		try LoggerDebug("LLM", "Automatic prediction skipped: the AI preview switch is off.")
 		return
 	}
 	IsLive := (Override is Map) && Override["live"]
-	; Hotstring tooltips win: a live prediction would replace the preview on the
-	; shared surface. The chain armed when it closes asks again.
-	if (IsLive && _LLM_Engine_HotstringTooltipShown()) {
-		try LoggerDebug("LLM", "Live prediction deferred: a hotstring tooltip is shown.")
+	; Hotstring tooltips win: a prediction would replace the preview on the
+	; shared surface and retire a hotstring that can still expand. The chain
+	; armed when it closes asks again (llm.trigger.while_hotstring_tooltip).
+	if _LLM_Engine_HotstringTooltipHolds(Override) {
+		try LoggerDebug("LLM", "{1} prediction deferred: a hotstring tooltip is shown.",
+			IsLive ? "Live" : "Automatic")
 		return
 	}
 	AcceptSource := _LLM_Engine_NormalizeAcceptSource(AcceptSource?)
@@ -339,7 +388,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		}
 		if IsSet(LLM_OllamaScheduleWarmupRetry)
 			LLM_OllamaScheduleWarmupRetry(_LLM_Engine["model"])
-		retry_ms := Max(500, Min(_LLM_Engine["debounce_ms"], 2000))
+		retry_ms := Max(500, Min(_LLM_Engine[ConfigLeaf.DEBOUNCE_MS], 2000))
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)
 		SetTimer(_LLM_Engine["pending_timer"], -retry_ms)
 		_LLM_Engine["timer_active"] := true
@@ -356,18 +405,18 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 
 	; A binding's own count replaces the menu's for this request only, and feeds
 	; every consumer of the global one below: temperature, dispatch, budget.
-	request_n_predictions := (Override is Map && Override["num_predictions"] > 0)
-		? Override["num_predictions"] : _LLM_Engine["n_predictions"]
+	request_n_predictions := (Override is Map && Override[ConfigLeaf.NUM_PREDICTIONS] > 0)
+		? Override[ConfigLeaf.NUM_PREDICTIONS] : _LLM_Engine["n_predictions"]
 	; Live mode shows what is typed from the first word: its own floor replaces
 	; the menu's minimum word count for the prompt and the parser alike.
-	request_min_words := IsLive ? LLM_Live_Config()["min_words"] : _LLM_Engine["min_words"]
+	request_min_words := IsLive ? LLM_Live_Config()[ConfigLeaf.MIN_WORDS] : _LLM_Engine[ConfigLeaf.MIN_WORDS]
 	pb := PromptBuilder()
 	pb_cfg := Map(
-		"max_words",            _LLM_Engine["max_words"],
-		"min_words",            request_min_words,
-		"num_predictions",      request_n_predictions,
+		ConfigLeaf.MAX_WORDS,            _LLM_Engine[ConfigLeaf.MAX_WORDS],
+		ConfigLeaf.MIN_WORDS,            request_min_words,
+		ConfigLeaf.NUM_PREDICTIONS,      request_n_predictions,
 		"temperature",          _LLM_Engine["temperature"] + 0.0,
-		"auto_raise_temp",      _LLM_Engine["auto_raise_temp"],
+		ConfigLeaf.AUTO_RAISE_TEMP,      _LLM_Engine[ConfigLeaf.AUTO_RAISE_TEMP],
 		"language",             _LLM_Engine["language"],
 		; The user's llm_context_length. Omitting it is why the setting had no
 		; effect on the automatic path: the menu wrote it, the manual trigger
@@ -389,20 +438,27 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		profile := Override.Has("translation_target")
 			? LLM_Translate_PredictionProfile(Override["translation_target"])
 			: LLM_FindProfile(effective_profile_id,
-				_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+				_LLM_Engine.Has(ConfigLeaf.USER_PROFILES) ? _LLM_Engine[ConfigLeaf.USER_PROFILES] : [])
 		if !(profile is Map) {
 			try LoggerWarn("LLM", "Prompt prediction dropped: the prompt '{1}' no longer exists.",
 				effective_profile_id)
+			if IsLive {
+				Receipt := Map("profile_id", effective_profile_id)
+				if Override[ConfigLeaf.NUM_PREDICTIONS] > 0
+					Receipt[ConfigLeaf.NUM_PREDICTIONS] := Override[ConfigLeaf.NUM_PREDICTIONS]
+				Decision := LLM_Live_Decide(LLM_Live_Config(), Receipt, _LLM_Engine["n_predictions"], profile)
+				LLM_Engine_LiveStop(Decision["cause"])
+			}
 			return
 		}
 	} else {
 		effective_profile_id := _LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"])
 		profile := LLM_GetActiveProfile(effective_profile_id,
-			_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+			_LLM_Engine.Has(ConfigLeaf.USER_PROFILES) ? _LLM_Engine[ConfigLeaf.USER_PROFILES] : [])
 	}
 	request_semantic_signature := _LLM_Engine_RequestSemanticSignature(
 		effective_profile_id, profile,
-		(Override is Map) ? Override["num_predictions"] : 0, IsLive)
+		(Override is Map) ? Override[ConfigLeaf.NUM_PREDICTIONS] : 0, IsLive)
 	_LLM_Engine["active_request_signature"] := request_semantic_signature
 	; Per-prediction output-token budget computed once by the shared PromptBuilder
 	; (max(15, max_words*6+10), default 150) — the single cross-driver source.
@@ -506,23 +562,18 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		}
 	}
 
-	; ── Backend-aware request floor ──
-	; Even when the user has set a 50 ms debounce, fire no more than one
-	; request per ``min_interval`` ms for the active backend (paid APIs need
-	; this hard cap; local backends benefit from it for energy). When the
-	; floor blocks, re-arm the debounce timer for the remaining gap so the
-	; next attempt fires at exactly the right moment instead of being lost.
+	; ── The user's request floor ──
+	; Even with a 50 ms debounce, automatic requests go no faster than
+	; llm.trigger.min_request_interval_ms (paid APIs need this cap; local backends
+	; save energy). When it blocks, re-arm for the remaining gap so the next attempt
+	; fires at exactly the right moment instead of being lost. An explicit request
+	; is never held.
 	backend := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
-	min_interval := LLM_ApiCommon_GetRateLimitMs(backend)
-	now := A_TickCount
-	last := _LLM_Engine.Has("last_request_tick") ? _LLM_Engine["last_request_tick"] : 0
-	; Wrap-safe delta: A_TickCount overflows at ~49.7 days; the mask keeps the
-	; result in [0, 0xFFFFFFFF] regardless of counter direction
-	elapsed_since_last := (now - last + 0x100000000) & 0xFFFFFFFF
-	if (last > 0 and elapsed_since_last < min_interval) {
-		remaining := min_interval - elapsed_since_last
-		try LoggerInfo("LLM", Format("Prediction request #{1} rate-floor deferred: backend={2}, remaining={3} ms.",
-			this_request_id, backend, remaining))
+	FloorDecision := _LLM_Engine_DispatchDecision(Override, A_TickCount)
+	if (FloorDecision["action"] == "defer") {
+		remaining := Max(1, FloorDecision["delay_ms"])
+		try LoggerInfo("LLM", Format("Prediction request #{1} rate-floor deferred: remaining={2} ms.",
+			this_request_id, remaining))
 		; Same reasoning as LLM_Engine_OnKeystroke: keep a reference to the
 		; closure so the next CancelTimer call can actually cancel it.
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource, Override)
@@ -552,23 +603,23 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; alternatives sequentially into the active document would produce
 	; chaos. The user-facing n_predictions setting is left untouched so
 	; flipping inline mode back off restores the original count.
-	if (_LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"])
+	if (_LLM_Engine.Has(ConfigLeaf.INLINE_AUTOTYPE) and _LLM_Engine[ConfigLeaf.INLINE_AUTOTYPE])
 		n_predictions := 1
 	system_prompt := LLM_ResolveSystemPrompt(
 		profile,
 		n_predictions,
 		request_min_words,
-		_LLM_Engine["max_words"],
+		_LLM_Engine[ConfigLeaf.MAX_WORDS],
 		_LLM_Engine["language"]
 	)
 	is_batch_profile := (profile is Map and profile.Has("batch") and profile["batch"] == true)
 
 	; A batch call returns all N predictions in one response; a sequential-variant
 	; call returns one. Size the per-call token budget accordingly (macOS parity).
-	preds_per_call := (n_predictions > 1 and is_batch_profile) ? n_predictions : 1
+	preds_per_call := LLM_RequestPlanBatching(is_batch_profile ? true : false, n_predictions)["per_call"]
 	call_tokens := _LLM_Engine_CallTokenBudget(max_tokens, preds_per_call)
 
-	_LLM_Engine["last_request_tick"] := A_TickCount
+	_LLM_Engine_Plan().OnSent(A_TickCount)
 
 	; Resolve the model + the per-backend async dispatch closure exactly
 	; once so the variant loop doesn't repeat the backend branch on every
@@ -578,6 +629,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; constraint as HS where the remote backend stays non-stream).
 	model_tag := ""
 	log_model := ""
+	; The API provider id, for the latency line only; "" for Ollama.
+	provider_id := ""
 	dispatch_fn := ""
 	dispatch_stream_fn := ""
 	; A rewrite is shown whole or not at all: a streamed partial is the raw
@@ -595,9 +648,10 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		}
 		model_tag := (entry is Map and entry.Has("Model")) ? entry["Model"] : (entry.HasOwnProp("Model") ? entry.Model : "")
 		log_model := model_tag
+		provider_id := (entry is Map) ? entry.Get("Provider", "") : (entry.HasOwnProp("Provider") ? entry.Provider : "")
 		remote_transport := _LLM_Engine_ResolveRemoteTransport()
-		dispatch_fn := (temp, on_succ, on_fail) =>
-			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens, "", 0, request_current)
+		dispatch_fn := (temp, on_succ, on_fail, tokens := 0) =>
+			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, tokens || call_tokens, "", 0, request_current)
 	} else {
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
@@ -609,8 +663,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		stop_seqs := (profile is Map and profile.Has("stop_sequences") and profile["stop_sequences"] is Array)
 			? profile["stop_sequences"] : ""
 		is_batch := (profile is Map and profile.Has("batch") and profile["batch"] == true)
-		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail, "", request_current)
+		dispatch_fn := (temp, on_succ, on_fail, tokens := 0) =>
+			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, tokens || call_tokens, is_batch, tail, "", request_current)
 		dispatch_stream_fn := (temp, on_partial, on_succ, on_fail) =>
 			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail)
 	}
@@ -625,13 +679,14 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		state := Map(
 			"ctx",           ctx,
 			"ctx_tail",      tail,
-			"min_words",     request_min_words,
-			"max_words",     _LLM_Engine["max_words"],
+			ConfigLeaf.MIN_WORDS,     request_min_words,
+			ConfigLeaf.MAX_WORDS,     _LLM_Engine[ConfigLeaf.MAX_WORDS],
 			"is_batch",      true,
 			"request_id",    this_request_id,
 			"semantic_signature", request_semantic_signature,
 			"backend",       backend,
 			"model",         log_model,
+			"provider",      provider_id,
 			"system_prompt", system_prompt,
 			"requested",     n_predictions,
 			"base_temp",     req_temp,
@@ -656,13 +711,14 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	state := Map(
 		"ctx",               ctx,
 		"ctx_tail",          tail,
-		"min_words",         request_min_words,
-		"max_words",         _LLM_Engine["max_words"],
+		ConfigLeaf.MIN_WORDS,         request_min_words,
+		ConfigLeaf.MAX_WORDS,         _LLM_Engine[ConfigLeaf.MAX_WORDS],
 		"is_batch",          is_batch_profile,
 		"request_id",        this_request_id,
 		"semantic_signature", request_semantic_signature,
 		"backend",           backend,
 		"model",             log_model,
+		"provider",          provider_id,
 		"system_prompt",     system_prompt,
 		"slots",             [],
 		"requested",         n_predictions,
@@ -674,6 +730,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		"rewrite_edits",     Map(),
 		"dispatch_fn",       dispatch_fn,
 		"dispatch_stream_fn",dispatch_stream_fn,
+		"call_tokens",       call_tokens,
 		"streaming",         streaming_enabled,
 		"show_all_at_once",  _LLM_Engine.Has("show_all_at_once") and _LLM_Engine["show_all_at_once"],
 		; Wallclock at request start so the keystats event can include the
@@ -697,7 +754,7 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 			prof := Override.Has("translation_target")
 				? LLM_Translate_PredictionProfile(Override["translation_target"])
 				: LLM_FindProfile(Override["profile_id"],
-					_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+					_LLM_Engine.Has(ConfigLeaf.USER_PROFILES) ? _LLM_Engine[ConfigLeaf.USER_PROFILES] : [])
 			; A built-in record carries no label of its own; the menu's names it,
 			; so the user sees which of their prompts answered.
 			if (prof is Map and prof.Has("label"))
@@ -707,24 +764,24 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 		} else {
 			prof := LLM_GetActiveProfile(
 				_LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"]),
-				_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+				_LLM_Engine.Has(ConfigLeaf.USER_PROFILES) ? _LLM_Engine[ConfigLeaf.USER_PROFILES] : [])
 			if (prof is Map and prof.Has("label"))
 				profile_label := prof["label"]
 		}
 	}
 	info_model := ""
-	if (_LLM_Engine.Has("show_info_bar") and _LLM_Engine["show_info_bar"])
+	if (_LLM_Engine.Has(ConfigLeaf.SHOW_INFO_BAR) and _LLM_Engine[ConfigLeaf.SHOW_INFO_BAR])
 		info_model := _LLM_Engine_BuildInfoBarText(
 			_LLM_Engine.Has("model") ? _LLM_Engine["model"] : "",
 			_LLM_Engine_ResolveBackendLabel(),
 			profile_label)
 	LLM_Tooltip_SetDisplayOpts(Map(
-		"show_info_bar", !!(_LLM_Engine.Has("show_info_bar") and _LLM_Engine["show_info_bar"]),
+		ConfigLeaf.SHOW_INFO_BAR, !!(_LLM_Engine.Has(ConfigLeaf.SHOW_INFO_BAR) and _LLM_Engine[ConfigLeaf.SHOW_INFO_BAR]),
 		"info_model", info_model,
 		"slot_count", Max(1, Integer(slotCount)),
-		"nav_modifiers", _LLM_Engine.Has("nav_modifiers") ? _LLM_Engine["nav_modifiers"] : "",
-		"pred_indent", _LLM_Engine.Has("pred_indent") ? Integer(_LLM_Engine["pred_indent"]) : 0,
-		"val_modifiers", _LLM_Engine.Has("val_modifiers") ? _LLM_Engine["val_modifiers"] : "",
+		ConfigLeaf.NAV_MODIFIERS, _LLM_Engine.Has(ConfigLeaf.NAV_MODIFIERS) ? _LLM_Engine[ConfigLeaf.NAV_MODIFIERS] : "",
+		ConfigLeaf.PRED_INDENT, _LLM_Engine.Has(ConfigLeaf.PRED_INDENT) ? Integer(_LLM_Engine[ConfigLeaf.PRED_INDENT]) : 0,
+		ConfigLeaf.VAL_MODIFIERS, _LLM_Engine.Has(ConfigLeaf.VAL_MODIFIERS) ? _LLM_Engine[ConfigLeaf.VAL_MODIFIERS] : "",
 	))
 }
 
@@ -732,7 +789,7 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 ; debounced request after the inactivity delay, before HTTP dispatch.
 _LLM_Engine_ShowLoadingTooltip() {
 	global _LLM_Engine
-	if (_LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"])
+	if (_LLM_Engine.Has(ConfigLeaf.INLINE_AUTOTYPE) and _LLM_Engine[ConfigLeaf.INLINE_AUTOTYPE])
 		return
 	; macOS parity (prediction_engine.lua:590 — "only show the spinner when the
 	; screen is empty"). If a real prediction is already on screen, KEEP it while
@@ -746,8 +803,8 @@ _LLM_Engine_ShowLoadingTooltip() {
 			and IsSet(LLM_Tooltip_IsLoading) and !LLM_Tooltip_IsLoading())
 		return
 	RequestId := _LLM_Engine.Get("request_id", 0)
-	; A hotstring tooltip wins over a live one on the shared surface
-	if (_LLM_Engine_RequestIsLive(RequestId) && _LLM_Engine_HotstringTooltipShown())
+	; A hotstring tooltip wins over the spinner on the shared surface
+	if _LLM_Engine_RequestHeldByHotstring(RequestId)
 		return
 	_LLM_Engine_ApplyTooltipDisplayOpts(1)
 	SemanticSignature := _LLM_Engine.Get("active_request_signature", "")
@@ -882,6 +939,12 @@ _LLM_Engine_DispatchVariant(state) {
 	variant_idx := state["attempt_index"]
 	state["attempt_index"] := variant_idx + 1
 	temp := LLM_ApiCommon_GetDiversityTemp(state["base_temp"], variant_idx)
+	Retry := state.Has("retry_call") ? state.Delete("retry_call") : 0
+	if Retry
+		temp := Retry["temp"]
+	state["sent_temp"] := temp
+	if state.Has("call_tokens")
+		state["sent_tokens"] := Retry ? Retry["tokens"] : state["call_tokens"]
 
 	; Reveal animation once earlier variants already filled a slot — keep the
 	; violet loading tooltip while the in-flight variant is still empty
@@ -917,8 +980,9 @@ _LLM_Engine_DispatchVariant(state) {
 	; Streaming path: when enabled and the backend exposes a streaming
 	; dispatcher, on_partial fires per token so the tooltip updates the
 	; in-flight slot live. on_success closes the slot with the final
-	; text just like the non-streaming path.
-	if (state["streaming"] and state["dispatch_stream_fn"] != "") {
+	; text just like the non-streaming path. A retry never streams: it would
+	; overwrite the growing preview, and only the plain path takes its budget.
+	if (!Retry and state["streaming"] and state["dispatch_stream_fn"] != "") {
 		this_slot_idx := state["slots"].Length + 1
 		stream_fn := state["dispatch_stream_fn"]
 		; ``(text, meta := "")`` signature matches both backends. The remote
@@ -935,6 +999,15 @@ _LLM_Engine_DispatchVariant(state) {
 	; Same signature as the streaming branch — forward ``meta`` so the
 	; finalize step can record token usage / cost. Without ``meta`` here
 	; the API path silently zeroed those metrics in the keystats event.
+	if Retry {
+		try LoggerDebug("LLM", "Variant {1}/{2} retries with {3} tokens at temperature {4}.",
+			variant_idx, state["max_attempts"], Retry["tokens"], Format("{:.2f}", temp))
+		dispatch_fn.Call(temp,
+			(text, meta := "") => _LLM_Engine_OnVariantSuccess(state_ref, text, meta),
+			(failure := "") => _LLM_Engine_OnVariantFail(state_ref, failure),
+			Retry["tokens"])
+		return
+	}
 	dispatch_fn.Call(temp,
 		(text, meta := "") => _LLM_Engine_OnVariantSuccess(state_ref, text, meta),
 		(failure := "") => _LLM_Engine_OnVariantFail(state_ref, failure))
@@ -1004,7 +1077,8 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 			state["dedup_stats"]["duplicates"] += 1
 		else
 			state["dedup_stats"]["kept"] += 1
-	}
+	} else
+		_LLM_Engine_ArmRetry(state)
 	; Paint the current accumulated slots so the user sees the new
 	; prediction land immediately, even if more variants are still in
 	; flight. Active = the first un-filled slot OR the last filled when
@@ -1041,9 +1115,8 @@ _LLM_Engine_OnVariantFail(state, failure := "") {
 		state["attempt_index"] - 1, state["max_attempts"], state["model"], Reason)
 	; The variant didn't yield a usable result. ``attempt_index`` already
 	; advanced for the next attempt; the retry budget (max_attempts) caps
-	; how often we keep trying. No special retry-temperature step here —
-	; the diversity step bumps the temperature on the next variant anyway,
-	; which is the same end effect.
+	; how often we keep trying.
+	_LLM_Engine_ArmRetry(state)
 	_LLM_Engine_DispatchVariant(state)
 }
 
@@ -1088,6 +1161,9 @@ _LLM_Engine_FinalizeRequest(state) {
 		; the audit trail captures the failure instead of silently
 		; dropping. The tooltip auto-dismisses via its own timer.
 		try LoggerWarn("LLM", "All variants failed for model {1} — no tooltip rendered.", state["model"])
+		if state.Get("request_start", 0) > 0
+			try LLM_RequestLatency_Report(state["backend"], state.Get("provider", ""), state["model"],
+				state["request_start"], "failed")
 		; The request check rejects a logger reentry; the exact presentation
 		; fence also protects a replacement admitted inside the hide path.
 		if (_LLM_Engine_IsCurrent(state) and IsObject(Origin))
@@ -1115,6 +1191,8 @@ _LLM_Engine_FinalizeRequest(state) {
 	try LoggerInfo("LLM", Format("Prediction request #{1} received — {2} suggestion(s), generation_chain={3} ms.",
 		state["request_id"], state["slots"].Length,
 		RequestStarted > 0 ? TickElapsed(RequestStarted) : "unknown"))
+	if RequestStarted > 0
+		try LLM_RequestLatency_Report(state["backend"], state.Get("provider", ""), state["model"], RequestStarted, "ok")
 	global _LLM_Ollama_IsReady
 	if state.Get("backend", "") == "ollama"
 		_LLM_Ollama_IsReady := true
@@ -1212,24 +1290,25 @@ _LLM_Engine_MaxAttempts(n) {
 ; mid-typing flips the prompt without any explicit toggle.
 _LLM_Engine_ResolveProfileIdForApp(default_id) {
 	global _LLM_Engine
-	if !_LLM_Engine.Has("app_profile_overrides")
+	if !_LLM_Engine.Has(ConfigLeaf.APP_PROFILE_OVERRIDES)
 		return default_id
-	overrides := _LLM_Engine["app_profile_overrides"]
+	overrides := _LLM_Engine[ConfigLeaf.APP_PROFILE_OVERRIDES]
 	if !(overrides is Map) or overrides.Count == 0
 		return default_id
 	; Pull the focused process via the WindowInfo adapter. WIGetFocused() can throw when no
 	; window is focused (lock screen, transient menu); fall back to the
 	; default in that case rather than blowing up the prediction.
 	app := ""
-	try app := StrLower(WIGetFocused()["appId"])
-	if (app == "")
-		return default_id
-	; Drop any trailing ``.exe`` so user-entered overrides ("slack") match
-	; the OS-reported process name ("slack.exe").
-	app := RegExReplace(app, "\.exe$", "")
-	if overrides.Has(app)
-		return overrides[app]
-	return default_id
+	try app := WIGetFocused()["appId"]
+	return LLM_AppProfile_Resolve(overrides, app, default_id)
+}
+
+; The twin of app_profile_overrides.lua `resolve`, so "slack" matches a reported "Slack.EXE".
+LLM_AppProfile_Resolve(Overrides, App, DefaultId) {
+	Key := LLM_AppIdentity_Normalize(App)
+	if Key == "" || !Overrides.Has(Key) || !(Overrides[Key] is String) || Overrides[Key] == ""
+		return DefaultId
+	return Overrides[Key]
 }
 
 ; Look up the active remote API entry from the engine state. Returns the entry
@@ -1250,8 +1329,8 @@ _LLM_Engine_ParseSlots(raw, state) {
 		raw,
 		state["ctx"],
 		state.Has("ctx_tail") ? state["ctx_tail"] : state["ctx"],
-		state.Has("min_words") ? state["min_words"] : 1,
-		state.Has("max_words") ? state["max_words"] : 15,
+		state.Has(ConfigLeaf.MIN_WORDS) ? state[ConfigLeaf.MIN_WORDS] : 1,
+		state.Has(ConfigLeaf.MAX_WORDS) ? state[ConfigLeaf.MAX_WORDS] : 15,
 		is_batch,
 		state["requested"],
 		&dedup_ref,
@@ -1323,7 +1402,7 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; on_partial would race the user's own keystrokes with no clean way
 	; to roll back. Letting the variant complete first means one
 	; deterministic SendText burst with a known length.
-	if (is_final and _LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"]) {
+	if (is_final and _LLM_Engine.Has(ConfigLeaf.INLINE_AUTOTYPE) and _LLM_Engine[ConfigLeaf.INLINE_AUTOTYPE]) {
 		if (slots.Length > 0) {
 			idx := Max(1, Min(active, slots.Length))
 			text := slots[idx]
@@ -1401,11 +1480,10 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 		try LoggerInfo("LLM", "Prediction superseded during render — discarding request #{1}.", request_id)
 		return
 	}
-	; A hotstring preview shown meanwhile keeps the surface: the live answer is
+	; A hotstring preview shown meanwhile keeps the surface: the answer is
 	; dropped, and the chain armed when the preview closes asks again.
-	if (request_id != "" && _LLM_Engine_RequestIsLive(request_id)
-			&& _LLM_Engine_HotstringTooltipShown()) {
-		try LoggerDebug("LLM", "Live prediction #{1} dropped: a hotstring tooltip is shown.", request_id)
+	if (request_id != "" && _LLM_Engine_RequestHeldByHotstring(request_id)) {
+		try LoggerDebug("LLM", "Prediction #{1} dropped: a hotstring tooltip is shown.", request_id)
 		return
 	}
 	; Freeze the chain timings BEFORE the final render, not after it. The render
@@ -1609,17 +1687,41 @@ _LLM_Engine_TrimProfileLabel(label) {
 	return RegExReplace(clean, "\s*—\s*$", "")
 }
 
+/**
+ * Pieces of the info bar in display order: request_plan/info_bar.lua `parts`.
+ * @param {Map} Spec model, backend, profile_label, position (index, count), require_model.
+ * @returns {Array|Integer} The strings, or 0 when nothing is to be shown.
+ */
+LLM_InfoBar_Parts(Spec) {
+	Model := Spec.Get("model", "")
+	if Spec.Get("require_model", false) && Model == ""
+		return 0
+	Parts := []
+	if Model != ""
+		Parts.Push(Model)
+	if Spec.Get("backend", "") != ""
+		Parts.Push(Spec["backend"])
+	Short := _LLM_Engine_TrimProfileLabel(Spec.Get("profile_label", ""))
+	if Short != ""
+		Parts.Push(Short)
+	if Spec.Has("position") {
+		Position := Spec["position"]
+		if !(Position is Map) || !IsNumber(Position.Get("index", "")) || Position.Get("index", "") is String
+				|| !IsNumber(Position.Get("count", "")) || Position.Get("count", "") is String
+			throw ValueError("position must be { index, count } numbers")
+		if Position["count"] > 1
+			Parts.Push(Position["index"] . "/" . Position["count"])
+	}
+	return Parts.Length ? Parts : 0
+}
+
 _LLM_Engine_BuildInfoBarText(modelName, backend := "", profileName := "") {
-	if (modelName = "")
+	Parts := LLM_InfoBar_Parts(Map("model", modelName, "backend", backend,
+		"profile_label", profileName, "require_model", true))
+	if !(Parts is Array)
 		return ""
-	pieces := [modelName]
-	if (backend != "")
-		pieces.Push(backend)
-	shortProfile := _LLM_Engine_TrimProfileLabel(profileName)
-	if (shortProfile != "")
-		pieces.Push(shortProfile)
 	out := ""
-	for i, p in pieces
+	for i, p in Parts
 		out .= (i = 1) ? p : " — " . p
 	return out
 }

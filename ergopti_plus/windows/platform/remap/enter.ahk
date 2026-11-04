@@ -132,6 +132,16 @@ SC01C::
 $SC01C:: _EnterDispatch()
 #HotIf
 
+; With no tap-hold on the key Enter stays native, except for the press that
+; completes a hotstring: the expansion must land before the key submits the line.
+; The criterion reads the tap-hold first, as the hook runs it on every Enter.
+#HotIf (TapHoldTapAction(TapHold, "enter") == "" or TapHoldTapAction(TapHold, "enter") == "enter") and TapHoldHoldModifier(TapHold, "enter") == "" and TapHoldHoldLayer(TapHold, "enter") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld() and HotstringEndKeyClaim(0x0D, "`n")
+$SC01C:: {
+	if !HotstringCompleteEndKey("`n")
+		TapHoldEmitKeyTap("Enter")
+}
+#HotIf
+
 
 
 

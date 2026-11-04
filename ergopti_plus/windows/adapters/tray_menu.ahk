@@ -144,6 +144,22 @@ TrayMenuHandleItemState(Handle, Position) {
 	return DllCall("GetMenuState", "ptr", Handle, "uint", Position, "uint", 0x400, "uint")
 }
 
+/**
+ * Reads the caption at a captured menu's zero-based row position.
+ * This Windows-only helper is outside the cross-driver TrayMenu port contract.
+ * @param {Integer} Handle Captured HMENU, without reacquiring Menu.Handle.
+ * @param {Integer} Position Zero-based row position.
+ * @returns {String} The caption, empty for a separator.
+ */
+TrayMenuHandleItemText(Handle, Position) {
+	Length := DllCall("GetMenuStringW", "ptr", Handle, "uint", Position, "ptr", 0, "int", 0, "uint", 0x400, "int")
+	if Length <= 0
+		return ""
+	Caption := Buffer((Length + 1) * 2)
+	DllCall("GetMenuStringW", "ptr", Handle, "uint", Position, "ptr", Caption, "int", Length + 1, "uint", 0x400, "int")
+	return StrGet(Caption, "UTF-16")
+}
+
 ; Reads a child from the same captured native parent during owned-tree cleanup.
 ; @param Handle {Integer} Captured parent HMENU.
 ; @param Position {Integer} Zero-based row position.

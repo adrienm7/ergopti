@@ -9,7 +9,9 @@
 			"Clean config.toml",
 			"-",
 			"Paths (configuration & logs)…",
-			"Setup wizard…"
+			"Setup wizard…",
+			"-",
+			"Proxy for downloads…"
 		]
 	},
 	"fr": {
@@ -22,7 +24,9 @@
 			"Nettoyer config.toml",
 			"-",
 			"Chemins (configuration & logs)…",
-			"Assistant de configuration…"
+			"Assistant de configuration…",
+			"-",
+			"Proxy des téléchargements…"
 		]
 	}
 }

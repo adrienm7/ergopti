@@ -29,10 +29,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_CLSO_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_CLSO_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -52,7 +50,7 @@ _CLSO_ReadSource(RelPath) {
 ; ToggleCapsLock must delegate the LED to the single owner instead of driving it
 ; directly, so it can never leave the LED disagreeing with CapsWord/layer state.
 _CLSO_ToggleRoutesThroughLed() {
-	Src := _CLSO_ReadSource("platform/remap/one_shot_shift.ahk")
+	Src := _CLSO_ReadSource("one_shot_shift.ahk")
 	Seg := _DriverFuncBody("ToggleCapsLock")
 	Assert(Seg != "", "ToggleCapsLock() declaration must exist in one_shot_shift.ahk")
 	Assert(InStr(Seg, "UpdateCapsLockLED()") > 0,

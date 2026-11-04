@@ -11,6 +11,9 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include ../../infra/phase_stats.ahk
+#Include ../../infra/perf_budget.ahk
+
 
 
 
@@ -468,24 +471,36 @@ _TrayRootRetireFatal(TargetGeneration) {
 }
 
 _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn := 0, CallerLlm := 0) {
-	global _TrayRootBootDetailsPending, _LLM_Menu_Handle
+	global _TrayRootBootDetailsPending, _LLM_Menu_Handle, _MenuPopulationBuilding, _MenuPopulationPublished
 	if HasMethod(WorkerFn, "Call")
 		return WorkerFn.Call(PublishAuthorizeFn)
 	_HS_InvalidatePersonalCache()
-	InitSubMenus()
-	; The AI child lent by the request is attached through the root builder map
-	; while it is still the live IA submenu. A rebuild of the AI menu since then
-	; replaced it, and the default builder stages the current one.
-	if (CallerLlm is Menu) {
-		if IsSet(_LLM_Menu_Handle) && _LLM_Menu_Handle == CallerLlm
-			LiveLlm := CallerLlm
-		else
-			try LoggerDebug("Menu", "Full tray root: the AI submenu lent by its request was replaced; staging the current one.")
+	; A full rebuild publishes the root: each submenu is rebuilt where it is next
+	; opened, so one toggle does not redraw a thousand rows nobody is looking at.
+	if _MenuPopulationBuilding is MenuPopulation
+		throw Error("Native menu population already has a build owner")
+	PopulationOwner := MenuPopulation()
+	_MenuPopulationBuilding := PopulationOwner
+	try {
+		InitSubMenus()
+		; The AI child lent by the request is attached through the root builder map
+		; while it is still the live IA submenu. A rebuild of the AI menu since then
+		; replaced it, and the default builder stages the current one.
+		if (CallerLlm is Menu) {
+			if IsSet(_LLM_Menu_Handle) && _LLM_Menu_Handle == CallerLlm
+				LiveLlm := CallerLlm
+			else
+				try LoggerDebug("Menu", "Full tray root: the AI submenu lent by its request was replaced; staging the current one.")
+		}
+		Published := initMenu(PublishAuthorizeFn, false, LiveLlm?)
+		if ((Published is Integer) && Published == 1)
+			_TrayRootBootDetailsPending := false
+		return Published
+	} finally {
+		_MenuPopulationBuilding := false
+		if !IsSet(_MenuPopulationPublished) || _MenuPopulationPublished != PopulationOwner
+			PopulationOwner.Pending.Clear()
 	}
-	Published := initMenu(PublishAuthorizeFn, false, LiveLlm?)
-	if ((Published is Integer) && Published == 1)
-		_TrayRootBootDetailsPending := false
-	return Published
 }
 
 _TrayRootDrain(IsAutomaticRetry := false, LogFn := 0) {
@@ -816,7 +831,22 @@ RebuildTrayMenu(PublishAuthorizeFn := 0, WorkerFn := 0,
 		ForceFullWorkerWhenQueued, CallerLlm)
 	if !Acquired
 		return QueuedOutcome
-	return _TrayRootDrain()
+	Started := PhaseStats_Now()
+	Published := false
+	try Published := _TrayRootDrain()
+	finally ElapsedMs := PhaseStats_Stop("menu.rebuild", Started)
+	if ((Published is Integer) && Published == 1)
+		_TrayRootReportRebuild(ElapsedMs, TrayMenuItemCount(A_TrayMenu))
+	return Published
+}
+
+; The macOS and Linux line of a tray rebuild and its budget, so one pattern of
+; tools/dev/field-log-analyse.py judges every driver. A refused pass rebuilt nothing.
+; @param ElapsedMs {Number} What the rebuild took.
+; @param TopLevelItems {Integer} The rows of the published root.
+_TrayRootReportRebuild(ElapsedMs, TopLevelItems) {
+	LoggerInfo("Menu", "Menu tree rebuilt in {1} ms ({2} top-level item(s)).", Format("{:.1f}", ElapsedMs), TopLevelItems)
+	PerfBudget_Report("Menu", "menu.rebuild", ElapsedMs, TimingsGet("budgets", "menu_rebuild_ms"))
 }
 
 ; Sets the active log level without a restart. Disk and the cached hot-path
@@ -834,7 +864,7 @@ LoggerSetLevel(Level, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 		try LoggerWarn("Menu", "LoggerSetLevel: unknown level '{1}' — ignoring.", Level)
 		return false
 	}
-	Updates := [{ Section: "script", Key: "log_level", Value: Level }]
+	Updates := [{ Section: "script", Key: ConfigLeaf.LOG_LEVEL, Value: Level }]
 	Persisted := ConfigCommitUpdates(ConfigurationFile, Updates,
 		"the runtime log level", WriterFn, NotifyFn,
 		_LoggerSetLevelPublish.Bind(Level))

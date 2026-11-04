@@ -1,6 +1,6 @@
 --- _shared/lua/test/layout_catalogue_local_contract.lua
 
---- Replays local-source catalogue refreshes without a published remote index.
+--- Replays clone-registry catalogue refreshes without a published remote index.
 return function(helpers, Catalogue, Json, settings, bundled)
 	local request_settings = {
 		owner = "test", repo = "registry", branch = "main", folder = "layouts",
@@ -14,7 +14,7 @@ return function(helpers, Catalogue, Json, settings, bundled)
 				local reads, writes, requests, callbacks = 0, 0, 0, 0
 				local outcome
 				Catalogue.refresh(request_settings, {
-					local_source = true,
+					clone_registry = true,
 					bundled_index = valid and bundled or nil,
 					decode_json = Json.decode,
 					read_cache = function()

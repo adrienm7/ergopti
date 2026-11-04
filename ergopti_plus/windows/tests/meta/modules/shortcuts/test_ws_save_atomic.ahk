@@ -17,10 +17,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TWSA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TWSA_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TWSA_StripLineComments(Src) {
@@ -43,7 +41,7 @@ _TWSA_StripLineComments(Src) {
 ; =====================================================================
 
 _TWSA_AtomicWrite() {
-	Src := _TWSA_StripLineComments(_TWSA_ReadSource("infra/wrap_symbols_config.ahk"))
+	Src := _TWSA_StripLineComments(_TWSA_ReadSource("wrap_symbols_config.ahk"))
 	Assert(Src != "", "infra/wrap_symbols_config.ahk must be readable")
 
 	Body := _DriverFuncBody("_WS_Save")

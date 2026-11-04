@@ -175,14 +175,10 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 		-- the whole point: before this, the manifest could not promise Linux this
 		-- row, and the restriction said no Lua driver had the concept while both
 		-- did.
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		helpers.assert_true(mb ~= nil)
 
-		local source = nil
-		for _, path in ipairs({ "ui/menu/menu_builder.lua" }) do
-			local fh = io.open("./" .. path, "r")
-			if fh then source = fh:read("*a") ; fh:close() end
-		end
+		local source = helpers.read_menu_source()
 		helpers.assert_not_nil(source, "the builder's source must be readable")
 		helpers.assert_contains(source, 'ManifestMenu.build("shortcuts_menu"',
 			"the submenu must go through the shared renderer — a hand-rolled one "
@@ -194,7 +190,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 	end)
 
 	helpers.it("keeps the rest of the tray when the shortcuts module is absent", function()
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local tree = mb.build({ _version = "9.9.9" })
 
 		-- Not "it did not throw": that would pass just as well if build returned an
@@ -236,6 +232,7 @@ helpers.describe("shortcuts menu: configured binding labels", function()
 					["owner_tap__number_row_left"] = "https://tap.example" }
 				package.loaded[owned[1]] = {
 					SLOT_GROUPS = { { prefix = "primary_", group_key = "menu.shortcuts.mod_ctrl" } },
+					get_group_label = function(group) return group.group_key end,
 					available_slots = function() return { "primary_k" } end,
 					get_action = function() return "open_url" end,
 					get_slot_label = function() return "Ctrl+K" end,
@@ -282,7 +279,7 @@ helpers.describe("shortcuts menu: master publication receipt", function()
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
-			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			if command:find("dialog_host.lua", 1, true) then notices[#notices + 1] = command; return 0 end
 			return execute(command)
 		end
 		local called, receipt = pcall(action)
@@ -390,7 +387,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
-			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			if command:find("dialog_host.lua", 1, true) then notices[#notices + 1] = command; return 0 end
 			return execute(command)
 		end
 		local called, receipt = pcall(action)

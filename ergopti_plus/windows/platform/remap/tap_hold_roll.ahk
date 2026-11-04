@@ -105,7 +105,9 @@ TapHoldKeyRolls(KeyId) {
 ; the block of hotkeys in tap_hold_roll_keys.ahk.
 ; @returns {Boolean}
 TapHoldRollUndecided() {
-	return _TapHoldRollState()["key"] != ""
+	global _KeyCombinationChordBusy
+	; A key waiting for its chord partner holds the next characters the same way.
+	return (IsSet(_KeyCombinationChordBusy) && _KeyCombinationChordBusy) || _TapHoldRollState()["key"] != ""
 }
 
 ; Whether the tap of KeyId is being typed by the roll owner now: the keys
@@ -323,6 +325,11 @@ TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 	if !RegExMatch(Name, "i)SC([0-9A-F]{3})$", &Found)
 		throw ValueError("A typing-key roll hotkey must be named by its scan code.", -1, Name)
 	Sc := Integer("0x" . Found[1])
+	global _KeyCombinationChordBusy
+	if (IsSet(_KeyCombinationChordBusy) && _KeyCombinationChordBusy) {
+		KeyCombinationChordInterrupt(Sc)
+		return
+	}
 	IsDown := _TapHoldRollPort(Ports, "is_down", _TapHoldRollScIsDown)
 	Tick := _TapHoldRollPort(Ports, "tick", _TapHoldModifierTickNow)
 	Wait := _TapHoldRollPort(Ports, "sleep", Sleep)
@@ -375,8 +382,8 @@ TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 	}
 }
 
-; Whether the key of a scan code is physically down.
+; Whether the key of a scan code is held, a replayed press included.
 _TapHoldRollScIsDown(Sc) {
-	return GetKeyState(Format("SC{:03X}", Sc), "P")
+	return KS_IsHeld(Format("SC{:03X}", Sc))
 }
 

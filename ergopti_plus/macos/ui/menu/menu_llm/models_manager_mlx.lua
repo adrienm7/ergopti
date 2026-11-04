@@ -446,12 +446,21 @@ function M.new(deps, presets)
 		end
 
 		-- Verify the pinned project venv has every required MLX dependency
-		-- importable: the packages ensure-mlx-deps.sh's fast path checks,
-		-- truststore included since the model download gate imports it. If it
-		-- does not, the venv is broken / out of sync and the next MLX selection
-		-- must rebuild it — silently pip-installing a fallback would bypass
-		-- pyproject.toml.
-		local check_cmd = "\"" .. project_venv_python_escaped .. "\" -c 'import mlx_lm; import huggingface_hub; import jinja2; import safetensors; import truststore'"
+		-- importable: the very statement ensure-mlx-deps.sh runs before it
+		-- publishes or reuses a venv (mlx_deps_checker.import_probe), truststore
+		-- included since the model download gate imports it. If it does not, the
+		-- venv is broken / out of sync and the next MLX selection must rebuild it
+		-- — silently pip-installing a fallback would bypass pyproject.toml.
+		local probe_ok, import_probe = false, "the MLX dependency checker is not loaded"
+		if mlx_deps_checker and type(mlx_deps_checker.import_probe) == "function" then
+			probe_ok, import_probe = pcall(mlx_deps_checker.import_probe)
+		end
+		if not probe_ok then
+			Logger.error(LOG, "The MLX import probe is unavailable; the runtime is not checked: %s.",
+				tostring(import_probe))
+			return settle_cancel("import_probe_unavailable")
+		end
+		local check_cmd = "\"" .. project_venv_python_escaped .. "\" -c '" .. import_probe .. "'"
 		-- Publish the exact owner before start(). TaskLifecycle.start() can mutate
 		-- native state and still return false/nil/throw, so refusal begins cleanup;
 		-- it never authorizes the queued completion or drops the GC pin

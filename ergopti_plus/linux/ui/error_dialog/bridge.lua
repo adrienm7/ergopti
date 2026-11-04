@@ -127,6 +127,10 @@ end
 --- @return boolean saved
 function M.set_enabled(enabled)
 	if not _scope.admit_change() then return false end
+	-- config.toml's [script] show_error_dialog wins at start: rewrite it first.
+	if type(enabled) == "boolean" and not require("infra.script_scope").rewrite_configured(SETTING, enabled) then
+		return false
+	end
 	if not DialogCore.save_enabled(Logger, LOG, function() return require("adapters.storage") end, SETTING, enabled) then
 		return false
 	end

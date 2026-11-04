@@ -1,5 +1,7 @@
 --- _shared/lua/test/debug_parent_contract.lua
 --- Replays structural source ownership through the actual complete native tray.
+local Layout = require("test.debug_menu_layout_contract")
+
 local M = {}
 
 --- Registers native parent controls without reconstructing Debug child rows.
@@ -66,8 +68,21 @@ function M.register(helpers, fixture, corpus, platform)
 					helpers.assert_true(rawequal(observed.child, observed.retained), "finished child is passed by identity")
 					local labels = {}; for _, row in ipairs(parent.menu) do labels[#labels + 1] = row.title end
 					helpers.assert_eq(labels, expected[platform], "complete hand-authored native child image")
+					-- The developer rows (macOS's console and its separator) lead; the
+					-- « Diagnostics » and « Logs » headers open the two user groups.
+					local base = platform == "hs" and 2 or 0
+					local checks = expected[platform .. "_tests"]
+					Layout.assert_layout(helpers, parent.menu, {
+						diagnostics = expected[platform][base + 2], report = expected[platform][base + 4],
+						suggest = expected[platform][base + 5], logs = expected[platform][base + 8],
+						tests = expected.tests, checks = checks,
+					}, platform .. " " .. language)
 					helpers.assert_eq(observed.effects, {}, "constructing Debug invokes no action")
-					local choice = parent.menu[platform == "hs" and 3 or 1]
+					for _, header in ipairs({ base + 1, base + 7 }) do
+						helpers.assert_true(parent.menu[header].disabled == true, "the section header is inert: " .. header)
+						helpers.assert_nil(parent.menu[header].fn, "the section header has no action: " .. header)
+					end
+					local choice = parent.menu[base + 8]
 					helpers.assert_eq(#choice.menu, 4)
 					for index, value in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
 						helpers.assert_eq(choice.menu[index].checked == true, value == "INFO")
@@ -185,6 +200,21 @@ function M.register(helpers, fixture, corpus, platform)
 				helpers.assert_true(rawequal(observed.child, observed.retained))
 				helpers.assert_true(rawequal(row.menu[#row.menu].menu, deep), "no depth-changing conversion of finished child")
 				helpers.assert_eq(observed.effects, {})
+			end)
+		end)
+
+		helpers.it("draws no empty Tests submenu and no separator left behind", function()
+			with_case(function(root, _, build, _, locale)
+				locale.set_locale("en")
+				local checks = root.debug_tests_menu
+				root.debug_tests_menu = {}
+				local ok, rows = pcall(build)
+				root.debug_tests_menu = checks
+				if not ok then error(rows, 0) end
+				local row = find(rows, corpus.en.parent)
+				helpers.assert_true(row ~= nil, "Debug is still drawn")
+				helpers.assert_nil(find(row.menu, corpus.en.tests), "no Tests row without a check")
+				helpers.assert_true(row.menu[#row.menu].title ~= "-", "no trailing separator")
 			end)
 		end)
 

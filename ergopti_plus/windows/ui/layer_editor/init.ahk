@@ -34,6 +34,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 ; The shared page's id in _shared/ui/apps.manifest.json.
 global LAYER_EDITOR_APP_ID := "layer_editor"
@@ -206,8 +207,8 @@ LayerEditor_LegendText(Text) {
 LayerEditor_CurrentEmulation() {
 	global Features
 	Layout := (IsSet(Features) && Features is Map && Features.Has("layout")) ? Features["layout"] : Map()
-	Registry := KeylayoutEmulation_LayerIsActive("ergopti_base")
-	Ergopti := !Registry && Layout.Get("ergopti_base", false) == true
+	Registry := KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE)
+	Ergopti := !Registry && Layout.Get(ConfigLeaf.ERGOPTI_BASE, false) == true
 	; The ordering in effect: a stored choice that is inert on this layout types
 	; nothing. A registry layout types its own « symbols first » levels.
 	Mode := NumberRowEffectiveMode()

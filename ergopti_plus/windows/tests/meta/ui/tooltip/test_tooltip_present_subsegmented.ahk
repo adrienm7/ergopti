@@ -208,8 +208,16 @@ _TPS_VisibleDecisionCommitHasOneTransitiveOwner() {
 		"_TooltipPresentStack\(Pos, Row, false, Items,\s*RenderGeneration, false, RebuildRequestSerial,\s*LifecyclePlan, 0, &PresentBreakdown\)") > 0,
 		"the destack presenter must publish only its surviving rows")
 	Assert(RegExMatch(Llm,
-		"_TooltipPresentStack\(Pos, Row, false, \[\],\s*RenderGeneration, true, RequestSerial, 0, StateCommit, &PresentBreakdown\)") > 0,
-		"the direct rich LLM presenter must fence its generation and request serial, then publish [] so replacing the shared surface retires the old hotstring decision")
+		"_TooltipPresentStack\(Pos, Row, false, HeaderItems,\s*RenderGeneration, true, RequestSerial, 0, StateCommit, &PresentBreakdown\)") > 0,
+		"the direct rich LLM presenter must fence its generation and request serial, then publish only the hotstring rows it draws")
+	; HeaderItems is [] unless the user chose to see both (llm.trigger.while_hotstring_tooltip):
+	; replacing the shared surface then still retires the old hotstring decision.
+	Assert(InStr(Llm, "HeaderItems := _LLM_TooltipSharedHotstringItems()") > 0,
+		"the rich LLM presenter publishes only the rows the shared-stack owner admits")
+	Shared := _StripFullLineComments(_DriverFuncBody("_LLM_TooltipSharedHotstringItems"))
+	Assert(Shared != "", "_LLM_TooltipSharedHotstringItems must exist in ui/tooltip/llm.ahk")
+	Assert(InStr(Shared, "!= LLM_HOTSTRING_TOOLTIP_SHOW_BOTH") > 0 && InStr(Shared, "return []") > 0,
+		"outside the shared stack the rich LLM presenter publishes [] and retires the hotstring decision")
 
 	Build := _StripFullLineComments(_DriverFuncBody("_TooltipBuildGui"))
 	Assert(InStr(Build, "_TooltipActiveSurface :=") == 0,

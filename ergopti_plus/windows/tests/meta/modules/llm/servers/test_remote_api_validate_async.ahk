@@ -77,8 +77,9 @@ _RAVB_AsyncProbeExists() {
 Test("api_remote: LLM_RemoteIsReady_Async is defined (remote-api-validate-blocks-message-pump)", _RAVB_AsyncProbeExists)
 
 _RAVB_AsyncProbeUsesChildTransport() {
-	Body := _DriverFuncBody("LLM_RemoteIsReady_Async")
-	Assert(Body != "", "LLM_RemoteIsReady_Async must exist in modules/llm/api_remote.ahk")
+	; The probe is sent once any access token is known, so its transport is built there.
+	Body := _DriverFuncBody("LLM_RemoteIsReady_Async") . "`n" . _DriverFuncBody("_LLMRemote_ReadySend")
+	Assert(InStr(Body, "LLM_RemoteIsReady_Async") > 0, "LLM_RemoteIsReady_Async must exist in modules/llm/api_remote.ahk")
 	Assert(InStr(Body, "CurlAsyncRequest()") > 0,
 		"remote readiness must use the tree-owned curl transport")
 	Assert(!InStr(Body, "ComObject(") and !InStr(Body, "WinHttp"),

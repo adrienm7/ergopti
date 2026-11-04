@@ -3,7 +3,7 @@
 	"drivers": {
 		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
 		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
-		"windows": "Not ported yet: prediction_exec.ahk caps the batch at max*n+5*n already, so it should call a port of for_call and replay every vector; its retry adds the retry policy's extra tokens the same way."
+		"windows": "Replays every vector through prediction_exec.ahk (tests/meta/corpus/test_corpus_llm_small_families.ahk)."
 	},
 	"differences": {
 		"batch_overhead": "Linux gave a batch of n variants n*base tokens; it now gives n*(base+5) as macOS and Windows do. Convergence, written reason: the five tokens are the numbering and separator each variant spends, and without them the last variant of a batch could be cut short on Linux only."

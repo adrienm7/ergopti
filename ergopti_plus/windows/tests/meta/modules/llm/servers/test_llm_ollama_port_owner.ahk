@@ -19,8 +19,7 @@ _AHK022_AllPortBoundariesUseOneOwner() {
 		"prompt_boundary", _DriverFuncBody("_LLM_Menu_TryNormalizePortPrompt"),
 		"prepare", _DriverFuncBody("_LLM_Menu_PrepareOllamaPortCandidate"),
 		"boot_apply", _DriverFuncBody("_LLM_Menu_ApplyOllamaPortAtBoot"),
-		"menu_init", _DriverFuncBody("LLM_Menu_Init"),
-		"installer", _DriverFuncBody("LLM_Deps_RunInstaller"))
+		"menu_init", _DriverFuncBody("LLM_Menu_Init"))
 	for Name, Body in Bodies
 		Assert(Body != "", "AHK-022 source guard must resolve " . Name)
 
@@ -43,10 +42,6 @@ _AHK022_AllPortBoundariesUseOneOwner() {
 	Assert(Source != "", "AHK-022 boot guard must inspect a non-empty source")
 	AssertContains(Source, "if !LLM_Ollama_LoadDefaults()",
 		"driver boot must fail fast when the shared defaults are rejected")
-	AssertContains(Bodies["installer"], "LLM_OLLAMA_BASE_URL",
-		"poll diagnostics must report the configured endpoint")
-	AssertFalse(InStr(Bodies["installer"], "localhost:11434") > 0,
-		"poll diagnostics must not lie after a custom port publication")
 }
 Test("AHK-022 Ollama port: every producer consumes one boundary "
 	. "(ahk-022-ollama-port-boundary)",

@@ -135,7 +135,7 @@ helpers.describe("linux-sqlite-wpm-fraction", function()
 			command.build = previous_build
 			if not ok then error(err, 0) end
 			helpers.assert_type(inserted, "string", "the actual writer must compose a typing INSERT")
-			local scalar = inserted:match(",0%.0,([^,]+),'owned text'")
+			local scalar = inserted:match(",%s*([^,%s]+),%s*'owned text'")
 			helpers.assert_eq(tonumber(scalar), fixture.expected, "REAL WPM must retain the admitted numeric value")
 		end)
 	end
@@ -223,9 +223,8 @@ helpers.describe("sqlite_writer", function()
     end)
 
 	it("persists generated-output sources and physical scancodes independently", function()
-		local path = helpers.driver_root() .. "/modules/keystats/sqlite_writer.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a"); fh:close()
+		-- modules/keystats/sqlite_writer, selected by a declaration unique to it.
+		local src = assert(helpers.read_driver_unit("local function _check_sqlite3("))
 		with_ngram_sql(function(writer, statements)
 			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
 				x = { c = 14, td = 7, cd = 2, e = 1,
@@ -253,26 +252,31 @@ helpers.describe("sqlite_writer", function()
 				helpers.assert_contains(sql, scalar .. " = " .. scalar .. " + excluded." .. scalar .. ", ")
 			end
 		end)
-		helpers.assert_true(src:find("INSERT INTO ngram_scancodes", 1, true) ~= nil,
+		helpers.assert_true(src:find('"agg.ngram_scancode"', 1, true) ~= nil,
+			"evdev hardware counts must be rendered through the catalogue")
+		helpers.assert_contains(require("keystats.queries").render("agg.ngram_scancode", "cli_json",
+			{ device_id = "d", date = "x", app = "a", scancode = 30, c = 1 }), "INSERT INTO ngram_scancodes",
 			"evdev hardware counts must be persisted in the canonical scancode table")
 	end)
 
     it("preserves complete dotted application identifiers during flush", function()
-      local path = helpers.driver_root() .. "/modules/keystats/keystats.lua"
-      local fh = assert(io.open(path, "r"))
-      local src = fh:read("*a"); fh:close()
+      -- modules/keystats/keystats, selected by a declaration unique to it.
+      local src = assert(helpers.read_driver_unit("local function new_live_tracker("))
       helpers.assert_true(src:find("local app_name = dashboard_app_name(app_id)", 1, true) ~= nil,
         "SQLite aggregation must use the same full app ID as the dashboard")
     end)
 
     it("uses persistent IDs and non-destructive inserts for raw events", function()
-      local path = helpers.driver_root() .. "/modules/keystats/sqlite_writer.lua"
-      local fh = assert(io.open(path, "r"))
-      local src = fh:read("*a"); fh:close()
+      -- modules/keystats/sqlite_writer, selected by a declaration unique to it.
+      local src = assert(helpers.read_driver_unit("local function _check_sqlite3("))
       helpers.assert_true(src:find("linux_next_event_id", 1, true) ~= nil,
         "a restart-safe SQLite event sequence is required")
-      helpers.assert_true(src:find("INSERT OR IGNORE INTO events_typing", 1, true) ~= nil,
-        "raw typing rows must never be replaced on an ID collision")
+      helpers.assert_true(src:find('"events.typing"', 1, true) ~= nil,
+        "raw typing rows must be rendered through the catalogue")
+      helpers.assert_contains(require("keystats.queries").render("events.typing", "cli_json", {
+        device_id = "d", id = 1, ts = "t", date = "x", app = "a", is_fullscreen = 0, in_meeting = 0,
+        mouse_clicks = 0, mouse_scrolls = 0, mouse_distance_px = 0, text = "", events_json = "[]",
+      }), "INSERT OR IGNORE INTO events_typing", "raw typing rows must never be replaced on an ID collision")
       helpers.assert_true(src:find("insert_hotstring_events", 1, true) ~= nil,
         "Linux must write canonical events_hotstring rows")
       helpers.assert_true(src:find("insert_app_switch_events", 1, true) ~= nil,
@@ -354,19 +358,19 @@ helpers.describe("sqlite_writer", function()
       end
       vals[#vals + 1] = table.concat(cur)
       helpers.assert_eq(#cols, #vals, "columns and values arity must match")
-      helpers.assert_eq(cols[9], "layout", "column 9 carries the layout")
-      helpers.assert_eq(vals[9], "'us'", "the layout binding must reach the row")
-      helpers.assert_eq(cols[19], "wpm", "column 19 carries wpm")
-      helpers.assert_eq(vals[19], "60", "wpm must land in its own column")
-      helpers.assert_eq(cols[20], "text", "column 20 carries text")
-      helpers.assert_eq(vals[20], "'hi'", "text must land in its own column")
-      helpers.assert_eq(cols[22], "events_json", "column 22 carries events_json")
+      -- By name: the catalogue statement also names app_category, which Linux leaves NULL.
+      local row = {}
+      for index, column in ipairs(cols) do row[column] = vals[index]:match("^%s*(.-)%s*$") end
+      helpers.assert_eq(row.app_category, "NULL", "Linux records no application category")
+      helpers.assert_eq(row.layout, "'us'", "the layout binding must reach the row")
+      helpers.assert_eq(row.wpm, "60", "wpm must land in its own column")
+      helpers.assert_eq(row.text, "'hi'", "text must land in its own column")
+      helpers.assert_eq(row.events_json, "'[]'", "events_json must land in its own column")
     end)
 
     it("migrates the former device OS constraint to include Linux", function()
-      local path = helpers.driver_root() .. "/modules/keystats/sqlite_writer.lua"
-      local fh = assert(io.open(path, "r"))
-      local src = fh:read("*a"); fh:close()
+      -- modules/keystats/sqlite_writer, selected by a declaration unique to it.
+      local src = assert(helpers.read_driver_unit("local function _check_sqlite3("))
       helpers.assert_true(src:find("_ensure_linux_device_schema", 1, true) ~= nil)
       helpers.assert_true(src:find("'darwin','windows','linux'", 1, true) ~= nil)
     end)

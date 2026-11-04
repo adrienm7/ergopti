@@ -21,7 +21,124 @@ global MENU_POPULATION_THREAD_PRIORITY := -1
 ; completion for navigation; this bounds work, not native-call wall time.
 global MENU_POPULATION_BATCH_ROWS := 16
 
+; Submenus published with one placeholder row, built when first opened, by handle.
+; Global rather than owned by a build: SubMenus can outlive a refused publication
+; and reach the tray through the updater's bare initMenu, and a child whose owner
+; went with that build would show its placeholder for ever.
+global _MenuDeferredChildren := Map()
+
 class MenuPopulationReentryError extends Error {
+}
+
+/**
+ * Publishes a submenu whose rows are built at its first open, from the state of
+ * that moment. The placeholder keeps the row a real parent: a declared group
+ * with an empty child is not drawn.
+ * @param {Func} BuildFn Fills the empty native Menu it receives.
+ * @param {String} ListId Closed list id for the counters and logs.
+ * @returns {Menu} The published child.
+ */
+MenuDeferred_Create(BuildFn, ListId) {
+	global _MenuDeferredChildren
+	if !HasMethod(BuildFn, "Call")
+		throw TypeError("A deferred submenu requires a builder")
+	Child := Menu()
+	_MenuDeferred_AddPlaceholder(Child)
+	_MenuDeferredChildren[Child.Handle] := { MenuObj: Child, BuildFn: BuildFn, ListId: ListId, Busy: false }
+	return Child
+}
+
+/**
+ * The submenu of one tray build: deferred inside a population build, built at
+ * once for a caller with no owner, such as a unit test reading the rows.
+ * @param {Func} BuildFn Fills the empty native Menu it receives.
+ * @param {String} ListId Closed list id for the counters and logs.
+ * @returns {Menu} The child to attach.
+ */
+MenuDeferOrBuild(BuildFn, ListId) {
+	global _MenuPopulationBuilding
+	if _MenuPopulationBuilding is MenuPopulation
+		return MenuDeferred_Create(BuildFn, ListId)
+	Child := Menu()
+	BuildFn.Call(Child)
+	return Child
+}
+
+_MenuDeferred_AddPlaceholder(Child) {
+	Label := t("common.loading")
+	Child.Add(Label, (*) => 0)
+	Child.Disable(Label)
+}
+
+/**
+ * Builds one deferred submenu before Windows paints it. Runs outside Critical:
+ * a build reads files and native state, and an open menu already holds the
+ * script's other threads. A failed build keeps its placeholder and stays pending,
+ * so the next open tries again.
+ * @param {Integer} Handle The native menu about to open.
+ * @param {String} Reason What asked for it.
+ * @returns {Boolean} True when this call built the rows.
+ */
+MenuDeferred_Build(Handle, Reason := "navigation") {
+	global _MenuDeferredChildren, _MenuPopulationBuilding, _MenuPopulationPublished
+	if !_MenuDeferredChildren.Has(Handle)
+		return false
+	Entry := _MenuDeferredChildren[Handle]
+	if Entry.Busy
+		throw MenuPopulationReentryError("Deferred submenu build reentered")
+	Entry.Busy := true
+	StartedAt := HotPath_Now()
+	PreviousBuilding := _MenuPopulationBuilding
+	; Nested pickers stay deferred under the published owner, finished at their open.
+	if _MenuPopulationPublished is MenuPopulation
+		_MenuPopulationBuilding := _MenuPopulationPublished
+	try {
+		Entry.MenuObj.Delete()
+		Entry.BuildFn.Call(Entry.MenuObj)
+		_MenuDeferredChildren.Delete(Handle)
+		; Formatted first: the logger folds repeats of one template, and each list's
+		; first-open cost must stay readable (the startup smoke bounds this line).
+		LoggerInfo("MenuPopulation", Format("Deferred submenu '{1}' built in {2} ms for {3}.",
+			Entry.ListId, Round(PerfElapsedUs(StartedAt) / 1000), Reason))
+	} catch as Err {
+		Entry.MenuObj.Delete()
+		_MenuDeferred_AddPlaceholder(Entry.MenuObj)
+		LoggerError("MenuPopulation", "Deferred submenu '{1}' could not be built for {2}: {3}.",
+			Entry.ListId, Reason, Err.Message)
+		throw Err
+	} finally {
+		_MenuPopulationBuilding := PreviousBuilding
+		Entry.Busy := false
+		PerfCount("menu.deferred_open_us." . Entry.ListId, PerfElapsedUs(StartedAt))
+		PerfCount("menu.deferred_open_runs." . Entry.ListId)
+		HotPath_LogIfSlow("Menu.deferred_build", StartedAt, Format("{1}; list={2}", Reason, Entry.ListId))
+	}
+	return true
+}
+
+/** Builds every deferred submenu: a reload replay must search the whole tree. */
+MenuDeferred_BuildAll(Reason) {
+	global _MenuDeferredChildren
+	Handles := []
+	for Handle in _MenuDeferredChildren
+		Handles.Push(Handle)
+	for Handle in Handles
+		MenuDeferred_Build(Handle, Reason)
+}
+
+/** Forgets children neither the tray nor SubMenus can reach any more. */
+MenuDeferred_Retire(LiveHandles) {
+	global _MenuDeferredChildren, SubMenus
+	Held := Map()
+	if IsSet(SubMenus) && SubMenus is Map
+		for , Child in SubMenus
+			Held[Child.Handle] := true
+	Retired := []
+	for Handle in _MenuDeferredChildren
+		if !LiveHandles.Has(Handle) && !Held.Has(Handle)
+			Retired.Push(Handle)
+	for Handle in Retired
+		_MenuDeferredChildren.Delete(Handle)
 }
 
 /** Owns the unpublished remainder of native leaf menus for one root build. */
@@ -70,6 +187,7 @@ class MenuPopulation {
 
 	/** Completes only a deferred picker containing the requested canonical action. */
 	CompleteReplayIdentity(Identity) {
+		MenuDeferred_BuildAll("reload replay identity")
 		Handles := []
 		for Handle, Entry in this.Pending {
 			for Row in Entry.Rows {
@@ -87,6 +205,7 @@ class MenuPopulation {
 	Complete(Handle, Reason := "navigation", RenderFn := 0, MaxRows := 0) {
 		if !(MaxRows is Integer) || MaxRows < 0
 			throw ValueError("Native population row limit must be a nonnegative integer")
+		MenuDeferred_Build(Handle, Reason)
 		PreviousCritical := Critical("On")
 		StartedAt := HotPath_Now()
 		OwnBusy := false
@@ -234,12 +353,13 @@ MenuPopulation_OnInitPopup(Handle, *) {
 	; prepares rows: feature commands remain fenced by root pause greying.
 	global _MenuPopulationPublished
 	PerfCount("menu.initpopup")
-	if IsSet(_MenuPopulationPublished) && _MenuPopulationPublished is MenuPopulation {
-		try _MenuPopulationPublished.Complete(Handle)
-		catch as Err {
-			TrayMenuCancelNavigation()
-			throw Err
-		}
+	try {
+		MenuDeferred_Build(Handle)
+		if IsSet(_MenuPopulationPublished) && _MenuPopulationPublished is MenuPopulation
+			_MenuPopulationPublished.Complete(Handle)
+	} catch as Err {
+		TrayMenuCancelNavigation()
+		throw Err
 	}
 }
 
@@ -252,6 +372,7 @@ MenuPopulation_Publish(RootMenu) {
 		return
 	LiveHandles := Map()
 	_MenuDispatchCollectLiveIds(RootMenu.Handle, Map(), LiveHandles)
+	MenuDeferred_Retire(LiveHandles)
 	Previous := _MenuPopulationPublished
 	if Previous is MenuPopulation && Previous != NextOwner {
 		Previous.Stop()
@@ -283,7 +404,8 @@ MenuPopulation_Resume() {
 
 /** Retires timer and native-menu references when the driver exits. */
 MenuPopulation_Shutdown() {
-	global _MenuPopulationPublished
+	global _MenuPopulationPublished, _MenuDeferredChildren
+	_MenuDeferredChildren.Clear()
 	if IsSet(_MenuPopulationPublished) && _MenuPopulationPublished is MenuPopulation {
 		_MenuPopulationPublished.Stop()
 		_MenuPopulationPublished.Pending.Clear()

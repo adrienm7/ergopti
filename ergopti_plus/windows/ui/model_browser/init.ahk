@@ -23,6 +23,8 @@
 ;    case install flow lives in this file.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
+
 #Requires AutoHotkey v2.0
 
 
@@ -136,7 +138,7 @@ _LLM_ModelBrowser_Build() {
 	g.FilterDebounce := () => _LLM_ModelBrowser_RefreshRows(g.ListView, filter_edit.Value)
 	filter_edit.OnEvent("Change", (*) => (
 		SetTimer(g.FilterDebounce, 0),
-		SetTimer(g.FilterDebounce, -120)
+		SetTimer(g.FilterDebounce, -TimingsGet("ui", "model_browser_filter_debounce_ms"))
 	))
 
 	; ListView — columns mirror the metadata extracted in
@@ -474,7 +476,7 @@ _LLM_ModelBrowser_ShowWeb() {
 			try Controller.Fill()
 			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
 				return g
-			SetTimer(_LLM_MBW_SafetyFlush.Bind(SessionEpoch), -2000)
+			SetTimer(_LLM_MBW_SafetyFlush.Bind(SessionEpoch), -TimingsGet("ui", "webview_page_safety_flush_ms"))
 			Script := _LLM_MBW_I18nApplyScript()
 			_LLM_MBW_Eval(Script, SessionEpoch)
 			return g
@@ -655,10 +657,10 @@ _LLM_MBW_BuildPayload() {
 	; The page's "Install Ollama" button posts the group action "install".
 	Tools["ollama`ninstall"] := (*) => _LLM_MBW_InstallOllama()
 	OllamaTools := []
-	PortDisplay := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
+	PortDisplay := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_owned_port")
 	OllamaTools.Push(_LLM_MBW_Tool(Tools, "ollama", "ollama_port",
 		StrReplace(t("menu.llm.ollama_port_label"), "%s", "" . PortDisplay), (*) => LLM_Menu_PromptOllamaPort()))
-	DefaultPort := _LLM_DefaultFor("llm_ollama_port")
+	DefaultPort := _LLM_DefaultFor("llm_ollama_owned_port")
 	if !(PortDisplay = DefaultPort)
 		OllamaTools.Push(_LLM_MBW_Tool(Tools, "ollama", "ollama_port_reset",
 			Trim(StrReplace(t("menu.llm.reset_label"), "%s", "" . DefaultPort)),
@@ -699,9 +701,8 @@ _LLM_MBW_BuildPayload() {
 	OllamaInstalled := !OllamaFailed && ((IsSet(LLM_Deps_IsReady) && LLM_Deps_IsReady())
 		|| Installed.Count > 0 || _LLM_MBW_OllamaRuntimePresent())
 	OllamaReason := Blocked != "" ? Blocked : (OllamaInstalled ? "" : "model_browser.reason_ollama_missing")
-	OllamaInstall := Blocked != "" ? "{state:" . JsonStringLiteral("unsupported") . ",reason_key:" . JsonStringLiteral(Blocked) . "}"
-		: "{state:" . JsonStringLiteral(_LLM_MBW_OllamaInstallState(OllamaInstalled)) . "}"
-	MlxInstall := "{state:" . JsonStringLiteral("unsupported") . ",reason_key:"
+	OllamaInstall := _LLM_MBW_OllamaInstallJson(Blocked, OllamaInstalled)
+	MlxInstall :="{state:" . JsonStringLiteral("unsupported") . ",reason_key:"
 		. JsonStringLiteral("model_browser.reason_mlx_unsupported_os") . "}"
 	Backends := _LLM_MBW_BackendJson("ollama", OllamaReason == "", OllamaReason, OllamaTools, OllamaReason == "", OllamaInstall)
 		. "," . _LLM_MBW_BackendJson("mlx", false, "model_browser.reason_mlx_unsupported_os", [], false, MlxInstall)
@@ -719,17 +720,23 @@ _LLM_MBW_BuildPayload() {
  * One local (Ollama) row: the catalogue fields the page's columns read. The
  * tray's delete runs only on the Ollama backend, so the page offers it there.
  */
+; The public page of a model tag in the Ollama library.
+_LLM_ModelLibraryUrl(Tag) {
+	return "https://" . Identifiers.Hosts.OLLAMA . "/library/" . Tag
+}
+
 _LLM_MBW_LocalRow(Name, Tag, Info, IsInstalled, IsDefault, Custom, Deletable) {
 	global _LLM_MBW_PullPercents
 	Params := Info.Has("params_b") ? Info["params_b"] : 0
 	ActiveB := Info.Has("active_b") ? Info["active_b"] : 0
 	if (ActiveB <= 0)
 		ActiveB := Params
-	Url := Custom ? "" : "https://ollama.com/library/" . Tag
+	Url := Custom ? "" : _LLM_ModelLibraryUrl(Tag)
 	Json := "{backend:" . JsonStringLiteral("ollama")
 		. ",name:" . JsonStringLiteral(Name)
 		. ",runtime_name:" . JsonStringLiteral(Tag)
 		. ",family:" . JsonStringLiteral(Custom ? "" : _LLM_ModelBrowser_GuessFamily(Name))
+		. ",provider:" . JsonStringLiteral(Custom || !Info.Has("provider") ? "" : Info["provider"])
 		. ",params_b:" . _LLM_MBW_Num(Params)
 		. ",active_b:" . _LLM_MBW_Num(ActiveB)
 		. ",is_moe:" . ((ActiveB > 0 && ActiveB < Params) ? "true" : "false")
@@ -778,6 +785,30 @@ _LLM_MBW_OllamaInstallState(Installed) {
 	if IsSet(LLM_Deps_IsChecking) && LLM_Deps_IsChecking()
 		return "running"
 	return Installed ? "installed" : "available"
+}
+
+; Why the last install click did not start, as a locale key the group shows.
+global _LLM_MBW_InstallRefusedKey := ""
+
+/**
+ * The install state the payload carries: a config.toml refusal or a pause
+ * greys the button with that reason, and an offered install names why the
+ * last click did not start.
+ * @param {String} Blocked The config.toml refusal key, or "".
+ * @param {Boolean} Installed
+ * @returns {String} A JSON object literal.
+ */
+_LLM_MBW_OllamaInstallJson(Blocked, Installed) {
+	global _LLM_MBW_InstallRefusedKey
+	Unsupported := (Key) => "{state:" . JsonStringLiteral("unsupported") . ",reason_key:" . JsonStringLiteral(Key) . "}"
+	if (Blocked != "")
+		return Unsupported(Blocked)
+	State := _LLM_MBW_OllamaInstallState(Installed)
+	if (State == "available" && A_IsSuspended)
+		return Unsupported("model_browser.install_paused")
+	Failed := (State == "available" && _LLM_MBW_InstallRefusedKey != "")
+		? ",failed_key:" . JsonStringLiteral(_LLM_MBW_InstallRefusedKey) : ""
+	return "{state:" . JsonStringLiteral(State) . Failed . "}"
 }
 
 /** One backend entry of the payload, brand and emoji from backends.json. */
@@ -864,20 +895,29 @@ _LLM_MBW_LocalServerRows(Rows, Tools, Models, ApiTools) {
 }
 
 /**
- * The Ollama install the backend selection runs, from the page's "Install
- * Ollama" button. The page shows it running; its outcome re-sends the payload,
- * which unlocks the Ollama rows once installed.
+ * The owned Ollama install, from the page's "Install Ollama" button: the click
+ * is the consent. It runs the visible bootstrap directly and leaves the backend
+ * alone: a backend selection restarts Ollama without its window and never
+ * installs it, so with another backend active this click used to do nothing.
+ * The page shows it running; its outcome re-sends the payload, which unlocks
+ * the Ollama rows once installed.
+ * @returns {Boolean} True when the install started.
  */
 _LLM_MBW_InstallOllama() {
-	global _LLM_Menu
-	LoggerInfo("LLM.browser", "Installing Ollama from the model selector page.")
-	if (_LLM_Menu.Get("backend", "") != "ollama")
-		Result := LLM_Menu_SetBackend("ollama")
-	else
-		Result := LLM_Deps_CheckAndInstall(_LLM_Menu.Get("model", ""),
-			(*) => LLM_ModelBrowser_Refresh(), (*) => LLM_ModelBrowser_Refresh())
-	LLM_ModelBrowser_Refresh()
-	return Result
+	global _LLM_Menu, _LLM_MBW_InstallRefusedKey
+	_LLM_MBW_InstallRefusedKey := ""
+	try {
+		LoggerInfo("LLM.browser", "Installing Ollama from the model selector page.")
+		Settled := (*) => LLM_ModelBrowser_Refresh()
+		LLM_Deps_CheckAndInstall(_LLM_Menu.Get("model", ""), Settled, Settled)
+		LLM_ModelBrowser_Refresh()
+		return true
+	} catch as Err {
+		_LLM_MBW_InstallRefusedKey := "model_browser.install_not_started"
+		LoggerError("LLM.browser", "The Ollama install from the page did not start: {1}.", Err.Message)
+		LLM_ModelBrowser_Refresh()
+		return false
+	}
 }
 
 /**
@@ -1003,8 +1043,10 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 	; WebMessageReceived is a COM callback that bypasses native Suspend, so
 	; without this guard a paused driver would still let select_model mutate
 	; the live LLM config/engine ("pause = tout éteint" invariant).
-	if A_IsSuspended
+	if A_IsSuspended {
+		_LLM_MBW_RepaintRefusal(ExpectedEpoch)
 		return
+	}
 
 	try Payload := JsonParse(Msg)
 	if !IsSet(Payload)
@@ -1020,6 +1062,7 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 		BlockReason := _LLM_Menu_ConfigBlockReason()
 		if (BlockReason != "") {
 			try LoggerWarn("LLM.browser", "Model selector action '{1}' refused: {2}.", Action, BlockReason)
+			_LLM_MBW_RepaintRefusal(ExpectedEpoch)
 			return
 		}
 	}
@@ -1047,6 +1090,16 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 }
 
 /**
+ * Sends a refused click's outcome to the page off this COM callback: the page
+ * already drew an install click as running, and only a new payload brings the
+ * reason back.
+ * @param {Integer} ExpectedEpoch The browser session that sent the click.
+ */
+_LLM_MBW_RepaintRefusal(ExpectedEpoch) {
+	SetTimer(() => (ExpectedEpoch == _LLM_MBW_SessionEpoch && LLM_ModelBrowser_Refresh()), -1)
+}
+
+/**
  * Runs one page action through the tray's own code path, on a fresh call
  * stack. The page names a row or a tool of the payload last injected; anything
  * else is refused, so the bridge never becomes a second, unvalidated model or
@@ -1069,8 +1122,12 @@ _LLM_MBW_RunAction(Payload, ExpectedEpoch) {
 		}
 		if (Action == "group_action") {
 			Id := Payload.Has("id") && Payload["id"] is String ? Payload["id"] : ""
-			if _LLM_MBW_Tools.Has(Backend . "`n" . Id)
+			if _LLM_MBW_Tools.Has(Backend . "`n" . Id) {
 				_LLM_MBW_Tools[Backend . "`n" . Id].Call()
+				return
+			}
+			try LoggerWarn("LLM.browser", "Refused the unknown group action '{1}' of '{2}'.", Id, Backend)
+			LLM_ModelBrowser_Refresh()
 			return
 		}
 		if (Action == "add_model") {
@@ -1149,7 +1206,7 @@ _LLM_MBW_IsCatalogueSourceUrl(Url) {
 			continue
 		Tag := Info["ollama"]
 		if ((Tag is String) && Tag != ""
-				&& Url == "https://ollama.com/library/" . Tag)
+				&& Url == _LLM_ModelLibraryUrl(Tag))
 			return true
 	}
 	return false
@@ -1235,7 +1292,7 @@ _LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_LLM_MBW_Controller)
-		try _LLM_MBW_Controller.Fill()
+		try WebView_FitToWindow(_LLM_MBW_Controller)
 }
 
 _LLM_MBW_Reset(ExpectedEpoch := unset, ExpectedWindow := unset) {

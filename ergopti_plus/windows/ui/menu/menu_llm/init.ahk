@@ -20,6 +20,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -70,15 +71,16 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 	if !(saved_opts is Map)
 		throw TypeError("LLM saved options must be a Map.")
 	static _str_keys := ["model", "profile_id", "temperature",
-		"nav_modifiers", "val_modifiers", "backend",
-		"api_entry_id", "agent_system1", "agent_system2", "agent_mode"]
-	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms",
-		"ctx_chars", "pred_indent", "ollama_port"]
-	static _bool_keys := ["enabled", "instant_on_word_end", "after_hotstring",
-		"reset_on_nav", "disable_url_bars", "disable_password_fields",
-		"show_info_bar", "streaming", "show_all_at_once", "auto_raise_temp",
-		"auto_profile_for_model", "onboarding_seen", "inline_autotype"]
-	static _arr_keys := ["user_profiles", "disabled_apps", "agent_disabled_apps"]
+		ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS, "backend",
+		"api_entry_id", ConfigLeaf.AGENT_SYSTEM1, ConfigLeaf.AGENT_SYSTEM2, ConfigLeaf.AGENT_MODE,
+		ConfigLeaf.WHILE_HOTSTRING_TOOLTIP]
+	static _num_keys := ["n_predictions", ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS, ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
+		"ctx_chars", ConfigLeaf.PRED_INDENT, "ollama_port"]
+	static _bool_keys := ["enabled", ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING,
+		ConfigLeaf.RESET_ON_NAV, "disable_url_bars", "disable_password_fields",
+		ConfigLeaf.SHOW_INFO_BAR, "streaming", "show_all_at_once", ConfigLeaf.AUTO_RAISE_TEMP,
+		ConfigLeaf.AUTO_PROFILE_FOR_MODEL, ConfigLeaf.ONBOARDING_SEEN, ConfigLeaf.INLINE_AUTOTYPE]
+	static _arr_keys := [ConfigLeaf.USER_PROFILES, ConfigLeaf.DISABLED_APPS, ConfigLeaf.AGENT_DISABLED_APPS]
 	for key in _str_keys {
 		if !saved_opts.Has(key)
 			continue
@@ -88,7 +90,7 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 			try LoggerError("LLM",
 				"Ignoring persisted '{1}' because its scalar type is invalid.", key)
 	}
-	for key in ["nav_modifiers", "val_modifiers"] {
+	for key in [ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS] {
 		if !LLM_Menu_IsValidModifierString(_LLM_Menu[key]) {
 			LoggerError("LLM", "Ignoring invalid persisted {1} value: '{2}'.", key, _LLM_Menu[key])
 			_LLM_Menu[key] := LLM_Defaults_ModifierString("llm_" . key)
@@ -123,10 +125,10 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 			try LoggerError("LLM",
 				"Ignoring persisted '{1}' because its array shape is invalid.", key)
 	}
-	if saved_opts.Has("app_profile_overrides") {
-		if LLM_Option_TryNormalize("app_profile_overrides",
-				saved_opts["app_profile_overrides"], &NormalizedOverrides)
-			_LLM_Menu["app_profile_overrides"] := NormalizedOverrides
+	if saved_opts.Has(ConfigLeaf.APP_PROFILE_OVERRIDES) {
+		if LLM_Option_TryNormalize(ConfigLeaf.APP_PROFILE_OVERRIDES,
+				saved_opts[ConfigLeaf.APP_PROFILE_OVERRIDES], &NormalizedOverrides)
+			_LLM_Menu[ConfigLeaf.APP_PROFILE_OVERRIDES] := NormalizedOverrides
 		else
 			try LoggerError("LLM",
 				"Ignoring persisted app-profile overrides because their shape is invalid.")
@@ -311,10 +313,6 @@ LLM_Menu_Init(saved_opts := Map(), ActivateRuntime := true) {
 	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray, DRIVER_BASELINE_PRIORITY_CLASS
 	global _LLM_Menu_Loaded
 
-	; Defensive: a previous session that crashed mid-install would have
-	; left the AHK process at PriorityClass = High (we boost it in
-	; LLM_Deps_RunInstaller to keep typing responsive during winget,
-	; and lower it back in LLM_Deps_OnPollProbeResult on completion).
 	; Reset to the driver baseline at every boot so a fresh script never
 	; inherits a stale boost. MUST use the shared constant, not a hardcoded
 	; "Normal" literal — this call runs ~16 ms after ErgoptiPlus.ahk's boot
@@ -425,6 +423,8 @@ LLM_Menu_ActivateRuntime(ActivateHotkeysFn := 0, ScheduleBackendFn := 0, HealthT
 	; no health timer or probe starts. A boot with the AI off used to bind them
 	; anyway, and a refused native navigation plan aborted the boot (issue #97).
 	Enabled := LLM_Menu_AiEnabled()
+	; The slots bound to an AI action were bound before this state was restored.
+	KeyboardShortcutsFollowAiSwitch()
 	if Enabled {
 		Activate := HasMethod(ActivateHotkeysFn, "Call") ? ActivateHotkeysFn : _LLM_Menu_RequireFirstRestoreHotkeys
 		try Activate.Call(true)

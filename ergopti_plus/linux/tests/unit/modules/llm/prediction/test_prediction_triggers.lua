@@ -27,7 +27,7 @@ local function restore()
 	if inventory_profiles then inventory_profiles.assert_no_inventory(); inventory_profiles = nil end
 end
 
-local function fixture(values)
+local function fixture(values, preview_showing)
 	local scheduler = Fakes.timer_scheduler()
 	values = values or {}
 	replace("modules.llm.trigger_settings", {
@@ -36,6 +36,7 @@ local function fixture(values)
 			if name == "debounce_ms" then return 500 end
 			if name == "min_request_interval_ms" then return 300 end
 			if name == "instant_on_word_end" or name == "after_hotstring" then return true end
+			if name == "while_hotstring_tooltip" then return "wait" end
 			return false
 		end,
 		set = function() return true end,
@@ -48,7 +49,8 @@ local function fixture(values)
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local engine = require("modules.llm.prediction_engine")
 	local fired = {}
-	engine.init({ focus_id = function() return "owned-prediction-window" end, scheduler = scheduler })
+	engine.init({ focus_id = function() return "owned-prediction-window" end, scheduler = scheduler,
+		hotstring_preview_showing = preview_showing })
 	engine.predict = function(context, output_context)
 		fired[#fired + 1] = { context = context, output_context = output_context }
 	end
@@ -114,8 +116,20 @@ helpers.describe("prediction triggers: hotstring preview ownership", function()
 		restore()
 	end)
 
-	helpers.it("uses ordinary debounce when post-hotstring chaining is disabled", function()
+	helpers.it("never covers the preview when post-hotstring chaining is disabled", function()
 		local engine, scheduler, fired = fixture({ after_hotstring = false })
+		engine.on_char("w", "btw", {
+			app_id = "editor",
+			hotstring_preview_visible = true,
+		})
+		helpers.assert_eq(scheduler.test.advance(1), 0)
+		helpers.assert_eq(#fired, 0, "waiting is the default: the preview can still expand")
+		helpers.assert_eq(engine.on_hotstring_expired("btw"), false)
+		restore()
+	end)
+
+	helpers.it("uses ordinary debounce beside the preview when both are shown", function()
+		local engine, scheduler, fired = fixture({ after_hotstring = false, while_hotstring_tooltip = "both" })
 		engine.on_char("w", "btw", {
 			app_id = "editor",
 			hotstring_preview_visible = true,
@@ -123,6 +137,39 @@ helpers.describe("prediction triggers: hotstring preview ownership", function()
 		helpers.assert_eq(scheduler.test.advance(0.5), 1)
 		helpers.assert_eq(#fired, 1)
 		helpers.assert_eq(engine.on_hotstring_expired("btw"), false)
+		restore()
+	end)
+
+	helpers.it("drops a debounce armed before the preview appeared", function()
+		local showing = false
+		local engine, scheduler, fired = fixture({ instant_on_word_end = false }, function() return showing end)
+		engine.on_char("t", "bt", { app_id = "editor" })
+		-- The next keystroke's preview is drawn before its own on_char runs; the
+		-- request armed by "t" must not fire over it.
+		showing = true
+		helpers.assert_eq(scheduler.test.advance(0.5), 1)
+		helpers.assert_eq(#fired, 0, "a request armed earlier waits for the preview too")
+		showing = false
+		helpers.assert_true(engine.on_hotstring_expired("bt", { app_id = "editor" }))
+		helpers.assert_eq(scheduler.test.advance(0), 1)
+		helpers.assert_eq(#fired, 1, "the preview's expiry asks again")
+		restore()
+	end)
+
+	helpers.it("lets a request armed before the preview fire beside it when both are shown", function()
+		local engine, scheduler, fired = fixture({ instant_on_word_end = false, while_hotstring_tooltip = "both" },
+			function() return true end)
+		engine.on_char("t", "bt", { app_id = "editor" })
+		helpers.assert_eq(scheduler.test.advance(0.5), 1)
+		helpers.assert_eq(#fired, 1)
+		restore()
+	end)
+
+	helpers.it("keeps an explicit trigger even while the preview shows", function()
+		local engine, scheduler, fired = fixture({}, function() return true end)
+		engine.on_char("/", "btw //", { app_id = "editor", hotstring_preview_visible = true })
+		helpers.assert_eq(scheduler.test.advance(1), 1)
+		helpers.assert_eq(#fired, 1, "a request the user typed a trigger for is not held")
 		restore()
 	end)
 end)

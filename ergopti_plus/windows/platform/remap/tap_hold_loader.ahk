@@ -35,6 +35,8 @@
 ; The loader reads the generated config leaf names (ConfigLeaf); include their
 ; owner here so a runner that loads this file alone still resolves them.
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+; The loader reads a file the boot has not migrated as the migration leaves it.
+#Include %A_LineFile%\..\tap_hold_migration.ahk
 
 ; The global default tap-hold delay (TAPHOLD_DEFAULT_ACTIVATION_SECONDS) is the
 ; timing registry's tap_hold.default_activation_ms, loaded at boot by
@@ -82,7 +84,7 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	; order is still: defaults → user (user wins per-key).
 	UserData := Map("keys", Map())
 	if FileExist(FilePath)
-		_TapHold_ParseFileInto(FilePath, UserData)
+		_TapHold_ParseFileInto(FilePath, UserData, DefaultsFilePath)
 	else
 		try LoggerDebug("TapHoldLoader", "No user tap-hold file found yet at '{1}'.", FilePath)
 
@@ -101,12 +103,6 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	; next tray write.
 	if UserData.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
 		Result[ConfigLeaf.TIME_ACTIVATION_SECONDS] := UserData[ConfigLeaf.TIME_ACTIVATION_SECONDS]
-	; A file without the flag may still hold the per-key delays this build used to
-	; ship, copied into it by an earlier rewrite: those exact values are not the
-	; user's choice and are ignored (see TapHoldRetiredDelays).
-	UserExplicit := UserData.Has("explicit_delays") && UserData["explicit_delays"]
-	Retired := (DefaultsFilePath != "" && !UserExplicit && UserData["keys"].Count > 0)
-		? TapHoldRetiredDelays(DefaultsFilePath) : Map()
 
 	try LoggerDebug("TapHoldLoader", "Parsed user tap-hold: {1} key(s), inherit_defaults={2}.",
 		UserData["keys"].Count, InheritDefaults)
@@ -148,15 +144,8 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 			Result["keys"][k].Delete("hold_layer")
 		else if v.Has("hold_layer") and Result["keys"][k].Has("hold_modifier")
 			Result["keys"][k].Delete("hold_modifier")
-		for field, val in v {
-			if (field == ConfigLeaf.TIME_ACTIVATION_SECONDS) && Retired.Has(k) && IsNumber(val) && val == Retired[k] {
-				try LoggerInfo("TapHoldLoader",
-					"Ignoring time_activation_seconds {1} of tap-hold key '{2}': it is a delay this build no longer ships, not one you set; the key follows the global delay.",
-					val, k)
-				continue
-			}
+		for field, val in v
 			Result["keys"][k][field] := val
-		}
 	}
 
 	if UserData["keys"].Has("left_ctrl") {
@@ -214,7 +203,9 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 ; Parse ``FilePath`` and merge its key/value pairs into ``Result`` in-place.
 ; Existing entries are overwritten field-by-field so a user file that only
 ; specifies some fields of a key still inherits the rest from a prior pass.
-_TapHold_ParseFileInto(FilePath, Result) {
+; @param MigrateWith {String} The shared defaults.toml when FilePath is a user
+;        file, read as its migration leaves it; "" for the shipped file itself.
+_TapHold_ParseFileInto(FilePath, Result, MigrateWith := "") {
 	; Reuse the admitted semantic reader: root dotted assignments, quoted
 	; headers and inline key tables must reload the same values the writer owns.
 	try Document := TOML_ParseDocument(ReadTomlFile(FilePath), &Records)
@@ -222,6 +213,8 @@ _TapHold_ParseFileInto(FilePath, Result) {
 		try LoggerError("TapHoldLoader", "Cannot read the tap-hold document '{1}': {2}.", FilePath, Err.Message)
 		return
 	}
+	if (MigrateWith != "")
+		TapHoldMigrationReadAsCurrent(Document, MigrateWith)
 	if !Document.Has("tap_hold")
 		return
 	Root := Document["tap_hold"]
@@ -234,12 +227,6 @@ _TapHold_ParseFileInto(FilePath, Result) {
 			Result["inherit_defaults"] := !!Root["inherit_defaults"].Value
 		else
 			try LoggerError("TapHoldLoader", "Field '[tap_hold].inherit_defaults' must be a TOML boolean; value rejected.")
-	}
-	if Root.Has("explicit_delays") {
-		if Root["explicit_delays"] is TOML_Bool
-			Result["explicit_delays"] := !!Root["explicit_delays"].Value
-		else
-			try LoggerError("TapHoldLoader", "Field '[tap_hold].explicit_delays' must be a TOML boolean; value rejected.")
 	}
 	if Root.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS) {
 		Seconds := _ConfigTomlNativeValue(Root[ConfigLeaf.TIME_ACTIVATION_SECONDS])
@@ -448,10 +435,19 @@ TapHoldIsActive(TapHold, KeyId) {
 		&& TapHoldIsConfigured(TapHold, KeyId)
 }
 
-; Return the configured tap action for ``KeyId`` (a string) or "" if
-; absent. Callers compare to known action ids ("enter", "tab", "backspace"…)
-; to decide which Send() to emit.
+; Return the tap action ``KeyId`` runs now (a string) or "" for the key's native
+; tap. Callers compare to known action ids ("enter", "tab", "backspace"…) to
+; decide which Send() to emit. An AI action is unarmed while the AI is off: every
+; hotkey criterion asks here at each press, so the key is left to the application
+; and the switch-on needs no reload.
 TapHoldTapAction(TapHold, KeyId) {
+	Action := TapHoldConfiguredTapAction(TapHold, KeyId)
+	return AiActionBlocked(Action) ? "" : Action
+}
+
+; Return the tap action stored for ``KeyId`` (a string) or "" if absent, whatever
+; the AI switch says: what the menu shows and what a write must preserve.
+TapHoldConfiguredTapAction(TapHold, KeyId) {
 	if !TapHoldIsEnabled(TapHold, KeyId) {
 		return ""
 	}
@@ -784,29 +780,23 @@ TapHoldFieldKinds() {
 ; The per-key delays the shared defaults used to ship, in seconds, by key id
 ; (``[tap_hold.retired_delays]``). They are not defaults: they identify the delay
 ; values a rewrite of an older tap_hold.toml copied into the file, which the
-; loader must not mistake for a choice of the user.
+; migration (_shared/tap_hold/migrations.toml) must not mistake for a choice of
+; the user.
 ; @param DefaultsFilePath {String} The shared tap_hold/defaults.toml.
-; @returns {Map} Key id -> seconds; empty (and logged) when the table is unusable.
+; @returns {Map} Key id -> seconds.
+; Throws when the table is unusable: stamping a file without its cleanup would
+; freeze the copied delays as the user's own.
 TapHoldRetiredDelays(DefaultsFilePath) {
 	Retired := Map()
-	try Document := TOML_ParseDocument(ReadTomlFile(DefaultsFilePath))
-	catch as Err {
-		try LoggerError("TapHoldLoader", "Cannot read the retired tap-hold delays of '{1}': {2}.",
-			DefaultsFilePath, Err.Message)
-		return Retired
-	}
+	Document := TOML_ParseDocument(ReadTomlFile(DefaultsFilePath))
 	Root := Document.Get("tap_hold", Map())
 	Table := (Root is Map) ? Root.Get("retired_delays", "") : ""
-	if !(Table is Map) {
-		try LoggerError("TapHoldLoader", "'{1}' declares no [tap_hold.retired_delays].", DefaultsFilePath)
-		return Retired
-	}
+	if !(Table is Map)
+		throw Error("'" . DefaultsFilePath . "' declares no [tap_hold.retired_delays]")
 	for KeyId, Typed in Table {
 		Seconds := _ConfigTomlNativeValue(Typed)
-		if (_TOML_ValueKind(Typed) != "number") || !_TapHoldDurationValid(Seconds) {
-			try LoggerError("TapHoldLoader", "[tap_hold.retired_delays] {1} must be a number of seconds above 0; ignored.", KeyId)
-			continue
-		}
+		if (_TOML_ValueKind(Typed) != "number") || !_TapHoldDurationValid(Seconds)
+			throw Error("[tap_hold.retired_delays] " . KeyId . " must be a number of seconds above 0")
 		Retired[KeyId] := Seconds
 	}
 	return Retired

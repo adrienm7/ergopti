@@ -106,13 +106,13 @@ final class LauncherEnvironmentTests: XCTestCase {
 				"UNRELATED": "preserved",
 			],
 			launcherPid: 4242,
-			launcherBundleId: "com.ergoptiplus.app"
+			launcherBundleId: Identifiers.BundleIds.launcher
 		)
 
 		XCTAssertEqual(environment["ERGOPTI_LAUNCHER_PID"], "4242")
 		XCTAssertEqual(
 			environment["ERGOPTI_LAUNCHER_BUNDLE_ID"],
-			"com.ergoptiplus.app"
+			Identifiers.BundleIds.launcher
 		)
 		XCTAssertEqual(environment["UNRELATED"], "preserved")
 		XCTAssertNil(environment["ERGOPTI_LOG_PORT"])
@@ -126,7 +126,7 @@ final class LauncherEnvironmentTests: XCTestCase {
 			let environment = launcherChildEnvironment(
 				base: ["ERGOPTI_INSTALLED_CAPTURE_CONTROL": inheritedRoute,
 					"UNRELATED": "preserved", "LUA_PATH": "user-owned-path"],
-				launcherPid: 4242, launcherBundleId: "com.ergoptiplus.app"
+				launcherPid: 4242, launcherBundleId: Identifiers.BundleIds.launcher
 			)
 			XCTAssertNil(environment["ERGOPTI_INSTALLED_CAPTURE_CONTROL"])
 			XCTAssertEqual(environment["UNRELATED"], "preserved")
@@ -152,12 +152,12 @@ final class LauncherEnvironmentTests: XCTestCase {
 	func testOuterLaunchServicesIdentityCannotLeakIntoEmbeddedGUIChild() {
 		let environment = launcherChildEnvironment(
 			base: [
-				"__CFBundleIdentifier": "com.ergoptiplus.app",
+				"__CFBundleIdentifier": Identifiers.BundleIds.launcher,
 				"XPC_SERVICE_NAME": "application.com.ergoptiplus.app.123",
 				"UNRELATED": "preserved",
 			],
 			launcherPid: 4242,
-			launcherBundleId: "com.ergoptiplus.app"
+			launcherBundleId: Identifiers.BundleIds.launcher
 		)
 
 		XCTAssertNil(environment["__CFBundleIdentifier"])
@@ -741,7 +741,7 @@ final class LauncherEnvironmentTests: XCTestCase {
 		let environment = launcherChildEnvironment(
 			base: ["PATH": "/usr/bin"],
 			launcherPid: 42,
-			launcherBundleId: "com.ergoptiplus.app",
+			launcherBundleId: Identifiers.BundleIds.launcher,
 			loggerEndpoint: LoggerDatagramEndpoint(port: 4242, token: "secret-token-value")
 		)
 		let summary = launcherEnvironmentKeySummary(environment)

@@ -219,7 +219,14 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; 43-44: the built-in delimiter commit (HotstringsTerminatorBuiltinCommit)
 	; and the legacy delimiter migration (HotstringsTerminatorMigrateStrings)
 	; commit through ConfigCommitUpdates and return false when it refuses.
-	AssertEqual(44, Calls,
+	; 45-47: the chord writers (SetKeyCombinationChord,
+	; KeyCombinationChordToggleSymmetric, KeyCombinationChordCommitDelay) return
+	; false and skip their reload on a refusal, driven for real by
+	; test_key_combination_chord_engine.ahk.
+	; 48: _ProxyOverride_Store returns the commit's answer to the menu row, which says so.
+	; 49: the lone tap window writer (_TH_CommitLoneTapMaxMs) returns false and
+	; skips its reload on a refusal, driven for real by test_tap_hold_lone_tap.ahk.
+	AssertEqual(49, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
@@ -866,12 +873,10 @@ _CPC_MetricsBootCacheHandoff(Source, &CacheName := "") {
 		Line := A_LoopField
 		if Depth == 0
 			Top .= Line . "`n"
-		loop parse Line {
-			if A_LoopField == "{"
-				Depth += 1
-			else if A_LoopField == "}"
-				Depth -= 1
-		}
+		; Depth is only read between lines, so per-line counts are equivalent.
+		StrReplace(Line, "{", , , &Opens)
+		StrReplace(Line, "}", , , &Closes)
+		Depth += Opens - Closes
 	}
 	if !RegExMatch(Top,
 		"m)^[\t ]*(?:global[\t ]+)?([A-Za-z_][A-Za-z0-9_]*)[\t ]*:=[\t ]*CS_Load\([\t ]*\)[\t ]*$", &Producer)

@@ -16,6 +16,7 @@ local LOG = "ui.menu.menu_llm.config_guard"
 local M = {}
 
 M.NEWER_REASON_KEY = Shared.NEWER_REASON_KEY
+M.OLDER_REASON_KEY = Shared.OLDER_REASON_KEY
 M.GENERIC_REASON_KEY = Shared.GENERIC_REASON_KEY
 M.reason_key = Shared.reason_key
 

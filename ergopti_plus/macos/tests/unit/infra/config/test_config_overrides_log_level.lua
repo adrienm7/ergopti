@@ -388,13 +388,15 @@ helpers.describe("Persisted native consent admission", function()
 			local neutral = manifest.default_for("llm.enabled")
 			helpers.assert_eq(neutral, false, "the actual published neutral consent remains opt-in")
 			local source = assert(helpers.read_driver_source("local function has_common_hotstring_groups"))
+			-- The AI setting is resolved once, then the cleanup gate reads it.
+			local bootstrap = assert(source:match("(local boot_llm_enabled =.-\nend)\n"))
 			local cleanup = assert(source:match("(local mlx_cleanup_enabled = [^\n]+)"))
-			local bootstrap = assert(source:match("(local boot_llm_enabled =.-)\nlocal function start_llm_bootstrap%(%)"))
 			local gate = assert(source:match('(if boot_llm_enabled then.-)\n\nBoot.mark%("LLM backend bootstrap"%)'))
 			local compiled = assert(load("return function(config_overrides, Storage, boot_saved_prefs, neutral, Logger)\n"
 				.. "local ok_core_llm, core_llm = true, { DEFAULT_STATE = { llm_enabled = neutral } }\n"
-				.. cleanup .. "\nlocal mlx_cleanup_settled = not mlx_cleanup_enabled\nlocal pending_llm_bootstrap\n"
-				.. bootstrap .. "\nlocal started = 0\nlocal function start_llm_bootstrap() started = started + 1 end\n"
+				.. bootstrap .. "\n" .. cleanup
+				.. "\nlocal mlx_cleanup_settled = not mlx_cleanup_enabled\nlocal pending_llm_bootstrap\n"
+				.. "\nlocal started = 0\nlocal function start_llm_bootstrap() started = started + 1 end\n"
 				.. gate .. "\nreturn mlx_cleanup_enabled, boot_llm_enabled, started, pending_llm_bootstrap ~= nil\nend",
 				"@native-consent-actual-init-slices"))()
 			body({ owner = owner, storage = storage, stored = stored, warnings = warnings,
@@ -463,10 +465,12 @@ helpers.describe("Persisted native consent admission", function()
 		helpers.it("obsolete residue cannot veto independently acknowledged canonical consent " .. type(value), function()
 			with_native(value, function(f)
 				local cleanup, enabled, started, pending = f.boot({ llm_enabled = true })
-				helpers.assert_eq(cleanup, false)
+				-- The cleanup follows the AI setting the bootstrap reads: it once read
+				-- the native value alone and let this boot start the AI uncleaned.
+				helpers.assert_eq(cleanup, true)
 				helpers.assert_eq(enabled, true)
-				helpers.assert_eq(started, 1)
-				helpers.assert_eq(pending, false)
+				helpers.assert_eq(started, 0, "the bootstrap waits for the cleanup")
+				helpers.assert_eq(pending, true)
 				helpers.assert_eq(#f.warnings, 1)
 			end)
 		end)

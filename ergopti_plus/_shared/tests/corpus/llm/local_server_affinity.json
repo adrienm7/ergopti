@@ -44,6 +44,34 @@
 			"matches": true
 		},
 		{
+			"name": "generic entry at a shared address belongs to its default row only",
+			"provider": "openai",
+			"base_url": "http://127.0.0.1:8000/v1",
+			"server": "vllm",
+			"matches": false
+		},
+		{
+			"name": "generic entry at the shared 5000 address belongs to text-generation-webui",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:5000/v1",
+			"server": "textgen_webui",
+			"matches": true
+		},
+		{
+			"name": "generic entry at the shared 5000 address is not TabbyAPI's",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:5000/v1",
+			"server": "tabbyapi",
+			"matches": false
+		},
+		{
+			"name": "explicit vLLM provider owns the shared address",
+			"provider": "vllm",
+			"base_url": "http://127.0.0.1:8000/v1",
+			"server": "vllm",
+			"matches": true
+		},
+		{
 			"name": "different port",
 			"provider": "openai_compat",
 			"base_url": "http://127.0.0.1:19423/v1",

@@ -68,7 +68,8 @@ ReloadTerminalHandoffPrepare(Bundle, SuccessFn := 0, CommitFn := 0,
 			"stop_probe_reported", false, "compensation_done", false,
 			"compensation_ok", false, "resume_exit", 0, "resume_armed", false,
 			"delivery_armed", false, "delivery_done", false,
-			"close_attempted", false, "close_acknowledged", false)
+			"close_attempted", false, "close_acknowledged", false,
+			"retry_started", 0, "retry_deferred", false, "retry_armed", false)
 		_ReloadTerminalHandoff := Record
 		return Record
 	} finally Critical(PreviousCritical)
@@ -440,6 +441,103 @@ _ReloadTerminalHandoffWatch(Record, *) {
 	}
 	_ReloadTerminalHandoffArmWatch(Record)
 	return true
+}
+
+; An OnExit gate refused only because a thread OnExit interrupted still holds its
+; state (a log flush, a keystats flush). That thread can resume only once OnExit
+; returns, so nothing inside OnExit can wait for it. The successor is still blocked
+; on this window, polling for it to close, and asks only once: the record goes back
+; to pending, the successor is left alone, and the same exit is retried here when
+; the gate's state settles. Only a claim, before any commit, can be returned.
+; @param Retry {Object} Settled() -> Boolean, Run() re-enters OnExit, BudgetMs, PollMs.
+; @returns {Boolean} False when the caller must refuse the reload for real.
+ReloadTerminalHandoffDeferClaim(ExitReason, Retry) {
+	global _ReloadTerminalHandoff
+	if !(ExitReason is String) || StrCompare(ExitReason, "Reload", true) != 0
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		Record := _ReloadTerminalHandoff
+		if !(Record is Map) || Record["state"] != "claimed"
+			return false
+		Port := Record["port"]
+		Now := Port["now"].Call()
+		; The budget spans every retry of this reload: a gate that keeps refusing
+		; ends in the real refusal, not in a new wait.
+		if Record["retry_deferred"] && TickExpired(Record["retry_started"], Retry.BudgetMs, Now)
+			return false
+		if !_ConfigWriteTerminalCancelShutdown(Record["bundle"])
+			|| !_ConfigWriteTerminalAuthorize(Record["bundle"])
+			return false
+		if !Record["retry_deferred"] {
+			Record["retry_deferred"] := true
+			Record["retry_started"] := Now
+		}
+		Record["state"] := "pending"
+	} catch as Err {
+		try LoggerError("Lifecycle", "A refused reload could not go back to pending: {1}.", Err.Message)
+		return false
+	} finally Critical(PreviousCritical)
+	return _ReloadTerminalHandoffArmRetry(Record, Retry)
+}
+
+_ReloadTerminalHandoffArmRetry(Record, Retry) {
+	if Record["retry_armed"]
+		return true
+	Record["retry_armed"] := true
+	try {
+		Record["port"]["arm"].Call(_ReloadTerminalHandoffRetryPoll.Bind(Record, Retry), Retry.PollMs)
+		return true
+	} catch as Err {
+		Record["retry_armed"] := false
+		try LoggerError("Lifecycle", "The retry of the reload could not be armed: {1}.", Err.Message)
+		return false
+	}
+}
+
+; One look at a deferred reload. Any other outcome of the record (an ordinary exit
+; that superseded it, a refusal) already owns what happens next.
+_ReloadTerminalHandoffRetryPoll(Record, Retry, *) {
+	global _ReloadTerminalHandoff
+	Record["retry_armed"] := false
+	PreviousCritical := Critical("On")
+	try {
+		if !(_ReloadTerminalHandoff is Map) || (_ReloadTerminalHandoff != Record)
+				|| Record["state"] != "pending"
+			return false
+	} finally Critical(PreviousCritical)
+	Port := Record["port"]
+	; Accepting the retry ends this process: it must never run without a successor.
+	try Alive := Port["alive"].Call(Record["successor"])
+	catch as Err {
+		try LoggerError("Lifecycle", "The successor of a deferred reload could not be probed: {1}.", Err.Message)
+		Alive := true
+		Settled := false
+	}
+	if !Alive
+		return ReloadTerminalHandoffRefuse(Record, "the successor exited while the reload was deferred")
+	if !IsSet(Settled) {
+		try Settled := Retry.Settled.Call()
+		catch as Err {
+			try LoggerError("Lifecycle", "A deferred reload could not read its gate: {1}.", Err.Message)
+			Settled := false
+		}
+	}
+	if Settled {
+		try LoggerInfo("Lifecycle", "The interrupted work settled; retrying the same reload.")
+		try Retry.Run.Call()
+		catch as Err {
+			try LoggerError("Lifecycle", "The retry of the reload raised: {1}.", Err.Message)
+			return ReloadTerminalHandoffRefuse(Record, "the retry of the reload raised")
+		}
+		return true
+	}
+	if TickExpired(Record["retry_started"], Retry.BudgetMs, Port["now"].Call())
+		return ReloadTerminalHandoffRefuse(Record,
+			"the interrupted work did not settle within " . Retry.BudgetMs . " ms")
+	if !_ReloadTerminalHandoffArmRetry(Record, Retry)
+		return ReloadTerminalHandoffRefuse(Record, "the retry of the reload could not be armed")
+	return false
 }
 
 ; Withdraws a launched reload. The successor is stopped first, while this code

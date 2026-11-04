@@ -44,7 +44,7 @@ global _SEND_INPUT_VOCABULARY_JSON := ""
 ; a broken install, not an empty vocabulary: every send_* binding would refuse
 ; its value with no explanation.
 ; @returns {Map}
-SendInputVocabulary() {
+SendKeysVocabulary() {
 	global _SEND_INPUT_VOCABULARY, _SEND_INPUT_VOCABULARY_JSON, _SharedDir
 	if (_SEND_INPUT_VOCABULARY is Map)
 		return _SEND_INPUT_VOCABULARY
@@ -67,9 +67,9 @@ SendInputVocabulary() {
 ; The vocabulary as the JSON text of the shared file, for the action picker's
 ; editor, which validates with the same rules in the page.
 ; @returns {String}
-SendInputVocabularyJson() {
+SendKeysVocabularyJson() {
 	global _SEND_INPUT_VOCABULARY_JSON
-	SendInputVocabulary()
+	SendKeysVocabulary()
 	return _SEND_INPUT_VOCABULARY_JSON
 }
 
@@ -132,7 +132,7 @@ SendInputDescribeKeys() {
 	Names := []
 	RunFirst := ""
 	RunLast := ""
-	for _, Entry in SendInputVocabulary()["keys"] {
+	for _, Entry in SendKeysVocabulary()["keys"] {
 		if RegExMatch(Entry["id"], "^f\d+$") {
 			if (RunFirst = "")
 				RunFirst := Entry["id"]
@@ -166,7 +166,7 @@ SendInputParseText(Value) {
 	if !(Value is String)
 		return ""
 	Points := _SendInputCodePoints(Value)
-	if (Points.Length == 0 || Points.Length > SendInputVocabulary()["text_max_code_points"])
+	if (Points.Length == 0 || Points.Length > SendKeysVocabulary()["text_max_code_points"])
 		return ""
 	for _, Point in Points {
 		if _SendInputIsControl(Point)
@@ -187,7 +187,7 @@ SendInputParseKey(Value, LowerLetter := false) {
 	Wanted := Trim(Value, SEND_INPUT_TRIM)
 	if (Wanted == "")
 		return ""
-	Entry := _SendInputFindEntry(SendInputVocabulary()["keys"], _SendInputAsciiLower(Wanted))
+	Entry := _SendInputFindEntry(SendKeysVocabulary()["keys"], _SendInputAsciiLower(Wanted))
 	if (Entry is Map)
 		return Map("named", Entry["id"], "canonical", Entry["id"])
 	Points := _SendInputCodePoints(Wanted)
@@ -217,7 +217,7 @@ SendInputParseShortcut(Value) {
 	}
 	if (ModTokens.Length == 0)
 		return ""
-	Vocabulary := SendInputVocabulary()
+	Vocabulary := SendKeysVocabulary()
 	Held := Map()
 	for _, Token in ModTokens {
 		Entry := _SendInputFindEntry(Vocabulary["modifiers"],
@@ -240,6 +240,126 @@ SendInputParseShortcut(Value) {
 	Key["mods"] := Mods
 	Key["canonical"] := Canonical . Key["canonical"]
 	return Key
+}
+
+; Reads the inside of one {group} of a hotstring output.
+; @param {String} Inner The text between the braces.
+; @param {String} Text Set to the code point a {U+XXXX} names.
+; @param {Map|String} Entry Set to the key a {name} or {name N} names.
+; @param {Integer} Count Set to how many times to press it.
+; @returns {Boolean} False when the group is not a token.
+_SendInputReadOutputGroup(Inner, &Text, &Entry, &Count) {
+	Text := ""
+	Entry := ""
+	Count := 1
+	Vocabulary := SendKeysVocabulary()
+	if RegExMatch(Inner, "^[Uu]\+([0-9A-Fa-f]+)$", &Hex) {
+		if (StrLen(Hex[1]) > 6)
+			return false
+		Code := Integer("0x" . Hex[1])
+		if (Code > 0x10FFFF || (Code >= 0xD800 && Code <= 0xDFFF)
+				|| Code <= 0x1F || (Code >= 0x7F && Code <= 0x9F))
+			return false
+		Text := Chr(Code)
+		return true
+	}
+	if !RegExMatch(Inner, "^([0-9A-Za-z][0-9A-Za-z_]*)(?: ([1-9][0-9]*))?$", &Group)
+		return false
+	if (Group[2] != "") {
+		; More digits than any bound: Integer() would wrap, and the text stays text.
+		if (StrLen(Group[2]) > 9)
+			return false
+		Count := Integer(Group[2])
+		if (Count > Vocabulary["output_key_max_repeat"])
+			return false
+	}
+	Entry := _SendInputFindEntry(Vocabulary["keys"], _SendInputAsciiLower(Group[1]))
+	return Entry is Map
+}
+
+; Parses a hotstring output into what it types and what it presses. The grammar is
+; the rule of _shared/tests/corpus/hotstrings/output_token_vectors.json; the macOS
+; and Linux drivers replay the same vectors against _shared/lua/send_input.
+; @param {String} Value The output as the TOML holds it.
+; @returns {Map} "tokens", an ordered Array of Map("kind", "text", "value", ...)
+;   and Map("kind", "key", "id", ..., "entry", ..., "count", ...); "text", the typed
+;   text alone; "has_keys".
+SendInputParseOutput(Value) {
+	if !(Value is String)
+		throw TypeError("A hotstring output must be a string.")
+	Vocabulary := SendKeysVocabulary()
+	if !Vocabulary.Has("output_key_max_repeat")
+		throw Error("The send-input vocabulary has no output_key_max_repeat.")
+	Tokens := []
+	Typed := ""
+	HasKeys := false
+	PushText(Text) {
+		Typed .= Text
+		if (Tokens.Length > 0 && Tokens[Tokens.Length]["kind"] == "text")
+			Tokens[Tokens.Length]["value"] .= Text
+		else
+			Tokens.Push(Map("kind", "text", "value", Text))
+	}
+	PushKey(Entry, Count) {
+		HasKeys := true
+		Tokens.Push(Map("kind", "key", "id", Entry["id"], "entry", Entry, "count", Count))
+	}
+	Index := 1
+	Size := StrLen(Value)
+	while (Index <= Size) {
+		At := RegExMatch(Value, "[{`r`n`t]", , Index)
+		if (At == 0) {
+			PushText(SubStr(Value, Index))
+			break
+		}
+		if (At > Index)
+			PushText(SubStr(Value, Index, At - Index))
+		Char := SubStr(Value, At, 1)
+		Index := At + 1
+		if (Char == "`t") {
+			PushKey(_SendInputFindEntry(Vocabulary["keys"], "tab"), 1)
+		} else if (Char == "`r" || Char == "`n") {
+			if (Char == "`r" && SubStr(Value, Index, 1) == "`n")
+				Index += 1
+			PushKey(_SendInputFindEntry(Vocabulary["keys"], "enter"), 1)
+		} else if (SubStr(Value, At, 3) == "{{}") {
+			PushText("{")
+			Index := At + 3
+		} else if (SubStr(Value, At, 3) == "{}}") {
+			PushText("}")
+			Index := At + 3
+		} else {
+			Close := InStr(Value, "}", true, Index)
+			if (Close > 0 && _SendInputReadOutputGroup(SubStr(Value, Index, Close - Index),
+					&Text, &Entry, &Count)) {
+				if (Entry is Map)
+					PushKey(Entry, Count)
+				else
+					PushText(Text)
+				Index := Close + 1
+			} else {
+				; Only the brace: what follows may still hold a real token.
+				PushText("{")
+			}
+		}
+	}
+	return Map("tokens", Tokens, "text", Typed, "has_keys", HasKeys)
+}
+
+; The Send string of a parsed output. {Text} covers the whole rest of a Send, so
+; text and keys cannot alternate under it: the text goes out escaped instead.
+; @param {Map} Parsed A result of SendInputParseOutput.
+; @returns {String}
+SendInputOutputPayload(Parsed) {
+	Payload := ""
+	for _, Token in Parsed["tokens"] {
+		if (Token["kind"] == "text")
+			Payload .= SendEscapeLiteral(Token["value"])
+		else
+			Payload .= "{" . Token["entry"]["ahk"]
+				. (Token["count"] > 1 ? " " . Token["count"] : "") . "}"
+	}
+	return Payload
 }
 
 ; Parses a value of one of the three send parameter kinds.
@@ -275,7 +395,7 @@ SendInputParse(Kind, Value) {
 _SendInputAhkKey(Parsed) {
 	if Parsed.Has("char")
 		return Parsed["char"]
-	return _SendInputFindEntry(SendInputVocabulary()["keys"], Parsed["named"])["ahk"]
+	return _SendInputFindEntry(SendKeysVocabulary()["keys"], Parsed["named"])["ahk"]
 }
 
 ; Types or presses a parsed value through the driver's synthetic-input choke
@@ -299,7 +419,7 @@ SendInputEmit(Kind, Parsed) {
 	Names := []
 	Seen := Map()
 	for _, Id in Parsed["mods"] {
-		Name := _SendInputFindEntry(SendInputVocabulary()["modifiers"], Id)["ahk"]
+		Name := _SendInputFindEntry(SendKeysVocabulary()["modifiers"], Id)["ahk"]
 		if !Seen.Has(Name) {
 			Seen[Name] := true
 			Names.Push(Name)

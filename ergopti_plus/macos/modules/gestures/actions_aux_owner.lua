@@ -29,6 +29,7 @@ local _next_id = 0
 local _timers = {}
 local _shells = {}
 local _degraded_shells = {}
+local _pause_listeners = {}
 
 --- Resolves one parent-scoped admission generation.
 --- @param parent string|nil Stable action parent.
@@ -444,16 +445,17 @@ local function publish_shell_timeout(entry)
 		entry.callback_active = false
 	end
 	shell_error(entry, "%s process exceeded its %.1f-second settlement deadline.",
-		tostring(entry.label), SHELL_DEADLINE_SEC)
+		tostring(entry.label), entry.deadline)
 	request_shell_termination(entry, "settlement deadline exhausted")
 	return true
 end
 
-local function start_shell(method, payload, label, callback, parent, strict, admit)
+local function start_shell(method, payload, label, callback, parent, strict, admit, deadline)
 	local admitted, scope = admission_open(parent)
 	if not admitted then return false end
 	local entry = {
 		id = next_id(),
+		deadline = deadline or SHELL_DEADLINE_SEC,
 		kind = "shell",
 		strict = strict == true,
 		admit = admit,
@@ -510,7 +512,7 @@ local function start_shell(method, payload, label, callback, parent, strict, adm
 		return false
 	end
 	if not shell_task_is_settled(entry)
-		and not arm_shell_timer(entry, "deadline_handle", SHELL_DEADLINE_SEC,
+		and not arm_shell_timer(entry, "deadline_handle", entry.deadline,
 			function() publish_shell_timeout(entry) end) then
 		entry.discard = true
 		terminate_shell(entry)
@@ -552,6 +554,48 @@ function M.run(executable, args, label, callback, parent)
 	return start_shell(function(payload, terminal)
 		return ShellRunner.run(payload.executable, payload.args, terminal)
 	end, { executable = executable, args = args }, label or "process", callback, parent)
+end
+
+--- Runs one owned program whose arguments and output are the user's own (a
+--- run_command line): the native task logs no payload, the deadline is the
+--- caller's, and stdout plus stderr are capped. A child that prints more than
+--- `max_bytes` is stopped at once and reported with `overflow`.
+--- @param executable string Absolute path of the program.
+--- @param args table Argument vector; it never reaches the log.
+--- @param label string Diagnostic label, free of user data.
+--- @param callback function fn(result): result is false when the deadline
+---   stopped the child, otherwise { code, stdout, stderr, overflow }.
+--- @param parent string|nil Stable action parent.
+--- @param deadline_sec number Seconds before the child is stopped.
+--- @param max_bytes number Captured output bound.
+--- @return boolean started
+function M.run_private(executable, args, label, callback, parent, deadline_sec, max_bytes)
+	if type(deadline_sec) ~= "number" or deadline_sec <= 0 or type(max_bytes) ~= "number" or max_bytes <= 0 then
+		error("actions_aux_owner.run_private: a positive deadline and output bound are required", 2)
+	end
+	return start_shell(function(payload, terminal)
+		local stdout, stderr, bytes, overflow = {}, {}, 0, false
+		local handle
+		local function take(into, chunk)
+			if overflow or type(chunk) ~= "string" or chunk == "" then return end
+			bytes = bytes + #chunk
+			if bytes > payload.max_bytes then overflow = true; return end
+			into[#into + 1] = chunk
+		end
+		handle = ShellRunner.spawn(payload.executable, payload.args, function(code, out, err)
+			take(stdout, out)
+			take(stderr, err)
+			terminal({ code = code, stdout = table.concat(stdout), stderr = table.concat(stderr), overflow = overflow })
+		end, function(_, out, err)
+			take(stdout, out)
+			take(stderr, err)
+			if not overflow then return true end
+			if handle then pcall(handle.terminate) end
+			return false
+		end, nil, true)
+		local ok, started = pcall(handle.start)
+		return ok and started == true, handle
+	end, { executable = executable, args = args, max_bytes = max_bytes }, label, callback, parent, false, nil, deadline_sec)
 end
 
 --- Runs an explicitly owned user program without legacy degraded-debt release.
@@ -634,11 +678,26 @@ local function settle_all(parent)
 	return true
 end
 
+--- Registers an owner whose work outlives one process (the Apple Shortcuts
+--- owner chains a query and a run) so that pausing a parent cancels it too.
+--- @param id string Stable listener identity; registering it again replaces it.
+--- @param listener function fn(parent) called on every pause of a parent.
+function M.register_pause_listener(id, listener)
+	if type(id) ~= "string" or id == "" or type(listener) ~= "function" then
+		error("actions_aux_owner.register_pause_listener: an id and a function are required", 2)
+	end
+	_pause_listeners[id] = listener
+end
+
 function M.pause(parent)
 	local scope = action_scope(parent)
 	if scope.paused ~= true then
 		scope.generation = scope.generation + 1
 		scope.paused = true
+	end
+	for id, listener in pairs(_pause_listeners) do
+		local ok, err = pcall(listener, scope.id)
+		if not ok then Logger.error(LOG, "Pause listener '%s' raised: %s.", id, tostring(err)) end
 	end
 	return settle_all(scope.id)
 end

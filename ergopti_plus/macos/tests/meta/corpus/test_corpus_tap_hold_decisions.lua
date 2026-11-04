@@ -153,6 +153,7 @@ helpers.with_fresh_modules({
 	local function build(vector)
 		local state = Config.build_default_state(keys, combos)
 		state.tap_holds_enabled = true
+		state.lone_modifier_tap_max_ms = vector.lone_tap_max_ms or 0
 		for key, binding in pairs(vector.bindings) do
 			local id = assert(ID_OF_KEY[key], vector.id .. ": '" .. key .. "' is no macOS tap-hold key")
 			local tap = binding.tap == nil and "none"

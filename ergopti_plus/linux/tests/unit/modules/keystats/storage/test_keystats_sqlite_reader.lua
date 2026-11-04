@@ -21,9 +21,8 @@ helpers.describe("keystats sqlite_reader", function()
   end)
 
   helpers.it("uses read-only JSON queries and the canonical aggregate tables", function()
-    local path = helpers.driver_root() .. "/modules/keystats/sqlite_reader.lua"
-    local fh = assert(io.open(path, "r"))
-    local src = fh:read("*a"); fh:close()
+    -- modules/keystats/sqlite_reader, selected by a declaration unique to it.
+    local src = assert(helpers.read_driver_unit("local function sql_quote("))
     -- The invocation is composed by modules/keystats/sqlite_command.lua now
     -- (the script travels on stdin instead of through a file in /tmp), so the
     -- assertion follows the mechanism: the reader must still ask for JSON, and

@@ -10,6 +10,8 @@
 ; rebuilds, callbacks) without being tied to a specific function's lifetime.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -39,11 +41,11 @@ _RegisterEmojisSymbolsSections() {
 	if Features["hotstrings"]["french_magickey"]["text_expansion_emojis"]["enabled"] {
 		LoadHotstringsSection("french_magickey", "text_expansion_emojis", Features["hotstrings"]["french_magickey"]["text_expansion_emojis"])
 	}
-	if Features["hotstrings"]["magic_key"]["text_expansion_symbols"]["enabled"] {
-		LoadHotstringsSection("magickey", "text_expansion_symbols", Features["hotstrings"]["magic_key"]["text_expansion_symbols"])
+	if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["text_expansion_symbols"]["enabled"] {
+		LoadHotstringsSection("magickey", "text_expansion_symbols", Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["text_expansion_symbols"])
 	}
-	if Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"]["enabled"] {
-		LoadHotstringsSection("magickey", "text_expansion_symbols_typst", Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"],
+	if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["text_expansion_symbols_typst"]["enabled"] {
+		LoadHotstringsSection("magickey", "text_expansion_symbols_typst", Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["text_expansion_symbols_typst"],
 			Map("OnlyText", False))
 	}
 }

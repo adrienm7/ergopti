@@ -28,13 +28,29 @@ LocalServerMenuHost(BaseUrl) {
 }
 
 /**
+ * The name of the server a verdict answered for: the row's own label, or the label
+ * of the row of the same address its response fingerprinted, so vLLM on oMLX's port
+ * is named vLLM.
+ * @param {Map} Servers View id -> Map with "label".
+ * @param {String} Id The row.
+ * @param {Any} Verdict Its published verdict.
+ * @returns {String} The label.
+ */
+LocalServerMenuLabelOf(Servers, Id, Verdict) {
+	Named := (Verdict is Map) ? Verdict.Get("server", "") : ""
+	if (Named is String) && Named != "" && (Servers.Get(Named, 0) is Map)
+		return Servers[Named]["label"]
+	return Servers[Id]["label"]
+}
+
+/**
  * @param {Map} Options Catalogue, cached verdicts, translations and action ports.
  * @returns {Array} Rows equivalent to shared llm/local_server_menu.lua.
  */
 LocalServerMenuRows(Options) {
 	Tr := Options["tr"], Fmt := Options["format"]
 	Paused := Options["paused"], Actions := Options["actions"]
-	Rows := [Map("separator", true), Map("label", Tr.Call("menu.llm.local_servers.header"), "disabled", true)]
+	Rows := [Map("separator", true), Map("label", MenuSectionTitle(Tr.Call("menu.llm.local_servers.header")), "disabled", true)]
 	Result := Options["result"], Unavailable := false
 	for Id in Options["order"] {
 		Verdict := Result.Call(Id)
@@ -45,7 +61,7 @@ LocalServerMenuRows(Options) {
 		Rows.Push(Map("label", Tr.Call("healthcheck.status.failed"), "disabled", true))
 	for Id in Options["detected"] {
 		Verdict := Result.Call(Id)
-		Label := Options["servers"][Id]["label"] . " 🖥️ — " . LocalServerMenuHost(Verdict["base_url"])
+		Label := LocalServerMenuLabelOf(Options["servers"], Id, Verdict) . " 🖥️ — " . LocalServerMenuHost(Verdict["base_url"])
 		if Verdict["status"] == "needs_key"
 			Label := Fmt.Call("menu.llm.local_servers.needs_key", Label)
 		Active := Options["active"]
@@ -54,11 +70,15 @@ LocalServerMenuRows(Options) {
 			"items", _LocalServerMenuItems(Options, Id, Verdict)))
 	}
 	if Options["detected"].Length == 0 && !Unavailable {
-		Labels := ""
-		for Id in Options["order"]
-			Labels .= (Labels == "" ? "" : ", ") . Options["servers"][Id]["label"]
-		Key := Options["sweeping"] ? "menu.llm.local_servers.searching" : "menu.llm.local_servers.none"
-		Rows.Push(Map("label", Fmt.Call(Key, Labels), "disabled", true))
+		; A finished sweep says one sentence: the catalogue's server names stay in the
+		; local servers panel and the "other address" submenu, not in this row.
+		if Options["sweeping"] {
+			Labels := ""
+			for Id in Options["order"]
+				Labels .= (Labels == "" ? "" : ", ") . Options["servers"][Id]["label"]
+			Rows.Push(Map("label", Fmt.Call("menu.llm.local_servers.searching", Labels), "disabled", true))
+		} else
+			Rows.Push(Map("label", Tr.Call("menu.llm.local_servers.none_detected"), "disabled", true))
 	}
 	Rescan := Map("label", Tr.Call("menu.llm.local_servers.rescan"), "disabled", Paused)
 	if !Paused

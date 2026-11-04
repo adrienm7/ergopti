@@ -630,6 +630,29 @@ INSERT INTO agg_app_day_media_hold VALUES ('a','2026-10-15','Owned App','media.p
 		end)
 	end)
 
+	helpers.it("semantic media: the session flush commits media with its raw source, once (linux-media-key-metrics)", function()
+		fixture(function(writer)
+			helpers.assert_true(writer.media_available(), "an opened database with the media schema stores media")
+			local function payload(threshold)
+				return { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, media = events() },
+					upserts = {}, media_threshold_ms = threshold }
+			end
+			helpers.assert_nil(writer.start_flush("owned-device", payload(nil)), "media needs its tap threshold")
+			local operation = assert(writer.start_flush("owned-device", payload(200)))
+			local uv = require("luv")
+			local deadline = uv.hrtime() + 20e9
+			while not operation:is_settled() and uv.hrtime() < deadline do uv.run("nowait"); operation:pump(); uv.sleep(5) end
+			helpers.assert_true(operation:is_settled(), "the flush settles")
+			helpers.assert_eq(operation.result.error, nil)
+			helpers.assert_true(operation.result.committed, "the flush COMMIT is acknowledged")
+			helpers.assert_eq(table.concat(assert(writer.query_rows("SELECT COUNT(*) FROM events_system;"))), "12")
+			helpers.assert_eq(table.concat(assert(writer.query_rows("SELECT SUM(c) FROM ngram_media_keys;"))), "7")
+			helpers.assert_eq(table.concat(assert(writer.query_rows("SELECT SUM(count),SUM(tap_count),SUM(hold_count) FROM agg_app_day_media_hold;"))), "5|3|2")
+			helpers.assert_eq(table.concat(assert(writer.query_rows("SELECT COUNT(*) FROM ngram_scancodes;"))), "0",
+				"media never reaches the numeric heatmap")
+		end)
+	end)
+
 	helpers.it("semantic media: native derived refusal rolls back raw rows and permits an unchanged retry", function()
 		fixture(function(writer)
 			helpers.assert_eq(type(writer.insert_media_events), "function", "native media port API admission")

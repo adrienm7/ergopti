@@ -25,110 +25,103 @@
 ---
 --- The fix records peakNLastSeen and measures the span the peak was actually
 --- observed over, so a one-frame spike scores 0 s and can never confirm.
+---
+--- WHERE THE OVERRIDE IS OBSERVABLE:
+--- Only a peak the engine has not already accepted reaches the commit-time
+--- override. A finger joining before the swipe locks takes the fast path and
+--- becomes maxFingers at once, and the old fixture's timings (every key but
+--- three set to 0) confirmed a candidate instantly, so the previous version of
+--- this test stayed green with the time gate deleted outright. The swipes below
+--- use the real timings and lock at three fingers first: a fourth finger is then
+--- a candidate, and only the override can turn it into the four-finger action.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- Vertical travel per frame, comfortably past TAP_MAX_DELTA (8.0) and SWIPE_MIN
--- over the frame count below, so the gesture commits as a swipe rather than a tap.
-local FRAME_TRAVEL_PX = 8
+-- Vertical travel per frame: enough to lock the direction and fire the live
+-- three-finger action within the locking frames.
+local FRAME_TRAVEL_PX = 12
 
--- Seconds advanced per frame on the fake clock. 20 ms × 10 frames = 200 ms, well
--- past PEAK_FINGERS_CONFIRM_MS (0.05) — that gap is what the old formula banked.
-local FRAME_DT_SEC    = 0.02
-local SWIPE_FRAMES    = 10
-
+-- Three-finger frames before the peak, so the swipe is locked when it arrives.
+local LOCK_FRAMES = 6
 
 
 
 
 -- =================================================
 -- =================================================
--- ======= 1/ A One-Frame Spike Must Not Win =======
+-- ======= 1/ Swipe Driver =========================
 -- =================================================
 -- =================================================
 
---- Runs a 3-finger upward swipe containing a single 4-finger frame and returns
---- the actions the engine fired.
---- @return table Array of action names, in fire order.
-local function swipe_with_one_frame_spike()
+--- Runs a three-finger downward swipe on the engine's own clock: LOCK_FRAMES at
+--- three fingers, then a four-finger peak, then optional three-finger frames,
+--- then lift-off. Returns the actions the engine fired.
+--- @param peak_frames number Frames the four-finger peak is held.
+--- @param frame_dt number Seconds per frame (1/120 is a ProMotion display).
+--- @param after_frames number Three-finger frames between the peak and lift-off.
+--- @return table fired Action names, in fire order.
+local function swipe(peak_frames, frame_dt, after_frames)
 	package.loaded["modules.gestures.engine"] = nil
-	package.loaded["infra.timings"] = {
-		sec = function(_, key)
-			-- tap_max_ms is deliberately short so a 200 ms gesture is unambiguously
-			-- a swipe; the confirm windows keep their production values so the
-			-- one-frame spike cannot legitimately confirm as a candidate.
-			if key == "tap_max_ms" then return 0.05
-			elseif key == "finger_confirm_ms" then return 0.05
-			elseif key == "finger_drop_confirm_ms" then return 0.12 end
-			return 0.0
-		end,
-	}
-
-	-- Drive the engine's clock rather than the wall clock: the defect is entirely
-	-- about which two timestamps get subtracted, so real elapsed time (microseconds
-	-- between process_frame calls) would make both formulas score ~0 and the test
-	-- could not tell them apart.
-	local hs          = _G.hs
+	-- Production timings: a stubbed table that answers 0 confirms every
+	-- candidate at once and hides the override this file is about.
+	local saved_timings = package.loaded["infra.timings"]
+	package.loaded["infra.timings"] = nil
+	local hs = _G.hs
 	local saved_clock = hs.timer.secondsSinceEpoch
 	local saved_absolute_clock = hs.timer.absoluteTime
 	local saved_scheduler = package.loaded["adapters.timer_scheduler"]
-	local clock       = 1000.0
+	local clock = 1000.0
 	hs.timer.secondsSinceEpoch = function() return clock end
 	hs.timer.absoluteTime = function() return clock * 1e9 end
 	package.loaded["adapters.timer_scheduler"] = nil
 
-	local Engine = require("modules.gestures.engine")
-	local fired  = {}
-	Engine.init({
-		enabled = true,
-		ga = {
-			-- The frames below travel with y increasing, which the engine locks as
-			-- "down"; the "up" slots stay unbound so only a down-swipe can fire.
-			swipe_3_up = "none",  swipe_3_down = "tab_next",
-			swipe_3_left = "none", swipe_3_right = "none",
-			swipe_4_up = "none",  swipe_4_down = "space_next",
-			swipe_4_left = "none", swipe_4_right = "none",
-			tap_2 = "none", tap_3 = "none", tap_4 = "none", tap_5 = "none",
-		},
-		modes         = { swipe_3_down = "x1", swipe_4_down = "x1" },
-		sensitivities = { swipe_3_down = 3.5, swipe_4_down = 3.5 },
-	}, {
-		execute_single = function(a) fired[#fired + 1] = a; return true end,
-		execute_axis   = function(a) fired[#fired + 1] = a; return true end,
-		set_gesture_in_progress = function() end,
-	})
-
-	local function fingers(count, y)
-		local f = {}
-		for i = 1, count do
-			f[#f + 1] = { absoluteVector = { position = { x = 100 + (i * 10), y = y } } }
+	local fired = {}
+	local ok, failure = xpcall(function()
+		local Engine = require("modules.gestures.engine")
+		Engine.init({
+			enabled = true,
+			ga = {
+				-- The frames travel with y increasing, which the engine locks as
+				-- "down"; the other slots stay unbound so only a down-swipe fires.
+				swipe_3_up = "none", swipe_3_down = "tab_next",
+				swipe_3_left = "none", swipe_3_right = "none",
+				swipe_4_up = "none", swipe_4_down = "space_next",
+				swipe_4_left = "none", swipe_4_right = "none",
+				tap_2 = "none", tap_3 = "none", tap_4 = "none", tap_5 = "none",
+			},
+			modes = { swipe_3_down = "x1", swipe_4_down = "x1" },
+			sensitivities = { swipe_3_down = 3.5, swipe_4_down = 3.5 },
+		}, {
+			execute_single = function(action) fired[#fired + 1] = action; return true end,
+			execute_axis = function(action) fired[#fired + 1] = action; return true end,
+			set_gesture_in_progress = function() end,
+		})
+		local y = 100
+		local function frame(count)
+			local contacts = {}
+			for index = 1, count do
+				contacts[#contacts + 1] = { absoluteVector = { position = { x = 100 + (index * 10), y = y } } }
+			end
+			Engine.process_frame(contacts)
+			y = y + FRAME_TRAVEL_PX
+			clock = clock + frame_dt
 		end
-		return f
-	end
-
-	local y = 100
-	--- Advances the clock and pushes one frame.
-	--- @param count number Contacts on the trackpad this frame.
-	local function frame(count)
-		Engine.process_frame(fingers(count, y))
-		y     = y + FRAME_TRAVEL_PX
-		clock = clock + FRAME_DT_SEC
-	end
-
-	frame(3)              -- Gesture starts at three fingers: maxFingers = peakN = 3
-	frame(4)              -- ONE stray frame: peakN rises to 4 and is never seen again
-	for _ = 1, SWIPE_FRAMES do frame(3) end   -- The real swipe, all at three fingers
-
-	for _ = 1, 5 do        -- Lift-off commits the gesture
-		Engine.process_frame({})
-		clock = clock + FRAME_DT_SEC
-	end
+		for _ = 1, LOCK_FRAMES do frame(3) end
+		for _ = 1, peak_frames do frame(4) end
+		for _ = 1, after_frames do frame(3) end
+		for _ = 1, 3 do
+			Engine.process_frame({})
+			clock = clock + frame_dt
+		end
+	end, debug.traceback)
 
 	hs.timer.secondsSinceEpoch = saved_clock
 	hs.timer.absoluteTime = saved_absolute_clock
 	package.loaded["adapters.timer_scheduler"] = saved_scheduler
+	package.loaded["infra.timings"] = saved_timings
 	package.loaded["modules.gestures.engine"] = nil
+	if not ok then error(failure, 0) end
 	return fired
 end
 
@@ -137,31 +130,49 @@ end
 --- @param name string Value to look for.
 --- @return boolean
 local function contains(list, name)
-	for _, v in ipairs(list) do
-		if v == name then return true end
+	for _, value in ipairs(list) do
+		if value == name then return true end
 	end
 	return false
 end
 
+
+
+
+
+-- ===================================================
+-- ===================================================
+-- ======= 2/ Only a Held Peak Wins the Commit =======
+-- ===================================================
+-- ===================================================
+
 helpers.describe("peak-finger override requires a sustained peak, not a stale one", function()
 	helpers.it("does not fire the 4-finger action after a single 4-finger frame", function()
-		local fired = swipe_with_one_frame_spike()
-		helpers.assert_true(#fired > 0,
-			"the swipe must have fired something — with nothing fired this test would "
-			.. "pass no matter what the override did")
+		local fired = swipe(1, 1 / 60, 6)
+		helpers.assert_true(contains(fired, "tab_next"),
+			"the three-finger swipe the user performed must fire. Fired: " .. table.concat(fired, ", "))
 		helpers.assert_true(not contains(fired, "space_next"), string.format(
 			"a 4-finger contact lasting ONE frame must never win the commit. It did because "
 			.. "peak_elapsed was measured as (commit time - first seen), so it grew with the "
-			.. "rest of the gesture: 200 ms of ordinary 3-finger swiping made a one-frame "
-			.. "spike look like a 200 ms hold. Fired: %s",
-			table.concat(fired, ", ")))
+			.. "rest of the gesture. Fired: %s", table.concat(fired, ", ")))
 	end)
 
-	helpers.it("fires the 3-finger action the user actually performed", function()
-		local fired = swipe_with_one_frame_spike()
-		helpers.assert_true(contains(fired, "tab_next"), string.format(
-			"suppressing the bogus override must leave the real gesture intact — the swipe was "
-			.. "three fingers up throughout, so swipe_3_down must fire (G2). Fired: %s",
-			table.concat(fired, ", ")))
+	helpers.it("does not fire the 4-finger action for a 4-frame peak at 120 Hz (25 ms)", function()
+		-- Four frames was the old frame-count threshold; at 120 Hz it is half the
+		-- confirmation time, so a frame count would confirm what the clock refuses.
+		local fired = swipe(4, 1 / 120, 0)
+		helpers.assert_true(contains(fired, "tab_next"),
+			"the three-finger swipe must fire. Fired: " .. table.concat(fired, ", "))
+		helpers.assert_true(not contains(fired, "space_next"),
+			"a peak held 25 ms is below PEAK_FINGERS_CONFIRM_MS. Fired: " .. table.concat(fired, ", "))
+	end)
+
+	helpers.it("fires the 4-finger action for a peak held past the confirmation time", function()
+		-- Three frames at 30 Hz hold the peak about 67 ms, yet stay below the four
+		-- frames the candidate path needs: only the commit-time override fires it.
+		local fired = swipe(3, 1 / 30, 0)
+		helpers.assert_true(contains(fired, "space_next"),
+			"a 4-finger peak held past the confirmation time must win the commit. Fired: "
+				.. table.concat(fired, ", "))
 	end)
 end)

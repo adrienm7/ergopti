@@ -23,10 +23,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TTCW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TTCW_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TTCW_StripLineComments(Src) {
@@ -49,7 +47,7 @@ _TTCW_StripLineComments(Src) {
 ; =============================================================
 
 _TTCW_CallbackForwarded() {
-	Src := _TTCW_StripLineComments(_TTCW_ReadSource("adapters/text_sender.ahk"))
+	Src := _TTCW_StripLineComments(_TTCW_ReadSource("text_sender.ahk"))
 	Assert(Src != "", "adapters/text_sender.ahk must be readable")
 
 	; The FIFO worker must bind each request callback into the completion bridge.
@@ -69,7 +67,7 @@ Test("text_sender: Callback is forwarded into _TextSendClipboard (fires after pa
 ; ================================================================
 
 _TTCW_CallbackAfterPaste() {
-	Src := _TTCW_StripLineComments(_TTCW_ReadSource("adapters/text_sender.ahk"))
+	Src := _TTCW_StripLineComments(_TTCW_ReadSource("text_sender.ahk"))
 
 	Body := _DriverFuncBody("_TextSendClipboard")
 	Assert(Body != "", "_TextSendClipboard must accept a Callback parameter")

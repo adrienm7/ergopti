@@ -342,7 +342,7 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset, GuardFn := unset) {
 		gap := TickElapsed64(last, now)
 		if (gap >= KLWatchConst.SESSION_TIMEOUT_MS)
 			KL_Hook_AdvanceContextWatermarks(gap)
-		if KLWatch.is_session_active && gap >= KLWatchConst.SESSION_TIMEOUT_MS {
+		if KLWatch.is_session_active && gap > KLWatchConst.SESSION_TIMEOUT_MS {
 			if !_KL_Watchers_CloseSession(last, now, AppendFn, GuardFn?)
 				return false
 		} else if KLWatch.is_idle {
@@ -372,6 +372,29 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset, GuardFn := unset) {
 	}
 	finally Critical(PreviousCritical)
 	return true
+}
+
+; A click or a scroll in an admitted window is activity: it keeps an open session
+; alive and ends an idle span. It starts nothing: a session is a typing session.
+KL_Watchers_OnPointer(AppendFn := 0, Now := unset, GuardFn := unset) {
+	if IsSet(GuardFn) && !GuardFn.Call()
+		return false
+	if !KLWatch.is_session_active || KLWatch.privacy_interrupted
+		|| KLWatch.session_close_draining || IsObject(KLWatch.session_close)
+		return false
+	; A key in flight carries an older tick and is about to own the activity: moving
+	; the tick past it would make its own gap run backwards.
+	if KL_Hook_HasPendingInput()
+		return false
+	Tick := IsSet(Now) ? Now : A_TickCount
+	Last := KLWatch.last_authorized_tick
+	; A key that interrupted after this pointer took its tick is the newer activity.
+	if Tick < Last
+		return true
+	if TickElapsed64(Last, Tick) > KLWatchConst.SESSION_TIMEOUT_MS
+		return _KL_Watchers_CloseSession(Last, Tick, AppendFn, GuardFn?)
+	KLWatch.last_authorized_tick := Tick
+	return KLWatch.is_idle ? _KL_Watchers_EndIdle(Tick, AppendFn, GuardFn?) : true
 }
 
 ; One periodic observation cannot mark a newer activity owner idle. The
@@ -410,14 +433,15 @@ KL_Watchers_IdleTick(Now := unset) {
 				return
 		ObservationCritical := Critical("On")
 		try {
-			LastTick := KLHook.last_tick
-			IdleOwner := {LastTick: LastTick, AuthorizedTick: KLWatch.last_authorized_tick,
+			; A pointer advances the authorized tick alone: KLHook.last_tick times keys.
+			LastTick := Max(KLHook.last_tick, KLWatch.last_authorized_tick)
+			IdleOwner := {LastTick: KLHook.last_tick, AuthorizedTick: KLWatch.last_authorized_tick,
 				LifecycleGeneration: Keystats.lifecycle_generation,
 				CaptureGeneration: KLHook.capture_generation,
 				SessionGeneration: KLWatch.session_generation,
 				IdleGeneration: KLWatch.idle_generation}
 		} finally Critical(ObservationCritical)
-		if LastTick = 0
+		if IdleOwner.LastTick = 0
 				return
 		now := IsSet(Now) ? Now : A_TickCount
 		gap := TickElapsed64(LastTick, now)
@@ -430,15 +454,16 @@ KL_Watchers_IdleTick(Now := unset) {
 				return _KL_Watchers_EndIdle(0)
 
 		if (!KLWatch.is_idle and KLWatch.is_session_active
-						and gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS) {
+						and gap > KLWatchConst.MICRO_IDLE_TIMEOUT_MS) {
+				; The span starts when the silence became an idle one, as on macOS and Linux.
 				IdlePublished := KL_LogSession("idle_start", unset,
-						_KL_Watchers_CommitIdleStart.Bind(LastTick), ,
+						_KL_Watchers_CommitIdleStart.Bind(LastTick + KLWatchConst.MICRO_IDLE_TIMEOUT_MS), ,
 						_KL_Watchers_IdleObservationCurrent.Bind(IdleOwner))
 				if !_KL_Watchers_IdleObservationCurrent(IdleOwner, IdlePublished)
 						return false
 		}
 
-		if (KLWatch.is_session_active and gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
+		if (KLWatch.is_session_active and gap > KLWatchConst.SESSION_TIMEOUT_MS) {
 				return _KL_Watchers_CloseSession(LastTick, now)
 		}
 }
@@ -706,6 +731,15 @@ KL_Watchers_Start() {
 		OnMessage(KLWatchConst.WM_POWERBROADCAST,   KLWatch.power_msg_handler)
 }
 
+; Closes what is open at shutdown. A session ends at its last input, silence not
+; being typing time; with no later authorized key, the first private key bounds it.
+KL_Watchers_CloseOnStop(Now := unset) {
+	Private := KLWatch.privacy_interrupted
+	SessionEnd := Private ? KLWatch.privacy_started_at : KLWatch.last_authorized_tick
+	IdleEnd := Private ? KLWatch.privacy_started_at : IsSet(Now) ? Now : A_TickCount
+	return _KL_Watchers_CloseSession(SessionEnd, IdleEnd)
+}
+
 KL_Watchers_Stop() {
 		Stopped := true
 		if KLWatch.HasOwnProp("idle_check_timer") && IsObject(KLWatch.idle_check_timer) {
@@ -732,9 +766,7 @@ KL_Watchers_Stop() {
 		; Drain any open session/idle state so the JSONL never ends with a
 		; dangling session_start. Pair every open lifecycle event with its
 		; closing counterpart.
-		; Shutdown has no later authorized key to close the pre-private interval.
-		EndTick := KLWatch.privacy_interrupted ? KLWatch.privacy_started_at : A_TickCount
-		if !_KL_Watchers_CloseSession(EndTick, EndTick)
+		if !KL_Watchers_CloseOnStop()
 				return false
 		KLWatch.privacy_interrupted := false
 		KLWatch.privacy_started_at := 0

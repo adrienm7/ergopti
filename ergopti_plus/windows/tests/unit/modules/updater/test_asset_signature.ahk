@@ -145,3 +145,93 @@ _TAS_Enforcement() {
 }
 
 Test("AssetSignature: required refuses what does not verify, off only reports it (asset-signature)", _TAS_Enforcement)
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 3/ The update gate ====
+; ===============================
+; ===============================
+
+; The offered release, publishing the signature asset or not.
+_TAS_Release(V, WithSignature := true) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Tag := "v9.9.9"
+	Assets := ""
+	if WithSignature
+		Assets := '{"name":"' . V["valid"]["name"] . '.sig","browser_download_url":"https://github.com/' . UPDATER_GH_OWNER
+			. "/" . UPDATER_GH_REPO . "/releases/download/" . Tag . "/" . V["valid"]["name"]
+			. '.sig","digest":"sha256:' . V["valid"]["sha256"] . '","size":88}'
+	return { Tag: Tag, RawJson: '{"tag_name":"' . Tag . '","assets":[' . Assets . ']}' }
+}
+
+; Runs the gate with the policy and the signature download replaced, and returns
+; its verdict and the fetched URLs.
+_TAS_Gate(V, Policy, Asset, Release, FetchFn) {
+	Fetched := []
+	Fetch(Url, Request) {
+		Fetched.Push(Url)
+		return FetchFn.Call()
+	}
+	Allowed := AssetSignature_AllowsInstall(V["valid"]["name"], Asset, Release, 0, () => Policy, Fetch)
+	return { Allowed: Allowed, Fetched: Fetched }
+}
+
+_TAS_GateDecides() {
+	V := _TAS_Vectors()
+	Good := { Size: V["valid"]["size"], Digest: V["valid"]["sha256"] }
+	Tampered := { Size: V["valid"]["size"] + 1, Digest: V["valid"]["sha256"] }
+	Signed := _TAS_Release(V)
+	Valid := () => V["valid"]["signature_base64"] . "`r`n"
+
+	Verified := _TAS_Gate(V, _TAS_Policy(V), Good, Signed, Valid)
+	AssertTrue(Verified.Allowed, "required: a valid signature installs")
+	AssertEqual(1, Verified.Fetched.Length, "the signature is fetched once")
+	Assert(InStr(Verified.Fetched[1], V["valid"]["name"] . ".sig"), "the policy's suffix names the signature asset")
+	AssertFalse(_TAS_Gate(V, _TAS_Policy(V), Tampered, Signed, Valid).Allowed, "required: another size is refused")
+	AssertFalse(_TAS_Gate(V, _TAS_Policy(V), Good, _TAS_Release(V, false), Valid).Allowed,
+		"required: a release without the signature is refused")
+	AssertFalse(_TAS_Gate(V, _TAS_Policy(V), Good, Signed, () => (Error("offline"))).Allowed,
+		"required: a signature that is not one is refused")
+	Thrower() {
+		throw Error("offline")
+	}
+	AssertFalse(_TAS_Gate(V, _TAS_Policy(V), Good, Signed, Thrower).Allowed, "required: a failed download is refused")
+
+	AssertTrue(_TAS_Gate(V, _TAS_Policy(V, "off"), Tampered, Signed, Valid).Allowed,
+		"off: a bad signature only reports")
+	AssertTrue(_TAS_Gate(V, _TAS_Policy(V, "off"), Good, Signed, Thrower).Allowed,
+		"off: a failed download only reports")
+	Unprovisioned := _TAS_Gate(V, _TAS_Policy(V, "off", ""), Good, Signed, Valid)
+	AssertTrue(Unprovisioned.Allowed, "off without a key installs")
+	AssertEqual(0, Unprovisioned.Fetched.Length, "no key: nothing is fetched")
+
+	AssertFalse(_TAS_Gate(V, Map("enforcement", "off"), Good, Signed, Valid).Allowed,
+		"a policy that cannot be admitted refuses instead of skipping the check")
+	Unreadable() {
+		throw Error("no file")
+	}
+	AssertFalse(AssetSignature_AllowsInstall(V["valid"]["name"], Good, Signed, 0, Unreadable, Valid),
+		"a policy that cannot be read refuses instead of skipping the check")
+}
+
+Test("AssetSignature: the update gate follows the policy before anything downloads (asset-signature)", _TAS_GateDecides)
+
+; The shipped policy stays off until the maintainer provisions the key, and every
+; install path passes the gate before its transaction.
+_TAS_GateWired() {
+	global _SharedDir
+	Policy := JsonParse(FileRead(_SharedDir . "\modules\updater\asset_signing.json", "UTF-8"))
+	AssertEqual("", AssetSignature_AdmitPolicy(Policy))
+	Body := _StripFullLineComments(_DriverFuncBody("Updater_DownloadAndInstall"))
+	Gate := InStr(Body, "AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)")
+	Begin := InStr(Body, "_Updater_BeginDownloadTransaction(")
+	Assert(Gate > 0 && Begin > Gate, "the gate runs before the download transaction")
+	Refused := InStr(Body, "if !SignatureAllows", , Gate)
+	Assert(Refused > Gate && Refused < Begin, "a refusal stops the install")
+}
+
+Test("AssetSignature: every install path passes the gate before its transaction (asset-signature)", _TAS_GateWired)

@@ -95,9 +95,90 @@ local function remap_participant(remap, scope, backup_path, defer)
 	return participant
 end
 
+--- The keyboard-layout part of one scope: the rows of config.toml through the
+--- synchronous owner, then the layout typing them, built and selected live
+--- (modules/keymap/number_row_live.lua). The request settles only once that
+--- layout was read back (docs/design/layout-option-emulation.md, section 5); a
+--- choice with no layout of ours to apply it to is stored and acknowledged with
+--- its reason. A layout the system did not take reverts the rows, so the file
+--- never claims options the keyboard does not type.
+--- @param synchronous table Participant over the scoped preferences owner.
+--- @param layout table { rows() -> { order, edges }, live } The stored rows and the live owner.
+--- @param defer function fn -> true once fn is scheduled off this stack.
+--- @return table participant See config_scope_composition.
+function M.layout_participant(synchronous, layout, defer)
+	local applying, changed = false, false
+	local participant = {}
+	local function same(a, b) return a.order == b.order and a.edges == b.edges end
+	--- Brings the typing layout to the stored rows; settle(ok, code).
+	local function load(settle)
+		local dispatched = layout.live.apply(layout.rows(), function(applied, code)
+			local function answer()
+				if applied then return settle(true, nil) end
+				if code == layout.live.REASON_NO_SOURCE then return settle(true, code) end
+				return settle(false, tostring(code))
+			end
+			if defer(answer) ~= true then answer() end
+		end)
+		return dispatched
+	end
+	function participant.pending() return applying or synchronous.pending() end
+	function participant.apply(mode, done)
+		if applying then return done(false, "the layout scope request is still settling") end
+		applying = true
+		local before = layout.rows()
+		synchronous.apply(mode, function(committed, detail)
+			if not committed then
+				applying = false
+				return done(false, detail)
+			end
+			changed = not same(before, layout.rows())
+			if not changed then
+				applying = false
+				return done(true, "rows_unchanged")
+			end
+			load(function(loaded, code)
+				if loaded then
+					applying = false
+					Logger.info(LOG, "Keyboard layout scope settled on the typing layout (%s).", tostring(code or "built"))
+					return done(true, code)
+				end
+				synchronous.revert(function(reverted, revert_detail)
+					applying = false
+					Logger.error(LOG, "The layout rows were not loaded (%s); config.toml reverted: %s.", tostring(code),
+						tostring(reverted == true or revert_detail))
+					done(false, "the system did not take the layout: " .. tostring(code))
+				end)
+			end)
+		end)
+	end
+	function participant.revert(done)
+		if applying then return done(false, "the layout scope request is still settling") end
+		synchronous.revert(function(reverted, detail)
+			if not reverted or not changed then return done(reverted == true, detail) end
+			changed = false
+			applying = true
+			load(function(loaded, code)
+				applying = false
+				done(loaded, code)
+			end)
+		end)
+	end
+	function participant.release()
+		if applying then return false end
+		return synchronous.release()
+	end
+	function participant.retry_restore(done)
+		if applying then return done(false, "the layout scope request is still settling") end
+		return synchronous.retry_restore(done)
+	end
+	return participant
+end
+
 --- Creates the global owner from the menu's scope owners.
 --- @param options table owners (scope id -> function returning the scoped owner
----   or nil when unavailable), remap (facade or nil), backup_path(scope),
+---   or nil when unavailable), remap (facade or nil), layout ({ rows, live } for
+---   the keyboard-layout participant, or nil), backup_path(scope),
 ---   defer(fn), paused() and refresh(committed, report), which also receives
 ---   every refusal, with the typed failure point of its report.
 --- @return table owner apply(mode), pending(), retry_restore(done).
@@ -119,6 +200,9 @@ function M.new(options)
 					apply = function(mode) return owner.apply(mode) end,
 					owner = function() return owner end,
 				})
+				if id == "keyboard_layout" and type(options.layout) == "table" then
+					registry[id] = M.layout_participant(registry[id], options.layout, options.defer)
+				end
 			end
 		end
 		local remap = options.remap

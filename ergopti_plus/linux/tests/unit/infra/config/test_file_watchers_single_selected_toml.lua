@@ -339,6 +339,45 @@ helpers.describe("file watchers single selected TOML", function()
 		end)
 	end
 
+	-- luaposix's legacy posix.stat reports a symlink itself (type "link") and its
+	-- mtime in whole seconds; installed, it made the pump judge the selected
+	-- link instead of its target and never see an edit. This port reproduces
+	-- those semantics, so the case fails on a host without luaposix too.
+	helpers.it("(linux-watch-selected-topology) pump follows a symlinked selected file under luaposix's stat", function()
+		local function luaposix_stat(path)
+			local attributes = native_luv.fs_lstat(path)
+			if not attributes then return nil end
+			local kinds = { file = "regular", directory = "directory", link = "link" }
+			return { dev = attributes.dev, ino = attributes.ino, type = kinds[attributes.type] or attributes.type,
+				mtime = attributes.mtime.sec }
+		end
+		local function luaposix_dir(path)
+			local scan = assert(native_luv.fs_scandir(path))
+			local names = { ".", ".." }
+			while true do
+				local name = native_luv.fs_scandir_next(scan)
+				if not name then break end
+				names[#names + 1] = name
+			end
+			return names
+		end
+		local held = package.loaded["posix"]
+		package.loaded["posix"] = { stat = luaposix_stat, dir = luaposix_dir }
+		local ok, failure = pcall(selected_file_session, "pump", function(s)
+			s.start()
+			s.write(s.target); s.settle(1)
+			local replacement = s.write(s.real .. "/replacement.tmp")
+			s.rename(replacement, s.target); s.now = s.now + 1100; s.settle(1)
+			s.write(s.target); s.settle(1); s.settle(0)
+		end, { prepare = function(s)
+			s.real = s.root .. "/real"; s.directory(s.real)
+			s.target = s.write(s.real .. "/target.toml")
+			s.symlink(s.target, s.path)
+		end })
+		package.loaded["posix"] = held
+		if not ok then error(failure, 0) end
+	end)
+
 	helpers.it("(linux-watch-selected-topology) pump sees another file with the same timestamp take the name", function()
 		selected_file_session("pump", function(s)
 			s.start()

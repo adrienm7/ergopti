@@ -124,7 +124,7 @@ _WebView_CleanupProfileAttempt(Owner) {
 		Owner["attempts"] += 1
 		if Owner["attempts"] < 4 {
 			Owner["queued"] := true
-			SetTimer(_WebView_CleanupProfile.Bind(Owner), -1000)
+			SetTimer(_WebView_CleanupProfile.Bind(Owner), -TimingsGet("adapters", "webview_profile_cleanup_ms"))
 		} else {
 			_WebView_ProfileOwners.Delete(Path)
 			try LoggerWarn("WebView", "Private browser profile cleanup failed after retries.")

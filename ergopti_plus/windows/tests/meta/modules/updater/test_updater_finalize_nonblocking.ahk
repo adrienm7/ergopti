@@ -30,7 +30,7 @@ _UFNB_DownloadGuardSpansFinalization() {
 	Body := _DriverFuncBody("_Updater_PollDownloadAsync")
 	StartBody := _DriverFuncBody("_Updater_StartStagingWorker")
 	Assert(StartBody != "", "_Updater_StartStagingWorker must exist")
-	SpawnPos := InStr(StartBody, "ShellRunner_SpawnTreeOwned")
+	SpawnPos := InStr(StartBody, "ProxyOverride_SpawnWorker")
 	Assert(SpawnPos > 0 and InStr(StartBody, "Worker.start()") > SpawnPos,
 		"the staging worker must be launched through the asynchronous tree-owned ShellRunner adapter")
 	StartCallPos := InStr(StartBody, "Worker.start()")

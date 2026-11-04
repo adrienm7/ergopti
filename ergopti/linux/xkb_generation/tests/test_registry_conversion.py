@@ -34,15 +34,6 @@ from support import (
 ERGOL_LEVEL_INDICES = [0, 2, 1, 1, 0, 3, 4]
 KEYPAD_CODES = range(65, 93)
 
-# (dead-key state, action) outputs the shipped Ergopti XCompose files cannot
-# reach: the action's key is itself a dead key, so it sends its dead keysym, not
-# the character its Compose line names. The golden test freezes those files
-# (docs/memory/linux-web-release.md); any other layout must have none, so a new
-# registry layout that hits this converter limit fails here instead of shipping
-# sequences nobody can type.
-ERGOPTI_FAMILY = {"ergopti", "ergopti_ansi", "ergopti_plus", "ergopti_plus_ansi"}
-ERGOPTI_UNREACHABLE = {("s1_circumflex", "^"), ("s1_circumflex", "¨"), ("s3_diaeresis", "¨")}
-
 _COMPOSE_LINE_RE = re.compile(r'^((?:<[^>]+>\s*)+):\s*"((?:[^"\\]|\\.)*)"\s*$')
 
 
@@ -131,15 +122,111 @@ class RegistryConversionTests(unittest.TestCase):
             self.assertIn('xkb_symbols "%s"' % entry["id"], result.symbols_text)
             self.assertTrue(result.compose_text.startswith('include "%L"'), entry["id"])
             self.assertEqual(result.conflicts, [], entry["id"])
+            self.assertEqual(result.unplaced, [], entry["id"])
 
-    def test_every_dead_key_output_is_reachable_from_its_own_key(self):
+    def test_a_key_the_keycode_table_cannot_place_is_reported(self):
+        """A JIS key (macOS 93 Yen, 94 underscore) has no XKB name in the table."""
+        text = registry_keylayout("ergol")
+        index0 = text.index('<keyMap index="0">') + len('<keyMap index="0">')
+        extra = (
+            '<key code="93" output="&#x00A5;"/><key code="94" action="a"/>'
+            '<key code="82" output="0"/><key code="95" output="&#x0001;"/>'
+        )
+        result = keylayout_to_xkb.convert(
+            text[:index0] + extra + text[index0:],
+            keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "ansi"),
+            "probe",
+            "Probe",
+        )
+        # The keypad key (82) is XKB's own, and a control output types nothing.
+        self.assertEqual(result.unplaced, [93, 94])
+
+    def test_every_dead_key_output_is_composed_from_the_keysym_its_key_sends(self):
+        """Inside a dead state a key sends its own keysym, a dead key its trigger.
+
+        Read from the written symbols (key_symbols), not from the converter's
+        choice of sequence keysym, so naming the character an action is called
+        after instead of what its key sends (the old chained-dead-key bug) fails.
+        A ``base_level_only`` output (Ergopti+'s magic key) is left out: inside a
+        dead state it still names its action's letter, a separate known limit
+        the shipped Ergopti files keep.
+        """
         entries = registry_entries()
         self.assertGreaterEqual(len(entries), 5)
-        self.assertTrue(ERGOPTI_FAMILY <= {entry["id"] for entry in entries})
+        checked = 0
         for entry in entries:
-            result = convert_registry_layout(entry["id"])
-            expected = ERGOPTI_UNREACHABLE if entry["id"] in ERGOPTI_FAMILY else set()
-            self.assertEqual(set(result.unreachable), expected, entry["id"])
+            layout_id = entry["id"]
+            layout = keylayout_to_xkb.parse_keylayout(registry_keylayout(layout_id))
+            result = convert_registry_layout(layout_id)
+            compose = parse_compose(result.compose_text)
+            level_indices = [layout.key_map_index(mods) for mods in keylayout_to_xkb.XKB_LEVELS]
+            keycodes = keylayout_to_xkb.load_keycodes(KEYCODES_PATH, entry["keycode_convention"])
+            magic = {
+                result.borrowed.get(text) or keylayout_to_xkb.unicode_keysym(text)
+                for text in entry.get("xkb", {}).get("base_level_only", [])
+            }
+            missing = []
+            for xkb, code in keycodes:
+                for level, index in enumerate(level_indices):
+                    key = layout.key_entry(index, code)
+                    keysym = result.key_symbols[xkb][level]
+                    if key is None or key[0] != "action" or keysym in magic:
+                        continue
+                    if keysym == keylayout_to_xkb.NO_SYMBOL:
+                        continue
+                    for state, (output, _next) in layout.actions[key[1]].whens.items():
+                        if state == "none" or not output:
+                            continue
+                        for prefix in result.dead_sequences.get(state, []):
+                            checked += 1
+                            if compose.get(tuple(prefix) + (keysym,)) != output:
+                                missing.append(f"{' '.join(prefix)} {keysym} -> {output!r}")
+            self.assertEqual(missing, [], layout_id)
+        self.assertGreater(checked, 1000)
+
+
+class BepoConversionTests(unittest.TestCase):
+    """The vendored bépo (chained dead keys up to three deep) converts whole.
+
+    Every output a key types inside a reachable dead state is checked by the
+    written-keysym test above, which covers bépo with the other registry
+    layouts; these pin what that layout added: it is in the registry, no two
+    actions collide on a sequence, and the chains that used to break compose.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = convert_registry_layout("bepo")
+        cls.compose = parse_compose(cls.result.compose_text)
+
+    def test_bepo_is_a_registry_layout_on_linux(self):
+        entry = next(entry for entry in registry_entries() if entry["id"] == "bepo")
+        self.assertIn("linux", entry["platforms"])
+        self.assertEqual(entry["licence"], "CC-BY-SA-3.0")
+        self.assertEqual(entry["keycode_convention"], "iso")
+
+    def test_no_compose_conflict(self):
+        self.assertEqual(self.result.conflicts, [])
+
+    def test_chained_dead_keys_compose_from_the_keysym_their_key_sends(self):
+        science = self.result.dead_triggers["scientifique"]
+        circumflex = self.result.dead_triggers["circonflexe"]
+        # The circumflex dead key and the plain "^" no longer share a sequence
+        # inside the science dead key.
+        self.assertEqual(self.compose[(science, circumflex)], "→")
+        self.assertEqual(self.compose[(science, "asciicircum")], "⃗")
+        # A dead key pressed twice composes from its own dead keysym.
+        breve = self.result.dead_triggers["breve"]
+        self.assertEqual(self.compose[(breve, breve)], "̑")
+        self.assertEqual(
+            max(
+                len(sequence)
+                for sequences in self.result.dead_sequences.values()
+                for sequence in sequences
+            ),
+            3,
+            "bépo chains reach three dead keys deep",
+        )
 
 
 class ErgolCompletenessTests(unittest.TestCase):

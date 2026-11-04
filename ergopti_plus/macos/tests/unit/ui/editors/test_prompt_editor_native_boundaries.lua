@@ -86,8 +86,13 @@ helpers.describe("prompt editor native boundaries", function()
 				pending[#pending + 1] = callback
 				return true
 			end }
-			local real_builder = assert(loadfile("ui/ui_builder.lua"))()
-			package.loaded["ui.ui_builder"].force_focus = real_builder.force_focus
+			-- A fresh real builder by module name, over the deferred-work double
+			-- above; the editor keeps its builder double with the real focus retry.
+			local builder_double = package.loaded["ui.ui_builder"]
+			package.loaded["ui.ui_builder"] = nil
+			local real_builder = require("ui.ui_builder")
+			package.loaded["ui.ui_builder"] = builder_double
+			builder_double.force_focus = real_builder.force_focus
 			helpers.assert_true(editor.open({ id = "A" }, function() end))
 			local reads = 0
 			state.views[1].hswindow = function() reads = reads + 1; return nil end

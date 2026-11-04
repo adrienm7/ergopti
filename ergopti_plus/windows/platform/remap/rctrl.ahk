@@ -101,7 +101,7 @@ _RCtrlHoldModKey() {
 ; need no hotkey of their own.
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "tab" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
 ~*SC11D:: {
-	tap := KeyWait("RControl", "T" . TapHoldDuration(TapHold, "right_ctrl"))
+	tap := KS_WaitReleased("RControl", TapHoldDuration(TapHold, "right_ctrl"))
 	if (tap and TapHoldPriorKeyIsSelf("right_ctrl")) {
 		if !TapHoldReleasePhysicalKey("RCtrl")
 			return
@@ -124,7 +124,7 @@ _RCtrlHoldModKey() {
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
 *SC11D:: {
-	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
+	tap := KS_WaitReleased("SC11D", TapHoldDuration(TapHold, "right_ctrl"))
 	if tap {
 		TapHoldDispatchTap("right_ctrl", OneShotShift)
 		return
@@ -136,7 +136,7 @@ _RCtrlHoldModKey() {
 	if !TapHoldSyntheticKeyDown("LShift")
 		return
 	try {
-		KeyWait("SC11D", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+		KS_WaitReleased("SC11D", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
 		TapHoldSyntheticKeyUp("LShift")
 	}

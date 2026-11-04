@@ -2,25 +2,28 @@
 
 local helpers=require('tests.helpers');local Fixture=require('tests.support.physical_shortcut_registrar_fixture');local Codec=require('toml_codec')
 local source='[shortcuts]\nenabled = true\nkeyboard = { foreign = 17 }\n[gestures]\naction_parameters = { tap_4__open_url="https://apple.com", future={keep=9} }\n[future]\nkeep=7\n'
+-- Ctrl+G is held by its role-named slot (the fixed hotkey retired with schema v20),
+-- so the logical-chord collision comes from that slot and no static owner remains.
+local logical_source=(source:gsub('foreign = 17','secondary_g = "send_text", foreign = 17'))
 local rows={{section='shortcuts.keyboard',key='physical_none_KeyJ',value='send_text'},{section='gestures.action_parameters',key='keyboard__physical_none_KeyJ__send_text',value='★'}}
 helpers.describe('Mac physical preflight actual all-owner registrar',function()
- for _, mode in ipairs({'foreign_none','foreign_action','logical_chord','static_chord'}) do
+ for _, mode in ipairs({'foreign_none','foreign_action','logical_chord'}) do
   helpers.it('refuses '..mode..' through actual registrar and scope',function()
    Fixture.run(function(f)
     local registrar=require('adapters.hotkey_registrar')
-    local slot=(mode=='logical_chord' or mode=='static_chord') and 'physical_ctrl_KeyG' or 'physical_none_KeyJ'
+    local slot=mode=='logical_chord' and 'physical_ctrl_KeyG' or 'physical_none_KeyJ'
     if mode=='foreign_none' or mode=='foreign_action' then
      helpers.assert_eq(registrar.replace_physical_claims('independent-owner',{{mods={},native_code=38,action=mode=='foreign_none' and 'none' or 'send_text',binding_id='independent__j'}}),true)
     end
     local committed=f.owner.edit({{section='shortcuts.keyboard',key=slot,value='send_text',intent='keyboard_assignment'},{section='gestures.action_parameters',key='keyboard__'..slot..'__send_text',value='★'}})
     helpers.assert_eq(committed,false,'Conflict is rejected through the actual registrar')
-    helpers.assert_eq(f.files.config,mode=='logical_chord' and source:gsub('foreign = 17','ctrl_g = "send_text", foreign = 17') or source,'Refusal preserves the exact source')
+    helpers.assert_eq(f.files.config,mode=='logical_chord' and logical_source or source,'Refusal preserves the exact source')
     helpers.assert_eq(f.owner.pending(),false,'Inverse settles')
     if mode=='foreign_none' or mode=='foreign_action' then
      helpers.assert_eq(registrar.has_physical_conflict({},38,'modules.shortcuts.keyboard_shortcuts','keyboard__physical_none_KeyJ'),true,'Independent ownership survives refusal')
      helpers.assert_eq(registrar.replace_physical_claims('independent-owner',{}),true)
     end
-   end,mode=='logical_chord' and source:gsub('foreign = 17','ctrl_g = "send_text", foreign = 17') or source)
+   end,mode=='logical_chord' and logical_source or source)
   end)
  end
  helpers.it('explicit physical record can displace a conditional recommendation',function()
@@ -39,20 +42,20 @@ helpers.describe('Mac physical preflight actual all-owner registrar',function()
 end)
 
 helpers.describe('Mac closed physical editor refusal receipts',function()
- for _, mode in ipairs({'foreign_none','foreign_action','logical_chord','static_chord'}) do
+ for _, mode in ipairs({'foreign_none','foreign_action','logical_chord'}) do
   helpers.it('returns authoritative collision from actual native '..mode,function()
    Fixture.run(function(f)
     local registrar=require('adapters.hotkey_registrar')
-    local slot=(mode=='logical_chord' or mode=='static_chord') and 'physical_ctrl_KeyG' or 'physical_none_KeyJ'
+    local slot=mode=='logical_chord' and 'physical_ctrl_KeyG' or 'physical_none_KeyJ'
     if mode=='foreign_none' or mode=='foreign_action' then
      helpers.assert_eq(registrar.replace_physical_claims('independent-owner',{{mods={},native_code=38,action=mode=='foreign_none' and 'none' or 'send_text',binding_id='independent__j'}}),true)
     end
     local committed,reason=f.owner.edit({{section='shortcuts.keyboard',key=slot,value='send_text',intent='keyboard_assignment'},{section='gestures.action_parameters',key='keyboard__'..slot..'__send_text',value='★'}})
     helpers.assert_eq(committed,false);helpers.assert_eq(reason,'collision')
-    helpers.assert_eq(f.files.config,mode=='logical_chord' and source:gsub('foreign = 17','ctrl_g = "send_text", foreign = 17') or source)
+    helpers.assert_eq(f.files.config,mode=='logical_chord' and logical_source or source)
     helpers.assert_eq(f.owner.pending(),false)
     if mode=='foreign_none' or mode=='foreign_action' then helpers.assert_eq(registrar.replace_physical_claims('independent-owner',{}),true)end
-   end,mode=='logical_chord' and source:gsub('foreign = 17','ctrl_g = "send_text", foreign = 17') or source)
+   end,mode=='logical_chord' and logical_source or source)
   end)
  end
  helpers.it('classifies native conflict-port throw without projecting its private detail',function()
@@ -196,7 +199,7 @@ helpers.describe("Mac missing Navigation producer admission", function()
 				helpers.assert_eq(f.keyboard.release_physical_publication(claim), true)
 				helpers.assert_eq(accepted, false)
 				helpers.assert_eq(reason, collision and "collision" or "unavailable")
-			end, source)
+			end, collision and logical_source or source)
 		end)
 	end
 	helpers.it("nav-configured absent owner preserves explicit None and removal bypass", function()

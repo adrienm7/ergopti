@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Network Field Check Ports (Linux)
 --- DESCRIPTION:
---- The four ports of the shared network check (network/field_check_network.lua)
+--- The ports of the shared network check (network/field_check_network.lua)
 --- bound to this driver: how the desktop's proxy settings are read, how a PAC
 --- file is downloaded, how one request runs through the managed transport
 --- (route lookup by GIO, then the managed curl engine, both owned and bounded) and
@@ -81,6 +81,8 @@ local function native()
 		end,
 		-- The origins the managed Ollama daemon contacts, and the shared selection rules.
 		ollama_origins = function() return require("infra.route_origins").client("ollama") end,
+		-- The sign-in relay the daemon's start probes (docs/design/proxy-auth-relay.md).
+		relay = function() return require("infra.proxy_auth_relay") end,
 		selection = function(receipt)
 			local policy, reason = require("infra.proxy_policy").load()
 			if not policy then return nil, reason end
@@ -169,7 +171,7 @@ end
 
 --- Builds the ports.
 --- @param deps table|nil Test doubles for the native collaborators.
---- @return table ports { proxy_settings, fetch_pac, chain, route_plan }
+--- @return table ports { proxy_settings, fetch_pac, chain, route_plan, relay, relay_probe }
 function M.new(deps)
 	deps = deps or native()
 
@@ -275,7 +277,23 @@ function M.new(deps)
 		dispatch(1)
 	end
 
-	return { proxy_settings = proxy_settings, fetch_pac = fetch_pac, chain = chain, route_plan = route_plan }
+	--- Probes the relay the plan selected for the registry, as the daemon's start
+	--- does: not needed, required with its scheme, or a closed refusal.
+	-- Partial test collaborators keep the real binding.
+	local Binding = deps.relay and deps.relay() or require("infra.proxy_auth_relay")
+	local function relay_probe(upstream, callback)
+		local policy = Binding.load()
+		local origins = deps.ollama_origins()
+		local authority = policy and type(origins) == "table" and policy.authority(origins[1]) or nil
+		if not authority then callback(nil, "relay_unavailable"); return end
+		local _, refusal = Binding.probe(upstream, authority, { owner = M.OWNER .. ".relay",
+			timeout_ms = Binding.timings().probe_ms, authorized = function() return true end }, callback)
+		if refusal then callback(nil, "relay_unavailable") end
+	end
+
+	local relay_policy = assert(Binding.load(), "the shared relay contract is unreadable")
+	return { proxy_settings = proxy_settings, fetch_pac = fetch_pac, chain = chain, route_plan = route_plan,
+		relay = relay_policy, relay_probe = relay_probe }
 end
 
 return M

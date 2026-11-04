@@ -96,7 +96,7 @@ Onboarding_Run() {
 	; the time, small enough to dismiss the script quickly when the user
 	; closes the wizard.
 	while (_ob_gui != 0) {
-		Sleep(100)
+		Sleep(TimingsGet("ui", "onboarding_poll_ms"))
 	}
 	; Reaching here means the wizard window was closed without committing —
 	; the driver cannot operate without a config, so exit cleanly.

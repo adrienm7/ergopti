@@ -86,11 +86,6 @@ _PBSS_LlmDepsCancelRestoresBaseline() {
 }
 Test("meta priority-baseline: LLM_Deps_Cancel restores via DRIVER_BASELINE_PRIORITY_CLASS, not a Normal literal", _PBSS_LlmDepsCancelRestoresBaseline)
 
-_PBSS_PollProbeResultRestoresBaseline() {
-	_PBSS_CheckRestoreSite("_LLM_Deps_OnPollProbeResult")
-}
-Test("meta priority-baseline: _LLM_Deps_OnPollProbeResult restores via DRIVER_BASELINE_PRIORITY_CLASS, not a Normal literal", _PBSS_PollProbeResultRestoresBaseline)
-
 _PBSS_LlmMenuInitRestoresBaseline() {
 	_PBSS_CheckRestoreSite("LLM_Menu_Init")
 }

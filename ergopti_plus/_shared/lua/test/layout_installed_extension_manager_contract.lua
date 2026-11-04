@@ -19,6 +19,7 @@ return function(helpers, Json, ports)
 		end
 		local registry, deps, state = ports.manager({ files = files, runs = receipts })
 		deps.local_source = true
+		deps.registry_changes = function(_, callback) callback(" M index.json\n", nil) end
 		local record_path = ports.local_dir .. "installed.json"
 		local original_read, original_exists, original_write = deps.read, deps.exists, deps.write
 		local writes, refuse = 0, false

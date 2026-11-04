@@ -223,7 +223,7 @@ _UST_ProductionLaunchesOnlyBundledWorkers() {
 		"production staging must launch the bundled worker through the transport builder")
 	Assert(InStr(Body, "FileExist(WorkerPath)") > 0,
 		"a missing bundled worker must fail before any launch")
-	Assert(InStr(Body, "ShellRunner_SpawnTreeOwned") > 0
+	Assert(InStr(Body, "ProxyOverride_SpawnWorker") > 0
 		and !RegExMatch(Body, "\bShellRunner_Spawn\("),
 		"production staging must bind the exact process-tree owner, never the PID-only runner")
 	Assert(InStr(Body, "_Updater_PowerShellPath()") > 0

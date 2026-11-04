@@ -7,6 +7,11 @@
 
 ; A separate native process observes the actual global clipboard lock. It only
 ; reads formats, never replaces clipboard data or runs any parent test source.
+
+; Clipboard history opens the lock right after every change, and this process
+; cannot use CB_OpenClipboardWithin; a leaked hold still outlasts this wait.
+global CALO_READER_WAIT_MS := 5000
+
 _CALO_Require(Condition, Message) {
 	if !Condition
 		throw Error(Message)
@@ -26,17 +31,42 @@ _CALO_Publish(Path, Text) {
 	FileMove(Pending, Path)
 }
 
+; The process whose window holds the global lock; 0 when it names no window.
+_CALO_HolderPid() {
+	Holder := DllCall("User32\GetOpenClipboardWindow", "Ptr"), HolderPid := 0
+	if Holder
+		DllCall("User32\GetWindowThreadProcessId", "Ptr", Holder, "UInt*", &HolderPid)
+	return HolderPid
+}
+
+; Opens the global lock past a passing reader, giving up at once when StopPid
+; holds it. Returns 0 once open, else the holder's PID, or -1 for an unnamed one.
+_CALO_Open(StopPid := 0) {
+	global CALO_READER_WAIT_MS
+	Started := A_TickCount
+	loop {
+		if DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int")
+			return 0
+		HolderPid := _CALO_HolderPid()
+		if (StopPid && HolderPid == StopPid) || A_TickCount - Started >= CALO_READER_WAIT_MS
+			return HolderPid ? HolderPid : -1
+		Sleep(10)
+	}
+}
+
 _CALO_Main() {
-	Root := A_Args[1], CustomFormat := Integer(A_Args[2])
+	Root := A_Args[1], CustomFormat := Integer(A_Args[2]), ParentPid := Integer(A_Args[3])
 	_CALO_Publish(Root . "\ready", "ready")
 	_CALO_Wait(Root . "\before.request")
-	Opened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
-	if Opened
+	HolderPid := _CALO_Open(ParentPid)
+	if !HolderPid
 		_CALO_Require(DllCall("User32\CloseClipboard", "Int"), "the observer must close its own before probe")
-	_CALO_Publish(Root . "\before.receipt", Opened ? "open" : "busy")
+	_CALO_Publish(Root . "\before.receipt", !HolderPid ? "open"
+		: HolderPid == ParentPid ? "busy" : "foreign holder " . HolderPid)
 	_CALO_Wait(Root . "\after.request")
-	_CALO_Require(DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int"),
-		"the AHK setter must release its internal clipboard open before the after probe")
+	HolderPid := _CALO_Open()
+	_CALO_Require(!HolderPid, "the AHK setter must release its internal clipboard open before the after probe"
+		. " (holder " . HolderPid . ", parent " . ParentPid . ")")
 	try {
 		TextHandle := DllCall("User32\GetClipboardData", "UInt", 13, "Ptr")
 		_CALO_Require(TextHandle != 0, "the actual Unicode format must survive ClipboardAll restoration")

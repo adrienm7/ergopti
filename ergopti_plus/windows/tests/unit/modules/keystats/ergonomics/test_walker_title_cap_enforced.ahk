@@ -162,7 +162,7 @@ _WTC_BuildSqlForSeededTitles(AppDays, TitlesPerAppDay) {
 				"title", "t" . A_Index, "c", 1, "ms", A_Index)
 		}
 	}
-	Sql := KLW_BuildBatchSql("'dev'")
+	Sql := KLW_BuildBatchSql("dev")
 	KLW_ResetBatch()
 	return Sql
 }

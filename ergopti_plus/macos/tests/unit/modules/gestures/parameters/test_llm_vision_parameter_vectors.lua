@@ -77,7 +77,7 @@ helpers.describe("llm_vision parameter: native prompt, picker choices and refusa
 			local vision_order = {}
 			for _, provider_id in ipairs(catalogue.provider_order) do
 				local format = catalogue.providers[provider_id].format
-				if format ~= "backboard" and format ~= "decisions" then vision_order[#vision_order + 1] = provider_id end
+				if format ~= "backboard" and format ~= "decisions" and format ~= "perplexity_agent" then vision_order[#vision_order + 1] = provider_id end
 			end
 			helpers.assert_true(#vision_order < #catalogue.provider_order, "the catalogue holds non-vision providers")
 			helpers.assert_eq(#choices, 1 + #vision_order, "the local server and every vision provider")

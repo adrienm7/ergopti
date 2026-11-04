@@ -12,7 +12,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Data-only steps. A step is a list of ops from a closed set (rename,
----    rename_prefix, move_section, merge_into, map_value, wrap_value,
+---    rename_prefix, move_section, merge_into, map_value, wrap_value, encode_value,
 ---    delete, set_if_absent). The engine
 ---    holds the only op semantics on this side; the corpus under
 ---    _shared/tests/corpus/config_migrations pins them to the Windows
@@ -151,7 +151,7 @@ M.DRIVERS = { ahk = true, hs = true, linux = true }
 
 -- The only keys of [registry] and of a [steps.*] table. Anything else is a
 -- defect every interpreter rejects: the shared registry-defect corpus pins it.
-local REGISTRY_FIELDS = { current_version = true, unstamped_version = true }
+local REGISTRY_FIELDS = { current_version = true, unstamped_version = true, oldest_version = true }
 local STEP_FIELDS = { from = true, to = true, drivers = true, reason = true, ops = true }
 
 --- Fields of each op of the closed set.
@@ -165,6 +165,7 @@ local OPS = {
 	merge_into    = { required = { "section", "to_section" }, optional = {} },
 	map_value     = { required = { "section", "key", "map" }, optional = {} },
 	wrap_value    = { required = { "section", "key", "to_key" }, optional = {} },
+	encode_value  = { required = { "section", "key", "to_section", "to_key", "encoding" }, optional = {} },
 	delete        = { required = { "section" }, optional = { "key" } },
 	set_if_absent = { required = { "section", "key", "value" }, optional = {} },
 }
@@ -216,13 +217,23 @@ local function destination_key(path)
 	return (spelling:sub(1, 1) == "/" and "/" or "") .. table.concat(parts, "/"), ambiguous
 end
 
-local function current_schema(source, version)
+--- Whether a source is at the destination's schema. Once the chain was squashed,
+--- a file with no stamp has no step left and counts as current (see M.classify).
+--- @param source table { status, content }.
+--- @param version number The registry's current version.
+--- @param stampless_current boolean|nil Whether a file with no stamp is current.
+--- @return boolean
+local function current_schema(source, version, stampless_current)
 	if type(source) ~= "table" then return false end
 	if source.status == "absent" then return true end
 	if source.status ~= "ok" or type(source.content) ~= "string" then return false end
 	local called, document, shapes = pcall(canonical_decode, source.content)
 	if not called or type(document) ~= "table" or type(shapes) ~= "table" then return false end
 	local meta = document._meta
+	if stampless_current == true and (meta == nil
+		or type(meta) == "table" and shapes.arrays[meta] ~= true and meta.schema_version == nil) then
+		return true
+	end
 	return type(meta) == "table" and shapes.arrays[meta] ~= true
 		and is_version(meta.schema_version) and meta.schema_version == version
 end
@@ -264,17 +275,19 @@ local function capture_admission(path, source, candidate, operation, adapter)
 		migration.consumed = true
 		return function()
 			return destination_live(record) and rawequal(record.publication, migration)
-				and migration.consumed and current_schema({ status = "ok", content = candidate }, record.current)
+				and migration.consumed and current_schema({ status = "ok", content = candidate }, record.current, record.stampless_current)
 		end, snapshot
 	end
-	if record.phase ~= "ready" or not current_schema(snapshot, record.current)
-		or candidate ~= nil and not current_schema({ status = "ok", content = candidate }, record.current) then
+	-- Only an existing file may stay unstamped: a file this build creates is stamped.
+	local stampless_candidate = record.stampless_current and snapshot.status ~= "absent"
+	if record.phase ~= "ready" or not current_schema(snapshot, record.current, record.stampless_current)
+		or candidate ~= nil and not current_schema({ status = "ok", content = candidate }, record.current, stampless_candidate) then
 		return false
 	end
 	return function()
 		return destination_live(record) and record.phase == "ready"
-			and current_schema(snapshot, record.current)
-			and (candidate == nil or current_schema({ status = "ok", content = candidate }, record.current))
+			and current_schema(snapshot, record.current, record.stampless_current)
+			and (candidate == nil or current_schema({ status = "ok", content = candidate }, record.current, stampless_candidate))
 	end, snapshot
 end
 
@@ -300,7 +313,7 @@ local function read_admitted(path, adapter)
 	if record.phase ~= "ready" then return false end
 	return function(content, status)
 		return destination_live(record) and record.phase == "ready"
-			and current_schema({ status = status, content = content }, record.current)
+			and current_schema({ status = status, content = content }, record.current, record.stampless_current)
 	end
 end
 
@@ -431,6 +444,9 @@ local function validate_op(op)
 			return false, "'" .. field .. "' must be one bare segment"
 		end
 	end
+	if op.op == "encode_value" and op.encoding ~= "user_profile_registry" then
+		return false, "encode_value names no known encoding"
+	end
 	if (op.op == "rename" or op.op == "copy_if_absent") and op.to_section == nil and op.to_key == nil then
 		return false, op.op .. " needs to_section or to_key"
 	end
@@ -490,7 +506,7 @@ end
 
 --- Validates a decoded registry and returns it in execution order.
 --- @param decoded table Decoded migrations.toml.
---- @return table|nil registry `{ current, unstamped, steps = { { from, to, drivers, reason, ops } } }`.
+--- @return table|nil registry `{ current, unstamped, oldest, steps = { { from, to, drivers, reason, ops } } }`.
 --- @return string|nil detail
 function M.validate_registry(decoded)
 	if type(decoded) ~= "table" or type(decoded.registry) ~= "table" then
@@ -513,6 +529,13 @@ function M.validate_registry(decoded)
 	local unstamped = decoded.registry.unstamped_version
 	if not is_version(current) or not is_version(unstamped) or unstamped > current then
 		return nil, "current_version and unstamped_version must be integers with 1 <= unstamped <= current"
+	end
+	-- Steps below the oldest supported version were squashed away: the chain
+	-- starts there, and anything older is refused rather than half migrated.
+	local oldest = decoded.registry.oldest_version
+	if oldest == nil then oldest = unstamped end
+	if not is_version(oldest) or oldest < unstamped or oldest > current then
+		return nil, "oldest_version must be an integer with unstamped <= oldest <= current"
 	end
 	local steps = {}
 	for name, step in pairs(decoded.steps or {}) do
@@ -546,15 +569,16 @@ function M.validate_registry(decoded)
 		steps[#steps + 1] = { from = step.from, to = step.to, drivers = drivers, reason = step.reason, ops = step.ops }
 	end
 	table.sort(steps, function(left, right) return left.from < right.from end)
-	if #steps ~= current - unstamped then
-		return nil, "the steps do not chain v" .. version_text(unstamped) .. " to v" .. version_text(current)
+	if #steps ~= current - oldest then
+		return nil, "the steps do not chain v" .. version_text(oldest) .. " to v" .. version_text(current)
 	end
 	for index, step in ipairs(steps) do
-		if step.from ~= unstamped + index - 1 then
+		if step.from ~= oldest + index - 1 then
 			return nil, "the chain has a gap at v" .. version_text(step.from)
 		end
 	end
-	local registry = { current = as_integer(current), unstamped = as_integer(unstamped), steps = steps }
+	local registry = { current = as_integer(current), unstamped = as_integer(unstamped),
+		oldest = as_integer(oldest), steps = steps }
 	validated_registries[registry] = detached(registry)
 	return registry
 end
@@ -960,6 +984,25 @@ function APPLY.wrap_value(sections, op)
 	drop_if_empty(sections, op.section)
 end
 
+--- A non-empty array of tables becomes the encoded string of its new key. An
+--- occupied target wins (the source stays for the cleanup), and anything the
+--- encoding cannot carry stays where it is: not encoded means not deleted.
+function APPLY.encode_value(sections, op)
+	local entries = sections[op.section]
+	local entry = entries and entries[op.key]
+	if entry == nil or type(entry.value) ~= "table" or #entry.value == 0 then return end
+	if sections[op.to_section] ~= nil and sections[op.to_section][op.to_key] ~= nil then return end
+	for _, item in ipairs(entry.value) do
+		if type(item) ~= "table" then return end
+	end
+	local encodable, envelope = pcall(require("llm.profile_registry_codec").encode, entry.value)
+	if not encodable or type(envelope) ~= "string" then return end
+	if sections[op.to_section] == nil then sections[op.to_section] = {} end
+	sections[op.to_section][op.to_key] = { value = envelope }
+	entries[op.key] = nil
+	drop_if_empty(sections, op.section)
+end
+
 function APPLY.delete(sections, op)
 	if op.key == nil then
 		for _, name in ipairs(sections_at_or_below(sections, op.section)) do sections[name] = nil end
@@ -986,10 +1029,14 @@ function M.classify(model, registry)
 	if entry ~= nil then
 		version = entry.value
 		if not is_version(version) then return "invalid", version end
+	elseif registry.unstamped < registry.oldest then
+		-- The steps a file with no stamp would need are gone: it is hand-written or
+		-- very old, so it runs as it is and the next save stamps it.
+		return "current", registry.current
 	end
 	if version > registry.current then return "newer", version end
 	if version == registry.current then return "current", version end
-	if version < registry.unstamped then return "unsupported", version end
+	if version < registry.oldest then return "unsupported", version end
 	return "migrate", version
 end
 
@@ -1299,16 +1346,19 @@ end
 -- The locale key of the notice a newer file earns, shared with the Windows
 -- driver's refused-save notification (config_io.ahk).
 M.NEWER_SCHEMA_NOTICE_KEY = "config.read_only.newer_schema"
+-- The one a file older than the registry's oldest supported version earns.
+M.OLDER_SCHEMA_NOTICE_KEY = "config.read_only.older_schema"
 
 --- Names the notice a boot result asks the driver to show once: a file saved
---- by a newer build is preserved and read-only, and the user must update and
---- reload before changing settings. Other refusals keep their log diagnostics.
+--- by a newer build, or one too old to migrate, is preserved and read-only, and
+--- the user must act before changing settings. Other refusals keep their log
+--- diagnostics.
 --- @param result table|nil The table M.boot or M.run returned.
 --- @return string|nil key The locale key, or nil when no notice is due.
 function M.read_only_notice_key(result)
-	if type(result) == "table" and result.status == "newer" and result.read_only == true then
-		return M.NEWER_SCHEMA_NOTICE_KEY
-	end
+	if type(result) ~= "table" or result.read_only ~= true then return nil end
+	if result.status == "newer" then return M.NEWER_SCHEMA_NOTICE_KEY end
+	if result.status == "unsupported" then return M.OLDER_SCHEMA_NOTICE_KEY end
 	return nil
 end
 
@@ -1391,6 +1441,7 @@ function M.run(opts)
 	if opts.context_error ~= nil then return refuse("failed", opts.context_error) end
 	result.to = registry.current
 	record.current = registry.current
+	record.stampless_current = registry.unstamped < registry.oldest
 	if not destination_live(record) then return refuse("failed", "config admission owner changed during boot") end
 
 	local adapter = opts.file_adapter
@@ -1415,7 +1466,7 @@ function M.run(opts)
 		-- native destination was admitted by this constructor.
 		if native_default then
 			local content, current_status = default_read(path)
-			if not current_schema({ status = current_status, content = content }, registry.current) then
+			if not current_schema({ status = current_status, content = content }, registry.current, record.stampless_current) then
 				return refuse("failed", "fresh native source is not current before runtime admission")
 			end
 			record.phase = "ready"
@@ -1462,14 +1513,19 @@ function M.run(opts)
 		return refuse(status, detail)
 	end
 	if version ~= nil and not is_version(version) then return refuse_version("invalid", "canonical schema version is invalid") end
-	if version ~= nil and version > registry.current then return refuse_version("newer", "canonical schema version is newer than this build") end
+	-- Both versions are named: a developer who switches branches reads which
+	-- build wrote the file (field log 2026-10-30: five refusals, no versions).
+	if version ~= nil and version > registry.current then
+		return refuse_version("newer", "canonical schema v" .. version_text(version)
+			.. " is newer than this build's v" .. version_text(registry.current))
+	end
 	local plan = M.plan(source, registry, opts.driver, opts.context)
 	if version ~= nil and version ~= registry.current and plan.version ~= version then
 		return refuse("unsupported", "legacy metadata is not addressable by this migration owner")
 	end
 	-- The strict canonical document, not the flat migration operation model,
 	-- owns current-schema admission for inline/dotted/quoted metadata.
-	if current_schema({ status = "ok", content = source }, registry.current) then
+	if current_schema({ status = "ok", content = source }, registry.current, record.stampless_current) then
 		plan = { outcome = "current", version = registry.current, candidate = source }
 	elseif plan.outcome == "current" then
 		return refuse("invalid", "canonical schema metadata is not current")
@@ -1491,7 +1547,8 @@ function M.run(opts)
 		return refuse("invalid", "[_meta] schema_version is not a positive integer")
 	end
 	if plan.outcome == "unsupported" then
-		return refuse("unsupported", "no migration path from schema v" .. version_text(plan.version))
+		return refuse("unsupported", "no migration path from schema v" .. version_text(plan.version)
+			.. ": the oldest this build migrates is v" .. version_text(registry.oldest))
 	end
 	if plan.outcome ~= "migrated" then return refuse("failed", plan.detail) end
 

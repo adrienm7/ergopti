@@ -80,7 +80,7 @@ end
 helpers.describe("menu_builder: the Reload item reloads this daemon", function()
 	helpers.it("invokes ctx.on_reload rather than signalling a spawned shell", function()
 		local calls = 0
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local items = mb.build({
 			config = make_config(),
 			_version = "9.9.9",
@@ -101,7 +101,7 @@ helpers.describe("menu_builder: the Reload item reloads this daemon", function()
 	end)
 
 	helpers.it("marks the built Reload row so a stale click joins a finished reload", function()
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local items = mb.build({ config = make_config(), _version = "9.9.9", on_reload = function() end })
 		local reload = find_item(items, "recharg") or find_item(items, "reload")
 		helpers.assert_true(reload ~= nil, "the menu must contain a Reload item")
@@ -121,7 +121,7 @@ helpers.describe("menu_builder: the Reload item reloads this daemon", function()
 		end
 
 		local ok, err = pcall(function()
-			local mb = helpers.load_module("ui.menu.menu_builder")
+			local mb = helpers.load_module("ui.menu.builder")
 			local items = mb.build({
 				config = make_config(),
 				_version = "9.9.9",
@@ -148,7 +148,7 @@ helpers.describe("menu_builder: the Reload item reloads this daemon", function()
 	helpers.it("reports loudly when the daemon supplied no reload callback", function()
 		-- A Reload item that quietly does nothing is precisely the bug being
 		-- fixed, so the missing-callback path must be visible rather than silent.
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local items = mb.build({ config = make_config(), _version = "9.9.9" })
 
 		local reload = find_item(items, "recharg") or find_item(items, "reload")
@@ -209,7 +209,7 @@ local function with_lifecycle_declarations(callback)
 		helpers.assert_eq(native_counts.reload, 1, "the fixture mutates exactly one native Reload declaration")
 		helpers.assert_eq(native_counts.quit, 1, "the fixture mutates exactly one native Quit declaration")
 		helpers.assert_true(owned.reload ~= nil and owned.quit ~= nil, "the real root declares both commands")
-		callback(helpers.load_module("ui.menu.menu_builder"), owned)
+		callback(helpers.load_module("ui.menu.builder"), owned)
 	end)
 	for index, row in pairs(saved) do rows[index] = row end
 	renderer.invalidate_cache()

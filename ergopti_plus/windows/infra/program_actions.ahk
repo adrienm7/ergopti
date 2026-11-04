@@ -29,10 +29,10 @@ _ProgramActions_BindingAction(Binding, &Section := "", &Slot := "") {
 			Section := "keyboard"
 			return IsSet(KeyboardShortcutAssignments) && (KeyboardShortcutAssignments is Map) ? KeyboardShortcutAssignments.Get(Slot, "") : ""
 		case "script":
-			Section := "script_control"
+			Section := ConfigLeaf.SCRIPT_CONTROL
 			return IsSet(ScriptShortcutAssignments) && (ScriptShortcutAssignments is Map) ? ScriptShortcutAssignments.Get(Slot, "") : ""
 		case "tap_key":
-			Section := "tap_keys"
+			Section := ConfigLeaf.TAP_KEYS
 			return IsSet(TapKeyAssignments) && (TapKeyAssignments is Map) ? TapKeyAssignments.Get(Slot, "") : ""
 	}
 	return ""
@@ -49,7 +49,7 @@ _ProgramActions_Snapshot(Binding) {
 		return false
 	Content := FSReadUtf8Exact(ConfigurationFile)
 	Document := TOML_ParseDocument(Content)
-	Parameters := Document.Get("action_parameters", 0)
+	Parameters := Document.Get(ConfigLeaf.ACTION_PARAMETERS, 0)
 	Actions := Section == "gestures" ? Document.Get("gestures", 0) : Document.Get("shortcuts", Map()).Get(Section, 0)
 	if !(Parameters is Map) || !(Actions is Map)
 		|| !(Parameters.Get(GestureActionParameterKey(Binding, "run_program"), "") == Scalar)
@@ -263,6 +263,8 @@ ProgramActions_Stop(Pause := false) {
 	_UserProgramGeneration += 1
 	_UserProgramPaused := Pause == true
 	Receipt := !IsObject(_UserProgramAcquiring)
+	if IsSet(UserActions_StopCommands) && !UserActions_StopCommands()
+		Receipt := false
 	for _, Entry in _UserProgramEntries.Clone()
 		if !_ProgramActions_Retire(Entry)
 			Receipt := false

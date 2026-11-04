@@ -11,12 +11,14 @@
 ; still see the same definitions.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 ; The four preview-bubble switches under [hotstrings], in the menu order. One
 ; list for the loader, the menu toggle and the engine readers.
 ; @returns {Array}
 HSE_PreviewSwitchKeys() {
-	return ["preview_star_enabled", "preview_autocorrect_enabled",
-		"preview_ai_enabled", "preview_colored_tooltips"]
+	return [ConfigLeaf.PREVIEW_STAR_ENABLED, ConfigLeaf.PREVIEW_AUTOCORRECT_ENABLED,
+		ConfigLeaf.PREVIEW_AI_ENABLED, ConfigLeaf.PREVIEW_COLORED_TOOLTIPS]
 }
 
 ; The switches as the loader and the menu publish them. A key absent from the
@@ -64,6 +66,6 @@ HSE_PreviewSwitchPublish(Key, Value) {
 ; @param Decision {Object} A HSE_PreviewNextDecision answer.
 ; @returns {String} "preview_star_enabled" or "preview_autocorrect_enabled".
 HSE_PreviewFamilySwitch(Decision) {
-	return (Decision.EndChar == "") ? "preview_star_enabled"
-		: "preview_autocorrect_enabled"
+	return (Decision.EndChar == "") ? ConfigLeaf.PREVIEW_STAR_ENABLED
+		: ConfigLeaf.PREVIEW_AUTOCORRECT_ENABLED
 }

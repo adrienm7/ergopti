@@ -49,7 +49,14 @@ local function run_phase_a()
 			calls[#calls + 1] = "io.popen " .. tostring(command)
 			return nil, "counted by the test"
 		end
-		return require("ui.healthcheck.core").run()
+		local Core = require("ui.healthcheck.core")
+		local phase_a = Core.run()
+		-- The versions, keyboard and USB collectors moved to the local_state
+		-- steps, which also run on the main thread: they are counted too
+		local steps, sections = Core.local_state_steps(phase_a)
+		for index = 1, 3 do steps[index]() end
+		phase_a.sections.peripherals = sections.peripherals
+		return phase_a
 	end)
 	os.execute, io.popen = saved_os_execute, saved_io_popen
 	if not ok then error(snapshot, 0) end

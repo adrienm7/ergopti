@@ -50,7 +50,8 @@ helpers.describe("Local OpenAI-compatible servers: catalogue (local-openai-backe
 	helpers.it("lists oMLX, LM Studio, llama.cpp / LocalAI and Jan at their documented ports (local-openai-backends)",
 		function()
 			local catalogue = read_json("modules/llm/local_servers.json")
-			helpers.assert_eq(table.concat(catalogue.server_order, ","), table.concat(SERVERS, ","))
+			-- The four first servers keep their place; the others follow them.
+			for index, id in ipairs(SERVERS) do helpers.assert_eq(catalogue.server_order[index], id) end
 			local expected = {
 				omlx = "http://127.0.0.1:8000/v1", lmstudio = "http://127.0.0.1:1234/v1",
 				llamacpp = "http://127.0.0.1:8080/v1", jan = "http://127.0.0.1:1337/v1",

@@ -1,0 +1,43 @@
+{
+	"_description": "N-gram token encoding 2, replayed on the Lua walker module, the AHK walker and the dashboard reader. event_tokens: one raw event and its key form. keys: a stored key and the tokens it reads as. legacy_keys: a version 1 key of a family of `count` tokens and what the store migration makes of it (Linux, the one store with no raw replay).",
+	"version": 2,
+	"event_tokens": [
+		{ "char": "a", "token": "a" },
+		{ "char": "é", "token": "é" },
+		{ "char": "]", "token": "]" },
+		{ "char": "[", "token": "[[" },
+		{ "char": "[BS]", "token": "[BS]" },
+		{ "char": "[ENTER]", "token": "[ENTER]" },
+		{ "char": "[PAGEUP]", "token": "[PAGEUP]" },
+		{ "char": "[PGUP]", "token": "[PAGEUP]" },
+		{ "char": "[PGDN]", "token": "[PAGEDOWN]" },
+		{ "char": "[DEL]", "token": "[DELETE]" },
+		{ "char": "[space]", "token": "[[space]" }
+	],
+	"keys": [
+		{ "key": "abcd", "tokens": ["a", "b", "c", "d"] },
+		{ "key": "[[", "tokens": ["["] },
+		{ "key": "[BS]", "tokens": ["[BS]"] },
+		{ "key": "[[BS]", "tokens": ["[", "B", "S", "]"] },
+		{ "key": "[[[BS]", "tokens": ["[", "[BS]"] },
+		{ "key": "[BS][[BS]x", "tokens": ["[BS]", "[", "B", "S", "]", "x"] },
+		{ "key": "[[BS][BS]x", "tokens": ["[", "B", "S", "]", "[BS]", "x"] },
+		{ "key": "ab[BS]c", "tokens": ["a", "b", "[BS]", "c"] },
+		{ "key": "[[[[", "tokens": ["[", "["] },
+		{ "key": "é[[", "tokens": ["é", "["] },
+		{ "key": "[[ab]", "tokens": ["[", "a", "b", "]"] },
+		{ "key": "[", "tokens": ["["] }
+	],
+	"legacy_keys": [
+		{ "key": "abcd", "count": 4, "migrated": "abcd" },
+		{ "key": "[", "count": 1, "migrated": "[[" },
+		{ "key": "[BS]", "count": 1, "migrated": "[BS]" },
+		{ "key": "[BS]", "count": 4, "migrated": "[[BS]" },
+		{ "key": "[ab]", "count": 4, "migrated": "[[ab]" },
+		{ "key": "ab[BS]c", "count": 4, "migrated": "ab[BS]c" },
+		{ "key": "[[", "count": 2, "migrated": "[[[[" },
+		{ "key": "a[", "count": 2, "migrated": "a[[" },
+		{ "key": "[PGUP]x", "count": 2, "migrated": "[PAGEUP]x" },
+		{ "key": "[BS][BS]x", "count": 6, "migrated": "[BS][[BS]x" }
+	]
+}

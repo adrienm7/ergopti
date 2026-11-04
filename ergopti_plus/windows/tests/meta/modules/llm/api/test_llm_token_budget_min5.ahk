@@ -17,10 +17,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TLTBM_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TLTBM_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TLTBM_StripLineComments(Src) {
@@ -40,7 +38,7 @@ _TLTBM_StripLineComments(Src) {
 ; ==============================================================
 
 _TLTBM_TokenBudgetMin5() {
-	Src := _TLTBM_StripLineComments(_TLTBM_ReadSource("modules/llm/prediction_engine.ahk"))
+	Src := _TLTBM_StripLineComments(_TLTBM_ReadSource("prediction_engine.ahk"))
 	Assert(Src != "", "modules/llm/prediction_engine.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_Engine_CallTokenBudget")

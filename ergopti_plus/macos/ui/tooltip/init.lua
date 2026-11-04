@@ -43,6 +43,15 @@ local _surface_repairing = false
 -- cleanup debt until a caller retries after the whole boundary unwinds.
 local _forced_hide_pending = false
 local _forced_hide_generation = 0
+-- llm.trigger.while_hotstring_tooltip = "both": the suggestions are drawn under
+-- the hotstring rows that can still expand instead of replacing them.
+local _shared_hotstring_stack = false
+
+--- Whether the hotstring rows stay on screen beside the suggestions now.
+--- @return boolean
+local function hotstring_rows_shared()
+	return _shared_hotstring_stack and TooltipHotstring.has_visible_rows()
+end
 
 
 local function runtime_available()
@@ -350,6 +359,9 @@ end
 --- @param background_color table|nil Optional background tint.
 local function show_loading_surface(content, is_enabled, background_color, owns)
 	if not runtime_available() or not owns() then return false end
+	-- Shown together, the hotstring rows stay: the spinner would take their
+	-- canvas and their expansion lease, so the suggestions alone come under them.
+	if hotstring_rows_shared() then return owns() end
 	if TooltipLLM.hide() ~= true then return false end
 	if not owns() then return false end
 	local shown = TooltipHotstring.show_loading(content, is_enabled, background_color) == true
@@ -388,7 +400,9 @@ local function show_predictions_surface(predictions, current_index, is_enabled, 
 	if not runtime_available() or not owns() then return false end
 	-- Reset hotstring state without hiding the shared canvas so the LLM render overwrites
 	-- the loading indicator in-place — no blank frame between the two tooltips.
-	if TooltipHotstring.dismiss_silent() ~= true then return false end
+	-- Shown together, the hotstring rows stay and the renderer places the
+	-- suggestions under them.
+	if not hotstring_rows_shared() and TooltipHotstring.dismiss_silent() ~= true then return false end
 	if not owns() then return false end
 	local shown = TooltipLLM.show_predictions(predictions, current_index, is_enabled, info_bar,
 		shortcut_modifier, indent, navigation_modifiers, background_color, loading_text,
@@ -433,6 +447,18 @@ end
 function M.is_llm_visible() return TooltipLLM.is_visible() end
 function M.is_hotstring_visible() return TooltipHotstring.is_visible() end
 function M.has_visible_hotstring_lease(token) return TooltipHotstring.has_visible_lease(token) end
+function M.has_visible_hotstring_rows() return TooltipHotstring.has_visible_rows() end
+
+--- Draws the suggestions under the hotstring rows, or in their place.
+--- @param enabled boolean True for llm.trigger.while_hotstring_tooltip = "both".
+function M.set_shared_hotstring_stack(enabled)
+	_shared_hotstring_stack = enabled == true
+	-- Required here: loading the renderer reads the tooltip layout configuration,
+	-- which the facade's own load must not depend on.
+	require("ui.tooltip.renderer").set_stack_below_hotstring(_shared_hotstring_stack)
+	TooltipHotstring.set_standard_canvas_owner(_shared_hotstring_stack
+		and function() return TooltipLLM.is_visible() == true end or nil)
+end
 function M.make_diff_styled(...) return TooltipLLM.make_diff_styled(...) end
 
 

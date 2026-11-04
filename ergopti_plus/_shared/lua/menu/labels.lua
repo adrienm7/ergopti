@@ -12,13 +12,17 @@
 --- 1. fmt_count: formats a large integer with space thousands separators
 ---    (French-style "1 234 567"). Duplicated as FmtCount in AHK
 ---    (menu_helpers.ahk) and fmt_grand in macOS (hotstring_counter.lua).
---- 2. decorate_section: wraps a section header label in "— … —" decoration
----    for disabled menu header items. Duplicated as MenuSectionTitle in AHK
----    (menu_helpers.ahk) and i18n.decorate_section in macOS (i18n.lua).
+--- 2. decorate_section: frames a section header title for disabled menu
+---    header rows. The frame is data, _shared/modules/menu/section_header.json,
+---    generated into menu.section_header_data here and into the constants
+---    MenuSectionTitle (windows/infra/menu_helpers.ahk) reads, so one edit
+---    restyles every header of the three drivers.
 ---
---- Windows cannot require Lua modules, so its AHK copies are kept in sync
---- via a JS drift gate (tools/test/test-section-decoration-parity.cjs).
+--- Windows cannot require Lua modules; a JS drift gate keeps its formatters
+--- in step (tools/test/test-section-decoration-parity.cjs).
 --- ==============================================================================
+
+local SectionHeader = require("menu.section_header_data")
 
 local M = {}
 
@@ -54,11 +58,11 @@ end
 -- ====================================================
 -- ====================================================
 
---- Wraps a label in "— … —" decoration for disabled menu section headers.
---- @param text string The raw label text.
---- @return string Decorated label.
+--- Frames a title as a disabled menu section header, in the shared format.
+--- @param text string The translated title, in the case its locale writes it.
+--- @return string The header label.
 function M.decorate_section(text)
-	return "— " .. text .. " —"
+	return SectionHeader.prefix .. text .. SectionHeader.suffix
 end
 
 return M

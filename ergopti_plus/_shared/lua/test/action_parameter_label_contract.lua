@@ -25,5 +25,23 @@ return function(helpers, json, shared_root)
 				end
 			end
 		end)
+		helpers.it("shows a user action's safe summary, never a command (action-parameter-label-user)", function()
+			local strings = read_json("data/locales/en.json")
+			local command = '{"version":1,"command":"echo s3cr3t","mode":"hidden","output":"none"}'
+			local shortcut = '{"version":1,"id":"1B2C3D4E-5F60-4718-9A0B-C1D2E3F40516","name":"Resize Image",'
+				.. '"input":"none","output":"none"}'
+			local run, open, apple = strings["sg_actions.run_command"], strings["sg_actions.open_path"],
+				strings["sg_actions.run_apple_shortcut"]
+			helpers.assert_eq(Labels.for_spec(run, "command", command), run)
+			local function marked(label, text) return (label:gsub("%[[^%]]*%]$", function() return "[" .. text .. "]" end)) end
+			helpers.assert_eq(Labels.for_spec(open, "path", "/home/me/Projets/"), marked(open, "Projets"))
+			helpers.assert_eq(Labels.for_spec(open, "path", "/Users/me/Rapport.pdf"),
+				marked(open, "Rapport.pdf"))
+			helpers.assert_eq(Labels.for_spec(open, "path", "relative"), open)
+			helpers.assert_eq(Labels.for_spec(apple, "apple_shortcut", shortcut), marked(apple, "Resize Image"))
+			local registry = { get_action_parameter_spec = function() return "command" end,
+				get_action_parameter = function() return command end }
+			helpers.assert_eq(Labels.for_binding(run, registry, "tap_3", "run_command"), run)
+		end)
 	end)
 end

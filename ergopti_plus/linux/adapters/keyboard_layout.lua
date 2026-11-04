@@ -333,10 +333,11 @@ end
 --- comes from libxkbcommon through XkbCapture.inverse_table(). This remains the
 --- libxkbcommon-free model the planner's fixture tests drive plan() with.
 --- @param text string Keymap dump.
+--- @param group integer|nil 1-based active XKB group; group 1 when nil.
 --- @return table char → { keycode, level, mods }, and the count.
-function M.build(text)
+function M.build(text, group)
 	local built = {}
-	local entries = XkbKeymap.parse(text or "")
+	local entries = XkbKeymap.parse(text or "", group)
 
 	for _, entry in ipairs(entries) do
 		local char = Keysym.to_char(entry.keysym)
@@ -469,7 +470,15 @@ function M.refresh(override_path)
 		return false
 	end
 
-	local base = M.build_base(text)
+	-- The labels follow the group the native table was taken in: with several
+	-- layouts active, group 1's symbols would name another layout's keys.
+	local group, group_err = XkbCapture.inverse_receipt_group(receipt)
+	if not group then
+		if _refresh_epoch == epoch then _table, _base, _cohort = nil, nil, nil end
+		Logger.error(LOG, "Cannot read the active XKB group via %s — %s.", tostring(source), tostring(group_err))
+		return false
+	end
+	local base = M.build_base(text, group)
 	local check = inverse_current
 	local ok, current = pcall(check, receipt)
 	if _refresh_epoch ~= epoch or XkbCapture.inverse_current ~= check or not ok or current ~= true then return false end
@@ -593,10 +602,11 @@ end
 --- The reverse of build()'s question, asked by labels rather than by injection:
 --- the menu names a physical key by what it types under the loaded keymap.
 --- @param text string Keymap dump.
+--- @param group integer|nil 1-based active XKB group; group 1 when nil.
 --- @return table evdev keycode → keysym name.
-function M.build_base(text)
+function M.build_base(text, group)
 	local base = {}
-	for _, entry in ipairs(XkbKeymap.parse(text or "")) do
+	for _, entry in ipairs(XkbKeymap.parse(text or "", group)) do
 		if entry.level == 1 then base[entry.keycode] = entry.keysym end
 	end
 	return base

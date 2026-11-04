@@ -84,8 +84,8 @@ _EBA_AssertEndCharRidesTheSameBurst() {
 	; never emitted by a send of its own. A second send for the terminator is
 	; exactly the macOS defect: Enter reached the host before the replacement and
 	; submitted the pre-expansion line.
-	Assert(InStr(Src, "EndCharPart := (EndChar != ") > 0,
-		"the end-char must be resolved into EndCharPart for the burst to concatenate")
+	Assert(InStr(Src, 'EndCharPart := Plan["tail"]') > 0,
+		"the end-char must be resolved by the injection plan into EndCharPart for the burst to concatenate")
 
 	Assert(!InStr(Src, "SendInput(EndChar"),
 		"the end-char must NEVER be sent on its own. Enter and Tab act on arrival — a separate "

@@ -22,4 +22,14 @@ function M.new()
 	}))
 end
 
+--- Builds a renderer stub around a scenario's own `build`, keeping the actual
+--- parent owner and declared templates (the Shortcuts menu draws its ChatGPT
+--- editor frame on every build, whatever the scenario's build returns).
+--- @param build function The scenario's manifest build.
+--- @return table stub { group_receiver, template_rows, build }.
+function M.stub(build)
+	local parent = M.new()
+	return { group_receiver = parent.group_receiver, template_rows = parent.template_rows, build = build }
+end
+
 return M

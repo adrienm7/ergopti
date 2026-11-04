@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Text Prompt Dialog (Linux)
 --- DESCRIPTION:
---- Asks the user for one line of text in a zenity entry. The tray's prompts and
+--- Asks the user for one line of text in Ergopti's own entry dialog. The tray's prompts and
 --- the AI agent's command dialog (llm_agent_command) share it.
 ---
 --- FEATURES & RATIONALE:
@@ -13,7 +13,8 @@
 ---    a confirmed empty entry still returns "".
 --- 2. The dialog runs through ui/modal.lua: it blocks the daemon's event loop,
 ---    so the keyboard is handed to the desktop while it is open.
---- 3. Every value reaches zenity as one quoted shell word.
+--- 3. Every value reaches the dialog (ui/native_dialog.lua) as one quoted
+---    shell word.
 --- ==============================================================================
 
 local M = {}
@@ -22,6 +23,7 @@ local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local Modal = require("ui.modal")
+local NativeDialog = require("ui.native_dialog")
 local Shell = require("adapters.shell_runner")
 local WindowTitles = require("window_titles")
 
@@ -42,7 +44,7 @@ end
 --- @param choices table|nil Values offered in the entry's drop-down list.
 --- @return string|nil The entered text, or nil when the dialog was cancelled.
 function M.ask(title, prompt, initial, hidden, choices)
-	local command = "zenity --entry --title=" .. shell_quote(WindowTitles.compose(title))
+	local command = NativeDialog.command() .. " --entry --title=" .. shell_quote(WindowTitles.compose(title))
 		.. " --text=" .. shell_quote(prompt)
 		.. " --entry-text=" .. shell_quote(initial or "")
 		.. (hidden and " --hide-text" or "")
@@ -53,7 +55,7 @@ function M.ask(title, prompt, initial, hidden, choices)
 	local ok, value, message, reason, status = Modal.run(function() return Shell.exec_checked(command) end)
 	if ok ~= true then
 		if not (reason == Errors.COMMAND_EXITED_NONZERO and status == 1) then
-			Logger.error(LOG, "Zenity could not prompt for '%s': %s.", tostring(title), tostring(message))
+			Logger.error(LOG, "The dialog could not prompt for '%s': %s.", tostring(title), tostring(message))
 		end
 		return nil
 	end

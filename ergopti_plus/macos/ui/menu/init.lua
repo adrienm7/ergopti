@@ -139,6 +139,18 @@ M._active_tasks = {}
 --- @param module_sections table Extra module sections definitions.
 --- @return table|nil myMenu The created menubar object.
 --- @return table|nil configWatcher The file watcher object.
+-- The running menu's timed rebuild, published once the menu exists (M.start).
+local _timed_rebuild = nil
+
+--- Rebuilds the menu tree now, as a state change does, and times it: the
+--- developer field run's menu step (infra/field_check_probes.lua).
+--- @return table|nil outcome { ok, ms, items, slowest = { { id, ms } } }, nil
+---   before the menu exists.
+function M.timed_rebuild()
+	if type(_timed_rebuild) ~= "function" then return nil end
+	return _timed_rebuild()
+end
+
 --- Stops the watchers this module owns.
 ---
 --- The shutdown callback stops everything pinned in _G.script_watchers, but the
@@ -996,7 +1008,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 
 		-- Restore the user-configured ChatGPT URL at boot the same way: without this,
-		-- ctrl_g silently ignores config.toml and always opens the manifest default
+		-- open_chatgpt silently ignores config.toml and always opens the manifest default
 		-- until the user happens to re-save the URL from the menu (shortcuts-ctrl-g-ignores-config).
 		if type(core_mods.shortcuts_mod.set_chatgpt_url) == "function" then
 			pcall(core_mods.shortcuts_mod.set_chatgpt_url, state.chatgpt_url)
@@ -1146,6 +1158,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		set_log_level             = function(level)
 			local L = require("infra.logger")
+			-- config.toml's [script] log_level wins at start: rewrite it first.
+			if not require("infra.script_scope").rewrite_configured(require("config_keys").KEY.SCRIPT_LOG_LEVEL, level) then
+				return false
+			end
 			local ok, committed = pcall(Storage.set, require("config_keys").LEAF.LOG_LEVEL, level)
 			if not ok or committed ~= true then
 				L.warn("menu", "Log level %s was refused by settings; the live level was left unchanged.", level)
@@ -1399,13 +1415,31 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		return layout_scope
 	end
+	--- The number-row rows the menu state holds (the layout scope's live part).
+	--- @return table { order, edges }
+	local function layout_scope_rows()
+		return { order = state.layout_number_row_mode, edges = state.layout_number_row_reorder_edges == true }
+	end
 	apply_preference_scope = function(scope, mode)
 		local owner = preference_scope_owner(scope)
 		if not owner then return false end
+		local before = scope == "keyboard_layout" and layout_scope_rows() or nil
 		local committed = owner.apply(mode)
 		if committed == true then
 			Builder.invalidate_cache()
 			updateMenu()
+			-- The layout's own restore rebuilds the typing layout for the new rows.
+			local after = before and layout_scope_rows() or nil
+			if after and (after.order ~= before.order or after.edges ~= before.edges) then
+				require("modules.keymap.number_row_live").apply(after, function(applied, code)
+					if not applied then
+						Logger.warn(LOG, "The keyboard layout scope stored rows the typing layout does not have yet: %s.",
+							tostring(code))
+					end
+					Builder.invalidate_cache()
+					updateMenu()
+				end)
+			end
 		end
 		return committed
 	end
@@ -1485,6 +1519,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			global_scope = require("ui.menu.global_scope").new({
 				owners = owners,
 				remap = karabiner,
+				-- The layout rows settle once the layout typing them is selected.
+				layout = { rows = layout_scope_rows, live = require("modules.keymap.number_row_live") },
 				backup_path = function(scope)
 					scope_generation = scope_generation + 1
 					return MenuPaths.get("KarabinerConfigPath") .. ".global-" .. scope .. "-"
@@ -1663,6 +1699,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			PhaseStats.add("menu.rebuild", elapsed_ms * 1e6)
 			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s", elapsed_ms, #items,
 				Logger.is_enabled(Logger.LEVELS.INFO) and slowest_items_text(Builder.get_last_item_timings()) or "")
+			require("perf_budget").judge(Logger, LOG, "menu.rebuild", elapsed_ms,
+				function() return require("infra.timings").ms("budgets", "menu_rebuild_ms") end)
 			return true
 		else
 			Logger.error(LOG, "Menu tree rebuild failed (%.1f ms): %s.", elapsed_ms, tostring(items))
@@ -1670,6 +1708,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 	end
 	ctx.rebuild_menu_cache = rebuild_menu_cache
+	_timed_rebuild = function()
+		local started = hs.timer.secondsSinceEpoch()
+		local ok = rebuild_menu_cache() == true
+		local ms = (hs.timer.secondsSinceEpoch() - started) * 1000
+		local slowest = {}
+		for index, entry in ipairs(Builder.get_last_item_timings() or {}) do slowest[index] = entry end
+		table.sort(slowest, function(a, b) return a.ms > b.ms end)
+		return { ok = ok, ms = ms, items = type(_cached_menu_items) == "table" and #_cached_menu_items or 0,
+			slowest = slowest }
+	end
 	refresh_for_click = function()
 		ctx.paused = core_mods.shortcuts_mod
 			and type(core_mods.shortcuts_mod.is_paused) == "function"

@@ -83,9 +83,9 @@ end
 
 --- Returns the comment-free source of a driver file, failing loudly when the
 --- file is missing so a rename cannot make the guards below vacuous.
-local function code_of(rel_path)
-	local src = read_source(rel_path)
-	helpers.assert_not_nil(src, "missing source file: " .. rel_path)
+local function code_of(module_name)
+	local src = helpers.read_module_source(module_name)
+	helpers.assert_not_nil(src, "missing source module: " .. module_name)
 	return strip_comment_lines(src)
 end
 
@@ -240,7 +240,7 @@ helpers.describe("sqlite_command — arguments", function()
 
 	helpers.it("places flags before the database path", function()
 		local cmd = Cmd.build("/db", "SELECT 1;", { flags = { "-json" } })
-		helpers.assert_contains(cmd, "sqlite3 '-init' '/dev/null' '-bail' '-json' '/db'", "owned flags precede the positional argument after isolated fail-fast init")
+		helpers.assert_contains(cmd, "'sqlite3' '-init' '/dev/null' '-bail' '-json' '/db'", "owned flags precede the positional argument after isolated fail-fast init")
 	end)
 
 	helpers.it("discards diagnostics by default and captures them on request", function()
@@ -266,7 +266,7 @@ helpers.describe("sqlite_command — stop-on-error ownership", function()
 			local flags = mode == "json" and { "-readonly", "-json" } or mode == "scalar" and { "-noheader" } or {}
 			local command = assert(Cmd.build("/db/metrics.sqlite", "BEGIN;\nSELECT 42;\nCOMMIT;", { flags = flags, capture_exit = true }))
 			helpers.assert_contains(command, "'-bail'", "receipt refusal alone cannot undo a later COMMIT")
-			helpers.assert_true(command:find("umask 077\nsqlite3 '-init' '/dev/null'", 1, true) == 1)
+			helpers.assert_true(command:find("umask 077\n'sqlite3' '-init' '/dev/null'", 1, true) == 1)
 			for _, flag in ipairs(flags) do helpers.assert_contains(command, "'" .. flag .. "'") end
 			helpers.assert_contains(command, "BEGIN;\nSELECT 42;\nCOMMIT;")
 			helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
@@ -280,7 +280,7 @@ helpers.describe("sqlite_command — native initialization isolation", function(
 		helpers.it("linux-sqlite-init: " .. mode .. " uses an explicit empty native init before its owned flags", function()
 			local flags = mode == "json" and { "-readonly", "-json" } or mode == "scalar" and { "-noheader" } or {}
 			local command = assert(Cmd.build("/db/metrics.sqlite", "SELECT 42;", { flags = flags, capture_exit = true }))
-			helpers.assert_true(command:find("umask 077\nsqlite3 '-init' '/dev/null'", 1, true) == 1,
+			helpers.assert_true(command:find("umask 077\n'sqlite3' '-init' '/dev/null'", 1, true) == 1,
 				"native application CLI must not inherit a personal .sqliterc program")
 			for _, flag in ipairs(flags) do helpers.assert_contains(command, "'" .. flag .. "'") end
 			helpers.assert_contains(command, "'/db/metrics.sqlite'")
@@ -421,8 +421,8 @@ end)
 
 helpers.describe("keystats SQLite paths stage nothing on disk", function()
 	local CALLERS = {
-		"modules/keystats/sqlite_writer.lua",
-		"modules/keystats/sqlite_reader.lua",
+		"modules.keystats.sqlite_writer",
+		"modules.keystats.sqlite_reader",
 	}
 
 	helpers.it("never reserves a temp name", function()

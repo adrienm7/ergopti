@@ -302,8 +302,15 @@ local function chat(backend, payload, on_text, on_fail, use, current)
 	if not ProviderUses.format_serves(backend.format, ProviderUses.SYSTEM2) and backend.kind ~= "local" then
 		return on_fail("a " .. tostring(backend.format) .. " provider is not a chat model")
 	end
+	local think
+	if backend.format == "ollama" then
+		local Remote = dependency("modules.llm.thinking_families", "ollama_think")
+		if not Remote then return on_fail("the local backend is unavailable") end
+		think = Remote.ollama_think(backend.model)
+	end
 	local body = Vision.build_request(backend.format, {
 		model = backend.model, system = payload.system, text = payload.text, max_tokens = payload.max_tokens,
+		think = think,
 	})
 	if backend.kind == "local" then
 		local Ollama = dependency("modules.llm.api_ollama", "request_chat")

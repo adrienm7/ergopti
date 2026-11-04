@@ -21,6 +21,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -233,16 +234,16 @@ _LLM_Menu_NavNativeIdentity(Spec) {
 _LLM_Menu_BuildNavModifierPrefixes(MenuState) {
 	if !(MenuState is Map)
 		return false
-	if (MenuState.Has("nav_modifiers")
-			&& !(MenuState["nav_modifiers"] is String))
+	if (MenuState.Has(ConfigLeaf.NAV_MODIFIERS)
+			&& !(MenuState[ConfigLeaf.NAV_MODIFIERS] is String))
 		return false
-	if (MenuState.Has("val_modifiers")
-			&& !(MenuState["val_modifiers"] is String))
+	if (MenuState.Has(ConfigLeaf.VAL_MODIFIERS)
+			&& !(MenuState[ConfigLeaf.VAL_MODIFIERS] is String))
 		return false
-	NavModifiers := MenuState.Has("nav_modifiers")
-		? Trim(MenuState["nav_modifiers"]) : ""
-	ValModifiers := MenuState.Has("val_modifiers")
-		? Trim(MenuState["val_modifiers"])
+	NavModifiers := MenuState.Has(ConfigLeaf.NAV_MODIFIERS)
+		? Trim(MenuState[ConfigLeaf.NAV_MODIFIERS]) : ""
+	ValModifiers := MenuState.Has(ConfigLeaf.VAL_MODIFIERS)
+		? Trim(MenuState[ConfigLeaf.VAL_MODIFIERS])
 		: LLM_Defaults_ModifierString("llm_val_modifiers")
 	if (!LLM_Menu_IsValidModifierString(NavModifiers)
 			|| !LLM_Menu_IsValidModifierString(ValModifiers))

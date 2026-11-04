@@ -116,7 +116,9 @@ helpers.describe("Local server port discovery (local-server-ports)", function()
 			api.detect_local_servers(function() done[#done + 1] = "second" end)
 			helpers.assert_eq(#world.probes, 0, "no probe before the scan settles")
 			local stopped = {}
-			for _, id in ipairs(Fixture.SERVERS) do stopped[id] = { id = id, running = false, pids = {} } end
+			for _, id in ipairs(require("modules.llm.local_servers").ORDER) do
+				stopped[id] = { id = id, running = false, pids = {} }
+			end
 			pending(stopped)
 			helpers.assert_eq(done, { "first", "second" })
 		end)

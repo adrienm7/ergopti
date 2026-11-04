@@ -27,10 +27,10 @@
 --- 5. Fail Fast: an unknown field is a programming error and raises; a
 ---    non-string value is converted, never dropped.
 ---
---- WINDOWS: the AutoHotkey reporter (crash_report_worker.ahk) has no cap and its
---- own text layout. It must adopt FIELDS (as a JSON object, same order), the file
---- name scheme and MAX_REPORTS, with the same vectors
---- (_shared/tests/corpus/diagnostics/crash_report_vectors.json).
+--- WINDOWS: the AutoHotkey reporter (modules/diagnostics/crash_reporter.ahk and
+--- its two worker scripts) writes the same fields, names and cap, replayed from
+--- the same vectors (_shared/tests/corpus/diagnostics/crash_report_vectors.json),
+--- and appends what only it knows after the shared fields.
 --- ==============================================================================
 
 local M = {}

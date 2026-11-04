@@ -54,9 +54,11 @@ _LAG_SystemListReceiving() {
 			Item := _MR_FindItemById("agent_menu", "agent_system1")
 			AssertTrue(Item is Map, "the genuine Windows declaration is uniquely visible")
 			AssertEqual("list", Item["type"], "central list receiving is the actual production route")
-			Platforms := Item["platforms"]
+			; One declaration for every driver: the row carries no platforms list.
+			AssertFalse(Item.Has("platforms"), "the System list is declared once for every driver")
 			Restore() {
-				Item["platforms"] := Platforms
+				if Item.Has("platforms")
+					Item.Delete("platforms")
 			}
 			try {
 				Built := LLM_Agent_MenuBuild()
@@ -77,7 +79,7 @@ _LAG_SystemListReceiving() {
 				Owned.Push(Repaired)
 				AssertEqual(6, TrayMenuItemCount(Repaired), "repair reopens the same genuine declaration route")
 				AssertEqual(Corpus["locales"]["fr"]["systems"]["system1"]["cerebras"], _CTC_LabelAt(Repaired, 2))
-				AssertTrue(Item["platforms"] == Platforms, "the exact original declaration owner is restored")
+				AssertFalse(Item.Has("platforms"), "the exact original declaration owner is restored")
 				AssertEqual(0, Fx.Commits.Length)
 				AssertEqual(0, Fx.Rebuilds)
 			} catch as Failure {
@@ -97,7 +99,7 @@ Test("LLM agent: complete Build receives declared System lists and respects with
 
 /** A committed requester withdrawal must survive the held model-consent dialog. */
 _LAG_RequesterWithdrawal(Mode) {
-	_LAG_Run(_LAG_Menu("action", "", "local", Mode != "prediction-off"), _LTN_Screen(LAG_SELECTION), Body)
+	_LAG_Run(_LAG_Menu("action", "", "local"), _LTN_Screen(LAG_SELECTION), Body)
 	Body(Fx, Lines, Sent) {
 		global _LLM_LocalModelOfferPort, _LLM_Agent_Generation, _LLM_Agent_CommitFn
 		Saved := _LLM_LocalModelOfferPort, Commit := _LLM_Agent_CommitFn
@@ -113,7 +115,7 @@ _LAG_RequesterWithdrawal(Mode) {
 				AssertTrue(LLM_Agent_SetMode("off"))
 			Request["on_fail"].Call(Failure)
 			Allowed := Mode == "same-source" || Mode == "same-mode" || Mode == "unrelated"
-				|| Mode == "refused-write" || Mode == "prediction-off"
+				|| Mode == "refused-write"
 			AssertEqual(Mode == "late-failure" ? 0 : 1, State["confirms"])
 			AssertEqual(Allowed ? 1 : 0, State["downloads"])
 			AssertEqual(Allowed, _LLM_Agent_RenderIsCurrent(Generation))
@@ -154,7 +156,7 @@ _LAG_RequesterWithdrawal(Mode) {
 }
 
 for _LAG_RequesterMode in ["source-off", "source-remote", "source-aba", "mode-off", "mode-aba",
-	"same-source", "same-mode", "unrelated", "refused-write", "prediction-off", "late-failure"]
+	"same-source", "same-mode", "unrelated", "refused-write", "late-failure"]
 	Test("LLM agent: requester currency " . _LAG_RequesterMode . " (todo46-manual-requester)",
 		_LAG_RequesterWithdrawal.Bind(_LAG_RequesterMode))
 
@@ -531,7 +533,7 @@ for Withdraw in [true, false]
 		_LAG_BackboardNativeCustody.Bind(Withdraw))
 
 _LAG_LocalNativeCustody(Phase, Withdraw) {
-	_LAG_Run(_LAG_Menu("action", "", "local", Phase == "queue-independent" ? !Withdraw : true), _LTN_Screen(LAG_SELECTION), Body)
+	_LAG_Run(_LAG_Menu("action", "", "local"), _LTN_Screen(LAG_SELECTION), Body)
 	Body(Fx, Lines, Sent) {
 		global _LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort, _LLM_Vision_OllamaTransport
 		global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_Ollama_AsyncCounter, _LLM_Engine, _LLM_Agent_Generation

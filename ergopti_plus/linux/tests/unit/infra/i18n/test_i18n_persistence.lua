@@ -193,7 +193,7 @@ helpers.describe("i18n persistence", function()
 
   helpers.describe("menu language submenu", function()
     helpers.it("language submenu items have callbacks and valid shape", function()
-      local mb = helpers.load_module("ui.menu.menu_builder")
+      local mb = helpers.load_module("ui.menu.builder")
       local items = mb.build({ _version = "test", on_quit = function() end })
 
       local lang_section = nil
@@ -237,7 +237,9 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local attempts = 0
 		local observations = nil
 		local ok, err = xpcall(function()
-			package.loaded["infra.config_paths"] = { config_home = function() return root end }
+			-- config() is where the locale owner rewrites a held [script] locale.
+			package.loaded["infra.config_paths"] = { config_home = function() return root end,
+				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["infra.locale"] = nil
 			package.loaded["adapters.storage"] = nil
 			package.loaded["infra.i18n"] = nil

@@ -19,7 +19,7 @@ helpers.describe("Ollama bootstrap framing (ollama-bootstrap-chunks)", function(
 				local state = Fixture.new_state()
 				local checker = Fixture.load_ollama_checker(state)
 				local result
-				helpers.assert_true(checker.install_for_selection(function(ok) result = ok end))
+				helpers.assert_true(Fixture.start_verification(state, checker, function(ok) result = ok end))
 				local task = state.tasks[1]
 				helpers.assert_true(task.stream(task, marker:sub(1, boundary), ""))
 				helpers.assert_true(task.stream(task, marker:sub(boundary + 1) .. "\r\n", ""))
@@ -34,7 +34,7 @@ helpers.describe("Ollama bootstrap framing (ollama-bootstrap-chunks)", function(
 	helpers.it("keeps stream fragments separate and flushes a final unterminated marker", Fixture.scoped(function()
 		local state = Fixture.new_state()
 		local checker = Fixture.load_ollama_checker(state)
-		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_true(Fixture.start_verification(state, checker))
 		local task = state.tasks[1]
 		helpers.assert_true(task.stream(task, "OLLAMA_ERROR_CHECK", "stderr diagnostic\n"))
 		task.done(1, "SUM", "")
@@ -52,7 +52,7 @@ helpers.describe("Ollama bootstrap framing (ollama-bootstrap-chunks)", function(
 		state.window.set_progress = function(value) progress[#progress + 1] = value end
 		state.window.append_log = function(line) logs[#logs + 1] = line end
 		local checker = Fixture.load_ollama_checker(state)
-		helpers.assert_true(checker.install_for_selection())
+		helpers.assert_true(Fixture.start_verification(state, checker))
 		local task = state.tasks[1]
 		local output = "OLLAMA_INSTALLING\r\nOLLAMA_DOWNLOAD_PROGRESS 37\r\nDownloading archive\r\n"
 		for index = 1, #output do

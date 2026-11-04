@@ -44,10 +44,11 @@ var _sortKey = 'name';
 var _sortDir = 1;
 var _filter = ''; // Backend id the table is narrowed to; '' shows every backend.
 var _capabilities = {}; // { disable: bool }.
-var _expanded = {}; // Group id -> true while the user keeps it open; lives as long as the page.
+// Each map below is keyed by group id or by provider section key.
+var _expanded = {}; // Open or closed as the user left it; lives as long as the page.
 var _narrowKey = ''; // The filter and search the narrowed groups were opened for.
-var _narrowCollapsed = {}; // Group id -> true when the user closed a group a narrowing opened.
-var _toggles = {}; // Group id -> its header toggle in the last render, to keep focus across renders.
+var _narrowCollapsed = {}; // True when the user closed what a narrowing opened.
+var _toggles = {}; // Its header toggle in the last render, to keep focus across renders.
 
 // Which column reads which row field. The numeric fields are the catalogue's
 // own (models.json hardware_requirements.<backend>.download_gb / ram_gb and
@@ -573,11 +574,7 @@ function render() {
 			tbody.setAttribute('data-group', g.backend.id);
 			tbody.appendChild(buildGroupHead(g.backend, g.rows, expanded, narrowed));
 		}
-		if (expanded) {
-			g.rows.forEach(function (m) {
-				tbody.appendChild(buildRow(m));
-			});
-		}
+		if (expanded) appendGroupRows(tbody, g, !!query);
 		table.appendChild(tbody);
 	});
 
@@ -597,13 +594,138 @@ function groupExpanded(g, narrowed) {
 	return _expanded[id] === true;
 }
 
-/** Opens or closes one group, then gives its toggle the focus back. */
-function toggleGroup(id, narrowedWithRows) {
+/**
+ * Opens or closes one group or provider section, then gives its toggle the
+ * focus back.
+ * @param {string} id - Group id or section key.
+ * @param {boolean} narrowedWithRows - Whether a narrowing opened it.
+ * @param {boolean} [open] - Whether it is open now; a section may be open with no record of it.
+ */
+function toggleGroup(id, narrowedWithRows, open) {
 	if (narrowedWithRows) _narrowCollapsed[id] = _narrowCollapsed[id] !== true;
-	else _expanded[id] = _expanded[id] !== true;
+	else _expanded[id] = !(open === undefined ? _expanded[id] === true : open);
 	render();
 	var toggle = _toggles[id];
 	if (toggle && typeof toggle.focus === 'function') toggle.focus();
+}
+
+/**
+ * A local backend's rows split by catalogue provider, sections in alphabetical
+ * order. A row without a provider (the user's own models) stays directly under
+ * the backend, and an API group stays flat: its names already start with it.
+ * @param {object} g - The group.
+ * @returns {object} { loose, sections: [{ key, provider, rows }] }
+ */
+function splitByProvider(g) {
+	if (!g.backend || !isLocalBackend(g.backend)) return { loose: g.rows, sections: [] };
+	var loose = [];
+	var byProvider = {};
+	var sections = [];
+	g.rows.forEach(function (m) {
+		if (!m.provider) {
+			loose.push(m);
+			return;
+		}
+		var key = g.backend.id + '\u0000' + m.provider;
+		if (!Object.prototype.hasOwnProperty.call(byProvider, key)) {
+			byProvider[key] = { key: key, provider: m.provider, rows: [] };
+			sections.push(byProvider[key]);
+		}
+		byProvider[key].rows.push(m);
+	});
+	sections.sort(function (a, b) {
+		return compareNames([a.provider.toLowerCase()], [b.provider.toLowerCase()]);
+	});
+	return { loose: loose, sections: sections };
+}
+
+/**
+ * Whether a provider section shows its rows. A search opens every section it
+ * matches in, unless the user closes it under that search; otherwise the
+ * user's choice holds, and until they made one only the section of the
+ * current or selected model is open.
+ */
+function sectionExpanded(section, searching) {
+	if (searching) return _narrowCollapsed[section.key] !== true;
+	if (_expanded[section.key] !== undefined) return _expanded[section.key] === true;
+	return section.rows.some(function (m) {
+		return isCurrent(m) || rowKey(m) === _selected;
+	});
+}
+
+/** Draws an open group's rows: those without a provider, then each section. */
+function appendGroupRows(tbody, g, searching) {
+	var split = splitByProvider(g);
+	split.loose.forEach(function (m) {
+		tbody.appendChild(buildRow(m));
+	});
+	split.sections.forEach(function (section) {
+		var open = sectionExpanded(section, searching);
+		tbody.appendChild(buildSectionHead(g.backend, section, open, searching));
+		if (open) {
+			section.rows.forEach(function (m) {
+				tbody.appendChild(buildRow(m));
+			});
+		}
+	});
+}
+
+/**
+ * One provider's header inside a backend: the same toggle as a backend's, with
+ * its model count and, while collapsed, the current model it holds.
+ * @param {object} b - The backend.
+ * @param {object} section - { key, provider, rows }.
+ * @param {boolean} open - Whether its rows are shown.
+ * @param {boolean} searching - Whether a search opened it.
+ */
+function buildSectionHead(b, section, open, searching) {
+	var catalogueOwner = _catalogueOwner;
+	var head = document.createElement('tr');
+	head.className =
+		'group section' + (b.available === false ? ' unavailable' : '') + (open ? ' expanded' : '');
+	var th = document.createElement('th');
+	th.setAttribute('scope', 'rowgroup');
+	th.setAttribute('colspan', String(COLUMNS.length));
+	var total = _models.filter(function (m) {
+		return m.backend === b.id && m.provider === section.provider;
+	}).length;
+	var current = open ? null : section.rows.filter(isCurrent)[0];
+	var toggle = document.createElement('span');
+	toggle.className = 'group-toggle';
+	toggle.setAttribute('role', 'button');
+	toggle.setAttribute('tabindex', '0');
+	toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+	toggle.setAttribute('data-section', section.key);
+	toggle.setAttribute('data-nav', 'true');
+	toggle.innerHTML =
+		'<span class="chevron" aria-hidden="true">▸</span> ' +
+		'<span class="group-title">' +
+		_escHtml(section.provider) +
+		'</span>' +
+		' <span class="group-count">' +
+		_escHtml(_fmt('model_browser.count_label', { n: section.rows.length, total: total })) +
+		'</span>' +
+		(current
+			? ' <span class="group-active">' +
+				_escHtml(_fmt('model_browser.current_label', { model: current.name })) +
+				'</span>'
+			: '');
+	bindHeaderToggle(th, toggle, function () {
+		if (_catalogueOwner === catalogueOwner) toggleGroup(section.key, searching, open);
+	});
+	var activate = toggle.onkeydown;
+	toggle.onkeydown = function (ev) {
+		if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+			ev.preventDefault();
+			moveFocus(toggle, ev.key === 'ArrowDown' ? 1 : -1);
+			return;
+		}
+		activate(ev);
+	};
+	_toggles[section.key] = toggle;
+	th.appendChild(toggle);
+	head.appendChild(th);
+	return head;
 }
 
 /** The thin line between the local backends and the remote ones. */
@@ -628,14 +750,22 @@ function activeIn(b) {
 }
 
 // The install states a local backend's payload names (b.install.state).
-var INSTALL_STATES = { available: true, installed: true, unsupported: true, running: true };
+var INSTALL_STATES = {
+	available: true,
+	installed: true,
+	unsupported: true,
+	checking: true,
+	running: true
+};
 
 /**
  * The "Install <backend>" button of a local backend's header. It acts only
- * while the runtime is missing (or its last install failed); installed,
- * unsupported on this machine and running installs grey it with the reason.
- * The click runs the driver's own owned-runtime install (group action
- * "install"), whose progress and outcome come back through the payload.
+ * while the runtime is missing (or its last install failed). Installed,
+ * unsupported on this machine, checking and running grey it, and its caption
+ * or the header's reason says why: a tooltip alone must not be the only answer
+ * to a click on a greyed button. The click runs the driver's own owned-runtime
+ * install (group action "install"), whose progress and outcome come back
+ * through the payload; a refusal comes back as install.failed_key.
  */
 function buildInstallButton(b, catalogueOwner) {
 	var install = b.install;
@@ -649,6 +779,10 @@ function buildInstallButton(b, catalogueOwner) {
 			typeof install.percent === 'number'
 				? _fmt('model_browser.install_running_percent', { name: brand, n: install.percent })
 				: _fmt('model_browser.install_running', { name: brand });
+	} else if (install.state === 'installed') {
+		btn.textContent = _t('model_browser.install_installed');
+	} else if (install.state === 'checking') {
+		btn.textContent = _fmt('model_browser.install_checking', { name: brand });
 	} else {
 		btn.textContent = _t('model_browser.install_runtime').replace('%s', brand);
 	}
@@ -672,12 +806,22 @@ function buildInstallButton(b, catalogueOwner) {
 	return btn;
 }
 
+/** The words next to an install button: why it refuses or why it did not start. */
+function installNote(text) {
+	var note = document.createElement('span');
+	note.className = 'install-note';
+	note.setAttribute('role', 'alert');
+	note.textContent = text;
+	return note;
+}
+
 /**
- * One backend's header: the toggle that shows or hides its rows (chevron,
- * emoji and name, model count, the active model while collapsed, why it
- * cannot run now), then its tools — the driver's own actions (install,
- * port, token…), the field that adds a model by identifier, and the
- * provider list that adds an API.
+ * One backend's header. Its first line is the toggle that shows or hides its
+ * rows (chevron, emoji and name, model count, the active model while
+ * collapsed); the next holds the install, the driver's own actions (port,
+ * token…) and why the backend cannot run now; the last adds a model by
+ * identifier or an API by provider. A click anywhere on the header toggles,
+ * except on a real control.
  * @param {object} b - The backend.
  * @param {Array} rows - Its rows the filters keep.
  * @param {boolean} expanded - Whether its rows are shown.
@@ -714,29 +858,28 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 			? ' <span class="group-active">' +
 				_escHtml(_fmt('model_browser.current_label', { model: active.name })) +
 				'</span>'
-			: '') +
-		(reason ? ' <span class="reason">' + _escHtml(reason) + '</span>' : '');
+			: '');
 	var narrowedWithRows = narrowed && rows.length > 0;
 	var toggleHere = function () {
 		if (_catalogueOwner === catalogueOwner) toggleGroup(b.id, narrowedWithRows);
 	};
-	toggle.onclick = toggleHere;
-	toggle.onkeydown = function (ev) {
-		if (ev.key === 'Enter' || ev.key === ' ') {
-			ev.preventDefault();
-			toggleHere();
-		}
-	};
-	// The header's empty space toggles too; its tools keep their own clicks.
-	th.onclick = function (ev) {
-		if (ev && ev.target === th) toggleHere();
-	};
+	bindHeaderToggle(th, toggle, toggleHere);
 	_toggles[b.id] = toggle;
 	th.appendChild(toggle);
 	var tools = document.createElement('div');
 	tools.className = 'group-tools';
+	var adders = document.createElement('div');
+	adders.className = 'group-add';
 
-	if (b.install) tools.appendChild(buildInstallButton(b, catalogueOwner));
+	if (b.install) {
+		tools.appendChild(buildInstallButton(b, catalogueOwner));
+		if (b.install.state === 'unsupported' && b.install.reason_key !== b.reason_key) {
+			tools.appendChild(installNote(_fmt(b.install.reason_key, { name: b.brand || b.id })));
+		}
+		if (b.install.failed_key) {
+			tools.appendChild(installNote(_fmt(b.install.failed_key, { name: b.brand || b.id })));
+		}
+	}
 
 	(Array.isArray(b.actions) ? b.actions : []).forEach(function (a) {
 		var btn = document.createElement('button');
@@ -750,6 +893,13 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 		};
 		tools.appendChild(btn);
 	});
+
+	if (reason) {
+		var status = document.createElement('span');
+		status.className = 'reason';
+		status.textContent = reason;
+		tools.appendChild(status);
+	}
 
 	if (b.add_model && b.available !== false) {
 		var texts = ADD_MODEL_TEXT_KEYS[b.id];
@@ -788,9 +938,9 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 				submit();
 			}
 		};
-		tools.appendChild(input);
-		tools.appendChild(addBtn);
-		tools.appendChild(error);
+		adders.appendChild(input);
+		adders.appendChild(addBtn);
+		adders.appendChild(error);
 	}
 
 	if (Array.isArray(b.providers) && b.providers.length > 0) {
@@ -812,13 +962,43 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 			var id = select.value || b.providers[0].id;
 			postModelAction({ action: 'add_provider', backend: b.id, provider: id });
 		};
-		tools.appendChild(select);
-		tools.appendChild(providerBtn);
+		adders.appendChild(select);
+		adders.appendChild(providerBtn);
 	}
 
 	th.appendChild(tools);
+	th.appendChild(adders);
 	head.appendChild(th);
 	return head;
+}
+
+// What keeps its own click inside a header; everything else toggles it.
+var HEADER_CONTROLS = 'button, input, select, textarea, a, label';
+
+/**
+ * Makes a whole header cell toggle: the mouse anywhere but on a real control,
+ * Enter or Space on its focusable toggle. The toggle stops its click, which
+ * would otherwise reach the cell and toggle twice.
+ * @param {object} cell - The header cell.
+ * @param {object} toggle - Its focusable toggle.
+ * @param {function} run - Opens or closes the header's rows.
+ */
+function bindHeaderToggle(cell, toggle, run) {
+	toggle.onclick = function (ev) {
+		if (ev && ev.stopPropagation) ev.stopPropagation();
+		run();
+	};
+	toggle.onkeydown = function (ev) {
+		if (ev.key === 'Enter' || ev.key === ' ') {
+			ev.preventDefault();
+			run();
+		}
+	};
+	cell.onclick = function (ev) {
+		var target = ev && ev.target;
+		if (target && target.closest && target.closest(HEADER_CONTROLS)) return;
+		run();
+	};
 }
 
 /** The cells of one row, in COLUMNS order. */
@@ -948,6 +1128,7 @@ function buildRow(m) {
 	tr.tabIndex = 0;
 	if (typeof tr.setAttribute === 'function') {
 		tr.setAttribute('data-key', key);
+		tr.setAttribute('data-nav', 'true');
 		tr.setAttribute('aria-disabled', isSelectable(m) ? 'false' : 'true');
 		tr.setAttribute('aria-selected', key === _selected ? 'true' : 'false');
 	}
@@ -999,11 +1180,13 @@ function buildRow(m) {
 	return tr;
 }
 
-/** Moves keyboard focus to the next or previous model row, across groups. */
-function moveFocus(fromRow, step) {
-	var rows = Array.prototype.slice.call(document.querySelectorAll('tr[data-key]'));
-	var index = rows.indexOf(fromRow);
-	var next = rows[index + step];
+/**
+ * Moves keyboard focus to the next or previous model row or provider header,
+ * across groups, so a collapsed section can be reached and opened by keyboard.
+ */
+function moveFocus(from, step) {
+	var stops = Array.prototype.slice.call(document.querySelectorAll('[data-nav]'));
+	var next = stops[stops.indexOf(from) + step];
 	if (next && typeof next.focus === 'function') next.focus();
 }
 

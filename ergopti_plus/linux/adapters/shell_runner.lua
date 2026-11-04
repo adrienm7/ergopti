@@ -488,8 +488,11 @@ local ASYNC_MAX_OUTPUT_BYTES = require("llm.process_limits").defaults().max_outp
 --- Runs a program without a shell and without blocking the event loop.
 --- @param executable string Program name or absolute path.
 --- @param args table Array of string arguments.
---- @param options table|nil { timeout_ms }
---- @param callback function Receives { ok, code, stdout, stderr, error } once.
+--- @param options table|nil { timeout_ms, max_output_bytes }: the output bound
+---   defaults to the registry's process_output_bytes; a caller whose child's
+---   output is the result (run_command) passes its own.
+--- @param callback function Receives { ok, code, stdout, stderr, error,
+---   timed_out, overflow } once.
 --- @return table|nil handle { cancel = function() } — nil when admission failed.
 --- @return string|nil error Why admission failed; the completion callback stays silent.
 function M.run_async(executable, args, options, callback)
@@ -500,6 +503,10 @@ function M.run_async(executable, args, options, callback)
 	local timeout_ms = type(options) == "table" and tonumber(options.timeout_ms) or nil
 	if not NumberPolicy.within_timer_ceiling(timeout_ms) or timeout_ms <= 0 then
 		return nil, "a positive timeout_ms within the timer ceiling is required"
+	end
+	local max_output = type(options) == "table" and options.max_output_bytes or ASYNC_MAX_OUTPUT_BYTES
+	if type(max_output) ~= "number" or max_output < 1 or max_output % 1 ~= 0 then
+		return nil, "max_output_bytes must be a positive integer"
 	end
 	-- Synchronous shell consumers and cold connector shutdown own no native
 	-- process ledger. Capture it once only after an async request is admitted.
@@ -518,16 +525,18 @@ function M.run_async(executable, args, options, callback)
 		local code = result.exit_code
 		if error_message == Errors.PROCESS_DEADLINE_EXCEEDED then error_message, code = "timeout", nil
 		elseif error_message == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND then
-			error_message, code = "output over " .. ASYNC_MAX_OUTPUT_BYTES .. " bytes", nil
+			error_message, code = "output over " .. max_output .. " bytes", nil
 		elseif error_message == Errors.PROCESS_EXITED_UNSUCCESSFULLY then error_message = "exit code " .. tostring(code) end
-		local answer = { ok = result.ok, code = code, stdout = result.stdout, stderr = result.stderr, error = error_message }
+		local answer = { ok = result.ok, code = code, stdout = result.stdout, stderr = result.stderr, error = error_message,
+			timed_out = result.error == Errors.PROCESS_DEADLINE_EXCEEDED,
+			overflow = result.error == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND }
 		record(result)
 		local ok, err = pcall(callback, answer)
 		if not ok then Logger.error(LOG, "run_async() callback for %s raised: %s.", request.name, tostring(err)) end
 	end
 	local operation = OwnedProcess.start(executable, args, {
 		owner = "shell_runner:" .. tostring(request), timeout_ms = timeout_ms,
-		max_output_bytes = ASYNC_MAX_OUTPUT_BYTES,
+		max_output_bytes = max_output,
 	}, publish)
 	request.constructing = false
 	-- Cancellation suppresses business delivery, not native exit diagnostics.

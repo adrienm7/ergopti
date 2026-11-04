@@ -3,7 +3,7 @@
 	"drivers": {
 		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
 		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
-		"windows": "Not ported yet: the AutoHotkey live mode must validate live.json as config does, and stop (asking for nothing) when the prompt is deleted; it must replay every vector."
+		"windows": "Replays every vector through prediction_live.ahk (tests/meta/corpus/test_corpus_llm_request_plan.ahk)."
 	},
 	"differences": {
 		"deleted_prompt": "macOS used to run the keystroke once with the menu's prompt after stopping live mode; it now asks for nothing, as Linux did. Convergence, written reason: live typing never falls back to a prompt the user did not choose for it.",

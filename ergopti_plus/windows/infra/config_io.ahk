@@ -13,6 +13,8 @@
 
 #Include config_write_lease.ahk
 #Include config_unused_keys.ahk
+#Include %A_LineFile%\..\slot_roles.ahk
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 ; Reports one user-visible error for a configuration mutation that did not
 ; reach disk. The TOML writer already logs its low-level failure; this adds the
@@ -23,6 +25,9 @@ ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchan
 	NewerSchema := ConfigNewerSchemaReadOnly()
 	if NewerSchema
 		Detail := "the startup configuration uses a newer schema; update ErgoptiPlus and reload before changing settings"
+	OlderSchema := ConfigOlderSchemaReadOnly()
+	if OlderSchema
+		Detail := "the startup configuration is too old for this build to migrate; it was left untouched"
 	if (Detail != "") {
 		try LoggerError("Config", "Could not persist {1}: {2}.", Context, Detail)
 	} else if StateUnchanged {
@@ -30,14 +35,20 @@ ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchan
 	} else {
 		try LoggerError("Config", "Could not fully persist {1}.", Context)
 	}
+	CaseTwin := TOML_TakeCaseTwinRefusal()
 	MessageKey := NewerSchema ? "config.read_only.newer_schema"
-		: (StateUnchanged ? "dialog.bulk_toggle.save_failed" : "onboarding.error.write_failed")
+		: OlderSchema ? "config.read_only.older_schema"
+		: (CaseTwin != "" ? "dialog.config_save.case_twin"
+		: (StateUnchanged ? "dialog.bulk_toggle.save_failed" : "onboarding.error.write_failed"))
 	; Failure reporting is a backstop, never a second failure source. Translation,
 	; an injected UI seam, or the native notifier can each throw while the driver
 	; is already handling a refused write. Preserve the false status and the
 	; file-log evidence instead of escaping the menu/timer callback.
 	try {
 		Message := t(MessageKey)
+		if MessageKey == "dialog.config_save.case_twin"
+			Message := StrReplace(StrReplace(Message, "{1}", CaseTwin),
+				"{2}", t("menu.global.clean_unused_keys"))
 		Options := Map("title", t("paths_editor.save_failed_title"), "level", "error")
 		if HasMethod(NotifyFn, "Call")
 			NotifyFn.Call(Message, Options)
@@ -56,6 +67,38 @@ ConfigNewerSchemaReadOnly() {
 	global ConfigurationFile
 	return IsSet(ConfigurationFile) && (ConfigurationFile is String)
 		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "newer"
+}
+
+; True when the startup configuration predates the registry's oldest supported
+; version: the boot migration refused it, the file stays byte for byte, and the
+; same notice and greyed rows name this cause.
+ConfigOlderSchemaReadOnly() {
+	global ConfigurationFile
+	return IsSet(ConfigurationFile) && (ConfigurationFile is String)
+		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "unsupported"
+}
+
+; Tells the user once at boot why nothing they change will stick, as macOS and
+; Linux do from read_only_notice_key: the refusal's ERROR line is for the logs.
+; NotifyFn is injectable so a test can read the words without a real TrayTip.
+ConfigNotifyOlderSchemaAtBoot(NotifyFn := 0) {
+	if !ConfigOlderSchemaReadOnly()
+		return false
+	; The migration's own ERROR can fall out of the pre-logger ring on a busy boot.
+	try LoggerWarn("Config", "The startup configuration is too old for this build to migrate: "
+		. "it is left untouched and this session is read-only.")
+	try {
+		Message := t("config.read_only.older_schema")
+		Options := Map("title", t("paths_editor.save_failed_title"), "level", "warning")
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(Message, Options)
+		else
+			NotifierSend(Message, Options)
+	} catch as Err {
+		try LoggerError("Config", "Could not present the older-configuration notice: {1}.", Err.Message)
+		return false
+	}
+	return true
 }
 
 ; SaveFullConfig has three explicit outcomes. Callers must compare against the
@@ -1026,7 +1069,7 @@ _ConfigSeedPersonalHotstring(FeaturesTarget, SectionName) {
 		Path := "hotstrings.personal." . SectionName
 		FeaturesTarget["hotstrings"]["personal"][SectionName] := Map(
 			"enabled", ManifestDefaultFor(Path . ".enabled"),
-			"time_activation_seconds", ManifestDefaultFor(Path . ".time_activation_seconds"))
+			ConfigLeaf.TIME_ACTIVATION_SECONDS, ManifestDefaultFor(Path . ".time_activation_seconds"))
 	}
 	return true
 }
@@ -1137,7 +1180,7 @@ _ConfigBuildCategoryIntentPlan(Category, Bool) {
 				throw Error("Unknown hotstring category state: " . Category)
 			RuntimePatches.Push({ target: Features["hotstrings"], key: Root, value: Projected["hotstrings"][Root] })
 	}
-	Updates := [_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Category), Bool)]
+	Updates := [_ConfigSparseOperation(ConfigLeaf.CATEGORY_ENABLED, _CategoryEnabledKey(Category), Bool)]
 	return { updates: Updates, publish: _ConfigPublishDesiredState.Bind(Desired,
 		RuntimePatches, CandidateCategories, CandidateTapHold) }
 }
@@ -1268,7 +1311,7 @@ _HS_SelectionAppliesLive(Paths, FlippedGate := "") {
 		return false
 	for Path in Paths {
 		Parts := StrSplit(Path, ".")
-		if Parts.Length != 3 || Parts[1] != "hotstrings" || Path == "hotstrings.dynamic.user_code"
+		if Parts.Length != 3 || Parts[1] != "hotstrings" || Path == ConfigKey.HOTSTRINGS_DYNAMIC_USER_CODE
 			return false
 		if Parts[2] == "personal"
 			continue
@@ -1321,8 +1364,8 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 			; Discover the canonical families inside the admitted lease, independent
 			; of a menu preview or the mixed legacy tray map. There is no extra gate.
 			; The programmable hotstrings keep their own start/cancel owner.
-			for Entry in ManifestFeaturesForSection("hotstrings.dynamic")
-				if Entry["path"] != "hotstrings.dynamic.user_code"
+			for Entry in ManifestFeaturesForSection(ConfigKey.HOTSTRINGS_DYNAMIC)
+				if Entry["path"] != ConfigKey.HOTSTRINGS_DYNAMIC_USER_CODE
 					Entries.Push(Map("path", Entry["path"], "value", Bool))
 		case "language":
 			; Each category's own sections, as its submenu draws them.
@@ -1371,7 +1414,7 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 			CandidateCategories := CategoryEnabled.Clone()
 			CandidateCategories[Gate] := Bool
 			FlippedGate := Gate
-			Updates.Push(_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Gate), Bool))
+			Updates.Push(_ConfigSparseOperation(ConfigLeaf.CATEGORY_ENABLED, _CategoryEnabledKey(Gate), Bool))
 		}
 	}
 	Projected := _HSDeepCloneMap(Desired)
@@ -1422,12 +1465,12 @@ _CategoryEnabledKey(Category) {
 				case "Layout":     return "layout"
 				case "Shortcuts":  return "shortcuts"
 				case "Hotstrings": return "hotstrings"
-				case "TapHolds":   return "tap_holds"
+				case "TapHolds":   return ConfigLeaf.TAP_HOLDS
 				case "KeyCombinations": return "key_combinations"
 				; Hotstring sub-category gates — snake_case to match the v2 schema.
-				case "DistancesReduction": return "distances_reduction"
-				case "SFBsReduction":      return "sfbs_reduction"
-				case "MagicKey":           return "magic_key"
+				case "DistancesReduction": return ConfigLeaf.DISTANCES_REDUCTION
+				case "SFBsReduction":      return ConfigLeaf.SFBS_REDUCTION
+				case "MagicKey":           return ConfigLeaf.MAGIC_KEY
 		}
 		; Language-pack gates are keyed by their group id ("french_autocorrection");
 		; the table is filled when the boot seeds those gates.
@@ -1460,26 +1503,26 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 				; state that only existed in the failed serialization candidate.
 				FeatureSnapshot := _HSDeepCloneMap(MasterGateDesiredFeatures(FeatureState))
 				; The dedicated category owner below is authoritative for master gates.
-				if FeatureSnapshot.Has("category_enabled")
-						FeatureSnapshot.Delete("category_enabled")
+				if FeatureSnapshot.Has(ConfigLeaf.CATEGORY_ENABLED)
+						FeatureSnapshot.Delete(ConfigLeaf.CATEGORY_ENABLED)
 				if IsSet(_LLM_Menu_SyncToFeatures)
 						&& MenuReady && (MenuState is Map)
 						&& !_LLM_Menu_SyncToFeatures(FeatureSnapshot, MenuState)
 						throw Error("LLM menu state could not be reconciled into the full-save candidate")
 				_CollectFeatureUpdates(Updates, "", FeatureSnapshot)
 				; The version the boot migration reads (infra/config_migrate.ahk).
-				Updates.Push({ Section: "_meta", Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
+				Updates.Push({ Section: ConfigLeaf._META, Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
 		}
 		Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
-		Updates.Push({ Section: "script", Key: "log_level", Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
-		Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
+		Updates.Push({ Section: "script", Key: ConfigLeaf.LOG_LEVEL, Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
+		Updates.Push({ Section: "hotstrings", Key: ConfigLeaf.TRIGGER_CHAR, Value: ScriptInformation["MagicKey"] })
 		if IsSet(ScriptShortcutAssignments) {
 				for Slot, Action in ScriptShortcutAssignments
-						Updates.Push({ Section: "shortcuts.script_control", Key: Slot, Value: Action })
+						Updates.Push({ Section: ConfigKey.SHORTCUTS_SCRIPT_CONTROL, Key: Slot, Value: Action })
 		}
 		if IsSet(KeyboardShortcutAssignments)
 				CollectKeyboardShortcutUpdates(Updates, KeyboardShortcutAssignments,
-						_IniCache.Get("shortcuts.keyboard", Map()), KEYBOARD_SHORTCUT_DEFAULTS)
+						_IniCache.Get(ConfigKey.SHORTCUTS_KEYBOARD, Map()), KEYBOARD_SHORTCUT_DEFAULTS)
 		if IsSet(GestureAssignments) {
 				for Slot, Action in GestureAssignments
 						Updates.Push({ Section: "gestures", Key: Slot, Value: Action })
@@ -1488,11 +1531,11 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		for proc, _ in MetricsFilters.disabled_apps
 				apps.Push(proc)
 		Updates.Push({ Section: "metrics", Key: "enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
-		Updates.Push({ Section: "metrics", Key: "private_filter_enabled", Value: TOML_Bool(MetricsFilters.private_browsing) })
-		Updates.Push({ Section: "metrics", Key: "secure_filter_enabled", Value: TOML_Bool(MetricsFilters.secure_field) })
-		Updates.Push({ Section: "metrics", Key: "system_auth_filter_enabled", Value: TOML_Bool(MetricsFilters.system_auth) })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.PRIVATE_FILTER_ENABLED, Value: TOML_Bool(MetricsFilters.private_browsing) })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.SECURE_FILTER_ENABLED, Value: TOML_Bool(MetricsFilters.secure_field) })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED, Value: TOML_Bool(MetricsFilters.system_auth) })
 		Updates.Push({ Section: "metrics", Key: "encrypt", Value: TOML_Bool(MetricsFilters.encrypt) })
-		Updates.Push({ Section: "metrics", Key: "disabled_apps", Value: apps })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.DISABLED_APPS, Value: apps })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: WPMWidget.show_graph })
@@ -1505,29 +1548,44 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		; over the user's saved values. Skipping is safe: TOML_BatchWrite preserves keys
 		; it does not re-collect, so the on-disk values survive until the menu has loaded.
 		if (MenuReady && (MenuState is Map)) {
-				if !MenuState.Has("onboarding_seen")
-						|| !LLM_Option_TryNormalize("onboarding_seen",
-							MenuState["onboarding_seen"], &OnboardingSeen)
+				if !MenuState.Has(ConfigLeaf.ONBOARDING_SEEN)
+						|| !LLM_Option_TryNormalize(ConfigLeaf.ONBOARDING_SEEN,
+							MenuState[ConfigLeaf.ONBOARDING_SEEN], &OnboardingSeen)
 					throw Error("LLM onboarding state could not be serialized into the full-save candidate")
-				Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: OnboardingSeen })
+				Updates.Push({ Section: "llm", Key: ConfigLeaf.ONBOARDING_SEEN, Value: OnboardingSeen })
 				_AppOverridesPayload := _LLM_Menu_SerializeAppProfileOverrides(
-						MenuState["app_profile_overrides"])
+						MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES])
 				if !(_AppOverridesPayload is String)
 						throw Error("Could not serialize LLM app-profile overrides")
-				Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesPayload })
+				Updates.Push({ Section: "llm", Key: ConfigLeaf.APP_PROFILE_OVERRIDES, Value: _AppOverridesPayload })
 				if IsSet(_LLM_Menu_AppendPersistedUpdates)
 						&& !_LLM_Menu_AppendPersistedUpdates(Updates, MenuState)
 					throw Error("LLM menu persistence fields could not be serialized into the full-save candidate")
 		}
 		if IsSet(CategoryEnabled) {
 				for _CatName, _CatBool in CategoryEnabled
-						Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(_CatName), Value: TOML_Bool(_CatBool) })
+						Updates.Push({ Section: ConfigLeaf.CATEGORY_ENABLED, Key: _CategoryEnabledKey(_CatName), Value: TOML_Bool(_CatBool) })
 		}
 		if IsSet(UPDATER_CHECK_INTERVAL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
 		if IsSet(UPDATER_CHANNEL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
-		return _ConfigKeepOutdatedEntries(_ConfigSparseUpdates(Updates))
+		return _ConfigKeepOutdatedEntries(_ConfigLastRowWins(_ConfigSparseUpdates(Updates)))
+}
+
+; The feature walk collects rows a dedicated owner below it overrules (the magic
+; key, the personal file controls). The writer refuses two rows on one path, so the
+; overruling is settled here, where the order means something.
+_ConfigLastRowWins(Updates) {
+	Last := Map()
+	Last.CaseSense := "On"
+	for Index, Update in Updates
+		Last[_TOML_ConfigPathName(_TOML_ConfigPath(Update.Section, Update.Key))] := Index
+	Kept := []
+	for Index, Update in Updates
+		if Last[_TOML_ConfigPathName(_TOML_ConfigPath(Update.Section, Update.Key))] == Index
+			Kept.Push(Update)
+	return Kept
 }
 
 ; Manifest comparison uses native values; Boolean serialization sentinels belong
@@ -1637,7 +1695,7 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		; a partial config flush triggered by the -500 ms boot timer from clobbering the
 		; user's file with uninitialised defaults (e.g. before Features or GestureAssignments
 		; have been populated by ApplyConfigToml and the deferred tray-menu build).
-		global _DriverReady
+		global _DriverReady, _DriverBootTailPending
 		; Guard: refuse to serialize the feature tree when boot could not READ an
 		; existing config.toml. In that case ApplyConfigToml applied nothing and the
 		; tree below is ManifestBuildFeaturesMap() DEFAULTS — writing it out replaces
@@ -1666,6 +1724,13 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		; pay the admission (a registry deep compare of about 21 ms): the 100 ms retry ran it
 		; 27 times per boot. A new request and every attempt once the driver is ready are
 		; still admitted before anything is collected or written.
+		; The request stays recorded early, but the write waits for the ready line: on
+		; the boot's last message pump it stalled the tail of the boot by 860 ms.
+		if !RegisterRequest && IsSet(_DriverBootTailPending) && _DriverBootTailPending && !PublicationDebt {
+			PerfCount("config_io.save_retry_deferred_boot_tail")
+			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+				? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+		}
 		if !RegisterRequest && !_DriverReady && !PublicationDebt {
 			PerfCount("config_io.save_retry_deferred_before_admission")
 			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
@@ -2037,11 +2102,11 @@ ReadScriptShortcutsConfig() {
 		; Authored preferences retain the canonical manifest/source-kind decision;
 		; detached runtime candidates keep their strict Boolean contract.
 		if !ConfigTomlTryReadBootValue(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, "chords_enabled", &Raw)
-				Raw := IniCacheGet(_IniCache, "shortcuts.script_control", "chords_enabled")
+				Raw := IniCacheGet(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, "chords_enabled")
 		if (Raw != "_")
 				ScriptShortcutChordsOn := _FeatureStateValidateBoolean(Raw, "shortcuts.script_control.chords_enabled")
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
-				Value := IniCacheGet(_IniCache, "shortcuts.script_control", Slot)
+				Value := IniCacheGet(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
 						ScriptShortcutAssignments[Slot] := Value
 				else if (Value != "_")
@@ -2077,8 +2142,8 @@ ResetScriptComboKeys(SuffixSC, ReleaseFn := 0) {
 		global _ALTGR_KANA_FIXUP
 		if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
 				return
-		KeyWait(SuffixSC, "T2")
-		if GetKeyState(SuffixSC, "P")
+		KS_WaitReleased(SuffixSC, 2)
+		if KS_IsHeld(SuffixSC)
 				return
 		_ScriptComboClearAltGr(KS_AltGrKeyName(), A_SendLevel,
 				HasMethod(ReleaseFn, "Call") ? ReleaseFn : _ScriptComboReleaseThroughHook, false)
@@ -2092,7 +2157,8 @@ ResetScriptComboKeys(SuffixSC, ReleaseFn := 0) {
 ; hotkey's SendLevel, kept for the Up sent from a timer thread.
 _ScriptComboClearAltGr(Name, Level, ReleaseFn, Waited) {
 		global _TapHoldKeyIsDown, _ScriptComboArmFn, SCRIPT_COMBO_ALTGR_RELEASE_POLL_MS
-		if _TapHoldKeyIsDown.Call(Name, "P") {
+		; A press replayed after a terminal expansion is held in the ledger alone.
+		if (_TapHoldKeyIsDown.Call(Name, "P") || KS_IsHeld(Name)) {
 				_ScriptComboArmFn.Call(_ScriptComboClearAltGr.Bind(Name, Level, ReleaseFn, true),
 						SCRIPT_COMBO_ALTGR_RELEASE_POLL_MS)
 				return
@@ -2141,11 +2207,18 @@ ScriptShortcutSlotRunsAction(Slot, Suspended := A_IsSuspended) {
 		global ScriptShortcutAssignments, GESTURE_ACTIONS, SCRIPT_SHORTCUT_SUSPEND_ALLOWED
 		if !ScriptShortcutAssignments.Has(Slot)
 				throw ValueError("Unknown script shortcut slot.", -1, Slot)
+		; These chords are exempt from Suspend, so a quarantined smoke closes them
+		; here: the resident driver keeps its pause, reload and quit.
+		if Suspended && IsSet(_DriverSmokeInputQuarantined) && _DriverSmokeInputQuarantined
+				return false
 		; The submenu's switch: off leaves every chord native and keeps the actions.
 		if !ScriptShortcutChordsAreOn()
 				return false
 		Action := ScriptShortcutAssignments[Slot]
 		if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
+				return false
+		; An AI action is unarmed while the AI is off: the chord stays the system's.
+		if AiActionBlocked(Action)
 				return false
 		; While suspended these chords stay armed ONLY for script management. Without this
 		; scope check the exemption silently widened to whatever the user assigned, so a
@@ -2157,9 +2230,9 @@ RunScriptShortcutAction(Slot) {
 		global ScriptShortcutAssignments, SCRIPT_SHORTCUT_FALLBACKS
 		if !ScriptShortcutSlotRunsAction(Slot) {
 				; The chord's #HotIf admitted this slot at the press, so only a pause
-				; that began before this thread ran gets here: the chord was already
-				; taken, and its key is the one thing left to give back.
-				LoggerWarn("Shortcuts", "Script slot '{1}' no longer runs '{2}' (paused since the press); sending its key instead.",
+				; or an AI switch-off that began before this thread ran gets here: the chord
+				; was already taken, and its key is the one thing left to give back.
+				LoggerWarn("Shortcuts", "Script slot '{1}' no longer runs '{2}' (paused or AI off since the press); sending its key instead.",
 						Slot, ScriptShortcutAssignments[Slot])
 				SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
 				return
@@ -2170,7 +2243,7 @@ RunScriptShortcutAction(Slot) {
 SetScriptShortcutAction(Slot, ActionName) {
 		global ScriptShortcutAssignments
 		if !GestureAssignConfiguredAction(&ScriptShortcutAssignments,
-				"script", "shortcuts.script_control", Slot, ActionName)
+				"script", ConfigKey.SHORTCUTS_SCRIPT_CONTROL, Slot, ActionName)
 				return false
 		return ReloadPreservingSuspend()
 }
@@ -2193,6 +2266,7 @@ SetScriptShortcutChordsOn(On, Path := "", ReloadFn := 0) {
 		Row := ManifestSparseOperation("shortcuts.script_control.chords_enabled", On ? true : false)
 		if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, [Row], "the script chords switch")
 				return false
+		NotifyFeature(t("notify.script_control"), On ? true : false)
 		return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 
@@ -2244,7 +2318,7 @@ ScriptShortcutRows() {
 				CurrentLabel := GESTURE_ACTIONS.Has(Current) ? GestureActionDisplayLabel(Current, GestureBindingId("script", Slot)) : t("dialog.action_picker.disabled")
 				SlotLabel := t(SCRIPT_SHORTCUT_LABELS[Slot])
 				Rows.Push(Map(
-					"label",  SlotLabel . " : " . CurrentLabel,
+					"label",  LabelValue(SlotLabel, CurrentLabel),
 					"action", ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id), false, GestureBindingId("script", _s)))(Slot, SlotLabel)))
 		}
 		return Rows
@@ -2253,35 +2327,22 @@ ScriptShortcutRows() {
 /**
  * Resolves a keyboard-shortcut slot id to a canonical chord string.
  *
- * The slot id is our own vocabulary ("ctrl_shift_v", "win_sc029"); the chord is
- * the cross-driver one. Everything AutoHotkey-specific — that Ctrl is "^", that
- * Space is "{Space}" — now lives in the HotkeyRegistrar adapter, which is the
- * only layer allowed to know it. This function previously emitted a native
- * AutoHotkey spec directly, which is why the macOS driver had to reimplement the
- * same slot grammar from scratch.
- * @param {String} SlotId e.g. "ctrl_shift_v", "win_e", "alt_space".
+ * The slot id is the neutral vocabulary of every driver ("primary_shift_v",
+ * "meta_sc029"); the chord is the cross-driver one. Everything
+ * AutoHotkey-specific — that Ctrl is "^", that Space is "{Space}" — lives in the
+ * HotkeyRegistrar adapter, the only layer allowed to know it.
+ * @param {String} SlotId e.g. "primary_shift_v", "meta_e", "alt_space".
  * @returns {String} The canonical chord, or "" when the slot names no modifier.
  */
 _KeyboardSlotChord(SlotId) {
-		if SubStr(SlotId, 1, 10) = "ctrl_shift"
-				Mods := ["ctrl", "shift"]
-		else if SubStr(SlotId, 1, 4) = "ctrl"
-				Mods := ["ctrl"]
-		else if SubStr(SlotId, 1, 3) = "win"
-				Mods := ["cmd"]
-		else if SubStr(SlotId, 1, 3) = "alt"
-				Mods := ["alt"]
-		else
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("modifiers")
 				return ""
-		if SubStr(SlotId, 1, 10) = "ctrl_shift"
-				Suffix := SubStr(SlotId, 12)
-		else
-				Suffix := SubStr(SlotId, InStr(SlotId, "_") + 1)
-		; Slot-id spellings for keys whose canonical name is a character. The
-		; brace-wrapped AutoHotkey forms that used to live here moved to the adapter
-		static _SlotKeyNames := Map("period", ".", "comma", ",", "enter", "return")
-		Key := _SlotKeyNames.Has(Suffix) ? _SlotKeyNames[Suffix] : Suffix
-		Formatted := ChordFormat(Mods, Key)
+		Mods := []
+		; The chord vocabulary calls the Windows key "cmd" on every driver.
+		for Modifier in Native["modifiers"]
+				Mods.Push(Modifier == "win" ? "cmd" : Modifier)
+		Formatted := ChordFormat(Mods, SlotRoleChordKey(Native["key"]))
 		return Formatted["ok"] ? Formatted["label"] : ""
 }
 
@@ -2299,21 +2360,19 @@ KeyboardSlotDeclaration() {
 
 _KeyboardSlotBuildDeclaration() {
 		Keys := []
-		loop Parse "abcdefghijklmnopqrstuvwxyz0123456789"
-				Keys.Push(A_LoopField)
-		for Special in ["space", "enter", "period", "comma", "sc029"]
-				Keys.Push(Special)
-		return Map("groups", ["alt_", "ctrl_", "ctrl_shift_", "win_"], "keys", Keys)
+		for Entry in SlotRolesData()["keys"]
+				Keys.Push(Entry["id"])
+		return Map("groups", SlotRoleFamilyPrefixes(), "keys", Keys)
 }
 
 /**
- * Resolves a physical Win slot (win_SC03A, any letter case) to its canonical
+ * Resolves a physical Win slot (meta_SC03A, any letter case) to its canonical
  * scan when the shipped physical key registry has that key.
  * @param {String} Slot Persisted slot id.
  * @returns {String} Canonical "SCnnn", or "" when Slot is no physical slot.
  */
 KeyboardSlotPhysicalScan(Slot) {
-		if !(Slot is String) || !RegExMatch(Slot, "i)^win_(SC[0-9a-f]{3})$", &Match)
+		if !(Slot is String) || !RegExMatch(Slot, "i)^meta_(SC[0-9a-f]{3})$", &Match)
 				return ""
 		Scan := StrUpper(Match[1])
 		for Key in MagicEditorPhysicalCatalogue()["keys"] {
@@ -2326,7 +2385,7 @@ KeyboardSlotPhysicalScan(Slot) {
 ; The exact ordinary slot ids, or 0 while the manifest is unavailable: without
 ; its slots the set is incomplete and must judge nothing.
 _KeyboardSlotOrdinarySet() {
-		Manifest := ManifestFeaturesForSection("shortcuts.keyboard")
+		Manifest := ManifestFeaturesForSection(ConfigKey.SHORTCUTS_KEYBOARD)
 		if !(Manifest is Array) || Manifest.Length == 0
 				return 0
 		Slots := Map()
@@ -2369,8 +2428,8 @@ KeyboardSlotCatalogueIds() {
 				return 0
 		for Key in MagicEditorPhysicalCatalogue()["keys"] {
 				Scan := StrUpper(Key["ahk"])
-				Slots["win_" . Scan] := true
-				Slots["win_" . StrLower(Scan)] := true
+				Slots["meta_" . Scan] := true
+				Slots["meta_" . StrLower(Scan)] := true
 		}
 		Ids := []
 		for Slot in Slots
@@ -2389,7 +2448,7 @@ CollectKeyboardShortcutUpdates(Updates, Assignments, Stored, Defaults) {
 	for Slot, Action in Assignments {
 		if Action == "none" && Defaults.Get(Slot, "none") == "none" && !Stored.Has(Slot)
 			continue
-		Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: Action })
+		Updates.Push({ Section: ConfigKey.SHORTCUTS_KEYBOARD, Key: Slot, Value: Action })
 	}
 }
 
@@ -2401,7 +2460,7 @@ ReadKeyboardShortcutsConfig() {
 		;
 		; The slot picker offers every modifier chord in GESTURE_ACTIONS — roughly
 		; 600 of them — while KEYBOARD_SHORTCUT_DEFAULTS holds 15. Iterating only
-		; the defaults meant a slot the user added (say win_b) was written to
+		; the defaults meant a slot the user added (say meta_b) was written to
 		; config.toml by SetKeyboardShortcutAction, and then never read back on the
 		; Reload that same function triggers: absent from KeyboardShortcutAssignments,
 		; so no hotkey is registered and the entry vanishes from the menu too. The
@@ -2410,13 +2469,13 @@ ReadKeyboardShortcutsConfig() {
 		SlotsToRead := Map()
 		for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS
 				SlotsToRead[Slot] := true
-		if IsSet(_IniCache) and _IniCache.Has("shortcuts.keyboard") {
-				for Slot, _ in _IniCache["shortcuts.keyboard"]
+		if IsSet(_IniCache) and _IniCache.Has(ConfigKey.SHORTCUTS_KEYBOARD) {
+				for Slot, _ in _IniCache[ConfigKey.SHORTCUTS_KEYBOARD]
 						SlotsToRead[Slot] := true
 		}
 
 		for Slot, _ in SlotsToRead {
-				; A slot this build's owner does not bind (a hand-written ctrl_f1, a
+				; A slot this build's owner does not bind (a hand-written primary_f1, a
 				; case variant, an unknown physical key) is the unused key the boot
 				; loader already warned about: it stays on disk for the cleanup and
 				; must never become a live hotkey.
@@ -2424,7 +2483,7 @@ ReadKeyboardShortcutsConfig() {
 						try LoggerInfo("Shortcuts", "Keyboard slot '{1}' is not a slot of this build; it is left for the configuration cleanup.", Slot)
 						continue
 				}
-				Value := IniCacheGet(_IniCache, "shortcuts.keyboard", Slot)
+				Value := IniCacheGet(_IniCache, ConfigKey.SHORTCUTS_KEYBOARD, Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
 						KeyboardShortcutAssignments[Slot] := Value
 				else if (Value != "_")
@@ -2437,18 +2496,224 @@ ReadKeyboardShortcutsConfig() {
 		}
 }
 
+/**
+ * The physical key a slot's letter lives on when the layout owner decides it: a
+ * letter the Ergopti emulation remapped (the slot follows the letter, not the key
+ * the host layout prints on it), and the apostrophe, which a host layout may type
+ * with Shift while the chord means the key alone.
+ * @param {String} SlotId Neutral slot id.
+ * @returns {String} Canonical "SCnnn", or "" when the host layout answers.
+ */
+KeyboardSlotLayoutScan(SlotId) {
+		global RemappedList
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("key")
+				return ""
+		Char := SlotRoleChordKey(Native["key"])
+		if StrLen(Char) != 1 || !(RemappedList.Has(Char) || Char == "'")
+				return ""
+		return MagicEditorNormalizeScan(RetrieveScancode(Char))
+}
+
+/**
+ * The physical key a Win slot binds. A textual Win chord cannot be relied on:
+ * AutoHotkey registers it with RegisterHotKey when the chord is free, and when
+ * Windows holds it (Win+S, Win+E, Win+1, Win+Tab) falls back to its hook, which
+ * reads a key carrying any scan-code hotkey from the scan-code table. The layout
+ * tables give almost every key one, inert or not, so the textual variant never
+ * fired and Windows kept the chord. An exact #SCnnn variant is found in that table.
+ * A key already spelled by its scan (sc029, sc03a) or one the host layout does not
+ * have stays with its chord.
+ * @param {String} SlotId A meta_ slot id.
+ * @returns {String} Canonical "SCnnn", or "" when the chord itself must be bound.
+ */
+KeyboardSlotWinScan(SlotId) {
+		LayoutScan := KeyboardSlotLayoutScan(SlotId)
+		if LayoutScan != ""
+				return LayoutScan
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("key")
+				return ""
+		Key := SlotRoleChordKey(Native["key"])
+		if RegExMatch(Key, "i)^(?:sc|vk)[0-9a-f]")
+				return ""
+		Code := GetKeySC(Key)
+		return Code > 0 ? Format("SC{:03X}", Code) : ""
+}
+
+/**
+ * The canonical chord a slot binds: its key is the physical one where the layout
+ * owner decides it (KeyboardSlotLayoutScan).
+ * @param {String} SlotId Neutral slot id.
+ * @param {String} Scan The slot's layout scan, "" for none.
+ * @returns {String} The chord, or "" when the slot names no modifier.
+ */
+_KeyboardSlotBoundChord(SlotId, Scan) {
+		Chord := _KeyboardSlotChord(SlotId)
+		if Scan == "" || Chord == ""
+				return Chord
+		Parsed := ChordParse(Chord)
+		Formatted := ChordFormat(Parsed["mods"], StrLower(Scan))
+		return Formatted["ok"] ? Formatted["label"] : ""
+}
+
+/**
+ * Registers every configured slot. A Win slot binds its physical key
+ * (KeyboardSlotWinScan) and, on a key of the physical registry, joins the broker,
+ * which holds that Win variant for the remap of the same key too. A Ctrl or Alt slot
+ * on a remapped key shares the layout's own variant, which asks at each press; the
+ * others take their own hotkey through the registrar, which reports refusal by
+ * returning "".
+ * @returns {Integer} The slots bound.
+ */
+KeyboardShortcutsBindAll() {
+		global KeyboardShortcutAssignments
+		LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
+		Bound := 0
+		for Slot, Action in KeyboardShortcutAssignments {
+				if Slot == MagicEditorSlot()["id"]
+						continue
+				if MagicEditorRecordOrdinaryPhysical(Slot, Action)
+						continue
+				if Action == "none"
+						continue
+				IsWinSlot := SubStr(Slot, 1, 5) == "meta_"
+				Scan := IsWinSlot ? KeyboardSlotWinScan(Slot) : KeyboardSlotLayoutScan(Slot)
+				if Scan != "" && IsWinSlot && KeyboardSlotPhysicalScan("meta_" . Scan) != "" {
+						MagicEditorRecordOrdinaryScan(Scan, Slot, Action)
+						Bound++
+						continue
+				}
+				; The broker asks at each press; a native hotkey would swallow the chord
+				; with the Shortcuts category off, and turning it on reloads the driver.
+				if !IsCategoryGated("Shortcuts")
+						continue
+				Chord := _KeyboardSlotBoundChord(Slot, Scan)
+				if Chord == "" {
+						LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — chord not resolvable.", Slot)
+						continue
+				}
+				Variant := _KeyboardSlotLayoutVariant(Slot, Scan, Chord)
+				if Variant != "" {
+						_KeyboardShortcutLayoutChords()[Variant] := Slot
+						LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' shares the layout's {3}.", Slot, Action, Variant)
+						Bound++
+						continue
+				}
+				Handle := HotkeyRegistrarBind(Chord, ((_s) => (*) => RunKeyboardShortcutAction(_s))(Slot))
+				if Handle == "" {
+						LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}' ({2}).", Slot, Chord)
+						continue
+				}
+				LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", Slot, Action)
+				MagicEditorRecordOrdinaryHandle(Slot, Handle)
+				KeyboardShortcutRecordHandle(Slot, Action, Handle)
+				Bound++
+		}
+		LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", Bound)
+		return Bound
+}
+
+; The slots set on a Ctrl or Alt variant the layout owns, by native spec. A function,
+; not a global: the boot binds the slots before this file's include.
+; @returns {Map}
+_KeyboardShortcutLayoutChords() {
+		static Chords := Map()
+		return Chords
+}
+
+; The native variant of a slot's chord when RemapKey already registered it: the
+; registrar would refuse it as another producer's, and the slot would never fire.
+; @param Slot {String} The slot.
+; @param Scan {String} Its layout scan, "" when the host layout answers.
+; @param Chord {String} Its bound chord.
+; @returns {String} "^SCnnn" or "!SCnnn", or "" when the slot takes its own hotkey.
+_KeyboardSlotLayoutVariant(Slot, Scan, Chord) {
+		global RemappedList
+		if Scan == "" || !RemappedList.Has(SlotRoleChordKey(SlotRoleNative(Slot)["key"]))
+				return ""
+		Parsed := ChordParse(Chord)
+		Spec := HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"])
+		return RegExMatch(Spec, "^[\^!]SC[0-9A-F]{3}$") ? Spec : ""
+}
+
+; Runs the slot set on a layout variant. An unassigned slot and an AI action held
+; back leave the chord to the layout, as a released native hotkey would.
+; @param Variant {String} The native spec.
+; @returns {Boolean} True when a slot took the press.
+KeyboardShortcutRunLayoutChord(Variant) {
+		global KeyboardShortcutAssignments
+		Slot := _KeyboardShortcutLayoutChords().Get(Variant, "")
+		if Slot == ""
+				return false
+		Action := KeyboardShortcutAssignments.Get(Slot, "none")
+		if Action == "none" || AiActionBlocked(Action)
+				return false
+		RunKeyboardShortcutAction(Slot)
+		return true
+}
+
 RunKeyboardShortcutAction(SlotId) {
 		global KeyboardShortcutAssignments, GESTURE_ACTIONS
 		Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
 		if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
 				return
+		; Re-read at delivery: the switch may have turned off since the press.
+		if AiActionBlocked(Action) {
+				LoggerDebug("KeyboardShortcuts", "Slot '{1}' -> '{2}' held back: the AI is off.", SlotId, Action)
+				return
+		}
 		GestureInvokeAction(Action, GestureBindingId("keyboard", SlotId))
+}
+
+; The registrar handles of the keyboard slots bound to an AI action, by slot. A
+; function, not a global: the boot binds the slots before this file's include.
+; @returns {Map}
+_KeyboardShortcutAiHandles() {
+		static Handles := Map()
+		return Handles
+}
+
+; Retains the handle of a slot bound to an AI action, which follows the AI switch.
+; @param SlotId {String} The keyboard slot.
+; @param Action {String} Its action.
+; @param Handle {String} Its registrar handle.
+KeyboardShortcutRecordHandle(SlotId, Action, Handle) {
+		if AiActionIsAi(Action)
+				_KeyboardShortcutAiHandles()[SlotId] := Handle
+}
+
+; Follows the AI switch: the hotkeys bound to an AI action are released while the
+; AI is off, so the chord reaches the application, and armed again by the
+; switch-on with no reload. A native hotkey cannot ask at each press, unlike every
+; other key layer. A slot the physical Win broker took stays with it: the broker's
+; criterion asks at each press. A refusal is logged and the others still follow.
+; @param SetEnabledFn {Func} Test seam; HotkeyRegistrarSetEnabled by default.
+; @returns {Boolean} True when every handle holds the wanted state.
+KeyboardShortcutsFollowAiSwitch(SetEnabledFn := 0) {
+		global KeyboardShortcutAssignments
+		SetEnabled := HasMethod(SetEnabledFn, "Call") ? SetEnabledFn : HotkeyRegistrarSetEnabled
+		Settled := true
+		for SlotId, Handle in _KeyboardShortcutAiHandles() {
+				if MagicEditorOwnsOrdinarySlot(SlotId)
+						continue
+				Wanted := !AiActionBlocked(KeyboardShortcutAssignments.Get(SlotId, "none"))
+				Accepted := false
+				try Accepted := SetEnabled.Call(Handle, Wanted)
+				catch as Err
+						LoggerError("KeyboardShortcuts", "Slot '{1}' raised while following the AI switch: {2}.", SlotId, Err.Message)
+				if (Accepted == true)
+						continue
+				Settled := false
+				LoggerError("KeyboardShortcuts", "Slot '{1}' could not follow the AI switch (enabled={2}).", SlotId, Wanted ? "true" : "false")
+		}
+		return Settled
 }
 
 SetKeyboardShortcutAction(SlotId, ActionName) {
 		global KeyboardShortcutAssignments
 		if !GestureAssignConfiguredAction(&KeyboardShortcutAssignments,
-				"keyboard", "shortcuts.keyboard", SlotId, ActionName)
+				"keyboard", ConfigKey.SHORTCUTS_KEYBOARD, SlotId, ActionName)
 				return false
 		MagicEditorConfigurationChanged()
 		return ReloadPreservingSuspend()
@@ -2461,26 +2726,53 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
 _FormatSlotLabel(SlotId) {
 		if SlotId == MagicEditorSlot()["id"]
 				return MagicEditorSlotLabel()
-		static _ModLabels := Map("ctrl_shift_", "Ctrl + Shift + ", "ctrl_", "Ctrl + ", "win_", "Win + ", "alt_", "Alt + ")
-		; Only the two NAMED keys are translatable — ".", "," and "²" are the glyphs
-		; themselves. The map holds i18n KEYS, never labels: a static initialised with
-		; t() would freeze the language at first call, and the menu is rebuilt on a
-		; language switch expecting the new one.
-		static _KeyNameKeys := Map("space", "common.key_space", "enter", "common.key_enter")
-		static _KeyGlyphs := Map("period", ".", "comma", ",", "sc029", "²")
-		for Prefix, ModLabel in _ModLabels {
-				if (SubStr(SlotId, 1, StrLen(Prefix)) = Prefix) {
-						Suffix := SubStr(SlotId, StrLen(Prefix) + 1)
-						if _KeyNameKeys.Has(Suffix)
-								Key := t(_KeyNameKeys[Suffix])
-						else if _KeyGlyphs.Has(Suffix)
-								Key := _KeyGlyphs[Suffix]
-						else
-								Key := StrUpper(Suffix)
-						return ModLabel . Key
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("modifiers")
+				return SlotId
+		; A named key (Space, Caps Lock) and every modifier read as the shared key
+		; name table names them in the user's language (« Ctrl + Maj + V »); a
+		; letter, digit or sign prints the catalogue's own legend.
+		Suffix := Native["key"]
+		if (KeyNameCanonical(Suffix) != "") {
+				Key := KeyNameLabel(Suffix)
+		} else {
+				Key := StrUpper(Suffix)
+				for Entry in SlotRolesData()["keys"] {
+						if Entry["id"] == Suffix
+								Key := Entry["label"]
 				}
 		}
-		return SlotId
+		Label := ""
+		for Modifier in Native["modifiers"]
+				Label .= KeyNameLabel(Modifier) . " + "
+		return Label . Key
+}
+
+; The modifiers of one keyboard-slot group, named as its rows name them
+; (« Ctrl + Maj »), for the picker that adds a slot to the group.
+; @param Prefix {String} A group prefix of KEYBOARD_SLOT_GROUPS, e.g. "primary_shift_".
+; @returns {String}
+_KeyboardSlotFamilyLabel(Prefix) {
+		; Any key of the family carries its modifiers; "a" is in every slot domain.
+		Native := SlotRoleNative(Prefix . "a")
+		if !Native.Has("modifiers") || Native["modifiers"].Length == 0
+				throw ValueError("The keyboard-slot group names no modifier.", -1, Prefix)
+		Label := ""
+		for Modifier in Native["modifiers"]
+				Label .= (Label == "" ? "" : " + ") . KeyNameLabel(Modifier)
+		return Label
+}
+
+; The heading or the Add row of one keyboard-slot group: the contextual
+; group's own title, a modifier group's template filled with its modifiers
+; (« Raccourcis Ctrl + Maj », « [+ Ajouter un raccourci Win + …] »).
+; @param GroupInfo {Map} An entry of KEYBOARD_SLOT_GROUPS.
+; @param Field {String} "group_key" or "add_key".
+; @returns {String}
+_KeyboardSlotGroupText(GroupInfo, Field) {
+		if GroupInfo["prefix"] == "magic_"
+				return t(GroupInfo[Field])
+		return KeyNameFill(GroupInfo[Field], _KeyboardSlotFamilyLabel(GroupInfo["prefix"]))
 }
 
 ; The keyboard-shortcut groups, in display order. The i18n KEYS are stored, never
@@ -2489,9 +2781,9 @@ _FormatSlotLabel(SlotId) {
 global KEYBOARD_SLOT_GROUPS := [
 		Map("prefix", "magic_", "group_key", "menu.shortcuts.group_contextual", "add_key", "menu.shortcuts.add_contextual"),
 		Map("prefix", "alt_", "group_key", "menu.shortcuts.alt_group", "add_key", "menu.shortcuts.alt_add"),
-		Map("prefix", "ctrl_", "group_key", "menu.shortcuts.ctrl_group", "add_key", "menu.shortcuts.ctrl_add"),
-		Map("prefix", "ctrl_shift_", "group_key", "menu.shortcuts.ctrl_shift_group", "add_key", "menu.shortcuts.ctrl_shift_add"),
-		Map("prefix", "win_", "group_key", "menu.shortcuts.win_group", "add_key", "menu.shortcuts.win_add"),
+		Map("prefix", "primary_", "group_key", "menu.shortcuts.ctrl_group", "add_key", "menu.shortcuts.ctrl_add"),
+		Map("prefix", "primary_shift_", "group_key", "menu.shortcuts.ctrl_shift_group", "add_key", "menu.shortcuts.ctrl_shift_add"),
+		Map("prefix", "meta_", "group_key", "menu.shortcuts.win_group", "add_key", "menu.shortcuts.win_add"),
 ]
 
 /**
@@ -2517,8 +2809,8 @@ KeyboardSlotRows() {
 				; The group opens with its restore and clear, declared by
 				; keyboard_group_scope_controls like on the two other drivers.
 				Items := MenuRenderer_TemplateRows("keyboard_group_scope_controls", Map(
-						"scope_restore", _KeyboardSlotGroupScopeCommand.Bind(Prefix, "recommended"),
-						"scope_clear", _KeyboardSlotGroupScopeCommand.Bind(Prefix, "clear")),
+						MenuCommand.SCOPE_RESTORE, _KeyboardSlotGroupScopeCommand.Bind(Prefix, "recommended"),
+						MenuCommand.SCOPE_CLEAR, _KeyboardSlotGroupScopeCommand.Bind(Prefix, "clear")),
 						Map("keyboard_group_ready", (*) => true), Map())
 				if !(Items is Array) || Items.Length != 3
 						throw Error("The keyboard group scope rows are not declared.")
@@ -2527,22 +2819,22 @@ KeyboardSlotRows() {
 								continue
 						ActionLabel := GESTURE_ACTIONS.Has(Action) ? GestureActionDisplayLabel(Action, GestureBindingId("keyboard", Slot)) : Action
 						Items.Push(Map(
-								"label", _FormatSlotLabel(Slot) . " : " . ActionLabel,
+								"label", LabelValue(_FormatSlotLabel(Slot), ActionLabel),
 								"action", ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot)
 						))
 				}
 				Items.Push(Map(
-						"label", t(GroupInfo["add_key"]),
+						"label", _KeyboardSlotGroupText(GroupInfo, "add_key"),
 						"action", ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix)
 				))
-				Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", Items))
+				Rows.Push(Map("label", _KeyboardSlotGroupText(GroupInfo, "group_key"), "items", Items))
 		}
 		return Rows
 }
 
 /**
  * The keyboard-slot group a slot is listed in: the LONGEST group prefix that
- * matches it, or "ctrl_shift_v" would also belong to the Ctrl group. The tray
+ * matches it, or "primary_shift_v" would also belong to the Ctrl group. The tray
  * and the group's restore and clear ask this one rule.
  * @param {String} Slot Persisted slot id.
  * @returns {String} The group prefix, or "" when no group lists the slot.
@@ -2561,7 +2853,7 @@ KeyboardSlotGroupOf(Slot) {
 ; Whether one configuration row belongs to a modifier group: its slot, or an
 ; action parameter of the binding that slot dispatches under.
 _KeyboardSlotGroupOwnsRow(Prefix, Row) {
-		if Row.Section == "shortcuts.keyboard"
+		if Row.Section == ConfigKey.SHORTCUTS_KEYBOARD
 				return KeyboardSlotGroupOf(Row.Key) == Prefix
 		BindingPrefix := GestureBindingId("keyboard", "")
 		if Row.Section != "action_parameters" || SubStr(Row.Key, 1, StrLen(BindingPrefix)) != BindingPrefix
@@ -2632,11 +2924,11 @@ ConfigIOShortcutScopeOperations(ScopeId, Mode) {
 		throw Error("Keyboard shortcut inventory is unavailable.")
 	Rows := []
 	for Slot in KeyboardShortcutAssignments {
-		if TomlConfigForeignOwner("shortcuts.keyboard", Slot) != "ConfigIO"
+		if TomlConfigForeignOwner(ConfigKey.SHORTCUTS_KEYBOARD, Slot) != "ConfigIO"
 			continue
 		if ManifestFindEntryByPath("shortcuts.keyboard." . Slot)
 			continue
-		Rows.Push({ Section: "shortcuts.keyboard", Key: Slot, Delete: true })
+		Rows.Push({ Section: ConfigKey.SHORTCUTS_KEYBOARD, Key: Slot, Delete: true })
 	}
 	for Row in KeyCombinationScopeRows()
 		Rows.Push(Row)

@@ -9,6 +9,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 global _MenuStartupCommands := false
 
@@ -57,7 +58,7 @@ MenuStartupDiagnosticsReady() {
 /** Explicitly declares the one toggle whose unchanged early presentation joins repeated clicks. */
 class MenuStartupRepeatableToggleCommand {
 	__New(Id, Callback) {
-		if !(Id is String) || !(Id == "llm_toggle") || !HasMethod(Callback, "Call")
+		if !(Id is String) || !(Id == MenuCommand.LLM_TOGGLE) || !HasMethod(Callback, "Call")
 			throw TypeError("Repeatable startup selection requires the declared AI toggle")
 		this.Id := Id
 		this.Callback := Callback
@@ -76,6 +77,9 @@ class MenuStartupCommands {
 		this.ReadyFn := ReadyFn
 		this.ScheduleFn := HasMethod(ScheduleFn, "Call") ? ScheduleFn : SetTimer
 		this.Pending := []
+		; Released selections Drain has not reached. The successor's close request
+		; can interrupt Drain, so they stay reachable for TakeForReload.
+		this.Draining := []
 		this.Released := false
 		this.Canceled := false
 		this.Generation := 0
@@ -104,10 +108,14 @@ class MenuStartupCommands {
 
 	/** Hands still-retained selections to an accepted reload as tray row paths, once. */
 	TakeForReload() {
-		if this.Canceled || this.Released
+		if this.Canceled
 			return []
 		Paths := []
-		for Entry in this.Pending {
+		Entries := this.Draining.Clone()
+		Entries.Push(this.Pending*)
+		; In place: an interrupted Drain holds this array and stops when it empties.
+		this.Draining.Length := 0
+		for Entry in Entries {
 			if Entry.HasOwnProp("ReplayPath") {
 				Paths.Push(Entry.ReplayPath)
 				continue
@@ -148,7 +156,7 @@ class MenuStartupCommands {
 				Identity.Desired := Registration.Desired
 			RepeatCallback := Callback is MenuStartupRepeatableToggleCommand ? Callback.Callback : 0
 			RepeatId := Callback is MenuStartupRepeatableToggleCommand ? Callback.Id : ""
-			if RepeatId == "llm_toggle" && IsObject(Identity)
+			if RepeatId == MenuCommand.LLM_TOGGLE && IsObject(Identity)
 					&& (Identity.ItemId is Integer) && Identity.ItemId > 0
 					&& (Identity.Token is Integer) && Identity.Token > 0 {
 				for Entry in this.Pending {
@@ -187,11 +195,13 @@ class MenuStartupCommands {
 			Entries := []
 		}
 		this.Pending := []
+		this.Draining := Entries
 		this.Released := true
 		if Entries.Length > 0 {
 			try this.ScheduleFn.Call(ObjBindMethod(this, "Drain", Entries, this.Generation), -1)
 			catch as Err {
 				this.Pending := Entries
+				this.Draining := []
 				this.Released := false
 				try LoggerError("MenuDispatcher", "Retained startup selections could not be scheduled: {1}.", Err.Message)
 				throw Err
@@ -204,9 +214,10 @@ class MenuStartupCommands {
 	Drain(Entries, Generation, *) {
 		global _MenuDispatchTokens
 		global _SuspendPending
-		for Entry in Entries {
+		while Entries.Length > 0 {
 			if Generation != this.Generation
 				return false
+			Entry := Entries.RemoveAt(1)
 			if Entry.HasOwnProp("ReplayPath") {
 				if A_IsSuspended || (IsSet(_SuspendPending) && _SuspendPending) {
 					try LoggerWarn("MenuDispatcher", "Menu command from before the reload refused: the driver is paused.")

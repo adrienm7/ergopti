@@ -96,7 +96,7 @@ _MAER_CaseOwned(PreviousCritical) {
 		Inputs: [], Pickers: 0, Warnings: 0, Options: 0, Receipt: 0, Spawns: 0, Started: 0,
 		WorkerError: 0, Lock: 0, ExpectedDisk: "", Projection: 0, PrefetchReceipt: 0, Timers: [],
 		Prefetch: KLPF_PrefetchPath("apps", Root) }
-	World.Original := '{"audit.exe":"productive","legacy.exe":"neutral"}' . "`n"
+	World.Original := '{"audit.exe":{"type":"productive","score":0},"explorer.exe":{"type":"neutral","score":0}}' . "`n"
 	World.ExpectedDisk := World.Original
 	World.View := _MAE_View(World.Url)
 	World.Entry := Map("epoch", 71, "webview", World.View, "navigation_url", World.Url,
@@ -117,7 +117,7 @@ _MAER_CaseOwned(PreviousCritical) {
 		KLAppCat.save_fn := Timer
 		if KLAppCat.HasOwnProp("write_owner")
 			KLAppCat.write_owner := 0
-		AssertTrue(KL_AppCat_Init(Root), "the existing public loader must admit the private legacy image")
+		AssertTrue(KL_AppCat_Init(Root), "the existing public loader must admit the private record image")
 		KLWV.windows := Map("apps", World.Entry), KLWV.metrics_dir := Root
 		KLPFWorker.jobs := Map(), KLPFWorker.spawn_fn := _MAER_Spawn.Bind(World), KLPFWorker.publish_fn := 0
 		KLWV.first_paint_push_fn := 0

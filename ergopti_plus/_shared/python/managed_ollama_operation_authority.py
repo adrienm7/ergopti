@@ -81,6 +81,17 @@ def stable(value):
     return value.st_dev, value.st_ino, value.st_uid, value.st_nlink, value.st_mode
 
 
+def directory_stable(value):
+    """A directory's identity without its link count.
+
+    APFS counts a directory's entries in st_nlink, so the count grew when
+    authority.json and window.json were created and every macOS model pull
+    was refused at the next fence (field run of 2026-10-30 21:57); ext4 keeps
+    it, which is why Linux never saw it. The entries are fenced by name.
+    """
+    return value.st_dev, value.st_ino, value.st_uid, value.st_mode
+
+
 def observation(value):
     return stable(value), value.st_size, value.st_mtime_ns, value.st_ctime_ns
 
@@ -272,7 +283,7 @@ class OperationFiles:
                 self.directory,
                 os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
             )
-            self.directory_identity = stable(os.fstat(self.directory_fd))
+            self.directory_identity = directory_stable(os.fstat(self.directory_fd))
             self.directory_fence()
             for name in ("authority.json", "window.json"):
                 fd = os.open(
@@ -301,8 +312,8 @@ class OperationFiles:
         named = self.directory.lstat()
         if (
             not private_directory(value)
-            or stable(value) != self.directory_identity
-            or stable(named) != self.directory_identity
+            or directory_stable(value) != self.directory_identity
+            or directory_stable(named) != self.directory_identity
         ):
             raise AuthorityRefusal()
         if set(os.listdir(self.directory_fd)) - {"authority.json", "window.json"}:
@@ -449,7 +460,7 @@ class ReadOperation:
                 decimal(directory["inode"]),
             ):
                 raise AuthorityRefusal()
-            self.directory_identity = stable(current)
+            self.directory_identity = directory_stable(current)
             if handoff["authority"]["path"] != str(self.directory / "authority.json") or handoff[
                 "window"
             ]["path"] != str(self.directory / "window.json"):
@@ -554,8 +565,8 @@ class ReadOperation:
         current, named = os.fstat(self.directory_fd), self.directory.lstat()
         if (
             not private_directory(current)
-            or stable(current) != self.directory_identity
-            or stable(named) != self.directory_identity
+            or directory_stable(current) != self.directory_identity
+            or directory_stable(named) != self.directory_identity
             or set(os.listdir(self.directory_fd)) != {"authority.json", "window.json"}
         ):
             raise AuthorityRefusal()

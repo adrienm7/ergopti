@@ -36,10 +36,8 @@
 ; hotkey scan below: SC029:: is NOT unique across the modules tree (it also tags
 ; the screenshot hotkey in modules/shortcuts/win.ahk), so no concat helper can
 ; safely scope that positional/first-match scan — it stays a pinned read.
-_RECU_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_RECU_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Asserts the function FnName exists in the driver source and its body wraps the
@@ -90,7 +88,7 @@ Test("layout: number-row hotkeys delegate to the serialised emit helpers (remap-
 
 
 _RECU_AssertOuterSymbolsRouteViaShiftSend() {
-	Src := _RECU_ReadSource("modules/keymap/layout.ahk")
+	Src := _RECU_ReadSource("layout.ahk")
 	; SC029, SC00C and SC00D sit outside the SC002-SC00B digit run. Their only
 	; number-row hotkeys reorder the three edge keys (number-row-edge-keys) and
 	; delegate to _NumberRowEdgeSend, which must type through _DigitShiftSend

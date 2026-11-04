@@ -306,6 +306,64 @@ helpers.describe("Shared privacy trigger checks", function()
 end)
 
 
+-- Saves are sparse: a filter at its shipped value is never in config.toml. The
+-- stub preference view hands back the whole state, so only the real owner over
+-- real bytes shows these rows.
+helpers.describe("Privacy rows over a sparse config.toml", function()
+	local SPARSE = {
+		{name = "no trigger entry", source = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n'},
+		{name = "no backend entry, the machine's own choice in force", backend = "mlx", source = '[llm]\nenabled = true\n'},
+		{name = "an outdated entry awaiting the cleanup", kept = "layer_scroll = true",
+			source = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[shortcuts.keys]\nlayer_scroll = true\n'},
+	}
+	for _, case in ipairs(SPARSE) do
+		helpers.it("keeps both rows enabled and persists a click with " .. case.name .. " (shared-privacy-triggers)", function()
+			for _, expected in ipairs(privacy_corpus().rows) do
+				local path = require("infra.config_paths").get("ConfigTomlPath")
+				local disk = case.source
+				local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
+				package.loaded["adapters.file_system"] = {
+					read_with_status = function() return disk, "ok" end,
+					write = function() error("a privacy row never writes unconditionally") end,
+					write_if_unchanged = function(_, content, source)
+						if source.status ~= "ok" or source.content ~= disk then return false, "source changed" end
+						disk = content
+						return true
+					end,
+				}
+				package.loaded["infra.preferences"] = nil
+				local preferences = require("infra.preferences")
+				local ok, err = xpcall(function()
+					local _, status = preferences.load(path)
+					helpers.assert_eq(status, "ok")
+					with_fixture({preferences = preferences, preference_source = path, backend = case.backend,
+						privacy_states = {false, true}}, function(fixture)
+						local shipped = expected.neutral
+						local row = assert(find_item(fixture.trigger_menu(), expected.i18n))
+						helpers.assert_eq(row.disabled or false, false, "a filter at its shipped value stays changeable")
+						helpers.assert_eq(row.checked or false, shipped)
+						helpers.assert_eq(row.fn(), true)
+						helpers.assert_eq(fixture.state[expected.hs], not shipped)
+						helpers.assert_eq(fixture.runtime[expected.hs], not shipped)
+						local leaf = expected.path:match("[^.]+$")
+						helpers.assert_true(disk:find(leaf .. " = " .. tostring(not shipped), 1, true) ~= nil,
+							"the click reaches config.toml")
+						if case.kept then
+							helpers.assert_true(disk:find(case.kept, 1, true) ~= nil, "the cleanup still owns the outdated entry")
+						end
+					end)
+				end, debug.traceback)
+				package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+				if not ok then error(err, 0) end
+			end
+		end)
+	end
+end)
+
+
+-- The renderer's title of a greyed row that declares its reason.
+local GREYED_SUFFIX = " — menu.llm.save_unavailable"
+
 helpers.describe("Privacy native publication source ownership", function()
 	for _, race in ipairs({"before menu construction", "after menu construction",
 		"before forward acknowledgement", "after forward acknowledgement", "between own acknowledgement and receipt admission"}) do
@@ -346,7 +404,8 @@ helpers.describe("Privacy native publication source ownership", function()
 						end,
 					}, function(fixture)
 						if race == "before menu construction" then disk = external end
-						local row = assert(find_item(fixture.trigger_menu(), expected.i18n))
+						local menu = fixture.trigger_menu()
+						local row = assert(find_item(menu, expected.i18n) or find_item(menu, expected.i18n .. GREYED_SUFFIX))
 						if race == "after menu construction" then disk = external end
 						if row.fn then helpers.assert_eq(row.fn(), false) end
 						helpers.assert_eq(disk, external)
@@ -375,7 +434,8 @@ helpers.describe("Privacy native publication source ownership", function()
 							end
 							helpers.assert_eq(owned_value, true)
 						end
-						local fresh = assert(find_item(fixture.trigger_menu(), expected.i18n))
+						local fresh = assert(find_item(fixture.trigger_menu(), expected.i18n .. GREYED_SUFFIX),
+							"a greyed privacy row states why")
 						helpers.assert_eq(fresh.disabled, true)
 						if fresh.fn then helpers.assert_eq(fresh.fn(), false) end
 						helpers.assert_eq(fixture.manager.apply_setting_transaction({key = expected.hs,
@@ -541,7 +601,12 @@ helpers.describe("LLM fixed parents: actual shared group topology", function()
 				for _, parent in ipairs(parents) do
 					local row = assert(find_item(rows, parent.key))
 					helpers.assert_eq(row.disabled, true)
-					helpers.assert_true(type(row.menu) == "table", "gating retains the genuine child tree")
+					if condition.paused then
+						helpers.assert_true(type(row.menu) == "table", "gating retains the genuine child tree")
+					else
+						-- Category-off rule: a greyed group of an off category opens nothing.
+						helpers.assert_nil(row.menu, "an off category's group opens nothing")
+					end
 				end
 			end)
 		end)

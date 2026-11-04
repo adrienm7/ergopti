@@ -85,6 +85,9 @@ _LTSR_ControlBoundary(Kind) {
 	Previous := _LLM_Menu
 	_LLM_Menu := Previous.Clone()
 	_LLM_Menu["debounce_ms"] := Expected["trigger_delay"]
+	_LLM_Menu[ConfigLeaf.MIN_REQUEST_INTERVAL_MS] := _LLM_DefaultFor("llm_min_request_interval_ms")
+	; The trigger group holds the debounce and the request floor before its boundary.
+	BoundaryIndex := Kind == "trigger" ? 3 : 2
 	_LLM_Menu["disabled_apps"] := []
 	_LLM_Menu["inline_autotype"] := false
 	_LLM_Menu["pred_indent"] := 0
@@ -93,10 +96,10 @@ _LTSR_ControlBoundary(Kind) {
 	OwnedRows() => Kind == "trigger" ? _LLM_Menu_TriggerRows("leading") : _LLM_Menu_DisplayRows("remaining")
 	try {
 		Rows := OwnedRows()
-		AssertEqual(2, Rows.Length)
+		AssertEqual(BoundaryIndex, Rows.Length)
 		AssertEqual(Kind == "trigger" ? StrReplace(t("menu.llm.debounce_label"), "%s", Expected["trigger_delay"] . " ms") : t(Expected["display_inline_key"]), Rows[1]["label"])
 		AssertTrue(HasMethod(Rows[1]["action"], "Call"))
-		AssertTrue(Rows[2]["separator"])
+		AssertTrue(Rows[BoundaryIndex]["separator"])
 		if Kind == "display"
 			AssertFalse(Rows[1]["checked"])
 		if Kind == "trigger" {
@@ -107,15 +110,15 @@ _LTSR_ControlBoundary(Kind) {
 		}
 		Native := Menu()
 		MenuRenderer_AppendRows(Native, "llm_menu", Kind == "trigger" ? "llm_trigger" : "llm_display", Rows)
-		AssertEqual(2, DllCall("GetMenuItemCount", "ptr", Native.Handle, "int"))
-		State := DllCall("GetMenuState", "ptr", Native.Handle, "uint", 1, "uint", 0x400, "uint")
+		AssertEqual(BoundaryIndex, DllCall("GetMenuItemCount", "ptr", Native.Handle, "int"))
+		State := DllCall("GetMenuState", "ptr", Native.Handle, "uint", BoundaryIndex - 1, "uint", 0x400, "uint")
 		Assert(State != 0xFFFFFFFF && (State & 0x800) != 0)
 		Frame[1] := Map("type", "label", "id", "hand_control_boundary", "i18n", Expected["marker_key"],
 			"platforms", Original["platforms"], "unavailable", "hide")
 		Rows := OwnedRows()
-		AssertEqual(t(Expected["marker_key"]), Rows[2]["label"])
-		AssertTrue(Rows[2]["disabled"])
-		AssertFalse(Rows[2].Has("action"))
+		AssertEqual(t(Expected["marker_key"]), Rows[BoundaryIndex]["label"])
+		AssertTrue(Rows[BoundaryIndex]["disabled"])
+		AssertFalse(Rows[BoundaryIndex].Has("action"))
 		AssertTrue(HasMethod(Rows[1]["action"], "Call"))
 		Root.Delete(Contract["section"])
 		AssertEqual(0, OwnedRows().Length, "actual native provider cannot rebuild a withdrawn boundary")

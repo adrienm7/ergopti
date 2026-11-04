@@ -131,7 +131,7 @@ final class LauncherLogTests: XCTestCase {
 		let deadline = ProcessInfo.processInfo.systemUptime + 0.5
 		while processes.contains(where: { $0.isRunning })
 			&& ProcessInfo.processInfo.systemUptime < deadline {
-			usleep(1_000)
+			usleep(LauncherTimings.testFastPoll.microseconds)
 		}
 		for process in processes where process.isRunning {
 			_ = Darwin.kill(process.processIdentifier, SIGKILL)
@@ -139,7 +139,7 @@ final class LauncherLogTests: XCTestCase {
 		let killDeadline = ProcessInfo.processInfo.systemUptime + 0.5
 		while processes.contains(where: { $0.isRunning })
 			&& ProcessInfo.processInfo.systemUptime < killDeadline {
-			usleep(1_000)
+			usleep(LauncherTimings.testFastPoll.microseconds)
 		}
 	}
 	#endif

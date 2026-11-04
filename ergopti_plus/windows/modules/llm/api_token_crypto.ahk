@@ -273,56 +273,13 @@ _LLM_DPAPI_Unprotect(b64) {
 ; ====================================
 ; ====================================
 
-; CryptBinaryToStringA / CryptStringToBinaryA give us standards-compliant
-; base64 without a third-party dependency.
+; The crypto adapter's single-line form fits cleanly into TOML and JSON values.
 
 _LLM_Base64Encode(buf) {
-	; 0x40000001 = CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF — single line,
-	; no CR/LF wrapping at 76 chars, so the output fits cleanly into TOML
-	; / JSON values.
-	flags := 0x40000001
-	required := 0
-	DllCall("Crypt32\CryptBinaryToStringW",
-		"Ptr",   buf.Ptr,
-		"UInt",  buf.Size,
-		"UInt",  flags,
-		"Ptr",   0,
-		"UInt*", &required)
-	if (required <= 0)
-		return ""
-	out := Buffer(required * 2, 0)
-	DllCall("Crypt32\CryptBinaryToStringW",
-		"Ptr",   buf.Ptr,
-		"UInt",  buf.Size,
-		"UInt",  flags,
-		"Ptr",   out.Ptr,
-		"UInt*", &required)
-	return StrGet(out.Ptr, required, "UTF-16")
+	return CryptoBase64Encode(buf)
 }
 
 _LLM_Base64Decode(b64) {
-	flags := 0x1   ; CRYPT_STRING_BASE64
-	required := 0
-	DllCall("Crypt32\CryptStringToBinaryW",
-		"WStr",  b64,
-		"UInt",  StrLen(b64),
-		"UInt",  flags,
-		"Ptr",   0,
-		"UInt*", &required,
-		"Ptr",   0,
-		"Ptr",   0)
-	if (required <= 0)
-		return ""
-	out := Buffer(required, 0)
-	ok := DllCall("Crypt32\CryptStringToBinaryW",
-		"WStr",  b64,
-		"UInt",  StrLen(b64),
-		"UInt",  flags,
-		"Ptr",   out.Ptr,
-		"UInt*", &required,
-		"Ptr",   0,
-		"Ptr",   0)
-	if !ok
-		return ""
-	return out
+	Decoded := CryptoBase64Decode(b64)
+	return Decoded.Size > 0 ? Decoded : ""
 }

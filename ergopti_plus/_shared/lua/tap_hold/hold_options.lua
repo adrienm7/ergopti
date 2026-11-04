@@ -24,6 +24,7 @@
 
 local M = {}
 local TextUtils = require("text_utils")
+local KeyNames = require("keycodes.key_names")
 
 --- The ordered modifier and layer ids of a picker catalogue.
 --- @param catalogue table|nil The `[tap_hold.hold_picker]` table.
@@ -186,31 +187,21 @@ function M.canonical(kind, id, catalogue)
 	return canonical, err
 end
 
---- The label key of one modifier of a combination.
---- @param modifier string A modifier id, e.g. "alt_gr".
---- @return string
-function M.modifier_i18n(modifier)
-	return "tap_hold.hold." .. modifier
-end
-
 --- The label a driver shows for one option.
 ---
---- A modifier combination is its modifiers' translated labels joined with
---- " + " ("Ctrl + Shift", "AltGr"), as the Windows menu shows it. The stored id
+--- A modifier combination is its modifiers' names from the shared key name
+--- table joined with " + " ("Ctrl + Maj", "AltGr"), as the Windows menu shows
+--- it, under the platform's usual name (Super on Linux). The stored id
 --- ("ctrl+shift", "alt_gr") used to be shown as is, in every locale.
 --- @param option table One entry of M.build().
 --- @param translate function Takes an i18n key, returns the translated string.
+--- @param platform string "windows", "macos" or "linux".
 --- @return string
-function M.label(option, translate)
+function M.label(option, translate, platform)
 	if type(option) ~= "table" then error("a hold option must be a table", 2) end
 	if type(translate) ~= "function" then error("a hold option label needs a translate function", 2) end
 	if option.kind == "modifier" then
-		local labels = {}
-		for modifier in tostring(option.id):gmatch("[^+]+") do
-			labels[#labels + 1] = translate(M.modifier_i18n(modifier))
-		end
-		if #labels == 0 then error("a modifier hold option has no modifier", 2) end
-		return table.concat(labels, " + ")
+		return KeyNames.combo_label(tostring(option.id), platform, translate)
 	end
 	if type(option.i18n) ~= "string" or option.i18n == "" then
 		error(string.format("hold option '%s' has no label key", tostring(option.id)), 2)
@@ -234,9 +225,10 @@ end
 --- catalogue: they are what a hold can be.
 --- @param options table The ordered result of M.build().
 --- @param translate function Takes an i18n key, returns the translated string.
+--- @param platform string "windows", "macos" or "linux".
 --- @return table items Picker items { type = "action", id, label }.
 --- @return table by_id Picker id → option, "none" included.
-function M.picker_items(options, translate)
+function M.picker_items(options, translate, platform)
 	if type(options) ~= "table" then error("hold picker items need the hold options", 2) end
 	local items, by_id = {}, {}
 	for _, option in ipairs(options) do
@@ -246,7 +238,7 @@ function M.picker_items(options, translate)
 		end
 		by_id[id] = option
 		if option.kind ~= "none" then
-			items[#items + 1] = { type = "action", id = id, label = M.label(option, translate) }
+			items[#items + 1] = { type = "action", id = id, label = M.label(option, translate, platform) }
 		end
 	end
 	if by_id.none == nil or by_id.none.kind ~= "none" then

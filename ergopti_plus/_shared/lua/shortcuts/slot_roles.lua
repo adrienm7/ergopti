@@ -149,6 +149,18 @@ function M.families(driver)
 	return result
 end
 
+--- The native modifiers of one family a driver accepts, the names a group
+--- heading reads them by.
+--- @param driver string "windows", "macos" or "linux".
+--- @param prefix string A family prefix, e.g. "primary_shift_".
+--- @return table modifiers Native modifier ids in role order.
+function M.family_modifiers(driver, prefix)
+	for _, family in ipairs(M.families(driver)) do
+		if family.prefix == prefix then return family.native end
+	end
+	error("slot roles: " .. tostring(driver) .. " has no family " .. tostring(prefix), 2)
+end
+
 --- Keys a driver accepts in slots beyond the shared key catalogue.
 --- @param driver string "windows", "macos" or "linux".
 --- @return table keys Dense array of { id, label, chord_key } with detached tables.

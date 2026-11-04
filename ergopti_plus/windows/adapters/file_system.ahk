@@ -1,6 +1,7 @@
 ﻿; adapters/file_system.ahk
 
 #Include %A_LineFile%\..\..\infra\file_read_activity.ahk
+#Include %A_LineFile%\..\file_system_ports.ahk
 
 ; ==============================================================================
 ; MODULE: FileSystem Adapter (AutoHotkey)
@@ -930,20 +931,295 @@ FSSameBytes(PathA, PathB) {
 	return DllCall("ntdll\RtlCompareMemory", "Ptr", A, "Ptr", B, "UPtr", A.Size, "UPtr") == A.Size
 }
 
-; Replaces a file by the bytes of another through a verified same-directory
-; stage and one atomic rename; a failure leaves the destination as it was.
-; @param Source {String} File whose bytes are published.
-; @param Destination {String} File replaced (or created).
-; @return {Boolean}
-FSCopyReplaceAtomic(Source, Destination) {
-	if !FSPathIsAdmissible(Source) || !FSPathIsAdmissible(Destination)
+global FS_RESTORE_STAGE_SUFFIX := ".ergopti-restore.tmp"
+global FS_RESTORE_COPY_BLOCK := 65536
+; FILE_BASIC_INFO: four 8-byte timestamps, then the attributes and padding.
+global FS_BASIC_INFO_BYTES := 40
+global FS_ATTRIBUTE_REPARSE_POINT := 0x400
+; List, add file, add subfolder, traverse, read attributes. The rename target
+; check opens the folder for writing, so read and write sharing stay granted;
+; delete sharing is what stops the folder being renamed or removed.
+global FS_HELD_FOLDER_ACCESS := 0x1 | 0x2 | 0x4 | 0x20 | 0x80
+global FS_HELD_FOLDER_SHARE := 0x1 | 0x2
+
+; Replaces one file below RootDir by a copy of Source, holding every object from
+; the first open to the last close. CopyFileW and MoveFileExW take pathnames, so
+; a same-user process could swap the stage, or a folder above it, between any
+; two of them: restore then verified one file and published another. Here no
+; pathname is resolved after the anchor opens: each folder is opened relative
+; to its parent, the stage relative to its folder with no sharing at all, and
+; the rename goes through the stage's own handle into the held folder handle.
+; A folder handle denies delete sharing, so the folder cannot be renamed away.
+; The stage keeps the name restore always used: an existing file of that name
+; belongs to someone else and refuses the attempt untouched. A refused stage
+; goes away through its own handle, never through a name.
+; @param Source {String} File published with its streams and metadata.
+; @param RootDir {String} Existing anchor folder; a link here is followed, since
+;   the configuration folder may legitimately live behind one.
+; @param Relative {String} Destination below RootDir, in "/" or "\" segments.
+;   A link among the segments refuses the attempt.
+; @param Detail {VarRef} Why a false return was false.
+; @return {Boolean} True only when the verified stage is the destination.
+FSCopyReplaceAtomic(Source, RootDir, Relative, &Detail := "") {
+	Detail := ""
+	if !FSPathIsAdmissible(Source) || !FSPathIsAdmissible(RootDir) || !FSPathIsAdmissible(Relative) {
+		Detail := "inadmissible path"
 		return false
-	Stage := Destination . ".ergopti-restore.tmp"
-	; The fixed pathname conveys no ownership over a preexisting sidecar.
-	if !FSCopyCreateVerified(Source, Stage)
+	}
+	Names := StrSplit(StrReplace(Relative, "\", "/"), "/")
+	for _, Name in Names
+		if Name == "" || Name == "." || Name == ".." || InStr(Name, ":") {
+			Detail := "invalid relative path"
+			return false
+		}
+	Leaf := Names.Pop()
+	Folders := []
+	SourceHandle := -1, StageHandle := -1, Published := false
+	try {
+		Folders.Push(_FSHoldRootFolder(RootDir))
+		for _, Name in Names
+			Folders.Push(_FSHoldChildFolder(Folders[Folders.Length], Name))
+		SourceHandle := _FSOpenHeldSource(Source)
+		Metadata := _FSHandleBasicInfo(SourceHandle)
+		StageHandle := _FSCreateHeldStage(Folders[Folders.Length], Leaf . FS_RESTORE_STAGE_SUFFIX,
+			NumGet(Metadata, 32, "UInt"))
+		_FSBackupStreamsCopy(SourceHandle, StageHandle)
+		_FSBackupStreamsCompare(SourceHandle, StageHandle)
+		_FSApplyCopyMetadata(StageHandle, Metadata)
+		if !DllCall("kernel32\FlushFileBuffers", "Ptr", StageHandle, "Int")
+			throw OSError(A_LastError, "stage flush")
+		_FSHeldRename(StageHandle, Folders[Folders.Length], Leaf)
+		Published := true
+		if !DllCall("kernel32\FlushFileBuffers", "Ptr", StageHandle, "Int")
+			throw OSError(A_LastError, "published file flush")
+		return true
+	} catch as Err {
+		Detail := (Published ? "published, but " : "") . Err.Message
+		if !Published && StageHandle != -1
+			Detail .= _FSDiscardHeldStage(StageHandle)
 		return false
-	; A refused rename does not identify the file now held at the stage name.
-	return FSAtomicMoveReplace(Stage, Destination)
+	} finally {
+		if StageHandle != -1
+			DllCall("kernel32\CloseHandle", "Ptr", StageHandle, "Int")
+		if SourceHandle != -1
+			DllCall("kernel32\CloseHandle", "Ptr", SourceHandle, "Int")
+		while Folders.Length
+			DllCall("kernel32\CloseHandle", "Ptr", Folders.Pop(), "Int")
+	}
+}
+
+; Opens the anchor folder: the one pathname of a held copy.
+_FSHoldRootFolder(RootDir) {
+	static OPEN_EXISTING := 3, FILE_FLAG_BACKUP_SEMANTICS := 0x02000000, SYNCHRONIZE := 0x100000
+	Handle := DllCall("kernel32\CreateFileW", "Str", RootDir, "UInt", FS_HELD_FOLDER_ACCESS | SYNCHRONIZE,
+		"UInt", FS_HELD_FOLDER_SHARE, "Ptr", 0, "UInt", OPEN_EXISTING,
+		"UInt", FILE_FLAG_BACKUP_SEMANTICS, "Ptr", 0, "Ptr")
+	if Handle == -1
+		throw OSError(A_LastError, "anchor folder open")
+	return Handle
+}
+
+; Opens or creates one folder inside a held one and refuses a link.
+_FSHoldChildFolder(Parent, Name) {
+	static FILE_OPEN_IF := 3, FILE_DIRECTORY_FILE := 0x1, FILE_ATTRIBUTE_DIRECTORY := 0x10
+	Handle := _FSNtCreateRelative(Parent, Name, FS_HELD_FOLDER_ACCESS, FILE_ATTRIBUTE_DIRECTORY,
+		FS_HELD_FOLDER_SHARE, FILE_OPEN_IF, FILE_DIRECTORY_FILE)
+	Info := Buffer(FS_BASIC_INFO_BYTES, 0)
+	Readable := DllCall("kernel32\GetFileInformationByHandleEx", "Ptr", Handle, "Int", 0,
+		"Ptr", Info, "UInt", Info.Size, "Int")
+	NativeError := A_LastError
+	if Readable && !(NumGet(Info, 32, "UInt") & FS_ATTRIBUTE_REPARSE_POINT)
+		return Handle
+	DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int")
+	throw Readable ? Error("a folder of the path is a link") : OSError(NativeError, "folder identity")
+}
+
+; Reads share only: nothing writes, renames or deletes the source meanwhile.
+_FSOpenHeldSource(Source) {
+	static GENERIC_READ := 0x80000000, FILE_SHARE_READ := 1, OPEN_EXISTING := 3
+	Handle := DllCall("kernel32\CreateFileW", "Str", Source, "UInt", GENERIC_READ,
+		"UInt", FILE_SHARE_READ, "Ptr", 0, "UInt", OPEN_EXISTING, "UInt", 0, "Ptr", 0, "Ptr")
+	if Handle == -1
+		throw OSError(A_LastError, "source open")
+	return Handle
+}
+
+; Creates the stage in its held folder, encrypted like its source as CopyFileW
+; does. Sharing nothing is the whole defence: no other handle can read, write,
+; rename or delete it, and FILE_CREATE never adopts an existing name or link.
+_FSCreateHeldStage(Folder, Name, SourceAttributes) {
+	static GENERIC_READ := 0x80000000, GENERIC_WRITE := 0x40000000, DELETE := 0x10000
+	static FILE_CREATE := 2, FILE_NON_DIRECTORY_FILE := 0x40, FILE_WRITE_THROUGH := 0x2
+	static FILE_ATTRIBUTE_NORMAL := 0x80, FILE_ATTRIBUTE_ENCRYPTED := 0x4000
+	return _FSNtCreateRelative(Folder, Name, GENERIC_READ | GENERIC_WRITE | DELETE,
+		FILE_ATTRIBUTE_NORMAL | (SourceAttributes & FILE_ATTRIBUTE_ENCRYPTED), 0,
+		FILE_CREATE, FILE_NON_DIRECTORY_FILE | FILE_WRITE_THROUGH)
+}
+
+; NtCreateFile on one name relative to a held handle. A reparse point is opened
+; as itself, never followed; the caller decides what that means.
+; @return {Integer} The new handle.
+; @throws {Error} Carrying the NTSTATUS on refusal.
+_FSNtCreateRelative(Root, Name, Access, Attributes, Share, Disposition, Options) {
+	static SYNCHRONIZE := 0x100000, OBJ_CASE_INSENSITIVE := 0x40
+	static FILE_SYNCHRONOUS_IO_NONALERT := 0x20, FILE_OPEN_REPARSE_POINT := 0x200000
+	Wide := Buffer(StrLen(Name) * 2 + 2, 0)
+	StrPut(Name, Wide, "UTF-16")
+	Unicode := Buffer(2 * A_PtrSize, 0)
+	NumPut("UShort", Wide.Size - 2, "UShort", Wide.Size - 2, Unicode)
+	NumPut("Ptr", Wide.Ptr, Unicode, A_PtrSize)
+	ObjectAttributes := Buffer(6 * A_PtrSize, 0)
+	NumPut("UInt", ObjectAttributes.Size, ObjectAttributes, 0)
+	NumPut("Ptr", Root, ObjectAttributes, A_PtrSize)
+	NumPut("Ptr", Unicode.Ptr, ObjectAttributes, 2 * A_PtrSize)
+	NumPut("UInt", OBJ_CASE_INSENSITIVE, ObjectAttributes, 3 * A_PtrSize)
+	Io := Buffer(2 * A_PtrSize, 0)
+	Status := DllCall("ntdll\NtCreateFile", "Ptr*", &Handle := 0, "UInt", Access | SYNCHRONIZE,
+		"Ptr", ObjectAttributes, "Ptr", Io, "Ptr", 0, "UInt", Attributes, "UInt", Share, "UInt", Disposition,
+		"UInt", Options | FILE_SYNCHRONOUS_IO_NONALERT | FILE_OPEN_REPARSE_POINT,
+		"Ptr", 0, "UInt", 0, "UInt")
+	if Status >= 0x80000000
+		throw Error(Format("relative open of a held folder refused (NTSTATUS 0x{:08X})", Status))
+	return Handle
+}
+
+; FILE_BASIC_INFO of a handle: four timestamps, then the attributes at 32.
+_FSHandleBasicInfo(Handle) {
+	Info := Buffer(FS_BASIC_INFO_BYTES, 0)
+	if !DllCall("kernel32\GetFileInformationByHandleEx", "Ptr", Handle, "Int", 0,
+		"Ptr", Info, "UInt", Info.Size, "Int")
+		throw OSError(A_LastError, "file metadata read")
+	return Info
+}
+
+; Copies what CopyFileW copies, by handle: BackupRead yields the content, the
+; named streams and the extended attributes, and BackupWrite applies them. The
+; security descriptor stays out: a copy inherits from its folder, as before.
+_FSBackupStreamsCopy(Source, Stage) {
+	Block := Buffer(FS_RESTORE_COPY_BLOCK), ReadContext := 0, WriteContext := 0
+	_FSRewind(Source)
+	try {
+		loop {
+			if !DllCall("kernel32\BackupRead", "Ptr", Source, "Ptr", Block, "UInt", Block.Size,
+				"UInt*", &Got := 0, "Int", false, "Int", false, "Ptr*", &ReadContext, "Int")
+				throw OSError(A_LastError, "stream read")
+			if Got == 0
+				return
+			if !DllCall("kernel32\BackupWrite", "Ptr", Stage, "Ptr", Block, "UInt", Got,
+				"UInt*", &Put := 0, "Int", false, "Int", false, "Ptr*", &WriteContext, "Int")
+				throw OSError(A_LastError, "stream write")
+			if Put != Got
+				throw Error("short stream write")
+		}
+	} finally {
+		_FSBackupRelease("BackupRead", Source, ReadContext)
+		_FSBackupRelease("BackupWrite", Stage, WriteContext)
+	}
+}
+
+; Reads both held handles back as backup streams and compares every byte. The
+; two sides may split a read differently, so what one side has ahead waits.
+; @throws {Error} On the first difference.
+_FSBackupStreamsCompare(Source, Stage) {
+	Left := Buffer(FS_RESTORE_COPY_BLOCK), Right := Buffer(FS_RESTORE_COPY_BLOCK)
+	LeftContext := 0, RightContext := 0, LeftFill := 0, RightFill := 0
+	_FSRewind(Source)
+	_FSRewind(Stage)
+	try {
+		loop {
+			_FSBackupReadInto(Source, Left, &LeftFill, &LeftContext)
+			_FSBackupReadInto(Stage, Right, &RightFill, &RightContext)
+			if LeftFill == 0 && RightFill == 0
+				return
+			Common := Min(LeftFill, RightFill)
+			if Common == 0
+				throw Error("the verified copy has a different length")
+			if DllCall("ntdll\RtlCompareMemory", "Ptr", Left, "Ptr", Right, "UPtr", Common, "UPtr") != Common
+				throw Error("the verified copy has different bytes")
+			_FSBufferConsume(Left, &LeftFill, Common)
+			_FSBufferConsume(Right, &RightFill, Common)
+		}
+	} finally {
+		_FSBackupRelease("BackupRead", Source, LeftContext)
+		_FSBackupRelease("BackupRead", Stage, RightContext)
+	}
+}
+
+; Tops up one comparison buffer behind what it already holds.
+_FSBackupReadInto(Handle, Block, &Fill, &Context) {
+	if Fill == Block.Size
+		return
+	if !DllCall("kernel32\BackupRead", "Ptr", Handle, "Ptr", Block.Ptr + Fill, "UInt", Block.Size - Fill,
+		"UInt*", &Got := 0, "Int", false, "Int", false, "Ptr*", &Context, "Int")
+		throw OSError(A_LastError, "stream read back")
+	Fill += Got
+}
+
+_FSBufferConsume(Block, &Fill, Count) {
+	Fill -= Count
+	if Fill
+		FSBufferMove(Block, Block.Ptr + Count, Fill)
+}
+
+_FSRewind(Handle) {
+	if !DllCall("kernel32\SetFilePointerEx", "Ptr", Handle, "Int64", 0, "Ptr", 0, "UInt", 0, "Int")
+		throw OSError(A_LastError, "rewind")
+}
+
+; An unfinished backup context owns native memory until an abort call frees it.
+_FSBackupRelease(Function, Handle, Context) {
+	if Context
+		DllCall("kernel32\" . Function, "Ptr", Handle, "Ptr", 0, "UInt", 0, "UInt*", &Done := 0,
+			"Int", true, "Int", false, "Ptr*", &Context, "Int")
+}
+
+; Gives the stage the attributes and write time CopyFileW carries over.
+_FSApplyCopyMetadata(Stage, Metadata) {
+	static WRITE_TIME_OFFSET := 16, ATTRIBUTES_OFFSET := 32, FILE_ATTRIBUTE_NORMAL := 0x80
+	; Read-only, hidden, system, archive and not-content-indexed.
+	static CARRIED_ATTRIBUTES := 0x2027
+	Info := Buffer(FS_BASIC_INFO_BYTES, 0)
+	NumPut("Int64", NumGet(Metadata, WRITE_TIME_OFFSET, "Int64"), Info, WRITE_TIME_OFFSET)
+	Carried := NumGet(Metadata, ATTRIBUTES_OFFSET, "UInt") & CARRIED_ATTRIBUTES
+	NumPut("UInt", Carried ? Carried : FILE_ATTRIBUTE_NORMAL, Info, ATTRIBUTES_OFFSET)
+	if !DllCall("kernel32\SetFileInformationByHandle", "Ptr", Stage, "Int", 0,
+		"Ptr", Info, "UInt", Info.Size, "Int")
+		throw OSError(A_LastError, "stage metadata")
+}
+
+; The publication: the file behind this handle takes Name in that folder handle,
+; replacing what is there, so neither side is a pathname anyone could swap.
+; @throws {Error} Carrying the NTSTATUS on refusal; the destination is unchanged.
+_FSHeldRename(Stage, Folder, Name) {
+	static FileRenameInformation := 10
+	NameOffset := 2 * A_PtrSize + 4
+	Info := Buffer(NameOffset + StrLen(Name) * 2 + 2, 0)
+	NumPut("UChar", true, Info, 0)
+	NumPut("Ptr", Folder, Info, A_PtrSize)
+	NumPut("UInt", StrLen(Name) * 2, Info, 2 * A_PtrSize)
+	StrPut(Name, Info.Ptr + NameOffset, "UTF-16")
+	Io := Buffer(2 * A_PtrSize, 0)
+	Status := DllCall("ntdll\NtSetInformationFile", "Ptr", Stage, "Ptr", Io, "Ptr", Info,
+		"UInt", Info.Size, "UInt", FileRenameInformation, "UInt")
+	if Status >= 0x80000000
+		throw Error(Format("rename refused (NTSTATUS 0x{:08X})", Status))
+}
+
+; Deletes the unpublished stage through its handle: a name could be anyone's.
+; A read-only attribute is cleared first since it refuses the disposition.
+; @return {String} "" or the suffix telling the stage stayed on disk.
+_FSDiscardHeldStage(Stage) {
+	static ATTRIBUTES_OFFSET := 32, FILE_ATTRIBUTE_NORMAL := 0x80, FileDispositionInfo := 4
+	Info := Buffer(FS_BASIC_INFO_BYTES, 0)
+	NumPut("UInt", FILE_ATTRIBUTE_NORMAL, Info, ATTRIBUTES_OFFSET)
+	Cleared := DllCall("kernel32\SetFileInformationByHandle", "Ptr", Stage, "Int", 0,
+		"Ptr", Info, "UInt", Info.Size, "Int")
+	Delete := Buffer(4, 0)
+	NumPut("UChar", true, Delete, 0)
+	if Cleared && DllCall("kernel32\SetFileInformationByHandle", "Ptr", Stage, "Int", FileDispositionInfo,
+		"Ptr", Delete, "UInt", 1, "Int")
+		return ""
+	return Format("; the stage stayed on disk (error {})", A_LastError)
 }
 
 ; Whether a path is a reparse point (a symbolic link or a junction), which a
@@ -1143,3 +1419,120 @@ FSUtf8Bytes(Content) {
 	DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", Encoded.Ptr, "UPtr", Size)
 	return Bytes
 }
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 2/ Classified read and publication =======
+; ==================================================
+; ==================================================
+
+; The methods of _shared/lua/file_system/ports.lua. AutoHotkey has no multiple
+; return, so a result is a Map: read_with_status gives content, status and
+; detail, a publication gives committed and detail.
+global FS_STATUS_OK := "ok"
+global FS_STATUS_ABSENT := "absent"
+global FS_STATUS_ERROR := "error"
+
+; Reports one fixed failure category: never a path, never file content.
+_FSReportFailure(OnError, Category) {
+	if HasMethod(OnError, "Call")
+		OnError.Call(Category)
+	return Category
+}
+
+; Reads a classified source a publication can later be conditioned on.
+; @param Path {String} File path.
+; @param OnError {Func|0} Receives the fixed category of an unreadable source.
+; @returns {Map} content ("" unless ok), status (FS_STATUS_*), detail.
+FSReadWithStatus(Path, OnError := 0) {
+	NativeOpenError := 0
+	Content := FSConfigReadUtf8Exact(Path, &NativeOpenError)
+	if (Content is String)
+		return Map("content", Content, "status", FS_STATUS_OK, "detail", "")
+	if (NativeOpenError == 2 || NativeOpenError == 3)
+		return Map("content", "", "status", FS_STATUS_ABSENT, "detail", "")
+	return Map("content", "", "status", FS_STATUS_ERROR,
+		"detail", _FSReportFailure(OnError, "the source cannot be read"))
+}
+
+; Whether a path still holds the classified source a caller read.
+_FSSourceIsUnchanged(Path, Expected) {
+	Current := FSReadWithStatus(Path)
+	return Current["status"] == Expected["status"]
+		&& (Expected["status"] != FS_STATUS_OK || Current["content"] == Expected["content"])
+}
+
+; Publishes through a same-directory stage named as FSAtomicTempOwnerIsGone expects.
+; The check and the rename are not one kernel operation: a writer of another
+; process is excluded by the configuration lease, not here.
+_FSPublishIfUnchanged(Path, Content, Expected, OnError, AdmissionFn) {
+	static StageSerial := 0
+	Refuse(Category) => Map("committed", false, "detail", _FSReportFailure(OnError, Category))
+	if !FSPathIsAdmissible(Path) || !(Content is String) || !(Expected is Map)
+			|| !Expected.Has("status") || (Expected["status"] != FS_STATUS_ABSENT
+				&& (Expected["status"] != FS_STATUS_OK || !(Expected.Get("content", 0) is String)))
+		return Refuse("a publication needs a path, a string payload and a source precondition")
+	if !_FSSourceIsUnchanged(Path, Expected)
+		return Refuse("the source changed since it was read")
+	Stage := Path . "." . A_ScriptHwnd . "-" . (++StageSerial) . ".tmp"
+	if !FSWriteDurable(Stage, Content)
+		return Refuse("the publication stage cannot be written")
+	Committed := Expected["status"] == FS_STATUS_ABSENT
+		? FSConfigAtomicMoveCreate(Stage, Path, AdmissionFn)
+		: FSConfigAtomicMoveReplace(Stage, Path, , AdmissionFn)
+	if Committed
+		return Map("committed", true, "detail", "")
+	FSDelete(Stage)
+	return Refuse("the publication was refused")
+}
+
+; Atomic replacement, refused when the file no longer matches `Expected`.
+; @param Path {String} Destination.
+; @param Content {String} Complete replacement text.
+; @param Expected {Map} status and, for FS_STATUS_OK, content.
+; @param OnError {Func|0} Receives the fixed category of a refusal.
+; @returns {Map} committed, detail.
+FSWriteIfUnchanged(Path, Content, Expected, OnError := 0) {
+	return _FSPublishIfUnchanged(Path, Content, Expected, OnError, 0)
+}
+
+; The same publication with a final logical admission checked just before commit.
+; @param Admission {Func} Returns 1 to admit; required.
+; @returns {Map} committed, detail.
+FSWriteIfUnchangedAdmitted(Path, Content, Expected, OnError, Admission) {
+	if !HasMethod(Admission, "Call")
+		return Map("committed", false, "detail", _FSReportFailure(OnError, "publication admission required"))
+	return _FSPublishIfUnchanged(Path, Content, Expected, OnError, Admission)
+}
+
+; The owner's own method identities, without IO. Windows offers no optional
+; capability, so the removers are 0.
+; @returns {Map} owner, reader, writer, publisher, remover, admitted_remover,
+;   exact_remover, delete.
+FSConfigurationPorts() {
+	return Map("owner", FILE_SYSTEM_OWNER, "reader", FILE_SYSTEM_OWNER["read_with_status"],
+		"writer", FILE_SYSTEM_OWNER["write_if_unchanged"],
+		"publisher", FILE_SYSTEM_OWNER["write_if_unchanged_admitted"],
+		"remover", 0, "admitted_remover", 0, "exact_remover", 0,
+		"delete", FILE_SYSTEM_OWNER["delete"])
+}
+
+; The owner the shared spec describes. ADAPTER_FILE_SYSTEM stays the five portable
+; methods of FileSystem.spec.js. Checked when the file loads: a missing method or a
+; half-offered capability would otherwise fail late, inside a publication.
+global FILE_SYSTEM_OWNER := Map(
+	"read", FSRead,
+	"write", FSWrite,
+	"append", FSAppend,
+	"exists", FSExists,
+	"delete", FSDelete,
+	"read_with_status", FSReadWithStatus,
+	"write_if_unchanged", FSWriteIfUnchanged,
+	"write_if_unchanged_admitted", FSWriteIfUnchangedAdmitted,
+	"configuration_ports", FSConfigurationPorts
+)
+FSPortsCheckOwner(FILE_SYSTEM_OWNER)

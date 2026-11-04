@@ -8,10 +8,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TLJ_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_TLJ_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TLJ_Check() {
@@ -26,7 +24,7 @@ _TLJ_Check() {
 	; (provider-error-prefix): a cut surrogate pair would corrupt the log line.
 	Assert(InStr(Body, "TextHeadWithinUnits(raw, 200)") > 0, "LLM_ParseOllamaChatResponse must log the raw response payload")
 
-	Src2 := _TLJ_ReadSource("modules/llm/models.ahk")
+	Src2 := _TLJ_ReadSource("models.ahk")
 	Assert(Src2 != "", "Source file models.ahk must exist")
 	Assert(InStr(Src2, "TextHeadWithinUnits(raw, 200)") > 0, "models.ahk must log the raw response payload")
 }

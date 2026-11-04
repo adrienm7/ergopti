@@ -12,15 +12,18 @@
 ; 1. Pure: no file, hotkey or global state. The emulation parses once when a
 ;    layout is loaded or changed, never on the typing path; Keylayout_Step, the only
 ;    function called per keystroke, is Map lookups.
-; 2. Same reading rules as the Linux converter
-;    (static/ergopti/linux/xkb_generation/keylayout_to_xkb.py): comments
-;    stripped, XML character references decoded, control-character outputs
-;    type nothing, modifierMap tokens folded onto shift/caps/option/command/
-;    control, baseMapSet inheritance followed. The shared resolution vectors in
-;    _shared/tests/layouts pin both readers to the same answers.
+; 2. One reader, one form. Keylayout_ParseCanonical reads the file into the
+;    canonical form (schema 1) documented in _shared/lua/layouts/keylayout.lua,
+;    the form the Lua reader, the Python converter and the web composer produce,
+;    with the same rules: comments stripped, XML character references decoded,
+;    double or single quoted attribute values, modifierMap tokens folded onto
+;    shift/caps/option/command/control, first <key> of a code and first <action>
+;    of an id kept. _shared/tests/corpus/keylayout pins them all to it.
+;    Keylayout_Parse then indexes that form into the Maps a keystroke looks up.
 ; 3. Fail fast: a missing <layout first="0">, an undefined modifierMap or
-;    keyMapSet, an unknown modifier token or an undefined action throws
-;    instead of producing a half-read layout.
+;    keyMapSet, an unknown modifier token, a tag of a walked element the grammar
+;    cannot read or an undefined action throws instead of producing a half-read
+;    layout: skipping an unreadable tag silently lost keys.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -51,8 +54,9 @@ global KEYLAYOUT_NEUTRAL_STATE := "none"
 ; Guards a baseMapSet chain that loops back on itself.
 global KEYLAYOUT_MAX_BASE_DEPTH := 8
 
-global _KEYLAYOUT_TAG_RE := 'S)<(/?)([A-Za-z][A-Za-z0-9]*)((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*"[^"]*")*)\s*(/?)>'
-global _KEYLAYOUT_ATTR_RE := 'S)([A-Za-z_:][\w:.-]*)\s*=\s*"([^"]*)"'
+; The tag starting exactly at the "<" being read, the attributes in either quote.
+global _KEYLAYOUT_TAG_RE := "SA)<(/?)([A-Za-z][A-Za-z0-9]*)((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*(?:" . '"[^"]*"' . "|'[^']*'))*)\s*(/?)>"
+global _KEYLAYOUT_ATTR_RE := "S)([A-Za-z_:][\w:.-]*)\s*=\s*(?:" . '"([^"]*)"' . "|'([^']*)')"
 global _KEYLAYOUT_ENTITY_RE := "S)&(#x[0-9A-Fa-f]+|#[0-9]+|lt|gt|amp|quot|apos)" . Chr(59)
 
 
@@ -112,7 +116,8 @@ _Keylayout_Attributes(Raw) {
 	Attrs := Map()
 	Pos := 1
 	while (Found := RegExMatch(Raw, _KEYLAYOUT_ATTR_RE, &M, Pos)) {
-		Attrs[M[1]] := Keylayout_DecodeEntities(M[2])
+		; An unmatched group reads as "": the other quote spelled this value.
+		Attrs[M[1]] := Keylayout_DecodeEntities(M.Len[2] || !M.Pos[3] ? M[2] : M[3])
 		Pos := Found + M.Len
 	}
 	return Attrs
@@ -122,7 +127,7 @@ _Keylayout_ParseModifierKeys(Keys) {
 	global KEYLAYOUT_MODIFIER_TOKENS
 	Required := Map()
 	Optional := Map()
-	Loop Parse, Keys, " `t" {
+	Loop Parse, Keys, " `t`r`n" {
 		Token := A_LoopField
 		if (Token == "")
 			continue
@@ -151,46 +156,69 @@ _Keylayout_ParseModifierKeys(Keys) {
 ; ==========================
 ; ==========================
 
+; A required integer attribute, or a refusal naming the element that lacks it.
+_Keylayout_IntegerAttribute(Attrs, Name, Element) {
+	Value := Attrs.Get(Name, "")
+	if !IsInteger(Value)
+		throw ValueError("A .keylayout " . Element . " has no valid " . Name . ".", -1, Value)
+	return Integer(Value)
+}
+
+; A required text attribute, or a refusal naming the element that lacks it.
+_Keylayout_RequiredAttribute(Attrs, Name, Element) {
+	if !Attrs.Has(Name)
+		throw ValueError("A .keylayout " . Element . " has no " . Name . ".")
+	return Attrs[Name]
+}
+
+; A tag of an element the walk reads that the grammar cannot: keys or whole
+; keyMaps would vanish silently. Any other "<" is not ours to judge.
+_Keylayout_RefuseUnreadableTag(Body, Open) {
+	static Known := Map("keyboard", 1, "layouts", 1, "layout", 1, "modifierMap", 1, "keyMapSelect", 1,
+		"modifier", 1, "keyMapSet", 1, "keyMap", 1, "key", 1, "actions", 1, "action", 1, "when", 1,
+		"terminators", 1)
+	if RegExMatch(Body, "SA)</?([A-Za-z][A-Za-z0-9]*)[\s/>]", &M, Open) && Known.Has(M[1]) {
+		StrReplace(SubStr(Body, 1, Open), "`n", , , &Newlines)
+		throw ValueError("Malformed .keylayout tag on line " . (Newlines + 1) . " of the comment-free text.", -1, M[1])
+	}
+}
+
 /**
- * Parses the text of a .keylayout.
+ * Reads the text of a .keylayout into the canonical form (schema 1).
  * @param {string} Text - Full file content.
- * @returns {Map} Model with Name, MapSet, DefaultIndex, Selects, KeyMapSets,
- *   Bases, Actions and Terminators.
- * @throws {ValueError} When a part every emulation needs is missing.
+ * @returns {Map} schema, name, map_set, default_index, selects, key_map_sets,
+ *   actions and terminators, as _shared/lua/layouts/keylayout.lua documents them.
+ * @throws {ValueError} When the file cannot be read completely.
  */
-Keylayout_Parse(Text) {
-	global _KEYLAYOUT_TAG_RE
+Keylayout_ParseCanonical(Text) {
+	global _KEYLAYOUT_TAG_RE, KEYLAYOUT_NEUTRAL_STATE
+	if !(Text is String)
+		throw TypeError("The .keylayout text must be a string.")
 	Body := RegExReplace(Text, "s)<!--.*?-->", "")
-	Model := Map(
-		"Name", "",
-		"MapSet", "",
-		"DefaultIndex", 0,
-		"Selects", [],
-		"KeyMapSets", Map(),
-		"Bases", Map(),
-		"Actions", Map(),
-		"Terminators", Map()
-	)
+	Name := ""
 	Layouts := []
 	ModifierMaps := Map()
-	CurModifierMap := ""
-	CurSelect := 0
-	CurMapSet := ""
-	CurKeyMap := ""
-	CurAction := 0
+	Sets := Map(), SetOrder := []
+	Actions := Map(), ActionOrder := []
+	TerminatorOutputs := Map(), TerminatorOrder := []
+	CurModifierMap := "", CurSelect := 0, CurSet := 0, CurKeyMap := 0, CurAction := 0
 	InTerminators := false
 
 	Pos := 1
-	while (Found := RegExMatch(Body, _KEYLAYOUT_TAG_RE, &M, Pos)) {
-		Pos := Found + M.Len
-		Closing := (M[1] == "/")
+	while (Open := InStr(Body, "<", true, Pos)) {
+		if !RegExMatch(Body, _KEYLAYOUT_TAG_RE, &M, Open) {
+			_Keylayout_RefuseUnreadableTag(Body, Open)
+			Pos := Open + 1
+			continue
+		}
+		Pos := Open + M.Len
 		Tag := M[2]
-		if Closing {
+		if (M[1] == "/") {
 			switch Tag, true {
 				case "modifierMap": CurModifierMap := ""
 				case "keyMapSelect": CurSelect := 0
-				case "keyMapSet": CurMapSet := ""
-				case "keyMap": CurKeyMap := ""
+				case "keyMapSet": CurSet := 0
+				case "keyMap": CurKeyMap := 0
 				case "action": CurAction := 0
 				case "terminators": InTerminators := false
 			}
@@ -200,66 +228,91 @@ Keylayout_Parse(Text) {
 		Attrs := _Keylayout_Attributes(M[3])
 		switch Tag, true {
 			case "keyboard":
-				Model["Name"] := Attrs.Get("name", "")
+				Name := Attrs.Get("name", "")
 			case "layout":
 				Layouts.Push(Attrs)
 			case "modifierMap":
-				CurModifierMap := Attrs["id"]
+				CurModifierMap := _Keylayout_RequiredAttribute(Attrs, "id", "modifierMap")
+				; A repeated id replaces the earlier map, as the Lua reader does.
 				ModifierMaps[CurModifierMap] := Map(
-					"DefaultIndex", Integer(Attrs.Get("defaultIndex", "0")),
-					"Selects", [])
+					"default_index", Attrs.Has("defaultIndex")
+						? _Keylayout_IntegerAttribute(Attrs, "defaultIndex", "modifierMap") : 0,
+					"selects", [])
 			case "keyMapSelect":
 				if (CurModifierMap != "") {
-					CurSelect := Map("Index", Integer(Attrs["mapIndex"]), "Modifiers", [])
-					ModifierMaps[CurModifierMap]["Selects"].Push(CurSelect)
+					CurSelect := Map("index", _Keylayout_IntegerAttribute(Attrs, "mapIndex", "keyMapSelect"), "modifiers", [])
+					ModifierMaps[CurModifierMap]["selects"].Push(CurSelect)
 				}
 			case "modifier":
-				if IsObject(CurSelect)
-					CurSelect["Modifiers"].Push(_Keylayout_ParseModifierKeys(Attrs.Get("keys", "")))
+				if IsObject(CurSelect) {
+					Parsed := _Keylayout_ParseModifierKeys(Attrs.Get("keys", ""))
+					Required := [], Optional := []
+					; A Map enumerates string keys sorted, the order the form requires.
+					for Token in Parsed["Required"]
+						Required.Push(Token)
+					for Token in Parsed["Optional"]
+						Optional.Push(Token)
+					CurSelect["modifiers"].Push(Map("required", Required, "optional", Optional))
+				}
 			case "keyMapSet":
-				CurMapSet := Attrs["id"]
-				if !Model["KeyMapSets"].Has(CurMapSet)
-					Model["KeyMapSets"][CurMapSet] := Map()
+				Id := _Keylayout_RequiredAttribute(Attrs, "id", "keyMapSet")
+				if !Sets.Has(Id) {
+					Sets[Id] := Map("Id", Id, "Maps", Map(), "Order", [])
+					SetOrder.Push(Id)
+				}
+				CurSet := Sets[Id]
 			case "keyMap":
-				if (CurMapSet != "") {
-					CurKeyMap := Integer(Attrs["index"])
-					Sets := Model["KeyMapSets"][CurMapSet]
-					if !Sets.Has(CurKeyMap)
-						Sets[CurKeyMap] := Map()
-					if Attrs.Has("baseIndex") {
-						if !Model["Bases"].Has(CurMapSet)
-							Model["Bases"][CurMapSet] := Map()
-						Model["Bases"][CurMapSet][CurKeyMap] := [
-							Attrs.Get("baseMapSet", CurMapSet), Integer(Attrs["baseIndex"])]
+				if IsObject(CurSet) {
+					Index := _Keylayout_IntegerAttribute(Attrs, "index", "keyMap")
+					if !CurSet["Maps"].Has(Index) {
+						CurSet["Maps"][Index] := Map("Keys", Map(), "Order", [], "Base", 0)
+						CurSet["Order"].Push(Index)
 					}
+					CurKeyMap := CurSet["Maps"][Index]
+					; A repeated baseIndex replaces the earlier one, as the Lua reader does.
+					if Attrs.Has("baseIndex")
+						CurKeyMap["Base"] := Map("set", Attrs.Get("baseMapSet", CurSet["Id"]),
+							"index", _Keylayout_IntegerAttribute(Attrs, "baseIndex", "keyMap"))
 					if SelfClosing
-						CurKeyMap := ""
+						CurKeyMap := 0
 				}
 			case "key":
-				if (CurMapSet != "" && CurKeyMap != "") {
-					Keys := Model["KeyMapSets"][CurMapSet][CurKeyMap]
-					Code := Integer(Attrs["code"])
-					if Keys.Has(Code)
-						continue
-					if Attrs.Has("output")
-						Keys[Code] := Map("Kind", "output", "Value", Attrs["output"])
-					else if Attrs.Has("action")
-						Keys[Code] := Map("Kind", "action", "Value", Attrs["action"])
+				if IsObject(CurSet) && IsObject(CurKeyMap) {
+					Code := _Keylayout_IntegerAttribute(Attrs, "code", "key")
+					if !CurKeyMap["Keys"].Has(Code) {
+						if Attrs.Has("output")
+							CurKeyMap["Keys"][Code] := Map("code", Code, "output", Attrs["output"])
+						else if Attrs.Has("action")
+							CurKeyMap["Keys"][Code] := Map("code", Code, "action", Attrs["action"])
+						if CurKeyMap["Keys"].Has(Code)
+							CurKeyMap["Order"].Push(Code)
+					}
 				}
 			case "action":
-				Id := Attrs["id"]
-				if !Model["Actions"].Has(Id)
-					Model["Actions"][Id] := Map()
-				CurAction := SelfClosing ? 0 : Model["Actions"][Id]
+				Id := _Keylayout_RequiredAttribute(Attrs, "id", "action")
+				; A repeated id keeps the first: the later one reads into nowhere.
+				CurAction := Map("Whens", Map(), "Order", [])
+				if !Actions.Has(Id) {
+					Actions[Id] := CurAction
+					ActionOrder.Push(Id)
+				}
+				if SelfClosing
+					CurAction := 0
 			case "when":
-				State := Attrs.Get("state", KEYLAYOUT_NEUTRAL_STATE)
 				if IsObject(CurAction) {
-					if !CurAction.Has(State)
-						CurAction[State] := Map("Output", Attrs.Get("output", ""),
-							"Next", Attrs.Get("next", ""))
-				} else if (InTerminators && Attrs.Has("state")) {
-					if !Model["Terminators"].Has(State)
-						Model["Terminators"][State] := Attrs.Get("output", "")
+					State := Attrs.Get("state", KEYLAYOUT_NEUTRAL_STATE)
+					if !CurAction["Whens"].Has(State) {
+						When := Map("state", State)
+						if (Attrs.Get("output", "") != "")
+							When["output"] := Attrs["output"]
+						if Attrs.Has("next")
+							When["next"] := Attrs["next"]
+						CurAction["Whens"][State] := When
+						CurAction["Order"].Push(State)
+					}
+				} else if (InTerminators && Attrs.Has("state") && !TerminatorOutputs.Has(Attrs["state"])) {
+					TerminatorOutputs[Attrs["state"]] := Attrs.Get("output", "")
+					TerminatorOrder.Push(Attrs["state"])
 				}
 			case "terminators":
 				InTerminators := true
@@ -275,14 +328,99 @@ Keylayout_Parse(Text) {
 	}
 	if !IsObject(Default)
 		throw ValueError('The .keylayout has no <layout first="0"> element.')
-	Model["MapSet"] := Default.Get("mapSet", "")
+	MapSet := Default.Get("mapSet", "")
 	ModifiersId := Default.Get("modifiers", "")
-	if !Model["KeyMapSets"].Has(Model["MapSet"])
-		throw ValueError("The .keylayout keyMapSet is not defined.", -1, Model["MapSet"])
+	if !Sets.Has(MapSet)
+		throw ValueError("The .keylayout keyMapSet is not defined.", -1, MapSet)
 	if !ModifierMaps.Has(ModifiersId)
 		throw ValueError("The .keylayout modifierMap is not defined.", -1, ModifiersId)
-	Model["DefaultIndex"] := ModifierMaps[ModifiersId]["DefaultIndex"]
-	Model["Selects"] := ModifierMaps[ModifiersId]["Selects"]
+
+	Canonical := Map("schema", 1, "name", Name, "map_set", MapSet,
+		"default_index", ModifierMaps[ModifiersId]["default_index"],
+		"selects", ModifierMaps[ModifiersId]["selects"],
+		"key_map_sets", [], "actions", [], "terminators", [])
+	for Id in SetOrder {
+		KeyMaps := []
+		for Index in Sets[Id]["Order"] {
+			Source := Sets[Id]["Maps"][Index]
+			Keys := []
+			for Code in Source["Order"]
+				Keys.Push(Source["Keys"][Code])
+			Entry := Map("index", Index, "keys", Keys)
+			if IsObject(Source["Base"])
+				Entry["base"] := Source["Base"]
+			KeyMaps.Push(Entry)
+		}
+		Canonical["key_map_sets"].Push(Map("id", Id, "key_maps", KeyMaps))
+	}
+	for Id in ActionOrder {
+		Whens := []
+		for State in Actions[Id]["Order"]
+			Whens.Push(Actions[Id]["Whens"][State])
+		Canonical["actions"].Push(Map("id", Id, "whens", Whens))
+	}
+	for State in TerminatorOrder
+		Canonical["terminators"].Push(Map("state", State, "output", TerminatorOutputs[State]))
+	return Canonical
+}
+
+/**
+ * Parses the text of a .keylayout and indexes it for the keystroke path.
+ * @param {string} Text - Full file content.
+ * @returns {Map} Model with Name, MapSet, DefaultIndex, Selects, KeyMapSets,
+ *   Bases, Actions and Terminators: the canonical form as lookup Maps.
+ * @throws {ValueError} When the file cannot be read completely.
+ */
+Keylayout_Parse(Text) {
+	Canonical := Keylayout_ParseCanonical(Text)
+	Model := Map(
+		"Name", Canonical["name"],
+		"MapSet", Canonical["map_set"],
+		"DefaultIndex", Canonical["default_index"],
+		"Selects", [],
+		"KeyMapSets", Map(),
+		"Bases", Map(),
+		"Actions", Map(),
+		"Terminators", Map()
+	)
+	for Select in Canonical["selects"] {
+		Modifiers := []
+		for Modifier in Select["modifiers"] {
+			Required := Map(), Optional := Map()
+			for Token in Modifier["required"]
+				Required[Token] := true
+			for Token in Modifier["optional"]
+				Optional[Token] := true
+			Modifiers.Push(Map("Required", Required, "Optional", Optional))
+		}
+		Model["Selects"].Push(Map("Index", Select["index"], "Modifiers", Modifiers))
+	}
+	for KeyMapSet in Canonical["key_map_sets"] {
+		SetId := KeyMapSet["id"]
+		Levels := Map()
+		Model["KeyMapSets"][SetId] := Levels
+		for KeyMap in KeyMapSet["key_maps"] {
+			Keys := Map()
+			Levels[KeyMap["index"]] := Keys
+			for Key in KeyMap["keys"]
+				Keys[Key["code"]] := Key.Has("output")
+					? Map("Kind", "output", "Value", Key["output"])
+					: Map("Kind", "action", "Value", Key["action"])
+			if KeyMap.Has("base") {
+				if !Model["Bases"].Has(SetId)
+					Model["Bases"][SetId] := Map()
+				Model["Bases"][SetId][KeyMap["index"]] := [KeyMap["base"]["set"], KeyMap["base"]["index"]]
+			}
+		}
+	}
+	for Action in Canonical["actions"] {
+		States := Map()
+		Model["Actions"][Action["id"]] := States
+		for When in Action["whens"]
+			States[When["state"]] := Map("Output", When.Get("output", ""), "Next", When.Get("next", ""))
+	}
+	for Terminator in Canonical["terminators"]
+		Model["Terminators"][Terminator["state"]] := Terminator["output"]
 	return Model
 }
 

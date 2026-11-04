@@ -10,8 +10,13 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 global _ConfigTomlSnapshots := Map()
+
+; Monotonic count of snapshot reads. Each one compares the whole snapshot with
+; its shadow, so tests pin how many a step spends.
+global _ConfigTomlSnapshotReads := 0
 
 /**
  * Reads manifest intent only from the published native bootstrap cache. Detached
@@ -21,14 +26,43 @@ global _ConfigTomlSnapshots := Map()
  * @returns {Boolean} Whether Cache has the actual bootstrap source owner.
  */
 ConfigTomlTryReadBootValue(Cache, Section, Key, &Value) {
+	Snapshot := ConfigTomlBootSnapshot(Cache)
+	if !IsObject(Snapshot)
+		return false
+	return ConfigTomlBootSnapshotValue(Snapshot, Section, Key, &Value)
+}
+
+/**
+ * The admitted snapshot behind the published bootstrap cache, read once for a
+ * caller that looks up several values in one synchronous step. Every snapshot
+ * read compares the whole snapshot with its private shadow twice (about 20 ms
+ * each on a maintainer-sized config.toml), so four lookups through
+ * ConfigTomlTryReadBootValue paid eight comparisons for one unchanged image.
+ * @param {Map} Cache - The cache the caller was handed.
+ * @returns {Object|Integer} The snapshot, or 0 when Cache is not the bootstrap cache.
+ */
+ConfigTomlBootSnapshot(Cache) {
 	global ConfigurationFile, _ParseTomlCache
 	if !IsSet(ConfigurationFile) || ConfigurationFile == ""
 			|| !IsSet(_ParseTomlCache) || !_ParseTomlCache.Has(ConfigurationFile)
 			|| _ParseTomlCache[ConfigurationFile] != Cache
-		return false
+		return 0
 	Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
 	if Snapshot.Cache != Cache
 		throw Error("The early configuration reader lost its admitted cache")
+	return Snapshot
+}
+
+/**
+ * One manifest value from a snapshot ConfigTomlBootSnapshot returned. Outdated
+ * authored values read as the manifest default, as ConfigTomlTryReadBootValue.
+ * @param {Object} Snapshot - The admitted bootstrap snapshot.
+ * @param {String} Section - Manifest section.
+ * @param {String} Key - Manifest key.
+ * @param {Any} Value - Receives the stored or default value.
+ * @returns {Boolean} Always true: the snapshot is the bootstrap source owner.
+ */
+ConfigTomlBootSnapshotValue(Snapshot, Section, Key, &Value) {
 	Path := Section . "." . Key
 	Entry := ManifestFindEntryByPath(Path)
 	if !(Entry is Map) || !Entry.Has("default")
@@ -232,7 +266,8 @@ _ConfigTomlProjectRecord(Parts, Value, Raw, Namespaces, Cache, Rows) {
  * @returns {Object} Typed snapshot; native or semantic failures throw.
  */
 ConfigTomlReadSnapshot(Path) {
-	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshotReads
+	_ConfigTomlSnapshotReads += 1
 	PerfCount("config.snapshot_read")
 	global _TomlReadFailures, _TomlUnreadableFiles
 	static Generations := Map()
@@ -347,12 +382,12 @@ ParseConfigTomlFile(Path) {
 ; loader. Language gate augmentation stays with the feature loader owner.
 TomlConfigStaticForeignOwnershipRegistry() {
 	static Registry := Map(
-		"category_enabled", Map(
+		ConfigLeaf.CATEGORY_ENABLED, Map(
 			"autocorrection", "FeatureState",
-			"distances_reduction", "FeatureState",
-			"magic_key", "FeatureState",
+			ConfigLeaf.DISTANCES_REDUCTION, "FeatureState",
+			ConfigLeaf.MAGIC_KEY, "FeatureState",
 			"rolls", "FeatureState",
-			"sfbs_reduction", "FeatureState"),
+			ConfigLeaf.SFBS_REDUCTION, "FeatureState"),
 		"hotstrings", Map(
 			"terminators", "TerminatorRecords",
 			"terminator_states", "TerminatorRecords",
@@ -366,10 +401,10 @@ TomlConfigStaticForeignOwnershipRegistry() {
 		"llm", Map(
 			"api_entry_id", "LLMMenu",
 			"ollama_port", "LLMMenu"),
-		"llm.navigation", Map(
-			"nav_modifiers", "LLMMenu"),
-		"llm.trigger", Map(
-			"disabled_apps", "LLMMenu"))
+		ConfigKey.LLM_NAVIGATION, Map(
+			ConfigLeaf.NAV_MODIFIERS, "LLMMenu"),
+		ConfigKey.LLM_TRIGGER, Map(
+			ConfigLeaf.DISABLED_APPS, "LLMMenu"))
 	return Registry
 }
 
@@ -383,67 +418,88 @@ _ConfigTomlDynamicPersonal(Parts) {
 
 ; Exact native decoder output is compared to a detached private shadow. This
 ; rejects in-place source/cache/row mutation without granting write authority.
+; Every snapshot read walks the whole snapshot twice, so this walk avoids the
+; work that cost per node without changing a verdict: a case-sensitive Right is
+; searched as it is instead of being copied, a scalar child is compared in its
+; parent's loop, and an object's fields are collected for Right only.
+; test_config_snapshot_equal.ahk holds it to the plain definition.
 _ConfigTomlSnapshotEqual(Left, Right) {
+	static MapBase := Map.Prototype, ArrayBase := Array.Prototype
+	static ObjectBase := Object.Prototype, BoolBase := TOML_Bool.Prototype
+	static Describe := Object.Prototype.GetOwnPropDesc, Absent := {}
 	if Type(Left) != Type(Right)
 		return false
 	if Left is Map {
-		if ObjGetBase(Left) != Map.Prototype || ObjGetBase(Right) != Map.Prototype
+		if ObjGetBase(Left) != MapBase || ObjGetBase(Right) != MapBase
+				|| ObjOwnPropCount(Left) || ObjOwnPropCount(Right)
+				|| Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
 			return false
-		for Name in ObjOwnProps(Left)
-			return false
-		for Name in ObjOwnProps(Right)
-			return false
-		if Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
-			return false
-		ExactRight := Map()
-		ExactRight.CaseSense := "On"
-		for Name, Value in Right
-			ExactRight[Name] := Value
+		ExactRight := Right
+		if Right.CaseSense != "On" {
+			ExactRight := Map()
+			ExactRight.CaseSense := "On"
+			for Name, Value in Right
+				ExactRight[Name] := Value
+		}
 		for Name, Value in Left {
-			if !ExactRight.Has(Name) || !_ConfigTomlSnapshotEqual(Value, ExactRight[Name])
+			Other := ExactRight.Get(Name, Absent)
+			if IsObject(Other) && Other == Absent
+				return false
+			if IsObject(Value) {
+				if !_ConfigTomlSnapshotEqual(Value, Other)
+					return false
+			} else if Type(Value) != Type(Other)
+					|| (Value is String ? StrCompare(Value, Other, true) != 0 : !(Value == Other))
 				return false
 		}
 		return true
 	}
 	if Left is Array {
-		if ObjGetBase(Left) != Array.Prototype || ObjGetBase(Right) != Array.Prototype
-			return false
-		for Name in ObjOwnProps(Left)
-			return false
-		for Name in ObjOwnProps(Right)
-			return false
-		if Left.Length != Right.Length
+		if ObjGetBase(Left) != ArrayBase || ObjGetBase(Right) != ArrayBase
+				|| ObjOwnPropCount(Left) || ObjOwnPropCount(Right)
+				|| Left.Length != Right.Length
 			return false
 		loop Left.Length {
 			if !Left.Has(A_Index) || !Right.Has(A_Index)
-					|| !_ConfigTomlSnapshotEqual(Left[A_Index], Right[A_Index])
+				return false
+			Value := Left[A_Index], Other := Right[A_Index]
+			if IsObject(Value) {
+				if !_ConfigTomlSnapshotEqual(Value, Other)
+					return false
+			} else if Type(Value) != Type(Other)
+					|| (Value is String ? StrCompare(Value, Other, true) != 0 : !(Value == Other))
 				return false
 		}
 		return true
 	}
 	if IsObject(Left) {
-		ExpectedBase := Left is TOML_Bool ? TOML_Bool.Prototype : Object.Prototype
+		ExpectedBase := Left is TOML_Bool ? BoolBase : ObjectBase
 		if ObjGetBase(Left) != ExpectedBase || ObjGetBase(Right) != ExpectedBase
+				|| ObjOwnPropCount(Left) != ObjOwnPropCount(Right)
+				|| (Left is TOML_Bool && ObjOwnPropCount(Left) != 1)
 			return false
-		LeftFields := Map(), RightFields := Map()
-		LeftFields.CaseSense := "On", RightFields.CaseSense := "On"
-		for Pair in [[Left, LeftFields], [Right, RightFields]] {
-			Owner := Pair[1], Fields := Pair[2]
-			for Name in ObjOwnProps(Owner) {
-				Descriptor := Object.Prototype.GetOwnPropDesc.Call(Owner, Name)
-				if !Descriptor.HasOwnProp("Value")
+		; Property names fold case while the field maps do not: Right's spellings
+		; are kept so a field renamed by case still differs.
+		RightFields := Map()
+		RightFields.CaseSense := "On"
+		for Name in ObjOwnProps(Right) {
+			Descriptor := Describe.Call(Right, Name)
+			if !Descriptor.HasOwnProp("Value")
+				return false
+			RightFields[Name] := Descriptor.Value
+		}
+		for Name in ObjOwnProps(Left) {
+			Descriptor := Describe.Call(Left, Name)
+			if !Descriptor.HasOwnProp("Value")
+				return false
+			Value := Descriptor.Value
+			Other := RightFields.Get(Name, Absent)
+			if IsObject(Other) && Other == Absent
+				return false
+			if Left is TOML_Bool {
+				if !(Name == "Value") || !(Value is Integer) || !(Value == Other)
 					return false
-				Fields[Name] := Descriptor.Value
-			}
-		}
-		if LeftFields.Count != RightFields.Count
-			return false
-		if Left is TOML_Bool {
-			return LeftFields.Count == 1 && LeftFields.Has("Value") && RightFields.Has("Value")
-				&& (LeftFields["Value"] is Integer) && LeftFields["Value"] == RightFields["Value"]
-		}
-		for Name, Value in LeftFields {
-			if !RightFields.Has(Name) || !_ConfigTomlSnapshotEqual(Value, RightFields[Name])
+			} else if !_ConfigTomlSnapshotEqual(Value, Other)
 				return false
 		}
 		return true

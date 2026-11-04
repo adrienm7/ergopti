@@ -168,18 +168,18 @@ _MRRI_ReusedCaption(Fixture) {
 
 _MRRI_Feature(Fixture) {
 	global _MenuReloadReplayRoot
-	OldRow := MenuRowWithLabel("shortcuts.uppercase", "Uppercase (3)", "Shortcuts")
+	OldRow := MenuRowWithLabel("layout.ergopti_base", "Uppercase (3)", "Shortcuts")
 	AssertTrue(OldRow is Map)
 	OldRow["action"] := _MRRI_Command.Bind(Fixture, "old", "uppercase")
 	Old := Menu(), Root := Menu()
-	AssertEqual(1, MenuRenderer_AppendRows(Old, "features", "shortcuts.uppercase", [OldRow]))
+	AssertEqual(1, MenuRenderer_AppendRows(Old, "features", "layout.ergopti_base", [OldRow]))
 	Root.Add("Shortcuts", Old), Fixture.Menus.Push(Old, Root)
 	_MRRI_Hold(Fixture, {Root: Root, Handle: Old.Handle, Position: 0, Population: false})
-	NewRow := MenuRowWithLabel("shortcuts.uppercase", "Majuscules (8)", "Shortcuts")
+	NewRow := MenuRowWithLabel("layout.ergopti_base", "Majuscules (8)", "Shortcuts")
 	AssertTrue(NewRow is Map)
 	NewRow["action"] := _MRRI_Command.Bind(Fixture, "new", "uppercase")
 	New := Menu(), NewRoot := Menu()
-	AssertEqual(1, MenuRenderer_AppendRows(New, "features", "shortcuts.uppercase", [NewRow]))
+	AssertEqual(1, MenuRenderer_AppendRows(New, "features", "layout.ergopti_base", [NewRow]))
 	NewRoot.Add("Shortcuts", New), Fixture.Menus.Push(New, NewRoot), _MenuReloadReplayRoot := NewRoot
 	Paths := MenuReloadReplay_Consume(Fixture.File, _MRR_Notify.Bind(Fixture))
 	AssertEqual("ran", MenuReloadReplay_Run(Paths[1], _MRR_Notify.Bind(Fixture)))

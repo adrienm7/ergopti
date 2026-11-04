@@ -110,33 +110,34 @@ global _LLM_Menu := Map(
 	"backend",                    "ollama",
 	; Local Ollama daemon port — placeholder, replaced at startup by
 	; LLM_Menu_ApplySharedDefaults() from the shared default (defaults.json
-	; llm_ollama_port). User-overridable from the backend submenu (persisted
+	; llm_ollama_owned_port). User-overridable from the backend submenu (persisted
 	; under [llm] ollama_port) for non-standard setups.
 	"ollama_port",                0,
 	"model",                      "",
 	"profile_id",                 "basic",
-	"user_profiles",              [],
+	ConfigLeaf.USER_PROFILES,              [],
 	"n_predictions",              3,
-	"min_words",                  3,
-	"max_words",                  15,
-	"debounce_ms",                500,
+	ConfigLeaf.MIN_WORDS,                  3,
+	ConfigLeaf.MAX_WORDS,                  15,
+	ConfigLeaf.DEBOUNCE_MS,                500,
+	ConfigLeaf.MIN_REQUEST_INTERVAL_MS,    300,
 	"ctx_chars",                  500,
 	"temperature",                "0.10",
-	"instant_on_word_end",        true,
-	"after_hotstring",            true,
-	"reset_on_nav",               true,
+	ConfigLeaf.INSTANT_ON_WORD_END,        true,
+	ConfigLeaf.AFTER_HOTSTRING,            true,
+	ConfigLeaf.RESET_ON_NAV,               true,
 	"disable_url_bars",           false,
 	"disable_password_fields",    false,
-	"disabled_apps",              [],
-	"show_info_bar",              true,
+	ConfigLeaf.DISABLED_APPS,              [],
+	ConfigLeaf.SHOW_INFO_BAR,              true,
 	"streaming",                  true,
 	"show_all_at_once",           true,
-	"pred_indent",                0,
-	"auto_raise_temp",            true,
-	"nav_modifiers",              "",
+	ConfigLeaf.PRED_INDENT,                0,
+	ConfigLeaf.AUTO_RAISE_TEMP,            true,
+	ConfigLeaf.NAV_MODIFIERS,              "",
 	; Placeholder only: LLM_Menu_ApplySharedDefaults() overwrites it from
 	; defaults.json ("" = bare digits select a prediction).
-	"val_modifiers",              "",
+	ConfigLeaf.VAL_MODIFIERS,              "",
 	; No on-demand prediction shortcut here: a prediction on request is the
 	; llm_generate_prediction action, bound in a keyboard slot (Win+Space
 	; recommended, neutral by default) like every other action.
@@ -145,18 +146,18 @@ global _LLM_Menu := Map(
 	; tooltip. Forces n_predictions = 1 internally because typing N
 	; alternatives sequentially would be chaos. Disabled by default —
 	; the tooltip flow is the safer baseline.
-	"inline_autotype",            false,
+	ConfigLeaf.INLINE_AUTOTYPE,            false,
 	; Per-app profile overrides. Map(app_name_lower -> profile_id).
 	; Resolved at fire time so the user can keep one global profile and
 	; override it just for Slack (short informal), VS Code (code), etc.
 	; Empty by default; populated via the per-app picker UI.
-	"app_profile_overrides",      Map(),
+	ConfigLeaf.APP_PROFILE_OVERRIDES,      Map(),
 	; When true, switching to a new model auto-picks the matching profile
 	; (raw / basic / advanced / batch_advanced) using the params count from
 	; models.json. Mirrors the HS get_recommended_profile_info heuristic so
 	; the user does not have to manually re-pick a profile every time they
 	; try a different model size. Toggleable via the profile submenu.
-	"auto_profile_for_model",     true,
+	ConfigLeaf.AUTO_PROFILE_FOR_MODEL,     true,
 	; Onboarding flag — flipped to true the first time the user enables
 	; the LLM feature so the welcome TrayTip never fires twice. MUST be
 	; declared here (not only added at first-flip) because SaveFullConfig
@@ -164,7 +165,7 @@ global _LLM_Menu := Map(
 	; saves triggered during the hotstrings boot before any onboarding
 	; logic has had a chance to run. Without this default a fresh install
 	; would crash with ``Item has no value`` on the first config write.
-	"onboarding_seen",            false,
+	ConfigLeaf.ONBOARDING_SEEN,            false,
 	; Set when Ollama is ready but PrefixWatcher is not up yet; cleared when
 	; HotstringPrefixWatcherInit starts the bridge.
 	"bridge_pending",             false,
@@ -200,24 +201,25 @@ LLM_Menu_ApplySharedDefaults() {
 		"llm_model",                   "model",
 		"llm_backend",                 "backend",
 		"llm_num_predictions",         "n_predictions",
-		"llm_min_words",               "min_words",
-		"llm_max_words",               "max_words",
-		"llm_debounce_ms",             "debounce_ms",
+		"llm_min_words",               ConfigLeaf.MIN_WORDS,
+		"llm_max_words",               ConfigLeaf.MAX_WORDS,
+		"llm_debounce_ms",             ConfigLeaf.DEBOUNCE_MS,
+		"llm_min_request_interval_ms", ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
 		"llm_context_length",          "ctx_chars",
-		"llm_pred_indent",             "pred_indent",
+		"llm_pred_indent",             ConfigLeaf.PRED_INDENT,
 		"llm_temperature",             "temperature",
-		"llm_show_info_bar",           "show_info_bar",
+		"llm_show_info_bar",           ConfigLeaf.SHOW_INFO_BAR,
 		"llm_streaming",               "streaming",
 		"llm_streaming_multi",         "show_all_at_once",
-		"llm_instant_on_word_end",     "instant_on_word_end",
-		"llm_after_hotstring",         "after_hotstring",
-		"llm_reset_on_nav",            "reset_on_nav",
-		"llm_auto_raise_temp",         "auto_raise_temp",
+		MenuCommand.LLM_INSTANT_ON_WORD_END,     ConfigLeaf.INSTANT_ON_WORD_END,
+		MenuCommand.LLM_AFTER_HOTSTRING,         ConfigLeaf.AFTER_HOTSTRING,
+		MenuCommand.LLM_RESET_ON_NAV,            ConfigLeaf.RESET_ON_NAV,
+		"llm_auto_raise_temp",         ConfigLeaf.AUTO_RAISE_TEMP,
 		"llm_disable_url_bars",        "disable_url_bars",
 		"llm_disable_password_fields", "disable_password_fields",
-		"llm_nav_modifiers",           "nav_modifiers",
-		"llm_val_modifiers",           "val_modifiers",
-		"llm_ollama_port",             "ollama_port"
+		"llm_nav_modifiers",           ConfigLeaf.NAV_MODIFIERS,
+		"llm_val_modifiers",           ConfigLeaf.VAL_MODIFIERS,
+		"llm_ollama_owned_port",       "ollama_port"
 	)
 
 	for shared_key, tray_key in _key_map {
@@ -226,7 +228,7 @@ LLM_Menu_ApplySharedDefaults() {
 		if tray_key == "ollama_port" {
 			if !LLM_Option_TryNormalizeOllamaPort(
 					LLM_Defaults[shared_key], &NormalizedPort)
-				throw Error("Shared LLM default 'llm_ollama_port' is invalid.")
+				throw Error("Shared LLM default 'llm_ollama_owned_port' is invalid.")
 			_LLM_Menu[tray_key] := NormalizedPort
 			continue
 		}
@@ -267,6 +269,7 @@ global LLM_MENU_BUILD_DEFER_MS := 200
 ; can reference any other. The grouping below mirrors the call graph
 ; (init → build → action handlers) purely for human readability.
 
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 #Include persist.ahk
 #Include transactions.ahk
 #Include backend_lifecycle.ahk

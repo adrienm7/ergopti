@@ -39,10 +39,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_TMDF_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_TMDF_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Returns the body of a single #HotIf hotkey block starting at the given hotkey
@@ -85,7 +83,7 @@ Test("tap_holds: capslock 2.4 hold-layer has TapMinDurationMs floor + A_PriorKey
 
 ; LAlt tab+layer (4.2): must gate on TapMinDurationMs().
 _TMDF_LAltTabLayerHasFloor() {
-	Src := _TMDF_ReadSource("platform/remap/lalt.ahk")
+	Src := _TMDF_ReadSource("lalt.ahk")
 	; Anchor on the unique 4.2 #HotIf directive (tap == "tab") so the slice starts
 	; at the top of the block and captures the tap-resolution lines (the
 	; TapMinDurationMs floor sits just above the Tab tap dispatch).

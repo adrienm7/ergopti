@@ -7,7 +7,7 @@
 --- aggregate tables using ON CONFLICT … DO UPDATE (UPSERT) statements. All
 --- writes are expected to run inside a transaction opened by the caller.
 ---
---- SQL helpers (exec, json_text, sq, i) are intentionally private to this
+--- SQL helpers (exec, json_text, i) are intentionally private to this
 --- module — they are pure formatting utilities with no need for external access.
 ---
 --- MIRRORS: windows/modules/keystats/keystats_walker_sql.ahk
@@ -23,7 +23,6 @@ local LOG     = "keystats.aggregator"
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local Export       = require("modules.keystats.export")
 local AggHelper    = require("keystats.aggregator_helpers")
-local Literal      = require("sqlite.literal")
 local Queries      = require("keystats.queries")
 
 local S = require("modules.keystats.aggregator.state")
@@ -87,11 +86,6 @@ local function json_text(value)
 	return encoded
 end
 
---- Quotes one SQL text literal through the shared C-string-safe encoder.
-local function sq(s)
-	return "'" .. Literal.escape(tostring(s)) .. "'"
-end
-
 local function i(n)
 	return math.floor(tonumber(n) or 0)
 end
@@ -125,7 +119,6 @@ function M.flush()
 	if not S.agg_batch then return end
 	local db = SqliteWriter.get_db()
 	if not db then return end
-	local d = sq(S.device_id)
 
 	for key, row in pairs(S.agg_batch.app_day) do
 		local cat = Export.get_native_app_category(row.app)
@@ -183,19 +176,19 @@ function M.flush()
 	require("keystats.media_store").flush(S.agg_batch, S.device_id, exec)
 
 	for key, row in pairs(S.agg_batch.kc_ngram) do
-		local ok = exec(string.format(
-			"INSERT INTO ngram_keycodes (device_id, date, app, keycode, c) VALUES (%s,%s,%s,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET c=c+excluded.c",
-			d, sq(row.date), sq(row.app), i(row.keycode), i(row.count)))
+		local ok = exec(Queries.render("agg.ngram_keycode", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			keycode = i(row.keycode), c = i(row.count),
+		}))
 		if ok then S.agg_batch.kc_ngram[key] = nil end
 	end
 
 	for tbl_name, tbl in pairs(S.agg_batch.sc_ngram) do
 		for key, row in pairs(tbl) do
-			local ok = exec(string.format(
-				"INSERT INTO %s (device_id, date, app, token, c) VALUES (%s,%s,%s,%s,%d) "
-				.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET c=c+excluded.c",
-				tbl_name, d, sq(row.date), sq(row.app), sq(row.token), i(row.count)))
+			local ok = exec(Queries.render("agg.ngram_shortcut", "native", {
+				table = tbl_name, device_id = tostring(S.device_id), date = tostring(row.date),
+				app = tostring(row.app), token = tostring(row.token), c = i(row.count),
+			}))
 			if ok then tbl[key] = nil end
 		end
 	end
@@ -330,19 +323,13 @@ function M.flush()
 	end
 
 	for key, row in pairs(S.agg_batch.system_day) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_system_day (device_id, date, wifi_changes, space_switches, audio_muted_ms, locked_ms, sleep_ms, awake_ms, passive_count, night_wake_count) VALUES (%s,%s,%d,%d,%d,%d,%d,%d,%d,%d) "
-			.. "ON CONFLICT(device_id, date) DO UPDATE SET "
-			.. "wifi_changes=wifi_changes+excluded.wifi_changes,"
-			.. "space_switches=space_switches+excluded.space_switches,"
-			.. "audio_muted_ms=audio_muted_ms+excluded.audio_muted_ms,"
-			.. "locked_ms=locked_ms+excluded.locked_ms,sleep_ms=sleep_ms+excluded.sleep_ms,"
-			.. "awake_ms=awake_ms+excluded.awake_ms,"
-			.. "passive_count=passive_count+excluded.passive_count,"
-			.. "night_wake_count=night_wake_count+excluded.night_wake_count",
-			d, sq(row.date), i(row.wifi_changes), i(row.space_switches),
-			i(row.audio_muted_ms), i(row.locked_ms), i(row.sleep_ms), i(row.awake_ms),
-			i(row.passive_count), i(row.night_wake_count)))
+		local ok = exec(Queries.render("agg.system_day", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date),
+			wifi_changes = i(row.wifi_changes), space_switches = i(row.space_switches),
+			audio_muted_ms = i(row.audio_muted_ms), locked_ms = i(row.locked_ms),
+			sleep_ms = i(row.sleep_ms), awake_ms = i(row.awake_ms),
+			passive_count = i(row.passive_count), night_wake_count = i(row.night_wake_count),
+		}))
 		if ok then S.agg_batch.system_day[key] = nil end
 	end
 	return not C.has_pending_batch()

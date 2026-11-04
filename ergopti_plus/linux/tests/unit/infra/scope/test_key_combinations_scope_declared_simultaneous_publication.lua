@@ -95,7 +95,7 @@ helpers.describe("declared Linux simultaneous publication through original owner
  -- could run; it now toggles the session through the executor like a pair tap.
  helpers.it("(linux-chord-caps-word) the chord picker publishes a simultaneous CapsWord",function()
   with_menu(function(s)
-   local row=find_menu(s.build(),'caps_lock → tab')
+   local row=find_menu(s.build(),'caps_lock + tab')
    local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))
    helpers.assert_true(chord.fn());helpers.assert_true(s.pairs.validate_slot("combo",pair,"caps_word"))
    helpers.assert_true(s.picker.confirm('caps_word'))
@@ -213,7 +213,7 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
  end)
  helpers.it("the real combo picker publishes its exact slot and excludes undispatched native state actions",function()
   with_menu(function(s)
-   local row=find_menu(s.build(),'caps_lock → tab')
+   local row=find_menu(s.build(),'caps_lock + tab')
    local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))
    helpers.assert_true(chord.fn());helpers.assert_eq(s.picker.binding,binding)
    local offers_caps_word=false
@@ -231,7 +231,7 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
   with_menu(function(s)
    local rows=s.build();helpers.assert_true(find_menu(rows,s.translate('menu.tapholds.symmetric'),true).fn())
    helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.symmetric,true)
-   local row=find_menu(s.build(),'caps_lock → tab')
+   local row=find_menu(s.build(),'caps_lock + tab')
    helpers.assert_true(find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none'))).fn())
    helpers.assert_eq(s.picker.binding,'combination__tab_then_caps_lock')
    helpers.assert_true(s.picker.confirm('copy'))
@@ -287,7 +287,7 @@ helpers.describe("unjoined third-slot native receiving is unavailable",function(
     helpers.assert_true(s.pairs.validate_slot("tap",pair,action))
     helpers.assert_eq(s.pairs.validate_slot("combo",pair,action),false)
     helpers.assert_eq(s.pairs.capture_action(binding,action),nil)
-    local row=find_menu(s.build(),'caps_lock → tab')
+    local row=find_menu(s.build(),'caps_lock + tab')
     local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))
     helpers.assert_true(chord.fn())
     for _,item in ipairs(s.picker.items) do helpers.assert_true(item.id~=action) end

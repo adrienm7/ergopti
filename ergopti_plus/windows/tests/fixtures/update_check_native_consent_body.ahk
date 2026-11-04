@@ -61,7 +61,7 @@ _UCNC_Offer(Request, Tag) {
 		"the genuine channel and version policy must admit this private offered release")
 	_UCNC_Require(UpdateCheck_Begin(Request, "v1.0.0"), "the public check must begin")
 	_UCNC_Capture()
-	Release := {Tag: Tag, RawJson: "{}"}
+	Release := {Tag: Tag, RawJson: "{}", Body: ""}
 	_UCNC_Require(UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v1.0.0",
 		"latest", Tag, "others", [], "release", Release)), "the public check must publish its exact offered release")
 	return _UCNC_Capture()

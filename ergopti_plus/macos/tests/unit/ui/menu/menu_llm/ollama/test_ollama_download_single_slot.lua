@@ -119,6 +119,18 @@ helpers.describe("HS-010 Ollama download shared slot", function()
 		end)
 	end
 
+	helpers.it("(ollama-pull-byte-progress) turns the managed pull's byte lines into the window's percent", function()
+		with_fixture({}, function(f)
+			helpers.assert_true(start_pull(f, "model-A"))
+			f.pulls[1].on_stream(nil, "OLLAMA_PULL_BYTES 1000 4000\nOLLAMA_PULL_BYTES 3000 4000\n", "")
+			local last = f.progress.last_update
+			helpers.assert_not_nil(last, "a byte line updates the window")
+			helpers.assert_eq(last.pct, 75, "the percent comes from the last byte line")
+			helpers.assert_eq(last.done, 3000)
+			helpers.assert_eq(last.total, 4000)
+		end)
+	end)
+
 	helpers.it("(ollama-terminal-model-argument) quotes custom repositories in the manual command", function()
 		with_fixture({}, function(f)
 			local repo = [[owner's/model; $(printf EXPANDED) `printf EXPANDED`]]
@@ -318,6 +330,30 @@ helpers.describe("HS-010 Ollama download shared slot", function()
 			helpers.assert_eq(f.pulls[1].args[2], "fixture_admission; exec '/fixture/ollama' pull 'model-A'")
 			helpers.assert_eq(f.active_tasks.ollama_pull, f.pulls[1])
 		end)
+	end)
+
+	-- docs/design/proxy-auth-relay.md: the daemon Ergopti started runs without its
+	-- proxy after a refused sign-in, so the pull is refused with the relay's message.
+	helpers.it("(proxy-auth-relay) a refused sign-in refuses the pull of Ergopti's daemon only", function()
+		local saved = package.loaded["modules.llm.proxy_relay_receipt"]
+		package.loaded["modules.llm.proxy_relay_receipt"] = {
+			pull_refusal = function() return "network.relay.sign_in_rejected", "sign_in_rejected" end,
+		}
+		local ok, err = pcall(function()
+			with_fixture({}, function(f)
+				helpers.assert_eq(start_pull(f), false)
+				helpers.assert_eq(#f.pulls, 0, "no pull child is started")
+				helpers.assert_eq(f.notification_records[1][2], "network.relay.sign_in_rejected")
+			end)
+			with_fixture({ binary_source = "app", network_env = {
+				prelude = function() return "local_settings; " end,
+			} }, function(f)
+				helpers.assert_true(start_pull(f))
+				helpers.assert_eq(#f.pulls, 1, "the user's own daemon has its own network settings")
+			end)
+		end)
+		package.loaded["modules.llm.proxy_relay_receipt"] = saved
+		if not ok then error(err, 0) end
 	end)
 
 	-- Issue #100: a Mac with a PAC proxy setting never got its model, because the

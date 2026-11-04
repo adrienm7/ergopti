@@ -16,7 +16,7 @@
 ---    privacy-safe result as the log line (field_check_report.lua).
 --- 3. One run at a time per check: a second click while a check is pending only
 ---    says so.
---- 4. The dialog is a zenity question whose two buttons are « Copy report » and
+--- 4. The dialog is a native question whose two buttons are « Copy report » and
 ---    « Close »; it opens through ui.modal, which hands the keyboard back to the
 ---    desktop while it is open. Every collaborator is injectable.
 --- 5. The logger is resolved at call time, so a suite can replace it per case.
@@ -44,7 +44,7 @@ local function native(spec)
 		notify = function(message) return require("adapters.application_notifier").send(message, { level = "info" }) end,
 		--- Shows the report; returns true when the user asked to copy it.
 		dialog = function(title, text, copy_label, close_label)
-			local command = "zenity --question --no-markup --title=" .. Shell.quote(require("window_titles").compose(title))
+			local command = require("ui.native_dialog").command() .. " --question --no-markup --title=" .. Shell.quote(require("window_titles").compose(title))
 				.. " --text=" .. Shell.quote(text)
 				.. " --ok-label=" .. Shell.quote(copy_label)
 				.. " --cancel-label=" .. Shell.quote(close_label)
@@ -75,15 +75,14 @@ function M.new(spec)
 		return running
 	end
 
-	--- Runs the check of the Debug menu row.
-	--- @param services table|nil Test doubles for native services.
+	--- Runs the check's steps once; on_result(result) receives the settled
+	--- report after its evidence record is logged.
+	--- @param env_services table Native services (or test doubles).
+	--- @param on_result function
 	--- @return boolean started False when a check is already pending.
-	function runner.run(services)
-		local env_services = services or native(spec)
-		local translate = env_services.translate
+	local function run_check(env_services, on_result)
 		if running then
 			logger().warn(spec.log, "%s refused: another one is still running.", spec.label)
-			env_services.notify(translate("field_check.busy"))
 			return false
 		end
 		running = true
@@ -97,16 +96,7 @@ function M.new(spec)
 			local result = report.result()
 			logger().evidence(spec.log, "%s result: %s", spec.label, Report.format_log_line(result))
 			logger().success(spec.log, "%s finished: %s.", spec.label, result.passed and "pass" or "fail")
-			local text = Report.format_text(result, translate)
-			-- The dialog blocks: it opens from a fresh turn of the event loop.
-			env_services.defer(function()
-				local copy_label, close_label = translate("field_check.copy"), translate("field_check.close")
-				if env_services.dialog(translate(spec.title_key), text, copy_label, close_label) then
-					local copied = env_services.copy(text)
-					logger().info(spec.log, "Report copy %s.", copied and "done" or "refused")
-					if copied then env_services.notify(translate("field_check.copied")) end
-				end
-			end)
+			on_result(result)
 		end
 		local env, env_err = env_services.env()
 		if not env then
@@ -122,6 +112,38 @@ function M.new(spec)
 			finish()
 		end
 		return true
+	end
+
+	--- Runs the check of the Debug menu row and shows its result.
+	--- @param services table|nil Test doubles for native services.
+	--- @return boolean started False when a check is already pending.
+	function runner.run(services)
+		local env_services = services or native(spec)
+		local translate = env_services.translate
+		local started = run_check(env_services, function(result)
+			local text = Report.format_text(result, translate)
+			-- The dialog blocks: it opens from a fresh turn of the event loop.
+			env_services.defer(function()
+				local copy_label, close_label = translate("field_check.copy"), translate("field_check.close")
+				if env_services.dialog(translate(spec.title_key), text, copy_label, close_label) then
+					local copied = env_services.copy(text)
+					logger().info(spec.log, "Report copy %s.", copied and "done" or "refused")
+					if copied then env_services.notify(translate("field_check.copied")) end
+				end
+			end)
+		end)
+		if not started then env_services.notify(translate("field_check.busy")) end
+		return started
+	end
+
+	--- Runs the check with no window, for the developer field run
+	--- (infra/field_run.lua): the same steps and the same evidence record.
+	--- @param on_result function on_result(result) once the report settles.
+	--- @param services table|nil Test doubles for native services.
+	--- @return boolean started False when a check is already pending.
+	function runner.run_headless(on_result, services)
+		assert(type(on_result) == "function", "a headless field check needs its result callback")
+		return run_check(services or native(spec), on_result)
 	end
 
 	--- Forgets a pending run; tests only.

@@ -11,7 +11,7 @@ _ScopeTestRenderCommand(TargetMenu, MenuKey, Id, Commands) {
 
 _ScopeMenuCommandsCase(Scope, Factory, MenuKey, Modes := ["recommended", "clear"]) {
 	global _MenuDispatchCallbacks
-	Source := '[layout]`nergopti_base = true`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
+	Source := '[layout]`nergopti_base = true`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nprivate_filter_enabled = false`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
@@ -51,6 +51,13 @@ _ScopeMenuCommandsCase(Scope, Factory, MenuKey, Modes := ["recommended", "clear"
 					AssertEqual(Parsed["llm"]["ollama_port"], 12345)
 					AssertEqual(Parsed["llm"]["api_entry_id"], "saved-api")
 				}
+				if Scope == "metrics" {
+					; A setting the user adjusted comes back: its key leaves the file and
+					; an absent key is the manifest default, the filter on.
+					Assert(!Parsed["metrics"].Has("private_filter_enabled"), "the restore removes the adjusted setting")
+					Assert(!Parsed["metrics"].Has("wpm_widget_visible"), "the restore removes the adjusted setting")
+					AssertEqual(ManifestDefaultFor("metrics.private_filter_enabled"), true)
+				}
 				if Scope == "keyboard_layout" {
 					AssertEqual(Parsed["llm"]["enabled"], true)
 					AssertEqual(Parsed["metrics"]["enabled"], true)
@@ -77,12 +84,12 @@ _ScopeMenuCommandsCase(Scope, Factory, MenuKey, Modes := ["recommended", "clear"
 	}
 }
 Test("config-scope-menu: layout commands publish only their scope and recover refusal",
-	_ScopeMenuCommandsCase.Bind("keyboard_layout", "_LAY_ScopeCommands", "layout_menu"))
+	_RRNC_NoDialog.Bind("Layout", _ScopeMenuCommandsCase.Bind("keyboard_layout", "_LAY_ScopeCommands", "layout_menu")))
 Test("config-scope-menu: LLM commands preserve credentials and recover refusal",
-	_ScopeMenuCommandsCase.Bind("llm", "_LLM_ScopeCommands", "llm_menu", ["recommended"]))
+	_RRNC_NoDialog.Bind("AI", _ScopeMenuCommandsCase.Bind("llm", "_LLM_ScopeCommands", "llm_menu", ["recommended"])))
 ; The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
 Test("config-scope-menu: metrics restore preserves consent, recovers refusal, and has no clear",
-	_ScopeMenuCommandsCase.Bind("metrics", "_MET_ScopeCommands", "metrics_menu", ["recommended"]))
+	_RRNC_NoDialog.Bind("Metrics", _ScopeMenuCommandsCase.Bind("metrics", "_MET_ScopeCommands", "metrics_menu", ["recommended"])))
 
 _ScopeMenuAbsentConsent() {
 	for Factory in ["_LLM_ScopeCommands", "_MET_ScopeCommands"] {

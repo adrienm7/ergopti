@@ -139,6 +139,46 @@ _LRF_DecisionsVectors() {
 }
 Test("LLM remote formats: the decisions shapes replay the shared corpus", _LRF_DecisionsVectors)
 
+_LRF_AgentVectors() {
+	Corpus := _LRF_Corpus()
+	for Vector in Corpus["agent_body"] {
+		Spec := Vector["spec"]
+		Temperature := Spec.Has("temperature") ? Format("{:.2f}", Spec["temperature"]) : ""
+		AssertEqual("", _LVS_DeepEqual(Vector["expected"], JsonParse(LLM_RemoteFormats_AgentBody(Spec["model"],
+			Spec["system"], Spec["text"], Spec["max_tokens"], Temperature))), Vector["id"])
+	}
+	for Vector in Corpus["agent_answer"] {
+		Result := _LLMRemoteClassifyResponse(LLM_AGENT_FORMAT, Vector["body"])
+		AssertEqual(Vector["text"], Result["text"], Vector["id"])
+		AssertEqual(Vector["text"] != "", Result["ok"], Vector["id"] . ": ok")
+	}
+	AssertTrue(Corpus["agent_answer"].Length >= 5, "the answer vectors are replayed")
+}
+Test("LLM remote formats: the Agent API shapes replay the shared corpus", _LRF_AgentVectors)
+
+_LRF_AgentWire() {
+	global LLM_API_PROVIDERS
+	Perplexity := LLM_API_PROVIDERS["perplexity"]
+	AssertEqual(LLM_AGENT_FORMAT, Perplexity["Format"], "Perplexity speaks the Agent API")
+	Url := _LLMRemoteBuildUrl(Perplexity["BaseUrl"], Perplexity["Format"], "k", "m")
+	AssertEqual("https://api.perplexity.ai/v1/agent", Url, "the documented endpoint")
+	Body := JsonParse(_LLMRemoteBuildPayload(Perplexity["Format"], Perplexity["DefaultModel"], "sys", "user", 0.5, 16))
+	AssertEqual("", _LVS_DeepEqual(Map("model", "perplexity/sonar", "instructions", "sys", "input", "user",
+		"max_output_tokens", 16, "temperature", 0.5, "stream", JsonParse("false")), Body), "the request shape")
+	AssertTrue(LLM_RemoteHasReadyPing("perplexity"), "the save-time ping lists its models")
+	AssertTrue(LLM_ApiListingSupported(LLM_AGENT_FORMAT), "the model page lists them")
+	AssertFalse(LLM_RemoteFormatServes(LLM_AGENT_FORMAT, "images"), "no screenshot goes to it")
+	Text := JsonParse(LLM_Vision_BuildRequest(LLM_AGENT_FORMAT, Map("model", "m", "system", "s", "text", "t", "max_tokens", 8)))
+	AssertEqual("t", Text["input"], "the agent's own text request")
+	Threw := false
+	try LLM_Vision_BuildRequest(LLM_AGENT_FORMAT, Map("model", "m", "system", "s", "text", "t", "max_tokens", 8,
+		"image", "aGk=", "mime", "image/png"))
+	catch ValueError
+		Threw := true
+	AssertTrue(Threw, "an image is refused, not dropped")
+}
+Test("LLM remote formats: Perplexity goes to the Agent API", _LRF_AgentWire)
+
 _LRF_EncoderWritesJson() {
 	AssertEqual('{"memory":"off","stream":false}',
 		LLM_RemoteFormats_Encode(Map("stream", LLM_REMOTE_JSON_FALSE, "memory", "off")),

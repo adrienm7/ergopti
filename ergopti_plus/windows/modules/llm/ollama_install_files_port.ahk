@@ -310,7 +310,7 @@ OllamaInstallFiles_Spawn(Executable, Arguments, OnDone, AdoptConstruction,
 			|| !HasMethod(AdoptConstruction, "Call")
 			|| !(CaptureBytes is Integer) || CaptureBytes <= 0
 		throw TypeError("File bridge requires exact callbacks and bounded capture.")
-	Factory := IsSet(SpawnFn) ? SpawnFn : ShellRunner_SpawnTreeOwned
+	Factory := IsSet(SpawnFn) ? SpawnFn : ProxyOverride_SpawnWorker
 	if !HasMethod(Factory, "Call")
 		throw TypeError("File bridge requires a lazy task constructor.")
 	; The fifth ShellRunner slot is a post-Job native fault seam, not adoption.

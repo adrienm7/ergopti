@@ -14,6 +14,7 @@ local Paths = require("infra.paths")
 
 local policies = {
 	{ module = "infra.proxy_policy", path = "modules/network/proxy_policy.json", call = ".load()" },
+	{ module = "infra.proxy_policy", path = "modules/network/proxy_override.json", call = ".override_setting()" },
 	{ module = "infra.route_origins", path = "modules/network/route_origins.json", call = '.client("uv")' },
 	{ module = "infra.http_header_policy", path = "data/http/header_policy.json", call = '.validate("Accept", "text/plain")' },
 	{ module = "infra.http_transport_policy", path = "data/http/transport_policy.json", call = '.resolve("https://example.test")' },

@@ -4,8 +4,8 @@
 --- MODULE: Owned Runtime Artifact Pin
 --- DESCRIPTION:
 --- Pins platform/remap/runtime_manifest.lua: a manifest is pinned only when
---- every field of M.FIELDS has its shape, the shipped manifest is honestly
---- unpinned until the hosted build exists, and an unpinned manifest produces a
+--- every field of M.FIELDS has its shape, the shipped manifest pins the
+--- artifact of the green hosted build, and an unpinned manifest produces a
 --- named refusal instead of a version guess.
 ---
 --- ROOT CAUSE ENCODED: the digest of the runtime and the designated requirement
@@ -81,19 +81,34 @@ end
 -- ==================================
 
 helpers.describe("owned runtime manifest: what ships", function()
-	helpers.it("pins the VirtualHIDDevice and the capture limits but not the unbuilt runtime", function()
-		local Manifest = load_module()
-		helpers.assert_eq(Manifest.unpinned(shipped()), {
-			"runtime.version", "runtime.file_name", "runtime.source_url", "runtime.sha256", "runtime.size",
-			"capture.requirement",
-		})
+	helpers.it("pins every field, the runtime built by the hosted job included", function()
+		helpers.assert_eq(load_module().unpinned(shipped()), {})
 	end)
 
-	helpers.it("refuses the shipped manifest with a sentence naming the first missing field", function()
+	helpers.it("pins the artifact of the green hosted build, under its release tag", function()
+		local runtime = shipped().runtime
+		helpers.assert_eq(runtime.version, "16.3.0-ergopti.2")
+		helpers.assert_eq(runtime.file_name, "ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.2.tar.gz")
+		helpers.assert_eq(runtime.source_url, "https://github.com/adrienm7/ergopti/releases/download/"
+			.. "remap-runtime-v16.3.0-ergopti.2/ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.2.tar.gz")
+		helpers.assert_eq(runtime.sha256, "ad1541f838a9d3d8c4d6aaa45cda82fddb36c34c381e866d0b69391cae42de8e")
+		helpers.assert_eq(runtime.size, 12176523)
+	end)
+
+	helpers.it("pins the capture to the launcher signed by the stable identity", function()
+		helpers.assert_eq(shipped().capture.requirement,
+			'identifier "com.ergoptiplus.app" and certificate leaf = H"759d8aae58886bac8886d834f9eeae52274051bc"')
+	end)
+
+	helpers.it("hands the owner the shipped driver version and capture declaration", function()
 		local pinned, reason = load_module().pinned(shipped())
-		helpers.assert_nil(pinned)
-		helpers.assert_contains(reason, "runtime.version")
-		helpers.assert_contains(reason, "5 more")
+		helpers.assert_nil(reason)
+		helpers.assert_eq(pinned.virtual_hid_version, "8.5.0")
+		helpers.assert_eq(pinned.capture.batch_limit, 64)
+	end)
+
+	helpers.it("hands the field check the pinned driver version", function()
+		helpers.assert_eq(load_module().virtual_hid_version(shipped()), "8.5.0")
 	end)
 
 	helpers.it("names the upstream revision the plan anchors the fork on", function()
@@ -122,6 +137,25 @@ helpers.describe("owned runtime manifest: a complete pin", function()
 			capture = { requirement = 'identifier "com.ergoptiplus.app"', batch_limit = 64, frame_limit = 65536,
 				history_capacity = 4096 },
 		})
+	end)
+
+	helpers.it("names the driver version only while every driver field is pinned", function()
+		local Manifest = load_module()
+		helpers.assert_eq(Manifest.virtual_hid_version(complete()), "8.5.0")
+		for _, field in ipairs(Manifest.FIELDS) do
+			local manifest = complete()
+			set(manifest, field[1], nil)
+			if field[1]:find("^virtual_hid_device%.") then
+				helpers.assert_nil(Manifest.virtual_hid_version(manifest), field[1])
+			else
+				helpers.assert_eq(Manifest.virtual_hid_version(manifest), "8.5.0", field[1])
+			end
+		end
+		local foreign = complete()
+		foreign.virtual_hid_device.source_url = "https://example.test/dl/other.pkg"
+		helpers.assert_nil(Manifest.virtual_hid_version(foreign))
+		helpers.assert_nil(Manifest.virtual_hid_version({ schema = 2 }))
+		helpers.assert_nil(Manifest.virtual_hid_version(nil))
 	end)
 
 	helpers.it("treats every field as required: removing or nulling any one unpins the manifest", function()

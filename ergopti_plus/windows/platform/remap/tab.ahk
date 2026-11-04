@@ -58,7 +58,7 @@ _TabAcceptVisiblePrediction() {
 	; once the tooltip hides, 8.5 is no longer eligible, and the repeat falls to
 	; the owned-press swallower (8.6) instead of typing Tabs after the text.
 	_TapHoldClaimPress("tab")
-	try KeyWait("SC00F", "T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	try KS_WaitReleased("SC00F", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	finally _TapHoldEndPressClaim("tab")
 	return true
 }
@@ -89,7 +89,7 @@ SC00F::
 		return
 	if !TapHoldSyntheticKeyDown("LAlt")
 		return
-	tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
+	tap := KS_WaitReleased("SC00F", TapHoldDuration(TapHold, "tab"))
 	if tap {
 		if TapHoldTapAction(TapHold, "left_alt") == "tab" and KS_IsDown("SC038") { ; LAlt physically held
 			TapHoldDispatchTap("tab", TextPressKey.Bind("Tab", "Alt"))
@@ -107,7 +107,7 @@ SC00F::
 		; SC00F key-up (Suspend toggled mid-hold disarms the SC00F Up:: fallback)
 		; can never latch Alt Down system-wide (hold-modifier-unbounded-keywait)
 		try {
-			KeyWait("SC00F", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+			KS_WaitReleased("SC00F", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 		} finally {
 			TapHoldSyntheticKeyUp("LAlt")
 		}
@@ -191,6 +191,18 @@ SC00F:: {
 	if _TabAcceptVisiblePrediction()
 		return
 	_TabDispatch()
+}
+#HotIf
+
+; With no tap-hold the key stays native, except for the press that completes a
+; hotstring: the expansion must land before the key moves the focus. A visible
+; prediction takes precedence over the expansion (HotstringEndKeyCompletes).
+#HotIf TapHoldTapAction(TapHold, "tab") == "" and TapHoldHoldModifier(TapHold, "tab") == "" and TapHoldHoldLayer(TapHold, "tab") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld() and HotstringEndKeyClaim(0x09, "`t")
+SC00F:: {
+	if _TabAcceptVisiblePrediction()
+		return
+	if !HotstringCompleteEndKey("`t")
+		TapHoldEmitKeyTap("Tab")
 }
 #HotIf
 

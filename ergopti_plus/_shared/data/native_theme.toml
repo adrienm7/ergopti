@@ -1,17 +1,13 @@
 # _shared/data/native_theme.toml
 #
-# The colours the native (Lua) drivers type themselves: the ordered palette of
-# the hotstrings settings window and the accent of each download-window kind.
+# The colours the native drivers type themselves: the ordered palette of the
+# hotstrings settings window and the accent of each download-window kind.
 # The web pages take their colours from _shared/ui/theme.css instead; this file
-# exists because a Lua driver has no stylesheet to read.
+# exists because a native driver has no stylesheet to read.
 #
-# Generated into _shared/lua/native_theme_data.lua by
-# tools/codegen/codegen-native-theme.cjs. Edit this file, then run
-# `npm run gen`; never edit the generated Lua by hand.
-#
-# The Windows driver still types the same palette in hcw_helpers.ahk;
-# tools/test/test-color-presets-parity.cjs holds that copy to this one, colour
-# for colour and in order, until Windows reads a generated palette too.
+# Generated into _shared/lua/native_theme_data.lua and, for the palette,
+# windows/_generated/native_theme.ahk by tools/codegen/codegen-native-theme.cjs.
+# Edit this file, then run `npm run gen`; never edit the generated files by hand.
 
 # The ordered palette: the 14 colours the three drivers offer, along the hue wheel
 # (warm, cool, neutral). `i18n` is the locale key of the colour's name; the

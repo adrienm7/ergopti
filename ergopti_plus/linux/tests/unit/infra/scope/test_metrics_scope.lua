@@ -55,6 +55,21 @@ local function with_scope(body)
 end
 
 helpers.describe("Linux metrics scope transaction", function()
+	helpers.it("restores an adjusted setting: it leaves the file and the runtime takes the default again", function()
+		with_scope(function(owner, collector, _, _, _, path)
+			local private_title = "Firefox (Private Browsing)"
+			helpers.assert_eq(collector.is_context_protected("app", private_title), false,
+				"the fixture adjusted the filter")
+			helpers.assert_eq(owner.apply("recommended"), true)
+			local document = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(document.metrics.private_filter_enabled, nil)
+			helpers.assert_eq(document.metrics.wpm_widget_visible, nil)
+			helpers.assert_eq(document.metrics.enabled, true, "the consent stays out of a restore")
+			helpers.assert_eq(collector.is_context_protected("app", private_title), true,
+				"the runtime takes the default again")
+		end)
+	end)
+
 	helpers.it("clears an outdated owned value instead of refusing (config-outdated-metrics)", function()
 		-- An old-shape leaf is outdated configuration: the reset that removes
 		-- it must never be refused because of it.
@@ -192,9 +207,9 @@ helpers.describe("Linux metrics scope rendered commands", function()
 			}
 			with_scope(function(_, collector)
 				local i18n = require("infra.i18n")
-				package.loaded["ui.menu.menu_builder"] = nil
+				package.loaded["ui.menu.builder"] = nil
 				local passed, detail = pcall(function()
-					local rows = require("ui.menu.menu_builder").build({ keystats = collector,
+					local rows = require("ui.menu.builder").build({ keystats = collector,
 						paused = false, is_paused = function() return false end })
 					local submenu
 					for _, row in ipairs(rows) do
@@ -247,14 +262,14 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						if scenario == "publication refusal" then controls.refuse = path end
 						package.loaded["adapters.file_system"] = controls.files
 						os.execute = function(command)
-							if command:find("zenity", 1, true) then
+							if command:find("dialog_host.lua", 1, true) then
 								questions = questions + 1
 								return 0
 							end
 							return execute(command)
 						end
-						package.loaded["ui.menu.menu_builder"] = nil
-						local rows = require("ui.menu.menu_builder").build({ keystats = collector,
+						package.loaded["ui.menu.builder"] = nil
+						local rows = require("ui.menu.builder").build({ keystats = collector,
 							paused = false, is_paused = function() return paused end,
 							on_menu_changed = function() changed = changed + 1 end })
 						local action

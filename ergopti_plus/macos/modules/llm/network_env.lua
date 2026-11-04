@@ -18,6 +18,13 @@
 ---    so every macOS download child reads the settings the same way.
 --- 3. Fail fast: without the shared policy file the prelude is nil and the
 ---    caller refuses to start a download that would fail for an unnamed cause.
+--- 4. The user's proxy override (Issue #101 point 2, network/proxy_override.lua)
+---    leads every prelude as ERGOPTI_PROXY_OVERRIDE, always assigned so an
+---    inherited value never applies: the shared policy then treats a relay as
+---    the explicit route and "direct" as no relay, before any PAC lookup. A
+---    managed (signed native worker) prelude cannot honour it, so an override
+---    selects the environment-driven path instead. An invalid stored value
+---    refuses the prelude.
 --- ==============================================================================
 
 local M = {}
@@ -26,16 +33,21 @@ local text_utils = require("infra.text_utils")
 local FileSystem = require("adapters.file_system")
 local Json = require("json")
 local Admission = require("modules.llm.opaque_network_admission")
+local NativePath = require("native_path")
+local Storage = require("adapters.storage")
+local ProxyOverride = require("network.proxy_override")
 
 -- The shared policy, relative to the driver root.
 local POLICY_RELATIVE = "modules/llm/network-retry.sh"
 
---- The driver root this module was loaded from.
+--- The driver root this module was loaded from. A backslash is a filename
+--- byte on macOS, so only the host's own separators split the path.
 --- @return string|nil root
 local function driver_root()
 	local source = debug.getinfo(1, "S").source or ""
-	source = (source:sub(1, 1) == "@" and source:sub(2) or source):gsub("\\", "/")
-	return source:match("^(.*)/modules/llm/network_env%.lua$")
+	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	local sep = "[" .. NativePath.separators() .. "]"
+	return source:match("^(.*)" .. sep .. "modules" .. sep .. "llm" .. sep .. "network_env%.lua$")
 end
 
 --- Locates the shared network policy file.
@@ -75,6 +87,22 @@ local function route_inventory()
 	return inventory, nil
 end
 
+-- The contract of the local sign-in relay (docs/design/proxy-auth-relay.md).
+local RELAY_RELATIVE = "/../_shared/modules/network/proxy_auth_relay.json"
+
+--- The shared sign-in relay policy (network/proxy_auth_relay.lua).
+--- @return table|nil policy
+--- @return string|nil err Why the contract cannot be used.
+function M.proxy_auth_relay()
+	local root = driver_root()
+	if not root then return nil, "the bundled relay contract owner is missing" end
+	local ok, bytes, status = pcall(FileSystem.read_with_status, root .. RELAY_RELATIVE, function() end)
+	if not ok or status ~= "ok" or type(bytes) ~= "string" then return nil, "the relay contract is unreadable" end
+	local decoded, contract = pcall(Json.decode, bytes)
+	if not decoded then return nil, "the relay contract is unreadable" end
+	return require("network.proxy_auth_relay").new(contract)
+end
+
 --- Seconds one origin's route lookup may take (route_origins.json).
 --- @return number|nil seconds
 --- @return string|nil err Why the inventory cannot be used.
@@ -98,6 +126,57 @@ function M.route_origins(client)
 		return nil, "the route inventory names no origin for " .. tostring(client)
 	end
 	return origins, nil
+end
+
+-- The shared proxy override declaration, relative to the driver root.
+local OVERRIDE_RELATIVE = "/../_shared/modules/network/proxy_override.json"
+
+--- Reads and validates the shared proxy override declaration.
+--- @return table|nil setting
+--- @return string|nil err Why the declaration cannot be used.
+local function load_override_setting()
+	local root = driver_root()
+	if not root then return nil, "the bundled proxy override owner is missing" end
+	local file = io.open(root .. OVERRIDE_RELATIVE, "rb")
+	local bytes = file and file:read("*a")
+	if file then file:close() end
+	if type(bytes) ~= "string" then return nil, "the shared proxy override declaration is unreadable" end
+	local decoded, data = pcall(Json.decode, bytes)
+	if not decoded then return nil, "the shared proxy override declaration is unreadable" end
+	local setting, reason = ProxyOverride.new(data)
+	if not setting then return nil, "the shared proxy override declaration is invalid (" .. tostring(reason) .. ")" end
+	return setting, nil
+end
+
+-- Read once, when the module loads, like the policy path: the file ships beside
+-- it in the bundle, and prelude builders run under callers that double io.open.
+local _override_setting, _override_error = load_override_setting()
+
+--- The shared proxy override declaration.
+--- @return table|nil setting
+--- @return string|nil err Why the declaration cannot be used.
+function M.proxy_override_setting()
+	return _override_setting, _override_error
+end
+
+--- The stored override in its canonical form: "" (automatic), "direct" or a relay.
+--- @return string|nil value
+--- @return string|nil err Why it cannot be used; the value itself is never named.
+function M.proxy_override_value()
+	local setting, err = M.proxy_override_setting()
+	if not setting then return nil, err end
+	local value = setting.normalize(Storage.get(setting.storage_key, nil))
+	if value == nil then return nil, "the proxy override in the settings is not valid" end
+	return value, nil
+end
+
+--- The shell assignment leading every prelude.
+--- @return string|nil assignment
+--- @return string|nil err
+local function override_assignment()
+	local value, err = M.proxy_override_value()
+	if not value then return nil, err end
+	return "ERGOPTI_PROXY_OVERRIDE=" .. text_utils.shell_quote(value) .. "; ", nil
 end
 
 -- The shared proxy policy, relative to the driver root's shared tree.
@@ -169,8 +248,10 @@ local function build_prelude(tag, opaque, options)
 			.. " \"$OPAQUE_NETWORK_FAILURE_PROVENANCE\" \"$OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS\" >&2 ;; esac; fi; "
 			.. "exit \"$_ergopti_network_status\"; fi; "
 	end
+	local override, override_error = override_assignment()
+	if not override then return nil, override_error end
 	local label = text_utils.shell_quote("[" .. tostring(tag) .. "] %s\n")
-	return "log_info() { printf " .. label .. " \"$1\" >&2; }; "
+	return override .. "log_info() { printf " .. label .. " \"$1\" >&2; }; "
 		.. "log_error() { printf " .. label .. " \"$1\" >&2; }; "
 		.. (probe and ("OPAQUE_NETWORK_PAC_PROBE_URL=" .. text_utils.shell_quote(probe) .. "; ") or "")
 		.. (probes and ("OPAQUE_NETWORK_PAC_PROBE_URLS=" .. text_utils.shell_quote(probes) .. "; ") or "")
@@ -228,6 +309,11 @@ end
 --- @return string|nil prelude
 --- @return string|nil err
 function M.managed_http_prelude(tag)
+	local override, override_error = M.proxy_override_value()
+	if not override then return nil, override_error end
+	-- The signed worker resolves each request natively; an override needs the
+	-- environment-driven client (M.uses_managed_transport tells the caller).
+	if override ~= "" then return M.opaque_prelude(tag) end
 	local root = driver_root()
 	if not root or not M.policy_path() then return nil, "the bundled managed network policy is missing" end
 	local directory = root .. "/platform/network"
@@ -235,6 +321,17 @@ function M.managed_http_prelude(tag)
 		return nil, "the bundled managed network receiver is missing"
 	end
 	return managed_receiver_prelude(tag, root)
+end
+
+--- Whether a download child may install the managed (signed native worker)
+--- transport: not while a proxy override is set, whose route the worker cannot
+--- take (managed_http_prelude then admits the environment-driven client).
+--- @return boolean|nil managed
+--- @return string|nil err
+function M.uses_managed_transport()
+	local override, err = M.proxy_override_value()
+	if not override then return nil, err end
+	return override == "", nil
 end
 
 --- Admits the transport selected by the installer without changing route provenance.
@@ -249,6 +346,10 @@ function M.bootstrap_prelude(tag, python)
 	if type(python) ~= "string" or python == "" or python:find("%z") then
 		return nil, "the admitted bootstrap interpreter is missing"
 	end
+	local override, override_error = M.proxy_override_value()
+	if not override then return nil, override_error end
+	-- An explicit route keeps opaque admission (see below); so does the override.
+	if override ~= "" then return M.opaque_prelude(tag) end
 	local root = driver_root()
 	if not root then return nil, "the bundled bootstrap owner is missing" end
 	local managed = managed_receiver_prelude(tag, root)

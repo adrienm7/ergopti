@@ -108,13 +108,34 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(handler.bridge_name, "hsOnboarding")
     end)
 
+		helpers.it("tells the page whether the number-row order applies, or the locale key of why not (number-row-order-linux)", function()
+			local cases = {
+				{ { true }, true },
+				{ { false, "session_unsupported" }, "platform_reason.number_row_live_session" },
+				{ { false, "no_source_layout" }, "platform_reason.number_row_live_no_layout" },
+			}
+			for _, case in ipairs(cases) do
+				local state = onboarding_state()
+				state.number_row_live = { available = function() return case[1][1], case[1][2] end }
+				local result = handler.on_message({ action = "ready" }, state)
+				helpers.assert_eq(result.data.capabilities.number_row_live, case[2])
+			end
+			local state = onboarding_state()
+			state.number_row_live = { available = function() error("registry unreadable") end }
+			local result = handler.on_message({ action = "ready" }, state)
+			helpers.assert_eq(result.data.capabilities.number_row_live, "platform_reason.number_row_live_session",
+				"an unreadable registry greys the control rather than offering it")
+		end)
+
 		helpers.it("pushes the complete shared initData contract on ready", function()
 			local state, _, captured = onboarding_state()
 			local result = handler.on_message({ action = "ready" }, state)
 			helpers.assert_true(result.pushed)
 			helpers.assert_eq(result.data.platform, "linux")
-			helpers.assert_eq(result.data.capabilities, { gesture_registration = false },
+			helpers.assert_eq(result.data.capabilities.gesture_registration, false,
 				"the page learns from the host that Linux registers no gesture with the system")
+			helpers.assert_eq(type(result.data.capabilities.number_row_live), "string",
+				"outside an X11 session the page is told why the number-row order cannot be applied")
 			helpers.assert_eq(result.data.locale, "en")
 			helpers.assert_eq(result.data.system_layout, "qwerty")
 			helpers.assert_eq(result.data.config_dir, "", "the default folder is not a custom choice")

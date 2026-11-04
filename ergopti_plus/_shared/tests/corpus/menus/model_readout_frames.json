@@ -4,7 +4,7 @@
 	"specs": {
 		"section": "llm_model_specs_frame",
 		"key": "menu.llm.specs_header",
-		"english": "SPECIFICATIONS",
+		"english": "Specifications",
 		"rows": [
 			{
 				"type": "---",
@@ -32,7 +32,7 @@
 					"separator": true
 				},
 				{
-					"label": "SPECIFICATIONS",
+					"label": "Specifications",
 					"disabled": true
 				}
 			],
@@ -41,7 +41,7 @@
 					"separator": true
 				},
 				{
-					"label": "— SPECIFICATIONS —",
+					"label": "— Specifications —",
 					"disabled": true
 				}
 			],
@@ -51,7 +51,7 @@
 	"caps": {
 		"section": "llm_model_caps_frame",
 		"key": "menu.llm.caps_header",
-		"english": "CAPABILITIES",
+		"english": "Capabilities",
 		"rows": [
 			{
 				"type": "---",
@@ -79,7 +79,7 @@
 					"separator": true
 				},
 				{
-					"label": "CAPABILITIES",
+					"label": "Capabilities",
 					"disabled": true
 				}
 			],
@@ -88,7 +88,7 @@
 					"separator": true
 				},
 				{
-					"label": "— CAPABILITIES —",
+					"label": "— Capabilities —",
 					"disabled": true
 				}
 			],

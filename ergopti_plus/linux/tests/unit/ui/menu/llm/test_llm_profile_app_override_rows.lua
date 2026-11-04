@@ -21,7 +21,7 @@ helpers.describe("Linux AI menu: per-application profile overrides", function()
 			local engine = require("modules.llm.prediction_engine")
 			-- A fresh builder over the current module state: an earlier test may have
 			-- retired the separator or manifest sources the cached one captured.
-			local MenuBuilder = helpers.load_module("ui.menu.menu_builder")
+			local MenuBuilder = helpers.load_module("ui.menu.builder")
 			local original_enabled, original_last = engine.is_enabled, engine.get_agent_last_app
 			local ok, err = xpcall(function()
 				local rebuilt = 0

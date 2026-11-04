@@ -19,10 +19,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TLPNS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TLPNS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TLPNS_StripLineComments(Src) {
@@ -45,7 +43,7 @@ _TLPNS_StripLineComments(Src) {
 ; ====================================================================
 
 _TLPNS_ControlCharStrip() {
-	Src := _TLPNS_StripLineComments(_TLPNS_ReadSource("modules/llm/parser.ahk"))
+	Src := _TLPNS_StripLineComments(_TLPNS_ReadSource("parser.ahk"))
 	Assert(Src != "", "modules/llm/parser.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_Parser_CleanModelOutput")

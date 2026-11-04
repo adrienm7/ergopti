@@ -23,6 +23,8 @@ local LOG = "tooltip_llm"
 local Config = require("ui.tooltip.config")
 local Renderer = require("ui.tooltip.renderer")
 local LlmLine = require("tooltip.llm_line")
+local KeyNames = require("keycodes.key_names")
+local i18n = require("infra.i18n")
 local HotPath = require("infra.hotpath_profiler")
 local TextUtils = require("text_utils")
 
@@ -987,10 +989,34 @@ end
 -- ==================================
 
 --- Safely appends styled segments to a result string.
-local function append_segment(result, text, color, is_bold)
+--- The footer's navigation hints in the user's language: the words from the
+--- locale, each key from the shared key name table (« Maj gauche + Tab ou ↑/← »).
+--- They read French in every locale until 2026-11-03. Port:
+--- windows/ui/tooltip/llm.ahk _LLM_BuildNavHint.
+--- @param ui table Config.llm_ui.
+--- @param nav_mod_str string The navigation modifiers shown before the arrows; "none" hides them.
+--- @return table { accept_single, accept_center, left, right }
+function M.footer_hints(ui, nav_mod_str)
+	local accept_key = KeyNames.combo_label(ui.hint_accept_key, "macos", i18n.get)
+	local left = KeyNames.combo_label(ui.hint_nav_left_keys, "macos", i18n.get)
+	local right = KeyNames.combo_label(ui.hint_nav_right_keys, "macos", i18n.get)
+	if nav_mod_str ~= "none" then
+		local chord = (nav_mod_str ~= nil and nav_mod_str ~= "") and (nav_mod_str .. " + ") or ""
+		left = i18n.format("llm.tooltip.hint_or", left, chord .. ui.hint_arrow_left)
+		right = i18n.format("llm.tooltip.hint_or", right, chord .. ui.hint_arrow_right)
+	end
+	return {
+		accept_single = KeyNames.fill("llm.tooltip.hint_accept_single", accept_key, i18n.get),
+		accept_center = KeyNames.fill("llm.tooltip.hint_accept_center", accept_key, i18n.get),
+		left = left,
+		right = right,
+	}
+end
+
+local function append_segment(result, text, color, is_bold, paragraph)
 	if not text or tostring(text) == "" then return result end
 	local font_name = is_bold and Config.fonts.bold or Config.fonts.main
-	local segment = hs.styledtext.new(tostring(text), { font = { name = font_name, size = Config.sizes.main }, color = color })
+	local segment = hs.styledtext.new(tostring(text), { font = { name = font_name, size = Config.sizes.main }, color = color, paragraphStyle = paragraph })
 	return result and (result .. segment) or segment
 end
 
@@ -1004,12 +1030,16 @@ local SELECTED_ROLE_COLOR = { typed = "unsel_gray", corrected = "corr_sel", next
 --- (tooltip/llm_line.lua); this only gives each piece its colour and weight.
 --- @param prediction table The prediction payload.
 --- @param is_selected boolean True if this prediction is currently highlighted.
+--- @param look table|nil { color?, paragraph? } A colour replacing every role's,
+---   and the paragraph style of the line.
 --- @return userdata|nil The styled text object.
-local function build_line(prediction, is_selected)
+local function build_line(prediction, is_selected, look)
+	look = look or {}
 	local result = nil
 	for _, segment in ipairs(LlmLine.segments(prediction, is_selected)) do
 		local color_key = is_selected and SELECTED_ROLE_COLOR[segment.role] or "unsel_gray"
-		result = append_segment(result, segment.text, Config.colors[color_key], segment.bold)
+		result = append_segment(result, segment.text, look.color or Config.colors[color_key],
+			segment.bold, look.paragraph)
 	end
 	return result
 end
@@ -1033,92 +1063,89 @@ local function assemble_blocks(state, reserved_count)
 	local styled_gap = hs.styledtext.new("\n", { font = { name = Config.fonts.main, size = Config.sizes.gap }, color = Config.colors.invis })
 
 	-- The shortcut column (_shared/modules/tooltip/constants.toml [llm_ui]): every
-	-- prediction row shows the chord that inserts it, muted, right-aligned on a
-	-- tab stop label_gap past the widest line. The widest line is measured over
-	-- both renderings of every row, so navigating never moves the column. The
-	-- tab stop rides on each line's prefix, its first character, which is what
-	-- gives a paragraph its style.
+	-- prediction row shows the chord that inserts it, muted, in a text element of
+	-- its own laid over the predictions block and right-aligned in the block's
+	-- whole frame, so the column ends on the panel's inner edge. A tab stop placed
+	-- from the widest line stayed there, stuck to the text, whenever the footer
+	-- made the panel wider than the lines. The widest line is measured over both
+	-- renderings of every row, so navigating never moves the lines' limit.
 	local validation_mods = parse_validation_shortcut(state.shortcut_mod)
-	local label_attributes = { font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.cmd_dim }
-	local function prefix_of(selected, paragraph)
+	local function prefix_of(selected, look)
 		local attributes = { font = { name = Config.fonts.main, size = Config.sizes.main },
-			color = selected and Config.colors.cursor or Config.colors.invis, paragraphStyle = paragraph }
+			color = look.color or (selected and Config.colors.cursor or Config.colors.invis),
+			paragraphStyle = look.paragraph }
 		return hs.styledtext.new(selected and prefix_selected or prefix_unselected, attributes)
+	end
+	local function body_of(row, selected, look)
+		local line = row.prediction ~= nil and build_line(row.prediction, selected, look) or nil
+		if line then return line end
+		local is_slot = row.prediction == nil
+		return hs.styledtext.new(is_slot and ui.slot_placeholder or "…", {
+			font = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } },
+			color = look.color or (is_slot and Config.colors.loading or Config.colors.unsel_gray),
+			paragraphStyle = look.paragraph })
 	end
 	local rows = {}
 	local measured_lines = nil
+	local labels_measured = nil
+	local label_attributes = { font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.cmd_dim }
+	local label_break = hs.styledtext.new("\n", label_attributes)
 
 	for i = 1, display_count do
 		local prediction = state.raw_predictions[i]
-		local is_selected = (i == state.current_index and prediction ~= nil)
-
+		local row = { prediction = prediction, selected = (i == state.current_index and prediction ~= nil), label = "" }
+		rows[#rows + 1] = row
+		local measured = prefix_of(row.selected, {}) .. body_of(row, row.selected, {})
 		if prediction ~= nil then
-			local body_block = build_line(prediction, is_selected)
-			if not body_block then
-				body_block = hs.styledtext.new("…", { font = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } }, color = Config.colors.unsel_gray })
-			end
-			local label = validation_mods and LlmLine.shortcut_label(i, validation_mods, ui.shortcut_spec) or ""
-			rows[#rows + 1] = { selected = is_selected, body = body_block, label = label }
-			if label ~= "" then
-				local both = prefix_of(is_selected) .. body_block .. styled_gap
-					.. prefix_of(not is_selected) .. (build_line(prediction, not is_selected) or body_block)
-				measured_lines = measured_lines and (measured_lines .. styled_gap .. both) or both
-			end
-		else
-			rows[#rows + 1] = { selected = false, label = "",
-				body = hs.styledtext.new(ui.slot_placeholder, { font = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } }, color = Config.colors.loading }) }
+			measured = measured .. styled_gap .. prefix_of(not row.selected, {}) .. body_of(row, not row.selected, {})
+			row.label = validation_mods and LlmLine.shortcut_label(i, validation_mods, ui.shortcut_spec) or ""
+		end
+		measured_lines = measured_lines and (measured_lines .. styled_gap .. measured) or measured
+		if row.label ~= "" then
+			local styled_label = hs.styledtext.new(row.label, label_attributes)
+			labels_measured = labels_measured and (labels_measured .. label_break .. styled_label) or styled_label
 		end
 	end
 
-	local paragraph, styled_tab = nil, nil
-	if measured_lines then
-		if not Renderer.canvas then error("the prediction tooltip canvas is unavailable") end
-		local labels_block = nil
-		local label_break = hs.styledtext.new("\n", label_attributes)
-		for _, row in ipairs(rows) do
-			if row.label ~= "" then
-				local styled_label = hs.styledtext.new(row.label, label_attributes)
-				labels_block = labels_block and (labels_block .. label_break .. styled_label) or styled_label
-			end
-		end
-		local column_end = Renderer.canvas:minimumTextSize(3, measured_lines).w
-			+ Config.layout.label_gap + Renderer.canvas:minimumTextSize(3, labels_block).w
-		paragraph = { tabStops = { { location = column_end, tabStopType = "right" } } }
-		styled_tab = hs.styledtext.new("\t", { font = { name = Config.fonts.main, size = Config.sizes.main }, color = Config.colors.invis })
-	end
+	if not Renderer.canvas then error("the prediction tooltip canvas is unavailable") end
+	local widest_line = Renderer.canvas:minimumTextSize(3, measured_lines).w
+	local widest_label = labels_measured and Renderer.canvas:minimumTextSize(3, labels_measured).w or 0
+	local column = LlmLine.shortcut_column(widest_line, widest_label,
+		Config.layout.label_gap, Config.layout.llm_max_content_width)
+	local placement = LlmLine.column_placement(state.fixed_width or column.preds_w, column.zone_w, 0, widest_line)
+	local line_limit = placement.truncated and placement.line_limit or nil
+	local line_look = { paragraph = line_limit and { lineBreak = "truncateTail" } or nil }
 
-	local assembled_result = nil
+	-- A column row repeats its line, invisible, in front of the label: same fonts,
+	-- so the same height and baseline, whatever a fallback font does to the line.
+	-- A cut line cannot be repeated, the label would be what gets cut.
+	local strut_look = { color = Config.colors.invis, paragraph = { alignment = "right" } }
+	local column_label_attributes = { font = label_attributes.font, color = label_attributes.color, paragraphStyle = strut_look.paragraph }
+	local assembled_result, labels_result = nil, nil
 	for _, row in ipairs(rows) do
-		local full_line
-		if paragraph and row.label ~= "" then
-			full_line = prefix_of(row.selected, paragraph) .. row.body .. styled_tab .. hs.styledtext.new(row.label, label_attributes)
-		else
-			full_line = prefix_of(row.selected) .. row.body
-		end
+		local full_line = prefix_of(row.selected, line_look) .. body_of(row, row.selected, line_look)
 		assembled_result = assembled_result and (assembled_result .. styled_gap .. full_line) or full_line
+		if labels_measured then
+			local label_line = prefix_of(row.selected, strut_look)
+			if not line_limit then label_line = label_line .. body_of(row, row.selected, strut_look) end
+			if row.label ~= "" then label_line = label_line .. hs.styledtext.new(row.label, column_label_attributes) end
+			labels_result = labels_result and (labels_result .. styled_gap .. label_line) or label_line
+		end
 	end
 
 	local space_divider = ui.footer_space_divider
 	local styled_hint
 
 	if display_count > 1 then
-		local hint_left  = ui.hint_nav_left
-		local hint_right = ui.hint_nav_right
-		if state.nav_mod_str ~= "none" then
-			local optional_nav_mod = (state.nav_mod_str ~= "" and state.nav_mod_str ~= "none") and (state.nav_mod_str .. " + ") or ""
-			local hint_or = ui.hint_or
-			hint_left  = hint_left  .. hint_or .. optional_nav_mod .. ui.hint_arrow_left
-			hint_right = hint_right .. hint_or .. optional_nav_mod .. ui.hint_arrow_right
-		end
-
+		local hints = M.footer_hints(ui, state.nav_mod_str)
 		styled_hint = hs.styledtext.new(
-			hint_left .. space_divider .. ui.hint_arrow_sep_left .. space_divider
-				.. ui.hint_accept_center .. space_divider
-				.. ui.hint_arrow_sep_right .. space_divider .. hint_right,
+			hints.left .. space_divider .. ui.hint_arrow_sep_left .. space_divider
+				.. hints.accept_center .. space_divider
+				.. ui.hint_arrow_sep_right .. space_divider .. hints.right,
 			{ font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.hint, paragraphStyle = { alignment = "center" } }
 		)
 	else
-		styled_hint = hs.styledtext.new(ui.hint_accept_single,
+		styled_hint = hs.styledtext.new(M.footer_hints(ui, state.nav_mod_str).accept_single,
 			{ font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.hint, paragraphStyle = { alignment = "center" } })
 	end
 
@@ -1137,7 +1164,8 @@ local function assemble_blocks(state, reserved_count)
 		styled_info = hs.styledtext.new(info_text, { font = { name = Config.fonts.main, size = Config.sizes.info }, color = Config.colors.info_bar, paragraphStyle = { alignment = "center" } })
 	end
 
-	return { preds = assembled_result, hint_st = styled_hint, info_st = styled_info, SP = space_divider }
+	return { preds = assembled_result, hint_st = styled_hint, info_st = styled_info, SP = space_divider,
+		preds_w = column.preds_w, labels_st = labels_result, line_limit = line_limit }
 end
 
 
@@ -1222,6 +1250,8 @@ local function refresh_chain_timing()
 		_tooltip_first_show_at = now
 		_chain_ttft_ms         = (now - _chain_start_time) * 1000
 		Logger.debug(LOG, "TTFT captured: %.0f ms.", _chain_ttft_ms)
+		require("perf_budget").judge(Logger, LOG, "prediction.display", _chain_ttft_ms,
+			function() return require("infra.timings").ms("budgets", "prediction_display_ms") end)
 	end
 end
 
@@ -1485,8 +1515,20 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 
 		local nav_modifier_string = "none"
 		if #flattened_nav_modifiers > 0 and not (#flattened_nav_modifiers == 1 and flattened_nav_modifiers[1] == "none") then
-			nav_modifier_string = table.concat(flattened_nav_modifiers, "+")
-			nav_modifier_string = nav_modifier_string:gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
+			-- The glyphs of the shared key name table, one per modifier, and the
+			-- translated name of one it draws no glyph for (Fn); the substitutions
+			-- here left any other spelling as its raw id.
+			local glyphs = {}
+			for _, mod in ipairs(flattened_nav_modifiers) do
+				if KeyNames.has_macos_symbol(mod) then
+					glyphs[#glyphs + 1] = KeyNames.macos_symbol(mod)
+				elseif KeyNames.canonical(mod) then
+					glyphs[#glyphs + 1] = KeyNames.label(mod, "macos", i18n.get)
+				else
+					Logger.warn(LOG, "Navigation modifier '%s' names no key; the hint leaves it out.", tostring(mod))
+				end
+			end
+			nav_modifier_string = table.concat(glyphs)
 		elseif #flattened_nav_modifiers == 0 then 
 			nav_modifier_string = "" 
 		end
@@ -1525,7 +1567,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			simulation_state._sizing_pass = true
 
 			local blocks = assemble_blocks(simulation_state, render_count)
-			local width_predictions = Renderer.canvas:minimumTextSize(3, blocks.preds).w
+			local width_predictions = blocks.preds_w
 			if width_hint_memo == nil then
 				width_hint_memo = blocks.hint_st and Renderer.canvas:minimumTextSize(3, blocks.hint_st).w or 0
 				width_info_memo = blocks.info_st and Renderer.canvas:minimumTextSize(3, blocks.info_st).w or 0

@@ -152,6 +152,15 @@ local function load_fixture(options)
 	package.loaded["modules.llm.ollama_binary"] = {
 		-- These existing daemon-ready cases model a native-owned source.
 		resolve = function() return "/fixture/ollama", nil, "native_managed" end,
+		-- metadata_pending_reads models the runtime metadata still being read
+		-- off the UI thread right after an install.
+		native_candidate = function()
+			fixture.metadata_reads = (fixture.metadata_reads or 0) + 1
+			if fixture.metadata_reads <= (options.metadata_pending_reads or 0) then
+				return nil, nil, "pending"
+			end
+			return "/fixture/ollama", {}
+		end,
 	}
 	package.loaded["modules.llm.api_ollama"] = {
 		ensure_running = function(transaction)

@@ -455,7 +455,7 @@ enum OwnedAutomationQueryWorker {
 				if result < 0 && errno != EINTR { ownershipLost = true }
 			}
 			// Unknown child ownership retains debt; never signal a reused PID.
-			usleep(20_000)
+			usleep(LauncherTimings.automationGuardianPoll.microseconds)
 		}
 	}
 
@@ -513,7 +513,7 @@ enum OwnedAutomationQueryWorker {
 		closeUnused()
 		guard spawned == 0 else { return refuseBeforeGuardian(spawned) }
 		// An impossible PID cannot authorize a numeric signal; retain ownership debt.
-		guard guardian > 1, guardian != getpid() else { while true { usleep(20_000) } }
+		guard guardian > 1, guardian != getpid() else { while true { usleep(LauncherTimings.automationGuardianPoll.microseconds) } }
 		guard LeaseExecutableIdentity.capture(at: executable) == expected, image.stoppedChildMatches(guardian),
 			nonblocking(STDIN_FILENO), nonblocking(inputDescriptor),
 			ProcessInfo.processInfo.systemUptime < deadline else {
@@ -595,7 +595,7 @@ enum OwnedAutomationQueryWorker {
 			if let status = guardianStatus, resultEOF {
 				// EOF or a normal helper exit alone cannot acknowledge an inner group.
 				guard status == 0, let terminal = transcript.terminal, closeAcknowledged else {
-					usleep(20_000); continue
+					usleep(LauncherTimings.automationGuardianPoll.microseconds); continue
 				}
 				guard streamValid, output.buffered.isEmpty else { return 70 }
 				for fact in transcript.setup { guard marker(fact) else { return 74 } }
@@ -668,7 +668,7 @@ enum OwnedAutomationQueryWorker {
 			_ = sentinel.withUnsafeBytes { Darwin.write(STDERR_FILENO, $0.baseAddress, sentinel.count) }
 			return 0
 		}
-		if operation == "fixture-wait" { usleep(30_000_000); return 0 }
+		if operation == "fixture-wait" { usleep(LauncherTimings.automationFixtureWait.microseconds); return 0 }
 		if operation == "fixture" {
 			let packet: [String: Any] = ["version": 1, "nonce": nonce, "operation": "discover", "status": "observed",
 				"rows": [["id": "11111111-1111-1111-1111-111111111111", "name": "日本 e\u{301}\n", "accepts_input": false]],
@@ -702,7 +702,7 @@ enum OwnedAutomationQueryWorker {
 			now: { ProcessInfo.processInfo.systemUptime },
 			query: { AEDeterminePermissionToAutomateTarget(&target, typeWildCard, typeWildCard, false) },
 			launch: { launchShortcutsEvents(until: started + targetLaunchSeconds) },
-			pause: { usleep(50_000) })
+			pause: { usleep(LauncherTimings.automationPermissionPoll.microseconds) })
 		guard permission == noErr else {
 			return publish(refusal(permission == -1743 || permission == -1744
 				? "automation_permission_refused" : "native_refused"))

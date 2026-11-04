@@ -19,6 +19,8 @@ local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
+local LabelValue = require("locale.label_value")
+local KeyNames = require("keycodes.key_names")
 local TextUtils     = require("text_utils")
 local Models        = require("ui.menu.menu_llm.models_manager")
 local Profiles      = require("ui.menu.menu_llm.profiles_manager")
@@ -186,6 +188,7 @@ M.DEFAULT_STATE = {
 		llm_agent_system1       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM1),
 		llm_agent_system2       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM2),
 		llm_agent_mode          = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_MODE),
+		llm_while_hotstring_tooltip = Manifest.default_for(require("config_keys").KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP),
 		llm_agent_disabled_apps = {},
 }
 
@@ -404,6 +407,19 @@ function M.active_models_manager()
 	return _active_models_mgr
 end
 
+--- Retires the owned Ollama daemon for the root teardown, calling back once
+--- the daemon's exact native retirement settles.
+--- @param on_settled function Called once with (settled, detail).
+--- @return boolean accepted True when retired or awaiting the callback.
+function M.retire_owned_ollama(on_settled)
+	local ApiOllama = require("modules.llm.api_ollama")
+	local accepted, state = ApiOllama.retire_owned_server(on_settled)
+	if accepted == true and state == "settled" then
+		on_settled(true, "owned Ollama daemon already retired")
+	end
+	return accepted == true
+end
+
 --- Retires the owned Ollama daemon and sweeps the local expander/HTTP helpers. Called by the root
 --- teardown shared by every controlled reload and quit path, so the quit entry
 --- points can never drift. Stock Karabiner processes are never owned by Ergopti.
@@ -462,12 +478,14 @@ end
 -- =================================
 -- =================================
 
-local function format_mod_string(m_str)
-		if type(m_str) ~= "string" then return "⌃" end
-		local dict = { ctrl="⌃", cmd="⌘", alt="⌥", shift="⇧" }
-		local res = ""
-		for p in m_str:gmatch("[^+]+") do res = res .. (dict[p] or p) end
-		return res == "" and "⌃" or res
+--- The modifiers of a navigation or validation chord as the macOS menus name
+--- them: their glyphs, then the shared key name table's names (« ⌃⇧ Ctrl +
+--- Maj »). The row used to show the glyphs alone, or the stored id itself for
+--- a modifier its own glyph list lacked.
+--- @param mods table Stored modifier ids.
+--- @return string
+local function format_mods(mods)
+		return KeyNames.modifiers_heading(mods, "macos", i18n.get)
 end
 
 
@@ -491,15 +509,14 @@ local function format_shortcut_title(action, mods, none_label, mod_label)
 		-- silently blanked the entire LLM submenu from the menubar. Treat any non-table
 		-- as "disabled" before the concat can ever run.
 		if type(mods) ~= "table" then
-				return action .. " : " .. i18n.get("common.disabled")
+				return LabelValue.compose(i18n.get, action, i18n.get("common.disabled"))
 		end
 		if not mods or mods_has_none(mods) then
-				return action .. " : " .. i18n.get("common.disabled")
+				return LabelValue.compose(i18n.get, action, i18n.get("common.disabled"))
 		elseif #mods == 0 then
-				return action .. " : " .. none_label
+				return LabelValue.compose(i18n.get, action, none_label)
 		else
-				local sym = format_mod_string(table.concat(mods, "+"))
-				return action .. " : " .. sym .. " " .. mod_label
+				return LabelValue.compose(i18n.get, action, format_mods(mods) .. " + " .. mod_label)
 		end
 end
 
@@ -1071,12 +1088,11 @@ local function create_menu(deps)
 				local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 				local is_disabled = (not state.llm_enabled) or paused
 				Logger.debug(LOG, string.format("Menu state: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled)))
-				-- Rows are collected under the id the manifest declares them with, and
-				-- the SHARED renderer places them. The order was the one thing the
-				-- shared spec always claimed to own and only Windows honoured: this
-				-- menu inserted its rows as it built them, so the model row sat ninth
-				-- here and second there, from one description.
-				local rows_by_id = {}
+				-- Rows are supplied as DATA under the `list` id the manifest declares
+				-- them with, and the SHARED renderer places and draws them. The order
+				-- was the one thing the shared spec always claimed to own and only
+				-- Windows honoured: this menu inserted its rows as it built them, so
+				-- the model row sat ninth here and second there, from one description.
 				local group_builders = {}
 				local list_providers = {}
 				local function child_group_for(id, children, disabled)
@@ -1112,14 +1128,6 @@ local function create_menu(deps)
 								return nil
 						end
 						return native[1]
-				end
-				local function row_for(id, row)
-						local bucket = rows_by_id[id]
-						if not bucket then
-								bucket = {}
-								rows_by_id[id] = bucket
-						end
-						bucket[#bucket + 1] = row
 				end
 
 
@@ -1231,40 +1239,35 @@ local function create_menu(deps)
 				})
 				-- An open page follows the state this rebuild publishes.
 				ModelSelectorPage.refresh()
-				row_for("llm_model", {
-						title    = rich_model_title,
+				local model_rows = { {
+						label    = rich_model_title,
 						disabled = MenuLayout.row_disabled("llm_model", is_disabled, paused),
-						fn       = function() return ModelSelectorPage.open() end,
-				})
+						action   = function() return ModelSelectorPage.open() end,
+				} }
 
 				-- Anchored to the model row it describes. It used to be inserted BEFORE
 				-- that row, because the row itself was placed further down.
 				if info and info.emojis and info.emojis:find("🧠💭") then
 						local info_rows = ManifestMenu.template_rows("llm_thinking_info", {}, {}, {})
 						if not info_rows then return {} end
-						for _, row in ipairs(ManifestMenu.render_rows(info_rows, "llm_model")) do row_for("llm_model", row) end
+						for _, row in ipairs(info_rows) do model_rows[#model_rows + 1] = row end
 				end
+				list_providers.llm_model = function() return model_rows end
 
 
 				local profiles_item = profiles_mgr.get_menu_item()
 				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)
 				-- The profile owner returns a DATA caption over completed native children.
-				-- Materialize only that parent; keep its existing child tree by identity.
+				-- The renderer materializes only that parent; `submenu` keeps the
+				-- existing child tree by identity.
 				ConfigGuard.protect(profiles_item.menu, config_reason)
-				local native_profile = ManifestMenu.render_rows({ {
+				local profile_rows = { {
 					label = profiles_item.label,
 					disabled = profiles_item.disabled or blocked_reason ~= nil or nil,
 					disabled_reason_key = blocked_reason,
 					submenu = profiles_item.menu,
-				} }, "llm_profile")
-				if #native_profile ~= 1 or not rawequal(native_profile[1].menu, profiles_item.menu) then
-					Logger.error(LOG, "Profile parent native handoff refused.")
-					return {}
-				end
-				row_for("llm_profile", native_profile[1])
-				local profile_boundary_rows = ManifestMenu.template_rows("llm_after_profile_boundary", {}, {}, {})
-				if not profile_boundary_rows then return {} end
-				list_providers.llm_after_profile_boundary = function() return profile_boundary_rows end
+				} }
+				list_providers.llm_profile = function() return profile_rows end
 
 
 
@@ -1316,9 +1319,6 @@ local function create_menu(deps)
 					if not reset_rows then return {} end
 					for _, row in ipairs(reset_rows) do generation_rows[#generation_rows + 1] = row end
 				end
-				local count_boundary_rows = ManifestMenu.template_rows("llm_generation_count_boundary", {}, {}, {})
-				if not count_boundary_rows then return {} end
-				for _, row in ipairs(count_boundary_rows) do generation_rows[#generation_rows + 1] = row end
 
 				local mw_min = tonumber(state.llm_min_words)
 				local min_words_display = (mw_min and mw_min > 0) and tostring(mw_min) or "1"
@@ -1326,7 +1326,7 @@ local function create_menu(deps)
 				local max_words_display = (mw_max and mw_max > 0) and tostring(mw_max) or i18n.get("menu.llm.unlimited")
 				local default_max_display = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0)
 					and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")
-				local native_generation_rows = ManifestMenu.template_rows("llm_generation_native_controls", {
+				local generation_commands = {
 					[require("config_keys").COMMAND.LLM_GENERATION_CONTEXT] = settings_mgr.set_context_length,
 					[require("config_keys").COMMAND.LLM_GENERATION_CONTEXT_RESET] = settings_mgr.reset_context_length,
 					[require("config_keys").COMMAND.LLM_GENERATION_MIN_WORDS] = settings_mgr.set_min_words,
@@ -1341,7 +1341,8 @@ local function create_menu(deps)
 							publish_setting = false,
 						})
 					end,
-				}, {
+				}
+				local generation_getters = {
 					llm_generation_ready = function() return not is_disabled end,
 					llm_generation_context_caption = function() return tostring(state.llm_context_length) end,
 					llm_generation_context_reset_caption = function() return tostring(llm_mod.DEFAULT_STATE.llm_context_length) end,
@@ -1353,9 +1354,12 @@ local function create_menu(deps)
 					llm_generation_max_words_caption = function() return max_words_display end,
 					llm_generation_max_words_reset_caption = function() return default_max_display end,
 					llm_generation_max_words_reset_present = function() return state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words end,
-				}, {})
-				if not native_generation_rows then return {} end
-				for _, row in ipairs(native_generation_rows) do generation_rows[#generation_rows + 1] = row end
+				}
+				local word_rows = ManifestMenu.template_rows("llm_generation_word_controls", generation_commands, generation_getters, {})
+				if not word_rows then return {} end
+				for _, row in ipairs(word_rows) do generation_rows[#generation_rows + 1] = row end
+				local context_rows = ManifestMenu.template_rows("llm_generation_context_controls", generation_commands, generation_getters, {})
+				if not context_rows then return {} end
 
 				local generation_ctx = TempPanel.build({
 						state        = state,
@@ -1369,6 +1373,7 @@ local function create_menu(deps)
 				if not generation_ctx then return {} end
 				child_group_for("llm_generation_settings", ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
 					["llm_generation_values"] = function() return generation_rows end,
+					["llm_generation_context_values"] = function() return context_rows end,
 				}), MenuLayout.row_disabled("llm_generation_settings", is_disabled, paused))
 
 
@@ -1955,25 +1960,17 @@ local function create_menu(deps)
 				do
 						local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 						if ok_mm and type(ManifestMenu.build) == "function" then
-								local handlers = {}
-								for _, id in ipairs(MenuLayout.row_ids()) do
-										handlers[id] = function(items)
-												local bucket = rows_by_id[id] or {}
-												-- A declared row nothing filled would render as nothing at
-												-- all, and the renderer would count it as handled — the one
-												-- failure the bijection gate cannot see from outside.
-												if #bucket == 0 then
-														Logger.warn(LOG, "Declared row '%s' has no content — nothing to place.", id)
-												end
-												for _, row in ipairs(bucket) do
-														items[#items + 1] = row
-												end
-										end
-								end
 								-- The restore alone: the AI menu's clear row was retired.
 								local render_ctx = {
 										commands      = {
 											llm_toggle = toggle_action,
+											[require("config_keys").COMMAND.LLM_TEST_PREDICTION] = function()
+												if not keymap or type(keymap.test_prediction) ~= "function" then
+													Logger.error(LOG, "Test prediction refused: the keymap is unavailable.")
+													return false
+												end
+												return keymap.test_prediction()
+											end,
 											[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
 												-- A retained row rechecks what greyed it when it was built.
 												if paused or not configuration_writable() then
@@ -1993,9 +1990,13 @@ local function create_menu(deps)
 													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
 													return require("config_migrate").read_only_status(path) == "newer"
 												end,
+												config_older_schema = function()
+													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
+													return require("config_migrate").read_only_status(path) == "unsupported"
+												end,
 										},
 								}
-								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}
+								main_menu = ManifestMenu.build("llm_menu", "LLM", nil, group_builders, render_ctx, list_providers) or {}
 						else
 								Logger.error(LOG, "Manifest renderer unavailable — the IA submenu has no settings row.")
 						end

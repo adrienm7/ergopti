@@ -90,6 +90,11 @@ segments = ["Library", "Logs", "{app}"]
 # always stay in this default folder, whatever LogsDirPath says.
 launcher_log = "launcher.log"
 fatal_report = "hammerspoon-fatal.txt"
+# The controlled reload's synchronous stage trail (adapters/reload_breadcrumb.lua),
+# beside launcher.log for the same reason: a reload that loses the app leaves
+# it for the next boot and the field report collector before any configuration
+# is read.
+reload_breadcrumb = "reload_breadcrumb.txt"
 
 [logs.windows]
 # Local, not Roaming: logs are machine state and must not follow the profile.
@@ -108,6 +113,20 @@ segments = ["{app}", "logs"]
 # ======= 4/ Managed runtime ==========
 # =====================================
 # =====================================
+
+# The default configuration folder of the macOS driver (a ConfigDirPath set in
+# paths.toml replaces it), inside it where the personal hotstrings live, and
+# where the launcher keeps that paths.toml (relative to the home folder).
+[config]
+override_key = "ConfigDirPath"
+hotstrings_dir = "hotstrings"
+personal_hotstrings_file = "personal_hotstrings.toml"
+
+[config.macos]
+base = "HOME"
+segments = [".config", "{app}"]
+paths_file = ["Library", "Application Support", "ErgoptiPlus", "paths.toml"]
+
 
 [runtime.windows]
 # A separate direct child of LocalApplicationData owns the runtime-only ACL.

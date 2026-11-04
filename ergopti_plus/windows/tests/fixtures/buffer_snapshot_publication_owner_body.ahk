@@ -16,6 +16,12 @@ _KBSP_Require(Condition, Message) {
 		throw Error(Message)
 }
 
+; KL_LogHotstring names the category through this diagnostic-only policy, whose
+; owner reads the driver's TOML tree; the child owns no such tree or log file.
+HotstringCategoryLogName(Category) {
+	return Category
+}
+
 LoggerDebug(Source, Message, Values*) {
 	global _KBSP
 	Text := Message
@@ -152,7 +158,7 @@ _KBSP_Exercise() {
 	; or requiring a metrics store. No category lookup is replaced by a fake port.
 	KLAppCat.file_path := _KBSP.Log . ".categories"
 	for App in ["old-fixture.exe", "new-fixture.exe", "later-fixture.exe"]
-		KLAppCat.categories[App] := "fixture-known"
+		KLAppCat.categories[App] := Map("type", "fixture-known", "score", 0)
 	MetricsFilters.secure_field := false
 	MetricsFocusCache.state := {valid: true, process_name: "old-fixture.exe", title: "private fixture", class: "Fixture"}
 	if _KBSP.Mode == "privacy-resumed"

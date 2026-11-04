@@ -28,22 +28,24 @@ local function probe(status, output)
 	local created, directory = Shell.exec_checked("mktemp -d")
 	assert(created)
 	directory = directory:gsub("[\r\n]+$", "")
-	local executable = directory .. "/zenity"
+	local executable = directory .. "/dialog"
 	local worker = directory .. "/worker.lua"
 	local ok, receipt = xpcall(function()
 		write(executable, "#!/bin/sh\nprintf '%s' " .. Shell.quote(output) .. "\nexit " .. status .. "\n")
 		assert(Shell.run("chmod u+x " .. Shell.quote(executable)))
 		write(worker, "package.path = " .. string.format("%q", package.path) .. "\n"
 			.. "package.loaded['logger.shim'] = { error = function() end, warn = function() end, debug = function() end }\n"
+			-- The private executable stands in for the owned dialog host.
+			.. "package.loaded['ui.native_dialog'] = { command = function() return "
+			.. string.format("%q", Shell.quote(executable)) .. " end }\n"
 			.. "local modal_calls = 0\n"
 			.. "package.loaded['ui.modal'] = { run = function(fn) modal_calls = modal_calls + 1; return fn() end }\n"
 			.. "local value = require('ui.text_prompt').ask('Caption', 'Question', 'Initial')\n"
 			.. "io.write(value == nil and 'cancelled' or 'accepted|' .. value)\n"
 			.. "io.write('|modal:' .. modal_calls)\n")
-		-- The executable is resolved only in this child. The parent interpreter's
-		-- PATH, pipe methods and production shell owner remain untouched.
-		local command = "env PATH=" .. Shell.quote(directory .. ":" .. (os.getenv("PATH") or ""))
-			.. " " .. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(worker)
+		-- The executable is named only in this child. The parent interpreter's
+		-- pipe methods and production shell owner remain untouched.
+		local command = Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(worker)
 		local executed, result, reason = Shell.exec_checked(command)
 		assert(executed, tostring(reason))
 		return result

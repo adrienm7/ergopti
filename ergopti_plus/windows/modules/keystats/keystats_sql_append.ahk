@@ -10,6 +10,78 @@
 global _KL_SQL_APPEND_DEBTS := Map()
 global _KL_SQL_APPEND_OWNERS := Map()
 global _KL_SQL_ACTIVE_APPENDS := 0
+global _KL_SQL_APPEND_RECEIPTS := Map()
+
+; The durable boundary of the last acknowledged append to Path: the file's
+; identity and its length. state.json stores it beside the journal offset, so
+; the two describe one instant, and an empty answer means none is known.
+KL_DataSqlAckReceipt(Path) {
+	global _KL_SQL_APPEND_RECEIPTS
+	return _KL_SQL_APPEND_RECEIPTS.Get(StrLower(Path), 0)
+}
+
+_KL_DataSqlReceiptValid(Receipt) {
+	if !(Receipt is Map)
+		return false
+	for Name in ["volume", "index_high", "index_low", "end"]
+		if !(Receipt.Get(Name, -1) is Integer) || Receipt.Get(Name, -1) < 0
+			return false
+	return true
+}
+
+; A process that dies inside an append leaves bytes past the last boundary
+; state.json acknowledged. They can stop inside a literal, and everything
+; appended behind them would then read as that literal's text while its journal
+; offset is acknowledged. Those bytes are unacknowledged by construction: the
+; journal offset beside the receipt still covers them, so ingest writes them
+; again. Reading only the receipt keeps this O(1) on any ledger size; the
+; lexical frontier would need the whole history. A file with another identity
+; is a ledger the receipt never described (a migration published it, a backup
+; restored it) and its bytes are not ours to cut.
+; @returns {Integer} The discarded byte count.
+KL_DataSqlRepairTail(Path, Receipt, FlushFn := 0) {
+	Fh := FileOpen(Path, "a-w", "UTF-8-RAW")
+	if !IsObject(Fh)
+		throw Error("data.sql could not be opened for tail repair")
+	try {
+		if !(Receipt is Map)
+			return 0
+		Snapshot := FSHandleSnapshot(Fh.Handle)
+		if !Snapshot.Get("ok", false)
+			throw Error("data.sql identity is unavailable")
+		for Name in ["volume", "index_high", "index_low"]
+			if Snapshot[Name] != Receipt[Name]
+				return 0
+		Excess := Fh.Length - Receipt["end"]
+		if Excess <= 0 {
+			if Excess
+				try LoggerWarn("Keystats",
+					"data.sql is {1} byte(s) shorter than its last acknowledged append.", -Excess)
+			return 0
+		}
+		if !KL_RollbackDataSqlAppend(Fh, Receipt["end"], FlushFn)
+			throw Error("data.sql tail repair could not cut the unacknowledged bytes")
+		return Excess
+	} finally {
+		Fh.Close()
+	}
+}
+
+; Boot admission of a ledger that already exists: it must be writable, and it
+; must end at the boundary the loaded state acknowledged.
+KL_AdmitExistingDataSql() {
+	try {
+		Discarded := KL_DataSqlRepairTail(Keystats.data_sql_path, Keystats.data_sql_receipt)
+		if Discarded
+			try LoggerWarn("Keystats",
+				"Discarded {1} byte(s) of an interrupted data.sql append; the journal replays them.",
+				Discarded)
+		return true
+	} catch as Err {
+		try LoggerError("Keystats", "data.sql is not writable: {1}.", Err.Message)
+		return false
+	}
+}
 
 ; A failed compensation retains the native writer, not just its pathname. A
 ; replacement file must never inherit a truncate boundary from the old owner.
@@ -97,7 +169,7 @@ KL_RollbackDataSqlAppend(Fh, OriginalLength, FlushFn := 0) {
 }
 
 KL_AppendDataSqlDurable(Path, Body, OpenFn := 0, FlushFn := 0, WriteFn := 0) {
-	global _KL_SQL_APPEND_DEBTS, _KL_SQL_APPEND_OWNERS, _KL_SQL_ACTIVE_APPENDS
+	global _KL_SQL_APPEND_DEBTS, _KL_SQL_APPEND_OWNERS, _KL_SQL_ACTIVE_APPENDS, _KL_SQL_APPEND_RECEIPTS
 	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
 	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
 	Fh := 0
@@ -143,6 +215,10 @@ KL_AppendDataSqlDurable(Path, Body, OpenFn := 0, FlushFn := 0, WriteFn := 0) {
 			}
 			throw
 		}
+		Snapshot := FSHandleSnapshot(Fh.Handle)
+		_KL_SQL_APPEND_RECEIPTS[Key] := !Snapshot.Get("ok", false) ? 0 : Map(
+			"volume", Snapshot["volume"], "index_high", Snapshot["index_high"],
+			"index_low", Snapshot["index_low"], "end", Fh.Length)
 		Fh.Close()
 		Fh := 0
 		return true

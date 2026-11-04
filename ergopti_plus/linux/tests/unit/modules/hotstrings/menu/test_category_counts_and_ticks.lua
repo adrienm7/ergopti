@@ -40,6 +40,9 @@ local function fake_config(opts)
 
 	local config
 	config = {
+		-- The Hotstrings switch reads on while any category is (another one here),
+		-- or the category-off rule greys every row of the menu.
+		any_enabled = function() return true end,
 		get_groups = function() return { "rolls" } end,
 		is_group_enabled = function(id) return id == "rolls" and enabled or false end,
 		toggle_group = function() end,
@@ -82,7 +85,7 @@ end
 --- @param config table
 --- @return table|nil
 local function rolls_row(config)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local found = nil
 	local function search(list)
 		for _, item in ipairs(list or {}) do

@@ -99,6 +99,7 @@ class Keystats {
     static today_log_offset := 0
     static today_log_date   := ""
     static rollover_pending := 0
+    static data_sql_receipt := 0
     ; Ownership latch for the multi-batch midnight transaction. It prevents
     ; an ingest timer from starting a second rollover while the first one is
     ; still draining/rotating yesterday's durable JSONL file.
@@ -305,7 +306,7 @@ KL_WriteAtomic(path, content) {
     ; of the same target — and there are several, on threads that interrupt one
     ; another. KL_SaveState is reached from the ingest timer, from
     ; KL_DayRollover and from KL_Stop (OnExit, which pre-empts a running timer),
-    ; and the ``Sleep 50`` retry below is a yield point that hands control to
+    ; and the ``Sleep(TimingsGet("keystats", "stop_poll_ms"))`` retry below is a yield point that hands control to
     ; exactly those threads. The losing interleaving is:
     ;
     ;   A: FileAppend(tmp) → MoveFileExW fails (AV lock) → Sleep 50 …yields…
@@ -321,7 +322,6 @@ KL_WriteAtomic(path, content) {
     static MOVEFILE_WRITE_THROUGH    := 0x8
     static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
     ; Age delays orphan cleanup; the producer-window check protects slow writes.
-    static STALE_TEMP_MS := 60000
     static WriteSeq := 0
 
     WriteSeq += 1
@@ -332,7 +332,7 @@ KL_WriteAtomic(path, content) {
     ; OS-call purity ratchet (tests/meta/suite/test_ahk_os_purity_ratchet.ahk) counts
     ; direct OS calls outside adapters/, and this needs none.
     tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
-    _KL_ReapStaleTemps(path, STALE_TEMP_MS)
+    _KL_ReapStaleTemps(path, StaleTempAgeMs())
     ; A rename only makes the stage atomic; it cannot tell whether an out-of-
     ; space write produced every byte. Publish only a flushed, byte-exact stage
     ; so state.json/device.json can never be atomically replaced with valid-
@@ -993,16 +993,7 @@ KL_MidnightCheck() {
 
 KL_BootstrapDataSql() {
     if FileExist(Keystats.data_sql_path) {
-		try {
-			Probe := FileOpen(Keystats.data_sql_path, "a", "UTF-8")
-			if !IsObject(Probe)
-				throw Error("append handle unavailable")
-			Probe.Close()
-			return true
-		} catch as Err {
-			try LoggerError("Keystats", "data.sql is not writable: {1}.", Err.Message)
-			return false
-		}
+		return KL_AdmitExistingDataSql()
 	}
     header := "-- ergopti metrics — device " . Keystats.device_id
         .  " — schema_version " . KeystatsConst.SCHEMA_VERSION . "`n"
@@ -1110,7 +1101,7 @@ KL_Init(metrics_dir) {
 		Critical(InitCritical)
 	}
 	try {
-		if !KL_AppCat_Init(metrics_dir)
+		if !KL_AppCat_Init(KL_AppCat_StoreDir(), metrics_dir)
 			throw Error("application category initialization failed")
 
 		; Initialise the walker batch dicts. KL_LoadState() above already

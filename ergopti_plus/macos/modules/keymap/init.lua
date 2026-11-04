@@ -22,6 +22,7 @@ local text_utils = require("infra.text_utils")
 local EventProvenance = require("adapters.event_provenance")
 local KeyboardGeometry = require("adapters.keyboard_geometry")
 local ControlSentinels = require("modules.keymap.control_sentinels")
+local SelftestGate = require("modules.keymap.selftest_gate")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
 local km_utils   = require("modules.keymap.utils")
@@ -45,6 +46,7 @@ local KeystrokeIntegrity = require("infra.keystroke_integrity")
 local KeyEventHealth = require("infra.key_event_health")
 local UnicodeCarrier = require("adapters.unicode_carrier")
 local EventClock = require("adapters.event_clock")
+local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 local ConfigKeys = require("config_keys")
 
@@ -69,7 +71,7 @@ local LOG = "keymap"
 M.DELAYS_DEFAULT = {
 	STAR_TRIGGER       = 2.0,  -- Manual expansions with ★ (magic key)
 	dynamichotstrings  = 2.0,  -- Phone numbers, SSN, dates…
-	autocorrection     = 1.0,  -- Spell checking
+	autocorrection     = 0.5,  -- Spell checking
 	rolls              = 0.5,  -- Rolls (e.g. sx → sk)
 	sfbsreduction      = 0.5,  -- Comma combos (e.g. ,t → pt)
 	distancesreduction = 0.5,  -- Dead keys and suffixes
@@ -834,6 +836,9 @@ end
 M.add                   = preview_fenced_registry_mutation(Registry.add)
 M.load_file             = preview_fenced_registry_mutation(Registry.load_file, true)
 M.load_toml             = preview_fenced_registry_mutation(Registry.load_toml, true)
+-- The hotstring editor reloads the personal group after each save; disable and
+-- load run as one registry transaction that keeps the old mappings on failure.
+M.reload_toml           = preview_fenced_registry_mutation(Registry.reload_toml, true)
 M.replace_personal_source = preview_fenced_registry_mutation(Registry.replace_personal_source, true)
 -- Exposed so the hotstring editor can show the personal source default (the
 -- single source kept in sync with _shared/modules/hotstrings/priority.json) instead of
@@ -910,6 +915,7 @@ M.set_llm_disabled_apps      = LLMBridge.set_llm_disabled_apps
 M.set_llm_app_profile_overrides = LLMBridge.set_llm_app_profile_overrides
 M.set_llm_enabled            = LLMBridge.set_llm_enabled
 M.set_llm_after_hotstring    = LLMBridge.set_llm_after_hotstring
+M.set_llm_while_hotstring_tooltip = LLMBridge.set_llm_while_hotstring_tooltip
 M.set_llm_debounce           = LLMBridge.set_llm_debounce
 M.set_llm_min_request_interval = LLMBridge.set_llm_min_request_interval
 M.set_llm_auto_raise_temp    = LLMBridge.set_llm_auto_raise_temp
@@ -931,6 +937,7 @@ M.set_preview_colored_tooltips    = LLMBridge.set_preview_colored_tooltips
 
 M.trigger_prediction = LLMBridge._perform_llm_check
 M.request_manual_prediction = LLMBridge.request_manual_prediction
+M.test_prediction = LLMBridge.test_prediction
 M.request_prompt_prediction = LLMBridge.request_prompt_prediction
 M.toggle_live_prompt = LLMBridge.toggle_live_prompt
 M.set_live_prompt    = LLMBridge.set_live_prompt
@@ -1554,6 +1561,10 @@ local _interceptor_error_logged = {}
 -- Declared above onKeyDownRaw for the same reason; cleared after every call.
 local _key_down_context = { keycode = nil, stale = false }
 
+-- The tap-hold copy watch (modules/keymap/tap_copy.lua), built by M.start.
+-- Declared above every tap callback that reads it, for the same reason.
+local _tap_copy = nil
+
 local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A stale internal loopback has lost the live transaction identity required to
 	-- re-enter the LLM, but it is still an Ergopti-only control key. Consume it in
@@ -2070,6 +2081,11 @@ local function onKeyDown(e)
 			physical_keycode = observe_key_health(e, "down", event_lateness_ms, event_stamp)
 			stale = event_lateness_ms ~= nil
 				and event_lateness_ms >= SyntheticInput.STALE_PHYSICAL_EVENT_MS
+			-- First delivery only: the application has not received this key yet, so
+			-- a tap-hold's Cmd+C is checked against the clipboard as it was before.
+			if _tap_copy and _tap_copy:watching() then
+				pcall(_tap_copy.key_down, _tap_copy, e, event_stamp, event_lateness_ms)
+			end
 		end
 	else
 		pcall(Logger.error, LOG, "Synthetic event provenance classification failed: %s.",
@@ -2088,6 +2104,19 @@ local function onKeyDown(e)
 	if fence_consumes_original then
 		HotPath.log_if_slow("keydown", t0_hot)
 		return true, fence_events
+	end
+	-- A field-run selftest key is the driver's own output, typed to prove this
+	-- very path. It is decoded as typing only while the field run's scratch
+	-- window has the focus; anywhere else it is consumed, so no application
+	-- receives it. An admitted key takes no physical fence: a fenced replay
+	-- would carry a physical tag and lose the class for every other tap.
+	local selftest_admitted = false
+	if provenance and provenance.selftest == true then
+		if not SelftestGate.admits(provenance) then
+			HotPath.log_if_slow("keydown", t0_hot)
+			return true
+		end
+		provenance, provenance_status, selftest_admitted = nil, EventProvenance.STATUS_FOREIGN, true
 	end
 	if provenance_status ~= EventProvenance.STATUS_OWNED then _user_hotstring_input = {} end
 
@@ -2139,8 +2168,8 @@ local function onKeyDown(e)
 	if t0 then Perf.sample("keymap_keydown", t0) end
 	HotPath.log_if_slow("keydown", t0_hot)
 	-- Owned echoes are the driver's own output; only physical presses (replays
-	-- included) enter the integrity ring.
-	if provenance_status ~= EventProvenance.STATUS_OWNED then
+	-- included) enter the integrity ring, never an admitted selftest key.
+	if provenance_status ~= EventProvenance.STATUS_OWNED and not selftest_admitted then
 		KeystrokeIntegrity.note(not ok and "error" or (result == true and "consumed" or "passed"))
 	end
 	if not ok then
@@ -2193,6 +2222,11 @@ loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
 	end
 	local fence_events = fence and fence.events or nil
 	if fence and fence.consume_original == true then return true, fence_events end
+	-- The release of a selftest key follows its press's rule (keyDown wrapper).
+	if provenance and provenance.selftest == true then
+		if not SelftestGate.admits(provenance) then return true, fence_events end
+		provenance, status = nil, EventProvenance.STATUS_FOREIGN
+	end
 	if provenance and (provenance.loopback or provenance.stale_loopback) then
 		return true, fence_events
 	end
@@ -2222,6 +2256,9 @@ end)
 -- key independently via its own keycode and derive shift_side from the pair.
 local SHIFT_KC_LEFT  = 56
 local SHIFT_KC_RIGHT = 60
+-- kVK_CapsLock: its flagsChanged with Control held is a Ctrl+Caps Lock press,
+-- counted so the field run can judge the secondary_capslock slot.
+local CAPS_LOCK_KC   = 57
 local _shift_left_down   = false
 local _shift_right_down  = false
 -- When both shifts are held simultaneously, shift_side reflects the most
@@ -2247,6 +2284,11 @@ shift_tap = eventtap.new(
 			e, "keymap.shift")
 		local fence_events = fence and fence.events or nil
 		if fence and fence.consume_original == true then return true, fence_events end
+		-- A selftest modifier edge follows the selftest key rule (keyDown wrapper).
+		if provenance and provenance.selftest == true then
+			if not SelftestGate.admits(provenance) then return true, fence_events end
+			provenance, provenance_status = nil, EventProvenance.STATUS_FOREIGN
+		end
 		if provenance then return false end
 		_user_hotstring_input = {}
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
@@ -2259,6 +2301,11 @@ shift_tap = eventtap.new(
 		local ok, result = pcall(function()
 			local kc = e:getKeyCode()
 			local f  = e:getFlags()
+			-- Its own pcall: a watch failure must never pass for a shift-side one.
+			if _tap_copy then
+				local _, stamp = EventClock.lateness_ms(e)
+				pcall(_tap_copy.modifier_edge, _tap_copy, kc, f, stamp)
+			end
 
 			-- The keycode on a flagsChanged event identifies which modifier
 			-- just toggled. We flip the matching side's flag, then resync
@@ -2270,6 +2317,8 @@ shift_tap = eventtap.new(
 			elseif kc == SHIFT_KC_RIGHT then
 				_shift_right_down = not _shift_right_down
 				if _shift_right_down then _shift_last_side = "right" end
+			elseif kc == CAPS_LOCK_KC and f.ctrl then
+				CapsLockChordEvidence.note_press()
 			end
 
 			-- Hard reconcile: if the OS says shift is not down, neither side
@@ -2323,6 +2372,8 @@ mouse_tap = eventtap.new(
 		-- passes through, but PAUSE owns every keymap mutation and deferred reset.
 		-- Claim any older synthetic fence above, then stop before touching context.
 		if CoreState.processing_paused == true then return false, fence_events end
+		-- A modifier held through a click was used with it: its release is no tap.
+		if _tap_copy then _tap_copy:activity() end
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
 			invalidate_observed_context()
 			return false, fence_events
@@ -2510,6 +2561,24 @@ local function taps_are_enabled()
 		and eventtap_is_enabled("mouse", mouse_tap)
 end
 
+--- The native state of each keymap event tap, read without changing any, for
+--- the field run's event tap check (infra/field_check_probes.lua).
+--- @return table states { started, watchdog, taps = { { name, state } } } where
+---   state is "enabled", "disabled", "absent" or "unreadable", in a fixed order.
+function M.tap_states()
+	local taps = {}
+	for _, entry in ipairs({ { "keyDown", tap }, { "loopbackKeyUp", loopback_keyup_tap },
+		{ "flagsChanged", shift_tap }, { "mouse", mouse_tap } }) do
+		local state = "absent"
+		if entry[2] then
+			local enabled, state_ok = eventtap_is_enabled(entry[1], entry[2])
+			state = not state_ok and "unreadable" or (enabled and "enabled" or "disabled")
+		end
+		taps[#taps + 1] = { name = entry[1], state = state }
+	end
+	return { started = _started == true, watchdog = _watchdog_committed == true, taps = taps }
+end
+
 tap_watchdog = function(timer, generation)
 	if _started ~= true
 		or _watchdog_committed ~= true
@@ -2553,6 +2622,66 @@ tap_watchdog = function(timer, generation)
 	end
 end
 
+--- Builds the tap-hold copy watch over the live adapters.
+--- @return table watch modules/keymap/tap_copy.lua owner.
+local function build_tap_copy()
+	local TapCopy = require("modules.keymap.tap_copy")
+	local CopyCheck = require("tap_hold.copy_check")
+	local Clipboard = require("adapters.clipboard")
+	local log_name = "keymap.tap_copy"
+	local function log(level, fmt, ...) Logger[level](log_name, fmt, ...) end
+	local function warn_user()
+		local ok, sent_or_err = pcall(require("infra.notifications").notify,
+			require("infra.i18n").get("notify.tap_hold.copy_failed"), nil, "warning")
+		if not ok or sent_or_err ~= true then
+			Logger.error(log_name, "Copy failure notice was not delivered: %s.", tostring(sent_or_err))
+		end
+	end
+	local report = CopyCheck.reporter(log, warn_user)
+	local watch
+	local checker = CopyCheck.new({
+		verify_ms = require("infra.timings").ms("tap_hold", "copy_verify_ms"),
+		read_counter = function() return (Clipboard._change_count()) end,
+		send_copy = function() return SyntheticInput.emit_key_stroke({ "cmd" }, "c", 0) == true end,
+		after = function(delay_ms, callback)
+			local handle, committed = TimerScheduler.after(delay_ms / 1000, callback)
+			return committed == true and handle or nil
+		end,
+		cancel = TimerScheduler.cancel,
+		-- Each outcome is counted for the field run (TapCopy statistics).
+		report = function(outcome, detail)
+			if watch then watch:note_outcome(outcome) end
+			report(outcome, detail)
+		end,
+	})
+	watch = TapCopy.new({
+		change_count = function() return (Clipboard._change_count()) end,
+		duration_ms = EventClock.duration_ms,
+		defer = SyntheticInput.defer_after_callback,
+		event_flags = function(event) return event:getFlags() end,
+		event_chars = function(event) return event:getCharacters(true) end,
+		-- The tap timeout Karabiner was given for the key: the lone tap window
+		-- when it applies (Generator.last_tap_timeouts), else its delay.
+		key_config = function(key_id)
+			local Remap = require("platform.remap")
+			if Remap.get_tap_holds_enabled() ~= true then return nil, nil end
+			local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
+			return Remap.get_tap_action(key_id),
+				deployed[key_id] or Remap.get_tap_timeout(key_id) or Remap.get_tap_hold_timeout()
+		end,
+		log = log,
+		checker = checker,
+	})
+	return watch
+end
+
+--- The tap-hold copy watch's statistics since the keymap started, for the field
+--- run (infra/field_check_tap_copy.lua).
+--- @return table|nil stats nil before the keymap started.
+function M.tap_copy_statistics()
+	return _tap_copy and _tap_copy:statistics() or nil
+end
+
 --- Starts the eventtap listeners and attaches them to the OS event queue.
 function M.start()
 	_user_hotstring_lifecycle = {}
@@ -2578,6 +2707,7 @@ function M.start()
 	if not _one_shot_shift then
 		_one_shot_shift = require("adapters.one_shot_shift").new({ magic = M.get_trigger_char })
 	end
+	if not _tap_copy then _tap_copy = build_tap_copy() end
 	ControlSentinels.set_listener("keymap.one_shot_shift", function(signal)
 		if signal == ControlSentinels.ONE_SHOT_SHIFT then M.arm_one_shot_shift() end
 	end)
@@ -2679,6 +2809,7 @@ function M.stop(teardown)
 	CoreState.lifecycle_generation = (CoreState.lifecycle_generation or 0) + 1
 	_started = false
 	if _one_shot_shift then _one_shot_shift.reset() end
+	if _tap_copy then _tap_copy:stop() end
 	local listener_stopped = true
 	if _action_listener_registered then
 		local ok, result = pcall(SyntheticInput.unregister_action_listener, ACTION_EPOCH_LISTENER_ID)

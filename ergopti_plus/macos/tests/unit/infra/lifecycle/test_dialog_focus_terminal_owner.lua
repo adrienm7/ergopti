@@ -12,7 +12,8 @@ local helpers = require("tests.helpers")
 local OWNERS = { "hs", "tests.stubs.hs", "infra.dialog_util", "infra.logger",
 	"adapters.timer_scheduler", "adapters.shell_runner", "adapters.running_application",
 	"infra.text_utils", "text_utils", "compat.utf8", "window_titles",
-	"error_description", "number_policy" }
+	"error_description", "number_policy", "modules.gestures.action_confirm",
+	"adapters.mouse_control", "adapters.window_info", "adapters.window_manager", "infra.i18n" }
 
 
 
@@ -206,6 +207,64 @@ helpers.describe("dialog focus: terminal alert ownership", function()
 		helpers.assert_true(rawequal(rawget(_G, "hs"), incoming_hs))
 		helpers.assert_true(rawequal(package.loaded["infra.dialog_util"], incoming_dialog))
 		for _, timer in ipairs(observed.timers) do helpers.assert_eq(timer.enabled, false) end
+	end)
+end)
+
+
+
+
+-- =======================================
+-- =======================================
+-- ======= 3/ The Alert's Argument Shape ==
+-- =======================================
+-- =======================================
+
+helpers.describe("dialog alert: a call without hs.dialog.alert's shape fails fast", function()
+	-- vscode_bridge once passed hs.alert.show's (message, duration): the native
+	-- call raised deep inside and aborted the bridge setup with it.
+	local MALFORMED = {
+		{ name = "a message and a duration", args = table.pack("Reload VS Code", 4) },
+		{ name = "no callback", args = table.pack(10, 20, nil, "Question") },
+		{ name = "no message", args = table.pack(10, 20, function() end) },
+		{ name = "a numeric button", args = table.pack(10, 20, function() end, "Question", "Details", 2) },
+		{ name = "a ninth argument", args = table.pack(10, 20, function() end, "Question", "Details", "Cancel",
+			"Confirm", "warning", "extra") },
+	}
+	for _, case in ipairs(MALFORMED) do
+		helpers.it("refuses " .. case.name .. " before focusing or showing anything", function()
+			with_dialog(function(fixture)
+				local ok, err = pcall(fixture.subject.alert, table.unpack(case.args, 1, case.args.n))
+				helpers.assert_eq(ok, false, "a malformed alert must raise")
+				helpers.assert_true(tostring(err):find("dialog_util.alert", 1, true) ~= nil, tostring(err))
+				helpers.assert_eq(#fixture.alerts, 0, "nothing reaches the native alert")
+				helpers.assert_eq(fixture.focus, 0, "nothing is focused for a refused call")
+				helpers.assert_eq(#fixture.timers, 0, "no deferred raise is armed")
+			end)
+		end)
+	end
+
+	helpers.it("the action confirmation's real call reaches the native alert", function()
+		-- Every production caller reaches the wrapper under its own alias; the
+		-- confirmation calls it through xpcall(Dialog.alert, …).
+		with_dialog(function(fixture)
+			package.loaded["infra.dialog_util"] = fixture.subject
+			package.loaded["infra.i18n"] = {
+				get = function(key) return key end,
+				format = function(key, value) return key .. ":" .. tostring(value) end,
+			}
+			package.loaded["adapters.mouse_control"] = {
+				screen_frame_under_cursor = function() return { x = 0, y = 0, w = 1200, h = 900 } end,
+			}
+			package.loaded["adapters.window_info"] = { frontmost_application = function() return nil end }
+			package.loaded["adapters.window_manager"] = { activate = function() return true end }
+			package.loaded["modules.gestures.action_confirm"] = nil
+			local Confirm = require("modules.gestures.action_confirm")
+			local ran = 0
+			helpers.assert_eq(Confirm.ask("x", function() ran = ran + 1 end), true)
+			helpers.assert_eq(#fixture.alerts, 1, "the confirmation is shown")
+			fixture.answer(1, "dialog.confirm_action.confirm")
+			helpers.assert_eq(ran, 1)
+		end)
 	end)
 end)
 

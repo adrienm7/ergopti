@@ -385,6 +385,9 @@ enum OwnedProgramWorker {
 		var requestSent = false
 		var inputOpen = true
 		var verifiedTerminal = false
+		// A receipt the caller never received cannot prove the terminal, so one
+		// refused forward keeps the bridge's exit status a refusal.
+		var forwardingRefused = false
 		var guardianOpen = true
 		var markers: Set<String> = []
 		var outbound = Data()
@@ -443,9 +446,12 @@ enum OwnedProgramWorker {
 						validReceipt(marker), !markers.contains(marker.components(separatedBy: " ").prefix(2).joined(separator: " "))
 					else { _ = shutdown(control, SHUT_WR); return reapGuardian(guardian, verifiedTerminal: false) }
 					markers.insert(marker.components(separatedBy: " ").prefix(2).joined(separator: " "))
-					if marker.hasPrefix("V1 RETIRED ") { verifiedTerminal = true }
-					if marker.hasPrefix("V1 REFUSED ") { verifiedTerminal = true }
-					if !ownedProgramWrite(line + Data([10]), to: STDOUT_FILENO) { _ = shutdown(control, SHUT_WR); inputOpen = false }
+					if !forwardingRefused && ownedProgramWrite(line + Data([10]), to: STDOUT_FILENO) {
+						if marker.hasPrefix("V1 RETIRED ") || marker.hasPrefix("V1 REFUSED ") { verifiedTerminal = true }
+					} else {
+						forwardingRefused = true; verifiedTerminal = false
+						_ = shutdown(control, SHUT_WR); inputOpen = false
+					}
 				}
 			case .eof: guardianOpen = false
 			case .failed: _ = shutdown(control, SHUT_WR); guardianOpen = false

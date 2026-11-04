@@ -39,10 +39,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_MDCUG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_MDCUG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -56,14 +54,14 @@ _MDCUG_ReadSource(RelPath) {
 ; ===================================================
 
 _MDCUG_PruneHelperExists() {
-	Src := _MDCUG_ReadSource("infra/menu_dispatcher.ahk")
+	Src := _MDCUG_ReadSource("menu_dispatcher.ahk")
 	Assert(InStr(Src, "MenuDispatcher_PruneMenu(MenuObj) {") > 0,
 		"menu_dispatcher.ahk must define MenuDispatcher_PruneMenu(MenuObj) - the per-menu prune that drops dead item IDs after a single-menu rebuild")
 }
 Test("menu_dispatcher: MenuDispatcher_PruneMenu prune helper exists (menu-dispatch-callbacks-unbounded-growth)", _MDCUG_PruneHelperExists)
 
 _MDCUG_PruneDeletesMapEntries() {
-	Src := _MDCUG_ReadSource("infra/menu_dispatcher.ahk")
+	Src := _MDCUG_ReadSource("menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("MenuDispatcher_PruneMenu")
 	Assert(Seg != "", "MenuDispatcher_PruneMenu(MenuObj) declaration must exist in menu_dispatcher.ahk")
 	Assert(InStr(Seg, "_MenuDispatchCallbacks.Delete(") > 0,
@@ -86,7 +84,7 @@ Test("menu_dispatcher: PruneMenu deletes dead entries from both dispatch Maps (m
 ; ==========================================
 
 _MDCUG_BuildCallsPrune() {
-	Src := _MDCUG_ReadSource("ui/menu/menu_llm/menu_main.ahk")
+	Src := _MDCUG_ReadSource("menu_main.ahk")
 	Seg := _DriverFuncBody("LLM_Menu_Build")
 	Assert(Seg != "", "LLM_Menu_Build() declaration must exist in menu_main.ahk")
 	Assert(InStr(Seg, "MenuDispatcher_PruneMenu(_LLM_Menu_Handle)") > 0,

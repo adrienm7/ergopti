@@ -98,7 +98,7 @@ function M.build_init_payload(opts)
 		items             = items,
 		-- The page's own editor for send_text / send_key / send_shortcut, from
 		-- the gestures manager's get_picker_parameter_fields; without them every
-		-- action confirms at once and the zenity prompt asks. Ctrl is the
+		-- action confirms at once and the native prompt asks. Ctrl is the
 		-- primary modifier and a program parameter names a POSIX executable.
 		executableSyntax  = "posix",
 		commandIsPrimary  = false,

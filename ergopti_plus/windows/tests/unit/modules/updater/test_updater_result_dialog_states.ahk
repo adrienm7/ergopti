@@ -107,11 +107,81 @@ _TUCD_StateJson() {
 Test("update check: the page's state message carries every field it reads (update-check-window)",
 	_TUCD_StateJson)
 
+; An offered release reaches the page with its body and the repository its link
+; policy needs (PAR-52); no other answer carries notes.
+_TUCD_ReleaseNotesSeed() {
+	_TUCD_Run(_TUCD_ReleaseNotesSeedCase)
+}
+_TUCD_ReleaseNotesSeedCase() {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Request := _TUCD_Request()
+	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
+	AssertFalse(_TUCD_Last().Has("notes"), "checking carries no notes")
+	Body := '## Changelog`n- fix </script> "quoted"'
+	Release := { Tag: "v0.0.0-dev.150", RawJson: "{}", Body: Body }
+	UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
+		"latest", Release.Tag, "others", [], "release", Release))
+	Json := _UpdateCheck_StateJson(_TUCD_Last())
+	AssertEqual(0, InStr(Json, "</script>"), "release text never closes the page's script")
+	Notes := JsonParse(Json)["notes"]
+	AssertEqual(Body, Notes["body"], "the body survives JSON")
+	AssertEqual(UPDATER_GH_OWNER, Notes["owner"])
+	AssertEqual(UPDATER_GH_REPO, Notes["repo"])
+	UpdateCheck_ShowResult(Request, Map("state", "up_to_date", "current", "v0.0.0-dev.144",
+		"latest", "v0.0.0-dev.144", "others", []))
+	AssertFalse(JsonParse(_UpdateCheck_StateJson(_TUCD_Last())).Has("notes"), "an answer without a release has no notes")
+}
+Test("update check: an offered release seeds the page's notes with the repository (PAR-52)",
+	_TUCD_ReleaseNotesSeed)
+
+; A clicked link is served only for the offered release, reaches the allowlisted
+; opener with the URL as sent, and is refused while paused (PAR-52).
+_TUCD_OpenUrlAction() {
+	_TUCD_Run(_TUCD_OpenUrlActionCase)
+}
+_TUCD_OpenUrlActionCase() {
+	global _UC_ResetDone, _UC_WindowEpoch, _TUCD_Effects
+	Request := _TUCD_Request()
+	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
+	Effects := _TUCD_NewEffects()
+	Refusals := []
+	Effects["refuse_paused"] := () => Refusals.Push(true)
+	Link := "https://github.com/owner/repo/pull/1"
+	Message := '{"action":"open_url","url":"' . Link . '"}'
+	_UC_WindowEpoch += 1
+	Epoch := _UC_WindowEpoch
+	_UC_ResetDone := false
+	try {
+		_UpdateCheck_HandleMessage(Epoch, Message, false, Effects)
+		AssertEqual(0, _TUCD_Effects.Links.Length, "no link opens while checking")
+		Release := { Tag: "v0.0.0-dev.150", RawJson: "{}", Body: "" }
+		UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
+			"latest", Release.Tag, "others", [], "release", Release))
+		_UpdateCheck_HandleMessage(Epoch, Message, true, Effects)
+		AssertEqual(0, _TUCD_Effects.Links.Length, "no link opens while paused")
+		AssertEqual(1, Refusals.Length, "the paused link is refused visibly")
+		_UpdateCheck_HandleMessage(Epoch, '{"action":"open_url","url":1}', false, Effects)
+		AssertEqual(0, _TUCD_Effects.Links.Length, "a URL that is not a string is refused")
+		_UpdateCheck_HandleMessage(Epoch, Message, false, Effects)
+		AssertEqual(1, _TUCD_Effects.Links.Length, "the offered release's link is served")
+		AssertEqual(Link, _TUCD_Effects.Links[1])
+		AssertEqual(0, _TUCD_Effects.Closes, "opening a link leaves the window open")
+	} finally {
+		_UC_ResetDone := true
+	}
+	Opened := []
+	AssertFalse(_Updater_OpenManualUrl(() => "https://example.com/owner/repo", , false, 0, (Url) => Opened.Push(Url)),
+		"the opener's allowlist refuses a foreign host")
+	AssertEqual(0, Opened.Length)
+}
+Test("update check: a release-notes link opens only through the allowlist of the offered answer (PAR-52)",
+	_TUCD_OpenUrlAction)
+
 global _TUCD_Effects := 0
 
 _TUCD_NewEffects() {
 	global _TUCD_Effects
-	Seen := { Installs: [], Changelogs: [], Switches: [], Reports: [], Logs: 0, Closes: 0 }
+	Seen := { Installs: [], Changelogs: [], Links: [], Switches: [], Reports: [], Logs: 0, Closes: 0 }
 	_TUCD_Effects := Seen
 	Install(Release) {
 		Seen.Installs.Push(Release.Tag)
@@ -119,6 +189,10 @@ _TUCD_NewEffects() {
 	}
 	Changelog(Channel) {
 		Seen.Changelogs.Push(Channel)
+		return true
+	}
+	OpenLink(Url) {
+		Seen.Links.Push(Url)
 		return true
 	}
 	SetChannel(Channel) {
@@ -136,7 +210,7 @@ _TUCD_NewEffects() {
 	Close() {
 		Seen.Closes += 1
 	}
-	return Map("install", Install, "changelog", Changelog, "set_channel", SetChannel,
+	return Map("install", Install, "changelog", Changelog, "open_url", OpenLink, "set_channel", SetChannel,
 		"report", Report, "open_log", OpenLog, "close", Close)
 }
 
@@ -162,7 +236,7 @@ _TUCD_ActionsCase() {
 	AssertEqual("main", _TUCD_Effects.Switches[1])
 
 	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
-	Release := { Tag: "v0.0.0-dev.150", RawJson: "{}" }
+	Release := { Tag: "v0.0.0-dev.150", RawJson: "{}", Body: "" }
 	UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
 		"latest", Release.Tag, "others", [], "release", Release))
 	AssertTrue(UpdateCheck_Perform("whats_new", "", Effects)["ok"])
@@ -196,7 +270,7 @@ _TUCD_PausedClicksCase() {
 	Request := _TUCD_Request()
 	Refusals := []
 	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
-	Release := { Tag: "v0.0.0-dev.150", RawJson: "{}" }
+	Release := { Tag: "v0.0.0-dev.150", RawJson: "{}", Body: "" }
 	UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
 		"latest", Release.Tag, "others", [Map("channel", "main", "tag", "v1.0.0")], "release", Release))
 	Effects := _TUCD_NewEffects()

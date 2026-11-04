@@ -207,7 +207,8 @@ _LRPW_ChildSource() {
 	Definition := _DriverFuncBody("RemapKey")
 	AssertTrue(Definition != "", "the real built-in registrar must be exercised")
 	return _LRPS_ChildSource("layout_row_win_fallback_body.ahk",
-		"#Include " . _DriverDir . "\infra\magic_editor.ahk`n" . Definition)
+		"#Include " . _DriverDir . "\infra\magic_editor.ahk`n" . Definition . "`n"
+		. _DriverFuncBody("_RemapChordEmit") . "`nKeyboardShortcutRunLayoutChord(*) => false`n")
 }
 
 for _LRPW_Row in ["number", "top", "home", "bottom"]
@@ -297,11 +298,12 @@ _LRPCM_ChildSource(BodyName := "layout_row_chosen_magic_body.ahk", AdditionalSou
 	Finish := InStr(Source, "`nRegisterShiftLayer()", , Start)
 	AssertTrue(Start > 0 && Finish > Start, "the genuine magic producer must be bounded before Shift registration")
 	Extra := "#Include " . _DriverDir . "\infra\magic_editor.ahk`n"
-	for Name in ["RemapKey", "LayoutRegistry_MagicKeyHotkeys"] {
+	for Name in ["RemapKey", "_RemapChordEmit", "LayoutRegistry_MagicKeyHotkeys"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine magic dependency must exist: " . Name)
 		Extra .= Definition . "`n"
 	}
+	Extra .= "KeyboardShortcutRunLayoutChord(*) => false`n"
 	Extra .= "_LRPCM_RegisterMagic() {`n global ScriptInformation, Features`n"
 		. SubStr(Source, Start, Finish - Start) . "`n}`n"
 	return _LRPS_ChildSource(BodyName, Extra . AdditionalSource)

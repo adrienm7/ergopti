@@ -140,6 +140,10 @@ local _stdout_only = false
 --- Pure redactor captured before the first output; never resolved on emission.
 local _redact = nil
 
+--- The configuration directory the user chose, followed for the redactor: its
+--- folder and file names are personal, and the user may move it at runtime.
+local _config_dir = nil
+
 
 
 
@@ -180,7 +184,12 @@ local function admit_redaction(supplied)
 	assert(type(rules.token_prefixes) == "table" and type(rules.secret_keys) == "table",
 		"logger_sink: canonical privacy inventory invalid")
 	assert(pcall(Redact.apply, "", rules, captured), "logger_sink: canonical privacy rules invalid")
-	return function(text) return Redact.apply(text, rules, captured) end
+	return function(text)
+		return Redact.apply(text, rules, {
+			home = captured.home, user = captured.user, case_insensitive = captured.case_insensitive,
+			config_dir = _config_dir,
+		})
+	end
 end
 
 --- Quotes a value for a POSIX shell command line, as adapters/shell_runner's
@@ -531,6 +540,9 @@ function M.install(logger, opts)
 	-- second arming.
 	logger.enable_repeat_collapsing()
 	_installed = true
+	-- The folder resolved now; infra.config_paths hands over every later move.
+	-- Read after the sink is live, so a line its storage read writes is redacted.
+	M.follow_config_dir(require("infra.config_paths").get_config_dir())
 
 	if _stdout_only then
 		io.stderr:write(_redact(
@@ -642,6 +654,18 @@ function M.uninstall(logger)
 	_installed   = false
 	_stdout_only = false
 	_redact = nil
+	_config_dir = nil
+end
+
+--- Follows the configuration directory the redactor masks. infra.config_paths
+--- calls it after each committed move, so a line written after the user changes
+--- folders hides the new folder's names, not the old ones.
+--- @param dir string|nil Absolute directory, or nil/"" while none is resolved.
+function M.follow_config_dir(dir)
+	if dir ~= nil and type(dir) ~= "string" then
+		error("logger_sink: the followed configuration directory must be a path", 2)
+	end
+	_config_dir = (dir ~= nil and dir ~= "") and dir or nil
 end
 
 --- Reports whether a durable file sink is currently active.

@@ -1,0 +1,145 @@
+{
+	"_comment": "Vectors of the update-check window's host contract and of the exhausted GitHub rate limit, replayed by _shared/lua/updater/check_session.lua and updater/rate_limit.lua (macOS and Linux, _shared/lua/test/check_session_contract.lua) and by the Windows host (windows/ui/update_check/init.ahk, modules/updater/core.ahk). answers: the window's answer per phase; checking is no answer yet. actions: the phases in which an action reaches its effect, for the answers below (a switch needs a channel its answer lists, which a failure's does not). state_messages: the fields the page receives for an answer; a field absent from expect may be anything, and a name in absent must not be sent. rate_limit: the sentence of a final response, \"\" when it is not an exhausted limit.",
+	"repository": { "owner": "adrienm7", "repo": "ergopti" },
+	"link": "https://github.com/adrienm7/ergopti/pull/1",
+	"switch_channel": "main",
+	"answers": {
+		"up_to_date": {
+			"state": "up_to_date",
+			"channel": "dev",
+			"current": "v0.0.0-dev.144",
+			"latest": "v0.0.0-dev.144",
+			"others": [{ "channel": "main", "tag": "v1.0.0" }]
+		},
+		"available": {
+			"state": "available",
+			"channel": "dev",
+			"current": "v0.0.0-dev.144",
+			"latest": "v0.0.0-dev.150",
+			"others": [{ "channel": "main", "tag": "v1.0.0" }],
+			"body": "## Changelog"
+		},
+		"no_release": {
+			"state": "no_release",
+			"channel": "dev",
+			"current": "v0.0.0-dev.144",
+			"others": [{ "channel": "main", "tag": "v1.0.0" }]
+		},
+		"error": {
+			"state": "error",
+			"channel": "dev",
+			"current": "v0.0.0-dev.144",
+			"reason": "no_connection",
+			"reason_key": "updater.no_connection",
+			"detail": "GitHub could not be reached",
+			"others": []
+		}
+	},
+	"actions": [
+		{ "action": "close", "phases": ["checking", "up_to_date", "available", "no_release", "error"] },
+		{ "action": "update", "phases": ["available"] },
+		{ "action": "whats_new", "phases": ["available"] },
+		{ "action": "open_url", "phases": ["available"] },
+		{ "action": "switch_channel", "phases": ["up_to_date", "available", "no_release"] },
+		{ "action": "report", "phases": ["error"] },
+		{ "action": "open_log", "phases": ["error"] }
+	],
+	"state_messages": [
+		{
+			"id": "up-to-date-names-no-notes",
+			"answer": "up_to_date",
+			"expect": {
+				"type": "state",
+				"state": "up_to_date",
+				"channel": "dev",
+				"current": "v0.0.0-dev.144",
+				"latest": "v0.0.0-dev.144"
+			},
+			"absent": ["notes", "check_only", "reason_key"]
+		},
+		{
+			"id": "available-carries-the-notes",
+			"answer": "available",
+			"expect": { "state": "available", "latest": "v0.0.0-dev.150" },
+			"expect_notes": { "body": "## Changelog", "owner": "adrienm7", "repo": "ergopti" },
+			"absent": ["check_only", "reason_key"]
+		},
+		{
+			"id": "available-from-the-feed-is-check-only",
+			"answer": "available",
+			"check_only": true,
+			"expect": { "state": "available", "check_only": true },
+			"absent": ["reason_key"]
+		},
+		{
+			"id": "no-release-names-no-notes",
+			"answer": "no_release",
+			"expect": { "state": "no_release", "channel": "dev" },
+			"absent": ["notes", "check_only", "reason_key"]
+		},
+		{
+			"id": "failure-names-its-reason",
+			"answer": "error",
+			"expect": { "state": "error", "reason_key": "updater.no_connection" },
+			"absent": ["notes", "check_only"]
+		}
+	],
+	"rate_limit": [
+		{
+			"id": "exhausted-403-names-the-reset",
+			"status": 403,
+			"remaining": "0",
+			"reset": "86400",
+			"detail": "HTTP 403: the GitHub API rate limit is exhausted, it resets at 1970-01-02 00:00:00 UTC"
+		},
+		{
+			"id": "exhausted-429-at-the-epoch",
+			"status": 429,
+			"remaining": "0",
+			"reset": "0",
+			"detail": "HTTP 429: the GitHub API rate limit is exhausted, it resets at 1970-01-01 00:00:00 UTC"
+		},
+		{
+			"id": "exhausted-remaining-as-a-number",
+			"status": 403,
+			"remaining": 0,
+			"reset": "86400",
+			"detail": "HTTP 403: the GitHub API rate limit is exhausted, it resets at 1970-01-02 00:00:00 UTC"
+		},
+		{
+			"id": "no-reset-still-names-the-limit",
+			"status": 429,
+			"remaining": "0",
+			"detail": "HTTP 429: the GitHub API rate limit is exhausted"
+		},
+		{
+			"id": "malformed-reset-is-no-time",
+			"status": 403,
+			"remaining": "0",
+			"reset": "soon",
+			"detail": "HTTP 403: the GitHub API rate limit is exhausted"
+		},
+		{
+			"id": "negative-reset-is-no-time",
+			"status": 403,
+			"remaining": "0",
+			"reset": "-1",
+			"detail": "HTTP 403: the GitHub API rate limit is exhausted"
+		},
+		{
+			"id": "calls-left-is-another-refusal",
+			"status": 403,
+			"remaining": "12",
+			"reset": "86400",
+			"detail": ""
+		},
+		{ "id": "no-header-is-another-refusal", "status": 403, "detail": "" },
+		{
+			"id": "other-status-is-no-limit",
+			"status": 500,
+			"remaining": "0",
+			"reset": "86400",
+			"detail": ""
+		}
+	]
+}

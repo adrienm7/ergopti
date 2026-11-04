@@ -56,20 +56,22 @@ GestureSlotIds() {
 }
 
 ; The keyboard shortcut each slot must be bound to in Windows Settings >
-; Touchpad > Advanced gestures. Shown verbatim in the manual-setup tutorial.
-; @return {Map} slot id => human-readable shortcut label.
+; Touchpad > Advanced gestures, as key name ids joined with "+" and then the
+; function key. The tutorial names the modifiers in the user's language
+; (GestureShortcutText), so this table stays locale-free.
+; @return {Map} slot id => shortcut ids.
 GestureShortcutLabels() {
 		static Labels := Map(
-				"tap_3", "Ctrl + Win + Shift + F1",
-				"swipe_3_up", "Ctrl + Win + Shift + F2",
-				"swipe_3_down", "Ctrl + Win + Shift + F3",
-				"swipe_3_left", "Ctrl + Win + Shift + F4",
-				"swipe_3_right", "Ctrl + Win + Shift + F5",
-				"tap_4", "Ctrl + Win + Shift + F6",
-				"swipe_4_up", "Ctrl + Win + Shift + F7",
-				"swipe_4_down", "Ctrl + Win + Shift + F8",
-				"swipe_4_left", "Ctrl + Win + Shift + F9",
-				"swipe_4_right", "Ctrl + Win + Shift + F10",
+				"tap_3", "ctrl+win+shift+F1",
+				"swipe_3_up", "ctrl+win+shift+F2",
+				"swipe_3_down", "ctrl+win+shift+F3",
+				"swipe_3_left", "ctrl+win+shift+F4",
+				"swipe_3_right", "ctrl+win+shift+F5",
+				"tap_4", "ctrl+win+shift+F6",
+				"swipe_4_up", "ctrl+win+shift+F7",
+				"swipe_4_down", "ctrl+win+shift+F8",
+				"swipe_4_left", "ctrl+win+shift+F9",
+				"swipe_4_right", "ctrl+win+shift+F10",
 		)
 		return Labels
 }

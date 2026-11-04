@@ -96,6 +96,12 @@ hint_spacing = 4
 # the shortcut column of the AI tooltip (layout units).
 label_gap = 16
 
+# Widest the prediction block of the AI tooltip grows, shortcut column included
+# (layout units). A longer line is cut with an ellipsis in front of the column:
+# past this the panel would run off the screen with its chords. Accepting a
+# line still inserts all of it.
+llm_max_content_width = 800
+
 # Corner arc radius applied to the rounded rectangle (layout units).
 # AHK passes 2 * corner_radius as the GDI ellipse diameter (nWidth/nHeight),
 # HS passes corner_radius directly as xRadius/yRadius on the canvas element.
@@ -321,9 +327,8 @@ cmd_dim_hex = "#737373"
 # ========================================
 
 [llm_ui]
-# Structural LLM-tooltip constants shared by every driver.
-# User-facing hint strings live here as canonical defaults; drivers may
-# override via i18n (AHK: t(), HS: i18n.get()) when locale keys exist.
+# Structural LLM-tooltip constants shared by every driver. No user-facing
+# word lives here: the footer's words are locale keys.
 
 # Active prediction row prefix (sparkle cursor marker).
 active_prefix = "✨ "
@@ -343,14 +348,13 @@ footer_combined_separator = "|"
 # beyond), right-aligned against the panel's inner edge at least
 # [layout].label_gap from the widest line, at the hint size, in cmd_dim. The
 # modifiers follow shortcut_modifier_order whatever order the configuration
-# lists them in, under each OS's native labels (same positions), joined by its
-# joiner and then to the digit. No modifier means the bare digit. Vectors:
+# lists them in, each named by the shared key name table
+# (_shared/data/keycodes/key_names.json): its glyph on macOS, its translated
+# name on Windows and Linux (« Ctrl+Maj+3 »), joined by the OS's joiner and
+# then to the digit. No modifier means the bare digit. Vectors:
 # _shared/tests/corpus/tooltip/llm_shortcut_vectors.json; rule:
 # _shared/lua/tooltip/llm_line.lua (ported in windows/ui/tooltip/llm.ahk).
 shortcut_modifier_order = "ctrl,alt,shift,cmd"
-shortcut_labels_ahk = "Ctrl,Alt,Shift,Win"
-shortcut_labels_hs = "⌃,⌥,⇧,⌘"
-shortcut_labels_linux = "Ctrl,Alt,Shift,Super"
 shortcut_joiner_ahk = "+"
 shortcut_joiner_hs = ""
 shortcut_joiner_linux = "+"
@@ -358,14 +362,17 @@ shortcut_joiner_linux = "+"
 # Vertical gap between stacked prediction lines (HS canvas gap font size).
 prediction_line_gap_hs = 3
 
-# Navigation hint strings (French canonical — mirror tooltip_llm.lua).
-hint_accept_single = "Tab pour accepter"
-hint_nav_left = "⇧G + Tab"
-hint_nav_right = "⇧D + Tab"
-hint_accept_center = "Tab = accepter"
+# Navigation hints of the footer. Their words are locale text
+# (llm.tooltip.hint_accept_single, hint_accept_center, hint_or), and each key is
+# named from the shared key name table on the platform that shows it
+# (« Maj gauche + Tab ou ↑/← »): the footer read French in every locale until
+# 2026-11-03. The keys are key name ids joined by "+"; the arrows and the
+# separators are glyphs, the same in every language.
+hint_accept_key = "tab"
+hint_nav_left_keys = "left_shift+tab"
+hint_nav_right_keys = "right_shift+tab"
 hint_arrow_left = "↑/←"
 hint_arrow_right = "↓/→"
-hint_or = " ou "
 hint_arrow_sep_left = " ◀"
 hint_arrow_sep_right = "▶ "
 

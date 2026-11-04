@@ -43,7 +43,7 @@ end
 helpers.describe("Shipped Ergopti native menu (Linux)", function()
 	helpers.it("(ergopti-extension-selection) controls real shipped metadata and physical replacement without an installed layout", function()
 		local names = { "modules.hotstrings.hotstrings_config", "modules.hotstrings.loader",
-			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences", "ui.menu.menu_builder" }
+			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences", "ui.menu.builder" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()
@@ -84,7 +84,7 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 				local I18n = require("infra.i18n")
 				local description = category.sections.replace.description
 				local label = description[I18n.get_locale()] or description.en
-				local Builder = require("ui.menu.menu_builder")
+				local Builder = require("ui.menu.builder")
 				local ctx = { config = Config, paused = false }
 				local function extension()
 					return find_row(Builder.build(ctx), string.format(I18n.get("menu.extensions.hotstrings_of"), "Ergopti+"))

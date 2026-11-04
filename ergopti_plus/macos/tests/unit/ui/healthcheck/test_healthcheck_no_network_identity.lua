@@ -51,7 +51,15 @@ helpers.describe("healthcheck: no network identity (no-network-identity)", funct
 			}
 			package.loaded["ui.healthcheck.helpers"] = nil
 			package.loaded["ui.healthcheck.core"] = nil
-			local snapshot = require("ui.healthcheck.core").run({ detailed = true })
+			-- The Wi-Fi signal is the local_state probe's: its steps run after
+			-- phase A, and their sections join the snapshot as the probe's answer
+			local Core = require("ui.healthcheck.core")
+			local snapshot = Core.run({ detailed = true })
+			local steps, sections = Core.local_state_steps()
+			for _, step in ipairs(steps) do step() end
+			for id, values in pairs(sections) do
+				for key, value in pairs(values) do snapshot.sections[id][key] = value end
+			end
 			helpers.assert_eq(snapshot.sections.network.wifi_signal, "70%", "the signal strength alone is reported")
 			for _, text in ipairs(strings_of(snapshot)) do
 				helpers.assert_true(not text:find(SSID_DIGEST, 1, true), "the Wi-Fi name digest was collected")

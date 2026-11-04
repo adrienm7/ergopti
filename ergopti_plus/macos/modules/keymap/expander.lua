@@ -416,6 +416,17 @@ local function emit_dispatch(m, to_type)
 	return km_utils.emit_tokens(km_utils.tokens_from_repl(m.repl))
 end
 
+--- Forgets the buffer after an output that pressed a key: {Left} moved the caret
+--- into the text just typed and {Tab} may have left the field, so "the text behind
+--- the caret" is no longer the replacement. Windows and Linux clear theirs too.
+--- @param m table The mapping entry that fired.
+local function forget_buffer_after_keys(m)
+	if m.plain_repl == m.repl then return end
+	_state.buffer = ""
+	_state.start_is_word_boundary = false
+	_state.start_is_line_start = false
+end
+
 
 
 
@@ -528,6 +539,18 @@ local function resolve_terminator_match(mapping, buffer, chars, explicit_magic)
 		return nil
 	end
 	if not _registry.is_terminator(chars) then return nil end
+
+	-- A final entry that changed nothing claims the text it matched against the
+	-- very next end character (the shared engine's _final_noop_pending).
+	-- The rolling cap may have dropped one codepoint (4 bytes at most) on the way.
+	local claimed = _state.final_noop_buffer
+	if claimed ~= nil then
+		local body_bytes = #buffer - #chars
+		if body_bytes > 0 and #claimed - body_bytes >= 0 and #claimed - body_bytes <= 4
+			and claimed:sub(-body_bytes) == buffer:sub(1, body_bytes) then
+			return nil
+		end
+	end
 
 	local trigger = mapping.trigger
 	local tb = mapping.trigger_bytes
@@ -965,6 +988,29 @@ end
 
 
 
+--- Whether a final end-character entry holds an immediate candidate back: the
+--- immediate one would fire on the last letter, before the end character the
+--- final entry of strictly higher priority is waiting for. The shared engine's
+--- final_end_outranks applies the same rule.
+--- @param m table The immediate mapping.
+--- @param buffer string The buffer it matched against.
+--- @return boolean
+local function final_end_outranks(m, buffer)
+	local ok, off = pcall(utf8.offset, buffer, -1)
+	if not ok or not off then return false end
+	local bucket = _registry.mappings_for_tail(buffer:sub(off):lower())
+	if not bucket then return false end
+	local own_priority = m.priority or 0
+	for _, candidate in ipairs(bucket) do
+		if not candidate.auto and candidate.final_result and mapping_group_active(candidate)
+			and candidate.tlen >= m.tlen and (candidate.priority or 0) > own_priority then
+			local eff_plain, _, _, is_noop = M.would_fire(candidate, buffer)
+			if eff_plain or is_noop then return true end
+		end
+	end
+	return false
+end
+
 --- Commits one automatic mapping against either the live buffer or an exact
 --- prospective buffer supplied by magic-key arbitration.
 --- @param m table Mapping entry.
@@ -999,15 +1045,18 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		if is_noop then
 			if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 			-- A final entry that changes nothing still wins: it masks the lower
-			-- candidates of this keystroke (the caller stops on this reason), as
-			-- Windows and the shared engine do. It no longer wipes the buffer, which
-			-- left a later terminator nothing to match: a personal immediate
-			-- "sru" -> "SRU" typed as "SRU" then lost the bundled "sru" -> "sur"
-			-- on the space (field report of 2026-10-30).
-			if m.final_result then return false, "noop_final" end
+			-- candidates of this keystroke (the caller stops on this reason) and of
+			-- the end character that follows, as Windows and the shared engine do.
+			-- The buffer stays, so a longer word can still complete its own trigger.
+			if m.final_result then
+				_state.final_noop_buffer = active_buffer
+				return false, "noop_final"
+			end
 		end
 		return false
 	end
+
+	if final_end_outranks(m, active_buffer) then return false end
 
 	local repl_text = eff_plain
 	-- 1-based byte index where the matched trigger starts, used below to splice the
@@ -1052,6 +1101,7 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		function() return emit_dispatch(m, injection.text) end,
 		function()
 			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. injection.buffer_suffix
+			forget_buffer_after_keys(m)
 		end,
 		is_final,
 		is_ignored,
@@ -1192,6 +1242,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 				-- buf_start is a valid byte index into _state.buffer: the buffer
 				-- is only mutated by this very closure, which runs after emit.
 				_state.buffer = _state.buffer:sub(1, start_byte - 1) .. injection.buffer_suffix
+				forget_buffer_after_keys(m)
 			end,
 			is_final,
 			is_ignored,
@@ -1278,6 +1329,8 @@ function M.try_repeat_feature(chars, is_ignored)
 		or not text_utils.is_hotstring_word_char(last_char) then
 		return false
 	end
+	-- Minus any delimiter the user added: it ends a word, as on Windows.
+	if Terminators.is_terminator(pred_char) or Terminators.is_terminator(last_char) then return false end
 	-- The predecessor is the buffer's first character and its start is not known
 	-- to be a word start: it may be the tail of an older word.
 	if before_last == pred_char and _state.start_is_word_boundary == false then return false end
@@ -1370,9 +1423,9 @@ function M.try_expand(chars, is_ignored)
 		tail = (ok and off) and _state.buffer:sub(off) or _state.buffer:sub(-1)
 	end
 	for _, m in ipairs(bucket_for(tail)) do
-		if M.try_auto_expand(m, char_len, is_ignored) then
-			return true
-		end
+		local fired, reason = M.try_auto_expand(m, char_len, is_ignored)
+		if fired then return true end
+		if reason == "noop_final" then break end
 	end
 
 	return false

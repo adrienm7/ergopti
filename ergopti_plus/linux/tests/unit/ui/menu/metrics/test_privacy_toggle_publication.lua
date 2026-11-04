@@ -43,8 +43,10 @@ local function with_private_config(body)
 	local config = ConfigPaths.config
 	ConfigPaths.config = function(name) return directory .. "/" .. name end
 	local ok, err = xpcall(function()
-		local collector = assert(loadfile(helpers.driver_root() .. "/modules/keystats/keystats.lua"))()
-		local menu = assert(loadfile(helpers.driver_root() .. "/ui/menu/menu_builder.lua"))()
+		local collector = helpers.fresh_module("modules.keystats.keystats")
+		-- A fresh builder does not reload its section modules, so they are reloaded here.
+		require("tests.support.menu_part_reload").forget_parts()
+		local menu = helpers.fresh_module("ui.menu.builder")
 		assert(collector.set_enabled(true))
 		body(collector, menu)
 	end, debug.traceback)
@@ -108,7 +110,9 @@ helpers.describe("metrics privacy menu publication", function()
 			helpers.it("(metrics-privacy-publication) encryption posture initial=" .. tostring(initial)
 				.. " refused=" .. tostring(refused), function()
 				local value, rebuilds, writes = initial, 0, 0
-				local menu = assert(loadfile(helpers.driver_root() .. "/ui/menu/menu_builder.lua"))()
+				-- A fresh builder does not reload its section modules, so they are reloaded here.
+				require("tests.support.menu_part_reload").forget_parts()
+				local menu = helpers.fresh_module("ui.menu.builder")
 				local context = { keystats = {
 					is_enabled = function() return true end,
 					get_privacy_state = function() return { encrypt = value } end,

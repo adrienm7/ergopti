@@ -157,12 +157,24 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 			parse = function() error("injected editor reload failure", 0) end,
 		}
 
+		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
+		local lines = {}
+		local previous_level = Logger.current_level
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = tostring(line) end)
 		local ok, committed = pcall(
 			registry.reload_toml,
 			"personal",
 			"/virtual/personal_hotstrings.toml"
 		)
+		Logger.set_sink(nil)
+		Logger.set_level(previous_level)
 		package.loaded["infra.toml.reader"] = previous_reader
+		-- Field log 2026-10-30 11:37: the editor reported a rolled-back reload
+		-- with no registry line naming the step that refused it.
+		helpers.assert_contains(table.concat(lines, "\n"), "did not load its saved file",
+			"the reload must name the refused step")
 
 		helpers.assert_true(ok, "the public reload must contain parser failures")
 		helpers.assert_eq(committed, false)

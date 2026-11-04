@@ -16,6 +16,6 @@
 		"KeyT": "keystroke:AudioVolumeMute",
 		"KeyG": "keystroke:F12",
 		"KeyQ": "keystroke:ctrl+shift+Home",
-		"WheelUp": null
+		"WheelUp": "keystroke:AudioVolumeUp@repeat"
 	}
 }

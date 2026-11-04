@@ -91,6 +91,9 @@ _KLRDC_EnsureSharedDir() {
 	global _SharedDir
 	if !IsSet(_SharedDir) || (_SharedDir = "")
 		_SharedDir := A_ScriptDir . "\..\_shared"
+	; Likewise the configuration folder holding the category store: the driver
+	; creates it at boot, and a partial snapshot refuses a missing store folder.
+	DirCreate(KL_AppCat_StoreDir())
 }
 
 _KLRDC_Cleanup() {

@@ -454,9 +454,8 @@ helpers.describe("ui.webkit_host", function()
 
   helpers.describe("webview_manager.show()", function()
     helpers.it("hands the page builder the locale catalogue (host-delivers-catalogue)", function()
-      local handle = io.open(DRIVER_ROOT .. "/ui/webview_manager.lua", "r")
-      local source = handle and handle:read("*a") or nil
-      if handle then handle:close() end
+      -- ui/webview_manager, selected by a declaration unique to it.
+      local source = helpers.read_driver_unit("function M.prepare_app_contextual_title(")
       helpers.assert_true(type(source) == "string" and source ~= "", "webview_manager.lua must be readable")
       helpers.assert_true(source:find('require("infra.locale").catalogue()', 1, true) ~= nil,
         "show() must read the full catalogue, active over English over French")

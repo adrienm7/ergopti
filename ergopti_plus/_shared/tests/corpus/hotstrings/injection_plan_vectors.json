@@ -1,6 +1,6 @@
 {
 	"schema": 1,
-	"description": "What each hotstring engine erases, types and replays, per completed match. Both drivers replay it through hotstring_engine.injection_plan. event_on_screen is the one driver-dependent input: Linux is always true; macOS is false unless the window is ignored. A divergence between drivers would be recorded in `divergence` (none today).",
+	"description": "What each hotstring engine erases, types and replays, per completed match. macOS and Linux replay it through hotstring_engine.injection_plan, Windows through infra/hotstrings/hotstring_injection_plan.ahk. event_on_screen is the one driver-dependent input: Linux and Windows are always true; macOS is false unless the window is ignored. A divergence between drivers would be recorded in `divergence` (none today).",
 	"vectors": [
 		{
 			"id": "auto-held-event",

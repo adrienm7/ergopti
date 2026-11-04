@@ -29,28 +29,24 @@ class _OFEP_Fixture {
 	}
 	Setup() {
 		global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch
-		global _LLM_Deps_InstallerOwner, _LLM_ManagedBootstrap, _LLM_Deps_PollTimer
+		global _LLM_ManagedBootstrap
 		global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 		global DRIVER_BASELINE_PRIORITY_CLASS
-		AssertFalse(IsObject(_LLM_Deps_InstallerOwner), "the fixture cannot cancel a foreign installer owner")
 		AssertFalse(IsObject(_LLM_ManagedBootstrap), "the fixture cannot cancel a foreign managed bootstrap")
-		AssertTrue(!IsSet(_LLM_Deps_PollTimer) || !_LLM_Deps_PollTimer, "the fixture cannot stop another poll timer")
 		AssertEqual(0, _LOGGER_TEST_SINK, "the fixture cannot replace another active logger observer")
 		this.LoggerState := _TLOG_CaptureLoggerState()
 		AssertFalse(this.LoggerState.FlushActive, "the fixture cannot detach an active logger flush")
 		this.Priority := DllCall("GetPriorityClass", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "UInt")
 		AssertTrue(this.Priority > 0, "native priority must be observed before the fixture changes state")
 		this.Saved := Map("state", _LLM_Deps_State, "checking", _LLM_Deps_Checking, "epoch", _LLM_Deps_Epoch,
-			"message_present", IsSet(_LLM_Deps_FailureMessage), "poll_present", IsSet(_LLM_Deps_PollTimer),
+			"message_present", IsSet(_LLM_Deps_FailureMessage),
 			"sink", _LOGGER_TEST_SINK, "repeat", _LOGGER_REPEAT_ENABLED,
 			"baseline_present", IsSet(DRIVER_BASELINE_PRIORITY_CLASS),
-			"installer", _LLM_Deps_InstallerOwner, "managed", _LLM_ManagedBootstrap)
+			"managed", _LLM_ManagedBootstrap)
 		if this.Saved["baseline_present"]
 			this.Saved["baseline"] := DRIVER_BASELINE_PRIORITY_CLASS
 		if this.Saved["message_present"]
 			this.Saved["message"] := _LLM_Deps_FailureMessage
-		if this.Saved["poll_present"]
-			this.Saved["poll"] := _LLM_Deps_PollTimer
 		this.Prepared := true
 		DRIVER_BASELINE_PRIORITY_CLASS := this.Baseline
 		_ResetLogger()
@@ -92,12 +88,11 @@ class _OFEP_Fixture {
 	}
 	CancelFromTimer() {
 		global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Epoch
-		global _LLM_Deps_InstallerOwner, _LLM_ManagedBootstrap, _LLM_Deps_PollTimer
+		global _LLM_ManagedBootstrap
 		this.TimerCalls += 1
 		try {
-			AssertFalse(IsObject(_LLM_Deps_InstallerOwner) || IsObject(_LLM_ManagedBootstrap),
+			AssertFalse(IsObject(_LLM_ManagedBootstrap),
 				"the cancellation observer must never retire another fixture's owner")
-			AssertTrue(!IsSet(_LLM_Deps_PollTimer) || !_LLM_Deps_PollTimer)
 			this.CancelResult := LLM_Deps_Cancel()
 			this.CancelState := _LLM_Deps_State
 			this.CancelMessage := _LLM_Deps_FailureMessage
@@ -130,7 +125,7 @@ class _OFEP_Fixture {
 		AssertEqual("failed", _LLM_Deps_State)
 	}
 	Close() {
-		global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch, _LLM_Deps_PollTimer
+		global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch
 		global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, DRIVER_BASELINE_PRIORITY_CLASS
 		if HasMethod(this.TimerFn, "Call")
 			SetTimer(this.TimerFn, 0)
@@ -147,10 +142,6 @@ class _OFEP_Fixture {
 				_LLM_Deps_FailureMessage := this.Saved["message"]
 			else
 				_LLM_Deps_FailureMessage := unset
-			if this.Saved["poll_present"]
-				_LLM_Deps_PollTimer := this.Saved["poll"]
-			else
-				_LLM_Deps_PollTimer := unset
 		} finally {
 			if this.Saved["baseline_present"]
 				DRIVER_BASELINE_PRIORITY_CLASS := this.Saved["baseline"]
@@ -171,7 +162,7 @@ class _OFEP_Fixture {
 
 _OFEP_Case(Mode) {
 	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch
-	global _LLM_Deps_InstallerOwner, _LLM_ManagedBootstrap
+	global _LLM_ManagedBootstrap
 	F := _OFEP_Fixture(Mode)
 	PreviousCritical := Critical("On")
 	try {
@@ -212,7 +203,6 @@ _OFEP_Case(Mode) {
 			AssertEqual(F.Message, _LLM_Deps_FailureMessage)
 			AssertFalse(_LLM_Deps_Checking)
 		}
-		AssertEqual(F.Saved["installer"], _LLM_Deps_InstallerOwner)
 		AssertEqual(F.Saved["managed"], _LLM_ManagedBootstrap)
 	} finally {
 		try F.Close()

@@ -207,6 +207,91 @@ function M.process_pattern(entries)
 	return table.concat(alternatives, "|")
 end
 
+--- Reverts regex_literal, refusing any operator it would have escaped.
+--- @param text string An escaped literal of M.process_pattern.
+--- @return string literal
+local function unescape_literal(text)
+	local literal, index = {}, 1
+	while index <= #text do
+		local char = text:sub(index, index)
+		if char == "\\" then
+			local escaped = text:sub(index + 1, index + 1)
+			assert(escaped ~= "", "process pattern ends with a lone backslash")
+			literal[#literal + 1] = escaped
+			index = index + 2
+		else
+			assert(not char:find("[%^%$%.%[%]|%(%)%*%+%?{}]"), "process pattern operator outside its grammar: " .. text)
+			literal[#literal + 1] = char
+			index = index + 1
+		end
+	end
+	return table.concat(literal)
+end
+
+--- Splits a pattern at its top-level alternation bars.
+--- @param pattern string
+--- @return table alternatives
+local function split_alternatives(pattern)
+	local alternatives, from, depth, index = {}, 1, 0, 1
+	while index <= #pattern do
+		local char = pattern:sub(index, index)
+		if char == "\\" then
+			index = index + 1
+		elseif char == "(" then
+			depth = depth + 1
+		elseif char == ")" then
+			depth = depth - 1
+		elseif char == "|" and depth == 0 then
+			alternatives[#alternatives + 1] = pattern:sub(from, index - 1)
+			from = index + 1
+		end
+		index = index + 1
+	end
+	alternatives[#alternatives + 1] = pattern:sub(from)
+	return alternatives
+end
+
+--- Compiles a M.process_pattern expression into the case-insensitive test a
+--- pgrep -f -i would apply, for a driver that reads the command lines itself
+--- (the Linux driver reads /proc: busybox pgrep has neither -a nor -i). Only
+--- the grammar M.process_pattern emits is accepted; anything else fails fast.
+--- @param pattern string From M.process_pattern.
+--- @return function matches Receives a command line, returns a boolean.
+function M.process_matcher(pattern)
+	assert(type(pattern) == "string" and pattern ~= "", "process_matcher: a pattern is required")
+	local names, fragments = {}, {}
+	for _, alternative in ipairs(split_alternatives(pattern)) do
+		local name = alternative:match("^%(%^|/%)(.+)%(\\%.exe%)%?%( |%$%)$")
+		if name then
+			names[#names + 1] = unescape_literal(name):lower()
+		else
+			local fragment = unescape_literal(alternative)
+			assert(fragment ~= "", "process pattern has an empty alternative")
+			fragments[#fragments + 1] = fragment:lower()
+		end
+	end
+	return function(command)
+		local line = tostring(command):lower()
+		for _, name in ipairs(names) do
+			local from = 1
+			while true do
+				local first, last = line:find(name, from, true)
+				if not first then break end
+				if first == 1 or line:sub(first - 1, first - 1) == "/" then
+					local rest = line:sub(last + 1)
+					if rest:sub(1, 4) == ".exe" then rest = rest:sub(5) end
+					if rest == "" or rest:sub(1, 1) == " " then return true end
+				end
+				from = first + 1
+			end
+		end
+		for _, fragment in ipairs(fragments) do
+			if line:find(fragment, 1, true) then return true end
+		end
+		return false
+	end
+end
+
 
 
 

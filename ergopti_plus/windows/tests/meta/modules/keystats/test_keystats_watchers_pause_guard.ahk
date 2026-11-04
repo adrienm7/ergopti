@@ -10,14 +10,12 @@
 
 #Requires AutoHotkey v2.0
 
-_KLLG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_KLLG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _KLLG_IdleTickHasPauseGuard() {
-	Src := _KLLG_ReadSource("modules/keystats/keystats_watchers.ahk")
+	Src := _KLLG_ReadSource("keystats_watchers.ahk")
 	Seg := _DriverFuncBody("KL_Watchers_IdleTick")
 	Assert(Seg != "", "KL_Watchers_IdleTick declaration must exist")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
@@ -26,7 +24,7 @@ _KLLG_IdleTickHasPauseGuard() {
 Test("keystats_watchers: KL_Watchers_IdleTick has an A_IsSuspended pause guard", _KLLG_IdleTickHasPauseGuard)
 
 _KLLG_OnSessionChangeHasPauseGuard() {
-	Src := _KLLG_ReadSource("modules/keystats/keystats_watchers.ahk")
+	Src := _KLLG_ReadSource("keystats_watchers.ahk")
 	Seg := _DriverFuncBody("KL_Watchers_OnSessionChange")
 	Assert(Seg != "", "KL_Watchers_OnSessionChange declaration must exist")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
@@ -35,7 +33,7 @@ _KLLG_OnSessionChangeHasPauseGuard() {
 Test("keystats_watchers: KL_Watchers_OnSessionChange has an A_IsSuspended pause guard", _KLLG_OnSessionChangeHasPauseGuard)
 
 _KLLG_OnPowerBroadcastHasPauseGuard() {
-	Src := _KLLG_ReadSource("modules/keystats/keystats_watchers.ahk")
+	Src := _KLLG_ReadSource("keystats_watchers.ahk")
 	Seg := _DriverFuncBody("KL_Watchers_OnPowerBroadcast")
 	Assert(Seg != "", "KL_Watchers_OnPowerBroadcast declaration must exist")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,

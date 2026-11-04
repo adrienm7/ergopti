@@ -105,6 +105,123 @@ local function require_vocabulary(vocabulary)
 	end
 end
 
+--- @param code integer A Unicode scalar value.
+--- @return string The scalar as UTF-8. Arithmetic: LuaJIT has no bitwise operators.
+local function utf8_encode(code)
+	if code < 0x80 then return string.char(code) end
+	if code < 0x800 then
+		return string.char(0xC0 + math.floor(code / 64), 0x80 + code % 64)
+	end
+	if code < 0x10000 then
+		return string.char(0xE0 + math.floor(code / 4096),
+			0x80 + math.floor(code / 64) % 64, 0x80 + code % 64)
+	end
+	return string.char(0xF0 + math.floor(code / 262144),
+		0x80 + math.floor(code / 4096) % 64, 0x80 + math.floor(code / 64) % 64, 0x80 + code % 64)
+end
+
+--- Reads the inside of one {group} of a hotstring output.
+--- @param inner string The text between the braces.
+--- @param vocabulary table Decoded send_keys.json.
+--- @return string|nil text The code point a {U+XXXX} names.
+--- @return table|nil entry The key a {name} or {name N} names.
+--- @return integer|nil count How many times to press it.
+local function read_output_group(inner, vocabulary)
+	local hex = inner:match("^[Uu]%+(%x+)$")
+	if hex then
+		if #hex > 6 then return nil end
+		local code = tonumber(hex, 16)
+		if code > 0x10FFFF or (code >= 0xD800 and code <= 0xDFFF) or is_control(code) then return nil end
+		return utf8_encode(code)
+	end
+	local name, repeats = inner:match("^(%w[%w_]*) ([1-9]%d*)$")
+	if not name then name, repeats = inner:match("^(%w[%w_]*)$"), "1" end
+	if not name then return nil end
+	local count = tonumber(repeats)
+	if count > vocabulary.output_key_max_repeat then return nil end
+	local entry = find_entry(vocabulary.keys, ascii_lower(name))
+	if not entry then return nil end
+	return nil, entry, count
+end
+
+--- Parses a hotstring output into what it types and what it presses. The grammar
+--- is the rule of _shared/tests/corpus/hotstrings/output_token_vectors.json; the
+--- Windows driver replays the same vectors against its own parser.
+--- @param value string The output as the TOML holds it.
+--- @param vocabulary table Decoded send_keys.json.
+--- @return table { tokens, text, has_keys }: tokens is an ordered array of
+---   { kind = "text", value } and { kind = "key", id, entry, count }, text the
+---   typed text alone.
+function M.parse_output(value, vocabulary)
+	require_vocabulary(vocabulary)
+	if type(vocabulary.output_key_max_repeat) ~= "number" then
+		error("send_input: the vocabulary has no output_key_max_repeat", 2)
+	end
+	if type(value) ~= "string" then error("send_input: an output must be a string", 2) end
+
+	local tokens, typed, has_keys = {}, {}, false
+	local function push_text(text)
+		typed[#typed + 1] = text
+		local last = tokens[#tokens]
+		if last and last.kind == "text" then
+			last.value = last.value .. text
+		else
+			tokens[#tokens + 1] = { kind = "text", value = text }
+		end
+	end
+	local function push_key(entry, count)
+		has_keys = true
+		tokens[#tokens + 1] = { kind = "key", id = entry.id, entry = entry, count = count }
+	end
+
+	local index, size = 1, #value
+	while index <= size do
+		local at = value:find("[{\r\n\t]", index)
+		if not at then
+			push_text(value:sub(index))
+			break
+		end
+		if at > index then push_text(value:sub(index, at - 1)) end
+		local char = value:sub(at, at)
+		index = at + 1
+		if char == "\t" then
+			push_key(find_entry(vocabulary.keys, "tab"), 1)
+		elseif char == "\r" or char == "\n" then
+			if char == "\r" and value:sub(index, index) == "\n" then index = index + 1 end
+			push_key(find_entry(vocabulary.keys, "enter"), 1)
+		elseif value:sub(at, at + 2) == "{{}" then
+			push_text("{")
+			index = at + 3
+		elseif value:sub(at, at + 2) == "{}}" then
+			push_text("}")
+			index = at + 3
+		else
+			local close = value:find("}", index, true)
+			local text, entry, count
+			if close then text, entry, count = read_output_group(value:sub(index, close - 1), vocabulary) end
+			if text then
+				push_text(text)
+				index = close + 1
+			elseif entry then
+				push_key(entry, count)
+				index = close + 1
+			else
+				-- Only the brace: what follows may still hold a real token.
+				push_text("{")
+			end
+		end
+	end
+	return { tokens = tokens, text = table.concat(typed), has_keys = has_keys }
+end
+
+--- Whether an output needs parse_output at all: the cheap test a loader of
+--- thousands of plain entries runs first.
+--- @param value string
+--- @return boolean
+function M.output_needs_parsing(value)
+	return value:find("[{\r\n\t]") ~= nil
+end
+
 --- Parses a send_text value.
 --- @param value any
 --- @param vocabulary table Decoded send_keys.json.

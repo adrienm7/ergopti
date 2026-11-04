@@ -77,7 +77,9 @@ helpers.describe("LLM scope native acknowledgements", function()
 			})
 			helpers.assert_true(renderer.show({{ text = "offer" }}, { style = {
 				fonts = { main = "sans" }, sizes = { main = 12 },
-				layout = { pad_x = 1, pad_y = 1, line_spacing = 1 },
+				-- Every key the shipped config requires (ui/tooltip/config.lua), the
+				-- shortcut column's two included.
+				layout = { pad_x = 1, pad_y = 1, line_spacing = 1, label_gap = 1, llm_max_content_width = 100 },
 				positioning = {}, tint = {}, colors = { bg = {} },
 			} }))
 			helpers.assert_eq(renderer.hide(), false, "a void hide call does not prove the window disappeared")

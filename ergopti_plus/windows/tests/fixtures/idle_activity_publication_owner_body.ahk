@@ -147,7 +147,7 @@ _KIO_Exercise() {
 			"The native timer must really accept newer activity before the old publication resumes.")
 	_KIO_Observe("old-return")
 	if _KIO.Mode == "current" {
-		_KIO_Require(KLWatch.is_idle && KLWatch.idle_started_at == _KIO.Origin
+		_KIO_Require(KLWatch.is_idle && KLWatch.idle_started_at == _KIO.Origin + KLWatchConst.MICRO_IDLE_TIMEOUT_MS
 			&& Keystats._pending_entries.Length == 2 && Keystats._pending_entries[2]["type"] == "idle_start",
 			"Uninterrupted inactivity must publish its real idle start and current state.")
 		KL_Hook_NoteActivity(false, true, _KIO.NewTick)
@@ -166,14 +166,14 @@ _KIO_Exercise() {
 	Rows := Keystats._pending_entries.Length
 	NextObservation := _KIO.NewTick + KLWatchConst.MICRO_IDLE_TIMEOUT_MS + 1
 	KL_Watchers_IdleTick(NextObservation)
-	_KIO_Require(KLWatch.is_idle && KLWatch.idle_started_at == _KIO.NewTick
+	_KIO_Require(KLWatch.is_idle && KLWatch.idle_started_at == _KIO.NewTick + KLWatchConst.MICRO_IDLE_TIMEOUT_MS
 		&& Keystats._pending_entries.Length == Rows + 1
 		&& Keystats._pending_entries[Rows + 1]["type"] == "idle_start",
 		"Fresh inactivity must begin at the newer accepted watermark exactly once.")
 	KL_Hook_NoteActivity(false, true, NextObservation + 1)
 	_KIO_Require(!KLWatch.is_idle && Keystats._pending_entries.Length == Rows + 2
 		&& Keystats._pending_entries[Rows + 2]["type"] == "idle_end"
-		&& Keystats._pending_entries[Rows + 2]["duration_ms"] == KLWatchConst.MICRO_IDLE_TIMEOUT_MS + 2
+		&& Keystats._pending_entries[Rows + 2]["duration_ms"] == 2
 		&& _KIO_Balanced() == History + 1,
 		"The subsequent genuine activity must close only the fresh interval with its true explicit duration.")
 	KL_Hook_NoteActivity(false, true, NextObservation + 2)

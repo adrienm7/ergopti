@@ -1,6 +1,6 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/tap_hold_decisions.v1.json",
-	"description": "Cross-driver corpus for the tap-versus-hold DECISION: which keystrokes reach applications for a timed stream of physical presses and releases on keys bound to a tap and a hold. vectors.json pins the configuration accessors; this file pins what the engines decide. Keys are [tap_hold.catalog] ids of _shared/tap_hold/defaults.toml plus the ordinary letters a and j. A binding names a tap (a key the tap types, or one_shot_shift; none types the key itself), a hold modifier and a threshold in milliseconds. Each event is [down|up, key, at_ms]. `strokes` lists, in order, every key press of a non-modifier key that applications receive, prefixed with the modifiers down at that moment in the [tap_hold.hold_picker] order (ctrl, shift, alt, alt_gr, win), whichever side holds them. `hold_presses`, when present, lists the modifier keys, by side, that the hold of the first bound key puts down. The expectations are the Windows and Linux semantics (the Linux engine follows the Windows hotkeys). A driver that decides otherwise is listed under `divergences` with what it does and why, so the difference stays visible and a change on either side fails a consumer.",
+	"description": "Cross-driver corpus for the tap-versus-hold DECISION: which keystrokes reach applications for a timed stream of physical presses and releases on keys bound to a tap and a hold. vectors.json pins the configuration accessors; this file pins what the engines decide. Keys are [tap_hold.catalog] ids of _shared/tap_hold/defaults.toml plus the ordinary letters a and j. A binding names a tap (a key the tap types, or one_shot_shift; none types the key itself), a hold modifier and a threshold in milliseconds. Each event is [down|up, key, at_ms]. `strokes` lists, in order, every key press of a non-modifier key that applications receive, prefixed with the modifiers down at that moment in the [tap_hold.hold_picker] order (ctrl, shift, alt, alt_gr, win), whichever side holds them. `hold_presses`, when present, lists the modifier keys, by side, that the hold of the first bound key puts down. The expectations are the Windows and Linux semantics (the Linux engine follows the Windows hotkeys). A driver that decides otherwise is listed under `divergences` with what it does and why, so the difference stays visible and a change on either side fails a consumer. `lone_tap_max_ms`, when a vector sets it, is tap_holds.lone_modifier_tap_max_ms: how long a key whose hold is a modifier, pressed alone, still types its tap; absent, it is 0, the strict tap-hold.",
 	"version": "1.0.0",
 	"vectors": [
 		{
@@ -448,6 +448,30 @@
 			}
 		},
 		{
+			"id": "one_shot_is_spent_by_one_letter_typed_in_a_roll",
+			"description": "Letters typed fast, each pressed before the one before it is released, take the one-shot Shift on the first letter only (on macOS a one-shot tap then « abc » typed fast gave « ABc »).",
+			"bindings": {
+				"caps_lock": {
+					"tap": "one_shot_shift",
+					"hold": "shift",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 100],
+				["down", "a", 300],
+				["down", "j", 320],
+				["up", "a", 330],
+				["down", "a", 340],
+				["up", "j", 350],
+				["up", "a", 360]
+			],
+			"expected": {
+				"strokes": ["shift+a", "j", "a"]
+			}
+		},
+		{
 			"id": "one_shot_hold_is_shift_and_arms_nothing",
 			"description": "Held over a letter, the key is its Shift hold and arms no one-shot for the letter after.",
 			"bindings": {
@@ -487,6 +511,128 @@
 			],
 			"expected": {
 				"strokes": ["j"]
+			}
+		},
+		{
+			"id": "lone_modifier_tap_up_to_its_window",
+			"description": "A key that holds a modifier, pressed alone past its threshold but within the lone tap window, types its tap.",
+			"lone_tap_max_ms": 1000,
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 600]
+			],
+			"expected": {
+				"strokes": ["enter"]
+			}
+		},
+		{
+			"id": "lone_modifier_tap_on_left_shift",
+			"description": "Left Shift holding Shift, released alone after 600 ms, types its tap (the copy of the field report).",
+			"lone_tap_max_ms": 1000,
+			"bindings": {
+				"left_shift": {
+					"tap": "enter",
+					"hold": "shift",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "left_shift", 0],
+				["up", "left_shift", 600]
+			],
+			"expected": {
+				"strokes": ["enter"]
+			}
+		},
+		{
+			"id": "lone_modifier_past_its_window_types_nothing",
+			"description": "Released alone after the lone tap window, the key was a hold.",
+			"lone_tap_max_ms": 1000,
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 1100]
+			],
+			"expected": {
+				"strokes": []
+			}
+		},
+		{
+			"id": "lone_modifier_window_keeps_chords",
+			"description": "A letter struck under the key is typed under its hold at once, and the release types no tap.",
+			"lone_tap_max_ms": 1000,
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["down", "a", 300],
+				["up", "a", 350],
+				["up", "caps_lock", 600]
+			],
+			"expected": {
+				"strokes": ["ctrl+a"]
+			}
+		},
+		{
+			"id": "lone_modifier_window_off_is_strict",
+			"description": "With the window off, a lone release past the threshold types nothing.",
+			"lone_tap_max_ms": 0,
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 600]
+			],
+			"expected": {
+				"strokes": []
+			}
+		},
+		{
+			"id": "lone_modifier_window_keeps_the_tap_minimum",
+			"description": "A release sooner than the tap minimum stays a bounce with the window on.",
+			"lone_tap_max_ms": 1000,
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 20]
+			],
+			"expected": {
+				"strokes": []
+			},
+			"divergences": {
+				"macos": {
+					"strokes": ["enter"],
+					"reason": "Karabiner's to_if_alone has no minimum duration: a to_if_held_down at the minimum would release the hold the key took at key-down, so a 20 ms bounce types the tap."
+				}
 			}
 		}
 	]

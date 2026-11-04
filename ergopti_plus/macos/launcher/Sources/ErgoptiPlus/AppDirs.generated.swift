@@ -34,3 +34,6 @@ let kLauncherLogFileName = "launcher.log"
 
 /// Per-launch fatal report, beside launcher.log.
 let kFatalReportFileName = "hammerspoon-fatal.txt"
+
+/// The paths.toml that may move the configuration folder, relative to the home folder.
+let kMacOSPathsFileHomeRelativePath = "Library/Application Support/ErgoptiPlus/paths.toml"

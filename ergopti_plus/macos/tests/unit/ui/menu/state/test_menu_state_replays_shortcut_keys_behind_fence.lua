@@ -21,7 +21,9 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
-local DISABLED_ID = "ctrl_g"
+-- A registered switch other than REFUSED_ID (Ctrl+G was until schema v20 made
+-- it a keyboard slot).
+local DISABLED_ID = "wrap_text_if_selected"
 -- A registered binding with a raw factory the fixture can make refuse.
 local REFUSED_ID = "cmd_star"
 -- Owners derived from other files (tap-key assignments, the layer's wheel in

@@ -40,9 +40,9 @@ M.DELAYS_SEC = {1, 3, 10, 30}
 
 --- Creates one retry series.
 --- @param log_tag string The owner's logger tag.
---- @param attempt function Called as attempt(final); returns true when no
----   refused shortcut remains.
---- @return table series Exposes schedule() and cancel().
+--- @param attempt function Called as attempt(final, index); returns true when
+---   no refused shortcut remains.
+--- @return table series Exposes schedule(), resume() and cancel().
 function M.new(log_tag, attempt)
 	assert(type(log_tag) == "string" and log_tag ~= "", "refusal retry needs a log tag")
 	assert(type(attempt) == "function", "refusal retry needs an attempt function")
@@ -50,13 +50,19 @@ function M.new(log_tag, attempt)
 	local generation = 0
 	local handle = nil
 
+	local function warn_exhausted()
+		Logger.warn(log_tag,
+			"Some shortcuts are still unregistered after %d retries; the next keyboard-layout change retries them.",
+			#M.DELAYS_SEC)
+	end
+
 	local function arm(index)
 		local armed_generation = generation
 		local ok, candidate, committed = pcall(TimerScheduler.after, M.DELAYS_SEC[index], function()
 			if armed_generation ~= generation then return end
 			handle = nil
 			local final = index == #M.DELAYS_SEC
-			local ok_attempt, settled = xpcall(attempt, debug.traceback, final)
+			local ok_attempt, settled = xpcall(attempt, debug.traceback, final, index)
 			if not ok_attempt then
 				Logger.error(log_tag, "Refused shortcut retry %d raised: %s.", index, tostring(settled))
 				return
@@ -65,9 +71,7 @@ function M.new(log_tag, attempt)
 			if settled == true then
 				Logger.info(log_tag, "Refused shortcuts registered on retry %d.", index)
 			elseif final then
-				Logger.warn(log_tag,
-					"Some shortcuts are still unregistered after %d retries; the next keyboard-layout change retries them.",
-					#M.DELAYS_SEC)
+				warn_exhausted()
 			else
 				arm(index + 1)
 			end
@@ -101,6 +105,22 @@ function M.new(log_tag, attempt)
 	function series.schedule()
 		series.cancel()
 		return arm(1)
+	end
+
+	--- Continues the series after retry `index`, whose attempt restarted the
+	--- owner (a full rebind) and so cancelled the series. Restarting from the
+	--- first delay instead would make a chord macOS itself holds rebind forever.
+	--- @param index integer The retry that restarted the owner.
+	--- @return boolean armed False once that retry was the last one.
+	function series.resume(index)
+		assert(math.type(index) == "integer" and index >= 1 and index <= #M.DELAYS_SEC,
+			"refusal retry resume needs a retry index")
+		series.cancel()
+		if index == #M.DELAYS_SEC then
+			warn_exhausted()
+			return false
+		end
+		return arm(index + 1)
 	end
 
 	return series

@@ -62,7 +62,11 @@ return function(helpers, Source, fixture)
 
 		helpers.it("(magic-key-source) the menu rows capture, restore automatic and list every candidate", function()
 			local calls = {}
-			local function t(key) return "<" .. key .. ">" end
+			-- The join is the locale's template (common.label_value), here the French one.
+			local function t(key)
+				if key == "common.label_value" then return "{1} : {2}" end
+				return "<" .. key .. ">"
+			end
 			local rows = Source.menu_rows(resolver, {
 				manifest = renderer(t),
 				t = t,
@@ -190,7 +194,7 @@ return function(helpers, Source, fixture)
 					})
 					helpers.assert_eq(#calls, 0, "construction never invokes native actions")
 					helpers.assert_eq(#rows, 1)
-					helpers.assert_eq(rows[1].label, translate(corpus.parent[1].i18n) .. corpus.caption_separator
+					helpers.assert_eq(rows[1].label, translate(corpus.parent[1].i18n) .. corpus.caption_separator[language]
 						.. (state.shown or translate(state.shown_key)))
 					local items = rows[1].items
 					helpers.assert_eq(#items, #corpus.candidates + 4)

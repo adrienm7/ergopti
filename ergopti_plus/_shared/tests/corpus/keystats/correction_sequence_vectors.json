@@ -88,6 +88,140 @@
 				"ngram_hexagrams": {},
 				"ngram_heptagrams": {}
 			}
+		},
+		{
+			"id": "typed_brackets_then_backspace",
+			"description": "'[', 'B', 'S', ']' typed, then a real Backspace, then x: the typed bracket is escaped, so this history and the next one, which share one flat spelling, keep two hexagram keys",
+			"flushes": [
+				[
+					{
+						"char": "[",
+						"delay": 100
+					},
+					{
+						"char": "B",
+						"delay": 100
+					},
+					{
+						"char": "S",
+						"delay": 100
+					},
+					{
+						"char": "]",
+						"delay": 100
+					},
+					{
+						"char": "[BS]",
+						"delay": 100
+					},
+					{
+						"char": "x",
+						"delay": 100
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"[[": 1,
+					"B": 1,
+					"S": 1,
+					"]": 1,
+					"[BS]": 1,
+					"x": 1
+				},
+				"ngram_bigrams": {
+					"[[B": 1,
+					"BS": 1,
+					"S]": 1,
+					"][BS]": 1,
+					"[BS]x": 1
+				},
+				"ngram_trigrams": {
+					"[[BS": 1,
+					"BS]": 1,
+					"S][BS]": 1,
+					"][BS]x": 1
+				},
+				"ngram_quadgrams": {
+					"[[BS]": 1,
+					"S][BS]x": 1
+				},
+				"ngram_pentagrams": {
+					"BS][BS]x": 1
+				},
+				"ngram_hexagrams": {
+					"[[BS][BS]x": 1
+				},
+				"ngram_heptagrams": {}
+			}
+		},
+		{
+			"id": "backspace_then_typed_brackets",
+			"description": "A real Backspace, then '[', 'B', 'S', ']' typed, then x: the mirror of the vector above",
+			"flushes": [
+				[
+					{
+						"char": "[BS]",
+						"delay": 100
+					},
+					{
+						"char": "[",
+						"delay": 100
+					},
+					{
+						"char": "B",
+						"delay": 100
+					},
+					{
+						"char": "S",
+						"delay": 100
+					},
+					{
+						"char": "]",
+						"delay": 100
+					},
+					{
+						"char": "x",
+						"delay": 100
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"[BS]": 1,
+					"[[": 1,
+					"B": 1,
+					"S": 1,
+					"]": 1,
+					"x": 1
+				},
+				"ngram_bigrams": {
+					"[BS][[": 1,
+					"[[B": 1,
+					"BS": 1,
+					"S]": 1,
+					"]x": 1
+				},
+				"ngram_trigrams": {
+					"[BS][[B": 1,
+					"[[BS": 1,
+					"BS]": 1,
+					"S]x": 1
+				},
+				"ngram_quadgrams": {
+					"[BS][[BS": 1,
+					"[[BS]": 1,
+					"BS]x": 1
+				},
+				"ngram_pentagrams": {
+					"[BS][[BS]": 1,
+					"[[BS]x": 1
+				},
+				"ngram_hexagrams": {
+					"[BS][[BS]x": 1
+				},
+				"ngram_heptagrams": {}
+			}
 		}
 	]
 }

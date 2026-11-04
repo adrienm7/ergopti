@@ -123,11 +123,17 @@ _LVS_RequestVectors() {
 	Checked := 0
 	Formats := Map()
 	for Vector in _LVS_Corpus()["request_vectors"] {
-		Body := LLM_Vision_BuildRequest(Vector["format"], Vector["spec"])
+		Spec := Vector["spec"]
+		; The spec's think is JSON source (LLM_OllamaThink); the decoder read false as 0
+		if Spec.Has("think")
+			Spec["think"] := (Spec["think"] is String) ? JsonStringLiteral(Spec["think"]) : "false"
+		Body := LLM_Vision_BuildRequest(Vector["format"], Spec)
 		AssertEqual("", _LVS_DeepEqual(Vector["body"], JsonParse(Body)), Vector["id"] . ": body")
 		; The decoder reads false as 0: the wire text must say false
 		if (Vector["format"] == "openai" || Vector["format"] == "ollama")
 			AssertContains(Body, '"stream":false', Vector["id"] . ": streaming is off")
+		if (Vector["format"] == "ollama")
+			AssertContains(Body, '"think":' . Spec["think"], Vector["id"] . ": the resolved think is sent")
 		Formats[Vector["format"]] := true
 		Checked += 1
 	}
@@ -150,6 +156,12 @@ Test("LLM vision: reading a tagged answer replays the shared corpus", _LVS_Extra
 _LVS_RequestRefusals() {
 	Spec := Map("model", "m", "system", "S", "text", "T", "max_tokens", 10)
 	AssertThrows(() => LLM_Vision_BuildRequest("xml", Spec), "an unknown dialect is a caller bug")
+	AssertThrows(() => LLM_Vision_BuildRequest("ollama", Spec), "an ollama request needs its think value")
+	Spec["think"] := "0"
+	AssertThrows(() => LLM_Vision_BuildRequest("ollama", Spec), "think is false or a quoted level")
+	Spec["think"] := '"low"'
+	AssertContains(LLM_Vision_BuildRequest("ollama", Spec), '"think":"low"', "a level is sent as given")
+	Spec.Delete("think")
 	Spec["image"] := "QUJD"
 	AssertThrows(() => LLM_Vision_BuildRequest("openai", Spec), "an image needs its mime type")
 	Spec["mime"] := "image/png"
@@ -299,7 +311,8 @@ _LVS_ParameterKind() {
 		AssertEqual(LLM_API_PROVIDERS[ProviderId]["Label"], Choices[Index + 1]["label"], ProviderId . " label")
 	}
 	for Choice in Choices
-		AssertFalse(Choice["value"] == "backboard" || LLM_RemoteProviderFormat(Choice["value"]) == "decisions",
+		AssertFalse(Choice["value"] == "backboard" || Choice["value"] == "perplexity"
+			|| LLM_RemoteProviderFormat(Choice["value"]) == "decisions",
 			Choice["value"] . " is no vision backend")
 	AssertFalse(InStr(GestureActionParameterPrompt("llm_screen_region"), "typesafe"),
 		"the prompt does not list a decisions provider")
@@ -308,6 +321,96 @@ _LVS_ParameterKind() {
 	AssertContains(Prompt, "openai — " . LLM_API_PROVIDERS["openai"]["Label"], "and the providers")
 }
 Test("LLM vision: the llm_vision parameter validates, lists and prompts", _LVS_ParameterKind)
+
+_LVS_ComposeParameter() {
+	AssertEqual("openai", LLM_Vision_ComposeParameter("openai", "  ", "gpt-x"), "an empty model keeps the default")
+	AssertEqual("openai|m", LLM_Vision_ComposeParameter("openai", " m ", "gpt-x"), "a typed model is trimmed and kept")
+	AssertEqual("cerebras|", LLM_Vision_ComposeParameter("cerebras", "", ""), "no default and no model stays refusable")
+	AssertFalse(LLM_Vision_IsValid("cerebras|"), "which validation refuses")
+}
+Test("LLM vision: the value of a picked backend and a typed model", _LVS_ComposeParameter)
+
+; Replays the two steps through the real prompt entry. Answers are consumed in
+; order; "" as a pick and a non-OK Result are the user's cancel.
+_LVS_PromptTwoSteps(Picks, Asks, Seed := "") {
+	global _GestureVisionPromptPorts, GestureActionParameters
+	Binding := "keyboard__primary_shift_i"
+	Key := GestureActionParameterKey(Binding, "llm_screen_full")
+	Run := { Picks: [], Asks: [], Refusals: [], Result: 0 }
+	PickAt := 0, AskAt := 0
+	Saved := _GestureVisionPromptPorts
+	Had := GestureActionParameters.Has(Key)
+	Prior := Had ? GestureActionParameters[Key] : ""
+	Pick(Title, Label, Choices, Selected) {
+		Run.Picks.Push(Map("label", Label, "count", Choices.Length, "selected", Selected))
+		return Picks[++PickAt]
+	}
+	Ask(Prompt, Title, Options, Default) {
+		Run.Asks.Push(Map("prompt", Prompt, "default", Default))
+		return Asks[++AskAt]
+	}
+	Refuse(Text, Title, Options) {
+		Run.Refusals.Push(Text)
+	}
+	_GestureVisionPromptPorts := Map("pick", Pick, "ask", Ask, "refuse", Refuse)
+	try {
+		if (Seed != "")
+			GestureActionParameters[Key] := Seed
+		else if Had
+			GestureActionParameters.Delete(Key)
+		Run.Result := GesturePromptActionParameter(Binding, "llm_screen_full")
+	} finally {
+		_GestureVisionPromptPorts := Saved
+		if Had
+			GestureActionParameters[Key] := Prior
+		else if GestureActionParameters.Has(Key)
+			GestureActionParameters.Delete(Key)
+	}
+	return Run
+}
+
+_LVS_NativePromptPicksTheBackend() {
+	Default := LLM_Vision_Config()["default_models"]["local"]
+	Run := _LVS_PromptTwoSteps(["local"], [{ Result: "OK", Value: "" }])
+	AssertEqual(1, Run.Picks.Length, "the backend is picked in a list, not typed")
+	AssertEqual(t("dialog.action_picker.vision_provider_label"), Run.Picks[1]["label"], "under the page's label")
+	AssertEqual(LLM_Vision_BackendChoices().Length, Run.Picks[1]["count"], "from the page's list")
+	AssertFalse(InStr(Run.Asks[1]["prompt"], "`nopenai"), "the model step does not print the backends")
+	AssertContains(Run.Asks[1]["prompt"], Default, "it shows the backend's default model")
+	AssertEqual("local", Run.Result["value"], "an empty model stores the bare backend")
+
+	Run := _LVS_PromptTwoSteps(["openai"], [{ Result: "OK", Value: " gpt-x " }], "openai|gpt-y")
+	AssertEqual("openai", Run.Picks[1]["selected"], "the stored backend is selected first")
+	AssertEqual("gpt-y", Run.Asks[1]["default"], "the stored model is offered")
+	AssertEqual("openai|gpt-x", Run.Result["value"], "a typed model is stored")
+
+	Run := _LVS_PromptTwoSteps(["local"], [{ Result: "OK", Value: "m" }], "openai|gpt-y")
+	AssertEqual("", Run.Asks[1]["default"], "another backend's model is not offered")
+
+	AssertFalse(_LVS_PromptTwoSteps([""], []).Result, "cancel at the list cancels")
+	Run := _LVS_PromptTwoSteps(["local"], [{ Result: "Cancel", Value: "x" }])
+	AssertFalse(Run.Result, "cancel at the model cancels")
+}
+Test("LLM vision: the native prompt picks the backend, then asks the optional model", _LVS_NativePromptPicksTheBackend)
+
+; A backend with no default needs a model: refused in words, then asked again.
+_LVS_NativePromptRequiresAModel() {
+	Bare := ""
+	for Choice in LLM_Vision_BackendChoices() {
+		if (Choice["defaultModel"] == "") {
+			Bare := Choice["value"]
+			break
+		}
+	}
+	Assert(Bare != "", "the catalogue holds a backend with no default model")
+	Run := _LVS_PromptTwoSteps([Bare, Bare], [{ Result: "OK", Value: "" }, { Result: "OK", Value: "m" }])
+	AssertEqual(1, Run.Refusals.Length, "the empty model is refused")
+	AssertEqual(t("dialog.gestures.param_err_llm_vision"), Run.Refusals[1], "with the kind's refusal")
+	AssertContains(Run.Asks[1]["prompt"], t("dialog.action_picker.vision_model_required"), "the step said it is required")
+	AssertEqual(Bare, Run.Picks[2]["selected"], "the second round keeps the backend")
+	AssertEqual(Bare . "|m", Run.Result["value"], "then stores the typed model")
+}
+Test("LLM vision: a backend with no default refuses an empty model", _LVS_NativePromptRequiresAModel)
 
 _LVS_ActionsAreRegistered() {
 	global GESTURE_ACTIONS
@@ -401,7 +504,7 @@ _LVS_Run(Menu, Body) {
 ; Stores a binding's llm_vision value and runs its action.
 _LVS_Invoke(ActionId, Value) {
 	global GestureActionParameters
-	Binding := "keyboard__ctrl_shift_i"
+	Binding := "keyboard__primary_shift_i"
 	GestureActionParameters[GestureActionParameterKey(Binding, ActionId)] := Value
 	return GestureInvokeAction(ActionId, Binding)
 }
@@ -1242,7 +1345,7 @@ _LVS_PublicLocalRequester(Action, Withdraw) {
 			_LLM_Engine["backend"] := "ollama", _LLM_Engine["model"] := Menu["model"]
 			; Controlled server reachability enters the real dependency owner; source
 			; admission, origin custody and all request state remain production code.
-			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, _LLM_Engine["model"])
+			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, _LLM_Engine["model"], , , , , (*) => true)
 			AssertTrue(LLM_Deps_IsReady(), "the genuine dependency owner records the supplied server reachability")
 			Origin.DefineProp("Call", {Call: ObserveOrigin})
 			Spawn.DefineProp("Call", {Call: ObserveSpawn})

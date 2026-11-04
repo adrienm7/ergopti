@@ -1,0 +1,103 @@
+{
+	"schema_version": 1,
+	"vectors": [
+		{
+			"id": "not_needed",
+			"exit_code": 0,
+			"stdout": "{\"schema\":1,\"status\":\"not_needed\"}\n",
+			"result": { "status": "not_needed" },
+			"emitted": true
+		},
+		{
+			"id": "required_negotiate",
+			"exit_code": 0,
+			"stdout": "{\"schema\":1,\"status\":\"required\",\"scheme\":\"negotiate\"}\n",
+			"result": { "status": "required", "scheme": "negotiate" },
+			"emitted": true
+		},
+		{
+			"id": "required_ntlm",
+			"exit_code": 0,
+			"stdout": "{\"schema\":1,\"status\":\"required\",\"scheme\":\"ntlm\"}\n",
+			"result": { "status": "required", "scheme": "ntlm" },
+			"emitted": true
+		},
+		{
+			"id": "refused_sign_in",
+			"exit_code": 3,
+			"stdout": "{\"schema\":1,\"status\":\"refused\",\"reason\":\"sign_in_unavailable\"}\n",
+			"reason": "sign_in_unavailable",
+			"emitted": true
+		},
+		{
+			"id": "refused_ntlm_posix",
+			"exit_code": 3,
+			"stdout": "{\"schema\":1,\"status\":\"refused\",\"reason\":\"ntlm_requires_windows\"}\n",
+			"reason": "ntlm_requires_windows",
+			"emitted": true
+		},
+		{
+			"id": "refused_invalid",
+			"exit_code": 2,
+			"stdout": "{\"schema\":1,\"status\":\"refused\",\"reason\":\"invalid_arguments\"}\n",
+			"reason": "invalid_arguments",
+			"emitted": true
+		},
+		{
+			"id": "never_ran",
+			"exit_code": -1,
+			"stdout": "",
+			"reason": "relay_unavailable",
+			"emitted": false
+		},
+		{
+			"id": "exit_contradicts_line",
+			"exit_code": 3,
+			"stdout": "{\"schema\":1,\"status\":\"required\",\"scheme\":\"negotiate\"}\n",
+			"reason": "relay_unavailable",
+			"emitted": false
+		},
+		{
+			"id": "unknown_scheme",
+			"exit_code": 0,
+			"stdout": "{\"schema\":1,\"status\":\"required\",\"scheme\":\"basic\"}\n",
+			"reason": "relay_unavailable",
+			"emitted": false
+		},
+		{
+			"id": "unknown_reason",
+			"exit_code": 3,
+			"stdout": "{\"schema\":1,\"status\":\"refused\",\"reason\":\"proxy.corp.example\"}\n",
+			"reason": "relay_unavailable",
+			"emitted": false
+		},
+		{
+			"id": "relay_claims_caller_reason",
+			"exit_code": 3,
+			"stdout": "{\"schema\":1,\"status\":\"refused\",\"reason\":\"relay_unavailable\"}\n",
+			"reason": "relay_unavailable",
+			"emitted": false
+		},
+		{
+			"id": "two_lines",
+			"exit_code": 0,
+			"stdout": "{\"schema\":1,\"status\":\"not_needed\"}\n{\"schema\":1,\"status\":\"not_needed\"}\n",
+			"reason": "relay_unavailable",
+			"emitted": false
+		},
+		{
+			"id": "other_schema",
+			"exit_code": 0,
+			"stdout": "{\"schema\":2,\"status\":\"not_needed\"}\n",
+			"reason": "relay_unavailable",
+			"emitted": false
+		},
+		{
+			"id": "extra_field",
+			"exit_code": 0,
+			"stdout": "{\"schema\":1,\"status\":\"not_needed\",\"proxy\":\"http://x:1\"}\n",
+			"reason": "relay_unavailable",
+			"emitted": false
+		}
+	]
+}

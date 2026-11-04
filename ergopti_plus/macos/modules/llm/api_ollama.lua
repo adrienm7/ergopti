@@ -39,6 +39,15 @@ local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local LOG            = "llm.api_ollama"
 local LocalModelPolicy = require("llm.local_model_policy")
 
+--- The think field of an Ollama chat body: false, or the effort level of a
+--- family that ignores false (thinking_off.json through thinking_families,
+--- required at the first body: it reads the shared tree).
+--- @param model_name string The Ollama model tag.
+--- @return boolean|string think
+local function ollama_think(model_name)
+	return require("modules.llm.thinking_families").ollama_think(model_name)
+end
+
 -- Ollama bind address. The default port is the single source in
 -- _shared/modules/llm/defaults.json (llm_ollama_owned_port, surfaced via DEFAULT_STATE); a user
 -- override owned by OllamaEndpoint wins so a port collision can be resolved
@@ -663,6 +672,43 @@ function M.stop_owned_server()
 	return ok == true and settled == true
 end
 
+--- Retires the owned daemon for the root reload/quit teardown. Where
+--- `stop_owned_server` only refuses while the daemon exits after its stdin EOF,
+--- this awaits the exact native retirement of the retained task, then retries.
+--- @param on_settled function Called once with (settled, detail) when pending.
+--- @return boolean accepted
+--- @return string state "settled" when already retired, else "pending".
+function M.retire_owned_server(on_settled)
+	if type(on_settled) ~= "function" then
+		Logger.error(LOG, "Owned Ollama retirement refused: settlement callback is not callable.")
+		return false, "refused"
+	end
+	if M.stop_owned_server() == true then return true, "settled" end
+	local task = _ollama_serve_task or _ollama_ambiguous_task
+	if type(task) ~= "table" or type(task.onSettled) ~= "function" then
+		Logger.error(LOG, "Owned Ollama retirement refused: no retained daemon task can report its exit.")
+		return false, "refused"
+	end
+	local fired = false
+	local registered_ok, registered = pcall(task.onSettled, function()
+		if fired then return end
+		fired = true
+		-- The task's own completion observer has released its slot by now
+		local retried_ok, retired = pcall(M.stop_owned_server)
+		local settled = retried_ok and retired == true
+		if not settled then
+			Logger.error(LOG, "Owned Ollama daemon exited but its retirement did not settle: %s.",
+				tostring(retired))
+		end
+		on_settled(settled, settled and "owned Ollama daemon retired" or "owned Ollama retirement refused")
+	end)
+	if not registered_ok or registered ~= true then
+		Logger.error(LOG, "Owned Ollama retirement refused: the daemon task refused its exit observer.")
+		return false, "refused"
+	end
+	return true, "pending"
+end
+
 --- Quiesces one in-flight warmup while retaining its exact pre-pause intent.
 --- @return boolean settled
 function M.pause_warmup()
@@ -1010,6 +1056,8 @@ function M.warmup(model_name, on_acquired)
 		model = model_name,
 		messages = { { role = "user", content = " " } },
 		stream = false,
+		-- Its one token must not open a reasoning block
+		think = ollama_think(model_name),
 		keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
 		options = { num_predict = 1, temperature = 0 },
 	})
@@ -1238,6 +1286,8 @@ local MAX_LOGGED_SERVER_ERROR = 300
 -- owners cannot publish an older inventory over a newer or forgotten receipt.
 local _listed_models = nil
 local _model_listing_epoch = 0
+-- Consecutive failed model-list reads of the current outage.
+local _listing_failures = 0
 -- Chat and vision share one HTTP owner; an inventory refresh has a different one.
 local _prebuilt_request_epoch = 0
 
@@ -1319,8 +1369,16 @@ local function list_models(client, on_done, origin, service_current)
 			if r.status ~= 200 then
 				local server_error = server_error_text(r)
 				if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
-				Logger.error(LOG, "The local server's model list is unavailable: HTTP %s (%s).",
-					tostring(r.status), server_error)
+				-- One line per outage: every poll while the daemon is down used to log
+				-- the same error (field log 2026-10-30 17:37: 20 lines in 38 s).
+				_listing_failures = _listing_failures + 1
+				if _listing_failures == 1 then
+					Logger.error(LOG, "The local server's model list is unavailable: HTTP %s (%s).",
+						tostring(r.status), server_error)
+				else
+					Logger.debug(LOG, "The local server's model list is still unavailable (read %d): HTTP %s.",
+						_listing_failures, tostring(r.status))
+				end
 				if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
 				on_done(nil, "http_" .. tostring(r.status or "unknown"))
 				return
@@ -1344,6 +1402,11 @@ local function list_models(client, on_done, origin, service_current)
 			end
 			receipt.models = names
 			_listed_models = receipt
+			if _listing_failures > 0 then
+				Logger.info(LOG, "The local server's model list is available again after %d failed read(s).",
+					_listing_failures)
+				_listing_failures = 0
+			end
 			Logger.debug(LOG, "The local server returned a readable model list.")
 			if _listed_models ~= receipt or not listing_current(receipt) or _listed_models ~= receipt then
 				on_done(nil, "model_list_unavailable")
@@ -1430,7 +1493,6 @@ local function build_options(temperature, num_predict_tokens, model_name, is_bat
         stop        = (line_mode and not is_batch) and STOP_LINE or STOP_BATCH,
     }
     
-    opts.think = false
     opts.thinking_budget = 0
     
     return opts
@@ -1509,7 +1571,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         model      = tostring(model_name),
         messages   = messages,
         stream     = false,
-        think      = false,
+        think      = ollama_think(model_name),
         keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
         options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
     }
@@ -1676,7 +1738,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		model      = tostring(model_name),
 		messages   = messages,
 		stream     = true,
-		think      = false,
+		think      = ollama_think(model_name),
 		keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
 		options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
 	}
@@ -2104,6 +2166,8 @@ local function request_prebuilt(client, label, body, on_text, on_fail, continuat
 						return
 					end
 					Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
+					require("perf_budget").judge(Logger, LOG, "llm.local", ms,
+						function() return require("infra.timings").ms("budgets", "llm_local_request_ms") end)
 					if not request_current() then
 						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 					end

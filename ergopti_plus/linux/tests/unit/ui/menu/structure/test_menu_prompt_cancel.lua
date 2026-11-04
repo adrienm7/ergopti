@@ -50,7 +50,7 @@ local function with_zenity(read_body, close_status, fn)
 	local real_checked = shell.exec_checked
 	local commands = {}
 	shell.exec_checked = function(command)
-		if not command:find("zenity --entry", 1, true) then return real_checked(command) end
+		if not command:find("dialog_host.lua' --entry", 1, true) then return real_checked(command) end
 		commands[#commands + 1] = command
 		return close_status == 0, read_body, close_status == 0 and nil or "command exited with status " .. close_status
 	end
@@ -107,7 +107,7 @@ local function find_delay_row(mb, manager)
 			if cb and children_of(row) == nil then
 				local commands = with_zenity("", 1, function() pcall(cb) end)
 				for _, cmd in ipairs(commands) do
-					if cmd:find("zenity", 1, true) and cmd:find("--entry", 1, true) then return cb end
+					if cmd:find("dialog_host.lua", 1, true) and cmd:find("--entry", 1, true) then return cb end
 				end
 			end
 		end
@@ -115,11 +115,19 @@ local function find_delay_row(mb, manager)
 	return nil
 end
 
+--- The user file the last manager() wrote, removed after its test.
+local last_user_path
+
 --- A tap-hold manager on the shared defaults.
 local function manager()
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local user_path = os.tmpname()
-	os.remove(user_path)
+	last_user_path = user_path
+	-- Tap-holds on over the shared defaults: with no file the category reads
+	-- off, and an off category greys every row of its submenu (category-off rule).
+	local file = assert(io.open(user_path, "wb"))
+	assert(file:write("[tap_hold]\nenabled = true\ninherit_defaults = true\n"))
+	assert(file:close())
 	Manager.init({
 		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
 			held_modifiers = function() return {} end,
@@ -143,7 +151,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 			-- The builder captures TextPrompt at load time. Earlier adapter tests
 			-- reload Shell, so bind this public owner to the current authority.
 			helpers.load_module("ui.text_prompt")
-			local mb = helpers.load_module("ui.menu.menu_builder")
+			local mb = helpers.load_module("ui.menu.builder")
 			local delay = find_delay_row(mb, th)
 			helpers.assert_true(delay ~= nil,
 				"a delay row shelling out to zenity --entry must exist — "
@@ -155,6 +163,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 				"Cancel is not an empty answer — it must change nothing")
 		end)
 		th._reset_for_test()
+		os.remove(last_user_path)
 		package.loaded["platform.remap.tap_hold_writer"] = previous
 		if not ok then error(err, 0) end
 	end)
@@ -166,7 +175,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 			-- The builder captures TextPrompt at load time. Earlier adapter tests
 			-- reload Shell, so bind this public owner to the current authority.
 			helpers.load_module("ui.text_prompt")
-			local mb = helpers.load_module("ui.menu.menu_builder")
+			local mb = helpers.load_module("ui.menu.builder")
 			local delay = find_delay_row(mb, th)
 			helpers.assert_true(delay ~= nil, "a delay row must exist")
 			writer_calls = {}
@@ -175,6 +184,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 			helpers.assert_eq(writer_calls[1][2], 0.3, "300 ms is 0.3 s in the file")
 		end)
 		th._reset_for_test()
+		os.remove(last_user_path)
 		package.loaded["platform.remap.tap_hold_writer"] = previous
 		if not ok then error(err, 0) end
 	end)

@@ -351,7 +351,7 @@ helpers.describe("tap-hold engine: what the one-shot Shift does with the next ke
 	end)
 
 	helpers.it("needs the layout's text when a key taps the one-shot Shift (one-shot-types-nothing)", function()
-		local ok, err = pcall(Engine.new, { keys = DEFAULTS, tap_min_ms = 50, one_shot_timeout_ms = 2000 })
+		local ok, err = pcall(Engine.new, { keys = DEFAULTS, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 })
 		helpers.assert_true(not ok, "an engine that cannot tell a character from Print must not start")
 		helpers.assert_contains(tostring(err), "key_text")
 	end)
@@ -426,7 +426,7 @@ helpers.describe("tap-hold engine: what the one-shot Shift does with the next ke
 			"a US \" :\" under a held AltGr")
 		-- The live layout says which keys select a level (the hook's, here
 		-- CapsLock as AltGr under lv3:caps_switch).
-		e = Engine.new({ keys = { right_ctrl = DEFAULTS.right_ctrl }, tap_min_ms = 50, one_shot_timeout_ms = 2000,
+		e = Engine.new({ keys = { right_ctrl = DEFAULTS.right_ctrl }, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			key_text = az_text, plan_text = az_plan, one_shot_result = one_shot_result,
 			held_text_modifier_codes = function() return { CAPS } end })
 		e:process(RCTRL, DOWN, 0)

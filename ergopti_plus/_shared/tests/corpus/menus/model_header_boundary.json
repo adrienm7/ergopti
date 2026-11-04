@@ -34,7 +34,7 @@
 	"english_no_model": "No model (Disabled)",
 	"french_no_model": "Aucun modèle (Désactivé)",
 	"marker_key": "menu.llm.specs_header",
-	"marker_english": "SPECIFICATIONS",
+	"marker_english": "Specifications",
 	"default_name": "Qwen3-Coder-30B-A3B-Instruct",
 	"english_default": "↺ Backend default model (Qwen3-Coder-30B-A3B-Instruct)"
 }

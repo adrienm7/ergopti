@@ -141,7 +141,7 @@ _AMCR_FrequencyPickerReadsTheSharedPresets() {
 			Rows := _MI_AboutUpdateRows(false, _AMCR_RecordChannel.Bind({ Calls: [] }))
 			Frequency := Rows[Rows.Length]
 			AssertTrue(Frequency.Has("items"), "the frequency picker closes the updater block")
-			AssertEqual(t("menu.about.frequency_menu") . ": " . t("menu.about.frequency." . Pair[2]),
+			AssertEqual(LabelValue(t("menu.about.frequency_menu"), t("menu.about.frequency." . Pair[2])),
 				Frequency["label"], "the parent row reads the translated preset for " . Pair[1] . " s")
 			Items := Frequency["items"]
 			AssertEqual(Presets.Length, Items.Length, "one row per shared preset")
@@ -181,7 +181,7 @@ _AMCR_LocalCheckoutGreysTheUpdateRows() {
 		Check := Rows[_AMCR_PICKER_AT + 1]
 		Frequency := Rows[_AMCR_PICKER_AT + 2]
 		AssertEqual(t("menu.about.check_for_updates"), Check["label"])
-		AssertEqual(t("menu.about.frequency_menu") . ": " . t("menu.about.frequency.1d"), Frequency["label"],
+		AssertEqual(LabelValue(t("menu.about.frequency_menu"), t("menu.about.frequency.1d")), Frequency["label"],
 			"the frequency row still names the preset in force")
 		; A local version installs nothing, so no channel can be chosen either.
 		for _, Row in [Channel, Check, Frequency] {
@@ -372,7 +372,7 @@ _AMCR_FrequencyIndependentProjection() {
 			State := Map("calls", [], "acknowledged", true)
 			Rows := _AMCR_FrequencyRows(State)
 			Frequency := Rows[Rows.Length]
-			AssertEqual(t(Corpus["i18n"]) . ": " . t("menu.about.frequency." . Expected["code"]), Frequency["label"])
+			AssertEqual(LabelValue(t(Corpus["i18n"]), t("menu.about.frequency." . Expected["code"])), Frequency["label"])
 			AssertEqual(10, Frequency["items"].Length)
 			AssertEqual(Expected["stored"], UPDATER_CHECK_INTERVAL, "rendering must not rewrite historical stored seconds")
 			for Index, Choice in Corpus["choices"] {
@@ -428,7 +428,7 @@ _AMCR_FrequencyPublishedOrder() {
 		Choices[1]["i18n"] := Corpus["alternate_i18n"]
 		Root["about_update_frequency_menu"] := [Map("type", "choice", "id", Corpus["id"],
 			"path", Corpus["path"], "i18n", Corpus["i18n"], "show_current_choice", true,
-			"current_choice_suffix", Corpus["suffix"], "choices", Choices)]
+			"current_choice_label_value", Corpus["label_value"], "choices", Choices)]
 		UPDATER_CHECK_INTERVAL := 3600
 		State := Map("calls", [], "acknowledged", true)
 		Rows := _AMCR_FrequencyRows(State)

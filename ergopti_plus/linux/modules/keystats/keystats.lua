@@ -42,6 +42,7 @@ local PrivateWindow = require("keystats.private_window")
 -- per-app rings below never drift from the collector's global ring cap.
 local SharedMetrics    = require("keystats.metrics")
 local Utils            = require("keystats.utils")
+local TokenEncoding    = require("keystats.token_encoding")
 local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
 local MAX_TYPING_INTERVAL_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
 -- The WPM readouts' live speed and last source, the same tracker macOS reads.
@@ -174,6 +175,21 @@ local _pending_session_events = {}
 local _session_reset_attempt = nil
 -- events_system rows: the machine's transitions system_metrics observed.
 local _pending_system_events = {}
+-- Semantic media presses and releases (play/pause, tracks, brightness), written
+-- to events_system with their derived media rows, never to the numeric heatmap.
+local _pending_media_events = {}
+-- The press each held media key started, by device and code, for its release.
+local _media_presses = {}
+-- The admitted five-key catalogue policy, read once (false after a refusal).
+local _media_policy = nil
+-- A media key held this long is a hold, shorter a tap: the shared threshold.
+local MEDIA_TAP_THRESHOLD_MS = Timings.ms("keystats", "hold_threshold_ms")
+-- Media entries wait in memory while no media store is open; beyond this many
+-- the oldest are dropped, with an error, rather than growing without bound.
+local MAX_PENDING_MEDIA_EVENTS = 4096
+-- The capture owner the media rows name: the daemon's own evdev reader.
+local MEDIA_CAPTURE = "linux_evdev"
+local _media_unavailable_warned = false
 
 --- Buffers the session events the tracker produced, stamped now.
 --- @param events table { kind, duration_ms? } in order.
@@ -645,7 +661,7 @@ function M.init(opts)
 	_device_id = "linux-" .. hostname
 
 	-- Open the SQLite database (bootstraps schema on first run).
-	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) then
+	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) and SqliteWriter.ensure_token_encoding() then
 		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
 		if SqliteReader then migrate_legacy_categories() end
 		-- A live walk owns the record; only a fresh process reads back what the
@@ -838,7 +854,10 @@ record_app_key = function(app_id, ch, timestamp_ms, clock)
 			app.titles[_current_title] = app.titles[_current_title] or new_title_row()
 			app.titles[_current_title].c = app.titles[_current_title].c + 1
 		end
-		if type(ch) == "string" and ch ~= "" then app.ngrams[ch] = (app.ngrams[ch] or 0) + 1 end
+		if type(ch) == "string" and ch ~= "" then
+			local token = TokenEncoding.event_token(ch)
+			app.ngrams[token] = (app.ngrams[token] or 0) + 1
+		end
 	end
 	live.wpm_ring[#live.wpm_ring + 1] = timestamp_ms
 	while #live.wpm_ring > WPM_RING_CAPACITY do table.remove(live.wpm_ring, 1) end
@@ -850,6 +869,85 @@ end
 --- @param timestamp_ms number
 function M.record_app_key(app_id, ch, timestamp_ms)
 	return record_app_key(app_id, ch, timestamp_ms, observe_calendar())
+end
+
+--- The admitted media policy, read once from the shared catalogue.
+--- @return table|nil policy
+local function media_policy()
+	if _media_policy == nil then
+		local ok, policy = pcall(function()
+			local path = assert(require("infra.paths").shared("data/keycodes/metrics_media_keys.json"))
+			local body, status = require("adapters.file_system").read_with_status(path)
+			assert(status == "ok" and type(body) == "string", "the media catalogue is unreadable")
+			return require("keystats.media_store").policy(require("json").decode(body))
+		end)
+		if not ok then
+			Logger.error(LOG, "The media key catalogue was refused; media keys are not counted: %s.",
+				ErrorDescription.describe(policy))
+		end
+		_media_policy = ok and policy or false
+	end
+	return _media_policy or nil
+end
+
+--- The semantic media identity of an evdev key, nil for every other key.
+--- @param scancode any Linux evdev key code.
+--- @return string|nil media_id
+function M.media_id(scancode)
+	local policy = media_policy()
+	return policy and policy.resolve_evdev(scancode) or nil
+end
+
+--- Buffers one admitted media entry, bounded while no media store accepts it.
+local function append_media_event(entry)
+	if #_pending_media_events >= MAX_PENDING_MEDIA_EVENTS then
+		table.remove(_pending_media_events, 1)
+		Logger.error(LOG, "Media key events waited past %d for a media store; the oldest was dropped.",
+			MAX_PENDING_MEDIA_EVENTS)
+	end
+	_pending_media_events[#_pending_media_events + 1] = entry
+end
+
+--- Records one media key press under its semantic identity, as macOS does: the
+--- dashboard's media panel counts it and the numeric heatmap never sees it.
+--- @param app_id string|nil Focused application identifier.
+--- @param scancode number Linux evdev key code of a catalogue media key.
+--- @param device string|nil The source's device number (st_rdev), decimal.
+--- @return boolean recorded
+function M.record_media_press(app_id, scancode, device)
+	if not may_record() then return false end
+	local media_id = M.media_id(scancode)
+	if not media_id then return false end
+	if type(device) ~= "string" or not device:match("^[1-9]%d*$") then
+		Logger.error(LOG, "A media key press has no device identity; it is not counted.")
+		return false
+	end
+	local clock = observe_calendar()
+	local seconds = math.floor(clock.wall_ms / 1000)
+	local entry = { action = "physical_media_press", media_id = media_id, capture = MEDIA_CAPTURE,
+		device = device, app = dashboard_app_name((type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"),
+		-- The local date leads, as the day projections read the date from it.
+		timestamp = clock.date .. os.date(" %H:%M:%S", seconds)
+			.. string.format(".%03d", math.floor(clock.wall_ms % 1000)) }
+	append_media_event(entry)
+	_media_presses[device .. ":" .. tostring(math.floor(scancode))] = entry
+	return true
+end
+
+--- Records the release of a media key with its hold, under the press's identity.
+--- @param scancode number Linux evdev key code.
+--- @param device string|nil The source's device number, decimal.
+--- @param held_ms number How long the key was held.
+--- @return boolean recorded
+function M.record_media_release(scancode, device, held_ms)
+	local key = tostring(device) .. ":" .. tostring(math.floor(tonumber(scancode) or 0))
+	local press = _media_presses[key]
+	_media_presses[key] = nil
+	if not press or not may_record() or type(held_ms) ~= "number" or held_ms < 0 then return false end
+	local entry = { action = "physical_media_release", hold_ms = math.floor(held_ms) }
+	for _, name in ipairs({ "media_id", "capture", "device", "app", "timestamp" }) do entry[name] = press[name] end
+	append_media_event(entry)
+	return true
 end
 
 --- Records one physical evdev keydown for the layout-independent heatmap.
@@ -884,9 +982,10 @@ ensure_pending = function(app_id, clock)
 end
 
 local function add_synthetic_ngram(app, char, source)
-	app.ngrams[char] = (app.ngrams[char] or 0) + 1
-	app.ngram_sources[char] = app.ngram_sources[char] or {}
-	app.ngram_sources[char][source] = (app.ngram_sources[char][source] or 0) + 1
+	local token = TokenEncoding.event_token(char)
+	app.ngrams[token] = (app.ngrams[token] or 0) + 1
+	app.ngram_sources[token] = app.ngram_sources[token] or {}
+	app.ngram_sources[token][source] = (app.ngram_sources[token][source] or 0) + 1
 end
 
 --- What actually gets persisted for one synthetic character.
@@ -2119,7 +2218,7 @@ local function capture_flush(close_session)
 	local date = clock.date
 	local calendar_snapshot = snapshot_calendar(clock)
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
-		sessions = {}, system = {} }, upserts = {} }
+		sessions = {}, system = {}, media = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -2129,7 +2228,7 @@ local function capture_flush(close_session)
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
 		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
-		system = _pending_system_events,
+		system = _pending_system_events, media = _pending_media_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
@@ -2137,6 +2236,7 @@ local function capture_flush(close_session)
 	local _pending_window_switch_events = buffers.windows
 	local _pending_session_events = buffers.sessions
 	local _pending_system_events = buffers.system
+	local _pending_media_events = buffers.media
 	local _flushed_app_totals = copy_flush_value(_flushed_app_totals)
 	local _flushed_app_titles = copy_flush_value(_flushed_app_titles)
 	local _flushed_app_holds = copy_flush_value(_flushed_app_holds)
@@ -2252,6 +2352,20 @@ local function capture_flush(close_session)
 	if #_pending_system_events > 0 then
 		payload.raw.system = _pending_system_events
 		_pending_system_events = {}
+	end
+	-- Media waits for a database whose media store was admitted; until then it
+	-- stays pending, and the wait is said once.
+	buffers.media = {}
+	if #_pending_media_events > 0 then
+		if SqliteWriter.media_available() == true then
+			payload.raw.media = _pending_media_events
+			payload.media_threshold_ms = MEDIA_TAP_THRESHOLD_MS
+			buffers.media = _pending_media_events
+		elseif not _media_unavailable_warned then
+			_media_unavailable_warned = true
+			Logger.warn(LOG, "The media key store is not open; %d media key event(s) wait in memory.",
+				#_pending_media_events)
+		end
 	end
 	-- The machine's own state, which the dashboard puts beside the typing to
 	-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
@@ -2559,6 +2673,7 @@ local function restore_flush_buffers(buffers)
 	_pending_window_switch_events = prepend(buffers.windows, _pending_window_switch_events)
 	_pending_session_events = prepend(buffers.sessions, _pending_session_events)
 	_pending_system_events = prepend(buffers.system, _pending_system_events)
+	_pending_media_events = prepend(buffers.media, _pending_media_events)
 	_pending_app_switch_events = prepend(buffers.switches, _pending_app_switch_events)
 end
 
@@ -2583,7 +2698,8 @@ local function dispatch_flush(close_session)
 	local payload = snapshot.payload
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
-		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.upserts == 0 then
+		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.raw.media == 0
+		and #payload.upserts == 0 then
 		_last_flush_committed = true
 		prune_calendar(snapshot.calendar)
 		return true
@@ -2599,6 +2715,8 @@ local function dispatch_flush(close_session)
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
 	_pending_system_events = {}
+	-- Media left out of this flush (no media store yet) stays pending.
+	if #payload.raw.media > 0 then _pending_media_events = {} end
 	local called, operation = pcall(SqliteWriter.start_flush, _device_id, payload)
 	if not called then
 		Logger.error(LOG, "SQLite dispatch raised; uncertain ownership and source remain retained.")

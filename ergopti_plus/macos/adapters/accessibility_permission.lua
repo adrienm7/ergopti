@@ -27,6 +27,13 @@
 ---    that does not answer wait six seconds; the taps then time out, macOS
 ---    disables them and every key typed meanwhile comes out late, held or lost
 ---    (issues #99 and #100). One process-wide messaging timeout bounds them all.
+--- 6. Unanswering applications: the bound still holds the main thread for the
+---    whole timeout on each unanswered read, and a caller that asks several
+---    reads in a row multiplies it (2515 ms for the tooltip caret, 1512 ms for
+---    the post-wake context capture of loginwindow, field run 2026-10-31). The
+---    first unanswered read marks the application for a short cooldown in which
+---    callers skip it, and this process is never asked: its own Accessibility
+---    server answers on the main thread that is waiting.
 --- ==============================================================================
 
 local M = {}
@@ -54,6 +61,100 @@ function M.bound_messaging_timeout()
 	if not ok then return false, tostring(accepted) end
 	if accepted ~= true then return false, "macOS refused the messaging timeout" end
 	return true
+end
+
+--- How long an application that left a read unanswered is not asked again,
+--- unless another application comes to the front. Read when a cooldown starts:
+--- requiring the timings at load would parse them for every reader of trust.
+--- @return number seconds
+function M.unanswered_cooldown_sec()
+	return require("infra.timings").sec("adapters", "unresponsive_ax_backoff_ms")
+end
+
+-- A read that took this share of the messaging timeout waited it out: the
+-- hs.window reads return nil without saying why
+local UNANSWERED_ELAPSED_RATIO = 0.9
+
+-- The AX error of a read the application did not answer (kAXErrorCannotComplete)
+M.UNANSWERED_ERROR = "Messaging failed"
+
+-- The one application in its cooldown: { pid, until_sec }, or nil
+local _unanswered = nil
+
+--- Returns this process's pid.
+--- @return number|nil pid
+local function own_pid()
+	local info = type(hs) == "table" and hs.processInfo or nil
+	return type(info) == "table" and info.processID or nil
+end
+
+--- Returns the caller's time, or the epoch clock's.
+--- @param now number|nil Seconds a caller already read.
+--- @return number now
+local function now_sec(now)
+	if type(now) == "number" then return now end
+	return hs.timer.secondsSinceEpoch()
+end
+
+--- Returns the frontmost application's pid without an Accessibility read.
+--- @return number|nil pid Nil when the workspace names none.
+function M.frontmost_pid()
+	local ok, pid = pcall(function()
+		local app = hs.application.frontmostApplication()
+		if app == nil or type(app.pid) ~= "function" then return nil end
+		return app:pid()
+	end)
+	return ok and type(pid) == "number" and pid or nil
+end
+
+--- Whether an application is in its unanswered cooldown. Asking about another
+--- application ends the cooldown: that one came to the front.
+--- @param pid number|nil Application pid.
+--- @param now number|nil Seconds the caller already read.
+--- @return boolean unanswering
+function M.is_unanswering(pid, now)
+	if _unanswered == nil or pid == nil then return false end
+	if _unanswered.pid ~= pid or now_sec(now) >= _unanswered.until_sec then
+		_unanswered = nil
+		return false
+	end
+	return true
+end
+
+--- Whether an application's elements may be asked an Accessibility read now.
+--- An unknown pid is asked: only a proven unanswered read or this process skip.
+--- @param pid number|nil Application pid.
+--- @return boolean askable
+function M.is_askable(pid)
+	if pid == nil then return true end
+	local own = own_pid()
+	if own ~= nil and pid == own then return false end
+	return not M.is_unanswering(pid)
+end
+
+--- Marks an application that left a read unanswered for the cooldown.
+--- @param pid number|nil Application pid; nil is ignored.
+--- @param now number|nil Seconds the caller already read.
+function M.mark_unanswered(pid, now)
+	if type(pid) ~= "number" then return end
+	_unanswered = { pid = pid, until_sec = now_sec(now) + M.unanswered_cooldown_sec() }
+end
+
+--- Marks the application when one read waited out the messaging timeout.
+--- @param pid number|nil Application pid.
+--- @param elapsed_sec number Duration of the read.
+--- @param now number|nil Seconds the caller already read.
+--- @return boolean unanswered True when the read is taken as unanswered.
+function M.note_read(pid, elapsed_sec, now)
+	if type(elapsed_sec) ~= "number"
+		or elapsed_sec < M.MESSAGING_TIMEOUT_SEC * UNANSWERED_ELAPSED_RATIO then return false end
+	M.mark_unanswered(pid, now)
+	return true
+end
+
+--- Forgets every unanswering application (tests only).
+function M.reset_unanswered_for_tests()
+	_unanswered = nil
 end
 
 --- Reports whether this process is currently trusted for Accessibility.

@@ -1,7 +1,7 @@
 ﻿; tests/meta/modules/llm/prediction/test_ngram_esrc_json_accumulate.ahk
 
 ; ==============================================================================
-; MODULE: N-gram UPSERT esrc_json Accumulation Meta Test
+; MODULE: N-gram UPSERT esrc_json Accumulation Test
 ; DESCRIPTION:
 ; Regression guard ensuring the ngram UPSERT accumulates esrc_json counts
 ; instead of overwriting them.
@@ -15,7 +15,7 @@
 ; values. Source names must never be interpolated as JSON paths: punctuation
 ; would create nested members instead of updating the original counter.
 ;
-; SCOPE: source introspection of modules/keystats/keystats_walker.ahk.
+; SCOPE: the real flush, KLW_BuildBatchSql, executed on the real SQLite engine.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -29,46 +29,62 @@
 ; ===================================================
 ; ===================================================
 
-_NEA_CheckNoOverwrite() {
-	; Move-resilient: scan the modules/keystats dir via the framework helper.
-	; All esrc_json anchors here are unique to keystats_walker.ahk within that dir.
-	Src := _DriverDirConcat("modules/keystats")
-	Assert(Src != "", "the keystats sources must be available")
-
-	; The old bare-overwrite form must not appear in the UPSERT for ngram tables
-	Assert(!InStr(Src, "esrc_json=excluded.esrc_json"),
-		"ngram UPSERT must not overwrite esrc_json with excluded.esrc_json — use KLW_EsrcMergeExpr() to accumulate counts")
+; Flushes one token's sources through the real batch emitter into the database.
+_NEA_Flush(Db, Esrc) {
+	SavedBatch := KLW.batch
+	try {
+		KLW_ResetBatch()
+		KLW.batch["app_day"][1] := Map("date", "2026-01-01", "app", "fixture.exe", "time_ms", 1)
+		KLW.batch["ngram"]["ngram_chars"] := Map("2026-01-01" . Chr(1) . "fixture.exe" . Chr(1) . "a",
+			Map("c", 1, "td", 0, "cd", 0, "e", 0, "esrc", Esrc))
+		AssertTrue(SQLite_Exec(Db, KLW_BuildBatchSql("esrc-device", false)), "the flush must execute")
+	} finally {
+		KLW.batch := SavedBatch
+	}
 }
 
-_NEA_CheckMergeExprExists() {
-	Body := _DriverFuncBody("KLW_EsrcMergeExpr")
-	Caller := _DriverFuncBody("KLW_BuildBatchSql")
-	Assert(Body != "" && Caller != "", "both merge and batch emitter must exist")
-	Assert(InStr(Caller, "KLW_EsrcMergeExpr("), "the ngram UPSERT must call the merge helper")
+_NEA_StoredSources(Db) {
+	Rows := SQLite_Query(Db, "SELECT c, esrc_json FROM ngram_chars;")
+	AssertEqual(1, Rows.Length, "the two flushes must land on one row")
+	AssertEqual(3, Rows[1]["c"], "the counts add")
+	return JsonParse(Rows[1]["esrc_json"])
 }
 
-_NEA_CheckMergeExprUsesLiteralKeys() {
-	Expr := KLW_EsrcMergeExpr(Map("source.v2", 1))
-	Assert(InStr(Expr, "json_each(COALESCE(esrc_json,'{}'))")
-		&& InStr(Expr, "json_each(excluded.esrc_json)"),
-		"both source objects must be enumerated by literal key, with a NULL-safe stored base")
+_NEA_SecondFlushAccumulates() {
+	Db := SQLite_Open(":memory:")
+	AssertTrue(Db != 0, "the fixture must open an in-memory DB")
+	try {
+		AssertTrue(KLR_LoadSchema(Db), "the fixture uses the production schema")
+		_NEA_Flush(Db, Map("hotstring", 3, "only_first", 7))
+		_NEA_Flush(Db, Map("hotstring", 2))
+		_NEA_Flush(Db, Map())
+		Sources := _NEA_StoredSources(Db)
+		AssertEqual(2, Sources.Count, "a key from one flush survives the others")
+		AssertEqual(5, Sources["hotstring"], "a later flush must add to the stored count, never replace it")
+		AssertEqual(7, Sources["only_first"], "an absent key keeps its stored count")
+	} finally {
+		SQLite_Close(Db)
+	}
 }
 
-_NEA_CheckMergeExprSumsKeys() {
-	Expr := KLW_EsrcMergeExpr(Map("source.v2", 1))
-	Assert(InStr(Expr, "SUM(value)") && InStr(Expr, "UNION ALL") && InStr(Expr, "GROUP BY key"),
-		"each key must accumulate both inputs, including equal-valued contributions")
+_NEA_PunctuationStaysALiteralKey() {
+	Db := SQLite_Open(":memory:")
+	AssertTrue(Db != 0, "the fixture must open an in-memory DB")
+	try {
+		AssertTrue(KLR_LoadSchema(Db), "the fixture uses the production schema")
+		for Count in [1, 2, 4]
+			_NEA_Flush(Db, Map("source.v2", Count, 'odd"key[0]', Count))
+		Sources := _NEA_StoredSources(Db)
+		AssertEqual(2, Sources.Count, "punctuation must not create a nested member")
+		AssertEqual(7, Sources["source.v2"], "a dotted name is one key")
+		AssertEqual(7, Sources['odd"key[0]'], "quotes and brackets are one key")
+	} finally {
+		SQLite_Close(Db)
+	}
 }
 
+Test("ngram-esrc-accumulate: a later flush adds to the stored sources",
+	_NEA_SecondFlushAccumulates)
 
-Test("meta ngram-esrc-accumulate: ngram UPSERT does not overwrite esrc_json with excluded value",
-	_NEA_CheckNoOverwrite)
-
-Test("meta ngram-esrc-accumulate: KLW_EsrcMergeExpr helper is defined and referenced",
-	_NEA_CheckMergeExprExists)
-
-Test("meta ngram-esrc-accumulate: KLW_EsrcMergeExpr enumerates literal keys with a NULL-safe base",
-	_NEA_CheckMergeExprUsesLiteralKeys)
-
-Test("meta ngram-esrc-accumulate: KLW_EsrcMergeExpr sums existing and excluded counts per key",
-	_NEA_CheckMergeExprSumsKeys)
+Test("ngram-esrc-accumulate: a source name with punctuation stays one literal key",
+	_NEA_PunctuationStaysALiteralKey)

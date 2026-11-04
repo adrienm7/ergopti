@@ -79,10 +79,10 @@ local function gesture_commands(fixture)
 	local original_menu = package.loaded["ui.menu.menu_gestures"]
 	local original_dialog = package.loaded["infra.dialog_util"]
 	local commands
-	package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, context)
+	package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(_, _, _, _, context)
 		commands = context.commands
 		return {}
-	end }
+	end)
 	package.loaded["infra.dialog_util"] = { block_alert = function(_, message, no)
 		fixture.asked[#fixture.asked + 1] = message
 		return no
@@ -170,10 +170,10 @@ local function run_tap_hold_row(id)
 			return no
 		end }
 		package.loaded["infra.config_paths"] = { get = function() return "/remap/config_karabiner.toml" end }
-		package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(menu_key, _, _, _, context)
+		package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(menu_key, _, _, _, context)
 			if menu_key == "tap_holds_menu" then commands = context.commands end
 			return {}
-		end }
+		end)
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds")
 		menu.build({ karabiner = remap_double(requests), updateMenu = function() refreshes = refreshes + 1 end })
 		helpers.assert_type(commands and commands[id], "function", "the Tap-Holds submenu registers " .. id)

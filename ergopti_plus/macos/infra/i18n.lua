@@ -11,8 +11,9 @@
 --- 1. Lazy Load: delegates file I/O to infra/locale; a locale switch clears
 ---    the locale cache so the next get() re-reads the new file.
 --- 2. Persistence: the active locale code is written to hs.settings under
----    ``i18n_locale`` so it survives script reloads without touching any
----    TOML file.
+---    ``i18n_locale`` so it survives script reloads. A config.toml [script]
+---    locale wins at start (infra.script_scope), so a change rewrites that row
+---    first when the file holds one.
 --- 3. Language selector: M.build_language_menu() returns a table of
 ---    hs.menubar or hs.menu items — one per supported locale — usable
 ---    directly inside builder.lua's global-actions section.
@@ -185,6 +186,14 @@ function M.get_locale()
 	return _locale
 end
 
+--- Rewrites config.toml's [script] locale when the file holds one: that row
+--- wins at start, so leaving it would undo this change on the next reload.
+--- @param code string Locale about to be saved.
+--- @return boolean committed
+local function rewrite_configured(code)
+	return require("infra.script_scope").rewrite_configured(require("config_keys").KEY.SCRIPT_LOCALE, code)
+end
+
 --- Changes the active locale, persists it, and triggers a Hammerspoon reload
 --- so all menus are rebuilt in the new language.
 --- The reload is debounced: rapid successive calls cancel the pending reload
@@ -198,6 +207,7 @@ function M.set_locale(code)
 		return false
 	end
 	if code == _locale then return true end
+	if not rewrite_configured(code) then return false end
 	Logger.start(LOG, "Switching locale to '%s'…", code)
 	-- Cancel any pending reload from a previous rapid switch
 	if _reload_timer then
@@ -251,12 +261,28 @@ function M.persist_locale(code)
 		Logger.warn(LOG, "persist_locale: unknown locale '%s' — ignoring.", code)
 		return false
 	end
+	if not rewrite_configured(code) then return false end
 	local persisted = Storage.set(SETTINGS_KEY, code)
 	if persisted ~= true then
 		Logger.error(LOG, "Locale persistence without reload was refused; selection remains unsaved.")
 		return false
 	end
 	Logger.debug(LOG, "Locale '%s' persisted to settings (no reload).", code)
+	return true
+end
+
+--- Adopts the saved locale when it changed after init(), without a reload.
+--- config_overrides writes a config.toml [script] locale into the saved
+--- setting once the config path is known, which is after init() ran; the
+--- configured locale wins at start, so the menu must be built in it.
+--- @return boolean adopted True when the active locale changed.
+function M.adopt_saved_locale()
+	if not _scope.admit_change() then return false end
+	local saved = Storage.get(SETTINGS_KEY)
+	if type(saved) ~= "string" or not is_known(saved) or saved == _locale then return false end
+	_locale = saved
+	if _locale_set_fn then _locale_set_fn(saved) end
+	Logger.info(LOG, "Locale '%s' from config.toml wins at start.", saved)
 	return true
 end
 

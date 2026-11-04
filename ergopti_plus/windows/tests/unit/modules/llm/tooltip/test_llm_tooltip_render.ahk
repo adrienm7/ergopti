@@ -41,12 +41,11 @@
 ; shortcut spec from the same constants.toml it reads, so the labels below are
 ; the shipped ones.
 _TestRender_SeedShortcutSpec() {
-	global _SharedDir, UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS, UI_LLM_SHORTCUT_JOINER
+	global _SharedDir, UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_JOINER
 	Constants := ParseTomlFile(_SharedDir . "\modules\tooltip\constants.toml")
 	UI_LLM_SHORTCUT_ORDER := IniCacheGet(Constants, "llm_ui", "shortcut_modifier_order")
-	UI_LLM_SHORTCUT_LABELS := IniCacheGet(Constants, "llm_ui", "shortcut_labels_ahk")
 	UI_LLM_SHORTCUT_JOINER := IniCacheGet(Constants, "llm_ui", "shortcut_joiner_ahk")
-	AssertTrue(UI_LLM_SHORTCUT_ORDER != "_" && UI_LLM_SHORTCUT_LABELS != "_" && UI_LLM_SHORTCUT_JOINER != "_",
+	AssertTrue(UI_LLM_SHORTCUT_ORDER != "_" && UI_LLM_SHORTCUT_JOINER != "_",
 		"constants.toml must declare the shortcut spec")
 }
 
@@ -64,7 +63,7 @@ _TestRender_ValModsDoesNotThrow() {
 	}
 	AssertFalse(threw,
 		"_LLM_FormatValModifiers must not throw on a normal modifier (regression: misplaced StrReplace arg)")
-	AssertEqual("Alt", r, "'alt' must format to the Windows key name")
+	AssertEqual(t("key_name.alt"), r, "'alt' must format to the Windows key name")
 }
 Test("render: _LLM_FormatValModifiers does not throw and maps 'alt'",
 	_TestRender_ValModsDoesNotThrow)
@@ -72,9 +71,11 @@ Test("render: _LLM_FormatValModifiers does not throw and maps 'alt'",
 
 _TestRender_ValModsAllSymbols() {
 	_TestRender_SeedShortcutSpec()
-	AssertEqual("Win",   _LLM_FormatValModifiers("cmd"),   "'cmd' -> Win")
-	AssertEqual("Ctrl",  _LLM_FormatValModifiers("ctrl"),  "'ctrl' -> Ctrl")
-	AssertEqual("Shift", _LLM_FormatValModifiers("shift"), "'shift' -> Shift")
+	; The key name table names each one in the active language (« Maj »), and
+	; the chord notation's cmd as the system key Win.
+	AssertEqual(t("key_name.win"),   _LLM_FormatValModifiers("cmd"),   "'cmd' -> Win")
+	AssertEqual(t("key_name.ctrl"),  _LLM_FormatValModifiers("ctrl"),  "'ctrl' -> Ctrl")
+	AssertEqual(t("key_name.shift"), _LLM_FormatValModifiers("shift"), "'shift' -> Shift")
 	for Name in ["cmd", "ctrl", "alt", "shift", "alt+shift"] {
 		Label := _LLM_FormatValModifiers(Name)
 		for Glyph in [0x2318, 0x2303, 0x2325, 0x21E7]
@@ -90,7 +91,7 @@ _TestRender_ValModsEmptyAndCombined() {
 	_TestRender_SeedShortcutSpec()
 	AssertEqual("", _LLM_FormatValModifiers(""),     "empty input formats to empty")
 	AssertEqual("", _LLM_FormatValModifiers("none"), "'none' formats to empty")
-	AssertEqual("Alt+Shift", _LLM_FormatValModifiers("alt+shift"),
+	AssertEqual(t("key_name.alt") . "+" . t("key_name.shift"), _LLM_FormatValModifiers("alt+shift"),
 		"combined modifiers keep the Windows '+' separator")
 }
 Test("render: empty/none/combined modifiers format correctly",
@@ -112,7 +113,12 @@ _TestRender_ShortcutLabelsFollowTheCorpus() {
 		Mods := ""
 		for Name in Vec["modifiers"]
 			Mods .= (Mods = "" ? "" : "+") . Name
-		AssertEqual(Vec["expected"]["ahk"], _LLM_PredictionShortcutLabel(Vec["index"], Mods),
+		; {id} stands for the key name table's Windows name of that modifier.
+		Expected := Vec["expected"]["ahk"]
+		for Name in ["ctrl", "alt", "shift", "cmd"]
+			Expected := StrReplace(Expected, "{" . Name . "}", KeyNameLabel(Name))
+		AssertFalse(InStr(Expected, "{"), "shortcut '" . Vec["id"] . "' names only known modifiers")
+		AssertEqual(Expected, _LLM_PredictionShortcutLabel(Vec["index"], Mods),
 			"shortcut '" . Vec["id"] . "'")
 	}
 }

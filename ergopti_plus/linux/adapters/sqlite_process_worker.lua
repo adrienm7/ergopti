@@ -33,7 +33,9 @@ function M.run(parent_pid, database)
 	assert(private.admit(database), "SQLite private file admission refused")
 	-- SQLite creates rollback journals and WAL/SHM after replacing this process.
 	ffi.C.umask(private.creation_mask)
-	local values = { "sqlite3", "-init", "/dev/null", "-bail", "-noheader", database }
+	-- The private runtime's sqlite3 by absolute path; execvp searches PATH only
+	-- for a source run, which has no prefix (infra/owned_programs.lua).
+	local values = { require("infra.owned_programs").resolve("sqlite3"), "-init", "/dev/null", "-bail", "-noheader", database }
 	local argv = ffi.new("char *[?]", #values + 1)
 	for index, value in ipairs(values) do argv[index - 1] = ffi.cast("char *", value) end
 	ffi.C.execvp(values[1], argv)

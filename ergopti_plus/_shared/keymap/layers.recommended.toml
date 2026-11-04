@@ -20,8 +20,8 @@
 # the OS tables: a repeat count on Windows, F1-F12, Spotlight and window
 # cycling on macOS, nothing on Linux. macOS also keeps Escape on the right
 # Command key, which sits where the right Alt key sits on a PC board. The wheel
-# is volume on Windows and macOS; the Linux layer cannot intercept wheel input
-# ([source_kinds.wheel] in layer_actions.toml), so it is no `all` entry.
+# is volume on the three OS, in each OS table: the `all` table stays the frozen
+# Windows golden.
 #
 # The layer id is the value a tap-hold key's hold_layer names
 # (_shared/tap_hold/defaults.toml [tap_hold.hold_picker].layers).
@@ -91,6 +91,11 @@ schema_version = 1
 "Slash" = "line_end"
 # Thumb.
 "AltRight" = "escape"
+
+[layers.nav.linux]
+# The wheel: volume instead of scroll, while the layer holds the mouse.
+"WheelUp" = "vol_up"
+"WheelDown" = "vol_down"
 
 [layers.nav.windows]
 # The wheel: volume instead of scroll.

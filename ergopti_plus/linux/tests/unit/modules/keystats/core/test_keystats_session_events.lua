@@ -48,6 +48,7 @@ helpers.describe("session events: the recorder", function()
 	helpers.it("session-events: a keystroke starts a session and the daemon's stop ends it, each flushed once", function()
 		local fake_writer = setmetatable({
 			open_db = function() return true end,
+			ensure_token_encoding = function() return true end,
 			register_device = function() return true end,
 			read_open_walk = function() return nil, true end,
 			upsert_open_walk = function() return true end,

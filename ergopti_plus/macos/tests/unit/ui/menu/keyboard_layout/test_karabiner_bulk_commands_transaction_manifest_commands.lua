@@ -560,9 +560,15 @@ helpers.describe("the Tap-Hold submenu offers the legacy rules cleanup (karabine
 				remap.legacy_rule_conflicts = function() return variant.pending end
 				remap.get_tap_holds_enabled = function() return variant.tap_holds_on ~= false end
 			end)
-			local row = find_descendant(built, ROW)
+			-- With Tap-Holds off the category-off rule greys the row: « label — reason ».
+			local row = variant.tap_holds_on == false and Fixture.find_descendant_prefix(built, ROW .. " ")
+				or find_descendant(built, ROW)
 			helpers.assert_eq(row ~= nil, variant.shown,
 				"the row follows the pending rules, Tap-Holds " .. tostring(variant.tap_holds_on ~= false))
+			if row and variant.tap_holds_on == false then
+				helpers.assert_eq(row.disabled, true, "an off category greys the cleanup row")
+				helpers.assert_nil(row_action(row), "a greyed cleanup row runs nothing")
+			end
 		end
 		helpers.assert_nil(find_descendant(build_menu("pending"), ROW),
 			"a facade without legacy rules shows no row")

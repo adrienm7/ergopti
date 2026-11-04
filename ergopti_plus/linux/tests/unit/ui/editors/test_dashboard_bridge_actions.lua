@@ -68,14 +68,16 @@ local function actions_sent_by(app)
 	return out
 end
 
---- Reads one of the driver\'s bridge sources.
---- @param relative string Path under the driver root.
+-- Each bridge is selected by a declaration unique to it, never by its path:
+-- ui/metrics_typing/bridge and ui/metrics_apps/bridge.
+local TYPING_BRIDGE = "local function payload_complete("
+local APPS_BRIDGE = 'local LOG = "bridge.metrics_apps"'
+
+--- The source of the one production file holding `selector`.
+--- @param selector string
 --- @return string
-local function bridge_source(relative)
-	local handle = assert(io.open(helpers.driver_root() .. "/" .. relative, "r"))
-	local content = handle:read("*a")
-	handle:close()
-	return content
+local function bridge_source(selector)
+	return assert(helpers.read_driver_unit(selector))
 end
 
 
@@ -91,7 +93,7 @@ helpers.describe("dashboard bridges: coverage of what the pages send", function(
 
 	helpers.it("handles every action the typing dashboard posts", function()
 		local sent = actions_sent_by("metrics_typing")
-		local source = bridge_source("ui/metrics_typing/bridge.lua")
+		local source = bridge_source(TYPING_BRIDGE)
 		helpers.assert_true(#sent > 0,
 			"no actions were found in the shared page — the file list above went "
 				.. "stale, and a scan that finds nothing agrees with every handler")
@@ -106,7 +108,7 @@ helpers.describe("dashboard bridges: coverage of what the pages send", function(
 
 	helpers.it("handles every action the apps dashboard posts", function()
 		local sent = actions_sent_by("metrics_apps")
-		local source = bridge_source("ui/metrics_apps/bridge.lua")
+		local source = bridge_source(APPS_BRIDGE)
 		helpers.assert_true(#sent > 0, "the scan must find the page's actions")
 		for _, name in ipairs(sent) do
 			helpers.assert_true(source:find('"' .. name .. '"', 1, true) ~= nil,
@@ -132,9 +134,9 @@ helpers.describe("dashboard bridges: no call to a function that is not there", f
 
 	local Keystats = helpers.load_module("modules.keystats.keystats")
 
-	for _, relative in ipairs({ "ui/metrics_apps/bridge.lua", "ui/metrics_typing/bridge.lua" }) do
-		helpers.it(relative .. " names only keystats functions that exist", function()
-			local source = bridge_source(relative)
+	for _, bridge in ipairs({ { "the apps bridge", APPS_BRIDGE }, { "the typing bridge", TYPING_BRIDGE } }) do
+		helpers.it(bridge[1] .. " names only keystats functions that exist", function()
+			local source = bridge_source(bridge[2])
 			local checked = 0
 			for name in source:gmatch("state%.keystats%.([%a_]+)") do
 				checked = checked + 1
@@ -146,7 +148,7 @@ helpers.describe("dashboard bridges: no call to a function that is not there", f
 						.. "survived, and how forty-one bridge calls before it did.")
 			end
 			helpers.assert_true(checked > 0,
-				"no keystats calls were found in " .. relative .. " — the pattern broke, "
+				"no keystats calls were found in " .. bridge[1] .. " — the pattern broke, "
 					.. "and a scan that matches nothing passes for any source at all")
 		end)
 	end

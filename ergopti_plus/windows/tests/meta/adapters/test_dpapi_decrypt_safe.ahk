@@ -35,10 +35,8 @@
 ; ===================================================
 ; ===================================================
 
-_DPAPI_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_DPAPI_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -49,7 +47,7 @@ _DPAPI_ReadSource(RelPath) {
 ; ===================================================
 
 _DPAPI_DecryptDoesNotReturnUnprotectDirectly() {
-	Src := _DPAPI_ReadSource("modules/llm/api_token_crypto.ahk")
+	Src := _DPAPI_ReadSource("api_token_crypto.ahk")
 	Seg := _DriverFuncBody("LLM_ApiToken_Decrypt")
 	Assert(Seg != "", "LLM_ApiToken_Decrypt declaration must exist in api_token_crypto.ahk")
 	; Old code ended with `return _LLM_DPAPI_Unprotect(b64)` — the direct return
@@ -60,7 +58,7 @@ _DPAPI_DecryptDoesNotReturnUnprotectDirectly() {
 Test("api_token_crypto: LLM_ApiToken_Decrypt does not return _LLM_DPAPI_Unprotect result directly", _DPAPI_DecryptDoesNotReturnUnprotectDirectly)
 
 _DPAPI_DecryptChecksForEmptyResult() {
-	Src := _DPAPI_ReadSource("modules/llm/api_token_crypto.ahk")
+	Src := _DPAPI_ReadSource("api_token_crypto.ahk")
 	Seg := _DriverFuncBody("LLM_ApiToken_Decrypt")
 	Assert(InStr(Seg, "result == ") > 0 or InStr(Seg, "result =  ") > 0 or InStr(Seg, "result =`t") > 0,
 		"LLM_ApiToken_Decrypt must inspect the result of _LLM_DPAPI_Unprotect before returning it")
@@ -68,7 +66,7 @@ _DPAPI_DecryptChecksForEmptyResult() {
 Test("api_token_crypto: LLM_ApiToken_Decrypt checks _LLM_DPAPI_Unprotect result before returning", _DPAPI_DecryptChecksForEmptyResult)
 
 _DPAPI_DecryptPreservesStoredOnFailure() {
-	Src := _DPAPI_ReadSource("modules/llm/api_token_crypto.ahk")
+	Src := _DPAPI_ReadSource("api_token_crypto.ahk")
 	Seg := _DriverFuncBody("LLM_ApiToken_Decrypt")
 	; The failure branch must return `stored` (the encrypted form) not "".
 	Assert(InStr(Seg, "return stored") > 0,

@@ -93,12 +93,12 @@ helpers.describe("Linux keyboard group scope", function()
 				root.top_level = declared_parent(top, "shortcuts")
 				os.execute = function(command)
 					if command:find("command -v zenity", 1, true) then return 0 end
-					if command:find("zenity --question", 1, true) then questions = questions + 1; return 1 end
+					if command:find("dialog_host.lua' --question", 1, true) then questions = questions + 1; return 1 end
 					return execute(command)
 				end
 				local i18n = require("infra.i18n")
 				local function groups()
-					local menu = require("ui.menu.menu_builder").build({ shortcuts = require("modules.shortcuts.manager"),
+					local menu = require("ui.menu.builder").build({ shortcuts = require("modules.shortcuts.manager"),
 						paused = false, is_paused = function() return controls.paused end,
 						on_menu_changed = function() changed = changed + 1 end })
 					local found = {}
@@ -109,10 +109,18 @@ helpers.describe("Linux keyboard group scope", function()
 					end
 					return found
 				end
+				-- A modifier group is titled by its template filled with its modifiers.
+				local function heading(key)
+					local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+					for _, group in ipairs(keyboard.SLOT_GROUPS) do
+						if group.group_key == key then return keyboard.get_group_label(group) end
+					end
+					return i18n.get(key)
+				end
 				local drawn = groups()
 				for _, key in ipairs({ "menu.shortcuts.ctrl_group", "menu.shortcuts.ctrl_shift_group",
 					"menu.shortcuts.alt_group", "menu.shortcuts.super_group" }) do
-					local row = drawn[i18n.get(key)]
+					local row = drawn[heading(key)]
 					helpers.assert_eq(type(row), "table", key .. " is drawn")
 					helpers.assert_eq(row.menu[1].title, i18n.get("common.restore_recommended"), key)
 					helpers.assert_eq(row.menu[2].title, i18n.get("common.clear_to_system"), key)
@@ -123,12 +131,12 @@ helpers.describe("Linux keyboard group scope", function()
 					helpers.assert_true(contextual.menu[1].title ~= i18n.get("common.restore_recommended"),
 						"the contextual slot has no modifier group to restore")
 				end
-				drawn[i18n.get("menu.shortcuts.ctrl_group")].menu[2].fn()
+				drawn[heading("menu.shortcuts.ctrl_group")].menu[2].fn()
 				helpers.assert_eq(questions, 0, "the group's clear asks nothing")
 				local keyboard = Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard or {}
 				helpers.assert_eq(keyboard.primary_j, nil)
 				helpers.assert_eq(keyboard.meta_j, "enter")
-				groups()[i18n.get("menu.shortcuts.super_group")].menu[1].fn()
+				groups()[heading("menu.shortcuts.super_group")].menu[1].fn()
 				helpers.assert_eq(questions, 0, "the group's restore asks nothing")
 				keyboard = Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard or {}
 				helpers.assert_eq(keyboard.meta_j, nil, "a user Super slot is removed")

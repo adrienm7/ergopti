@@ -11,6 +11,18 @@
 #   - older file  -> byte-exact backup ``<name>.pre-v<N>-<stamp>.toml``, every
 #                    step from the file's version to ``current_version`` in
 #                    order, stamp last, one atomic publish;
+#   - stamped below ``oldest_version``
+#                 -> the file is never written and the session is read-only
+#                    (ERROR logged, notice shown). v2 to v11 were written by
+#                    pre-releases only and their steps were squashed away on
+#                    2026-11-01: ``oldest_version`` is v12, what ErgoptiPlus
+#                    1.0.0 wrote and what the notice's bridge, 1.0.8, still
+#                    climbs from any older file. Raising it past a schema a
+#                    public release wrote needs a maintainer's decision, and the
+#                    bridge named in ``config.read_only.older_schema``;
+#   - no stamp, once ``unstamped_version`` is below ``oldest_version``
+#                 -> treated as current: no step runs, no backup, and the next
+#                    save stamps it. Unknown keys go to the explicit cleanup;
 #   - current     -> nothing is written;
 #   - newer file  -> the file is never written and the session is read-only
 #                    (ERROR logged), so a downgrade cannot destroy settings a
@@ -20,7 +32,9 @@
 # names the drivers whose files the ops apply to ("ahk", "hs", "linux"); any
 # other driver only moves its stamp through that version. ``ops`` is an array
 # drawn from a CLOSED set, addressed by explicit section/key (a section is a
-# [header] path, a key is one bare segment inside it):
+# [header] path, a key is one bare segment inside it). The op lines below are
+# parsed, as written, into the Windows field table by
+# tools/codegen/codegen-config-migration-ops.cjs: ``field?`` is optional.
 #   { op = "rename", section, key, to_section?, to_key? }
 #       Moves one value. Absent source: no-op. Existing target: the target
 #       keeps its value and the source is dropped.
@@ -45,6 +59,12 @@
 #       actions or occupied namespaces retain every source byte and its owner.
 #       Historical [section.key] mods/key tables use the same exact contract.
 #       All destinations must be represented before any source is removed.
+#   { op = "move_ergopti_variant", section, key, to_key, base_key, alt_gr_key,
+#     source_key, false_variant, true_variant, neutral_variant? }
+#       Replaces the boolean key by to_key, holding true_variant or false_variant.
+#       An absent key is a no-op. base_key, alt_gr_key and source_key are read as
+#       witnesses and stay. A malformed participant, an occupied namespace or a
+#       to_key disagreeing with the boolean refuses the migration ("invalid").
 #   { op = "move_section", section, to_section }
 #       Moves a section and every section below it. Same conflict rule.
 #   { op = "merge_into", section, to_section }
@@ -52,6 +72,10 @@
 #       Same conflict rule.
 #   { op = "map_value", section, key, map = [{ from, to }, ...] }
 #       Replaces a present value equal (same type) to a ``from``.
+#   { op = "encode_value", section, key, to_section, to_key, encoding }
+#       A non-empty array of tables becomes the encoded string of its new key
+#       (the one encoding: "user_profile_registry", the llm.user_profiles
+#       envelope); an occupied target, or anything else, stays where it is.
 #   { op = "wrap_value", section, key, to_key }
 #       Moves a present scalar into its own [section.key] table as to_key (a
 #       bare `date = true` becomes [section.date] enabled = true). A table, an
@@ -74,8 +98,9 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 16
+current_version = 20
 unstamped_version = 2
+oldest_version = 12
 
 
 
@@ -87,224 +112,6 @@ unstamped_version = 2
 # ===================================
 # ===================================
 
-[steps.v2_to_v3]
-from = 2
-to = 3
-drivers = ["hs"]
-reason = "The circular Spaces navigation toggle is retired: Space actions carry the wrap choice."
-# The retired setting remains on disk for the explicit outdated-key cleanup.
-ops = []
-
-[steps.v3_to_v4]
-from = 3
-to = 4
-drivers = ["ahk", "hs"]
-reason = "The AI menu's dedicated trigger shortcut is retired: a prediction on demand is the llm_generate_prediction action in a keyboard slot."
-# macOS saves an unset shortcut as the key `shortcut = false` and a bound one as
-# the [llm.trigger.shortcut] table (mods, key); Windows saves the chord text as
-# [llm] trigger_shortcut. Every spelling remains on disk for the explicit
-# outdated-key cleanup; readers never use it as a runtime alias.
-ops = []
-
-[steps.v4_to_v5]
-from = 4
-to = 5
-drivers = ["ahk"]
-reason = "The physical magic key is one setting on every driver: the Windows scan code becomes the KeyboardEvent.code of [hotstrings] magic_key_source."
-# One map_value per candidate key of the manifest's hotstrings.magic_key_source,
-# in every letter case the Windows reader accepted (it matched SCxxx without
-# regard to case and upper-cased the value), then the rename. A scan code of no
-# candidate key keeps its value under the new name, where every driver reports
-# it as outdated and reads the automatic key.
-# tools/test/test-magic-key-source.cjs pins this map to the manifest candidates
-# and to their scan codes in _shared/data/keycodes/physical_keys.json.
-ops = [
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC029", to = "Backquote" }, { from = "Sc029", to = "Backquote" }, { from = "sC029", to = "Backquote" }, { from = "sc029", to = "Backquote" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC002", to = "Digit1" }, { from = "Sc002", to = "Digit1" }, { from = "sC002", to = "Digit1" }, { from = "sc002", to = "Digit1" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC003", to = "Digit2" }, { from = "Sc003", to = "Digit2" }, { from = "sC003", to = "Digit2" }, { from = "sc003", to = "Digit2" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC004", to = "Digit3" }, { from = "Sc004", to = "Digit3" }, { from = "sC004", to = "Digit3" }, { from = "sc004", to = "Digit3" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC005", to = "Digit4" }, { from = "Sc005", to = "Digit4" }, { from = "sC005", to = "Digit4" }, { from = "sc005", to = "Digit4" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC006", to = "Digit5" }, { from = "Sc006", to = "Digit5" }, { from = "sC006", to = "Digit5" }, { from = "sc006", to = "Digit5" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC007", to = "Digit6" }, { from = "Sc007", to = "Digit6" }, { from = "sC007", to = "Digit6" }, { from = "sc007", to = "Digit6" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC008", to = "Digit7" }, { from = "Sc008", to = "Digit7" }, { from = "sC008", to = "Digit7" }, { from = "sc008", to = "Digit7" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC009", to = "Digit8" }, { from = "Sc009", to = "Digit8" }, { from = "sC009", to = "Digit8" }, { from = "sc009", to = "Digit8" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC00A", to = "Digit9" }, { from = "SC00a", to = "Digit9" }, { from = "Sc00A", to = "Digit9" }, { from = "Sc00a", to = "Digit9" }, { from = "sC00A", to = "Digit9" }, { from = "sC00a", to = "Digit9" }, { from = "sc00A", to = "Digit9" }, { from = "sc00a", to = "Digit9" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC00B", to = "Digit0" }, { from = "SC00b", to = "Digit0" }, { from = "Sc00B", to = "Digit0" }, { from = "Sc00b", to = "Digit0" }, { from = "sC00B", to = "Digit0" }, { from = "sC00b", to = "Digit0" }, { from = "sc00B", to = "Digit0" }, { from = "sc00b", to = "Digit0" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC00C", to = "Minus" }, { from = "SC00c", to = "Minus" }, { from = "Sc00C", to = "Minus" }, { from = "Sc00c", to = "Minus" }, { from = "sC00C", to = "Minus" }, { from = "sC00c", to = "Minus" }, { from = "sc00C", to = "Minus" }, { from = "sc00c", to = "Minus" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC00D", to = "Equal" }, { from = "SC00d", to = "Equal" }, { from = "Sc00D", to = "Equal" }, { from = "Sc00d", to = "Equal" }, { from = "sC00D", to = "Equal" }, { from = "sC00d", to = "Equal" }, { from = "sc00D", to = "Equal" }, { from = "sc00d", to = "Equal" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC010", to = "KeyQ" }, { from = "Sc010", to = "KeyQ" }, { from = "sC010", to = "KeyQ" }, { from = "sc010", to = "KeyQ" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC011", to = "KeyW" }, { from = "Sc011", to = "KeyW" }, { from = "sC011", to = "KeyW" }, { from = "sc011", to = "KeyW" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC012", to = "KeyE" }, { from = "Sc012", to = "KeyE" }, { from = "sC012", to = "KeyE" }, { from = "sc012", to = "KeyE" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC013", to = "KeyR" }, { from = "Sc013", to = "KeyR" }, { from = "sC013", to = "KeyR" }, { from = "sc013", to = "KeyR" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC014", to = "KeyT" }, { from = "Sc014", to = "KeyT" }, { from = "sC014", to = "KeyT" }, { from = "sc014", to = "KeyT" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC015", to = "KeyY" }, { from = "Sc015", to = "KeyY" }, { from = "sC015", to = "KeyY" }, { from = "sc015", to = "KeyY" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC016", to = "KeyU" }, { from = "Sc016", to = "KeyU" }, { from = "sC016", to = "KeyU" }, { from = "sc016", to = "KeyU" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC017", to = "KeyI" }, { from = "Sc017", to = "KeyI" }, { from = "sC017", to = "KeyI" }, { from = "sc017", to = "KeyI" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC018", to = "KeyO" }, { from = "Sc018", to = "KeyO" }, { from = "sC018", to = "KeyO" }, { from = "sc018", to = "KeyO" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC019", to = "KeyP" }, { from = "Sc019", to = "KeyP" }, { from = "sC019", to = "KeyP" }, { from = "sc019", to = "KeyP" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC01A", to = "BracketLeft" }, { from = "SC01a", to = "BracketLeft" }, { from = "Sc01A", to = "BracketLeft" }, { from = "Sc01a", to = "BracketLeft" }, { from = "sC01A", to = "BracketLeft" }, { from = "sC01a", to = "BracketLeft" }, { from = "sc01A", to = "BracketLeft" }, { from = "sc01a", to = "BracketLeft" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC01B", to = "BracketRight" }, { from = "SC01b", to = "BracketRight" }, { from = "Sc01B", to = "BracketRight" }, { from = "Sc01b", to = "BracketRight" }, { from = "sC01B", to = "BracketRight" }, { from = "sC01b", to = "BracketRight" }, { from = "sc01B", to = "BracketRight" }, { from = "sc01b", to = "BracketRight" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC01E", to = "KeyA" }, { from = "SC01e", to = "KeyA" }, { from = "Sc01E", to = "KeyA" }, { from = "Sc01e", to = "KeyA" }, { from = "sC01E", to = "KeyA" }, { from = "sC01e", to = "KeyA" }, { from = "sc01E", to = "KeyA" }, { from = "sc01e", to = "KeyA" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC01F", to = "KeyS" }, { from = "SC01f", to = "KeyS" }, { from = "Sc01F", to = "KeyS" }, { from = "Sc01f", to = "KeyS" }, { from = "sC01F", to = "KeyS" }, { from = "sC01f", to = "KeyS" }, { from = "sc01F", to = "KeyS" }, { from = "sc01f", to = "KeyS" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC020", to = "KeyD" }, { from = "Sc020", to = "KeyD" }, { from = "sC020", to = "KeyD" }, { from = "sc020", to = "KeyD" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC021", to = "KeyF" }, { from = "Sc021", to = "KeyF" }, { from = "sC021", to = "KeyF" }, { from = "sc021", to = "KeyF" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC022", to = "KeyG" }, { from = "Sc022", to = "KeyG" }, { from = "sC022", to = "KeyG" }, { from = "sc022", to = "KeyG" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC023", to = "KeyH" }, { from = "Sc023", to = "KeyH" }, { from = "sC023", to = "KeyH" }, { from = "sc023", to = "KeyH" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC024", to = "KeyJ" }, { from = "Sc024", to = "KeyJ" }, { from = "sC024", to = "KeyJ" }, { from = "sc024", to = "KeyJ" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC025", to = "KeyK" }, { from = "Sc025", to = "KeyK" }, { from = "sC025", to = "KeyK" }, { from = "sc025", to = "KeyK" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC026", to = "KeyL" }, { from = "Sc026", to = "KeyL" }, { from = "sC026", to = "KeyL" }, { from = "sc026", to = "KeyL" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC027", to = "Semicolon" }, { from = "Sc027", to = "Semicolon" }, { from = "sC027", to = "Semicolon" }, { from = "sc027", to = "Semicolon" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC028", to = "Quote" }, { from = "Sc028", to = "Quote" }, { from = "sC028", to = "Quote" }, { from = "sc028", to = "Quote" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC02B", to = "Backslash" }, { from = "SC02b", to = "Backslash" }, { from = "Sc02B", to = "Backslash" }, { from = "Sc02b", to = "Backslash" }, { from = "sC02B", to = "Backslash" }, { from = "sC02b", to = "Backslash" }, { from = "sc02B", to = "Backslash" }, { from = "sc02b", to = "Backslash" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC056", to = "IntlBackslash" }, { from = "Sc056", to = "IntlBackslash" }, { from = "sC056", to = "IntlBackslash" }, { from = "sc056", to = "IntlBackslash" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC02C", to = "KeyZ" }, { from = "SC02c", to = "KeyZ" }, { from = "Sc02C", to = "KeyZ" }, { from = "Sc02c", to = "KeyZ" }, { from = "sC02C", to = "KeyZ" }, { from = "sC02c", to = "KeyZ" }, { from = "sc02C", to = "KeyZ" }, { from = "sc02c", to = "KeyZ" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC02D", to = "KeyX" }, { from = "SC02d", to = "KeyX" }, { from = "Sc02D", to = "KeyX" }, { from = "Sc02d", to = "KeyX" }, { from = "sC02D", to = "KeyX" }, { from = "sC02d", to = "KeyX" }, { from = "sc02D", to = "KeyX" }, { from = "sc02d", to = "KeyX" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC02E", to = "KeyC" }, { from = "SC02e", to = "KeyC" }, { from = "Sc02E", to = "KeyC" }, { from = "Sc02e", to = "KeyC" }, { from = "sC02E", to = "KeyC" }, { from = "sC02e", to = "KeyC" }, { from = "sc02E", to = "KeyC" }, { from = "sc02e", to = "KeyC" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC02F", to = "KeyV" }, { from = "SC02f", to = "KeyV" }, { from = "Sc02F", to = "KeyV" }, { from = "Sc02f", to = "KeyV" }, { from = "sC02F", to = "KeyV" }, { from = "sC02f", to = "KeyV" }, { from = "sc02F", to = "KeyV" }, { from = "sc02f", to = "KeyV" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC030", to = "KeyB" }, { from = "Sc030", to = "KeyB" }, { from = "sC030", to = "KeyB" }, { from = "sc030", to = "KeyB" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC031", to = "KeyN" }, { from = "Sc031", to = "KeyN" }, { from = "sC031", to = "KeyN" }, { from = "sc031", to = "KeyN" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC032", to = "KeyM" }, { from = "Sc032", to = "KeyM" }, { from = "sC032", to = "KeyM" }, { from = "sc032", to = "KeyM" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC033", to = "Comma" }, { from = "Sc033", to = "Comma" }, { from = "sC033", to = "Comma" }, { from = "sc033", to = "Comma" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC034", to = "Period" }, { from = "Sc034", to = "Period" }, { from = "sC034", to = "Period" }, { from = "sc034", to = "Period" }] },
-	{ op = "map_value", section = "hotstrings", key = "magic_key_source_scan", map = [{ from = "SC035", to = "Slash" }, { from = "Sc035", to = "Slash" }, { from = "sC035", to = "Slash" }, { from = "sc035", to = "Slash" }] },
-	{ op = "rename", section = "hotstrings", key = "magic_key_source_scan", to_key = "magic_key_source" },
-]
-
-[steps.v5_to_v6]
-from = 5
-to = 6
-drivers = ["hs"]
-reason = "macOS keeps one app or window switching action per target and scope: its duplicates map to the action that does the same thing."
-# One map_value per key that holds an action id: every single gesture slot of
-# _shared/modules/actions/actions.toml [slots], the three number-row tap keys
-# and the three script-control keys. app_switcher and alt_tab_apps were a
-# posted Cmd+Tab and the Alt+F17 hotkey for app_previous; app_window_previous,
-# win_next and the F17 cycle_windows_in_app all went to the next window of the
-# active application, win_prev to the previous one. Keyboard slots
-# ([shortcuts.keyboard], 200 possible keys) are not listed: each op is parsed
-# on every boot of every driver, and those keys would multiply the registry
-# by six. A slot still naming a removed action is reported as outdated.
-# tools/test/test-app-switch-labels.cjs pins this list to the slot space.
-ops = [
-	{ op = "map_value", section = "gestures", key = "tap_2", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "tap_3", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "tap_4", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "tap_5", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_2_left", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_2_right", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_2_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_2_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_2_left_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_2_right_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_2_left_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_2_right_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_3_left", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_3_right", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_3_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_3_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_3_left_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_3_right_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_3_left_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_3_right_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_4_left", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_4_right", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_4_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_4_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_4_left_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_4_right_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_4_left_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_4_right_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_5_left", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_5_right", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_5_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_5_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_5_left_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_5_right_up", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_5_left_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "gestures", key = "swipe_5_right_down", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "shortcuts.tap_keys", key = "number_row_left", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "shortcuts.tap_keys", key = "number_row_right_1", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "shortcuts.tap_keys", key = "number_row_right_2", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "shortcuts.script_control", key = "backspace", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "shortcuts.script_control", key = "escape", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-	{ op = "map_value", section = "shortcuts.script_control", key = "return_key", map = [{ from = "app_switcher", to = "app_previous" }, { from = "alt_tab_apps", to = "app_previous" }, { from = "app_window_previous", to = "win_app_next" }, { from = "cycle_windows_in_app", to = "win_app_next" }, { from = "win_prev", to = "win_app_prev" }, { from = "win_next", to = "win_app_next" }] },
-]
-
-[steps.v6_to_v7]
-from = 6
-to = 7
-drivers = ["hs"]
-reason = "Layer + Scroll is retired on macOS: the navigation layer's wheel bindings (layers.toml WheelUp and WheelDown, edited from Tap-Holds > Edit the layer) replace it."
-# The switch had no effect left: it armed on an F19 key that only the retired
-# legacy Karabiner rules sent. An existing layers.toml gains no wheel binding
-# (a loader never falls back to the preset), so the wheel keeps scrolling while
-# the layer is held until the user binds it in the layer editor or restores the
-# recommended layer, whose wheel is volume up and down.
-# The retired switch remains on disk for the explicit outdated-key cleanup.
-ops = []
-
-[steps.v7_to_v8]
-from = 7
-to = 8
-drivers = ["hs"]
-reason = "The script-management chords are one set of four slots on every driver: the macOS switch and its three right-Option slots take the names Windows and Linux use."
-# The macOS `enabled` switch turned every chord off, as chords_enabled off
-# does; return_key, backspace and escape held the
-# actions of right Option + Return, Backspace and Escape. The Delete slot is
-# new on macOS and has nothing to carry over.
-ops = [
-	{ op = "rename", section = "shortcuts.script_control", key = "enabled", to_key = "chords_enabled" },
-	{ op = "rename", section = "shortcuts.script_control", key = "return_key", to_key = "script_altgr_enter" },
-	{ op = "rename", section = "shortcuts.script_control", key = "backspace", to_key = "script_altgr_backspace" },
-	{ op = "rename", section = "shortcuts.script_control", key = "escape", to_key = "script_altgr_escape" },
-]
-
-[steps.v8_to_v9]
-from = 8
-to = 9
-drivers = ["hs"]
-reason = "Representable legacy hotstring editor shortcuts become ordinary actions; explicit custom or disabled choices disable the contextual recommendation."
-ops = [
-	{ op = "move_chord_action", section = "hotstrings.editor", key = "shortcut", to_section = "shortcuts.keyboard", action = "open_hotstrings_editor", conditional_key = "magic_editor", disabled_action = "none", platform = "macos" },
-]
-
-[steps.v9_to_v10]
-from = 9
-to = 10
-drivers = ["ahk"]
-reason = "The Windows number-row switch becomes an explicit native, digits or symbols policy; only genuine legacy booleans are mapped."
-ops = [
-	{ op = "map_value", section = "layout", key = "direct_access_digits", map = [{ from = false, to = "native" }, { from = true, to = "digits" }] },
-]
-
-[steps.v10_to_v11]
-from = 10
-to = 11
-drivers = ["ahk", "hs", "linux"]
-reason = "Common autocorrections become independently selectable names, abbreviations and technical terms; existing destinations and unrelated legacy fields retain their values."
-ops = [
-	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "enabled", to_section = "hotstrings.autocorrection.names" },
-	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "time_activation_seconds", to_section = "hotstrings.autocorrection.names" },
-	{ op = "copy_if_absent", section = "hotstrings.modules.autocorrection", key = "caps", to_key = "names" },
-	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "enabled", to_section = "hotstrings.autocorrection.abbreviations" },
-	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "time_activation_seconds", to_section = "hotstrings.autocorrection.abbreviations" },
-	{ op = "copy_if_absent", section = "hotstrings.modules.autocorrection", key = "caps", to_key = "abbreviations" },
-	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "enabled", to_section = "hotstrings.autocorrection.technical_terms" },
-	{ op = "copy_if_absent", section = "hotstrings.autocorrection.caps", key = "time_activation_seconds", to_section = "hotstrings.autocorrection.technical_terms" },
-	{ op = "copy_if_absent", section = "hotstrings.modules.autocorrection", key = "caps", to_key = "technical_terms" },
-]
-
-# Preserve helper-backed Windows variants and independent source/layer ownership.
-[steps.v11_to_v12]
-from = 11
-to = 12
-drivers = ["ahk"]
-reason = "Represent the helper-backed built-in variant without changing registry or layer intent."
-ops = [
-	{ op = "move_ergopti_variant", section = "layout", key = "ergopti_plus", to_key = "ergopti_variant", base_key = "ergopti_base", alt_gr_key = "ergopti_alt_gr", source_key = "emulated_layout", false_variant = "ergopti", true_variant = "ergopti_plus", neutral_variant = "none" },
-]
-
-# Windows reads the dynamic-hotstring master where macOS and Linux always have.
 [steps.v12_to_v13]
 from = 12
 to = 13
@@ -803,4 +610,220 @@ ops = [
 	{ op = "wrap_value", section = "hotstrings.dynamic", key = "ssn_prefixes", to_key = "enabled" },
 	{ op = "wrap_value", section = "hotstrings.dynamic", key = "user_code", to_key = "enabled" },
 	{ op = "wrap_value", section = "hotstrings.dynamic", key = "text_expansion_personal_information", to_key = "enabled" },
+]
+
+[steps.v16_to_v17]
+from = 16
+to = 17
+drivers = ["hs"]
+reason = "The prompt profiles macOS kept as an array at [llm.profiles] user_profiles move to llm.user_profiles, the encoded envelope every OS reads. Only macOS ever wrote that array. A file that already holds the envelope keeps it, and the array stays for the cleanup to offer."
+ops = [
+	{ op = "encode_value", section = "llm.profiles", key = "user_profiles", to_section = "llm", to_key = "user_profiles", encoding = "user_profile_registry" },
+]
+
+[steps.v17_to_v18]
+from = 17
+to = 18
+drivers = ["ahk"]
+reason = "Windows keyboard slots are named by modifier role (primary_b, primary_shift_v, meta_a, meta_space) like macOS and Linux since v15: every saved binding keeps its action."
+# One rename per ordinary slot, so a target already there keeps its value (a
+# file copied from Linux can hold meta_space next to win_space). The physical
+# Win slots (win_SC03A, any letter case) are the one open-ended family, so a
+# prefix carries them. Each parameter key follows its slot: keyboard__ctrl_
+# also carries keyboard__ctrl_shift_ to keyboard__primary_shift_. A hand-written
+# key no slot owns (ctrl_f1) stays for the configuration cleanup.
+ops = [
+	{ op = "rename_prefix", section = "action_parameters", prefix = "keyboard__ctrl_", to_prefix = "keyboard__primary_" },
+	{ op = "rename_prefix", section = "action_parameters", prefix = "keyboard__win_", to_prefix = "keyboard__meta_" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_a", to_key = "primary_a" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_b", to_key = "primary_b" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_c", to_key = "primary_c" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_d", to_key = "primary_d" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_e", to_key = "primary_e" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_f", to_key = "primary_f" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_g", to_key = "primary_g" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_h", to_key = "primary_h" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_i", to_key = "primary_i" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_j", to_key = "primary_j" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_k", to_key = "primary_k" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_l", to_key = "primary_l" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_m", to_key = "primary_m" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_n", to_key = "primary_n" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_o", to_key = "primary_o" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_p", to_key = "primary_p" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_q", to_key = "primary_q" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_r", to_key = "primary_r" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_s", to_key = "primary_s" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_t", to_key = "primary_t" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_u", to_key = "primary_u" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_v", to_key = "primary_v" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_w", to_key = "primary_w" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_x", to_key = "primary_x" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_y", to_key = "primary_y" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_z", to_key = "primary_z" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_0", to_key = "primary_0" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_1", to_key = "primary_1" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_2", to_key = "primary_2" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_3", to_key = "primary_3" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_4", to_key = "primary_4" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_5", to_key = "primary_5" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_6", to_key = "primary_6" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_7", to_key = "primary_7" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_8", to_key = "primary_8" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_9", to_key = "primary_9" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_space", to_key = "primary_space" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_enter", to_key = "primary_enter" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_period", to_key = "primary_period" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_comma", to_key = "primary_comma" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_quote", to_key = "primary_quote" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_capslock", to_key = "primary_capslock" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_sc029", to_key = "primary_sc029" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_a", to_key = "primary_shift_a" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_b", to_key = "primary_shift_b" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_c", to_key = "primary_shift_c" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_d", to_key = "primary_shift_d" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_e", to_key = "primary_shift_e" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_f", to_key = "primary_shift_f" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_g", to_key = "primary_shift_g" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_h", to_key = "primary_shift_h" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_i", to_key = "primary_shift_i" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_j", to_key = "primary_shift_j" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_k", to_key = "primary_shift_k" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_l", to_key = "primary_shift_l" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_m", to_key = "primary_shift_m" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_n", to_key = "primary_shift_n" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_o", to_key = "primary_shift_o" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_p", to_key = "primary_shift_p" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_q", to_key = "primary_shift_q" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_r", to_key = "primary_shift_r" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_s", to_key = "primary_shift_s" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_t", to_key = "primary_shift_t" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_u", to_key = "primary_shift_u" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_v", to_key = "primary_shift_v" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_w", to_key = "primary_shift_w" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_x", to_key = "primary_shift_x" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_y", to_key = "primary_shift_y" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_z", to_key = "primary_shift_z" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_0", to_key = "primary_shift_0" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_1", to_key = "primary_shift_1" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_2", to_key = "primary_shift_2" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_3", to_key = "primary_shift_3" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_4", to_key = "primary_shift_4" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_5", to_key = "primary_shift_5" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_6", to_key = "primary_shift_6" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_7", to_key = "primary_shift_7" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_8", to_key = "primary_shift_8" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_9", to_key = "primary_shift_9" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_space", to_key = "primary_shift_space" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_enter", to_key = "primary_shift_enter" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_period", to_key = "primary_shift_period" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_comma", to_key = "primary_shift_comma" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_quote", to_key = "primary_shift_quote" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_capslock", to_key = "primary_shift_capslock" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "ctrl_shift_sc029", to_key = "primary_shift_sc029" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_a", to_key = "meta_a" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_b", to_key = "meta_b" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_c", to_key = "meta_c" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_d", to_key = "meta_d" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_e", to_key = "meta_e" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_f", to_key = "meta_f" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_g", to_key = "meta_g" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_h", to_key = "meta_h" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_i", to_key = "meta_i" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_j", to_key = "meta_j" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_k", to_key = "meta_k" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_l", to_key = "meta_l" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_m", to_key = "meta_m" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_n", to_key = "meta_n" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_o", to_key = "meta_o" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_p", to_key = "meta_p" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_q", to_key = "meta_q" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_r", to_key = "meta_r" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_s", to_key = "meta_s" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_t", to_key = "meta_t" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_u", to_key = "meta_u" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_v", to_key = "meta_v" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_w", to_key = "meta_w" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_x", to_key = "meta_x" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_y", to_key = "meta_y" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_z", to_key = "meta_z" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_0", to_key = "meta_0" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_1", to_key = "meta_1" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_2", to_key = "meta_2" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_3", to_key = "meta_3" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_4", to_key = "meta_4" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_5", to_key = "meta_5" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_6", to_key = "meta_6" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_7", to_key = "meta_7" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_8", to_key = "meta_8" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_9", to_key = "meta_9" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_space", to_key = "meta_space" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_enter", to_key = "meta_enter" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_period", to_key = "meta_period" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_comma", to_key = "meta_comma" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_quote", to_key = "meta_quote" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_capslock", to_key = "meta_capslock" },
+	{ op = "rename", section = "shortcuts.keyboard", key = "win_sc029", to_key = "meta_sc029" },
+	{ op = "rename_prefix", section = "shortcuts.keyboard", prefix = "win_sc", to_prefix = "meta_sc" },
+	{ op = "rename_prefix", section = "shortcuts.keyboard", prefix = "win_SC", to_prefix = "meta_SC" },
+]
+
+[steps.v18_to_v19]
+from = 18
+to = 19
+drivers = ["ahk"]
+reason = "The Windows feature switches become the keyboard slots of the same chords, as on macOS since v15: a switch left on becomes its catalogue action, a switch turned off becomes none, and an action the user chose for the slot wins."
+# A saved slot is already under its neutral id (v18), so it keeps its value over
+# the switch of the same chord. Win+G and Win+S recommended open_url and
+# search_web, which read a per-binding parameter the switch never wrote, while
+# the switch ran the ChatGPT link and the selection opener. A file restored to
+# the recommendations holds both, so those two values become what the chord
+# actually ran. A URL on the slot and then the switch's link go to the setting
+# open_chatgpt reads, the first one present winning. The search and note fields
+# other than the switch stay where they are: they are now settings.
+ops = [
+	{ op = "rename", section = "action_parameters", key = "keyboard__meta_g__open_url", to_section = "shortcuts", to_key = "chatgpt_url" },
+	{ op = "rename", section = "shortcuts.gpt", key = "link", to_section = "shortcuts", to_key = "chatgpt_url" },
+	{ op = "rename", section = "shortcuts.gpt", key = "enabled", to_section = "shortcuts.keyboard", to_key = "meta_g" },
+	{ op = "rename", section = "shortcuts.search", key = "enabled", to_section = "shortcuts.keyboard", to_key = "meta_s" },
+	{ op = "rename", section = "shortcuts.take_note", key = "enabled", to_section = "shortcuts.keyboard", to_key = "meta_n" },
+	{ op = "rename", section = "shortcuts", key = "get_hex_value", to_section = "shortcuts.keyboard", to_key = "meta_x" },
+	{ op = "rename", section = "shortcuts", key = "microsoft_bold", to_section = "shortcuts.keyboard", to_key = "primary_b" },
+	{ op = "rename", section = "shortcuts", key = "title_case", to_section = "shortcuts.keyboard", to_key = "meta_w" },
+	{ op = "rename", section = "shortcuts", key = "uppercase", to_section = "shortcuts.keyboard", to_key = "meta_u" },
+	{ op = "rename", section = "shortcuts", key = "paste_without_formatting", to_section = "shortcuts.keyboard", to_key = "primary_shift_v" },
+	{ op = "rename", section = "shortcuts", key = "select_line", to_section = "shortcuts.keyboard", to_key = "meta_a" },
+	{ op = "rename", section = "shortcuts", key = "spotlight_mouse", to_section = "shortcuts.keyboard", to_key = "meta_quote" },
+	{ op = "rename", section = "shortcuts", key = "surround_with_parentheses", to_section = "shortcuts.keyboard", to_key = "meta_o" },
+	{ op = "rename", section = "shortcuts", key = "teleport_mouse", to_section = "shortcuts.keyboard", to_key = "meta_t" },
+	{ op = "rename", section = "shortcuts", key = "open_downloads", to_section = "shortcuts.keyboard", to_key = "meta_d" },
+	{ op = "rename", section = "shortcuts", key = "move", to_section = "shortcuts.keyboard", to_key = "meta_m" },
+	{ op = "rename", section = "shortcuts", key = "screen", to_section = "shortcuts.keyboard", to_key = "meta_h" },
+	{ op = "rename", section = "shortcuts", key = "win_caps_lock", to_section = "shortcuts.keyboard", to_key = "meta_capslock" },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_g", map = [{ from = "open_url", to = "open_chatgpt" }, { from = true, to = "open_chatgpt" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_s", map = [{ from = "search_web", to = "copy_selected_path" }, { from = true, to = "copy_selected_path" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_n", map = [{ from = true, to = "take_note" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_x", map = [{ from = true, to = "pick_color" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "primary_b", map = [{ from = true, to = "microsoft_bold" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_w", map = [{ from = true, to = "titlecase_selection" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_u", map = [{ from = true, to = "uppercase_selection" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "primary_shift_v", map = [{ from = true, to = "paste_plain" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_a", map = [{ from = true, to = "select_line" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_quote", map = [{ from = true, to = "spotlight_mouse" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_o", map = [{ from = true, to = "surround_parens" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_t", map = [{ from = true, to = "teleport_mouse" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_d", map = [{ from = true, to = "open_downloads" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_m", map = [{ from = true, to = "activity_simulation" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_h", map = [{ from = true, to = "screen_capture" }, { from = false, to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_capslock", map = [{ from = true, to = "toggle_capslock" }, { from = false, to = "none" }] },
+]
+
+[steps.v19_to_v20]
+from = 19
+to = 20
+drivers = ["hs"]
+reason = "The macOS Ctrl+G switch becomes its keyboard slot, as the other switches did (PAR-41): on becomes open_chatgpt, off becomes none, and an action the user chose for the slot wins."
+ops = [
+	{ op = "rename", section = "shortcuts.keys", key = "ctrl_g", to_section = "shortcuts.keyboard", to_key = "secondary_g" },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "secondary_g", map = [{ from = true, to = "open_chatgpt" }, { from = false, to = "none" }] },
 ]

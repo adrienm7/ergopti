@@ -173,6 +173,7 @@ local function with_fixture(options, callback)
 		state.llm_url_bar_filter_enabled, state.llm_secure_field_filter_enabled = table.unpack(options.privacy_states)
 	end
 	if options.enabled ~= nil then state.llm_enabled = options.enabled end
+	if options.backend ~= nil then state.llm_backend = options.backend end
 	local runtime = clone_value(state)
 	local display_generation = 0
 	local persisted = clone_value(state)
@@ -733,7 +734,7 @@ local ENTRY_SPECS = {
 		candidate = {"shift"},
 		publishes_setting = true,
 		invoke = function(fixture)
-			return find_item(fixture.manager.build_nav_modifier_menu(), "⇧ Shift").fn()
+			return find_item(fixture.manager.build_nav_modifier_menu(), "⇧ key_name.shift").fn()
 		end,
 	},
 }

@@ -272,6 +272,19 @@ _LLMPL_IsProfileLabelKey(Key) {
 	return RegExMatch(Key, "^llm\.profile\.[\w]+\.label$") > 0
 }
 
+; These tests load locale files into the active cache. Left there, the last file
+; scanned stayed the live language for every later test while _I18nLocale still
+; read "fr", so a test expecting a French or English string failed by order.
+_LLMPL_KeepActiveLocale(Body) {
+	global _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity
+	Saved := [_I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity]
+	try Body.Call()
+	finally {
+		_I18nCache := Saved[1], _I18nCacheLoaded := Saved[2]
+		_I18nActiveCacheIdentity := Saved[3]
+	}
+}
+
 ; Scans every locale file for printf tokens in profile labels. Returns a newline
 ; list of "<locale>:<key>" offenders (empty string when all clean) plus the count
 ; of files scanned, so the test can also fail if enumeration found nothing.
@@ -305,7 +318,7 @@ Test_LLM_Regression_NoPrintfTokenInProfileLabels() {
 		. "{n}/{s}, not %d/%s:`n" . Offenders)
 }
 Test("LLM regression: no printf %d/%s token in any locale profile label",
-	Test_LLM_Regression_NoPrintfTokenInProfileLabels)
+	_LLMPL_KeepActiveLocale.Bind(Test_LLM_Regression_NoPrintfTokenInProfileLabels))
 
 Test_LLM_Regression_BatchLabelKeepsBracePlaceholders() {
 	global _I18nCache
@@ -327,7 +340,7 @@ Test_LLM_Regression_BatchLabelKeepsBracePlaceholders() {
 		"batch_advanced label must keep {n} and {s} in every language:`n" . Missing)
 }
 Test("LLM regression: batch_advanced label keeps {n}/{s} in all locales",
-	Test_LLM_Regression_BatchLabelKeepsBracePlaceholders)
+	_LLMPL_KeepActiveLocale.Bind(Test_LLM_Regression_BatchLabelKeepsBracePlaceholders))
 
 ; Source guard: LLM_Menu_GetProfileLabel must substitute the brace placeholders.
 ; If a refactor swaps back to Format()/%d the locale strings stop matching and the
@@ -379,7 +392,7 @@ Test_LLM_Regression_BraceSubstitutionLeavesNoPlaceholder() {
 		"brace placeholder leaked (singular): " . OutSingular)
 }
 Test("LLM regression: brace substitution on real label leaves no placeholder",
-	Test_LLM_Regression_BraceSubstitutionLeavesNoPlaceholder)
+	_LLMPL_KeepActiveLocale.Bind(Test_LLM_Regression_BraceSubstitutionLeavesNoPlaceholder))
 
 
 

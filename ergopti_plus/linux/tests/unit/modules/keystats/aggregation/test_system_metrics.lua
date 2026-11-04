@@ -40,7 +40,8 @@ local function sample_event(action, now, date, metadata)
 end
 
 --- Runs the sampler with the shell answering from a table.
---- @param answers table Array of { match = string, out = string }.
+--- @param answers table Array of { match = string, out = string }; answers.missing
+---   names the commands this machine lacks (every other command is installed).
 --- @param body function Receives the module.
 local function with_shell(answers, body)
 	local shell_name = "adapters.shell_runner"
@@ -65,7 +66,7 @@ local function with_shell(answers, body)
 
 	package.loaded[shell_name] = {
 		quote = function(v) return "'" .. tostring(v) .. "'" end,
-		has_command = function() return true end,
+		has_command = function(name) return not (answers.missing or {})[name] end,
 		run = function() return true end,
 		exec = answer,
 		exec_line = answer,
@@ -89,6 +90,69 @@ local function with_shell(answers, body)
 	package.loaded[module_name] = previous_module
 	helpers.assert_true(ok, "the sampler must not throw: " .. tostring(err))
 end
+
+--- Muted time over one sample interval, with the shell answering as given.
+local function muted_ms(answers)
+	local measured
+	with_shell(answers, function(metrics, sample)
+		local interval = metrics._sample_interval_ms()
+		sample(0, "2026-01-02")
+		measured = { sample(interval, "2026-01-02").audio_muted_ms, interval }
+	end)
+	return measured[1], measured[2]
+end
+
+--- An amixer simple-control report with one playback line per channel switch.
+local function amixer(...)
+	local lines = { "Simple mixer control 'Master',0", "  Capabilities: pvolume pswitch",
+		"  Playback channels: Front Left - Front Right", "  Limits: Playback 0 - 87" }
+	for index, switch in ipairs({ ... }) do
+		lines[#lines + 1] = string.format("  %s: Playback 30 [47%%] [-34.50dB] [%s]",
+			index == 1 and "Front Left" or "Front Right", switch)
+	end
+	return table.concat(lines, "\n") .. "\n"
+end
+
+helpers.describe("system audio without a sound server (linux-audio-alsa-fallback)", function()
+	helpers.it("reads PipeWire's own wpctl when pactl is absent", function()
+		for _, case in ipairs({ { "Volume: 0.40 [MUTED]", true }, { "Volume: 0.40", false } }) do
+			local muted, interval = muted_ms({ missing = { pactl = true },
+				{ match = "wpctl get-volume @DEFAULT_AUDIO_SINK@", out = case[1] } })
+			helpers.assert_eq(muted, case[2] and interval or 0, case[1])
+		end
+	end)
+
+	helpers.it("falls through a pactl with no server to the next stack", function()
+		local muted, interval = muted_ms({
+			{ match = "pactl get-sink-mute", out = "Connection failure: Connection refused" },
+			{ match = "wpctl get-volume", out = "Volume: 1.00 [MUTED]" } })
+		helpers.assert_eq(muted, interval, "a refused pactl is no answer, never 'unmuted'")
+	end)
+
+	helpers.it("reads the ALSA mixer when neither PulseAudio nor PipeWire is present", function()
+		local no_server = { pactl = true, wpctl = true }
+		for _, case in ipairs({
+			{ amixer("off", "off"), true, "every channel off" },
+			{ amixer("off", "on"), false, "one channel still on" },
+			{ amixer("on"), false, "a mono control on" },
+		}) do
+			local muted, interval = muted_ms({ missing = no_server,
+				{ match = "LC_ALL=C amixer sget 'Master'", out = case[1] } })
+			helpers.assert_eq(muted, case[2] and interval or 0, case[3])
+		end
+		-- A card without a Master switch is read from its PCM control.
+		local muted, interval = muted_ms({ missing = no_server,
+			{ match = "amixer sget 'Master'", out = "Simple mixer control 'Master',0\n  Capabilities: pvolume\n" },
+			{ match = "amixer sget 'PCM'", out = amixer("off") } })
+		helpers.assert_eq(muted, interval)
+	end)
+
+	helpers.it("measures no muted time when no sound stack answers", function()
+		helpers.assert_eq(muted_ms({ missing = { pactl = true, wpctl = true, amixer = true } }), 0)
+		helpers.assert_eq(muted_ms({ missing = { pactl = true, wpctl = true },
+			{ match = "amixer", out = "amixer: Unable to find simple control 'Master',0\n" } }), 0)
+	end)
+end)
 
 helpers.describe("system audio native output locale", function()
 	for _, locale in ipairs({ "French", "German" }) do

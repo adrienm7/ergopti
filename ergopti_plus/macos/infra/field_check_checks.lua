@@ -6,7 +6,8 @@
 --- The four one-click Mac checks of the Debug menu, as step lists over the
 --- ports of infra/field_check.lua:
 --- 1. lease: is the Karabiner lease healthy right now (command line tool,
----    integration switch, lease phase, guardian, losses this session)?
+---    integration switch, lease phase, guardian, losses and swallowed keys this
+---    session, lease failures per kind, free memory)?
 --- 2. owned_runtime: is the Ergopti-owned Karabiner runtime (ADR 011, HS-274)
 ---    still dormant, and what of it is installed on this Mac?
 --- 3. key_accounting: for a few seconds, how many key presses does the Quartz
@@ -17,6 +18,8 @@
 --- 5. login_items: what starts Ergopti or Hammerspoon at login (login item state,
 ---    background items, launch agents), and does each entry belong to the
 ---    running copy or to another one?
+--- The checks only the developer field run asks for live in
+--- infra/field_check_probes.lua and are registered in M.checks below.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only: no step starts, stops or reconfigures Karabiner, writes a file
@@ -30,7 +33,9 @@
 
 local Identifiers = require("identifiers")
 local Logger = require("infra.logger")
+local MainThreadHold = require("infra.main_thread_hold")
 local KePaths = require("platform.remap.ke_paths")
+local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
 local RuntimeVhid = require("platform.remap.runtime_vhid")
 local TextUtils = require("text_utils")
 
@@ -44,7 +49,6 @@ local OWNED_RUNTIME_DIR = "/Library/Application Support/ErgoptiPlus/Runtime"
 local OWNED_JOB_FILE = "/Library/LaunchDaemons/" .. Identifiers.service_labels.macos_core .. ".plist"
 local OWNED_JOB = "system/" .. Identifiers.service_labels.macos_core
 local STOCK_APP = "/Applications/Karabiner-Elements.app"
-local VHID_EXTENSION = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 
 --- Seconds the key accounting check watches the keyboard.
 M.KEY_ACCOUNTING_SECONDS = 30
@@ -53,6 +57,21 @@ M.KEY_ACCOUNTING_SECONDS = 30
 local COMMAND_TIMEOUT = 5
 
 local function yes_no(flag) return flag and "yes" or "no" end
+
+--- Names lease failure counts per kind in the step grammar ("pong:2+ready:1").
+--- @param kinds table|nil Kind → count.
+--- @return string names "none" when no lease failed.
+function M.format_lease_kinds(kinds)
+	local names = {}
+	for kind, count in pairs(kinds or {}) do
+		if count > 0 then names[#names + 1] = kind end
+	end
+	if #names == 0 then return "none" end
+	table.sort(names)
+	local parts = {}
+	for _, kind in ipairs(names) do parts[#parts + 1] = kind .. ":" .. tostring(kinds[kind]) end
+	return table.concat(parts, "+")
+end
 
 --- Counts the non-empty lines of a command output.
 --- @param text any Command output.
@@ -65,19 +84,29 @@ local function count_lines(text)
 	return count
 end
 
---- Extracts the activation state of the virtual keyboard driver from the
---- output of `systemextensionsctl list`, as a token such as activated_enabled.
---- @param output any Command output.
---- @return string state "absent" when the extension is not listed.
-function M.parse_driver_state(output)
-	for line in tostring(output or ""):gmatch("[^\r\n]+") do
-		if line:find(VHID_EXTENSION, 1, true) then
-			local state = line:match("%[([%a%s]+)%]")
-			if not state then return "unknown" end
-			return (state:gsub("%s+", "_"))
-		end
-	end
-	return "absent"
+--- The driver as the owned runtime owner reads it (platform/remap/runtime_vhid.lua):
+--- the active copy when macOS still lists an older one, and the owner's verdict
+--- against the driver version the runtime manifest pins. One parser, so the field
+--- report shows exactly what the owner's admission would decide.
+--- @param code integer|nil Exit status of `systemextensionsctl list`.
+--- @param output any Its output.
+--- @return table report runtime_vhid.parse report.
+--- @return string state Token such as activated_enabled, absent or unreadable.
+function M.read_driver(code, output)
+	local report = RuntimeVhid.parse(code == 0 and output or nil)
+	return report, report.state == "present" and report.activation or report.state
+end
+
+--- Names the owner's verdict on the installed driver.
+--- @param report table runtime_vhid.parse report.
+--- @param code integer|nil Exit status of the listing.
+--- @param pinned any Driver version the runtime manifest pins, nil when unpinned.
+--- @return string verdict compatible, unreadable, unpinned or a runtime_vhid reason.
+function M.driver_verdict(report, code, pinned)
+	if code ~= 0 then return "unreadable" end
+	if type(pinned) ~= "string" or pinned == "" then return "unpinned" end
+	local verdict = RuntimeVhid.assess(report, pinned)
+	return verdict.ok and "compatible" or verdict.reason
 end
 
 --- Extracts a dotted version number from a command line tool's output.
@@ -160,15 +189,47 @@ function M.lease_with_facts(ports, report, finish, remap, waited)
 	report.step("lease_failures", lease_total == 0 and STATE.pass or STATE.fail, lease_total)
 	local losses = (counts.ups_without_down or 0) + (counts.downs_without_up or 0) + (counts.stuck or 0)
 	report.step("key_losses", losses == 0 and STATE.pass or STATE.fail, losses)
+	-- A key the driver consumed and never delivered: the dropped-letter owner
+	-- this driver can see (infra/keystroke_integrity.lua).
+	local swallowed = ports.swallowed_keys()
+	report.step("swallowed_keys", swallowed == 0 and STATE.pass or STATE.fail, swallowed)
+	-- PONG and READY timeouts are the Apple silicon lease failures (117/140).
+	report.step("lease_failure_kinds", STATE.info, M.format_lease_kinds(counts.lease))
+	-- Every rule change rewrites karabiner.json on the main thread: a long write
+	-- is the stall that decides whether the file must shrink.
+	local deploy = ports.deploy_facts()
+	report.step("deploy_write_ms", STATE.info, deploy and math.floor(deploy.write_ms + 0.5) or "none")
+	report.step("deploy_kb", STATE.info, deploy and math.floor(deploy.bytes / 1024 + 0.5) or "none")
+	-- The share of the write spent in the atomic writer's forks: what an
+	-- asynchronous publication could take off the main thread.
+	report.step("deploy_fork_ms", STATE.info, deploy and deploy.fork_ms and math.floor(deploy.fork_ms + 0.5) or "none")
+	-- The swallowed-keys item's open decision: a write that is itself a key-delaying
+	-- hold means karabiner.json must shrink; a shorter one is kept as is.
+	if deploy == nil then
+		report.step("deploy_write_verdict", STATE.info, "none")
+	elseif deploy.write_ms < MainThreadHold.COUNT_MS then
+		report.step("deploy_write_verdict", STATE.pass, "keep")
+	else
+		report.step("deploy_write_verdict", STATE.fail, "shrink")
+	end
+	-- Starvation is their open explanation: the free memory names it.
+	local function memory_then_finish()
+		ports.exec(LeaseMemorySnapshot.TOOL, {}, COMMAND_TIMEOUT, function(code, output)
+			local percent = code == 0 and LeaseMemorySnapshot.parse_free_percent(output) or nil
+			report.step("memory_free_percent", STATE.info,
+				percent or (code == nil and "timeout" or (code == 0 and "unparsed" or "exit_" .. tostring(code))))
+			finish()
+		end)
+	end
 	if not cli then
 		report.step("cli_version", STATE.skip, "no_cli")
-		finish()
+		memory_then_finish()
 		return
 	end
 	ports.exec(KePaths.CLI, { "--version" }, COMMAND_TIMEOUT, function(code, output)
 		local version = code == 0 and M.parse_version(output) or nil
 		report.step("cli_version", version and STATE.pass or STATE.fail, version or (code == nil and "timeout" or "exit_" .. tostring(code)))
-		finish()
+		memory_then_finish()
 	end)
 end
 
@@ -183,7 +244,8 @@ function M.owned_runtime(ports, report, finish)
 	ports.exec("/bin/launchctl", { "print", OWNED_JOB }, COMMAND_TIMEOUT, function(code)
 		report.step("job_loaded", STATE.info, code == 0 and "loaded" or (code == nil and "timeout" or "not_loaded"))
 		ports.exec("/usr/bin/systemextensionsctl", { "list" }, COMMAND_TIMEOUT, function(ext_code, ext_out)
-			report.step("driver_state", STATE.info, ext_code == 0 and M.parse_driver_state(ext_out) or "unreadable")
+			local driver, driver_state = M.read_driver(ext_code, ext_out)
+			report.step("driver_state", STATE.info, driver_state)
 			ports.exec("/usr/bin/pgrep", { "-f", "org.pqrs/Karabiner" }, COMMAND_TIMEOUT, function(stock_code, stock_out)
 				report.step("stock_running", STATE.info, stock_code == nil and "timeout" or count_lines(stock_out))
 				ports.exec("/usr/bin/pgrep", { "-f", "ErgoptiPlus/Runtime" }, COMMAND_TIMEOUT, function(own_code, own_out)
@@ -192,6 +254,7 @@ function M.owned_runtime(ports, report, finish)
 						local unpinned = facts.unpinned
 						report.step("artifact_pin", STATE.info,
 							unpinned == nil and "unreadable" or (unpinned == 0 and "pinned" or ("unpinned_" .. unpinned)))
+						report.step("driver_verdict", STATE.info, M.driver_verdict(driver, ext_code, facts.virtual_hid_version))
 						report.step("installed_source", STATE.info, facts.source and "reachable" or "unavailable")
 						report.step("other_karabiner_helper", STATE.info, yes_no(facts.helper_present))
 						report.step("other_karabiner_active", STATE.info, facts.active == nil and "unknown" or facts.active)
@@ -269,6 +332,8 @@ function M.network(ports, report, finish)
 			end)
 		end,
 		route_plan = ports.route_plan,
+		relay_probe = ports.relay_probe,
+		relay = assert(ports.relay_policy(), "the shared relay contract is unreadable"),
 		-- The shared policy, not a platform call: a lookup the PAC fallback covers goes direct.
 		pac_fallback = function(stage)
 			return require("modules.llm.opaque_network_admission").is_pac_fallback_stage(stage)
@@ -291,6 +356,8 @@ M.TIMER_LATE_MS = 250
 
 -- Homebrew may need to update its index before answering.
 local BREW_TIMEOUT = 20
+-- The Homebrew cask that installs Karabiner-Elements.
+local KARABINER_CASK = "karabiner-elements"
 
 --- Describes why a bounded command did not succeed, as a closed token.
 --- @param code any Exit code, nil when it timed out.
@@ -477,13 +544,13 @@ function M.toolchain(ports, report, finish)
 		ports.exec(brew, { "--version" }, BREW_TIMEOUT, function(code, output)
 			local version = code == 0 and M.parse_version(output) or nil
 			report.step("brew_version", version and STATE.pass or STATE.fail, version or failure_token(code))
-			ports.exec(brew, { "list", "--cask", "--versions", "karabiner-elements" }, BREW_TIMEOUT, function(list_code, list_output)
-				local installed = list_code == 0 and count_lines(list_output) > 0
-				-- A cask that is absent exits non-zero: that is an answer, not a fault
-				local token = installed and "installed" or (list_code == nil and "timeout" or "absent")
-				report.step("karabiner_cask", list_code == nil and STATE.fail or STATE.info, token)
-				signature_stage()
-			end)
+			-- Homebrew keeps each installed cask in its Caskroom folder. Reading it
+			-- answers at once where `brew list --cask` outlived its bound on a Mac
+			-- whose security agents slow every brew start (field run 2026-10-30
+			-- 16:28, karabiner_cask fail:timeout); an absent cask is information.
+			local caskroom = brew:match("^(.*)/bin/brew$") .. "/Caskroom/" .. KARABINER_CASK
+			report.step("karabiner_cask", STATE.info, ports.path_exists(caskroom) and "installed" or "absent")
+			signature_stage()
 		end)
 	end
 
@@ -716,6 +783,16 @@ end
 function M.login_items(ports, report, finish)
 	local app_path = ports.app_path()
 	report.step("this_copy_known", STATE.info, yes_no(app_path ~= nil))
+	-- What an ad hoc build did with its guardian registrations in this
+	-- lifecycle (RemapGuardianRegistrationNote), with that registration's own
+	-- answer. A refused removal leaves a Background Items record whose spawn
+	-- macOS kills (field runs 2026-10-30 and 2026-10-31); a legacy-only
+	-- registration that is not ready leaves remapping without a guardian.
+	local note, status = ports.guardian_registration_note()
+	local failed = note == "developer_adhoc_reset_refused"
+		or (note == "developer_adhoc_legacy_only" and status ~= "ready")
+	report.step("guardian_registration", failed and STATE.fail or STATE.info,
+		(note or "no_reset") .. ":" .. (status or "unknown"))
 
 	local function agents_stage()
 		find_agent_files(ports, function(files)
@@ -782,15 +859,54 @@ function M.composer(ports, report, finish)
 	require("layouts.composer_check").run(env, report, finish)
 end
 
+-- The checks only the developer field run asks for (data/field_run.json)
+local Probes = require("infra.field_check_probes")
+local LayoutRows = require("infra.field_check_layout_rows")
+local LocalServerProbe = require("infra.field_check_local_servers")
+local Session = require("infra.field_check_session")
+local PacFallback = require("infra.field_check_pac_fallback")
+
 --- Check identity → definition(ports, report, finish), as run by infra.field_check.
 M.checks = {
 	network = M.network,
 	lease = M.lease,
 	owned_runtime = M.owned_runtime,
+	owned_start = require("infra.field_check_owned_activation").start,
+	owned_pause = require("infra.field_check_owned_activation").pause,
 	key_accounting = M.key_accounting,
 	toolchain = M.toolchain,
 	login_items = M.login_items,
 	composer = M.composer,
+	permissions = Probes.permissions,
+	event_taps = Probes.event_taps,
+	input_sources = Probes.input_sources,
+	storage = Probes.storage,
+	launcher_roles = Probes.launcher_roles,
+	network_hosts = Probes.network_hosts,
+	ollama_blob_host = Probes.ollama_blob_host,
+	app_health = Probes.app_health,
+	ai_local = Probes.ai_local,
+	menu_build = Probes.menu_build,
+	typing_selftest = Probes.typing_selftest,
+	capslock_chord = Probes.capslock_chord,
+	gesture_frames = Probes.gesture_frames,
+	hotstring_roundtrip = Probes.hotstring_roundtrip,
+	prediction_tooltip = Probes.prediction_tooltip,
+	layout_rows = LayoutRows.layout_rows,
+	local_servers = LocalServerProbe.local_servers,
+	boot_cost = Session.boot_cost,
+	idle_cost = Session.idle_cost,
+	fifo_safety = Session.fifo_safety,
+	slow_lines = Session.slow_lines,
+	pac_fallback = PacFallback.pac_fallback,
+	apple_shortcuts = require("infra.field_check_apple_shortcuts").apple_shortcuts,
+	tap_hold_thresholds = require("infra.field_check_tap_hold_thresholds").tap_hold_thresholds,
+	tap_copy = require("infra.field_check_tap_copy").tap_copy,
 }
+
+--- The Debug menu checks the field run does not ask for, each with the
+--- automatic check it runs instead: the menu's key accounting waits for a
+--- person to type, the field run's types into its own scratch field.
+M.FIELD_RUN_SUBSTITUTES = { key_accounting = "typing_selftest" }
 
 return M

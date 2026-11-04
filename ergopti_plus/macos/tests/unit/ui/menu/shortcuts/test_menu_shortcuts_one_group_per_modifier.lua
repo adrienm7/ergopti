@@ -15,7 +15,7 @@
 local helpers = require("tests.helpers")
 
 --- Renders the real Shortcuts submenu over a shortcut engine listing a wrap
---- toggle, a Ctrl shortcut and a Cmd shortcut.
+--- toggle and a Cmd shortcut (no fixed Ctrl shortcut remains since schema v20).
 --- @return table rows
 local function render_shortcuts_submenu()
 	local shortcuts = helpers.load_with_stubs("ui.menu.menu_shortcuts")
@@ -29,7 +29,6 @@ local function render_shortcuts_submenu()
 			list_shortcuts = function()
 				return {
 					{ id = "wrap_text_if_selected", label = "Wrap", enabled = true },
-					{ id = "ctrl_a", label = "Select line", enabled = true },
 					{ id = "cmd_star", label = "Star", enabled = true },
 				}
 			end,
@@ -77,7 +76,8 @@ helpers.describe("the Shortcuts submenu has one group per modifier", function()
 		local cmd = find(rows, "menu.shortcuts.cmd_group")
 		helpers.assert_true(ctrl ~= nil and type(ctrl.menu) == "table", "the Ctrl group must render")
 		helpers.assert_true(cmd ~= nil and type(cmd.menu) == "table", "the Cmd group must render")
-		helpers.assert_true(has_row_containing(ctrl.menu, "Select line"), "ctrl_a must sit in the Ctrl group")
+		helpers.assert_true(has_row_containing(ctrl.menu, "menu.shortcuts.chatgpt_url_item"),
+			"the ChatGPT URL editor must sit in the Ctrl group")
 		helpers.assert_true(has_row_containing(cmd.menu, "Star"), "cmd_star must sit in the Cmd group")
 		helpers.assert_true(has_row_containing(ctrl.menu, "menu.shortcuts.ctrl_add"),
 			"the Ctrl group keeps its add row")

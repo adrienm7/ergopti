@@ -138,15 +138,15 @@ helpers.describe("ShellRunner: argv typing", function()
 	-- here" ships. Ordering matters too -- a check after luv.spawn proves nothing.
 	helpers.it("every luv.spawn site validates its argv before spawning", function()
 		local sites = {
-			{ file = "adapters/curl_http_client.lua", binary = "curl" },
-			{ file = "adapters/file_digest.lua", binary = "sha256sum" },
-			{ file = "adapters/process_runner.lua", binary = "any program (python3 for layouts)", boundary = "pcall(OwnedProcess.start," },
-			{ file = "adapters/owned_process.lua", binary = "the retained native process", boundary = "pcall(native.spawn," },
-			{ file = "adapters/system_proxy.lua", binary = "the native proxy lookup helper" },
+			{ file = "adapters.curl_http_client", binary = "curl" },
+			{ file = "adapters.file_digest", binary = "sha256sum" },
+			{ file = "adapters.process_runner", binary = "any program (python3 for layouts)", boundary = "pcall(OwnedProcess.start," },
+			{ file = "adapters.owned_process", binary = "the retained native process", boundary = "pcall(native.spawn," },
+			{ file = "adapters.system_proxy", binary = "the native proxy lookup helper" },
 		}
 		local checked = 0
 		for _, site in ipairs(sites) do
-			local src = read_driver_file(site.file)
+			local src = helpers.read_module_source(site.file)
 			helpers.assert_true(src ~= nil and src ~= "",
 				site.file .. " must be readable -- an unreadable source would make "
 				.. "this guard pass vacuously")

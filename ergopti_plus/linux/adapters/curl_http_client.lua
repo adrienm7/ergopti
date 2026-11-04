@@ -43,7 +43,7 @@ if not ok_luv then luv = nil end
 local DEFAULT_TIMEOUT_MS = Timings.ms("adapters", "default_timeout_ms")
 local DEFAULT_OWNER = "default"
 local CLEANUP_POLL_MS = Timings.ms("llm", "poll_interval_ms")
-local MAX_DIAGNOSTIC_BYTES = 65536
+local MAX_DIAGNOSTIC_BYTES = Timings.count("limits", "http_diagnostic_bytes")
 local STATUS_MARKER = "ERGOPTI_HTTP_STATUS:"
 local PROXY_MARKER = "ERGOPTI_PROXY_STATUS:"
 local NATIVE_TRAILER_BYTES = #STATUS_MARKER + #PROXY_MARKER + 32
@@ -990,7 +990,8 @@ local function admit_metadata(url, headers, body, options)
 		output_target = output_target,
 		max_download_bytes = options.max_download_bytes,
 		proxy_selection = options.proxy_selection,
-		curl_executable = options.curl_executable or "curl",
+		-- The private runtime's curl unless the caller pinned one (infra/owned_programs.lua).
+		curl_executable = options.curl_executable or require("infra.owned_programs").path("curl"),
 		curl_executable_identity = copy_executable_identity(options.curl_executable_identity),
 		curl_executable_identity_exact = ExactIdentity.copy(options.curl_executable_identity_exact),
 		proxy_metrics_available = options.proxy_metrics_available == true and type(options.curl_executable) == "string",

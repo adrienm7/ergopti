@@ -28,13 +28,12 @@
 ; ============================================================
 ; ============================================================
 
-_CWB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_CWB_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _CWB_AsyncPollAcceptsBinaryWithoutWaiting() {
-	Src := _CWB_ReadSource("infra/hotstrings/hotstring_engine.ahk")
+	Src := _CWB_ReadSource("hotstring_engine.ahk")
 	Body := _DriverFuncBody("_SelectionCapturePoll")
 
 	Assert(Body != "", "_SelectionCapturePoll() must exist in hotstring_engine.ahk")

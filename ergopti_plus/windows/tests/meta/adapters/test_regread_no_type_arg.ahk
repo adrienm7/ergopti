@@ -16,10 +16,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TRNTA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TRNTA_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TRNTA_StripLineComments(Src) {
@@ -42,7 +40,7 @@ _TRNTA_StripLineComments(Src) {
 ; ================================================================
 
 _TRNTA_NoThirdArg() {
-	Src := _TRNTA_StripLineComments(_TRNTA_ReadSource("infra/registry.ahk"))
+	Src := _TRNTA_StripLineComments(_TRNTA_ReadSource("registry.ahk"))
 	Assert(Src != "", "infra/registry.ahk must be readable")
 
 	Body := _DriverFuncBody("Reg_ReadBinary")

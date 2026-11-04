@@ -16,7 +16,10 @@
 global _PathsEarlyLocator := A_Args[1]
 global _PathsEarlyReceipt := A_Args[2]
 global _DriverBootPhase := "starting"
-global _DriverStartupSmokeDir := "owned-early-bootstrap-fixture"
+; Not a smoke: a smoke's fatal path ends through ExitProcess, which skips the
+; OnExit observer below. No dialog opens either way, since Ui_MsgBox is not
+; included here and the handler calls it under try.
+global _DriverStartupSmokeDir := ""
 
 #Include ../../infra/error_net.ahk
 OnError(ErgoptiGlobalErrorHandler)

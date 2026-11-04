@@ -28,6 +28,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -281,16 +282,67 @@ _LLM_Menu_PromptApiEntry(EditId, Port := 0) {
 		return false
 	provider := LLM_API_PROVIDERS[provider_id]
 
-	; Step 2 — base URL (prefilled with the provider default).
-	def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
-	ib := InputFn.Call(t("menu.llm.api_prompt_url"), t("menu.llm.api_window_title"),
-		"w520 h130", def_url)
-	if (ib.Result != "OK")
-		return false
-	if !Owner.Current(Receipt)
-		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
-			"the originating private configuration changed during a prompt")
-	new_url := Trim(ib.Value)
+	; Step 2 — base URL (prefilled with the provider default). A new entry of a
+	; per-account provider asks one value per placeholder of its address instead.
+	Template := ApiUrlTemplateFields(provider["BaseUrl"])
+	if (existing == "" && Template["fields"].Length > 0) {
+		Values := Map()
+		for Name in Template["fields"] {
+			ib := InputFn.Call(t("menu.llm.api_prompt_field." . Name), t("menu.llm.api_window_title"),
+				"w520 h130", "")
+			if (ib.Result != "OK")
+				return false
+			if !Owner.Current(Receipt)
+				return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+					"the originating private configuration changed during a prompt")
+			Values[Name] := Trim(ib.Value)
+			if !ApiUrlTemplateValidValue(Values[Name]) {
+				LoggerError("LLM.menu", "API entry address refused: the '{1}' value cannot fill it.", Name)
+				Body := t("menu.llm.api_prompt_field_invalid"), Title := t("common.error_title")
+				if HasMethod(NotifyFn, "Call")
+					NotifyFn.Call(Body, Title)
+				else
+					Ui_MsgBox(Body, Title, "Icon!")
+				return false
+			}
+		}
+		new_url := ApiUrlTemplateExpand(provider["BaseUrl"], Values)["url"]
+		LoggerInfo("LLM.menu", "API entry address filled for provider '{1}' ({2} account field(s)).",
+			provider_id, Template["fields"].Length)
+	} else if (existing == "" && provider.Get("OptionalAddress", "") is Map) {
+		; The catalogue's address works; one optional value replaces it.
+		Optional := provider["OptionalAddress"]
+		ib := InputFn.Call(t("menu.llm.api_prompt_field." . Optional["field"]), t("menu.llm.api_window_title"),
+			"w520 h130", "")
+		if (ib.Result != "OK")
+			return false
+		if !Owner.Current(Receipt)
+			return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+				"the originating private configuration changed during a prompt")
+		Filled := ApiUrlTemplateOptionalUrl(Optional, Trim(ib.Value))
+		if !(Filled is String) {
+			LoggerError("LLM.menu", "API entry address refused: the '{1}' value cannot fill it.", Optional["field"])
+			Body := t("menu.llm.api_prompt_field_invalid." . Optional["field"]), Title := t("common.error_title")
+			if HasMethod(NotifyFn, "Call")
+				NotifyFn.Call(Body, Title)
+			else
+				Ui_MsgBox(Body, Title, "Icon!")
+			return false
+		}
+		new_url := Filled == "" ? provider["BaseUrl"] : Filled
+		LoggerInfo("LLM.menu", "API entry address for provider '{1}': {2}.", provider_id,
+			Filled == "" ? "the catalogue's" : "the optional field's")
+	} else {
+		def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
+		ib := InputFn.Call(t("menu.llm.api_prompt_url"), t("menu.llm.api_window_title"),
+			"w520 h130", def_url)
+		if (ib.Result != "OK")
+			return false
+		if !Owner.Current(Receipt)
+			return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
+				"the originating private configuration changed during a prompt")
+		new_url := Trim(ib.Value)
+	}
 
 	; Step 3 — token. InputBox does not natively mask, so we use the Hide
 	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
@@ -305,6 +357,9 @@ _LLM_Menu_PromptApiEntry(EditId, Port := 0) {
 		return ConfigReportPersistenceFailure("the LLM API-entry form", NotifyFn,
 			"the originating private configuration changed during a prompt")
 	new_token := ib.Value   ; do NOT Trim — leading/trailing chars are part of the secret
+	; Vertex AI's key is a credentials file, pasted with its line breaks
+	if provider.Get("Auth", "") is Map
+		new_token := LLM_TokenExchange_NormalizeKey(new_token)
 
 	; Step 4 — model.
 	def_model := existing != "" ? _LLM_MenuApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
@@ -959,6 +1014,8 @@ _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info := "") {
 	NetworkKey := Info is Map ? ManagedNetworkFailureWindows_MessageKey(Info.Get("network_report", 0)) : ""
 	if NetworkKey != ""
 		Body .= "`n" . t(NetworkKey)
+	if Info is Map && Info.Get("reason", "") == "token_exchange"
+		Body .= "`n" . t("menu.llm.api_token_exchange_failed")
 	ServerLine := _LLM_Menu_ApiTestServerLine(Info)
 	if (ServerLine != "")
 		Body .= "`n" . ServerLine
@@ -1170,6 +1227,20 @@ _LLM_Menu_ReportApiEntriesLoadFailure(Reason, ReportFn := 0) {
 }
 
 
+; One WARNING per outdated row, naming it as Linux does, so the user can fix the
+; entry by hand: api_entries.json has no cleanup offer.
+; @param Path {String} The api_entries.json the rows came from.
+; @param Retired {Array} The rows _LLM_Menu_ParseAndValidateApiEntries kept aside.
+; @param WarnFn {Func|Integer} Test seam for the log sink.
+_LLM_Menu_ReportRetiredApiEntries(Path, Retired, WarnFn := 0) {
+	Sink := HasMethod(WarnFn, "Call") ? WarnFn : (Message, Args*) => LoggerWarn("LLM", Message, Args*)
+	for Row in Retired
+		ConfigOutdatedReportInFile(Path, "entries[id=" . Row["Id"] . "]",
+			"this build no longer lists its provider '" . Row["Provider"]
+			. "'; the entry is not usable and is written back unchanged", Sink)
+}
+
+
 ; Read api_entries.json on startup and publish only one completely validated
 ; authority. A missing file is normal first-run state; unreadable or corrupt
 ; files are reported and retained byte-for-byte for recovery.
@@ -1192,10 +1263,7 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	if !Parsed["ok"]
 		return _LLM_Menu_ReportApiEntriesLoadFailure(Parsed["reason"], ReportFn)
 	entries := Parsed["entries"]
-	if Parsed["retired"].Length
-		try LoggerWarn("LLM",
-			"Kept {1} API entries whose provider this build no longer lists; they are not usable and are written back unchanged.",
-			Parsed["retired"].Length)
+	_LLM_Menu_ReportRetiredApiEntries(path, Parsed["retired"])
 	; Re-anchor the active id only if it still exists; otherwise pick the
 	; first entry so a corrupted ``api_entry_id`` does not leave the user
 	; with "no active entry" while entries exist on disk.
@@ -1459,17 +1527,19 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		this.Bundle := 0
 		this.BoundReceipt := 0
 		this.Writing := false
+		this.RegistryProof := { registry: 0, shadow: 0 }
+		this.SweepAdmission := false
 	}
 
 	/** Returns native ports without exporting private snapshots through the receipt. */
 	Ports() {
 		return Map("capture_source", ObjBindMethod(this, "Capture"),
-			"source_current", ObjBindMethod(this, "Current"),
+			"source_current", ObjBindMethod(this, "SweepCurrent"),
 			"entry", ObjBindMethod(this, "Entry"),
 			"entry_bound", ObjBindMethod(this, "EntryBound"),
 			"entries_bound", ObjBindMethod(this, "EntriesBound"),
 			"views_bound", ObjBindMethod(this, "ViewsBound"),
-			"admit", ObjBindMethod(this, "Admit"),
+			"admit", ObjBindMethod(this, "SweepAdmit"),
 			"apply", ObjBindMethod(this, "Apply"))
 	}
 
@@ -1480,10 +1550,38 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		finally Critical(PreviousCritical)
 	}
 
+	; Every source operation compares the whole migration registry, so a changed
+	; registry never mints currentness, and that comparison arms the proof below.
+	; Only the local server sweep's own ports (SweepAdmit, SweepCurrent), which
+	; revalidate hundreds of times (18 ms, 1,500 times in one join) and can write
+	; nothing, reuse the proof; each sweep's Capture compares again, and so does a
+	; bound bundle's admission and the transaction's own port.
 	_AdmitNonCritical() {
-		if A_IsSuspended || !ConfigFullStateCanPersist()
+		if A_IsSuspended
+			return false
+		Standing := this.RegistryProof
+		if !this.SweepAdmission || (this.Bundle is Object)
+			Standing.registry := 0, Standing.shadow := 0
+		if !ConfigMigrateWithRegistryProof(ConfigFullStateCanPersist, Standing)
 			return false
 		return this._AdmitContextNonCritical()
+	}
+
+	/** Admit for a local server sweep: reuses the proof of its last full comparison. */
+	SweepAdmit() {
+		return this._WithSweepAdmission(ObjBindMethod(this, "Admit"))
+	}
+
+	/** Current for a local server sweep: reuses the proof of its last full comparison. */
+	SweepCurrent(Receipt) {
+		return this._WithSweepAdmission(ObjBindMethod(this, "Current", Receipt))
+	}
+
+	_WithSweepAdmission(Operation) {
+		Previous := this.SweepAdmission
+		this.SweepAdmission := true
+		try return Operation.Call()
+		finally this.SweepAdmission := Previous
 	}
 
 	; This context fence grants no schema or source permission by itself.
@@ -1875,8 +1973,8 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		; This private mutation owns API fields only. Establish unchanged picker
 		; selections outside Critical; the ordinary publisher's no-change branch
 		; has exactly the two native Map assignments performed below.
-		if !(Stamp is Map) || !AppPicker_SelectionsEqual(Held["menu"].Get("disabled_apps", []),
-				CandidateMenu.Get("disabled_apps", []))
+		if !(Stamp is Map) || !AppPicker_SelectionsEqual(Held["menu"].Get(ConfigLeaf.DISABLED_APPS, []),
+				CandidateMenu.Get(ConfigLeaf.DISABLED_APPS, []))
 				|| !this.CandidateAdmitted(Capability, AdmissionFn)
 			return false
 		PreviousCritical := Critical("On")
@@ -1919,7 +2017,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			"lifecycle", Held["lifecycle"], "lifecycle_generation", Held["lifecycle_generation"],
 			"held", Held, "source", Candidate["source"], "bundle", Candidate["bundle"],
 			"llm", Llm, "models", Models, "entries", _LLM_Menu.Get("api_entries", 0),
-			"disabled_apps", _LLM_Menu.Get("disabled_apps", 0),
+			ConfigLeaf.DISABLED_APPS, _LLM_Menu.Get(ConfigLeaf.DISABLED_APPS, 0),
 			"lease_state", LeaseState, "lease_owners", LeaseState.owners,
 			"config_token", ConfigToken, "api_token", ApiToken, "locator_token", LocatorToken,
 			"refusals", Refusals, "refusal_key", RefusalKey,
@@ -1962,7 +2060,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			&& LLM_Defaults == Held["defaults"] && LLM_Defaults.Get("llm_backend", 0) == Held["default_backend"]
 			&& _LLM_Menu.Get("backend", 0) == Held["backend"] && _LLM_Menu.Get("api_entry_id", 0) == Held["active_id"]
 			&& _LLM_Menu.Get("api_entries", 0) == Stamp["entries"]
-			&& _LLM_Menu.Get("disabled_apps", 0) == Stamp["disabled_apps"]
+			&& _LLM_Menu.Get(ConfigLeaf.DISABLED_APPS, 0) == Stamp[ConfigLeaf.DISABLED_APPS]
 	}
 
 	_Held(Receipt) {
@@ -2114,7 +2212,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 					return false
 				if Path.Length >= 2 && Path[2] == "models" {
 					if Path.Length < 3 || (Path[3] == "selected"
-							&& (!(Record.NativeSection == "llm.models") || !(Record.NativeKey == "selected")))
+							&& (!(Record.NativeSection == ConfigKey.LLM_MODELS) || !(Record.NativeKey == "selected")))
 						return false
 				}
 				if Path.Length >= 2 && Path[2] == "api_entry_id"

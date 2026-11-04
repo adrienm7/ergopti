@@ -29,8 +29,8 @@
 ---    segment, so a 12 ms expansion inside a keystroke reads as the expansion's
 ---    cost, not as two slow lines that bill the same 12 ms twice. Vectors:
 ---    _shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json. The Windows
----    profiler (infra/hotpath_profiler.ahk, _HotPathNestedMs) prints the
----    exclusive time but still judges and reports on the wall clock.
+---    profiler (infra/hotpath_profiler.ahk, HotPathNesting) is the same algorithm
+---    in AutoHotkey and replays the same vectors.
 --- ==============================================================================
 
 local M = {}

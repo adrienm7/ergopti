@@ -247,7 +247,7 @@ helpers.describe("Gestures: declared cached-status refresh and actual native cal
 				local group = f.build()[1]
 				helpers.assert_eq(#group.menu, 3)
 				helpers.assert_eq(group.menu[1].title, "Existing native conflict")
-				helpers.assert_eq(group.menu[2].title, f.strings["gestures.system.pinch"] .. " : " .. f.strings["menu.common.enabled"])
+				helpers.assert_eq(group.menu[2].title, require("locale.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gestures.system.pinch"], f.strings["menu.common.enabled"]))
 				helpers.assert_eq(group.menu[3].title, f.corpus.captions[locale])
 				helpers.assert_type(group.menu[3].fn, "function")
 				helpers.assert_eq(f.refreshes, 0)
@@ -349,7 +349,7 @@ helpers.describe("Gestures: declared cached-status refresh and actual native cal
 				local group = f.build()[1]
 				helpers.assert_eq(group.title, f.strings["gestures.system.clear"])
 				helpers.assert_eq(#group.menu, 2)
-				helpers.assert_eq(group.menu[1].title, f.strings["gestures.system.pinch"] .. " : " .. f.strings[pinch[3]])
+				helpers.assert_eq(group.menu[1].title, require("locale.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gestures.system.pinch"], f.strings[pinch[3]]))
 				helpers.assert_eq(group.menu[2].title, f.corpus.captions.en)
 				helpers.assert_eq(f.refreshes, 0)
 			end)

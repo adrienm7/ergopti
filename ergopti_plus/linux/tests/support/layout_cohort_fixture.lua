@@ -81,9 +81,10 @@ end
 
 --- Creates the controlled map acknowledgement used only by source-order tests.
 --- @param build function Actual textual map parser used by those tests.
+--- @param group integer|nil 1-based group every receipt reports (1 when nil).
 --- @return table capture
 --- @return table scope Explicit non-native fixture description.
-function M.capture(build)
+function M.capture(build, group)
 	assert(type(build) == "function", "a controlled map parser is required")
 	local capture, generation, built = {}, 0, nil
 	local receipts = setmetatable({}, { __mode = "k" })
@@ -114,6 +115,12 @@ function M.capture(build)
 		return accepted
 	end
 	capture.load, capture.is_ready, capture.inverse_table, capture.inverse_current = load, ready, inverse, current
+	-- Every receipt reports the fixture's group, as a native session reports
+	-- the layout index active when the table was taken.
+	capture.inverse_receipt_group = function(receipt)
+		if receipts[receipt] == nil then return nil, "inverse-receipt-unknown" end
+		return group or 1, nil
+	end
 	return capture, { kind = "controlled-capture-acknowledgement", native_reason = "source-selection-protocol-only" }
 end
 

@@ -10,6 +10,8 @@
 
 local h = require("tests.helpers")
 local Shell = require("adapters.shell_runner")
+-- The owned dialog host's command words every native site starts with.
+local DIALOG = require("ui.native_dialog").command()
 
 --- Owns module replacements and pipe restoration for one completed scenario.
 --- @param body function Receives effect observations and a shell authority.
@@ -62,6 +64,17 @@ local function scenario(body)
 end
 
 h.describe("native dialog captions (linux-native-titles)", function()
+	h.it("(linux-native-titles) the choice prompt brands its caption and hides the value column", function()
+		package.loaded["ui.choice_prompt"] = nil
+		local ok, command = pcall(function()
+			return require("ui.choice_prompt").command("Vision provider", "Pick one",
+				{ { value = "openai", label = "OpenAI" } })
+		end)
+		package.loaded["ui.choice_prompt"] = nil
+		h.assert_true(ok, tostring(command))
+		h.assert_eq(command, DIALOG .. " --list --no-markup --hide-header --title='ErgoptiPlus — Vision provider'"
+			.. " --text='Pick one' --column='' --column='' --hide-column=1 --print-column=1 'openai' 'OpenAI' 2>/dev/null")
+	end)
 	h.it("(linux-native-titles) the text prompt brands chrome while retaining masking, choices and exact value", function()
 		scenario(function(observed)
 			observed.answer, observed.status = " exact value \n", 0
@@ -69,7 +82,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 				{ "First choice", "Second 'choice'" })
 			h.assert_eq(value, " exact value ")
 			h.assert_eq(observed.modals, 1)
-			h.assert_eq(observed.commands[1], "zenity --entry --title='ErgoptiPlus — Native '\\''caption'\\'''"
+			h.assert_eq(observed.commands[1], DIALOG .. " --entry --title='ErgoptiPlus — Native '\\''caption'\\'''"
 				.. " --text='Preserved <body>' --entry-text=' Initial ' --hide-text 'First choice' 'Second '\\''choice'\\''' 2>/dev/null")
 		end)
 	end)
@@ -83,43 +96,36 @@ h.describe("native dialog captions (linux-native-titles)", function()
 			h.assert_eq(observed.modals, 2)
 		end)
 	end)
-	for _, backend in ipairs({ "zenity", "kdialog" }) do
-		h.it("(linux-native-titles) the application chooser keeps its backend, filter and id: " .. backend, function()
-			scenario(function(observed, shell)
-				observed.backend, observed.answer, observed.status = backend, "/usr/share/applications/org.example.Native.desktop", 0
-				h.assert_eq(require("ui.app_chooser").pick(shell, "Choose application"), "org.example.Native")
-				local expected = backend == "zenity"
-					and "zenity --file-selection --title='ErgoptiPlus — Choose application' --filename='/usr/share/applications/' --file-filter='*.desktop' 2>/dev/null"
-					or "kdialog --getopenfilename '/usr/share/applications/' '*.desktop' --title 'ErgoptiPlus — Choose application' 2>/dev/null"
-				h.assert_eq(observed.commands[1], expected)
-				h.assert_eq(observed.modals, 1)
-			end)
+	h.it("(linux-native-titles) the application chooser keeps its filter and id", function()
+		scenario(function(observed, shell)
+			observed.answer, observed.status = "/usr/share/applications/org.example.Native.desktop", 0
+			h.assert_eq(require("ui.app_chooser").pick(shell, "Choose application"), "org.example.Native")
+			h.assert_eq(observed.commands[1], DIALOG .. " --file-selection --title='ErgoptiPlus — Choose application'"
+				.. " --filename='/usr/share/applications/' --file-filter='*.desktop' 2>/dev/null")
+			h.assert_eq(observed.modals, 1)
 		end)
-		h.it("(linux-native-titles) the directory picker keeps its backend and normalized result: " .. backend, function()
-			scenario(function(observed, shell)
-				observed.backend, observed.answer, observed.status = backend, "/owned/chosen/", 0
-				local paths = { default_config_dir = function() return "/owned/default" end }
-				local value = require("ui.config_dir_picker").pick(shell, paths, require("infra.i18n"), "/owned/current")
-				h.assert_eq(value, "/owned/chosen")
-				local expected = backend == "zenity"
-					and "zenity --file-selection --directory --title='ErgoptiPlus — Select configuration folder' --filename='/owned/current/' 2>/dev/null"
-					or "kdialog --getexistingdirectory '/owned/current' --title 'ErgoptiPlus — Select configuration folder' 2>/dev/null"
-				h.assert_eq(observed.commands[1], expected)
-				h.assert_eq(observed.modals, 1)
-			end)
+	end)
+	h.it("(linux-native-titles) the directory picker keeps its normalized result", function()
+		scenario(function(observed, shell)
+			observed.answer, observed.status = "/owned/chosen/", 0
+			local paths = { default_config_dir = function() return "/owned/default" end }
+			local value = require("ui.config_dir_picker").pick(shell, paths, require("infra.i18n"), "/owned/current")
+			h.assert_eq(value, "/owned/chosen")
+			h.assert_eq(observed.commands[1], DIALOG .. " --file-selection --directory"
+				.. " --title='ErgoptiPlus — Select configuration folder' --filename='/owned/current/' 2>/dev/null")
+			h.assert_eq(observed.modals, 1)
 		end)
-		h.it("(linux-native-titles) system confirmation preserves safe cancellation and command chaining: " .. backend, function()
-			scenario(function(observed)
-				observed.backend = backend
-				local command = require("modules.gestures.system_actions").confirmed_command("Owned action", "printf owned",
-					function(binary) return binary == backend end)
-				h.assert_true(command:find("ErgoptiPlus — Confirm action", 1, true) ~= nil)
-				h.assert_true(command:find("dialog.confirm_action.message", 1, true) ~= nil)
-				h.assert_eq(command:sub(-#" && { printf owned; }"), " && { printf owned; }")
-				h.assert_true(command:find(backend == "zenity" and "--default-cancel" or "; [ $? -eq 1 ]; }", 1, true) ~= nil)
-			end)
+	end)
+	h.it("(linux-native-titles) system confirmation preserves safe cancellation and command chaining", function()
+		scenario(function()
+			local command = require("modules.gestures.system_actions").confirmed_command("Owned action", "printf owned")
+			h.assert_eq(command:sub(1, #DIALOG + 1), DIALOG .. " ", "the owned dialog asks, never a host tool")
+			h.assert_true(command:find("ErgoptiPlus — Confirm action", 1, true) ~= nil)
+			h.assert_true(command:find("dialog.confirm_action.message", 1, true) ~= nil)
+			h.assert_eq(command:sub(-#" && { printf owned; }"), " && { printf owned; }")
+			h.assert_true(command:find("--default-cancel", 1, true) ~= nil)
 		end)
-	end
+	end)
 	h.it("(linux-native-titles) gesture conflict chrome is branded without changing cancellation persistence", function()
 		scenario(function(observed)
 			local admitted = require("ui.gesture_conflicts").show({ key = "swipe_3", slot = "swipe_3_left" })
@@ -137,7 +143,7 @@ end)
 
 h.describe("native menu dialog captions", function()
 	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
-		local names = { "ui.menu.menu_builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows" }
+		local names = { "ui.menu.builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local original_execute = os.execute
@@ -153,13 +159,12 @@ h.describe("native menu dialog captions", function()
 			opts.fail("Preserved <failure>")
 		end }
 		os.execute = function(command)
-			if command == "command -v zenity >/dev/null 2>&1" then return 0 end
 			commands[#commands + 1] = command
-			return command:find("zenity --question", 1, true) and 1 or 0
+			return command:find("dialog_host.lua' --question", 1, true) and 256 or 0
 		end
 		local ok, err = xpcall(function()
 			local i18n = require("infra.i18n")
-			local items = require("ui.menu.menu_builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
+			local items = require("ui.menu.builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
 			local found
 			for _, item in ipairs(items) do
 				for _, row in ipairs(item.menu or {}) do
@@ -171,20 +176,20 @@ h.describe("native menu dialog captions", function()
 			h.assert_eq(accepted, false, "native Cancel remains a refusal")
 			h.assert_eq(modals, 2, "both real dialog callbacks release the keyboard")
 			local title = Shell.quote("ErgoptiPlus — " .. i18n.get("menu.global.uninstall"))
-			h.assert_eq(commands[1], "zenity --question --title=" .. title
+			h.assert_eq(commands[1], DIALOG .. " --question --title=" .. title
 				.. " --text='Preserved &lt;confirmation&gt;' --ok-label=" .. Shell.quote(i18n.get("button.remove"))
 				.. " --cancel-label=" .. Shell.quote(i18n.get("button.cancel")) .. " 2>/dev/null")
-			h.assert_eq(commands[2], "zenity --error --title=" .. title
+			h.assert_eq(commands[2], DIALOG .. " --error --title=" .. title
 				.. " --text='Preserved &lt;failure&gt;' 2>/dev/null")
 			h.assert_type(dialogs, "table", "the model selector page receives the native dialog ports")
 			dialogs.info("Native information", "Preserved information body")
-			h.assert_eq(commands[3], "zenity --info --title='ErgoptiPlus — Native information'"
+			h.assert_eq(commands[3], DIALOG .. " --info --title='ErgoptiPlus — Native information'"
 				.. " --text='Preserved information body' 2>/dev/null")
 			dialogs.error("Preserved untitled failure")
-			h.assert_eq(commands[4], "zenity --error --title=" .. Shell.quote("ErgoptiPlus — " .. i18n.get("common.error_title"))
+			h.assert_eq(commands[4], DIALOG .. " --error --title=" .. Shell.quote("ErgoptiPlus — " .. i18n.get("common.error_title"))
 				.. " --text='Preserved untitled failure' 2>/dev/null")
 			dialogs.error("Preserved explicit empty caption", "")
-			h.assert_eq(commands[5], "zenity --error --title='ErgoptiPlus'"
+			h.assert_eq(commands[5], DIALOG .. " --error --title='ErgoptiPlus'"
 				.. " --text='Preserved explicit empty caption' 2>/dev/null")
 			h.assert_eq(modals, 5)
 		end, debug.traceback)
@@ -196,7 +201,7 @@ end)
 
 
 h.describe("programmable source problems open no dialog", function()
-	-- A refused source action used to open a zenity question offering to open
+	-- A refused source action used to open a native question offering to open
 	-- the source. The row now names the problem instead: a refusal redraws the
 	-- menu and runs no native dialog, whatever the problem.
 	for _, problem in ipairs({ false, "missing", "failed" }) do
@@ -240,7 +245,7 @@ h.describe("programmable source problems open no dialog", function()
 				h.assert_eq(calls.changed, 2, "each refusal redraws the menu so the row shows the state")
 				h.assert_eq(calls.path, 0, "nothing offers or opens the source")
 				h.assert_eq(observed.modals, 0, "no native modal opens")
-				h.assert_eq(observed.commands, {}, "no zenity question or editor command runs")
+				h.assert_eq(observed.commands, {}, "no native question or editor command runs")
 			end)
 		end)
 	end
@@ -262,7 +267,7 @@ h.describe("one-click check report caption (linux-native-titles)", function()
 			h.assert_eq(observed.modals, 1)
 			h.assert_eq(#observed.commands, 1)
 			local command = observed.commands[1]
-			local head = "zenity --question --no-markup --title='ErgoptiPlus — Native '\\''check'\\''' --text="
+			local head = DIALOG .. " --question --no-markup --title='ErgoptiPlus — Native '\\''check'\\''' --text="
 			h.assert_eq(command:sub(1, #head), head)
 			local tail = " --ok-label='field_check.copy' --cancel-label='field_check.close'"
 			h.assert_eq(command:sub(-#tail), tail, "Close answers the dialog without a copy")
@@ -274,17 +279,21 @@ end)
 h.describe("native caption consumer inventory", function()
 	h.it("(linux-native-titles) every production CLI caption remains in the independently bounded owner inventory", function()
 		local expected = {
-			["ui/text_prompt.lua"] = 1,
-			["ui/app_chooser.lua"] = 2,
-			["ui/config_dir_picker.lua"] = 2,
-			["ui/gesture_conflicts.lua"] = 1,
-			["modules/gestures/system_actions.lua"] = 2,
-			["ui/menu/menu_builder.lua"] = 3,
-			["modules/llm/local_model_offer.lua"] = 2,
-			-- The enable refusal tests prove both policy-owned native captions and modal receipts.
-			["ui/llm_enable_refusal.lua"] = 2,
+			["ui.text_prompt"] = 1,
+			-- The application picker's two captions, and the open_path picker's two,
+			-- composed through window_titles and proven by test_user_actions.
+			["ui.app_chooser"] = 2,
+			["ui.config_dir_picker"] = 1,
+			["ui.gesture_conflicts"] = 1,
+			["modules.gestures.system_actions"] = 1,
+			["ui.menu.menu_dialogs"] = 3,
+			["modules.llm.local_model_offer"] = 1,
+			-- The enable refusal tests prove the policy-owned native caption and modal receipts.
+			["ui.llm_enable_refusal"] = 1,
 			-- The one-click check runner owns the caption of every check report.
-			["ui/field_check/window.lua"] = 1,
+			["ui.field_check.window"] = 1,
+			-- The list prompt's caption is proven by the choice prompt case.
+			["ui.choice_prompt"] = 1,
 		}
 		local observed = {}
 		local root = h.driver_root()
@@ -298,7 +307,8 @@ h.describe("native caption consumer inventory", function()
 		h.assert_eq(paths:sub(-1), "\0", "production discovery finishes every exact pathname record")
 		for path in paths:gmatch("([^%z]+)%z") do
 			h.assert_eq(path:sub(1, #root + 1), root .. "/", "discovered source belongs to the exact driver root")
-			local child = path:sub(#root + 2)
+			-- Keyed by module name, as the code requires it, not by path.
+			local child = path:sub(#root + 2):gsub("%.lua$", ""):gsub("/", ".")
 			local file = assert(io.open(path, "rb"))
 			local source = assert(file:read("*a")); assert(file:close())
 			local _, count = source:gsub("%-%-title", "")
@@ -308,23 +318,22 @@ h.describe("native caption consumer inventory", function()
 		local file = assert(io.open(root .. "/uninstall.sh", "rb"))
 		local source = assert(file:read("*a")); assert(file:close())
 		local _, count = source:gsub("%-%-title", "")
-		-- One caption, GUI_TITLE from the tested GUI handoff, shown by zenity or by the
-		-- kdialog fallback (tools/test/test-linux-uninstall-sandbox.cjs proves both).
-		h.assert_eq(count, 2, "the independent removal worker shows its one handed-off caption through two dialog tools")
+		-- One caption, GUI_TITLE from the tested GUI handoff, shown by the owned dialog
+		-- host (tools/test/test-linux-uninstall-sandbox.cjs proves it).
+		h.assert_eq(count, 1, "the independent removal worker shows its one handed-off caption through the owned dialog")
 	end)
 end)
 
 --- Receives an original picker through a private executable's real exit status.
---- @param backend string Native chooser name.
 --- @param status number Independent child exit code.
 --- @param output string Independent child stdout.
 --- @param application_root string|nil Real XDG data root for the application chooser.
 --- @return string receipt
-local function picker_exit_receipt(backend, status, output, application_root)
+local function picker_exit_receipt(status, output, application_root)
 	local created, directory = Shell.exec_checked("mktemp -d")
 	assert(created)
 	directory = directory:gsub("[\r\n]+$", "")
-	local executable, worker = directory .. "/" .. backend, directory .. "/worker.lua"
+	local executable, worker = directory .. "/dialog", directory .. "/worker.lua"
 	local function write(path, content)
 		local file = assert(io.open(path, "wb"))
 		assert(file:write(content)); assert(file:close())
@@ -334,8 +343,8 @@ local function picker_exit_receipt(backend, status, output, application_root)
 		assert(Shell.run("chmod u+x " .. Shell.quote(executable)))
 		write(worker, "package.path = " .. string.format("%q", package.path) .. "\n"
 			.. "local shell = require('adapters.shell_runner')\n"
-			.. "local has_command = shell.has_command\n"
-			.. "shell.has_command = function(name) return name == " .. string.format("%q", backend) .. " and has_command(name) end\n"
+			-- The private executable stands in for the owned dialog host.
+			.. "package.loaded['ui.native_dialog'] = { command = function() return shell.quote(" .. string.format("%q", executable) .. ") end }\n"
 			.. "local modals = 0\n"
 			.. "package.loaded['ui.modal'] = { run = function(fn) modals = modals + 1; return fn() end }\n"
 			.. "local paths = { default_config_dir = function() return '/owned/default' end }\n"
@@ -358,9 +367,9 @@ local function picker_exit_receipt(backend, status, output, application_root)
 end
 
 h.describe("native configuration picker exit receipts", function()
-	for _, backend in ipairs({ "zenity", "kdialog" }) do
+	do local backend = "owned dialog"
 		h.it("linux-config-picker-exit: " .. backend .. " accepts successful normalized selection", function()
-			h.assert_eq(picker_exit_receipt(backend, 0, "/owned/chosen/\n"), "accepted|/owned/chosen|modal:1")
+			h.assert_eq(picker_exit_receipt(0, "/owned/chosen/\n"), "accepted|/owned/chosen|modal:1")
 		end)
 		for _, case in ipairs({
 			{ "spaces", "/  configuration  " },
@@ -375,7 +384,7 @@ h.describe("native configuration picker exit receipts", function()
 				local selected = directory .. case[2]
 				local ok, receipt = xpcall(function()
 					assert(Shell.run("mkdir -- " .. Shell.quote(selected)))
-					return picker_exit_receipt(backend, 0, selected .. "\n")
+					return picker_exit_receipt(0, selected .. "\n")
 				end, debug.traceback)
 				assert(Shell.run("rmdir -- " .. Shell.quote(selected) .. " " .. Shell.quote(directory)))
 				if not ok then error(receipt, 0) end
@@ -385,17 +394,17 @@ h.describe("native configuration picker exit receipts", function()
 		end
 		for _, status in ipairs({ 1, 7 }) do
 			h.it("linux-config-picker-exit: " .. backend .. " refuses absolute stdout after exit " .. status, function()
-				h.assert_eq(picker_exit_receipt(backend, status, "/untrusted/selection\n"), "refused|modal:1")
+				h.assert_eq(picker_exit_receipt(status, "/untrusted/selection\n"), "refused|modal:1")
 			end)
 		end
 		h.it("linux-config-picker-exit: " .. backend .. " refuses successful empty stdout", function()
-			h.assert_eq(picker_exit_receipt(backend, 0, ""), "refused|modal:1")
+			h.assert_eq(picker_exit_receipt(0, ""), "refused|modal:1")
 		end)
 	end
 end)
 
 h.describe("native application picker record admission", function()
-	for _, backend in ipairs({ "zenity", "kdialog" }) do
+	do local backend = "owned dialog"
 		h.it("picker-native-record: " .. backend .. " never replaces a selected desktop file with its first line", function()
 			local created, directory = Shell.exec_checked("mktemp -d")
 			assert(created)
@@ -410,7 +419,7 @@ h.describe("native application picker record admission", function()
 					assert(file:write("[Desktop Entry]\nType=Application\nName=Owned\nExec=true\n"))
 					assert(file:close())
 				end
-				return picker_exit_receipt(backend, 0, selected .. "\n", directory)
+				return picker_exit_receipt(0, selected .. "\n", directory)
 			end, debug.traceback)
 			os.remove(prefix); os.remove(selected)
 			assert(Shell.run("rmdir -- " .. Shell.quote(applications) .. " " .. Shell.quote(directory)))
@@ -423,10 +432,10 @@ end)
 
 
 h.describe("configuration filesystem root", function()
-	for _, backend in ipairs({ "zenity", "kdialog" }) do
+	do local backend = "owned dialog"
 		h.it("linux-config-root: picker preserves a successful root selection: " .. backend, function()
 			scenario(function(observed, shell)
-				observed.backend, observed.answer, observed.status = backend, "/\n", 0
+				observed.answer, observed.status = "/\n", 0
 				local paths = { default_config_dir = function() return "/owned/default" end }
 				local picker = require("ui.config_dir_picker")
 				h.assert_eq(picker.pick(shell, paths, require("infra.i18n"), "/"), "/")

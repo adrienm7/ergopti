@@ -208,6 +208,28 @@ helpers.describe("word-expander terminator mutations are transactional", functio
 		i18n.get("common.restore_recommended"),
 	}
 
+	helpers.it("a consumption row flips its delimiter's choice alone (PAR-8)", function()
+		local i18n_get = i18n.get
+		local fixture = run_action(i18n_get("menu.hotstrings.check_all"), "true", { inspect_only = true })
+		local rows = fixture.controls
+		local group
+		for _, row in ipairs(rows) do
+			if (row.label or row.title) == i18n_get("menu.hotstrings.consumed_delimiters") then group = row end
+		end
+		helpers.assert_type(group, "table", "the submenu is drawn")
+		local children = group.items or group.submenu or group.menu
+		helpers.assert_eq(#children, 2, "one row per built-in delimiter, the custom one apart")
+		helpers.assert_eq(children[1].checked == true, false, "space is not consumed")
+		helpers.assert_eq(children[2].checked, true, "slash is")
+		helpers.assert_eq((children[1].action or children[1].fn)(), true)
+		helpers.assert_eq(fixture.consumed.space, true, "the choice flips")
+		helpers.assert_eq(fixture.state.terminator_consume.space, true, "off its catalogue value, it is stored")
+		helpers.assert_eq(fixture.calls.batches + fixture.calls.singles, 0, "the on/off switch stays")
+		helpers.assert_eq((children[2].action or children[2].fn)(), true)
+		helpers.assert_eq(fixture.state.terminator_consume.slash, nil, "back on its catalogue value, no key is stored")
+		helpers.assert_eq(fixture.calls.saves, 2)
+	end)
+
 	helpers.it("retains every acknowledged bit when a bulk mutation is refused", function()
 		for _, label in ipairs(bulk_labels) do
 			for _, outcome in ipairs(FAILURE_OUTCOMES) do

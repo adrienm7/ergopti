@@ -10,69 +10,77 @@
 ---
 --- Fix (2026-06-19): save() now uses readAllData() and restore() uses
 --- writeAllData(), matching the approach in keymap/utils.lua.
+---
+--- Behaviour, not spelling: the adapter runs against a pasteboard double that
+--- holds several types at once and keeps only text through its text-only calls,
+--- so a save/restore round trip that goes through text loses the image and fails.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
+local TEXT = "public.utf8-plain-text"
+local IMAGE = "public.png"
+
+--- Builds a pasteboard double holding a text and an image item.
+--- @return table pasteboard The hs.pasteboard double.
+--- @return table state Its current types, read by the assertions.
+local function multi_type_pasteboard()
+	local state = { types = { [TEXT] = "caption", [IMAGE] = "\137PNG\r\n" }, generation = 7 }
+	local function copy(types)
+		local out = {}
+		for key, value in pairs(types) do out[key] = value end
+		return out
+	end
+	local pasteboard = {
+		readAllData = function() return copy(state.types) end,
+		writeAllData = function(data)
+			state.types, state.generation = copy(data), state.generation + 1
+			return true
+		end,
+		-- The text-only API drops every other type, as the real one does.
+		getContents = function() return state.types[TEXT] end,
+		setContents = function(text)
+			state.types, state.generation = { [TEXT] = text }, state.generation + 1
+			return true
+		end,
+		clearContents = function() state.types, state.generation = {}, state.generation + 1 end,
+		changeCount = function() return state.generation end,
+	}
+	return pasteboard, state
+end
+
 
 
 
 -- =========================================================================
 -- =========================================================================
--- ======= 1/ Clipboard adapter uses all-type API ==========================
+-- ======= 1/ Clipboard adapter round trip keeps every type ================
 -- =========================================================================
 -- =========================================================================
 
 helpers.describe("clipboard: save/restore uses all pasteboard types", function()
-	helpers.it("save() uses readAllData, not getContents", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/adapters/clipboard.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open adapters/clipboard.lua")
-		local src = fh:read("*a")
-		fh:close()
-
-		-- save() must use readAllData
-		helpers.assert_true(
-			src:find("readAllData", 1, true) ~= nil,
-			"Clipboard.save() must use readAllData() to preserve non-text clipboard types"
-		)
-		-- Must NOT use getContents inside save()
-		local save_start = src:find("function M.save()", 1, true)
-		local restore_start = src:find("function M.restore(", 1, true)
-		helpers.assert_true(save_start ~= nil, "function M.save() must exist")
-		helpers.assert_true(restore_start ~= nil, "function M.restore() must exist")
-		local save_body = src:sub(save_start, restore_start)
-		helpers.assert_true(
-			save_body:find("getContents", 1, true) == nil,
-			"Clipboard.save() must not use getContents() (text-only, destroys non-text clipboard)"
-		)
+	helpers.it("a save, a text write and a restore give back the image and the text", function()
+		local pasteboard, state = multi_type_pasteboard()
+		local clipboard = helpers.load_with_stubs("adapters.clipboard", { pasteboard = pasteboard })
+		local saved, ok = clipboard.save()
+		helpers.assert_true(ok, "save() reports success")
+		helpers.assert_eq(type(saved), "table", "a clipboard holding an image is saved, not reported empty")
+		-- A synthetic paste replaces the clipboard with text, as the hotstrings do.
+		helpers.assert_true(clipboard.write("expansion"))
+		helpers.assert_nil(state.types[IMAGE], "the double drops the image on a text write")
+		helpers.assert_true(clipboard.restore(saved))
+		helpers.assert_eq(state.types[IMAGE], "\137PNG\r\n", "restore() must bring the image back")
+		helpers.assert_eq(state.types[TEXT], "caption", "restore() must bring the text back")
 	end)
 
-	helpers.it("restore() uses writeAllData, not setContents", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/adapters/clipboard.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open adapters/clipboard.lua")
-		local src = fh:read("*a")
-		fh:close()
-
-		-- restore() must use writeAllData
-		helpers.assert_true(
-			src:find("writeAllData", 1, true) ~= nil,
-			"Clipboard.restore() must use writeAllData() to preserve all pasteboard types"
-		)
-		-- Must NOT use setContents inside restore()
-		local restore_start = src:find("function M.restore(", 1, true)
-		helpers.assert_true(restore_start ~= nil, "function M.restore() must exist")
-		local restore_body = src:sub(restore_start)
-		helpers.assert_true(
-			restore_body:find("setContents", 1, true) == nil,
-			"Clipboard.restore() must not use setContents() (text-only)"
-		)
+	helpers.it("an image-only clipboard is saved and restored, never cleared", function()
+		local pasteboard, state = multi_type_pasteboard()
+		state.types = { [IMAGE] = "\137PNG\r\n" }
+		local clipboard = helpers.load_with_stubs("adapters.clipboard", { pasteboard = pasteboard })
+		local saved = clipboard.save()
+		helpers.assert_eq(type(saved), "table", "a clipboard without text is not empty")
+		clipboard.write("expansion")
+		helpers.assert_true(clipboard.restore(saved))
+		helpers.assert_eq(state.types[IMAGE], "\137PNG\r\n")
 	end)
 end)

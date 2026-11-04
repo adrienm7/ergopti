@@ -4,8 +4,9 @@
 --- MODULE: Tap-Hold Key Catalogue (shared)
 --- DESCRIPTION:
 --- Reads `[tap_hold.catalog]` from `_shared/tap_hold/defaults.toml`: every key a
---- tap-hold can be set on, in tray order, with its hand and its label key, and
---- the id each driver's engine gives it. A driver asks for its own column and
+--- tap-hold can be set on, in tray order, with its hand and the id each
+--- driver's engine gives it. Its name is the shared key name table's
+--- (_shared/data/keycodes/key_names.json), under each OS's usual name. A driver asks for its own column and
 --- gets its keys in order; the Tap-Hold submenu lists them under one header per
 --- hand.
 ---
@@ -20,15 +21,20 @@
 --- or a key would be the exact failure this table exists to end.
 --- ==============================================================================
 
+local KeyNames = require("keycodes.key_names")
+
 local M = {}
 
 --- The driver columns an entry may carry.
 M.PLATFORMS = { "ahk", "hs", "linux" }
 
+--- The key name table's platform of each driver column.
+local KEY_NAME_PLATFORM = { ahk = "windows", hs = "macos", linux = "linux" }
+
 --- The hands, in the order the Tap-Hold submenu shows them.
 M.HANDS = { "left", "right" }
 
-local KNOWN_FIELDS = { id = true, hand = true, label_key = true, ahk = true, hs = true, linux = true }
+local KNOWN_FIELDS = { id = true, hand = true, ahk = true, hs = true, linux = true }
 
 
 
@@ -65,7 +71,8 @@ local function validate(keys)
 		if not hands[entry.hand] then
 			error(string.format("%s: hand must be 'left' or 'right', got '%s'", where, tostring(entry.hand)), 0)
 		end
-		if not is_name(entry.label_key) then error(where .. " has no label_key", 0) end
+		-- The name comes from the shared key name table, never from the catalogue.
+		if KeyNames.canonical(entry.id) ~= entry.id then error(where .. " has no key name", 0) end
 		local columns = 0
 		for _, platform in ipairs(M.PLATFORMS) do
 			local id = entry[platform]
@@ -100,7 +107,8 @@ end
 --- @param defaults table The decoded `_shared/tap_hold/defaults.toml`.
 --- @param platform string "ahk", "hs" or "linux".
 --- @return table Array of { id, key, hand, label_key }: `id` is the driver's own
----   key id, `key` the catalogue id.
+---   key id, `key` the catalogue id, `label_key` the locale key the shared key
+---   name table gives it on that driver's OS.
 function M.for_platform(defaults, platform)
 	local known = false
 	for _, name in ipairs(M.PLATFORMS) do known = known or name == platform end
@@ -114,7 +122,8 @@ function M.for_platform(defaults, platform)
 	local out = {}
 	for _, entry in ipairs(catalog.keys) do
 		if entry[platform] ~= nil then
-			out[#out + 1] = { id = entry[platform], key = entry.id, hand = entry.hand, label_key = entry.label_key }
+			out[#out + 1] = { id = entry[platform], key = entry.id, hand = entry.hand,
+				label_key = KeyNames.i18n(entry.id, KEY_NAME_PLATFORM[platform]) }
 		end
 	end
 	if #out == 0 then error("[tap_hold.catalog] lists no key for '" .. platform .. "'", 0) end

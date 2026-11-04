@@ -23,9 +23,10 @@ end
 --- deps: source, resolver, installed, file_factory, admission, install_phase,
 --- process (single finite/service bridge), http, owned_timer, timings, environment,
 --- serve_environment (rows of the shared managed_ollama_environment.json),
---- optional network ({policy,lookup,timeout_ms,origins}: the shared proxy policy,
---- the owned system proxy lookup, its bound and the route_origins.json "ollama"
---- inventory, see managed_ollama_proxy.lua).
+--- optional network ({policy,lookup,timeout_ms,origins,relay}: the shared proxy policy,
+--- the owned system proxy lookup, its bound, the route_origins.json "ollama"
+--- inventory and the sign-in relay binding (infra/proxy_auth_relay.lua: policy,
+--- probe, timeout_ms, executable, timings), see managed_ollama_proxy.lua).
 --- `source` owns captured enable/app source proofs and existing writer ACK.
 function M.new(deps)
 	assert(type(deps)=='table', 'runtime composition unavailable')
@@ -57,7 +58,9 @@ function M.new(deps)
 	local network=d.network
 	if network~=nil then
 		assert(type(network)=='table' and type(network.policy)=='table' and type(network.lookup)=='function'
-			and type(network.timeout_ms)=='number' and type(network.origins)=='table', 'managed network port unavailable')
+			and type(network.timeout_ms)=='number' and type(network.origins)=='table'
+			and type(network.relay)=='table' and type(network.relay.executable)=='function'
+			and type(network.relay.timings)=='function', 'managed network port unavailable')
 		for _,name in ipairs(require('modules.llm.managed_ollama_proxy').VARIABLES) do proxy_names[name]=true end
 	end
 	local p={current=s.current,publish=s.publish,app_capture=s.app_capture,app_current=s.app_current, compensate=s.compensate,
@@ -112,12 +115,28 @@ function M.new(deps)
 		for _,row in ipairs(serve_environment) do env[#env+1]=row end
 		for _,row in ipairs(selected) do env[#env+1]=row end
 		if not current(authorized) then return empty('runtime_source_changed',done) end
+		-- A proxy that demands an NTLM/Negotiate sign-in: the relay serves the
+		-- daemon for its lifetime and is the process this service owns, so it
+		-- stops with Ergopti exactly as the daemon did (proxy-auth-relay.md).
+		if options.relay~=nil then
+			local relay=network and network.relay
+			local relay_executable=relay and relay.executable()
+			if type(options.relay)~='table' or not relay_executable then
+				return empty('runtime_proxy_relay_unavailable',done)
+			end
+			local wrapped=relay.policy.run_args(options.relay.upstream,
+				{require('modules.llm.managed_ollama_proxy').VARIABLE},relay.timings(),executable,args)
+			if not wrapped then return empty('runtime_proxy_relay_unavailable',done) end
+			executable,args=relay_executable,wrapped
+		end
 		return serve_start(executable,args,{owner=options.owner,authorized=authorized,
 			timeout_ms=false,env=env,capture_tail=true},done)
 	end
 	if network~=nil then
 		local proxy_port=require('modules.llm.managed_ollama_proxy').new({policy=network.policy,lookup=network.lookup,
-			environment=environment,timeout_ms=network.timeout_ms,owner='ollama-runtime-proxy',origins=network.origins})
+			environment=environment,timeout_ms=network.timeout_ms,owner='ollama-runtime-proxy',origins=network.origins,
+			relay=network.relay,
+			probe=network.probe,relay_address=network.relay_address,probe_timeout_ms=network.probe_timeout_ms})
 		function p.network(budget,authorized,done) return proxy_port(budget,authorized,done) end
 	end
 	function p.probe(url,budget,authorized,done)

@@ -39,7 +39,7 @@ M.HINTS = {
 }
 
 -- The wire formats whose providers list their models at <base>/models.
-local LISTING_FORMATS = { openai = true, anthropic = true, gemini = true }
+local LISTING_FORMATS = { openai = true, anthropic = true, gemini = true, perplexity_agent = true }
 
 --- Whether providers of one wire format answer a model listing.
 --- @param format string Provider wire format (api_providers.json).

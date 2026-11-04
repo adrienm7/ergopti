@@ -70,72 +70,6 @@ Test("llm menu: the suggestion count heads the generation submenu (llm-count-row
 	_LLMPC_CountHeadsGenerationRows)
 
 
-/** Exercises one true boundary through the actual native numeric allocator and Win32 menu. */
-_LLMPC_GenerationBoundary(Key) {
-	global _LLM_Menu, _SharedDir, LLM_MENU_N_OPTIONS, LLM_Defaults
-	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\generation_boundaries.json", "UTF-8"))
-	Expected := Corpus["boundaries"][Key]
-	Saved := _LLM_Menu
-	HadDefaults := IsSet(LLM_Defaults)
-	if HadDefaults
-		SavedDefaults := LLM_Defaults
-	Frame := _MR_GetMenuDef(Expected["section"])
-	Original := Frame[1]
-	Native := 0
-	try {
-		LLM_Defaults_Load()
-		Assert(Type(_LLM_DefaultFor("llm_num_predictions")) == "Integer", "the genuine defaults loader supplies the numeric fixture prerequisite")
-		_LLM_Menu := Saved.Clone()
-		_LLM_Menu["n_predictions"] := _LLM_DefaultFor("llm_num_predictions")
-		_LLM_Menu["ctx_chars"] := _LLM_DefaultFor("llm_context_length", 500)
-		_LLM_Menu["min_words"] := _LLM_DefaultFor("llm_min_words", 3)
-		_LLM_Menu["max_words"] := _LLM_DefaultFor("llm_max_words", 15)
-		_LLM_Menu["temperature"] := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
-		Rows := _LLM_Menu_GenerationRows()
-		AssertEqual(9, Rows.Length, "the independent default numeric order has no optional reset")
-		Position := Key == "count" ? 2 : Key == "context" ? 5 : 8
-		AssertTrue(Rows[Position]["separator"])
-		AssertEqual(LLM_MENU_N_OPTIONS.Length, Rows[1]["items"].Length)
-		AssertTrue(HasMethod(Rows[3]["action"], "Call"))
-		AssertTrue(HasMethod(Rows[4]["action"], "Call"))
-		AssertTrue(HasMethod(Rows[6]["action"], "Call"))
-		AssertTrue(HasMethod(Rows[7]["action"], "Call"))
-		AssertTrue(HasMethod(Rows[9]["action"], "Call"))
-		Native := Menu()
-		MenuRenderer_AppendRows(Native, "llm_generation_menu", "llm_generation_values", Rows)
-		AssertEqual(Rows.Length, DllCall("GetMenuItemCount", "ptr", Native.Handle, "int"))
-		Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", Position - 1, "uint", 0x400, "uint")
-		Assert(Flags != 0xFFFFFFFF && (Flags & 0x800) != 0, "the actual native boundary remains a separator")
-		Frame[1] := Map("type", "label", "id", "generation_boundary_marker", "i18n", Corpus["published_marker_key"],
-			"platforms", Original["platforms"], "unavailable", "hide")
-		Rows := _LLM_Menu_GenerationRows()
-		AssertEqual(9, Rows.Length)
-		AssertEqual(t(Corpus["published_marker_key"]), Rows[Position].Get("label", ""), "the true native allocator consumes its shared declaration")
-		AssertTrue(Rows[Position]["disabled"])
-		AssertFalse(Rows[Position].Has("action"))
-		AssertTrue(HasMethod(Rows[9]["action"], "Call"))
-		Frame[1] := Map("type", "command", "id", "unowned_generation_boundary", "i18n", Corpus["published_marker_key"],
-			"platforms", Original["platforms"], "unavailable", "hide")
-		AssertEqual(0, _LLM_Menu_GenerationRows().Length, "a refused boundary cannot fall back to native presentation")
-		AssertEqual(_LLM_DefaultFor("llm_num_predictions"), _LLM_Menu["n_predictions"])
-		AssertEqual(_LLM_DefaultFor("llm_context_length", 500), _LLM_Menu["ctx_chars"])
-	} finally {
-		Frame[1] := Original
-		_LLM_Menu := Saved
-		LLM_Defaults := HadDefaults ? SavedDefaults : unset
-		if Native is Menu
-			_CTC_ReleaseMenu(Native)
-	}
-}
-/** Registers vectors without publishing a global loop variable. */
-_LLMPC_RegisterGenerationBoundaryCases() {
-	local Key
-	for Key in ["count", "context", "words"]
-		Test("generation boundaries: authentic numeric owner " . Key, _LLMPC_GenerationBoundary.Bind(Key))
-}
-_LLMPC_RegisterGenerationBoundaryCases()
-
-
 /** Retains the hand numeric order while each true complete frame is withdrawn. */
 _LLMPC_CompleteGenerationFrame(Section) {
 	global _LLM_Menu, LLM_Defaults
@@ -157,28 +91,27 @@ _LLMPC_CompleteGenerationFrame(Section) {
 			_LLM_Menu["n_predictions"] += 1
 		Rows := _LLM_Menu_GenerationRows()
 		Offset := Section == "llm_native_numeric_reset" ? 1 : 0
-		AssertEqual(9 + Offset, Rows.Length)
+		AssertEqual(4 + Offset, Rows.Length, "the count, the words and the temperature")
 		AssertEqual(StrReplace(t("menu.llm.num_predictions_label"), "%s", _LLM_Menu["n_predictions"]), Rows[1]["label"])
 		AssertTrue(Rows[1]["items"] is Array)
-		if Offset
-			AssertTrue(HasMethod(Rows[2]["action"], "Call"))
-		for Position in [2, 5, 8]
-			AssertTrue(Rows[Position + Offset]["separator"])
-		for Position in [3, 4, 6, 7, 9]
+		for Position in [2, 3, 4]
 			AssertTrue(HasMethod(Rows[Position + Offset]["action"], "Call"))
-		AssertEqual(StrReplace(t("menu.llm.context_length_label"), "%s", _LLM_Menu["ctx_chars"]), Rows[3 + Offset]["label"])
-		AssertEqual(t("menu.llm.reset_on_nav"), Rows[4 + Offset]["label"])
+		ContextRows := _LLM_Menu_GenerationContextRows()
+		AssertEqual(2, ContextRows.Length, "the context size and its clearing")
+		AssertEqual(StrReplace(t("menu.llm.context_length_label"), "%s", _LLM_Menu["ctx_chars"]), ContextRows[1]["label"])
+		AssertEqual(t("menu.llm.reset_on_nav"), ContextRows[2]["label"])
+		Owner := Section == "llm_generation_context_controls" ? _LLM_Menu_GenerationContextRows : _LLM_Menu_GenerationRows
 		Before := _LLM_Menu.Clone()
 		Root.Delete(Section)
 		if Section == "llm_native_numeric_reset"
 			AssertThrows(_LLM_Menu_GenerationRows, "a withdrawn required native reset refuses construction")
 		else
-			AssertEqual(0, _LLM_Menu_GenerationRows().Length, "a withdrawn real frame refuses the complete numeric menu")
+			AssertEqual(0, Owner.Call().Length, "a withdrawn real frame refuses the complete numeric group")
 		Root[Section] := [Map("type", "command", "id", "unbound_generation_command", "i18n", "button.cancel")]
 		if Section == "llm_native_numeric_reset"
 			AssertThrows(_LLM_Menu_GenerationRows, "an unowned required reset command refuses construction")
 		else
-			AssertEqual(0, _LLM_Menu_GenerationRows().Length, "an unowned action cannot be silently omitted")
+			AssertEqual(0, Owner.Call().Length, "an unowned action cannot be silently omitted")
 		AssertEqual("", _LVS_DeepEqual(Before, _LLM_Menu, "generation_state"), "construction/refusal cannot change any native setting")
 	} finally {
 		Root[Section] := Original

@@ -31,7 +31,8 @@ helpers.describe("renderer scenario isolation (tooltip-renderer-scope)", functio
 		for _, failure in ipairs({ false, true }) do
 			helpers.it("restores all renderer scenarios after " .. (failure and "assertion failure" or "success") .. " with " .. initial .. " scanner owner", function()
 				local scenarios = collect_scenarios()
-				helpers.assert_eq(#scenarios, 11, "the complete native renderer corpus must be replayed")
+				-- 11 + the three shortcut-column scenarios of f45a7ac1e7.
+				helpers.assert_eq(#scenarios, 14, "the complete native renderer corpus must be replayed")
 				for _, scenario in ipairs(scenarios) do
 					helpers.with_fresh_modules({ "toml_codec.record_scanner" }, function()
 						package.loaded["toml_codec.record_scanner"] = sentinel

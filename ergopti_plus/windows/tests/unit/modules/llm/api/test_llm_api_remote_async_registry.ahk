@@ -429,6 +429,44 @@ _RemoteCancelPublication_WinHttpBoundary() {
 Test("api_remote: cancellation during WinHTTP Send cannot miss unpublished owner (remote-cancel-publication-race)",
 	_RemoteCancelPublication_WinHttpBoundary)
 
+; The COM request takes the override's route; a refused value sends nothing.
+class _RemoteOverrideHttp extends _RemoteCancelPublicationHttp {
+	SetProxy(Setting, Server := "") {
+		this.State["proxy"] := Setting . "|" . Server
+	}
+}
+
+_RemoteOverride_Dispatch(Stored) {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	State["proxy"] := "unset"
+	Failed := 0
+	Port := Map("create_http", (*) => _RemoteOverrideHttp(State),
+		"poll", _RemoteCancelPublication_Poll.Bind(State), "tick", (*) => 1314)
+	ProxyOverride_Publish(Stored)
+	try {
+		_LLMRemote_DispatchWinHttp(891304, _RemoteCancelPublication_Resolved(),
+			"https://safe.invalid/v1", "{}", (*) => 0, (*) => (Failed += 1), 1000, Port)
+		State["failed"] := Failed
+		return State
+	} finally {
+		EnvSet(PROXY_OVERRIDE_ENVIRONMENT, "")
+		_LLM_Remote_Async := Map()
+	}
+}
+
+_RemoteOverride_WinHttpRoute() {
+	AssertEqual("unset", _RemoteOverride_Dispatch("")["proxy"], "automatic leaves the object's route alone")
+	AssertEqual("1|", _RemoteOverride_Dispatch("direct")["proxy"], "direct is explicit")
+	AssertEqual("2|proxy.corp.invalid:3128", _RemoteOverride_Dispatch("http://proxy.corp.invalid:3128")["proxy"])
+	Refused := _RemoteOverride_Dispatch("not a proxy")
+	AssertEqual(0, Refused["sends"], "a refused override sends nothing")
+	AssertEqual(1, Refused["failed"], "and says so")
+}
+Test("api_remote: the WinHTTP request takes the proxy override's route (remote-winhttp-override)",
+	_RemoteOverride_WinHttpRoute)
+
 
 _RemoteTrimRegistry_DropsOldestWhenAtCap() {
 	global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT

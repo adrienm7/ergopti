@@ -27,7 +27,7 @@ local TableUtil = require("table_util")
 --- @return table order
 --- @return table servers
 function M.catalogue(root, occupied)
-	local order, servers = {}, {}
+	local order, servers, defaults = {}, {}, {}
 	if type(root) ~= "table" or type(root.server_order) ~= "table"
 		or type(root.servers) ~= "table" or type(occupied) ~= "table" then return order, servers end
 	for _, id in ipairs(root.server_order) do
@@ -36,7 +36,10 @@ function M.catalogue(root, occupied)
 			and occupied[id] == nil and servers[id] == nil and desc.auth == "optional"
 			and type(desc.label) == "string" and desc.label ~= ""
 			and type(desc.base_url) == "string" and desc.base_url:match("^https?://%S+$") then
-			servers[id] = { id = id, label = desc.label, base_url = desc.base_url, auth = desc.auth }
+			-- The first row of a shared default address is that address's default row
+			defaults[desc.base_url] = defaults[desc.base_url] or id
+			servers[id] = { id = id, label = desc.label, base_url = desc.base_url, auth = desc.auth,
+				address_default = defaults[desc.base_url] }
 			order[#order + 1] = id
 		end
 	end
@@ -147,6 +150,9 @@ end
 --- Matches a configured entry without transferring its credentials to another URL.
 --- Exact catalogue providers remain authoritative; generic providers need explicit
 --- canonical loopback affinity, never a model name, user label or shared wire shape.
+--- At a default address two rows share (oMLX and vLLM on 8000), a generic entry
+--- belongs to the address's default row only; the sweep then names the server
+--- that answered there (llm.local_server_fingerprint).
 --- @param provider any
 --- @param base_url any
 --- @param server_id any
@@ -157,6 +163,7 @@ function M.entry_matches(provider, base_url, server_id, servers)
 	if type(server) ~= "table" or type(provider) ~= "string" or type(base_url) ~= "string" then return false end
 	if provider == server_id then return true end
 	if provider ~= "openai" and provider ~= "openai_compat" then return false end
+	if server.address_default ~= nil and server.address_default ~= server_id then return false end
 	local configured, canonical = loopback_endpoint(base_url), loopback_endpoint(server.base_url)
 	return configured ~= nil and canonical ~= nil and configured == canonical
 end

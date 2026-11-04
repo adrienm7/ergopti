@@ -537,6 +537,55 @@ _LNWPrivacyAppend(User) {
 		State["config"] := Saved[1], State["root"] := Saved[2]
 	}
 }
+; A folder or pack name under the configuration directory is the user's own: the
+; rule the diagnostics collector applies at export must also hold on the disk,
+; and the directory is the live one, because it is only known after paths.toml
+; is read, later than the policy's admission.
+_LNWPrivacyConfigDirNames() {
+	global _SharedDir, _ConfigDir
+	State := _LoggerPrivacyState(), Saved := [State["config"], State["root"], _ConfigDir]
+	FileObject := _LNWPrivacyFile(), Receipt := Map("text", "")
+	try {
+		State["root"] := _SharedDir, State["config"] := _LNWPrivacyContext("privacy-user")
+		_ConfigDir := "D:\Private Folder\ergopti_plus\"
+		Prefix := "2026-10-10 09:00:00:123 [INFO] [TomlLoader] "
+		Body := "Loading '" . _ConfigDir . "extensions\Secret Pack\hidden.toml'" . Chr(0x2026)
+		AssertTrue(_LoggerAppendComplete("C:\private-recording-log.txt", Prefix . Body . "`r`n", false,
+			(*) => FileObject, (*) => true, (*) => true, _LNWPrivacyWrite.Bind(Receipt), [Prefix . Body]))
+		AssertEqual(Chr(0xFEFF) . Prefix . "Loading '<config>\<name>\<name>\<name>'" . Chr(0x2026) . "`r`n",
+			Receipt["text"], "Names under the configuration directory never reach the file")
+
+		_ConfigDir := "E:\Moved Elsewhere\"
+		Masked := _LoggerPrivacyBlob("E:\Moved Elsewhere\Secret Pack.toml", _LoggerPrivacyConfig())
+		AssertEqual("<config>\<name>", Masked, "The mask follows the live configuration directory")
+	} finally {
+		State["config"] := Saved[1], State["root"] := Saved[2], _ConfigDir := Saved[3]
+	}
+}
+Test("Logger privacy: names under the configuration directory are masked at write time", _LNWPrivacyConfigDirNames)
+
+; Item 139: every identity rule the collector applies at export also holds on
+; the disk, as the Linux and macOS sinks prove for their own write boundary.
+_LNWPrivacyIdentities() {
+	global _SharedDir
+	State := _LoggerPrivacyState(), Saved := [State["config"], State["root"]]
+	FileObject := _LNWPrivacyFile(), Receipt := Map("text", "")
+	try {
+		State["root"] := _SharedDir, State["config"] := _LNWPrivacyContext("privacy-user")
+		Prefix := "2026-10-10 09:00:00:123 [WARNING] [logger] "
+		Body := "Sent to someone@example.org via https://bob:hunter2pass@proxy.example:8080 from C:\Users\OtherPerson\x"
+		AssertTrue(_LoggerAppendComplete("C:\private-recording-log.txt", Prefix . Body . "`r`n", false,
+			(*) => FileObject, (*) => true, (*) => true, _LNWPrivacyWrite.Bind(Receipt), [Prefix . Body]))
+		for Private in ["someone@example.org", "hunter2pass", "bob:", "OtherPerson"]
+			AssertFalse(InStr(Receipt["text"], Private, true), "'" . Private . "' reached the file: " . Receipt["text"])
+		AssertContains(Receipt["text"], State["config"]["rules"]["email_placeholder"])
+		AssertContains(Receipt["text"], Prefix, "the line's metadata is kept")
+	} finally {
+		State["config"] := Saved[1], State["root"] := Saved[2]
+	}
+}
+Test("Logger privacy: an email, a URL credential and another account's folder are masked at write time", _LNWPrivacyIdentities)
+
 _LNWPrivacyRegister() {
 	local PrivacyUser
 	for PrivacyUser in ["privacy-user", "2026", "ERROR", "logger"]

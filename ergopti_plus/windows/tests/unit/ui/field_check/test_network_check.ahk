@@ -123,12 +123,24 @@ _TNC_PacVerdict() {
 	NumPut("UChar", 0xFF, Wide, 0), NumPut("UChar", 0xFE, Wide, 1)
 	AssertEqual("ok", NetworkCheck_JudgePac(200, Wide), "a UTF-16 PAC is accepted as the download accepts it")
 	; A valid script padded past the limit, so only the size can refuse it
-	Big := Buffer(1048577, 0x20)
+	Big := Buffer(NetworkCheck_PacMaxBytes() + 1, 0x20)
 	DllCall("RtlMoveMemory", "Ptr", Big, "Ptr", Good, "UPtr", Good.Size)
 	AssertEqual("error", NetworkCheck_JudgePac(200, Big), "over the size limit")
 }
 
 Test("NetworkCheck: the PAC verdict follows the managed download's rules (network-check)", _TNC_PacVerdict)
+
+; The ceiling is the shared policy's, not a copy: a different value there moves it.
+_TNC_PacCeilingIsThePolicys() {
+	global _SharedDir
+	Policy := JsonParse(FileRead(_SharedDir . "\modules\network\proxy_policy.json", "UTF-8"))
+	Maximum := Policy["native_pac"]["max_script_bytes"]
+	AssertTrue(Maximum > 0, "the policy names a PAC ceiling")
+	AssertEqual(Maximum, NetworkCheck_PacMaxBytes())
+	Body := _DriverFuncBody("NetworkCheck_PacMaxBytes")
+	AssertTrue(InStr(Body, "max_script_bytes") > 0, "the ceiling is read from the policy")
+}
+Test("NetworkCheck: the PAC ceiling is the shared policy's (PAR-71)", _TNC_PacCeilingIsThePolicys)
 
 
 
@@ -173,6 +185,45 @@ _TNC_NoPac() {
 }
 
 Test("NetworkCheck: a missing PAC skips both PAC steps (network-check)", _TNC_NoPac)
+
+
+; Under an override the PAC decides nothing, and a relay override forbids any other
+; route: the probe stays silent even though the system names a PAC.
+_TNC_OverrideSkipsPac() {
+	Fetched := 0
+	Report := _TNC_Run(_TNC_Deps(Map("override_routes", () => true,
+		"fetch_pac", (Url, Callback) => (Fetched += 1, Callback.Call(200, "")))))
+	Steps := _TNC_ByIdentity(Report)
+	AssertEqual(0, Fetched, "no request may leave outside the chosen route")
+	AssertEqual("skip", Steps["pac_download"]["state"])
+	AssertEqual("override", Steps["pac_download"]["value"])
+	AssertEqual("override", Steps["pac_script"]["value"])
+	AssertEqual("selected_proxy", Steps["route_lookup"]["value"], "the check goes on with the route")
+	Fetched := 0
+	_TNC_Run(_TNC_Deps(Map("override_routes", () => false,
+		"fetch_pac", (Url, Callback) => (Fetched += 1, Callback.Call(0, "")))))
+	AssertEqual(1, Fetched, "automatic still probes the PAC")
+}
+
+Test("NetworkCheck: an override leaves the PAC alone (network-check)", _TNC_OverrideSkipsPac)
+
+
+; The object's default is the machine's WinHTTP proxy; the policy's route is direct.
+_TNC_PacFetchIsDirect() {
+	Calls := []
+	Request := {}
+	Request.DefineProp("SetProxy", { Call: (Self, Setting) => Calls.Push("proxy:" . Setting) })
+	Request.DefineProp("SetTimeouts", { Call: (Self, *) => Calls.Push("timeouts") })
+	Request.DefineProp("Open", { Call: (Self, Verb, Url, Async) => Calls.Push("open") })
+	Request.DefineProp("Send", { Call: (Self) => (Calls.Push("send"), 0) })
+	Request.DefineProp("WaitForResponse", { Call: (Self, Timeout) => false })
+	Request.DefineProp("Abort", { Call: (Self) => 0 })
+	_NetworkCheck_FetchPac("https://pac.invalid/proxy.pac", (*) => 0, () => Request)
+	AssertEqual("proxy:1", Calls[1], "the route is set before the request opens")
+	AssertEqual("open", Calls[3])
+}
+
+Test("NetworkCheck: the PAC download is direct (network-check)", _TNC_PacFetchIsDirect)
 
 
 _TNC_PacFailures() {

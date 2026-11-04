@@ -4,8 +4,8 @@
 # SCHEMA: Hotstring Resolution Defaults — Cross-Driver Canon
 # DESCRIPTION:
 # Single source of truth for the hard fallback values used by the hotstring
-# config resolver when neither a user override nor a category/section TOML
-# `[_meta]` declares a delay or color. Both drivers read this file at boot:
+# config resolver when neither a user override, the section's manifest row nor a
+# category/section TOML `[_meta]` declares a delay or color. Both drivers read this file at boot:
 #   AHK         — lib/hotstrings/hotstrings_config.ahk
 #                 (HotstringsConfigLoadSharedDefaults, fail-fast).
 #   Hammerspoon — modules/hotstrings_config.lua (load_shared_defaults, fail-fast).

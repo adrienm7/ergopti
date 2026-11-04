@@ -10,7 +10,8 @@
 ; actions and the touchpad registry owner use these two), mute the default
 ; microphone, close a process, read the active window
 ; and the Explorer windows, create a file exclusively, delete a file's
-; Zone.Identifier stream, move the pointer, and ask or tell the user.
+; Zone.Identifier stream, read and set the display topology, move the pointer,
+; and ask or tell the user.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Thin on purpose: each method is one native call with the arguments the
@@ -64,6 +65,23 @@ global SYSTEM_CONTROL_PROCESS_QUERY_LIMITED_INFORMATION := 0x1000
 global SYSTEM_CONTROL_SYNCHRONIZE := 0x00100000
 global SYSTEM_CONTROL_WAIT_OBJECT_0 := 0
 global SYSTEM_CONTROL_WAIT_TIMEOUT := 258
+; QueryDisplayConfig (wingdi.h): every path Windows knows, and the topology of
+; the current database entry.
+global SYSTEM_CONTROL_QDC_ALL_PATHS := 0x1
+global SYSTEM_CONTROL_QDC_DATABASE_CURRENT := 0x4
+; SetDisplayConfig: apply at once; the topology flags equal the topology ids.
+global SYSTEM_CONTROL_SDC_APPLY := 0x80
+; Sizes of DISPLAYCONFIG_PATH_INFO and DISPLAYCONFIG_MODE_INFO, and the offsets
+; in a path of its target's adapter LUID, id and targetAvailable.
+global SYSTEM_CONTROL_DISPLAY_PATH_BYTES := 72
+global SYSTEM_CONTROL_DISPLAY_MODE_BYTES := 64
+global SYSTEM_CONTROL_DISPLAY_TARGET_ADAPTER_OFFSET := 20
+global SYSTEM_CONTROL_DISPLAY_TARGET_ID_OFFSET := 28
+global SYSTEM_CONTROL_DISPLAY_TARGET_AVAILABLE_OFFSET := 60
+; The buffers are sized by one call and filled by the next: a display plugged in
+; between them is answered with this status, and the sizes are read again.
+global SYSTEM_CONTROL_ERROR_INSUFFICIENT_BUFFER := 122
+global SYSTEM_CONTROL_DISPLAY_QUERY_ATTEMPTS := 3
 
 
 
@@ -426,6 +444,81 @@ class SystemControl {
 			Monitors.Push({ Left: Left, Top: Top, Right: Right, Bottom: Bottom })
 		}
 		return Monitors
+	}
+
+	; One call into User32's display configuration API: the seam the suite answers.
+	; @returns {Integer} The Win32 status (0 is success).
+	DisplayConfigCall(Name, Args*) {
+		Args.Push("Int")
+		return DllCall("User32\" . Name, Args*)
+	}
+
+	; Reads one view of the display configuration.
+	; @param {Integer} Flags The QDC_* view.
+	; @returns {Object} { Paths: Buffer, Count, Topology }; Topology is only
+	;     meaningful for QDC_DATABASE_CURRENT, the one view allowed to ask for it.
+	; @throws {OSError} When Windows refuses, or the buffers never fit.
+	_DisplayConfigRead(Flags) {
+		global SYSTEM_CONTROL_QDC_DATABASE_CURRENT, SYSTEM_CONTROL_ERROR_INSUFFICIENT_BUFFER
+		global SYSTEM_CONTROL_DISPLAY_QUERY_ATTEMPTS, SYSTEM_CONTROL_DISPLAY_PATH_BYTES
+		global SYSTEM_CONTROL_DISPLAY_MODE_BYTES
+		Status := SYSTEM_CONTROL_ERROR_INSUFFICIENT_BUFFER
+		Loop SYSTEM_CONTROL_DISPLAY_QUERY_ATTEMPTS {
+			Counts := Buffer(8, 0)
+			Status := this.DisplayConfigCall("GetDisplayConfigBufferSizes", "UInt", Flags,
+				"Ptr", Counts.Ptr, "Ptr", Counts.Ptr + 4)
+			if (Status != 0)
+				throw OSError(Status, "GetDisplayConfigBufferSizes")
+			Paths := Buffer(Max(1, NumGet(Counts, 0, "UInt")) * SYSTEM_CONTROL_DISPLAY_PATH_BYTES, 0)
+			Modes := Buffer(Max(1, NumGet(Counts, 4, "UInt")) * SYSTEM_CONTROL_DISPLAY_MODE_BYTES, 0)
+			Topology := Buffer(4, 0)
+			Status := this.DisplayConfigCall("QueryDisplayConfig", "UInt", Flags,
+				"Ptr", Counts.Ptr, "Ptr", Paths.Ptr, "Ptr", Counts.Ptr + 4, "Ptr", Modes.Ptr,
+				"Ptr", (Flags = SYSTEM_CONTROL_QDC_DATABASE_CURRENT) ? Topology.Ptr : 0)
+			if (Status = 0)
+				return { Paths: Paths, Count: NumGet(Counts, 0, "UInt"), Topology: NumGet(Topology, 0, "UInt") }
+			if (Status != SYSTEM_CONTROL_ERROR_INSUFFICIENT_BUFFER)
+				throw OSError(Status, "QueryDisplayConfig")
+		}
+		throw OSError(Status, "QueryDisplayConfig")
+	}
+
+	; @returns {Integer} The current DISPLAYCONFIG_TOPOLOGY_ID.
+	DisplayTopology() {
+		global SYSTEM_CONTROL_QDC_DATABASE_CURRENT
+		return this._DisplayConfigRead(SYSTEM_CONTROL_QDC_DATABASE_CURRENT).Topology
+	}
+
+	; The displays connected now, active or not. MonitorGetCount cannot answer:
+	; duplicated displays count as one monitor, and a laptop on its internal screen
+	; does not count its idle external one.
+	; @returns {Integer} The distinct available targets.
+	ConnectedDisplayCount() {
+		global SYSTEM_CONTROL_QDC_ALL_PATHS, SYSTEM_CONTROL_DISPLAY_PATH_BYTES
+		global SYSTEM_CONTROL_DISPLAY_TARGET_ADAPTER_OFFSET, SYSTEM_CONTROL_DISPLAY_TARGET_ID_OFFSET
+		global SYSTEM_CONTROL_DISPLAY_TARGET_AVAILABLE_OFFSET
+		Read := this._DisplayConfigRead(SYSTEM_CONTROL_QDC_ALL_PATHS)
+		Targets := Map()
+		Loop Read.Count {
+			Row := (A_Index - 1) * SYSTEM_CONTROL_DISPLAY_PATH_BYTES
+			if !NumGet(Read.Paths, Row + SYSTEM_CONTROL_DISPLAY_TARGET_AVAILABLE_OFFSET, "UInt")
+				continue
+			; One target appears once per source that could drive it.
+			Adapter := Row + SYSTEM_CONTROL_DISPLAY_TARGET_ADAPTER_OFFSET
+			Key := NumGet(Read.Paths, Adapter, "UInt") . ":" . NumGet(Read.Paths, Adapter + 4, "Int")
+				. ":" . NumGet(Read.Paths, Row + SYSTEM_CONTROL_DISPLAY_TARGET_ID_OFFSET, "UInt")
+			Targets[Key] := true
+		}
+		return Targets.Count
+	}
+
+	; Applies one topology, as the Win+P menu does.
+	; @param {Integer} Topology A DISPLAYCONFIG_TOPOLOGY_ID.
+	; @returns {Integer} The Win32 status (0 is success).
+	ApplyDisplayTopology(Topology) {
+		global SYSTEM_CONTROL_SDC_APPLY
+		return this.DisplayConfigCall("SetDisplayConfig", "UInt", 0, "Ptr", 0, "UInt", 0, "Ptr", 0,
+			"UInt", Topology | SYSTEM_CONTROL_SDC_APPLY)
 	}
 
 	; Moves the pointer at once, in screen coordinates.

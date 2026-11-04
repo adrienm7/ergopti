@@ -671,9 +671,9 @@ _SysActions_OpenApp() {
 	Saved := GestureActionParameters
 	try {
 		Target := "shell:AppsFolder\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
-		GestureActionParameters := Map(GestureActionParameterKey("keyboard__ctrl_k", "open_app"), Target)
+		GestureActionParameters := Map(GestureActionParameterKey("keyboard__primary_k", "open_app"), Target)
 		Fake := _SysActionsFake()
-		GestureSysOpenApp("keyboard__ctrl_k", Fake)
+		GestureSysOpenApp("keyboard__primary_k", Fake)
 		Launches := _SysActions_CallsNamed(Fake, "Launch")
 		AssertEqual(1, Launches.Length)
 		AssertEqual(Target, Launches[1][2], "the binding's own application, as the shell runs it")

@@ -1,0 +1,15 @@
+# _shared/tests/corpus/config_migrations/oldest_version_keeps_no_stamp/migrations.toml
+
+[registry]
+current_version = 3
+unstamped_version = 1
+oldest_version = 2
+
+[steps.v2_to_v3]
+from = 2
+to = 3
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: the chain was squashed to v2."
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+]

@@ -45,6 +45,22 @@
 					"checked": false
 				},
 				{
+					"title": "menu.llm.while_hotstring_tooltip: menu.llm.while_hotstring_tooltip_wait",
+					"callback": false,
+					"children": [
+						{
+							"title": "menu.llm.while_hotstring_tooltip_wait",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "menu.llm.while_hotstring_tooltip_both",
+							"callback": true,
+							"checked": false
+						}
+					]
+				},
+				{
 					"title": "-",
 					"callback": false
 				},
@@ -176,7 +192,7 @@
 			"callback": false,
 			"children": [
 				{
-					"title": "menu.llm.nav_label : ⌃ menu.llm.arrows",
+					"title": "menu.llm.nav_label: ⌃ key_name.ctrl + menu.llm.arrows",
 					"callback": false,
 					"children": [
 						{
@@ -188,34 +204,34 @@
 							"callback": true
 						},
 						{
-							"title": "⇧ Shift",
+							"title": "⇧ key_name.shift",
 							"callback": true
 						},
 						{
-							"title": "⌘ Cmd",
+							"title": "⌘ key_name.cmd",
 							"callback": true
 						},
 						{
-							"title": "⌥ Option",
+							"title": "⌥ key_name.option",
 							"callback": true
 						},
 						{
-							"title": "⌃ Ctrl",
+							"title": "⌃ key_name.ctrl",
 							"callback": true,
 							"checked": true
 						},
 						{
-							"title": "⇧⌘ Shift + Cmd",
+							"title": "⇧⌘ key_name.shift + key_name.cmd",
 							"callback": true
 						},
 						{
-							"title": "⇧⌥ Shift + Option",
+							"title": "⇧⌥ key_name.shift + key_name.option",
 							"callback": true
 						}
 					]
 				},
 				{
-					"title": "menu.llm.val_label : ⇧ menu.llm.digits",
+					"title": "menu.llm.val_label: ⇧ key_name.shift + menu.llm.digits",
 					"callback": false,
 					"children": [
 						{
@@ -227,28 +243,28 @@
 							"callback": true
 						},
 						{
-							"title": "⇧ Shift",
+							"title": "⇧ key_name.shift",
 							"callback": true,
 							"checked": true
 						},
 						{
-							"title": "⌘ Cmd",
+							"title": "⌘ key_name.cmd",
 							"callback": true
 						},
 						{
-							"title": "⌥ Option",
+							"title": "⌥ key_name.option",
 							"callback": true
 						},
 						{
-							"title": "⌃ Ctrl",
+							"title": "⌃ key_name.ctrl",
 							"callback": true
 						},
 						{
-							"title": "⇧⌘ Shift + Cmd",
+							"title": "⇧⌘ key_name.shift + key_name.cmd",
 							"callback": true
 						},
 						{
-							"title": "⇧⌥ Shift + Option",
+							"title": "⇧⌥ key_name.shift + key_name.option",
 							"callback": true
 						}
 					]
@@ -394,6 +410,22 @@
 					"checked": false
 				},
 				{
+					"title": "Prédiction IA pendant une bulle hotstring : Attendre l’expiration de la bulle hotstring",
+					"callback": false,
+					"children": [
+						{
+							"title": "Attendre l’expiration de la bulle hotstring",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "Afficher les deux",
+							"callback": true,
+							"checked": false
+						}
+					]
+				},
+				{
 					"title": "-",
 					"callback": false
 				},
@@ -443,7 +475,7 @@
 					"callback": false
 				},
 				{
-					"title": "Indentation de la suggestion sélectionnée: Aucune indentation",
+					"title": "Indentation de la suggestion sélectionnée : Aucune indentation",
 					"callback": false,
 					"children": [
 						{
@@ -539,42 +571,42 @@
 							"checked": true
 						},
 						{
-							"title": "alt",
+							"title": "Alt",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "ctrl",
+							"title": "Ctrl",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "shift",
+							"title": "Maj",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "cmd",
+							"title": "Super",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "ctrl+alt",
+							"title": "Ctrl + Alt",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "ctrl+shift",
+							"title": "Ctrl + Maj",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "alt+shift",
+							"title": "Alt + Maj",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "shift+cmd",
+							"title": "Maj + Super",
 							"callback": true,
 							"checked": false
 						}
@@ -590,42 +622,42 @@
 							"checked": true
 						},
 						{
-							"title": "alt",
+							"title": "Alt",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "ctrl",
+							"title": "Ctrl",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "shift",
+							"title": "Maj",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "cmd",
+							"title": "Super",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "ctrl+alt",
+							"title": "Ctrl + Alt",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "ctrl+shift",
+							"title": "Ctrl + Maj",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "alt+shift",
+							"title": "Alt + Maj",
 							"callback": true,
 							"checked": false
 						},
 						{
-							"title": "shift+cmd",
+							"title": "Maj + Super",
 							"callback": true,
 							"checked": false
 						}

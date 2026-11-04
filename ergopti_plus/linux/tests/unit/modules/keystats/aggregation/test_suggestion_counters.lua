@@ -134,10 +134,8 @@ end)
 helpers.describe("suggestion counters: the writer's allow-list", function()
 
 	it("names both fields", function()
-		local handle = assert(io.open(
-			helpers.driver_root() .. "/modules/keystats/sqlite_writer.lua", "r"))
-		local source = handle:read("*a")
-		handle:close()
+		-- modules/keystats/sqlite_writer, selected by a declaration unique to it.
+		local source = assert(helpers.read_driver_unit("local function _check_sqlite3("))
 		-- The allow-list silently drops a field it does not name, so the count
 		-- could be perfect in memory and never reach the database. That is exactly
 		-- how the three LLM counters spent their existence.

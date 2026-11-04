@@ -12,14 +12,15 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
-local DISABLED_ID = "ctrl_g"
+-- Cmd+* is the named built-in left since schema v20 made Ctrl+G a keyboard slot.
+local DISABLED_ID = "cmd_star"
 
 --- Builds the real Shortcuts submenu around the given registry and returns
---- the named Ctrl rows, the only ones the stubbed renderer hands back.
+--- the named Cmd rows, the only ones the stubbed renderer hands back.
 --- @param bindings table Real Bindings module.
 --- @param state_shortcuts boolean Shortcuts master switch.
 --- @return table rows Menu rows.
-local function build_ctrl_rows(bindings, state_shortcuts)
+local function build_cmd_rows(bindings, state_shortcuts)
 	return helpers.with_fresh_modules({
 		"ui.menu.menu_shortcuts", "infra.deferred_work", "infra.fs_dir",
 		"infra.dialog_util", "modules.shortcuts", "ui.menu.menu_utils",
@@ -50,7 +51,7 @@ local function build_ctrl_rows(bindings, state_shortcuts)
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["ui.menu.menu_keyboard_slots"] = {
-			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.secondary_ end,
+			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.primary_ end,
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return "star" end }
 
@@ -74,26 +75,24 @@ local function build_ctrl_rows(bindings, state_shortcuts)
 	end)
 end
 
---- Asserts one checkmark per named Ctrl shortcut, matched by its key label.
+--- Asserts one checkmark per named Cmd shortcut, the rows following the
+--- registry's own order of its cmd_* entries.
 --- @param bindings table Real Bindings module.
 --- @param rows table Rendered rows.
 --- @param context string Diagnostic context.
 local function assert_checkmarks(bindings, rows, context)
-	local checked_by_key = {}
-	for _, row in ipairs(rows) do
-		local key = type(row.label) == "string" and row.label:match("^Ctrl %+ (%S+) :")
-		if key then checked_by_key[key] = row.checked == true end
-	end
 	local compared = 0
-	for id in pairs(Fixture.index(bindings)) do
-		local letter = id:match("^ctrl_(%a)$")
-		if letter then
+	for _, entry in ipairs(bindings.list_shortcuts()) do
+		if entry.id:sub(1, 4) == "cmd_" then
 			compared = compared + 1
-			helpers.assert_eq(checked_by_key[letter:upper()], id ~= DISABLED_ID,
-				context .. ": row checkmark for " .. id)
+			local row = rows[compared]
+			helpers.assert_true(type(row) == "table", context .. ": a row is drawn for " .. entry.id)
+			helpers.assert_eq(row.checked == true, entry.id ~= DISABLED_ID,
+				context .. ": row checkmark for " .. entry.id)
 		end
 	end
-	helpers.assert_true(compared >= 1, "the Ctrl rows must be rendered, or nothing was compared")
+	helpers.assert_true(compared >= 1, "the Cmd rows must be rendered, or nothing was compared")
+	helpers.assert_eq(#rows, compared, context .. ": one row per named Cmd shortcut")
 end
 
 
@@ -111,9 +110,9 @@ helpers.describe("menu_shortcuts: row checkmarks show the preference (shortcut-p
 		Fixture.with_recommended_bindings(function(bindings)
 			helpers.assert_eq(bindings.start(), true)
 			helpers.assert_eq(bindings.disable(DISABLED_ID), true)
-			assert_checkmarks(bindings, build_ctrl_rows(bindings, true), "running")
+			assert_checkmarks(bindings, build_cmd_rows(bindings, true), "running")
 			helpers.assert_eq(bindings.pause(), true)
-			assert_checkmarks(bindings, build_ctrl_rows(bindings, false), "layer off")
+			assert_checkmarks(bindings, build_cmd_rows(bindings, false), "layer off")
 		end)
 	end)
 end)

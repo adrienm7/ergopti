@@ -8,14 +8,14 @@
 --- per-category and per-section delays, colours, previews and priorities.
 ---
 --- WHY DELETION IS NOT ENOUGH FOR « RESTORE RECOMMENDED »:
---- Removing a user's delay makes the section inherit its corpus value
---- ([_meta.section_delays], then [_meta].delay, then the shared default). The
---- manifest's recommended delay is a separate declaration and the two differ:
---- autocorrection.toml ships `delay = 1.0` while the manifest recommends 0.5 s
---- for its caps section. Each driver therefore supplies its own runtime
---- inheritance, and this planner writes an explicit value wherever deletion
---- would not produce the recommendation. « Clear » only deletes, which leaves
---- every section on its corpus inheritance.
+--- Removing a user's delay makes the section inherit the delay it declares
+--- (its manifest default), else its corpus value ([_meta.section_delays], then
+--- [_meta].delay), else the shared default. The manifest's recommended delay
+--- is a separate declaration that may differ from that inheritance. Each
+--- driver therefore supplies its own runtime inheritance, and this planner
+--- writes an explicit value wherever deletion would not produce the
+--- recommendation. « Clear » only deletes, which leaves every section on its
+--- inheritance.
 ---
 --- WHAT IS NEVER TOUCHED:
 --- Categories, sections and fields this planner is not told about stay in the

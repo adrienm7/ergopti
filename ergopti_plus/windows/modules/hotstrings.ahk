@@ -16,6 +16,7 @@
 ;     the folder name macOS and Linux already use for the same behaviour.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include hotstrings\hotstrings_distances.ahk
 #Include hotstrings\hotstrings_autocorrection.ahk
 #Include hotstrings\hotstrings_text_expansion.ahk
@@ -68,9 +69,9 @@ RegisterAllHotstrings(DeferHeavy := false, ColdBoot := false) {
 	; would otherwise need a Reload. At boot this reproduces the exact value
 	; ErgoptiPlus.ahk computed just before the #Include.
 	_SpaceNode := (Features.Has("hotstrings")
-		and Features["hotstrings"].Has("distances_reduction")
-		and Features["hotstrings"]["distances_reduction"].Has("space_around_symbols"))
-		? Features["hotstrings"]["distances_reduction"]["space_around_symbols"]
+		and Features["hotstrings"].Has(ConfigLeaf.DISTANCES_REDUCTION)
+		and Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION].Has("space_around_symbols"))
+		? Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["space_around_symbols"]
 		: Map()
 	SpaceAroundSymbols := (_SpaceNode.Has("enabled") and _SpaceNode["enabled"]) ? " " : ""
 

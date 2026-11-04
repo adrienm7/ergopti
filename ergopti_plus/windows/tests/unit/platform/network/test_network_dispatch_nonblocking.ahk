@@ -491,7 +491,7 @@ _NDB_EveryProductionEntrypointUsesChildTransport() {
 		"_Updater_PrepareLatestAsyncTransport",
 		"_Updater_PrepareReleasesListAsyncTransport",
 		"_CLW_DoFetch",
-		"LLM_RemoteIsReady_Async",
+		"_LLMRemote_ReadySend",
 		"LLM_OllamaWarmup"
 	] {
 		Body := _DriverFuncBody(FunctionName)

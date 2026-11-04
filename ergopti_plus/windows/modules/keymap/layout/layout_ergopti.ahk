@@ -35,6 +35,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -661,7 +662,7 @@ ErgoptiLayout_BuiltinVariant(FeaturesSource := unset) {
 	Layout := FeaturesSource.Get("layout", Map())
 	if !(Layout is Map)
 		return ""
-	Variant := Layout.Get("ergopti_variant", "none")
+	Variant := Layout.Get(ConfigLeaf.ERGOPTI_VARIANT, "none")
 	return (Variant is String) && (StrCompare(Variant, "none", true) == 0 || StrCompare(Variant, "ergopti", true) == 0 || StrCompare(Variant, "ergopti_plus", true) == 0) ? Variant : ""
 }
 
@@ -681,6 +682,6 @@ ErgoptiLayout_PlusIsActive(FeaturesSource := unset) {
 	if ErgoptiLayout_BuiltinVariant(FeaturesSource) != "ergopti_plus"
 		return false
 	Layout := FeaturesSource["layout"]
-	Selected := Layout.Get("emulated_layout", "")
+	Selected := Layout.Get(ConfigLeaf.EMULATED_LAYOUT, "")
 	return (Selected is String) && Selected == ""
 }

@@ -10,10 +10,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TBCC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_TBCC_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -27,7 +25,7 @@ _TBCC_ReadSource(RelPath) {
 ; =============================================
 
 _TBCC_DeepCopyPresent() {
-	Src := _TBCC_ReadSource("infra/toml/toml_helpers.ahk")
+	Src := _TBCC_ReadSource("toml_helpers.ahk")
 	Wrapper := _DriverFuncBody("TOML_BatchWrite")
 	Seg := _DriverFuncBody("_TOML_BatchWriteImpl")
 	Assert(Wrapper != "" && Seg != "",
@@ -48,7 +46,7 @@ Test("toml_helpers: TOML_BatchWrite deep-copies parsed Map before mutation", _TB
 
 
 _TBCC_FailurePathsInvalidateCache() {
-	Src := _TBCC_ReadSource("infra/toml/toml_helpers.ahk")
+	Src := _TBCC_ReadSource("toml_helpers.ahk")
 	Wrapper := _DriverFuncBody("TOML_BatchWrite")
 	Seg := _DriverFuncBody("_TOML_BatchWriteImpl")
 	Assert(Wrapper != "" && Seg != "",

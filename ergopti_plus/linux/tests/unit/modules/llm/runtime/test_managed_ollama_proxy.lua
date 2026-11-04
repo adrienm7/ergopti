@@ -7,7 +7,8 @@
 --- real shared route plan and origin inventory, and a controlled system lookup:
 --- the PAC-only network that refused every pull, the blob host a PAC sends
 --- direct, two relays the daemon cannot hold, the user-exported proxy that must
---- stay untouched, and each refusal.
+--- stay untouched, the user's proxy override (through the real policy binding)
+--- and each refusal.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -25,20 +26,42 @@ local function policy()
 	return assert(require("network.proxy_policy").new(require("json").decode(bytes)))
 end
 
+local function relay_policy()
+	local file = assert(io.open(assert(Paths.shared("modules/network/proxy_auth_relay.json")), "rb"))
+	local bytes = file:read("*a")
+	assert(file:close())
+	return assert(require("network.proxy_auth_relay").new(require("json").decode(bytes)))
+end
+
 local ORIGINS = assert(require("infra.route_origins").client("ollama"))
 local BLOB = ORIGINS[2]
 
 --- One port over a scripted lookup. `world.receipt` is what the desktop answers
 --- for every origin; `world.receipts[url]` overrides it for one origin.
 local function world(options)
+	-- `probe_answer` is what the relay probe answers ({ answer, reason });
+	-- by default the proxy demands no sign-in.
 	local w = { rows = { "PATH=/usr/bin" }, authorized = true, remaining = 5000, lookups = 0, results = {},
-		urls = {}, receipts = {} }
+		urls = {}, receipts = {}, probes = {}, probe_answer = { { status = "not_needed" } } }
 	for key, value in pairs(options or {}) do w[key] = value end
 	local Proxy = helpers.load_module("modules.llm.managed_ollama_proxy")
 	w.module = Proxy
 	w.port = Proxy.new({
-		policy = policy(), environment = function() return w.rows end, timeout_ms = 3000, owner = "test-owner",
+		policy = w.policy or policy(), environment = function() return w.rows end, timeout_ms = 3000, owner = "test-owner",
 		origins = w.origins or ORIGINS,
+		probe_timeout_ms = 1000, relay_address = require("adapters.tcp_probe").relay_address,
+		probe = function(host, port, timeout_ms, callback)
+			w.tcp_probes = w.tcp_probes or {}
+			w.tcp_probes[#w.tcp_probes + 1] = { host = host, port = port, timeout_ms = timeout_ms }
+			local probe_child = { settled = false }
+			function probe_child.is_settled() return probe_child.settled end
+			function probe_child.on_settled(listener) probe_child.listener = listener; return true end
+			function probe_child.cancel() return true end
+			local answer = w.reachable and w.reachable[host .. ":" .. port]
+			probe_child.settled = true
+			callback(answer == true, answer == true and nil or "timeout")
+			return probe_child
+		end,
 		lookup = function(url, lookup_options, callback)
 			w.lookups = w.lookups + 1
 			w.urls[#w.urls + 1] = url
@@ -52,6 +75,18 @@ local function world(options)
 			if receipt then callback(receipt) end
 			return w.child
 		end,
+		relay = { policy = relay_policy(), timeout_ms = 4000,
+			probe = function(upstream, authority, probe_options, callback)
+				w.probes[#w.probes + 1] = { upstream = upstream, authority = authority, options = probe_options }
+				w.probe_callback = callback
+				if w.probe_error then return nil, w.probe_error end
+				local child = { settled = true }
+				function child.is_settled() return child.settled end
+				function child.on_settled(listener) listener(); return true end
+				function child.cancel() return true end
+				if w.probe_answer then callback(w.probe_answer[1], w.probe_answer[2]) end
+				return child
+			end },
 	})
 	function w:run()
 		local budget = { remaining_ms = function() return w.remaining end }
@@ -79,8 +114,9 @@ it("a PAC-only network yields the PAC proxy as HTTPS_PROXY", function()
 	assert(#w.lookup_options.environment_exclusions > 0, "the lookup must ignore the proxy variables")
 end)
 
-it("only the first selection is used and a socks proxy is kept as named", function()
-	local w = world({ receipt = { ok = true, proxies = { "socks5://gate.corp.example:1080", "http://other:1" } } })
+it("a reachable first selection wins over the later ones and a socks proxy is kept as named", function()
+	local w = world({ receipt = { ok = true, proxies = { "socks5://gate.corp.example:1080", "http://other:1" } },
+		reachable = { ["gate.corp.example:1080"] = true } })
 	eq(w:run().environment[1], "HTTPS_PROXY=socks5://gate.corp.example:1080")
 end)
 
@@ -127,12 +163,16 @@ it("an authenticated desktop relay keeps its credentials", function()
 	eq(w:run().environment[1], "HTTPS_PROXY=http://user:pw@proxy.corp.example:3128")
 end)
 
-it("a failed lookup of the blob host refuses the start", function()
+-- (pac-unavailable-fallback) A lookup GIO could not answer is an unusable PAC:
+-- that origin goes direct, the other keeps the relay its PAC named.
+it("(pac-unavailable-fallback) an unusable lookup of the blob host sends only that host direct", function()
 	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } } })
 	w.receipts[BLOB] = { ok = false, error = "proxy-lookup-timeout" }
 	local result = w:run()
-	eq(result.ok, false)
-	eq(result.error, "proxy_lookup_failed")
+	eq(result.ok, true)
+	eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
+	eq(result.environment[2], "NO_PROXY=" .. BLOB:gsub("^https://", ""))
+	eq(result.direct_fallback, "native_proxy_budget")
 end)
 
 it("an inventory that does not start with the registry is refused at construction", function()
@@ -170,9 +210,46 @@ it("an empty exported variable does not count as a proxy", function()
 	eq(w:run().environment[1], "HTTPS_PROXY=http://p:1")
 end)
 
+it("(pac-unavailable-fallback) an unusable desktop configuration sends the daemon direct", function()
+	for receipt_error, stage in pairs({ ["proxy-lookup-failed"] = "native_proxy_lookup",
+		["proxy-lookup-timeout"] = "native_proxy_budget" }) do
+		local warnings = {}
+		local Logger = require("logger.shim")
+		local original = Logger.warn
+		Logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
+		local ok, result = pcall(function()
+			return world({ receipt = { ok = false, error = receipt_error } }):run()
+		end)
+		Logger.warn = original
+		assert(ok, result)
+		eq(result.ok, true)
+		eq(#result.environment, 0)
+		eq(result.direct_fallback, stage)
+		eq(#warnings, #ORIGINS)
+		assert(warnings[1]:find(stage, 1, true), warnings[1])
+	end
+end)
+
+it("(pac-unavailable-fallback) each fallback stage is one the shared policy lists", function()
+	local active = policy()
+	local Proxy = helpers.load_module("modules.llm.managed_ollama_proxy")
+	for _, stage in pairs(Proxy.LOOKUP_STAGES) do assert(active.falls_back_direct(stage), stage) end
+end)
+
+it("(pac-unavailable-fallback) an exported relay never reaches the lookup, so never falls back", function()
+	local w = world({ rows = { "PATH=/usr/bin", "HTTPS_PROXY=http://mine:1" },
+		receipt = { ok = false, error = "proxy-lookup-failed" } })
+	local result = w:run()
+	eq(w.lookups, 0)
+	eq(result.ok, true)
+	eq(#result.environment, 0)
+	eq(result.direct_fallback, nil)
+end)
+
 it("a failed lookup refuses with a classified reason", function()
 	for _, receipt in ipairs({
-		{ ok = false, error = "proxy-lookup-timeout" },
+		{ ok = false, error = "proxy-child-failed" },
+		{ ok = false, error = "proxy-receipt-invalid" },
 		{ ok = true, proxies = { "gopher://x:1" } },
 		{ ok = true, proxies = {} },
 		{ ok = "yes" },
@@ -270,15 +347,18 @@ end)
 it("no origin URL and no proxy ever reach the log", function()
 	local seen = {}
 	local Logger = require("logger.shim")
-	local originals = { info = Logger.info, error = Logger.error }
-	for _, level in ipairs({ "info", "error" }) do
+	local originals = { info = Logger.info, error = Logger.error, warn = Logger.warn }
+	for _, level in ipairs({ "info", "error", "warn" }) do
 		Logger[level] = function(_, message, ...) seen[#seen + 1] = string.format(message, ...) end
 	end
 	local ok, failure = pcall(function()
 		world({ receipt = { ok = true, proxies = { "http://user:secret@proxy.corp.example:3128" } } }):run()
 		world({ receipt = { ok = true, proxies = { "gopher://leak.example:1" } } }):run()
+		local fallback = world({ receipt = { ok = true, proxies = { "http://user:secret@proxy.corp.example:3128" } } })
+		fallback.receipts[BLOB] = { ok = false, error = "proxy-lookup-failed" }
+		fallback:run()
 	end)
-	Logger.info, Logger.error = originals.info, originals.error
+	Logger.info, Logger.error, Logger.warn = originals.info, originals.error, originals.warn
 	assert(ok, failure)
 	assert(#seen >= 2, "the lifecycle must be logged")
 	for _, line in ipairs(seen) do
@@ -286,4 +366,234 @@ it("no origin URL and no proxy ever reach the log", function()
 			and not line:find("secret", 1, true) and not line:find("leak", 1, true)
 			and not line:find(BLOB:gsub("^https://", ""), 1, true), line)
 	end
+end)
+
+-- ========== Sign-in relay (docs/design/proxy-auth-relay.md) ==========
+
+local REGISTRY_AUTHORITY = ORIGINS[1]:gsub("^https://", "") .. ":443"
+
+it("(proxy-auth-relay) a plain http relay is probed once for the registry and needs no relay", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } } })
+	local result = w:run()
+	eq(result.ok, true)
+	eq(result.relay, nil)
+	eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
+	eq(#w.probes, 1)
+	eq(w.probes[1].upstream, "http://proxy.corp.example:3128")
+	eq(w.probes[1].authority, REGISTRY_AUTHORITY)
+	eq(w.probes[1].options.owner, "test-owner-relay")
+	eq(w.probes[1].options.timeout_ms, 4000)
+end)
+
+it("(proxy-auth-relay) a proxy that demands Negotiate starts the daemon under the relay", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
+		probe_answer = { { status = "required", scheme = "negotiate" } } })
+	local result = w:run()
+	eq(result.ok, true)
+	eq(result.relay.upstream, "http://proxy.corp.example:3128")
+	eq(result.relay.scheme, "negotiate")
+	-- The plan's own rows stay: the relay replaces HTTPS_PROXY in the child only.
+	eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
+end)
+
+it("(proxy-auth-relay) a refused sign-in starts without the proxy and carries the relay's reason", function()
+	for _, reason in ipairs({ "sign_in_unavailable", "ntlm_requires_windows", "sign_in_rejected", "relay_unavailable" }) do
+		local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
+			probe_answer = { nil, reason } })
+		local result = w:run()
+		eq(result.ok, true)
+		eq(result.relay, nil)
+		eq(result.relay_refusal, reason)
+		-- No relay row, and a bypass of any relay the daemon would inherit.
+		eq(#result.environment, 2)
+		eq(result.environment[1], "NO_PROXY=*")
+		eq(result.environment[2], "no_proxy=*")
+	end
+end)
+
+it("(proxy-auth-relay) a relay that is not installed keeps the proxy as named, with a warning", function()
+	local Logger = require("logger.shim")
+	local warned = {}
+	local original = Logger.warn
+	Logger.warn = function(_, message) warned[#warned + 1] = message end
+	local ok, failure = pcall(function()
+		local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
+			probe_answer = { { status = "not_installed" } } })
+		local result = w:run()
+		eq(result.ok, true)
+		eq(result.relay, nil)
+		eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
+	end)
+	Logger.warn = original
+	assert(ok, failure)
+	eq(#warned, 1)
+	assert(warned[1]:find("not installed", 1, true), warned[1])
+end)
+
+it("(proxy-auth-relay) a probe that cannot start is the named relay_unavailable", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
+		probe_error = "proxy-auth-relay-probe-unavailable" })
+	local result = w:run()
+	eq(result.ok, true)
+	eq(result.environment[1], "NO_PROXY=*")
+	eq(result.relay_refusal, "relay_unavailable")
+end)
+
+it("(proxy-auth-relay) Basic credentials, socks and direct routes are never probed", function()
+	for _, proxy in ipairs({ "http://user:pw@proxy.corp.example:3128", "socks5://gate.corp.example:1080", "direct://" }) do
+		local w = world({ receipt = { ok = true, proxies = { proxy } } })
+		eq(w:run().ok, true)
+		eq(#w.probes, 0)
+	end
+end)
+
+it("(proxy-auth-relay) the probe bound is the smaller of its timeout and the budget left", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } }, remaining = 1500 })
+	w:run()
+	eq(w.probes[1].options.timeout_ms, 1500)
+	local spent = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } } })
+	local lookups = 0
+	spent.remaining = 5000
+	local original = spent.port
+	spent.receipts[BLOB] = { ok = true, proxies = { "http://proxy.corp.example:3128" } }
+	-- The budget runs out between the last lookup and the probe.
+	local budget = { remaining_ms = function() lookups = lookups + 1; return lookups > #ORIGINS and 0 or 5000 end }
+	original(budget, function() return true end, function(result) spent.results[#spent.results + 1] = result end)
+	eq(spent.results[1].error, "proxy_timeout")
+	eq(#spent.probes, 0)
+end)
+
+it("(proxy-auth-relay) a start withdrawn during the probe discards its answer", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } },
+		probe_answer = false })
+	w:run()
+	eq(#w.results, 0)
+	eq(#w.probes, 1)
+	w.authorized = false
+	w.probe_callback({ status = "required", scheme = "ntlm" })
+	eq(#w.results, 1)
+	eq(w.results[1].ok, false)
+	eq(w.results[1].error, "proxy_cancelled")
+end)
+
+--- The real Linux policy binding over a stubbed storage holding `stored`.
+local function bound_policy(stored)
+	local saved = { storage = package.loaded["adapters.storage"], binding = package.loaded["infra.proxy_policy"] }
+	package.loaded["adapters.storage"] = { get = function(key, default)
+		if key == "network.proxy_override" then return stored end
+		return default
+	end }
+	package.loaded["infra.proxy_policy"] = nil
+	local active = assert(require("infra.proxy_policy").load())
+	return active, function()
+		package.loaded["adapters.storage"], package.loaded["infra.proxy_policy"] = saved.storage, saved.binding
+	end
+end
+
+it("a relay override becomes the daemon relay, over an exported one, with no lookup", function()
+	local active, restore = bound_policy("http://override.corp.example:8080")
+	local ok, failure = pcall(function()
+		local w = world({ policy = active, rows = { "PATH=/usr/bin", "HTTPS_PROXY=http://exported.example:3128" },
+			receipt = { ok = true, proxies = { "http://pac.corp.example:3128" } } })
+		local result = w:run()
+		eq(result.ok, true)
+		eq(#result.environment, 1)
+		eq(result.environment[1], "HTTPS_PROXY=http://override.corp.example:8080")
+		eq(w.lookups, 0)
+	end)
+	restore()
+	assert(ok, failure)
+end)
+
+it("a direct override bypasses every inherited relay, with no lookup", function()
+	local active, restore = bound_policy("direct")
+	local ok, failure = pcall(function()
+		local w = world({ policy = active, rows = { "PATH=/usr/bin", "HTTPS_PROXY=http://exported.example:3128" } })
+		local result = w:run()
+		eq(result.ok, true)
+		eq(table.concat(result.environment, " "), "NO_PROXY=* no_proxy=*")
+		eq(w.lookups, 0)
+	end)
+	restore()
+	assert(ok, failure)
+end)
+
+it("an automatic override keeps the PAC lookup, and an invalid one refuses the start", function()
+	local active, restore = bound_policy("")
+	local ok, failure = pcall(function()
+		local w = world({ policy = active, receipt = { ok = true, proxies = { "http://pac.corp.example:3128" } } })
+		eq(w:run().environment[1], "HTTPS_PROXY=http://pac.corp.example:3128")
+		eq(w.lookups, #ORIGINS)
+	end)
+	restore()
+	assert(ok, failure)
+	active, restore = bound_policy("proxy.corp.example:3128")
+	ok, failure = pcall(function()
+		local w = world({ policy = active })
+		local result = w:run()
+		eq(result.ok, false)
+		eq(result.error, "proxy_route_invalid")
+		eq(w.lookups, 0)
+	end)
+	restore()
+	assert(ok, failure)
+end)
+
+it("a relay override that demands Negotiate still gets the sign-in relay, probed once", function()
+	local active, restore = bound_policy("http://override.corp.example:8080")
+	local ok, failure = pcall(function()
+		local w = world({ policy = active, probe_answer = { { status = "required", scheme = "negotiate" } } })
+		local result = w:run()
+		eq(result.ok, true)
+		eq(result.relay.upstream, "http://override.corp.example:8080")
+		eq(result.environment[1], "HTTPS_PROXY=http://override.corp.example:8080")
+		eq(w.lookups, 0)
+		eq(#w.probes, 1)
+	end)
+	restore()
+	assert(ok, failure)
+end)
+
+it("a direct override bypasses the sign-in relay: no probe, no relay", function()
+	local active, restore = bound_policy("direct")
+	local ok, failure = pcall(function()
+		local w = world({ policy = active, rows = { "PATH=/usr/bin", "HTTPS_PROXY=http://ntlm.corp.example:3128" } })
+		local result = w:run()
+		eq(result.ok, true)
+		eq(result.relay, nil)
+		eq(w.probes == nil or #w.probes == 0, true)
+	end)
+	restore()
+	assert(ok, failure)
+end)
+
+it("a PAC list whose first relay is unreachable falls through to DIRECT, probed once with the shared deadline", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://down.corp.example:3128", "direct://" } } })
+	local result = w:run()
+	eq(result.ok, true)
+	eq(#result.environment, 0)
+	eq(#w.tcp_probes, #ORIGINS)
+	eq(w.tcp_probes[1].host, "down.corp.example")
+	eq(w.tcp_probes[1].port, 3128)
+	eq(w.tcp_probes[1].timeout_ms, 1000)
+end)
+
+it("a reachable first relay is kept, and a relay with nothing after it is never probed", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://up.corp.example:3128", "direct://" } },
+		reachable = { ["up.corp.example:3128"] = true } })
+	eq(w:run().environment[1], "HTTPS_PROXY=http://up.corp.example:3128")
+	local single = world({ receipt = { ok = true, proxies = { "http://only.corp.example:3128" } } })
+	eq(single:run().environment[1], "HTTPS_PROXY=http://only.corp.example:3128")
+	eq(single.tcp_probes, nil)
+end)
+
+it("an unreachable relay moves to the next relay, not straight to DIRECT", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://down.corp.example:3128",
+		"http://up.corp.example:8080", "direct://" } }, reachable = { ["up.corp.example:8080"] = true } })
+	eq(w:run().environment[1], "HTTPS_PROXY=http://up.corp.example:8080")
+end)
+
+it("the shared probe deadline is the timings registry's one second", function()
+	local Timings = require("infra.timings")
+	eq(Timings.ms("llm", "managed_proxy_probe_timeout_ms"), 1000)
 end)

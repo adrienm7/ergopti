@@ -20,6 +20,7 @@ local Fakes = helpers.load_module("tests.fakes")
 local function recorded(script)
 	local fake_writer = setmetatable({
 		open_db = function() return true end,
+		ensure_token_encoding = function() return true end,
 		register_device = function() return true end,
 		read_open_walk = function() return nil, true end,
 		upsert_open_walk = function() return true end,

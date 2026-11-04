@@ -113,9 +113,14 @@ Test("diagnostics configuration: a collected configuration shares no canary (hea
 
 ; Controlled fixtures: one folder holds an admitted config.toml, a layers.toml
 ; that is missing, a tap_hold.toml that is a folder (unreadable), and a variant
-; with a config.toml that does not parse.
+; with a config.toml that does not parse. A serial keeps two fixtures made in
+; the same clock tick apart: with a tick and a random suffix alone, two
+; fixtures of one case can share a folder, and the second delete then finds
+; nothing left (a CI run failed on that delete, line « DirDelete(Empty) »).
 _HCCfgT_Fixture(ConfigText) {
-	Root := A_Temp . "\ergopti_cfgdiag_" . A_TickCount . "_" . Random(1000, 9999)
+	static Serial := 0
+	Serial += 1
+	Root := A_Temp . "\ergopti_cfgdiag_" . A_TickCount . "_" . Serial . "_" . Random(1000, 9999)
 	DirCreate(Root)
 	DirCreate(Root . "\tap_hold.toml")
 	if ConfigText != ""

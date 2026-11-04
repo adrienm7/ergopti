@@ -110,7 +110,8 @@ _LMBCM_ToggleRecordingScript(Source, Framework, Receipt) {
 		"SetTimer", true, "_LLM_Menu_FireHealthProbe", true,
 		"LLM_Menu_ScheduleBackendLifecycle", true, "LLM_Menu_BackendLifecycleInvalidate", true,
 		"LLM_Bridge_Stop", true, "LLM_Menu_RequestBuild", true,
-		"LLM_Menu_ScheduleHotkeysAwaitingEnable", true)
+		"LLM_Menu_ScheduleHotkeysAwaitingEnable", true, "HTTP_ScheduleCurlCheck", true,
+		"KeyboardShortcutsFollowAiSwitch", true, "LLM_Agent_OnAiSwitchedOff", true)
 	Position := 1, Scanned := 0
 	while Found := RegExMatch(Code, "[A-Za-z_][A-Za-z0-9_]*", &Word, Position) {
 		AssertTrue(Allowed.Has(Word[0]), "the exact toggle recorder refuses an uncontrolled effect: " Word[0])
@@ -156,6 +157,20 @@ LLM_Menu_ScheduleHotkeysAwaitingEnable() {
 	_LMTO_State["hotkeys"] += 1
 	_LMTO_State["events"].Push("hotkeys")
 }
+HTTP_ScheduleCurlCheck(AiOn) {
+	global _LMTO_State
+	AssertEqual(true, AiOn, "only an AI turned on asks for the curl check")
+	_LMTO_State["curl"] += 1
+	_LMTO_State["events"].Push("curl")
+}
+LLM_Agent_OnAiSwitchedOff() {
+	global _LMTO_State
+	_LMTO_State["events"].Push("agent")
+}
+KeyboardShortcutsFollowAiSwitch() {
+	global _LMTO_State
+	_LMTO_State["events"].Push("keys")
+}
 LLM_Menu_BackendLifecycleInvalidate(Stop) {
 	global _LMTO_State
 	AssertEqual(true, Stop)
@@ -176,6 +191,7 @@ LLM_Menu_RequestBuild(Reason) {
 		AssertEqual(LLM_HEALTH_PROBE_INTERVAL_MS, State["timer"], "health ownership is armed before repaint")
 		AssertEqual(1, State["scheduled"], "backend lifecycle is scheduled before repaint")
 		AssertEqual(1, State["hotkeys"], "hotkeys left inactive by an AI-off boot are handed over before repaint")
+		AssertEqual(1, State["curl"], "turning the AI on checks the curl it needs")
 		AssertEqual(State["expected_ui"], State["show_ui"])
 		AssertEqual(0, State["stopped"])
 		AssertEqual(0, State["invalidated"])
@@ -185,6 +201,7 @@ LLM_Menu_RequestBuild(Reason) {
 		AssertEqual(1, State["stopped"], "bridge retirement precedes entry into the repaint")
 		AssertEqual(0, State["scheduled"])
 		AssertEqual(0, State["hotkeys"], "disabling never activates AI hotkeys")
+		AssertEqual(0, State["curl"], "turning the AI off shows no curl dialog")
 	}
 	State["events"].Push("build")
 	if State["throw_build"]
@@ -195,7 +212,7 @@ _LMTO_Case(Enabled, ShowUi, ThrowBuild) {
 	global _LMTO_State
 	_LMTO_State := Map("enabled", Enabled, "expected_ui", ShowUi, "throw_build", ThrowBuild,
 		"events", [], "timer", -1, "scheduled", 0, "show_ui", -1,
-		"invalidated", 0, "stopped", 0, "builds", 0, "hotkeys", 0)
+		"invalidated", 0, "stopped", 0, "builds", 0, "hotkeys", 0, "curl", 0)
 	Observed := "", Accepted := false
 	try Accepted := _LLM_Menu_ApplyToggleCommitted(Map("enabled", Enabled), ShowUi)
 	catch as Err
@@ -203,7 +220,7 @@ _LMTO_Case(Enabled, ShowUi, ThrowBuild) {
 	AssertEqual(ThrowBuild ? "Controlled repaint refusal." : "", Observed)
 	AssertEqual(!ThrowBuild, Accepted)
 	AssertEqual(1, _LMTO_State["builds"])
-	Expected := Enabled ? ["log", "timer", "schedule", "hotkeys", "build"] : ["log", "timer", "invalidate", "stop", "build"]
+	Expected := Enabled ? ["log", "timer", "schedule", "hotkeys", "curl", "keys", "build"] : ["log", "timer", "invalidate", "stop", "agent", "keys", "build"]
 	AssertEqual(Expected.Length, _LMTO_State["events"].Length)
 	for Index, Event in Expected
 		AssertEqual(Event, _LMTO_State["events"][Index], "all committed effects keep exact order")
@@ -329,7 +346,7 @@ _LMPC_ProjectionScript(Framework, Receipt, ReadBody := _DriverFuncBodyOrEmpty) {
 global _LMPC_State := 0
 global _LLM_Menu := Map("enabled", false)
 global _LLM_Menu_Handle := 0, _LLM_Menu_InTray := true
-global _DriverInputInitPending := false, _IniCache := Map()
+global _DriverInputInitPending := false, _IniCache := Map(), _LLM_Menu_Loaded := false
 global _TrayMenuStage := false
 global _TrayTitleCache := Map(), _FmtCountCache := Map(), _I18nSortedLocalesCache := false
 LoggerInfo(Args*) => 0

@@ -26,8 +26,8 @@ helpers.describe("adapters.file_system: write() source uses temp+rename (F-MED-1
 		local body = src:sub(fn_start, fn_end)
 		local public_write = src:match("function M%.write%(path, content%)(.-)end") or ""
 
-		helpers.assert_true(public_write:find("write_atomic(path, content, nil)", 1, true) ~= nil,
-			"the canonical two-argument port must delegate to the reviewed atomic writer")
+		helpers.assert_true(public_write:find("write_atomic(path, content, nil, nil)", 1, true) ~= nil,
+			"the canonical two-argument port must delegate to the reviewed atomic writer, without a source precondition")
 		helpers.assert_true(body:find("reserve_staging_area(resolved_path)", 1, true) ~= nil,
 			"write() must exclusively reserve its staging pathname before opening it (F-MED-16)")
 		helpers.assert_true(body:find("os.rename(", 1, true) ~= nil,
@@ -87,7 +87,7 @@ helpers.describe("adapters.file_system: final logical publication admission", fu
 					os.rename, adapter.read_with_status = rename, read
 					local handle = assert(io.open(path, "rb"))
 					local actual = assert(handle:read("*a")); assert(handle:close())
-					os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+					os.remove(path); os.remove(fixture.write_lock_path(path))
 					helpers.assert_eq(called, true)
 					helpers.assert_eq(written, mode == "true", tostring(detail))
 					helpers.assert_eq(admissions, 1)
@@ -133,7 +133,7 @@ helpers.describe("FileSystem admitted publication captures exact source before c
 				os.rename, adapter.read_with_status = rename, read
 				local file = assert(io.open(path, "rb"))
 				local actual = assert(file:read("*a")); assert(file:close())
-				os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+				os.remove(path); os.remove(fixture.write_lock_path(path))
 				helpers.assert_eq(called, true)
 				helpers.assert_eq(written, false)
 				helpers.assert_eq(actual, "external-successor")

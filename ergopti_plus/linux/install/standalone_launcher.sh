@@ -9,9 +9,17 @@ WRAPPER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 INSTALL_ROOT="$(cd -- "$WRAPPER_DIR/.." && pwd -P)"
 DRIVER_ROOT="$INSTALL_ROOT/linux"
 SHARED_LUA="$INSTALL_ROOT/_shared/lua"
-export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
-# The installer publishes native_modules only for a system without a LuaJIT luv.
-source "$DRIVER_ROOT/install/native_modules_env.sh"
-ergopti_admit_native_modules "$DRIVER_ROOT" optional
+if [ -e "$DRIVER_ROOT/runtime" ] || [ -L "$DRIVER_ROOT/runtime" ]; then
+	# A release install carries the private runtime every package runs; its
+	# environment refuses a missing part. _shared sits beside linux/ here, so
+	# LUA_PATH is this layout's, with the runtime's Lua packages after it.
+	source "$DRIVER_ROOT/network-runtime-env.sh" "$DRIVER_ROOT/runtime" "$DRIVER_ROOT"
+	export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;$ERGOPTI_RUNTIME_PREFIX/share/lua/5.1/?.lua;$ERGOPTI_RUNTIME_PREFIX/share/lua/5.1/?/init.lua;;"
+else
+	export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
+	# A checkout install publishes native_modules only for a system without a LuaJIT luv.
+	source "$DRIVER_ROOT/install/native_modules_env.sh"
+	ergopti_admit_native_modules "$DRIVER_ROOT" optional
+fi
 # The standalone installer already selected its startup owner.
 exec bash "$DRIVER_ROOT/install/launch.sh" --service "$@"

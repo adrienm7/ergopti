@@ -68,7 +68,7 @@ _HLRB_AssertBounded(RelPath, Anchor, Where) {
 	; the same shared owner: at key-down, or once the order of the keys decided it.
 	Assert(InStr(Body, "TapHoldOwnImmediateLayer(") > 0 or InStr(Body, "TapHoldOwnHoldLayer(") > 0,
 		Where . " must hand the layer to the shared layer owner")
-	Assert(!InStr(Body, "KeyWait("),
+	Assert(!RegExMatch(Body, "(KeyWait|KS_WaitReleased)\("),
 		Where . " must not wait for the tap threshold before publishing LayerEnabled")
 }
 

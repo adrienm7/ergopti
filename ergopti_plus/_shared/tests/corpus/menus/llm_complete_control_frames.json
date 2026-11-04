@@ -12,17 +12,17 @@
 			"prefix": [
 				"Number of suggestions: 3",
 				"  ↳ Reset (default: 1)",
-				"-",
-				"Context size: 300 last characters",
-				"  ↳ Reset (default: 1500)",
-				"Clear context on click/navigation",
 				"Min words per suggestion: 2",
 				"  ↳ Reset (default: 4)",
 				"Max words per suggestion: 7",
 				"  ↳ Reset (default: 20)",
 				"Temperature (Creativity): 0.2",
 				"  ↳ Reset (default: 0.1)",
-				"  ↳ Auto-raise temperature (+0.1 per suggestion)"
+				"  ↳ Auto-raise temperature (+0.1 per suggestion)",
+				"-",
+				"Context size: 300 last characters",
+				"  ↳ Reset (default: 1500)",
+				"Clear context on click/navigation"
 			],
 			"choices": [
 				"1 suggestion",
@@ -42,17 +42,17 @@
 			"prefix": [
 				"Nombre de suggestions : 3",
 				"  ↳ Réinitialiser (défaut : 1)",
-				"-",
-				"Taille du contexte : 300 derniers caractères",
-				"  ↳ Réinitialiser (défaut : 1500)",
-				"Vider le contexte sur clic/navigation",
 				"Mots min par suggestion : 2",
 				"  ↳ Réinitialiser (défaut : 4)",
 				"Mots max par suggestion : 7",
 				"  ↳ Réinitialiser (défaut : 20)",
 				"Température (Créativité) : 0.2",
 				"  ↳ Réinitialiser (défaut : 0.1)",
-				"  ↳ Hausser la temp. automatiquement (+0.1 par suggestion)"
+				"  ↳ Hausser la temp. automatiquement (+0.1 par suggestion)",
+				"-",
+				"Taille du contexte : 300 derniers caractères",
+				"  ↳ Réinitialiser (défaut : 1500)",
+				"Vider le contexte sur clic/navigation"
 			],
 			"choices": [
 				"1 suggestion",
@@ -68,6 +68,6 @@
 			]
 		},
 		"count": 13,
-		"callback_positions": [2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+		"callback_positions": [2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13]
 	}
 }

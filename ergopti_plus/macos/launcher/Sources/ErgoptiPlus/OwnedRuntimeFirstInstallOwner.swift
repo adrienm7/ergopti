@@ -6,7 +6,7 @@ import Security
 
 final class OwnedRuntimeFirstInstallOwner {
 	enum State { case held, filesPublished, refused, cleanupPending }
-	private static let identifier = "com.ergoptiplus.app.runtime-installer"
+	private static let identifier = Identifiers.SigningIds.runtimeInstaller
 	private static let parentURL = URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus", isDirectory: true)
 	private let lock = NSLock()
 	private let publisher: OwnedRuntimePublisherIdentity
@@ -61,7 +61,7 @@ final class OwnedRuntimeFirstInstallOwner {
 			var existing = stat(); errno = 0
 			guard fstatat(parentDescriptor, "Runtime", &existing, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else { throw OwnedRuntimeInstallFailure.destination }
 			errno = 0
-			guard fstatat(daemonDescriptor, "com.ergoptiplus.runtime.core.plist", &existing, AT_SYMLINK_NOFOLLOW) == -1,
+			guard fstatat(daemonDescriptor, Identifiers.ServiceLabels.macosCore + ".plist", &existing, AT_SYMLINK_NOFOLLOW) == -1,
 				errno == ENOENT else { throw OwnedRuntimeInstallFailure.destination }
 			guard let journal = OwnedRuntimeInstallJournal.create() else { throw OwnedRuntimeInstallFailure.cleanupPending }
 			self.journal = journal

@@ -268,6 +268,9 @@ end)
 --- @return table
 local function empty_config()
 	return {
+		-- Another category keeps the Hotstrings switch on, so the dynamic
+		-- category alone can be off: an off switch greys the whole submenu.
+		any_enabled        = function() return true end,
 		get_groups         = function() return {} end,
 		is_group_enabled   = function() return false end,
 		toggle_group       = function() end,
@@ -283,7 +286,7 @@ end
 --- @param dh table The manager to hand the builder.
 --- @return table|nil
 local function dynamic_submenu(dh)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local first = dh.rule_families()[1].label
 	local found = nil
 

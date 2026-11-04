@@ -8,7 +8,7 @@ local helpers, Installer, Fs, etag_response, shell_quote, command_ok, write_file
 
 
 
-helpers.describe("modules/updater/manager.lua", function()
+helpers.describe("modules.updater.manager", function()
 	local M = helpers.load_module("modules.updater.manager")
 
 	-- Explicit portable native-port model only for the original controlled

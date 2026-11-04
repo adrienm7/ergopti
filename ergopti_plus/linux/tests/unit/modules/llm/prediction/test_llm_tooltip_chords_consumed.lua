@@ -496,7 +496,7 @@ end)
 local function consumed_details(keys, events)
 	local Engine = require("platform.remap.tap_hold_engine")
 	local hook = helpers.load_module("adapters.keyboard_hook")
-	hook.set_remapper(Engine.new({ keys = keys, tap_min_ms = 0, one_shot_timeout_ms = 2000 }))
+	hook.set_remapper(Engine.new({ keys = keys, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 }))
 	local details = {}
 	local ok, err = pcall(hook._test_drive, events, {
 		onConsume = function(detail)

@@ -10,6 +10,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local Logger        = require("infra.logger")
 local I18n          = require("infra.i18n")
 local Notifications = require("infra.notifications")
@@ -29,8 +30,9 @@ end
 
 --- Reports a rejected keymap-backed mutation without claiming it succeeded.
 local function notify_mutation_failure()
-	local ok, err = pcall(Notifications.notify,
-		I18n.get("common.error_title"), I18n.get("dialog.bulk_toggle.save_failed"), "error")
+	local ok, err = pcall(SaveFailure.present, I18n.get, function(message)
+		Notifications.notify(I18n.get("common.error_title"), message, "error")
+	end)
 	if not ok then
 		Logger.error(LOG, "Keymap mutation failure notification failed: %s.", tostring(err))
 	end

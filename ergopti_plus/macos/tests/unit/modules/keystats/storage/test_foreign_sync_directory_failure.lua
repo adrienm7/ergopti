@@ -172,7 +172,9 @@ helpers.describe("keystats log manager — foreign sync failures", function()
 			"local foreign_devices = _sync_foreign_data_sql(function(device_id)", 1, true) ~= nil,
 			"the recurring ingest path must consume the checked boundary result")
 		local recovery = executable:match("local function _recover_aggregate_cache%(db, replay_state%)(.-)\nend\n")
-		helpers.assert_true(recovery ~= nil and recovery:find("\n\t_sync_foreign_data_sql()\n", 1, true) ~= nil,
+		-- A resumed walk leaves foreign rows to ingest; a fresh one imports them here.
+		helpers.assert_true(recovery ~= nil and recovery:find(
+			"\n\tif _running_recovery_progress() == nil then _sync_foreign_data_sql() end\n", 1, true) ~= nil,
 			"startup aggregate recovery must route through the checked boundary too")
 	end)
 end)

@@ -1,5 +1,6 @@
 ﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\_generated\config_keys.ahk
 ; Version resource of the compiled exe (Ahk2Exe directives, plain comments for
 ; the interpreter): without it the exe carries only the runtime's defaults. The
 ; version comes from BUNDLE_VERSION in infra/bundle.ahk.
@@ -9,6 +10,7 @@
 ;@Ahk2Exe-SetCopyright Copyright (c) 2024 Adrien MOYAUX (MIT License) - https://ergopti.fr
 ;@Ahk2Exe-SetOrigFilename ErgoptiPlus.exe
 ;@Ahk2Exe-SetInternalName ErgoptiPlus
+;@Ahk2Exe-Set Comments, Open-source keyboard companion.
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 ; No process starts with a tray icon: the driver path reveals it once the custom
 ; icon and the safe bootstrap menu are in place, and a detached worker never does.
@@ -179,13 +181,30 @@ if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 	}
 }
 
+; The mutex exemption above lets a smoke boot beside a resident driver, so this
+; decision runs before anything can register a hook. Suspended, the boot's hotkeys
+; never reach the hook, and every other input path honors the pause.
+global _DriverSmokeInputQuarantined := false
+if (_DriverStartupSmokeDir != "" && !_DriverIsDetachedWorker) {
+	_DriverSmokeInputDecision := DriverSmokeInput_Decide(
+		EnvGet("ERGOPTI_STARTUP_SMOKE_LIVE_INPUT") == "1", EnvGet("CI") == "true",
+		DriverMutex_ResidentLives(DRIVER_MUTEX_NAME))
+	if (_DriverSmokeInputDecision == DRIVER_SMOKE_INPUT_REFUSE)
+		PLC_ExitProcessNow(1, "startup-smoke: live input refused, a resident driver owns this session.")
+	if (_DriverSmokeInputDecision == DRIVER_SMOKE_INPUT_QUARANTINE) {
+		_DriverSmokeInputQuarantined := true
+		Suspend(true)
+	}
+	StartupSmokeArmDeadline()
+}
+
 BootProfile_Stamp("Single-owner gate completed")
 
 ; Single source of truth for the driver's baseline (non-boosted) process
 ; priority class. Every restore site outside a transient boost — LLM_Menu_Init's
-; defensive reset, LLM_Deps_Fail, LLM_Deps_Cancel, _LLM_Deps_OnPollProbeResult —
+; defensive reset, LLM_Deps_Fail, LLM_Deps_Cancel —
 ; MUST reference this constant instead of a hardcoded "Normal" literal. Before
-; this fix those four sites restored to the OS default "Normal", silently
+; this fix those sites restored to the OS default "Normal", silently
 ; undoing the AboveNormal boot boost below the first time any of them ran
 ; (driver-baseline-priority-reverted-to-normal).
 global DRIVER_BASELINE_PRIORITY_CLASS := "AboveNormal"
@@ -361,6 +380,7 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 #Include infra/error_policy.ahk
 #Include infra/error_report.ahk
 #Include infra/hotpath_profiler.ahk
+#Include infra/perf_budget.ahk
 #Include infra/registry.ahk
 #Include infra/app_state.ahk
 BootProfile_Stamp("Diagnostics and core state initialised")
@@ -510,6 +530,8 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/program_parameter.ahk
 #Include adapters/program_providers.ahk
 #Include infra/program_actions.ahk
+#Include infra/user_actions.ahk
+#Include infra/sticky_modifiers.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
 #Include infra/locale.ahk
@@ -616,6 +638,10 @@ KLPF_InitializeCleanup()
 #Include modules/llm/parser.ahk
 #Include modules/llm/remote_formats.ahk
 #Include ..\_shared\modules\llm\local_server_auth.ahk
+#Include ..\_shared\modules\llm\api_url_template.ahk
+#Include ..\_shared\modules\llm\model_capabilities.ahk
+#Include ..\_shared\modules\llm\thinking_off.ahk
+#Include ..\_shared\modules\llm\local_server_fingerprint.ahk
 #Include ..\_shared\modules\llm\local_server_discovery.ahk
 #Include ..\_shared\modules\llm\local_server_ports.ahk
 #Include ..\_shared\modules\llm\local_server_menu.ahk
@@ -670,6 +696,7 @@ BootProfile_Stamp("Module includes initialised")
 #Include infra/suspend_handoff.ahk
 ; Before boot.ahk: a developer run reads the installed build's paths.toml.
 #Include infra/dev_source.ahk
+#Include infra/field_run.ahk
 #Include infra/boot.ahk
 BootProfile_Stamp("Paths and shared configuration loaded")
 #Include infra/feature_state.ahk
@@ -701,11 +728,11 @@ global _TrayStartupCommands := TrayStartupCommands(
 if FileExist(ConfigurationFile)
 	_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 global _TrayStartupClick := TrayStartupClick(
-	() => IsSet(_DriverMenuReady) && _DriverMenuReady,
+	TrayStartupClickReadyNow,
 	_DriverStartupSmokeDir != "" ? (*) => 0 : 0, 0, 0, 0, 0,
 	_DriverStartupSmokeDir != "" ? 0 : TrayStartupOnboarding)
-; Retain context requests until the complete root exists. Entering the native
-; bootstrap menu here blocks auto-execute for the user's navigation interval.
+; Retain context requests until the complete root exists and input is ready.
+; Entering a native menu blocks auto-execute for the user's navigation interval.
 if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 	_DriverStartupSmokeInspectBootstrap.Call()
 ; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
@@ -737,6 +764,9 @@ BootProfile_Stamp("Tray reset + onboarding")
 ; untouched and every write to it is refused for the session
 ; (infra/config_migrate.ahk, docs/adr/009-config-versioning.md).
 ConfigMigrateBoot(ConfigurationFile)
+; From here to readiness the boot only reads config.toml: one registry comparison
+; serves those reads, and the close below compares again.
+ConfigMigrateBootReadsOpen()
 BootProfile_Stamp("Configuration migration checked")
 
 global _IniCache := ParseConfigTomlFile(ConfigurationFile)
@@ -783,6 +813,7 @@ LoggerInit()
 ; window, which waits for the driver to be ready before it shows
 ErrorDialog_Init(_IniCache)
 ManagedNetworkFailureWindows_Init()
+ProxyOverride_Init(_IniCache)
 Updater_ConfigureManagedFailurePresenter(ManagedNetworkFailureWindows_Contract(),
 	_Updater_ShowManagedDownloadFailure, _Updater_RetireManagedDownloadFailure)
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
@@ -820,6 +851,7 @@ BootProfile_StageBegin("i18n")
 I18nPreload()
 BootProfile_StageEnd("i18n", "locale " . I18nGetLocale())
 BootProfile_Mark("i18n locale preloaded")
+ConfigNotifyOlderSchemaAtBoot()
 
 ; Load tooltip visual constants from _shared/modules/tooltip/constants.toml so the
 ; runtime values stay in sync with the TOML single source of truth.
@@ -923,6 +955,7 @@ EnsureUserConfigsExist()
 ; Map and every downstream Features["llm"]["enabled"] access throws a
 ; cryptic "Item has no value" error. Fail loudly here instead.
 if !ManifestEnsureLoaded() {
+	try LoggerError("ErgoptiPlus", "Startup aborted: the generated manifest is missing.")
 	Ui_MsgBox(t("startup.manifest_missing"), t("startup.manifest_window_title"), "OK Iconx")
 	ExitApp(1)
 }
@@ -951,8 +984,12 @@ HotstringsOverridesBoot()
 ; config.toml leaves and records once the owner exists. After the delays: the
 ; file is rewritten from memory, which must hold the migrated delays by then.
 HotstringsDelimitersBoot()
+; Versions the file once, before anything reads it; a file this build cannot
+; version is left alone and refuses every later write of this session.
+TapHoldMigrateFile(_ConfigDir . _AhkSubDir . "tap_hold.toml", _SharedDir . "\tap_hold\defaults.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
+GestureSystemRetireDismissals()
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",
 	_BootConfigApplied, (TapHold is Map && TapHold.Has("keys")) ? TapHold["keys"].Count : 0))
 
@@ -960,9 +997,9 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 
 ; Safe nested read
 _SpaceAroundSymbolsNode := (Features.Has("hotstrings")
-	and Features["hotstrings"].Has("distances_reduction")
-	and Features["hotstrings"]["distances_reduction"].Has("space_around_symbols"))
-	? Features["hotstrings"]["distances_reduction"]["space_around_symbols"]
+	and Features["hotstrings"].Has(ConfigLeaf.DISTANCES_REDUCTION)
+	and Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION].Has("space_around_symbols"))
+	? Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["space_around_symbols"]
 	: Map()
 global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceAroundSymbolsNode["enabled"]) ? " " : ""
 
@@ -1188,34 +1225,6 @@ BootProfile_StageBegin("shortcuts")
 ReadScriptShortcutsConfig()
 ReadKeyboardShortcutsConfig()
 
-LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
-_KbBoundCount := 0
-for _KbSlot, _KbAction in KeyboardShortcutAssignments {
-		if _KbSlot == MagicEditorSlot()["id"]
-				continue
-		if MagicEditorRecordOrdinaryPhysical(_KbSlot, _KbAction)
-				continue
-		if (_KbAction == "none")
-				continue
-		_KbChord := _KeyboardSlotChord(_KbSlot)
-		if (_KbChord == "") {
-				LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — chord not resolvable.", _KbSlot)
-				continue
-		}
-		; The registrar owns the OS call and reports refusal by returning "", so the
-		; try/catch that used to wrap Hotkey() here would now only ever catch our own
-		; bugs — which must surface, not be logged as a skipped shortcut
-		_KbHandle := HotkeyRegistrarBind(_KbChord, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
-		if (_KbHandle == "") {
-				LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}' ({2}).", _KbSlot, _KbChord)
-				continue
-		}
-		LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
-		MagicEditorRecordOrdinaryHandle(_KbSlot, _KbHandle)
-		_KbBoundCount++
-}
-LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
-
 #Include infra/config_io.ahk
 #Include infra/config_scope.ahk
 #Include ../_shared/modules/hotstrings/scope_overrides.ahk
@@ -1224,14 +1233,16 @@ LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active)
 _BootMetricsCache := CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
-if MetricsShortcuts.enabled
-		WPMWidget_LoadConfig(_BootMetricsCache)
+; Loaded with Metrics off too: SaveFullConfig writes the widget booleans back, so
+; they must carry the user's or the manifest's answer, not the class placeholders.
+WPMWidget_LoadConfig(_BootMetricsCache)
 
-BootProfile_StageEnd("shortcuts", _KbBoundCount . " configurable hotkey(s) bound")
+BootProfile_StageEnd("shortcuts", KeyboardShortcutAssignments.Count . " configured keyboard slot(s) read")
 BootProfile_Mark("Config, features & shortcuts loaded")
-; Publish the configured native root before registering the input surface. Leaf
-; pickers finish before paint or prewarm after input readiness; command admission
-; retains feature selections until their runtime owners genuinely exist.
+; The configured native root is published once the input surface is registered
+; (below the prefix watcher). Leaf pickers finish before paint or prewarm after
+; input readiness; command admission retains feature selections until their
+; runtime owners genuinely exist.
 ; Stock tray items (Pause/Suspend/Reload/Exit/Edit) are cleared once at boot,
 ; before Onboarding_Run (AHK-21), so they are never live during the first-run wizard.
 ; Keep the real native commands throughout boot and refresh their locale before
@@ -1246,6 +1257,8 @@ _InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 TapKeysReadConfig(_IniCache)
 #Include infra/key_combinations.ahk
 KeyCombinationsReadConfig(_IniCache)
+TapHoldLoneTapReadConfig(_IniCache)
+#Include infra/quit_admission.ahk
 #Include infra/lifecycle.ahk
 ; Cleanup must own windows before the configured menu admits diagnostic clicks.
 ; Empty, uninitialized metrics now pass the reversible persistence preflight.
@@ -1255,16 +1268,13 @@ LoggerInfo("ErgoptiPlus", "Shutdown handler registered before configured menu pu
 if _DriverStartupSmokeDir == ""
 	WebView_BeginBrowserWarmup()
 global _DriverInputInitPending := true
+; True until the ready line: the boot's full save is requested earlier, written after.
+global _DriverBootTailPending := true
 global _DriverMenuReady := false
 ; Commands clicked while the previous instance's reload was pending are replayed
 ; first, once input is ready (infra/menu_reload_replay.ahk).
 MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated, MenuReloadReplay_Consume())
 _TrayRootBootDetailsPending := true
-if !BuildTrayMenuDeferred()
-	throw Error("the configured startup menu could not be published")
-if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectShell))
-	_DriverStartupSmokeInspectShell.Call()
-ConfigRegistryCacheFlushPending()
 BootProfile_StageBegin("magic key source")
 ; The physical key typing the magic key (LayoutRegistry_MagicKeySource): the
 ; key the user chose in [hotstrings] magic_key_source always wins; then the key
@@ -1286,10 +1296,10 @@ _MagicKeySource := LayoutRegistry_MagicKeySource(Map(
 	"configured", ScriptInformation["MagicKeySource"],
 	"declared", LayoutRegistry_DeclaredMagicKey(
 		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
-			Features["layout"]["ergopti_base"], ERGOPTI_LAYOUT_ID,
+			Features["layout"][ConfigLeaf.ERGOPTI_BASE], ERGOPTI_LAYOUT_ID,
 			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
 		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
-	"emulated", Features["layout"]["ergopti_base"],
+	"emulated", Features["layout"][ConfigLeaf.ERGOPTI_BASE],
 	"keycodes", LayoutRegistry_Keycodes(),
 	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"]),
 	"shipped", LayoutRegistry_ShippedMagicKey))
@@ -1385,6 +1395,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/layout_manager/composer.ahk
 #Include ui/layout_manager/composer_check.ahk
 #Include ui/field_check/network_check.ahk
+#Include ui/proxy_override.ahk
 #Include ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
 
@@ -1420,6 +1431,10 @@ BootProfile_Mark("LAYOUT: registry emulation registered")
 #Include modules/keymap/layout.ahk
 BootProfile_Mark("LAYOUT: Ergopti layout registered")
 #Include modules/shortcuts.ahk
+; After the layout: a slot's letter is the key that types it under the emulation,
+; which RemappedList only knows from here. Before MagicEditorStart: a Win slot on
+; a remapped key joins the physical broker, which acquires its keys once.
+KeyboardShortcutsBindAll()
 ; [shortcuts.caps_word], read before the first activation arms its listeners.
 CapsWordAutoOffReadConfig(_IniCache)
 BootProfile_Mark("LAYOUT: shortcut modules registered")
@@ -1463,21 +1478,38 @@ HotstringPrefixWatcherInit()
 ; Install the shared low-level keyboard arbiter after the prefix InputHook. Its
 ; terminal capture then runs first in the hook chain and can hold physical edges
 ; while paced terminal output completes. A failed native admission is reported
-; by the adapter and terminal expansions remain fail-open.
-LLM_NavEventOwner_EnsureStarted()
+; by the adapter and terminal expansions remain fail-open. It runs whatever the
+; AI's state: the press ledger serves every user's first-key order.
+; The native hook does not obey Suspend: a quarantined smoke never starts it.
+if !_DriverSmokeInputQuarantined
+	KeyboardArbiterEnsureForLedger()
 HotstringPrefixWatcherRebuildIndex()
 BootProfile_StageEnd("prefix watcher")
 BootProfile_Mark("Prefix watcher index complete")
+; The keyboard is registered first and the configured tray root after it, so the
+; first keystroke never waits for the menu build (maintainer decision, 3 November
+; 2026). A tray clicked meanwhile keeps the bootstrap menu, or is queued until
+; input is ready (_TrayStartupClick): an open native menu stops this thread.
+if !BuildTrayMenuDeferred()
+	throw Error("the configured startup menu could not be published")
+if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectShell))
+	_DriverStartupSmokeInspectShell.Call()
+ConfigRegistryCacheFlushPending()
 SuspendWatchdogStart()
 _SuspendStateWatchdog()
 _DriverInputInitPending := false
 #InputLevel 0
 LLM_Menu_ActivateRuntime()
+if !ConfigMigrateBootReadsClose(ConfigurationFile)
+	LoggerError("ErgoptiPlus", "The configuration registry changed during boot; every later write of this session is refused.")
 _DriverReady := true
 if _LLM_Menu_RuntimeActivated
 	_MenuStartupCommands.NotifyReady()
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
+SetTimer(ShellRunner_CheckWinPsAtStart, -1)
+ProxyOverride_ScheduleSealAtStart()
+HTTP_ScheduleCurlCheck(_LLM_Menu.Get("enabled", false))
 HealthCheck_StartWindowControl()
 ; The local reload command is optional: a control that cannot start is
 ; reported and the ready driver keeps running without it.
@@ -1491,31 +1523,49 @@ try {
 		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1} (clone root from {2}).",
 			_DriverDir, DevSource_Resolution()["origin"])
 		DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)
+		; The collector's field run (infra/field_run.ahk) is optional too: the
+		; driver keeps running without it.
+		try FieldRun_Start(DevSource_Root())
+		catch as _FieldRunErr
+			LoggerError("FieldRun", "The developer field run could not start: {1}.", _FieldRunErr.Message)
 	}
 } catch as _DevSourceErr
 	LoggerError("ErgoptiPlus", "Developer source mode refused: {1}.", _DevSourceErr.Message)
+; The counted operations of the whole boot (parses, reads, rebuilds), published as
+; their own window so the first minute's interval record starts from ready. Flushed
+; before the boot tail ends: a save or a queued tray waiting for it would run at the
+; first yield and be counted as boot work.
+PerfCount("config_migrate.registry_checks", ConfigMigrateRegistryChecks)
+PerfCount("config_migrate.registry_deep_compares", ConfigMigrateRegistryDeepCompares)
+PerfCounters_Flush()
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+_DriverBootTailPending := false
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
-_BootTotalMs := BootProfile_TotalBootMs()
+; A tray clicked while the keyboard was registering opens now, from a timer, and
+; never earlier (maintainer decision, 3 November 2026). A root a restored pause
+; refused publishes later and releases the click itself (_TrayRootBuildBoot).
+if _DriverMenuReady
+	_TrayStartupClick.NotifyReady()
+_BootTotalMs := BootProfile_CompletedBootMs(BootProfile_TotalBootMs())
 _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
 	LoggerWarn("BootProfile", "Boot completed with unclosed stage(s): {1}.", _BootOpenStages)
 LoggerInfo("BootProfile", "Boot complete in {1} ms (since process start).", _BootTotalMs)
+try PerfBudget_Report("BootProfile", "boot", _BootTotalMs, TimingsGet("budgets", "boot_total_ms"))
+catch as _BootBudgetErr
+	LoggerError("BootProfile", "The boot could not be judged against its budget: {1}.", _BootBudgetErr.Message)
 ; Evidence, never collapsed: the per-stage table that boot-time comparisons need.
 LoggerEvidence("BootProfile", "Boot summary: total_ms={1} stage_ms: {2}.", _BootTotalMs,
 	BootProfile_StageSummary())
-; The counted operations of the whole boot (parses, reads, rebuilds), published as
-; their own window so the first minute's interval record starts from ready.
-PerfCount("config_migrate.registry_checks", ConfigMigrateRegistryChecks)
-PerfCount("config_migrate.registry_deep_compares", ConfigMigrateRegistryDeepCompares)
-PerfCounters_Flush()
 ; One environment summary with the same field names on every driver. A probe
 ; failure is reported and never allowed to turn a ready driver into a dead one.
 try DiagSnapshot_Emit(_BootTotalMs)
 catch as _SnapshotErr
 	LoggerError("Diagnostics", "Diagnostic snapshot could not be collected: {1}.", _SnapshotErr.Message)
 if (_DriverStartupSmokeDir != "") {
+		if _DriverSmokeInputQuarantined
+				LoggerInfo("Lifecycle", "Startup smoke quarantined from session input.")
 		_StartupSmokeExpectedSuspend :=
 				EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED") == "1"
 		if _StartupSmokeExpectedSuspend {
@@ -1526,16 +1576,17 @@ if (_DriverStartupSmokeDir != "") {
 				if !A_IsSuspended
 						throw Error("suspend marker was not restored before ready")
 		}
-		; The complete configured root precedes input registration, including a
-		; paused reload. Reaching ready alone cannot prove that publication order.
+		; The complete configured root follows input registration and precedes
+		; readiness, including a paused reload (maintainer decision, 3 November
+		; 2026); the wrapper's shell receipt proves both sides of that order.
 		if !_DriverMenuReady
 				throw Error("the complete configured menu was not published before input readiness")
 		if IsSet(_DriverStartupSmokeInspectAdmission)
 				_DriverStartupSmokeInspectAdmission.Call()
 		; The same driver must come back from that pause: lift it and wait for the
 		; AI hotkeys its paused build deferred. Any error the resume logs fails
-		; the fixture like any other.
-		if _StartupSmokeExpectedSuspend {
+		; the fixture like any other. A quarantined smoke stays paused.
+		if _StartupSmokeExpectedSuspend && !_DriverSmokeInputQuarantined {
 				ToggleSuspend()
 				_StartupSmokeResumeStarted := A_TickCount
 				while ((A_IsSuspended or _LLM_Menu_FirstRestoreHotkeysDeferred)
@@ -1601,8 +1652,8 @@ _Updater_ArmInheritedSwapFailureNotice()
 ; replay the full driver boot, and no provider call happens until an idle-gated
 ; request arrives. Starting it here prevents the first wrap action after a
 ; reload from racing a cold worker process.
-if Features.Has("shortcuts") && Features["shortcuts"].Has("wrap_text_if_selected")
-	&& Features["shortcuts"]["wrap_text_if_selected"]
+if Features.Has("shortcuts") && Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
+	&& Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 	SetTimer(UIASW_Start, -1)
 
 if _DriverStartupSmokeDir == "" && IsCategoryGated("Hotstrings")

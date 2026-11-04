@@ -73,6 +73,10 @@ local function release_native()
 	return true
 end
 
+--- Cancels the running source proof.
+--- @return boolean settled True when no attempt remains.
+--- @return boolean|nil deferred True when the cancel was accepted but settles
+---   later: the attempt is fenced, and its on_settled observer retargets.
 local function cancel_attempt()
 	local attempt = _attempt
 	if attempt == nil then return true end
@@ -81,7 +85,9 @@ local function cancel_attempt()
 	_cancel_depth = _cancel_depth + 1
 	local called, cancelled = xpcall(attempt.operation.cancel, debug.traceback)
 	_cancel_depth = _cancel_depth - 1
-	if not called or cancelled ~= true then return false end
+	if not called then return false end
+	-- A probe task still running settles after its stop; that is not cleanup debt.
+	if cancelled ~= true then return false, _attempt == attempt end
 	if _attempt == attempt then _attempt = nil end
 	return true
 end
@@ -236,8 +242,11 @@ end
 function M.refresh()
 	_generation = _generation + 1
 	_decision = nil
-	local cancelled = cancel_attempt()
+	local cancelled, deferred = cancel_attempt()
 	local released = release_native()
+	-- A second retarget while a proof runs (a bulk edit that settles at once)
+	-- was reported as cleanup debt; the fenced attempt retargets when it settles.
+	if deferred and released then return true end
 	if not cancelled or not released then return false end
 	if not probe_current() then return false end
 	if not _started or _spec.action == "none" or _spec.context.legacy_present

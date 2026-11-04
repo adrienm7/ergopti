@@ -147,12 +147,13 @@ helpers.describe("raw task launchers: nullable construction and false start are 
 		local saw_root, native_files, native_sites = false, 0, 0
 		local offenders = {}
 		for _, rel in ipairs(files) do
-			if rel == "init.lua" then saw_root = true end
+			local module_name = helpers.module_name_of(rel)
+			if module_name == "init" then saw_root = true end
 			local src = read_relative(rel)
 			helpers.assert_true(src ~= nil, "production source must remain readable: " .. rel)
 			local code = src:gsub("%-%-[^\n]*", "")
-			local owns_raw = rel == "adapters/task_lifecycle.lua"
-				or rel == "adapters/shell_runner.lua"
+			local owns_raw = module_name == "adapters.task_lifecycle"
+				or module_name == "adapters.shell_runner"
 			if not owns_raw and (code:find("hs%.task%.new%s*%(")
 					or code:find("pcall%s*%(%s*hs%.task%.new")) then
 				offenders[#offenders + 1] = rel .. ": raw hs.task.new ownership"

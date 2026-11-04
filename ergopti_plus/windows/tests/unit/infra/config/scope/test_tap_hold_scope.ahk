@@ -108,8 +108,8 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("tap-hold-scope: recommended preset and master compensate native refusal", _TapHoldScopeCase.Bind("recommended"))
-Test("tap-hold-scope: clear preset keeps the switch and compensates native refusal (tap-hold-clear-keeps-switch)", _TapHoldScopeCase.Bind("clear"))
+Test("tap-hold-scope: recommended preset and master compensate native refusal", _RRNC_NoDialog.Bind("Tap-Holds", _TapHoldScopeCase.Bind("recommended")))
+Test("tap-hold-scope: clear preset keeps the switch and compensates native refusal (tap-hold-clear-keeps-switch)", _RRNC_NoDialog.Bind("Tap-Holds", _TapHoldScopeCase.Bind("clear")))
 
 ; The manifest plan itself: a clear of the Tap-Holds, alone or composed in the
 ; global one, names no row for the switch, and a restore still switches it on.

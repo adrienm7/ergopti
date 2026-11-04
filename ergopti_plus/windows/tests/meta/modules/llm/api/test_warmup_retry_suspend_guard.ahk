@@ -31,10 +31,8 @@
 ; ===================================================
 ; ===================================================
 
-_WRS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_WRS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -45,7 +43,7 @@ _WRS_ReadSource(RelPath) {
 ; ===================================================
 
 _WRS_WarmupTickHasSuspendGuard() {
-	Src := _WRS_ReadSource("modules/llm/api_ollama.ahk")
+	Src := _WRS_ReadSource("api_ollama.ahk")
 	Seg := _DriverFuncBody("LLM_Ollama_WarmupRetryTick")
 	Assert(Seg != "", "LLM_Ollama_WarmupRetryTick must exist in api_ollama.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
@@ -69,39 +67,6 @@ _WRS_SuspendEnterCancelsWarmupRetry() {
 		"suspend must require an explicit successful warmup cancellation receipt")
 }
 Test("ErgoptiPlus: Ergopti_OnSuspendEnter cancels Ollama warmup retry on pause", _WRS_SuspendEnterCancelsWarmupRetry)
-_WRS_DepsPollHasSuspendGuard() {
-	Seg1 := _DriverFuncBody("LLM_Deps_PollServerReady")
-	Assert(InStr(Seg1, "A_IsSuspended") > 0,
-		"LLM_Deps_PollServerReady must check A_IsSuspended (warmup-retry-ignores-suspend)")
-	; LLM_Deps_PollFile (the PS1-stdout poll callback this invariant originally
-	; guarded alongside PollServerReady) was deleted by the AHK-29 winget
-	; refactor as unreachable dead code — winget has no PS1 stdout to poll, so
-	; there is no second poll callback left to check; see
-	; test_dead_ps1_pipeline_absent.ahk for the regression guard on its removal.
-}
-Test("ollama_deps_checker: deps poll callbacks have A_IsSuspended guard", _WRS_DepsPollHasSuspendGuard)
-
-_WRS_SuspendEnterCancelsDepsPoll() {
-	Src := _DriverSourceConcat()
-	
-	FuncPos := InStr(Src, "Ergopti_OnSuspendEnter() {")
-	Assert(FuncPos > 0, "Ergopti_OnSuspendEnter must exist")
-	Tail := SubStr(Src, FuncPos)
-	NextFunc := InStr(Tail, "`nErgopti_On")
-	Segment := (NextFunc > 0) ? SubStr(Tail, 1, NextFunc) : Tail
-	Assert(InStr(Segment, "SetTimer(_LLM_Deps_PollTimer, 0)") > 0,
-		"Ergopti_OnSuspendEnter must stop _LLM_Deps_PollTimer when paused")
-		
-	FuncPos2 := InStr(Src, "Ergopti_OnSuspendResume() {")
-	Assert(FuncPos2 > 0, "Ergopti_OnSuspendResume must exist")
-	Tail2 := SubStr(Src, FuncPos2)
-	NextFunc2 := InStr(Tail2, "`n_SuspendStateWatchdog")
-	Segment2 := (NextFunc2 > 0) ? SubStr(Tail2, 1, NextFunc2) : Tail2
-	Assert(InStr(Segment2, "SetTimer(_LLM_Deps_PollTimer, 3000)") > 0,
-		"Ergopti_OnSuspendResume must resume _LLM_Deps_PollTimer if checking")
-}
-Test("ErgoptiPlus: Suspend toggles pause deps poll timer", _WRS_SuspendEnterCancelsDepsPoll)
-
 
 ; F26: LLM_OllamaScheduleWarmupRetry's FIRST dispatch is reachable directly
 ; from LLM_Menu_SetModel and LLM_Menu_OnDepsReady while suspended, with no

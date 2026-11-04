@@ -331,6 +331,9 @@ end
 --- Classifies a lease failure reason without keeping its text.
 --- @param reason string Lease failure reason.
 --- @return string kind
+--- Names the kind of a lease failure from its reason.
+--- @param reason any Lease failure reason.
+--- @return string kind pong, ready, mode, worker_exit, heartbeat or other.
 local function lease_kind(reason)
 	local text = tostring(reason)
 	if text:find("PONG", 1, true) then return "pong" end
@@ -340,6 +343,8 @@ local function lease_kind(reason)
 	if text:find("heartbeat", 1, true) then return "heartbeat" end
 	return "other"
 end
+
+M.lease_kind = lease_kind
 
 --- Counts one Karabiner lease failure and writes the session totals with it.
 --- @param reason string Lease failure reason.

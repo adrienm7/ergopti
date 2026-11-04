@@ -246,7 +246,9 @@ function M.report(err, context)
 	local ok_hc, hc = false, nil
 	if collect_probes then ok_hc, hc = pcall(require, "ui.healthcheck") end
 	if ok_hc and hc and type(hc.run) == "function" then
-		local ok_run, snap = pcall(hc.run)
+		-- Phase A leaves the versions and the module check to the local_state
+		-- steps, which a report without a page completes at once
+		local ok_run, snap = pcall(hc.run, { complete_local = true })
 		if ok_run and type(snap) == "table" and type(snap.sections) == "table" then
 			-- The version 2 snapshot of _shared/modules/diagnostics/schema.json
 			local sections = snap.sections

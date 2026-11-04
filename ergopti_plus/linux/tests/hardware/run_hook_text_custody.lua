@@ -66,14 +66,12 @@ local ok, failure = pcall(function()
 	assert(Reader.use_ffi_backend(), "native evdev backend unavailable")
 	for index = 1, 2 do
 		Names.VIRTUAL_KEYBOARD = "Ergopti Custody Test " .. index
-		package.loaded["adapters.uinput_writer"] = nil
-		local keyboard = require("adapters.uinput_writer")
+		local keyboard = require("tests.hardware.keyboard_source_writer").load(Names.VIRTUAL_KEYBOARD)
 		keyboards[index] = keyboard
 		assert(keyboard.open(), "cannot create source keyboard")
 		paths[index] = await_node(Names.VIRTUAL_KEYBOARD)
 	end
 	Names.VIRTUAL_KEYBOARD = original_name
-	package.loaded["adapters.uinput_writer"] = nil
 	Injector = require("modules.hotstrings.injector")
 	assert(Injector.open_fast_channel(), "cannot create production output")
 	assert(Reader.open(await_node(original_name), "custody-output"), "cannot observe output")

@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 local fixture = require("tests.support.manifest_menu_fixture")
-local CONTENT = '{"test_menu":[{"type":"dynamic","id":"owned"}]}'
+local CONTENT = '{"test_menu":[{"type":"action","id":"owned"}]}'
 
 --- Captures allocation and injects one failure while preserving real file I/O.
 --- @param mode string Failure boundary or success.

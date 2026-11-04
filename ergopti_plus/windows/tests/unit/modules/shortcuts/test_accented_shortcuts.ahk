@@ -185,7 +185,10 @@ _ACS_LayoutProviderPlacement(Tokens, AnyLayout) {
 	try {
 		Features := Map("layout", Map("ergopti_base", true, "ergopti_alt_gr", true,
 			"ergopti_variant", "ergopti_plus", "ctrl_magic_save", false,
-			"direct_access_digits", "digits", "emulated_layout", ""))
+			"direct_access_digits", "digits", "emulated_layout", "",
+				; Rows of the same section layout_switching owns: a provider listing the
+				; section's remainder drew them here as raw ids.
+				"pause_switch_enabled", false, "on_pause", "", "on_resume", ""))
 		State["initialized"] := false
 		Rows := _LAY_LayoutFeatureAltGrRows()
 		AssertEqual(1, Rows.Length, "the actual AltGr provider owns only its independent general layer")

@@ -108,6 +108,60 @@ _TRC_AuthorizationPrecedesMutation() {
 Test("tray root: terminal authorization precedes mutation (tray-publish-terminal-ticket)",
 	_TRC_AuthorizationPrecedesMutation)
 
+_TRC_RebuildLines(Worker) {
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try RebuildTrayMenu(0, Worker, false)
+	finally LoggerClearTestSink()
+	return Lines
+}
+
+_TRC_LinesWith(Lines, Text) {
+	Count := 0
+	for Line in Lines {
+		if InStr(Line, Text)
+			Count += 1
+	}
+	return Count
+}
+
+; field-log-analyse.py reads this exact line to judge a Windows rebuild.
+_TRC_RebuildWritesItsLine() {
+	Saved := _TRC_SaveState()
+	try {
+		_TRC_ResetState()
+		Lines := _TRC_RebuildLines((*) => true)
+		Rows := DllCall("GetMenuItemCount", "ptr", A_TrayMenu.Handle, "int")
+		Found := false
+		for Line in Lines {
+			if RegExMatch(Line, "Menu tree rebuilt in \d+\.\d ms \((\d+) top-level item\(s\)\)\.$", &Match) {
+				AssertEqual(String(Rows), Match[1], "the line counts the published root's rows")
+				Found := true
+			}
+		}
+		AssertTrue(Found, "a published rebuild writes the shared line")
+		_TRC_ResetState()
+		Refused := _TRC_RebuildLines((*) => false)
+		AssertEqual(0, _TRC_LinesWith(Refused, "Menu tree rebuilt"), "a refused pass rebuilt nothing")
+	} finally {
+		_TRC_RestoreState(Saved)
+	}
+}
+Test("tray root: a published rebuild writes the shared line (menu-rebuild-budget)", _TRC_RebuildWritesItsLine)
+
+_TRC_RebuildIsJudged() {
+	Budget := TimingsGet("budgets", "menu_rebuild_ms")
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try {
+		_TrayRootReportRebuild(Budget, 3)
+		_TrayRootReportRebuild(Budget + 1, 3)
+	} finally LoggerClearTestSink()
+	AssertEqual(2, _TRC_LinesWith(Lines, "Menu tree rebuilt"))
+	AssertEqual(1, _TRC_LinesWith(Lines, "Over budget: menu.rebuild took"), "only past the [budgets] value")
+}
+Test("tray root: a rebuild is judged against its budget (menu-rebuild-budget)", _TRC_RebuildIsJudged)
+
 _TRC_ConcurrentWorker(PublishAuthorizeFn) {
 	global _TRC_Builds
 	BuildNumber := _TRC_Builds.Length + 1

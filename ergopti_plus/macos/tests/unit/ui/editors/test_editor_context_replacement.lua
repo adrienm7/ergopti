@@ -28,7 +28,7 @@ local function with_editor(module_name, callback)
 			"adapters.apple_shortcuts", "adapters.shell_runner", "adapters.apple_shortcuts_native",
 			"infra.deferred_work", "infra.launcher_environment", "adapters.timer_scheduler", "app_dirs",
 			"lfs", "program_provider_picker", "diagnostics.operation_reporter", "infra.config_paths",
-			"infra.log_folders", "program_parameter", "text_utils", "adapters.program_providers",
+			"infra.log_folders", "program_parameter", "user_action_parameter", "text_utils", "adapters.program_providers",
 			"adapters.file_system", "json",
 			"infra.toml.codec", "toml_codec", "toml_codec.codec", "toml_codec.basic_string",
 			"toml_codec.bom", "toml_codec.key_path", "toml_codec.record_scanner",

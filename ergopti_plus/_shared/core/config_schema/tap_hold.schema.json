@@ -38,7 +38,7 @@
 				},
 				"explicit_delays": {
 					"type": "boolean",
-					"description": "Retired. Windows still writes it: true means every per-key time_activation_seconds in the file is the user's own. Linux no longer reads or writes it; its v0_to_v1 migration (_shared/tap_hold/migrations.toml) uses it once, to leave the delays of a flagged file alone, and removes it."
+					"description": "Retired. No driver reads or writes it; the v0_to_v1 migration (_shared/tap_hold/migrations.toml) uses it once, to leave the delays of a flagged file alone, and removes it."
 				},
 				"keys": { "$ref": "#/$defs/keys_map" }
 			}

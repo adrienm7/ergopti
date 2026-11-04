@@ -173,7 +173,11 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		; resident with a partial set of hotkeys/hooks and no reliable recovery path.
 		; Cleanup is best-effort because this handler also covers failures before
 		; those modules are loaded; ExitApp is the only publication boundary here.
-		if (_DriverBootPhase != "ready") {
+		; A smoke ends on any error, ready or not: one that survived a failed readiness
+		; receipt stayed resident and hooked until its harness killed it. It exits
+		; through ExitProcess, as its ready path does, because a teardown can veto ExitApp.
+		SmokeRun := IsSet(_DriverStartupSmokeDir) && _DriverStartupSmokeDir != ""
+		if (_DriverBootPhase != "ready" or SmokeRun) {
 				try LoggerError("ErgoptiPlus", "Fatal startup error during phase '{1}': {2}",
 						_DriverBootPhase, ErrorNet_Describe(Exc)
 								. (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
@@ -200,12 +204,14 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 				; Tell the user WHY the driver is exiting. A modal is safe here: no input
 				; pipeline is owned yet and we are about to ExitApp. i18n may not be loaded
 				; this early, so the message is a hardcoded French string (last-resort path).
-				if !(IsSet(_DriverStartupSmokeDir) && _DriverStartupSmokeDir != "")
+				if !SmokeRun
 						try Ui_MsgBox("ErgoptiPlus n'a pas pu démarrer (phase « " . _DriverBootPhase . " ») :`n`n"
 								. Exc.Message . "`n`nLe driver va se fermer. Le journal des erreurs contient le détail.",
 								"erreur de démarrage", "Iconx")
 				try KL_Stop()
 				try HookDispatcher.Stop()
+				if SmokeRun
+						PLC_ExitProcessNow(1)
 				ExitApp(1)
 				return true
 		}
@@ -408,19 +414,20 @@ _CrashReport_CheapSnapshot(Exc) {
 		"error_file", Exc.HasProp("File") ? String(Exc.File) : "",
 		"error_line", Exc.HasProp("Line") ? String(Exc.Line) : "",
 		"stack_trace", Exc.HasProp("Stack") ? Exc.Stack : "",
-		"os_name", A_OSVersion, "os_build", "",
+		"os_version", A_OSVersion, "os_build", "",
 		"os_arch", A_Is64bitOS ? "64 bits" : "32 bits",
-		"ahk_version", A_AhkVersion,
+		"hs_version", A_AhkVersion,
 		"ahk_bitness", A_PtrSize = 8 ? "64-bit" : "32-bit",
 		"cpu_name", "", "cpu_cores", "",
 		"ram_total_gb", "", "ram_free_gb", "",
-		"screen_resolution", A_ScreenWidth . "x" . A_ScreenHeight,
+		"screen_res", A_ScreenWidth . "x" . A_ScreenHeight,
 		"dpi", String(A_ScreenDPI),
 		"dpi_scale", String(Round(A_ScreenDPI / 96 * 100)),
 		"locale", A_Language, "script_dir", A_ScriptDir, "git_hash", BuiltCommit,
+		"commit_source", BuiltCommit != "" ? "build" : "unknown",
 		"uptime_sec", String(UptimeSec),
-		"active_window_title", ActiveWindowTitle,
-		"active_window_process", ActiveWindowProcess,
+		"active_title", ActiveWindowTitle,
+		"active_app", ActiveWindowProcess,
 		"stuck_modifiers", StuckMods.Length ? _CrashReport_JoinArr(StuckMods) : "none",
 		"adapters_ok", AdapterState["validated"],
 		"adapters_failed", AdapterState["failed"],
@@ -440,6 +447,11 @@ _CrashReport_WorkerDone(ReleaseDedup, ExitCode, Stdout, Stderr) {
 	if (ExitCode = 0 and RegExMatch(Text, "m)^OK:(.+)$", &Match)) {
 		try LoggerSuccess("CrashReporter", "Crash report saved by worker: {1}.", Match[1])
 		try NotifierSend(Match[1], Map("title", t("crash.report.saved_title"), "level", "info"))
+		; The worker writes the report out of process; the cap is enforced here,
+		; where the logger owns the folder.
+		try CrashReport_PruneReports()
+		catch as PruneErr
+			try LoggerError("CrashReporter", "Crash reports could not be pruned: {1}.", PruneErr.Message)
 		return
 	}
 	if ReleaseDedup

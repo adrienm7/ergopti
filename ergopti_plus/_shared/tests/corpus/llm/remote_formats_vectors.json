@@ -1,5 +1,62 @@
 {
-	"_comment": "Pins _shared/lua/llm/remote_formats.lua and windows/modules/llm/remote_formats.ahk: Backboard's assistant/thread shapes and TypeSafe's decisions shapes. Generated from the Lua oracle. {\"absent\": true} means nothing. message_request jev carries agent.jev_questions(agent.json); decisions_body questions are the same. Request vectors are compared as decoded JSON.",
+	"_comment": "Pins _shared/lua/llm/remote_formats.lua and windows/modules/llm/remote_formats.ahk: Backboard's assistant/thread shapes, TypeSafe's decisions shapes and Perplexity's Agent API (agent_body, agent_answer: a raw body classified whole). Generated from the Lua oracle. {\"absent\": true} means nothing. message_request jev carries agent.jev_questions(agent.json); decisions_body questions are the same. Request vectors are compared as decoded JSON.",
+	"agent_body": [
+		{
+			"id": "system_and_user",
+			"spec": {
+				"model": "perplexity/sonar",
+				"system": "Reply.",
+				"text": "ping",
+				"max_tokens": 16,
+				"temperature": 0.5
+			},
+			"expected": {
+				"model": "perplexity/sonar",
+				"instructions": "Reply.",
+				"input": "ping",
+				"max_output_tokens": 16,
+				"temperature": 0.5,
+				"stream": false
+			}
+		},
+		{
+			"id": "no_system_no_temperature",
+			"spec": { "model": "perplexity/sonar", "system": "", "text": "\"ping\"", "max_tokens": 8 },
+			"expected": {
+				"model": "perplexity/sonar",
+				"input": "\"ping\"",
+				"max_output_tokens": 8,
+				"stream": false
+			}
+		}
+	],
+	"agent_answer": [
+		{
+			"id": "message_after_tool_items",
+			"body": "{\"object\":\"response\",\"status\":\"completed\",\"error\":null,\"output\":[{\"type\":\"search_results\",\"results\":[{\"text\":\"decoy\"}]},{\"type\":\"reasoning\",\"content\":[{\"type\":\"output_text\",\"text\":\"decoy\"}]},{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"OK\",\"annotations\":[]},{\"type\":\"output_text\",\"text\":\" then\"}]}]}",
+			"text": "OK then"
+		},
+		{
+			"id": "no_message_is_empty",
+			"body": "{\"status\":\"completed\",\"output\":[{\"type\":\"search_results\"}]}",
+			"text": ""
+		},
+		{
+			"id": "error_envelope",
+			"body": "{\"error\":{\"message\":\"bad key\",\"type\":\"auth\"},\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"decoy\"}]}]}",
+			"text": ""
+		},
+		{
+			"id": "failed_status",
+			"body": "{\"status\":\"failed\",\"error\":null,\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"decoy\"}]}]}",
+			"text": ""
+		},
+		{
+			"id": "chat_completion_shape_is_no_answer",
+			"body": "{\"choices\":[{\"message\":{\"content\":\"decoy\"}}]}",
+			"text": ""
+		}
+	],
 	"headers": [
 		{
 			"expected": {

@@ -94,10 +94,22 @@ end
 --- @return string|nil candidate Canonical physical-key identity.
 function M.code_for(keycode, keyboard_type)
 	if type(keycode) ~= "number" then return nil end
+	return M.candidates_by_code(keyboard_type)[keycode]
+end
+
+--- Every candidate's virtual code for one keyboard geometry, the first
+--- candidate in manifest order owning a code, as code_for answers it. The menu
+--- labels each candidate from one such table: a code_for per row walked every
+--- candidate per row (2026-10-31 field run, menu.rebuild over budget).
+--- @param keyboard_type integer|nil Keyboard model.
+--- @return table owners { [virtual code] = candidate }, a fresh table.
+function M.candidates_by_code(keyboard_type)
+	local owners, keys = {}, registry().keys
 	for _, candidate in ipairs(M.resolver().candidates()) do
-		if Geometry.physical_code(registry().keys[candidate], keyboard_type) == keycode then return candidate end
+		local code = Geometry.physical_code(keys[candidate], keyboard_type)
+		if code ~= nil and owners[code] == nil then owners[code] = candidate end
 	end
-	return nil
+	return owners
 end
 
 

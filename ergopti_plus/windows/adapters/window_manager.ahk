@@ -113,6 +113,26 @@ WMBrowserWarmHost() {
 }
 
 /**
+ * Grows a child control to the whole client area of its parent window. A
+ * top-level window is left as it is: it has no parent client to fill.
+ * @param HWnd {Integer} The control's window handle.
+ * @return {Boolean} True when a child was moved, false for a top-level window.
+ */
+WMFitChildToParentClient(HWnd) {
+	; GA_PARENT, unlike GetParent, never answers a top-level window's owner.
+	Parent := DllCall("user32\GetAncestor", "ptr", HWnd, "uint", 1, "ptr")
+	if !Parent || Parent == DllCall("user32\GetDesktopWindow", "ptr")
+		return false
+	Rect := Buffer(16, 0)
+	if !DllCall("user32\GetClientRect", "ptr", Parent, "ptr", Rect, "int")
+		throw OSError(A_LastError, -1, "GetClientRect")
+	Width := NumGet(Rect, 8, "int"), Height := NumGet(Rect, 12, "int")
+	if !DllCall("user32\MoveWindow", "ptr", HWnd, "int", 0, "int", 0, "int", Width, "int", Height, "int", true, "int")
+		throw OSError(A_LastError, -1, "MoveWindow")
+	return true
+}
+
+/**
  * Asks one of this process's windows to close through WM_CLOSE, so its own
  * Close handler runs exactly as for the title-bar button. A handle that is not
  * ours (closed, recycled) is refused rather than sent a message.

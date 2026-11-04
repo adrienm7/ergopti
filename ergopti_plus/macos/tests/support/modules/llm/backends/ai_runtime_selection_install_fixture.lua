@@ -265,6 +265,20 @@ local function load_mlx_checker(state)
 	})
 end
 
+--- Starts the plain check over Ergopti's own resolved runtime: the verifier
+--- task every bootstrap stream and terminal goes through. The stock download
+--- entry that tests once used is retired (owned-runtimes row "Ollama
+--- installers (legacy)").
+--- @param state table Fixture state.
+--- @param checker table The loaded Ollama checker.
+--- @param on_complete function|nil Terminal callback.
+--- @return boolean accepted
+local function start_verification(state, checker, on_complete)
+	state.native_hint = true
+	state.executables[NATIVE_BIN] = true
+	return checker.check_and_install_deps(on_complete)
+end
+
 local STUBBED_MODULES = {
 	"ui.download_window", "modules.llm.ollama_binary", "modules.llm.api_ollama",
 	"modules.llm.pty_process_group", "adapters.task_lifecycle",
@@ -310,6 +324,7 @@ return {
 	new_state = new_state,
 	scoped = scoped,
 	set_upvalue = set_upvalue,
+	start_verification = start_verification,
 	task_api = task_api,
 	with_environment = with_environment,
 }

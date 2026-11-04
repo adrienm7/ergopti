@@ -21,8 +21,11 @@ _SMB_SeparatorBeforeModifierGroups() {
 			Index := Position
 		}
 	}
-	Assert(Index > 1, "shortcuts_menu must declare the keyboard_slots list")
-	Before := Def[Index - 1]
+	Assert(Index > 2, "shortcuts_menu must declare the keyboard_slots list")
+	; The groups open with their section header, right after the separator.
+	AssertEqual("section_header", _MR_Get(Def[Index - 1], "type"), "the modifier groups are titled")
+	AssertEqual("menu.shortcuts.header_modifier_groups", _MR_Get(Def[Index - 1], "i18n"))
+	Before := Def[Index - 2]
 	Assert(_MR_Get(Before, "type") == "---",
 		"a '---' must separate the text rows from the modifier shortcut groups")
 	Assert(!Before.Has("platforms"),

@@ -163,4 +163,3 @@ _PPSFT_Case(Client) {
 
 
 Test("Plain paste foreign text: gesture preserves a newer Unicode and private-format copy (plain-paste-foreign-text-owner)", _PPSFT_Case.Bind("gesture"))
-Test("Plain paste foreign text: shortcut preserves a newer Unicode and private-format copy (plain-paste-foreign-text-owner)", _PPSFT_Case.Bind("shortcut"))

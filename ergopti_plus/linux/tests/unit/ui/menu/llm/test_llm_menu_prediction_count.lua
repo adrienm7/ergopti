@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 --- Builds the tray around an enabled LLM double.
 --- @return table items
 local function build()
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	return mb.build({
 		_version = "0.0.0-dev.12",
 		llm = { is_enabled = function() return true end, toggle = function() return true end },
@@ -65,15 +65,17 @@ helpers.describe("tray (linux): the AI suggestion count", function()
 	end)
 
 	-- The count is a generation parameter on every driver: here the generation
-	-- rows are inline, so it heads them, right above the temperature.
+	-- rows are inline, so it heads them, right above the minimum words
+	-- (ai-generation-groups).
 	helpers.it("heads the generation parameters, not the profile block (llm-count-row)", function()
 		local i18n = require("infra.i18n")
 		local rows = ai_rows(build())
 		local _, index = count_row(rows)
 		local next_row = rows[index + 1]
+		local min_words = i18n.get("menu.llm.min_words_label"):match("^[^%%]*")
 		helpers.assert_true(next_row ~= nil and type(next_row.title) == "string", "a row follows the count")
-		helpers.assert_true(next_row.title:find(i18n.get("menu.llm.generation.temperature"), 1, true) == 1,
-			"the first generation parameter after the count is the temperature, got: " .. tostring(next_row.title))
+		helpers.assert_true(next_row.title:find(min_words, 1, true) == 1,
+			"the first generation parameter after the count is the minimum words, got: " .. tostring(next_row.title))
 		local trigger_index = nil
 		for position, row in ipairs(rows) do
 			if row.title == i18n.get("menu.llm.trigger_menu_title") then trigger_index = position end
@@ -149,7 +151,7 @@ local function with_numeric_menu(options, exercise)
 			paused = paused, is_paused = function() return paused end,
 			webview = webview, on_quit = function() end,
 			on_menu_changed = function() log.changed = log.changed + 1 end }
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local rendered = mb.build(ctx)
 		exercise({ rows = rendered, declaration = declaration, renderer = renderer, strings = strings,
 			log = log, path = path, initial = initial, webview = webview,

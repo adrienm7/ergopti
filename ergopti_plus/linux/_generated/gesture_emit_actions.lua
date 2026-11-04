@@ -43,6 +43,8 @@ return {
 	["line_start"] = "Home",
 	["line_up"] = "Up",
 	["maximize"] = "super+Up",
+	["nav_back"] = "alt+Left",
+	["nav_forward"] = "alt+Right",
 	["notification_center"] = "super+v",
 	["page_down"] = "Next",
 	["page_up"] = "Prior",

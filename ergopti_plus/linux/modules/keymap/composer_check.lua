@@ -50,6 +50,10 @@ function M.env(overrides)
 		deps = deps,
 		exists = exists,
 		log = function(level, message, ...) Logger[level]("modules.keymap.composer_check", message, ...) end,
+		-- The installer runs on Ergopti's own Python, downloaded on consent: a run
+		-- without it (a headless field run nobody answers) skips the check.
+		prerequisite_code = Registry.FAILURE_PYTHON,
+		prerequisite_name = "Ergopti's Python",
 	}
 
 	function env.snapshot() return Registry.snapshot(deps) end

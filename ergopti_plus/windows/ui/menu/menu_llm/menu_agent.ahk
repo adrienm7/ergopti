@@ -20,6 +20,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -37,10 +38,10 @@
  */
 LLM_Agent_MenuBuild() {
 	return MenuRenderer_Build("agent_menu", "Agent", Map(), "", Map(
-		"agent_system1", () => _LLM_Agent_MenuSystemRows("agent_system1"),
-		"agent_system2", () => _LLM_Agent_MenuSystemRows("agent_system2")),
-		Map("agent_mode", _LLM_Agent_MenuSetMode, "agent_disabled_apps", (*) => LLM_Agent_OpenAppPicker()),
-		Map("llm.agent_mode", () => LLM_Agent_Setting("agent_mode"),
+		ConfigLeaf.AGENT_SYSTEM1, () => _LLM_Agent_MenuSystemRows(ConfigLeaf.AGENT_SYSTEM1),
+		ConfigLeaf.AGENT_SYSTEM2, () => _LLM_Agent_MenuSystemRows(ConfigLeaf.AGENT_SYSTEM2)),
+		Map(ConfigLeaf.AGENT_MODE, _LLM_Agent_MenuSetMode, ConfigLeaf.AGENT_DISABLED_APPS, (*) => LLM_Agent_OpenAppPicker()),
+		Map(ConfigKey.LLM_AGENT_MODE, () => LLM_Agent_Setting(ConfigLeaf.AGENT_MODE),
 			"agent_mode_ready", () => true, "agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount))
 }
 
@@ -68,7 +69,7 @@ _LLM_Agent_MenuSystemRows(Key) {
 /**
  * The row of System 1 or System 2: its current backend, then "Off", the local
  * server and every provider, the current one checked, then its model.
- * @param {String} Key "agent_system1" or "agent_system2".
+ * @param {String} Key "agent_system1" or ConfigLeaf.AGENT_SYSTEM2.
  * @returns {Map} A row with its items.
  */
 _LLM_Agent_SystemRow(Key) {
@@ -76,8 +77,8 @@ _LLM_Agent_SystemRow(Key) {
 	Value := LLM_Agent_Setting(Key)
 	Parsed := LLM_Vision_Parse(Value)
 	Current := (Parsed is Map) ? Parsed["backend"] : ""
-	Off := MenuRenderer_CheckRow("agent_system_controls", "agent_system_off",
-		Map("agent_system_off", _LLM_Agent_MenuSetBackend.Bind(Key, "")),
+	Off := MenuRenderer_CheckRow("agent_system_controls", MenuCommand.AGENT_SYSTEM_OFF,
+		Map(MenuCommand.AGENT_SYSTEM_OFF, _LLM_Agent_MenuSetBackend.Bind(Key, "")),
 		Map("agent_system_is_off", _LLM_Agent_MenuSystemIsOff.Bind(Key),
 			"agent_system_off_ready", (*) => true))
 	if !(Off is Map)
@@ -96,7 +97,7 @@ _LLM_Agent_SystemRow(Key) {
 	}
 	Model := LLM_Agent_ResolveModel(Parsed, LLM_Agent_Config(), LLM_API_PROVIDERS)
 	ModelRows := MenuRenderer_TemplateRows("agent_system_model_controls",
-		Map("agent_system_model", _LLM_Agent_MenuPromptModel.Bind(Key)),
+		Map(MenuCommand.AGENT_SYSTEM_MODEL, _LLM_Agent_MenuPromptModel.Bind(Key)),
 		Map("agent_system_model_ready", (*) => Current != "",
 			"agent_system_model_caption", (*) => Model), Map())
 	if !(ModelRows is Array)
@@ -114,14 +115,14 @@ _LLM_Agent_SystemRow(Key) {
  * @returns {Map|false} One canonical group or a refused declaration.
  */
 _LLM_Agent_MenuSystemFrame(Key, Caption, Items) {
-	if Key == "agent_system1"
+	if Key == ConfigLeaf.AGENT_SYSTEM1
 		Rows := MenuRenderer_TemplateRows("agent_linux_system1_frame", Map(),
 			Map("agent_system_backend_current_caption", (*) => Caption),
-			Map("agent_system1", Items))
-	else if Key == "agent_system2"
+			Map(ConfigLeaf.AGENT_SYSTEM1, Items))
+	else if Key == ConfigLeaf.AGENT_SYSTEM2
 		Rows := MenuRenderer_TemplateRows("agent_linux_system2_frame", Map(),
 			Map("agent_system_backend_current_caption", (*) => Caption),
-			Map("agent_system2", Items))
+			Map(ConfigLeaf.AGENT_SYSTEM2, Items))
 	else
 		return false
 	return (Rows is Array) && Rows.Length == 1 && (Rows[1] is Map) ? Rows[1] : false
@@ -142,8 +143,8 @@ _LLM_Agent_MenuSystemIsOff(Key) {
  * @returns {Map|false} The declared native data row, or refused ownership.
  */
 _LLM_Agent_AppsRow() {
-	return MenuRenderer_CommandRow("agent_menu", "agent_disabled_apps",
-		Map("agent_disabled_apps", (*) => LLM_Agent_OpenAppPicker()),
+	return MenuRenderer_CommandRow("agent_menu", ConfigLeaf.AGENT_DISABLED_APPS,
+		Map(ConfigLeaf.AGENT_DISABLED_APPS, (*) => LLM_Agent_OpenAppPicker()),
 		Map("agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount))
 }
 
@@ -155,7 +156,7 @@ _LLM_Agent_MenuDisabledAppsCount() {
 	Reader := LLM_Agent_Setting
 	if Object.Prototype.HasOwnProp.Call(Reader, "Call")
 		return false
-	Apps := Reader.Call("agent_disabled_apps")
+	Apps := Reader.Call(ConfigLeaf.AGENT_DISABLED_APPS)
 	if Object.Prototype.HasOwnProp.Call(Reader, "Call") || !(Apps is Array) || ObjGetBase(Apps) != Array.Prototype
 		return false
 	for Name in ObjOwnProps(Apps)
@@ -223,10 +224,10 @@ LLM_Agent_OpenAppPicker() {
 	AppPicker_Show(Map(
 		"owner",    "agent:disabled_apps",
 		"title",    StrReplace(t("menu.agent.disabled_apps"), "{1}",
-			LLM_Agent_Setting("agent_disabled_apps").Length),
+			LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS).Length),
 		"prompt",   t("dialog.llm.exclude_prompt"),
 		"ok_label", t("dialog.llm.exclude_ok"),
-		"initial",  LLM_Agent_Setting("agent_disabled_apps"),
+		"initial",  LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS),
 		"on_save",  LLM_Agent_OnAppPickerSave
 	))
 }
@@ -235,10 +236,10 @@ LLM_Agent_OpenAppPicker() {
 LLM_Agent_OnAppPickerSave(Selected, Receipt) {
 	global _LLM_Agent_CommitFn
 	Commit := HasMethod(_LLM_Agent_CommitFn, "Call") ? _LLM_Agent_CommitFn : LLM_Menu_CommitMutation
-	Previous := LLM_Agent_Setting("agent_disabled_apps")
+	Previous := LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS)
 	Committed := Commit.Call("the AI agent excluded applications",
 			_LLM_Agent_ApplyPickerSelection.Bind(Selected, Receipt),
-			_LLM_Agent_ApplyCommitted.Bind("agent_disabled_apps", Previous))
+			_LLM_Agent_ApplyCommitted.Bind(ConfigLeaf.AGENT_DISABLED_APPS, Previous))
 	if !(Committed is Integer) || Committed != true
 		return false
 	LLM_Agent_RefreshTray()
@@ -249,12 +250,12 @@ LLM_Agent_OnAppPickerSave(Selected, Receipt) {
 _LLM_Agent_ApplyPickerSelection(Selected, Receipt, Candidate) {
 	if !(Candidate is Map) || !(Selected is Array)
 		return false
-	Current := Candidate.Has("agent_disabled_apps") ? Candidate["agent_disabled_apps"]
-		: LLM_Agent_Setting("agent_disabled_apps")
+	Current := Candidate.Has(ConfigLeaf.AGENT_DISABLED_APPS) ? Candidate[ConfigLeaf.AGENT_DISABLED_APPS]
+		: LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS)
 	if !AppPicker_ClaimReceipt(Receipt, Current)
 		return false
-	if !LLM_Option_TryNormalize("agent_disabled_apps", Selected, &Normalized)
+	if !LLM_Option_TryNormalize(ConfigLeaf.AGENT_DISABLED_APPS, Selected, &Normalized)
 		return false
-	Candidate["agent_disabled_apps"] := Normalized
+	Candidate[ConfigLeaf.AGENT_DISABLED_APPS] := Normalized
 	return true
 }

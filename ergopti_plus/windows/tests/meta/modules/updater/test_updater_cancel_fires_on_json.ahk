@@ -15,49 +15,55 @@
 ; menu item stuck disabled until a full restart.
 ;
 ; AHK-31 keeps that terminal contract while a COM effect is on the stack.
-; Non-leased owners Abort and receive one typed callback immediately; a leased
-; owner stores the terminal and converges on the same Abort -> callback path when
-; its operation lease releases. The guard follows that transitive route instead
-; of requiring on_json to remain textually inside the top-level cancel wrapper.
+; Non-leased owners Abort and receive one typed callback immediately, which the
+; real cancellation proves below; a leased owner stores the terminal and converges
+; on the same Abort -> callback path when its operation lease releases, which
+; only a live COM effect can stage, so that route stays a source guard.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 
+_UCFJ_Terminal(State, Json, Request, Terminal := 0) {
+	State.Events.Push("callback")
+	State.Terminal := Terminal
+	State.Registered := _UpdaterAsyncRequests.Count
+}
+
+; The real registry and cancellation; only the transport is an in-memory owner.
 _UCFJ_AssertCancelFiresOnJson() {
-	Cancel := _DriverFuncBody("_Updater_CancelAsyncChecks")
-	Direct := _DriverFuncBody("_Updater_DeliverAsyncCancellationRecord")
-	Abort := _DriverFuncBody("_Updater_AbortAsyncTransport")
+	global UPDATER_REQUEST_ORIGIN_MANUAL, _UpdaterAsyncRequests
+	Saved := _UpdaterTest_SaveRequestState()
+	try {
+		_UpdaterTest_ResetRequestState()
+		State := {Events: [], Terminal: 0, Registered: -1}
+		Http := {}
+		Http.DefineProp("Abort", {Call: (*) => State.Events.Push("abort")})
+		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false)
+		_Updater_RegisterAsyncRequestOwner(Http, "main", _UCFJ_Terminal.Bind(State), "test://cancel", Request)
+		AssertEqual(1, _UpdaterAsyncRequests.Count, "the owner is registered before the cancel")
+		_Updater_CancelAsyncChecks("test cancel")
+		AssertEqual(2, State.Events.Length, "the transport is aborted and the owner called, once each")
+		AssertEqual("abort", State.Events[1], "the transport is aborted before the owner hears of it")
+		AssertEqual("callback", State.Events[2], "a cancelled request must fire its stored on_json")
+		Assert(_Updater_AsyncTerminalIsCancelled(State.Terminal), "the owner receives a typed cancellation")
+		AssertEqual(0, State.Registered, "the registry entry is gone before the callback runs")
+		_Updater_CancelAsyncChecks("test cancel again")
+		AssertEqual(2, State.Events.Length, "a second cancel cannot deliver the terminal twice")
+	} finally {
+		_UpdaterTest_RestoreRequestState(Saved)
+	}
+}
+Test("updater AHK-31: cancellation fires typed on_json after direct retirement (updater-cancel-fires-on-json) (updater-operation-lease)",
+	_UCFJ_AssertCancelFiresOnJson)
+
+_UCFJ_LeasedAndSetupFailuresConverge() {
 	Release := _DriverFuncBody("_Updater_ReleaseAsyncSendLease")
 	DispatchFailure := _DriverFuncBody("_Updater_FailOwnedAsyncDispatch")
-	Assert(Cancel != "" and Direct != "" and Abort != "" and Release != ""
-		and DispatchFailure != "",
-		"cancel, direct delivery, setup failure, Abort and leased release helpers must all exist")
-	DrainAt := InStr(Cancel, "_Updater_SwapAsyncRequestsForBoundary(")
-	Batch := _DriverFuncBodyOrEmpty("_Updater_DeliverCancelledAsyncRequests")
-	Route := Cancel . Batch
-	Assert(DrainAt > 0
-		and InStr(Cancel, "_UpdaterAsyncRequests.Clear()") == 0
-		and InStr(Route, "_Updater_DeferLeasedAsyncCancellation(") > 0
-		and InStr(Route, "_Updater_DeliverAsyncCancellationRecord(") > 0,
-		"cancel must atomically replace registry ownership, then route every leased or direct terminal outside that live Map")
-	AbortAt := InStr(Direct, "_Updater_AbortAsyncTransport(")
-	DispatcherAt := InStr(Direct, "_Updater_InvokeAsyncOnJson(", , AbortAt)
-	Assert(AbortAt > 0 and DispatcherAt > AbortAt
-		and InStr(Direct, "Cancellation", , DispatcherAt) > DispatcherAt
-		and InStr(Abort, ".Abort()") > 0,
-		"direct cancellation must best-effort Abort before the shared typed terminal dispatcher")
-	Assert(InStr(Direct, '["on_json"](') == 0
-		and InStr(Direct, '["on_json"].Call(') == 0,
-		"direct cancellation must never retain an obsolete raw callback alternative")
-	Dispatcher := _DriverFuncBodyOrEmpty("_Updater_InvokeAsyncOnJson")
-	Assert(Dispatcher != "" and InStr(Dispatcher, "OnJson.Call(") > 0,
-		"the centralized terminal dispatcher must invoke the owned callback")
-	Assert(InStr(Release,
-		"_Updater_DeliverAsyncCancellationRecord(Record, Cancellation)") > 0,
+	Assert(InStr(Release, "_Updater_DeliverAsyncCancellationRecord(Record, Cancellation)") > 0,
 		"leased cancellation must converge on the same Abort and callback contract after COM returns")
 	Assert(InStr(DispatchFailure, "_Updater_InvokeAsyncOnJson(") > 0,
 		"async setup failure must converge on the same terminal dispatcher")
 }
-Test("updater AHK-31: cancellation fires typed on_json after direct or leased retirement (updater-cancel-fires-on-json) (updater-operation-lease)",
-	_UCFJ_AssertCancelFiresOnJson)
+Test("updater AHK-31: leased and setup failures converge on one terminal (updater-cancel-fires-on-json) (updater-operation-lease)",
+	_UCFJ_LeasedAndSetupFailuresConverge)

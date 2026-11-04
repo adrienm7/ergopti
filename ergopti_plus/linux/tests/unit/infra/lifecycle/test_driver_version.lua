@@ -173,11 +173,24 @@ describe("Driver version: infra/version.lua resolves the stamp", function()
 		assert_eq(Version.SOURCE_LOCAL, Version.SOURCE)
 	end)
 
-	it("the source file carries no version literal a build would have to rewrite", function()
-		local fh = assert(io.open(helpers.driver_root() .. "/infra/version.lua", "r"))
-		local src = fh:read("*a")
-		fh:close()
-		assert_eq(nil, src:match('M%.VERSION%s*=%s*"%d'), "M.VERSION must be resolved, not typed")
+	it("a fresh load takes M.VERSION from the stamp, never from a typed literal", function()
+		-- Loads the module itself over a stamped shared root: a version typed in
+		-- the source (the old "3.0.0") would ignore the stamp and fail here.
+		local Paths = require("infra.paths")
+		local FileSystem = require("adapters.file_system")
+		local restore = helpers.keep_loaded({ "infra.version" })
+		local original_root, original_read = Paths.shared_root, FileSystem.read
+		Paths.shared_root = function() return SHARED end
+		FileSystem.read = function(path)
+			if path == STAMP then return "commit=" .. SHA .. "\nversion=0.0.0-dev.913\n" end
+			return nil
+		end
+		local ok, loaded = pcall(helpers.load_module, "infra.version")
+		Paths.shared_root, FileSystem.read = original_root, original_read
+		restore()
+		assert_true(ok, tostring(loaded))
+		assert_eq("0.0.0-dev.913", loaded.VERSION)
+		assert_eq(loaded.SOURCE_BUILD, loaded.SOURCE)
 	end)
 end)
 

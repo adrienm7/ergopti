@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Native Configuration Directory Picker
 --- DESCRIPTION:
---- Owns the Linux zenity/kdialog selection policy shared by onboarding and the
---- paths editor. Returns one normalized absolute directory or a precise refusal.
+--- Owns the Linux folder selection policy shared by onboarding and the paths
+--- editor, through Ergopti's own dialog (ui/native_dialog.lua). Returns one normalized absolute directory or a precise refusal.
 --- ==============================================================================
 
 local M = {}
@@ -37,8 +37,7 @@ end
 --- @return string|nil selected
 --- @return string|nil error_message
 function M.pick(shell, config_paths, i18n, current)
-	if type(shell) ~= "table" or type(shell.has_command) ~= "function"
-		or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
+	if type(shell) ~= "table" or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
 		return nil, "shell runner is unavailable"
 	end
 	local seed = M.normalize(config_paths, current)
@@ -50,20 +49,12 @@ function M.pick(shell, config_paths, i18n, current)
 	local title = type(i18n) == "table" and type(i18n.get) == "function"
 		and i18n.get("dialog.config_folder.select_title") or "Select configuration folder"
 	title = WindowTitles.compose(title)
-	local command
-	if shell.has_command("zenity") then
-		command = "zenity --file-selection --directory --title=" .. shell.quote(title)
-			.. " --filename=" .. shell.quote(seed .. "/") .. " 2>/dev/null"
-	elseif shell.has_command("kdialog") then
-		command = "kdialog --getexistingdirectory " .. shell.quote(seed)
-			.. " --title " .. shell.quote(title) .. " 2>/dev/null"
-	else
-		return nil, "neither zenity nor kdialog is available"
-	end
+	local command = require("ui.native_dialog").command() .. " --file-selection --directory --title="
+		.. shell.quote(title) .. " --filename=" .. shell.quote(seed .. "/") .. " 2>/dev/null"
 	local completed, output = require("ui.modal").run(function() return shell.exec_checked(command) end)
 	-- Partial stdout cannot turn native cancellation or command failure into a selection.
 	if completed ~= true or type(output) ~= "string" then return nil, "folder selection was cancelled or refused" end
-	-- Both chooser CLIs append one LF to the raw filename. A CR or another LF
+	-- The dialog appends one LF to the raw filename. A CR or another LF
 	-- before that delimiter belongs to the selected directory itself.
 	local chosen = output:gsub("\n$", "")
 	local normalized = chosen ~= "" and M.normalize(config_paths, chosen) or nil

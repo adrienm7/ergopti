@@ -9,7 +9,9 @@
 ; Every registry value Ergopti writes so each gesture slot sends its
 ; Ctrl + Win + Shift + Fn shortcut, in write order. The in-process writer and
 ; the first-run wizard's elevated PowerShell script both read this data, and
-; modules/gestures/touchpad_registry.ahk backs it up and restores it.
+; modules/gestures/touchpad_registry.ahk backs it up and restores it, or
+; writes factory_defaults back (and deletes every other name) when no
+; backup exists.
 ; ==============================================================================
 
 ; A function rather than a global initialiser so include ORDER cannot matter:
@@ -70,5 +72,6 @@ TouchpadRegistryData() {
 			Map("name", "FourFingerRight", "value", 65535),
 			Map("name", "FourFingerRightKeyParams", "value", 7929863),
 			Map("name", "FourFingerSlideRightAction", "value", 65535)
-		])
+		],
+		"factory_defaults", Map("ThreeFingerSlideEnabled", 1, "ThreeFingerTapEnabled", 1, "FourFingerSlideEnabled", 2, "FourFingerTapEnabled", 2))
 }

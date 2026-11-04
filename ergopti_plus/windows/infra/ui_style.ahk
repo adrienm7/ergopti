@@ -24,6 +24,7 @@
 ;   [layout]      pad_x                  → UI_PAD_X
 ;   [layout]      pad_y                  → UI_PAD_Y
 ;   [layout]      label_gap              → UI_LABEL_GAP
+;   [layout]      llm_max_content_width  → UI_LLM_MAX_CONTENT_WIDTH
 ;   [layout]      corner_radius × 2      → UI_CORNER_RADIUS (GDI diameter)
 ;   [colors]      bg_hex                 → UI_BG_HEX
 ;   [colors]      border_white/alpha_ahk → UI_BORDER_COLOR_HEX / UI_BORDER_ALPHA
@@ -38,7 +39,7 @@
 ;   [llm_ui]      active_prefix          → UI_LLM_ACTIVE_PREFIX
 ;   [llm_ui]      slot_placeholder       → UI_LLM_SLOT_PLACEHOLDER
 ;   [llm_ui]      footer_space_divider   → UI_LLM_FOOTER_SPACE_DIV
-;   [llm_ui]      hint_accept_single     → UI_LLM_HINT_ACCEPT_SINGLE
+;   [llm_ui]      hint_accept_key        → UI_LLM_HINT_ACCEPT_KEY
 ;   [positioning] caret_offset_y         → UI_OFFSET_BELOW
 ;   [positioning] caret_offset_x         → UI_OFFSET_RIGHT
 ;   [positioning] max_caret_height       → UI_MAX_CARET_HEIGHT_PX
@@ -60,6 +61,7 @@ global UI_FONT_SIZE_INFO  := 0
 global UI_PAD_X           := 0
 global UI_PAD_Y           := 0
 global UI_LABEL_GAP       := 0
+global UI_LLM_MAX_CONTENT_WIDTH := 0
 global UI_LINE_SPACING    := 0
 global UI_HINT_SPACING    := 0
 global UI_CORNER_RADIUS   := 0
@@ -106,15 +108,12 @@ global UI_LLM_INACTIVE_ALIGN_CHAR   := ""
 global UI_LLM_FOOTER_SPACE_DIV      := ""
 global UI_LLM_FOOTER_COMBINED_SEP   := ""
 global UI_LLM_SHORTCUT_ORDER        := ""
-global UI_LLM_SHORTCUT_LABELS       := ""
 global UI_LLM_SHORTCUT_JOINER       := ""
-global UI_LLM_HINT_ACCEPT_SINGLE    := ""
-global UI_LLM_HINT_NAV_LEFT         := ""
-global UI_LLM_HINT_NAV_RIGHT        := ""
-global UI_LLM_HINT_ACCEPT_CENTER    := ""
+global UI_LLM_HINT_ACCEPT_KEY       := ""
+global UI_LLM_HINT_NAV_LEFT_KEYS    := ""
+global UI_LLM_HINT_NAV_RIGHT_KEYS   := ""
 global UI_LLM_HINT_ARROW_LEFT       := ""
 global UI_LLM_HINT_ARROW_RIGHT      := ""
-global UI_LLM_HINT_OR               := ""
 global UI_LLM_HINT_ARROW_SEP_LEFT   := ""
 global UI_LLM_HINT_ARROW_SEP_RIGHT  := ""
 
@@ -185,6 +184,7 @@ UiStyle_LoadSharedConst() {
 	global UI_PAD_X                := Integer(_UiStyleRequire(c, "layout", "pad_x"))
 	global UI_PAD_Y                := Integer(_UiStyleRequire(c, "layout", "pad_y"))
 	global UI_LABEL_GAP            := Integer(_UiStyleRequire(c, "layout", "label_gap"))
+	global UI_LLM_MAX_CONTENT_WIDTH := Integer(_UiStyleRequire(c, "layout", "llm_max_content_width"))
 	global UI_LINE_SPACING         := Integer(_UiStyleRequire(c, "layout", "line_spacing"))
 	global UI_HINT_SPACING         := Integer(_UiStyleRequire(c, "layout", "hint_spacing"))
 	; GDI nWidth/nHeight = full ellipse diameter = 2 × corner_radius.
@@ -239,18 +239,17 @@ UiStyle_LoadSharedConst() {
 	global UI_LLM_INACTIVE_ALIGN_CHAR  := _UiStyleRequire(c, "llm_ui", "inactive_align_char")
 	global UI_LLM_FOOTER_SPACE_DIV     := _UiStyleRequire(c, "llm_ui", "footer_space_divider")
 	global UI_LLM_FOOTER_COMBINED_SEP  := _UiStyleRequire(c, "llm_ui", "footer_combined_separator")
+	; The modifiers of the order are named by the shared key name table
+	; (KeyNameLabel), in the active language.
 	global UI_LLM_SHORTCUT_ORDER       := _UiStyleRequire(c, "llm_ui", "shortcut_modifier_order")
-	global UI_LLM_SHORTCUT_LABELS      := _UiStyleRequire(c, "llm_ui", "shortcut_labels_ahk")
 	global UI_LLM_SHORTCUT_JOINER      := _UiStyleRequire(c, "llm_ui", "shortcut_joiner_ahk")
-	if StrSplit(UI_LLM_SHORTCUT_ORDER, ",").Length != StrSplit(UI_LLM_SHORTCUT_LABELS, ",").Length
-		_UiStyleFatal("llm_ui", "shortcut_labels_ahk", "shortcut_modifier_order")
-	global UI_LLM_HINT_ACCEPT_SINGLE   := _UiStyleRequire(c, "llm_ui", "hint_accept_single")
-	global UI_LLM_HINT_NAV_LEFT        := _UiStyleRequire(c, "llm_ui", "hint_nav_left")
-	global UI_LLM_HINT_NAV_RIGHT       := _UiStyleRequire(c, "llm_ui", "hint_nav_right")
-	global UI_LLM_HINT_ACCEPT_CENTER   := _UiStyleRequire(c, "llm_ui", "hint_accept_center")
+	; The footer's keys are key name ids its words name in the active language
+	; (_LLM_BuildNavHint); the words themselves are locale text.
+	global UI_LLM_HINT_ACCEPT_KEY      := _UiStyleRequire(c, "llm_ui", "hint_accept_key")
+	global UI_LLM_HINT_NAV_LEFT_KEYS   := _UiStyleRequire(c, "llm_ui", "hint_nav_left_keys")
+	global UI_LLM_HINT_NAV_RIGHT_KEYS  := _UiStyleRequire(c, "llm_ui", "hint_nav_right_keys")
 	global UI_LLM_HINT_ARROW_LEFT      := _UiStyleRequire(c, "llm_ui", "hint_arrow_left")
 	global UI_LLM_HINT_ARROW_RIGHT     := _UiStyleRequire(c, "llm_ui", "hint_arrow_right")
-	global UI_LLM_HINT_OR              := _UiStyleRequire(c, "llm_ui", "hint_or")
 	global UI_LLM_HINT_ARROW_SEP_LEFT  := _UiStyleRequire(c, "llm_ui", "hint_arrow_sep_left")
 	global UI_LLM_HINT_ARROW_SEP_RIGHT := _UiStyleRequire(c, "llm_ui", "hint_arrow_sep_right")
 

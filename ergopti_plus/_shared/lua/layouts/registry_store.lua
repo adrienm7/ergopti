@@ -39,7 +39,7 @@ local STOPPED = "layout registry stopped"
 
 --- Builds one driver's store.
 --- @param ports table {
----   logger = table with start, warn, error and success,
+---   logger = table with start, info, warn, error and success,
 ---   log = string log namespace,
 ---   shipped_noun = string what ships the registry folder ("app", "driver"),
 ---   prepare_parent = function(deps, path) -> boolean, string|nil: creates the
@@ -58,6 +58,10 @@ function M.new(ports)
 	local catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
 	local bundled = nil
 	local bundled_read = false
+	-- The exact inputs `bundled` was decoded from (text, decoder, size bound): a
+	-- source checkout rereads the file on every call, and identical inputs
+	-- decode to the identical index.
+	local bundled_key = nil
 
 	--- The last refresh outcome: { index, source, error }.
 	--- @return table
@@ -68,6 +72,7 @@ function M.new(ports)
 		catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
 		bundled = nil
 		bundled_read = false
+		bundled_key = nil
 	end
 
 	--- Writes one file, creating its folder first.
@@ -85,6 +90,10 @@ function M.new(ports)
 	end
 
 	--- The shipped index, reread for source checkouts so Refresh sees local edits.
+	--- Only a changed text is decoded again: the keyboard-layout menu asks for
+	--- it on every rebuild, and decoding the unchanged index there cost most of
+	--- the number-row rows (2026-10-31 field run, menu.rebuild over budget).
+	--- The index is shared read-only, as the packaged app always shared it.
 	--- @param deps table
 	--- @return table|nil
 	function store.bundled_index(deps)
@@ -96,11 +105,19 @@ function M.new(ports)
 			return nil
 		end
 		local text = deps.read(deps.bundled_dir .. deps.settings.index_file)
-		local index, _, detail = Catalogue.decode_index(text, deps.decode_json, deps.settings.max_file_bytes)
+		local max_bytes = deps.settings.max_file_bytes
+		local key = bundled_key
+		if type(text) == "string" and key ~= nil and key.text == text
+			and key.decode == deps.decode_json and key.max_bytes == max_bytes then
+			return bundled
+		end
+		local index, _, detail = Catalogue.decode_index(text, deps.decode_json, max_bytes)
 		if not index then
 			Logger.error(LOG, "The layout index shipped with the %s is unusable: %s.", ports.shipped_noun, tostring(detail))
 		end
 		bundled = index
+		bundled_key = type(text) == "string"
+			and { text = text, decode = deps.decode_json, max_bytes = max_bytes } or nil
 		return index
 	end
 
@@ -131,17 +148,14 @@ function M.new(ports)
 		return store.write_file(deps, deps.local_dir .. deps.settings.installed_file, deps.encode_json(record))
 	end
 
-	--- Refreshes the catalogue from the registry (a conditional request) and
-	--- keeps the outcome. on_done(outcome) is called once; see
-	--- Catalogue.resolve_index.
+	--- Runs the refresh once the registry source is chosen.
 	--- @param deps table Resolved collaborators.
-	--- @param is_current function|nil Freshness probe; false drops the result.
+	--- @param clone_registry boolean Whether the clone's registry folder is shown.
+	--- @param current function Freshness probe.
 	--- @param on_done function|nil
-	function store.refresh(deps, is_current, on_done)
-		local function current() return is_current == nil or is_current() end
-		Logger.start(LOG, "Refreshing the layout catalogue…")
+	local function refresh_from(deps, clone_registry, current, on_done)
 		Catalogue.refresh(deps.settings, {
-			local_source = deps.local_source,
+			clone_registry = clone_registry,
 			read_cache = function()
 				local index_path = deps.local_dir .. deps.settings.index_file
 				if not deps.exists(index_path) then return nil end
@@ -171,6 +185,41 @@ function M.new(ports)
 			if outcome.cache_error then Logger.error(LOG, "%s.", outcome.cache_error) end
 			Logger.success(LOG, "Layout catalogue refreshed from the %s index.", outcome.source)
 			if on_done then on_done(outcome) end
+		end)
+	end
+
+	--- Refreshes the catalogue from the registry (a conditional request) and
+	--- keeps the outcome. on_done(outcome) is called once; see
+	--- Catalogue.resolve_index. A source run (deps.local_source) first asks
+	--- deps.registry_changes(dir, callback(changes, err)) whether the clone's
+	--- registry folder differs from HEAD (Catalogue.registry_source).
+	--- @param deps table Resolved collaborators.
+	--- @param is_current function|nil Freshness probe; false drops the result.
+	--- @param on_done function|nil
+	function store.refresh(deps, is_current, on_done)
+		local function current() return is_current == nil or is_current() end
+		Logger.start(LOG, "Refreshing the layout catalogue…")
+		if not deps.local_source then
+			refresh_from(deps, false, current, on_done)
+			return
+		end
+		assert(type(deps.registry_changes) == "function", "a source run needs the registry_changes port")
+		if type(deps.bundled_dir) ~= "string" then
+			Logger.error(LOG, "The clone's registry folder is unknown; its changes cannot be listed.")
+			refresh_from(deps, true, current, on_done)
+			return
+		end
+		deps.registry_changes(deps.bundled_dir, function(changes, err)
+			if not current() then return end
+			local use_clone, reason = Catalogue.registry_source(true, changes, err)
+			if reason == Catalogue.REGISTRY_GIT_FAILED then
+				Logger.error(LOG, "git cannot list the changes of the clone's registry (%s); the catalogue shows the clone's registry.",
+					tostring(err or "no git output"))
+			else
+				Logger.info(LOG, "The clone's registry is %s; the catalogue shows the %s registry.", reason,
+					use_clone and "clone's" or "published")
+			end
+			refresh_from(deps, use_clone, current, on_done)
 		end)
 	end
 

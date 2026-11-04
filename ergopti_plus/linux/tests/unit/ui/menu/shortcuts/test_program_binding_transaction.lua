@@ -18,8 +18,7 @@ local CASES = {
 
 --- Loads the exact production helper without booting unrelated tray providers.
 local function callback(logger)
-	local file = assert(io.open(helpers.driver_root() .. "/ui/menu/menu_builder.lua", "rb"))
-	local source = file:read("*a"); file:close()
+	local source = helpers.read_menu_source()
 	local body = assert(source:match("(local function assign_parameterized_action%(.+\nend)\n\n%-%-%- Opens the shared searchable"))
 	local factory = assert(load("return function(Logger) " .. body .. "\nreturn assign_parameterized_action end", "actual-program-picker"))()
 	return factory(logger)
@@ -30,7 +29,9 @@ end
 local function menu_rows(gestures, path, extra)
 	package.loaded["modules.shortcuts.manager"] = nil
 	local shortcuts = require("modules.shortcuts.manager")
-	shortcuts.init({ persist = true, config_path = path })
+	-- Both categories read on: an off one greys every row of its submenu
+	-- (category-off rule), and these scenarios click the binding rows.
+	shortcuts.init({ persist = true, config_path = path, enabled = true })
 	-- A renderer captures its native dependencies and manifest cache at load.
 	-- This fixture owns that instance as well as the real binding providers.
 	package.loaded["infra.manifest_menu"] = nil
@@ -50,11 +51,17 @@ local function menu_rows(gestures, path, extra)
 	end
 	-- Select genuine source records through the renderer's actual root and reader.
 	root.top_level = selected
-	package.loaded["ui.menu.menu_builder"] = nil
+	package.loaded["ui.menu.builder"] = nil
 	local ctx = { gestures = gestures, shortcuts = shortcuts,
 		is_paused = function() return false end, on_quit = function() end }
 	for name, value in pairs(extra or {}) do ctx[name] = value end
-	return require("ui.menu.menu_builder").build(ctx)
+	-- The touchpad reader stays off in this fixture; the menu reads gestures on.
+	local is_enabled = gestures.is_enabled
+	gestures.is_enabled = function() return true end
+	local built, rows = pcall(require("ui.menu.builder").build, ctx)
+	gestures.is_enabled = is_enabled
+	if not built then error(rows, 0) end
+	return rows
 end
 
 local function with_case(spec, body)

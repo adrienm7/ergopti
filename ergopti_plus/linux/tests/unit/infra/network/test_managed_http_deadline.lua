@@ -10,7 +10,6 @@
 
 local helpers = require("tests.helpers")
 local Paths = require("infra.paths")
-local driver_root = helpers.driver_root()
 
 --- Loads the production deadline ledger with independent native receipts.
 --- @param config table|nil
@@ -55,7 +54,7 @@ local function fresh(config)
 	package.loaded.luv = uv
 	package.loaded["infra.monotonic"] = { now_ms = function() return state.time end }
 	package.loaded["logger.shim"] = { error = function(_, message) state.logs[#state.logs + 1] = message end }
-	return dofile(driver_root .. "/infra/managed_http_deadline.lua")
+	return helpers.fresh_module("infra.managed_http_deadline")
 	end)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(module, 0) end

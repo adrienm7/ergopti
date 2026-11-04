@@ -77,7 +77,16 @@ Test("locale loader: parses UTF-8 BOM source after cache miss", Test_LocaleLoade
 ; =============================================
 ; =============================================
 
-_MetaRunLocaleJsonValidTests() {
+; Parsing all 21 locales takes seconds, so the scan runs inside the tests that
+; read it, once per process: at registration it taxed every runner boot.
+_MetaLocaleScan() {
+	static Result := 0
+	if !IsObject(Result)
+		Result := _MetaLocaleScanFresh()
+	return Result
+}
+
+_MetaLocaleScanFresh() {
 	; A_ScriptDir = tests/ (set by run_all.ahk, which #Include-s this file)
 	; SplitPath(tests/) → windows/
 	; SplitPath(windows/) → ergopti_plus/
@@ -164,31 +173,41 @@ _MetaRunLocaleJsonValidTests() {
 		}
 	}
 
-	TotalErrors := ParseErrors + StructErrors + MissingKeys + MissingParityKeys
-
-	_MetaLocaleParseResult() {
-		Assert(ParseErrors = 0,
-			"Found " . ParseErrors . " locale file(s) with JSON parse errors — check for malformed JSON")
-	}
-	Test("meta locales: all " . TotalFiles . " JSON files are parseable (" . ParseErrors . " error(s))", _MetaLocaleParseResult)
-
-	_MetaLocaleStructResult() {
-		Assert(StructErrors = 0,
-			"Found " . StructErrors . " locale file(s) missing opening '{' or closing '}' — check for truncated files")
-	}
-	Test("meta locales: all JSON files have valid '{...}' envelope (" . StructErrors . " error(s))", _MetaLocaleStructResult)
-
-	_MetaLocaleRequiredKeysResult() {
-		Assert(MissingKeys = 0,
-			"Found " . MissingKeys . " missing required key(s) across locale files — _meta.locale, _meta.flag, _meta.name must be present")
-	}
-	Test("meta locales: all required keys present (" . MissingKeys . " missing)", _MetaLocaleRequiredKeysResult)
-
-	_MetaLocaleParityResult() {
-		Assert(MissingParityKeys = 0,
-			"Found " . MissingParityKeys . " missing parity key(s) across locale files. All locales must have the exact same set of keys.")
-	}
-	Test("meta locales: all locales have complete key parity (" . MissingParityKeys . " missing)", _MetaLocaleParityResult)
+	return {Total: TotalFiles, Parse: ParseErrors, Struct: StructErrors, Keys: MissingKeys, Parity: MissingParityKeys}
 }
 
-_MetaRunLocaleJsonValidTests()
+; An empty listing reports zero errors of every kind, so each result first proves
+; the scan reached the locale directory.
+_MetaLocaleScanned() {
+	Scan := _MetaLocaleScan()
+	Assert(Scan.Total > 0, "the locale scan found no JSON file: the listing or the directory moved")
+	return Scan
+}
+
+_MetaLocaleParseResult() {
+	ParseErrors := _MetaLocaleScanned().Parse
+	Assert(ParseErrors = 0,
+		"Found " . ParseErrors . " locale file(s) with JSON parse errors — check for malformed JSON")
+}
+Test("meta locales: all JSON files are parseable", _MetaLocaleParseResult)
+
+_MetaLocaleStructResult() {
+	StructErrors := _MetaLocaleScanned().Struct
+	Assert(StructErrors = 0,
+		"Found " . StructErrors . " locale file(s) missing opening '{' or closing '}' — check for truncated files")
+}
+Test("meta locales: all JSON files have valid '{...}' envelope", _MetaLocaleStructResult)
+
+_MetaLocaleRequiredKeysResult() {
+	MissingKeys := _MetaLocaleScanned().Keys
+	Assert(MissingKeys = 0,
+		"Found " . MissingKeys . " missing required key(s) across locale files — _meta.locale, _meta.flag, _meta.name must be present")
+}
+Test("meta locales: all required keys present", _MetaLocaleRequiredKeysResult)
+
+_MetaLocaleParityResult() {
+	MissingParityKeys := _MetaLocaleScanned().Parity
+	Assert(MissingParityKeys = 0,
+		"Found " . MissingParityKeys . " missing parity key(s) across locale files. All locales must have the exact same set of keys.")
+}
+Test("meta locales: all locales have complete key parity", _MetaLocaleParityResult)

@@ -1,0 +1,255 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
+	"description": "Cross-driver vectors for a personal final_result entry against a bundled correction of the same trigger: the output of a final entry is never matched again, a final entry that changes nothing still claims its text, and a final end-character entry of higher priority holds back a lower immediate one. Replayed by the Windows engine and dispatcher, the macOS expander and the shared engine on Linux; every driver must reach the same screen.",
+	"field_semantics": {
+		"matrix": "Every combination of the axes is replayed: a personal rule (priority 100, final_result, word_start) against a bundled rule `trigger` > `bundled` (priority 10, not final, word_start, not case sensitive). Typing the trigger then the end character must leave the personal output plus the end character on screen.",
+		"personal_auto": "Whether the personal rule fires on its own last character.",
+		"bundled_auto": "Whether the bundled rule fires on its own last character.",
+		"case_sensitive": "The editor's case box: is_case_sensitive and is_case_sensitive_strict on the personal rule.",
+		"output": "The personal rule's output: identical to the trigger, a case variant of it, or different text.",
+		"max_arrows": "hotstrings.cascade_max_arrows, 1 being no chaining at all.",
+		"end_char": "The word delimiter typed after the trigger.",
+		"rules": "Explicit vectors: registered hotstrings. auto: fires on its own last character; word_start: only at the start of a word; priority: collision priority; final_result; case_sensitive: is_case_sensitive and is_case_sensitive_strict.",
+		"typed": "The characters typed, in order; a Space, Tab or Enter is an end character.",
+		"expect_screen": "The text left in the application."
+	},
+	"matrix": {
+		"trigger": "sru",
+		"bundled": "sur",
+		"personal_priority": 100,
+		"bundled_priority": 10,
+		"personal_auto": [true, false],
+		"bundled_auto": [true, false],
+		"case_sensitive": [false, true],
+		"output": ["sru", "SRU", "abc"],
+		"max_arrows": [1, 2, 3],
+		"end_char": [" ", "\t", "\n"]
+	},
+	"vectors": [
+		{
+			"id": "typed-in-capitals-immediate",
+			"description": "Typing the output itself: the final entry changes nothing and still claims the text.",
+			"rules": [
+				{
+					"trigger": "sru",
+					"replacement": "SRU",
+					"auto": true,
+					"word_start": true,
+					"priority": 100,
+					"final_result": true
+				},
+				{
+					"trigger": "sru",
+					"replacement": "sur",
+					"auto": false,
+					"word_start": true,
+					"priority": 10
+				}
+			],
+			"typed": "SRU ",
+			"max_arrows": 3,
+			"expect_screen": "SRU "
+		},
+		{
+			"id": "typed-in-capitals-terminator",
+			"description": "The same with an end-character personal entry.",
+			"rules": [
+				{
+					"trigger": "sru",
+					"replacement": "SRU",
+					"auto": false,
+					"word_start": true,
+					"priority": 100,
+					"final_result": true
+				},
+				{
+					"trigger": "sru",
+					"replacement": "sur",
+					"auto": false,
+					"word_start": true,
+					"priority": 10
+				}
+			],
+			"typed": "SRU ",
+			"max_arrows": 3,
+			"expect_screen": "SRU "
+		},
+		{
+			"id": "every-occurrence-stays-final",
+			"description": "Forgetting a final output does not disable the rule for the next word.",
+			"rules": [
+				{
+					"trigger": "sru",
+					"replacement": "SRU",
+					"auto": true,
+					"word_start": true,
+					"priority": 100,
+					"final_result": true
+				},
+				{
+					"trigger": "sru",
+					"replacement": "sur",
+					"auto": false,
+					"word_start": true,
+					"priority": 10
+				}
+			],
+			"typed": "sru sru ",
+			"max_arrows": 3,
+			"expect_screen": "SRU SRU "
+		},
+		{
+			"id": "identity-then-longer-word",
+			"description": "A final entry that changes nothing claims its own text, not what is typed after it.",
+			"rules": [
+				{
+					"trigger": "sru",
+					"replacement": "sru",
+					"auto": true,
+					"word_start": true,
+					"priority": 100,
+					"final_result": true
+				},
+				{
+					"trigger": "sruc",
+					"replacement": "xyz",
+					"auto": true,
+					"word_start": true,
+					"priority": 10
+				}
+			],
+			"typed": "sruc",
+			"max_arrows": 3,
+			"expect_screen": "xyz"
+		},
+		{
+			"id": "identity-then-word-then-correction",
+			"description": "The claim lasts for the very next key: a later occurrence behind other text is judged afresh.",
+			"rules": [
+				{
+					"trigger": "sru",
+					"replacement": "sru",
+					"auto": true,
+					"word_start": true,
+					"priority": 100,
+					"final_result": true
+				},
+				{
+					"trigger": "adn",
+					"replacement": "ADN",
+					"auto": false,
+					"word_start": true,
+					"priority": 10
+				}
+			],
+			"typed": "sru adn ",
+			"max_arrows": 3,
+			"expect_screen": "sru ADN "
+		},
+		{
+			"id": "chaining-without-final",
+			"description": "Genuine chaining: the next key completes a trigger through the output.",
+			"rules": [
+				{ "trigger": "ab", "replacement": "cd", "auto": true, "word_start": false, "priority": 10 },
+				{
+					"trigger": "cde",
+					"replacement": "xyz",
+					"auto": true,
+					"word_start": false,
+					"priority": 10
+				}
+			],
+			"typed": "abe",
+			"max_arrows": 1,
+			"expect_screen": "xyz"
+		},
+		{
+			"id": "chaining-stopped-by-final",
+			"description": "The same rules with a final first entry: its output completes nothing.",
+			"rules": [
+				{
+					"trigger": "ab",
+					"replacement": "cd",
+					"auto": true,
+					"word_start": false,
+					"priority": 10,
+					"final_result": true
+				},
+				{
+					"trigger": "cde",
+					"replacement": "xyz",
+					"auto": true,
+					"word_start": false,
+					"priority": 10
+				}
+			],
+			"typed": "abe",
+			"max_arrows": 1,
+			"expect_screen": "cde"
+		},
+		{
+			"id": "correction-of-a-non-final-output",
+			"description": "A personal entry that is not final stays open to the correction on the end character.",
+			"rules": [
+				{
+					"trigger": "sru",
+					"replacement": "SRU",
+					"auto": true,
+					"word_start": true,
+					"priority": 100
+				},
+				{
+					"trigger": "sru",
+					"replacement": "sur",
+					"auto": false,
+					"word_start": true,
+					"priority": 10
+				}
+			],
+			"typed": "sru ",
+			"max_arrows": 1,
+			"expect_screen": "SUR "
+		},
+		{
+			"id": "lower-priority-final-does-not-hold-back",
+			"description": "Only a final entry of strictly higher priority holds an immediate one back.",
+			"rules": [
+				{
+					"trigger": "sru",
+					"replacement": "SRU",
+					"auto": false,
+					"word_start": true,
+					"priority": 10,
+					"final_result": true
+				},
+				{
+					"trigger": "sru",
+					"replacement": "sur",
+					"auto": true,
+					"word_start": true,
+					"priority": 100
+				}
+			],
+			"typed": "sru",
+			"max_arrows": 1,
+			"expect_screen": "sur"
+		},
+		{
+			"id": "non-final-end-entry-does-not-hold-back",
+			"description": "An end-character entry that is not final keeps the rule that an immediate entry fires first.",
+			"rules": [
+				{
+					"trigger": "sru",
+					"replacement": "SRU",
+					"auto": false,
+					"word_start": true,
+					"priority": 100
+				},
+				{ "trigger": "sru", "replacement": "sur", "auto": true, "word_start": true, "priority": 10 }
+			],
+			"typed": "sru",
+			"max_arrows": 1,
+			"expect_screen": "sur"
+		}
+	]
+}

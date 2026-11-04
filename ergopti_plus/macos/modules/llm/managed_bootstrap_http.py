@@ -28,6 +28,7 @@ REDIRECT_POLICY = SHARED_ROOT / "data/http/redirect_policy.json"
 PROXY_POLICY = SHARED_ROOT / "python/network_proxy_policy.py"
 PYTHON_RELEASE = SHARED_ROOT / "modules/llm/managed_python_release.json"
 NATIVE_ENGINE = DRIVER_ROOT / "platform/network/native_http.py"
+IDENTIFIERS = SHARED_ROOT / "data/identifiers.py"
 
 
 class BootstrapFailure(Exception):
@@ -140,6 +141,21 @@ def _url(value, maximum):
     if port is not None and not 1 <= port <= 65535:
         raise BootstrapFailure("protocol")
     return parsed
+
+
+def _github_host():
+    """The GitHub host declared once in _shared/data/identifiers.json."""
+    specification = importlib.util.spec_from_file_location(
+        "_ergopti_bootstrap_identifiers", IDENTIFIERS
+    )
+    if specification is None or specification.loader is None:
+        raise BootstrapFailure("unavailable")
+    module = importlib.util.module_from_spec(specification)
+    try:
+        specification.loader.exec_module(module)
+    except OSError:
+        raise BootstrapFailure("unavailable") from None
+    return module.HOSTS["github"]
 
 
 def _direct_route(url):
@@ -327,7 +343,9 @@ def install_python(uv, python_request, deadline, idle_timeout):
         if (
             key != "cpython-" + version + "-darwin-" + architecture + "-none"
             or candidate.get("url")
-            != "https://github.com/astral-sh/python-build-standalone/releases/download/"
+            != "https://"
+            + _github_host()
+            + "/astral-sh/python-build-standalone/releases/download/"
             + candidate["build"]
             + "/cpython-"
             + version

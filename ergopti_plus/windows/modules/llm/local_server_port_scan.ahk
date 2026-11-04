@@ -31,6 +31,19 @@ global LLM_LOCAL_SERVER_SCAN_SCRIPT := "[Console]::OutputEncoding=[Text.Encoding
 	. " Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | ForEach-Object {"
 	. " 'L ' + $_.OwningProcess + ' ' + $_.LocalAddress + ' ' + $_.LocalPort }"
 
+/**
+ * Puts a Win32_Process command line in the form the shared policy reads: Windows
+ * keeps the quotes of the program path (any path with a space, and everything a
+ * shortcut starts), so "...\Jan.exe" ended on a quote the process name match
+ * refuses, and the catalogue's command line fragments use forward slashes.
+ * macOS and Linux read ps and need neither: argv carries no quotes there.
+ * @param {String} Command The raw command line.
+ * @returns {String} The line with no double quote and forward slashes only.
+ */
+LocalServerPortScanNormalizeCommand(Command) {
+	return StrReplace(StrReplace(Command, '"', ""), "\", "/")
+}
+
 /** Finds where each catalogue server runs and listens, asynchronously. */
 class LocalServerPortScan {
 
@@ -126,7 +139,7 @@ class LocalServerPortScan {
 		ProcessRows := "", ListenerRows := ""
 		for Line in StrSplit(Output, "`n", "`r") {
 			if SubStr(Line, 1, 2) == "P "
-				ProcessRows .= SubStr(Line, 3) "`n"
+				ProcessRows .= LocalServerPortScanNormalizeCommand(SubStr(Line, 3)) "`n"
 			else if SubStr(Line, 1, 2) == "L "
 				ListenerRows .= SubStr(Line, 3) "`n"
 		}

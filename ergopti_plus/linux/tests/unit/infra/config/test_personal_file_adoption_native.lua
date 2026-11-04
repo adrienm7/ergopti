@@ -54,6 +54,21 @@ local function fixture(choices, body, overrides)
 	if not ok then error(detail, 0) end
 end
 
+--- The head of a reason text a greyed row shows: before the first colon, ASCII
+--- or full-width, trimmed. The French catalogue spaces its colon, so the raw
+--- prefix keeps a trailing space the rendered title never holds.
+--- @param key string Locale key of the reason.
+--- @return string
+local function reason_head(key)
+	local text = require("infra.i18n").get(key)
+	local cut
+	for _, mark in ipairs({ ":", "\239\188\154" }) do
+		local at = text:find(mark, 1, true)
+		if at and (cut == nil or at < cut) then cut = at end
+	end
+	return ((cut and text:sub(1, cut - 1) or text):gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
 --- Builds the actual native menu while restoring every captured module dependency.
 --- @param fixture_state table Physical source/configuration/engine fixture.
 --- @param body function Rendered native row assertions.
@@ -61,8 +76,8 @@ local function with_native_menu(fixture_state, body)
 	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
 	local changed, opened = 0, {}
 	local ok, detail = pcall(function()
-		package.loaded["ui.menu.menu_builder"] = nil
-		local Builder = require("ui.menu.menu_builder")
+		package.loaded["ui.menu.builder"] = nil
+		local Builder = require("ui.menu.builder")
 		local context = { config = fixture_state.config, _version = "9.9.9",
 			on_menu_changed = function() changed = changed + 1 end,
 			webview = { show = function(app) opened[#opened + 1] = app; return true end } }
@@ -117,7 +132,7 @@ helpers.describe("native adopted personal file gates", function()
 					helpers.assert_true(row.menu[6].disabled); helpers.assert_nil(row.menu[6].fn)
 					helpers.assert_true(row.menu[7].disabled); helpers.assert_nil(row.menu[7].fn)
 					helpers.assert_true(row.menu[8].disabled); helpers.assert_nil(row.menu[8].fn)
-					helpers.assert_true(row.menu[6].title:find(require("infra.i18n").get("menu.hotstrings.personal_file_unavailable"):match("^[^:]+"), 1, true) ~= nil)
+					helpers.assert_true(row.menu[6].title:find(reason_head("menu.hotstrings.personal_file_unavailable"), 1, true) ~= nil, "the row names why: " .. row.menu[6].title)
 					helpers.assert_eq(f.read(), preferences); helpers.assert_eq(opened, {}); helpers.assert_eq(changed(), 0)
 				end)
 			end)
@@ -203,7 +218,7 @@ helpers.describe("native adopted personal file gates", function()
 						local folder = assert(render(prefix), "the actual skipped directory remains visible")
 						helpers.assert_eq(#folder.menu, 1)
 						helpers.assert_true(folder.menu[1].disabled); helpers.assert_nil(folder.menu[1].fn)
-						helpers.assert_true(folder.menu[1].title:find(require("infra.i18n").get("menu.hotstrings.personal_directory_unavailable"):match("^[^:]+"), 1, true) ~= nil)
+						helpers.assert_true(folder.menu[1].title:find(reason_head("menu.hotstrings.personal_directory_unavailable"), 1, true) ~= nil, "the row names why: " .. folder.menu[1].title)
 					end
 					helpers.assert_nil(f.match("excluded"), "diagnostic discovery cannot activate linked or excluded child sources")
 					helpers.assert_eq(opened, {}); helpers.assert_eq(changed(), 0)

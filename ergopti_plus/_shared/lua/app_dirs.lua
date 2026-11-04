@@ -28,10 +28,19 @@ return {
 		relative = "Library/Logs/ergopti_plus",
 		launcher_log = "launcher.log",
 		fatal_report = "hammerspoon-fatal.txt",
+		reload_breadcrumb = "reload_breadcrumb.txt",
 	},
 	linux = {
 		base_env = "XDG_STATE_HOME",
 		base_fallback = ".local/state",
 		relative = "ergopti_plus/logs",
+	},
+	config = {
+		override_key = "ConfigDirPath",
+		hotstrings_dir = "hotstrings",
+		personal_hotstrings_file = "personal_hotstrings.toml",
+		macos_base_env = "HOME",
+		macos_relative = ".config/ergopti_plus",
+		macos_paths_file = "Library/Application Support/ErgoptiPlus/paths.toml",
 	},
 }

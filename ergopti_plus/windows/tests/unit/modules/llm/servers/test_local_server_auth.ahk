@@ -24,7 +24,9 @@ _LSA_SharedCorpus() {
 	Root := JsonParse(FileRead(_SharedDir . "\modules\llm\local_servers.json", "UTF-8"))
 	Catalogue := LocalServerAuthCatalogue(Root, Map("openai", true, "openai_compat", true))
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\llm\local_server_auth.json", "UTF-8"))
-	AssertEqual(4, Catalogue["order"].Length, "the four actual descriptors own optional authentication")
+	AssertEqual(Root["server_order"].Length, Catalogue["order"].Length, "every catalogue descriptor owns optional authentication")
+	for Index, Id in Root["server_order"]
+		AssertEqual(Id, Catalogue["order"][Index], "the capability keeps the catalogue's order")
 	AssertEqual(42, Corpus["auth_cases"].Length, "the independent credential corpus stays complete")
 	AssertEqual(16, Corpus["models_cases"].Length, "the independent models corpus stays complete")
 	for Vector in Corpus["auth_cases"]
@@ -55,8 +57,8 @@ Test("local API authentication: independent cross-driver credential and models c
 ; ==========================================
 
 _LSA_ResolverAndPrivateRestart() {
-	global LLM_LOCAL_API_SERVERS
-	for Id in ["omlx", "lmstudio", "llamacpp", "jan"] {
+	global LLM_LOCAL_API_SERVERS, _SharedDir
+	for Id in JsonParse(FileRead(_SharedDir . "\modules\llm\local_servers.json", "UTF-8"))["server_order"] {
 		AssertTrue(LLM_LOCAL_API_SERVERS.Has(Id), "actual provider boot publishes the shared local capability")
 		Entry := Map("Id", "local_" . Id, "Name", Id, "Provider", Id, "BaseUrl", "http://127.0.0.1:19273/v1", "Token", "", "Model", "fixture-model")
 		Resolved := _LLMRemoteResolveEntry(Entry)
@@ -131,7 +133,7 @@ _LSA_AffinityCorpus() {
 	global _SharedDir, LLM_LOCAL_API_SERVERS
 	LLM_Defaults_Load()
 	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\llm\local_server_affinity.json"))
-	AssertEqual(24, Corpus["affinity_cases"].Length, "the independent endpoint affinity inventory must be complete")
+	AssertEqual(28, Corpus["affinity_cases"].Length, "the independent endpoint affinity inventory must be complete")
 	for Vector in Corpus["affinity_cases"]
 		AssertEqual(Vector["matches"], LocalServerAuthEntryMatches(Vector["provider"], Vector["base_url"], Vector["server"], LLM_LOCAL_API_SERVERS), Vector["name"])
 	AssertEqual(13, Corpus["entry_auth_cases"].Length, "the contextual authentication inventory must remain independent")

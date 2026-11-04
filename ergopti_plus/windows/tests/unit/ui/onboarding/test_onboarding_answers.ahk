@@ -593,7 +593,7 @@ _TOAN_FullSemanticCommit() {
 	AssertTrue(DllCall("CreateDirectoryW", "Str", Folder, "Ptr", 0, "Int"),
 		"the wizard transaction fixture must exclusively own its directory")
 	Source := _CMJFixtureCurrentSource('script = {locale = "en", future = "retain"}`n[future]`nold = "retain" # user data`n')
-	Expected := Chr(0xFEFF) . _CMJFixtureCurrentSource('script = {locale = "fr", future = "retain"}`n[future]`nold = "retain" # user data`n')
+	Expected := _CMJFixtureCurrentSource('script = {locale = "fr", future = "retain"}`n[future]`nold = "retain" # user data`n')
 	Seen := Map("calls", 0)
 	Observe() {
 		Seen["calls"] += 1

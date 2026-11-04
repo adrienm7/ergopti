@@ -33,10 +33,8 @@
 ; =================================================
 ; =================================================
 
-_TWHID_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_TWHID_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -47,7 +45,7 @@ _TWHID_ReadSource(RelPath) {
 ; ===================================================
 
 _TWHID_CheckWriterEmitsInheritDefaults() {
-	Src := _TWHID_ReadSource("platform/remap/tap_hold_writer.ahk")
+	Src := _TWHID_ReadSource("tap_hold_writer.ahk")
 	Assert(Src != "", "platform/remap/tap_hold_writer.ahk must be readable")
 
 	Body := _DriverFuncBody("_TH_WriteTapHoldToml")
@@ -58,7 +56,7 @@ _TWHID_CheckWriterEmitsInheritDefaults() {
 }
 
 _TWHID_CheckWriterEmitsRootSection() {
-	Src := _TWHID_ReadSource("platform/remap/tap_hold_writer.ahk")
+	Src := _TWHID_ReadSource("tap_hold_writer.ahk")
 	Assert(Src != "", "platform/remap/tap_hold_writer.ahk must be readable")
 
 	Body := _DriverFuncBody("_TH_WriteTapHoldToml")
@@ -70,7 +68,7 @@ _TWHID_CheckWriterEmitsRootSection() {
 }
 
 _TWHID_CheckLoaderReadsInheritDefaults() {
-	Src := _TWHID_ReadSource("platform/remap/tap_hold_loader.ahk")
+	Src := _TWHID_ReadSource("tap_hold_loader.ahk")
 	Assert(Src != "", "platform/remap/tap_hold_loader.ahk must be readable")
 
 	Assert(InStr(Src, "inherit_defaults"),

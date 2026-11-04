@@ -27,6 +27,7 @@ local Registrar   = require("adapters.hotkey_registrar")
 local FileSystem  = require("adapters.file_system")
 local Paths       = require("infra.paths")
 local Logger      = require("infra.logger")
+local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
 local OperationReporter = require("diagnostics.operation_reporter")
 local GestActions = nil
 local Codec       = require("toml_codec")
@@ -45,12 +46,16 @@ local PhysicalSlots = require("shortcuts.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
 local i18n = require("infra.i18n")
+local KeyNames = require("keycodes.key_names")
 local AiActions = require("modules.shortcuts.ai_actions")
 local TableUtil = require("table_util")
 local ConfigKeys = require("config_keys")
 local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.keyboard_shortcuts"
+-- Retry index whose full rebind is restarting this owner: start() then
+-- continues that retry series instead of opening a fresh one.
+local _full_rebind_retry_index = nil
 
 -- Ownership inspection needs only key identities; action initialization belongs
 -- to assignment validation and delivery, not the cleanup reader.
@@ -111,14 +116,6 @@ end
 -- ====================================
 -- ====================================
 
--- Modifier symbols for labels
-local MOD_SYMBOLS = {
-	cmd        = "⌘",
-	shift      = "⇧",
-	ctrl       = "^",
-	alt        = "⌥",
-}
-
 -- Resolved from the shared modifier catalogue after its first acknowledged read.
 local SLOT_MODS = nil
 local SPECIAL_KEYS = nil
@@ -134,6 +131,25 @@ M.SLOT_GROUPS = {
 	{ prefix = "primary_",          group_key = "menu.shortcuts.cmd_group",        add_key = "menu.shortcuts.cmd_add" },
 	{ prefix = "primary_shift_",    group_key = "menu.shortcuts.cmd_shift_group",  add_key = "menu.shortcuts.cmd_shift_add" },
 }
+
+--- The names of a modifier group's modifiers (« Cmd + Maj »), the {1} of its
+--- Add row: the shared key name table's, never a spelling of the template.
+--- @param group table An entry of M.SLOT_GROUPS with modifiers.
+--- @return string
+function M.get_keyboard_group_modifiers_label(group)
+	return KeyNames.modifiers_label(SlotRoles.family_modifiers("macos", group.prefix), "macos", i18n.get)
+end
+
+--- The heading of one group's submenu: the contextual group's own title, a
+--- modifier group's template filled with its glyphs and names (« ⌥ Option
+--- shortcuts », « ⌘⇧ Cmd + Maj shortcuts »).
+--- @param group table An entry of M.SLOT_GROUPS.
+--- @return string
+function M.get_keyboard_group_label(group)
+	if group.fixed then return i18n.get(group.group_key) end
+	local modifiers = SlotRoles.family_modifiers("macos", group.prefix)
+	return KeyNames.fill(group.group_key, KeyNames.modifiers_heading(modifiers, "macos", i18n.get), i18n.get)
+end
 
 -- Path to the shared key catalogue. The slot space is prefix × key, and the keys
 -- are the same 40 the gesture actions and the Windows driver already use — a
@@ -409,15 +425,17 @@ local function slot_to_chord(slot_id)
 	return nil
 end
 
---- Returns a human-readable label for a slot (e.g. "⌘ A", "^ Espace").
+--- Returns a human-readable label for a slot (e.g. "⌘ A", "⌃ Espace"): the
+--- modifiers as the glyphs of the shared key name table, a named key under its
+--- translated name.
 --- @param slot_id string
 --- @return string
 local function slot_label(slot_id)
 	local descriptor = M.physical_slot_descriptor(slot_id)
 	if descriptor then
 		local parts = {}
-		for _, mod in ipairs(physical_modifiers(descriptor.mods)) do parts[#parts + 1] = MOD_SYMBOLS[mod] or mod end
-		parts[#parts + 1] = descriptor.code
+		for _, mod in ipairs(physical_modifiers(descriptor.mods)) do parts[#parts + 1] = KeyNames.macos_symbol(mod) end
+		parts[#parts + 1] = KeyNames.physical_label(descriptor.code, "macos", i18n.get)
 		return table.concat(parts, " ")
 	end
 	if slot_id == MagicPolicy.SLOT_ID then
@@ -430,10 +448,15 @@ local function slot_label(slot_id)
 		local prefix, mods = entry[1], entry[2]
 		if slot_id:sub(1, #prefix) == prefix then
 			local suffix = slot_id:sub(#prefix + 1)
-			local key_display = key_labels()[suffix] or (suffix:sub(1, 1):upper() .. suffix:sub(2))
+			local key_display
+			if KeyNames.canonical(suffix) then
+				key_display = KeyNames.label(suffix, "macos", i18n.get)
+			else
+				key_display = key_labels()[suffix] or (suffix:sub(1, 1):upper() .. suffix:sub(2))
+			end
 			local mod_str = ""
 			for _, m in ipairs(mods) do
-				mod_str = mod_str .. (MOD_SYMBOLS[m] or m) .. " "
+				mod_str = mod_str .. KeyNames.macos_symbol(m) .. " "
 			end
 			return mod_str .. key_display
 		end
@@ -755,9 +778,11 @@ local function bind_slot(slot_id, action_id)
 	-- The Caps Lock slot keeps the native factory the retired Ctrl+CapsLock
 	-- switch used; the registrar refuses Caps Lock as a key on every other path.
 	local parsed_chord = Chord.parse(chord)
-	local bind = (parsed_chord and parsed_chord.key:lower() == "capslock")
-		and Registrar.bind_capslock_chord or Registrar.bind
+	local is_capslock = parsed_chord ~= nil and parsed_chord.key:lower() == "capslock"
+	local bind = is_capslock and Registrar.bind_capslock_chord or Registrar.bind
 	local ok_bind, handle, refusal = xpcall(bind, debug.traceback, chord, function()
+		-- Whether macOS fires a Caps Lock hotkey at all is the field question.
+		if is_capslock then CapsLockChordEvidence.note_delivery() end
 		if _delivery_enabled ~= true or _lifecycle_paused == true then return false end
 		local current_action = _actions[slot_id] or "none"
 		if current_action == "none" then
@@ -883,6 +908,13 @@ function M.get_configuration_intent()
 	for slot, action in pairs(_explicit_actions) do assignments[slot] = action end
 	for slot in pairs(_physical_assignments) do claims[slot] = true end
 	return assignments, claims
+end
+
+--- Reports whether a slot holds a native binding right now.
+--- @param slot_id string
+--- @return boolean bound
+function M.is_slot_bound(slot_id)
+	return _hotkeys[slot_id] ~= nil
 end
 
 --- Returns the current action id for a given slot.
@@ -1214,7 +1246,13 @@ function M.start(candidate, raw_claims)
 	local count = TableUtil.count(_hotkeys)
 	Logger.success(LOG, "Keyboard shortcuts started (%d active binding(s), %d waiting for a retry).",
 		count, TableUtil.count(_pending_slots))
-	if next(_pending_slots) ~= nil then _refusal_retry.schedule() end
+	if next(_pending_slots) ~= nil then
+		if _full_rebind_retry_index ~= nil then
+			_refusal_retry.resume(_full_rebind_retry_index)
+		else
+			_refusal_retry.schedule()
+		end
+	end
 	return true
 end
 
@@ -1252,8 +1290,9 @@ end
 --- each on its own.
 --- @param final boolean|nil True on the last bounded retry: a key the layout
 ---   still cannot resolve is then bound at its US-ANSI position.
+--- @param index integer|nil Position of this retry in its bounded series.
 --- @return boolean settled True when no refused slot remains.
-function M.bind_pending(final)
+function M.bind_pending(final, index)
 	if not _started or _lifecycle_paused == true or _start_attempt ~= nil then
 		return next(_pending_slots) == nil
 	end
@@ -1270,6 +1309,27 @@ function M.bind_pending(final)
 		if _lifecycle_epoch ~= epoch or _lifecycle_paused == true then break end
 	end
 	_layout_fallback_admitted = false
+	if next(_pending_slots) == nil then return true end
+	-- A chord macOS refused is usually held by another live registration: a
+	-- static chord resolved while the keycode map still described the previous
+	-- layout. Retrying this slot alone never moves it; one full rebind with the
+	-- current map does (field log 2026-10-30, Ctrl+. refused for 11 minutes).
+	-- Every retry of the bounded series may rebind: a probe layout switched
+	-- back and forth several times in a few seconds (field log 2026-10-30
+	-- 18:30) left the one rebind a minute allowed spent on a stale map, and
+	-- Ctrl+. stayed refused after the last retry.
+	for _, refusal in pairs(_pending_slots) do
+		if refusal == Registrar.OS_REFUSAL then
+			Logger.info(LOG,
+				"A refused shortcut may be held by a chord of the previous layout; rebinding every shortcut (retry %s).",
+				tostring(index))
+			_full_rebind_retry_index = math.type(index) == "integer" and index or nil
+			local ok_rebind, rebound = pcall(function() return require("modules.shortcuts").rebind_for_layout() end)
+			_full_rebind_retry_index = nil
+			if not ok_rebind then Logger.error(LOG, "Full shortcut rebind raised: %s.", tostring(rebound)) end
+			break
+		end
+	end
 	return next(_pending_slots) == nil
 end
 

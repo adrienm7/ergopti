@@ -24,6 +24,9 @@
 ; The generated config-key constants; #Include skips a file the entry script
 ; already loaded, so a unit harness that loads this file alone still resolves them.
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+; The shared matcher between a runtime category and its manifest rows, which the
+; delay a built-in section declares is read through.
+#Include %A_LineFile%\..\..\..\..\_shared\modules\hotstrings\scope_overrides.ahk
 
 
 
@@ -41,9 +44,12 @@
 ; Resolution order — first non-empty wins:
 ;   1. user_override.section
 ;   2. user_override.file
-;   3. toml.section
-;   4. toml.file
-;   5. the base expansion delay (delay only); color stays empty.
+;   3. the delay the section declares (delay only): its config.toml leaf, else
+;      its manifest default (HotstringsSectionDeclaredDelay)
+;   4. toml.section
+;   5. toml.file
+;   6. the base expansion delay (delay only); color stays empty.
+; The order is the shared cascade's (_shared/lua/hotstrings/delay_resolver.lua).
 HotstringsResolve(CategoryName, SectionName := "") {
 		if IsSet(PersonalFileControls) && PersonalFileControls.owners.Has(CategoryName)
 				return PersonalFileControls.owners[CategoryName].Resolve(SectionName)
@@ -242,6 +248,40 @@ HotstringsSetBaseDelay(Seconds) {
 		return true
 }
 
+; The delay a built-in section declares, rung 3 of the cascade: the user's
+; time_activation_seconds leaf of the section in config.toml, else the section's
+; manifest default (the maintainer's decision of 3 November 2026). "" when the
+; section declares none (no row, no delay in its row, a personal row), so the
+; category file and then the base expansion delay decide.
+; @param CategoryName Runtime category (file stem or language group id).
+; @param SectionName Section name, already folded as the resolver folds it.
+; @returns {Number|String} Seconds, or "".
+HotstringsSectionDeclaredDelay(CategoryName, SectionName) {
+		global Features
+		Rows := ManifestFeatures()
+		Default := HotstringsSectionDefaultDelay(Rows, CategoryName, SectionName)
+		if (Default == "")
+				return ""
+		Entry := _HotstringsScopeSectionFeature(Rows, CategoryName, SectionName)
+		if !IsSet(Features)
+				return Default
+		Node := Features
+		for Key in StrSplit(Entry["path"], ".") {
+				if !(Node is Map) or !Node.Has(Key)
+						return Default
+				Node := Node[Key]
+		}
+		if !(Node is Map) or !Node.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+				return Default
+		Value := Node[ConfigLeaf.TIME_ACTIVATION_SECONDS]
+		if (Value is Integer or Value is Float) and Value >= 0
+				return Value
+		try LoggerWarn("HotstringsConfig",
+				"{1}.{2} is not a non-negative number of seconds; the section waits its manifest default.",
+				Entry["path"], ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		return Default
+}
+
 ; Internal resolution logic (uncached); HotstringsResolve above memoises it.
 _HotstringsResolveUncached(CategoryName, SectionName := "") {
 		global _HotstringsOverrides
@@ -268,6 +308,8 @@ _HotstringsResolveUncached(CategoryName, SectionName := "") {
 				Delay := UserSec.Delay
 		} else if (UserCat != "" and UserCat.Delay != "") {
 				Delay := UserCat.Delay
+		} else if ((Declared := HotstringsSectionDeclaredDelay(Cat, Sec)) != "") {
+				Delay := Declared
 		} else if (TomlSec != "" and TomlSec.Delay != "") {
 				Delay := TomlSec.Delay
 		} else if (TomlCfg.Delay != "") {

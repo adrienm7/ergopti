@@ -663,11 +663,13 @@ function M.add(trigger, replacement, opts)
 	-- word-boundary / group-order / seq tiebreakers (behaviour unchanged).
 	local priority          = type(opts.priority) == "number" and opts.priority or PRIORITY_COMMON
 
-	-- Replacements containing newlines or key directives are always "final" so
-	-- the engine does not attempt to chain another expansion on top of them.
-	if replacement:match("\n") or replacement:match("{Tab}") or replacement:match("{Enter}") or replacement:match("{Return}") then
-		is_final = true
-	end
+	-- The output grammar (send_input.parse_output). {U+XXXX} and the brace escapes
+	-- are text, resolved once here so the matcher, the case forms and the preview
+	-- see the characters. A key token is always "final": the caret is no longer
+	-- behind this text, so nothing can chain off it.
+	local replacement_has_keys
+	replacement, replacement_has_keys = km_utils.resolve_output(replacement)
+	if replacement_has_keys then is_final = true end
 
 	--- Appends or updates a single mapping entry in the database.
 	--- @param t string The trigger.
@@ -959,6 +961,63 @@ end
 -- ======= 3/ Module API =======
 -- =============================
 -- =============================
+
+--- Lists the shipped hotstrings the developer field run may type to prove a
+--- real expansion: enabled, from a bundled file, expanded by a terminator, a
+--- plain lowercase ASCII trigger no other file registers, and a replacement
+--- with no token, no line break and no magic key. Registry order, so the
+--- choice is stable from run to run.
+--- @return table candidates Array of { trigger, expansion }.
+function M.field_run_candidates()
+	if not require_state("field_run_candidates") then return {} end
+	-- The groups registering each folded trigger: the cased variants of one
+	-- entry share its group, another file's entry for it does not.
+	local trigger_groups = {}
+	for _, m in ipairs(_state.mappings) do
+		local folded = text_utils.trig_lower(m.trigger)
+		local groups = trigger_groups[folded]
+		if groups == nil then groups = { count = 0 }; trigger_groups[folded] = groups end
+		local group = m.group or ""
+		if not groups[group] then groups[group] = true; groups.count = groups.count + 1 end
+	end
+	-- The settings and manifest reads behind a section's state, and a group's
+	-- origin, are answered once per group or section: per mapping they held the
+	-- main thread for 1810 ms over 301 candidates (field run 2026-10-31).
+	local shipped_groups, section_states = {}, {}
+	local function group_shipped(name)
+		local known = shipped_groups[name]
+		if known ~= nil then return known end
+		local group = _state.groups[name]
+		known = group ~= nil and group.enabled == true and group.kind == "toml"
+			and group.personal_source == nil
+			and type(group.path) == "string" and Groups.file_origin(group.path) == "bundled"
+		shipped_groups[name] = known
+		return known
+	end
+	local function section_enabled(group_name, section)
+		local key = group_name .. "\0" .. section
+		local known = section_states[key]
+		if known == nil then
+			known = M.is_section_enabled(group_name, section) == true
+			section_states[key] = known
+		end
+		return known
+	end
+	local candidates = {}
+	for _, m in ipairs(_state.mappings) do
+		-- The cheap per-mapping filters run before any group or section read.
+		if m.group and m.personal_source == nil and not m.auto and not m.has_magic and not m.is_private
+			and m.trigger:match("^[a-z][a-z]+$") and #m.trigger <= 12
+			and trigger_groups[m.trigger].count == 1
+			and m.repl == m.plain_repl and m.plain_repl ~= "" and m.plain_repl ~= m.trigger
+			and not m.plain_repl:find("[%c{}]") and not m.plain_repl:find(_state.magic_key, 1, true)
+			and group_shipped(m.group)
+			and (m.section == nil or section_enabled(m.group, m.section)) then
+			candidates[#candidates + 1] = { trigger = m.trigger, expansion = m.plain_repl }
+		end
+	end
+	return candidates
+end
 
 --- Injects the shared CoreState from keymap/init.lua.
 --- Must be called exactly once before any other function in this module.

@@ -94,7 +94,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 	local SOURCE = '# private independent neighbor\n[llm.navigation]\nfuture = "retain" # unknown\n[other]\nvalue = 42\n'
 	local function with_native_navigation(variant, body)
 		Sandbox.with_config(type(variant) == "table" and variant.source or SOURCE, function(path)
-			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.navigation_settings", "modules.llm.trigger_settings", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.menu_builder", "adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "infra.i18n" }
+			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.navigation_settings", "modules.llm.trigger_settings", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.builder", "adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "infra.i18n" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local previous_execute, previous_rename = os.execute, os.rename
 			local notices, changed, refused_publications = 0, 0, 0
@@ -137,7 +137,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 				}))
 				package.loaded["infra.manifest_menu"] = native_menu
 				os.execute = function(command)
-					if command:find("zenity --error", 1, true) then notices = notices + 1; return true end
+					if command:find("dialog_host.lua' --error", 1, true) then notices = notices + 1; return true end
 					if command:find("start_at_login.sh", 1, true) then return false end
 					return previous_execute(command)
 				end
@@ -146,14 +146,14 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 					get_backend = function() return "ollama" end, streaming_revision = function() return 0 end }, on_quit = function() end,
 					on_menu_changed = function() changed = changed + 1 end }
 				local function full()
-					local items = require("ui.menu.menu_builder").build(context)
+					local items = require("ui.menu.builder").build(context)
 					for _, item in ipairs(items) do
 						if item.title == i18n.get("menu.llm.title") then return item.menu end
 					end
 					error("the actual tray AI owner is absent")
 				end
 				local function build()
-					local items = require("ui.menu.menu_builder").build(context)
+					local items = require("ui.menu.builder").build(context)
 					for _, item in ipairs(items) do
 						if item.title == i18n.get("menu.llm.title") then
 							for _, child in ipairs(item.menu or {}) do if child.title == i18n.get("menu.llm.nav_menu_title") then return child.menu end end
@@ -331,7 +331,8 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 			for _, parent in ipairs(parents) do
 				local row = assert(parent_named(rows, fixture.i18n.get(parent.key)))
 				helpers.assert_eq(row.disabled, true)
-				helpers.assert_true(type(row.menu) == "table")
+				-- Category-off rule: a greyed group of an off category opens nothing.
+				helpers.assert_nil(row.menu)
 			end
 			helpers.assert_eq(Sandbox.read_bytes(fixture.path), before)
 			helpers.assert_eq(fixture.changed(), 0)

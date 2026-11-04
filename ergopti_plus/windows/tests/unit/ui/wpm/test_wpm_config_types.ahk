@@ -51,6 +51,32 @@ TestWPMConfigRejectsStringEncodedBooleans() {
 Test("WPM config: boolean fields preserve TOML types (AHK-101)",
 	TestWPMConfigRejectsStringEncodedBooleans)
 
+; An absent key used to read as false whatever the manifest shipped, and
+; SaveFullConfig then wrote that false back (decision of 2026-11-03: the graph
+; and colours ship on).
+TestWPMConfigAbsentKeysTakeManifestDefaults() {
+	SavedVisible := WPMWidget.visible
+	SavedColors := WPMWidget.use_colors
+	SavedGraph := WPMWidget.show_graph
+	try {
+		WPMWidget.visible := !ManifestDefaultFor(ConfigKey.METRICS_WPM_WIDGET_VISIBLE)
+		WPMWidget.use_colors := !ManifestDefaultFor(ConfigKey.METRICS_WPM_WIDGET_COLORS)
+		WPMWidget.show_graph := !ManifestDefaultFor(ConfigKey.METRICS_WPM_WIDGET_GRAPH)
+		WPMWidget_LoadConfig(Map("metrics", Map()), _TWCT_Areas, _TWCT_NoStoredPosition)
+		AssertEqual(ManifestDefaultFor(ConfigKey.METRICS_WPM_WIDGET_VISIBLE), WPMWidget.visible)
+		AssertEqual(ManifestDefaultFor(ConfigKey.METRICS_WPM_WIDGET_COLORS), WPMWidget.use_colors)
+		AssertEqual(ManifestDefaultFor(ConfigKey.METRICS_WPM_WIDGET_GRAPH), WPMWidget.show_graph)
+		AssertTrue(WPMWidget.use_colors && WPMWidget.show_graph && !WPMWidget.visible,
+			"an empty configuration shows colours and graph, the pill itself stays hidden")
+	} finally {
+		WPMWidget.visible := SavedVisible
+		WPMWidget.use_colors := SavedColors
+		WPMWidget.show_graph := SavedGraph
+	}
+}
+Test("WPM config: absent widget booleans take the manifest default",
+	TestWPMConfigAbsentKeysTakeManifestDefaults)
+
 TestWPMConfigValidatesSavedPositionAgainstEveryMonitor() {
 	WorkAreas := [
 		{ Left: 0, Top: 0, Right: 1920, Bottom: 1080 },

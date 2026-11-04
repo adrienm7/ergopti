@@ -29,9 +29,10 @@ end
 
 
 --- Loads and drives one prediction acceptance inside a real callback collector.
---- @param options table { text, buffer?, llm_private_mark?, expander_failure?, real_overlap?, prediction? };
+--- @param options table { text, buffer?, llm_private_mark?, expander_failure?, expander?, real_overlap?, prediction? };
 ---   prediction is a complete parser record the engine hands over instead of
----   one built from text and deletes.
+---   one built from text and deletes; expander replaces the real choke point
+---   with a double, so a test can see what reaches it and what goes around it.
 --- @return table result Captured call, event, state, and side-effect data.
 function M.run(options)
 	options = options or {}
@@ -232,7 +233,10 @@ function M.run(options)
 	end
 
 	local expander
-	if options.expander_failure then
+	if options.expander then
+		expander = options.expander
+		package.loaded["modules.keymap.expander"] = expander
+	elseif options.expander_failure then
 		expander = {
 			init = function() return true end,
 			perform_text_replacement = function() return false end,
@@ -263,7 +267,7 @@ function M.run(options)
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,
 	})
-	if not options.expander_failure then
+	if not options.expander_failure and not options.expander then
 		expander.init(state, package.loaded["modules.keymap.registry"], bridge)
 	end
 

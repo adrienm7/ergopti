@@ -92,7 +92,7 @@ h1 {
 }
 
 label {
-	color: #444;
+	color: var(--theme-grey-444);
 	flex-grow: 1;
 	font-size: 11px;
 	font-weight: 600;
@@ -105,8 +105,8 @@ label {
 }
 
 input[type='text'] {
-	background: #f9f9f9;
-	border: 1px solid #d0d0d0;
+	background: var(--theme-grey-f9f9f9);
+	border: 1px solid var(--theme-grey-d0d0d0);
 	border-radius: 5px;
 	color: var(--theme-label);
 	flex-grow: 1;
@@ -149,7 +149,7 @@ input[type='text'].is-default {
 /* ======================================= */
 
 .btn-browse {
-	background: #e8e8ed;
+	background: var(--theme-hue-e8e8ed);
 	border: none;
 	border-radius: 5px;
 	color: var(--theme-grey-333);
@@ -167,7 +167,7 @@ input[type='text'].is-default {
 }
 
 .tag-default {
-	background: #e8f4ff;
+	background: var(--theme-hue-e8f4ff);
 	border-radius: 4px;
 	color: var(--theme-blue);
 	font-size: 10px;
@@ -178,9 +178,9 @@ input[type='text'].is-default {
 }
 
 .tag-modified {
-	background: #fff3e0;
+	background: var(--theme-hue-fff3e0);
 	border-radius: 4px;
-	color: #e65100;
+	color: var(--theme-hue-e65100);
 	font-size: 10px;
 	font-weight: 500;
 	margin-left: 4px;
@@ -240,6 +240,6 @@ button:hover {
 }
 
 .reset:hover {
-	background: #f0f0f0;
+	background: var(--theme-grey-f0f0f0);
 	filter: none;
 }

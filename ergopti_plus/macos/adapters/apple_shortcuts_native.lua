@@ -48,6 +48,13 @@ local function identity(path)
 	return ok and token and { executable = path, token = token } or nil
 end
 
+--- The identity of the system Shortcuts command line tool: its path and a
+--- fingerprint of the file, nil when it is absent or not a plain executable.
+--- The command-line transport (adapters/apple_shortcuts_cli.lua) checks it
+--- before and after every query and run, as this transport does.
+--- @return table|nil identity { executable, token }
+function M.cli_identity() return identity() end
+
 local function query_helper()
 	local ok, launcher = pcall(Helper.resolve)
 	if not ok or type(launcher) ~= "string" or launcher:sub(-12) ~= "/ErgoptiPlus" then return nil end

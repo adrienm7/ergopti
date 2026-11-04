@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 --- A config module standing in for hotstrings_config, recording what it is asked.
---- @param opts table { enabled = boolean, sections_enabled = table }
+--- @param opts table { enabled = boolean, sections_enabled = table, hotstrings_enabled = boolean }
 --- @return table config, table log
 local function fake_config(opts)
 	opts = opts or {}
@@ -20,6 +20,9 @@ local function fake_config(opts)
 	local section_state = opts.sections_enabled or {}
 
 	return {
+		-- The Hotstrings switch reads on while any category is (another one here),
+		-- or the category-off rule greys every row of the menu.
+		any_enabled = function() return opts.hotstrings_enabled ~= false end,
 		get_groups = function() return { "rolls" } end,
 		is_group_enabled = function(id) return id == "rolls" and enabled or false end,
 		toggle_group = function(id) log.toggled[#log.toggled + 1] = id end,
@@ -58,7 +61,7 @@ end
 --- @param ctx_extra table|nil
 --- @return table|nil row
 local function rolls_row(config, ctx_extra)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local ctx = { config = config, _version = "9.9.9" }
 	for k, v in pairs(ctx_extra or {}) do ctx[k] = v end
 
@@ -108,7 +111,7 @@ local function with_file_command(body, change_label)
 		body()
 	end, debug.traceback)
 	package.loaded["infra.manifest_menu"] = saved
-	package.loaded["ui.menu.menu_builder"] = nil
+	package.loaded["ui.menu.builder"] = nil
 	if not ok then error(err, 0) end
 end
 

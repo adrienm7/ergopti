@@ -46,7 +46,8 @@ global LLM_VISION_LOCAL_BACKEND := "local"
 global LLM_VISION_MAX_MODEL_LENGTH := 200
 
 ; Request formats LLM_Vision_BuildRequest writes
-global LLM_VISION_FORMATS := Map("openai", true, "anthropic", true, "gemini", true, "ollama", true)
+global LLM_VISION_FORMATS := Map("openai", true, "anthropic", true, "gemini", true, "ollama", true,
+	"perplexity_agent", true)
 
 ; The user turn that goes with the screenshot of the reading request
 global LLM_VISION_READ_USER_TEXT := "Transcribe this screenshot."
@@ -141,7 +142,9 @@ LLM_Vision_ResolveModel(Parsed, Config) {
  * @param {String} Fmt "openai", "anthropic", "gemini" or "ollama". Named Fmt,
  *     not Format, so the built-in Format() stays reachable.
  * @param {Map} Spec Map("model", "system", "text", "max_tokens"[, "image",
- *     "mime"]): image is base64 PNG data, absent for a text request.
+ *     "mime"][, "think"]): image is base64 PNG data, absent for a text
+ *     request; think, required for ollama, is the JSON source of its value
+ *     (LLM_OllamaThink: false or a quoted level).
  * @returns {String} The JSON body, without address or credentials.
  */
 LLM_Vision_BuildRequest(Fmt, Spec) {
@@ -163,10 +166,19 @@ LLM_Vision_BuildRequest(Fmt, Spec) {
 		if !(Spec.Get(Key, "") is String)
 			throw TypeError("LLM_Vision_BuildRequest: " . Key . " must be a string.")
 	}
+	Think := Spec.Get("think", "")
+	if (Fmt == "ollama") && !((Think is String) && (Think == "false" || RegExMatch(Think, '^"[a-z]+"$')))
+		throw ValueError("LLM_Vision_BuildRequest: an ollama request needs its think value (false or a level).")
 	Model := JsonStringLiteral(Spec.Get("model", ""))
 	System := JsonStringLiteral(Spec["system"])
 	Text := JsonStringLiteral(Spec["text"])
 	Tokens := String(MaxTokens)
+	if (Fmt == LLM_AGENT_FORMAT) {
+		; The Agent API takes an image by URL only: a screenshot has none
+		if HasImage
+			throw ValueError("LLM_Vision_BuildRequest: a perplexity_agent request carries no image.")
+		return LLM_RemoteFormats_AgentBody(Spec["model"], Spec["system"], Spec["text"], MaxTokens)
+	}
 	if (Fmt == "openai") {
 		Content := Text
 		if HasImage
@@ -196,7 +208,8 @@ LLM_Vision_BuildRequest(Fmt, Spec) {
 	}
 	User := '{"role":"user","content":' . Text
 		. (HasImage ? ',"images":[' . JsonStringLiteral(Image) . ']' : "") . '}'
-	return '{"model":' . Model . ',"stream":false,'
+	; A thinking model would spend the whole budget reasoning before it answers
+	return '{"model":' . Model . ',"stream":false,"think":' . Think . ','
 		. '"messages":[{"role":"system","content":' . System . '},' . User . '],'
 		. '"options":{"num_predict":' . Tokens . '}}'
 }

@@ -18,6 +18,13 @@ _GPO_Require(Condition, Message) {
 		throw Error(Message)
 }
 
+; The Quit admission's fact owners, idle: no reload, writer or publication is
+; running in this child, so the genuine admission admits at once.
+ReloadTerminalHandoffPending() => 0
+MenuCommandConfigBusy() => false
+HSE_TerminalTransactionPending() => false
+_ConfigFullSaveHasPending() => false
+
 _GPO_Click(Button, Direction) {
 	global _GPO
 	_GPO_Require(_GPO.NativeHeld.Has(Button) && (Direction == "Down" || Direction == "Up"), "only the actual mouse transport may be bound")

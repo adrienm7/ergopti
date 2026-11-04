@@ -20,7 +20,7 @@
 ; ===============================================
 
 LocalServerAuthCatalogue(Root, Occupied) {
-	Order := [], Servers := Map()
+	Order := [], Servers := Map(), Defaults := Map()
 	if !(Root is Map) || !(Occupied is Map)
 			|| !(Root.Get("server_order", 0) is Array) || !(Root.Get("servers", 0) is Map)
 		return Map("order", Order, "servers", Servers)
@@ -34,7 +34,11 @@ LocalServerAuthCatalogue(Root, Occupied) {
 				|| !(Desc.Get("label", 0) is String) || StrLen(Desc["label"]) == 0
 				|| !(Desc.Get("base_url", 0) is String) || !RegExMatch(Desc["base_url"], "^https?://\S+$")
 			continue
-		Servers[Id] := Map("id", Id, "label", Desc["label"], "base_url", Desc["base_url"], "auth", Desc["auth"])
+		; The first row of a shared default address is that address's default row
+		if !Defaults.Has(Desc["base_url"])
+			Defaults[Desc["base_url"]] := Id
+		Servers[Id] := Map("id", Id, "label", Desc["label"], "base_url", Desc["base_url"], "auth", Desc["auth"],
+			"address_default", Defaults[Desc["base_url"]])
 		Order.Push(Id)
 	}
 	return Map("order", Order, "servers", Servers)
@@ -85,6 +89,11 @@ LocalServerAuthEntryMatches(Provider, BaseUrl, ServerId, Servers) {
 	if Provider == ServerId
 		return true
 	if !(Provider == "openai") && !(Provider == "openai_compat")
+		return false
+	; At a default address two rows share (oMLX and vLLM on 8000), a generic entry
+	; belongs to the address's default row only, as local_server_auth.lua decides.
+	AddressDefault := Servers[ServerId].Get("address_default", ServerId)
+	if !(AddressDefault == ServerId)
 		return false
 	Configured := _LocalServerAuthLoopbackIdentity(BaseUrl)
 	Declared := _LocalServerAuthLoopbackIdentity(Servers[ServerId].Get("base_url", 0))

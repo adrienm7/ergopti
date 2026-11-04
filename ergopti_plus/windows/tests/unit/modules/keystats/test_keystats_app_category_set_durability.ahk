@@ -36,7 +36,7 @@ _KLACSD_Case(PendingDiscovery) {
 			"the fixture cannot replace an active foreign category writer")
 		FSCreateDirectoryExclusiveStrict(Root)
 		Owned := true
-		Original := '{"audit.exe":"productive","other.exe":"neutral"}' . "`n"
+		Original := '{"audit.exe":{"type":"productive","score":0},"other.exe":{"type":"neutral","score":0}}' . "`n"
 		AssertTrue(FSWriteCreateDurable(Path, Original), "the private original must be durably created")
 		OriginalBytes := FileRead(Path, "RAW")
 		; The original timer stays parked under Critical. Any retry from this

@@ -66,6 +66,7 @@ _LLM_Persist_MakeDefaultTray() {
 		"max_words",                  15,
 		"language",                   "fr",
 		"debounce_ms",                500,
+		"min_request_interval_ms",    300,
 		"ctx_chars",                  500,
 		"temperature",                "0.10",
 		"instant_on_word_end",        true,
@@ -82,7 +83,7 @@ _LLM_Persist_MakeDefaultTray() {
 		"nav_modifiers",              "",
 		"val_modifiers",              "alt",
 		"api_entry_id",               "api_primary",
-		"ollama_port",                11434,
+		"ollama_port",                11435,
 		"inline_autotype",            false,
 		"user_profiles",              []
 	)
@@ -210,8 +211,13 @@ Test_LLM_Persist_AllTrayKeysAreSynced() {
 		trayKey := ahk["tray_key"]
 		needle1 := '"' . trayKey . '"'
 		needle2 := "['" . trayKey . "']"
-		inSync := (InStr(syncBlock, needle1) > 0 or InStr(syncBlock, needle2) > 0)
-		inAppend := (InStr(appendBlock, needle1) > 0 or InStr(appendBlock, needle2) > 0)
+		; The persistence owner may name the key through its generated constant, but
+		; only a constant whose value is this exact key counts as the key.
+		leafName := StrUpper(trayKey)
+		needle3 := ConfigLeaf.HasOwnProp(leafName) && ConfigLeaf.%leafName% == trayKey
+			? "ConfigLeaf." . leafName : needle1
+		inSync := (InStr(syncBlock, needle1) > 0 or InStr(syncBlock, needle2) > 0 or InStr(syncBlock, needle3) > 0)
+		inAppend := (InStr(appendBlock, needle1) > 0 or InStr(appendBlock, needle2) > 0 or InStr(appendBlock, needle3) > 0)
 		Assert(inSync or inAppend,
 			"tray key '" . trayKey . "' (" . entry["id"] . ") must appear in "
 			. "_LLM_Menu_SyncToFeatures or _LLM_Menu_AppendPersistedUpdates")
@@ -611,11 +617,8 @@ Test_LLM_Persist_LosslessAppOverrides() {
 	AssertEqual("advanced", Decoded["semi;tool"])
 	AssertEqual("basic", Decoded["eq=tool"])
 	AssertEqual("raw", Decoded["éditeur"])
-	Legacy := _LLM_Menu_DeserializeAppProfileOverrides("eq=tool=advanced")
-	Assert(Legacy is Map, "a recoverable legacy payload must decode")
-	AssertEqual(1, Legacy.Count)
-	AssertEqual("advanced", Legacy["eq=tool"],
-		"legacy migration must split on the last equals sign so a legal app basename survives")
+	; The legacy pairs are refused as on macOS and Linux (no user holds them).
+	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("eq=tool=advanced"))
 	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("dup=raw;dup=basic"))
 	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("broken"))
 	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("good=basic;;late=advanced"),
@@ -948,7 +951,14 @@ _LLM_Persist_BootSourceKind(Section, Key, Raw, Outdated, OptionKey, Kind) {
 		Expected := Kind == "modifiers" ? _LLM_Menu_ModifiersArrayToString(Admitted) : Admitted
 		if Kind == "modifiers"
 			AssertTrue(Expected is String, "the admitted typed modifier vector must have a valid native representation")
+		global _ConfigTomlSnapshotReads
+		ReadsBefore := _ConfigTomlSnapshotReads
 		Opts := LLM_Menu_BuildSavedOpts(Cache)
+		; boot-snapshot-one-read-2026-11-03: each snapshot read compares the whole
+		; snapshot with its shadow twice; four reads of one image took about
+		; 0.35 s of the maintainer's boot tray build.
+		AssertEqual(1, _ConfigTomlSnapshotReads - ReadsBefore,
+			"the saved-options build must read the boot snapshot once for all its manifest values")
 		AssertTrue(Opts.Has(OptionKey), "the actually authored native option must be published")
 		_LLM_Persist_AssertBootOption(Opts[OptionKey], Expected)
 		AssertTrue(ConfigTomlReadSnapshot(ConfigurationFile) == _BootConfigSnapshot,

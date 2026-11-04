@@ -16,22 +16,24 @@
 ;    log stays useful instead of drowning in one line per character.
 ; 3. Bounded overhead: existing QPC reads feed numeric counters, without another
 ;    clock, formatting or I/O on the fast path. A fixed label limit bounds memory.
-; 4. Nesting-aware: a segment reports how much of its wall clock was spent inside
-;    OTHER segments that opened and closed within it. AHK is single-threaded but
-;    Gui creation and COM calls PUMP the message loop, so a physically typed key's
-;    whole InputHook callback can run nested inside Tooltip.Build — and the raw
-;    wall-clock delta then bills that keystroke to the tooltip. The driver
-;    documents that re-entrancy itself (ui/tooltip/core.ahk, the generation
-;    counter exists because of it), and the largest number this profiler has ever
-;    reported was produced by it: "Slow Tooltip.Build: 112.86 ms (1 item(s))" for
-;    a one-row tooltip that benches at ~7 ms. Without the breakdown, real work,
-;    OS descheduling and driver re-entry are three different events that print
-;    identically, and a genuine 3x regression would be invisible in the noise.
+; 4. Judged on own time: a segment is slow when its wall clock MINUS the segments
+;    that opened and closed inside it exceeds the threshold, and a slow child is
+;    reported with its parent instead of being billed to it. AHK is
+;    single-threaded but Gui creation and COM calls PUMP the message loop, so a
+;    physically typed key's whole InputHook callback can run nested inside
+;    Tooltip.Build, and the wall clock then bills that keystroke to the tooltip.
+;    The driver documents that re-entrancy itself (ui/tooltip/core.ahk, the
+;    generation counter exists because of it), and the largest number this
+;    profiler ever reported was produced by it: 112.86 ms for a one-row tooltip
+;    that benches at ~7 ms. The attribution and the line are those of macOS and
+;    Linux (_shared/lua/hotpath_segments.lua new_nesting); the shared vectors in
+;    _shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json bind all three.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 #Include ../adapters/boot_clock.ahk
+#Include phase_stats.ahk
 
 ; QueryPerformanceFrequency is constant for the life of the process; cache it on
 ; first use so the per-keystroke path never re-queries it.
@@ -39,7 +41,12 @@ global _HOTPATH_QPC_FREQ := 0
 ; Keystrokes whose hot-path processing exceeds this many milliseconds are logged
 ; at WARNING. 5 ms is below the threshold of perceptible single-keystroke lag yet
 ; high enough that a healthy keystroke (sub-millisecond) never trips it.
-global _HOTPATH_SLOW_MS := 5.0
+; Single source: _shared/modules/timings/constants.toml [logger] hotpath_slow_ms,
+; assigned by HotPath_LoadTimings. Declared unset on purpose: every reader already
+; skips an unset threshold (a message-pumping Bundle_Init reaches the profiler
+; before this file's initializers), so a sample taken before the registry is read
+; is not judged against a guessed number.
+global _HOTPATH_SLOW_MS
 ; Per-segment overrides of the threshold above, for segments whose NORMAL cost is
 ; already past it. The global 5 ms is calibrated for per-keystroke work, where
 ; 5 ms is alarming. Applied to a repeating background probe whose healthy cost is
@@ -70,14 +77,6 @@ global _HOTPATH_SLOW_MS_BY_SEGMENT := Map(
 	; 58 % over 5 ms, 15 % over 10 ms, 2 over 50 ms, max 208 ms.
 	"Tooltip.Build", 30.0
 )
-; A closed segment shorter than this is not remembered as a possible child. It
-; cannot materially distort a parent that has to exceed _HOTPATH_SLOW_MS to be
-; reported at all, and skipping it keeps normal typing allocation-free.
-global _HOTPATH_NEST_MIN_MS := 1.0
-; How many recently closed segments stay eligible as children. Segments nest at
-; most a few deep (OnChar > HSE.FeedChar > Tooltip.Build > a re-entrant OnChar),
-; so this is generous; it exists to bound both memory and the containment sweep.
-global _HOTPATH_NEST_TRACK_CAP := 16
 ; Upper bound on the sub-steps one segment may attribute. A segment with more
 ; parts than this is not a segment any more, and the cap keeps the accumulator
 ; allocation-free in the steady state.
@@ -96,95 +95,299 @@ global _HOTPATH_BREAKDOWN_CAP := 24
 ; ==================================================
 ; ==================================================
 
-; Read the current high-resolution performance counter.
-; @returns {Integer} Raw QPC tick value; pass to HotPath_LogIfSlow as the start.
+; Assign the slow-segment threshold from the shared registry. AHK v2 runs global
+; initializers before the auto-execute body, so infra/boot.ahk calls this right
+; after TimingsLoadShared(). Fail-fast: TimingsGet throws on a missing key, and a
+; threshold of zero would report every keystroke as slow.
+HotPath_LoadTimings() {
+	global _HOTPATH_SLOW_MS
+	SlowMs := TimingsGet("logger", "hotpath_slow_ms")
+	if (SlowMs <= 0)
+		throw ValueError(Format("[logger] hotpath_slow_ms must be positive, got {1}.", SlowMs))
+	_HOTPATH_SLOW_MS := SlowMs
+}
+
+; Read the current high-resolution performance counter and open a frame: every
+; call is closed by HotPath_LogIfSlow or, for a sub-step, HotPath_BreakdownMark.
+; @returns {Integer} Raw QPC tick value; pass to the closing call as the start.
 HotPath_Now() {
-	return PerfClockTicks()
+	static Tracker := _HotPathNestingOwner().Tracker, Starts := Tracker.Starts, MaxDepth := Tracker.MaxDepth
+	Now := PerfClockTicks()
+	; Tracker.Open inlined for the usual case: this runs on every segment of every
+	; keystroke, and a method call costs more than the rest of the frame.
+	if ((Depth := Tracker.Depth) >= MaxDepth)
+		return Tracker.Open(Now)
+	Tracker.Depth := ++Depth, Starts[Depth] := Now
+	return Now
 }
 
-; Sum the wall clock of the segments in ``Closed`` that opened AND closed inside
-; [StartTicks, EndTicks] — i.e. the time a parent spent running OTHER measured
-; work rather than its own. Only the OUTERMOST contained segments are counted, so
-; a grandchild is never added twice.
-; @param Closed {Array} Recently closed segments, each { S, E } in QPC ticks.
-; @param StartTicks {Integer} Parent segment start, in QPC ticks.
-; @param EndTicks {Integer} Parent segment end, in QPC ticks.
-; @returns {Float} Nested milliseconds (0 when nothing ran inside).
-_HotPathNestedMs(Closed, StartTicks, EndTicks) {
-	global _HOTPATH_QPC_FREQ
-	; A parse-time #HotIf can reach the profiler while Bundle_Init() is pumping
-	; messages, before this include's auto-execute assignments have run.
-	if !IsSet(_HOTPATH_QPC_FREQ)
-		return 0.0
-	Inside := []
-	for , Seg in Closed
-		if (Seg.S >= StartTicks and Seg.E <= EndTicks)
-			Inside.Push(Seg)
-	Ticks := 0
-	for i, Child in Inside {
-		Enclosed := false
-		for j, Other in Inside {
-			if (j == i)
-				continue
-			; Strictly enclosing, or an exact duplicate — which is kept once, by
-			; the lowest index, so identical intervals cannot both be counted.
-			if (Other.S <= Child.S and Other.E >= Child.E
-				and (Other.S < Child.S or Other.E > Child.E or j < i)) {
-				Enclosed := true
-				break
-			}
-		}
-		if !Enclosed
-			Ticks += Child.E - Child.S
-	}
-	return (_HOTPATH_QPC_FREQ > 0) ? (Ticks / _HOTPATH_QPC_FREQ * 1000.0) : 0.0
-}
-
-; Log a WARNING when the elapsed time since StartTicks exceeds _HOTPATH_SLOW_MS.
-; Fast callbacks update only their bounded numeric distribution.
-; When other segments ran nested inside this one, the line also reports the
-; exclusive time, because the raw delta alone reads as this segment's own cost.
+; Close the segment opened by HotPath_Now and log a WARNING when its own time
+; exceeds its threshold. Fast callbacks update only their numeric distribution,
+; which keeps the wall clock: it answers "how long did the user wait".
 ; @param Label {String} Hot-path segment name (e.g. "OnChar").
 ; @param StartTicks {Integer} QPC value captured by HotPath_Now at segment entry.
 ; @param Detail {String} Context shown when slow (typed char, buffer, …).
 HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
-	global _HOTPATH_QPC_FREQ, _HOTPATH_SLOW_MS
-	global _HOTPATH_NEST_MIN_MS, _HOTPATH_NEST_TRACK_CAP, _HOTPATH_SLOW_MS_BY_SEGMENT
+	global _HOTPATH_QPC_FREQ, _HOTPATH_SLOW_MS, _HOTPATH_SLOW_MS_BY_SEGMENT
+	static Tracker := _HotPathNestingOwner().Tracker, Starts := Tracker.Starts
+	static Pending := Tracker.Pending, NestMinMs := Tracker.NestMinMs
+	local now := PerfClockTicks()
 	; HotIf helpers are live at parse time. During the first message-pumping
-	; Bundle_Init() call the profiler globals below are not assigned yet, so the
-	; only safe behaviour is to skip this optional diagnostic sample.
+	; Bundle_Init() call the profiler globals below are not assigned yet, so this
+	; optional diagnostic sample is skipped; its frame still closes, as a span.
 	if (!IsSet(_HOTPATH_QPC_FREQ) || !IsSet(_HOTPATH_SLOW_MS)
-			|| !IsSet(_HOTPATH_NEST_MIN_MS) || !IsSet(_HOTPATH_NEST_TRACK_CAP)
-			|| !IsSet(_HOTPATH_SLOW_MS_BY_SEGMENT))
+			|| !IsSet(_HOTPATH_SLOW_MS_BY_SEGMENT)) {
+		Tracker.Close(Label, StartTicks, now, "")
 		return
-	; Ring of recently closed segments, oldest first. Deliberately a static local
-	; rather than a module global: this file otherwise holds no mutable state.
-	; A segment that closed before this one started can never be contained in it,
-	; so stale entries are inert and the ring needs no time-based pruning.
-	static Closed := []
-	local now := 0
+	}
 	if (_HOTPATH_QPC_FREQ == 0)
 		_HOTPATH_QPC_FREQ := PerfClockFrequency()
-	now := PerfClockTicks()
 	ElapsedMs := (now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0
 	; .Get, never a bracket read: an absent key THROWS in AHK v2, and this runs on
 	; the keystroke path where a throw would take the hook down.
 	SlowMs := _HOTPATH_SLOW_MS_BY_SEGMENT.Get(Label, _HOTPATH_SLOW_MS)
 	HotPath_RecordLatency(Label, ElapsedMs, SlowMs)
-	if (ElapsedMs > SlowMs) {
-		; Computed before this segment joins the ring, or it would contain itself.
-		NestedMs := _HotPathNestedMs(Closed, StartTicks, now)
-		Breakdown := ""
-		if (NestedMs > 0)
-			Breakdown := " [excl " . Round(ElapsedMs - NestedMs, 2) . " ms, nested " . Round(NestedMs, 2) . " ms]"
-		try LoggerWarn("HotPath", "Slow {1}: {2} ms{3} ({4}).",
-			Label, Round(ElapsedMs, 2), Breakdown, Detail)
+	; The fast path of Tracker.Close inlined, for the reason HotPath_Now gives.
+	if (ElapsedMs < NestMinMs && ElapsedMs <= SlowMs && (Depth := Tracker.Depth) > 0
+			&& Starts[Depth] == StartTicks && !Pending[Depth]) {
+		Tracker.Depth := Depth - 1
+		return
 	}
-	if (ElapsedMs >= _HOTPATH_NEST_MIN_MS) {
-		Closed.Push({ S: StartTicks, E: now })
-		while (Closed.Length > _HOTPATH_NEST_TRACK_CAP)
-			Closed.RemoveAt(1)
+	Tracker.Close(Label, StartTicks, now, SlowMs, Detail)
+}
+
+/**
+ * The open segments of the one AutoHotkey thread stack; the port of
+ * _shared/lua/hotpath_segments.lua new_nesting. Threads interrupt one another
+ * last in, first out, so a stack fits even when a pump runs a whole callback
+ * inside a segment. A span closed without a limit (a sub-step, or a sample taken
+ * before the thresholds exist) is transparent: its time stays its enclosing
+ * segment's own time. A frame left open by a raise closes with its enclosing
+ * frame. One with no enclosing frame would hold back every later report, so
+ * Sweep empties the stack at the depth cap and on the one-minute timer, whose
+ * priority -1 cannot interrupt a keystroke's thread.
+ */
+class HotPathNesting {
+	; Segments nest a few levels deep; a deeper stack is a clock read never closed.
+	static MAX_DEPTH := 32
+	; Parent token of a slow segment that no segment encloses.
+	static NO_PARENT := "none"
+	; A closed segment shorter than this is not billed to its parent: it cannot
+	; distort a parent that has to pass a 5 ms threshold to be reported, and
+	; skipping it keeps normal typing from writing the stack twice per segment.
+	static NEST_MIN_MS := 1.0
+
+	/**
+	 * @param {Func} Emit Receives (Report, NowMs); Report holds Segment, Parent,
+	 *   TotalMs, OwnMs and Detail.
+	 * @param {Number} MsPerUnit Milliseconds per unit of the stamps passed in.
+	 */
+	__New(Emit, MsPerUnit) {
+		this.Emit := Emit
+		this.MsPerUnit := MsPerUnit
+		this.Starts := []
+		this.Nested := []
+		this.Pending := []
+		loop HotPathNesting.MAX_DEPTH {
+			this.Starts.Push(0)
+			this.Nested.Push(0)
+			this.Pending.Push("")
+		}
+		this.Depth := 0
+		this.MaxDepth := HotPathNesting.MAX_DEPTH
+		this.NestMinMs := HotPathNesting.NEST_MIN_MS
 	}
+
+	/**
+	 * Opens a frame. One statement on purpose: AutoHotkey checks for an
+	 * interrupting thread between lines, never inside one.
+	 * @param {Number} Now The stamp to pass to Close.
+	 * @returns {Number} Now.
+	 */
+	Open(Now) {
+		if ((Depth := this.Depth) >= this.MaxDepth)
+			Depth := (this.Sweep(), 0)
+		this.Depth := ++Depth, this.Starts[Depth] := Now
+		return Now
+	}
+
+	/**
+	 * Closes the frame opened at Started.
+	 * @param {String} Name Segment name.
+	 * @param {Number} Started The stamp Open returned.
+	 * @param {Number} Now The current stamp.
+	 * @param {Number|String} LimitMs Slow threshold, "" for a transparent span.
+	 * @param {String} Detail Context carried by this segment's report.
+	 * @returns {Boolean} Whether this close judged the segment slow.
+	 */
+	Close(Name, Started, Now, LimitMs, Detail := "") {
+		; The usual keystroke: under NEST_MIN_MS and under its limit, this frame on
+		; top. Nothing that short can hold a billed child, so its slot is clean. No
+		; transaction: a thread that interrupts here leaves the stack as it found it.
+		Depth := this.Depth
+		Ms := (Now - Started) * this.MsPerUnit
+		if (Ms < this.NestMinMs && LimitMs != "" && Ms <= LimitMs && Depth > 0
+				&& this.Starts[Depth] == Started && !this.Pending[Depth]) {
+			this.Depth := Depth - 1
+			return false
+		}
+		Ready := ""
+		Slow := false
+		PreviousCritical := Critical("On")
+		try {
+			; Frames opened after this span started and still open were abandoned.
+			while (this.Depth > 0 && this.Starts[this.Depth] > Started) {
+				ChildUnits := this.Nested[this.Depth]
+				this.Nested[this.Depth] := 0
+				Reports := this.Pending[this.Depth]
+				this.Pending[this.Depth] := ""
+				this.Depth -= 1
+				if (this.Depth > 0)
+					this.Nested[this.Depth] += ChildUnits
+				this._HandDown(Reports, "", &Ready)
+			}
+			ChildUnits := 0
+			Reports := ""
+			if (this.Depth > 0 && this.Starts[this.Depth] == Started) {
+				ChildUnits := this.Nested[this.Depth]
+				this.Nested[this.Depth] := 0
+				Reports := this.Pending[this.Depth]
+				this.Pending[this.Depth] := ""
+				this.Depth -= 1
+			}
+			if (LimitMs == "") {
+				if (this.Depth > 0)
+					this.Nested[this.Depth] += ChildUnits
+				this._HandDown(Reports, "", &Ready)
+			} else {
+				TotalUnits := Now - Started
+				if (this.Depth > 0)
+					this.Nested[this.Depth] += TotalUnits
+				this._HandDown(Reports, Name, &Ready)
+				OwnMs := (TotalUnits - ChildUnits) * this.MsPerUnit
+				if (OwnMs > LimitMs) {
+					Slow := true
+					this._HandDown([{ Segment: Name, Parent: "", TotalMs: TotalUnits * this.MsPerUnit,
+						OwnMs: OwnMs, Detail: Detail }], "", &Ready)
+				}
+			}
+		} finally Critical(PreviousCritical)
+		; Outside the transaction: logging can pump callbacks into this tracker.
+		if Ready
+			for Report in Ready
+				(this.Emit)(Report, Now * this.MsPerUnit)
+		return Slow
+	}
+
+	/**
+	 * Delivers the reports waiting on every open frame and forgets the frames.
+	 * @returns {Integer} How many frames were left open.
+	 */
+	Sweep() {
+		Ready := ""
+		Left := 0
+		PreviousCritical := Critical("On")
+		try {
+			Left := this.Depth
+			; The newest stamp known here: the sweep is not handed a clock.
+			Stamp := Left ? this.Starts[Left] : 0
+			while (this.Depth > 0) {
+				Reports := this.Pending[this.Depth]
+				this.Pending[this.Depth] := ""
+				this.Nested[this.Depth] := 0
+				this.Depth -= 1
+				this._HandDown(Reports, HotPathNesting.NO_PARENT, &Ready)
+			}
+		} finally Critical(PreviousCritical)
+		if Ready
+			for Report in Ready
+				(this.Emit)(Report, Stamp * this.MsPerUnit)
+		return Left
+	}
+
+	; Moves a frame's reports to Ready once their parent is known, else to the frame below.
+	_HandDown(Reports, Parent, &Ready) {
+		if !Reports
+			return
+		if (Parent == "" && this.Depth > 0) {
+			if !this.Pending[this.Depth]
+				this.Pending[this.Depth] := []
+			this.Pending[this.Depth].Push(Reports*)
+			return
+		}
+		if !Ready
+			Ready := []
+		for Report in Reports {
+			Report.Parent := (Parent == "") ? HotPathNesting.NO_PARENT : Parent
+			Ready.Push(Report)
+		}
+	}
+}
+
+/**
+ * The rate limiter of the slow-segment WARNING, as in hotpath_segments.lua
+ * new_slow_gate: a segment that stays slow is slow on every keystroke, so one
+ * line per segment per window keeps the first occurrence and the log readable.
+ * The latency summaries keep counting every occurrence.
+ */
+class HotPathSlowGate {
+	; The window of LOG_WINDOW_MS in _shared/lua/hotpath_segments.lua, which
+	; AutoHotkey cannot load; test_hotpath_nesting_vectors.ahk compares the two.
+	static SLOW_LINE_WINDOW_MS := 10000
+
+	__New() {
+		this.Reset()
+	}
+
+	Reset() {
+		this.LastLogged := Map()
+		this.Withheld := Map()
+	}
+
+	/**
+	 * Admits or withholds one slow occurrence.
+	 * @param {String} Name Segment name.
+	 * @param {Number} NowMs Monotonic milliseconds.
+	 * @returns {Integer} The occurrences withheld since the last line, -1 to withhold this one.
+	 */
+	Admit(Name, NowMs) {
+		if (this.LastLogged.Has(Name) && NowMs - this.LastLogged[Name] < HotPathSlowGate.SLOW_LINE_WINDOW_MS) {
+			this.Withheld[Name] := this.Withheld.Get(Name, 0) + 1
+			return -1
+		}
+		Skipped := this.Withheld.Get(Name, 0)
+		this.LastLogged[Name] := NowMs
+		this.Withheld[Name] := 0
+		return Skipped
+	}
+}
+
+/** Static ownership: a message-pumping Bundle_Init reaches the profiler before this file's initializers. */
+_HotPathNestingOwner() {
+	static Owner := { Tracker: HotPathNesting(_HotPathReportSlow, 1000.0 / PerfClockFrequency()),
+		Gate: HotPathSlowGate() }
+	return Owner
+}
+
+; Writes one slow segment, in the line macOS and Linux write. The caller's context
+; (the sub-steps of Tooltip.Present, a redacted trigger) follows on its own line.
+_HotPathReportSlow(Report, NowMs) {
+	Skipped := _HotPathNestingOwner().Gate.Admit(Report.Segment, NowMs)
+	if (Skipped < 0)
+		return
+	try LoggerWarn("HotPath", "Slow {1}: {2:.2f} ms own, {3:.2f} ms total, parent {4} ({5} similar since the last line).",
+		Report.Segment, Report.OwnMs, Report.TotalMs, Report.Parent, Skipped)
+	if (Report.Detail != "")
+		try LoggerWarn("HotPath", "Slow {1} detail: {2}.", Report.Segment, Report.Detail)
+}
+
+/** Forgets every open frame and the rate limiter. Tests only. */
+_HotPathResetForTest() {
+	Owner := _HotPathNestingOwner()
+	Owner.Tracker.Depth := 0
+	loop HotPathNesting.MAX_DEPTH
+		Owner.Tracker.Pending[A_Index] := ""
+	Owner.Gate.Reset()
 }
 
 
@@ -221,16 +424,19 @@ _HotPathBreakdown(Marks, Op, Label := "", StartTicks := 0) {
 	if !(Marks is Array)
 		throw TypeError("Hot-path breakdown requires an owned marks array.")
 	if (Op == "mark") {
+		local now := PerfClockTicks()
+		; A sub-step is a transparent span: it closes the frame HotPath_Now opened,
+		; and its time stays the composite segment's own time.
+		_HotPathNestingOwner().Tracker.Close(Label, StartTicks, now, "")
 		if (Marks.Length >= _HOTPATH_BREAKDOWN_CAP)
 			return ""
-		local now := 0
 		if (_HOTPATH_QPC_FREQ == 0)
 			_HOTPATH_QPC_FREQ := PerfClockFrequency()
-		now := PerfClockTicks()
 		ElapsedMs := (_HOTPATH_QPC_FREQ > 0)
 			? ((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0) : 0.0
 		Marks.Push({ L: Label, Ms: ElapsedMs })
-		HotPath_RecordLatency("Substep." . Label, ElapsedMs, _HOTPATH_SLOW_MS)
+		if IsSet(_HOTPATH_SLOW_MS)
+			HotPath_RecordLatency("Substep." . Label, ElapsedMs, _HOTPATH_SLOW_MS)
 		return ""
 	}
 	if Op != "drain"
@@ -301,10 +507,14 @@ class HotPathLatencyStatistics {
 		Sample.MinMs := Min(Sample.MinMs, ElapsedMs)
 		Sample.MaxMs := Max(Sample.MaxMs, ElapsedMs)
 		Sample.Slow += ElapsedMs > SlowMs
-		Sample.Ge1 += ElapsedMs >= 1
-		Sample.Ge5 += ElapsedMs >= 5
-		Sample.Ge10 += ElapsedMs >= 10
-		Sample.Ge50 += ElapsedMs >= 50
+		; Nested so a sub-millisecond keystroke, nearly all of them, pays one
+		; comparison here: this method runs once per segment on the hot path.
+		if (ElapsedMs >= 1) {
+			Sample.Ge1 += 1
+			Sample.Ge5 += ElapsedMs >= 5
+			Sample.Ge10 += ElapsedMs >= 10
+			Sample.Ge50 += ElapsedMs >= 50
+		}
 		return true
 	}
 }
@@ -317,7 +527,7 @@ _HotPathStatisticsOwner() {
 
 /** Adds a sample with no clock reads, formatting or I/O on the usual path. */
 HotPath_RecordLatency(Label, ElapsedMs, SlowMs) {
-	Owner := _HotPathStatisticsOwner()
+	static Owner := _HotPathStatisticsOwner()
 	PreviousCritical := Critical("On")
 	try {
 		Accepted := Owner.Stats.Record(Label, ElapsedMs, SlowMs)
@@ -345,11 +555,18 @@ HotPath_FlushStatistics(*) {
 	Owner := _HotPathStatisticsOwner()
 	if !Owner.Started
 		return
+	; Runs at priority -1, so no keystroke's frame is open: what is, was abandoned.
+	Abandoned := _HotPathNestingOwner().Tracker.Sweep()
+	if Abandoned
+		PerfCount("hotpath.frames_swept", Abandoned)
 	; Counted operations and process state share the minute: a stalled latency
 	; window must not hide a leaking handle or a parse storm.
 	try PerfCounters_Flush()
 	catch as PerfErr
 		try LoggerError("Perf", "Interval counters could not be published: {1}.", PerfErr.Message)
+	try PhaseStats_MaybeFlush()
+	catch as PhaseErr
+		try LoggerError("Perf", "Phase summary could not be published: {1}.", PhaseErr.Message)
 	PreviousCritical := Critical("On")
 	try {
 		Snapshot := Owner.Stats
@@ -501,8 +718,10 @@ PerfCounters_Flush() {
 	if Refused > 0
 		try LoggerWarn("Perf", "Interval counters refused {1} increment(s) beyond the registry capacity.", Refused)
 	State := PerfProcessState()
+	; The log-volume figures ride on this record as they ride on the macOS memory
+	; record: both are process-wide and one record per interval is what is read back.
 	try LoggerEvidence("Perf",
-		"Process state: working_set_mb={1} peak_working_set_mb={2} private_mb={3} handles={4} gdi_objects={5} user_objects={6}.",
+		"Process state: working_set_mb={1} peak_working_set_mb={2} private_mb={3} handles={4} gdi_objects={5} user_objects={6}. Log volume over {7} s: {8}.",
 		State.WorkingSetMb, State.PeakWorkingSetMb, State.PrivateMb, State.Handles,
-		State.GdiObjects, State.UserObjects)
+		State.GdiObjects, State.UserObjects, IntervalMs // 1000, LoggerVolumeText(LoggerVolumeInterval()))
 }

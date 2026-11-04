@@ -117,10 +117,10 @@ _KLAppCat_SeedMap() {
 	; wherever the current working directory happens to be at that point.
 	KLAppCat.file_path := A_Temp . "\ergopti_test_appcat_seed_unused.json"
 	KLAppCat.categories := Map(
-		"code.exe",     "productive",
-		"discord.exe",  "communication",
-		"spotify.exe",  "distracting",
-		"explorer.exe", "neutral"
+		"code.exe",     _KL_AppCat_NewRecord("productive"),
+		"discord.exe",  _KL_AppCat_NewRecord("communication"),
+		"spotify.exe",  _KL_AppCat_NewRecord("distracting"),
+		"explorer.exe", _KL_AppCat_NewRecord("neutral")
 	)
 	; Clear dirty flag so the save timer is not armed by prior test runs
 	KLAppCat.dirty := false
@@ -171,7 +171,8 @@ _KLAppCat_Get_NeverSeenAppRegistersAsUnknown() {
 	AssertEqual("unknown", result)
 	; The app must now exist in the categories map for subsequent calls
 	AssertTrue(KLAppCat.categories.Has("newapp.exe"))
-	AssertEqual("unknown", KLAppCat.categories["newapp.exe"])
+	AssertEqual("unknown", KLAppCat.categories["newapp.exe"]["type"])
+	AssertEqual(0, KLAppCat.categories["newapp.exe"]["score"], "a discovery is a { type, score } record")
 }
 Test("KL_AppCat_Get: unseen app registers as unknown and persists in map", _KLAppCat_Get_NeverSeenAppRegistersAsUnknown)
 
@@ -273,14 +274,20 @@ TestKLAppCat_DefaultsRequireProvenAbsence() {
 		AssertTrue(KL_AppCat_InitWithIo("C:\missing-fixture",
 			(*) => false, (*) => false, CreateFn))
 		AssertEqual("C:\missing-fixture\app_categories.json", CreatedPath)
-		AssertContains(CreatedContent, '"code.exe": "productive"')
-		AssertEqual("productive", KLAppCat.categories["code.exe"])
+		Document := JsonParse(CreatedContent)
+		AssertEqual(KLAppCatConst.STORE_SCHEMA, Document["schema"])
+		AssertEqual(KLAppCatConst.DEFAULTS.Count, Document["apps"].Count)
+		for Name, Record in Document["apps"] {
+			AssertEqual(KLAppCatConst.DEFAULTS[Name], Record["type"], "the first-run record of " . Name)
+			AssertEqual(0, Record["score"], "the first-run score of " . Name)
+		}
+		AssertEqual("productive", KLAppCat.categories["code.exe"]["type"])
 	} finally {
 		_KLAppCatReset()
 	}
 
 	InitBody := _DriverFuncBody("KL_Init")
-	AssertContains(InitBody, "if !KL_AppCat_Init(metrics_dir)",
+	AssertContains(InitBody, "if !KL_AppCat_Init(KL_AppCat_StoreDir(), metrics_dir)",
 		"keystats startup must consume and surface category initialization failure")
 }
 Test("keystats_app_categories: defaults are create-only after proven absence (app-category-malformed-preserved)",
@@ -301,7 +308,7 @@ Test("keystats_app_categories: dirty stays true on write failure", TestKLAppCat_
 TestKLAppCat_ReentrantDiscoveryRetainsDirtyDebt() {
 	_KLAppCatReset()
 	KLAppCat.file_path := "C:\metrics\app_categories.json"
-	KLAppCat.categories["before-save.exe"] := "unknown"
+	KLAppCat.categories["before-save.exe"] := _KL_AppCat_NewRecord("unknown")
 	KLAppCat.dirty := true
 	Persisted := ""
 	WriteFn := (Path, Content) => (
@@ -311,7 +318,7 @@ TestKLAppCat_ReentrantDiscoveryRetainsDirtyDebt() {
 	try {
 		AssertFalse(KL_AppCat_Save(WriteFn),
 			"a save superseded by a reentrant discovery must stay non-terminal")
-		AssertContains(Persisted, '"before-save.exe": "unknown"')
+		AssertContains(Persisted, '"before-save.exe":{"type":"unknown","score":0}')
 		AssertFalse(InStr(Persisted, '"during-save.exe"') > 0,
 			"the injected discovery must happen after the persisted snapshot")
 		AssertTrue(KLAppCat.categories.Has("during-save.exe"))
@@ -330,7 +337,7 @@ TestKLAppCat_SaveRoundTrip() {
 	_KLAppCatReset()
 	TmpPath := A_Temp . "\ergopti_test_appcat_" . A_TickCount . ".json"
 	KLAppCat.file_path := TmpPath
-	KLAppCat.categories["TestApp.exe"] := "productive"
+	KLAppCat.categories["TestApp.exe"] := _KL_AppCat_NewRecord("productive")
 	KLAppCat.dirty := true
 	KL_AppCat_Save()
 	; Reload from disk
@@ -358,7 +365,7 @@ TestKLAppCat_SaveSucceedsWithMultipleAlphaKeys() {
 	; Seed with the real production DEFAULTS table — this is the exact Map
 	; shape KL_AppCat_Reload() builds on every boot before the first save.
 	for k, v in KLAppCatConst.DEFAULTS
-		KLAppCat.categories[k] := v
+		KLAppCat.categories[k] := _KL_AppCat_NewRecord(v)
 	KLAppCat.dirty := true
 
 	Captured := []
@@ -417,7 +424,7 @@ TestKLAppCat_DeferredSaveSkipsWriteWhileSuspended() {
 	_KLAppCatReset()
 	TmpPath := A_Temp . "\ergopti_test_appcat_suspend_" . A_TickCount . ".json"
 	KLAppCat.file_path := TmpPath
-	KLAppCat.categories["TestApp.exe"] := "productive"
+	KLAppCat.categories["TestApp.exe"] := _KL_AppCat_NewRecord("productive")
 	KLAppCat.dirty := true
 
 	Suspend(1)
@@ -448,13 +455,13 @@ TestKLAppCat_ShutdownPersistsPendingDiscovery() {
 		Captured["content"] := Content)
 	try {
 		KLAppCat.file_path := "C:\metrics\app_categories.json"
-		KLAppCat.categories["just-discovered.exe"] := "unknown"
+		KLAppCat.categories["just-discovered.exe"] := _KL_AppCat_NewRecord("unknown")
 		KLAppCat.dirty := true
 		AssertTrue(KL_AppCat_PrepareShutdown(WriteFn),
 			"shutdown preflight must persist a category discovered before the deferred timer fires")
 		AssertEqual(1, Captured["calls"])
 		AssertEqual(KLAppCat.file_path, Captured["path"])
-		AssertContains(Captured["content"], '"just-discovered.exe": "unknown"')
+		AssertContains(Captured["content"], '"just-discovered.exe":{"type":"unknown","score":0}')
 		AssertFalse(KLAppCat.dirty,
 			"successful terminal persistence must release the dirty debt")
 
@@ -471,6 +478,8 @@ TestKLAppCat_ShutdownPersistsPendingDiscovery() {
 }
 Test("keystats_app_categories: shutdown persists discoveries before the deferred save (AHK-063)",
 	TestKLAppCat_ShutdownPersistsPendingDiscovery)
+
+#Include test_keystats_app_category_shared_store.ahk
 
 #Include test_keystats_app_category_deleted_source.ahk
 

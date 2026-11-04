@@ -189,7 +189,7 @@ assert(native_caption_closed and native_caption_close ~= nil and native_caption_
 
 local native_caption_corpus = assert(Json.decode(native_caption_bytes))
 
-local magic_notice_module_names = { "ui.menu.menu_builder", "infra.native_presentation", "adapters.application_notifier",
+local magic_notice_module_names = { "ui.menu.builder", "infra.native_presentation", "adapters.application_notifier",
 	"infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
 
 -- A caller catching an expected primary must also consume cleanup_failures.
@@ -219,7 +219,7 @@ local function with_magic_notice(body, cleanup_failures)
 		with_source(nil, function(Source)
 			local settled, primary = pcall(function()
 				local calls = wire(Source, { active = true, replace = true, typed_ok = true })
-				local Builder = require("ui.menu.menu_builder")
+				local Builder = require("ui.menu.builder")
 				local changed = 0
 				local items = Builder.build({ on_quit = function() end, magic_key_source = Source,
 					on_menu_changed = function() changed = changed + 1 end })

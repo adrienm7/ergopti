@@ -3,9 +3,10 @@
 --- ==============================================================================
 --- MODULE: Role-Named Keyboard Slot Migration Contract
 --- DESCRIPTION:
---- Replays the shipped v14 -> v15 step through the real Lua migration engine
---- over EVERY retired slot id of the driver (each legacy prefix times each key
---- of the shared key catalogue) and every retired macOS Ctrl-letter switch. The
+--- Replays the shipped chain from v14 (the v14 -> v15 slot step, then the macOS
+--- v19 -> v20 Ctrl+G step) through the real Lua migration engine over EVERY
+--- retired slot id of the driver (each legacy prefix times each key of the
+--- shared key catalogue) and every retired macOS Ctrl-letter switch. The
 --- expectations below are written independently of the registry: a prefix map
 --- and a switch table, so a wrong or missing op in the registry fails here.
 ---
@@ -55,6 +56,8 @@ local SWITCHES = {
 	{ "ctrl_x", "secondary_x", "pick_color" }, { "ctrl_capslock", "secondary_capslock", "toggle_capslock" },
 	{ "ctrl_l", "secondary_l", "lock_screen" }, { "ctrl_period", "secondary_period", "open_emoji_picker" },
 	{ "ctrl_quote", "secondary_quote", "spotlight_mouse" }, { "cmd_shift_v", "primary_shift_v", "paste_plain" },
+	-- Retired by the v19 -> v20 step rather than v14 -> v15 (PAR-41).
+	{ "ctrl_g", "secondary_g", "open_chatgpt" },
 }
 
 local function shared_root()
@@ -156,10 +159,10 @@ function M.register(h, opts)
 		end)
 
 		h.it("(slot-migration) a file at the new version is untouched and a newer one is refused", function()
-			local current = Engine.plan("[_meta]\nschema_version = 16\n[shortcuts.keyboard]\ncmd_a = \"copy\"\n", registry, driver, context)
+			local current = Engine.plan("[_meta]\nschema_version = " .. registry.current .. "\n[shortcuts.keyboard]\ncmd_a = \"copy\"\n", registry, driver, context)
 			h.assert_eq(current.outcome, "current")
 			h.assert_nil(current.candidate)
-			local newer = Engine.plan("[_meta]\nschema_version = 17\n[shortcuts.keyboard]\ncmd_a = \"copy\"\n", registry, driver, context)
+			local newer = Engine.plan("[_meta]\nschema_version = " .. (registry.current + 1) .. "\n[shortcuts.keyboard]\ncmd_a = \"copy\"\n", registry, driver, context)
 			h.assert_eq(newer.outcome, "newer")
 			h.assert_nil(newer.candidate)
 		end)
@@ -172,12 +175,12 @@ function M.register(h, opts)
 						lines[#lines + 1] = row[1] .. " = " .. tostring(state)
 						expected[row[2]] = state and row[3] or "none"
 					end
-					lines[#lines + 1] = "ctrl_g = true\ncmd_star = true\nwrap_text_if_selected = false"
+					lines[#lines + 1] = "cmd_star = true\nwrap_text_if_selected = false"
 					local plan = migrate(table.concat(lines, "\n") .. "\n")
 					h.assert_eq(plan.outcome, "migrated", tostring(plan.detail))
 					local model = Engine.plain(Engine.model_from_source(plan.candidate))
 					h.assert_eq(model["shortcuts.keyboard"], expected)
-					h.assert_eq(model["shortcuts.keys"], { ctrl_g = true, cmd_star = true, wrap_text_if_selected = false },
+					h.assert_eq(model["shortcuts.keys"], { cmd_star = true, wrap_text_if_selected = false },
 						"only the switches without a catalogue action stay")
 				end
 			end)

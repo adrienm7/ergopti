@@ -44,6 +44,31 @@ _ULH_AltGrLCtrlIsNotTheUsers() {
 Test("user lctrl: AltGr's fake LCtrl is not the user's LCtrl (std-altgr-fake-lctrl-backspace-2026-09-26)",
 	_ULH_AltGrLCtrlIsNotTheUsers)
 
+; The ledger's flag decides under AltGr on a standard layout, and on that layout
+; only: a release missed during Ctrl+Alt+Del or on a secure desktop is forgotten
+; by the ledger (item3-missed-release in nav_event_owner_test.c), so the later
+; AltGr alone reads as the alias, and never as the user's Ctrl.
+_ULH_LedgerTellsTheFakeLCtrl() {
+	Family := _TestSetAltGrFamily(false)
+	Physical := _ULH_Keys("SC01D", "RAlt")
+	try {
+		AssertTrue(TapHoldUserLCtrlHeld(Physical, (*) => 1),
+			"a real LCtrl held with AltGr is the user's")
+		AssertFalse(TapHoldUserLCtrlHeld(Physical, (*) => 0),
+			"missed release then AltGr: the ledger forgot it, only the alias is down")
+		AssertFalse(TapHoldUserLCtrlHeld(Physical, (*) => -1),
+			"no owner: the LCtrl under AltGr stays AltGr's")
+		AssertTrue(TapHoldUserLCtrlHeld(_ULH_Keys("SC01D"), (*) => 0),
+			"without AltGr the physical LCtrl answers, as before")
+	} finally _TestRestoreAltGrFamily(Family)
+	Family := _TestSetAltGrFamily(true)
+	try AssertTrue(TapHoldUserLCtrlHeld(_ULH_Keys("SC01D", "SC138"), (*) => 0),
+		"Kana: no alias exists, the ledger is not asked")
+	finally _TestRestoreAltGrFamily(Family)
+}
+Test("user lctrl: the ledger tells the fake LCtrl from a real one, a missed release included (item3-missed-release)",
+	_ULH_LedgerTellsTheFakeLCtrl)
+
 ; On QWERTY right Alt is a plain Alt with no fake LCtrl (the boot probe finds no
 ; AltGr level), so a physical LCtrl held with it is the user's: LCtrl+RAlt then
 ; LAlt tapped as Backspace must take the Ctrl+Backspace branch, not the

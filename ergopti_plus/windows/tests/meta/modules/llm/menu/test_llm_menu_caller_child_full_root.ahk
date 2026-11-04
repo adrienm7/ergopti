@@ -68,7 +68,7 @@ _LMCC_Script(Framework, Receipt) {
 			"_TrayRootRelease", "_TrayRootTryReleaseFailed",
 			"_TrayRootFinishReportableFailure", "_TrayRootFinishOrdinaryFailure",
 			"_TrayRootReportTerminalFailure", "_TrayRootRetireFatal",
-			"_TrayRootFirstPublicationPending", "PerfCount", "_PerfCountersOwner"] {
+			"_TrayRootFirstPublicationPending", "_TrayRootReportRebuild", "PerfCount", "_PerfCountersOwner"] {
 		Body := _DriverFuncBodyOrEmpty(Name)
 		AssertTrue(Body != "", "the actual root composition subject must exist: " Name)
 		Sources .= Body "`n"
@@ -84,7 +84,11 @@ _LMCC_Script(Framework, Receipt) {
 global _LMCC := 0
 global _LLM_Menu := Map("enabled", true)
 global _LLM_Menu_Handle := 0, _LLM_Menu_InTray := true
-global _DriverInputInitPending := false, _IniCache := Map()
+global _DriverInputInitPending := false, _IniCache := Map(), _LLM_Menu_Loaded := false
+global _MenuPopulationBuilding := false, _MenuPopulationPublished := false
+class MenuPopulation {
+ Pending := Map()
+}
 global _TrayMenuStage := false
 global _TrayTitleCache := Map(), _FmtCountCache := Map(), _I18nSortedLocalesCache := false
 global _TrayRootRequestedGeneration := 0, _TrayRootPublishedGeneration := 0
@@ -107,6 +111,10 @@ LoggerError(Args*) {
 }
 TickElapsed(Args*) => 0
 t(Key, Args*) => Key
+PhaseStats_Now(Args*) => 0
+PhaseStats_Stop(Args*) => 0
+PerfBudget_Report(Args*) => 0
+TimingsGet(Args*) => 0
 BootProfile_Mark(Args*) => 0
 BootProfile_StageBegin(Args*) => 0
 BootProfile_StageEnd(Args*) => 0

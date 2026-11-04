@@ -35,7 +35,9 @@ InitSubMenus() {
 	; Flat hotstring categories — order = sections_order from the TOML (which
 	; includes "-" separators); falls back to manifest declaration order when
 	; the TOML has no sections_order.
-	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
+	; Fills one flat category. A nested function so a late open reads the live
+	; tables of this module, and bound per loop pass: the loop variable is shared.
+	BuildCategory(V1Cat, Target) {
 		; Native section data keeps the file's order; the shared declaration adds
 		; the explicit category commands and optional source-file row.
 		TomlPath := HotstringsBundledTomlPath(V1Cat)
@@ -99,9 +101,11 @@ InitSubMenus() {
 		}
 		PerfStage_End("Menu.cat.rows", _perfCat, Rows.Length)
 		_perfRender := PerfStage_Begin()
-		SubMenu := _HS_CategoryMenu(V1Cat, TomlPath, Rows)
+		_HS_CategoryMenu(V1Cat, TomlPath, Rows, , Target)
 		PerfStage_End("Menu.cat.render", _perfRender, Rows.Length)
-		SubMenus[V1Cat] := SubMenu
+	}
+	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
+		SubMenus[V1Cat] := MenuDeferOrBuild(BuildCategory.Bind(V1Cat), "hotstring_category")
 		; Per-category attribution. This loop is the largest post-ready boot
 		; segment by a wide margin — 1094 ms of a 3406 ms warm boot on 2026-07-30,
 		; four times the next one — and it is repaid in FULL on every live tray
@@ -116,15 +120,15 @@ InitSubMenus() {
 	BootProfile_Mark("MENU/InitSub: flat hotstring submenus")
 
 	; DynamicHotstrings — custom-ordered, with separator + injected editor.
-	SubMenus["DynamicHotstrings"] := _BuildDynamicHotstringsSubmenu()
+	SubMenus["DynamicHotstrings"] := MenuDeferOrBuild((Target) => _BuildDynamicHotstringsSubmenu(, Target), "dynamic_hotstrings")
 	BootProfile_Mark("MENU/InitSub: dynamic submenu")
 
 	; Shortcuts — Accents + WrapTextIfSelected + Modifier combos + transitional Personal.
-	SubMenus["Shortcuts"] := _BuildShortcutsSubmenu()
+	SubMenus["Shortcuts"] := MenuDeferOrBuild((Target) => _BuildShortcutsSubmenu(Target), "shortcuts_menu")
 	BootProfile_Mark("MENU/InitSub: shortcuts submenu")
 
 	; TapHolds — built from the v2 variant tables in tap_hold_writer.ahk.
-	SubMenus["TapHolds"] := _BuildTapHoldsSubmenu()
+	SubMenus["TapHolds"] := MenuDeferOrBuild((Target) => _BuildTapHoldsSubmenu(Target), "tap_holds_menu")
 	BootProfile_Mark("MENU/InitSub: tapholds submenu")
 }
 
@@ -200,7 +204,7 @@ _HS_LanguageRows() {
 ; Build the DynamicHotstrings submenu directly from the manifest, honouring
 ; the curated render order in ``_DYNAMIC_HOTSTRINGS_ORDER`` and injecting
 ; the personal-info editor entry right after the text-expansion item.
-_BuildDynamicHotstringsSubmenu(Options := unset) {
+_BuildDynamicHotstringsSubmenu(Options := unset, TargetMenu := unset) {
 	if !IsSet(Options)
 		Options := Map()
 	global _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
@@ -222,7 +226,7 @@ _BuildDynamicHotstringsSubmenu(Options := unset) {
 			continue
 		}
 		V2Id := _LegacyDynamicHotstringsKeyMap[V1Id]
-		if V2Id == "user_code" {
+		if V2Id == ConfigLeaf.USER_CODE {
 			for UserRow in _HS_ProgrammableHotstringRows()
 				Rows.Push(UserRow)
 			continue
@@ -244,7 +248,8 @@ _BuildDynamicHotstringsSubmenu(Options := unset) {
 		}
 	}
 	return _HS_CategoryMenu("DynamicHotstrings", "", Rows,
-		(_Targets, Enabled) => ToggleDynamicAllSections(Enabled, Options))
+		(_Targets, Enabled) => _HS_SelectionNotice(GetCategoryTitle("DynamicHotstrings"), Enabled,
+			ToggleDynamicAllSections(Enabled, Options)), IsSet(TargetMenu) ? TargetMenu : unset)
 }
 
 /**

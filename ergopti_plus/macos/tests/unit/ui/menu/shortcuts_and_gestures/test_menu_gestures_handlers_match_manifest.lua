@@ -186,8 +186,11 @@ local function with_mode_fixture(options, callback)
 		end
 		function fixture.rows()
 			local item = fixture.build()
+			-- The slot row joins its label to its action with the locale's template.
+			local title = strings["common.label_value"]:gsub("{1}", i18n.get("gesture.slots.swipe_2_left"))
+				:gsub("{2}", "None")
 			for _, row in ipairs(item.submenu) do
-				if row.title == i18n.get("gesture.slots.swipe_2_left") .. " : None" then
+				if row.title == title then
 					return assert(row.menu[3].menu)
 				end
 			end
@@ -260,6 +263,34 @@ helpers.describe("Gestures: shared swipe mode declaration and actual native muta
 			helpers.assert_eq(f.updates, 1)
 		end)
 	end)
+	-- Never a double action (maintainer, 2026-11-03): a slot macOS uses itself is
+	-- greyed with a short suffix, and a change in the macOS settings rebuilds the menu.
+	for _, case in ipairs({ { "taken", "menu.gestures.slot_taken_by_macos" },
+			{ "unverified", "menu.gestures.slot_unverified_macos" }, { "free", nil } }) do
+		helpers.it("greys a slot macOS uses with a short suffix: " .. case[1], function()
+			with_mode_fixture({}, function(f)
+				local listener
+				f.gestures.system_slot_state = function() return case[1] end
+				f.gestures.set_system_gestures_listener = function(fn) listener = fn end
+				local item = f.build()
+				local base = f.strings["common.label_value"]:gsub("{1}", f.strings["gesture.slots.swipe_2_left"])
+					:gsub("{2}", "None")
+				local expected = case[2] and (base .. " — " .. f.strings[case[2]]) or base
+				local found
+				for _, row in ipairs(item.submenu) do
+					if row.title == expected then found = row end
+				end
+				helpers.assert_type(found, "table", "the slot row reads " .. expected)
+				helpers.assert_eq(found.disabled == true, case[2] ~= nil, "only a held slot is greyed")
+				if case[2] then
+					helpers.assert_true(#f.strings[case[2]] <= 20, "the suffix stays short")
+				end
+				helpers.assert_type(listener, "function", "the menu listens for macOS setting changes")
+				listener()
+				helpers.assert_eq(f.updates, 1, "a change asks for a rebuild")
+			end)
+		end)
+	end
 	helpers.it("reads caption, check predicate and platform mutations from the declaration", function()
 		with_mode_fixture({}, function(f)
 			local row = f.root[f.corpus.section][1]
@@ -428,7 +459,7 @@ local function with_gesture_controls(options, callback)
 		function f.control_slot()
 			local item = f.control_build()
 			local slot = f.root.gesture_slots["2"][1]
-			local prefix = (f.strings["gesture.slots." .. slot] or "gesture.slots." .. slot) .. " : "
+			local prefix = require("locale.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gesture.slots." .. slot] or "gesture.slots." .. slot, "")
 			for _, row in ipairs(item.submenu) do
 				if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then return row end
 			end
@@ -485,8 +516,14 @@ helpers.describe("Gestures: declared sensitivity head and real action-choice own
 				if refusal == "paused" then f.control_paused = true else f.control_state.gestures = false end
 				local slot = assert(f.control_slot())
 				helpers.assert_true(slot.disabled)
-				helpers.assert_true(slot.menu[1].disabled)
-				helpers.assert_eq(false, slot.menu[1].fn())
+				if refusal == "disabled" then
+					-- Category-off rule: an off Gestures menu greys the slot and opens nothing.
+					helpers.assert_nil(slot.menu)
+					helpers.assert_nil(slot.fn)
+				else
+					helpers.assert_true(slot.menu[1].disabled)
+					helpers.assert_eq(false, slot.menu[1].fn())
+				end
 				helpers.assert_eq(f.queue, {})
 			end)
 		end)

@@ -84,13 +84,16 @@ end)
 --- Initializes the real configuration reservation and builds its actual tray row.
 --- Native selection/clipboard ports remain the case fixture's boundaries.
 --- @param body function
-local function with_caps_word_menu(body)
+--- @param shortcuts_enabled boolean|nil The Shortcuts category state; on by default,
+---   since an off category greys every row of its submenu (category-off rule).
+local function with_caps_word_menu(body, shortcuts_enabled)
+	local enabled = shortcuts_enabled ~= false and "true" or "false"
 	with_manager("unused", function(manager, _, capture_text_owner)
 		require("test.config_unused_keys_contract").sandbox.with_config(
-			'[shortcuts]\nenabled = false\n[foreign]\nvalue = "keep"\n', function(path)
+			'[shortcuts]\nenabled = ' .. enabled .. '\n[foreign]\nvalue = "keep"\n', function(path)
 				manager.init({ persist = true, config_path = path, capture_text_owner = capture_text_owner })
 				local changed = { count = 0 }
-				local builder = helpers.load_module("ui.menu.menu_builder")
+				local builder = helpers.load_module("ui.menu.builder")
 				local function row()
 					local rows = builder.build({ _version = "0.0.0-dev.12", shortcuts = manager,
 						paused = false, is_paused = function() return true end,
@@ -151,7 +154,15 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 		end)
 	end)
 
-	helpers.it("acknowledges the published state before menu refresh after live pause while shortcuts are off (selection-caps-word)", function()
+	helpers.it("draws no live CapsWord checkbox while shortcuts are off (selection-caps-word)", function()
+		with_caps_word_menu(function(_, row)
+			local item = row()
+			helpers.assert_true(item == nil or (item.disabled == true and item.fn == nil),
+				"an off category greys its submenu, CapsWord included")
+		end, false)
+	end)
+
+	helpers.it("acknowledges the published state before menu refresh after live pause (selection-caps-word)", function()
 		with_caps_word_menu(function(manager, row, changed)
 			local item = row()
 			helpers.assert_eq(item.disabled == true, false)
@@ -315,7 +326,7 @@ local function with_case_menu(body)
 			observed.replacement = transform(observed.selected or "été")
 			return true
 		end
-		local builder = helpers.load_module("ui.menu.menu_builder")
+		local builder = helpers.load_module("ui.menu.builder")
 		local function rows()
 			return builder.build({ _version = "0.0.0-dev.12", shortcuts = manager,
 				paused = false, is_paused = function() return true end,
@@ -670,7 +681,7 @@ helpers.describe("shared selection helper command ownership", function()
 	helpers.it("uses actual helper captions in all 21 locales (selection-helper-command)", function()
 		-- Each binding captures its locale owner at load time. The full suite may
 		-- have replaced that owner; reload the whole chain and restore it together.
-		local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.menu_builder" }
+		local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
 		local previous_modules = {}
 		for _, name in ipairs(names) do
 			previous_modules[name] = package.loaded[name]

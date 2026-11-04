@@ -267,9 +267,8 @@ _LLS_WidestBodyIncludesTheUnselectedWeight() {
 	AssertEqual(true, Calls[5].Bold, "unselected correction must request bold metrics")
 	AssertEqual(true, Calls[6].Bold, "unselected continuation must request bold metrics")
 	Row := _LLM_TooltipMeasurePredictionRow(Slot, { W: 30, H: 18 }, { W: 5, H: 18 },
-		10, 7, (Text, Bold) => _LLS_WeightedMeasure.Measure(Text, Bold))
-	AssertEqual(87, Row.W,
-		"the actual selected width 30+40+10 wins over inactive 5+70, then adds the common shortcut")
+		10, (Text, Bold) => _LLS_WeightedMeasure.Measure(Text, Bold))
+	AssertEqual(80, Row.W, "the actual selected width 30+40+10 wins over inactive 5+70")
 	AssertEqual(22, Row.H, "bold height remains reserved when the selected width wins")
 }
 Test("(llm-line-style) panel geometry reserves the widest selected or emphasized body",

@@ -123,9 +123,12 @@ private let kProtocolReadBytes = 4_096
 let kCLIDiagnosticReadBytes = 4_096
 let kMaximumCLIDiagnosticChunksPerDrain = 16
 private let kBoundaryPollMaximumEINTRRetries = 3
-private let kChildPollMicroseconds: useconds_t = 50_000
-private let kProcessTerminationGraceSeconds: TimeInterval = 0.05
-private let kFenceRetryDelays: [useconds_t] = [50_000, 100_000, 250_000, 1_000_000]
+private let kChildPollMicroseconds = LauncherTimings.leaseChildPoll.microseconds
+private let kProcessTerminationGraceSeconds = LauncherTimings.processTerminationGrace.seconds
+private let kFenceRetryDelays: [useconds_t] = [
+	LauncherTimings.fenceRetryFirst.microseconds, LauncherTimings.fenceRetrySecond.microseconds,
+	LauncherTimings.fenceRetryThird.microseconds, LauncherTimings.fenceRetryLast.microseconds,
+]
 private let kMaximumWorkerFenceRecoveryAttempts = 3
 /// Lower inclusive byte bound for canonical ASCII decimal identity text.
 private let kASCIIDigitZero: UInt8 = 48
@@ -394,8 +397,8 @@ func runGuardianRegistration(
 	identityReader: (String) -> LeaseExecutableIdentity? = {
 		LeaseExecutableIdentity.capture(at: $0)
 	},
-	register: (String) -> RemapGuardianRegistrationStatus = {
-		remapGuardianRegistrationStatus(executablePath: $0)
+	register: (String) -> RemapGuardianRegistrationOutcome = {
+		remapGuardianRegistrationOutcome(executablePath: $0)
 	},
 	writeResult: (Data) -> Bool = {
 		writeLauncherLogData($0, descriptor: STDOUT_FILENO)
@@ -408,8 +411,8 @@ func runGuardianRegistration(
 		environment: environment,
 		identityReader: identityReader
 	), let executablePath else { return LeaseWorkerExit.invalidArguments.rawValue }
-	let status = register(executablePath)
-	guard let output = (status.rawValue + "\n").data(using: .utf8), writeResult(output)
+	let outcome = register(executablePath)
+	guard let output = outcome.output.data(using: .utf8), writeResult(output)
 	else { return LeaseWorkerExit.innerFailed.rawValue }
 	return LeaseWorkerExit.success.rawValue
 }
@@ -2045,7 +2048,7 @@ final class SpawnedLeaseInner {
 	func terminateOwnedProcessGroupAndReap() {
 		if reaped { return }
 		_ = Darwin.killpg(processGroupID, SIGTERM)
-		usleep(useconds_t(kProcessTerminationGraceSeconds * 1_000_000))
+		usleep(LauncherTimings.processTerminationGrace.microseconds)
 		_ = Darwin.killpg(processGroupID, SIGKILL)
 		reapBlocking()
 	}

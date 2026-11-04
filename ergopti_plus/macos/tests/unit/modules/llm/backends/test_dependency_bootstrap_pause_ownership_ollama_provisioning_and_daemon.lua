@@ -79,6 +79,24 @@ helpers.describe("HS-119 Ollama provisioning and daemon verdicts", function()
 		helpers.assert_eq(fixture.checker.get_daemon_failure_message(), nil)
 	end)
 
+	helpers.it("waits for the pending runtime metadata before starting the daemon", function()
+		-- Field run 2026-10-30 16:29: the first read after the install was
+		-- pending and the daemon start was refused at once.
+		local fixture = load_fixture({ backend = "ollama", metadata_pending_reads = 2 })
+		helpers.assert_true(fixture.checker.check_and_install_deps())
+
+		fixture.tasks[1]:complete(0, "", "")
+		helpers.assert_eq(fixture.daemon_calls, 0, "no daemon start while the metadata is pending")
+		for _ = 1, 10 do
+			if fixture.daemon_calls > 0 then break end
+			for _, timer in ipairs(fixture.timers) do timer:fire() end
+		end
+
+		helpers.assert_eq(fixture.daemon_calls, 1)
+		helpers.assert_eq(fixture.metadata_reads, 3)
+		helpers.assert_eq(fixture.checker.get_daemon_state(), "ready")
+	end)
+
 	helpers.it("keeps daemon verdict pending when dependency provisioning fails", function()
 		local fixture = load_fixture({ backend = "ollama" })
 		helpers.assert_true(fixture.checker.check_and_install_deps())
@@ -491,22 +509,20 @@ helpers.describe("Native migration caller context fences", function()
 
 end)
 
-helpers.describe("Official installation remains available without native daemon authority", function()
-	helpers.it("(ollama-official-client-install) completes an explicitly chosen stock download as client provisioning", function()
+-- Owned-runtimes row "Ollama installers (legacy)": the stock download that
+-- once completed here as client provisioning is retired.
+helpers.describe("The stock Ollama download is retired", function()
+	helpers.it("(ollama-stock-retired) settles a check without Ergopti's runtime as missing, with no task", function()
 		local fixture = load_fixture({})
 		local binary = package.loaded["modules.llm.ollama_binary"]
 		binary.resolve = function() return nil, "not installed", nil end
-		binary.managed_install_dir = function() return "/fixture/official" end
+		helpers.assert_nil(fixture.checker.install_for_selection, "no stock download entry remains")
 		local completions = {}
-		helpers.assert_true(fixture.checker.install_for_selection(function(value) completions[#completions + 1] = value end))
-		helpers.assert_eq(#fixture.tasks, 1)
-		helpers.assert_eq(fixture.tasks[1].start_calls, 1)
-		fixture.tasks[1]:complete(0)
-		helpers.assert_eq(fixture.daemon_calls, 0, "successful stock installation never acquires foreign daemon authority")
-		helpers.assert_true(fixture.checker.is_ready())
-		helpers.assert_eq(fixture.checker.get_daemon_state(), "pending")
-		helpers.assert_eq(#completions, 1)
-		helpers.assert_true(completions[1])
+		helpers.assert_true(fixture.checker.check_and_install_deps(function(value) completions[#completions + 1] = value end))
+		helpers.assert_eq(#fixture.tasks, 0)
+		helpers.assert_eq(fixture.daemon_calls, 0)
+		helpers.assert_eq(fixture.checker.get_state(), "missing")
+		helpers.assert_eq(completions, { false })
 	end)
 end)
 

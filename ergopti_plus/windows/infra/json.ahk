@@ -59,6 +59,23 @@ global JSON_MAX_NESTING_DEPTH := 128
  * @param {string} text - The raw JSON text.
  * @returns The root value (Map / Array / String / Number / Boolean / JSON_NULL).
  */
+/**
+ * The decoded root of one exact JSON text, or false for any other text. The
+ * master gates re-read the menu manifest on every call, by contract: when those
+ * bytes equal the ones the menu loader decoded, the 125 KB decode (147 ms at boot)
+ * is the same work twice. Here because both owners depend on this file, and a
+ * partial include graph can hold either alone.
+ * @param {String} Text The JSON text.
+ * @param {Map} Root Records this read-only root for Text when supplied.
+ * @returns {Map|Boolean} The root, false when Text differs.
+ */
+JsonKnownRoot(Text, Root := unset) {
+	static KnownText := "", KnownRoot := false
+	if IsSet(Root)
+		KnownText := Text, KnownRoot := Root
+	return (KnownRoot is Map && KnownText == Text) ? KnownRoot : false
+}
+
 JsonParse(text) {
 	pos := 1
 	val := _JsonParseValue(&text, &pos, 0)

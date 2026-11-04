@@ -8,13 +8,14 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 class ConsoleWindowNative {
 	; Opens one of the script's built-in debug views.
 	; @param {String} Kind The validated view identifier.
 	; @returns {Boolean}
 	static Open(Kind) {
-		if (Kind == "list_vars")
+		if (Kind == MenuCommand.LIST_VARS)
 			ListVars()
 		else
 			KeyHistory()

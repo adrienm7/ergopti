@@ -99,9 +99,8 @@ local function run_case(family, change, route)
 				layout._set_table_for_test(plan)
 				injector = helpers.load_module("modules.hotstrings.injector")
 				injector._set_uinput(session.writer)
-				local source_file = assert(io.open(root .. "/modules/hotstrings/injector.lua", "rb"))
-				local settle = assert(tonumber(source_file:read("*a"):match("local INTER_PHASE_DELAY_MS = (%d+)")))
-				assert(source_file:close())
+				-- modules/hotstrings/injector, selected by a declaration unique to it.
+				local settle = assert(tonumber(assert(helpers.read_driver_unit("local function retire_clipboard(")):match("local INTER_PHASE_DELAY_MS = (%d+)")))
 				injector._set_nanosleep_for_test(function(seconds)
 					if change == "settle" and seconds == settle / 1000 then retire() end
 				end)

@@ -1,34 +1,28 @@
 ﻿; tests/meta/modules/keystats/metrics/test_metrics_private_title_memo.ahk
 
 ; ==============================================================================
-; MODULE: Private-Browsing Title Scan Is Memoized (metrics-private-title-regex-per-event)
+; MODULE: Private-Browsing Title Verdict (metrics-private-title-regex-per-event)
 ; DESCRIPTION:
 ; MF_ShouldFilter() is the single chokepoint KL_AppendLog calls before any disk
-; I/O, so it runs on EVERY logged keystats event. With the private-browsing
-; filter on (the shipped default) it ran seven RegExMatch calls over the focused
-; window title every single time — the only real per-event regex site in the
-; driver.
+; I/O, so a wrong verdict means keystrokes from a private window reach the disk.
+; It memoizes its pattern scan on the focused title, which only changes when the
+; focus refresh publishes a new snapshot.
 ;
-; ROOT CAUSE ENCODED: the title it scans comes from MetricsFocusCache, which a
-; bounded resident timer refreshes every 50 ms; between two refreshes the input
-; is byte-identical, so the scan re-derived a value that could not have changed.
-; The scan is now memoized on the title itself and only re-runs when the title
-; actually changes.
+; The memo must not become a correctness hole, so these tests drive the real
+; predicate through the focus cache: the verdict follows each title change in both
+; directions, the user's toggle wins over a remembered verdict, and
+; MF_ShouldFilterFor answers for the title it is given, whatever the live one is.
 ;
-; The memo must not become a correctness hole, so three properties are pinned
-; alongside it: it lives INSIDE the private_browsing toggle (turning the filter
-; off must still skip the check), title and verdict are published together
-; through one reference assignment (a timer interrupting mid-scan must never see
-; a new title paired with the previous verdict), and MF_ShouldFilterFor — which
-; evaluates an arbitrary caller-supplied title, not the live focus cache — keeps
-; scanning unconditionally.
-;
-; SCOPE: source introspection. infra/metrics/metrics_filters.ahk is not among the
-; production files the headless runner includes, so MF_ShouldFilter cannot be
-; called here; a behavioural twin becomes possible the day that include is added.
+; Only the first test still reads source: sparing the regex calls changes no
+; result, so a behaviour test cannot see the memo disappear.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+
+; One line per case-insensitive heuristic of MF_PRIVATE_TITLE_PATTERNS, in its locales.
+global _MFP_PRIVATE_TITLES := ["Site - InPrivate", "Site - Incognito", "Site - Private Browsing",
+	"Site (Private)", "Site - Navigation privée", "Site - Privé", "Site - Privater Modus"]
+
 
 
 
@@ -41,17 +35,11 @@
 
 _MFP_ScanIsMemoizedOnTheTitle() {
 	Body := _DriverFuncBody("MF_ShouldFilter")
-	Assert(Body != "", "MF_ShouldFilter must exist in infra/metrics/metrics_filters.ahk")
-
-	MemoPos  := InStr(Body, "static _private_memo")
 	GuardPos := InStr(Body, "title !== memo.title")
-	LoopPos  := InStr(Body, "for _, pat in MF_PRIVATE_TITLE_PATTERNS")
-	Assert(LoopPos > 0,
-		"prerequisite: MF_ShouldFilter must still scan MF_PRIVATE_TITLE_PATTERNS — the memo may skip repeat work, never the check itself")
-	Assert(MemoPos > 0,
-		"MF_ShouldFilter must memoize the private-browsing title scan — it runs on every logged event, and seven RegExMatch calls per keystroke re-derive a value that only changes when the 50 ms focus refresh publishes a new title (metrics-private-title-regex-per-event)")
+	LoopPos := InStr(Body, "for _, pat in MF_PRIVATE_TITLE_PATTERNS")
+	Assert(LoopPos > 0, "MF_ShouldFilter must scan MF_PRIVATE_TITLE_PATTERNS")
 	Assert(GuardPos > 0 and GuardPos < LoopPos,
-		"the pattern loop must sit behind a title-change guard, otherwise the memo is declared but never spares a single RegExMatch")
+		"the pattern loop must sit behind a title-change guard: seven RegExMatch calls per keystroke re-derive a value that only changes when the focus refresh publishes a new title")
 }
 Test("metrics_filters: the private-browsing title scan is memoized (metrics-private-title-regex-per-event)",
 	_MFP_ScanIsMemoizedOnTheTitle)
@@ -59,58 +47,85 @@ Test("metrics_filters: the private-browsing title scan is memoized (metrics-priv
 
 
 
-; =====================================================================
-; =====================================================================
-; ======= 2/ The memo cannot become a correctness hole ================
-; =====================================================================
-; =====================================================================
 
-_MFP_MemoObeysTheUserToggle() {
-	Body := _DriverFuncBody("MF_ShouldFilter")
-	Assert(Body != "", "MF_ShouldFilter must exist")
-	TogglePos := InStr(Body, "MetricsFilters.private_browsing")
-	MemoUsePos := InStr(Body, "memo := _private_memo")
-	Assert(TogglePos > 0, "prerequisite: the private-browsing toggle must still gate the check")
-	Assert(MemoUsePos > TogglePos,
-		"the memo lookup must sit INSIDE the MetricsFilters.private_browsing branch — a cached 'this title is private' verdict must never survive the user switching the filter off")
+; ======================================================================
+; ======================================================================
+; ======= 2/ The verdict follows the title and the user's choice =======
+; ======================================================================
+; ======================================================================
+
+; Runs Body with only the private-browsing filter on and event-driven refresh off,
+; so the snapshot under test is the one MF_ShouldFilter reads.
+_MFP_WithFilters(Body) {
+	SavedState := MetricsFocusCache.state
+	SavedEventMode := MetricsFocusCache.event_mode
+	SavedDisabledApps := MetricsFilters.disabled_apps
+	SavedPrivate := MetricsFilters.private_browsing
+	SavedSecure := MetricsFilters.secure_field
+	SavedSystemAuth := MetricsFilters.system_auth
+	try {
+		MetricsFocusCache.event_mode := false
+		MetricsFilters.disabled_apps := Map()
+		MetricsFilters.private_browsing := true
+		MetricsFilters.secure_field := false
+		MetricsFilters.system_auth := false
+		Body.Call()
+	} finally {
+		MetricsFocusCache.state := SavedState
+		MetricsFocusCache.event_mode := SavedEventMode
+		MetricsFilters.disabled_apps := SavedDisabledApps
+		MetricsFilters.private_browsing := SavedPrivate
+		MetricsFilters.secure_field := SavedSecure
+		MetricsFilters.system_auth := SavedSystemAuth
+	}
 }
-Test("metrics_filters: the title memo stays inside the private-browsing toggle (metrics-private-title-regex-per-event)",
-	_MFP_MemoObeysTheUserToggle)
 
-
-; Build-then-swap, the same discipline MetricsFocusCache documents: the title
-; and its verdict must be published in ONE reference assignment. Written as two
-; separate field writes, a timer firing between them would leave the memo
-; claiming the new title had the old title's verdict — and a "not private"
-; verdict wrongly attached to a private window means keystrokes reach the disk.
-_MFP_MemoIsPublishedAtomically() {
-	Body := _DriverFuncBody("MF_ShouldFilter")
-	Assert(Body != "", "MF_ShouldFilter must exist")
-	LoopPos    := InStr(Body, "for _, pat in MF_PRIVATE_TITLE_PATTERNS")
-	BuildPos   := InStr(Body, "memo := { title: title, is_private: is_private }")
-	PublishPos := InStr(Body, "_private_memo := memo")
-	Assert(BuildPos > LoopPos,
-		"the memo entry must be built AFTER the scan completes, from a single object literal carrying both the title and its verdict")
-	Assert(PublishPos > BuildPos,
-		"the freshly built entry must then be published in one reference assignment — two separate field writes leave a window in which the new title carries the previous verdict")
+_MFP_Focus(Title) {
+	MetricsFocusCache.state := {valid: true, last_at: 0, hwnd: 0, process_name: "browser.exe",
+		title: Title, class: "BrowserHost", failure_reason: "", timed_out: false}
 }
-Test("metrics_filters: the title memo is published in one atomic swap (metrics-private-title-regex-per-event)",
-	_MFP_MemoIsPublishedAtomically)
 
+_MFP_VerdictFollowsTheTitle() {
+	_MFP_WithFilters(() => (
+		_MFP_Focus("Ordinary page"),
+		AssertFalse(MF_ShouldFilter(), "an ordinary title is kept"),
+		_MFP_Focus("Secret - InPrivate"),
+		AssertTrue(MF_ShouldFilter(), "the new private title must not inherit the ordinary verdict"),
+		AssertTrue(MF_ShouldFilter(), "the remembered verdict answers the same title"),
+		_MFP_Focus("Ordinary page"),
+		AssertFalse(MF_ShouldFilter(), "leaving the private window must not keep filtering"),
+		0))
+}
+Test("metrics_filters: the private verdict follows every title change (metrics-private-title-regex-per-event)",
+	_MFP_VerdictFollowsTheTitle)
 
-; MF_ShouldFilterFor evaluates an explicit (app, title) pair for the OUTGOING
-; side of an app/window switch. Its title is not the live focus title, so the
-; live-focus memo would answer the wrong question for it.
-_MFP_OutgoingVariantScansUnconditionally() {
-	Body := _DriverFuncBody("MF_ShouldFilterFor")
-	Assert(Body != "", "MF_ShouldFilterFor must exist in infra/metrics/metrics_filters.ahk")
-	Assert(InStr(Body, "for _, pat in MF_PRIVATE_TITLE_PATTERNS") > 0,
-		"prerequisite: MF_ShouldFilterFor must still scan the private-browsing patterns against the supplied title")
-	Assert(InStr(Body, "_private_memo") = 0,
-		"MF_ShouldFilterFor must NOT read the live-focus title memo — it is handed an arbitrary outgoing title, and a memo keyed on the currently focused window would answer a different question entirely")
+_MFP_ToggleWinsOverTheMemo() {
+	_MFP_WithFilters(() => (
+		_MFP_Focus("Secret - InPrivate"),
+		AssertTrue(MF_ShouldFilter(), "the filter on: the private title is dropped"),
+		MetricsFilters.private_browsing := false,
+		AssertFalse(MF_ShouldFilter(), "a remembered private verdict must not survive the user switching the filter off"),
+		MetricsFilters.private_browsing := true,
+		AssertTrue(MF_ShouldFilter(), "switching it back applies at once"),
+		0))
+}
+Test("metrics_filters: the user's toggle wins over the remembered verdict (metrics-private-title-regex-per-event)",
+	_MFP_ToggleWinsOverTheMemo)
+
+; It is handed the OUTGOING window of a switch, so the live focus must not answer.
+_MFP_OutgoingVariantIgnoresTheLiveFocus() {
+	_MFP_WithFilters(() => (
+		_MFP_Focus("Secret - InPrivate"),
+		AssertTrue(MF_ShouldFilter(), "the live title is private"),
+		AssertFalse(MF_ShouldFilterFor("browser.exe", "Ordinary page"), "an ordinary outgoing title stays ordinary"),
+		_MFP_Focus("Ordinary page"),
+		AssertFalse(MF_ShouldFilter(), "the live title is ordinary"),
+		AssertTrue(MF_ShouldFilterFor("browser.exe", "Secret - InPrivate"), "a private outgoing title stays private"),
+		0))
 }
 Test("metrics_filters: the outgoing-context variant does not reuse the live-focus memo (metrics-private-title-regex-per-event)",
-	_MFP_OutgoingVariantScansUnconditionally)
+	_MFP_OutgoingVariantIgnoresTheLiveFocus)
+
 
 
 
@@ -121,32 +136,18 @@ Test("metrics_filters: the outgoing-context variant does not reuse the live-focu
 ; =====================================================================
 ; =====================================================================
 
-; The cheapest way to "fix" seven regexes per event is to delete some of them.
-; The heuristic is deliberately generous — a false positive only means "we
-; logged a bit less than we could have", which is the safe direction — so the
-; list must keep every locale variant it had.
-_MFP_PatternListBlock() {
-	Src := _DriverSourceNoComments()
-	Start := InStr(Src, "MF_PRIVATE_TITLE_PATTERNS := [")
-	if !Start
-		return ""
-	End := InStr(Src, "]", , Start)
-	if !End
-		return ""
-	return SubStr(Src, Start, End - Start + 1)
-}
-
+; The cheapest way to "fix" seven regexes per event is to delete some of them. A
+; false positive only means logging less, the safe direction, so every locale stays.
 _MFP_EveryPatternSurvived() {
-	Block := _MFP_PatternListBlock()
-	Assert(Block != "", "the MF_PRIVATE_TITLE_PATTERNS array literal must be findable in the driver source")
-	Count := 0
-	Pos := 1
-	while (Pos := InStr(Block, '"i)', , Pos)) {
-		Count += 1
-		Pos += 3
+	global _MFP_PRIVATE_TITLES
+	_MFP_WithFilters(() => _MFP_AssertEveryTitleFiltered(_MFP_PRIVATE_TITLES))
+}
+_MFP_AssertEveryTitleFiltered(Titles) {
+	for Title in Titles {
+		_MFP_Focus(Title)
+		AssertTrue(MF_ShouldFilter(), "a private window was kept: " . Title)
+		AssertTrue(MF_ShouldFilterFor("browser.exe", Title), "an outgoing private window was kept: " . Title)
 	}
-	Assert(Count >= 7,
-		"MF_PRIVATE_TITLE_PATTERNS must keep at least its seven case-insensitive heuristics (InPrivate, Incognito, Private Browsing, (Private), Navigation privée, Privé, Privater Modus) — memoizing the scan is the way to make it cheap, dropping locales is not (metrics-private-title-regex-per-event)")
 }
 Test("metrics_filters: no private-browsing pattern was dropped for speed (metrics-private-title-regex-per-event)",
 	_MFP_EveryPatternSurvived)

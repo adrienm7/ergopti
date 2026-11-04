@@ -31,10 +31,11 @@ _OSRA_ChildSource() {
 		Code .= "#Include " . Owner . "`n"
 	}
 	for Name in ["OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys",
-		"TapHoldDispatchTap", "TapHoldTapInDispatch", "TapHoldShouldCancelTap", "_TH_TakePressTakenByCombination",
+		"TapHoldDispatchTap", "HotstringEndCharOfTap", "TapHoldTapInDispatch", "TapHoldShouldCancelTap", "_TH_TakePressTakenByCombination",
 		"TapHoldForgetTrackedKey", "TapHoldTapIsCommand", "_TapHoldTapEndsCapsWord", "TapHoldDuration",
 		"_TapHoldDurationValid", "TapHoldGlobalDuration",
-		"TapHoldIsEnabled", "TapHoldEntryHasKnownAction", "TapHoldTapAction", "TapHoldHoldModifier", "TapHoldHoldLayer"] {
+		"TapHoldIsEnabled", "TapHoldEntryHasKnownAction", "TapHoldTapAction", "TapHoldConfiguredTapAction",
+		"AiActionBlocked", "AiActionIsAi", "TapHoldHoldModifier", "TapHoldHoldLayer"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine route dependency must exist: " . Name)
 		if Name == "OneShotShift" {

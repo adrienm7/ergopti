@@ -24,8 +24,8 @@
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--accent: #4a9eff;
-		--accent-text: #0b0b0b;
+		--accent: var(--theme-hue-4a9eff);
+		--accent-text: var(--theme-grey-0b0b0b);
 	}
 }
 

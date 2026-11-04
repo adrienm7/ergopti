@@ -58,9 +58,9 @@ helpers.describe("canonical metrics preferences", function()
 				helpers.assert_eq(restarted.uses_source_colors(), true)
 			end
 			local metrics = Codec.decode(Sandbox.read_bytes(path)).metrics
-			-- The widget pill is neutral by default, as on Windows (2026-10-22), so
-			-- colours are an explicit choice; the menubar default stays coloured.
-			helpers.assert_eq(metrics.wpm_widget_colors, true)
+			-- Both surfaces ship coloured (the widget since the decision of
+			-- 2026-11-03), so choosing colours again drops each leaf.
+			helpers.assert_eq(metrics.wpm_widget_colors, nil)
 			helpers.assert_eq(metrics.wpm_menubar_colors, nil)
 			helpers.assert_eq(package.loaded["adapters.storage"].get("wpm_widget.pos_x"), 300)
 			helpers.assert_eq(package.loaded["adapters.storage"].get("wpm_widget.pos_y"), 400)

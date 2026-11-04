@@ -52,6 +52,9 @@ _MetaLoggerReadSources(Root := unset) {
 }
 
 _MetaLoggerCallCount(Body, Name) {
+	; No "Name(" spelling variant survives without the bare name in the text.
+	if !InStr(Body, Name)
+		return 0
 	Code := _DriverMaskNonCode(&Body)
 	return _MetaCountPattern(Code, "i)\b" . Name . "\s*\(")
 		- _DriverTopLevelDefinitionCount(&Code, Name)

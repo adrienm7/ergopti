@@ -26,7 +26,7 @@ private final class ManagedPTYTestSession {
 	private(set) var bytes = Data()
 	private(set) var errorBytes = Data()
 
-	init(script: String, milliseconds: Int = 10_000, wrongDigest: Bool = false, inheritedStartup: Bool = false, sourceName: String = "ensure-mlx-deps.sh") throws {
+	init(script: String, milliseconds: Int = 10_000, wrongDigest: Bool = false, inheritedStartup: Bool = false, sourceName: String = "ensure-mlx-deps.sh", resolvedOllama: String = "/fixture/ollama-native-http/ollama") throws {
 		let manager = FileManager.default
 		root = manager.temporaryDirectory.appendingPathComponent("ergopti-native-pty-" + UUID().uuidString).resolvingSymlinksInPath()
 		let app = root.appendingPathComponent("Fixture.app")
@@ -58,11 +58,9 @@ private final class ManagedPTYTestSession {
 		var pairs = [["PROJECT_ROOT", root.path]]
 		if sourceName == "ensure-ollama-deps.sh" {
 			pairs += [["ERGOPTI_NATIVE_ARCH", "arm64"], ["ERGOPTI_NATIVE_PYTHONS", ""],
-				["ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN", ""],
-				["ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR", root.appendingPathComponent("Library/Application Support/Ergopti/ollama").path],
+				["ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN", resolvedOllama],
+				["ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR", ""],
 				["ERGOPTI_BOOTSTRAP_PYTHON", ""]]
-			var environment = ProcessInfo.processInfo.environment; environment["HOME"] = root.path
-			process.environment = environment
 		}
 		let request: [String: Any] = ["version": 1, "source_path": source.path, "source_sha256": digest,
 			"environment": pairs, "timeout_ms": milliseconds,
@@ -127,6 +125,17 @@ private final class ManagedPTYTestSession {
 			var event = pollfd(fd: output.fileHandleForReading.fileDescriptor, events: Int16(POLLIN), revents: 0)
 			_ = Darwin.poll(&event, 1, 20)
 		}
+	}
+
+	/// A request refused while parsing returns EX_USAGE before any receipt or
+	/// process group exists, so its empty receipt is the retirement proof.
+	func finishRefusedRequest() throws {
+		try wait { !process.isRunning && outputEOF && errorEOF }
+		process.waitUntilExit()
+		XCTAssertEqual(process.terminationReason, .exit)
+		XCTAssertEqual(process.terminationStatus, 64)
+		XCTAssertEqual(try Data(contentsOf: receipt).count, 0, "a refused request starts nothing to report")
+		provenRetired = true
 	}
 
 	func finish(worker: Int32, admitted: Bool, exit: Int? = nil, workerError: String? = nil) throws {
@@ -450,18 +459,28 @@ final class ManagedPTYWorkerTests: XCTestCase {
 		XCTAssertTrue(session.bytes.isEmpty)
 	}
 
-	func testOfficialThirdPinnedInstallerReceivesOnlyItsPrivateEnvironmentContract() throws {
+	func testOllamaVerifierReceivesOnlyTheResolvedRuntime() throws {
 		let session = try ManagedPTYTestSession(script: """
 		#!/bin/bash
 		test "$0" = "$ERGOPTI_BOOTSTRAP_SNAPSHOT" && test -t 0 && test -t 1 && test -t 2 || exit 91
-		test -z "$ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN" && test -z "$ERGOPTI_BOOTSTRAP_PYTHON" || exit 92
-		test "$ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR" = "$HOME/Library/Application Support/Ergopti/ollama" || exit 93
+		test "$ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN" = /fixture/ollama-native-http/ollama || exit 92
+		test -z "$ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR" && test -z "$ERGOPTI_BOOTSTRAP_PYTHON" || exit 93
 		test "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" -gt 0 && test "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" -le 5000 || exit 94
-		printf 'OFFICIAL-INSTALLER-PRIVATE-INPUT\\n'
+		printf 'OLLAMA-VERIFIER-PRIVATE-INPUT\\n'
 		""" + "\n", milliseconds: 5000, sourceName: "ensure-ollama-deps.sh")
 		defer { session.cleanup() }
 		try session.finish(worker: 0, admitted: true, exit: 0)
-		XCTAssertNotNil(session.bytes.range(of: Data("OFFICIAL-INSTALLER-PRIVATE-INPUT".utf8)))
+		XCTAssertNotNil(session.bytes.range(of: Data("OLLAMA-VERIFIER-PRIVATE-INPUT".utf8)))
+	}
+
+	// Owned-runtimes row "Ollama installers (legacy)": an Ollama request with no
+	// resolved runtime was the stock download, and the guardian now refuses it.
+	func testOllamaVerifierRefusesTheRetiredStockDownloadRequest() throws {
+		let session = try ManagedPTYTestSession(script: "#!/bin/bash\nprintf STOCK-DOWNLOAD\n", milliseconds: 5000,
+			sourceName: "ensure-ollama-deps.sh", resolvedOllama: "")
+		defer { session.cleanup() }
+		try session.finishRefusedRequest()
+		XCTAssertTrue(session.bytes.isEmpty)
 	}
 
 	/// Field run 2026-10-27 19:47: a developer build refused its clone's
@@ -471,6 +490,21 @@ final class ManagedPTYWorkerTests: XCTestCase {
 		let admitted = ManagedPTYWorker.admittedSources(for: .developer(root: "/Users/maintainer/ergopti", configDir: clone))
 		XCTAssertEqual(admitted, Set(ManagedPTYWorker.admittedSourceNames.map { "\(clone)/modules/llm/\($0)" }))
 		XCTAssertTrue(admitted.contains("\(clone)/modules/llm/ensure-ollama-native-deps.sh"))
+	}
+
+	/// App Cloner's PyObjC installer runs under the guardian like the AI installers
+	/// (owned_runtimes.json, the macOS /usr/bin/python3 row); every admitted name
+	/// is a shipped installer, so the list cannot admit a script nobody wrote.
+	func testEveryAdmittedInstallerShipsAndThePyObjCInstallerIsAdmitted() {
+		var repository = URL(fileURLWithPath: #filePath)
+		for _ in 0..<7 { repository.deleteLastPathComponent() }
+		let folder = repository.appendingPathComponent("static/ergopti_plus/macos/modules/llm")
+		XCTAssertTrue(ManagedPTYWorker.admittedSourceNames.contains("ensure-managed-pyobjc.sh"))
+		XCTAssertEqual(Set(ManagedPTYWorker.admittedSourceNames).count, ManagedPTYWorker.admittedSourceNames.count)
+		for name in ManagedPTYWorker.admittedSourceNames {
+			XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent(name).path),
+				"\(name) is admitted but not shipped")
+		}
 	}
 
 	func testPackagedAppAdmitsOnlyItsPayloadAndARefusalAdmitsNothing() {

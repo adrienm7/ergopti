@@ -44,18 +44,10 @@ end
 local function confirm(title, text, opts)
 	local Shell = require("adapters.shell_runner")
 	title = require("window_titles").compose(title)
-	local command
-	if Shell.has_command("zenity") then
-		command = "zenity --question --no-markup --default-cancel --title=" .. Shell.quote(title)
-			.. " --text=" .. Shell.quote(text) .. " --ok-label=" .. Shell.quote(I18n.get("menu.llm.btn_download"))
-			.. " --cancel-label=" .. Shell.quote(I18n.get("common.cancel"))
-	elseif Shell.has_command("kdialog") then
-		command = "kdialog --yesno " .. Shell.quote(text) .. " --title " .. Shell.quote(title)
-			.. " --yes-label " .. Shell.quote(I18n.get("menu.llm.btn_download"))
-			.. " --no-label " .. Shell.quote(I18n.get("common.cancel"))
-	else
-		return nil
-	end
+	local command = require("ui.native_dialog").command() .. " --question --no-markup --default-cancel --title="
+		.. Shell.quote(title) .. " --text=" .. Shell.quote(text)
+		.. " --ok-label=" .. Shell.quote(I18n.get("menu.llm.btn_download"))
+		.. " --cancel-label=" .. Shell.quote(I18n.get("common.cancel"))
 	local ok, _, _, reason, status = require("ui.modal").run(function() return Shell.exec_checked(command) end, { observer = type(opts) == "table" and opts.modal_observer or nil })
 	if ok == true then return true end
 	if reason == Errors.COMMAND_EXITED_NONZERO and status == 1 then return false end

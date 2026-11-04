@@ -40,14 +40,15 @@ end
 --- @param kind string DisplayServer constant.
 --- @param answers table Ordered { pattern, output } pairs; first match wins.
 --- @param env table|nil Environment variables the module may read.
+--- @param group integer|nil Active XKB group the capture reports (1 when nil).
 --- @return table layout, table commands
-local function load_with(kind, answers, env)
+local function load_with(kind, answers, env, group)
 	local commands = {}
 	-- A controlled map acknowledgement owns the parser's inverse data and
 	-- receipt. This checks source order without granting native source currency.
 	package.loaded["adapters.xkb_capture"] = require("tests.support.layout_cohort_fixture").capture(function(text)
-		return package.loaded["adapters.keyboard_layout"].build(text)
-	end)
+		return package.loaded["adapters.keyboard_layout"].build(text, group)
+	end, group)
 	local Shell = helpers.load_module("adapters.shell_runner")
 	Shell._set_runner(function(cmd)
 		commands[#commands + 1] = cmd
@@ -129,6 +130,21 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 		end)
 		helpers.assert_contains(layout.source(), "dump-keymap-wayland")
 		cleanup(Shell)
+	end)
+
+	helpers.it("(xkb-groups) labels a key by the active group when several layouts are loaded", function()
+		-- Group 1 types the plausible letters; group 2 maps K01 to "z".
+		local two_groups = plausible_keymap():gsub("key <K01> { %[ a, A %] };", "key <K01> { [ a, A ], [ z, Z ] };")
+		helpers.assert_true(two_groups:find("[ z, Z ]", 1, true) ~= nil, "the fixture carries a second group")
+		for group, expected in pairs({ [1] = "a", [2] = "z" }) do
+			local layout, _, Shell = load_with("wayland", { { "dump-keymap-wayland", two_groups } }, nil, group)
+			local ok, detail = pcall(function()
+				with_env({ DISPLAY = ":0" }, function() helpers.assert_true(layout.refresh(nil)) end)
+				helpers.assert_eq(layout.base_symbol(21 - 8).text, expected, "group " .. group)
+			end)
+			cleanup(Shell)
+			assert(ok, detail)
+		end
 	end)
 
 	for _, fallback in ipairs({ "xwayland", "compile" }) do

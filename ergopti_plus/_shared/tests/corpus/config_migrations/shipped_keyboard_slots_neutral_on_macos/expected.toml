@@ -1,5 +1,5 @@
 [_meta]
-schema_version = 16
+schema_version = 20
 
 [shortcuts.keyboard]
 primary_a = "copy"
@@ -15,9 +15,9 @@ secondary_e = "none"
 secondary_capslock = "toggle_capslock"
 secondary_quote = "none"
 primary_shift_v = "paste_plain"
+secondary_g = "open_chatgpt"
 
 [shortcuts.keys]
-ctrl_g = true
 cmd_star = true
 wrap_text_if_selected = true
 

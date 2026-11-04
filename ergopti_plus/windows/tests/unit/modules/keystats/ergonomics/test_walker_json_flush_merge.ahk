@@ -20,7 +20,7 @@ _WJFM_OpenMemory() {
 }
 
 _WJFM_Flush(Db, Device := "merge-device") {
-	Sql := KLW_BuildBatchSql(SQLite_Q(Device))
+	Sql := KLW_BuildBatchSql(Device)
 	AssertTrue(Sql != "", "the seeded batch must emit SQL")
 	AssertTrue(SQLite_Exec(Db, Sql), "the real walker SQL must execute")
 }

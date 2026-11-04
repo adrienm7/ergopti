@@ -15,7 +15,9 @@ _OllamaAsync_PreparationAdmission(Mode) {
 	global _LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort, _LLM_Ollama_ActiveStreams
 	global _LLM_AuxGeneration, _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_ManagedBootstrap
 	global LLM_Defaults, LLM_OLLAMA_PORT, LLM_OLLAMA_BASE_URL, LLM_OLLAMA_KEEP_ALIVE
+	global _LLM_Ollama_LastSweepTick
 	Saved := Map("async", _LLM_Ollama_Async, "pending", _LLM_Ollama_Pending,
+		"sweep_tick", _LLM_Ollama_LastSweepTick,
 		"port", _LLM_Ollama_PreflightPort, "streams", _LLM_Ollama_ActiveStreams,
 		"generation", _LLM_AuxGeneration, "owners", _LLM_AuxOwners, "debt", _LLM_AuxCleanupDebt,
 		"bootstrap", _LLM_ManagedBootstrap, "server_port", LLM_OLLAMA_PORT,
@@ -33,12 +35,17 @@ _OllamaAsync_PreparationAdmission(Mode) {
 	Current := (*) => State["current"]
 	try {
 		AssertFalse(HadDirectoryCall, "the directory boundary must start from its genuine production owner")
+		; The orphan sweep's timer reads the same directory boundary from any yield.
+		; Whether it was due depended on the tests before this one, and in
+		; queued-cancel it took the cancellation meant for the dispatch.
+		SetTimer(_LLM_Ollama_StreamCleanupOrphans, 0)
+		_LLM_Ollama_LastSweepTick := A_TickCount
 		Suspend(false)
 		_LLM_Ollama_Async := Map(), _LLM_Ollama_Pending := "", _LLM_Ollama_ActiveStreams := []
 		_LLM_AuxOwners := Map(), _LLM_AuxCleanupDebt := Map(), _LLM_ManagedBootstrap := 0
 		LLM_Defaults_Load()
 		AssertTrue(LLM_Ollama_LoadDefaults(), "the real canonical boot owner supplies an admitted server origin")
-		AssertEqual(LLM_Defaults["llm_ollama_port"], LLM_OLLAMA_PORT, "the test never invents a server-port default")
+		AssertEqual(LLM_Defaults["llm_ollama_owned_port"], LLM_OLLAMA_PORT, "the test never invents a server-port default")
 		_LLM_Ollama_PreflightPort := Map("schedule", Schedule, "list_models", ListModels, "spawn", Spawn)
 		DirectoryFn.DefineProp("Call", {Call: ObserveDirectory})
 		Caught := false
@@ -99,6 +106,7 @@ _OllamaAsync_PreparationAdmission(Mode) {
 			AssertEqual(0, _LLM_AuxCleanupDebt.Count, "the unit boundaries cannot hide native auxiliary cleanup debt")
 		} finally {
 			_LLM_Ollama_Async := Saved["async"], _LLM_Ollama_Pending := Saved["pending"]
+			_LLM_Ollama_LastSweepTick := Saved["sweep_tick"]
 			_LLM_Ollama_PreflightPort := Saved["port"], _LLM_Ollama_ActiveStreams := Saved["streams"]
 			_LLM_AuxGeneration := Saved["generation"], _LLM_AuxOwners := Saved["owners"]
 			_LLM_AuxCleanupDebt := Saved["debt"], _LLM_ManagedBootstrap := Saved["bootstrap"]

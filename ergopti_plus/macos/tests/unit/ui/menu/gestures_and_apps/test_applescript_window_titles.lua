@@ -72,6 +72,7 @@ local function remap_owner(world)
 		get_tap_timeout = function() return nil end,
 		get_tap_hold_timeout = function() return 200 end,
 		get_sticky_timeout = function() return 1000 end,
+		get_lone_modifier_tap_max_ms = function() return 1000 end,
 		get_simultaneous_threshold = function() return 50 end,
 		set_tap_hold_timeout = write, set_sticky_timeout = write,
 		set_simultaneous_threshold = write, set_tap_timeout = write,

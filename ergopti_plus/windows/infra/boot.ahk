@@ -112,6 +112,7 @@ HotstringsConfigLoadSharedDefaults()
 ; keystats hook or any tap-hold hotkey arms. Fail-fast on a missing key.
 TimingsLoadShared()
 LoggerLoadTimings()
+HotPath_LoadTimings()
 KeystatsWalkerLoadTimings()
 TapHoldsLoadTimings()
 ; Native scalar EndChars takes a measured ~30 ms to build cold. Warm the pure

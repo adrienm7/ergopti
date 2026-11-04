@@ -10,6 +10,26 @@
 
 #Requires AutoHotkey v2.0
 
+/**
+ * Whether a tray clicked during boot may open: the configured root exists and
+ * input is ready. An open native menu stops the auto-execute thread, so opening
+ * it before the keyboard is ready stalled whole boots (maintainer decision,
+ * 3 November 2026).
+ * @param {Boolean} MenuReady - The configured root is published.
+ * @param {Boolean} InputPending - Input initialization is still running.
+ * @returns {Boolean}
+ */
+TrayStartupClickReady(MenuReady, InputPending) {
+	return MenuReady && !InputPending
+}
+
+/** TrayStartupClickReady on the driver's boot state; unset state is not ready. */
+TrayStartupClickReadyNow() {
+	global _DriverMenuReady, _DriverInputInitPending
+	return TrayStartupClickReady(IsSet(_DriverMenuReady) && _DriverMenuReady,
+		!IsSet(_DriverInputInitPending) || _DriverInputInitPending)
+}
+
 class TrayStartupClick {
 	/**
 	 * Installs one notification owner for a driver instance.

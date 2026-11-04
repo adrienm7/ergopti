@@ -26,15 +26,15 @@ local fixture = require("tests.support.manifest_menu_fixture")
 local MANIFEST = [[
 {
 	"test_menu": [
-		{ "type": "dynamic", "id": "throwing_handler" },
-		{ "type": "dynamic", "id": "good_handler" }
+		{ "type": "action", "id": "throwing_handler" },
+		{ "type": "action", "id": "good_handler" }
 	]
 }
 ]]
 
 
 helpers.describe("ManifestMenu.build: dispatch isolates each handler under pcall (F-HIGH-18)", function()
-	helpers.it("a throwing dynamic handler does not prevent a sibling good handler's item from appearing", function()
+	helpers.it("a throwing action handler does not prevent a sibling good handler's item from appearing", function()
 		fixture.with_manifest(MANIFEST, nil, function(ManifestMenu)
 
 			local dyn_handlers = {

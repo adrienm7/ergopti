@@ -55,7 +55,12 @@
 			"parameter_preview_colored"
 		]
 	},
-	"word": ["parameter_catalogue_entries", "separator", "parameter_custom_entries"],
+	"word": [
+		"parameter_catalogue_entries",
+		"parameter_consume_children",
+		"separator",
+		"parameter_custom_entries"
+	],
 	"parents": {
 		"word_expander": "menu.hotstrings.word_expanders",
 		"preview": "menu.hotstrings.preview_bubbles",

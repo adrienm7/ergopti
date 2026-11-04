@@ -58,6 +58,9 @@ local Json = require("json")
 local ErrorDescription = require("error_description")
 local PhaseStats = require("infra.phase_stats")
 local _redact_message = nil
+-- The configuration directory the user chose, followed for the redactor: its
+-- folder and file names are personal, and the user may move it at runtime.
+local _config_dir = nil
 
 --- Captures canonical privacy rules before bootstrap permits any log output.
 --- The entry point owns the shared path; this constructor does not resolve paths
@@ -83,7 +86,24 @@ function M.initialize_privacy(raw_policy, supplied)
 	assert(type(rules.token_prefixes) == "table" and type(rules.secret_keys) == "table",
 		"logger: canonical privacy inventory invalid")
 	assert(pcall(Redact.apply, "", rules, captured), "logger: canonical privacy rules invalid")
-	_redact_message = function(text) return Redact.apply(text, rules, captured) end
+	_redact_message = function(text)
+		return Redact.apply(text, rules, {
+			home = captured.home, user = captured.user, case_insensitive = captured.case_insensitive,
+			config_dir = _config_dir,
+		})
+	end
+end
+
+--- Follows the configuration directory the redactor masks. The path owner calls
+--- it at initialization and after each committed move, so a line written after
+--- the user changes folders hides the new folder's names, not the old ones.
+--- Independent of privacy admission: it records a value the redactor reads.
+--- @param dir string|nil Absolute directory, or nil/"" while none is resolved.
+function M.follow_config_dir(dir)
+	if dir ~= nil and type(dir) ~= "string" then
+		error("logger: the followed configuration directory must be a path", 2)
+	end
+	_config_dir = (dir ~= nil and dir ~= "") and dir or nil
 end
 
 --- Redacts unformatted free text for the owned log sinks and boot journal.
@@ -1812,8 +1832,8 @@ local _capture_installed = false
 -- tap, the Karabiner lease heartbeat and each typed key behind it. macOS
 -- disables an event tap that waits about a second, so a shorter hold is
 -- invisible to the user and a longer one is named in the log.
-local SLOW_TIMER_CALLBACK_REPORT_MS = 1000
-local SLOW_TIMER_CALLBACK_COUNT_MS = 250
+local SLOW_TIMER_CALLBACK_REPORT_MS = require("infra.main_thread_hold").REPORT_MS
+local SLOW_TIMER_CALLBACK_COUNT_MS = require("infra.main_thread_hold").COUNT_MS
 -- One report per callback site per minute: a callback that stalls on every
 -- tick would otherwise write a line per tick.
 local SLOW_TIMER_CALLBACK_REPEAT_SEC = 60
@@ -1822,6 +1842,9 @@ local MILLISECONDS_PER_SECOND = 1000
 -- Monotonic nanosecond clock captured at install; nil without hs.timer.
 local _callback_clock = nil
 local _slow_callback_reported_at = {}
+-- The longest hold of the session, with its callback site: the field run names
+-- it (ledger L16, L18, L24) without a person reading the log.
+local _worst_hold = nil
 -- Total nanoseconds spent waiting for a person inside a modal dialog since
 -- install. A callback that opens a dialog is not stalled by the time the user
 -- takes to answer it, so the slow-callback report subtracts this wait.
@@ -1877,6 +1900,68 @@ local function describe_callback_site(fn)
 	return site
 end
 
+--- The session's longest timer-callback hold of 250 ms or more.
+--- @return table|nil hold { ms, site } where site is "path:line", nil before any.
+function M.worst_timer_hold()
+	if _worst_hold == nil then return nil end
+	return { ms = _worst_hold.ms, site = _worst_hold.site }
+end
+
+-- Timer-callback time per site while an accounting window is open, nil when
+-- none is: the field run's idle check names the callbacks that wake the app.
+local _callback_accounting = nil
+-- Site of each callback seen in the window: naming walks debug info, and a
+-- pump that ticks every 250 ms would pay it on every tick.
+local _accounting_sites = setmetatable({}, { __mode = "k" })
+
+--- Opens the timer-callback accounting window. One window at a time: a second
+--- opener would read the first one's callbacks as its own.
+function M.begin_callback_accounting()
+	if _callback_accounting ~= nil then
+		error("Logger.begin_callback_accounting: an accounting window is already open", 2)
+	end
+	_callback_accounting = {}
+end
+
+--- Closes the accounting window and returns what ran in it.
+--- @return table sites { { site = "path:line", count, ms } }, most time first.
+function M.end_callback_accounting()
+	local sites = _callback_accounting
+	if sites == nil then error("Logger.end_callback_accounting: no accounting window is open", 2) end
+	_callback_accounting = nil
+	local list = {}
+	for site, entry in pairs(sites) do
+		list[#list + 1] = { site = site, count = entry.count, ms = entry.ns / NANOSECONDS_PER_MILLISECOND }
+	end
+	table.sort(list, function(a, b)
+		if a.ms ~= b.ms then return a.ms > b.ms end
+		return a.site < b.site
+	end)
+	return list
+end
+
+--- Adds one timer callback to the open accounting window.
+--- @param fn function The callback that ran.
+--- @param started integer Monotonic start, nanoseconds.
+--- @param modal_before integer Modal wait total when the callback started.
+local function account_timer_callback(fn, started, modal_before)
+	local ok_now, now = pcall(_callback_clock)
+	if not ok_now or type(now) ~= "number" then return end
+	local site = _accounting_sites[fn]
+	if site == nil then
+		local ok_site, described = pcall(describe_callback_site, fn)
+		site = ok_site and described or "?"
+		_accounting_sites[fn] = site
+	end
+	local entry = _callback_accounting[site]
+	if entry == nil then
+		entry = { count = 0, ns = 0 }
+		_callback_accounting[site] = entry
+	end
+	entry.count = entry.count + 1
+	entry.ns = entry.ns + math.max(0, now - started - (_modal_wait_ns - modal_before))
+end
+
 --- Reports one timer callback that held the main thread past the threshold.
 --- @param fn function The callback that ran.
 --- @param kind string Timer family label.
@@ -1897,6 +1982,7 @@ local function report_slow_timer_callback(fn, kind, started, modal_before, heap_
 	if held_ms < SLOW_TIMER_CALLBACK_COUNT_MS then return end
 	local ok_site, site = pcall(describe_callback_site, fn)
 	site = ok_site and site or "?"
+	if _worst_hold == nil or held_ms > _worst_hold.ms then _worst_hold = { ms = held_ms, site = site } end
 	local previous = _slow_callback_reported_at[site]
 	local now_sec = now / NANOSECONDS_PER_MILLISECOND / MILLISECONDS_PER_SECOND
 	if previous and now_sec - previous < SLOW_TIMER_CALLBACK_REPEAT_SEC then return end
@@ -1954,6 +2040,12 @@ local function _guard_timer_cb(fn, kind)
 		-- A main-thread hold has no error to report, yet it is what disabled the
 		-- event taps and cost the Karabiner lease in issue #99 (13.4 s inside one
 		-- ingest flush). Naming the callback makes the next log say which one.
+		if started and _callback_accounting ~= nil then
+			local accounted, account_err = pcall(account_timer_callback, fn, started, modal_before)
+			if not accounted then
+				M.error("runtime", "Timer callback accounting failed: %s", ErrorDescription.describe(account_err))
+			end
+		end
 		if started then
 			local reported, report_err = pcall(report_slow_timer_callback, fn, kind, started, modal_before, heap_before_kb)
 			if not reported then

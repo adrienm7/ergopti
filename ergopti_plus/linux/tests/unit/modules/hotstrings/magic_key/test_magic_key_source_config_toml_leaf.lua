@@ -257,7 +257,7 @@ helpers.describe("magic key source: the keyboard-layout menu", function()
 		with_source("[hotstrings]\nmagic_key_source = \"KeyJ\"\n", function(Source)
 			wire(Source, { active = true, replace = true, typed_ok = true })
 			local I18n = require("infra.i18n")
-			local builder = helpers.load_module("ui.menu.menu_builder")
+			local builder = helpers.load_module("ui.menu.builder")
 			local ok, items = pcall(builder.build, { on_quit = function() end, magic_key_source = Source })
 			Source._reset_for_test()
 			if not ok then error(items, 0) end
@@ -266,7 +266,7 @@ helpers.describe("magic key source: the keyboard-layout menu", function()
 				if item.title == I18n.get("menu.layout.title") then layout = item.menu end
 			end
 			helpers.assert_type(layout, "table", "the tray has a keyboard-layout submenu")
-			local prefix = I18n.get("menu.layout.magic_key_source") .. " : "
+			local prefix = require("locale.label_value").compose(I18n.get, I18n.get("menu.layout.magic_key_source"), "")
 			local row
 			for _, item in ipairs(layout) do
 				if type(item.title) == "string" and item.title:sub(1, #prefix) == prefix then row = item end
@@ -399,7 +399,9 @@ end)
 
 helpers.describe("magic replacement: the Ergopti extension control", function()
 	local Choices = require("tests.support.hotstring_choices")
-	local SOURCE = '[hotstrings]\ngroups = { magickey = true }\n'
+	-- A second category (rolls) stays on, so closing the magic key alone leaves
+	-- the Hotstrings switch on: an off switch greys the whole submenu.
+	local SOURCE = '[hotstrings]\ngroups = { magickey = true, rolls = true }\n'
 		.. '[hotstrings.modules.magickey]\nreplace = false\n'
 		.. '[future]\nchoice = "preserve exact bytes" # untouched\n'
 
@@ -407,7 +409,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 	--- @param source string Initial canonical document.
 	--- @param body function body(Config, path, state, row).
 	local function with_replace(source, body)
-		local names = { "modules.hotstrings.loader", "modules.hotstrings.hotstrings_config", "ui.menu.menu_builder" }
+		local names = { "modules.hotstrings.loader", "modules.hotstrings.hotstrings_config", "ui.menu.builder" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { published = {}, notified = 0, redraw = 0, paused = false, reject = false }
@@ -418,6 +420,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 					magickey = { id = "magickey", sections_order = { "replace" },
 						sections = { replace = { count = 1, description = "Native replacement",
 							extension = { id = "ergopti", name = "Ergopti+" } } }, count = 1 },
+					rolls = { id = "rolls", sections_order = { "hc" }, sections = { hc = { count = 0 } }, count = 0 },
 				}, mappings = { { trigger = "j", replacement = "★", group = "magickey", section = "replace" } } }
 			end,
 		}

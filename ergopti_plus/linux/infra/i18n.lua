@@ -229,7 +229,9 @@ function M.persist_locale(code)
 		return false
 	end
 
-	if not _save_locale(code) then
+	-- config.toml's [script] locale wins at start: rewrite it first.
+	if not require("infra.script_scope").rewrite_configured(require("config_keys").KEY.SCRIPT_LOCALE, code)
+		or not _save_locale(code) then
 		Logger.error(LOG, "Locale '%s' was not persisted — nothing changed.", code)
 		return false
 	end

@@ -55,6 +55,23 @@ helpers.describe("Linux Reload is a daemon restart (reload-is-a-restart-2026-10-
 		helpers.assert_eq(perform("SIGHUP"), true, "a reload may be requested again after the abandon")
 	end)
 
+	helpers.it("(linux-reload-budget) stamps the request before the restart and retires a refused or abandoned one", function()
+		local events = {}
+		local timing = { mark = function() events[#events + 1] = "mark" end,
+			clear = function() events[#events + 1] = "clear" end }
+		local answers = { false, true }
+		local perform, _, abandon = ReloadRestart.new({ timing = timing,
+			restart = function() events[#events + 1] = "restart"; return table.remove(answers, 1) end,
+			cancel = function() return true end })
+		perform("the tray menu")
+		helpers.assert_eq(events, { "mark", "restart", "clear" }, "a refused restart retires its stamp")
+		events = {}
+		perform("the tray menu")
+		helpers.assert_eq(events, { "mark", "restart" }, "the successor reads the stamp of a requested restart")
+		abandon()
+		helpers.assert_eq(events, { "mark", "restart", "clear" }, "an abandoned restart retires its stamp")
+	end)
+
 	helpers.it("postpones on window or program cleanup debt without restarting", function()
 		for _, case in ipairs({ { false, true }, { true, false } }) do
 			local restarted = 0

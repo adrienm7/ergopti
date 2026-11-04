@@ -915,8 +915,17 @@ end
 local EXEC_RESPONSES = {}
 local EXEC_CALLS = {}
 
+local FusedMetadataCommand = require("tests.support.fused_metadata_command")
+
+local execute_one
+
 M.execute = function(cmd, _withUserEnv)
 	table.insert(EXEC_CALLS, cmd)
+	if FusedMetadataCommand.is_fused(cmd) then return FusedMetadataCommand.run(cmd, execute_one) end
+	return execute_one(cmd)
+end
+
+execute_one = function(cmd)
 	for pattern, response in pairs(EXEC_RESPONSES) do
 		if cmd:find(pattern, 1, true) then
 			return response.output, response.success, response.exitType, response.rc

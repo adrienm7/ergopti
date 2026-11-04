@@ -28,17 +28,17 @@ const APP_BADGE_COLORS = [
 	ThemeTokens.color('green'),
 	ThemeTokens.color('red'),
 	ThemeTokens.color('orange'),
-	'#AF52DE',
-	'#FF2D55',
+	ThemeTokens.color('hue-af52de'),
+	ThemeTokens.color('hue-ff2d55'),
 	ThemeTokens.color('hue-5ac8fa'),
 	ThemeTokens.color('yellow'),
-	'#4CD964',
-	'#FF6B00',
+	ThemeTokens.color('hue-4cd964'),
+	ThemeTokens.color('hue-ff6b00'),
 	ThemeTokens.color('hue-30b0c7'),
-	'#FF6961',
-	'#77DD77',
-	'#AEC6CF',
-	'#CB99C9'
+	ThemeTokens.color('hue-ff6961'),
+	ThemeTokens.color('hue-77dd77'),
+	ThemeTokens.color('hue-aec6cf'),
+	ThemeTokens.color('hue-cb99c9')
 ];
 
 /**

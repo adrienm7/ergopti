@@ -23,8 +23,8 @@
 	--text-muted: var(--theme-metrics-text-muted);
 	--accent: var(--theme-accent);
 	--border: var(--theme-metrics-border);
-	--mono-bg: #eaeaea;
-	--mono-color: #005cc5;
+	--mono-bg: var(--theme-grey-eaeaea);
+	--mono-color: var(--theme-hue-005cc5);
 	--th-bg: var(--theme-metrics-th-bg);
 	--th-hover: var(--theme-metrics-th-hover);
 	--td-hover: var(--theme-metrics-td-hover);
@@ -44,7 +44,7 @@
 	--kpi-wpm-rgb: 230, 140, 0;
 	--chart-wpm-color: rgb(204, 163, 0);
 	--chart-wpm-rgb: 204, 163, 0;
-	--kpi-precision-color: #008000;
+	--kpi-precision-color: var(--theme-hue-008000);
 	--kpi-delegation-color: rgb(0, 86, 179);
 	--kpi-sfb-color: rgb(0, 155, 150); /* Teal — same-finger bigram indicator (was rep color) */
 	--kpi-dist-color: rgb(0, 113, 197);
@@ -84,8 +84,8 @@
 @media (prefers-color-scheme: dark) {
 	:root {
 		--text-color-rgb: 240, 240, 240; /* matches --text-color for use in rgba() */
-		--mono-bg: #111111;
-		--mono-color: #9cdcfe;
+		--mono-bg: var(--theme-grey-111);
+		--mono-color: var(--theme-hue-9cdcfe);
 		--tooltip-bg: var(--theme-grey-555);
 		--modal-overlay: rgba(0, 0, 0, 0.6);
 
@@ -962,7 +962,7 @@ tr:hover td {
 	background: var(--mono-bg);
 	border: 1px solid rgba(255, 51, 51, 0.6);
 	border-radius: 3px;
-	color: #ff3333;
+	color: var(--theme-hue-ff3333);
 	font-size: 0.85em;
 	font-weight: bold;
 	padding: 1px 3px;
@@ -974,7 +974,7 @@ tr:hover td {
 	background: var(--mono-bg);
 	border: 1px solid rgba(255, 51, 51, 0.6);
 	border-radius: 3px;
-	color: #ff3333 !important;
+	color: var(--theme-hue-ff3333) !important;
 	font-weight: bold;
 	padding: 1px 3px;
 }
@@ -1000,14 +1000,14 @@ tr:hover td {
 .shortcut-mod-alt {
 	background: rgba(204, 85, 255, 0.1);
 	border-color: rgba(204, 85, 255, 0.45) !important;
-	color: #cc55ff !important;
+	color: var(--theme-hue-cc55ff) !important;
 }
 
 /* Bright sky-blue — same visual weight as cmd but in blue */
 .shortcut-mod-shift {
 	background: rgba(77, 182, 255, 0.1);
 	border-color: rgba(77, 182, 255, 0.5) !important;
-	color: #4db6ff !important;
+	color: var(--theme-hue-4db6ff) !important;
 }
 
 /* Vivid gold/yellow — clearly distinct from ctrl's orange */
@@ -1022,7 +1022,7 @@ tr:hover td {
 .shortcut-key-control {
 	background: var(--mono-bg);
 	border-color: rgba(255, 51, 51, 0.6) !important;
-	color: #ff3333 !important;
+	color: var(--theme-hue-ff3333) !important;
 }
 
 /* =================================================== */

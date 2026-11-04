@@ -43,6 +43,8 @@ _WPMR_ChildSource() {
 	AssertTrue(Owner != "", "The genuine WPM calculation must have its unique owner")
 	Source := FileRead(Owner, "UTF-8")
 	Code := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
+	; The genuine state class names its config keys through the generated constants.
+	Code .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
 	for Name in ["WPMWidgetConst", "WPMWidget"] {
 		Pattern := "ms)^class " . Name . " \{.*?^\}"
 		AssertTrue(RegExMatch(Source, Pattern, &State) > 0, "The actual state class must exist: " . Name)

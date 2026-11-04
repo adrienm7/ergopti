@@ -123,7 +123,7 @@ helpers.describe("Conflicts current macOS preference checks", function()
 		local warning = conflicts.on_action_changed("tap_3", "lookup")
 		helpers.assert_nil(warning, "disabled native three-finger tap must not show a warning")
 		helpers.assert_eq(#warnings, 0, "suppression must not emit a warning-level log")
-		helpers.assert_eq(#commands, 3, "all current Trackpad preference sources must be queried")
+		helpers.assert_eq(#commands, 4, "all current Trackpad and Dock preference sources must be queried")
 		cleanup()
 	end)
 
@@ -186,6 +186,109 @@ helpers.describe("Conflicts current macOS preference checks", function()
 		helpers.assert_eq(#active, 0, "both native motion policies must be off")
 		helpers.assert_eq(#warnings, 0, "confirmed macOS opt-outs must leave the diagnostic clean")
 		cleanup()
+	end)
+end)
+
+-- Never a double action (maintainer, 2026-11-03): a slot whose macOS gesture
+-- is on is taken, greyed in the menu and held back by the engine, and comes
+-- back once the macOS gesture is off. The preferences come from an injected
+-- defaults reader; nothing is ever written.
+helpers.describe("Conflicts — slots taken by a macOS gesture", function()
+	helpers.it("takes the slots of every macOS gesture that is on, and only those", function()
+		local conflicts, _warnings, _commands, cleanup = load_with_macos_preferences([[
+{
+    TrackpadFourFingerHorizSwipeGesture = 2;
+    TrackpadFourFingerVertSwipeGesture = 2;
+    TrackpadThreeFingerTapGesture = 0;
+    TrackpadThreeFingerHorizSwipeGesture = 0;
+    TrackpadThreeFingerVertSwipeGesture = 0;
+    TrackpadThreeFingerDrag = 0;
+    showAppExposeGestureEnabled = 0;
+}
+]])
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_left"), "taken", "Spaces takes the four-finger swipes")
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_up"), "taken", "Mission Control is on by default")
+		helpers.assert_eq(conflicts.slot_system_state("swipe_5_up"), "taken")
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_down"), "free", "App Exposé is off in the Dock")
+		helpers.assert_eq(conflicts.slot_system_state("tap_3"), "free", "Look up is off")
+		helpers.assert_eq(conflicts.slot_system_state("swipe_3_left"), "free")
+		helpers.assert_eq(conflicts.slot_system_state("swipe_2_left_up"), "free", "two-finger touches never block")
+		helpers.assert_true(conflicts.slot_held_by_system("swipe_4_right"))
+		helpers.assert_true(not conflicts.slot_held_by_system("tap_3"))
+		cleanup()
+	end)
+
+	helpers.it("frees every slot once the macOS gestures are off, App Exposé included", function()
+		local conflicts, _warnings, _commands, cleanup = load_with_macos_preferences([[
+{
+    TrackpadFourFingerHorizSwipeGesture = 0;
+    TrackpadFourFingerVertSwipeGesture = 2;
+    showMissionControlGestureEnabled = 0;
+    showAppExposeGestureEnabled = 1;
+    TrackpadThreeFingerTapGesture = 2;
+}
+]])
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_left"), "free")
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_up"), "free", "Mission Control is off in the Dock")
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_down"), "taken", "App Exposé is on")
+		helpers.assert_eq(conflicts.slot_system_state("tap_3"), "taken", "Look up is on")
+		cleanup()
+	end)
+
+	helpers.it("holds the slots when the read returned nothing, and frees nothing before the first read", function()
+		local conflicts, _warnings, _commands, cleanup = load_with_macos_preferences("")
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_left"), "unverified")
+		helpers.assert_true(conflicts.slot_held_by_system("swipe_4_left"), "an unverified slot is held too")
+		cleanup()
+		package.loaded["modules.gestures.conflicts"] = nil
+		local fresh = helpers.load_with_stubs("modules.gestures.conflicts")
+		helpers.assert_eq(fresh.slot_system_state("swipe_4_left"), "free", "nothing is known before the boot read")
+		package.loaded["modules.gestures.conflicts"] = nil
+	end)
+
+	helpers.it("rechecks: a macOS gesture turned on, then off, greys then restores its slot", function()
+		local output = "{\n    TrackpadFourFingerHorizSwipeGesture = 0;\n}\n"
+		local conflicts, _warnings, _commands, cleanup = load_with_macos_preferences(output)
+		package.loaded["adapters.shell_runner"].spawn = function(_command, _args, callback)
+			callback(0, output, "")
+			return { isSettled = function() return true end }
+		end
+		local changes = 0
+		conflicts.set_state_listener(function() changes = changes + 1 end)
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_left"), "free")
+		output = "{\n    TrackpadFourFingerHorizSwipeGesture = 2;\n}\n"
+		conflicts.recheck()
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_left"), "taken", "turned on: taken")
+		helpers.assert_eq(changes, 1, "the menu is asked to rebuild")
+		conflicts.recheck()
+		helpers.assert_eq(changes, 1, "an unchanged read asks for nothing")
+		output = "{\n    TrackpadFourFingerHorizSwipeGesture = 0;\n}\n"
+		conflicts.recheck()
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_left"), "free", "turned off: back by itself")
+		helpers.assert_eq(changes, 2)
+		cleanup()
+	end)
+
+	helpers.it("arms one recheck timer and stops it at shutdown", function()
+		local conflicts, _warnings, _commands, cleanup = load_with_macos_preferences("")
+		local armed, cancelled = 0, 0
+		local scheduler = {
+			every = function(_interval, _fn) armed = armed + 1; return { id = armed }, true end,
+			cancel = function() cancelled = cancelled + 1 end,
+		}
+		helpers.assert_true(conflicts.start_watch(scheduler))
+		helpers.assert_true(conflicts.start_watch(scheduler))
+		helpers.assert_eq(armed, 1, "a second start reuses the armed timer")
+		conflicts.restore_all_overrides()
+		helpers.assert_eq(cancelled, 1, "shutdown stops the recheck")
+		cleanup()
+	end)
+
+	helpers.it("never writes a macOS preference", function()
+		local src = helpers.read_driver_source("local function macos_gesture_is_disabled")
+		helpers.assert_true(src ~= nil)
+		helpers.assert_true(src:find('"write"', 1, true) == nil and src:find("'write'", 1, true) == nil,
+			"the conflict module only reads the Trackpad and Dock preferences")
 	end)
 end)
 

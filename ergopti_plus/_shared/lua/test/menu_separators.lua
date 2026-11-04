@@ -92,11 +92,18 @@ end
 
 --- Renders every menu array in the manifest with worst-case probes.
 --- @param Renderer table The shared renderer module (menu.renderer).
---- @param opts table { platform, manifest_path, json_decode, logger, i18n?, on_rendered? }.
----   i18n         optional { get, section }; defaults to returning the key itself.
----   on_rendered  optional function(key, rendered) called with each built menu.
+--- @param opts table { platform, manifest_path, json_decode, logger, i18n?, on_rendered?,
+---   provider_rows?, dynamic?, skip? }.
+---   i18n           optional { get, section }; defaults to returning the key itself.
+---   on_rendered    optional function(key, rendered) called with each built menu.
+---   provider_rows  optional probe for list providers and groups; defaults to the
+---                  worst-case separator probe.
+---   dynamic        optional probe for action handlers; defaults likewise.
+---   skip           optional set of menu keys not rendered as a root.
 --- @return table defects, number menus_rendered
 function M.render_every_menu(Renderer, opts)
+	local rows_probe = opts.provider_rows or probe_rows
+	local dynamic_probe = opts.dynamic or probe_dynamic
 	local R = Renderer.new({
 		platform      = opts.platform,
 		manifest_path = function() return opts.manifest_path end,
@@ -119,17 +126,18 @@ function M.render_every_menu(Renderer, opts)
 	for key, value in pairs(root) do
 		-- Only arrays of typed entries are renderer menus; top_level is checked
 		-- by top_level_defects below, and the other keys are lookup tables.
-		if type(value) == "table" and type(value[1]) == "table" and value[1].type ~= nil then
+		if type(value) == "table" and type(value[1]) == "table" and value[1].type ~= nil
+			and not (opts.skip and opts.skip[key]) then
 			keys[#keys + 1] = key
 		end
 	end
 	table.sort(keys)
 	for _, key in ipairs(keys) do
 		local rendered = R.build(key, key,
-			answer_every_id(probe_dynamic),
-			answer_every_id(function() return { items = probe_rows() } end),
+			answer_every_id(dynamic_probe),
+			answer_every_id(function() return { items = rows_probe() } end),
 			ctx,
-			answer_every_id(probe_rows))
+			answer_every_id(rows_probe))
 		M.find_defects(rendered, opts.platform .. " " .. key, defects)
 		if opts.on_rendered then opts.on_rendered(key, rendered) end
 		menu_count = menu_count + 1

@@ -171,6 +171,7 @@ end
 ---   read(handle, count)      → string|nil, "would_block"|"fatal"|nil, reason
 ---   poll(handle, timeout_ms) → boolean      (true when readable)
 ---   close(handle)            → true|nil on completion, false, reason on failure
+---   device_number(handle)    → integer|nil (st_rdev of a character device; optional)
 --- A normally returning void backend acknowledges completion. Exceptions and
 --- explicit failures retire the handle and fence its slot until process restart;
 --- close(2) may have released it already, so retrying could close a reused fd.
@@ -313,6 +314,13 @@ local function build_ffi_backend()
 			if native_close(fd) == 0 then return true end
 			return false, "close failed (errno=" .. tostring(native_errno()) .. ")"
 		end,
+		-- fstat(2) through libuv, which takes the same integer descriptor and
+		-- spares this module the per-architecture struct stat layout.
+		device_number = function(fd)
+			local stat = require("luv").fs_fstat(fd)
+			if type(stat) ~= "table" or stat.type ~= "char" then return nil end
+			return stat.rdev
+		end,
 	}
 end
 
@@ -410,6 +418,23 @@ function M.open(path, slot)
 	pcall(Logger.success, LOG, "Reading %s (non-blocking).", path)
 	_busy = false
 	return true
+end
+
+--- The owned descriptor's device number (st_rdev, read by fstat on the open
+--- descriptor), as the decimal string the shared media contract stores: the
+--- device the descriptor reads, never a path or an event-node number.
+--- @param slot string|nil
+--- @return string|nil device, string|nil reason
+function M.device_identity(slot)
+	local st = state(slot)
+	if st.fd == nil or st.close_error then return nil, "device is not open" end
+	local port = _backend and rawget(_backend, "device_number")
+	if type(port) ~= "function" then return nil, "no device-number port" end
+	local called, number = pcall(port, st.fd)
+	if not called or type(number) ~= "number" or number < 1 or number % 1 ~= 0 or number >= 2 ^ 53 then
+		return nil, "the descriptor names no character device"
+	end
+	return string.format("%.0f", number)
 end
 
 --- Takes EVIOCGRAB, so the desktop stops receiving this device entirely.

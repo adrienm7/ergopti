@@ -177,9 +177,10 @@ local function record(state)
 end
 
 helpers.describe("layout manager (macOS): installing", function()
-	helpers.it("rereads the checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
+	helpers.it("rereads a modified checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
 		local registry, deps, state = manager({ files = shipped_files() })
 		deps.local_source = true
+		deps.registry_changes = function(_, callback) callback(" M index.json\n", nil) end
 		local outcomes = {}
 		local function refreshed(outcome) outcomes[#outcomes + 1] = outcome end
 		registry.refresh(refreshed, deps)

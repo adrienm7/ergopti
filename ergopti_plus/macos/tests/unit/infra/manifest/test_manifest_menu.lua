@@ -16,10 +16,12 @@
 --- branches, matching the existing warn-on-drift convention already used by
 --- the "group" and unknown-type branches.
 ---
---- This test exercises M.build with an EMPTY dynamic_handlers table against a
---- manifest entry of type "dynamic" (via a throwaway fixture manifest) and
---- asserts Logger.warn fires — it fails before the fix (zero warn calls,
---- silent skip) and passes after.
+--- This test exercises M.build with an EMPTY handler table against a manifest
+--- entry of type "action" (via a throwaway fixture manifest) and asserts
+--- Logger.warn fires — it fails before the fix (zero warn calls, silent skip)
+--- and passes after. The "dynamic" type was retired on 2026-10-31: the compiler
+--- refuses it, and a stale one reaching the renderer is reported as an unknown
+--- type and drawn as nothing, never handed to a driver handler.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -28,7 +30,7 @@ local fixture = require("tests.support.manifest_menu_fixture")
 local MANIFEST = [[
 {
 	"test_menu": [
-		{ "type": "dynamic", "id": "no_such_dynamic_handler" },
+		{ "type": "dynamic", "id": "retired_dynamic_row" },
 		{ "type": "action", "id": "no_such_action_handler" }
 	]
 }
@@ -51,12 +53,16 @@ local function make_warn_capturing_logger()
 end
 
 helpers.describe("ManifestMenu.build: warns (does not silently skip) on a handler miss (F-HIGH-25)", function()
-	helpers.it("logs Logger.warn when a type=dynamic entry has no matching dynamic_handlers key", function()
+	helpers.it("logs Logger.warn when an action has no handler, and refuses a retired dynamic row", function()
 		local logger_stub, warn_messages = make_warn_capturing_logger()
 		fixture.with_manifest(MANIFEST, logger_stub, function(ManifestMenu)
 
-			-- Empty dynamic_handlers: neither fixture entry has a matching handler.
-			local built = ManifestMenu.build("test_menu", "Test", {}, nil, {})
+			-- A handler for the retired row must not be called: the type is unknown now.
+			local called = false
+			local built = ManifestMenu.build("test_menu", "Test", {
+				retired_dynamic_row = function() called = true end,
+			}, nil, {})
+			helpers.assert_eq(called, false, "a retired dynamic row is never handed to a handler")
 
 			helpers.assert_eq(#built, 0, "no item should be rendered when no handler matches")
 			helpers.assert_true(#warn_messages > 0,
@@ -66,10 +72,10 @@ helpers.describe("ManifestMenu.build: warns (does not silently skip) on a handle
 			local saw_dynamic_warn = false
 			local saw_action_warn = false
 			for _, msg in ipairs(warn_messages) do
-				if msg:find("no_such_dynamic_handler", 1, true) then saw_dynamic_warn = true end
+				if msg:find("Unknown item type 'dynamic'", 1, true) then saw_dynamic_warn = true end
 				if msg:find("no_such_action_handler", 1, true) then saw_action_warn = true end
 			end
-			helpers.assert_true(saw_dynamic_warn, "a missing 'dynamic' handler must be named in the warning")
+			helpers.assert_true(saw_dynamic_warn, "a retired 'dynamic' row must be reported as an unknown type")
 			helpers.assert_true(saw_action_warn, "a missing 'action' handler must be named in the warning")
 		end)
 	end)
@@ -170,7 +176,7 @@ helpers.describe("inert existing-provider status data", function()
 	end
 	local document = [[
 {
-	"llm_menu": [{ "type": "dynamic", "id": "llm_backend", "status_rows": { "unavailable": [
+	"llm_menu": [{ "type": "list", "id": "llm_backend", "status_rows": { "unavailable": [
 		{ "type": "---" },
 		{ "type": "label", "i18n": "menu.llm.local_servers.header" },
 		{ "type": "label", "i18n": "menu.llm.unavailable" }
@@ -621,7 +627,7 @@ require("test.menu_native_composition").register(helpers, "hs")
 require("test.menu_layout_caption_values_contract").register(helpers, "macos")
 
 require("test.menu_numbered_caption_contract").register(helpers, "macos")
-require("test.menu_row_order_contract").register(helpers, 9)
+require("test.menu_row_order_contract").register(helpers, 8)
 
 require("test.menu_fixed_feature_parent_contract").register(helpers, "macos")
 

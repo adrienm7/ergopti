@@ -438,6 +438,7 @@ _RQS_ExhaustedBudget(Mode) {
 	if State.CleanupFailure is Error
 		throw State.CleanupFailure
 }
+Test("reload quiescence: a transient refusal keeps the successor and retries the same reload", _RQS_ExhaustedBudget.Bind("transient-retry"))
 Test("reload quiescence: exhausted earlier READV4 veto preserves pending child", _RQS_ExhaustedBudget.Bind("pending-read"))
 Test("reload quiescence: repeated exhausted Exit preserves live stop polls", _RQS_ExhaustedBudget.Bind("timeout"))
 Test("reload quiescence: exhausted Exit preserves failed stop debt", _RQS_ExhaustedBudget.Bind("false"))

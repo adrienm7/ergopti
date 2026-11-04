@@ -32,7 +32,7 @@ local function with_scope(body, source, chord_j_identity)
 		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
 				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.gestures.manager",
-				"infra.shortcuts_scope", "ui.menu.menu_builder", "modules.shortcuts.key_combinations",
+				"infra.shortcuts_scope", "ui.menu.builder", "modules.shortcuts.key_combinations",
 				"platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
 				"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }) do
 				package.loaded[name] = nil

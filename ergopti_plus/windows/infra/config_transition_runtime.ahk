@@ -825,8 +825,15 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 	; Keep canonical Native as authority. This private callback adapter forwards
 	; the captured real native class without registering itself as a native port.
 	Callbacks := Map()
+	; One save asks about 320 of these, nearly all to read the journal back. A native
+	; call that changes nothing keeps the registry proof standing, and the next
+	; durable effect compares again before it runs, so a mutated registry still stops
+	; the transaction with nothing written after the mutation. A comparison per call
+	; cost 30 s of the driver's only thread per save (2026-11-01).
+	Standing := { registry: 0, shadow: 0 }
+	ReadOnlyMethods := Map("exists", true, "read", true, "read_bounded", true, "hash", true)
 	for Method, Callback in Native
-		Callbacks[Method] := Dispatch.Bind(Callback)
+		Callbacks[Method] := Dispatch.Bind(ReadOnlyMethods.Has(Method), Callback)
 	if Recovery {
 		Inspected := ConfigTransitionInspect(PathsFile, Callbacks)
 		if !ConfigTransitionResultIs(Inspected, "ready")
@@ -876,39 +883,39 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 		}
 		return true
 	}
-	AllLive() {
+	; Before a durable effect the standing proof is emptied, so every guard's scope
+	; compares the live registry once more; a read keeps the proof of the last one.
+	AllLive(BeforeEffect := true) {
 		if !NativeLive() || !_ConfigWriteTerminalOwnsExact(Bundle, PathsFile)
 			return false
-		; Every guard proves the same shipped registry, so one scope pays for one
-		; deep comparison; the fresh check of the last guard then closes the proof
-		; against any mutation made while the guards ran.
-		if !ConfigMigrateWithRegistryProof(GuardsHold)
-			return false
-		for Key, Row in Guards
-			LastRow := Row
-		if IsSet(LastRow) && !LastRow.check.Call(LastRow.old_content, LastRow.old_present,
-				LastRow.new_content, LastRow.new_present)
+		if BeforeEffect
+			Standing.registry := 0, Standing.shadow := 0
+		if !ConfigMigrateWithRegistryProof(GuardsHold, Standing)
 			return false
 		; Source comparisons may be long; their accepted result cannot retain
 		; callback authority withdrawn while the real guards were evaluating.
 		return NativeLive() && _ConfigWriteTerminalOwnsExact(Bundle, PathsFile)
 	}
-	Dispatch(Callback, Args*) {
-		if !AllLive()
+	; One target guard against the proof standing from the AllLive just before it.
+	GuardHolds(Check, Args*) {
+		return ConfigMigrateWithRegistryProof(() => Check.Call(Args*), Standing)
+	}
+	Dispatch(ReadOnly, Callback, Args*) {
+		if !AllLive(!ReadOnly)
 			throw Error("The actual guarded native callback owner was withdrawn before dispatch")
 		Result := Callback.Call(Args*)
-		if !AllLive()
+		if !AllLive(!ReadOnly)
 			throw Error("The actual guarded native callback owner was withdrawn during dispatch")
 		return Result
 	}
 	Read(Path) {
-		if !AllLive()
+		if !AllLive(false)
 			throw Error("The native transition source owner was withdrawn")
 		Content := Callbacks["read"].Call(Path)
-		if !AllLive()
+		if !AllLive(false)
 			throw Error("The actual guarded native read owner was withdrawn before source admission")
 		Key := _ConfigWriteLeaseKey(Path)
-		if Guards.Has(Key) && !Guards[Key].check.Call(Content, 1, Content, 1)
+		if Guards.Has(Key) && !GuardHolds(Guards[Key].check, Content, 1, Content, 1)
 			throw Error("The actual transition target source changed outside its admitted images")
 		return Content
 	}
@@ -921,7 +928,7 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 			Present := Callbacks["exists"].Call(Destination)
 			Content := Present ? Callbacks["read"].Call(Destination) : ""
 			Check := Guards[Key].check
-			Admission := () => AllLive() && Check.Call(Content, Present, Candidate, 1)
+			Admission := () => AllLive() && GuardHolds(Check, Content, Present, Candidate, 1)
 		} else
 			Admission := AllLive
 		return ReplaceOwner.Call(Source, Destination, &MoveError, Admission)
@@ -939,7 +946,7 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 			Present := Callbacks["exists"].Call(Path)
 			Content := Present ? Callbacks["read"].Call(Path) : ""
 			Check := Guards[Key].check
-			Admission := () => AllLive() && Check.Call(Content, Present, "", 0)
+			Admission := () => AllLive() && GuardHolds(Check, Content, Present, "", 0)
 		} else
 			Admission := AllLive
 		return DeleteOwner.Call(Path, Admission)
@@ -954,7 +961,7 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 		Key := _ConfigWriteLeaseKey(Path)
 		if Guards.Has(Key) {
 			Check := Guards[Key].check
-			Admission := () => AllLive() && Check.Call(Content, Present, Content, Present)
+			Admission := () => AllLive() && GuardHolds(Check, Content, Present, Content, Present)
 		} else
 			Admission := AllLive
 		return NoopOwner.Call(Admission)

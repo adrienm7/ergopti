@@ -65,7 +65,9 @@ local CACHE_VERSION = 7
 
 --- Read granularity for collecting complete source bytes. Equality is byte-exact;
 --- neither timestamps nor a fixed-width digest can certify the parsed document.
-local SOURCE_CHUNK_BYTES = 64 * 1024
+--- The registry's generated table, not infra.timings: the timings reader parses
+--- through this cache.
+local SOURCE_CHUNK_BYTES = require("_generated.registry_limits").count("limits", "toml_source_chunk_bytes")
 
 --- djb2 hash seed and modulus (32-bit) used to derive a collision-resistant
 --- snapshot filename from the full source path.

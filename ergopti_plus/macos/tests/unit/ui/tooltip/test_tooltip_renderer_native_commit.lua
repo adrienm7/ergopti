@@ -64,7 +64,7 @@ end
 local function make_canvas(options)
 	options = options or {}
 	local canvas = { showing = options.showing ~= false }
-	local element_count = options.element_count or 7
+	local element_count = options.element_count or 8
 	for index = 1, element_count do
 		local element_options = index == 7 and options.model_element or nil
 		canvas[index] = select(1, make_element(element_options))
@@ -107,6 +107,47 @@ local function make_canvas(options)
 
 	return canvas, model_values
 end
+
+--- Renders the shortcut column on a panel a footer made wider than the lines.
+--- @param blocks table Render blocks.
+--- @return table canvas, table renderer
+local function render_panel(blocks)
+	local renderer = load_renderer()
+	local canvas = make_canvas()
+	renderer.canvas = canvas
+	renderer.resolve_placement = function() return {}, { x = 0, y = 0, w = 2000, h = 1000 } end
+	renderer.compute_position = function() return { x = 0, y = 0 } end
+	local shown = renderer.render(blocks, { fixed_width = 300 }, function() end)
+	helpers.assert_eq(shown, true, "the panel renders")
+	return canvas, renderer
+end
+
+helpers.describe("tooltip renderer: the shortcut column (llm-shortcut-column)", function()
+	Fixture.it("hangs the column from the panel, not from the widest line", function()
+		local canvas, renderer = render_panel({ preds = "line", labels_st = "1" })
+		local labels = canvas[renderer.ELEM_LABELS]
+		helpers.assert_eq(labels.action, "fill")
+		helpers.assert_eq(labels.text, "1")
+		helpers.assert_eq(labels.frame.w, 300, "the column fills the content width")
+		helpers.assert_eq(labels.frame.x, canvas[renderer.ELEM_PREDS].frame.x, "over the lines")
+		helpers.assert_eq(labels.frame.h, canvas[renderer.ELEM_PREDS].frame.h, "as tall as the lines")
+		helpers.assert_eq(canvas[renderer.ELEM_PREDS].frame.w, 300, "whole lines keep the frame")
+	end)
+
+	Fixture.it("stops cut lines before the column", function()
+		local canvas, renderer = render_panel({ preds = "line", labels_st = "1", line_limit = 270 })
+		helpers.assert_eq(canvas[renderer.ELEM_PREDS].frame.w, 270)
+		helpers.assert_eq(canvas[renderer.ELEM_LABELS].frame.w, 300)
+	end)
+
+	Fixture.it("skips the element when no row has a chord", function()
+		local canvas, renderer = render_panel({ preds = "line" })
+		helpers.assert_eq(canvas[renderer.ELEM_LABELS].action, "skip")
+	end)
+end)
+
+
+
 
 --- Asserts that at least one file ERROR contains the requested marker.
 --- @param errors table Captured error messages.

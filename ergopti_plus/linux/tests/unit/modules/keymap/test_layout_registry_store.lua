@@ -107,6 +107,28 @@ helpers.describe("layout registry store (linux)", function()
 		helpers.assert_eq(reads, 3)
 	end)
 
+	-- The keyboard-layout menu asks for the index on every rebuild: decoding the
+	-- unchanged file each time held most of its number-row rows (2026-10-31).
+	helpers.it("(menu-rebuild-2026-10-31) decodes an unchanged shipped index once in a source checkout", function()
+		local store = new_store()
+		local text, decodes = '{"schema_version":1,"layouts":[]}', 0
+		local deps = deps_over({})
+		deps.bundled_dir, deps.local_source = "/pkg/", true
+		deps.read = function() return text end
+		deps.decode_json = function(raw) decodes = decodes + 1; return Json.decode(raw) end
+		local first = store.bundled_index(deps)
+		helpers.assert_true(type(first) == "table", "the shipped index must decode")
+		helpers.assert_true(store.bundled_index(deps) == first, "identical bytes must reuse the decoded index")
+		helpers.assert_eq(decodes, 1)
+		text = '{"schema_version":1,"layouts":[] }'
+		local edited = store.bundled_index(deps)
+		helpers.assert_eq(decodes, 2)
+		helpers.assert_true(edited ~= first, "a local edit must be decoded again")
+		deps.settings = { index_file = "index.json", max_file_bytes = 4 }
+		helpers.assert_eq(store.bundled_index(deps), nil)
+		helpers.assert_eq(decodes, 2)
+	end)
+
 	helpers.it("warns about a missing shipped folder only when the port names a notice", function()
 		local logger, seen = silent_logger()
 		local store = RegistryStore.new({ logger = logger, log = "t", shipped_noun = "x",
@@ -134,3 +156,6 @@ helpers.describe("layout registry store (linux)", function()
 		helpers.assert_eq(store.catalogue().index, nil)
 	end)
 end)
+
+require("test.layout_catalogue_source_contract")(helpers, RegistryStore, require("layouts.catalogue"), Json,
+	assert(require("modules.keymap.layout_registry").settings()))

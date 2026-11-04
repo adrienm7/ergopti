@@ -605,3 +605,44 @@ helpers.describe("Linux AI runtime source admission", function()
 		end)
 	end)
 end)
+
+-- The managed download re-checks the AI source about 80 times per 64 KiB chunk
+-- (runtime_source.unchanged through get_many and the engine's get_backend), and
+-- each read decoded config.toml again: 1.8 million decodes for one Ollama
+-- archive. Identical bytes now share one decode; freshness stays per call.
+helpers.describe("AI preferences decode identical bytes once (llm-preferences-decode-once)", function()
+	helpers.it("repeated reads of unchanged bytes decode once and an edit is seen at once", function()
+		with_config('[llm]\nagent_mode = "auto"\n', function(path)
+			local decodes, original = 0, Codec.decode
+			Codec.decode = function(...)
+				local caller = debug.getinfo(2, "S")
+				if caller and caller.source:find("llm_preferences%.lua$") then decodes = decodes + 1 end
+				return original(...)
+			end
+			local ok, err = pcall(function()
+				local preferences = require("infra.llm_preferences")
+				for _ = 1, 50 do helpers.assert_eq(preferences.get("llm.agent_mode"), "auto") end
+				for _ = 1, 50 do preferences.get_many({ "llm.agent_mode" }) end
+				helpers.assert_eq(decodes, 1, "unchanged bytes must be decoded once")
+				Sandbox.write_bytes(path, '[llm]\nagent_mode = "action"\n')
+				helpers.assert_eq(preferences.get("llm.agent_mode"), "action", "an external edit is read at once")
+				helpers.assert_eq(decodes, 2)
+			end)
+			Codec.decode = original
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("a table value handed out cannot change what the next read returns", function()
+		with_config('[llm.navigation]\nval_modifiers = ["ctrl"]\n', function()
+			local preferences = require("infra.llm_preferences")
+			local first = preferences.get("llm.navigation.val_modifiers")
+			helpers.assert_eq(first, { "ctrl" })
+			first[1], first[2] = "shift", "alt"
+			helpers.assert_eq(preferences.get("llm.navigation.val_modifiers"), { "ctrl" })
+			local values = preferences.get_many({ "llm.navigation.val_modifiers" })
+			values["llm.navigation.val_modifiers"][1] = "super"
+			helpers.assert_eq(preferences.get("llm.navigation.val_modifiers"), { "ctrl" })
+		end)
+	end)
+end)

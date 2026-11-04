@@ -45,6 +45,20 @@ _CTWP_NativeReadCustodyTick(State) {
 
 ; These fixture-only helpers serve the two real acquired-read timer families.
 ; They do not grant production admission or replace the native journal ports.
+; Attempts a padded read gets to span a timer tick. The source only has to outlast
+; the gap between two interrupt checks on some attempt, and every byte of it costs
+; far more in the commit and the rollback than in that read, so a small source with
+; many attempts is both faster and tighter than a large one with few.
+global _CTWP_TEMPORAL_READ_ATTEMPTS := 512
+
+_CTWP_TemporalPaddedSource(Marker) {
+	static PaddingDoublings := 18
+	Padding := "x"
+	loop PaddingDoublings
+		Padding .= Padding
+	return _CTWP_SchemaSource(Marker) . "# " . Padding . "`n"
+}
+
 _CTWP_TemporalDescriptorMatches(Left, Right) {
 	if !(Left is Object) || !(Right is Object)
 		return false
@@ -209,31 +223,25 @@ _CTWP_TemporalReport(Receipt, Primary, Family) {
 		throw Receipt.errors[1].failure
 }
 
-_CTWP_NativeReadTemporalCustody(Mode) {
+; Every mode reads the same committed journal and repairs what it withdrew, so
+; one commit and one rollback serve them all: together they cost far more than
+; the modes. The mode being run is printed ahead of it for a failure's reader.
+_CTWP_NativeReadTemporalCustody() {
 	global _ConfigTransitionRetainedBarrier
 	PriorRetained := _ConfigTransitionRetainedBarrier
 	Dir := _CTWP_NewDir("genuine-native-read-temporal-custody")
 	PathsFile := Dir . "\paths.toml", Path := Dir . "\config.toml"
 	OldSource := _CTWP_SchemaSource("old actual timed recovery source")
-	; 8 MiB keeps the native read across a timer tick (1 MiB sometimes missed it)
-	; at a quarter of the cost of the former 32 MiB source.
-	Padding := "x"
-	loop 23
-		Padding .= Padding
-	NewSource := _CTWP_SchemaSource("new actual timed recovery source") . "# " . Padding . "`n"
-	Padding := ""
+	NewSource := _CTWP_TemporalPaddedSource("new actual timed recovery source")
 	Native := ConfigTransitionProductionPort(), HashCallback := Native["hash"]
 	Digest := CryptoSha256(NewSource), Bundle := false
-	State := {path: Path, pathKey: FileReadActivityKey(Path), port: Native, mode: Mode,
-		active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failure: ""}
-	State.observer := Mode == "port" ? ((*) => (State.observerCalls += 1, HashCallback))
-		: ((*) => (State.observerCalls += 1, Digest))
-	Timer := _CTWP_NativeReadCustodyTick.Bind(State)
+	State := {active: false, restoreErrors: [], observer: 0}
+	Timer := (*) => 0
 	HadHashCall := Object.Prototype.HasOwnProp.Call(CryptoSha256, "Call")
 	HashDescriptor := HadHashCall ? CryptoSha256.GetOwnPropDesc("Call") : false
 	HadPortItem := Object.Prototype.HasOwnProp.Call(Native, "__Item")
 	PortDescriptor := HadPortItem ? Native.GetOwnPropDesc("__Item") : false
-	State.restoreErrors := [], Primary := false
+	Primary := false
 	RestoreHash() {
 		_CTWP_TemporalRestoreDescriptor(CryptoSha256, "Call", HadHashCall, HashDescriptor, State.observer, "Call")
 	}
@@ -266,40 +274,51 @@ _CTWP_NativeReadTemporalCustody(Mode) {
 			[ConfigTransitionPresentTarget(Path, NewSource)], Bundle)
 		AssertTrue(ConfigTransitionResultIs(Committed, "committed_new"))
 		WalPath := ConfigTransitionWalPath(PathsFile), BeforeWal := _CTWP_RawHex(WalPath)
-		Facts := false
-		; Eight genuine invocations bound timing variance. A missing acquired-read
-		; timer interval is a failure, never a green skip or modeled observation.
-		loop 8 {
-			State.active := true
-			SetTimer(Timer, 1)
-			try Facts := _ConfigTransitionNativeRecoveryImages(PathsFile, Path, Bundle)
-			finally {
-				State.active := false
-				SetTimer(Timer, 0)
+		for Mode in ["control", "hash", "port"] {
+			_TestPrint("# acquired-read timer custody mode " . Mode)
+			State := {path: Path, pathKey: FileReadActivityKey(Path), port: Native, mode: Mode,
+				active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failure: "",
+				restoreErrors: []}
+			State.observer := Mode == "port" ? ((*) => (State.observerCalls += 1, HashCallback))
+				: ((*) => (State.observerCalls += 1, Digest))
+			Timer := _CTWP_NativeReadCustodyTick.Bind(State)
+			Facts := false
+			; A missing acquired-read timer interval is a failure, never a green skip
+			; or modeled observation.
+			loop _CTWP_TEMPORAL_READ_ATTEMPTS {
+				State.active := true
+				SetTimer(Timer, 1)
+				try Facts := _ConfigTransitionNativeRecoveryImages(PathsFile, Path, Bundle)
+				finally {
+					State.active := false
+					SetTimer(Timer, 0)
+				}
+				if State.observed {
+					_TestPrint("# acquired-read timer observed on attempt " . A_Index)
+					break
+				}
 			}
-			if State.observed
-				break
+			Restore()
+			AssertEqual("", State.failure, "actual timer observer failure is retained rather than swallowed")
+			AssertTrue(State.observed, "an actual timer must run during the acquired native exact-read span")
+			Assert(State.readerHandle != -1, "the timer observed an actual retained Win32 read handle")
+			AssertEqual(0, State.timerCritical, "the original native read remains interruptible")
+			AssertFalse(FileReadActivityBusy(Path), "actual native close retires the observed read activity")
+			if Mode == "control" {
+				Assert(Facts is Object, "the original unmodified acquired-read timer control issues genuine recovery facts")
+				AssertEqual(OldSource, Facts.old.source)
+				AssertEqual(NewSource, Facts.new.source)
+			} else
+				AssertFalse(Facts, "custody withdrawn during real IO cannot issue recovery facts")
+			AssertEqual(0, State.observerCalls, "same-object ownership withdrawal must refuse before nested hash or port lookup dispatch")
+			AssertEqual(BeforeWal, _CTWP_RawHex(WalPath))
+			AssertTrue(FSUtf8ExactMatches(Path, NewSource), "the exact genuine target bytes remain unchanged")
+			AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path))
+			Repaired := _ConfigTransitionNativeRecoveryImages(PathsFile, Path, Bundle)
+			Assert(Repaired is Object, "repair of original descriptors restores actual native recovery facts")
+			AssertEqual(OldSource, Repaired.old.source)
+			AssertEqual(NewSource, Repaired.new.source)
 		}
-		Restore()
-		AssertEqual("", State.failure, "actual timer observer failure is retained rather than swallowed")
-		AssertTrue(State.observed, "an actual timer must run during the acquired native exact-read span")
-		Assert(State.readerHandle != -1, "the timer observed an actual retained Win32 read handle")
-		AssertEqual(0, State.timerCritical, "the original native read remains interruptible")
-		AssertFalse(FileReadActivityBusy(Path), "actual native close retires the observed read activity")
-		if Mode == "control" {
-			Assert(Facts is Object, "the original unmodified acquired-read timer control issues genuine recovery facts")
-			AssertEqual(OldSource, Facts.old.source)
-			AssertEqual(NewSource, Facts.new.source)
-		} else
-			AssertFalse(Facts, "custody withdrawn during real IO cannot issue recovery facts")
-		AssertEqual(0, State.observerCalls, "same-object ownership withdrawal must refuse before nested hash or port lookup dispatch")
-		AssertEqual(BeforeWal, _CTWP_RawHex(WalPath))
-		AssertTrue(FSUtf8ExactMatches(Path, NewSource), "the exact genuine target bytes remain unchanged")
-		AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path))
-		Repaired := _ConfigTransitionNativeRecoveryImages(PathsFile, Path, Bundle)
-		Assert(Repaired is Object, "repair of original descriptors restores actual native recovery facts")
-		AssertEqual(OldSource, Repaired.old.source)
-		AssertEqual(NewSource, Repaired.new.source)
 		RolledBack := ConfigTransitionRollbackOwned(PathsFile, Bundle)
 		AssertTrue(ConfigTransitionResultIs(RolledBack, "recovered_old"))
 		AssertTrue(FSUtf8ExactMatches(Path, OldSource))
@@ -313,13 +332,12 @@ _CTWP_NativeReadTemporalCustody(Mode) {
 		}
 		Receipt := _CTWP_TemporalCleanup(Dir, PathsFile, Path, OldSource, Bundle, Native,
 			State, Timer, RestoreHash, RestorePort, PriorRetained, ReleaseOwned)
-		_CTWP_TemporalReport(Receipt, Primary, "recovery:" . Mode)
+		_CTWP_TemporalReport(Receipt, Primary, "recovery")
 	}
 }
 
-for Mode in ["control", "hash", "port"]
-	Test("config transition native recovery: genuine acquired-read timer custody " . Mode,
-		_CTWP_NativeReadTemporalCustody.Bind(Mode))
+Test("config transition native recovery: genuine acquired-read timer custody in every mode",
+	_CTWP_NativeReadTemporalCustody)
 
 
 ; A real AHK timer withdraws custody while the unchanged Win32 reader owns
@@ -350,38 +368,23 @@ _CTWP_GuardedReadCustodyTick(State) {
 	}
 }
 
-_CTWP_GuardedReadTemporalCustody(Mode) {
+; One commit and one rollback serve every mode, as in the recovery family above.
+_CTWP_GuardedReadTemporalCustody() {
 	global _ConfigTransitionRetainedBarrier
 	PriorRetained := _ConfigTransitionRetainedBarrier
 	Dir := _CTWP_NewDir("genuine-guarded-read-temporal-custody")
 	PathsFile := Dir . "\paths.toml", Path := Dir . "\config.toml"
 	OldSource := _CTWP_SchemaSource("old actual timed recovery source")
-	; 8 MiB keeps the native read across a timer tick (1 MiB sometimes missed it)
-	; at a quarter of the cost of the former 32 MiB source.
-	Padding := "x"
-	loop 23
-		Padding .= Padding
-	NewSource := _CTWP_SchemaSource("new actual timed recovery source") . "# " . Padding . "`n"
-	Padding := ""
+	NewSource := _CTWP_TemporalPaddedSource("new actual timed recovery source")
 	Native := ConfigTransitionProductionPort(), HashCallback := Native["hash"]
-	TargetCallback := false
-	switch Mode {
-	case "hash": TargetCallback := CryptoSha256
-	case "exists": TargetCallback := FSStrictExists
-	case "read_bounded": TargetCallback := FSReadUtf8ExactBounded
-	case "write_create_durable": TargetCallback := FSWriteCreateDurable
-	}
+	TargetCallback := false, Mode := ""
 	Digest := CryptoSha256(NewSource), Bundle := false
-	State := {path: Path, pathKey: FileReadActivityKey(Path), port: Native, mode: Mode, callback: TargetCallback,
-		active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failure: ""}
-	State.observer := Mode == "port" ? ((*) => (State.observerCalls += 1, HashCallback))
-		: ((*) => (State.observerCalls += 1, Mode == "hash" ? Digest : 1))
-	Timer := _CTWP_GuardedReadCustodyTick.Bind(State)
-	HadHashCall := TargetCallback is Object && Object.Prototype.HasOwnProp.Call(TargetCallback, "Call")
-	HashDescriptor := HadHashCall ? TargetCallback.GetOwnPropDesc("Call") : false
+	State := {active: false, restoreErrors: [], observer: 0}
+	Timer := (*) => 0
+	HadHashCall := false, HashDescriptor := false
 	HadPortItem := Object.Prototype.HasOwnProp.Call(Native, "__Item")
 	PortDescriptor := HadPortItem ? Native.GetOwnPropDesc("__Item") : false
-	State.restoreErrors := [], Primary := false
+	Primary := false
 	RestoreHash() {
 		_CTWP_TemporalRestoreDescriptor(TargetCallback, "Call", HadHashCall, HashDescriptor, State.observer, "Call")
 	}
@@ -418,61 +421,82 @@ _CTWP_GuardedReadTemporalCustody(Mode) {
 		Assert(Captured is Object && Captured.port is Map)
 		AssertEqual(8, Captured.port.Count, "the actual guarded adapter forwards the complete native callback class")
 		ProbePath := Dir . "\foreign-timer-probe.txt"
-		Facts := false
-		; Eight genuine invocations bound timing variance. A missing acquired-read
-		; timer interval is a failure, never a green skip or modeled observation.
-		loop 8 {
-			State.active := true
-			SetTimer(Timer, 1)
-			try Facts := _ConfigTransitionReadSnapshot(Captured.port, Path)
-			finally {
-				State.active := false
-				SetTimer(Timer, 0)
+		for ModeName in ["control", "hash", "port", "exists", "read_bounded", "write_create_durable"] {
+			Mode := ModeName
+			_TestPrint("# acquired-read timer custody mode " . Mode)
+			switch Mode {
+			case "hash": TargetCallback := CryptoSha256
+			case "exists": TargetCallback := FSStrictExists
+			case "read_bounded": TargetCallback := FSReadUtf8ExactBounded
+			case "write_create_durable": TargetCallback := FSWriteCreateDurable
+			default: TargetCallback := false
 			}
-			if State.observed
-				break
+			State := {path: Path, pathKey: FileReadActivityKey(Path), port: Native, mode: Mode, callback: TargetCallback,
+				active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failure: "",
+				restoreErrors: []}
+			State.observer := Mode == "port" ? ((*) => (State.observerCalls += 1, HashCallback))
+				: ((*) => (State.observerCalls += 1, Mode == "hash" ? Digest : 1))
+			Timer := _CTWP_GuardedReadCustodyTick.Bind(State)
+			HadHashCall := TargetCallback is Object && Object.Prototype.HasOwnProp.Call(TargetCallback, "Call")
+			HashDescriptor := HadHashCall ? TargetCallback.GetOwnPropDesc("Call") : false
+			Facts := false
+			; A missing acquired-read timer interval is a failure, never a green skip
+			; or modeled observation.
+			loop _CTWP_TEMPORAL_READ_ATTEMPTS {
+				State.active := true
+				SetTimer(Timer, 1)
+				try Facts := _ConfigTransitionReadSnapshot(Captured.port, Path)
+				finally {
+					State.active := false
+					SetTimer(Timer, 0)
+				}
+				if State.observed {
+					_TestPrint("# acquired-read timer observed on attempt " . A_Index)
+					break
+				}
+			}
+			if Mode != "control" {
+				if Mode == "write_create_durable"
+					AssertThrows(() => Captured.port[Mode].Call(ProbePath, "foreign timer output"))
+				else if Mode == "read_bounded"
+					AssertThrows(() => Captured.port[Mode].Call(WalPath, CONFIG_TRANSITION_MAX_WAL_BYTES))
+				else if Mode == "exists"
+					AssertThrows(() => Captured.port[Mode].Call(Path))
+				else if Mode == "hash"
+					AssertThrows(() => Captured.port[Mode].Call(NewSource))
+				else
+					AssertThrows(() => Captured.port["hash"].Call(NewSource))
+			}
+			Restore()
+			AssertEqual("", State.failure, "actual timer observer failure is retained rather than swallowed")
+			AssertTrue(State.observed, "an actual timer must run during the acquired native exact-read span")
+			Assert(State.readerHandle != -1, "the timer observed an actual retained Win32 read handle")
+			AssertEqual(0, State.timerCritical, "the original native read remains interruptible")
+			AssertFalse(FileReadActivityBusy(Path), "actual native close retires the observed read activity")
+			if Mode == "control" {
+				AssertTrue(ConfigTransitionResultIs(Facts, "snapshot"), "the original guarded acquired-read control returns a genuine native snapshot")
+				AssertEqual(NewSource, Facts["snapshot"]["content"])
+			} else
+				AssertFalse(ConfigTransitionResultIs(Facts, "snapshot"), "custody withdrawn during real IO cannot acknowledge a guarded snapshot")
+			AssertEqual(0, State.observerCalls, "same-object ownership withdrawal must refuse before nested hash or port lookup dispatch")
+			AssertFalse(FSStrictExists(ProbePath), "a withdrawn callback never creates foreign native output")
+			AssertEqual(BeforeWal, _CTWP_RawHex(WalPath))
+			AssertTrue(FSUtf8ExactMatches(Path, NewSource), "the exact genuine target bytes remain unchanged")
+			AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path))
+			Repaired := _ConfigTransitionReadSnapshot(Captured.port, Path)
+			AssertTrue(ConfigTransitionResultIs(Repaired, "snapshot"), "exact descriptor repair restores the same actual guarded adapter")
+			AssertEqual(NewSource, Repaired["snapshot"]["content"])
+			AssertEqual(1, Captured.port["exists"].Call(Path), "repaired existence uses its actual native producer")
+			AssertEqual(Digest, Captured.port["hash"].Call(NewSource), "repaired hash keeps the actual canonical native digest")
+			AssertEqual(FSReadUtf8Exact(WalPath), Captured.port["read_bounded"].Call(WalPath, CONFIG_TRANSITION_MAX_WAL_BYTES),
+				"repaired bounded read returns actual native WAL bytes")
+			RepairPath := Dir . "\owned-native-repair.txt"
+			AssertEqual(1, Captured.port["write_create_durable"].Call(RepairPath, "owned native repair output"),
+				"repaired creation retains the actual durable native receipt")
+			AssertEqual("owned native repair output", FSReadUtf8Exact(RepairPath))
+			AssertEqual(1, Captured.port["delete"].Call(RepairPath))
+			AssertFalse(FSStrictExists(RepairPath))
 		}
-		if Mode != "control" {
-			if Mode == "write_create_durable"
-				AssertThrows(() => Captured.port[Mode].Call(ProbePath, "foreign timer output"))
-			else if Mode == "read_bounded"
-				AssertThrows(() => Captured.port[Mode].Call(WalPath, CONFIG_TRANSITION_MAX_WAL_BYTES))
-			else if Mode == "exists"
-				AssertThrows(() => Captured.port[Mode].Call(Path))
-			else if Mode == "hash"
-				AssertThrows(() => Captured.port[Mode].Call(NewSource))
-			else
-				AssertThrows(() => Captured.port["hash"].Call(NewSource))
-		}
-		Restore()
-		AssertEqual("", State.failure, "actual timer observer failure is retained rather than swallowed")
-		AssertTrue(State.observed, "an actual timer must run during the acquired native exact-read span")
-		Assert(State.readerHandle != -1, "the timer observed an actual retained Win32 read handle")
-		AssertEqual(0, State.timerCritical, "the original native read remains interruptible")
-		AssertFalse(FileReadActivityBusy(Path), "actual native close retires the observed read activity")
-		if Mode == "control" {
-			AssertTrue(ConfigTransitionResultIs(Facts, "snapshot"), "the original guarded acquired-read control returns a genuine native snapshot")
-			AssertEqual(NewSource, Facts["snapshot"]["content"])
-		} else
-			AssertFalse(ConfigTransitionResultIs(Facts, "snapshot"), "custody withdrawn during real IO cannot acknowledge a guarded snapshot")
-		AssertEqual(0, State.observerCalls, "same-object ownership withdrawal must refuse before nested hash or port lookup dispatch")
-		AssertFalse(FSStrictExists(ProbePath), "a withdrawn callback never creates foreign native output")
-		AssertEqual(BeforeWal, _CTWP_RawHex(WalPath))
-		AssertTrue(FSUtf8ExactMatches(Path, NewSource), "the exact genuine target bytes remain unchanged")
-		AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path))
-		Repaired := _ConfigTransitionReadSnapshot(Captured.port, Path)
-		AssertTrue(ConfigTransitionResultIs(Repaired, "snapshot"), "exact descriptor repair restores the same actual guarded adapter")
-		AssertEqual(NewSource, Repaired["snapshot"]["content"])
-		AssertEqual(1, Captured.port["exists"].Call(Path), "repaired existence uses its actual native producer")
-		AssertEqual(Digest, Captured.port["hash"].Call(NewSource), "repaired hash keeps the actual canonical native digest")
-		AssertEqual(FSReadUtf8Exact(WalPath), Captured.port["read_bounded"].Call(WalPath, CONFIG_TRANSITION_MAX_WAL_BYTES),
-			"repaired bounded read returns actual native WAL bytes")
-		RepairPath := Dir . "\owned-native-repair.txt"
-		AssertEqual(1, Captured.port["write_create_durable"].Call(RepairPath, "owned native repair output"),
-			"repaired creation retains the actual durable native receipt")
-		AssertEqual("owned native repair output", FSReadUtf8Exact(RepairPath))
-		AssertEqual(1, Captured.port["delete"].Call(RepairPath))
-		AssertFalse(FSStrictExists(RepairPath))
 		RolledBack := ConfigTransitionRollbackOwned(PathsFile, Bundle)
 		AssertTrue(ConfigTransitionResultIs(RolledBack, "recovered_old"))
 		AssertTrue(FSUtf8ExactMatches(Path, OldSource))
@@ -486,13 +510,12 @@ _CTWP_GuardedReadTemporalCustody(Mode) {
 		}
 		Receipt := _CTWP_TemporalCleanup(Dir, PathsFile, Path, OldSource, Bundle, Native,
 			State, Timer, RestoreHash, RestorePort, PriorRetained, ReleaseOwned)
-		_CTWP_TemporalReport(Receipt, Primary, "guarded:" . Mode)
+		_CTWP_TemporalReport(Receipt, Primary, "guarded")
 	}
 }
 
-for Mode in ["control", "hash", "port", "exists", "read_bounded", "write_create_durable"]
-	Test("config transition guarded native adapter: genuine acquired-read timer custody " . Mode,
-		_CTWP_GuardedReadTemporalCustody.Bind(Mode))
+Test("config transition guarded native adapter: genuine acquired-read timer custody in every mode",
+	_CTWP_GuardedReadTemporalCustody)
 
 ; A body error after a real committed journal must not destroy that journal
 ; before owned rollback, nor replace the exact original error object.

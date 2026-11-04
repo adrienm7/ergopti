@@ -125,3 +125,42 @@ _TWLR_UnexpectedMemoryQuery() {
 }
 Test("webview-lowram: cold-start boundaries and warm browser reuse",
 	_TWLR_ColdAndWarmDecisions)
+
+_TWLR_Value(Value) {
+	return Value
+}
+
+_TWLR_RecordNotice(Notices, Text) {
+	Notices.Push(Text)
+}
+
+; The minimum is compared part by part: "100.0" is newer than "87.0.664.8" though
+; a string comparison says otherwise. The refusal speaks once per run.
+_TWLR_RuntimeMinimum() {
+	global _WebView_RuntimeRefusalShown, _WebView_SharedEnv, WEBVIEW_MIN_RUNTIME_VERSION
+	SavedShown := _WebView_RuntimeRefusalShown
+	SavedEnvironment := _WebView_SharedEnv
+	Notices := []
+	Notice := _TWLR_RecordNotice.Bind(Notices)
+	try {
+		_WebView_RuntimeRefusalShown := false
+		_WebView_SharedEnv := 0
+		for Version in ["", WEBVIEW_MIN_RUNTIME_VERSION, "87.0.664.9", "100.0.0.0", "141.0.3537.71"]
+			AssertFalse(WebView_RuntimeIsRefused(_TWLR_Value.Bind(Version), Notice), "version '" . Version . "' is admitted")
+		AssertEqual(0, Notices.Length, "an admitted runtime says nothing")
+		for Version in ["87.0.664.7", "86.0.622.38", "9.0.0.0"]
+			AssertTrue(WebView_RuntimeIsRefused(_TWLR_Value.Bind(Version), Notice), "version " . Version . " is refused")
+		AssertEqual(1, Notices.Length, "the refusal speaks once")
+		AssertContains(Notices[1], WEBVIEW_MIN_RUNTIME_VERSION, "it names the minimum")
+		AssertContains(Notices[1], "87.0.664.7", "and the version found")
+		AssertTrue(WebView_ShouldUseNativeFallback(_TWLR_UnexpectedMemoryQuery, _TWLR_Value.Bind(true)),
+			"a refused runtime takes the native fallback before reading the memory")
+		AssertFalse(WebView_ShouldUseNativeFallback(_TWLR_MemoryReading.Bind(-1), _TWLR_Value.Bind(false)),
+			"an admitted runtime goes on to the memory reading")
+	} finally {
+		_WebView_RuntimeRefusalShown := SavedShown
+		_WebView_SharedEnv := SavedEnvironment
+	}
+}
+Test("webview-runtime: a runtime below the minimum is refused in words, native fallback kept",
+	_TWLR_RuntimeMinimum)

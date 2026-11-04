@@ -52,7 +52,7 @@ local function with_scope(body, source, options)
 		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
 				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "modules.gestures.manager",
-				"infra.shortcuts_scope", "ui.menu.menu_builder" }) do
+				"infra.shortcuts_scope", "ui.menu.builder" }) do
 				package.loaded[name] = nil
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0, pair_changes = 0 }

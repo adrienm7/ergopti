@@ -25,7 +25,7 @@ final class UninstallWorkerTests: XCTestCase {
 		try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
 		defer { try? FileManager.default.removeItem(at: temporary) }
 		let root = temporary.resolvingSymlinksInPath()
-		let bundle = root.appendingPathComponent("ErgoptiPlus.app")
+		let bundle = root.appendingPathComponent(Identifiers.App.bundle)
 		let executable = bundle.appendingPathComponent("Contents/MacOS/ErgoptiPlus")
 		try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(),
 			withIntermediateDirectories: true)
@@ -60,7 +60,7 @@ final class UninstallWorkerTests: XCTestCase {
 		try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
 		defer { try? FileManager.default.removeItem(at: home) }
 		let plist = agents.appendingPathComponent(kRemapGuardianPlistName)
-		let executable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+		let executable = "/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus"
 		let runner = UninstallLaunchctlStub()
 		try Data("foreign agent".utf8).write(to: plist)
 		XCTAssertFalse(removeLegacyRemapGuardian(
@@ -177,10 +177,10 @@ final class UninstallWorkerTests: XCTestCase {
 	func testTheAdministratorScriptNamesOnlyTheOwnedRuntime() {
 		let script = OwnedRuntimeUninstall.script()
 		XCTAssertTrue(script.hasPrefix("set -e; "), "the first failure must stop the script")
-		XCTAssertTrue(script.contains("launchctl bootout system/com.ergoptiplus.runtime.core"))
-		XCTAssertTrue(script.contains("launchctl bootout system/com.ergoptiplus.runtime.vhid"))
+		XCTAssertTrue(script.contains("launchctl bootout system/\(Identifiers.ServiceLabels.macosCore)"))
+		XCTAssertTrue(script.contains("launchctl bootout system/\(Identifiers.ServiceLabels.macosVirtualHid)"))
 		XCTAssertTrue(script.contains("/bin/rm -rf '/Library/Application Support/ErgoptiPlus/Runtime'"))
-		XCTAssertTrue(script.contains("/bin/rm -f /Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist"))
+		XCTAssertTrue(script.contains("/bin/rm -f /Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"))
 		XCTAssertFalse(script.contains("org.pqrs"), "the official Karabiner is never touched")
 		XCTAssertFalse(script.contains("||"), "no failure is swallowed")
 		XCTAssertFalse(script.contains("\""), "the AppleScript string holds no double quote")

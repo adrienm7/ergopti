@@ -29,9 +29,13 @@ helpers.describe("Metrics scope deferred activation admission", function()
 		local owner, dispatch, starts = fixture(false, true)
 		helpers.assert_eq(owner.metrics_start_pending(), true)
 		helpers.assert_eq(starts(), 0)
+		helpers.assert_nil(owner.keystats_start_ms(), "(keystats-start-ms) no duration before the start")
 		dispatch()
 		helpers.assert_eq(owner.metrics_start_pending(), false)
 		helpers.assert_eq(starts(), 1)
+		local held = owner.keystats_start_ms()
+		helpers.assert_true(type(held) == "number" and held >= 0,
+			"(keystats-start-ms) the deferred start's hold is kept for the field run")
 	end)
 	helpers.it("a refused scheduler cannot activate through a captured or synchronous callback", function()
 		for _, synchronous in ipairs({ false, true }) do

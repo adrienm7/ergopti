@@ -76,8 +76,11 @@ end
 -- text is resolved when the submenu is built: resolved here, at module load, it
 -- was frozen in the session cache and stayed in the old language after a
 -- language change until the next reload.
+-- The bundled app whose helpers need the managed Python (ui/app_cloner_python_offer.lua).
+local APP_CLONER = "App Cloner"
+
 local APP_DESCRIPTION_KEYS = {
-	["App Cloner"] = "menu.apps.clone_desc",
+	[APP_CLONER] = "menu.apps.clone_desc",
 	["Encryptor"]  = "menu.apps.encrypt_desc",
 }
 
@@ -342,29 +345,42 @@ function M.build(ctx)
 				-- are injected directly into the launched app's environment.
 				-- `setEnvironment` on the `open` process itself does not propagate
 				-- to the app it spawns; `--env KEY=VALUE` does.
-				local task
-				task = TaskLifecycle.native(
-					"Bundled app launch",
-					"/usr/bin/open",
-					function(code, _, stderr)
-						if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
-						if code ~= 0 then
-							Logger.error(LOG, "open '%s' exited %d: %s.", app_name, code, stderr)
-						end
-					end,
-					function() return false end,
-					{
+				local function launch(extra_environment)
+					local arguments = {
 						"-n",
 						"--env", "ERGOPTI_LOCALE="     .. locale_code,
 						"--env", "ERGOPTI_LOCALES_DIR=" .. locales_dir,
-						app_path,
 					}
-				)
-				if not task then return end
-				M._active_tasks[task] = true
-				if not TaskLifecycle.start(task, "Bundled app launch") then
-					M._active_tasks[task] = nil
+					for _, entry in ipairs(extra_environment) do
+						arguments[#arguments + 1] = "--env"
+						arguments[#arguments + 1] = entry
+					end
+					arguments[#arguments + 1] = app_path
+					local task
+					task = TaskLifecycle.native(
+						"Bundled app launch",
+						"/usr/bin/open",
+						function(code, _, stderr)
+							if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
+							if code ~= 0 then
+								Logger.error(LOG, "open '%s' exited %d: %s.", app_name, code, stderr)
+							end
+						end,
+						function() return false end,
+						arguments
+					)
+					if not task then return end
+					M._active_tasks[task] = true
+					if not TaskLifecycle.start(task, "Bundled app launch") then
+						M._active_tasks[task] = nil
+					end
 				end
+				-- App Cloner's helpers run on Ergopti's managed Python and its
+				-- pinned PyObjC, installed on the user's first agreement.
+				if app_name == APP_CLONER then
+					return require("ui.app_cloner_python_offer").open(require("modules.llm.managed_pyobjc").default(), launch)
+				end
+				launch({})
 			end,
 		})
 	end

@@ -118,4 +118,9 @@ if "$DAEMON_LAUNCH"; then
 	export ERGOPTI_SESSION_LOCK_FD=9
 fi
 
+# A package's private runtime (network-runtime-env.sh, sourced by its wrapper)
+# names the one LuaJIT it runs; install.sh's source install has none.
+if [ -n "${ERGOPTI_RUNTIME_PREFIX:-}" ]; then
+	exec "$ERGOPTI_RUNTIME_PREFIX/bin/luajit" "$DRIVER_ROOT/ergopti_hotstrings.lua" "$@"
+fi
 exec luajit "$DRIVER_ROOT/ergopti_hotstrings.lua" "$@"

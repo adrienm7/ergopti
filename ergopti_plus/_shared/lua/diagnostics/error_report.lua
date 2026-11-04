@@ -26,9 +26,9 @@ local M = {}
 
 local IssueReport = require("diagnostics.issue_report")
 
--- The kinds of error the window reports: an ERROR logged by a running driver,
--- and the notice of a crash found at the next launch
-M.KINDS = { error = true, crash = true }
+-- The kinds of error the window reports: an ERROR logged by a running driver. A
+-- crash is announced by its own notice and never reaches this window.
+M.KINDS = { error = true }
 
 
 
@@ -61,7 +61,7 @@ local function checked(err)
 end
 
 --- Builds the report of one error.
---- @param err table { kind = "error"|"crash", module, message, time, recent = { line, … } }
+--- @param err table { kind = "error", module, message, time, recent = { line, … } }
 --- @param identity table { version, commit, os, driver, generated_utc, warn_count, err_count }
 --- @return table { text, fields = { title, version, os, driver } }
 function M.compose(err, identity)

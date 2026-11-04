@@ -165,7 +165,9 @@ function M.set(value)
 		Logger.error(LOG, "Refusing invalid log level '%s'.", tostring(value))
 		return false
 	end
-	if Storage.set(FEATURE_PATH, level) ~= true then
+	-- config.toml's [script] log_level wins at start: rewrite it first.
+	if not require("infra.script_scope").rewrite_configured(FEATURE_PATH, level)
+		or Storage.set(FEATURE_PATH, level) ~= true then
 		Logger.error(LOG, "Log level '%s' could not be persisted — active state is unchanged.", level)
 		return false
 	end

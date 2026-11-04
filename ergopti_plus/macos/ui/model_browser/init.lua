@@ -248,7 +248,9 @@ local function create_ucc()
 				if _ctx ~= context or _session ~= session or _wv_committed ~= true then return end
 				if ok and accepted == true and (body.action == "select_model" or body.action == "disable_model") then
 					M.close()
-				elseif ok and accepted == true then
+				elseif (ok and accepted == true) or body.action == "group_action" then
+					-- A refused tool too: the page already drew its click as running,
+					-- and only a new payload brings the outcome and its reason back.
 					inject_catalogue(context)
 				end
 				return

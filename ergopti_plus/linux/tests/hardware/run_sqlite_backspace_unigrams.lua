@@ -31,7 +31,10 @@ local function bs_fields(payload)
 end
 local function literal_fields(payload)
  local c=assert(payload.today.literal).c
- for _,ch in ipairs({'[','B','S',']'}) do assert(c[ch].c==1 and c[ch].o==1 and c[ch].hs==0 and c[ch].llm==0) end
+ -- Version 2 keys escape a typed bracket as [[, which is what keeps these four
+ -- codepoints apart from one Backspace; raw events keep the bracket as typed.
+ for _,token in ipairs({'[[','B','S',']'}) do assert(c[token].c==1 and c[token].o==1 and c[token].hs==0 and c[token].llm==0) end
+ assert(c['[']==nil,'a typed bracket has one key form')
  assert(c['[BS]']==nil,'literal text must stay four codepoints')
 end
 local before=K.get_range_payload(day,day,nil)

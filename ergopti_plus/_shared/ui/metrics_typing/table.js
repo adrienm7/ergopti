@@ -249,9 +249,8 @@ function derive_modifier_usage(sc_dict) {
  * @returns {boolean} Whether all characters in the sequence are the same.
  */
 function is_repetition(key) {
-	// Normalize [BS] markers before the grapheme check
-	const clean = key.replace(/\[BS\]/gi, '');
-	const chars = Array.from(clean);
+	// A [BS] marker takes no part in the repetition check
+	const chars = key_tokens(key).filter((token) => token.toUpperCase() !== '[BS]');
 	if (chars.length <= 1) return false;
 	return chars.every((c) => c === chars[0]);
 }
@@ -266,11 +265,7 @@ function is_repetition(key) {
  * @returns {number} The number of effective tokens.
  */
 function count_key_tokens(key) {
-	const parts = key.split(/(\[[^\]]+\])/i).filter((p) => p.length > 0);
-	return parts.reduce((sum, part) => {
-		if (/^\[[^\]]+\]$/i.test(part)) return sum + 1;
-		return sum + Array.from(part).length;
-	}, 0);
+	return key_tokens(key).length;
 }
 
 // ===========================================
@@ -420,10 +415,7 @@ function compute_key_km_per_stroke(key, char_km_map, is_kc_tab, is_sc_tab) {
 				.split('+')
 				.map((p) => p.trim().toLowerCase())
 				.filter((p) => p.length > 0)
-		: key
-				.split(/(\[[^\]]+\])/i)
-				.filter((p) => p.length > 0)
-				.flatMap((part) => (/^\[[^\]]+\]$/i.test(part) ? [part.toLowerCase()] : Array.from(part)));
+		: key_tokens(key);
 
 	return tokens.reduce((sum, t) => sum + (char_km_map[t.toLowerCase()] ?? char_km_map[t] ?? 0), 0);
 }
@@ -516,15 +508,11 @@ function render_current_tab() {
 			});
 			if (has_ctrl) return;
 
-			// Tokenize: [BRACKET] markers → one token; everything else → per grapheme
-			const tokens = k
-				.split(/(\[[^\]]+\])/i)
-				.filter((p) => p.length > 0)
-				.flatMap((part) => (/^\[[^\]]+\]$/i.test(part) ? [part] : Array.from(part)));
+			const tokens = key_tokens(k);
 
 			if (tokens.length === 1) {
 				// Single token: preserve full stats including timing
-				accum_token(k, item, true);
+				accum_token(tokens[0], item, true);
 			} else {
 				// Multi-token: propagate counts only; timing is not per-char here
 				tokens.forEach((t) => accum_token(t, item, false));
@@ -611,11 +599,8 @@ function render_current_tab() {
 		// The projection retains correction policy from original native keys before folding.
 		const acc = item.count > 0 ? ((item.count - item.accuracy_errors) / item.count) * 100 : 0;
 
-		// Normalize any [BRACKET] marker to a single char before grapheme length computation.
 		// Keycode tab keys are numeric strings ("49") representing a single physical key.
-		const norm_key = k.replace(/\[[^\]]+\]/gi, 'B');
-		const display_len =
-			app_state.current_tab === 'kc' ? 1 : Math.max(1, Array.from(norm_key).length);
+		const display_len = app_state.current_tab === 'kc' ? 1 : Math.max(1, count_key_tokens(k));
 
 		total_occ += item.count;
 
@@ -667,7 +652,9 @@ function render_current_tab() {
 	if (rep_source_tab) {
 		const rep_dict = app_state.data[rep_source_tab] || {};
 		data_arr.forEach((item) => {
-			const rep_key = item.key + item.key;
+			// The characters tab unescapes a typed bracket; the source dict does not.
+			const stem = item.key === '[' ? KEYSTATS_LITERAL_BRACKET : item.key;
+			const rep_key = stem + stem;
 			// Lowercase fallback handles bracket markers stored with mixed case
 			// (e.g. "[BS][BS]" vs "[bs][bs]" depending on raw data source path).
 			const rep_entry = rep_dict[rep_key] ?? rep_dict[rep_key.toLowerCase()];
@@ -1293,7 +1280,7 @@ function render_kc_heatmap(kc_data_arr) {
 		// Tooltip div — absolutely positioned, hidden by default
 		tooltips +=
 			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
-			`background:#1a1a2e;border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
+			`background:${ThemeTokens.color('hue-1a1a2e')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
 			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:220px;white-space:nowrap;text-align:left;">` +
 			tip_html +
 			`</div>`;
@@ -1301,10 +1288,10 @@ function render_kc_heatmap(kc_data_arr) {
 
 	container.innerHTML =
 		`<div style="display:inline-block;position:relative;">` +
-		`<div style="font-size:17px;font-weight:bold;color:#1e96ff;margin-bottom:6px;text-align:left;">` +
+		`<div style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-1e96ff')};margin-bottom:6px;text-align:left;">` +
 		`Heatmap de l'utilisation physique des touches</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
-		`style="background:#12121e;border-radius:10px;display:block;"` +
+		`style="background:${ThemeTokens.color('hue-12121e')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
 		labels +
@@ -1470,7 +1457,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 	// Green (cold, 0 SFBs) → red (hot, many SFBs)
 	const heat_color = (count) => {
-		if (count === 0) return '#1e2e1e';
+		if (count === 0) return ThemeTokens.color('hue-1e2e1e');
 		const t = Math.pow(count / max_count, 0.4);
 		if (t < 0.5) {
 			const tt = t * 2;
@@ -1727,7 +1714,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 		tooltips +=
 			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
-			`background:#1a2e1a;border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
+			`background:${ThemeTokens.color('hue-1a2e1a')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
 			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:280px;white-space:nowrap;text-align:left;">` +
 			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:${ThemeTokens.color('grey-555')};}</style>` +
 			tip_html +
@@ -1736,10 +1723,10 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 	container.innerHTML =
 		`<div style="display:inline-block;position:relative;">` +
-		`<div style="font-size:17px;font-weight:bold;color:#22c55e;margin-bottom:6px;text-align:left;">` +
+		`<div style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-22c55e')};margin-bottom:6px;text-align:left;">` +
 		`Heatmap des SFBs par touche</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
-		`style="background:#1e1608;border-radius:10px;display:block;"` +
+		`style="background:${ThemeTokens.color('hue-1e1608')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
 		labels +
@@ -1763,12 +1750,14 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
  * @returns {string} Lowercase composite string including all aliases.
  */
 function build_searchable_key(raw_key, case_sensitive) {
-	let s = case_sensitive ? raw_key : raw_key.toLowerCase();
+	const tokens = key_tokens(raw_key);
+	const text = tokens.join('');
+	let s = case_sensitive ? text : text.toLowerCase();
 	// Space character variants
 	if (raw_key.includes('\u00A0')) s += ' nbsp';
 	if (raw_key.includes('\u202F')) s += ' nnbsp';
 	// [BS] marker → backspace alias
-	if (/\[bs\]/i.test(raw_key)) s += ' backspace';
+	if (tokens.some((token) => token.toUpperCase() === '[BS]')) s += ' backspace';
 	// Single ASCII control characters → add their CONTROL_CHAR_NAMES abbreviation
 	if (raw_key.length === 1) {
 		const code = raw_key.charCodeAt(0);
@@ -1794,8 +1783,7 @@ function build_searchable_key(raw_key, case_sensitive) {
 		if (!s.includes(candidate)) s += ' ' + candidate;
 	}
 	// For sequences: also add labels for each embedded bracket marker (e.g. in bigrams)
-	const bracket_matches = raw_key.match(/\[[^\]]+\]/gi) || [];
-	bracket_matches.forEach((m) => {
+	tokens.filter(is_key_marker).forEach((m) => {
 		const m_sym = CONTROL_KEY_SYMBOLS[m.toLowerCase()];
 		if (m_sym) {
 			const candidate = case_sensitive ? m_sym : m_sym.toLowerCase();
@@ -2124,11 +2112,15 @@ function render_media_keys() {
 				const breakdown = _t('onboarding.checklist.tap_hold')
 					.replace('{1}', String(row.tap))
 					.replace('{2}', String(row.hold));
-				details +=
-					` · ${escape_html(breakdown)} · ${escape_html(_t('ui_apps.col_duration'))}: ` +
+				const labelled = (label, value) =>
+					escape_html(_t('common.label_value'))
+						.replace('{1}', () => escape_html(label))
+						.replace('{2}', () => value);
+				const durations =
 					`${escape_html(_t('ui_typing.lbl_total'))} ${number(row.s)} ms · ` +
 					`${escape_html(_t('ui_typing.key_tip_avg_dur'))} ${number(Number((row.s / row.n).toFixed(1)))} ms · ` +
-					`${escape_html(_t('ui_typing.lbl_longest_time'))}: ${number(row.m)} ms`;
+					labelled(_t('ui_typing.lbl_longest_time'), `${number(row.m)} ms`);
+				details += ` · ${escape_html(breakdown)} · ${labelled(_t('ui_apps.col_duration'), durations)}`;
 			}
 			return `<li data-media-id="${row.id}"><strong>${escape_html(_t(row.label_key))}</strong><br>${details}</li>`;
 		})

@@ -24,6 +24,7 @@ local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local SecureFieldDetector = require("adapters.secure_field_detector")
 local TimerScheduler = require("adapters.timer_scheduler")
+local AXResponsiveness = require("adapters.accessibility_permission")
 local LOG    = "keystats.context_tracker"
 local M      = {}
 
@@ -641,6 +642,10 @@ local AX_DEAD_ELEMENT = "AXUIElementRef is invalid"
 local AX_RELEASED_ON_REMOVAL = { [AX_DEAD_ELEMENT] = true, ["Messaging failed"] = true }
 local AX_UNWATCHABLE_ELEMENT = { ["Illegal argument"] = true, ["Notification unsupported"] = true,
 	[AX_DEAD_ELEMENT] = true, ["Messaging failed"] = true }
+--- kAXErrorNotificationAlreadyRegistered: this observer still watches the
+--- element, as after a removal released on "Messaging failed" above. The watch
+--- the caller asked for exists, so it commits instead of raising an ERROR.
+local AX_ALREADY_WATCHED = "Notification has already been registered"
 
 --- Returns the AX message of a watcher error, without its location or traceback.
 --- @param detail any xpcall error value.
@@ -650,22 +655,49 @@ local function ax_watcher_error(detail)
 	return first:match(":%d+: (.+)$") or first
 end
 
+-- Outcomes of this process's AXValueChanged mutations. The field run reports
+-- them for the running process only: the ERROR the 2026-10-31 17:37 report
+-- still carried came from a process booted before the fix reached dev (its
+-- traceback lines are the pre-fix file's), which a daily log cannot tell apart.
+local _ax_value_watch_counts = { already_watched = 0, failed = 0 }
+
 local function mutate_ax_value_watcher(observer, method, element, label)
 	local ok, result = xpcall(function()
 		return observer[method](observer, element, "AXValueChanged")
 	end, debug.traceback)
 	if ok and result ~= false then return true end
 	local message = not ok and ax_watcher_error(result) or nil
+	if message == AXResponsiveness.UNANSWERED_ERROR then
+		-- The post-wake focused-window read of the same application then waited
+		-- the timeout out again (1005 ms, field run 2026-11-03)
+		local ok_pid, pid = pcall(function() return element:pid() end)
+		if ok_pid then AXResponsiveness.mark_unanswered(pid) end
+	end
 	if method == "removeWatcher" and AX_RELEASED_ON_REMOVAL[message] then
 		Logger.debug(LOG, "%s: the element is released without a confirmed removal (%s).", label, message)
+		return true
+	end
+	if method == "addWatcher" and message == AX_ALREADY_WATCHED then
+		_ax_value_watch_counts.already_watched = _ax_value_watch_counts.already_watched + 1
+		Logger.debug(LOG, "%s: the element is already watched by this observer.", label)
 		return true
 	end
 	if method == "addWatcher" and AX_UNWATCHABLE_ELEMENT[message] then
 		Logger.debug(LOG, "%s skipped: the element cannot be watched (%s).", label, message)
 		return false
 	end
+	_ax_value_watch_counts.failed = _ax_value_watch_counts.failed + 1
 	Logger.error(LOG, "%s failed: %s.", label, tostring(result))
 	return false
+end
+
+--- This process's AXValueChanged watcher outcomes, for the field run.
+--- @return table counts { already_watched, failed } since the module loaded.
+function M.ax_value_watch_counts()
+	return {
+		already_watched = _ax_value_watch_counts.already_watched,
+		failed = _ax_value_watch_counts.failed,
+	}
 end
 
 --- Rejects one observer candidate while retaining ambiguous cleanup debt.
@@ -675,6 +707,7 @@ local function reject_ax_observer_candidate(detail, app_pid)
 	mark_context("secure", false)
 	local text = tostring(detail)
 	if text:match("^[^\n]*Messaging failed") then
+		AXResponsiveness.mark_unanswered(app_pid)
 		-- kAXErrorCannotComplete: the application did not answer Accessibility,
 		-- as one still launching or one without an Accessibility server does.
 		-- This is the application's state, not a driver fault, and the next
@@ -708,6 +741,15 @@ function M.update_ax_observer(app_pid)
 	end
 
 	if not app_pid then return true end
+	-- An application that just left a read unanswered would hold the main
+	-- thread for the messaging timeout on each of the reads below
+	if hs.processInfo == nil or app_pid ~= hs.processInfo.processID then
+		if not AXResponsiveness.is_askable(app_pid) then
+			Logger.debug(LOG, "Accessibility observer not attached to PID %s: it left a read unanswered moments ago; the next activation attaches again.",
+				tostring(app_pid))
+			return false
+		end
+	end
 
 	Logger.trace(LOG, "Attaching accessibility observer to PID %s…", tostring(app_pid))
 
@@ -969,7 +1011,20 @@ function M.update_private_status()
 	-- payload this module handles, and the browser window watchers keep firing while paused.
 	if _is_paused() then return end
 
-	local win = hs.window.focusedWindow()
+	-- Each window read below waits out the messaging timeout on an application
+	-- that does not answer, as loginwindow right after a wake (1512 ms, field
+	-- run 2026-10-31): one unanswered read skips the others.
+	local pid = AXResponsiveness.frontmost_pid()
+	local win = nil
+	if AXResponsiveness.is_askable(pid) then
+		local started_ns = hs.timer.absoluteTime()
+		win = hs.window.focusedWindow()
+		if AXResponsiveness.note_read(pid, (hs.timer.absoluteTime() - started_ns) / 1e9) then
+			Logger.debug(LOG, "Focused-window read of PID %s waited out the Accessibility timeout; window details skipped.",
+				tostring(pid))
+			win = nil
+		end
+	end
 	_state.is_fullscreen        = false
 	_state.session_document_path = nil
 

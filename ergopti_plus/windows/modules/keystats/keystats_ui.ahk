@@ -350,29 +350,13 @@ KLUI_LaunchEdge(which, url, title, partial_stage := "") {
 ; ====================================
 ; ====================================
 
-; Bail-out helper. The dashboards are tightly coupled to the keystats
-; storage layer, so opening one while the feature is OFF would only show
-; an empty page (and silently signal the user that the keystats is
-; capturing). Better: refuse with a friendly hint pointing to the toggle.
-KLUI_RequireEnabled() {
-		if MetricsShortcuts.enabled
-				return true
-		Ui_MsgBox(
-				t("keystats_ui.metrics_disabled") . "`n`n" . t("keystats_ui.metrics_disabled_body"),
-				t("keystats_ui.metrics_title"), "Iconi"
-		)
-		return false
-}
-
+; The dashboards only read the stored history, so they open with the feature
+; off: the manifest declares both rows `readable_when_off`, to consult the past.
 KLUI_ToggleTyping(*) {
-		if !KLUI_RequireEnabled()
-				return
 		KLUI_ToggleDashboard("typing", t("keystats_ui.typing_metrics"))
 }
 
 KLUI_ToggleApps(*) {
-		if !KLUI_RequireEnabled()
-				return
 		KLUI_ToggleDashboard("apps", t("keystats_ui.app_metrics"))
 }
 

@@ -3,11 +3,11 @@
   "runtime": {
     "upstream_repository": "pqrs-org/Karabiner-Elements",
     "upstream_revision": "9312593e1a3bf72b94c63c524ebabe2637442e8a",
-    "version": null,
-    "file_name": null,
-    "source_url": null,
-    "sha256": null,
-    "size": null
+    "version": "16.3.0-ergopti.2",
+    "file_name": "ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.2.tar.gz",
+    "source_url": "https://github.com/adrienm7/ergopti/releases/download/remap-runtime-v16.3.0-ergopti.2/ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.2.tar.gz",
+    "sha256": "ad1541f838a9d3d8c4d6aaa45cda82fddb36c34c381e866d0b69391cae42de8e",
+    "size": 12176523
   },
   "virtual_hid_device": {
     "version": "8.5.0",
@@ -18,7 +18,7 @@
     "size": 2089117
   },
   "capture": {
-    "requirement": null,
+    "requirement": "identifier \"com.ergoptiplus.app\" and certificate leaf = H\"759d8aae58886bac8886d834f9eeae52274051bc\"",
     "batch_limit": 64,
     "frame_limit": 65536,
     "history_capacity": 4096

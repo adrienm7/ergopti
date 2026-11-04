@@ -18,6 +18,10 @@
 --- Fix (2026-06-19): changed wrapped_on_done signature to (exit_code, stdout,
 ---     stderr) and used the closure upvalue '_task' for pin release;
 ---     native task and pin now remain owned until wrapped_on_done observes exit.
+---
+--- Every case drives a spawned handle through a fake hs.task and reads the pin
+--- table: reinstating the leading task parameter fails the completion cases,
+--- which is why the old source-text checks of the signature were dropped.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -27,76 +31,11 @@ local helpers = require("tests.helpers")
 
 -- =====================================================================
 -- =====================================================================
--- ======= 1/ ShellRunner source: correct on_done signature ============
+-- ======= 1/ ShellRunner completion releases its GC pin ================
 -- =====================================================================
 -- =====================================================================
 
 helpers.describe("ShellRunner: GC pin release", function()
-	helpers.it("wrapped_on_done uses (exit_code, stdout, stderr) signature", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/adapters/shell_runner.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open shell_runner.lua at: " .. src_file)
-		local src = fh:read("*a")
-		fh:close()
-
-		-- The corrected signature must NOT have 4 params starting with task
-		helpers.assert_true(
-			src:find("local function wrapped_on_done(task, exit_code,", 1, true) == nil,
-			"wrapped_on_done must not have task as first param (hs.task gives no task object)"
-		)
-		-- Must have the 3-param form
-		helpers.assert_true(
-			src:find("local function wrapped_on_done(exit_code, stdout, stderr)", 1, true) ~= nil,
-			"wrapped_on_done must have signature (exit_code, stdout, stderr)"
-		)
-	end)
-
-	helpers.it("wrapped_on_done captures and releases the exact closure task", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/adapters/shell_runner.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open shell_runner.lua")
-		local src = fh:read("*a")
-		fh:close()
-
-		-- Capture the closure task before clearing the mutable upvalue. The callback's
-		-- first argument is only an exit code, never the native task object.
-		local fn_start = src:find("local function wrapped_on_done", 1, true)
-		helpers.assert_true(fn_start ~= nil, "wrapped_on_done not found")
-		local region = src:sub(fn_start, fn_start + 500)
-		helpers.assert_true(
-			region:find("local completed_task = _task", 1, true) ~= nil
-				and region:find("M._active_tasks[completed_task]", 1, true) ~= nil,
-			"wrapped_on_done must release the exact task captured from its closure"
-		)
-	end)
-
-	helpers.it("_safe_terminate retains the exact task until native termination succeeds", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/adapters/shell_runner.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open shell_runner.lua")
-		local src = fh:read("*a")
-		fh:close()
-
-		-- Find _safe_terminate and verify it clears the GC pin
-		local fn_start = src:find("local function _safe_terminate", 1, true)
-		helpers.assert_true(fn_start ~= nil, "_safe_terminate not found")
-		local region = src:sub(fn_start, fn_start + 1200)
-		helpers.assert_true(
-			region:find("local task = _task", 1, true) ~= nil
-				and region:find("M._active_tasks[task]", 1, true) ~= nil,
-			"_safe_terminate must retain and then release the exact captured task"
-		)
-	end)
-
 	helpers.it("terminate failure and accepted SIGTERM keep the task pinned until completion", function()
 		local attempts = 0
 		local fake_task, captured_done

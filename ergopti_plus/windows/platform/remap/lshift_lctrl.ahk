@@ -66,12 +66,13 @@ _LShiftHandleHold(PhysicalModifierPassthrough) {
 #HotIf TapHoldTapAction(TapHold, "left_shift") != "" and TapHoldHoldModifier(TapHold, "left_shift") == "" and TapHoldHoldLayer(TapHold, "left_shift") == "" and not LayerEnabled
 ~*$SC02A::
 {
-	DurationSec := TapHoldDuration(TapHold, "left_shift")
+	; Pressed alone, the Shift still taps up to the lone tap window.
+	DurationSec := TapHoldTapMaxMs("left_shift", TapHoldDuration(TapHold, "left_shift")) / 1000
 	; Bounded (unlike a bare KeyWait): a lost SC02A key-up (focus stolen by a
 	; UAC prompt, Suspend toggled mid-press) can never wedge this hotkey's
 	; tap/hold discrimination forever (hold-keywait-whole-class).
 	TimeBefore := A_TickCount
-	Released := KeyWait("SC02A", "T" . DurationSec)
+	Released := KS_WaitReleased("SC02A", DurationSec)
 	TimeAfter := A_TickCount
 	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
 	GuardMs := DurationSec * 1000
@@ -150,13 +151,14 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 
 _LCtrlHandleTapOnly() {
 	_TH_TakeAltGrPress("left_ctrl") ; a mark an unfinished press left
-	DurationSec := TapHoldDuration(TapHold, "left_ctrl")
+	; Pressed alone, the Ctrl still taps up to the lone tap window.
+	DurationSec := TapHoldTapMaxMs("left_ctrl", TapHoldDuration(TapHold, "left_ctrl")) / 1000
 	CapsUp := KS_IsUp("SC03A") ; CapsLock must not be physically held
 	AltUp := KS_IsUp("SC038") ; LAlt must not be physically held
 	; Bounded (unlike a bare KeyWait): a lost SC01D key-up can never wedge
 	; this hotkey's tap/hold discrimination forever (hold-keywait-whole-class).
 	TimeBefore := A_TickCount
-	Released := KeyWait("SC01D", "T" . DurationSec)
+	Released := KS_WaitReleased("SC01D", DurationSec)
 	TimeAfter := A_TickCount
 	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
 	TapHoldRecordLCtrlPress()

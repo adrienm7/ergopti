@@ -35,7 +35,7 @@ h2 {
 }
 
 #prompt-hint {
-	color: #a0a0a6;
+	color: var(--theme-hue-a0a0a6);
 	font-size: 12px;
 	line-height: 1.45;
 }
@@ -47,8 +47,8 @@ h2 {
 }
 
 #value-input {
-	background: #1b1b1d;
-	border: 1px solid #3a3a3d;
+	background: var(--theme-hue-1b1b1d);
+	border: 1px solid var(--theme-hue-3a3a3d);
 	border-radius: 6px;
 	color: var(--theme-grey-e8e8ea);
 	font-family: 'SF Mono', ui-monospace, monospace;
@@ -58,21 +58,21 @@ h2 {
 }
 
 #value-input:focus {
-	border-color: #5a8dee;
+	border-color: var(--theme-hue-5a8dee);
 	outline: none;
 }
 
 #range-hint {
-	color: #7a7a80;
+	color: var(--theme-hue-7a7a80);
 	font-size: 11px;
 }
 
 /* Not colour alone: a red border on a dark field is easy to miss and invisible
    to a reader who cannot distinguish it, so the message carries the meaning. */
 #error {
-	background: #3a1f1f;
+	background: var(--theme-hue-3a1f1f);
 	border-radius: 6px;
-	color: #ff9d9d;
+	color: var(--theme-hue-ff9d9d);
 	font-size: 12px;
 	padding: 8px 10px;
 }
@@ -84,8 +84,8 @@ h2 {
 }
 
 button {
-	background: #333336;
-	border: 1px solid #46464a;
+	background: var(--theme-hue-333336);
+	border: 1px solid var(--theme-hue-46464a);
 	border-radius: 6px;
 	color: var(--theme-grey-e8e8ea);
 	cursor: pointer;
@@ -94,14 +94,14 @@ button {
 }
 
 button:hover {
-	background: #3d3d41;
+	background: var(--theme-hue-3d3d41);
 }
 
 #save-button {
-	background: #3a6bd0;
-	border-color: #3a6bd0;
+	background: var(--theme-hue-3a6bd0);
+	border-color: var(--theme-hue-3a6bd0);
 }
 
 #save-button:hover {
-	background: #4478e0;
+	background: var(--theme-hue-4478e0);
 }

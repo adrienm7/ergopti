@@ -36,7 +36,7 @@ _CUK_RetiredRootVector(Kind, WithRootNeighbors := true) {
 		. "[_future]`nflag = false`nzero = 0`nvalues = [1, 2]`nempty = []`n"
 		. "stamp = 2026-10-05T10:20:30Z`n" . '"literal.dot" = "keep" # exact future comment' . "`n"
 	return Map("source", Root . Source . Tables,
-		"expected", Chr(0xFEFF) . Root . "# retired " . Kind . " root`n`n" . Tables)
+		"expected", Root . "# retired " . Kind . " root`n`n" . Tables)
 }
 
 _CUK_RetiredRootTypedNeighbors(Document) {
@@ -103,6 +103,24 @@ Test("config cleanup: privately captured inline namespace uses actual verified p
 	_CUK_RetiredRootActualCleanup.Bind("inline"))
 Test("config cleanup: privately captured table-array root removes all exact generations (config-retired-root)",
 	_CUK_RetiredRootActualCleanup.Bind("array"))
+
+; The whole-root cut has its own rendering path, so it carries the same rule.
+_CUK_RetiredRootKeepsSourceBom() {
+	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
+	Vector := _CUK_RetiredRootVector("dotted")
+	Source := Chr(0xFEFF) . Vector["source"]
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_CUK_AdmitCurrentSource(Path)
+		Rows := _CUK_RetiredRows(ConfigUnusedKeysFind(Path))
+		AssertEqual(1, Rows.Length)
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20990101-000301", 0, 0, Source)
+		AssertEqual("removed", Result["status"])
+		AssertEqual(Chr(0xFEFF) . Vector["expected"], FSReadUtf8Exact(Path), "a source with a byte order mark keeps it")
+	} finally DirDelete(Folder, true)
+}
+Test("config cleanup: a removed retired root leaves a source's byte order mark in place (config-retired-root)",
+	_CUK_RetiredRootKeepsSourceBom)
 
 _CUK_RetiredRootPrivatePage() {
 	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
@@ -351,3 +369,80 @@ Test("config cleanup: root capability retains the native exact-source and lease 
 
 Test("config cleanup: selecting the same whole-root receipt twice refuses before backup (config-retired-root)",
 	_CUK_RetiredRootRefusesBorrowedRecord.Bind("duplicate"))
+
+
+; The three complete images of _shared/lua/test/config_cleanup_roots_contract.lua,
+; byte for byte except the schema stamp, which has to be current to be writable
+; here: Windows and the Lua engine must leave the same file behind (config policy
+; 33 and 42). Each root row is selected alone, as the Lua contract selects it.
+_CUK_LuaRootImage(Kind) {
+	Kept := '"ahk.literal" = {keep="literal", empty=[]}' . "`nAHK={keep=" . '"case"' . ",flag=false}`n`n"
+	Tail := "[_meta]`nschema_version=" . ConfigMigrateCurrentVersion() . "`n`n[_future]`nflag=false`nzero=0`nempty=[]`n"
+		. "values=[1,2]`nstamp=2026-10-05T10:20:30Z`n" . '"literal.dot"="keep"' . "`n"
+	switch Kind {
+		case "dotted":
+			Retired := "# obsolete`nahk.layout.flag=true`n" . 'ahk.layout.label="old"' . "`n`n"
+		case "inline":
+			Retired := "# obsolete`n" . 'ahk={layout={flag=true},items=[{id="a"},{id="b"}]}' . "`n`n"
+		case "array":
+			Retired := "# obsolete`n[[ahk.items]]`nflag=true`n" . 'id="a"' . "`n[[ahk.items]]`nflag=0`n" . 'id="b"' . "`n`n"
+		default: throw ValueError("Unknown image " . Kind)
+	}
+	return Map("source", Kept . Retired . Tail, "expected", Kept . "# obsolete`n`n" . Tail)
+}
+
+_CUK_OnlyRootRows(Keys, Root) {
+	Rows := []
+	for Entry in Keys
+		if Entry["section"] == Root && Entry["key"] == ""
+			Rows.Push(Entry)
+	return Rows
+}
+
+_CUK_LuaRootImageMatches(Kind) {
+	Image := _CUK_LuaRootImage(Kind)
+	Dir := _CUK_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		AssertEqual(1, FSWriteCreateDurable(Path, Image["source"]))
+		_CUK_AdmitCurrentSource(Path)
+		Scan := ConfigUnusedKeysFind(Path)
+		AssertEqual("ok", Scan["status"], Kind)
+		Rows := _CUK_OnlyRootRows(Scan["keys"], "ahk")
+		AssertEqual(1, Rows.Length, Kind . ": one whole-root row, every generation included")
+		AssertTrue(FSUtf8ExactMatches(Path, Image["source"]), Kind . ": a scan writes nothing")
+		Result := ConfigUnusedKeysRemove(Path, Rows, "20991005-000" . StrLen(Kind), 0, 0, Image["source"])
+		AssertEqual("removed", Result["status"], Kind)
+		AssertEqual(1, Result["removed"], Kind)
+		AssertTrue(FSUtf8ExactMatches(Result["backup"], Image["source"]), Kind . ": the backup is the exact source")
+		AssertTrue(FSUtf8ExactMatches(Path, Image["expected"]),
+			Kind . ": the same file the Lua engine leaves. Got:`n" . FSReadUtf8Exact(Path))
+		After := ConfigUnusedKeysFind(Path)
+		AssertEqual(0, _CUK_OnlyRootRows(After["keys"], "ahk").Length, Kind . ": nothing left to offer")
+		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertFalse(Document.Has("ahk"), Kind)
+		AssertEqual("literal", Document["ahk.literal"]["keep"], Kind . ": the literal root stays")
+		AssertEqual("case", Document["AHK"]["keep"], Kind . ": the case twin stays")
+		AssertTrue(Document.Has("_future"), Kind . ": a future reserved table stays")
+	} finally DirDelete(Dir, true)
+}
+for _CUK_LuaKind in ["dotted", "inline", "array"]
+	Test("config cleanup: the " . _CUK_LuaKind . " image of the Lua roots contract leaves the same file (config-policy-33-42)",
+		_CUK_LuaRootImageMatches.Bind(_CUK_LuaKind))
+
+; A physical Win slot is spelled meta_SC03A (KeyboardSlotPhysicalScan). The
+; win_SC03A of the handoff names no slot, so its parameter is rightly listed;
+; test_config_unused_keys.ahk proves the live meta_ spelling is not.
+_CUK_WinSpellingOfAPhysicalSlotIsRetired() {
+	Retired := "keyboard__win_SC03A__open_url"
+	AssertEqual("retired", TomlConfigActionParameterBindingStatus(Retired))
+	Dir := _CUK_NewDir()
+	try {
+		Path := _CUK_WriteSemanticSubject(Dir, "[action_parameters]`n" . Retired . ' = "https://example.invalid/"' . "`n")
+		Scan := ConfigUnusedKeysFind(Path)
+		AssertEqual("ok", Scan["status"])
+		_CUK_AssertIds("action_parameters." . Retired . "=section", Scan["keys"])
+	} finally DirDelete(Dir, true)
+}
+Test("config cleanup: a parameter on the win_ spelling of a physical slot is offered (config-policy-33-42)",
+	_CUK_WinSpellingOfAPhysicalSlotIsRetired)

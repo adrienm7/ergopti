@@ -3,9 +3,10 @@
 --- ==============================================================================
 --- MODULE: Native Application Chooser
 --- DESCRIPTION:
---- Lets the user pick the application an open_app binding launches: a zenity
---- or kdialog file dialog over the system's desktop entries, answered with the
---- desktop-file id gtk-launch takes (firefox, org.gnome.Nautilus).
+--- Lets the user pick the application an open_app binding launches: Ergopti's
+--- own file dialog (ui/native_dialog.lua) over the system's desktop entries, answered with the
+--- desktop-file id gtk-launch takes (firefox, org.gnome.Nautilus). The same
+--- dialogs pick the file or folder an open_path binding opens (pick_path).
 ---
 --- FEATURES & RATIONALE:
 --- 1. A desktop entry, not an executable: gtk-launch starts it the way the
@@ -74,28 +75,19 @@ function M.desktop_id(path)
 	return nil
 end
 
---- Opens the first available file dialog over the desktop entries.
---- @param shell table Shell-runner authority (has_command, exec_checked, quote).
+--- Opens the file dialog over the desktop entries.
+--- @param shell table Shell-runner authority (exec_checked, quote).
 --- @param title string Already-translated dialog title.
 --- @return string|nil id The chosen desktop-file id.
 --- @return string|nil error_message Why nothing was chosen.
 function M.pick(shell, title)
-	if type(shell) ~= "table" or type(shell.has_command) ~= "function"
-		or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
+	if type(shell) ~= "table" or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
 		return nil, "shell runner is unavailable"
 	end
 	title = WindowTitles.compose(title)
-	local command
-	if shell.has_command("zenity") then
-		command = "zenity --file-selection --title=" .. shell.quote(title)
-			.. " --filename=" .. shell.quote(M.APPLICATIONS_DIR)
-			.. " --file-filter=" .. shell.quote("*" .. DESKTOP_SUFFIX) .. " 2>/dev/null"
-	elseif shell.has_command("kdialog") then
-		command = "kdialog --getopenfilename " .. shell.quote(M.APPLICATIONS_DIR)
-			.. " " .. shell.quote("*" .. DESKTOP_SUFFIX) .. " --title " .. shell.quote(title) .. " 2>/dev/null"
-	else
-		return nil, "neither zenity nor kdialog is available"
-	end
+	local command = require("ui.native_dialog").command() .. " --file-selection --title=" .. shell.quote(title)
+		.. " --filename=" .. shell.quote(M.APPLICATIONS_DIR)
+		.. " --file-filter=" .. shell.quote("*" .. DESKTOP_SUFFIX) .. " 2>/dev/null"
 	local completed, output = require("ui.modal").run(function() return shell.exec_checked(command) end)
 	-- Native cancellation or failure can leave partial stdout; only a confirmed
 	-- dialog result may become a stored application binding.
@@ -109,6 +101,39 @@ function M.pick(shell, title)
 	local id = M.desktop_id(chosen)
 	if not id then return nil, "the chosen file is not a desktop entry" end
 	return id
+end
+
+--- The picker command line that chooses one file or folder for open_path.
+--- @param shell table Shell-runner authority (quote).
+--- @param title string Window title, already composed.
+--- @param folder boolean True to choose a folder.
+--- @param start string The folder the picker opens on.
+--- @return string command
+function M.path_picker_command(shell, title, folder, start)
+	return require("ui.native_dialog").command() .. " --file-selection" .. (folder and " --directory" or "")
+		.. " --title=" .. shell.quote(title) .. " --filename=" .. shell.quote(start) .. " 2>/dev/null"
+end
+
+--- Opens the picker over one file or one folder.
+--- @param shell table Shell-runner authority (exec_checked, quote).
+--- @param title string Already-translated dialog title.
+--- @param folder boolean True to choose a folder.
+--- @param start string The folder the picker opens on.
+--- @param modal function|nil Test seam replacing ui/modal's run.
+--- @return string|nil path The chosen path, as the picker printed it.
+--- @return string|nil error_message Why nothing was chosen.
+function M.pick_path(shell, title, folder, start, modal)
+	if type(shell) ~= "table" or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
+		return nil, "shell runner is unavailable"
+	end
+	local command = M.path_picker_command(shell, WindowTitles.compose(title), folder == true, start)
+	local completed, output = (modal or require("ui.modal").run)(function() return shell.exec_checked(command) end)
+	if completed ~= true or type(output) ~= "string" then return nil, "path selection was cancelled or refused" end
+	-- Remove the picker's single LF delimiter; a line break inside a chosen
+	-- name stays and the open_path validator refuses it.
+	local chosen = output:gsub("\n$", "")
+	if chosen == "" then return nil, "path selection was cancelled" end
+	return chosen
 end
 
 return M

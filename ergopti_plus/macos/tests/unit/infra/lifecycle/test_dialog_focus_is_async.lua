@@ -165,7 +165,7 @@ end
 helpers.describe("dialog_util: deferred focus timer transaction", function()
 	helpers.it("reports and rolls back an uncommitted nudge without suppressing the alert", function()
 		with_dialog_fixture("uncommitted", true, function(Dialog, calls, get_candidate)
-			helpers.assert_eq(Dialog.alert("body"), "shown",
+			helpers.assert_eq(Dialog.alert(10, 20, function() end, "body"), "shown",
 				"focus assistance is best-effort; timer refusal must not suppress the user's dialog")
 			helpers.assert_eq(calls.alerts, 1)
 			helpers.assert_eq(calls.spawns, 0)
@@ -181,7 +181,7 @@ helpers.describe("dialog_util: deferred focus timer transaction", function()
 
 	helpers.it("contains a throwing timer and still opens the alert truthfully", function()
 		with_dialog_fixture("throw", nil, function(Dialog, calls)
-			helpers.assert_eq(Dialog.alert("body"), "shown")
+			helpers.assert_eq(Dialog.alert(10, 20, function() end, "body"), "shown")
 			helpers.assert_eq(calls.alerts, 1)
 			helpers.assert_eq(calls.spawns, 0)
 			helpers.assert_true(calls.errors > 0,

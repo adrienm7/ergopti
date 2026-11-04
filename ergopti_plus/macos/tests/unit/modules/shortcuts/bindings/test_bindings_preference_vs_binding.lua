@@ -24,7 +24,7 @@ local Fixture = require("tests.support.shortcut_bindings_fixture")
 
 -- Preference and binding asserted against every listed shortcut. The fixture
 -- index refuses an empty registry, so none of these loops can pass vacuously.
-local DISABLED_ID = "ctrl_g"
+local DISABLED_ID = "cmd_star"
 
 --- Asserts the user preference of every listed shortcut.
 --- @param bindings table Real Bindings module.

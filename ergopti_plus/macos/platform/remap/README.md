@@ -48,10 +48,30 @@ implemented today.
   own quit steps, hidden `[karabiner] close_other_instances`, default `true`) and
   the capture port (`adapters/runtime_capture_port.lua` over
   `adapters/installed_physical_source.lua`). The artifact comes from
-  `vendor/remap-runtime/manifest.json`, which stays unpinned until the hosted
-  build, so an opted-in boot reports `artifact_unpinned` today. The Swift lease
+  `vendor/remap-runtime/manifest.json`, which pins `16.3.0-ergopti.2`, the
+  hosted `runtime-artifact` job's digest (`tools/build/remap_runtime_publish.py
+apply`); `runtime_artifact_fetch.lua` downloads and verifies it into
+  `~/Library/Application Support/ErgoptiPlus/RemapRuntime/` on the first
+  admission and reuses it after. That helper publishes the runtime files only:
+  nothing installs it or writes the Core and VirtualHIDDevice jobs yet, so an
+  opted-in boot stops at `runtime_not_installed`. The artifact is the signed privileged
+  helper `ErgoptiPlus-Runtime-Installer.app` with the runtime products sealed in its
+  `Contents/Resources/OwnedRuntime/` (the `runtime-artifact` job runs
+  `remap_runtime_build.py --package-owned`); the launcher's administrator install
+  stages that helper from `<version>/payload/` once the receipt names the pinned digest. `runtime_activation.lua` is the
+  maintainer's rule: while Ergopti runs and is not paused ours runs and closes
+  the user's Karabiner, which a notification and a Tap-Holds row say; a pause
+  or a quit stops ours and gives theirs back when Ergopti closed it. An owned boot also removes the rules
+  an earlier shared-mode build merged into the user's `karabiner.json`. The Swift lease
   worker and guardian accept the owned `ergoptiplus_remap_cli` next to the shared
-  tool, and the guardian record names the runtime.
+  tool, and the guardian record names the runtime. When another
+  VirtualHIDDevice version blocks the runtime (`virtual_hid_incompatible`), a
+  Tap-Holds row offers the driver-only update: after an explicit confirmation
+  (`ui/virtual_hid_update.lua`), `runtime_vhid_update.lua` downloads the
+  manifest's pinned pqrs package, checks its size and digest, then one
+  administrator shell checks the digest and pqrs' installer signature again on
+  a root-owned copy before `/usr/sbin/installer`, and pqrs' manager asks macOS
+  to activate it; the driver reloads after the report.
 
 ## « Ergopti uses Karabiner »
 

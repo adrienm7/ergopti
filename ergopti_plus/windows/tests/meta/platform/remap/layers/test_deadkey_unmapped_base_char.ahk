@@ -19,9 +19,8 @@
 
 #Requires AutoHotkey v2.0
 
-_DKUBC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_DKUBC_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _DKUBC_StripComments(Src) {
@@ -44,7 +43,7 @@ _DKUBC_StripComments(Src) {
 ; ============================================================================
 
 _DKUBC_UnmappedKeyEmitsBaseChar() {
-	Raw := _DKUBC_ReadSource("modules/keymap/layout.ahk")
+	Raw := _DKUBC_ReadSource("layout.ahk")
 	Src := _DKUBC_StripComments(Raw)
 	Body := _DriverFuncBody("DeadKey")
 	Assert(Body != "", "DeadKey(Mapping) must exist in modules/keymap/layout.ahk")

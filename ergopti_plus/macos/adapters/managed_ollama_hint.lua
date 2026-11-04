@@ -16,6 +16,8 @@ local Settings = require("modules.llm.bootstrap_retry_generated")
 local ShellRunner = require("adapters.shell_runner")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local Json = require("json")
+local Logger = require("infra.logger")
+local LOG = "managed_ollama_hint"
 
 -- The exact lifecycle handle stays strongly reachable until native settlement,
 -- including a start refusal that may have followed native mutation.
@@ -212,6 +214,11 @@ function M.get(directory, driver)
 			and operation.stderr == "" and type(operation.stdout) == "string"
 			and not expired(operation) and snapshot(directory, driver) == operation.key then
 			value = decoded_result(operation.stdout, directory)
+		end
+		if value == nil and operation.committed and not operation.cancelled then
+			-- The script names only the refusing check, never a path or a value.
+			Logger.warn(LOG, "Owned Ollama runtime metadata refused (exit=%s): %s",
+				tostring(operation.status), (tostring(operation.stderr or ""):sub(1, 200):gsub("%s+$", "")))
 		end
 		cached = { key = operation.key, value = value, transient = operation.cancelled or operation.failed }
 		if operation.handle then M._active_tasks[operation.handle] = nil end

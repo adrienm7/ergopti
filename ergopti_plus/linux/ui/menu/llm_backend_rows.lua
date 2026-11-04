@@ -12,7 +12,7 @@
 --- FEATURES & RATIONALE:
 --- 1. The tray builds no list (maintainer, 2026-10-27): the page offers the
 ---    entries, the providers and the local servers, and runs these actions.
---- 2. Adding an API asks for the key in a hidden zenity entry, stores it in the
+--- 2. Adding an API asks for the key in a hidden native entry, stores it in the
 ---    private entries file, selects it, then tests it at once so a wrong key is
 ---    reported while the user is still looking, with the provider's own reason.
 --- 3. Dialogs are handed in by the menu builder, so this module never opens a
@@ -27,11 +27,13 @@
 --- ==============================================================================
 
 local M = {}
+local SaveFailure = require("config_save_failure")
 local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local EntryNames = require("llm.api_entry_names")
 local ApiModelListing = require("llm.api_model_listing")
+local UrlTemplate = require("llm.api_url_template")
 local BackendBrands = require("modules.llm.backend_brands")
 
 local LOG = "ui.menu.llm_backend_rows"
@@ -53,6 +55,21 @@ end
 --- @return string
 local function fill(template, values)
 	return (template:gsub("{(%d+)}", function(index) return tostring(values[tonumber(index)] or "") end))
+end
+
+--- Says why an API entry was not saved: the secret service's refusal when it
+--- refused the key (a key is never written in plaintext instead), else the
+--- generic save failure.
+--- @param dialogs table
+--- @param entries table api_entries
+--- @param title string
+local function save_failed(dialogs, entries, title)
+	local called, refusal = pcall(entries.store_refusal)
+	if called and type(refusal) == "string" then
+		dialogs.error(fill(tr("menu.llm.api_key_no_secret_store"), { refusal }), title)
+	else
+		SaveFailure.present(tr, function(message) dialogs.error(message, title) end)
+	end
 end
 
 --- The automatic name of every entry, by id: <provider>/<model>, with the
@@ -130,9 +147,37 @@ end
 local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	local heading = tr("menu.llm.api_dialog_title") .. " — " .. provider.label
 	local base_url = ""
+	local fields = UrlTemplate.fields(provider.base_url)
+	if #fields > 0 then
+		-- A per-account address: one value per placeholder, filled into the entry's own URL
+		local values = {}
+		for _, name in ipairs(fields) do
+			local label = tr("menu.llm.api_prompt_field." .. name)
+			local value = dialogs.prompt(heading, label, "")
+			if not value then return end
+			values[name] = TextUtils.trim(value)
+			if not UrlTemplate.valid_value(values[name]) then
+				dialogs.error(label .. " " .. tr("menu.llm.api_prompt_field_invalid"), heading)
+				return
+			end
+		end
+		base_url = assert(UrlTemplate.expand(provider.base_url, values))
+		Logger.info(LOG, "API entry address filled for provider '%s' (%d account field(s)).", provider.id, #fields)
+	elseif provider.optional_address then
+		-- The catalogue's address works; one optional value replaces it
+		local optional = provider.optional_address
+		local value = dialogs.prompt(heading, tr("menu.llm.api_prompt_field." .. optional.field), "")
+		if not value then return end
+		local filled = UrlTemplate.optional_url(optional, TextUtils.trim(value))
+		if not filled then
+			Logger.error(LOG, "API entry address refused: the '%s' value cannot fill it.", optional.field)
+			dialogs.error(tr("menu.llm.api_prompt_field_invalid." .. optional.field), heading)
+			return
+		end
+		base_url = filled
 	-- OpenAI selects the wire schema, not a fixed host. Keep its declared
 	-- default visible while allowing the same custom endpoint as the generic form.
-	if provider.base_url == "" or provider.id == "openai" then
+	elseif provider.base_url == "" or provider.id == "openai" then
 		base_url = dialogs.prompt(heading, tr("menu.llm.api_prompt_url"), provider.base_url)
 		if not base_url or base_url == "" then return end
 		if not remote.normalize_base_url(base_url) then
@@ -159,12 +204,12 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		local begin = llm.begin_api_selection
 		current, finish = llm.api_selection_is_current, llm.finish_api_selection
 		if type(begin) ~= "function" or type(current) ~= "function" or type(finish) ~= "function" then
-			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			SaveFailure.present(tr, function(message) dialogs.error(message, heading) end)
 			return false
 		end
 		local captured, receipt = pcall(begin)
 		if not captured or type(receipt) ~= "table" then
-			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			SaveFailure.present(tr, function(message) dialogs.error(message, heading) end)
 			return false
 		end
 		ticket = receipt
@@ -185,12 +230,12 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	if chat then
 		local retired, ack = pcall(finish, ticket, called and type(entry) == "table", called and settled == true)
 		if not retired or ack ~= true then
-			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			SaveFailure.present(tr, function(message) dialogs.error(message, heading) end)
 			return false
 		end
 	end
 	if not called or not entry then
-		dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+		save_failed(dialogs, entries, heading)
 		return false
 	end
 	local function published_current()
@@ -401,7 +446,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 					local saved
 					if own then saved = entries.set_active(entry.id) else saved = entries.set_model(entry.id, model) end
 					if saved ~= true then
-						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
+						save_failed(dialogs, entries, tr("common.error_title"))
 						return false
 					end
 					changed()
@@ -419,8 +464,12 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 					local typed = dialogs.prompt(label, tr("menu.llm.api_prompt_model"), configured)
 					typed = type(typed) == "string" and TextUtils.trim(typed) or ""
 					if typed == "" then return false end
-					if llm.set_backend("api") ~= true or entries.set_model(entry.id, typed) ~= true then
-						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
+					if llm.set_backend("api") ~= true then
+						SaveFailure.present(tr, function(message) dialogs.error(message, tr("common.error_title")) end)
+						return false
+					end
+					if entries.set_model(entry.id, typed) ~= true then
+						save_failed(dialogs, entries, tr("common.error_title"))
 						return false
 					end
 					changed()

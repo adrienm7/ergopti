@@ -33,10 +33,8 @@
 ; ===================================================
 ; ===================================================
 
-_RoiWord_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_RoiWord_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -51,7 +49,7 @@ _RoiWord_ReadSource(RelPath) {
 ; The cap constant must exist (named constant, not a magic number) so the
 ; in-progress buffer length is bounded.
 _RoiWord_HasCapConstant() {
-	Src := _RoiWord_ReadSource("modules/keystats/keystats_trigger_roi.ahk")
+	Src := _RoiWord_ReadSource("keystats_trigger_roi.ahk")
 	Assert(RegExMatch(Src, "static\s+MAX_INPROGRESS_WORD_LEN\s*:=\s*\d+"), "KLRoiConst.MAX_INPROGRESS_WORD_LEN must be defined so the in-progress word buffer is bounded (roi-current-word-unbounded-growth)")
 }
 
@@ -59,7 +57,7 @@ _RoiWord_HasCapConstant() {
 ; and reset the buffer once the cap is reached so growth is bounded on the
 ; keystroke thread.
 _RoiWord_OnCharCapsBuffer() {
-	Src := _RoiWord_ReadSource("modules/keystats/keystats_trigger_roi.ahk")
+	Src := _RoiWord_ReadSource("keystats_trigger_roi.ahk")
 	Body := _DriverFuncBody("KL_Roi_OnChar")
 	Assert(Body != "", "KL_Roi_OnChar must exist in keystats_trigger_roi.ahk (roi-current-word-unbounded-growth)")
 	Assert(InStr(Body, "MAX_INPROGRESS_WORD_LEN") > 0, "KL_Roi_OnChar must bound current_word against MAX_INPROGRESS_WORD_LEN before appending (roi-current-word-unbounded-growth)")
@@ -70,7 +68,7 @@ _RoiWord_OnCharCapsBuffer() {
 ; must use the word_overflowed flag and bail out at the boundary so an
 ; over-long run never reaches KL_Roi_ProcessWord and becomes a candidate.
 _RoiWord_OverflowDiscardsRun() {
-	Src := _RoiWord_ReadSource("modules/keystats/keystats_trigger_roi.ahk")
+	Src := _RoiWord_ReadSource("keystats_trigger_roi.ahk")
 	Body := _DriverFuncBody("KL_Roi_OnChar")
 	Assert(InStr(Body, "word_overflowed") > 0, "KL_Roi_OnChar must track an overflow flag so the over-long run is discarded (roi-current-word-unbounded-growth)")
 	; The boundary path must early-return on overflow before calling ProcessWord.

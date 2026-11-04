@@ -13,6 +13,13 @@
 
 #Include ../../adapters/ollama_identity.ahk
 
+; Every field of the readiness receipt ollama-runtime-launch.ps1 writes: a foreign
+; or older image must not be admitted, and a field the launcher adds must be added
+; here (test-windows-route-plan.cjs compares the two lists).
+global OLLAMA_RUNTIME_RECEIPT_FIELDS := ["runtime_ticket", "ticket", "root_identity", "version_identity",
+	"manifest_sha256", "origin", "launcher_pid", "child_pid", "child_created_filetime", "ready_file_identity",
+	"leases_held", "proxy_mode", "proxy_tunnel", "proxy_relay"]
+
 /** Holds one exact server task; accepted launch never means AI is enabled. */
 class OllamaRuntimeOwner {
 	/**
@@ -28,6 +35,23 @@ class OllamaRuntimeOwner {
 		if !this._LocalPath(Options.Get("environment", ""))
 				|| !RegExMatch(Options.Get("environment_sha256", ""), "^[0-9a-f]{64}$")
 			throw TypeError("Runtime ownership requires the captured shared serve environment.")
+		; The proxy the owned daemon reads is looked up by the launcher itself
+		; (ollama-runtime-launch.ps1 Get-OllamaRuntimeProxy) from these captures
+		Proxy := Options.Get("proxy", 0)
+		if !(Proxy is Map)
+			throw TypeError("Runtime ownership requires the captured proxy dependencies.")
+		for Name in ["VendorDirectory", "ProxyPolicyPath", "UpdaterDefaultsPath", "RouteOriginsPath", "ProxyRelayContractPath"]
+			if !this._LocalPath(Proxy.Get(Name, ""))
+				throw TypeError("Runtime proxy capture requires a local path.", -1, Name)
+		for Name in ["VendorSha256", "ProxyPolicySha256", "UpdaterDefaultsSha256", "RouteOriginsSha256", "ProxyRelayContractSha256"]
+			if !RegExMatch(Proxy.Get(Name, ""), "^[0-9a-f]{64}$")
+				throw TypeError("Runtime proxy capture requires its digest.", -1, Name)
+		for Name in ["ProxyRelayDialMs", "ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs"]
+			if !(Proxy.Get(Name, 0) is Integer) || Proxy.Get(Name, 0) <= 0
+				throw TypeError("Runtime proxy capture requires its relay deadlines.", -1, Name)
+		if Proxy.Has("ProxyRelayPath") && (!this._LocalPath(Proxy["ProxyRelayPath"])
+				|| !RegExMatch(Proxy.Get("ProxyRelaySha256", ""), "^[0-9a-f]{64}$"))
+			throw TypeError("An installed relay requires its local path and digest.")
 		if !HasMethod(Options.Get("on_retired", 0), "Call")
 			throw TypeError("Runtime ownership requires an independent physical retirement observer.")
 		for Name in ["spawn", "factory", "read_ready", "live_identity", "clock", "on_error", "on_retired"]
@@ -101,6 +125,15 @@ class OllamaRuntimeOwner {
 			}
 			Arguments.Push("-ServeEnvironmentPath", this.Options["environment"],
 				"-ServeEnvironmentSha256", this.Options["environment_sha256"])
+			for Name in ["VendorDirectory", "VendorSha256", "ProxyPolicyPath", "ProxyPolicySha256",
+					"UpdaterDefaultsPath", "UpdaterDefaultsSha256", "RouteOriginsPath", "RouteOriginsSha256",
+					"ProxyRelayContractPath", "ProxyRelayContractSha256", "ProxyRelayDialMs",
+					"ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs"]
+				Arguments.Push("-" . Name, String(this.Options["proxy"][Name]))
+			; No relay installed: the launcher reads the empty default.
+			if this.Options["proxy"].Has("ProxyRelayPath")
+				Arguments.Push("-ProxyRelayPath", this.Options["proxy"]["ProxyRelayPath"],
+					"-ProxyRelaySha256", this.Options["proxy"]["ProxyRelaySha256"])
 			Spawn := this.Options.Get("spawn", ObjBindMethod(this, "_NativeSpawn"))
 			Task := Spawn.Call(PowerShell, Arguments, ObjBindMethod(this, "_OnTerminal", Record),
 				ObjBindMethod(this, "_AdoptConstruction", Record))
@@ -202,7 +235,7 @@ class OllamaRuntimeOwner {
 					|| !RegExMatch(Observation.Get("image_sha256", ""), "^[0-9a-f]{64}$")
 				return false
 			Receipt := Observation.Get("receipt", 0)
-			if !(Receipt is Map) || Receipt.Count != 11
+			if !this._ReceiptHasExactFields(Receipt)
 				return false
 			Target := Record["target"]
 			for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin"]
@@ -310,7 +343,7 @@ class OllamaRuntimeOwner {
 			return false
 		Receipt := Observation.Get("receipt", 0)
 		Task := Record["task"]
-		if !(Receipt is Map) || Receipt.Count != 11 || !IsObject(Task) || !this._Current(Record)
+		if !this._ReceiptHasExactFields(Receipt) || !IsObject(Task) || !this._Current(Record)
 				|| !this._ReadyDeadline(Record)
 			return false
 		Target := Record["target"]
@@ -379,11 +412,25 @@ class OllamaRuntimeOwner {
 			&& this._Owns(Record) && !Record["cancelled"] && !Record["terminal"] && !A_IsSuspended
 	}
 
+	_ReceiptHasExactFields(Receipt) {
+		global OLLAMA_RUNTIME_RECEIPT_FIELDS
+		if !(Receipt is Map) || Receipt.Count != OLLAMA_RUNTIME_RECEIPT_FIELDS.Length
+			return false
+		for Name in OLLAMA_RUNTIME_RECEIPT_FIELDS {
+			if !Receipt.Has(Name)
+				return false
+		}
+		return true
+	}
+
 	_NativeReadReady(Target) {
 		Path := Target["managed_root"] . "\.runtime-" . Target["runtime_ticket"] . ".json"
 		if !FileExist(Path)
 			return false
 		Image := FSReadUtf8ExactBounded(Path, 4096)
+		; The launcher readmits its image exclusively for an instant: not ready yet.
+		if !(Image is String)
+			return false
 		return Map("receipt", JsonParse(Image), "image_sha256", CryptoSha256(Image))
 	}
 
@@ -426,7 +473,7 @@ class OllamaRuntimeOwner {
 	}
 
 	_NativeSpawn(Executable, Arguments, OnDone, Adopt) {
-		Factory := this.Options.Get("factory", ShellRunner_SpawnTreeOwned)
+		Factory := this.Options.Get("factory", ProxyOverride_SpawnWorker)
 		Task := Factory.Call(Executable, Arguments, OnDone, , , 0, false, true)
 		Adopt.Call(Task)
 		return Task

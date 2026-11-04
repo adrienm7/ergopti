@@ -175,9 +175,23 @@ helpers.describe("gestures.actions: get_label", function()
 		helpers.assert_eq(Actions.get_label("totally_not_a_real_id"), "totally_not_a_real_id")
 	end)
 
-	helpers.it("renders shared modifier chords with language-neutral labels", function()
-		helpers.assert_eq(Actions.get_label("ctrl_a"), "Ctrl + A")
-		helpers.assert_eq(Actions.get_label("cmd_option_shift_enter"), "Cmd + Option + Shift + Enter")
+	-- 2026-11-03: the chords read the catalogue's English names (« Shift »,
+	-- « Enter ») in every locale; each key is now named in the user's language.
+	helpers.it("names shared modifier chords in the user's language", function()
+		local i18n = require("infra.i18n")
+		local file = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+		local french = assert(require("adapters.json_codec").decode(assert(file:read("*a"))))
+		file:close()
+		local saved = i18n.get
+		i18n.get = function(key) return french[key] or key end
+		local ok, err = pcall(function()
+			helpers.assert_eq(Actions.get_label("ctrl_a"), "Ctrl + A")
+			helpers.assert_eq(Actions.get_label("cmd_option_shift_enter"), "Cmd + Option + Maj + Entrée")
+			helpers.assert_eq(Actions.get_label("shift_space"), "Maj + Espace")
+			helpers.assert_eq(Actions.get_label("cmd_period"), "Cmd + .")
+		end)
+		i18n.get = saved
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("includes every modifier chord in the gesture picker", function()

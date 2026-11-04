@@ -97,8 +97,10 @@ else
 		*) exit 10 ;;
 	esac
 fi
+# shasum prefixes the digest with a backslash when the name holds one.
 actual=$(/usr/bin/shasum -a 256 "$archive") || exit 20
 actual=${actual%% *}
+actual=${actual#\\}
 [ "$actual" = "$digest" ] || exit 21
 case "$format" in
 	zip)

@@ -165,7 +165,9 @@ _UCSch_CompletionRecordsTheCheck() {
 	Body(Store, Clock) {
 		global UPDATER_REQUEST_ORIGIN_BACKGROUND
 		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_BACKGROUND, false)
-		_Updater_HandleBackgroundResult("", "0.0.0-dev.200", Request)
+		; The API and then its public feed fail.
+		_Updater_HandleBackgroundResult("", "0.0.0-dev.200", Request, 0, false,
+			(Channel, FeedRequest, OnJson) => OnJson.Call("", FeedRequest))
 		Record := _UCSch_Record(Store)
 		AssertEqual(Clock.Now, Record["last_check_at"], "a failed check is recorded")
 		AssertEqual(1, Record["failures"], "a failed check counts one failure")

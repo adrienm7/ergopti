@@ -27,6 +27,8 @@ local MODULES = {
 	"modules.llm.network_env",
 	-- FileSystem captures hs when it loads; bind it to this fixture's probe.
 	"adapters.file_system",
+	-- Storage captures hs too: the prelude reads the proxy override through it.
+	"adapters.storage",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
 	"adapters.timer_scheduler",
@@ -114,6 +116,8 @@ local function with_fixture(save_results, callback)
 					secondsSinceEpoch = function() return 0 end,
 				},
 				urlevent = {openURL = function() return true end},
+				-- The prelude reads the proxy override setting: none is stored.
+				settings = {get = function() return nil end},
 			}
 			_G.hs = hs_fixture
 			package.loaded["hs"] = hs_fixture

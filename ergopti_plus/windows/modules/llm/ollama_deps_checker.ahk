@@ -8,11 +8,13 @@
 ; reachable on the configured local Ollama endpoint.
 ;
 ; Production bootstrap consumes exact app-owned file/runtime components with
-; independent installation, start and model consent. A responding external
-; server remains external. Deferred callbacks retain their captured epoch.
+; independent installation, start and model consent. Only that owned runtime
+; is ever used: a listener Ergopti does not own is refused, never adopted, stopped
+; or modified. Deferred callbacks retain their captured epoch.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
 #Include ollama_managed_bootstrap.ahk
 
 
@@ -25,9 +27,7 @@
 ; ====================================
 ; ====================================
 
-; AHK-30: ceiling for the daemon-reachability poll to prevent AHK from being
-; held at High priority indefinitely when the user installs Ollama via the
-; browser fallback and then abandons the install without clicking Cancel.
+; Ceiling of the dependency bootstrap.
 ; Sentinel 0 — sourced at boot from [llm].dependency_bootstrap_timeout_ms.
 global LLM_DEPS_POLL_TIMEOUT_MS := 0
 
@@ -40,12 +40,6 @@ global _LLM_Deps_Checking       := false        ; guard against concurrent calls
 ; check's late callback from clearing _LLM_Deps_Checking that now belongs to a
 ; newer check.
 global _LLM_Deps_Epoch          := 0
-global _LLM_Deps_PollTimer      := unset        ; lambda reference kept for explicit cancellation
-global _LLM_Deps_PollStartTick  := 0            ; TickCount when RunInstaller armed the poll timer
-; Exact ShellRunner tree owner. A numeric PID cannot identify a process after
-; winget exits because Windows can reuse that number while the daemon poll is
-; still active for up to thirty minutes.
-global _LLM_Deps_InstallerOwner := 0
 
 
 
@@ -176,8 +170,8 @@ LLM_Deps_AsyncCheck(default_model, on_ready?, on_failed?, show_ui := true,
 	if captured_epoch != _LLM_Deps_Epoch
 		return false
 
-	; Check the configured endpoint before offering a managed installation.
-	; A responding external server is never acquired, migrated or terminated.
+	; Check the owned endpoint before offering a managed installation. A
+	; responding foreign server is never adopted, migrated or terminated.
 	LLM_Deps_DoCheck(default_model, captured_epoch, on_ready?, on_failed?, show_ui)
 	return true
 }
@@ -197,7 +191,7 @@ LLM_Deps_DoCheck(default_model, captured_epoch, on_ready?, on_failed?, show_ui?)
 	return true
 }
 
-_LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_ready?, on_failed?, show_ui?, InstallerFn := 0) {
+_LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_ready?, on_failed?, show_ui?, InstallerFn := 0, OwnedFn := 0) {
 	global _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch
 	; AHK-14: discard stale callbacks from preempted checks. When Cancel() or a
 	; second CheckAndInstall bumps the epoch, any in-flight curl callback fires
@@ -208,7 +202,18 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 		return
 	}
 	LoggerInfo("LLM", "DoCheck — Ollama reachability check took " TickElapsed(t_start) " ms, result=" (running ? "running" : "not running") ".")
-	if running {
+	Owned := HasMethod(OwnedFn, "Call") ? OwnedFn.Call() : LLM_OllamaManagedOriginRequired()
+	if running && !Owned {
+		; Ergopti's daemon dies with its driver, so an answer with no live owner
+		; is a foreign server: refused, and an explicit start then names the
+		; occupied port instead of chatting to someone else's Ollama.
+		LoggerWarn("LLM", "A server Ergopti does not own answers on its Ollama port; it is not used.")
+		if IsSet(show_ui) && !show_ui {
+			_LLM_Deps_Checking := false
+			return
+		}
+	}
+	if running && Owned {
 		LoggerInfo("LLM", "Ollama already running — fast path, state → ready.")
 		_LLM_Deps_State    := "ready"
 		_LLM_Deps_Checking := false
@@ -217,16 +222,15 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 		return
 	}
 
-	; When called from the auto-boot path (show_ui=false), do not open the
-	; install window — the user has not asked for an installation.
+	Installer := HasMethod(InstallerFn, "Call") ? InstallerFn : LLM_Deps_RunManagedInstaller
+	; The auto-boot path (show_ui=false) restarts the installed runtime with no
+	; window; it never installs one, since the user has not asked for that.
 	if IsSet(show_ui) && !show_ui {
-		LoggerInfo("LLM", "Ollama not running but show_ui=false — silent abort, state stays pending.")
-		_LLM_Deps_Checking := false
-		return
+		LoggerInfo("LLM", "Ollama not running and show_ui=false — restarting the owned runtime silently.")
+		return Installer.Call(default_model, captured_epoch, on_ready?, on_failed?, true)
 	}
 
 	LoggerInfo("LLM", "Ollama not running — launching installer…")
-	Installer := HasMethod(InstallerFn, "Call") ? InstallerFn : LLM_Deps_RunManagedInstaller
 	return Installer.Call(default_model, captured_epoch, on_ready?, on_failed?)
 }
 
@@ -236,244 +240,13 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 
 ; ======================================
 ; ======================================
-; ======= 4/ Installer Execution =======
+; ======= 4/ Cancel and Failures =======
 ; ======================================
 ; ======================================
 
 /**
- * Legacy installer task ownership for explicitly injected fixture ports only.
- * Default production dispatch uses the source-bound managed file/runtime owner.
- */
-_LLM_Deps_RetireInstallerOwner(ExpectedOwner) {
-	global _LLM_Deps_InstallerOwner
-	PreviousCritical := Critical("On")
-	try {
-		if !IsObject(_LLM_Deps_InstallerOwner)
-			return false
-		if _LLM_Deps_InstallerOwner != ExpectedOwner
-			return false
-		_LLM_Deps_InstallerOwner := 0
-		return true
-	} finally {
-		Critical(PreviousCritical)
-	}
-}
-
-_LLM_Deps_OnInstallerTerminal(Owner, ExitCode, Stdout, Stderr) {
-	if !_LLM_Deps_RetireInstallerOwner(Owner)
-		return
-	if ExitCode = 0 {
-		try LoggerInfo("LLM", "winget installer process completed.")
-	} else {
-		try LoggerWarn("LLM", "winget installer process exited with code {1}.", ExitCode)
-	}
-}
-
-_LLM_Deps_CancelInstallerOwner(ExpectedOwner := 0) {
-	global _LLM_Deps_InstallerOwner
-	PreviousCritical := Critical("On")
-	try {
-		Owner := _LLM_Deps_InstallerOwner
-		if !IsObject(Owner)
-			return true
-		if IsObject(ExpectedOwner) && Owner != ExpectedOwner
-			return false
-		if Owner.Get("state", "") = "cancelling"
-			return false
-		Owner["state"] := "cancelling"
-	} finally {
-		Critical(PreviousCritical)
-	}
-
-	Terminated := false
-	try Terminated := Owner["task"].terminate() == true
-	catch as Err
-		try LoggerError("LLM", "Exact installer termination threw: {1}.", Err.Message)
-
-	PreviousCritical := Critical("On")
-	try {
-		if _LLM_Deps_InstallerOwner == Owner {
-			if Terminated
-				_LLM_Deps_InstallerOwner := 0
-			else
-				Owner["state"] := "running"
-		}
-	} finally {
-		Critical(PreviousCritical)
-	}
-	return Terminated
-}
-
-LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?, Port := 0) {
-	global _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_Epoch
-	global _LLM_Deps_InstallerOwner
-	if captured_epoch != _LLM_Deps_Epoch
-		return false
-	; Retained injected transfer regression seam; production always uses the
-	; managed per-user owner, including direct calls to this historical API.
-	if !(Port is Map)
-		return LLM_Deps_RunManagedInstaller(model, captured_epoch, on_ready?, on_failed?)
-	PriorityFn := _LLM_CurlArtifactPortFn(Port, "priority", ProcessSetPriority)
-	; Failed cancellation retains the predecessor; no successor may acquire work.
-	if IsObject(_LLM_Deps_InstallerOwner) {
-		LoggerError("LLM", "Installer acquisition refused because the exact predecessor remains owned.")
-		_LLM_Deps_PublishFailure(t("ollama.deps_failed"), on_failed?, captured_epoch, PriorityFn)
-		return false
-	}
-
-	; Boost AHK's own priority BEFORE we kick the installer off. Any heavy
-	; download — winget, the browser's download manager, the OllamaSetup
-	; exe itself — contests CPU and disk with the AHK message loop. If
-	; AHK loses scheduling slots, the PrefixWatcher's InputHook misses
-	; OnChar callbacks and characters get silently dropped from the
-	; user's typing. Pinning AHK to High keeps the keyboard responsive
-	; even when the OS is otherwise saturated.
-	try PriorityFn.Call("High")
-
-	; A prior ``where winget`` RunWait blocked the menu action on AHK's sole
-	; thread. Check the local app alias without spawning a process, then retain
-	; the exact asynchronous process-tree owner for its whole lifetime.
-	WingetPath := EnvGet("LOCALAPPDATA") . "\Microsoft\WindowsApps\winget.exe"
-	AvailableFn := _LLM_CurlArtifactPortFn(Port, "available", (*) => FileExist(WingetPath) != "")
-	winget_available := AvailableFn.Call()
-	LoggerInfo("LLM", "Handing off to winget install Ollama.Ollama (BelowNormal priority)…")
-	if winget_available {
-		try {
-			Owner := Map("task", 0, "state", "starting")
-			SpawnFn := _LLM_CurlArtifactPortFn(Port, "spawn", ShellRunner_SpawnTreeOwned)
-			Task := SpawnFn.Call(WingetPath, [
-				"install", "--id", "Ollama.Ollama", "-e",
-				"--accept-package-agreements", "--accept-source-agreements"
-			], _LLM_Deps_OnInstallerTerminal.Bind(Owner), , , 0, false)
-			Owner["task"] := Task
-			PreviousCritical := Critical("On")
-			try {
-				if IsObject(_LLM_Deps_InstallerOwner)
-					throw Error("an installer owner is already active")
-				_LLM_Deps_InstallerOwner := Owner
-			} finally {
-				Critical(PreviousCritical)
-			}
-			if !Task.start() {
-				throw Error("exact installer process tree did not start")
-			}
-			PreviousCritical := Critical("On")
-			try {
-				if _LLM_Deps_InstallerOwner == Owner
-					Owner["state"] := "running"
-			} finally {
-				Critical(PreviousCritical)
-			}
-			LoggerInfo("LLM", "winget command launched under exact tree ownership.")
-		} catch as err {
-			if IsSet(Owner) && IsObject(Owner)
-					&& !_LLM_Deps_CancelInstallerOwner(Owner) {
-				LoggerError("LLM", "Installer launch failed and exact cancellation was not acknowledged; ownership was retained.")
-				_LLM_Deps_PublishFailure(t("ollama.deps_failed"), on_failed?, captured_epoch, PriorityFn)
-				return false
-			}
-			LoggerInfo("LLM", "winget is unavailable; opening browser fallback: " err.Message ".")
-			winget_available := false
-		}
-	}
-
-	if !winget_available {
-		LoggerInfo("LLM", "Opening https://ollama.com/download in the default browser.")
-		try {
-			RunFn := _LLM_CurlArtifactPortFn(Port, "run", Run)
-			RunFn.Call('https://ollama.com/download')
-		} catch as err {
-			LoggerError("LLM", "Could not open the download page: " err.Message ".")
-			LLM_Deps_Fail(t("menu.llm.deps_download_page_failed"),
-				on_failed?, captured_epoch)
-			return
-		}
-		; Surface a tray tip so the user knows what to do — without it,
-		; the browser opening out of nowhere can feel disconnected from
-		; their click in the menu.
-		TipFn := _LLM_CurlArtifactPortFn(Port, "tip", TrayTip)
-		try TipFn.Call("Ergopti — IA", t("llm.deps.browser_install_tip"), 0x1)
-	}
-
-	; Poll the daemon every 3 s. When it answers, fire on_ready.
-	global LLM_OLLAMA_BASE_URL
-	LoggerInfo("LLM", "Polling {1} every 3 s until Ollama responds…",
-		LLM_OLLAMA_BASE_URL)
-	global _LLM_Deps_PollStartTick := A_TickCount
-	_LLM_Deps_PollTimer := () => LLM_Deps_PollServerReady(
-		on_ready?, on_failed?, captured_epoch)
-	TimerFn := _LLM_CurlArtifactPortFn(Port, "timer", SetTimer)
-	TimerFn.Call(_LLM_Deps_PollTimer, 3000)
-	return true
-}
-
-/**
- * Poll callback set up by LLM_Deps_RunInstaller. Fires every 3 s; checks
- * whether Ollama is reachable. As soon as it answers, the install is
- * considered done (regardless of HOW the user installed it — via winget,
- * a manual download, or anything else).
- */
-LLM_Deps_PollServerReady(on_ready?, on_failed?, captured_epoch := 0) {
-	if A_IsSuspended
-		return
-	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer, _LLM_Deps_Epoch
-	global _LLM_Deps_PollStartTick, LLM_DEPS_POLL_TIMEOUT_MS
-	if captured_epoch != _LLM_Deps_Epoch
-		return false
-	; AHK-30: bound the poll so a user who installs via the browser fallback
-	; and then abandons the install without clicking Cancel does not leave AHK
-	; pinned at High priority indefinitely.
-	elapsed := (A_TickCount - _LLM_Deps_PollStartTick) & 0xFFFFFFFF
-	if (elapsed >= LLM_DEPS_POLL_TIMEOUT_MS) {
-		LoggerWarn("LLM", "Daemon poll timed out after " Round(elapsed / 60000) " min — aborting.")
-		if IsSet(_LLM_Deps_PollTimer)
-			SetTimer(_LLM_Deps_PollTimer, 0)
-		LLM_Deps_Fail(t("llm.deps.fail_timeout"), on_failed?, captured_epoch)
-		return
-	}
-	; ASYNC probe — never call the sync LLM_OllamaIsRunning here. When
-	; Ollama isn't installed yet, that sync call blocks the message loop
-	; for ~4 s (4 × 1 s WinHTTP phases) at every poll tick. With the
-	; timer firing every 3 s, AHK was effectively frozen the entire
-	; install — the user's typing lagged hard for as long as the install
-	; ran. The async version dispatches the probe to WinHTTP's
-	; background thread and the result lands in a separate callback.
-	; AHK-14: capture epoch so the poll callback can detect preemption.
-	captured_epoch := _LLM_Deps_Epoch
-	try LLM_OllamaIsRunning_Async((reachable) => _LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?))
-}
-
-/**
- * Callback for the async probe scheduled by LLM_Deps_PollServerReady.
- * Fires once Ollama answers (or fails to) on a given tick. When
- * reachable, we finalise the install; otherwise we just wait for the
- * next 3 s tick — no work done on the main thread.
- */
-_LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?) {
-	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
-	; AHK-14: discard stale poll callbacks from a preempted or cancelled check.
-	if (captured_epoch != _LLM_Deps_Epoch) {
-		LoggerInfo("LLM", "OnPollProbeResult — stale epoch " captured_epoch " (current=" _LLM_Deps_Epoch "), discarding.")
-		return
-	}
-	if !reachable
-		return    ; still not up — next tick will probe again
-	LoggerInfo("LLM", "Ollama is now reachable — install complete.")
-	if IsSet(_LLM_Deps_PollTimer)
-		SetTimer(_LLM_Deps_PollTimer, 0)
-	_LLM_Deps_State    := "ready"
-	_LLM_Deps_Checking := false
-	; Restore the driver baseline (not a hardcoded "Normal") — must stay in
-	; sync with the boot-time boost class (driver-baseline-priority-reverted-to-normal).
-	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
-	if IsSet(on_ready)
-		on_ready()
-}
-
-/**
- * Cancels an in-flight Ollama install: terminates its exact winget process tree
- * and stops the poll timer. Safe to call when nothing is running — it
- * just resets the state flags.
+ * Cancels an in-flight Ollama install through the managed bootstrap owner. Safe
+ * to call when nothing is running — it just resets the state flags.
  *
  * Called from LLM_Deps_OnUserCancel (Cancel button) and from
  * LLM_Menu_OnToggle when the user disables the feature mid-install.
@@ -481,16 +254,9 @@ _LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?) {
  * the user closed every visible cue.
  */
 LLM_Deps_Cancel() {
-	global _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
+	global _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
 
-	InstallerStopped := _LLM_Deps_CancelInstallerOwner()
 	ManagedStopped := LLM_ManagedBootstrapCancel()
-	if !InstallerStopped
-		try LoggerError("LLM", "Cancel could not confirm that the exact installer tree stopped; ownership was retained.")
-	if IsSet(_LLM_Deps_PollTimer) and _LLM_Deps_PollTimer {
-		try SetTimer(_LLM_Deps_PollTimer, 0)
-		_LLM_Deps_PollTimer := unset
-	}
 	; AHK-14: bump epoch so in-flight async callbacks from the cancelled check
 	; recognise themselves as stale (captured epoch != _LLM_Deps_Epoch) and
 	; bail before touching _LLM_Deps_Checking or _LLM_Deps_State.
@@ -504,15 +270,12 @@ LLM_Deps_Cancel() {
 	; the shared constant, not a hardcoded "Normal" literal
 	; (driver-baseline-priority-reverted-to-normal).
 	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
-	return InstallerStopped && ManagedStopped
+	return ManagedStopped
 }
 
-; Stop the exact package-installer tree before lifecycle teardown becomes
-; irreversible. Kill-on-job-close is only a last-resort containment fence: it
-; must not be used as successful shutdown while winget may still be mutating
-; the package store.
+; Stop the managed bootstrap before lifecycle teardown becomes irreversible.
 LLM_Deps_PrepareShutdown() {
-	return _LLM_Deps_CancelInstallerOwner() && LLM_ManagedBootstrapCancel()
+	return LLM_ManagedBootstrapCancel()
 }
 
 /**
@@ -524,8 +287,6 @@ LLM_Deps_Fail(msg, on_failed?, captured_epoch := 0) {
 	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
 	if captured_epoch && captured_epoch != _LLM_Deps_Epoch
 		return false
-	if !_LLM_Deps_CancelInstallerOwner()
-		LoggerError("LLM", "Dependency failure could not confirm installer-tree termination; ownership was retained.")
 	return _LLM_Deps_PublishFailure(msg, on_failed?, captured_epoch, ProcessSetPriority)
 }
 

@@ -69,6 +69,14 @@ local function strip_comment_lines(src)
 end
 
 --- Returns the comment-free source of a driver file, failing loudly if absent.
+--- The comment-free source of the one production file holding `selector`, a
+--- declaration unique to it, so the module can move without a path error.
+--- @param selector string
+--- @return string
+local function unit_code(selector)
+	return strip_comment_lines(assert(helpers.read_driver_unit(selector)))
+end
+
 local function code_of(rel_path)
 	local fh = io.open(DRIVER_ROOT .. "/" .. rel_path, "r")
 	helpers.assert_not_nil(fh, "missing source file: " .. rel_path)
@@ -106,7 +114,7 @@ helpers.describe("keystats privacy — the posture is read, not re-typed", funct
 	end)
 
 	it("does not hardcode the four defaults in the driver", function()
-		local code = code_of("modules/keystats/keystats.lua")
+		local code = unit_code("local function new_live_tracker(")
 		local KEY = require("config_keys").KEY
 		for _, entry in ipairs({
 			{ "METRICS_ENABLED",                    "metrics.enabled" },
@@ -389,7 +397,7 @@ helpers.describe("keystats privacy — the daemon supplies the signals", functio
 		-- case above is: every behavioural test of the filter still passes with the
 		-- call deleted, because the filter simply never fires.
 		local code = code_of("ergopti_hotstrings.lua")
-		local guard_code = code_of("modules/keystats/focus_guard.lua")
+		local guard_code = unit_code('error("focus_guard requires keystats.set_secure_field")')
 		helpers.assert_contains(code, "adapters.secure_field_detector",
 			"the daemon must reach the detector at all")
 		helpers.assert_contains(code, "keystats  = keystats",
@@ -416,7 +424,7 @@ helpers.describe("keystats privacy — the daemon supplies the signals", functio
 	end)
 
 	it("uses the shared keyword list rather than a driver-local copy", function()
-		local code = code_of("modules/keystats/keystats.lua")
+		local code = unit_code("local function new_live_tracker(")
 		helpers.assert_contains(code, 'require("keystats.private_window")',
 			"the markers are a cross-driver privacy guarantee and live in _shared")
 		helpers.assert_true(code:find("Incognito", 1, true) == nil,

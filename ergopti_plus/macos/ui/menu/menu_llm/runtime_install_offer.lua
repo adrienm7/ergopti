@@ -106,11 +106,6 @@ function M.select_ollama(on_complete, opts)
 		Logger.debug(LOG, "Ollama provisioning already running; joining it.")
 		return ollama_deps().check_and_install_deps(on_complete) == true
 	end
-	local user_path, user_source = OllamaBinary.find_user_installation()
-	if user_path then
-		Logger.info(LOG, "A user-owned Ollama (%s) is installed; Ergopti leaves it untouched and uses its own.",
-			tostring(user_source))
-	end
 	if ollama_deps().provisioning_idle() ~= true or not migration_idle() then return false end
 	local native_target = OllamaBinary.native_managed_install_dir()
 	local model_store = os.getenv("OLLAMA_MODELS")

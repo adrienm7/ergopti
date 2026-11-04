@@ -27,9 +27,7 @@ _KSDO_ChildSource() {
 	}
 	PrivacyOwner := _DriverProductionFileForSymbol("MF_ShouldFilter", _DriverDir)
 	AssertTrue(PrivacyOwner != "", "The actual privacy classifier must resolve")
-	PrivacySource := FileRead(PrivacyOwner, "UTF-8")
-	AssertFalse(RegExMatch(PrivacySource, "im)^#Include\b"),
-		"An embedded owner with relative imports requires an explicit child composition")
+	PrivacySource := _KFPO_EmbeddableOwnerSource(PrivacyOwner)
 	PrivacySource := StrReplace(PrivacySource, "MF_ShouldFilter() {", "_KSDO_NativeFilter() {", true, &Replaced)
 	AssertEqual(1, Replaced, "Only the genuine classifier declaration may receive the scheduling alias")
 	Source .= PrivacySource . "`n"

@@ -578,15 +578,15 @@ _KCT_MenuListsEveryOrderedPair() {
 			}
 		}
 		AssertEqual(All.Length * (All.Length - 1), Pairs, "every ordered pair is listed")
-		Assert(Groups.Has("space") and Left[Left.Length]["label"] == t("tap_hold.group.space"),
+		Assert(Groups.Has("space") and Left[Left.Length]["label"] == t("key_name.space"),
 			"Space is a left-hand key, the last of its hand")
 		Forward := "", Backward := ""
 		for _, Pair in Groups["left_alt"]["items"] {
-			if InStr(Pair["label"], t("tap_hold.group.left_alt") . " + " . t("tap_hold.group.caps_lock")) == 1
+			if InStr(Pair["label"], t("key_name.left_alt") . " + " . t("key_name.caps_lock")) == 1
 				Forward := Pair
 		}
 		for _, Pair in Groups["caps_lock"]["items"] {
-			if InStr(Pair["label"], t("tap_hold.group.caps_lock") . " + " . t("tap_hold.group.left_alt")) == 1
+			if InStr(Pair["label"], t("key_name.caps_lock") . " + " . t("key_name.left_alt")) == 1
 				Backward := Pair
 		}
 		Assert(Forward is Map and Backward is Map, "LAlt + CapsLock and CapsLock + LAlt are two rows")
@@ -594,14 +594,15 @@ _KCT_MenuListsEveryOrderedPair() {
 		Assert(InStr(Forward["label"], GestureActionDisplayLabel("caps_word")) > 0, "and names its tap")
 		Assert(InStr(Forward["label"], _TH_HoldOptionLabel("ctrl")) > 0, "and its hold")
 		AssertFalse(Backward["checked"], "the other order has its own, empty, slots")
-		AssertEqual(t("tap_hold.group.caps_lock") . " + " . t("tap_hold.group.left_alt") . " : "
-			. t("dialog.action_picker.disabled"), Backward["label"], "an empty pair explicitly names its disabled action")
+		AssertEqual(LabelValue(t("key_name.caps_lock") . " + " . t("key_name.left_alt"),
+			t("dialog.action_picker.disabled")), Backward["label"], "an empty pair explicitly names its disabled action")
 		AssertTrue(Groups["left_alt"]["checked"], "a first key with a pair is ticked")
 		AssertFalse(Groups["caps_lock"]["checked"])
 		; The menu a pair opens is the manifest's: its clear row, a separator,
-		; then the two slots this provider supplies.
+		; then the three slots this provider supplies.
 		Slots := KeyCombinationSlotRows("left_alt_then_caps_lock", "LAlt + CapsLock")
-		AssertEqual(2, Slots.Length, "a pair has a tap slot and a hold slot")
+		AssertEqual(3, Slots.Length, "a pair has a tap slot, a hold slot and a chord slot")
+		Assert(HasMethod(Slots[3].Get("action", 0), "Call"), "the chord slot opens the action picker")
 		Assert(HasMethod(Slots[1]["action"], "Call"), "the tap slot opens the action picker")
 		Assert(InStr(Slots[1]["label"], GestureActionDisplayLabel("caps_word")) > 0, "and names its action")
 		Assert(!Slots[2].Has("items") && HasMethod(Slots[2].Get("action", 0), "Call"),
@@ -612,8 +613,8 @@ _KCT_MenuListsEveryOrderedPair() {
 		AssertEqual(1, Shown.Length, "the pair's menu is built from the manifest and handed over to be shown")
 		AssertTrue(_KeyCombinationPairMenu == Shown[1],
 			"the shown pair menu stays referenced after the call returns, so its click still finds its item")
-		try AssertEqual(4, DllCall("GetMenuItemCount", "ptr", Shown[1].Handle, "int"),
-			"the clear row, the separator, the tap slot and the hold slot")
+		try AssertEqual(5, DllCall("GetMenuItemCount", "ptr", Shown[1].Handle, "int"),
+			"the clear row, the separator, and the tap, hold and chord slots")
 		finally Shown[1].Delete()
 		Opened := []
 		Capture(Title, Current, OnConfirm, ShowNative, BindingId, Slot) {
@@ -754,9 +755,9 @@ _KCT_GroupScope(Mode) {
 	global _MenuDispatchCallbacks
 	Source := '[shortcuts.key_combination_taps]`nleft_alt_then_caps_lock = "open_url"`nspace_then_enter = "caps_word"`nfuture_pair = "keep"`n'
 		. '[shortcuts.key_combination_holds]`nspace_then_enter = "ctrl"`nfuture_pair = "keep"`n'
-		. '[shortcuts.keyboard]`nwin_b = "copy"`n[category_enabled]`nkey_combinations = false`nshortcuts = false`n'
+		. '[shortcuts.keyboard]`nmeta_b = "copy"`n[category_enabled]`nkey_combinations = false`nshortcuts = false`n'
 		. '[action_parameters]`ncombination__left_alt_then_caps_lock__open_url = "https://pair.test"`n'
-		. 'combination__future_pair__open_url = "keep"`nkeyboard__win_b__open_url = "keep"`n'
+		. 'combination__future_pair__open_url = "keep"`nkeyboard__meta_b__open_url = "keep"`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
@@ -790,8 +791,8 @@ _KCT_GroupScope(Mode) {
 		AssertEqual("keep", Holds["future_pair"])
 		Assert(!Parsed["action_parameters"].Has("combination__left_alt_then_caps_lock__open_url"))
 		AssertEqual("keep", Parsed["action_parameters"]["combination__future_pair__open_url"])
-		AssertEqual("keep", Parsed["action_parameters"]["keyboard__win_b__open_url"])
-		AssertEqual("copy", Parsed["shortcuts.keyboard"]["win_b"])
+		AssertEqual("keep", Parsed["action_parameters"]["keyboard__meta_b__open_url"])
+		AssertEqual("copy", Parsed["shortcuts.keyboard"]["meta_b"])
 		AssertEqual(false, Parsed["category_enabled"]["shortcuts"])
 		AssertEqual(Mode == "recommended", Parsed["category_enabled"].Get("key_combinations",
 			ManifestDefaultFor("category_enabled.key_combinations")), "clear preserves the disabled switch")

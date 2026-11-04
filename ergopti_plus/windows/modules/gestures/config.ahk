@@ -138,6 +138,19 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		}
 		if (Spec = "")
 				return true
+		; Syntax only, before the trim: whether a path still exists is checked when it opens.
+		if (Spec == "command") {
+				if (UserActionParseCommand(Value) is Map)
+						return true
+				ErrorText := StrReplace(t("dialog.gestures.param_err_command"), "{1}", USER_ACTION_MAX_COMMAND_BYTES)
+				return false
+		}
+		if (Spec == "path") {
+				if (UserActionParsePath(Value) is Map)
+						return true
+				ErrorText := t("dialog.gestures.param_err_path")
+				return false
+		}
 		; Checked before the trim below: the spaces of a text to type are part of it,
 		; and the key and shortcut rules trim for themselves.
 		if (Spec = "text" || Spec = "key" || Spec = "shortcut") {
@@ -215,6 +228,10 @@ GestureActionParameterPrompt(ActionName) {
 		switch GestureActionParameterSpec(ActionName) {
 				case "program":
 						return t("dialog.gestures.param_program")
+				case "command":
+						return t("dialog.gestures.param_command_windows")
+				case "path":
+						return t("dialog.gestures.param_path")
 				case "search_url":
 						return t("dialog.gestures.param_search_url")
 				case "url":
@@ -226,7 +243,7 @@ GestureActionParameterPrompt(ActionName) {
 								WrapPairDescribe(_WS_BUILTIN_PAIRS))
 				case "text":
 						return StrReplace(t("dialog.gestures.param_text"), "{1}",
-								SendInputVocabulary()["text_max_code_points"])
+								SendKeysVocabulary()["text_max_code_points"])
 				case "key", "shortcut":
 						return StrReplace(t("dialog.gestures.param_" . GestureActionParameterSpec(ActionName)),
 								"{1}", SendInputDescribeKeys())
@@ -267,7 +284,7 @@ GestureClearPickedParameter() {
 ; @returns {String}
 GestureSendInputErrorText(Spec) {
 		return StrReplace(t("dialog.gestures.param_err_" . Spec), "{1}",
-				SendInputVocabulary()["text_max_code_points"])
+				SendKeysVocabulary()["text_max_code_points"])
 }
 
 ; Builds a detached action-parameter candidate. Cancel is represented by false;
@@ -296,9 +313,15 @@ GesturePromptActionParameter(BindingId, ActionName) {
 				return _GesturePickProgram(BindingId, ActionName, Title, Existing)
 		if (Spec = "app")
 				return _GesturePickApplication(BindingId, ActionName, Prompt)
+		if (Spec = "llm_vision")
+				return _GesturePickVision(BindingId, ActionName, Title, Existing)
+		if (Spec == "command")
+				return _GesturePickCommand(BindingId, ActionName, Title, Prompt, Existing)
+		if (Spec == "path")
+				return _GesturePickPath(BindingId, ActionName, Title, Prompt)
 		loop {
 				; The wrap-pair, shortcut and prompt-choice prompts list a catalogue under their text.
-				Listed := (Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt" || Spec = "llm_vision")
+				Listed := (Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt")
 				Size := Listed ? "w680 h300" : (Spec = "key") ? "w680 h220" : "w680 h160"
 				Result := Ui_InputBox(Prompt, Title, Size, Existing)
 				if (Result.Result != "OK")
@@ -314,6 +337,147 @@ GesturePromptActionParameter(BindingId, ActionName) {
 								"value", Value)
 				Ui_MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
 				Existing := Value
+		}
+}
+
+; Asks for a run_command parameter: the command, how it runs, then what happens to
+; its text output when it runs hidden. Cancel at any step cancels.
+; @returns {Map|false} The parameter candidate, false when cancelled.
+_GesturePickCommand(BindingId, ActionName, Title, Prompt, Existing) {
+		Prior := UserActionParseCommand(Existing)
+		Command := (Prior is Map) ? Prior["command"] : ""
+		loop {
+				Answer := Ui_InputBox(Prompt, Title, "w680 h160", Command)
+				if (Answer.Result != "OK")
+						return false
+				Command := Answer.Value
+				Mode := _GestureVisionPickBackend(Title, t("dialog.gestures.param_command_mode"), [
+						Map("value", "hidden", "label", t("dialog.gestures.param_command_mode_hidden")),
+						Map("value", "terminal", "label", t("dialog.gestures.param_command_mode_terminal"))],
+						(Prior is Map) ? Prior["mode"] : "")
+				if (Mode == "")
+						return false
+				Output := "none"
+				if (Mode == "hidden") {
+						Output := _GestureVisionPickBackend(Title, t("dialog.gestures.param_output"), [
+								Map("value", "none", "label", t("dialog.gestures.param_output_none")),
+								Map("value", "type", "label", t("dialog.gestures.param_output_type")),
+								Map("value", "copy", "label", t("dialog.gestures.param_output_copy"))],
+								(Prior is Map) ? Prior["output"] : "")
+						if (Output == "")
+								return false
+				}
+				Value := UserActionSpellCommand(Command, Mode, Output)
+				ErrorText := ""
+				if GestureValidateActionParameter(ActionName, Value, &ErrorText)
+						return Map("has_value", true,
+								"key", GestureActionParameterKey(BindingId, ActionName),
+								"value", Value)
+				Ui_MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
+		}
+}
+
+; Asks for an open_path parameter in the native file or folder picker.
+; @returns {Map|false} The parameter candidate, false when cancelled or refused.
+_GesturePickPath(BindingId, ActionName, Title, Prompt) {
+		static FILE_MUST_EXIST := 1 + 2, FOLDER_MUST_EXIST := 1
+		Kind := _GestureVisionPickBackend(Title, Prompt, [
+				Map("value", "file", "label", t("dialog.gestures.param_path_kind_file")),
+				Map("value", "folder", "label", t("dialog.gestures.param_path_kind_folder"))], "")
+		if (Kind == "")
+				return false
+		Picked := (Kind == "file") ? Ui_FileSelect(FILE_MUST_EXIST, "", Prompt)
+				: Ui_DirSelect("", FOLDER_MUST_EXIST, Prompt, Title, 0)
+		if (Picked = "")
+				return false
+		ErrorText := ""
+		if GestureValidateActionParameter(ActionName, Picked, &ErrorText)
+				return Map("has_value", true,
+						"key", GestureActionParameterKey(BindingId, ActionName),
+						"value", Picked)
+		Ui_MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
+		return false
+}
+
+; The steps of the native vision prompt, replaced by recorders in the unit suite.
+global _GestureVisionPromptPorts := 0
+
+; Asks for a screen action's vision parameter as the action picker page does:
+; the backend picked in a list (about forty with the API catalogue), then the
+; optional model typed with the backend's default shown. Cancel at either step
+; cancels. macOS and Linux ask the same two steps.
+; @returns {Map|false} The parameter candidate, false when cancelled.
+_GesturePickVision(BindingId, ActionName, Title, Existing) {
+		global _GestureVisionPromptPorts
+		Ports := (_GestureVisionPromptPorts is Map) ? _GestureVisionPromptPorts
+				: Map("pick", _GestureVisionPickBackend, "ask", Ui_InputBox, "refuse", Ui_MsgBox)
+		Choices := LLM_Vision_BackendChoices()
+		Prior := LLM_Vision_Parse(Existing)
+		loop {
+				Selected := (Prior is Map) ? Prior["backend"] : ""
+				Backend := Ports["pick"].Call(Title, t("dialog.action_picker.vision_provider_label"), Choices, Selected)
+				if (Backend == "")
+						return false
+				DefaultModel := ""
+				for Choice in Choices {
+						if (Choice["value"] == Backend)
+								DefaultModel := Choice["defaultModel"]
+				}
+				Hint := (DefaultModel != "")
+						? StrReplace(t("dialog.action_picker.vision_model_default"), "{1}", DefaultModel)
+						: t("dialog.action_picker.vision_model_required")
+				Initial := ((Prior is Map) && Prior["backend"] == Backend) ? Prior.Get("model", "") : ""
+				Answer := Ports["ask"].Call(t("dialog.action_picker.vision_model_label") . "`n" . Hint,
+						Title, "w680 h160", Initial)
+				if (Answer.Result != "OK")
+						return false
+				Value := LLM_Vision_ComposeParameter(Backend, Answer.Value, DefaultModel)
+				ErrorText := ""
+				if GestureValidateActionParameter(ActionName, Value, &ErrorText)
+						return Map("has_value", true,
+								"key", GestureActionParameterKey(BindingId, ActionName),
+								"value", Value)
+				Ports["refuse"].Call(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
+				Prior := Map("backend", Backend)
+		}
+}
+
+; The native list of the vision backends.
+; @param {String} Title The window's title.
+; @param {String} Label The list's caption.
+; @param {Array} Choices Maps ("value", "label").
+; @param {String} Selected The value selected first; "" selects the first row.
+; @returns {String} The picked value, "" when cancelled.
+_GestureVisionPickBackend(Title, Label, Choices, Selected) {
+		Labels := []
+		Current := 1
+		for Index, Choice in Choices {
+				Labels.Push(Choice["label"])
+				if (Choice["value"] == Selected)
+						Current := Index
+		}
+		Result := ""
+		W := Gui_Create("", Title)
+		W.Add("Text", "xm", Label)
+		List := W.Add("ListBox", "xm w560 r16 Choose" . Current, Labels)
+		List.OnEvent("DoubleClick", Accept)
+		W.Add("Button", "xm Default", t("button.ok")).OnEvent("Click", Accept)
+		W.Add("Button", "x+8", t("button.cancel")).OnEvent("Click", Retire)
+		W.OnEvent("Close", Retire)
+		W.OnEvent("Escape", Retire)
+		; Read before Show: a click thread can retire the window before this
+		; thread resumes, and a destroyed Gui has no Hwnd left to wait on.
+		PickerHwnd := W.Hwnd
+		W.Show()
+		WinWaitClose("ahk_id " . PickerHwnd)
+		return Result
+		Accept(*) {
+				if (List.Value > 0)
+						Result := Choices[List.Value]["value"]
+				Retire()
+		}
+		Retire(*) {
+				W.Destroy()
 		}
 }
 
@@ -418,11 +582,15 @@ GestureEnsureActionParameter(BindingId, ActionName, WriterFn := 0, NotifyFn := 0
 
 GestureActionDisplayLabel(ActionName, BindingId := "") {
 		Label := _GestureActionLabel(ActionName)
-		if GestureActionParameterSpec(ActionName) == "program"
+		Spec := GestureActionParameterSpec(ActionName)
+		; A command's text may hold a secret, and a menu is on screen.
+		if (Spec == "program" || Spec == "command")
 				return Label
 		if (BindingId = "")
 				return Label
 		Value := GestureGetActionParameter(BindingId, ActionName)
+		if (Spec == "path")
+				Value := UserActionPathLabel(Value)
 		if (Value = "")
 				return Label
 		if !RegExMatch(Label, "\[[^\[\]]*\]$", &Marker)
@@ -697,8 +865,8 @@ GestureConsumeAutoConfigureFlag(Path, WriterFn := 0, NotifyFn := 0, TimerFn := 0
 ; slots send Ctrl+Win+Shift+F1..F10 without any manual Settings configuration.
 ; The values come from the generated touchpad table and are written by its one
 ; owner (modules/gestures/touchpad_registry.ahk), which backs up the prior
-; values before the first write so « Restaurer les gestes du pavé tactile
-; Windows » can put them back.
+; values before the first write so the Gestures « Tout effacer » can put them
+; back.
 ; Returns true on success, false if the backup or any registry write failed.
 GestureAutoConfigureRegistry(OnDone := 0) {
 		LoggerStart("gestures", "Auto-configuring touchpad gestures via registry…")
@@ -742,9 +910,9 @@ _GestureRestartReserve(Candidate, TimerFn := 0) {
 		; The poller handles the UAC interval where Candidate has no PID yet.
 		PollFn := _GestureRestartPoll.Bind(Candidate["epoch"])
 		if HasMethod(TimerFn, "Call")
-			TimerFn.Call(PollFn, -100)
+			TimerFn.Call(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))
 		else
-			SetTimer(PollFn, -100)
+			SetTimer(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))
 		_GestureRestartJob := Candidate
 		return true
 	} finally {
@@ -841,7 +1009,7 @@ _GestureRestartPoll(Epoch) {
 		if (_GestureRestartJob["epoch"] != Epoch)
 				return
 		if _GestureRestartJob.Get("starting", false) {
-				SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+				SetTimer(_GestureRestartPoll.Bind(Epoch), -TimingsGet("gestures", "worker_result_poll_ms"))
 				return
 		}
 		if !_GestureRestartJob["pid"]
@@ -850,14 +1018,14 @@ _GestureRestartPoll(Epoch) {
 		; resumes rather than presenting status or invoking a user callback while
 		; suspended.
 		if A_IsSuspended {
-				SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+				SetTimer(_GestureRestartPoll.Bind(Epoch), -TimingsGet("gestures", "worker_result_poll_ms"))
 				return
 		}
 		; A complete atomic result is authoritative even if Windows has recycled
 		; the launch PID. Liveness is only an advisory while no receipt exists.
 		if !FileExist(_GestureRestartJob["result"])
 				&& ProcessExist(_GestureRestartJob["pid"]) {
-				SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+				SetTimer(_GestureRestartPoll.Bind(Epoch), -TimingsGet("gestures", "worker_result_poll_ms"))
 				return
 		}
 		Ok := _GestureRestartReadResult(_GestureRestartJob["result"])
@@ -940,9 +1108,25 @@ GestureBuildSetupInstructions() {
 		Labels := GestureShortcutLabels()
 		for _, Slot in GestureSlotIds() {
 				Body .= "  " . t("gesture.slots." . Slot) . " :  "
-						. Labels[Slot] . "`n"
+						. GestureShortcutText(Labels[Slot]) . "`n"
 		}
 		return Body
+}
+
+; One tutorial shortcut as the user reads it: its modifiers named by the shared
+; key name table (« Ctrl + Win + Maj + F1 »), the function key as written. The
+; tutorial used to print the English « Shift » in every locale.
+; @param Ids {String} Key name ids joined with "+", the key last ("ctrl+win+shift+F1").
+; @returns {String}
+GestureShortcutText(Ids) {
+		Parts := StrSplit(Ids, "+")
+		if (Parts.Length < 2)
+				throw ValueError("A gesture shortcut names its modifiers and its key.", -1, Ids)
+		Key := Parts.Pop()
+		Text := ""
+		for Modifier in Parts
+				Text .= KeyNameLabel(Modifier) . " + "
+		return Text . Key
 }
 
 ; Public entry point: shows the gesture setup tutorial in a single panel with
@@ -999,7 +1183,7 @@ GestureOpenTouchpadSettings() {
 ; so a failure here is visible in the log.
 _DeferredGestureAutoConfigure(*) {
 		if A_IsSuspended {
-				SetTimer(_DeferredGestureAutoConfigure, -250)
+				SetTimer(_DeferredGestureAutoConfigure, -TimingsGet("gestures", "auto_configure_delay_ms"))
 				return
 		}
 		LoggerStart("gestures", "Running deferred touchpad auto-configuration…")

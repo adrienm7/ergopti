@@ -181,16 +181,28 @@ _LSP_CurrentConfigSource(AuthoredImage) {
 _LSP_AuthoredSchemaAdmission(World) {
 	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath), "the authored fixture must retain its genuine current boot admission")
 	World.Capture()
-	Unstamped := StrReplace(World.ConfigImage, "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n")
+	Stamp := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n"
+	Unstamped := StrReplace(World.ConfigImage, Stamp)
 	AssertTrue(FSWriteDurable(World.ConfigPath, Unstamped))
-	AssertFalse(ConfigSchemaCanPrepareWrite(World.ConfigPath), "removing the genuine stamp must lose native schema admission")
-	AssertFalse(World.Owner.Capture(), "an unstamped fixture cannot borrow its earlier READY receipt")
-	AssertEqual(Unstamped, FSReadUtf8Exact(World.ConfigPath), "qualification cannot repair an unversioned source")
+	; Maintainer decision: a file with no stamp runs as current, and the next full
+	; save stamps it. Only its own fresh capture admits it, not the earlier receipt.
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath), "an unstamped source counts as current")
+	AssertFalse(World.Owner.Current(World.Receipt), "an unstamped source cannot borrow the earlier READY receipt")
+	AssertTrue(World.Owner.Capture() is LLM_Menu_ApiPrivateSourceReceipt, "an unstamped source earns its own receipt")
+	AssertEqual(Unstamped, FSReadUtf8Exact(World.ConfigPath), "qualification cannot rewrite an unstamped source")
+	Registry := ConfigMigrateShippedRegistry()
+	for Version in [Registry["oldest"] - 1, Registry["current"] + 1, '"abc"'] {
+		Refused := Unstamped . "[_meta]`nschema_version = " . Version . "`n"
+		AssertTrue(FSWriteDurable(World.ConfigPath, Refused))
+		AssertFalse(ConfigSchemaCanPrepareWrite(World.ConfigPath), "a stamp that is not current loses admission: " . Version)
+		AssertFalse(World.Owner.Capture(), "a stamp that is not current mints no receipt: " . Version)
+		AssertEqual(Refused, FSReadUtf8Exact(World.ConfigPath), "qualification cannot repair a refused stamp: " . Version)
+	}
 	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
 	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath), "restoring the exact current source is observed afresh")
 	AssertTrue(World.Owner.Current(World.Receipt), "the original receipt remains bound to exact restored source bytes")
 }
-Test("Local server source: authored current stamp and unstamped refusal (local-server-current-schema-fixture)",
+Test("Local server source: authored current stamp, unstamped admission and stamp refusal (local-server-current-schema-fixture)",
 	(*) => _LSP_WithWorld(_LSP_AuthoredSchemaAdmission))
 
 

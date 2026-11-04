@@ -603,11 +603,17 @@ Test("LLM_Engine_FirePrediction: re-arms timer when Ollama not ready",
 	_FirePrediction_RearmsWhenOllamaNotReady)
 
 _OllamaAllowInference_GraceAfterWarmupStart() {
-	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupStartedTick
-	_LLM_Ollama_IsReady := false
-	_LLM_Ollama_WarmupStartedTick := A_TickCount - 10000
-	AssertTrue(LLM_OllamaAllowInference(), "grace must allow inference 8s after warmup start")
-	_LLM_Ollama_WarmupStartedTick := 0
+	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupStartedTick, _LLM_Deps_State
+	SavedState := _LLM_Deps_State
+	try {
+		_LLM_Deps_State := "ready"
+		_LLM_Ollama_IsReady := false
+		_LLM_Ollama_WarmupStartedTick := A_TickCount - 10000
+		AssertTrue(LLM_OllamaAllowInference(), "grace must allow inference 8s after warmup start")
+	} finally {
+		_LLM_Ollama_WarmupStartedTick := 0
+		_LLM_Deps_State := SavedState
+	}
 }
 Test("LLM_OllamaAllowInference: grace period after warmup start",
 	_OllamaAllowInference_GraceAfterWarmupStart)
@@ -649,6 +655,75 @@ _OnVariantFail_FallsBackFromStreaming() {
 
 Test("LLM_Engine_OnVariantFail: disables streaming for WinHTTP retry",
 	_OnVariantFail_FallsBackFromStreaming)
+
+; Replays the retry policy of inference.json through the real variant loop: the
+; attempt after a failure, or after an answer the parser refused, gets the extra
+; room and temperature; the attempt after a usable answer is back on the base.
+_RetryPolicy_ReachesTheNextCall() {
+	global _LLM_Engine
+	Saved := _LLM_Engine
+	_LLM_Engine := Saved.Clone()
+	try {
+		_LLM_Engine["request_id"] := 41
+		_LLM_Engine["active_request_signature"] := "retry-policy"
+		Calls := []
+		Policy := LLM_ApiCommon_GetRetryPolicy()
+		state := Map("request_id", 41, "semantic_signature", "retry-policy", "streaming", false,
+			"attempt_index", 1, "max_attempts", 6, "model", "fixture", "slots", [], "requested", 3,
+			"dispatch_fn", (Temp, OnSuccess, OnFail, Tokens := 0) => Calls.Push(Map("temp", Temp,
+				"tokens", Tokens, "ok", OnSuccess, "fail", OnFail)),
+			"dispatch_stream_fn", "", "call_tokens", 40, "base_temp", 0.4, "ctx", "ctx",
+			"dedup_stats", LLM_ApiCommon_NewDedupStats(), "show_all_at_once", true)
+		_LLM_Engine_DispatchVariant(state)
+		AssertEqual(0, Calls[1]["tokens"], "a first attempt keeps the planned budget")
+		Calls[1]["fail"].Call("http 500")
+		AssertEqual(2, Calls.Length, "a retry spends one attempt of the shared budget")
+		AssertEqual(40 + Policy[3], Calls[2]["tokens"], "the failed call's budget plus the policy's room")
+		AssertEqual(Round(Calls[1]["temp"] + Policy[2], 6), Round(Calls[2]["temp"], 6),
+			"the failed call's temperature plus the policy's step")
+		Calls[2]["ok"].Call("")
+		AssertEqual(3, Calls.Length)
+		AssertEqual(40 + 2 * Policy[3], Calls[3]["tokens"],
+			"an answer with no usable prediction is a failed attempt too")
+		Calls[3]["ok"].Call("une suite correcte")
+		AssertEqual(1, state["slots"].Length, "the fixture answer must parse into a slot")
+		AssertEqual(4, Calls.Length)
+		AssertEqual(0, Calls[4]["tokens"], "a usable answer ends the retry")
+	} finally {
+		_LLM_Engine := Saved
+	}
+}
+
+Test("LLM engine: a retried attempt gets the policy's extra tokens and temperature",
+	_RetryPolicy_ReachesTheNextCall)
+
+; A retry never streams, even while the streaming dispatcher stays available.
+_RetryPolicy_NeverStreams() {
+	global _LLM_Engine
+	Saved := _LLM_Engine
+	_LLM_Engine := Saved.Clone()
+	try {
+		_LLM_Engine["request_id"] := 42
+		_LLM_Engine["active_request_signature"] := "retry-stream"
+		Plain := 0, Streamed := 0
+		state := Map("request_id", 42, "semantic_signature", "retry-stream", "streaming", true,
+			"attempt_index", 2, "max_attempts", 6, "model", "fixture", "slots", [], "requested", 3,
+			"dispatch_fn", (Temp, OnSuccess, OnFail, Tokens := 0) => Plain += 1,
+			"dispatch_stream_fn", (Temp, OnPartial, OnSuccess, OnFail) => Streamed += 1,
+			"call_tokens", 40, "sent_tokens", 40, "sent_temp", 0.4, "base_temp", 0.4, "ctx", "ctx",
+			"dedup_stats", LLM_ApiCommon_NewDedupStats(), "show_all_at_once", true)
+		_LLM_Engine_ArmRetry(state)
+		_LLM_Engine_DispatchVariant(state)
+		AssertEqual(1, Plain)
+		AssertEqual(0, Streamed)
+		_LLM_Engine_DispatchVariant(state)
+		AssertEqual(1, Streamed, "the next variant streams again")
+	} finally {
+		_LLM_Engine := Saved
+	}
+}
+
+Test("LLM engine: a retried attempt does not stream", _RetryPolicy_NeverStreams)
 
 ; ===================================================
 ; ===================================================

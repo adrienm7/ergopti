@@ -36,7 +36,7 @@ h2 {
 
 #instruction {
 	background: rgba(100, 100, 100, 0.15);
-	border-left: 3px solid #5eb1ff;
+	border-left: 3px solid var(--theme-hue-5eb1ff);
 	border-radius: 4px;
 	color: var(--theme-grey-ccc);
 	font-size: 13px;
@@ -53,13 +53,13 @@ h2 {
 }
 
 #link-section a {
-	color: #5eb1ff;
+	color: var(--theme-hue-5eb1ff);
 	font-weight: 500;
 	text-decoration: none;
 }
 
 #link-section a:hover {
-	color: #a8d8ff;
+	color: var(--theme-hue-a8d8ff);
 	text-decoration: underline;
 }
 
@@ -107,8 +107,8 @@ label {
 }
 
 #token-input:focus {
-	background: #343436;
-	border-color: #5eb1ff;
+	background: var(--theme-hue-343436);
+	border-color: var(--theme-hue-5eb1ff);
 	box-shadow:
 		0 0 0 3px rgba(94, 177, 255, 0.3),
 		inset 0 0 2px rgba(94, 177, 255, 0.2);

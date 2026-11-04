@@ -21,10 +21,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TDUDMK_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TDUDMK_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TDUDMK_StripLineComments(Src) {
@@ -47,7 +45,7 @@ _TDUDMK_StripLineComments(Src) {
 ; ==============================================================================
 
 _TDUDMK_DynamicMagicKeyUsed() {
-	Src := _TDUDMK_StripLineComments(_TDUDMK_ReadSource("modules/hotstrings.ahk"))
+	Src := _TDUDMK_StripLineComments(_TDUDMK_ReadSource("hotstrings.ahk"))
 	Assert(Src != "", "modules/hotstrings.ahk must be readable")
 
 	Body := _DriverFuncBody("ShouldActivateDeadkey")

@@ -57,6 +57,12 @@ local LIVE_STATE_FILES = { ConfigTomlPath = true, PersonalTomlPath = true, Perso
 local LISTING_RETRY_SECONDS = 2
 local LISTING_ATTEMPTS = 20
 
+-- Seconds between two looks at the owned runtime while its metadata hint is
+-- pending, and how many: an install changes the files the hint keys on, so
+-- resolve() answers nil until the new hint settles.
+local RESOLVE_RETRY_SECONDS = 1
+local RESOLVE_ATTEMPTS = 30
+
 
 
 
@@ -183,6 +189,36 @@ local function run_field_check(step, finish)
 	if not started then finish("fail", { Engine.is_running() and "check_busy" or "check_refused" }) end
 end
 
+-- Collectors named by cost in the diagnostics step's codes.
+M.PHASE_A_COLLECTORS_NAMED = 5
+
+--- The diagnostics step's verdict and codes: the session's issue counts, then
+--- the synchronous collection's duration against its budget and its costliest
+--- collectors, so the field run names the one to move off phase A.
+--- @param issues table The snapshot's issues section.
+--- @param phase_a table|nil ui.healthcheck.core.last_phase_a().
+--- @return string verdict "pass", or "fail" over the budget or without a measure.
+--- @return table codes Closed codes.
+function M.diagnostics_codes(issues, phase_a)
+	local codes = { "warnings_" .. tostring(issues.warn_count or 0), "errors_" .. tostring(issues.err_count or 0) }
+	if type(phase_a) ~= "table" or type(phase_a.ms) ~= "number" or type(phase_a.budget_ms) ~= "number" then
+		codes[#codes + 1] = "fail_phase_a_unmeasured"
+		return "fail", codes
+	end
+	codes[#codes + 1] = "phase_a_ms_" .. tostring(math.floor(phase_a.ms + 0.5))
+	local ranked = {}
+	for index, entry in ipairs(phase_a.collectors or {}) do ranked[index] = entry end
+	table.sort(ranked, function(a, b) return a.ms > b.ms end)
+	for index = 1, math.min(#ranked, M.PHASE_A_COLLECTORS_NAMED) do
+		codes[#codes + 1] = string.format("phase_a_%s_%.1f", ranked[index].name, ranked[index].ms)
+	end
+	if phase_a.ms > phase_a.budget_ms then
+		codes[#codes + 1] = "fail_phase_a_budget"
+		return "fail", codes
+	end
+	return "pass", codes
+end
+
 --- Collects the diagnostics snapshot as the Debug menu's bug report does, and
 --- keeps its share projection.
 local function run_diagnostics(finish)
@@ -191,8 +227,8 @@ local function run_diagnostics(finish)
 	local snapshot = Core.run({ complete_local = true })
 	local issues = type(snapshot.sections) == "table" and snapshot.sections.issues or {}
 	local safe = require("healthcheck.share").snapshot(snapshot, schema)
-	finish("pass", { "warnings_" .. tostring(issues.warn_count or 0), "errors_" .. tostring(issues.err_count or 0) },
-		safe)
+	local verdict, codes = M.diagnostics_codes(issues, Core.last_phase_a())
+	finish(verdict, codes, safe)
 end
 
 
@@ -205,15 +241,8 @@ end
 -- =============================
 -- =============================
 
---- The catalogue's smallest model for a backend.
---- @param backend string "ollama" or "mlx".
---- @return table|nil model
-local function smallest_model(backend)
-	local path = require("infra.paths").shared_llm_path("models.json")
-	local text = path and FileSystem.read(path) or nil
-	if type(text) ~= "string" then return nil end
-	return require("infra.field_run").smallest_model(Json.decode(text), backend)
-end
+-- One owner of the model choice, shared with the blob host check.
+local smallest_model = require("adapters.field_check_ports").smallest_model
 
 --- The AI menu's models manager, or nil before the menu exists.
 local function models_manager()
@@ -228,6 +257,26 @@ local function mlx_supported()
 	return ok and supported ~= false
 end
 
+--- Calls back with the owned Ollama runtime once its metadata hint settles.
+--- The step after an install read the pending hint as an absent runtime and
+--- skipped (field run of 2026-10-30 19:17: runtime_installed, then
+--- runtime_absent); a hint still pending after the bound reads as absent.
+--- @param callback function fn(path|nil, source|nil, pending).
+local function settled_ollama_binary(callback)
+	local Binary = require("modules.llm.ollama_binary")
+	local attempts = 0
+	local function look()
+		attempts = attempts + 1
+		local _, _, state = Binary.native_candidate()
+		if state == "pending" and attempts < RESOLVE_ATTEMPTS then
+			return Timer.after(RESOLVE_RETRY_SECONDS, look)
+		end
+		local path, _, source = Binary.resolve()
+		callback(path, source, state == "pending")
+	end
+	look()
+end
+
 --- Installs or reuses the Ollama runtime through the selection router, as the
 --- install button of the AI menu does. An Ollama of another origin (the app,
 --- Homebrew) is reused: the router would offer to replace it with the native
@@ -239,8 +288,13 @@ local function ollama_runtime(finish)
 	local before = Deps.runtime_available()
 	local function settle(ok)
 		if ok ~= true then return finish("fail", { "install_failed", "state_" .. tostring(Deps.get_state()) }) end
-		local _, _, now_source = Binary.resolve()
-		finish("pass", { before and "runtime_reused" or "runtime_installed" }, { source = tostring(now_source) })
+		settled_ollama_binary(function(now_path, now_source, pending)
+			if not now_path then
+				return finish("fail", { before and "runtime_reused" or "runtime_installed",
+					pending and "metadata_pending" or "runtime_unresolved" })
+			end
+			finish("pass", { before and "runtime_reused" or "runtime_installed" }, { source = tostring(now_source) })
+		end)
 	end
 	local accepted
 	if path and require("core.llm.ollama_runtime_choice").classify(source) == "foreign" then
@@ -273,36 +327,36 @@ local function ollama_listing(model, callback)
 	ask()
 end
 
---- Pulls the smallest catalogue model through the AI menu's download window,
---- checks the server lists it, then removes it unless it was already there.
+--- Pulls the smallest catalogue model through the AI menu's download window
+--- and checks the server lists it. The model stays installed: the maintainer's
+--- shared connection paid its download once, and the next run's pull only
+--- compares the manifest.
 local function ollama_model(finish)
 	local manager = models_manager()
 	if not manager then return finish("skip", { "ai_menu_absent" }) end
-	if not require("modules.llm.ollama_deps_checker").runtime_available() then
-		return finish("skip", { "runtime_absent" })
-	end
-	local model = smallest_model("ollama")
-	if not model then return finish("fail", { "no_catalogue_model" }) end
-	local report = { model = model.runtime_name, download_gb = model.download_gb }
-	ollama_listing(model.runtime_name, function(before, started_server)
-		if before == nil then return finish("fail", { "server_unreachable" }, report) end
-		report.started_server = started_server
-		local codes = { before and "model_preexisting" or "model_absent" }
-		manager.pull_ollama_model(model.runtime_name, function()
-			ollama_listing(model.runtime_name, function(listed)
-				if listed ~= true then
-					codes[#codes + 1] = "not_listed_after_pull"
-					return finish("fail", codes, report)
-				end
-				codes[#codes + 1] = "pulled"
-				if before == false then
-					codes[#codes + 1] = manager.delete_ollama_model(model.runtime_name) and "removal_started" or "removal_refused"
-				end
-				finish("pass", codes, report)
+	settled_ollama_binary(function(path, _, pending)
+		if not path then return finish("skip", { pending and "metadata_pending" or "runtime_absent" }) end
+		local model = smallest_model("ollama")
+		if not model then return finish("fail", { "no_catalogue_model" }) end
+		local report = { model = model.runtime_name, download_gb = model.download_gb }
+		ollama_listing(model.runtime_name, function(before, started_server)
+			if before == nil then return finish("fail", { "server_unreachable" }, report) end
+			report.started_server = started_server
+			local codes = { before and "model_preexisting" or "model_absent" }
+			manager.pull_ollama_model(model.runtime_name, function()
+				ollama_listing(model.runtime_name, function(listed)
+					if listed ~= true then
+						codes[#codes + 1] = "not_listed_after_pull"
+						return finish("fail", codes, report)
+					end
+					codes[#codes + 1] = "pulled"
+					codes[#codes + 1] = "model_kept"
+					finish("pass", codes, report)
+				end)
+			end, function(reason)
+				codes[#codes + 1] = "pull_" .. tostring(reason)
+				finish("fail", codes, report)
 			end)
-		end, function(reason)
-			codes[#codes + 1] = "pull_" .. tostring(reason)
-			finish("fail", codes, report)
 		end)
 	end)
 end
@@ -348,8 +402,10 @@ local function keep_mlx_active_model()
 end
 
 --- Downloads the smallest catalogue MLX model, stops the server its download
---- starts, then removes the model unless it was already there and puts the
---- active-model file back as it found it.
+--- starts and puts the active-model file back as it found it. The model stays
+--- in the cache: removing it made every run download it again (about 380 MB
+--- over the maintainer's shared connection), while a complete cache only costs
+--- the next run a metadata check.
 local function mlx_model(finish)
 	if not mlx_supported() then return finish("skip", { "mlx_unsupported_here" }) end
 	local manager = models_manager()
@@ -363,7 +419,7 @@ local function mlx_model(finish)
 	if Llm.get_backend() == "mlx" and Llm.get_runtime_llm_enabled() == true then
 		return finish("skip", { "mlx_backend_in_use" })
 	end
-	local model = smallest_model("mlx")
+	local model = smallest_model("mlx", function(candidate) return manager.mlx_model_installed(candidate.name) end)
 	if not model then return finish("fail", { "no_catalogue_model" }) end
 	local report = { model = model.name, download_gb = model.download_gb }
 	local before = manager.mlx_model_installed(model.name)
@@ -378,9 +434,7 @@ local function mlx_model(finish)
 		codes[#codes + 1] = "downloaded_and_served"
 		require("ui.menu.menu_llm").stop_mlx_server(function(stopped)
 			codes[#codes + 1] = stopped and "server_stopped" or "server_stop_refused"
-			if not before then
-				codes[#codes + 1] = manager.delete_mlx_model(model.name) and "removal_started" or "removal_refused"
-			end
+			codes[#codes + 1] = "model_kept"
 			settle(stopped)
 		end)
 	end, function(reason)

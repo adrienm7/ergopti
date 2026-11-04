@@ -589,25 +589,54 @@ end
 -- ===================================
 
 helpers.describe("The script and the Lua probe import the same packages (mlx-bootstrap-probe-parity)", function()
-	--- Lists the modules an "import a; import b" statement names.
-	--- @param statement string
-	--- @return table sorted
-	local function modules_of(statement)
-		local names = {}
-		for name in statement:gmatch("import%s+([%w_%.]+)") do names[#names + 1] = name end
-		table.sort(names)
-		return names
+	--- Loads mlx_deps_checker resolving its script to `script_path` only.
+	--- @param script_path string|nil
+	--- @return table checker
+	local function checker_for(script_path)
+		package.loaded["modules.llm.mlx_deps_checker"] = nil
+		-- No folder resolves beside the module, so the paths owner names the script.
+		local checker = helpers.load_with_stubs("modules.llm.mlx_deps_checker", {
+			fs = { attributes = function() return nil end },
+		})
+		require("infra.paths").find_from_configdir = function() return script_path end
+		return checker
 	end
 
-	helpers.it("probes the same modules before publishing and before reusing", function()
-		local driver = helpers.driver_root()
-		local script = assert(read(driver .. "modules/llm/ensure-mlx-deps.sh"))
-		local manager = assert(read(driver .. "ui/menu/menu_llm/models_manager_mlx.lua"))
-		local script_probe = script:match('\nMLX_IMPORT_PROBE="([^"]+)"')
-		helpers.assert_not_nil(script_probe, "ensure-mlx-deps.sh must declare its import probe")
-		local lua_probe = manager:match("%-c '(import mlx_lm[^']+)'")
-		helpers.assert_not_nil(lua_probe, "models_manager_mlx must keep its import probe")
-		helpers.assert_eq(modules_of(script_probe), modules_of(lua_probe),
-			"a venv the script published must pass the probe that reuses it")
+	--- Runs `body` with the paths owner and the checker restored afterwards.
+	--- @param body function
+	local function with_scope(body)
+		helpers.with_stub_scope({ "infra.paths", "modules.llm.mlx_deps_checker" }, body)
+	end
+
+	helpers.it("the menu's probe is the statement the script runs before publishing and reusing", function()
+		with_scope(function()
+			local script_path = helpers.driver_root() .. "modules/llm/ensure-mlx-deps.sh"
+			local script_probe = assert(read(script_path)):match('\nMLX_IMPORT_PROBE="([^"]+)"')
+			helpers.assert_not_nil(script_probe, "ensure-mlx-deps.sh must declare its import probe")
+			helpers.assert_eq(checker_for(script_path).import_probe(), script_probe,
+				"a venv the script published must pass the probe that reuses it")
+		end)
+	end)
+
+	helpers.it("a script without a usable probe is refused, never guessed", function()
+		with_scope(function()
+			local folder = os.tmpname()
+			os.remove(folder)
+			assert(os.execute("mkdir -p '" .. folder .. "'"))
+			local fixture = folder .. "/ensure-mlx-deps.sh"
+			for _, text in ipairs({ "#!/bin/bash\nexit 0\n", "#!/bin/bash\nMLX_IMPORT_PROBE=\"import os'; rm -rf /\"\n" }) do
+				write(fixture, text)
+				helpers.assert_eq(pcall(checker_for(fixture).import_probe), false, text)
+			end
+			os.execute("rm -rf '" .. folder .. "'")
+		end)
+	end)
+
+	helpers.it("the menu keeps no copy of the probe", function()
+		-- models_manager_mlx, selected by a declaration unique to it.
+		local manager = assert(helpers.read_driver_source("local function handle_requirement_completion"))
+		helpers.assert_true(manager:find("import mlx_lm", 1, true) == nil,
+			"the menu must run mlx_deps_checker.import_probe(), not its own list")
+		helpers.assert_true(manager:find("mlx_deps_checker.import_probe", 1, true) ~= nil)
 	end)
 end)

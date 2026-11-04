@@ -14,7 +14,7 @@ helpers.describe("Physical editor native readiness", function()
 			package.loaded['infra.monotonic']={now_ms=function()return 0 end}
 			package.loaded['window_titles']={compose=function(v)return v end}
 			package.loaded['ui.webkit_host']={}
-			local file=helpers.driver_root() .. '/ui/webview_manager.lua'
+			local file=assert(package.searchpath('ui.webview_manager', package.path))
 			local count=0
 			local function eq(a,b,label)count=count+1;helpers.assert_eq(a,b,label)end
 			local function load(value,refusal)

@@ -282,7 +282,8 @@ helpers.describe("aggregate walker: backspace unigram retention", function()
 		local batch = Walker.walk({ key("[", 0, "other"), key("B", 0, "other"),
 			key("S", 0, "other"), key("]", 0, "other") }, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_chars", "[BS]"), 0)
-		for _, char in ipairs({ "[", "B", "S", "]" }) do
+		-- The key of a typed bracket carries its escape (keystats_tokens.json).
+		for _, char in ipairs({ "[[", "B", "S", "]" }) do
 			local item = batch.ngram.ngram_chars["2026-08-06\1app\1" .. char]
 			helpers.assert_eq(item.c, 1)
 			helpers.assert_eq(item.esrc.other, 1)

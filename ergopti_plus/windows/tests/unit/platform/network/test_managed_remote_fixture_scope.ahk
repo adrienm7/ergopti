@@ -748,3 +748,71 @@ _ManagedRemotePrimaryPrimitiveControl(Value) {
 for Pair in [["zero", 0], ["empty", ""], ["string", "PRIVATE_BODY_PRIMITIVE"]]
 	Test("managed remote native: " . Pair[1] . " exception retains priority (managed-fixture-primary-cleanup)",
 		_ManagedRemotePrimaryPrimitiveControl.Bind(Pair[2]))
+
+; Records what the real ChangeTrust would ask of the native fixture. Signal is the
+; only way to the root store, so no run of this control can raise a security warning.
+class _ManagedRemoteRootPromptControlFixture extends _ManagedRemoteFixtureOwner {
+	__New(Scope) {
+		super.__New()
+		this.DefineProp("RootStoreScope", {Get: (*) => Scope})
+		this.Signals := []
+		this.State := Map("sequence", 1, "root_removed", true)
+	}
+
+	Signal(Name) {
+		this.Signals.Push(Name)
+	}
+
+	WaitState(*) {
+		return true
+	}
+}
+
+_ManagedRemoteRootPromptAttempt(Scope, Installed, Interactive) {
+	global _AHK_INTERACTIVE
+	Fixture := _ManagedRemoteRootPromptControlFixture(Scope)
+	Saved := _AHK_INTERACTIVE
+	Refusal := 0
+	_AHK_INTERACTIVE := Interactive
+	try {
+		try Fixture.ChangeTrust(Installed)
+		catch TestNotExecutedSignal as Signal
+			Refusal := Signal
+	} finally _AHK_INTERACTIVE := Saved
+	return {Signals: Fixture.Signals, Refusal: Refusal}
+}
+
+_ManagedRemoteRootPromptGateControls() {
+	Unattended := _ManagedRemoteRootPromptAttempt("CurrentUser", true, false)
+	AssertEqual(0, Unattended.Signals.Length, "an unattended run must not ask Windows for a CurrentUser root")
+	AssertTrue(Unattended.Refusal is TestNotExecutedSignal, "the case reports that it did not run instead of a budget expiry")
+	AssertContains(Unattended.Refusal.Message, "--interactive", "the reason names the way to run the case")
+	AssertContains(Unattended.Refusal.Message, "security warning", "the reason names what cannot be answered")
+	for Pair in [["LocalMachine", false], ["CurrentUser", true]] {
+		Admitted := _ManagedRemoteRootPromptAttempt(Pair[1], true, Pair[2])
+		AssertEqual(0, IsObject(Admitted.Refusal), "a scope that can admit the root keeps running: " . Pair[1])
+		AssertEqual("InstallRoot", Admitted.Signals[1])
+	}
+	Removal := _ManagedRemoteRootPromptAttempt("CurrentUser", false, false)
+	AssertEqual(0, IsObject(Removal.Refusal), "only the admission is gated: a retained root must still be removed")
+	AssertEqual("RemoveRoot", Removal.Signals[1])
+}
+Test("managed remote native: an unattended run never raises the root security warning (managed-fixture-root-prompt)",
+	_ManagedRemoteRootPromptGateControls)
+
+_ManagedRemoteNotExecutedCleanupControl(CleanupRefused) {
+	State := {BodyCalls: 0, CleanupCalls: 0, PrintCalls: 0, Lines: [],
+		Primary: TestNotExecutedSignal("controlled"), Cleanup: ValueError("PRIVATE_CLEANUP_FAILURE")}
+	Observed := 0
+	try _ManagedRemoteFixtureFinalize({}, true, State.Primary,
+		_ManagedRemotePrimaryCleanupControl.Bind(State, CleanupRefused),
+		_ManagedRemotePrimaryPrintControl.Bind(State, false))
+	catch Any as Failure
+		Observed := Failure
+	AssertTrue(Observed == (CleanupRefused ? State.Cleanup : State.Primary),
+		"a case that did not run keeps its report only when its fixture retired cleanly")
+}
+Test("managed remote native: a not-executed case cannot hide a refused cleanup (managed-fixture-root-prompt)",
+	_ManagedRemoteNotExecutedCleanupControl.Bind(true))
+Test("managed remote native: a not-executed case reports after a clean retirement (managed-fixture-root-prompt)",
+	_ManagedRemoteNotExecutedCleanupControl.Bind(false))

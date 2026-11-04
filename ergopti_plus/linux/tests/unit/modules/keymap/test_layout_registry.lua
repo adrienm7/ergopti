@@ -23,6 +23,8 @@ local CHANNEL = require("modules.updater.manager").installed_channel()
 local INDEX_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/index.json"
 local ERGOL_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/ergol/ergol.keylayout"
 local PYTHON_MESSAGE = "translated: layouts.linux_needs_python"
+-- The interpreter the managed Python dependency answers with.
+local MANAGED_PYTHON = "/data/ergopti/runtime/python/cpython-3.11.16+20260929-x86_64-gnu/python/bin/python3"
 local LOCAL_DIR = "/cfg/layouts/"
 local SHIPPED_DIR = "/pkg/linux/static/layouts/registry/"
 local CONVERTER_DATA = "/pkg/linux/xkb_generation/data"
@@ -109,6 +111,12 @@ local function manager(options)
 		delete = function(path) state.files[path] = nil; state.deleted[#state.deleted + 1] = path; return true end,
 		exists = function(path) return state.files[path] ~= nil end,
 		ensure_dir = function() return true end,
+		-- Ergopti's own Python, as modules/keymap/managed_python.lua answers once installed.
+		python = function(callback)
+			state.python_asked = (state.python_asked or 0) + 1
+			if options.python_refusal then callback(false, options.python_refusal, "fixture refusal") return end
+			callback(true, MANAGED_PYTHON)
+		end,
 		run = function(program, args, run_options, callback)
 			state.runs[#state.runs + 1] = { program = program, args = args, timeout_ms = run_options.timeout_ms }
 			callback(assert(table.remove(runs, 1), "unexpected process run"))
@@ -216,9 +224,10 @@ helpers.describe("layout manager (Linux): installing", function()
 		helpers.assert_true(errors[1]:find("not valid JSON", 1, true) ~= nil, errors[1])
 	end)
 
-	helpers.it("rereads the checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
+	helpers.it("rereads a modified checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
 		local registry, deps, state = manager({ files = shipped_files() })
 		deps.local_source = true
+		deps.registry_changes = function(_, callback) callback(" M index.json\n", nil) end
 		local outcomes = {}
 		local function refreshed(outcome) outcomes[#outcomes + 1] = outcome end
 		registry.refresh(refreshed, deps)
@@ -374,6 +383,66 @@ helpers.describe("layout manager (Linux): installing", function()
 		end
 	end)
 
+	helpers.it("runs the installer on Ergopti's own Python, never the host's python3 (layout-registry-managed-python)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files(),
+			runs = { OK_RUN, INSTALLED_RUN } })
+		run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(#state.runs >= 1, "the interpreter probe runs")
+		for _, child in ipairs(state.runs) do
+			helpers.assert_eq(child.program, MANAGED_PYTHON, "every Python child runs the managed interpreter")
+		end
+	end)
+
+	helpers.it("asks once before downloading Ergopti's own Python, naming its size (layout-registry-managed-python)", function()
+		local saved = { registry = package.loaded["modules.keymap.layout_registry"],
+			managed = package.loaded["modules.keymap.managed_python"], dialogs = package.loaded["ui.menu.menu_dialogs"],
+			i18n = package.loaded["infra.i18n"] }
+		local asked, answer = {}, nil
+		package.loaded["infra.i18n"] = { get = function(key)
+			return key == "layouts.managed_python_offer" and "Download {1} MB <now>?" or key
+		end }
+		package.loaded["ui.menu.menu_dialogs"] = {
+			plain_markup = function(text) return (text:gsub("<", "&lt;"):gsub(">", "&gt;")) end,
+			ask_yes_no = function(title, text, ok_label, cancel_label)
+				asked[#asked + 1] = { title = title, text = text, ok = ok_label, cancel = cancel_label }
+				return answer
+			end,
+		}
+		package.loaded["modules.keymap.managed_python"] = { ensure = function(deps, done)
+			done(deps.confirm(31 * 1048576 - 1), "fixture")
+		end }
+		package.loaded["modules.keymap.layout_registry"] = nil
+		local ok, err = pcall(function()
+			local python = require("modules.keymap.layout_registry")._managed_python_for_probe()
+			local outcomes = {}
+			-- nil is the question that could not be shown (no display): a decline.
+			for _, reply in ipairs({ { true }, { false }, {} }) do
+				answer = reply[1]
+				python(function(accepted) outcomes[#outcomes + 1] = accepted end)
+			end
+			helpers.assert_eq(outcomes, { true, false, false }, "only Download accepts; Cancel and no answer decline")
+		end)
+		package.loaded["modules.keymap.layout_registry"] = saved.registry
+		package.loaded["modules.keymap.managed_python"] = saved.managed
+		package.loaded["ui.menu.menu_dialogs"] = saved.dialogs
+		package.loaded["infra.i18n"] = saved.i18n
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(asked[1], { title = "layouts.managed_python_title", text = "Download 31 MB &lt;now&gt;?",
+			ok = "menu.llm.btn_download", cancel = "common.cancel" })
+	end)
+
+	helpers.it("reports a declined or failed managed Python and runs nothing (layout-registry-managed-python)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files(),
+			python_refusal = "python_declined" })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok == false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_PYTHON)
+		helpers.assert_eq(result.user_message, PYTHON_MESSAGE)
+		helpers.assert_contains(result.extra, "python_declined")
+		helpers.assert_eq(#state.runs, 0, "no child runs without Ergopti's Python")
+		helpers.assert_eq(state.python_asked, 1)
+	end)
+
 	helpers.it("tells the user why a pure Xorg session cannot install a layout (layout-registry-convert)", function()
 		local LayoutRegistry, deps, state = manager({
 			served = "offline",
@@ -499,8 +568,8 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 	local APPLIED_RUN = { exit_code = 0, stdout = '{"ok": true, "verified": true, "detail": "loaded into the running X server"}\n', stderr = "" }
 	local NOT_LOADED_RUN = { exit_code = 1, stdout = '{"ok": false, "verified": false, "detail": "not loaded: not_loaded", "code": "not_loaded"}\n', stderr = "" }
 
-	--- An installed Ergo-L and a session of the given type.
-	local function with_ergol(session, runs)
+	--- An installed Ergo-L and a session of the given type and desktop.
+	local function with_ergol(session, runs, desktop)
 		local LayoutRegistry, deps, state = manager({
 			files = {
 				[LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1, layouts = { ergol = entry_of("ergol") } }),
@@ -509,6 +578,7 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 			runs = runs,
 		})
 		deps.session_type = function() return session end
+		deps.desktop_is = function(token) return (desktop or ""):find(token, 1, true) ~= nil end
 		return LayoutRegistry, deps, state
 	end
 
@@ -541,8 +611,10 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 	end)
 
 	helpers.it("refuses a session that cannot load a user layout live before anything is written (layout-rows-live)", function()
-		for _, session in ipairs({ "wayland", "tty", "" }) do
-			local LayoutRegistry, deps, state = with_ergol(session, {})
+		for _, case in ipairs({ { "wayland", "sway" }, { "wayland", "hyprland" }, { "wayland", "" }, { "tty", "gnome" },
+			{ "", "kde" } }) do
+			local session = case[1]
+			local LayoutRegistry, deps, state = with_ergol(session, {}, case[2])
 			local before = {}
 			for path, text in pairs(state.files) do before[path] = text end
 			local result = run(function(done) LayoutRegistry.apply_rows("ergol", ROWS, done, deps) end)
@@ -550,6 +622,39 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 			helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_SESSION, session)
 			helpers.assert_eq(#state.runs, 0, "no child runs")
 			helpers.assert_eq(state.files, before, "nothing is written")
+		end
+	end)
+
+	helpers.it("selects the new build through the GNOME or KDE setting on Wayland (layout-rows-live)", function()
+		for _, desktop in ipairs({ "ubuntu:gnome", "kde" }) do
+			local WAYLAND_RUN = { exit_code = 0, stdout = '{"ok": true, "verified": true, "slot": "ergol_live", "detail": "loaded"}\n', stderr = "" }
+			local LayoutRegistry, deps, state = with_ergol("wayland", { OK_RUN, WAYLAND_RUN }, desktop)
+			local result = run(function(done) LayoutRegistry.apply_rows(nil, ROWS, done, deps) end)
+			helpers.assert_true(result.ok, tostring(result.detail) .. " " .. tostring(result.extra))
+			helpers.assert_eq(result.detail.slot, "ergol_live")
+			helpers.assert_eq(result.detail.rows.order, "symbols")
+			helpers.assert_eq(#state.runs, 2, "one installer call converts nothing: the conversion is Lua")
+			helpers.assert_eq(state.runs[2].args[2], "apply-wayland")
+			helpers.assert_eq(arg_value(state.runs[2].args, "--layout-id"), "ergol")
+			helpers.assert_eq(arg_value(state.runs[2].args, "--source-dir"), LOCAL_DIR .. "ergol")
+			helpers.assert_eq(levels_of(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], "AE01")[1], "EuroSign")
+			helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
+		end
+	end)
+
+	helpers.it("reports the Wayland installer's closed code and keeps the session's own refusal (layout-rows-live)", function()
+		for _, case in ipairs({ { "stale_keymap", "live_apply_failed" }, { "select_refused", "live_apply_failed" },
+			{ "session_unsupported", "session_unsupported" } }) do
+			local refused = { exit_code = 1, stderr = "",
+				stdout = '{"ok": false, "verified": false, "detail": "not loaded", "code": "' .. case[1] .. '"}\n' }
+			local LayoutRegistry, deps = with_ergol("wayland", { OK_RUN, refused }, "gnome")
+			local failed, code
+			LayoutRegistry.apply_rows("ergol", ROWS, function(ok, detail, _, _, live)
+				failed, code = { ok = ok, detail = detail }, live
+			end, deps)
+			helpers.assert_eq(failed.ok, false)
+			helpers.assert_eq(failed.detail, case[2], case[1])
+			helpers.assert_eq(code, case[1])
 		end
 	end)
 
@@ -833,6 +938,8 @@ require("test.composer_check_contract")(helpers, Json, {
 		return count
 	end,
 	ready_step = "composer_ready=pass:verified",
+	-- The installer runs on Ergopti's own Python: without it the check skips.
+	prerequisite_code = "python_missing",
 	-- The installer is not run again for a composition that already exists.
 	existing_ready_step = "composer_ready=info:not_reprobed",
 	-- The installer installs the layout but could not verify it.

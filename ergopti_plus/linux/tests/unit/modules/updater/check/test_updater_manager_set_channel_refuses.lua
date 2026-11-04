@@ -8,7 +8,7 @@ local helpers, Fakes, etag_response, with_config, read_config =
 
 
 
-helpers.describe("modules/updater/manager.lua", function()
+helpers.describe("modules.updater.manager", function()
 	local M = helpers.load_module("modules.updater.manager")
 
 	-- Explicit portable native-port model only for the original controlled

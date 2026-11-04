@@ -86,7 +86,32 @@ namespace Ergopti.Ollama {
    try { return new System.IO.FileStream(owned,System.IO.FileAccess.Read); }
    catch { owned.Dispose(); throw; }
   }
+  // A second reader beside the lease a running launcher holds: that lease has DELETE
+  // access and shares no DELETE, so a reader asks for no DELETE and shares it.
+  public static System.IO.FileStream OpenObservedFile(string path) {
+   var handle=CreateFile(path,0x80000000u,5,IntPtr.Zero,3,0x00200000u,IntPtr.Zero);
+   if(handle==new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+   FileInfo info;
+   if(!GetFileInformationByHandle(handle,out info) || (info.Attributes & 0x410)!=0) {
+    int error=Marshal.GetLastWin32Error(); CloseHandle(handle);
+    throw new Win32Exception(error==0 ? 4390 : error,"Source is not a regular non-reparse file.");
+   }
+   var owned=new SafeFileHandle(handle,true);
+   try { return new System.IO.FileStream(owned,System.IO.FileAccess.Read); }
+   catch { owned.Dispose(); throw; }
+  }
+  public static IntPtr OpenObservedDirectory(string path) {
+   var handle=CreateFile(path,0x80u,7,IntPtr.Zero,3,0x02200000u,IntPtr.Zero);
+   if(handle==new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+   FileInfo info;
+   if(!GetFileInformationByHandle(handle,out info) || (info.Attributes & 0x10)==0 || (info.Attributes & 0x400)!=0) {
+    int error=Marshal.GetLastWin32Error(); CloseHandle(handle);
+    throw new Win32Exception(error==0 ? 4390 : error,"Untrusted managed directory shape.");
+   }
+   return handle;
+  }
   public static System.IO.FileStream CreateOwnedFile(string path) {
+
    var handle=CreateFile(path,0xc0010000u,1,IntPtr.Zero,1,0x00200000u,IntPtr.Zero);
    if(handle==new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
    var owned=new SafeFileHandle(handle,true);
@@ -198,7 +223,7 @@ function Remove-OllamaExactFile([IO.FileStream]$Stream) {
 }
 
 function Hold-OllamaStageDirectories([string]$Stage, $Directories, [bool]$Create = $false,
-	[bool]$Retiring = $false, $CreationWal = $null) {
+	[bool]$Retiring = $false, $CreationWal = $null, [bool]$Observer = $false) {
 	$held = [ordered]@{}
 	try {
 		foreach ($relative in @($Directories | Sort-Object { $_.Length })) {
@@ -211,7 +236,8 @@ function Hold-OllamaStageDirectories([string]$Stage, $Directories, [bool]$Create
 				} elseif ($Retiring) { continue }
 				else { throw 'An expected prepared directory is absent.' }
 			}
-			$handle = [Ergopti.Ollama.ManagedNative]::OpenDirectory($path, $true)
+			if ($Observer) { $handle = [Ergopti.Ollama.ManagedNative]::OpenObservedDirectory($path) }
+			else { $handle = [Ergopti.Ollama.ManagedNative]::OpenDirectory($path, $true) }
 			$held[$relative] = $handle
 			Assert-OllamaPrivateSecurity $path
 			if ($Create) { Add-OllamaCreationRecord $CreationWal 'directory-owned' $relative ([Ergopti.Ollama.ManagedNative]::Identity($handle)) }
@@ -585,7 +611,9 @@ function Assert-OllamaHeldInventory([string]$Stage, $Directories, $Files) {
 
 function Open-OllamaPreparedStage($Root, [string]$Ticket, [string]$ExpectedIdentity, [string]$ExpectedManifestHash,
 	[bool]$AllowRetiring = $false, [string]$PublishedPath = '',
-	[IntPtr]$RetainedHandle = [IntPtr]::Zero) {
+	[IntPtr]$RetainedHandle = [IntPtr]::Zero, [bool]$Observer = $false) {
+	# An observer reads a version the running launcher leases: same admission, no lease.
+	$openFile = { param($Path) if ($Observer) { [Ergopti.Ollama.ManagedNative]::OpenObservedFile((Assert-OllamaLocalPath $Path)) } else { Open-OllamaReadFile $Path $true } }
 	if ($Ticket -notmatch '^[0-9a-f]{32}\z' -or $ExpectedManifestHash -notmatch '^[0-9a-f]{64}\z') {
 		throw 'Prepared stage admission needs exact originating receipts.'
 	}
@@ -624,7 +652,7 @@ function Open-OllamaPreparedStage($Root, [string]$Ticket, [string]$ExpectedIdent
 		if ($retiring -and [Ergopti.Ollama.ManagedNative]::PathIsAbsent($manifestPath)) {
 			$manifestStream = [IO.MemoryStream]::new([Convert]::FromBase64String($cleanup.manifest_bytes), $false)
 		} else {
-			$manifestStream = Open-OllamaReadFile $manifestPath $true
+			$manifestStream = & $openFile $manifestPath
 			$ownedFiles['prepared.json'] = $manifestStream
 		}
 		$streams.Add($manifestStream)
@@ -650,7 +678,7 @@ function Open-OllamaPreparedStage($Root, [string]$Ticket, [string]$ExpectedIdent
 		[void]$expected.Add('prepared.json'); [void]$expected.Add('stage-owner.json')
 		$ownerPath = [IO.Path]::Combine($stage, 'stage-owner.json')
 		if (-not ($retiring -and [Ergopti.Ollama.ManagedNative]::PathIsAbsent($ownerPath))) {
-			$ownerStream = Open-OllamaReadFile $ownerPath $true
+			$ownerStream = & $openFile $ownerPath
 			$ownedFiles['stage-owner.json'] = $ownerStream
 			$streams.Add($ownerStream)
 			$owner = Read-OllamaJsonStream $ownerStream
@@ -663,7 +691,7 @@ function Open-OllamaPreparedStage($Root, [string]$Ticket, [string]$ExpectedIdent
 		foreach ($directory in $manifest.directories) {
 			if (-not $expectedDirectories.Add($directory)) { throw 'The prepared receipt contains colliding directories.' }
 		}
-		$directoryHandles = Hold-OllamaStageDirectories $stage $expectedDirectories $false $retiring
+		$directoryHandles = Hold-OllamaStageDirectories $stage $expectedDirectories $false $retiring $null $Observer
 		foreach ($relative in $directoryHandles.Keys) {
 			$expectedDirectory = $manifest.directory_identities.PSObject.Properties[$relative]
 			if ($null -eq $expectedDirectory -or $expectedDirectory.Value -notmatch '^[0-9a-f]{8}:[0-9a-f]{16}\z' -or
@@ -675,7 +703,7 @@ function Open-OllamaPreparedStage($Root, [string]$Ticket, [string]$ExpectedIdent
 			if (-not $expected.Add($file.path)) { throw 'The prepared receipt contains colliding files.' }
 			$path = [IO.Path]::Combine($stage, $file.path.Replace('/', '\'))
 			if ($retiring -and [Ergopti.Ollama.ManagedNative]::PathIsAbsent($path)) { continue }
-			$stream = Open-OllamaReadFile $path $true
+			$stream = & $openFile $path
 			$ownedFiles[$file.path] = $stream
 			$streams.Add($stream)
 			if ([Ergopti.Ollama.ManagedNative]::Identity($stream.SafeFileHandle.DangerousGetHandle()) -ne $file.identity -or

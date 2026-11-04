@@ -74,7 +74,7 @@ _LSP_Replay(Vector, Catalogue) {
 _LSP_RegisterCorpus() {
 	global _SharedDir
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\llm\local_server_ports.json", "UTF-8"))
-	if Corpus["version"] != 1 || Corpus["cases"].Length != 17
+	if Corpus["version"] != 1 || Corpus["cases"].Length != 32
 		throw Error("The independent port discovery corpus requires explicit review.")
 	Catalogue := _LSP_Catalogue()
 	for Id in Catalogue["server_order"]
@@ -153,6 +153,38 @@ _LSP_ScanCommandLinePort() {
 }
 Test("local server ports: the Windows scan reads a command-line port", _LSP_ScanCommandLinePort)
 
+; ROOT CAUSE ENCODED: Win32_Process keeps the quotes of a program path, so a
+; server started from a shortcut ("C:\...\Jan.exe") never matched its process
+; name, and GPT4All's chat.exe matches only the forward-slash catalogue fragment.
+_LSP_ScanQuotedCommandLines() {
+	Fixture := _LSP_ScanFixture()
+	Fixture.Scan()
+	Fixture.Spawns[1]["on_done"].Call(0,
+		'P 900 "C:\Program Files\Jan\Jan.exe" --type=browser`r`nL 900 127.0.0.1 1338`r`n'
+		. 'P 901 "C:\Program Files\LM Studio\LM Studio.exe"`r`nL 901 127.0.0.1 1235`r`n'
+		. 'P 902 "C:\Users\u\gpt4all\bin\chat.exe"`r`nL 902 127.0.0.1 4892`r`n'
+		. 'P 903 "C:\llama cpp\llama-server.exe" --port "8181"`r`n'
+		. 'P 904 "C:\Program Files\Other\chat.exe"`r`n', "")
+	AssertEqual("http://127.0.0.1:1338/v1", Fixture.Results["jan"]["base_url"])
+	AssertEqual("http://127.0.0.1:1235/v1", Fixture.Results["lmstudio"]["base_url"])
+	AssertEqual("http://127.0.0.1:4892/v1", Fixture.Results["gpt4all"]["base_url"])
+	AssertEqual("902", "" . Fixture.Results["gpt4all"]["pids"][1], "another program's chat.exe is not GPT4All")
+	AssertEqual(1, Fixture.Results["gpt4all"]["pids"].Length, "another program's chat.exe is not GPT4All")
+	AssertEqual("http://127.0.0.1:8181/v1", Fixture.Results["llamacpp"]["base_url"])
+	AssertEqual("cli", Fixture.Results["llamacpp"]["source"])
+}
+Test("local server ports: the Windows scan reads quoted program paths and GPT4All's chat.exe", _LSP_ScanQuotedCommandLines)
+
+; Lemonade documents %USERPROFILE%\.config\lemonade\config.json on Windows.
+_LSP_ScanLemonadeSettingsFile() {
+	Fixture := _LSP_ScanFixture(Map("C:/Users/u/.config/lemonade/config.json", '{"port":13400}'))
+	Fixture.Scan()
+	Fixture.Spawns[1]["on_done"].Call(0, 'P 700 "C:\Program Files\Lemonade\lemond.exe"`r`n', "")
+	AssertEqual("config", Fixture.Results["lemonade"]["source"])
+	AssertEqual("http://127.0.0.1:13400/v1", Fixture.Results["lemonade"]["base_url"])
+}
+Test("local server ports: the Windows scan reads Lemonade's settings file", _LSP_ScanLemonadeSettingsFile)
+
 _LSP_ScanDeadline() {
 	Fixture := _LSP_ScanFixture()
 	Fixture.Scan()
@@ -195,20 +227,23 @@ Test("local server ports: a Windows scan without a process list still reads the 
 ; =====================================
 
 class _LSP_OwnerFixture extends _LSO_Fixture {
-	__New() {
+	__New(Identities := 0) {
 		super.__New(true)
 		this.Scans := []
 		this.ScanResults := Map()
 		Descriptor := Map("process_names", ["fixture-server"], "command_lines", [], "port_flags", [],
 			"address_flags", [], "config_files", [])
-		this.Native := LocalServersOwner(Map("order", this.Order, "servers", this.Servers,
+		Options := Map("order", this.Order, "servers", this.Servers,
 			"models_owner", this.Transport, "poll_ms", 20,
 			"clock", ObjBindMethod(this, "Clock"), "max_age", (*) => 1000,
 			"entry", ObjBindMethod(this, "Entry"), "capture_source", ObjBindMethod(this, "CaptureSource"),
 			"source_current", ObjBindMethod(this, "SourceCurrent"), "admit", ObjBindMethod(this, "Admission"),
 			"apply", ObjBindMethod(this, "Persist"), "timer", ObjBindMethod(this, "QueueTimer"),
 			"on_publish", ObjBindMethod(this, "Publish"), "on_error", ObjBindMethod(this, "NativeError"),
-			"scan_ports", ObjBindMethod(this, "Scan"), "discovery", Map("lmstudio", Descriptor, "llamacpp", Descriptor)))
+			"scan_ports", ObjBindMethod(this, "Scan"), "discovery", Map("lmstudio", Descriptor, "llamacpp", Descriptor))
+		if Identities is Map
+			Options["identities"] := Identities
+		this.Native := LocalServersOwner(Options)
 	}
 
 	Scan(Entries, OnDone) {

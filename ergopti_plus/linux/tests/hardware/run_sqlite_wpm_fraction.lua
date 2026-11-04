@@ -101,6 +101,25 @@ for _, nonfinite in ipairs({ math.huge, -math.huge, 0 / 0 }) do
 	end)
 end
 
+-- The other raw families render through the same catalogue: a row it cannot
+-- render must come back as a false receipt, never as a raised Lua error.
+local function count_of(table_name)
+	return tonumber(assert(Writer.query_rows("SELECT COUNT(*) FROM " .. table_name .. ";"))[1])
+end
+check("(raw-batch-render-refusal) an unrenderable app switch is a false receipt", function()
+	local before = count_of("events_app_switch")
+	local accepted = Writer.insert_app_switch_events("owned", {
+		{ ts = "2026-10-30 10:00:00", date = "2026-10-30", prev_app = "a", next_app = "b", duration_ms = math.huge },
+	})
+	assert(accepted == false, "a non-finite duration was acknowledged")
+	assert(count_of("events_app_switch") == before)
+end)
+check("(raw-batch-render-refusal) the writer stays usable after a refused batch", function()
+	local before = row_count()
+	assert(Writer.insert_typing_events("owned", { { app = "owned-after", text = "owned", events_json = "[]", wpm = 3.5 } }))
+	assert(row_count() == before + 1)
+end)
+
 check("actual native trigger refusal preserves accepted rows and healthy retry", function()
 	local before = row_count()
 	assert(Writer.exec_sql("CREATE TRIGGER owned_refusal BEFORE INSERT ON events_typing BEGIN SELECT RAISE(ABORT,'owned refusal'); END;"))

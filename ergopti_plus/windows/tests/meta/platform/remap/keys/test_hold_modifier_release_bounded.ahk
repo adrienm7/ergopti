@@ -67,7 +67,7 @@ _HMRB_AssertBounded(RelPath, Anchor, Where) {
 	Assert(Body != "", Where . " generic hold-modifier #HotIf block must exist")
 	; TapHoldOwnHoldModifier is the typing keys' entry to the same shared owner.
 	if (InStr(Body, "TapHoldOwnImmediateModifier(") or InStr(Body, "TapHoldOwnHoldModifier(")) {
-		Assert(!InStr(Body, "KeyWait("),
+		Assert(!RegExMatch(Body, "(KeyWait|KS_WaitReleased)\("),
 			Where . " must delegate release ownership to the shared bounded owner instead of waiting privately")
 		return
 	}
@@ -75,9 +75,9 @@ _HMRB_AssertBounded(RelPath, Anchor, Where) {
 		Where . " long-press KeyWait must be capped by STUCK_MODIFIER_RELEASE_TIMEOUT_SEC so a lost key-up cannot block the modifier release forever")
 	Assert(InStr(Body, "finally") > 0,
 		Where . " must release the modifier in a finally so a lost key-up or thrown Send can never latch Ctrl/Shift/Alt/Win Down")
-	Assert(InStr(Body, "KeyWait") > 0, Where . " must still KeyWait for the physical release")
-	; A bare unbounded wait ends with the literal "U") — the capped form is "U T".
-	Assert(InStr(Body, "KeyWait(") > 0 and !InStr(Body, Q . "U" . Q . ")"),
+	Assert(InStr(Body, "KS_WaitReleased(") > 0, Where . " must still wait for the physical release")
+	; A bare unbounded wait ends with the literal "U") — the owner always takes a bound.
+	Assert(!InStr(Body, "KeyWait(") and !InStr(Body, Q . "U" . Q . ")"),
 		Where . " must not use a bare unbounded KeyWait(key, " . Q . "U" . Q . ") — use the capped " . Q . "U T" . Q . " . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC form")
 }
 
@@ -168,6 +168,8 @@ _HMRB_WholeClassNoBareUnbounded() {
 	; KeyWait mode argument. The bounded form "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC
 	; never produces this token because the timeout constant follows before the closing
 	; paren, making the mode string "U T<N>" not "U".
+	Assert(!RegExMatch(Src, "m)^[^;\n]*\bKeyWait\("),
+		"platform/remap/ must wait through the bounded KS_WaitReleased, never a KeyWait of its own")
 	Assert(!InStr(Src, Q . "U" . Q . ")"),
 		"platform/remap/ contains a bare KeyWait(key, " . Q . "U" . Q . ") "
 		. "— all hold-modifier and hold-layer long-press waits must use "

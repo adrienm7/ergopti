@@ -92,6 +92,7 @@ local function replay(vector)
 		keys = keys,
 		roll_keys = ROLL_KEYS,
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
+		lone_tap_max_ms = vector.lone_tap_max_ms or 0,
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 		key_text = Fixture.us_text,
 		plan_text = Fixture.us_plan,

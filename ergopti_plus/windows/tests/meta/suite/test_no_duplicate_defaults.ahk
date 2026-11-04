@@ -32,7 +32,8 @@ _MetaListAhkFilesDups(Dir) {
 	return Files
 }
 
-_MetaRunDuplicateDefaultsTests() {
+; Runs inside its test: scanning the tree at registration taxed every runner boot.
+_MetaDuplicateDefaultsResult() {
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Whitelist := Map(
@@ -95,21 +96,16 @@ _MetaRunDuplicateDefaultsTests() {
 	; version of this test that can ever notice.
 	DUPLICATE_BASELINE := 2
 
-	_MetaDuplicateDefaultsResult() {
-		; The scan must have looked at something. A dir listing that returns nothing
-		; — a moved tree, a failed RunWait — would otherwise report zero duplicates
-		; and pass.
-		Assert(Seen.Count > 50,
-			"the constant scan found only " . Seen.Count . " global declaration(s) across infra/ and "
-			. "modules/ — the file listing is broken, so a duplicate count of " . DupCount
-			. " means nothing")
-		Assert(DupCount <= DUPLICATE_BASELINE,
-			"duplicated constant defaults rose to " . DupCount . " (baseline " . DUPLICATE_BASELINE
-			. "). Each is the same value declared under the same name in two files, which is "
-			. "exactly how two copies drift apart:" . Report)
-	}
-	Test("meta duplicate defaults: no new duplicated constant (" . DupCount . " found)",
-		_MetaDuplicateDefaultsResult)
+	; The scan must have looked at something. A dir listing that returns nothing
+	; — a moved tree, a failed RunWait — would otherwise report zero duplicates
+	; and pass.
+	Assert(Seen.Count > 50,
+		"the constant scan found only " . Seen.Count . " global declaration(s) across infra/ and "
+		. "modules/ — the file listing is broken, so a duplicate count of " . DupCount
+		. " means nothing")
+	Assert(DupCount <= DUPLICATE_BASELINE,
+		"duplicated constant defaults rose to " . DupCount . " (baseline " . DUPLICATE_BASELINE
+		. "). Each is the same value declared under the same name in two files, which is "
+		. "exactly how two copies drift apart:" . Report)
 }
-
-_MetaRunDuplicateDefaultsTests()
+Test("meta duplicate defaults: no new duplicated constant", _MetaDuplicateDefaultsResult)

@@ -20,10 +20,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TTIB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TTIB_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TTIB_StripLineComments(Src) {
@@ -43,7 +41,7 @@ _TTIB_StripLineComments(Src) {
 ; ===========================================================================
 
 _TTIB_IntBeforeBool() {
-	Src := _TTIB_StripLineComments(_TTIB_ReadSource("platform/remap/tap_hold_writer.ahk"))
+	Src := _TTIB_StripLineComments(_TTIB_ReadSource("tap_hold_writer.ahk"))
 	Assert(Src != "", "platform/remap/tap_hold_writer.ahk must be readable")
 
 	Body := _DriverFuncBody("_TH_TomlFormatLine")

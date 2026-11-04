@@ -1131,7 +1131,7 @@ try:
             text=True
         )
 
-        credential_input = f"protocol=https\nhost=huggingface.co\nusername=oauth2config\npassword={token.strip()}\n"
+        credential_input = f"protocol=https\nhost=]] .. Identifiers.hosts.huggingface .. [[\nusername=oauth2config\npassword={token.strip()}\n"
         process.communicate(input=credential_input, timeout=5)
     except Exception as e:
         print(f"Note: Git credential save skipped: {e}", file=sys.stderr)

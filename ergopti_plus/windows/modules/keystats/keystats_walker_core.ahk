@@ -20,6 +20,8 @@
 ;    called on every processed keystroke — kept tight and inline.
 ; ==============================================================================
 
+#Include ../../_generated/keystats_tokens.ahk
+
 
 
 
@@ -251,6 +253,22 @@ KLW_CharClass(c) {
 		if RegExMatch(c, "^[[:punct:]<>=+*/\\|\-]$")
 				return "punct"
 		return "other"
+}
+
+; The n-gram key form of one raw event, the rule of the shared Lua
+; keystats/token_encoding.lua: a marker stays itself, an older spelling becomes
+; its marker, and a typed "[" is escaped so no key has two readings. A "[" is
+; rare, so an ordinary keystroke pays for one substring test only.
+; @param char {String} The event's character or marker.
+; @returns {String}
+KLW_EventToken(char) {
+		if !InStr(char, "[")
+				return char
+		if KeystatsTokenMarkers().Has(char)
+				return char
+		if KeystatsTokenAliases().Has(char)
+				return KeystatsTokenAliases()[char]
+		return StrReplace(char, "[", KEYSTATS_LITERAL_BRACKET)
 }
 
 ; Pop the last UTF-16 code unit (AHK strings are UTF-16 internally).

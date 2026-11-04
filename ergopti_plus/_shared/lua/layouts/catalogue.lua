@@ -23,6 +23,8 @@
 ---    layouts it can install while saying why it could not look further.
 --- 4. Offline Ergopti: a layout whose shipped copy is the file the index
 ---    describes is taken from that copy, so installing Ergopti needs no network.
+--- 5. Clone runs behave like a release: the published registry, unless the
+---    clone's registry folder differs from HEAD (M.registry_source).
 --- ==============================================================================
 
 local Registry = require("layouts.registry")
@@ -181,11 +183,47 @@ function M.resolve_index(response, cached, bundled, decode_json, max_bytes)
 	return { index = nil, source = M.SOURCE_NONE, etag = nil, store = false, error = failure }
 end
 
+--- Why a refresh reads the published registry or the clone's own folder.
+M.REGISTRY_RELEASE = "release"
+M.REGISTRY_UNMODIFIED = "unmodified"
+M.REGISTRY_MODIFIED = "modified"
+M.REGISTRY_GIT_FAILED = "git_failed"
+
+--- The git arguments that list the local changes of a clone's registry folder.
+--- Untracked files count as changes; --no-optional-locks keeps the probe from
+--- taking the index lock a concurrent pull or commit of the developer needs.
+--- @param dir string The clone's registry folder.
+--- @return table argv Arguments after the git executable.
+function M.registry_changes_args(dir)
+	return { "--no-optional-locks", "-C", dir, "status", "--porcelain", "--untracked-files=all", "--", "." }
+end
+
+--- Whether a refresh shows the clone's registry folder instead of the
+--- published registry. A release always reads the published one. A source run
+--- (a clone, including the developer mode) behaves like a release unless the
+--- clone's registry folder differs from HEAD: index.json and the layout files
+--- it is generated from both count, since a changed layout is the very thing a
+--- developer needs to see installed. When git cannot answer, the clone's folder
+--- is shown: it is the copy the developer runs, and reading the published one
+--- would hide a local edit without a word; the caller logs the git failure.
+--- @param source_run boolean Whether the driver runs from a clone.
+--- @param changes string|nil git status --porcelain output of the folder.
+--- @param git_error string|nil Why git could not list the changes.
+--- @return boolean use_clone
+--- @return string reason One of the M.REGISTRY_* codes.
+function M.registry_source(source_run, changes, git_error)
+	if not source_run then return false, M.REGISTRY_RELEASE end
+	if git_error ~= nil or type(changes) ~= "string" then return true, M.REGISTRY_GIT_FAILED end
+	if changes:match("%S") then return true, M.REGISTRY_MODIFIED end
+	return false, M.REGISTRY_UNMODIFIED
+end
+
 --- Runs one conditional index refresh.
 --- deps.read_cache() -> { text, etag } | nil reads the local cache;
 --- deps.write_cache(text, etag) -> ok, err stores a fresh index;
 --- deps.bundled_index is the decoded index shipped with the app (or nil);
---- deps.local_source selects the checkout's registry without remote cache or HTTP.
+--- deps.clone_registry selects the clone's registry without remote cache or
+--- HTTP (see M.registry_source).
 --- deps.transport.get(url, headers, timeout_ms, callback(status, body, err, headers))
 --- must call back exactly once; deps.decode_json decodes.
 --- on_done(outcome) is called exactly once (see M.resolve_index); a cached
@@ -195,7 +233,7 @@ end
 --- @param deps table
 --- @param on_done function
 function M.refresh(settings, deps, on_done)
-	if deps.local_source then
+	if deps.clone_registry then
 		local valid, detail = M.validate_index(deps.bundled_index)
 		on_done({ index = valid and deps.bundled_index or nil,
 			source = valid and M.SOURCE_BUNDLED or M.SOURCE_NONE, store = false,

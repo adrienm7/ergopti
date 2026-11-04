@@ -8,7 +8,7 @@ local helpers, Installer, etag_response, Json, shell_quote, command_ok, write_fi
 
 
 
-helpers.describe("modules/updater/manager.lua", function()
+helpers.describe("modules.updater.manager", function()
 	local M = helpers.load_module("modules.updater.manager")
 
 	-- Explicit portable native-port model only for the original controlled
@@ -300,12 +300,12 @@ helpers.describe("modules/updater/manager.lua", function()
 	-- ========================================
 
 	helpers.it("menu_builder renders updater section when updater context is present", function()
-		local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
-		-- Asserted, not skipped. ui/menu/menu_builder.lua ships with this driver, so
+		local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
+		-- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
 		-- "not available" can only mean it stopped loading — and the skip made that
 		-- indistinguishable from a pass in six cases across three files.
 		helpers.assert_true(ok_mb and menu_builder ~= nil,
-			"ui.menu.menu_builder must load: " .. tostring(menu_builder))
+			"ui.menu.builder must load: " .. tostring(menu_builder))
 
 		local items = menu_builder.build({
 			_version = "3.0.0",
@@ -326,12 +326,12 @@ helpers.describe("modules/updater/manager.lua", function()
 	end)
 
 	helpers.it("menu_builder handles nil updater context gracefully", function()
-		local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
-		-- Asserted, not skipped. ui/menu/menu_builder.lua ships with this driver, so
+		local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
+		-- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
 		-- "not available" can only mean it stopped loading — and the skip made that
 		-- indistinguishable from a pass in six cases across three files.
 		helpers.assert_true(ok_mb and menu_builder ~= nil,
-			"ui.menu.menu_builder must load: " .. tostring(menu_builder))
+			"ui.menu.builder must load: " .. tostring(menu_builder))
 
 		local items = menu_builder.build({
 			_version = "3.0.0",
@@ -376,7 +376,7 @@ helpers.describe("updater bounded pagination", function()
 			local index = tonumber(url:match("&page=(%d+)$"))
 			helpers.assert_true(index ~= nil, "requests carry an explicit page")
 			helpers.assert_contains(url, "per_page=20")
-			helpers.assert_eq(options.max_body_bytes, 2 * 1024 * 1024)
+			helpers.assert_eq(options.max_body_bytes, 8 * 1024 * 1024)
 			local response = cached and { ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" } or { ok = true, status = 200, body = page((index - 1) * 20 + 1, 20) }
 			etag_response(response, "https://etag-fixture.invalid/releases/page-" .. index, '"PAGE-' .. index .. '"', cached)
 			if cached then helpers.assert_true(options.etag_compare ~= nil, "the controlled 304 sent a cached validator") end

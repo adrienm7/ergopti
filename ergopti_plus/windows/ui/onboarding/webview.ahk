@@ -224,7 +224,7 @@ _Onboarding_TryWeb() {
 
 	; Safety: if the page never posts "ready" (rare), flush the queue anyway so
 	; the wizard is not left blank.
-	SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_SafetyFlush, SessionEpoch), -2500)
+	SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_SafetyFlush, SessionEpoch), -TimingsGet("ui", "webview_host_safety_flush_ms"))
 	return true
 }
 
@@ -655,7 +655,7 @@ _OnbWeb_GestureAutoDone(SessionEpoch, ok) {
 		return
 	}
 	if A_IsSuspended {
-		SetTimer(_OnbWeb_GestureAutoDone.Bind(SessionEpoch, ok), -100)
+		SetTimer(_OnbWeb_GestureAutoDone.Bind(SessionEpoch, ok), -TimingsGet("ui", "onboarding_gesture_done_ms"))
 		return
 	}
 	try LoggerInfo("Onboarding", "Gesture auto-configuration completed (ok={1}).", ok ? "true" : "false")
@@ -829,7 +829,7 @@ _OnbWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_OnbWeb_Controller)
-		try _OnbWeb_Controller.Fill()
+		try WebView_FitToWindow(_OnbWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) without committing: restore AltGr, drop the WebView2

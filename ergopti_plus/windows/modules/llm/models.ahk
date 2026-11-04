@@ -442,6 +442,7 @@ _LLM_BuildFlatIndex(presets) {
 				if (name == "")
 					continue
 				index[name] := _LLM_ExtractModelMetadata(model)
+				index[name]["provider"] := provider.Has("label") ? provider["label"] : ""
 			}
 		}
 	}

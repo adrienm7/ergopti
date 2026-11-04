@@ -307,13 +307,51 @@ _DriverProductionSourceCensus(Root := unset) {
 	return { Root: Root, Paths: Paths }
 }
 
+; The generated constants a source test reads through: "ConfigLeaf.MAX_WORDS" -> "max_words".
+_DriverGeneratedConstants() {
+	SplitPath(A_ScriptDir, , &Root)
+	Text := FileRead(Root . "\_generated\config_keys.ahk", "UTF-8")
+	Table := Map()
+	Owner := ""
+	loop parse, Text, "`n", "`r" {
+		if RegExMatch(A_LoopField, "^class (\w+) \{", &Header)
+			Owner := Header[1]
+		else if RegExMatch(A_LoopField, '^\s*static (\w+) := "([^"]*)"', &Entry)
+			Table[Owner . "." . Entry[1]] := Entry[2]
+	}
+	if (Table.Count == 0)
+		throw Error("_DriverGeneratedConstants: _generated\config_keys.ahk declares no constant.")
+	return Table
+}
+
+; A pin on a literal must survive that literal moving to its generated constant,
+; as tools/lib/config-key-tokens.cjs does for the Node gates: each reference reads
+; as the quoted string it stands for. A name the table does not hold stays, so a
+; misspelt constant still fails its pin, and one inside a string stays as written.
+_DriverResolveConstants(Src) {
+	; Read on the first reference: a fixture tree of its own holds no generated file.
+	static Table := 0
+	Out := ""
+	Position := 1
+	while RegExMatch(Src, "\b(?:ConfigKey|ConfigLeaf|MenuCommand)\.[A-Z][A-Z0-9_]*\b", &Found, Position) {
+		if !IsObject(Table)
+			Table := _DriverGeneratedConstants()
+		Before := SubStr(Src, Found.Pos - 1, 1)
+		Quoted := Found.Pos > 1 && (Before == '"' || Before == "'")
+		Out .= SubStr(Src, Position, Found.Pos - Position)
+			. (Table.Has(Found[0]) && !Quoted ? '"' . Table[Found[0]] . '"' : Found[0])
+		Position := Found.Pos + Found.Len
+	}
+	return Out . SubStr(Src, Position)
+}
+
 _DriverSourceConcat() {
 	static cache := ""
 	if (cache != "")
 		return cache
 	Combined := ""
 	for Path in _DriverProductionSourceCensus().Paths
-		Combined .= "`n" . FileRead(Path, "UTF-8")
+		Combined .= "`n" . _DriverResolveConstants(FileRead(Path, "UTF-8"))
 	cache := Combined
 	return cache
 }
@@ -328,11 +366,13 @@ _DriverSourceConcat() {
 ; no-prefix-keywait, where "; native Suspend() never disarms..." comments
 ; added by the Pattern-1 hardening campaign inflated a raw "Suspend(" count).
 _StripFullLineComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r")
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	return Out
+	if Src == ""
+		return ""
+	; Native passes keep the line contract: CR is trimmed around every LF and the
+	; text boundaries, and each surviving line ends in LF. `[^\S\n]` stops the
+	; leading whitespace from spanning a line, which a bare \s would do.
+	Lines := RegExReplace(Trim(Src, "`r"), "\r*\n\r*", "`n") . "`n"
+	return RegExReplace(Lines, "m`n)^[^\S\n]*;[^\n]*\n", "")
 }
 
 ; How a refused exit looks in Ergopti_OnShutdown source.
@@ -391,9 +431,30 @@ _DriverMaskBlockComments(&Src) {
 }
 
 ; Code-only consumers also exclude quoted data and single-line comments.
+; The memo is keyed by the text itself, never by a path, so a rewritten file or
+; a mutated fixture is simply a new key and no stale mask can be returned.
 _DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
+	static Memo := [Map(), Map()], MemoChars := 0
 	if BlockCommentsOnly && !InStr(Src, "/*")
 		return Src
+	Length := StrLen(Src)
+	if Length < 1024
+		return _DriverComputeNonCodeMask(&Src, BlockCommentsOnly)
+	Masks := Memo[BlockCommentsOnly ? 1 : 2]
+	; A mask preserves offsets; the length check refuses a key cut short by NUL.
+	if Masks.Has(Src) && StrLen(Masks[Src]) == Length
+		return Masks[Src]
+	Mask := _DriverComputeNonCodeMask(&Src, BlockCommentsOnly)
+	; Whole-tree mutants must not accumulate without limit: past the budget a
+	; mask is only recomputed, which costs time but cannot change a result.
+	if MemoChars + Length <= 100000000 {
+		Masks[Src] := Mask
+		MemoChars += Length
+	}
+	return Mask
+}
+
+_DriverComputeNonCodeMask(&Src, BlockCommentsOnly) {
 	Quote := Chr(34)
 	; Atomic runs keep large fixture literals from exhausting the PCRE stack.
 	; Escaped delimiters remain separate atoms and cannot close their string.
@@ -421,6 +482,10 @@ _DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
 ; PCRE replaces a supplementary character once, but source positions count its
 ; two UTF-16 units. Blank spans by native string length to keep aligned offsets.
 _DriverBlankNonNewlines(Text) {
+	static Blanks := Format("{:4096}", "")
+	; Nearly every token is a short one-line string or comment.
+	if StrLen(Text) <= 4096 && !InStr(Text, "`n") && !InStr(Text, "`r")
+		return SubStr(Blanks, 1, StrLen(Text))
 	Out := ""
 	Position := 1
 	while RegExMatch(Text, "[`r`n]", &Boundary, Position) {
@@ -629,10 +694,35 @@ _DriverDirConcat(RelDir) {
 	Dir := Root . "\" . StrReplace(RelDir, "/", "\")
 	Combined := ""
 	Loop Files, Dir . "\*.ahk", "FR"
-		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
+		Combined .= "`n" . _DriverResolveConstants(FileRead(A_LoopFileFullPath, "UTF-8"))
 	if (Combined == "")
 		throw Error("_DriverDirConcat: '" . RelDir . "' holds no readable .ahk file — the directory was renamed, moved or emptied. Update the test's directory name; do not let it scan nothing.")
 	return Combined
+}
+
+; Reads ONE production file by its name, wherever the tree holds it, for a test
+; whose claim is about that whole file (a single-file absence assertion that a
+; directory-wide scan would weaken). A move between directories cannot break it;
+; a rename, a missing file or a second file of that name throws, because each of
+; those would otherwise leave the test scanning the wrong text or nothing.
+; @param FileName {String} Base name, such as "logger.ahk".
+; @returns {String} The file's content.
+_DriverFileSource(FileName) {
+	static ByName := 0
+	if !IsObject(ByName) {
+		Found := Map()
+		Found.CaseSense := "Off"
+		for Path in _DriverProductionSourceCensus().Paths {
+			SplitPath(Path, &Name)
+			Found[Name] := Found.Has(Name) ? "" : Path
+		}
+		ByName := Found
+	}
+	if !ByName.Has(FileName)
+		throw Error("_DriverFileSource: no production file is named '" . FileName . "': it was renamed or deleted. Update the test.")
+	if (ByName[FileName] == "")
+		throw Error("_DriverFileSource: several production files are named '" . FileName . "'. Read it by a symbol it defines instead.")
+	return _DriverResolveConstants(FileRead(ByName[FileName], "UTF-8"))
 }
 
 ; Export a callable reference for fragment tests. AHK's isolated #Warn pass
@@ -1089,6 +1179,7 @@ RunTests(PlanModuleOf := 0) {
 		Status := "ok"
 		Detail := ""
 		StartedMs := _TestClockMs()
+		AuxMark := _TestLlmAuxMark()
 		try {
 			try TestEntry.callback.Call()
 			finally {
@@ -1101,6 +1192,9 @@ RunTests(PlanModuleOf := 0) {
 			}
 			if LeakedCritical
 				throw Error("Test LEAKED Critical: " . TestEntry.name)
+			LeakedWorkers := _TestLlmAuxLeaked(AuxMark)
+			if LeakedWorkers != ""
+				throw Error("Test LEFT an LLM worker in flight (" . LeakedWorkers . "): " . TestEntry.name)
 		} catch Any as e {
 			if e is TestNotExecutedSignal {
 				Status := "not executed"
@@ -1179,6 +1273,32 @@ _TestClockMs() {
 	if !DllCall("Kernel32\QueryPerformanceCounter", "Int64*", &Counter)
 		throw Error("Test performance counter is unavailable.")
 	return Counter * 1000.0 / Frequency
+}
+
+; A test that starts an LLM auxiliary request (an Ollama health or tags probe,
+; a pull, a server check) must retire it before it returns. A request left in
+; flight keeps its native process and poll timer alive, and its completion
+; runs inside whichever later test next yields: a rebuild launched from there
+; reached a proof that forbids every launch, in a whole-group CI run only.
+; @returns {Integer} The owner counter before the test, or -1 without the module.
+_TestLlmAuxMark() {
+	global _LLM_AuxOwnerCounter
+	return IsSet(_LLM_AuxOwnerCounter) ? _LLM_AuxOwnerCounter : -1
+}
+
+; @param {Integer} Mark The counter _TestLlmAuxMark returned before the test.
+; @returns {String} The kinds of the owners the test opened and left current,
+;   comma-separated; "" when it retired every one.
+_TestLlmAuxLeaked(Mark) {
+	global _LLM_AuxOwners
+	if Mark < 0 || !IsSet(_LLM_AuxOwners) || !(_LLM_AuxOwners is Map)
+		return ""
+	Kinds := ""
+	for Kind, Owner in _LLM_AuxOwners {
+		if Owner is Map && Owner.Get("token", 0) > Mark
+			Kinds .= (Kinds == "" ? "" : ", ") . Kind
+	}
+	return Kinds
 }
 
 ; CI and local tooling read %TEMP%\ergopti_test_results.txt (fixed name).
@@ -1265,6 +1385,9 @@ TestMsgBoxCount(Record := false) {
 ; retaining production registration while following module moves by symbol.
 ; A fresh complete census refuses missing, duplicate and unreadable sources;
 ; no first match or cached path may hide a moved or newly duplicated export.
+; Each lookup walks the tree again, but _DriverSymbolScanCount reuses what an
+; unchanged file already taught: a child fixture resolves dozens of symbols per
+; case, and rereading and masking the whole tree each time cost minutes per test.
 ; @param Name {String} Unqualified function name; AHK identity ignores case.
 ; @param Root {String} Driver root; the suite's windows parent by default.
 ; @returns {String} Absolute path of the unique production definition.
@@ -1282,10 +1405,8 @@ _DriverProductionFileForSymbol(Name, Root := "") {
 		Path := A_LoopFileFullPath
 		if !_DriverIsProductionSource(Path)
 			continue
-		Source := FileRead(Path, "UTF-8")
-		Code := _DriverMaskNonCode(&Source)
-		Count := _DriverTopLevelDefinitionCount(&Code, Name)
-		Loop Count
+		Stamp := A_LoopFileTimeModified . ":" . A_LoopFileSize
+		Loop _DriverSymbolScanCount(Path, Stamp, A_LoopFileTimeModified, Name)
 			Matches.Push(Path)
 	}
 	if Matches.Length == 0
@@ -1293,6 +1414,40 @@ _DriverProductionFileForSymbol(Name, Root := "") {
 	if Matches.Length != 1
 		throw Error("Multiple production definitions for function '" . Name . "': " . Matches.Length . ".")
 	return Matches[1]
+}
+
+; How many exported definitions of Name one source file holds, remembered per
+; file for as long as its modification time and size stand. Those stamps have a
+; one-second grain, so a file written within the racy window is read afresh and
+; not remembered: a rewrite of the same size in the same second cannot go unseen
+; (the same rule as Git's racy index entries). Masking cannot add a name, so a
+; raw substring miss answers zero without paying for the mask.
+_DriverSymbolScanCount(Path, Stamp, Modified, Name) {
+	static Entries := Map(), RacyWindowSeconds := 2
+	Entry := Entries.Get(Path, 0)
+	if !IsObject(Entry) || Entry.Stamp != Stamp {
+		if Entries.Has(Path)
+			Entries.Delete(Path)
+		Counts := Map()
+		Counts.CaseSense := "Off"
+		Entry := {Stamp: Stamp, Source: FileRead(Path, "UTF-8"), Code: "", Counts: Counts}
+		if DateDiff(A_Now, Modified, "Seconds") > RacyWindowSeconds
+			Entries[Path] := Entry
+	}
+	if Entry.Counts.Has(Name)
+		return Entry.Counts[Name]
+	if !InStr(Entry.Source, Name)
+		Count := 0
+	else {
+		if Entry.Code == "" {
+			Source := Entry.Source
+			Entry.Code := _DriverMaskNonCode(&Source)
+		}
+		Code := Entry.Code
+		Count := _DriverTopLevelDefinitionCount(&Code, Name)
+	}
+	Entry.Counts[Name] := Count
+	return Count
 }
 
 ; Definition syntax comes from the existing signature scanner. Prefix brace

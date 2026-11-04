@@ -22,7 +22,8 @@ local helpers = require("tests.helpers")
 local DRIVER_ROOT = helpers.driver_root()
 local SCAN_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
 local NATIVE_KEYS = { space = true, tab = true, enter = true, star = true }
-local POINTER_MAP = "modules/shortcuts/caps_word_auto_off.lua"
+-- The one file allowed to spell the pointer kinds, resolved from its module name.
+local POINTER_MAP = assert(package.searchpath("modules.shortcuts.caps_word_auto_off", package.path))
 
 --- Lists every .lua file under a directory, recursively (lfs or the shell).
 --- @param abs string Absolute directory path.
@@ -90,7 +91,7 @@ helpers.describe("CapsWord auto-off single source (Linux)", function()
 							offenders[#offenders + 1] = rel .. " spells the delimiter " .. key
 						end
 					end
-					if rel ~= POINTER_MAP then
+					if path ~= POINTER_MAP then
 						for _, kind in ipairs(kinds) do
 							if source:find('"' .. kind .. '"', 1, true) then
 								offenders[#offenders + 1] = rel .. " spells the pointer kind " .. kind

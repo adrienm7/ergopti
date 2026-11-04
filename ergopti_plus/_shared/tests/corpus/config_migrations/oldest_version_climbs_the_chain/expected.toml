@@ -1,0 +1,7 @@
+# _shared/tests/corpus/config_migrations/oldest_version_climbs_the_chain/expected.toml
+
+[_meta]
+schema_version = 3
+
+[gestures]
+enabled = true

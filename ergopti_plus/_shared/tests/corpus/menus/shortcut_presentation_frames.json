@@ -66,6 +66,6 @@
 		"static/ergopti_plus/windows/infra/manifest_menu.ahk": "0b7dcaf61cf2aa387d9b8c634995fbfa87b055b5c73805ad161beb97204fd496",
 		"static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua": "d4de8942a5d5bc7421d93661e90c3f3ef894b4331616a4dfca57252d635cb426",
 		"static/ergopti_plus/macos/ui/menu/menu_utils.lua": "9b337e605e1064e0129c3723280d0e316ad7c0953166de80a52f6d49e7fe1ef2",
-		"static/ergopti_plus/linux/ui/menu/menu_builder.lua": "2c4ba7955c1965164e68e111b357a1bf9184f8c01816165ff3726bb258e9cec7"
+		"static/ergopti_plus/linux/ui/menu/builder.lua": "2c4ba7955c1965164e68e111b357a1bf9184f8c01816165ff3726bb258e9cec7"
 	}
 }

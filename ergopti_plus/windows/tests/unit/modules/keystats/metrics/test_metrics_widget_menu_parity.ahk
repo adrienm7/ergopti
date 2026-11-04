@@ -20,7 +20,9 @@ _MWMP_AnchorPosition(Target, Label) {
 		Text := Buffer((Max(Length, 0) + 1) * 2, 0)
 		DllCall("GetMenuStringW", "Ptr", Target.Handle, "UInt", Position,
 			"Ptr", Text, "Int", Max(Length, 0) + 1, "UInt", 0x400, "Int")
-		if StrGet(Text, "UTF-16") == Label {
+		; With metrics off the category-off rule appends its reason to the caption.
+		Caption := StrGet(Text, "UTF-16")
+		if Caption == Label || Caption == Label . " — " . _MR_ReasonHead(t("menu.category_off_reason")) {
 			AssertEqual(-1, Found, "the floating widget group is drawn only once")
 			Found := Position
 		}

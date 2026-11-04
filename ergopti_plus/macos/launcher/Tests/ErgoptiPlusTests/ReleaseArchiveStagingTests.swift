@@ -7,6 +7,7 @@
 import Foundation
 import Security
 import XCTest
+@testable import ErgoptiPlus
 
 final class ReleaseArchiveStagingTests: XCTestCase {
 	private struct Receipt {
@@ -23,7 +24,7 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 	private var fixtureCanRetire = true
 	private let manager = FileManager.default
 	private let version = "1.2.3"
-	private let bundleName = "ErgoptiPlus.app"
+	private let bundleName = Identifiers.App.bundle
 	private let ownedURL = "https://example.invalid/owned-release"
 
 	private static var repositoryURL: URL {
@@ -139,12 +140,12 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		let owner = Self.repositoryURL.appendingPathComponent("tools/build/macos-release-archives.cjs")
 		let produced = try successful("/usr/bin/env", ["node", owner.path, app.path, output.path], root: root)
 		XCTAssertEqual(produced.stdout,
-			"Created ErgoptiPlus.app.tar.xz\nCreated ErgoptiPlus.app.zip\n",
+			"Created \(Identifiers.App.bundle).tar.xz\nCreated \(Identifiers.App.bundle).zip\n",
 			"The actual producer emits both canonical names after native readback verification")
 		XCTAssertTrue(produced.stderr.isEmpty, produced.stderr)
-		XCTAssertTrue(manager.fileExists(atPath: output.appendingPathComponent("ErgoptiPlus.app.zip").path))
-		XCTAssertTrue(manager.fileExists(atPath: output.appendingPathComponent("ErgoptiPlus.app.tar.xz").path))
-		return output.appendingPathComponent(format == "zip" ? "ErgoptiPlus.app.zip" : "ErgoptiPlus.app.tar.xz")
+		XCTAssertTrue(manager.fileExists(atPath: output.appendingPathComponent("\(Identifiers.App.bundle).zip").path))
+		XCTAssertTrue(manager.fileExists(atPath: output.appendingPathComponent("\(Identifiers.App.bundle).tar.xz").path))
+		return output.appendingPathComponent(format == "zip" ? "\(Identifiers.App.bundle).zip" : "\(Identifiers.App.bundle).tar.xz")
 	}
 
 	private func digest(_ payload: URL, root: URL) throws -> String {
@@ -320,13 +321,13 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 			let payload = try archive(format, app: app, root: root)
 			let input = payload.deletingLastPathComponent()
 			if format == "zip" {
-				try manager.removeItem(at: input.appendingPathComponent("ErgoptiPlus.app.tar.xz"))
+				try manager.removeItem(at: input.appendingPathComponent("\(Identifiers.App.bundle).tar.xz"))
 			}
 			let source = try successful("/usr/bin/env", ["node", owner.path, "--ci-receipt", app.path, input.path], root: root)
 			XCTAssertTrue(source.stdout.isEmpty)
 			XCTAssertTrue(source.stderr.isEmpty)
 			let sourcePacket = try XCTUnwrap(try JSONSerialization.jsonObject(with:
-				Data(contentsOf: input.appendingPathComponent("ErgoptiPlus.app.ci-receipt.json"))) as? [String: Any])
+				Data(contentsOf: input.appendingPathComponent("\(Identifiers.App.bundle).ci-receipt.json"))) as? [String: Any])
 			let requirement = try XCTUnwrap(sourcePacket["requirement"] as? String)
 			XCTAssertFalse(requirement.isEmpty)
 			let output = root.appendingPathComponent("ci-install-" + UUID().uuidString)
@@ -366,7 +367,7 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 			_ = try successful("/usr/bin/env", ["node", owner.path, "--ci-receipt", app.path, input.path], root: root)
 			if refusal == "digest" { try Data("Different archive bytes\n".utf8).write(to: payload) }
 			if refusal == "signature" {
-				let receipt = input.appendingPathComponent("ErgoptiPlus.app.ci-receipt.json")
+				let receipt = input.appendingPathComponent("\(Identifiers.App.bundle).ci-receipt.json")
 				var packet = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(contentsOf: receipt)) as? [String: Any])
 				packet["requirement"] = "identifier \"com.ergopti.foreign-staging-fixture\""
 				try JSONSerialization.data(withJSONObject: packet).write(to: receipt)
@@ -377,7 +378,7 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 			XCTAssertNotEqual(result.status, 0)
 			XCTAssertTrue(result.stdout.isEmpty)
 			XCTAssertFalse(manager.fileExists(atPath: output.appendingPathComponent(bundleName).path))
-			XCTAssertTrue(manager.fileExists(atPath: input.appendingPathComponent("ErgoptiPlus.app.zip").path),
+			XCTAssertTrue(manager.fileExists(atPath: input.appendingPathComponent("\(Identifiers.App.bundle).zip").path),
 				"A usable compatibility ZIP cannot turn a refused preferred archive into success")
 			XCTAssertFalse(try manager.contentsOfDirectory(atPath: input.path).contains { $0.hasPrefix(".ci-install-") })
 		}
@@ -426,7 +427,7 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 		let app = try signedBundle(root: root)
 		let preferred = try archive("tar.xz", app: app, root: root)
 		let directory = preferred.deletingLastPathComponent()
-		let payloads = [preferred, directory.appendingPathComponent("ErgoptiPlus.app.zip")]
+		let payloads = [preferred, directory.appendingPathComponent("\(Identifiers.App.bundle).zip")]
 		let before = try payloads.map { try Data(contentsOf: $0) }
 		var seed = [UInt8](repeating: 0, count: 32)
 		let randomStatus = seed.withUnsafeMutableBytes { bytes in

@@ -31,6 +31,8 @@ local Logger = require("infra.logger")
 local Layout = require("modules.keymap.layout")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
+local KeyNames = require("keycodes.key_names")
+local StickyLabel = require("actions.sticky_label")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
 
@@ -45,6 +47,11 @@ local ConfigKeys = require("config_keys")
 local LOG = "karabiner"
 
 local TAP_HOLD_TIMEOUT_MS_DEFAULT       = Defaults.tap_hold_timeout_ms
+local LoneTap = require("tap_hold.lone_tap")
+-- How long a modifier key pressed alone still taps: the manifest's
+-- tap_holds.lone_modifier_tap_max_ms (0 = the strict tap-hold).
+M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT = LoneTap.validate(
+	Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 local STICKY_TIMEOUT_MS_DEFAULT         = Defaults.sticky_timeout_ms
 local SIMULTANEOUS_THRESHOLD_MS_DEFAULT = Defaults.simultaneous_threshold_ms
 local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
@@ -60,6 +67,20 @@ local function timing_leaf(section, key, default, path, section_name)
 	if called and value ~= nil then return value, false end
 	Outdated.report_in_file(path, { section_name, key },
 		"a timing is numeric; the canonical default is used", Logger)
+	return default, true
+end
+
+--- Reads the lone modifier tap window, where 0 (the strict tap-hold) is a
+--- choice, not an absent value; a negative or fractional window is obsolete.
+--- @return number value The existing window or the canonical default.
+--- @return boolean outdated True when the raw leaf must survive ordinary saves.
+local function lone_tap_leaf(section, key, default, path, section_name)
+	if section[key] == nil then return default, false end
+	local valid, value = pcall(LoneTap.validate, section[key])
+	if valid then return value, false end
+	Outdated.report_in_file(path, { section_name, key },
+		"a lone modifier tap window is 0 or a positive whole number of milliseconds; the canonical default is used",
+		Logger)
 	return default, true
 end
 
@@ -119,8 +140,11 @@ local RUNTIME_KEY = "runtime"
 --- an official Karabiner-Elements that is running to quit (ADR 011, decision 3).
 --- It is the user's consent: `true` (the absent default, as the maintainer
 --- decided) lets the owned runtime close it, `false` makes the owned runtime
---- report `other_karabiner_running` instead. Like `runtime` it is not a menu row
---- until the owned runtime ships; a value that is not a boolean refuses the file.
+--- report `other_karabiner_running` instead, so Ergopti's runtime never runs
+--- beside theirs. It is the Tap-Holds row « close other Karabiner apps while
+--- Ergopti is running » on an owned boot; a value that is not a boolean refuses
+--- the file. It is written only once it differs from the default or is already
+--- in the file.
 M.CLOSE_OTHER_INSTANCES_DEFAULT = true
 local CLOSE_OTHER_KEY = "close_other_instances"
 -- Builds before 2026-09-22 defaulted to off and wrote `[karabiner] enabled =
@@ -198,8 +222,9 @@ local function load_json_file(path)
 end
 
 --- Appends the full shared modifier × key matrix used by gesture and tap-hold
---- action pickers. The labels come verbatim from the catalogue, so "Ctrl + A"
---- never depends on the active UI language.
+--- action pickers. Each label names its modifiers and its key from the shared
+--- key name table in the user's language (« Cmd + Maj + Entrée »); they used to
+--- keep the catalogue's English names in every locale.
 -- Decoded once. The shared modifier-chord catalogue is a file on disk that does
 -- not change while the driver runs, and this whole function re-ran on EVERY
 -- layout change — re-reading and re-decoding the JSON to rebuild the same 673
@@ -216,9 +241,11 @@ local _chord_catalogue = nil
 --- and `alt_tab_apps_list`≡`app_switcher`) and resolve through the alias table
 --- rather than duplicating a translated string in twenty-one files.
 ---
---- The 19 that remain French are the hold-only ones — `layer`, the bare
---- modifiers and their combinations. A gesture has no duration, so they have no
---- registry row by design, not by omission.
+--- The hold-only ones have no registry row by design, not by omission: a
+--- gesture has no duration. The bare modifiers and their combinations are named
+--- from the key name table (name_modifier_holds), the layer holds by the hold
+--- picker's layer label (name_held_layers). A sticky label is a template its
+--- modifiers fill from the same table (« 📌 {1} rémanents »).
 --- @param actions table The decoded action list, mutated in place.
 --- @return number localised How many labels came from the registry.
 local function localise_action_labels(actions)
@@ -239,6 +266,9 @@ local function localise_action_labels(actions)
 			-- signal that this action has no registry row and no alias. Writing it
 			-- through would put "sg_actions.hyper" in the menu.
 			if translated and translated ~= key and translated ~= "" then
+				if StickyLabel.is_sticky(action.id) then
+					translated = StickyLabel.label(action.id, key, "macos", i18n.get)
+				end
 				action.label = translated
 				action.short_label = translated
 				localised = localised + 1
@@ -247,6 +277,45 @@ local function localise_action_labels(actions)
 	end
 	Logger.debug(LOG, "Localised %d of %d action label(s) from the shared registry.", localised, #actions)
 	return localised
+end
+
+--- Names the bare modifier and modifier-combination holds (those declaring
+--- `modifiers`) from the shared key name table: their glyphs, then their names
+--- in the user's language (« ⌘⇧ Cmd + Maj »). They read « ⌘⇧ — Cmd+Shift »
+--- in English in every locale.
+--- @param actions table The decoded action list, mutated in place.
+local function name_modifier_holds(actions)
+	for _, action in ipairs(actions) do
+		if type(action) == "table" and action.modifiers ~= nil then
+			if type(action.modifiers) ~= "table" or #action.modifiers == 0 then
+				error("remap action " .. tostring(action.id) .. " declares no modifier", 2)
+			end
+			action.label = KeyNames.modifiers_heading(action.modifiers, "macos", i18n.get)
+			action.short_label = KeyNames.modifiers_label(action.modifiers, "macos", i18n.get)
+		end
+	end
+end
+
+--- Names the layer holds (those declaring `hold_layer`) by the label the shared
+--- hold picker gives that layer on every driver (_shared/lua/tap_hold/
+--- hold_options.lua: tap_hold.hold.<layer>_layer). The navigation layer hold
+--- read « Layer nav. — Actif tant que maintenu » in French in every locale.
+--- @param actions table The decoded action list, mutated in place.
+local function name_held_layers(actions)
+	for _, action in ipairs(actions) do
+		if type(action) == "table" and action.hold_layer ~= nil then
+			if type(action.hold_layer) ~= "string" or action.hold_layer == "" then
+				error("remap action " .. tostring(action.id) .. " declares no layer", 2)
+			end
+			local key = "tap_hold.hold." .. action.hold_layer .. "_layer"
+			local text = i18n.get(key)
+			if type(text) ~= "string" or text == "" then
+				error("remap action " .. tostring(action.id) .. ": " .. key .. " has no text", 2)
+			end
+			action.label = "🗂 " .. text
+			action.short_label = text
+		end
+	end
 end
 
 local function append_shared_modifier_chords(actions)
@@ -263,21 +332,20 @@ local function append_shared_modifier_chords(actions)
 
 	local max_mask = (2 ^ #modifiers) - 1
 	for mask = 1, max_mask do
-		local ids, labels, karabiner_modifiers = {}, {}, {}
+		local ids, karabiner_modifiers = {}, {}
 		for index, modifier in ipairs(modifiers) do
 			if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
 				ids[#ids + 1] = modifier.id
-				labels[#labels + 1] = modifier.label
 				karabiner_modifiers[#karabiner_modifiers + 1] = modifier.karabiner
 			end
 		end
 		local id_prefix = table.concat(ids, "_")
-		local label_prefix = table.concat(labels, " + ")
 		for _, key_def in ipairs(keys) do
+			local label = KeyNames.chord_label(ids, key_def, "macos", i18n.get)
 			local action = {
 				id = id_prefix .. "_" .. key_def.id,
-				short_label = label_prefix .. " + " .. key_def.label,
-				label = label_prefix .. " + " .. key_def.label,
+				short_label = label,
+				label = label,
 				category = "Keyboard shortcuts",
 				holdable = false,
 			}
@@ -371,6 +439,8 @@ function M.load_available_actions(actions_file)
 		return nil
 	end
 	localise_action_labels(list)
+	name_modifier_holds(list)
+	name_held_layers(list)
 	append_shared_modifier_chords(list)
 	local _, catalogue_err = ActionCatalogue.index_by_id(list)
 	if catalogue_err then
@@ -495,6 +565,7 @@ local function build_state(tap_hold_keys, mod_combos, recommended)
 		tap_hold_config           = tap_hold_config,
 		mod_combos_config         = mod_combos_config,
 		tap_hold_timeout_ms       = TAP_HOLD_TIMEOUT_MS_DEFAULT,
+		lone_modifier_tap_max_ms  = M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT,
 		sticky_timeout_ms         = STICKY_TIMEOUT_MS_DEFAULT,
 		simultaneous_threshold_ms = SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
 		combo_symmetric           = COMBO_SYMMETRIC_DEFAULT,
@@ -684,6 +755,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS)
 	local sticky_ms = timing(tap_holds, "sticky_timeout_ms", STICKY_TIMEOUT_MS_DEFAULT,
 		ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+	local lone_tap_ms = lone_tap_leaf(tap_holds, ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS,
+		M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT, user_config_path, ConfigKeys.KEY.TAP_HOLDS)
 	local simultaneous_ms = timing(combos, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
 		ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 
@@ -706,6 +779,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		tap_hold_config           = tap_hold_config,
 		mod_combos_config         = combos_config,
 		tap_hold_timeout_ms       = timeout_ms,
+		lone_modifier_tap_max_ms  = lone_tap_ms,
 		sticky_timeout_ms         = sticky_ms,
 		simultaneous_threshold_ms = simultaneous_ms,
 		combo_symmetric           = combo_symmetric,
@@ -715,6 +789,7 @@ end
 -- The scalar leaves a menu setter can name as explicitly set by the user.
 local INTENT_LEAVES = {
 	[ConfigKeys.KEY.TAP_HOLDS_ENABLED] = true, [ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS] = true, [ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS] = true,
+	[ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = true,
 	[ConfigKeys.KEY.MOD_COMBOS_ENABLED] = true, [ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS] = true,
 	[ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC] = true,
 }
@@ -821,8 +896,8 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			if not overwrite_corrupt and value == neutral then value = nil end
 			target[key] = value
 		end
-		local function assign_timing(target, section, key, value, neutral)
-			local _, outdated = timing_leaf(target, key, neutral, user_config_path, section)
+		local function assign_timing(target, section, key, value, neutral, read_leaf)
+			local _, outdated = (read_leaf or timing_leaf)(target, key, neutral, user_config_path, section)
 			if not overwrite_corrupt and outdated and not explicit[section .. "." .. key] then
 				if value ~= neutral then
 					candidate_refusal = "candidate has no explicit repair owner for " .. section .. "." .. key
@@ -907,16 +982,33 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			assert(type(state.enabled) == "boolean", "the Karabiner integration switch must be a boolean")
 			table_at(document, INTEGRATION_SECTION)[INTEGRATION_KEY] = state.enabled
 		end
+		-- The close consent is written once the user changed it, and kept in sync after.
+		if state.close_other_instances ~= nil then
+			assert(type(state.close_other_instances) == "boolean", "the close consent must be a boolean")
+			if state.close_other_instances ~= M.CLOSE_OTHER_INSTANCES_DEFAULT
+				or (type(integration) == "table" and integration[CLOSE_OTHER_KEY] ~= nil) then
+				table_at(document, INTEGRATION_SECTION)[CLOSE_OTHER_KEY] = state.close_other_instances
+			end
+		end
 		if not preserve_array(document.tap_holds, { ConfigKeys.KEY.TAP_HOLDS },
 			(state.tap_holds_enabled == nil or state.tap_holds_enabled == Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED))
 			and (state.tap_hold_timeout_ms == nil or state.tap_hold_timeout_ms == TAP_HOLD_TIMEOUT_MS_DEFAULT)
 			and (state.sticky_timeout_ms == nil or state.sticky_timeout_ms == STICKY_TIMEOUT_MS_DEFAULT)
+			and (state.lone_modifier_tap_max_ms == nil
+				or state.lone_modifier_tap_max_ms == M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT)
 			and bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
 			local tap_holds = table_at(document, ConfigKeys.KEY.TAP_HOLDS)
 			assign_boolean(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "enabled", state.tap_holds_enabled,
 				Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), tap_holds_switch)
 			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
 			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
+			-- 0 is the strict tap-hold, a choice of its own: only the default is elided.
+			if state.lone_modifier_tap_max_ms ~= nil and not pcall(LoneTap.validate, state.lone_modifier_tap_max_ms) then
+				candidate_refusal = "candidate has an invalid " .. ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS
+				error(candidate_refusal, 0)
+			end
+			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS,
+				state.lone_modifier_tap_max_ms, M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT, lone_tap_leaf)
 			if not preserve_array(tap_holds.config, { ConfigKeys.KEY.TAP_HOLDS, "config" },
 				bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
 				merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" }, ConfigKeys.KEY.TAP_HOLDS)

@@ -28,6 +28,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -451,15 +452,15 @@ _PromptEdWeb_Save(EditId, Epoch, Name, Batch, Prompt) {
 ; Applies form values to one detached menu candidate. The explicit target keeps
 ; nested profile Maps isolated until the strict writer has made them durable.
 _PromptEdWeb_ApplyProfile(MenuState, EditId, Name, Batch, Prompt) {
-	if !(MenuState is Map) || !MenuState.Has("user_profiles")
-			|| !(MenuState["user_profiles"] is Array)
+	if !(MenuState is Map) || !MenuState.Has(ConfigLeaf.USER_PROFILES)
+			|| !(MenuState[ConfigLeaf.USER_PROFILES] is Array)
 		return false
 	if (EditId != "") {
-		for i, p in MenuState["user_profiles"] {
+		for i, p in MenuState[ConfigLeaf.USER_PROFILES] {
 			if (p.Has("id") && p["id"] == EditId) {
-				MenuState["user_profiles"][i]["label"]         := Name
-				MenuState["user_profiles"][i]["system_single"] := Prompt
-				MenuState["user_profiles"][i]["batch"]         := Batch
+				MenuState[ConfigLeaf.USER_PROFILES][i]["label"]         := Name
+				MenuState[ConfigLeaf.USER_PROFILES][i]["system_single"] := Prompt
+				MenuState[ConfigLeaf.USER_PROFILES][i]["batch"]         := Batch
 				return true
 			}
 		}
@@ -473,7 +474,7 @@ _PromptEdWeb_ApplyProfile(MenuState, EditId, Name, Batch, Prompt) {
 			"system_multi",  "",
 			"batch",         Batch
 		)
-		MenuState["user_profiles"].Push(new_profile)
+		MenuState[ConfigLeaf.USER_PROFILES].Push(new_profile)
 		MenuState["profile_id"] := pid
 	}
 	return true
@@ -641,7 +642,7 @@ _PromptEdWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_PromptEdWeb_Controller)
-		try _PromptEdWeb_Controller.Fill()
+		try WebView_FitToWindow(_PromptEdWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) and the frontend "cancel" button both land here.

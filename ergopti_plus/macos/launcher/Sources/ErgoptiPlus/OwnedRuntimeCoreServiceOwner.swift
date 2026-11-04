@@ -85,7 +85,7 @@ final class OwnedRuntimeCoreServiceOwner {
 	private static func coreCode(pid: pid_t, leaf: Data) -> SecCode? {
 		var code: SecCode?, staticCode: SecStaticCode?, path: CFURL?
 		guard SecCodeCopyGuestWithAttributes(nil, [kSecGuestAttributePid as String: pid] as CFDictionary, [], &code) == errSecSuccess, let code,
-			signedLeaf(code, identifier: "com.ergoptiplus.remap.core") == leaf,
+			signedLeaf(code, identifier: Identifiers.SigningIds.remapCore) == leaf,
 			SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode,
 			SecCodeCopyPath(staticCode, [], &path) == errSecSuccess, let path,
 			(path as URL).path == executable || (path as URL).path == core else { return nil }

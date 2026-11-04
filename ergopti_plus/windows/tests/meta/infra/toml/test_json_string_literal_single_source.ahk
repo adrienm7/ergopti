@@ -40,11 +40,9 @@ _JSLSS_EveryWebViewHelperDelegates() {
 		Assert(Body != "" && InStr(Body, "JsonStringContents(") > 0,
 			Name . " must delegate to the shared unquoted JSON-string encoder")
 	}
-	for Name in ["KL_JsonStr", "KL_JsonEncodeString"] {
-		Body := _DriverFuncBody(Name)
-		Assert(Body != "" && InStr(Body, "JsonStringLiteral(") > 0,
-			Name . " must delegate to the shared quoted JSON-string encoder")
-	}
+	Body := _DriverFuncBody("KL_JsonEncodeString")
+	Assert(Body != "" && InStr(Body, "JsonStringLiteral(") > 0,
+		"KL_JsonEncodeString must delegate to the shared quoted JSON-string encoder")
 }
 Test("JSON strings: every WebView and payload serializer uses one complete encoder (json-string-literal-single-source)",
 	_JSLSS_EveryWebViewHelperDelegates)

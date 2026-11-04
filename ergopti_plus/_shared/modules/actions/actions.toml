@@ -43,7 +43,13 @@
 #             rule pinned by _shared/tests/corpus/action_parameters/app_vectors.json),
 #             or "program" (versioned JSON containing an absolute executable
 #             and literal ordered arguments; rule pinned independently by
-#             _shared/tests/corpus/action_parameters/program_vectors.json).
+#             _shared/tests/corpus/action_parameters/program_vectors.json),
+#             or "command" (versioned JSON: a shell command line, hidden or in
+#             a terminal, and what to do with its output), "path" (an
+#             absolute file or folder path) or "apple_shortcut" (versioned
+#             JSON: a Shortcuts identifier and name, its input and output);
+#             rule pinned by
+#             _shared/tests/corpus/action_parameters/user_action_vectors.json.
 #   confirm   true for a destructive action that must ask before it runs. Each
 #             driver's dispatcher asks, off the input thread, and runs the
 #             action only on the explicit answer: macOS execute_single
@@ -58,11 +64,11 @@
 #             hint, instead of offering a binding that would do nothing. Linux
 #             understands "tool:<binary>" (on PATH), "session:x11" and
 #             "session:workspaces" (a session whose workspaces another process
-#             can read and pick: X11, KDE Plasma, sway or Hyprland). The Lua
-#             drivers understand "ai:on" (the AI menu's switch is on: the
+#             can read and pick: X11, KDE Plasma, sway or Hyprland). Every
+#             driver understands "ai:on" (the AI menu's switch is on: the
 #             picker greys the row with the AI-off notice while it is off, and
 #             the action refuses itself then). The other
-#             tokens have no macOS probe, and Windows has none yet, so the
+#             tokens have no macOS or Windows probe, so the
 #             generator refuses them for those drivers rather than emitting one
 #             nothing checks.
 #   scalable  (axis only) whether the axis repeats with the swipe distance.
@@ -117,66 +123,130 @@ axis = [
 
 [ax_actions.tabs]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["tab_prev", "tab_next"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["tab_prev", "tab_next"]
 scalable = true
 
 [ax_actions.char]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["arrow_left", "arrow_right"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["arrow_left", "arrow_right"]
 scalable = true
 
 [ax_actions.char_sel]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["sel_left", "sel_right"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["sel_left", "sel_right"]
 scalable = true
 
 [ax_actions.line_arrow]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["arrow_up", "arrow_down"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["arrow_up", "arrow_down"]
 scalable = true
 
 [ax_actions.line_sel]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["sel_up", "sel_down"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["sel_up", "sel_down"]
 scalable = true
 
 [ax_actions.words]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["word_prev", "word_next"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["word_prev", "word_next"]
 scalable = true
 
 [ax_actions.words_sel]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["sel_word_prev", "sel_word_next"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["sel_word_prev", "sel_word_next"]
 scalable = true
 
 [ax_actions.windows]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["win_prev", "win_next"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["win_prev", "win_next"]
 scalable = false
 
 [ax_actions.spaces]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["desktop_prev", "desktop_next"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["desktop_prev", "desktop_next"]
 scalable = false
 
 [ax_actions.volume]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["vol_down", "vol_up"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["vol_down", "vol_up"]
 scalable = true
 
 [ax_actions.brightness]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["brightness_down", "brightness_up"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["brightness_down", "brightness_up"]
 scalable = true
 
 [ax_actions.tracks]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["track_prev", "track_next"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["track_prev", "track_next"]
 scalable = false
 
 [ax_actions.lines]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["line_up", "line_down"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["line_up", "line_down"]
 scalable = true
 
 [ax_actions.line_bounds]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["line_start", "line_end"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["line_start", "line_end"]
 scalable = false
 
 [ax_actions.paragraphs]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["para_prev", "para_next"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["para_prev", "para_next"]
 scalable = true
 
 [ax_actions.document]
 platform = "hs"
+reason_ahk = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_ahk = ["doc_start", "doc_end"]
+reason_linux = "platform_reason.action_continuous_swipe_is_macos"
+equivalent_linux = ["doc_start", "doc_end"]
 scalable = false
 
 
@@ -227,6 +297,8 @@ requires_linux = ["session:x11", "tool:xdotool"]
 
 [sg_actions.lookup]
 platform = "hs"
+reason_ahk = "platform_reason.action_lookup_is_macos_dictionary"
+reason_linux = "platform_reason.action_lookup_is_macos_dictionary"
 
 # --- Navigation applications ---
 
@@ -235,6 +307,8 @@ platform = "hs"
 # Historical v5-to-v6 migration remains unchanged; macOS uses a distinct ID.
 [sg_actions.app_switcher]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_window_switching_is_not_macos"
+equivalent_hs = ["system_app_switcher"]
 emit_ahk_key = "Tab"
 emit_ahk_mods = ["alt"]
 emit_linux = "alt+Tab"
@@ -243,45 +317,65 @@ emit_linux = "alt+Tab"
 # Its observed private Command/Tab edges and retirement are separate from focus.
 [sg_actions.system_app_switcher]
 platform = "hs"
+reason_ahk = "platform_reason.action_application_switching_is_macos"
+equivalent_ahk = ["app_switcher"]
+reason_linux = "platform_reason.action_application_switching_is_macos"
+equivalent_linux = ["app_switcher"]
 
 # The two previous-application scopes: every screen, and only the screen under
 # the cursor. macOS activates the application directly
 # (macos/modules/gestures/app_switch.lua): a posted Cmd+Tab never switched.
 [sg_actions.app_previous]
 platform = "hs"
+reason_ahk = "platform_reason.action_application_switching_is_macos"
+equivalent_ahk = ["app_switcher"]
+reason_linux = "platform_reason.action_application_switching_is_macos"
+equivalent_linux = ["app_switcher"]
 
 [sg_actions.app_previous_screen]
 platform = "hs"
+reason_ahk = "platform_reason.action_application_switching_is_macos"
+equivalent_ahk = ["app_switcher"]
+reason_linux = "platform_reason.action_application_switching_is_macos"
+equivalent_linux = ["app_switcher"]
 
 [sg_actions.app_window_previous]
 # Linux runs it through its emit row (Alt+Escape: the next window, with no
 # switcher). On macOS it posted Cmd+` like win_next did, so both became
 # win_app_next there (config migration step v5_to_v6).
-platform = "linux"
+platform = "ahk,linux"
+reason_hs = "platform_reason.action_window_switching_is_not_macos"
+equivalent_hs = ["win_app_next"]
+emit_ahk_key = "Escape"
+emit_ahk_mods = ["alt"]
 emit_linux = "alt+Escape"
 
 # --- Editing (Windows and Linux; macOS uses Cmd+C/V/X in cmd_*) ---
 
 [sg_actions.copy]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_shortcut_is_a_modifier_chord_here"
 emit_ahk_key = "c"
 emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+c"
 
 [sg_actions.paste]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_shortcut_is_a_modifier_chord_here"
 emit_ahk_key = "v"
 emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+v"
 
 [sg_actions.cut]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_shortcut_is_a_modifier_chord_here"
 emit_ahk_key = "x"
 emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+x"
 
 [sg_actions.undo]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_shortcut_is_a_modifier_chord_here"
 emit_ahk_key = "z"
 emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+z"
@@ -290,18 +384,21 @@ emit_linux = "ctrl+z"
 # while only some applications also accept Ctrl+Y.
 [sg_actions.redo]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_shortcut_is_a_modifier_chord_here"
 emit_ahk_key = "y"
 emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+shift+z"
 
 [sg_actions.select_all]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_shortcut_is_a_modifier_chord_here"
 emit_ahk_key = "a"
 emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+a"
 
 [sg_actions.find]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_shortcut_is_a_modifier_chord_here"
 emit_ahk_key = "f"
 emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+f"
@@ -394,11 +491,21 @@ emit_linux = "ctrl+Tab"
 
 # --- Navigation navigateur ---
 
+# The browsers' own history keys: Alt+Left and Alt+Right on Windows and Linux
+# (Firefox, Chromium, GNOME Files, Dolphin), Cmd+Left and Cmd+Right on macOS
+# (Safari, Chrome, Firefox). Cmd+[ is macOS's other spelling, but it names a
+# character, and the key typing "[" moves with the keyboard layout.
 [sg_actions.nav_back]
-platform = "ahk"
+platform = "all"
+emit_hs_key = "left"
+emit_hs_mods = ["cmd"]
+emit_linux = "alt+Left"
 
 [sg_actions.nav_forward]
-platform = "ahk"
+platform = "all"
+emit_hs_key = "right"
+emit_hs_mods = ["cmd"]
+emit_linux = "alt+Right"
 
 # --- Fenêtres ---
 
@@ -408,10 +515,14 @@ platform = "ahk"
 # step v5_to_v6 maps a stored one).
 [sg_actions.win_prev]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_window_switching_is_not_macos"
+equivalent_hs = ["win_app_prev"]
 emit_linux = "alt+shift+Tab"
 
 [sg_actions.win_next]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_window_switching_is_not_macos"
+equivalent_hs = ["win_app_next"]
 emit_linux = "alt+Tab"
 
 # The windows of the active application, in turn. macOS focuses them directly
@@ -419,9 +530,13 @@ emit_linux = "alt+Tab"
 # layout carrying a backquote.
 [sg_actions.win_app_prev]
 platform = "ahk,hs"
+reason_linux = "platform_reason.action_app_windows_unreachable_on_wayland"
+equivalent_linux = ["win_prev"]
 
 [sg_actions.win_app_next]
 platform = "ahk,hs"
+reason_linux = "platform_reason.action_app_windows_unreachable_on_wayland"
+equivalent_linux = ["win_next"]
 
 [sg_actions.close_window]
 platform = "all"
@@ -462,34 +577,60 @@ emit_linux = "super+Up"
 # One Space left or right, as Ctrl+Arrow does: stops at the first and last.
 [sg_actions.space_prev]
 platform = "hs"
+reason_ahk = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_ahk = ["desktop_prev"]
+reason_linux = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_linux = ["desktop_prev"]
 
 [sg_actions.space_next]
 platform = "hs"
+reason_ahk = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_ahk = ["desktop_next"]
+reason_linux = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_linux = ["desktop_next"]
 
 # The same step, wrapping at the edges: from the last Space of the focused
 # screen to its first, and from the first to its last.
 [sg_actions.space_prev_wrap]
 platform = "hs"
+reason_ahk = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_ahk = ["desktop_prev_wrap"]
+reason_linux = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_linux = ["desktop_prev_wrap"]
 
 [sg_actions.space_next_wrap]
 platform = "hs"
+reason_ahk = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_ahk = ["desktop_next_wrap"]
+reason_linux = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_linux = ["desktop_next_wrap"]
 
 [sg_actions.mission_control]
 platform = "hs"
+reason_ahk = "platform_reason.action_window_overview_is_each_systems"
+equivalent_ahk = ["task_view"]
+reason_linux = "platform_reason.action_window_overview_is_each_systems"
 
 [sg_actions.app_expose]
 platform = "hs"
+reason_ahk = "platform_reason.action_window_overview_is_each_systems"
+equivalent_ahk = ["task_view"]
+reason_linux = "platform_reason.action_window_overview_is_each_systems"
 
 [sg_actions.desktop_prev]
 # One desktop left or right, stopping at the first and the last. Linux drives
 # the session's own interface (wmctrl, KWin, sway, Hyprland) and presses the
 # desktop's Ctrl+Alt+Arrow where there is none, so no session is left out.
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_hs = ["space_prev"]
 emit_ahk_key = "Left"
 emit_ahk_mods = ["ctrl", "super"]
 
 [sg_actions.desktop_next]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_hs = ["space_next"]
 emit_ahk_key = "Right"
 emit_ahk_mods = ["ctrl", "super"]
 
@@ -499,33 +640,45 @@ emit_ahk_mods = ["ctrl", "super"]
 # session that tells where the edge is (GNOME under Wayland does not).
 [sg_actions.desktop_prev_wrap]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_hs = ["space_prev_wrap"]
 requires_linux = ["session:workspaces"]
 
 [sg_actions.desktop_next_wrap]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_spaces_and_desktops_are_one_thing"
+equivalent_hs = ["space_next_wrap"]
 requires_linux = ["session:workspaces"]
 
 [sg_actions.desktop_new]
 platform = "ahk"
+reason_hs = "platform_reason.action_spaces_are_edited_in_mission_control"
+reason_linux = "platform_reason.action_desktop_count_belongs_to_the_desktop"
 emit_ahk_key = "d"
 emit_ahk_mods = ["ctrl", "super"]
 
 [sg_actions.desktop_close]
 platform = "ahk"
+reason_hs = "platform_reason.action_spaces_are_edited_in_mission_control"
+reason_linux = "platform_reason.action_desktop_count_belongs_to_the_desktop"
 emit_ahk_key = "F4"
 emit_ahk_mods = ["ctrl", "super"]
 
 [sg_actions.task_view]
 platform = "ahk"
+reason_hs = "platform_reason.action_window_overview_is_each_systems"
+equivalent_hs = ["mission_control"]
+reason_linux = "platform_reason.action_window_overview_is_each_systems"
 emit_ahk_key = "Tab"
 emit_ahk_mods = ["super"]
 
 [sg_actions.minimize_all]
 # Windows minimizes with Win+M (Win+D is show_desktop, which toggles back);
 # macOS minimizes every window of every visible app through System Events.
-# Linux is not implemented, not impossible: EWMH has no "minimize all" request,
-# so it needs a per-window pass (xdotool on X11; nothing on Wayland).
-platform = "ahk,hs"
+# EWMH has no "minimize all" request, so Linux minimizes each window wmctrl
+# lists with xdotool, which only an X11 session lets another process do.
+platform = "all"
+requires_linux = ["session:x11", "tool:wmctrl", "tool:xdotool"]
 emit_ahk_key = "m"
 emit_ahk_mods = ["super"]
 
@@ -750,6 +903,10 @@ platform = "all"
 
 [sg_actions.screen_record]
 platform = "ahk"
+reason_hs = "platform_reason.action_recording_starts_from_the_capture_tool"
+equivalent_hs = ["screen_capture"]
+reason_linux = "platform_reason.action_recording_starts_from_the_capture_tool"
+equivalent_linux = ["screen_capture"]
 emit_ahk_key = "r"
 emit_ahk_mods = ["super", "alt"]
 
@@ -804,11 +961,46 @@ platform = "all"
 # The centre of the screen under the pointer. Linux, as for teleport_mouse, has
 # no compositor-independent way to warp the pointer.
 platform = "ahk,hs"
+reason_linux = "platform_reason.action_pointer_cannot_be_moved_on_linux"
 
 [sg_actions.run_program]
 # Versioned absolute executable plus a literal argument vector, owned by the action lifecycle.
 platform = "all"
 parameter = "program"
+
+[sg_actions.run_command]
+# A shell command line the user typed, run by /bin/sh -l -c (a login shell's
+# environment: /etc/profile and ~/.profile, so macOS path_helper's PATH) either
+# hidden, its exit code logged, a failure notified with its first stderr line
+# and its stdout optionally typed or copied, or in a new terminal window (macOS
+# Terminal, Linux the session's terminal). Bounded by
+# [gestures] run_command_timeout_ms and [limits] run_command_output_bytes. The
+# command text is user configuration and never logged (see README, security).
+# Windows runs it through cmd.exe /d /s /c, or a new console (windows/infra/user_actions.ahk).
+platform = "all"
+parameter = "command"
+
+[sg_actions.open_path]
+# A file or folder opened with its default application (macOS `open`, Linux
+# xdg-open, else gio open; Windows ShellExecute), chosen in the native file/folder picker. A path
+# that no longer exists is refused with a named notice. Windows opens it through
+# ShellExecute and spells it with a drive letter or a UNC share.
+platform = "all"
+parameter = "path"
+
+[sg_actions.run_apple_shortcut]
+# One shortcut of the user's Shortcuts library, picked from `shortcuts list`
+# and stored by its identifier, run with `shortcuts run` (optionally given the
+# selection as text input, its text output typed or copied), bounded by
+# [gestures] apple_shortcut_run_timeout_ms. The identifier is revalidated by
+# adapters/apple_shortcuts.lua before each run: a deleted or renamed shortcut
+# is refused with a named reason. Apple Shortcuts exists only on macOS.
+platform = "hs"
+parameter = "apple_shortcut"
+reason_ahk = "platform_reason.action_apple_shortcuts_are_macos"
+equivalent_ahk = ["run_program"]
+reason_linux = "platform_reason.action_apple_shortcuts_are_macos"
+equivalent_linux = ["run_command", "run_program"]
 
 [sg_actions.open_app]
 # Opens the application stored for the binding: macOS `open -a` (a name or
@@ -848,15 +1040,21 @@ requires_linux = ["tool:gio"]
 confirm = true
 
 [sg_actions.eject_all_disks]
-# Linux is not implemented, not impossible: udisksctl can unmount and power off
-# each removable drive, but telling them apart needs a parsed lsblk listing.
-platform = "hs,ahk"
+# Linux unmounts each partition of every removable or hot-plugged disk lsblk
+# lists and powers the drive off through udisksctl, never a disk the running
+# system is mounted from.
+platform = "all"
+requires_linux = ["tool:lsblk", "tool:udisksctl"]
 
 [sg_actions.clear_notifications]
 # Best effort: the notification daemons that expose a command (dunst, mako,
 # SwayNC). GNOME Shell and KDE Plasma expose none, and neither do macOS nor
 # Windows, where the notification centre (notification_center) is the way.
 platform = "linux"
+reason_ahk = "platform_reason.action_notifications_are_cleared_from_their_centre"
+equivalent_ahk = ["notification_center"]
+reason_hs = "platform_reason.action_notifications_are_cleared_from_their_centre"
+equivalent_hs = ["notification_center"]
 
 # The file-manager selection helpers. The selection is Finder's (osascript -ss,
 # parsed by _shared/lua/file_selection), Explorer's SelectedItems (COM), or the
@@ -864,24 +1062,33 @@ platform = "linux"
 
 [sg_actions.remove_quarantine_selection]
 platform = "hs"
+reason_ahk = "platform_reason.action_download_mark_is_each_systems"
+equivalent_ahk = ["unblock_file_selection"]
+reason_linux = "platform_reason.action_download_mark_is_each_systems"
 confirm = true
 
 [sg_actions.unblock_file_selection]
 # The Windows counterpart of the quarantine: the Zone.Identifier stream (Mark
 # of the Web) of each selected file, recursively for a folder.
 platform = "ahk"
+reason_hs = "platform_reason.action_download_mark_is_each_systems"
+equivalent_hs = ["remove_quarantine_selection"]
+reason_linux = "platform_reason.action_download_mark_is_each_systems"
 confirm = true
 
 [sg_actions.make_executable_selection]
 platform = "hs,linux"
+reason_ahk = "platform_reason.action_executable_permission_is_unix"
 
 [sg_actions.open_terminal_here]
 # The folder of the active Finder or Explorer window. Linux is not
 # implemented, not impossible: its file managers expose no current folder.
 platform = "hs,ahk"
+reason_linux = "platform_reason.action_file_manager_folder_is_unreadable_on_linux"
 
 [sg_actions.new_text_file_here]
 platform = "hs,ahk"
+reason_linux = "platform_reason.action_file_manager_folder_is_unreadable_on_linux"
 
 # --- UI / Fenêtres de l'app ---
 # Every row of this group TOGGLES one Ergopti web-view window, so a single
@@ -1002,17 +1209,24 @@ emit_linux = "Print"
 [sg_actions.screen_capture_instant]
 # The frontmost window, saved to the screenshots folder: GestureScreenshotInstant
 # on Windows, the shortcut layer's capture_frontmost_window on macOS (what the
-# key left of 1 ran before it became a tap key). Linux is not implemented, not
-# impossible: the focused window is readable on X11 and through each Wayland
-# compositor's own tool.
-platform = "ahk,hs"
+# key left of 1 ran before it became a tap key), and Linux's window capture
+# cascade (screenshot_window_save).
+platform = "all"
 
 [sg_actions.ocr_screenshot]
-platform = "ahk"
+# Windows presses PowerToys Text Extractor's Win+Shift+T; Linux captures a
+# region through its screenshot cascade and reads it with tesseract. Both
+# leave the text on the clipboard.
+platform = "ahk,linux"
+reason_hs = "platform_reason.action_text_recognition_is_live_text_on_macos"
+equivalent_hs = ["screen_capture"]
+requires_linux = ["tool:tesseract"]
 emit_ahk = "#+t"
 
 [sg_actions.open_chatgpt]
-platform = "linux"
+# Opens the configured shortcuts.chatgpt_url on every driver; macOS runs it
+# through its parent-scoped apps owner (the Ctrl+G slot since schema v20).
+platform = "all"
 requires_linux = ["tool:xdg-open"]
 
 [sg_actions.open_url]
@@ -1024,22 +1238,23 @@ parameter = "url"
 
 [sg_actions.pick_color]
 # macOS reads the pixel through screencapture (parent-scoped pixel owner).
-# Linux: Wayland forbids reading the screen outside a portal that asks the user
-# to pick, which is a different interaction; an X11-only reader (the pointer
-# position, then a 1x1 capture) is possible but not implemented.
-platform = "ahk,hs"
+# Linux runs the first installed picker of its session: hyprpicker under a
+# wlroots Wayland compositor, xcolor or gpick under X11 (GNOME and KDE under
+# Wayland give no other process the screen without a portal question).
+platform = "all"
 
 [sg_actions.open_emoji_picker]
 # Windows opens its panel with Win+., macOS its Character Viewer (Ctrl+Cmd+Space,
-# run by the shortcut layer's mouse owner). Linux is not implemented, not
-# impossible: its desktops share no emoji chooser (GNOME's opens inside GTK text
-# fields, KDE ships the plasma-emojier application), so it needs a per-desktop
-# cascade.
-platform = "hs,ahk"
+# run by the shortcut layer's mouse owner). Linux desktops share no chooser, so
+# Linux runs the installed ones in turn: plasma-emojier (KDE), IBus's emoji
+# panel (GNOME), Smile.
+platform = "all"
 emit_ahk = "#."
 
 [sg_actions.take_note]
 platform = "ahk"
+reason_hs = "platform_reason.action_take_note_uses_notepad"
+reason_linux = "platform_reason.action_take_note_uses_notepad"
 
 [sg_actions.activity_simulation]
 # One keep-awake session per machine, stopped by the first physical input on
@@ -1047,13 +1262,15 @@ platform = "ahk"
 # uinput device could nudge the pointer the same way (an idle inhibitor would
 # be a different feature).
 platform = "ahk,hs"
+reason_linux = "platform_reason.action_keep_awake_is_the_desktops_inhibitor"
 
 [sg_actions.display_mirror_toggle]
-# macOS mirrors through the CoreGraphics display-configuration API. Windows and
-# Linux are not implemented, not impossible: neither has one call that toggles
-# mirroring, so the current topology has to be read first (QueryDisplayConfig
-# on Windows; xrandr or kscreen-doctor, depending on the session, on Linux).
-platform = "hs"
+# macOS mirrors through the CoreGraphics display-configuration API, Windows
+# through QueryDisplayConfig and SetDisplayConfig. Linux is not implemented, not
+# impossible: no one call toggles mirroring, so the current layout has to be read
+# first (xrandr or kscreen-doctor, depending on the session).
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_mirroring_is_the_systems_projection_menu"
 
 [sg_actions.surround_parens]
 # Wraps the current LINE in parentheses (Home, "(", End, ")"), not the
@@ -1104,6 +1321,7 @@ parameter = "search_url"
 # modules/shortcuts/actions/. Linux has no compositor-independent API for
 # warping the pointer, and Wayland intentionally forbids global pointer moves.
 platform = "ahk,hs"
+reason_linux = "platform_reason.action_pointer_cannot_be_moved_on_linux"
 
 # The case actions share one rule on every driver, pinned by the corpus
 # _shared/tests/corpus/text_case/vectors.json that the three suites replay:
@@ -1267,6 +1485,7 @@ parameter = "llm_language"
 platform = "all"
 requires_linux = ["ai:on"]
 requires_hs = ["ai:on"]
+requires_ahk = ["ai:on"]
 
 [sg_actions.llm_agent_command]
 # llm_agent_selection on a command the user types in a dialog ("meeting
@@ -1275,6 +1494,7 @@ requires_hs = ["ai:on"]
 platform = "all"
 requires_linux = ["ai:on"]
 requires_hs = ["ai:on"]
+requires_ahk = ["ai:on"]
 
 [sg_actions.llm_agent_auto_toggle]
 # Switches the agent between its automatic mode and "on action"
@@ -1289,6 +1509,7 @@ platform = "all"
 # modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
 # declaring it there made the action picker offer a binding that did nothing.
 platform = "ahk,hs"
+reason_linux = "platform_reason.action_screen_overlay_is_not_on_linux"
 
 [sg_actions.toggle_capslock]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
@@ -1298,6 +1519,8 @@ emit_linux = "Caps_Lock"
 
 [sg_actions.microsoft_bold]
 platform = "ahk"
+reason_hs = "platform_reason.action_office_bold_key_is_windows"
+reason_linux = "platform_reason.action_office_bold_key_is_windows"
 
 [sg_actions.paste_plain]
 # Windows and macOS put the text form alone back on the clipboard and paste it,
@@ -1309,32 +1532,45 @@ platform = "all"
 
 [sg_actions.one_shot_shift]
 platform = "ahk"
+reason_hs = "platform_reason.action_same_action_under_another_name"
+equivalent_hs = ["sticky_shift"]
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.caps_word]
 # Linux toggles the shortcuts manager's CapsWord, which locks CapsLock as
 # Windows does. macOS keeps its Karabiner rule, the separate `capsword` below.
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_same_action_under_another_name"
+equivalent_hs = ["capsword"]
 
 [sg_actions.ctrl_backspace]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_word_deletion_modifier_differs"
+equivalent_hs = ["opt_backspace"]
 emit_ahk_key = "BackSpace"
 emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+BackSpace"
 
 [sg_actions.ctrl_delete]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_word_deletion_modifier_differs"
+equivalent_hs = ["opt_delete_fwd"]
 emit_ahk_key = "Delete"
 emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+Delete"
 
 [sg_actions.space]
-platform = "ahk,linux"
+platform = "all"
 emit_ahk_key = "Space"
 emit_ahk_mods = []
+emit_hs_key = "space"
+emit_hs_mods = []
 emit_linux = "space"
 
 [sg_actions.caps_lock]
 platform = "ahk,linux"
+reason_hs = "platform_reason.action_same_action_under_another_name"
+equivalent_hs = ["toggle_capslock"]
 emit_linux = "Caps_Lock"
 
 # --- Actions du remap Karabiner (macOS) ---
@@ -1355,35 +1591,57 @@ emit_linux = "Caps_Lock"
 
 [sg_actions.layer_on]
 platform = "hs"
+reason_ahk = "platform_reason.action_navigation_layer_switch_is_karabiner"
+reason_linux = "platform_reason.action_navigation_layer_switch_is_karabiner"
 
 [sg_actions.layer_off]
 platform = "hs"
+reason_ahk = "platform_reason.action_navigation_layer_switch_is_karabiner"
+reason_linux = "platform_reason.action_navigation_layer_switch_is_karabiner"
 
 [sg_actions.capsword]
 platform = "hs"
+reason_ahk = "platform_reason.action_same_action_under_another_name"
+equivalent_ahk = ["caps_word"]
+reason_linux = "platform_reason.action_same_action_under_another_name"
+equivalent_linux = ["caps_word"]
 
 [sg_actions.save]
 platform = "hs"
+reason_ahk = "platform_reason.action_shortcut_is_a_modifier_chord_here"
+reason_linux = "platform_reason.action_shortcut_is_a_modifier_chord_here"
 emit_hs_key = "s"
 emit_hs_mods = ["cmd"]
 
 [sg_actions.opt_backspace]
 platform = "hs"
+reason_ahk = "platform_reason.action_word_deletion_modifier_differs"
+equivalent_ahk = ["ctrl_backspace"]
+reason_linux = "platform_reason.action_word_deletion_modifier_differs"
+equivalent_linux = ["ctrl_backspace"]
 emit_hs_key = "delete"
 emit_hs_mods = ["alt"]
 
 [sg_actions.opt_delete_fwd]
 platform = "hs"
+reason_ahk = "platform_reason.action_word_deletion_modifier_differs"
+equivalent_ahk = ["ctrl_delete"]
+reason_linux = "platform_reason.action_word_deletion_modifier_differs"
+equivalent_linux = ["ctrl_delete"]
 emit_hs_key = "forwarddelete"
 emit_hs_mods = ["alt"]
 
 [sg_actions.cmd_backspace]
 platform = "hs"
+reason_ahk = "platform_reason.action_line_deletion_is_macos"
+reason_linux = "platform_reason.action_line_deletion_is_macos"
 emit_hs_key = "delete"
 emit_hs_mods = ["cmd"]
 
 [sg_actions.cmd_delete_fwd]
 platform = "hs"
+reason_ahk = "platform_reason.action_line_deletion_is_macos"
+reason_linux = "platform_reason.action_line_deletion_is_macos"
 emit_hs_key = "forwarddelete"
 emit_hs_mods = ["cmd"]
 
@@ -1392,6 +1650,10 @@ emit_hs_mods = ["cmd"]
 # activates it from Lua (macos/modules/gestures/app_switch.lua).
 [sg_actions.cmd_shift_tab]
 platform = "hs"
+reason_ahk = "platform_reason.action_application_switching_is_macos"
+equivalent_ahk = ["app_switcher"]
+reason_linux = "platform_reason.action_application_switching_is_macos"
+equivalent_linux = ["app_switcher"]
 
 # Ces deux-là émettent F17 : le driver lui-même l'écoute (watchers.lua lie
 # Shift+F17 et Ctrl+F17), donc le geste passe par le même chemin que la touche
@@ -1400,6 +1662,8 @@ platform = "hs"
 # app_previous et win_app_next font la même chose sans la couche de remap.
 [sg_actions.alt_tab_windows]
 platform = "hs,ahk"
+reason_linux = "platform_reason.action_same_action_under_another_name"
+equivalent_linux = ["win_next"]
 emit_hs_key = "f17"
 emit_hs_mods = ["shift"]
 
@@ -1413,31 +1677,41 @@ emit_hs_mods = ["ctrl"]
 requires_linux = ["session:x11", "tool:timeout", "tool:xdotool", "tool:xrandr", "tool:xprop", "tool:xwininfo", "tool:sha256sum"]
 
 [sg_actions.home]
-platform = "hs,linux"
+platform = "all"
+emit_ahk_key = "Home"
+emit_ahk_mods = []
 emit_hs_key = "home"
 emit_hs_mods = []
 emit_linux = "Home"
 
 [sg_actions.end]
-platform = "hs,linux"
+platform = "all"
+emit_ahk_key = "End"
+emit_ahk_mods = []
 emit_hs_key = "end"
 emit_hs_mods = []
 emit_linux = "End"
 
 [sg_actions.page_up]
-platform = "hs,linux"
+platform = "all"
+emit_ahk_key = "PgUp"
+emit_ahk_mods = []
 emit_hs_key = "pageup"
 emit_hs_mods = []
 emit_linux = "Prior"
 
 [sg_actions.page_down]
-platform = "hs,linux"
+platform = "all"
+emit_ahk_key = "PgDn"
+emit_ahk_mods = []
 emit_hs_key = "pagedown"
 emit_hs_mods = []
 emit_linux = "Next"
 
 [sg_actions.spotlight]
 platform = "hs"
+reason_ahk = "platform_reason.layer_spotlight_is_macos"
+reason_linux = "platform_reason.layer_spotlight_is_macos"
 emit_hs_key = "space"
 emit_hs_mods = ["cmd"]
 
@@ -1449,68 +1723,93 @@ emit_hs_mods = ["cmd"]
 
 [sg_actions.sticky_shift]
 platform = "hs"
+reason_ahk = "platform_reason.action_same_action_under_another_name"
+equivalent_ahk = ["one_shot_shift"]
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_ctrl]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_option]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_shift]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_option]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_ctrl]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_option_shift]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_option_ctrl]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_ctrl_shift]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_option_shift]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_option_ctrl]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_cmd_shift_ctrl]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_option_shift_ctrl]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.sticky_hyper]
-platform = "hs"
+platform = "ahk,hs"
+reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 # --- Debug ---
 
 [sg_actions.open_console]
 platform = "hs"
+reason_ahk = "platform_reason.debug_surface_is_each_drivers_own"
+reason_linux = "platform_reason.debug_surface_is_each_drivers_own"
 
 [sg_actions.open_window_spy]
 platform = "ahk"
+reason_hs = "platform_reason.debug_surface_is_each_drivers_own"
+reason_linux = "platform_reason.debug_surface_is_each_drivers_own"
 
 [sg_actions.open_list_vars]
 platform = "ahk"
+reason_hs = "platform_reason.debug_surface_is_each_drivers_own"
+reason_linux = "platform_reason.debug_surface_is_each_drivers_own"
 
 [sg_actions.open_key_history]
 platform = "ahk"
+reason_hs = "platform_reason.debug_surface_is_each_drivers_own"
+reason_linux = "platform_reason.debug_surface_is_each_drivers_own"
 
 # --- Modifier + key shortcuts ---
 # The exhaustive matrix is declared once in modifier_chords.json. Each driver
-# registers every non-empty combination of its native modifiers and shows them
-# under language-neutral labels such as "Ctrl + A"; the internal ids are never
-# displayed. In the picker they sit under the localized
+# registers every non-empty combination of its native modifiers and names each
+# key from _shared/data/keycodes/key_names.json in the user's language
+# (« Ctrl + Maj + Entrée »); the internal ids are never displayed. In the picker they sit under the localized
 # sg_order.header.modifier_chords heading, one sub-heading per modifier
 # combination built from sg_order.header.modifier_chord_group.
 
@@ -1753,7 +2052,10 @@ items = [
     "clear_clipboard",
     "center_mouse",
     "open_app",
+    "open_path",
     "run_program",
+    "run_command",
+    "run_apple_shortcut",
     "quit_frontmost_app",
     "force_quit_frontmost",
     "empty_trash",

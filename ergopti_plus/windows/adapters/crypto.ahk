@@ -364,6 +364,76 @@ CryptoEcdsaP256Verify(Spki, PointOffset, ComponentBytes, Message, Signature) {
 }
 
 
+; The SHA-256 digest of some bytes, through CNG's one-shot hash.
+; @param {Buffer} Data The bytes.
+; @return {Buffer} 32 bytes; throws when CNG refuses.
+CryptoSha256Digest(Data) {
+	HashAlg := 0
+	try {
+		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &HashAlg, "WStr", CRYPTO_BCRYPT_SHA256_ALG, "Ptr", 0, "UInt", 0, "UInt")
+			throw Error("no SHA-256 provider")
+		Digest := Buffer(32)
+		if DllCall("bcrypt\BCryptHash", "Ptr", HashAlg, "Ptr", 0, "UInt", 0, "Ptr", Data.Ptr, "UInt", Data.Size,
+				"Ptr", Digest, "UInt", Digest.Size, "UInt")
+			throw Error("hash refused")
+		return Digest
+	} finally {
+		if HashAlg
+			DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", HashAlg, "UInt", 0, "UInt")
+	}
+}
+
+; What CryptoRsaPkcs1SignSha256 answers instead of a signature.
+global CRYPTO_RSA_NO_PROVIDER := "no_provider"
+global CRYPTO_RSA_KEY_REFUSED := "key_refused"
+; BCRYPT_RSAFULLPRIVATE_BLOB and BCRYPT_PAD_PKCS1
+global CRYPTO_RSA_FULL_PRIVATE_BLOB := "RSAFULLPRIVATEBLOB"
+global CRYPTO_RSA_PAD_PKCS1 := 2
+
+; Signs a SHA-256 digest with RSASSA-PKCS1-v1_5 and opens the signature again. The
+; caller owns the key blob and wipes it; this boundary owns the OS handles.
+; @param {Buffer} Blob BCRYPT_RSAKEY_BLOB of a full private key.
+; @param {Buffer} Digest The SHA-256 digest.
+; @param {Integer} SignatureBytes The size of the modulus.
+; @return {Buffer|String} The signature, else a CRYPTO_RSA_* refusal.
+CryptoRsaPkcs1SignSha256(Blob, Digest, SignatureBytes) {
+	KeyAlg := 0, Key := 0
+	try {
+		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &KeyAlg, "WStr", "RSA", "Ptr", 0, "UInt", 0, "UInt")
+			return CRYPTO_RSA_NO_PROVIDER
+		if DllCall("bcrypt\BCryptImportKeyPair", "Ptr", KeyAlg, "Ptr", 0, "WStr", CRYPTO_RSA_FULL_PRIVATE_BLOB,
+				"Ptr*", &Key, "Ptr", Blob, "UInt", Blob.Size, "UInt", 0, "UInt")
+			return CRYPTO_RSA_KEY_REFUSED
+		; BCRYPT_PKCS1_PADDING_INFO names the digest the padding wraps
+		AlgName := Buffer(StrPut(CRYPTO_BCRYPT_SHA256_ALG, "UTF-16"), 0)
+		StrPut(CRYPTO_BCRYPT_SHA256_ALG, AlgName, "UTF-16")
+		Padding := Buffer(A_PtrSize, 0)
+		NumPut("Ptr", AlgName.Ptr, Padding, 0)
+		Signature := Buffer(SignatureBytes, 0)
+		Written := 0
+		if DllCall("bcrypt\BCryptSignHash", "Ptr", Key, "Ptr", Padding, "Ptr", Digest, "UInt", Digest.Size,
+				"Ptr", Signature, "UInt", Signature.Size, "UInt*", &Written, "UInt", CRYPTO_RSA_PAD_PKCS1, "UInt")
+				|| Written != Signature.Size
+				|| DllCall("bcrypt\BCryptVerifySignature", "Ptr", Key, "Ptr", Padding, "Ptr", Digest, "UInt", Digest.Size,
+					"Ptr", Signature, "UInt", Signature.Size, "UInt", CRYPTO_RSA_PAD_PKCS1, "UInt")
+			return CRYPTO_RSA_KEY_REFUSED
+		return Signature
+	} finally {
+		if Key
+			DllCall("bcrypt\BCryptDestroyKey", "Ptr", Key, "UInt")
+		if KeyAlg
+			DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", KeyAlg, "UInt", 0, "UInt")
+	}
+}
+
+; RtlZeroMemory as a call the compiler of this script cannot drop.
+; @param {Buffer} Bytes Key material to wipe.
+CryptoWipe(Bytes) {
+	if (Bytes.Size > 0)
+		DllCall("Kernel32\RtlZeroMemory", "Ptr", Bytes.Ptr, "UPtr", Bytes.Size)
+}
+
+
 
 
 ; Port dispatch map (ADAPTER_CRYPTO) — the single-source-of-truth contract

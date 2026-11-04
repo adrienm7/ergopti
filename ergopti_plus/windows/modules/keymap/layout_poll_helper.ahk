@@ -28,6 +28,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -323,7 +324,7 @@ _LayoutRemapPort() {
 ; declared or an emulated layout fixed never moves with the OS layout.
 _LayoutRemapEmulated() {
 	global Features, ScriptInformation
-	return Features["layout"]["ergopti_base"] || !ScriptInformation["MagicKeySourceFollowsOsLayout"]
+	return Features["layout"][ConfigLeaf.ERGOPTI_BASE] || !ScriptInformation["MagicKeySourceFollowsOsLayout"]
 }
 
 _LayoutRemapMagicChar() {

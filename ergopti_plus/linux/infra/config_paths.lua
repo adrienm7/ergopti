@@ -153,6 +153,13 @@ local function prepare_config_directory(normalized)
 	return false
 end
 
+--- Hands the resolved configuration directory to the log redactor, which masks
+--- the names under it at write time. Required lazily: the sink reads this module
+--- when it installs, so neither may require the other at load.
+local function follow_config_dir_in_logs()
+	require("infra.logger_sink").follow_config_dir(M.get_config_dir())
+end
+
 --- Persists a configuration-directory override.
 --- @param path string Empty/default resets the override; custom paths must be absolute.
 --- @return boolean True only when bootstrap storage confirms the mutation.
@@ -163,12 +170,16 @@ function M.set_config_dir(path)
 	local ok, Storage = pcall(require, "adapters.storage")
 	if not ok or type(Storage) ~= "table" then return false end
 	if not prepare_config_directory(normalized) then return false end
+	local committed
 	if normalized == "" or normalized == M.default_config_dir() then
-		return type(Storage.delete) == "function"
+		committed = type(Storage.delete) == "function"
 			and Storage.delete(CONFIG_DIR_STORAGE_KEY) == true
+	else
+		committed = type(Storage.set) == "function"
+			and Storage.set(CONFIG_DIR_STORAGE_KEY, normalized) == true
 	end
-	return type(Storage.set) == "function"
-		and Storage.set(CONFIG_DIR_STORAGE_KEY, normalized) == true
+	if committed then follow_config_dir_in_logs() end
+	return committed
 end
 
 
@@ -301,7 +312,9 @@ function M.set_paths(config_dir, logs_dir)
 	if not ok or type(Storage) ~= "table" or type(Storage.set_many) ~= "function" then return false end
 	if not prepare_config_directory(config) then return false end
 	local called, saved = pcall(Storage.set_many, values, deletions)
-	return called and saved == true
+	local committed = called and saved == true
+	if committed then follow_config_dir_in_logs() end
+	return committed
 end
 
 return M

@@ -58,7 +58,7 @@ local _enabled = false
 local _inventory = nil
 local _initializing = false
 
--- Base URL for Ollama (default port 11434).
+-- Base URL of Ergopti's own Ollama (HttpBridge.OLLAMA_OWNED_PORT).
 local _base_url = nil
 
 --- Persists one profile value before its in-memory counterpart is published.
@@ -91,7 +91,8 @@ end
 
 --- Initialises the profile state, loading persisted settings from storage.
 --- @param opts table { port?, model? }
----              port  number  Ollama port (default 11434).
+---              port  number  Ollama port (default HttpBridge.OLLAMA_OWNED_PORT;
+---                    the stock port of a user's own Ollama is refused).
 ---              model string  Override default model.
 function M.init(opts)
 	if _initializing then return false end
@@ -104,10 +105,15 @@ function M.init(opts)
 		local options = type(opts) == "table" and opts or {}
 		-- The bridge owns both the canonical origin and operation paths. A profile
 		-- stores only the origin; callers ask the bridge for /api/tags or /api/chat.
-		local default_port = HttpBridge and HttpBridge.OLLAMA_DEFAULT_PORT or nil
+		local default_port = HttpBridge and HttpBridge.OLLAMA_OWNED_PORT or nil
 		local default_host = HttpBridge and HttpBridge.OLLAMA_DEFAULT_HOST or nil
 		local port = type(options.port) == "number" and options.port or default_port
 		origin = HttpBridge and HttpBridge.resolve_base_url(port, default_host) or nil
+		if origin == "" then
+			Logger.error(LOG, "LLM profiles refused Ollama port %s: Ergopti runs only its own Ollama on port %d.",
+				tostring(port), HttpBridge.OLLAMA_OWNED_PORT)
+			return false
+		end
 
 		local values = require("infra.llm_preferences").get_many({ KEY.LLM_MODELS_OLLAMA, KEY.LLM_ENABLED })
 		model, enabled = options.model ~= nil and options.model or values[KEY.LLM_MODELS_OLLAMA], values[KEY.LLM_ENABLED]
@@ -240,7 +246,7 @@ function M.toggle()
 	return M.enable()
 end
 
---- Returns the Ollama base URL (e.g. "http://localhost:11434").
+--- Returns the base URL of Ergopti's own Ollama (e.g. "http://127.0.0.1:11435").
 --- @return string|nil
 function M.get_base_url()
 	return _base_url

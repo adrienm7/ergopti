@@ -33,7 +33,7 @@ _KLACRA_Exercise(Mode, Path) {
 	if Mode == "uninterrupted-disk-edit" {
 		AssertEqual("unknown", KL_AppCat_Get("preexisting-pending.reload.exe"))
 		AssertTrue(KLAppCat.dirty, "the positive control must begin with an older pending discovery")
-		Edited := '{"audit.reload.exe":"disk edited","other.reload.exe":"neutral"}' . "`n"
+		Edited := '{"audit.reload.exe":{"type":"disk edited","score":0},"other.reload.exe":{"type":"neutral","score":0}}' . "`n"
 		AssertTrue(FSWriteDurable(Path, Edited))
 		AssertTrue(KL_AppCat_Reload(), "uninterrupted reload must adopt the user's actual disk edit")
 		AssertEqual("disk edited", KL_AppCat_Get("audit.reload.exe"))
@@ -44,8 +44,8 @@ _KLACRA_Exercise(Mode, Path) {
 	}
 	App := Mode == "disk-collision" ? "on-disk.reload.exe" : "new-read.reload.exe"
 	if Mode == "disk-collision" {
-		Edited := '{"audit.reload.exe":"disk edited","other.reload.exe":"neutral",'
-			. '"on-disk.reload.exe":"explicit disk category"}' . "`n"
+		Edited := '{"audit.reload.exe":{"type":"disk edited","score":0},"other.reload.exe":{"type":"neutral","score":0},'
+			. '"on-disk.reload.exe":{"type":"explicit disk category","score":0}}' . "`n"
 		AssertTrue(FSWriteDurable(Path, Edited))
 	}
 	BeforeBytes := FileRead(Path, "RAW")
@@ -70,14 +70,14 @@ _KLACRA_Exercise(Mode, Path) {
 	AssertTrue(Result is Integer && (Result == 0 || Result == 1),
 		"reload may admit a merged image or refuse a superseded read with a strict Boolean")
 	AssertTrue(KLAppCat.categories.Has(App), "reload cannot erase discovery admitted after its real file read")
-	AssertEqual("unknown", KLAppCat.categories[App])
+	AssertEqual("unknown", KLAppCat.categories[App]["type"])
 	AssertTrue(KLAppCat.dirty, "new discovery must retain its ordinary persistence debt")
 	KL_AppCat_DeferredSave()
 	AssertFalse(KLAppCat.dirty, "the real deferred-save API must settle the retained discovery")
-	Durable := JsonParse(FileRead(Path, "UTF-8"))
-	AssertEqual("unknown", Durable[App])
-	AssertEqual("productive", Durable["audit.reload.exe"])
-	AssertEqual("neutral", Durable["other.reload.exe"])
+	Durable := JsonParse(FileRead(Path, "UTF-8"))["apps"]
+	AssertEqual("unknown", Durable[App]["type"])
+	AssertEqual("productive", Durable["audit.reload.exe"]["type"])
+	AssertEqual("neutral", Durable["other.reload.exe"]["type"])
 }
 
 _KLACRA_Case(Mode) {
@@ -97,7 +97,7 @@ _KLACRA_Case(Mode) {
 		AssertTrue(Saved.Get("write_owner", 0) is Integer && Saved.Get("write_owner", 0) == 0,
 			"the fixture cannot replace a foreign category write owner")
 		FSCreateDirectoryExclusiveStrict(Root), Owned := true
-		Original := '{"audit.reload.exe":"productive","other.reload.exe":"neutral"}' . "`n"
+		Original := '{"audit.reload.exe":{"type":"productive","score":0},"other.reload.exe":{"type":"neutral","score":0}}' . "`n"
 		AssertTrue(FSWriteCreateDurable(Path, Original))
 		KLAppCat.categories := Map(), KLAppCat.file_path := "", KLAppCat.dirty := false
 		KLAppCat.save_fn := FixtureTimer

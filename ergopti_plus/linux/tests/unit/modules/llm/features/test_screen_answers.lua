@@ -17,6 +17,8 @@
 --- ROOT CAUSE ENCODED:
 --- No request could carry an image, so nothing on the screen could be answered:
 --- the user had to retype a message before any prediction could reply to it.
+--- The first screen action to watsonx or Vertex AI was refused while its
+--- access token was fetched: its endpoint was resolved synchronously.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -36,6 +38,9 @@ local SCREEN = "Salut, on se voit demain à 14h ?"
 local CEREBRAS = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", token = "ck", model = "", base_url = "" }
 local OPENAI = { id = "openai-1", provider = "openai", label = "OpenAI", token = "ok-key", model = "", base_url = "" }
 local GEMINI = { id = "gemini-1", provider = "gemini", label = "Gemini", token = "gk", model = "", base_url = "" }
+-- A provider exchanging its key for an access token (api_providers.json auth)
+local WATSONX = { id = "watsonx-1", provider = "watsonx", label = "watsonx", token = "ibm-api-key", model = "",
+	base_url = "https://us-south.ml.cloud.ibm.com/ml/gateway/v1" }
 
 local RELOADED = {
 	"modules.llm.prediction_engine", "modules.llm.settings", "modules.llm.profile_settings",
@@ -454,6 +459,60 @@ end)
 -- ======= 3/ Refusals and failures =============
 -- ==============================================
 -- ==============================================
+
+helpers.describe("screen actions: a provider exchanging its key waits for its token (access-token-lease)", function()
+	--- Answers the token exchange, request `index`, with an access token.
+	local function grant(world, index)
+		local post = assert(world.posts[index], "no exchange was sent")
+		post.callback({ ok = true, status = 200, body = Json.encode({ access_token = "iam-token", expires_in = 3600 }) })
+	end
+
+	helpers.it("the first screen action waits for the token, then captures and sends it as Bearer", function()
+		scenario({ entries = { CEREBRAS, WATSONX } }, function(world)
+			helpers.assert_eq(world.handlers.llm_screen_region("tap_3", "watsonx|ibm/granite-vision-3-3-2b"), true)
+			helpers.assert_eq(#world.captures, 0, "no capture before the address is known")
+			helpers.assert_eq(#world.notices, 0, "not refused while the token is fetched")
+			helpers.assert_eq(world.posts[1].url, "https://iam.cloud.ibm.com/identity/token")
+			grant(world, 1)
+			helpers.assert_eq(#world.captures, 1, "the capture starts once the token arrived")
+			world.captures[1].on_done({ status = "ok", scaled = true })
+			helpers.assert_eq(world.posts[2].url, WATSONX.base_url .. "/chat/completions")
+			helpers.assert_eq(world.posts[2].headers.Authorization, "Bearer iam-token", "the token, never the key")
+		end)
+	end)
+
+	helpers.it("a refused exchange is told and captures nothing", function()
+		scenario({ entries = { CEREBRAS, WATSONX } }, function(world)
+			helpers.assert_eq(world.handlers.llm_screen_full("tap_3", "watsonx|ibm/granite-vision-3-3-2b"), true)
+			world.posts[1].callback({ ok = false, status = 400, body = "",
+				error_body = Json.encode({ errorMessage = "Provided API key could not be found" }) })
+			helpers.assert_eq(world.notices[1], notice("llm.manual_prediction.backend_not_ready"))
+			helpers.assert_eq(#world.captures, 0)
+			helpers.assert_eq(#world.posts, 1, "no vision request")
+		end)
+	end)
+
+	helpers.it("a screen action dropped while it waits never captures when the token arrives", function()
+		scenario({ entries = { CEREBRAS, WATSONX } }, function(world)
+			helpers.assert_eq(world.handlers.llm_screen_region("tap_3", "watsonx|ibm/granite-vision-3-3-2b"), true)
+			world.engine.drop_vision("typing")
+			grant(world, 1)
+			helpers.assert_eq(#world.captures, 0)
+			helpers.assert_eq(#world.notices, 0)
+		end)
+	end)
+
+	helpers.it("with a fresh token the next screen action captures at once", function()
+		scenario({ entries = { CEREBRAS, WATSONX } }, function(world)
+			world.handlers.llm_screen_region("tap_3", "watsonx|ibm/granite-vision-3-3-2b")
+			grant(world, 1)
+			world.captures[1].on_done({ status = "cancelled", scaled = false })
+			helpers.assert_eq(world.handlers.llm_screen_region("tap_3", "watsonx|ibm/granite-vision-3-3-2b"), true)
+			helpers.assert_eq(#world.captures, 2, "no second wait")
+			helpers.assert_eq(#world.posts, 1, "no second exchange")
+		end)
+	end)
+end)
 
 helpers.describe("screen actions: refusals, cancellations and failures", function()
 

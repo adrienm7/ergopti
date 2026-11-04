@@ -170,6 +170,34 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		end)
 	end
 
+	-- model-selector-install-refusal: the click reaches the selector owner, and a
+	-- refused one repaints the page, which already drew it as running.
+	helpers.it("(model-selector-install-button) an install click reaches the owner; a refusal sends a new payload", function()
+		local bridge, state = install_hs_stubs()
+		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local browser = require("ui.model_browser")
+		local received, answers = {}, { false, true }
+		helpers.assert_true(browser.open({
+			build_payload = function() return { backend = "mlx", models = {} } end,
+			on_action = function(body)
+				received[#received + 1] = body.backend .. "/" .. body.id
+				return table.remove(answers, 1)
+			end,
+		}))
+		bridge()({ body = "ready" })
+		local evaluations = state.webviews[1].evaluations
+		for _ = 1, 2 do
+			local before = #evaluations
+			bridge()({ body = { action = "group_action", backend = "ollama", id = "install", session = 1 } })
+			helpers.assert_eq(#evaluations, before + 1, "the outcome reaches the page, refused or not")
+			helpers.assert_true(evaluations[#evaluations]:find("injectModels(", 1, true) ~= nil)
+		end
+		helpers.assert_eq(received, { "ollama/install", "ollama/install" })
+		helpers.assert_eq(#state.errors, 0)
+	end)
+
 	helpers.it("(model-browser-operation-session) does not transfer selection authority through logger reentry", function()
 		local bridge, state = install_hs_stubs()
 		package.loaded["infra.deferred_work"] = { after = function() return true end }

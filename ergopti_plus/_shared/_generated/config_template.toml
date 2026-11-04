@@ -1,0 +1,1166 @@
+# _shared/_generated/config_template.toml
+# AUTO-GENERATED from _shared/modules/features/manifest.toml.
+# DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.
+# The default v2 config of the three drivers (ahk, hs, linux), written once.
+# - `key = value` holds for every driver whose view contains the table.
+# - `platform.<driver>.key = value` holds for that driver only: a key only it
+#   has, or a default the drivers disagree on.
+# - [platform.<driver>] sections lists the tables of that driver's view, in
+#   that driver's order.
+# A driver's view is those tables, each with its shared keys and its own
+# platform.<driver>. keys (prefix removed), in file order. That view is
+# <driver dir>/_generated/config_template.toml, rendered by
+# tools/lib/config-template-projection.cjs.
+
+[script]
+locale = "fr"
+log_level = "INFO"
+show_error_dialog = true
+platform.ahk.alt_gr_is_kana_remap = "auto"
+
+
+
+
+
+[hotstrings]
+platform.hs.enabled = false
+trigger_char = "★"
+magic_key_source = "auto"
+platform.ahk.magic_key_source_char = "j"
+repeat_key_enabled = false
+idle_reset_seconds = 3
+click_resets_word = true
+arrow_resets_word = true
+shortcut_resets_word = true
+platform.ahk.tap_hold_resets_word = true
+platform.linux.tap_hold_resets_word = true
+cascade_max_arrows = 3
+expansion_delay = 0.75
+preview_ai_enabled = true
+preview_autocorrect_enabled = true
+preview_colored_tooltips = true
+preview_star_enabled = true
+
+
+
+[hotstrings.dynamic]
+enabled = false
+
+
+
+[hotstrings.autocorrection.names]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.autocorrection.abbreviations]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.autocorrection.technical_terms]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.distances_reduction.qu]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.distances_reduction.comma_j]
+enabled = false
+
+
+
+[hotstrings.distances_reduction.comma_far_letters]
+enabled = false
+
+
+
+[hotstrings.distances_reduction.dead_key_e_circumflex]
+enabled = false
+
+
+
+[hotstrings.distances_reduction.e_circumflex_e]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.distances_reduction.space_around_symbols]
+enabled = false
+
+
+
+[hotstrings.sfbs_reduction.comma]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.sfbs_reduction.e_circ]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.sfbs_reduction.e_grave]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.sfbs_reduction.bu]
+enabled = false
+
+
+
+[hotstrings.sfbs_reduction.i_e_acute]
+enabled = false
+
+
+
+[hotstrings.rolls.hc]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.sx]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.cx]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.ct]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.ez]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.assign]
+enabled = false
+
+
+
+[hotstrings.rolls.assign_arrow_equal_left]
+enabled = false
+
+
+
+[hotstrings.rolls.assign_arrow_equal_right]
+enabled = false
+
+
+
+[hotstrings.rolls.assign_arrow_minus_left]
+enabled = false
+
+
+
+[hotstrings.rolls.assign_arrow_minus_right]
+enabled = false
+
+
+
+[hotstrings.rolls.bracket_quote]
+enabled = false
+
+
+
+[hotstrings.rolls.chevron_equal]
+enabled = false
+
+
+
+[hotstrings.rolls.chevron_greater]
+enabled = false
+
+
+
+[hotstrings.rolls.chevron_less]
+enabled = false
+
+
+
+[hotstrings.rolls.close_chevron_tag]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.comment_close]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.comment_open]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.english_negation]
+enabled = false
+
+
+
+[hotstrings.rolls.equal_string]
+enabled = false
+
+
+
+[hotstrings.rolls.hashtag_close_bracket]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.hashtag_open_bracket]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.hashtag_parenthesis]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.rolls.hashtag_quote]
+enabled = false
+
+
+
+[hotstrings.rolls.left_arrow]
+enabled = false
+
+
+
+[hotstrings.rolls.not_equal]
+enabled = false
+
+
+
+[hotstrings.rolls.paren_quote]
+enabled = false
+
+
+
+[hotstrings.magic_key.replace]
+enabled = false
+
+
+
+[hotstrings.magic_key.repeat_corrections]
+enabled = false
+time_activation_seconds = 2
+
+
+
+[hotstrings.magic_key.text_expansion_symbols]
+enabled = false
+time_activation_seconds = 2
+
+
+
+[hotstrings.magic_key.text_expansion_symbols_typst]
+enabled = false
+time_activation_seconds = 2
+
+
+
+[hotstrings.french_distancesreduction.suffixes_a]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.french_autocorrection.accents]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.french_autocorrection.names]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.french_autocorrection.typographic_apostrophe]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.french_autocorrection.errors]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.french_autocorrection.ou]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.french_autocorrection.multiple_punctuation_marks]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.french_autocorrection.suffixes_a_chaining]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.french_autocorrection.minus]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.french_autocorrection.minus_apostrophe]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.french_magickey.text_expansion]
+enabled = false
+time_activation_seconds = 2
+
+
+
+[hotstrings.french_magickey.text_expansion_auto]
+enabled = false
+time_activation_seconds = 2
+
+
+
+[hotstrings.french_magickey.text_expansion_emojis]
+enabled = false
+time_activation_seconds = 2
+
+
+
+[hotstrings.dynamic.date]
+enabled = false
+
+
+
+[hotstrings.dynamic.date_fr]
+enabled = false
+
+
+
+[hotstrings.dynamic.date_long_fr]
+enabled = false
+
+
+
+[hotstrings.dynamic.iban_prefixes]
+enabled = false
+
+
+
+[hotstrings.dynamic.phone_prefixes]
+enabled = false
+
+
+
+[hotstrings.dynamic.ssn_prefixes]
+enabled = false
+
+
+
+[hotstrings.dynamic.user_code]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.dynamic.text_expansion_personal_information]
+enabled = false
+pattern_max_length = 1
+
+
+
+[hotstrings.personal.autocorrection]
+enabled = false
+time_activation_seconds = 0.75
+
+
+
+[hotstrings.personal.code]
+enabled = false
+time_activation_seconds = 0.75
+
+
+
+[hotstrings.personal.email_shortcuts]
+enabled = false
+time_activation_seconds = 0.75
+
+
+
+[hotstrings.personal.professional_vocabulary]
+enabled = false
+time_activation_seconds = 0.75
+
+
+
+[hotstrings.personal.test]
+enabled = false
+time_activation_seconds = 0.75
+
+
+
+
+
+[llm]
+enabled = false
+platform.ahk.onboarding_seen = false
+app_profile_overrides = ""
+user_profiles = ""
+agent_system1 = ""
+agent_system2 = ""
+agent_mode = "off"
+agent_disabled_apps = []
+
+
+
+[llm.display]
+pred_indent = -3
+show_info_bar = true
+streaming = true
+streaming_multi = true
+
+
+
+[llm.generation]
+context_length = 500
+min_words = 3
+max_words = 15
+temperature = 0.1
+auto_raise_temp = true
+reset_on_nav = true
+sequential_mode = false
+
+
+
+[llm.models]
+platform.hs.user_models = []
+platform.ahk.selected = "ollama"
+platform.hs.selected = "mlx"
+platform.linux.selected = "ollama"
+platform.ahk.ollama = "Qwen3.5-0.8B"
+platform.hs.ollama = "gemma-4-E2B-it"
+platform.linux.ollama = "Qwen3.5-0.8B"
+platform.hs.mlx = "Qwen3.5-2B"
+
+
+
+[llm.profiles]
+active = "basic"
+num_predictions = 3
+platform.ahk.auto_profile_for_model = true
+platform.linux.auto_profile_for_model = true
+
+
+
+[llm.trigger]
+disabled_apps = []
+debounce_ms = 500
+min_request_interval_ms = 300
+instant_on_word_end = true
+after_hotstring = true
+while_hotstring_tooltip = "wait"
+platform.ahk.inline_autotype = false
+secure_filter_enabled = true
+url_bar_filter_enabled = false
+
+
+
+[llm.navigation]
+nav_modifiers = []
+val_modifiers = []
+platform.hs.arrow_nav_enabled = false
+
+
+
+
+
+[metrics]
+enabled = false
+private_filter_enabled = true
+secure_filter_enabled = true
+system_auth_filter_enabled = true
+encrypt = false
+disabled_apps = []
+wpm_widget_visible = false
+wpm_widget_colors = true
+wpm_widget_graph = true
+platform.hs.wpm_menubar_visible = false
+platform.linux.wpm_menubar_visible = false
+platform.hs.wpm_menubar_colors = true
+platform.linux.wpm_menubar_colors = true
+
+
+
+
+
+[shortcuts]
+platform.hs.enabled = false
+platform.linux.enabled = false
+chatgpt_url = "https://chat.openai.com"
+platform.ahk.wrap_text_if_selected = false
+platform.linux.wrap_text_if_selected = false
+
+
+
+[shortcuts.search]
+search_engine = "https://www.google.com"
+search_engine_url_query = "https://www.google.com/search?q="
+
+
+
+[shortcuts.take_note]
+dated_notes = false
+destination_folder = "D:\\Bureau"
+
+
+
+[shortcuts.a_grave]
+enabled = false
+letter = "v"
+
+
+
+[shortcuts.e_acute]
+enabled = false
+letter = "c"
+
+
+
+[shortcuts.e_circ]
+enabled = false
+letter = "x"
+
+
+
+[shortcuts.e_grave]
+enabled = false
+letter = "z"
+
+
+
+[shortcuts.key_combination_taps]
+alt_gr_then_left_alt = "none"
+alt_gr_then_caps_lock = "none"
+left_alt_then_caps_lock = "none"
+
+
+
+
+
+[mod_combos]
+simultaneous_threshold_ms = 100
+symmetric = false
+
+
+
+[shortcuts.personal]
+laptop_broken_key = false
+mouse_drag_window = false
+mouse_tab_switching = false
+professional_environment = false
+programmable_keyboard = false
+
+
+
+[shortcuts.script_control]
+chords_enabled = true
+script_altgr_backspace = "script_reload"
+script_altgr_delete = "open_personal_shortcuts"
+script_altgr_enter = "script_pause_toggle"
+script_altgr_escape = "script_quit"
+
+
+
+[shortcuts.keyboard]
+magic_editor = "open_hotstrings_editor"
+
+
+
+[shortcuts.tap_keys]
+number_row_left = "none"
+number_row_right_1 = "none"
+number_row_right_2 = "none"
+
+
+
+[shortcuts.caps_word]
+idle_timeout_seconds = 10
+terminators = ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"]
+
+
+
+[shortcuts.caps_word.pointer]
+platform.hs.gesture = true
+platform.linux.gesture = true
+pointer_motion = true
+left_click = true
+right_click = true
+middle_click = true
+other_buttons = true
+
+
+
+
+
+[gestures]
+enabled = false
+swipe_3_down = "none"
+swipe_3_left = "none"
+swipe_3_right = "none"
+swipe_3_up = "none"
+swipe_4_down = "none"
+swipe_4_left = "none"
+swipe_4_right = "none"
+swipe_4_up = "none"
+tap_3 = "none"
+tap_4 = "none"
+platform.hs.swipe_2_left = "none"
+platform.linux.swipe_2_left = "none"
+platform.hs.swipe_5_up = "none"
+platform.linux.swipe_5_up = "none"
+platform.hs.swipe_5_down = "none"
+platform.linux.swipe_5_down = "none"
+platform.hs.swipe_5_left = "none"
+platform.linux.swipe_5_left = "none"
+platform.hs.swipe_5_right = "none"
+platform.linux.swipe_5_right = "none"
+platform.hs.swipe_2_right = "none"
+platform.linux.swipe_2_right = "none"
+platform.hs.swipe_2_up = "none"
+platform.linux.swipe_2_up = "none"
+platform.hs.swipe_2_down = "none"
+platform.linux.swipe_2_down = "none"
+platform.hs.swipe_2_left_down = "none"
+platform.linux.swipe_2_left_down = "none"
+platform.hs.swipe_2_left_up = "none"
+platform.linux.swipe_2_left_up = "none"
+platform.hs.swipe_2_right_down = "none"
+platform.linux.swipe_2_right_down = "none"
+platform.hs.swipe_2_right_up = "none"
+platform.linux.swipe_2_right_up = "none"
+platform.hs.swipe_3_left_down = "none"
+platform.linux.swipe_3_left_down = "none"
+platform.hs.swipe_3_left_up = "none"
+platform.linux.swipe_3_left_up = "none"
+platform.hs.swipe_3_right_down = "none"
+platform.linux.swipe_3_right_down = "none"
+platform.hs.swipe_3_right_up = "none"
+platform.linux.swipe_3_right_up = "none"
+platform.hs.swipe_3_horiz = "none"
+platform.linux.swipe_3_horiz = "none"
+platform.hs.swipe_4_left_down = "none"
+platform.linux.swipe_4_left_down = "none"
+platform.hs.swipe_4_left_up = "none"
+platform.linux.swipe_4_left_up = "none"
+platform.hs.swipe_4_right_down = "none"
+platform.linux.swipe_4_right_down = "none"
+platform.hs.swipe_4_right_up = "none"
+platform.linux.swipe_4_right_up = "none"
+platform.hs.swipe_4_horiz = "none"
+platform.linux.swipe_4_horiz = "none"
+platform.hs.swipe_5_left_down = "none"
+platform.linux.swipe_5_left_down = "none"
+platform.hs.swipe_5_left_up = "none"
+platform.linux.swipe_5_left_up = "none"
+platform.hs.swipe_5_right_down = "none"
+platform.linux.swipe_5_right_down = "none"
+platform.hs.swipe_5_right_up = "none"
+platform.linux.swipe_5_right_up = "none"
+platform.hs.swipe_5_horiz = "none"
+platform.linux.swipe_5_horiz = "none"
+platform.hs.tap_2 = "none"
+platform.linux.tap_2 = "none"
+platform.hs.tap_5 = "none"
+platform.linux.tap_5 = "none"
+
+
+
+[gestures.modes]
+swipe_2_left = "x1"
+swipe_2_right = "x1"
+swipe_2_up = "x1"
+swipe_2_down = "x1"
+swipe_2_left_down = "x1"
+swipe_2_left_up = "x1"
+swipe_2_right_down = "x1"
+swipe_2_right_up = "x1"
+swipe_3_left = "incremental"
+swipe_3_right = "incremental"
+swipe_3_up = "x1"
+swipe_3_down = "x1"
+swipe_3_left_down = "incremental"
+swipe_3_left_up = "incremental"
+swipe_3_right_down = "incremental"
+swipe_3_right_up = "incremental"
+swipe_4_left = "x1"
+swipe_4_right = "x1"
+swipe_4_up = "x1"
+swipe_4_down = "x1"
+swipe_4_left_down = "x1"
+swipe_4_left_up = "x1"
+swipe_4_right_down = "x1"
+swipe_4_right_up = "x1"
+swipe_5_left = "incremental"
+swipe_5_right = "incremental"
+swipe_5_up = "x1"
+swipe_5_down = "x1"
+swipe_5_left_down = "incremental"
+swipe_5_left_up = "incremental"
+swipe_5_right_down = "incremental"
+swipe_5_right_up = "incremental"
+swipe_3_horiz = "x1"
+swipe_4_horiz = "x1"
+swipe_5_horiz = "x1"
+
+
+
+[gestures.sensitivities]
+swipe_2_left = 3.5
+swipe_2_right = 3.5
+swipe_2_up = 3.5
+swipe_2_down = 3.5
+swipe_2_left_down = 3.5
+swipe_2_left_up = 3.5
+swipe_2_right_down = 3.5
+swipe_2_right_up = 3.5
+swipe_3_left = 3.5
+swipe_3_right = 3.5
+swipe_3_up = 25
+swipe_3_down = 25
+swipe_3_left_down = 3.5
+swipe_3_left_up = 3.5
+swipe_3_right_down = 3.5
+swipe_3_right_up = 3.5
+swipe_4_left = 3.5
+swipe_4_right = 3.5
+swipe_4_up = 3.5
+swipe_4_down = 3.5
+swipe_4_left_down = 3.5
+swipe_4_left_up = 3.5
+swipe_4_right_down = 3.5
+swipe_4_right_up = 3.5
+swipe_5_left = 3.5
+swipe_5_right = 3.5
+swipe_5_up = 3.5
+swipe_5_down = 3.5
+swipe_5_left_down = 3.5
+swipe_5_left_up = 3.5
+swipe_5_right_down = 3.5
+swipe_5_right_up = 3.5
+swipe_3_horiz = 3.5
+swipe_4_horiz = 3.5
+swipe_5_horiz = 3.5
+
+
+
+
+
+[layout]
+platform.ahk.ergopti_base = false
+direct_access_digits = "native"
+platform.hs.virtual_keyboard = "auto"
+number_row_reorder_edges = false
+platform.ahk.ergopti_alt_gr = false
+platform.ahk.ergopti_variant = "none"
+platform.ahk.emulate_number_row = true
+platform.ahk.emulate_top_row = true
+platform.ahk.emulate_home_row = true
+platform.ahk.emulate_bottom_row = true
+platform.ahk.ctrl_magic_save = false
+platform.ahk.emulated_layout = ""
+pause_switch_enabled = false
+on_pause = ""
+on_resume = ""
+
+
+
+
+
+[category_enabled]
+platform.ahk.hotstrings = false
+platform.ahk.layout = false
+platform.ahk.shortcuts = false
+platform.ahk.tap_holds = false
+key_combinations = true
+platform.ahk.autocorrection = false
+platform.ahk.distances_reduction = false
+platform.ahk.sfbs_reduction = false
+platform.ahk.rolls = false
+platform.ahk.magic_key = false
+
+
+
+
+
+[network]
+proxy_override = ""
+
+
+
+
+
+[ui]
+menubar_icon = "v1"
+
+
+
+
+
+[tap_holds]
+platform.hs.enabled = false
+platform.linux.enabled = false
+lone_modifier_tap_max_ms = 1000
+
+
+
+[shortcuts.keys]
+wrap_text_if_selected = false
+cmd_star = false
+
+
+
+[platform.ahk]
+sections = [
+	"script",
+	"hotstrings.dynamic",
+	"hotstrings.dynamic.date",
+	"hotstrings.dynamic.date_fr",
+	"hotstrings.dynamic.date_long_fr",
+	"hotstrings.dynamic.iban_prefixes",
+	"hotstrings.dynamic.phone_prefixes",
+	"hotstrings.dynamic.ssn_prefixes",
+	"hotstrings.dynamic.user_code",
+	"hotstrings.dynamic.text_expansion_personal_information",
+	"hotstrings",
+	"hotstrings.autocorrection.names",
+	"hotstrings.autocorrection.abbreviations",
+	"hotstrings.autocorrection.technical_terms",
+	"hotstrings.distances_reduction.qu",
+	"hotstrings.distances_reduction.comma_j",
+	"hotstrings.distances_reduction.comma_far_letters",
+	"hotstrings.distances_reduction.dead_key_e_circumflex",
+	"hotstrings.distances_reduction.e_circumflex_e",
+	"hotstrings.distances_reduction.space_around_symbols",
+	"hotstrings.sfbs_reduction.comma",
+	"hotstrings.sfbs_reduction.e_circ",
+	"hotstrings.sfbs_reduction.e_grave",
+	"hotstrings.sfbs_reduction.bu",
+	"hotstrings.sfbs_reduction.i_e_acute",
+	"hotstrings.rolls.hc",
+	"hotstrings.rolls.sx",
+	"hotstrings.rolls.cx",
+	"hotstrings.rolls.ct",
+	"hotstrings.rolls.ez",
+	"hotstrings.rolls.assign",
+	"hotstrings.rolls.assign_arrow_equal_left",
+	"hotstrings.rolls.assign_arrow_equal_right",
+	"hotstrings.rolls.assign_arrow_minus_left",
+	"hotstrings.rolls.assign_arrow_minus_right",
+	"hotstrings.rolls.bracket_quote",
+	"hotstrings.rolls.chevron_equal",
+	"hotstrings.rolls.chevron_greater",
+	"hotstrings.rolls.chevron_less",
+	"hotstrings.rolls.close_chevron_tag",
+	"hotstrings.rolls.comment_close",
+	"hotstrings.rolls.comment_open",
+	"hotstrings.rolls.english_negation",
+	"hotstrings.rolls.equal_string",
+	"hotstrings.rolls.hashtag_close_bracket",
+	"hotstrings.rolls.hashtag_open_bracket",
+	"hotstrings.rolls.hashtag_parenthesis",
+	"hotstrings.rolls.hashtag_quote",
+	"hotstrings.rolls.left_arrow",
+	"hotstrings.rolls.not_equal",
+	"hotstrings.rolls.paren_quote",
+	"hotstrings.magic_key.replace",
+	"hotstrings.magic_key.repeat_corrections",
+	"hotstrings.magic_key.text_expansion_symbols",
+	"hotstrings.magic_key.text_expansion_symbols_typst",
+	"hotstrings.french_distancesreduction.suffixes_a",
+	"hotstrings.french_autocorrection.accents",
+	"hotstrings.french_autocorrection.names",
+	"hotstrings.french_autocorrection.typographic_apostrophe",
+	"hotstrings.french_autocorrection.errors",
+	"hotstrings.french_autocorrection.ou",
+	"hotstrings.french_autocorrection.multiple_punctuation_marks",
+	"hotstrings.french_autocorrection.suffixes_a_chaining",
+	"hotstrings.french_autocorrection.minus",
+	"hotstrings.french_autocorrection.minus_apostrophe",
+	"hotstrings.french_magickey.text_expansion",
+	"hotstrings.french_magickey.text_expansion_auto",
+	"hotstrings.french_magickey.text_expansion_emojis",
+	"hotstrings.personal.autocorrection",
+	"hotstrings.personal.code",
+	"hotstrings.personal.email_shortcuts",
+	"hotstrings.personal.professional_vocabulary",
+	"hotstrings.personal.test",
+	"llm",
+	"llm.display",
+	"llm.generation",
+	"llm.models",
+	"llm.profiles",
+	"llm.trigger",
+	"llm.navigation",
+	"metrics",
+	"shortcuts",
+	"shortcuts.search",
+	"shortcuts.take_note",
+	"shortcuts.a_grave",
+	"shortcuts.e_acute",
+	"shortcuts.e_circ",
+	"shortcuts.e_grave",
+	"shortcuts.key_combination_taps",
+	"mod_combos",
+	"shortcuts.personal",
+	"shortcuts.script_control",
+	"shortcuts.keyboard",
+	"shortcuts.tap_keys",
+	"shortcuts.caps_word",
+	"shortcuts.caps_word.pointer",
+	"gestures",
+	"layout",
+	"category_enabled",
+	"network",
+	"tap_holds",
+]
+
+
+
+[platform.hs]
+sections = [
+	"script",
+	"hotstrings",
+	"hotstrings.dynamic",
+	"hotstrings.dynamic.date",
+	"hotstrings.dynamic.date_fr",
+	"hotstrings.dynamic.date_long_fr",
+	"hotstrings.dynamic.iban_prefixes",
+	"hotstrings.dynamic.phone_prefixes",
+	"hotstrings.dynamic.ssn_prefixes",
+	"hotstrings.dynamic.user_code",
+	"hotstrings.dynamic.text_expansion_personal_information",
+	"hotstrings.autocorrection.names",
+	"hotstrings.autocorrection.abbreviations",
+	"hotstrings.autocorrection.technical_terms",
+	"hotstrings.distances_reduction.qu",
+	"hotstrings.distances_reduction.comma_j",
+	"hotstrings.distances_reduction.comma_far_letters",
+	"hotstrings.distances_reduction.dead_key_e_circumflex",
+	"hotstrings.distances_reduction.e_circumflex_e",
+	"hotstrings.distances_reduction.space_around_symbols",
+	"hotstrings.sfbs_reduction.comma",
+	"hotstrings.sfbs_reduction.e_circ",
+	"hotstrings.sfbs_reduction.e_grave",
+	"hotstrings.sfbs_reduction.bu",
+	"hotstrings.sfbs_reduction.i_e_acute",
+	"hotstrings.rolls.hc",
+	"hotstrings.rolls.sx",
+	"hotstrings.rolls.cx",
+	"hotstrings.rolls.ct",
+	"hotstrings.rolls.ez",
+	"hotstrings.rolls.assign",
+	"hotstrings.rolls.assign_arrow_equal_left",
+	"hotstrings.rolls.assign_arrow_equal_right",
+	"hotstrings.rolls.assign_arrow_minus_left",
+	"hotstrings.rolls.assign_arrow_minus_right",
+	"hotstrings.rolls.bracket_quote",
+	"hotstrings.rolls.chevron_equal",
+	"hotstrings.rolls.chevron_greater",
+	"hotstrings.rolls.chevron_less",
+	"hotstrings.rolls.close_chevron_tag",
+	"hotstrings.rolls.comment_close",
+	"hotstrings.rolls.comment_open",
+	"hotstrings.rolls.english_negation",
+	"hotstrings.rolls.equal_string",
+	"hotstrings.rolls.hashtag_close_bracket",
+	"hotstrings.rolls.hashtag_open_bracket",
+	"hotstrings.rolls.hashtag_parenthesis",
+	"hotstrings.rolls.hashtag_quote",
+	"hotstrings.rolls.left_arrow",
+	"hotstrings.rolls.not_equal",
+	"hotstrings.rolls.paren_quote",
+	"hotstrings.magic_key.replace",
+	"hotstrings.magic_key.repeat_corrections",
+	"hotstrings.magic_key.text_expansion_symbols",
+	"hotstrings.magic_key.text_expansion_symbols_typst",
+	"hotstrings.french_distancesreduction.suffixes_a",
+	"hotstrings.french_autocorrection.accents",
+	"hotstrings.french_autocorrection.names",
+	"hotstrings.french_autocorrection.typographic_apostrophe",
+	"hotstrings.french_autocorrection.errors",
+	"hotstrings.french_autocorrection.ou",
+	"hotstrings.french_autocorrection.multiple_punctuation_marks",
+	"hotstrings.french_autocorrection.suffixes_a_chaining",
+	"hotstrings.french_autocorrection.minus",
+	"hotstrings.french_autocorrection.minus_apostrophe",
+	"hotstrings.french_magickey.text_expansion",
+	"hotstrings.french_magickey.text_expansion_auto",
+	"hotstrings.french_magickey.text_expansion_emojis",
+	"hotstrings.personal.autocorrection",
+	"hotstrings.personal.code",
+	"hotstrings.personal.email_shortcuts",
+	"hotstrings.personal.professional_vocabulary",
+	"hotstrings.personal.test",
+	"llm",
+	"llm.display",
+	"llm.generation",
+	"llm.models",
+	"llm.profiles",
+	"llm.trigger",
+	"llm.navigation",
+	"metrics",
+	"shortcuts",
+	"mod_combos",
+	"shortcuts.script_control",
+	"shortcuts.keyboard",
+	"shortcuts.tap_keys",
+	"shortcuts.caps_word",
+	"shortcuts.caps_word.pointer",
+	"gestures",
+	"gestures.modes",
+	"gestures.sensitivities",
+	"layout",
+	"ui",
+	"tap_holds",
+	"shortcuts.keys",
+]
+
+
+
+[platform.linux]
+sections = [
+	"script",
+	"hotstrings.dynamic",
+	"hotstrings.dynamic.date",
+	"hotstrings.dynamic.date_fr",
+	"hotstrings.dynamic.date_long_fr",
+	"hotstrings.dynamic.iban_prefixes",
+	"hotstrings.dynamic.phone_prefixes",
+	"hotstrings.dynamic.ssn_prefixes",
+	"hotstrings.dynamic.user_code",
+	"hotstrings.dynamic.text_expansion_personal_information",
+	"hotstrings",
+	"hotstrings.autocorrection.names",
+	"hotstrings.autocorrection.abbreviations",
+	"hotstrings.autocorrection.technical_terms",
+	"hotstrings.distances_reduction.qu",
+	"hotstrings.distances_reduction.comma_j",
+	"hotstrings.distances_reduction.comma_far_letters",
+	"hotstrings.distances_reduction.dead_key_e_circumflex",
+	"hotstrings.distances_reduction.e_circumflex_e",
+	"hotstrings.distances_reduction.space_around_symbols",
+	"hotstrings.sfbs_reduction.comma",
+	"hotstrings.sfbs_reduction.e_circ",
+	"hotstrings.sfbs_reduction.e_grave",
+	"hotstrings.sfbs_reduction.bu",
+	"hotstrings.sfbs_reduction.i_e_acute",
+	"hotstrings.rolls.hc",
+	"hotstrings.rolls.sx",
+	"hotstrings.rolls.cx",
+	"hotstrings.rolls.ct",
+	"hotstrings.rolls.ez",
+	"hotstrings.rolls.assign",
+	"hotstrings.rolls.assign_arrow_equal_left",
+	"hotstrings.rolls.assign_arrow_equal_right",
+	"hotstrings.rolls.assign_arrow_minus_left",
+	"hotstrings.rolls.assign_arrow_minus_right",
+	"hotstrings.rolls.bracket_quote",
+	"hotstrings.rolls.chevron_equal",
+	"hotstrings.rolls.chevron_greater",
+	"hotstrings.rolls.chevron_less",
+	"hotstrings.rolls.close_chevron_tag",
+	"hotstrings.rolls.comment_close",
+	"hotstrings.rolls.comment_open",
+	"hotstrings.rolls.english_negation",
+	"hotstrings.rolls.equal_string",
+	"hotstrings.rolls.hashtag_close_bracket",
+	"hotstrings.rolls.hashtag_open_bracket",
+	"hotstrings.rolls.hashtag_parenthesis",
+	"hotstrings.rolls.hashtag_quote",
+	"hotstrings.rolls.left_arrow",
+	"hotstrings.rolls.not_equal",
+	"hotstrings.rolls.paren_quote",
+	"hotstrings.magic_key.replace",
+	"hotstrings.magic_key.repeat_corrections",
+	"hotstrings.magic_key.text_expansion_symbols",
+	"hotstrings.magic_key.text_expansion_symbols_typst",
+	"hotstrings.french_distancesreduction.suffixes_a",
+	"hotstrings.french_autocorrection.accents",
+	"hotstrings.french_autocorrection.names",
+	"hotstrings.french_autocorrection.typographic_apostrophe",
+	"hotstrings.french_autocorrection.errors",
+	"hotstrings.french_autocorrection.ou",
+	"hotstrings.french_autocorrection.multiple_punctuation_marks",
+	"hotstrings.french_autocorrection.suffixes_a_chaining",
+	"hotstrings.french_autocorrection.minus",
+	"hotstrings.french_autocorrection.minus_apostrophe",
+	"hotstrings.french_magickey.text_expansion",
+	"hotstrings.french_magickey.text_expansion_auto",
+	"hotstrings.french_magickey.text_expansion_emojis",
+	"hotstrings.personal.autocorrection",
+	"hotstrings.personal.code",
+	"hotstrings.personal.email_shortcuts",
+	"hotstrings.personal.professional_vocabulary",
+	"hotstrings.personal.test",
+	"llm",
+	"llm.display",
+	"llm.generation",
+	"llm.models",
+	"llm.profiles",
+	"llm.trigger",
+	"llm.navigation",
+	"metrics",
+	"shortcuts",
+	"shortcuts.key_combination_taps",
+	"mod_combos",
+	"shortcuts.script_control",
+	"shortcuts.keyboard",
+	"shortcuts.tap_keys",
+	"shortcuts.caps_word",
+	"shortcuts.caps_word.pointer",
+	"gestures",
+	"layout",
+	"category_enabled",
+	"tap_holds",
+]

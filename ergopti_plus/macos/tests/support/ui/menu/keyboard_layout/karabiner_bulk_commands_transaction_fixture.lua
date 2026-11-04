@@ -35,31 +35,31 @@ local COMMAND_CASES = {
 local PICKER_ROUTE_CASES = {
 	{
 		setter = "set_tap_action",
-		parent_prefix = "tap_hold.group.left_shift  :",
+		parent_prefix = "key_name.left_shift  :",
 		picker_label = "tap_hold.picker.tap",
 		expected_id = "left_shift",
 	},
 	{
 		setter = "set_hold_action",
-		parent_prefix = "tap_hold.group.left_shift  :",
+		parent_prefix = "key_name.left_shift  :",
 		picker_label = "tap_hold.picker.hold",
 		expected_id = "left_shift",
 	},
 	{
 		setter = "set_combo_combo_action",
-		parent_prefix = "tap_hold.group.left_shift + tap_hold.group.right_shift  :",
+		parent_prefix = "key_name.left_shift + key_name.right_shift  :",
 		picker_label = "menu.shortcuts.key_combinations_chord",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_tap_action",
-		parent_prefix = "tap_hold.group.left_shift + tap_hold.group.right_shift  :",
+		parent_prefix = "key_name.left_shift + key_name.right_shift  :",
 		picker_label = "menu.shortcuts.key_combinations_hold_tap",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_hold_action",
-		parent_prefix = "tap_hold.group.left_shift + tap_hold.group.right_shift  :",
+		parent_prefix = "key_name.left_shift + key_name.right_shift  :",
 		picker_label = "menu.shortcuts.key_combinations_hold_hold",
 		expected_id = "shift_pair",
 	},
@@ -246,6 +246,8 @@ local function make_remap(observations, mode)
 			from = { simultaneous = { { key_code = "left_shift" }, { key_code = "right_shift" } } } } },
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return true end,
+		-- Tap-holds on: an off category greys every row of its submenu.
+		get_tap_holds_enabled = function() return true end,
 		set_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,
 		set_combo_symmetric = function() return true end,
@@ -284,6 +286,7 @@ local function make_remap(observations, mode)
 		get_tap_hold_timeout = function() return 200 end,
 		set_tap_hold_timeout = function() return true end,
 		get_sticky_timeout = function() return 1000 end,
+		get_lone_modifier_tap_max_ms = function() return 1000 end,
 		set_sticky_timeout = function() return true end,
 		get_simultaneous_threshold = function() return 50 end,
 		set_simultaneous_threshold = function() return true end,

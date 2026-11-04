@@ -21,6 +21,13 @@ return {
 		launcher = "com.ergoptiplus.app",
 		hammerspoon = "com.ergoptiplus.app.hammerspoon",
 	},
+	signing_ids = {
+		runtime_installer = "com.ergoptiplus.app.runtime-installer",
+		installed_physical_source = "com.ergoptiplus.app.installed-physical-source",
+		remap_core = "com.ergoptiplus.remap.core",
+		remap_console = "com.ergoptiplus.remap.console",
+		remap_cli = "com.ergoptiplus.remap.cli",
+	},
 	service_labels = {
 		macos_core = "com.ergoptiplus.runtime.core",
 		macos_remap_guardian = "com.ergoptiplus.remap-guardian",

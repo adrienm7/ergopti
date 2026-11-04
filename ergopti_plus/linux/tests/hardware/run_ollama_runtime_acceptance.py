@@ -256,6 +256,24 @@ def canonical_model(node):
     return isinstance(node, list) and any(canonical_model(value) for value in node)
 
 
+# The private log may carry signed URLs, so a failure prints only the step lines
+# and the last driver log lines, every URL reduced to its scheme and host.
+URL = re.compile(r"(https?://[^/\s'\"]+)[^\s'\"]*")
+TRACE_PREFIXES = ("ACCEPTANCE_PHASE ", "ACCEPTANCE_TRACE ")
+FAILURE_LOG_LINES = 40
+
+
+def print_failure_trace(text):
+    """Name the step a refused or stalled run was waiting on, without its payloads."""
+    lines = text.splitlines()
+    steps = [line for line in lines if line.startswith(TRACE_PREFIXES)]
+    logs = [line for line in lines if line.startswith("NATIVE_LOG ")][-FAILURE_LOG_LINES:]
+    print("::group::Ollama acceptance step trace")
+    for line in steps + logs:
+        print(URL.sub(r"\1/<redacted>", line))
+    print("::endgroup::")
+
+
 def write_evidence(path, document):
     """Retain a bounded safe result even when native admission fails."""
     path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
@@ -568,6 +586,8 @@ def main():
                 command, env=environment, cwd=repository, stdout=raw, stderr=subprocess.STDOUT
             )
         text = (root / "native.private.log").read_text(errors="replace")
+        if result.returncode != 0:
+            print_failure_trace(text)
         document.update(acceptance_phases(text))
         document.update(_boundary_observation(text))
         after = sources()

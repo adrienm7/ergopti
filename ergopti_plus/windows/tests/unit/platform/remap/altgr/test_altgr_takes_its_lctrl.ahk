@@ -43,8 +43,11 @@ _ATIL_Press(Kana, AltGrLevel, ModKey, Arrive, AsAltGr := true, KeyId := "left_ct
 	_TapHoldKeyIsDown := (Name, Mode) => (Name == "SC01D" and Mode == "P")
 	try {
 		Wait := (*) => (Arrive ? TapHoldAltGrTakesItsLCtrl(AsAltGr) : 0, true)
+		; A press of 100 ms: a tap, above the shared minimum and below the threshold.
+		Clock := 900
+		Tick := (*) => (Clock += 100)
 		Result := TapHoldOwnImmediateModifier(KeyId, "SC01D", ModKey, 0.2,
-			Wait, (*) => false, (*) => 1000, , , (*) => "")
+			Wait, (*) => false, Tick, , , (*) => "")
 		Wire := ""
 		for _, Keys in _ATIL_Sent
 			Wire .= (Wire == "" ? "" : "|") . Keys

@@ -31,6 +31,7 @@ local function deps(fields)
 		has_failed = function() return fields.failed == true end,
 		is_runtime_broken = function() return fields.broken == true end,
 		is_task_running = function() return fields.running == true end,
+		runtime_pending = function() return fields.pending == true end,
 	}
 end
 
@@ -184,6 +185,12 @@ helpers.describe("model selector page owner", function()
 			{ opts = { read_only = "menu.read_only.newer_schema" }, backend = "ollama",
 				install = { state = "unsupported", reason_key = "menu.read_only.newer_schema" } },
 			{ opts = { ollama = { installed = false, running = true } }, backend = "ollama", install = { state = "running" } },
+			-- model-selector-checking-install: a metadata probe still in flight
+			-- reads as no runtime; an installed Ollama must not be offered then.
+			{ opts = { ollama = { installed = false, pending = true } }, backend = "ollama", install = { state = "checking" } },
+			{ opts = { paused = true, ollama = { installed = false } }, backend = "ollama",
+				install = { state = "unsupported", reason_key = "model_browser.install_paused" } },
+			{ opts = { paused = true }, backend = "ollama", install = { state = "installed" } },
 		}
 		for _, case in ipairs(cases) do
 			with_page(case.opts, function(Page, ctx, _, collected, p)
@@ -228,8 +235,47 @@ helpers.describe("model selector page owner", function()
 		local refused = { mlx = { installed = false }, install_refused = true }
 		with_page(refused, function(Page, ctx, _, collected, p)
 			helpers.assert_eq(Page.handle_action(ctx, { action = "group_action", backend = "mlx", id = "install" }, p, collected), false)
-			helpers.assert_eq(backend_of(Page.build_payload(ctx, p, collected), "mlx").install, { state = "available" },
-				"an install that did not start is offered again")
+			helpers.assert_eq(backend_of(Page.build_payload(ctx, p, collected), "mlx").install,
+				{ state = "available", failed_key = "model_browser.install_not_started" },
+				"an install that did not start is offered again, with why")
+			refused.install_refused = nil
+			helpers.assert_true(Page.handle_action(ctx, { action = "group_action", backend = "mlx", id = "install" }, p, collected))
+			helpers.assert_eq(backend_of(Page.build_payload(ctx, p, collected), "mlx").install, { state = "running" },
+				"the next click forgets the refusal")
+		end)
+	end)
+
+	helpers.it("(model-selector-checking-install) a probe in flight states no missing runtime and asks again", function()
+		local opts = { ollama = { installed = false, pending = true } }
+		with_page(opts, function(Page, ctx, _, collected, p)
+			local refreshes = 0
+			package.loaded["ui.model_browser"].refresh = function() refreshes = refreshes + 1; return true end
+			local b = backend_of(Page.build_payload(ctx, p, collected), "ollama")
+			helpers.assert_eq(b.install, { state = "checking" })
+			helpers.assert_nil(b.reason_key, "no missing runtime is stated before the probe ends")
+			helpers.assert_eq(refreshes, 1, "the page asks again by itself")
+			helpers.assert_eq(Page.handle_action(ctx, { action = "group_action", backend = "ollama", id = "install" }, p, collected), false,
+				"a click cannot start an install over an unread runtime")
+			helpers.assert_nil(opts.installs, "nothing was installed")
+		end)
+	end)
+
+	helpers.it("(model-selector-install-refusal) a paused driver names the pause on the install button", function()
+		local opts = { paused = true, ollama = { installed = false } }
+		with_page(opts, function(Page, ctx, _, collected, p)
+			helpers.assert_eq(Page.handle_action(ctx, { action = "group_action", backend = "ollama", id = "install" }, p, collected), false)
+			helpers.assert_nil(opts.installs, "a paused driver installs nothing")
+			helpers.assert_eq(backend_of(Page.build_payload(ctx, p, collected), "ollama").install.reason_key, "model_browser.install_paused")
+		end)
+	end)
+
+	helpers.it("(model-selector-install-refusal) a raising install leaves the button offered with its reason", function()
+		local opts = { mlx = { installed = false } }
+		with_page(opts, function(Page, ctx, _, collected, p)
+			p.install_runtime = function() error("boom") end
+			helpers.assert_eq(Page.handle_action(ctx, { action = "group_action", backend = "mlx", id = "install" }, p, collected), false)
+			helpers.assert_eq(backend_of(Page.build_payload(ctx, p, collected), "mlx").install,
+				{ state = "available", failed_key = "model_browser.install_not_started" })
 		end)
 	end)
 

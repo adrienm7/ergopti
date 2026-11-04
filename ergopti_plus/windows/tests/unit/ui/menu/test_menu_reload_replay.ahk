@@ -224,6 +224,40 @@ _MRR_RetainedBody(Fixture) {
 Test("menu reload replay: a startup selection still retained at the reload is replayed by the successor",
 	(*) => _MRR_Run(_MRR_RetainedBody))
 
+; A replayed toggle can itself start a reload whose successor asks to close while
+; Drain still runs: OnExit then interrupts Drain, whose remaining rows lived only
+; in its own local array and were lost without a word (a full live run: three
+; toggles handed, one replayed, two never applied).
+_MRR_DrainInterruptedBody(Fixture) {
+	global _MenuReloadReplayRoot, _MenuStartupCommands
+	Root := Menu(), Sub := Menu()
+	Interrupting := (ItemName, ItemPosition, NativeMenu) => (
+		Fixture.Runs.Push({Who: "first", Name: ItemName}),
+		AssertTrue(MenuReloadReplay_Publish(Fixture.File), "OnExit publishes on top of Drain"),
+		"ran")
+	AssertEqual(1, RegisterMenuItem(Sub, "Toggle", Interrupting))
+	AssertEqual(1, RegisterMenuItem(Sub, "Second", _MRR_Command.Bind(Fixture.Runs, "second")))
+	AssertEqual(1, RegisterMenuItem(Sub, "Third", _MRR_Command.Bind(Fixture.Runs, "third")))
+	Root.Add("Features", Sub)
+	Fixture.Menus.Push(Sub, Root)
+	_MenuReloadReplayRoot := Root
+	State := {Ready: false, Timers: []}
+	Owner := MenuStartupCommands(() => State.Ready, (Fn, Delay) => State.Timers.Push(Fn))
+	_MenuStartupCommands := Owner
+	Owner.AdoptReplay([["Features", "Toggle"], ["Features", "Second"], ["Features", "Third"]])
+	State.Ready := true
+	AssertTrue(Owner.NotifyReady())
+	State.Timers[1].Call()
+	AssertEqual(1, Fixture.Runs.Length, "the rows handed over are not also run by the exiting instance")
+	_MenuStartupCommands := 0
+	Paths := MenuReloadReplay_Consume(Fixture.File, _MRR_Notify.Bind(Fixture))
+	AssertEqual(2, Paths.Length, "every row Drain had not reached reaches the next successor")
+	AssertEqual("Second", Paths[1][2])
+	AssertEqual("Third", Paths[2][2])
+}
+Test("menu reload replay: a reload accepted during the drain hands over the rows not reached",
+	(*) => _MRR_Run(_MRR_DrainInterruptedBody))
+
 _MRR_RefusedReloadBody(Fixture) {
 	global _MenuReloadReplayRoot
 	Old := _MRR_BuildTray(Fixture, "predecessor")

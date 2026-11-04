@@ -10,7 +10,6 @@
 
 local helpers = require("tests.helpers")
 local Json = require("json")
-local SOURCE = helpers.driver_root() .. "/adapters/system_proxy.lua"
 
 --- Loads the candidate with independent controllable native acknowledgements.
 --- @param config table|nil
@@ -106,7 +105,7 @@ local function fresh(config)
 		}
 	end
 	package.loaded.luv = uv
-	return dofile(SOURCE)
+	return helpers.fresh_module("adapters.system_proxy")
 	end)
 	package.loaded.luv = saved
 	package.loaded["infra.paths"] = saved_paths

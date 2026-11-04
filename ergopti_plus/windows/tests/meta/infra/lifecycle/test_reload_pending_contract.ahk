@@ -174,6 +174,22 @@ Test("reload: every OnExit veto hands the launched reload back (reload-returns-p
 ; OnExit and the layout poll read the veto ceiling through one rule, and the
 ; poll's port consults it; the reload core reports a refused stage through the
 ; caller's reporter, so the poll's quiet one replaces the notice.
+_RBL_InterruptedFlushesRetryTheReload() {
+	Shutdown := _StripFullLineComments(_DriverFuncBody("Ergopti_OnShutdown"))
+	Assert(InStr(Shutdown, "LoggerShutdownRefusalSettles(LoggerRefusal)", true) > 0
+		&& InStr(Shutdown, "_LifecycleReloadRetry(LoggerFlushSettled, code)", true) > 0
+		&& InStr(Shutdown, '"diagnostic records are not durable yet", false, LoggerRetry)', true) > 0,
+		"a log flush the close request interrupted must retry the same reload, not refuse it")
+	Assert(InStr(Shutdown, "_LifecycleReloadRetry(KL_FlushHandoffSettled, code)", true) > 0
+		&& InStr(Shutdown, '"keystats persistence debt is not durable yet", false, KeystatsRetry)', true) > 0,
+		"a keystats flush the close request interrupted must retry the same reload, not refuse it")
+	Consumed := InStr(Shutdown, 'reason := "Reload"', true)
+	Assert(Consumed > 0 && Consumed < InStr(Shutdown, "ReloadTerminalHandoffClaim(reason)", true),
+		"the retried ExitApp must count as the reload before anything reads its reason")
+}
+Test("reload: a flush interrupted by the close request retries the same reload",
+	_RBL_InterruptedFlushesRetryTheReload)
+
 _RBL_TheAutomaticReloadStaysWithinBounds() {
 	Rule := _StripFullLineComments(_DriverFuncBody("LifecycleShutdownVetoHonored"))
 	Refuse := _StripFullLineComments(_DriverFuncBody("_LifecycleRefuseShutdown"))

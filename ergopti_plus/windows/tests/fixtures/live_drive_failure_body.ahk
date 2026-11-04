@@ -9,6 +9,7 @@
 #Requires AutoHotkey v2.0
 
 global LIVE_DEFAULT_TIMEOUT_MS := 1000
+global _LiveUnclosedDialog := ""
 
 _LDF_Require(Condition, Detail) {
 	if !Condition
