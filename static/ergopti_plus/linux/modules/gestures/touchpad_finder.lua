@@ -260,8 +260,13 @@ function M.list(text)
 			Logger.error(LOG, "Cannot read %s — no touchpad can be found.", DEVICES_PATH)
 			return {}
 		end
-		text = fh:read("*a") or ""
-		fh:close()
+		local read_ok, content = pcall(fh.read, fh, "*a")
+		local close_ok, closed = pcall(fh.close, fh)
+		if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
+			Logger.error(LOG, "Cannot complete reading %s — no touchpad can be found.", DEVICES_PATH)
+			return {}
+		end
+		text = content
 	end
 
 	local found = {}

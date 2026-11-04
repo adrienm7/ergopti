@@ -289,3 +289,25 @@ B: ABS=661800011000003
 	end)
 
 end)
+
+for _, fault in ipairs({ "read_throw", "close_false", "close_throw" }) do
+	helpers.it("touchpad finder refuses an incomplete device snapshot " .. fault, function()
+		local original, closes = io.open, 0
+		io.open = function(path, mode)
+			if path ~= "/proc/bus/input/devices" then return original(path, mode) end
+			return { read = function()
+				if fault == "read_throw" then error("injected read failure") end
+				return DEVICES
+			end, close = function()
+				closes = closes + 1
+				if fault == "close_throw" then error("injected close failure") end
+				return fault ~= "close_false"
+			end }
+		end
+		local called, devices = pcall(Finder.list)
+		io.open = original
+		helpers.assert_true(called)
+		helpers.assert_eq(devices, {}, "an unacknowledged snapshot must not select a touchpad")
+		helpers.assert_eq(closes, 1)
+	end)
+end
