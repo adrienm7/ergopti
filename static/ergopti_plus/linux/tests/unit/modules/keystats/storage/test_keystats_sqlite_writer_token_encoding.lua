@@ -128,6 +128,13 @@ helpers.describe("keystats sqlite writer: n-gram token encoding", function()
 		end)
 	end
 
+	helpers.it("token-encoding migrates the explicit legacy version", function()
+		local result, commands = migrate({ version = "1", keys = { ngram_chars = "5B\n" } })
+		helpers.assert_true(result)
+		helpers.assert_true(position(commands, "VACUUM INTO") ~= nil)
+		helpers.assert_true(position(commands, "UPDATE OR ROLLBACK") ~= nil)
+	end)
+
 	helpers.it("token-encoding: a store already moved is left alone", function()
 		local result, commands = migrate({ version = "2" })
 		helpers.assert_true(result)
