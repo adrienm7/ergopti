@@ -45,7 +45,12 @@ A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 		_LAltIsBackspaceLayer()
 		and LayerEnabled
 )
-*SC038:: TapHoldSyntheticKeyUp("LAlt") ; Necessary to do this, otherwise multicursor trigger in VSCode when scrolling in the layer and then leaving it
+; Clear the orphaned physical Alt bit that can leave VSCode in multicursor mode,
+; while preserving an Alt legitimately held by another synthetic gesture.
+*SC038:: {
+	if !TapHoldReleasePhysicalKey("LAlt")
+		return
+}
 #HotIf
 
 

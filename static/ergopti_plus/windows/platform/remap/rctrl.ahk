@@ -124,21 +124,22 @@ _RCtrlHoldModKey() {
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
 *SC11D:: {
+	Owner := TapHoldNewOwner()
 	tap := KS_WaitReleased("SC11D", TapHoldDuration(TapHold, "right_ctrl"))
 	if tap {
-		TapHoldDispatchTap("right_ctrl", OneShotShift)
+		TapHoldDispatchTap("right_ctrl", () => (TapHoldOwnerCurrent(Owner) ? OneShotShift() : false))
 		return
 	}
 	; Long press — arm Shift until key-up, releasing it in a finally so it can
 	; NEVER latch. The wait is capped (U T<timeout>) so a lost SC11D key-up
 	; (focus stolen by a UAC prompt, Suspend toggled mid-press) cannot block the
 	; release forever and leave Shift stuck Down.
-	if !TapHoldSyntheticKeyDown("LShift")
+	if !TapHoldSyntheticKeyDown("LShift", Owner)
 		return
 	try {
 		KS_WaitReleased("SC11D", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TapHoldSyntheticKeyUp("LShift")
+		TapHoldSyntheticKeyUp("LShift", Owner)
 	}
 }
 #HotIf

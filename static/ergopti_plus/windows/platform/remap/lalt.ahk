@@ -86,6 +86,7 @@ _LAltHoldModKey() {
 
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and not LayerEnabled
 SC038:: {
+	Owner := TapHoldNewOwner()
 	if (
 		KS_IsDown("SC11D") ; RCtrl physically held
 		or KS_IsDown("SC03A") ; CapsLock physically held
@@ -98,16 +99,18 @@ SC038:: {
 
 	if !TapHoldReleasePhysicalKey("LAlt")
 		return
+	if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+		return
 	OneShotShift()
 	; Arm LShift for the hold, then release it in a finally so it can NEVER latch.
 	; The wait is capped (U T<timeout>) so a lost SC038 key-up (focus stolen by a
 	; UAC prompt, Suspend toggled mid-press) cannot block the release forever.
-	if !TapHoldSyntheticKeyDown("LShift")
+	if !TapHoldSyntheticKeyDown("LShift", Owner)
 		return
 	try {
 		KS_WaitReleased("SC038", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TapHoldSyntheticKeyUp("LShift")
+		TapHoldSyntheticKeyUp("LShift", Owner)
 	}
 }
 #HotIf
@@ -162,26 +165,20 @@ SC11D & SC038:: {
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and not LayerEnabled
 *SC038::
 {
-	if !TapHoldSyntheticKeyDown("LAlt")
+	Owner := TapHoldNewOwner()
+	if !TapHoldSyntheticKeyDown("LAlt", Owner)
 		return
-	tap := KS_WaitReleased("SC038", TapHoldDuration(TapHold, "left_alt"))
-	if tap {
-		; The synthetic LAlt Down armed above must always be released regardless
-		; of Suspend state; only the AltTabMonitor() side effect is guarded —
-		; native Suspend() never disarms this hotkey's own KeyWait/dispatch.
-		if !TapHoldSyntheticKeyUp("LAlt")
-			return
-		TapHoldDispatchTap("left_alt", AltTabMonitor)
-	} else {
-		; Bound the wait and release LAlt in a finally so a lost SC038 key-up (Alt+Tab
-		; focus steal, a UAC prompt, or Suspend toggled mid-press) can never latch Alt
-		; Down system-wide — this else is the SOLE release path (no SC038 Up:: fallback
-		; exists here, unlike tab.ahk) (hold-modifier-unbounded-keywait)
-		try {
+	try {
+		tap := KS_WaitReleased("SC038", TapHoldDuration(TapHold, "left_alt"))
+		if tap {
+			if !_TapHoldReleaseOwnedModifier("LAlt", Owner)
+				return
+			TapHoldDispatchTap("left_alt", () => (TapHoldOwnerCurrent(Owner) ? AltTabMonitor() : false))
+		} else {
 			KS_WaitReleased("SC038", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-		} finally {
-			TapHoldSyntheticKeyUp("LAlt")
 		}
+	} finally {
+		_TapHoldReleaseOwnedModifier("LAlt", Owner)
 	}
 }
 #HotIf
