@@ -399,6 +399,33 @@ if (process.platform === 'linux') {
 
 const errors = [];
 
+// The standalone uninstaller refuses an installation nested in any checkout.
+// Do not create that unremovable installation, even when the prefix is new.
+for (const viaAlias of [false, true]) {
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		prefixName: `${viaAlias ? 'checkout-alias' : 'checkout'}/new-prefix`,
+		seed(home) {
+			const checkout = path.join(home, 'checkout');
+			fs.mkdirSync(checkout);
+			const initialized = spawnSync('git', ['init', '--quiet', checkout], { encoding: 'utf8' });
+			assert.equal(initialized.status, 0, initialized.stderr);
+			if (viaAlias) fs.symlinkSync(checkout, path.join(home, 'checkout-alias'));
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, 'a prefix inside a checkout must be refused');
+		assert.equal(fs.existsSync(path.join(run.home, 'checkout/new-prefix')), false);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
 // A root shell without a desktop caller cannot enroll UID 0. Refuse before
 // replacing payload files, not at the final permission-setup step.
 for (const sudoUid of [undefined, '0', '999', '65534', 'invalid']) {
