@@ -71,8 +71,9 @@ _KATO_Source(Receipt) {
 	RegExReplace(DeclarationsCode, "m)^\s*global\b", "", &DeclarationCount)
 	AssertTrue(DeclarationCount >= 6, "all original session defaults must be present")
 	Bound := Original
-	MouseBindings := _KATO_Bind(&Bound, "StartActivitySimulation", "MouseGetPos(", "_KATO_MouseGetPos(", 1)
-	MouseBindings += _KATO_Bind(&Bound, "AwakeCheckMouseMoved", "MouseGetPos(", "_KATO_MouseGetPos(", 1)
+	MouseBindings := _KATO_Bind(&Bound, "StartActivitySimulation", "MCGetPos(", "_KATO_GetPos(", 1)
+	MouseBindings += _KATO_Bind(&Bound, "AwakeCheckMouseMoved", "MCGetPos(", "_KATO_GetPos(", 1)
+	MouseBindings += _KATO_Bind(&Bound, "SimulateActivity", "MCGetPos(", "_KATO_GetPos(", 1)
 	; Every SetTimer call in this whole subject owner uses one identity-preserving
 	; arm/cancel proxy. A future cancel-only repair must cancel the same wrapper.
 	BoundCode := _DriverMaskNonCode(&Bound)
