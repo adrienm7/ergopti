@@ -172,7 +172,10 @@ function M.write(path, content)
 		Logger.error(LOG, "write(): path must be a non-empty string without NUL.")
 		return false
 	end
-	content = type(content) == "string" and content or ""
+	if type(content) ~= "string" then
+		Logger.error(LOG, "write(): content must be a string.")
+		return false
+	end
 
 	local ok, result = pcall(function()
 		local fh, err = require("infra.regular_file_writer").open(path, "w")
@@ -200,7 +203,10 @@ function M.append(path, content)
 		Logger.error(LOG, "append(): path must be a non-empty string without NUL.")
 		return false
 	end
-	content = type(content) == "string" and content or ""
+	if type(content) ~= "string" then
+		Logger.error(LOG, "append(): content must be a string.")
+		return false
+	end
 
 	local ok, result = pcall(function()
 		local fh, err = require("infra.regular_file_writer").open(path, "a")
