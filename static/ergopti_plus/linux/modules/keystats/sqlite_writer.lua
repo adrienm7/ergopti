@@ -405,7 +405,8 @@ function M.ensure_token_encoding()
 		local backup = _db_path .. TokenEncoding.BACKUP_SUFFIX
 		local fh, detail, code = RegularFileReader.open(backup)
 		if fh then
-			if not fh:close() then
+			local close_ok, closed = pcall(fh.close, fh)
+			if not close_ok or closed ~= true then
 				Logger.error(LOG, "Cannot close the metrics migration backup.")
 				return false
 			end
