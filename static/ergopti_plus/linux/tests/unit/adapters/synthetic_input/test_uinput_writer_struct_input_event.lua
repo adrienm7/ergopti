@@ -38,6 +38,22 @@ local helpers, recorder, le, owned_channel =
 -- ====================================================
 
 helpers.describe("uinput_writer: struct input_event encoding", function()
+	helpers.it("uses the measured 32-bit input_event ABI for output (uinput-32-bit-event)", function()
+		local Input = require("infra.input_event")
+		local native_size, writer_before = Input.native_size, package.loaded["adapters.uinput_writer"]
+		Input.native_size = function() return 16 end
+		local ok, writer = pcall(helpers.load_module, "adapters.uinput_writer")
+		Input.native_size = native_size
+		package.loaded["adapters.uinput_writer"] = writer_before
+		helpers.assert_true(ok)
+		local event = writer.encode_event(1, 30, 1, 2, 3)
+		helpers.assert_eq(#event, 16, "32-bit uinput accepts a 16-byte input_event")
+		helpers.assert_eq(le(event, 1, 4), 2)
+		helpers.assert_eq(le(event, 5, 4), 3)
+		helpers.assert_eq(le(event, 9, 2), 1)
+		helpers.assert_eq(le(event, 11, 2), 30)
+		helpers.assert_eq(le(event, 13, 4), 1)
+	end)
 
 	helpers.it("is exactly 24 bytes with the fields at the 64-bit offsets", function()
 		local U = helpers.load_module("adapters.uinput_writer")
