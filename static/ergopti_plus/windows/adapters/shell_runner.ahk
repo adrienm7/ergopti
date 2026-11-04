@@ -1447,6 +1447,8 @@ ShellRunner_BuildEnvironment(Overrides) {
 	for Name, Value in Overrides {
 		if !(Name is String) or Name == "" or InStr(Name, "=") or !(Value is String)
 			throw TypeError("Environment entries require valid names and string values.")
+		if _SR_HasNul(Name) || _SR_HasNul(Value)
+			throw ValueError("Native environment names and values cannot contain NUL.")
 		if StrLower(Name) == "errorlevel"
 			throw ValueError("Environment overrides must not shadow the process exit status.")
 		Values[Name] := Value

@@ -301,6 +301,17 @@
 			"root_cause": "static/ergopti_plus/windows/modules/llm/parser.ahk and _shared/lua/llm/parser.lua bound word counts but not character counts or dynamic-programming grid sizes. Character distance and token substitution consume quadratic work; substitution allocates a full matrix. Tokenization and raw cleanup also expand entire oversized words.",
 			"silent_failure": "A small admitted server response can stall the message/input thread or allocate excessive memory. The actual Lua baseline takes about2.08 CPU seconds and sampled87MiB for an8KiB answer; no AHK runtime measurement is claimed.",
 			"regression_test": "Both ports read one canonical policy:4096 UTF-8 bytes per operand and262144 cells per conservative diff grid. Refuse oversized corrections, next words and raw output before expensive helpers, then recheck actual normalized diff operands. Assert inclusive byte/cell boundaries and multibyte accounting on Windows; retain all32 shared physical golden vectors. Six real Lua cases pass after the audited baseline fails the oversized-word refusal."
+		},
+		{
+			"id": "AHK-028",
+			"title": "Native environment overrides accept an embedded NUL value",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Build an environment from Map(ERGOPTI_PROBE, keep plus Chr(0) plus drop). The actual Map value preserves its complete length but the native environment uses NUL as its entry delimiter.",
+			"root_cause": "static/ergopti_plus/windows/adapters/shell_runner.ahk:ShellRunner_BuildEnvironment validates String types but does not refuse NUL before serializing overrides into a launchable NUL-delimited Unicode block.",
+			"silent_failure": "The child cannot receive the requested complete value and instead sees a shortened value or malformed block. Arbitrary variable injection or execution has not been measured. Ordinary Map keys truncate NUL before enumeration, so that earlier candidate is explicitly not claimed.",
+			"regression_test": "After actual Map construction, authenticate its retained NUL value and require ValueError for leading, middle and trailing positions. A real native child control verifies exact Unicode, spaces and equals, empty-entry encoding, case-insensitive replacement and an unchanged parent environment."
 		}
 	]
 }
