@@ -246,6 +246,20 @@ helpers.describe("The AI menu builds no model list (model-selector-page)", funct
 		end)
 	end
 
+	helpers.it("reports refusal when the model browser cannot be scheduled", function()
+		with_count_menu(function(menu)
+			menu.build_item()
+			local page = require("ui.menu.menu_llm.model_selector_page")
+			local deferred = require("infra.deferred_work")
+			local previous = deferred.after
+			deferred.after = function() return false end
+			local ok, result = pcall(page.open)
+			deferred.after = previous
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, false, "a refused timer cannot claim that the page was scheduled")
+		end, { real_model_selector = true, backend = "ollama" })
+	end)
+
 	helpers.it("registers the model browser toggle at creation, before any AI menu build", function()
 		local openers = {}
 		local toggle = { set_opener = function(page, fn) openers[page] = fn end }

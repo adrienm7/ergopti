@@ -94,6 +94,10 @@ end
 --- @param args table|nil Argv for the streaming form.
 --- @return any|nil Native task handle, or nil on construction failure.
 function M.native(label, executable, on_done, on_chunk_or_args, args)
+	if on_done ~= nil and type(on_done) ~= "function" then
+		Logger.error(LOG, "%s completion task callback is not callable.", tostring(label))
+		return nil
+	end
 	-- The system curl is checked at its point of use; the gate logs and tells.
 	local SystemCurl = require("adapters.system_curl")
 	if executable == SystemCurl.PATH and not SystemCurl.check(tostring(label)) then return nil end

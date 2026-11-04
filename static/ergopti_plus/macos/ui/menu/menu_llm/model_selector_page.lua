@@ -832,7 +832,7 @@ function M.open()
 	Logger.info(LOG, "Model selector page requested (backend=%s).", tostring(ctx.state.llm_backend))
 	-- A window shown from inside the still-open menu callback can silently fail
 	-- to appear, so the page opens on the next tick.
-	DeferredWork.after(0, function()
+	local scheduled = DeferredWork.after(0, function()
 		if _ctx ~= ctx or ctx.is_paused() ~= false then return false end
 		local ModelBrowser = require("ui.model_browser")
 		local opened = ModelBrowser.open({
@@ -846,6 +846,10 @@ function M.open()
 		list_api_models()
 		return true
 	end, "model_selector_page.open")
+	if scheduled ~= true then
+		Logger.error(LOG, "Model selector page could not be scheduled.")
+		return false
+	end
 	return true
 end
 
