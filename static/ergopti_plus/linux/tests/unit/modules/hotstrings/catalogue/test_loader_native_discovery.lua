@@ -30,6 +30,15 @@ local Shell = require("adapters.shell_runner")
 
 local ON_WINDOWS = package.config:sub(1, 1) == "\\"
 
+helpers.it("linux-native-directory-nul: rejects paths before native truncation", function()
+	local directory = require("infra.native_directory")
+	for _, name in ipairs({ "stat", "kind", "target_kind", "entries" }) do
+		local value, _, code = directory[name]("/tmp\0/not-the-same-directory")
+		helpers.assert_nil(value, name .. " must not inspect /tmp instead")
+		helpers.assert_eq(code, "EINVAL")
+	end
+end)
+
 helpers.describe("extension manifest native read", function()
 	helpers.it("does not block when the bundled priority policy is a FIFO", function()
 		local uv = require("luv")
