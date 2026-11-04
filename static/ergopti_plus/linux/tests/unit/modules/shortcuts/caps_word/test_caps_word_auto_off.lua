@@ -599,12 +599,12 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 	helpers.it("caps word auto-off, the hook hands every pointer press and EV_REL report to the callback", function()
 		-- adapters/keyboard_hook, selected by a declaration unique to it.
 		local hook = assert(helpers.read_driver_unit("local function hold_owner("))
-		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value)')
-		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value)')
+		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value, slot)')
+		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)')
 		helpers.assert_contains(hook, "_on_pointer_event = options.onPointerEvent")
 		-- The frame a report closes is for the metrics; it is neither a press nor a motion.
-		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value)')
-		helpers.assert_contains(source("ergopti_hotstrings.lua"), 'if kind_of_event == "frame" then return end')
+		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot)')
+		helpers.assert_contains(source("ergopti_hotstrings.lua"), 'if kind_of_event == "frame" or kind_of_event == "reset" then return end')
 	end)
 
 	helpers.it("caps word auto-off, the manager maps a native press and motion to their declared kinds", function()
