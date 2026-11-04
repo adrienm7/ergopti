@@ -2451,20 +2451,22 @@ end
 --- scrolls with its fingers, and its absolute reports cannot be forwarded.
 function LayerPointer.sync()
 	local wanted, held = LayerPointer.wanted(), next(LayerPointer.slots) ~= nil
-	if wanted and not held then
+	if wanted then
+		local grabbed = false
 		for _, path in ipairs(_pointer_devices) do
 			local slot = pointer_slot(path)
-			local mask = EvdevReader.is_open(slot) and EvdevReader.event_capabilities(slot) or nil
+			local mask = not LayerPointer.slots[slot] and EvdevReader.is_open(slot) and EvdevReader.event_capabilities(slot) or nil
 			if mask and LayerPointer.has_type(mask, LayerPointer.EV_REL_BIT)
 				and not LayerPointer.has_type(mask, LayerPointer.EV_ABS_BIT) then
 				if EvdevReader.grab(slot) then
 					LayerPointer.slots[slot] = path
+					grabbed = true
 				else
 					Logger.warn(LOG, "The navigation layer cannot take %s: its wheel keeps scrolling.", path)
 				end
 			end
 		end
-		if next(LayerPointer.slots) ~= nil then Logger.debug(LOG, "The navigation layer took the mouse wheel.") end
+		if grabbed then Logger.debug(LOG, "The navigation layer took the mouse wheel.") end
 	elseif held and not wanted and next(LayerPointer.buttons) == nil then
 		for slot, path in pairs(LayerPointer.slots) do
 			if EvdevReader.is_open(slot) and EvdevReader.ungrab(slot) ~= true then
@@ -2511,8 +2513,9 @@ function LayerPointer.forward(ev, slot)
 			Logger.warn(LOG, "A mouse report under the navigation layer was not forwarded (axis %d).", ev.code)
 		end
 	elseif ev.type == EVDEV_TYPE_KEY and InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
-		if ev.value == InputEvent.VALUE_DOWN then LayerPointer.buttons[ev.code] = true
-		else LayerPointer.buttons[ev.code] = nil end
+		local key = source_key(slot, ev.code)
+		if ev.value == InputEvent.VALUE_DOWN then LayerPointer.buttons[key] = true
+		else LayerPointer.buttons[key] = nil end
 		_forward_raw({ type = EVDEV_TYPE_KEY, code = ev.code, value = ev.value }, slot)
 	end
 end
@@ -3434,10 +3437,21 @@ local function _acquire_pointers(paths, tx)
 		end
 		retained[path] = nil
 	end
-	for path in pairs(retained) do _close_paths({ path }, pointer_slot, tx) end
+	for path in pairs(retained) do
+		local slot = pointer_slot(path)
+		local released = _release_forwarded_sources({ slot })
+		if not released then return false end
+		_close_paths({ path }, pointer_slot, tx)
+		LayerPointer.slots[slot] = nil
+	end
 	_pointer_devices = {}
-	LayerPointer.slots, LayerPointer.buttons = {}, {}
 	for index, path in ipairs(paths) do _pointer_devices[index] = path end
+	LayerPointer.buttons = {}
+	for key, row in pairs(_forwarded_down) do
+		if LayerPointer.slots[row.owner_source] and InputEvent.is_pointer_button(row.code) then
+			LayerPointer.buttons[key] = true
+		end
+	end
 	return true
 end
 

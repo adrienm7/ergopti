@@ -58,16 +58,17 @@ end
 --- @param keyboard_events table { {code, value, at_us} }
 --- @param pointer_events table { {type, code, value, at_us} }
 --- @return table emitted { "key:code:value" | "rel:axis:value" }, table grabs { [path] = {on, off} }
-local function drive(pointer_kind, keyboard_events, pointer_events, observer)
-	local keyboard, pointer = fake_node("keyboard"), fake_node(pointer_kind)
-	local queues = { [keyboard] = {}, [pointer] = {} }
+local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer)
+	local keyboard, pointer, second = fake_node("keyboard"), fake_node(pointer_kind), fake_node("mouse")
+	local queues = { [keyboard] = {}, [pointer] = {}, [second] = {} }
 	for _, ev in ipairs(keyboard_events) do
 		queues[keyboard][#queues[keyboard] + 1] = InputEvent.encode(EV_KEY, ev[1], ev[2], nil, ev[3])
 	end
 	for _, ev in ipairs(pointer_events) do
-		queues[pointer][#queues[pointer] + 1] = InputEvent.encode(ev[1], ev[2], ev[3], nil, ev[4])
+		local target = ev[5] == "second" and second or pointer
+		queues[target][#queues[target] + 1] = InputEvent.encode(ev[1], ev[2], ev[3], nil, ev[4])
 	end
-	local grabs = { [keyboard] = { on = 0, off = 0 }, [pointer] = { on = 0, off = 0 } }
+	local grabs = { [keyboard] = { on = 0, off = 0 }, [pointer] = { on = 0, off = 0 }, [second] = { on = 0, off = 0 } }
 	local doubled, saved = { "modules.hotstrings.device_finder", "adapters.xkb_capture" }, {}
 	for _, name in ipairs(doubled) do saved[name] = package.loaded[name] end
 	package.loaded["modules.hotstrings.device_finder"] = {
@@ -84,7 +85,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, observer)
 	}
 	local reader = helpers.load_module("adapters.evdev_reader")
 	reader._set_backend({
-		read_event_bits = function(fd) return fd == pointer and MASKS[pointer_kind] or MASKS.keyboard end,
+		read_event_bits = function(fd) return fd == pointer and MASKS[pointer_kind] or fd == second and MASKS.mouse or MASKS.keyboard end,
 		open = function(path) return path end,
 		ioctl = function(fd, request, value)
 			if request == EVIOCGRAB and grabs[fd] then
@@ -97,18 +98,23 @@ local function drive(pointer_kind, keyboard_events, pointer_events, observer)
 		close = function() end,
 	})
 	local kh = helpers.load_module("adapters.keyboard_hook")
-	local emitted = {}
+	local emitted, before_stop = {}, {}
 	local ok, err = pcall(function()
 		kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			nav_layer = wheel_layer() }), function() end)
 		kh.start({
 			intercept = true,
 			onEmitRaw = function(code, value) emitted[#emitted + 1] = "key:" .. code .. ":" .. value; return true end,
-			onEmitRelative = function(axis, value) emitted[#emitted + 1] = "rel:" .. axis .. ":" .. value; return true end,
+			onEmitRelative = function(axis, value)
+				emitted[#emitted + 1] = "rel:" .. axis .. ":" .. value
+				if on_relative then on_relative(kh, keyboard, pointer, second) end
+				return true
+			end,
 			onClick = function() end,
 			onPointerEvent = observer,
 		})
 		kh.pump()
+		for index, row in ipairs(emitted) do before_stop[index] = row end
 	end)
 	kh.set_remapper(nil)
 	kh.stop()
@@ -117,8 +123,9 @@ local function drive(pointer_kind, keyboard_events, pointer_events, observer)
 	for _, name in ipairs(doubled) do package.loaded[name] = saved[name] end
 	os.remove(keyboard)
 	os.remove(pointer)
+	os.remove(second)
 	assert(ok, err)
-	return emitted, grabs[pointer], "pointer:" .. pointer
+	return emitted, grabs[pointer], before_stop, "pointer:" .. pointer
 end
 
 local function has(list, item)
@@ -138,9 +145,9 @@ local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
 	helpers.it("identifies the pointer on each motion and frame report", function()
 		local reports = {}
-		local _, _, source = drive("mouse", {}, {
+		local _, _, _, source = drive("mouse", {}, {
 			{ EV_REL, REL_X, 3, 3000 }, { EV_SYN, 0, 0, 3000 },
-		}, function(kind, code, value, slot)
+		}, nil, function(kind, code, value, slot)
 			reports[#reports + 1] = { kind, code, value, slot }
 		end)
 		helpers.assert_eq(reports, { { "motion", REL_X, 3, source }, { "frame", 0, 0, source },
@@ -149,7 +156,7 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 
 	helpers.it("reports pointer queue loss to its observer", function()
 		local reports = {}
-		local _, _, source = drive("mouse", {}, { { EV_SYN, 3, 0, 3000 }, { EV_SYN, 0, 0, 4000 } },
+		local _, _, _, source = drive("mouse", {}, { { EV_SYN, 3, 0, 3000 }, { EV_SYN, 0, 0, 4000 } }, nil,
 			function(kind, code, value, slot) reports[#reports + 1] = { kind, code, value, slot } end)
 		helpers.assert_eq(reports, { { "dropped", 3, 0, source }, { "frame", 0, 0, source },
 			{ "reset", nil, nil, source } })
@@ -220,6 +227,55 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		})
 		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":1"))
 		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":0"), "stop must release the virtual button")
+	end)
+
+	helpers.it("releases a grabbed mouse button when that pointer disappears", function()
+		local changed = false
+		local emitted = drive("mouse", HOLD, {
+			{ EV_KEY, BTN_LEFT, 1, 3000 }, { EV_REL, REL_X, 1, 3500 },
+		}, function(hook, keyboard)
+			if changed then return end
+			changed = true
+			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { keyboard }, {} end
+			for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
+		end)
+		helpers.assert_true(changed)
+		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":0"), "the departed mouse cannot leave a virtual button down")
+	end)
+
+	helpers.it("keeps a grabbed mouse forwarding its button after another mouse arrives", function()
+		local changed, running = false, false
+		local _, grabs, emitted = drive("mouse", HOLD, {
+			{ EV_KEY, BTN_LEFT, 1, 3000 }, { EV_REL, REL_X, 1, 3500 },
+			{ EV_KEY, BTN_LEFT, 0, 4000 },
+		}, function(hook, keyboard, pointer, second)
+			if changed then return end
+			changed = true
+			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { keyboard }, { pointer, second } end
+			for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
+			running = hook.isRunning()
+		end)
+		helpers.assert_true(changed)
+		helpers.assert_true(running, "the retained mouse remains captured")
+		helpers.assert_eq(grabs.on, 1, "a retained grab cannot be acquired a second time")
+		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":0"), "the retained mouse must still forward its release")
+	end)
+
+	helpers.it("keeps both mouse grabs until the last shared button release", function()
+		local changed = false
+		local _, grabs, emitted = drive("mouse", HOLD, {
+			{ EV_REL, REL_X, 1, 2000 },
+			{ EV_KEY, BTN_LEFT, 1, 3000 }, { EV_KEY, BTN_LEFT, 1, 4000, "second" },
+			{ EV_KEY, BTN_LEFT, 0, 9500 }, { EV_KEY, BTN_LEFT, 0, 10000, "second" },
+		}, function(hook, keyboard, pointer, second)
+			if changed then return end
+			changed = true
+			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { keyboard }, { pointer, second } end
+			for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
+		end)
+		helpers.assert_eq(count(emitted, "key:" .. BTN_LEFT .. ":1"), 1)
+		helpers.assert_eq(count(emitted, "key:" .. BTN_LEFT .. ":0"), 1, "the last owner releases the shared virtual button")
+		helpers.assert_eq(grabs.off, 1)
 	end)
 
 	helpers.it("leaves the wheel and the mouse alone outside the layer and under an unbound key", function()
