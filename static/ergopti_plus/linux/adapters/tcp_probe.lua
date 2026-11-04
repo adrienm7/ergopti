@@ -175,12 +175,16 @@ end
 --- @return string|nil host, integer|nil port
 function M.relay_address(relay)
 	if type(relay) ~= "string" then return nil, nil end
-	local authority = relay:match("^%l[%l%d]*://([^/]+)$")
+	local scheme, authority = relay:match("^(%l[%l%d]*)://([^/]+)$")
 	if not authority then return nil, nil end
 	authority = authority:gsub("^.*@", "")
 	-- IPv4-mapped IPv6 addresses may contain a dotted decimal suffix.
 	local host, port = authority:match("^%[([%x:%.]+)%]:(%d+)$")
 	if not host then host, port = authority:match("^([^:]+):(%d+)$") end
+	if not host then
+		host = authority:match("^%[([%x:%.]+)%]$") or authority:match("^([^:%[%]]+)$")
+		if host then port = scheme == "https" and 443 or 1080 end -- libcurl proxy defaults.
+	end
 	port = tonumber(port)
 	if not host or not port or port < 1 or port > 65535 then return nil, nil end
 	return host, port

@@ -234,12 +234,18 @@ it("reads the relay address of every relay form the policy admits", function()
 		{ "socks5h://user:secret@gate.example:1080", "gate.example", 1080 },
 		{ "http://[::1]:8080", "::1", 8080 },
 		{ "http://[::ffff:127.0.0.1]:8080", "::ffff:127.0.0.1", 8080 },
+		{ "http://proxy.example", "proxy.example", 1080 },
+		{ "https://proxy.example", "proxy.example", 443 },
+		{ "socks5h://user:secret@[::1]", "::1", 1080 },
 	}
 	for _, case in ipairs(cases) do
+		local policy = assert(require("infra.proxy_policy").load())
+		local choices = assert(policy.selection({ ok = true, proxies = { case[1], "direct://" } }))
+		helpers.assert_eq(choices[1].proxy, case[1])
 		local host, port = Probe.relay_address(case[1])
 		helpers.assert_eq(host, case[2])
 		helpers.assert_eq(port, case[3])
 	end
-	helpers.assert_eq(Probe.relay_address("http://proxy.example"), nil)
+	helpers.assert_eq(Probe.relay_address("http://"), nil)
 	helpers.assert_eq(Probe.relay_address("proxy.example:3128"), nil)
 end)
