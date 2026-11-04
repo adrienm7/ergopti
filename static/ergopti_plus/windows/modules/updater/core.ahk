@@ -2616,9 +2616,12 @@ _Updater_RateLimitDetail(Status, Remaining, Reset) {
 	if (Status != 403 && Status != 429) || Remaining != "0"
 		return ""
 	When := ""
-	if RegExMatch(Reset, "^\d+$")
-		When := ", it resets at "
+	if RegExMatch(Reset, "^\d+$") {
+		try When := ", it resets at "
 			. FormatTime(DateAdd("19700101000000", Integer(Reset), "Seconds"), "yyyy-MM-dd HH:mm:ss") . " UTC"
+		catch
+			When := ""
+	}
 	return Format("HTTP {1}: the GitHub API rate limit is exhausted{2}", Status, When)
 }
 

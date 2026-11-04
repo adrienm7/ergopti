@@ -263,7 +263,7 @@ local function clipboard_received_capture(mark)
 	if mark == nil then return false end
 	local Adapter = capture_adapter()
 	local now = Adapter.clipboard_change_count()
-	if now == nil or now == mark then return false end
+	if now == nil or now <= mark then return false end
 	return Adapter.clipboard_has_image() == true
 end
 

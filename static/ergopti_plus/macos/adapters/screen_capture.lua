@@ -139,7 +139,7 @@ function M.clipboard_change_count()
 	if not fn then return nil, missing end
 	local ok, count = pcall(fn)
 	if not ok then return nil, tostring(count) end
-	if type(count) ~= "number" then return nil, "changeCount returned " .. tostring(count) end
+	if math.type(count) ~= "integer" or count < 0 then return nil, "changeCount returned an invalid count" end
 	return count
 end
 
@@ -177,7 +177,7 @@ function M.copy_image_file_to_clipboard(path)
 
 	local after, after_err = M.clipboard_change_count()
 	if after == nil then return false, after_err end
-	if after == before then return false, "the pasteboard change count did not advance" end
+	if after <= before then return false, "the pasteboard change count did not advance" end
 	local present, read_err = M.clipboard_has_image()
 	if present ~= true then
 		return false, present == nil and read_err or "the pasteboard holds no image after the write"

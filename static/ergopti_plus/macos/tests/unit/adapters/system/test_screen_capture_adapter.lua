@@ -214,6 +214,29 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 end)
 
 helpers.describe("screen capture adapter: verified clipboard image", function()
+	helpers.it("rejects invalid or regressing pasteboard counts (screen-capture-count-validity)", function()
+		for _, invalid in ipairs({ -1, 1.5, math.huge, 0 / 0 }) do
+			local native, state = pasteboard_native()
+			native.pasteboard.changeCount = function() return invalid end
+			with_native(native, function(adapter)
+				local copied, detail = adapter.copy_image_file_to_clipboard("/tmp/cap.png")
+				helpers.assert_eq(copied, false)
+				helpers.assert_contains(detail, "invalid count")
+				helpers.assert_eq(#state.writes, 0, "invalid ownership must prevent the clipboard write")
+			end)
+		end
+		local native, state = pasteboard_native()
+		native.pasteboard.writeObjects = function(image)
+			state.count, state.image = 6, image
+			return true
+		end
+		with_native(native, function(adapter)
+			local copied, detail = adapter.copy_image_file_to_clipboard("/tmp/cap.png")
+			helpers.assert_eq(copied, false)
+			helpers.assert_contains(detail, "did not advance")
+		end)
+	end)
+
 	helpers.it("copies the capture file and reads the image back", function()
 		local native, state = pasteboard_native()
 		with_native(native, function(adapter)
