@@ -527,8 +527,8 @@ helpers.describe("keyboard_hook: a failing callback still forwards the grabbed e
 				return true
 			end,
 		}, true)
-		helpers.assert_eq(emitted, { "30:1" },
-			"the grabbed press must reach the application even as capture stops")
+		helpers.assert_eq(emitted, { "30:1", "30:0" },
+			"the grabbed press reaches the application without leaving a virtual key held")
 		helpers.assert_true(not kh.isRunning(),
 			"the failure must still release capture ownership")
 	end)
@@ -545,8 +545,8 @@ helpers.describe("keyboard_hook: a failing callback still forwards the grabbed e
 				return true
 			end,
 		}, true)
-		helpers.assert_eq(emitted, { "30:1" },
-			"a missing verdict is not a suppression — the press must be forwarded")
+		helpers.assert_eq(emitted, { "30:1", "30:0" },
+			"a missing verdict is forwarded as a balanced press")
 		helpers.assert_true(not kh.isRunning(),
 			"the failure must still release capture ownership")
 	end)
