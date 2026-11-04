@@ -60,6 +60,7 @@ local function exec(executable, args, timeout_s, callback, environment)
 		settle(nil, "")
 		return
 	end
+	if settled then return end
 	timer = Timer.after(timeout_s, function()
 		timer = nil
 		pcall(handle.terminate)

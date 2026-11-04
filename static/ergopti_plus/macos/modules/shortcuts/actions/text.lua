@@ -710,49 +710,8 @@ local function text_case()
 	return _text_case
 end
 
---- Tells whether a codepoint joins the character before it on screen, so one
---- arrow press moves over both: combining marks, variation selectors, emoji
---- skin-tone modifiers, tag characters and the zero-width joiner.
---- @param code number The codepoint.
---- @return boolean joins
-local function joins_previous(code)
-	return (code >= 0x0300 and code <= 0x036F) or (code >= 0x1AB0 and code <= 0x1AFF)
-		or (code >= 0x1DC0 and code <= 0x1DFF) or (code >= 0x20D0 and code <= 0x20FF)
-		or (code >= 0xFE20 and code <= 0xFE2F) or (code >= 0xFE00 and code <= 0xFE0F)
-		or (code >= 0xE0100 and code <= 0xE01EF) or (code >= 0x1F3FB and code <= 0x1F3FF)
-		or (code >= 0xE0020 and code <= 0xE007F) or code == 0x200D
-end
-
---- Counts the arrow presses that move over a text. macOS moves the caret over
---- one composed character sequence per press, not one UTF-16 unit or one
---- codepoint: é written e + U+0301, 👍🏽, ❤️, a ZWJ family and a flag are one
---- press each, as is CR LF. Counting codepoints left a combined character, or
---- the start of the text, out of the reselection.
---- @param text string Valid UTF-8.
---- @return number steps Arrow presses from the end of the text to its start.
-local function cursor_steps(text)
-	local steps, previous, regional_open = 0, nil, false
-	for _, code in utf8.codes(text) do
-		local joined = false
-		if previous == nil then
-			joined = false
-		elseif joins_previous(code) or previous == 0x200D then
-			joined = true
-		elseif code == 0x0A and previous == 0x0D then
-			joined = true
-		elseif code >= 0x1F1E6 and code <= 0x1F1FF and regional_open then
-			joined = true
-		end
-		if code >= 0x1F1E6 and code <= 0x1F1FF then
-			regional_open = not joined
-		elseif not joined then
-			regional_open = false
-		end
-		if not joined then steps = steps + 1 end
-		previous = code
-	end
-	return steps
-end
+-- The keymap's Backspace tracker uses the same composed-text boundaries.
+local cursor_steps = require("infra.composed_text").count
 M._cursor_steps = cursor_steps
 
 --- Asynchronous text-transform engine.

@@ -40,18 +40,17 @@ function parseToNodes(text) {
 	if (!text) return [document.createTextNode('')];
 
 	var nodes = [];
-	var normalized = text.replace(/\n/g, '{Enter}');
-	var re = /\{([^}]+)\}/gi;
+	var re = /\n|\{([^}\n]+)\}/gi;
 	var last = 0;
 	var match;
 
-	while ((match = re.exec(normalized)) !== null) {
+	while ((match = re.exec(text)) !== null) {
 		if (match.index > last) {
-			nodes.push(document.createTextNode(normalized.slice(last, match.index)));
+			nodes.push(document.createTextNode(text.slice(last, match.index)));
 		}
 
-		var tokenName = match[1].toLowerCase();
-		if (tokenName === 'enter') {
+		var tokenName = match[1] && match[1].toLowerCase();
+		if (match[0] === '\n') {
 			nodes.push(document.createElement('br'));
 		} else if (
 			tokenName === 'context' ||
@@ -67,8 +66,8 @@ function parseToNodes(text) {
 		last = re.lastIndex;
 	}
 
-	if (last < normalized.length) {
-		nodes.push(document.createTextNode(normalized.slice(last)));
+	if (last < text.length) {
+		nodes.push(document.createTextNode(text.slice(last)));
 	}
 
 	return nodes;

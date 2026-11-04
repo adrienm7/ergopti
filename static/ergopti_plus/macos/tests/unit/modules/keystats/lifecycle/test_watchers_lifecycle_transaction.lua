@@ -222,7 +222,7 @@ local function with_fixture(options, scenario)
 		end,
 		day_rollover = function() return true end,
 		log_app_switch = noop,
-		log_passive_period = noop,
+		log_passive_period = function(kind, duration) fixture.passive_period = { kind = kind, duration = duration } end,
 		log_system_event = function(kind, payload)
 			fixture.system_events[#fixture.system_events + 1] = {
 				kind = kind,
@@ -273,6 +273,20 @@ end
 -- =================================================
 
 helpers.describe("keystats hardware watchers form one exact transaction", function()
+	helpers.it("keeps the original sleep start across screen and system sleep events", function()
+		with_fixture({}, function(watchers, fixture)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms = 1000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.screensDidSleep)
+			fixture.now_ms = 4000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemWillSleep)
+			fixture.now_ms = 9000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemDidWake)
+			helpers.assert_eq(fixture.passive_period.kind, "sleep")
+			helpers.assert_eq(fixture.passive_period.duration, 8000)
+		end)
+	end)
+
 	helpers.it("rolls back earlier siblings when a later watcher refuses startup", function()
 		with_fixture({ start_results = { battery = false } }, function(watchers, fixture)
 			helpers.assert_eq(watchers.init_hardware_watchers(), false)

@@ -19,6 +19,7 @@
 local hs         = hs
 local eventtap   = hs.eventtap
 local text_utils = require("infra.text_utils")
+local ComposedText = require("infra.composed_text")
 local EventProvenance = require("adapters.event_provenance")
 local KeyboardGeometry = require("adapters.keyboard_geometry")
 local ControlSentinels = require("modules.keymap.control_sentinels")
@@ -1840,13 +1841,18 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 			return false
 		end
 		if #CoreState.buffer > 0 then
-			-- Remove the last UTF-8 character from the buffer safely.
-			local ok, offset = pcall(utf8.offset, CoreState.buffer, -1)
-			CoreState.buffer = (ok and offset) and CoreState.buffer:sub(1, offset - 1) or ""
-			-- The Backspace that erases the last character typed since the
-			-- buffer started puts the caret back where that typing began: the
-			-- next character starts a word, as on Windows and Linux.
-			if CoreState.buffer == "" then CoreState.start_is_word_boundary = true end
+			-- macOS Backspace deletes a composed character, not just its last scalar.
+			local ok, offset = pcall(ComposedText.last_start, CoreState.buffer)
+			if ok and offset then
+				CoreState.buffer = CoreState.buffer:sub(1, offset - 1)
+				-- A proven deletion to the buffer's start restores that boundary.
+				if CoreState.buffer == "" then CoreState.start_is_word_boundary = true end
+			else
+				-- Malformed text cannot prove where the caret landed.
+				CoreState.buffer = ""
+				CoreState.start_is_word_boundary = false
+				CoreState.start_is_line_start = false
+			end
 			update_preview_with_action_recovery(CoreState.buffer)
 		elseif CoreState.start_is_line_start and CoreState.start_is_word_boundary then
 			-- The start of an empty line: the Backspace deleted nothing.

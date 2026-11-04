@@ -730,6 +730,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-keystats-token-encoding.cjs"],
 			"repro": "npm run test:keystats-token-encoding"
+		},
+		{
+			"id": "js-hotstring-editor-preference-update",
+			"ordinal": 575,
+			"name": "hotstring editor preference updates preserve unsaved drafts",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-editor-preference-update.cjs"],
+			"repro": "node tools/test/test-hotstring-editor-preference-update.cjs"
 		}
 	]
 }

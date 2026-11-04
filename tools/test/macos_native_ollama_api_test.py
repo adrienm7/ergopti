@@ -48,6 +48,10 @@ if request.get('method'):
  if mode=='bad_header':headers=[['Content-Type','application/json\r\nX-Injected: yes']]
  if mode=='bad_header_name':headers=[['bad name','value']]
  if mode=='encoded_body':headers=[['Content-Encoding','gzip']]
+ if mode=='length_short':headers=[['Content-Length','100']]
+ if mode=='length_extra':headers=[['Content-Length','1']]
+ if mode=='length_bad_terminal':headers=[['Content-Length',str(len(b'{"status":"success"}\n'))]]
+ if mode=='length_exact':headers=[['Content-Length',str(len(b'{"status":"success"}\n'))]]
  frame(b'H',{'version':1,'status':200,'headers':headers})
  frame(b'D',b'{"status":"success"}\n')
  if mode=='body_wait':time.sleep(60)
@@ -60,7 +64,7 @@ receipt={'version':1,'success':mode!='admission','reason':'admission' if mode=='
 if mode=='duplicate':
  frame(b'C',b'{"version":1,"version":1,"success":true,"reason":"complete","listener":null}')
 else:frame(b'C',receipt)
-if mode=='trailing':sys.stdout.buffer.write(b'x');sys.stdout.buffer.flush()
+if mode in ('trailing','length_bad_terminal'):sys.stdout.buffer.write(b'x');sys.stdout.buffer.flush()
 if mode=='exit':sys.exit(74)
 """
 
@@ -276,6 +280,27 @@ class WireReceiving(unittest.TestCase):
                 finally:
                     if response is not None:
                         response.close()
+
+    def test_content_length_requires_exact_body_and_verified_terminal(self):
+        for mode in ("length_short", "length_extra", "length_bad_terminal"):
+            with self.subTest(mode=mode):
+                self.receipt.unlink(missing_ok=True)
+                os.environ["ERGOPTI_PEER_MODE"] = mode
+                with self.request() as response:
+                    delivered = []
+                    with self.assertRaises(self.api.ENGINE.NativeHTTPError):
+                        while chunk := response.read():
+                            delivered.append(chunk)
+                    if mode != "length_short":
+                        self.assertEqual(delivered, [])
+                        self.assertFalse(response._complete)
+
+    def test_content_length_exact_verifies_terminal_before_last_bytes(self):
+        os.environ["ERGOPTI_PEER_MODE"] = "length_exact"
+        with self.request() as response:
+            self.assertEqual(response.read(), b'{"status":"success"}\n')
+            self.assertTrue(response._complete)
+            self.assertEqual(response.read(), b"")
 
     def test_invalid_identity_duplicate_trailing_and_exit_never_publish(self):
         for mode in ("boolean_pid", "noncanonical_start", "duplicate", "trailing", "exit"):

@@ -119,6 +119,7 @@ class NativeOllamaResponse(ENGINE.NativeHTTPResponse):
         ):
             raise ENGINE.NativeHTTPError("protocol")
         self._listener_expected = expected
+        self._method = method
         self._device_expected, self._inode_expected = device, inode
         milliseconds = math.ceil(timeout * 1000) if timeout is not None else None
         idle_milliseconds = math.ceil(idle_timeout * 1000)

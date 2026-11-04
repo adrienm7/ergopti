@@ -32,6 +32,33 @@ local function load_reader(open_count)
 end
 
 helpers.describe("sqlite_reader: historical ranges exclude the live today split", function()
+	helpers.it("returns incomplete and closes the database when a query error cannot be formatted", function()
+		helpers.with_stub_scope({"modules.keystats.sqlite_reader", "infra.logger"}, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local calls, closed = 0, 0
+			local opaque = setmetatable({}, {__tostring = function() error("unprintable") end})
+			local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", {
+				sqlite3 = {OPEN_READONLY = 1, open = function()
+					return {
+						exec = function() return 0 end,
+						close = function() closed = closed + 1 end,
+						nrows = function()
+							calls = calls + 1
+							if calls == 1 then error(opaque) end
+							return function() return nil end
+						end,
+					}
+				end},
+			})
+			local ok, manifest, complete = pcall(reader.read_manifest, "/fake/db.sqlite")
+			helpers.assert_true(ok, "formatting a query error must not escape the reader")
+			helpers.assert_true(type(manifest) == "table")
+			helpers.assert_eq(complete, false)
+			helpers.assert_true(calls > 1, "subsequent projections still run")
+			helpers.assert_eq(closed, 1)
+		end)
+	end)
+
 	helpers.it("does not open a second today projection for an interval ending before today", function()
 		local opens = { value = 0 }
 		local reader = load_reader(opens)
