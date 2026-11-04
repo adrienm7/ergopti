@@ -278,7 +278,11 @@ const migration = {
 			'\\'
 		),
 		legacyLocalFolder: requireString(migrationWindows, 'legacy_local_folder', 'migration.windows'),
-		legacyOllamaFolder: requireString(migrationWindows, 'legacy_ollama_folder', 'migration.windows')
+		legacyOllamaFolders: requireSegments(
+			migrationWindows,
+			'legacy_ollama_folders',
+			'migration.windows'
+		)
 	},
 	linux: {
 		legacyFolder: requireString(migrationLinux, 'legacy_folder', 'migration.linux')
@@ -301,11 +305,15 @@ for (const [name, base] of [
 for (const legacy of [
 	migration.macos.legacySupportRelative.split('/').pop(),
 	migration.windows.legacyLocalFolder,
-	migration.windows.legacyOllamaFolder,
+	...migration.windows.legacyOllamaFolders,
 	migration.linux.legacyFolder
 ]) {
 	if (legacy === folderName || legacy === linuxFolderName)
 		fail(`the legacy folder "${legacy}" must differ from the current folder name.`);
+}
+for (const legacy of migration.windows.legacyOllamaFolders) {
+	if (legacy.toLowerCase() === managedOllamaFolder.toLowerCase())
+		fail(`the legacy Ollama folder "${legacy}" must differ from the managed runtime folder.`);
 }
 
 /** A Lua double-quoted string literal. */
@@ -437,7 +445,7 @@ function emitAhk() {
 		fn(
 			'AppDirsWindowsManagedOllamaFolderName',
 			managedOllamaFolder,
-			'Separate direct LocalApplicationData child for the managed Windows runtime.'
+			'Protected managed Windows runtime folder inside the Ergopti root.'
 		) +
 		'\n' +
 		fn(
@@ -574,11 +582,11 @@ function emitAhk() {
 			'Legacy LocalApplicationData folder whose entries move into the root.'
 		) +
 		'\n' +
-		fn(
-			'AppDirsMigrationWindowsLegacyOllamaFolder',
-			migration.windows.legacyOllamaFolder,
-			'Legacy managed Ollama folder, renamed to the managed runtime folder.'
-		)
+		'; Legacy managed Ollama folders, LocalApplicationData children moved in order\n' +
+		'; into the managed runtime folder.\n' +
+		'AppDirsMigrationWindowsLegacyOllamaFolders() {\n' +
+		`\treturn [${migration.windows.legacyOllamaFolders.map(ahkStr).join(', ')}]\n` +
+		'}\n'
 	);
 }
 

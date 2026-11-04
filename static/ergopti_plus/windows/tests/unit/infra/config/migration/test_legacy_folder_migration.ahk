@@ -160,3 +160,56 @@ _LFM_BootRunsItFirstAndNeverUnderTheSmoke() {
 }
 Test("legacy folder migration: boot runs it before paths.toml, never under the smoke (legacy-folder-migration-boot-order)",
 	_LFM_BootRunsItFirstAndNeverUnderTheSmoke)
+
+; The whole Windows plan on a private profile: the three base variables point
+; at a temp tree for the call only, so the real AppData is never read or moved.
+; Both old managed Ollama folders land in the root's ollama folder, the second
+; one in the backup, and every old folder is gone afterwards.
+_LFM_WindowsPlanMovesEveryOldFolderOnAPrivateProfile() {
+	Profile := A_Temp . "\ergopti_test_legacy_folder_plan_" . A_TickCount
+	Saved := Map()
+	for Name in ["LOCALAPPDATA", "APPDATA", "USERPROFILE"]
+		Saved[Name] := EnvGet(Name)
+	try {
+		Local_ := Profile . "\Local", Roaming := Profile . "\Roaming", Home := Profile . "\Home"
+		for Path in [Local_ . "\" . AppDirsMigrationWindowsLegacyLocalFolder() . "\logs",
+			Roaming . "\" . StrReplace(AppDirsMigrationWindowsLegacyPathsFileRelative(), "\paths.toml", ""),
+			Home . "\" . AppDirsMigrationWindowsLegacyConfigRelative()]
+			DirCreate(Path)
+		FileAppend("a", Local_ . "\" . AppDirsMigrationWindowsLegacyLocalFolder() . "\logs\old.log")
+		FileAppend('ConfigDirPath = ""`n', Roaming . "\" . AppDirsMigrationWindowsLegacyPathsFileRelative())
+		FileAppend("x", Home . "\" . AppDirsMigrationWindowsLegacyConfigRelative() . "\config.toml")
+		Ollama := AppDirsMigrationWindowsLegacyOllamaFolders()
+		AssertEqual(2, Ollama.Length, "the first build's folder and the protected sibling")
+		for Index, Name in Ollama {
+			DirCreate(Local_ . "\" . Name . "\versions")
+			FileAppend(Index, Local_ . "\" . Name . "\versions\v" . Index)
+		}
+		EnvSet("LOCALAPPDATA", Local_), EnvSet("APPDATA", Roaming), EnvSet("USERPROFILE", Home)
+		Root := RTrim(AppFoldersRoot(), "\")
+		Report := LegacyFolderMigrationRun(AppFoldersPathsFile())
+		Managed := AppFoldersManagedOllamaRoot()
+		AssertEqual(Root . "\" . AppDirsWindowsManagedOllamaFolderName(), Managed, "the managed runtime is inside the root")
+		Assert(FileExist(Managed . "\versions\v1"), "the first old runtime folder became the managed root")
+		Backup := Root . "\" . AppDirsMigrationBackupFolder() . "\" . Ollama[2]
+		Assert(FileExist(Backup . "\versions\v2"), "the second old runtime folder went to the backup")
+		Assert(FileExist(Root . "\logs\old.log"), "the old LocalAppData entries merged into the root")
+		Assert(FileExist(AppFoldersPathsFile()), "the Roaming paths.toml moved into the root")
+		Assert(FileExist(RTrim(AppFoldersDefaultConfigDir(), "\") . "\config.toml"), "the old configuration folder moved")
+		for Name in Ollama
+			Assert(!FileExist(Local_ . "\" . Name), "the old runtime folder " . Name . " is gone")
+		Assert(!FileExist(Local_ . "\" . AppDirsMigrationWindowsLegacyLocalFolder()), "the old LocalAppData folder is gone")
+		AssertEqual(1, Report["backed_up"].Length, "one entry backed up")
+		AssertEqual(0, Report["kept"].Length, "nothing left behind")
+		Again := LegacyFolderMigrationRun(AppFoldersPathsFile())
+		AssertEqual(0, Again["moved"].Length + Again["backed_up"].Length + Again["kept"].Length,
+			"a second boot has nothing to move")
+	} finally {
+		for Name, Value in Saved
+			EnvSet(Name, Value)
+		if DirExist(Profile)
+			DirDelete(Profile, true)
+	}
+}
+Test("legacy folder migration: the Windows plan moves both old Ollama folders on a private profile (legacy-folder-migration-windows-plan)",
+	_LFM_WindowsPlanMovesEveryOldFolderOnAPrivateProfile)
