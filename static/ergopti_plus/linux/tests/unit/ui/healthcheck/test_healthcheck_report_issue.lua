@@ -825,3 +825,24 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 		helpers.assert_true(not pcall(DayLogHost.read_file, "x", 100, fake(5, "abc")), "a short read is an error")
 	end)
 end)
+
+helpers.it("diagnostic path existence checks do not read a FIFO", function()
+	local uv = require("luv")
+	local Report = require("ui.healthcheck.report")
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-diagnostic-fifo-XXXXXX"))
+	local path = dir .. "/log"
+	local made = os.execute("mkfifo '" .. path .. "'"); assert(made == 0 or made == true)
+	local exited, code, process = false, nil, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; printf synthetic > "$1"', "fixture", path } }, function(result)
+		code, exited = result, true; process:close()
+	end))
+	local opened, outcome = 0, nil
+	Report.perform({ action = "open_path", id = "log_today" }, { log_today = path }, {}, {}, {
+		open = function(target, done) opened = opened + 1; helpers.assert_eq(target, path); done({ ok = true, code = 0 }) end,
+	}, nil, { current = function() return true end, complete = function(result) outcome = result end })
+	os.remove(path); os.remove(dir)
+	while not exited do uv.run("once") end
+	helpers.assert_true(code ~= 0, "checking existence opened the FIFO")
+	helpers.assert_eq(opened, 1)
+	helpers.assert_true(outcome and outcome.ok)
+end)

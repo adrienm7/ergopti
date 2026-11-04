@@ -77,11 +77,8 @@ local DEFAULT_EFFECTS = {
 		return path
 	end,
 	exists = function(path)
-		local fh = io.open(path, "rb")
-		if fh then fh:close() return true end
-		-- A folder cannot be opened as a file on every system; ask the shell
-		local Shell = require("adapters.shell_runner")
-		return Shell.run("test -e " .. Shell.quote(path))
+		local called, kind = pcall(require("infra.native_directory").target_kind, path)
+		return called and kind ~= nil
 	end,
 	-- No portable "select this file" exists across file managers; the folder
 	-- holding it is the next best thing
