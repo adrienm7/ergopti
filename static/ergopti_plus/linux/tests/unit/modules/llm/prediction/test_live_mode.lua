@@ -257,6 +257,33 @@ end
 -- ======================================
 -- ======================================
 
+helpers.it("live mode refuses a FIFO configuration without blocking", function()
+	scenario({}, function(world)
+		local uv, Paths = require("luv"), require("infra.paths")
+		local original = Paths.shared
+		local source = assert(original("modules/llm/live.json"))
+		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-live-config-XXXXXX"))
+		local path = dir .. "/live.json"
+		local made = os.execute("mkfifo '" .. path .. "'")
+		assert(made == 0 or made == true)
+		local exited, process = false, nil
+		process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source } }, function()
+			exited = true; process:close()
+		end))
+		Paths.shared = function(relative)
+			if relative == "modules/llm/live.json" then return path end
+			return original(relative)
+		end
+		local called, started = pcall(world.handlers.llm_live_prompt_toggle, "tap_3", "translate_en|1")
+		Paths.shared = original
+		os.remove(path); os.remove(dir)
+		while not exited do uv.run("once") end
+		assert(called, started)
+		helpers.assert_eq(started, false, "live mode must not start from a special file")
+		helpers.assert_nil(world.engine.get_live())
+	end)
+end)
+
 helpers.describe("live mode: the sentence translated as it is typed", function()
 
 	helpers.it("ships a debounce shorter than the menu's and no word floor", function()

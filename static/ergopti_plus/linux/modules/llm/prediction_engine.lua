@@ -450,9 +450,9 @@ end
 local function live_config()
 	if _live_config then return _live_config end
 	local path = require("infra.paths").shared(LIVE_CONFIG_FILE)
-	local fh = path and io.open(path, "r")
-	local text = fh and fh:read("*a") or nil
-	if fh then fh:close() end
+	local text, status
+	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then text = nil end
 	local config, reason = M.parse_live_config(text)
 	if not config then
 		Logger.error(LOG, "Live mode unavailable: %s.", tostring(reason))
