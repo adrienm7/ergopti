@@ -487,7 +487,7 @@
 			"reproduction": "Native run41908674329 at944d513 passes the two-POST thinking-retry control. At the actual refusal logger cutpoint the original reservation is already retired; cancel the genuine progress window there. Its owner and window retire, but a new second reservation and second native HTTP POST still appear. The exact expected1/observed2 failure reproduces individually and reversed.",
 			"root_cause": "The Menu API test supplies callbacks and a request kind to Generate without its supported CurrentFn authority. CancelAsync(original) cannot find a retry that has not yet been reserved, so the retry sender is admitted after the progress owner is gone.",
 			"silent_failure": "Clicking Cancel can still send another prompt to the provider after the native progress window closes and the auxiliary test owner is retired.",
-			"regression_test": "Two api-thinking-retry-owner cases drive the actual native Menu progress GUI, genuine Generate/managed HTTP and an owned loopback peer. A real logger sink cancels exactly between original retirement and retry admission; the positive control must issue two requests and settle successfully, while cancellation must leave one request, no retry link and no retired UI publication. The fix binds the exact progress owner through the existing Generate CurrentFn argument. Native fail-before measured; post-fix qualification pending."
+			"regression_test": "Two api-thinking-retry-owner cases drive the actual native Menu progress GUI, genuine Generate/managed HTTP and an owned loopback peer. A real logger sink cancels exactly between original retirement and retry admission; the positive control must issue two requests and settle successfully, while cancellation must leave one request, no retry link and no retired UI publication. The fix binds the exact progress owner through the existing Generate CurrentFn argument. Native fail-before measured; post-fix qualification measured in run41909512571 ata6373a4: both cases passed individually and reversed, with two requests for the positive control and one request for cancellation. The mixed cohort remains red for AHK-046/AHK-047."
 		},
 		{
 			"id": "AHK-045",
@@ -510,6 +510,17 @@
 			"root_cause": "KL_Clip_OnPaste computes native A_TickCount differences with an explicit UInt32 mask for copy_lag_ms and retained paste_ticks. These origins are full-width monotonic ticks rather than clipboard sequence DWORDs. Retained old copy/burst state can therefore alias recent activity after 2^32 milliseconds.",
 			"silent_failure": "Long-lived retained clipboard metadata reports a short copy age and can turn ancient pastes into a fresh burst after roughly49.7 days or a multiple thereof.",
 			"regression_test": "Three clipboard-paste-native64 cases use actual accepted copy/paste producers, native privacy/context/queue owners and an isolated existing child. Only the unique current paste-clock read is bound; no timestamp state is assigned. Ordinary activity, one/two DWORD eras and subsequent fresh activity must preserve full lag and burst retirement. TickElapsed64 replaces the two masks without changing copy provenance. Native fail-before measured; post-fix pending. No49-day native uptime is claimed."
+		},
+		{
+			"id": "AHK-047",
+			"title": "A late token answer can mark an expired readiness request successful",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Native run41909512571 ata6373a4 passes the timely token answer. A genuine answer timer begins while the request owner is current and its clock live, then crosses the unchanged96ms deadline under Critical before delivering the actual token answer. Readiness returns true instead of false, individually and reversed.",
+			"root_cause": "_LLMRemote_ReadyOnAccess checks auxiliary identity but omits the stored absolute whole-request deadline. For a nonlisting request it publishes true immediately after successful token preparation even if the due deadline timer has not yet run.",
+			"silent_failure": "Save-time credential validation can report success after its total request budget expired, depending on native callback delivery order. The shared usable token may correctly remain cached while the expired individual validation must fail.",
+			"regression_test": "Two token-ready-deadline cases run public readiness and the genuine token engine through the existing passive exchange HTTP port, with actual AHK timer delivery. The late reply crosses the original real budget; neither origin nor duration is moved. Timely control, current-owner checks, exact one-result receipt and preserved token cache distinguish authority from credential lifetime. The narrow fix checks the original deadline in ReadyOnAccess. Native fail-before measured; post-fix pending. macOS/Linux token readiness continues through a request rather than this Windows-only nonlisting shortcut."
 		}
 	]
 }

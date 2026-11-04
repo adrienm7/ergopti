@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **46 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **47 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -869,3 +869,21 @@ Consequence: Long-lived retained clipboard metadata reports a short copy age and
 Regression: Three clipboard-paste-native64 cases use actual accepted copy/paste producers, native privacy/context/queue owners and an isolated existing child. Only the unique current paste-clock read is bound; no timestamp state is assigned. Ordinary activity, one/two DWORD eras and subsequent fresh activity must preserve full lag and burst retirement. TickElapsed64 replaces the two masks without changing copy provenance. Native fail-before measured; post-fix pending. No49-day native uptime is claimed.
 
 The ongoing register now contains **46 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-047: A late token answer can mark an expired readiness request successful
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_LLMRemote_ReadyOnAccess checks auxiliary identity but omits the stored absolute whole-request deadline. For a nonlisting request it publishes true immediately after successful token preparation even if the due deadline timer has not yet run.
+
+Reproduction: Native run41909512571 ata6373a4 passes the timely token answer. A genuine answer timer begins while the request owner is current and its clock live, then crosses the unchanged96ms deadline under Critical before delivering the actual token answer. Readiness returns true instead of false, individually and reversed.
+
+Consequence: Save-time credential validation can report success after its total request budget expired, depending on native callback delivery order. The shared usable token may correctly remain cached while the expired individual validation must fail.
+
+Regression: Two token-ready-deadline cases run public readiness and the genuine token engine through the existing passive exchange HTTP port, with actual AHK timer delivery. The late reply crosses the original real budget; neither origin nor duration is moved. Timely control, current-owner checks, exact one-result receipt and preserved token cache distinguish authority from credential lifetime. The narrow fix checks the original deadline in ReadyOnAccess. Native fail-before measured; post-fix pending. macOS/Linux token readiness continues through a request rather than this Windows-only nonlisting shortcut.
+
+The ongoing register now contains **47 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native partial qualification checkpoint: 41909512571
+
+At `a6373a4`, both native thinking-retry cases passed individually and reversed, qualifying AHK-044: the positive control issued two HTTP requests and cancellation retained exactly one. The complete production metrics JSON NUL regression also passed. Ordinary clipboard timing and timely readiness passed; the two native64 clipboard probes and late readiness case reproduced AHK-046/AHK-047. The eight-case mixed cohort is intentionally not reported green. Complete production compile passed; both E2E families were outside selection.
