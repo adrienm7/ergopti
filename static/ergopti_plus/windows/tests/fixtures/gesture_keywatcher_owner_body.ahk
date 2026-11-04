@@ -88,6 +88,11 @@ _GKO_Replacement() {
 	_GKO.OwnerA := _GKO_Acquire(First)
 	_GKO.CallbackA := _GKO.OwnerA.OnKeyDown
 	_GKO_Require(_GKO.CallbackA is Func, "the original owner's actual callback must be retained before replacement")
+	_GKO_Require(GestureStartKeyboardWatcher() && GestureKeyboardHook == _GKO.OwnerA
+		&& _GKO.OwnerA.InProgress && _GKO.Stops.Length == 0,
+		"a live watcher must be reused without disturbing the existing held button")
+	; Create a genuinely retired generation explicitly for the stale callback probe.
+	_GKO_Require(GestureStopKeyboardWatcher(), "the first generation must retire before replacement")
 	_GKO.OwnerB := _GKO_Acquire(Second)
 	_GKO.CallbackB := _GKO.OwnerB.OnKeyDown
 	_GKO_Require(_GKO.OwnerA != _GKO.OwnerB && GestureKeyboardHook == _GKO.OwnerB, "the actual second acquisition must publish a distinct replacement")

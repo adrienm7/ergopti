@@ -148,6 +148,10 @@ GestureStartKeyboardWatcher() {
 	global GestureKeyboardHook
 	PreviousCritical := Critical("On")
 	try {
+		; Both click holds share one observer. Replacing a live observer creates
+		; a failure window in which the earlier held button has no release path.
+		if IsObject(GestureKeyboardHook) && GestureKeyboardHook.InProgress
+			return true
 		if !GestureStopKeyboardWatcher()
 			throw Error("the previous keyboard watcher still owns its native hook")
 		; L3: Level 3 (higher than Ergopti's Level 2 hotkeys).

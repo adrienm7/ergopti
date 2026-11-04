@@ -120,6 +120,7 @@ Test("gestures: lifecycle and dispatch require native click-release receipts (ge
 class _GCHT_RefusingKeyboardHook {
 	__New() {
 		this.StopCalls := 0
+		this.InProgress := false
 	}
 
 	Stop() {
@@ -131,6 +132,7 @@ class _GCHT_RefusingKeyboardHook {
 class _GCHT_AcceptingKeyboardHook {
 	__New() {
 		this.StopCalls := 0
+		this.InProgress := false
 	}
 
 	Stop() {
@@ -188,3 +190,18 @@ _GCHT_StartCannotReplaceRefusedOwner() {
 }
 Test("gestures: keyboard watcher replacement is fenced by exact stop ownership (gesture-keywatcher-stop-debt)",
 	_GCHT_StartCannotReplaceRefusedOwner)
+
+
+_GCHT_ActiveWatcherIsShared() {
+	global GestureKeyboardHook
+	SavedHook := GestureKeyboardHook
+	Hook := _GCHT_AcceptingKeyboardHook()
+	Hook.InProgress := true
+	try {
+		GestureKeyboardHook := Hook
+		AssertTrue(GestureStartKeyboardWatcher())
+		AssertTrue(GestureKeyboardHook == Hook, "an active observer keeps its exact owner")
+		AssertEqual(0, Hook.StopCalls, "another held button must not remove the existing release path")
+	} finally GestureKeyboardHook := SavedHook
+}
+Test("gestures: active click watcher is shared (gesture-shared-active-watcher)", _GCHT_ActiveWatcherIsShared)
