@@ -75,12 +75,6 @@ Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-
 - [ ] **[CODE] macOS chosen-release updater:** evaluate an equivalent of Windows successor boot-ready/probation and post-launch recovery. The custom armed swap currently observes dispatch/rename, not a healthy successor; Sparkle is a distinct engine. Preserve intentional ARMED-on-quit semantics and record any deliberate lower guarantee. [Compared contracts](docs/audits/platform-parity/2026-11-04-recovery/capabilities.md).
 - [ ] **[CODE] Linux standalone updater:** evaluate successor-ready receiving and recovery beyond pre-restart wrapper smoke plus systemd/relay request admission. Windows has the stronger boot-ready/probation contract; an equivalent or an explicit scoped reason remains to be established. [Compared contracts](docs/audits/platform-parity/2026-11-04-recovery/capabilities.md).
 
-## Audit validation follow-up
-
-- [ ] **[CODE] macOS:** declare the existing `/usr/sbin/installer` child in the owned-runtime program inventory through its canonical owner and regenerate consumers. The unchanged inventory test rejects this pre-existing omission at all three reviewed source revisions. [Baseline proof](docs/audits/platform-parity/2026-11-04-flows/validation/installer-baseline/report.md). This metadata item is outside the 26 flow findings.
-
-- [ ] **[CODE] CI:** resolve the current pipeline-wiring permission mismatch for `remap-runtime-build.yml` / `install-acceptance` (`actions: read`) without weakening the closed permission policy. [Integrated-source failure receipt](docs/audits/platform-parity/2026-11-04-flows/validation/delivery-ci.txt).
-
 ## End-to-end parity follow-up
 
 Evidence: [12-scope flow review](docs/audits/platform-parity/2026-11-04-flows/report.md). These are OS/flow work items, not a claim of 26 unique causes or native acceptance. Preserve intentional policies and all current refusal guards.

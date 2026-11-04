@@ -2,6 +2,8 @@
 
 Audited source: `3a680d9f530a9af686fccc16d3f7611ec7fb034c`. Date: 2026-11-04.
 
+The [delivery overlay](delivery-delta.md) reviews subsequent dev through `8eb5378`, including the superseded Windows Ollama sibling rationale, upstream CI fixes and newly added native scope. All 17 mechanisms remain applicable by source comparison; the proofs below remain pinned to their audited revision.
+
 Six OS × module scopes extend the previous review: legacy-folder migration and updater/reload handoff, separately on Windows, macOS and Linux. Six reviewers and root followed real entry points through native effect, acknowledgment, cleanup and next-start adoption. This campaign explicitly covers the newly added migration excluded from the previous flow audit. Earlier evidence remains unchanged.
 
 **17 OS-scoped follow-ups** are retained. They are manifestations and work items, not 17 distinct causes or native desktop reproductions. Root independently opened and replayed the safe private proofs, challenged intent and narrowed classifications. The Windows updater review established no new confirmed root in its declared five-flow coverage; it is not certified globally clean.

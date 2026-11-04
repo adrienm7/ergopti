@@ -1,0 +1,50 @@
+{
+	"audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+	"reviewed_delivery_base": "8eb5378b125b282c56284625f0b4459d4cdd1383",
+	"root_verified_unchanged_owners": [
+		{
+			"path": "static/ergopti_plus/macos/modules/updater/release_installer.lua",
+			"blob": "90569116892e2066951bafc8e52116f0f8b9d58a"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/changelog/init.lua",
+			"blob": "4b4e0e13b5c4c1863ac401699470c8e204ca80f7"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/updater/release_install.lua",
+			"blob": "c3af3e5f9b54f1e1159740085fe00313188b8b30"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/termination_coordinator.lua",
+			"blob": "e1c0b5aef8b76a998815ade9fea2450e757b66e5"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/hotstrings/hotstrings_config.lua",
+			"blob": "739c00d43869c65a43b867e990578d5da34564ed"
+		},
+		{
+			"path": "static/ergopti_plus/macos/init.lua",
+			"blob": "98bbe58f23da8c713cc1eab3cbf25a7e99f8253e"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/legacy_folder_migration.lua",
+			"blob": "ba1fe3d3bbbd66c71eb7c80fc6316f733910f443"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/legacy_folder_migration.lua",
+			"blob": "0552eb6e35fe37c222da5e42a31a8e5f39e66ba6"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/config_paths.lua",
+			"blob": "3311b4e0258b61ecda6be9d18a70c67f06f12e72"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/app_dirs.lua",
+			"blob": "5c5563d7f3c62829b2d68098eaed990175434565"
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+			"blob": "24f61d915db7dcfd13af922fba88d16a0f1b715e"
+		}
+	]
+}
