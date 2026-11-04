@@ -1,0 +1,52 @@
+{
+	"schema_version": 1,
+	"scope": "windows-input",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:24:28.426317+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/windows-input/report.md",
+	"findings": [
+		{
+			"id": "WI-001",
+			"title": "LAlt Tab tap with explicit None hold still activates navigation",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "SOURCE-ONLY, not executed AHK: choose left_alt tap_action=tab and hold None (serialized hold_modifier=\"\", inherited hold_layer evicted), then hold LAlt and press a nav-bound letter. lalt.ahk special Tab criterion matches without testing hold_layer and calls TapHoldOwnImmediateLayer. Long LAlt emits no Tab. source-checks.cjs asserts exact production source and negative controls.",
+			"root_cause": "Special LAlt Tab hotkey omits a nonempty hold_layer criterion while unconditionally entering the layer helper; generic tap-only excludes Tab as special, so None cannot fall back to tap-only.",
+			"silent_failure": "Picker persists and shows no hold, yet non-native nav layer activates. Default Backspace+nav and shared default/catalogue gates do not exercise this custom combination.",
+			"regression_test": "On Windows capture/evaluate actual LAlt registration criteria across Tab x None/nav/Ctrl; invoke winner through hold ownership seams and assert None never activates nav. Include custom RCtrl+LAlt path and other special tap/hold combinations.",
+			"evidence": [
+				"windows/platform/remap/lalt.ahk:127",
+				"windows/platform/remap/lalt.ahk:132",
+				"windows/platform/remap/lalt.ahk:62",
+				"windows/platform/remap/lalt.ahk:341",
+				"windows/platform/remap/tap_hold_writer.ahk:830",
+				"windows/platform/remap/tap_hold_loader.ahk:295",
+				"windows/infra/nav_layer_helpers.ahk:128"
+			],
+			"native_validation": "not_run"
+		},
+		{
+			"id": "WI-002",
+			"title": "Composer Save-and-use treats pending selection launch as completed active layout",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G3", "G5"],
+			"reproduction": "SOURCE-ONLY, not executed AHK: with another layout selected, Save-and-use a valid composition; allow selection reload to launch then refuse later terminal handoff. LayoutManager_Select returns true for pending, composer immediately publishes used=true; scoped gateway later rolls config back without a composer terminal callback. source-checks.cjs asserts actual branches and already-selected negative control.",
+			"root_cause": "Unselected composer use branch consumes bool API LayoutManager_Select that conflates pending/committed receipts, instead of retaining terminal receipt/callback as the already-selected refresh branch does.",
+			"silent_failure": "Shared page marks composition active and clears busy before runtime replacement commits; a later refusal leaves old runtime/config but no corrected composer result.",
+			"regression_test": "Use actual pending selection owner with later refusal/success and synchronous refusal; keep pending=true used=false until terminal completion and publish one final result after rollback/acknowledgement.",
+			"evidence": [
+				"windows/ui/layout_manager/composer.ahk:380",
+				"windows/ui/layout_manager/composer.ahk:387",
+				"windows/ui/layout_manager/composer.ahk:330",
+				"windows/ui/layout_manager/init.ahk:356",
+				"windows/infra/config_scope.ahk:187",
+				"windows/infra/config_scope.ahk:105",
+				"_shared/ui/layout_composer/composer_page.js:592",
+				"_shared/ui/layout_composer/composer_page.js:608"
+			],
+			"native_validation": "not_run"
+		}
+	]
+}

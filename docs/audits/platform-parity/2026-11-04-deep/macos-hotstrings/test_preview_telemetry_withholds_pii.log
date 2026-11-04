@@ -1,0 +1,10 @@
+MODULE tests.unit.modules.keymap.preview.test_preview_telemetry_withholds_pii
+
+=== preview telemetry: what may be persisted ===
+  ok   refuses a private match
+  ok   allows an ordinary match
+  ok   refuses anything that is not a record
+
+=== preview telemetry: both call sites consult it ===
+  ok   guards both sinks with the predicate, and still calls them
+RESULT 4 passed 0 failed

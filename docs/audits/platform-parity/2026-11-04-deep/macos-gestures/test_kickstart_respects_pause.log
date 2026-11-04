@@ -1,0 +1,6 @@
+MODULE tests.unit.modules.gestures.engine.test_kickstart_respects_pause
+
+=== gestures: the HID kickstart is silent while paused ===
+  ok   the timer guard sites consult the suspend flag, not only the feature flag
+  ok   the real wake callback performs no HID action while suspended
+RESULT 2 passed 0 failed

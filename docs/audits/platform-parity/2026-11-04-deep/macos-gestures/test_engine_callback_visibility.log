@@ -1,0 +1,49 @@
+MODULE tests.unit.modules.gestures.engine.test_engine_callback_visibility
+
+=== gestures.engine: callback failure visibility ===
+2026-11-04 15:27:31:000 [ERROR] [gestures.engine] Callback 'Gesture any-touch hook' raised: ...ules/gestures/engine/test_engine_callback_visibility.lua:83: touch hook exploded
+stack traceback:
+	[C]: in function 'error'
+	...ules/gestures/engine/test_engine_callback_visibility.lua:83: in function <...ules/gestures/engine/test_engine_callback_visibility.lua:81>
+	[C]: in function 'xpcall'
+	...space/ergopti/static/ergopti_plus/macos/infra/logger.lua:1794: in function 'infra.logger.callback'
+	...ti/static/ergopti_plus/macos/modules/gestures/engine.lua:888: in function 'modules.gestures.engine.process_frame'
+	...ules/gestures/engine/test_engine_callback_visibility.lua:88: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	...ules/gestures/engine/test_engine_callback_visibility.lua:74: in function <...ules/gestures/engine/test_engine_callback_visibility.lua:73>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...ules/gestures/engine/test_engine_callback_visibility.lua:73: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...space/scratch/deep-parity/macos-gestures/run-focused.lua:8: in main chunk
+	[C]: in ?.
+[logger] unified log write refused: /tmp/lua_JRHyQX_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_JRHyQX_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_gestures.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_JRHyQX_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   logs and centrally throttles repeated any-touch hook failures
+2026-11-04 15:27:31:000 [ERROR] [gestures.engine] Callback 'Gesture commit' raised: ...ules/gestures/engine/test_engine_callback_visibility.lua:107: commit state exploded
+stack traceback:
+	[C]: in function 'error'
+	...ules/gestures/engine/test_engine_callback_visibility.lua:107: in metamethod 'index'
+	...ti/static/ergopti_plus/macos/modules/gestures/engine.lua:704: in function <...ti/static/ergopti_plus/macos/modules/gestures/engine.lua:641>
+	[C]: in function 'xpcall'
+	...space/ergopti/static/ergopti_plus/macos/infra/logger.lua:1794: in function 'infra.logger.callback'
+	(...tail calls...)
+	...ti/static/ergopti_plus/macos/modules/gestures/engine.lua:951: in function 'modules.gestures.engine.process_frame'
+	...ules/gestures/engine/test_engine_callback_visibility.lua:114: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	...ules/gestures/engine/test_engine_callback_visibility.lua:102: in function <...ules/gestures/engine/test_engine_callback_visibility.lua:73>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...ules/gestures/engine/test_engine_callback_visibility.lua:73: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...space/scratch/deep-parity/macos-gestures/run-focused.lua:8: in main chunk
+	[C]: in ?.
+  ok   logs a failed commit and resets state before the next gesture
+RESULT 2 passed 0 failed

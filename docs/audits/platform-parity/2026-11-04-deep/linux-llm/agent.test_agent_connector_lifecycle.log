@@ -1,0 +1,56 @@
+
+=== agent connector owned shutdown ===
+  ok   (agent-connector-shutdown) normal publication waits for physical close ACK
+  ok   (agent-connector-shutdown) a false constructor receipt retains unknown debt
+  ok   (agent-connector-shutdown) all jobs retain debt and suppress late callbacks
+  ok   (agent-connector-shutdown) closes admission before a native cancellation callback
+  ok   (agent-connector-shutdown) retains a reentrant constructor until it returns its owner
+  ok   (agent-connector-shutdown) retains throw constructor debt without false success
+  ok   (agent-connector-shutdown) retains malformed constructor debt without false success
+  ok   (agent-connector-shutdown) explicit refusal owns no cleanup and reports once
+  ok   (agent-connector-shutdown) accepts an inline settled result once
+  ok   (agent-connector-shutdown) desktop pending handoff retains input without claiming tool retirement
+  ok   (agent-connector-shutdown) desktop callbacks keep the original logical 30-second protocol
+  ok   (agent-connector-shutdown) pending mail is fenced without cancelling its accepted GUI
+  ok   (agent-connector-shutdown) terminal admission creates no calendar file or process
+  ok   (agent-connector-shutdown) preparation random cannot acquire after terminal admission
+  ok   (agent-connector-shutdown) preparation utc cannot acquire after terminal admission
+  ok   (agent-connector-shutdown) preparation private_dir cannot acquire after terminal admission
+  ok   (agent-connector-shutdown) preparation write cannot acquire after terminal admission
+  ok   (agent-connector-shutdown) preparation clock cannot acquire after terminal admission
+  ok   (agent-connector-shutdown) preparation tools_dir cannot acquire after terminal admission
+  ok   (agent-connector-shutdown) preparation list cannot acquire after terminal admission
+  ok   (agent-connector-shutdown) preparation has_command cannot acquire after terminal admission
+  ok   (agent-connector-shutdown) reserves admission before action metadata
+  ok   (agent-connector-shutdown) reserves admission before config metadata
+  ok   (agent-connector-shutdown) cleanup during a write cannot delete its preparing input
+  ok   (agent-connector-shutdown) an inline business result runs after preparation retires
+  ok   (agent-connector-shutdown) logger reentry cancel retains the first calendar input
+  ok   (agent-connector-shutdown) logger reentry second calendar retains the first calendar input
+
+=== Main agent connector shutdown ownership ===
+  ok   (agent-connector-main) cold shutdown never imports connectors
+  ok   (agent-connector-main) pins exact owner after module replacement
+  ok   (agent-connector-main) pins exact owner after method replacement
+  ok   (agent-connector-main) pins exact owner after unload replacement
+  ok   (agent-connector-main) refuses a truthy non-ACK until literal true
+
+=== agent connector native deadline admission ===
+  ok   (agent-connector-clock) fresh clock before native allocation
+  ok   (agent-connector-clock) stop during refresh before native allocation
+
+=== native agent connector shutdown ===
+PASS native normal agent tool: callback once after physical retirement
+OWNED_CLEANUP	{"children_reaped":true,"groups_absent":true,"handles":0}
+  ok   (agent-connector-shutdown-native) actual normal helper lifetime
+{"callbacks_at_loop_return":0,"child_alive_after_loop":false,"child_pid":42027,"loop_stops":1,"marker_without_uv_pump":false,"shutdown_complete":true,"uv_alive_after_loop":true}
+PASS native Main agent shutdown: no late callback, exact group absent
+OWNED_CLEANUP	{"children_reaped":true,"groups_absent":true,"handles":0}
+  ok   (agent-connector-shutdown-native) actual shutdown helper lifetime
+PASS native cold agent shutdown: no process backend acquisition
+OWNED_CLEANUP	{"children_reaped":true,"groups_absent":true,"handles":0}
+  ok   (agent-connector-shutdown-native) actual cold helper lifetime
+PASS native refused agent tool: no child, pending pipes physically closed
+OWNED_CLEANUP	{"children_reaped":true,"groups_absent":true,"handles":0}
+  ok   (agent-connector-shutdown-native) actual spawn-refused helper lifetime
+AUDIT_TEST_RESULT	38	0

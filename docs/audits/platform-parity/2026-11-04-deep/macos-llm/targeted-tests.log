@@ -1,0 +1,718 @@
+
+=== Shared engine transcripts through the three ports ===
+2026-11-04 15:12:01:000 [DEBUG] [llm.parser] Parsing model output block…
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+2026-11-04 15:12:01:000 [INFO] [llm.parser] Fallback text parsed successfully.
+  ok   scenario 'typing-arms-the-menu-debounce-then-asks-once'
+2026-11-04 15:12:01:000 [DEBUG] [llm.parser] Parsing model output block…
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+  ok   scenario 'a-batch-prompt-asks-once-with-the-batch-budget'
+2026-11-04 15:12:01:000 [DEBUG] [llm.parser] Parsing model output block…
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+  ok   scenario 'live-mode-arms-its-own-debounce-and-rewrites'
+  ok   scenario 'a-deleted-live-prompt-stops-live-mode-and-asks-for-nothing'
+
+=== the engine checks its ports at init ===
+  ok   refuses an incomplete scheduler or HTTP client, naming the missing method
+
+=== prediction engine: deferred telemetry pause ownership ===
+2026-11-04 15:12:01:000 [WARNING] [logger] ↑ 1 identical line suppressed
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — returned false.
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction telemetry timer remains owned: false
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'deferred telemetry stop' did not commit (result: false).
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — returned false.
+  ok   retains and fences dismissal telemetry after false cancellation
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — running() returned true.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction telemetry timer remains owned: false
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'deferred telemetry stop' did not commit (result: false).
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — running() returned true.
+  ok   retains and fences dismissal telemetry after nil cancellation
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — .../prediction/test_prediction_deferred_pause_ownership.lua:60: native prediction telemetry stop failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:60: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:57>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:353: in function 'adapters.timer_scheduler.cancel'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:440: in function <...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:422>
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2806: in local 'cleanup_stage'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2818: in function 'modules.llm.prediction_engine.reset'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:240: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:227: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:225>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:225: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction telemetry timer remains owned: false
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'deferred telemetry stop' did not commit (result: false).
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — .../prediction/test_prediction_deferred_pause_ownership.lua:60: native prediction telemetry stop failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:60: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:57>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:353: in function 'adapters.timer_scheduler.cancel'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:213: in field 'callback'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:246: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:227: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:225>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:225: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+  ok   retains and fences dismissal telemetry after throw cancellation
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'deferred profile warmup stop' did not commit (result: false).
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   aggregates a deferred profile-warmup cleanup refusal
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'deferred telemetry stop' did not commit (result: false).
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction dismissal telemetry could not be scheduled (result: table: 0x55bedfcb8810).
+  ok   publishes the telemetry owner before native start re-enters PAUSE
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — returned false.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] after(): native timer start failed — returned false.
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — returned false.
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction dismissal telemetry could not be scheduled (result: table: 0x55bedfd2b890).
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — returned false.
+  ok   reports telemetry start and rollback false debt from ordinary reset
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — running() returned true.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] after(): native timer start failed — returned false.
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — running() returned true.
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction dismissal telemetry could not be scheduled (result: table: 0x55bedeef3020).
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — running() returned true.
+  ok   reports telemetry start and rollback nil debt from ordinary reset
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — .../prediction/test_prediction_deferred_pause_ownership.lua:60: native prediction telemetry stop failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:60: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:57>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:353: in function 'adapters.timer_scheduler.cancel'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:244: in function 'adapters.timer_scheduler.after'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:367: in function <...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:308>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2880: in function 'modules.llm.prediction_engine.reset'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:302: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:294: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:225>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:225: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] after(): native timer start failed — .../prediction/test_prediction_deferred_pause_ownership.lua:52: native prediction timer start failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:52: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:43>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:235: in function 'adapters.timer_scheduler.after'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:367: in function <...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:308>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2880: in function 'modules.llm.prediction_engine.reset'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:302: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:294: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:225>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:225: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — .../prediction/test_prediction_deferred_pause_ownership.lua:60: native prediction telemetry stop failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:60: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:57>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:353: in function 'adapters.timer_scheduler.cancel'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:401: in function <...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:308>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2880: in function 'modules.llm.prediction_engine.reset'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:302: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:294: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:225>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:225: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction dismissal telemetry could not be scheduled (result: table: 0x55bedecc3cf0).
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — .../prediction/test_prediction_deferred_pause_ownership.lua:60: native prediction telemetry stop failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:60: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:57>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:353: in function 'adapters.timer_scheduler.cancel'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:213: in field 'callback'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:311: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:294: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:225>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:225: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+  ok   reports telemetry start and rollback throw debt from ordinary reset
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'deferred telemetry stop' did not commit (result: false).
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   keeps PAUSE pending until the telemetry callback returns
+  ok   preserves telemetry scheduled reentrantly during native settlement
+
+=== prediction engine: settled timer callback ownership ===
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Inactivity timer callback is still running.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'inactivity timer stop' did not commit (result: false).
+  ok   retains the inactivity owner through reentrant PAUSE in get_current_model
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Inactivity timer callback is still running.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'inactivity timer stop' did not commit (result: false).
+  ok   retains the inactivity owner through reentrant PAUSE in show_loading
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Inactivity timer callback is still running.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'inactivity timer stop' did not commit (result: false).
+  ok   retains the inactivity owner through reentrant PAUSE in fetch
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Inactivity timer callback is still running.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Inactivity timer cancellation did not commit (result: false).
+  ok   stops an inactivity-owned fetch when stop_timer revokes only its owner
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Inactivity timer cleanup was superseded during native settlement.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   preserves an inactivity successor installed during native settlement
+  ok   cannot publish chain_pending after fallback delivery during suppression
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — returned false.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] superseded chain fallback timer remains owned: false
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+  ok   rejects fallback delivery during suppression after stop false
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — running() returned true.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] superseded chain fallback timer remains owned: false
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+  ok   rejects fallback delivery during suppression after stop nil
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — .../prediction/test_prediction_deferred_pause_ownership.lua:60: native prediction telemetry stop failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:60: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:57>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:353: in function 'adapters.timer_scheduler.cancel'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:221: in field 'callback'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:546: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:545>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2995: in function 'modules.llm.prediction_engine.arm_chain'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:550: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:541: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:395>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:395: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — .../prediction/test_prediction_deferred_pause_ownership.lua:60: native prediction telemetry stop failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:60: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:57>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:353: in function 'adapters.timer_scheduler.cancel'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:1498: in function <...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:1481>
+	(...tail calls...)
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:3008: in function 'modules.llm.prediction_engine.arm_chain'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:550: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:541: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:395>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:395: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] superseded chain fallback timer remains owned: false
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+  ok   rejects fallback delivery during suppression after stop throw
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Chain rescan suppression did not commit: false
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   rejects a false chain suppression result exactly
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Chain rescan suppression did not commit: nil
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   rejects a nil chain suppression result exactly
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Chain rescan suppression did not commit: .../prediction/test_prediction_deferred_pause_ownership.lua:571: CHAIN_SUPPRESSION_THROW
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:571: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:570>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2995: in function 'modules.llm.prediction_engine.arm_chain'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:576: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:568: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:395>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:395: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   rejects a throw chain suppression result exactly
+  ok   preserves a reentrant successor when the outer chain arm resumes
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] prior chain fallback timer cleanup was superseded during native settlement.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   preserves a chain successor installed during native stop proof
+  ok   rejects F16 while the fallback arm is still uncommitted
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] after(): native timer start failed — returned false.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Chain fallback timer did not commit; exact cleanup is retained.
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+  ok   clears chain intent after replacement start false
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — returned false.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] prior chain fallback timer remains owned: false
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — returned false.
+  ok   retains exact cleanup but clears intent after replacement cancel false
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] after(): native timer start failed — returned false.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Chain fallback timer did not commit; exact cleanup is retained.
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+  ok   clears chain intent after replacement start nil
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — running() returned true.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] prior chain fallback timer remains owned: false
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — running() returned true.
+  ok   retains exact cleanup but clears intent after replacement cancel nil
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] after(): native timer start failed — .../prediction/test_prediction_deferred_pause_ownership.lua:52: native prediction timer start failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:52: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:43>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:235: in function 'adapters.timer_scheduler.after'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:1559: in upvalue 'acquire_chain_timer'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2962: in function 'modules.llm.prediction_engine.arm_chain'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:659: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:655: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:395>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:395: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Chain fallback timer did not commit; exact cleanup is retained.
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+  ok   clears chain intent after replacement start throw
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — .../prediction/test_prediction_deferred_pause_ownership.lua:60: native prediction telemetry stop failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:60: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:57>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:353: in function 'adapters.timer_scheduler.cancel'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:1498: in upvalue 'settle_chain_timer'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2959: in function 'modules.llm.prediction_engine.arm_chain'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:675: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:669: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:395>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:395: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] prior chain fallback timer remains owned: false
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [adapters.timer_scheduler] cancel(): native timer stop failed; retained for retry — .../prediction/test_prediction_deferred_pause_ownership.lua:60: native prediction telemetry stop failed
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:60: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:57>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:353: in function 'adapters.timer_scheduler.cancel'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:213: in field 'callback'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:680: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:669: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:395>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:395: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?.
+  ok   retains exact cleanup but clears intent after replacement cancel throw
+2026-11-04 15:12:01:000 [WARNING] [llm.prediction_engine] Fallback chain triggered — F16 signal was missed.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] chain fallback timer callback is still running.
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'chain fallback timer stop' did not commit (result: false).
+  ok   retains the chain fallback owner through false model-boundary PAUSE
+2026-11-04 15:12:01:000 [WARNING] [llm.prediction_engine] Fallback chain triggered — F16 signal was missed.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] chain fallback timer callback is still running.
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'chain fallback timer stop' did not commit (result: false).
+  ok   retains the chain fallback owner through nil model-boundary PAUSE
+2026-11-04 15:12:01:000 [WARNING] [llm.prediction_engine] Fallback chain triggered — F16 signal was missed.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] chain fallback timer callback is still running.
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'chain fallback timer stop' did not commit (result: false).
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Current model lookup raised — request aborted: .../prediction/test_prediction_deferred_pause_ownership.lua:707: CHAIN_MODEL_BOUNDARY_THROW
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:707: in function 'modules.llm.get_current_model'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:1830: in function 'modules.llm.prediction_engine.perform_check'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2943: in upvalue 'run_chain_check'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2970: in function <...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2963>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:1569: in function <...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:1559>
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:107: in upvalue 'invoke_callback'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:222: in field 'callback'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:725: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:694: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:395>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:395: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?
+  ok   retains the chain fallback owner through throw model-boundary PAUSE
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] chain dispatch timer callback is still running.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'chain dispatch timer stop' did not commit (result: false).
+  ok   retains the chain dispatch owner through false model-boundary PAUSE
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] chain dispatch timer callback is still running.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'chain dispatch timer stop' did not commit (result: false).
+  ok   retains the chain dispatch owner through nil model-boundary PAUSE
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] chain dispatch timer callback is still running.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_llm.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Prediction reset stage 'chain dispatch timer stop' did not commit (result: false).
+2026-11-04 15:12:01:000 [ERROR] [llm.prediction_engine] Current model lookup raised — request aborted: .../prediction/test_prediction_deferred_pause_ownership.lua:707: CHAIN_MODEL_BOUNDARY_THROW
+stack traceback:
+	[C]: in function 'error'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:707: in function 'modules.llm.get_current_model'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:1830: in function 'modules.llm.prediction_engine.perform_check'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:2943: in upvalue 'run_chain_check'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:3174: in function <...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:3173>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:1569: in function <...tic/ergopti_plus/macos/modules/llm/prediction_engine.lua:1559>
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:107: in upvalue 'invoke_callback'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:222: in field 'callback'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:725: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:694: in function <.../prediction/test_prediction_deferred_pause_ownership.lua:395>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../prediction/test_prediction_deferred_pause_ownership.lua:395: in main chunk
+	[C]: in function 'dofile'
+	/workspace/scratch/deep-parity/macos-llm/run-targeted.lua:6: in main chunk
+	[C]: in ?
+  ok   retains the chain dispatch owner through throw model-boundary PAUSE
+
+=== every LLM backend retries on the shared policy ===
+  FAIL finds a retry site in each backend — ...tatic/ergopti_plus/_shared/lua/test/runner_discovery.lua:12: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/macos/tests/stubs/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL derives the retry temperature from the policy step, not a literal — ...tatic/ergopti_plus/_shared/lua/test/runner_discovery.lua:12: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/macos/tests/stubs/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL uses the same retry temperature ceiling everywhere — ...tatic/ergopti_plus/_shared/lua/test/runner_discovery.lua:12: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/macos/tests/stubs/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL derives the retry token budget from the policy too — ...tatic/ergopti_plus/_shared/lua/test/runner_discovery.lua:12: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/macos/tests/stubs/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+
+=== api_remote entry identity generation ===
+  ok   (remote-identity-generation) treats an empty active id as No Model instead of selecting the first entry
+2026-11-04 15:12:01:000 [ERROR] [llm.api_remote] Remote warmup GET acquisition failed: nil.
+  ok   (remote-identity-generation) discards an old health callback after the active entry changes
+  ok   (remote-identity-generation) discards an old inference callback after the active entry changes
+  ok   (config-outdated-api-provider) names once an entry whose provider this build no longer has
+
+=== Actual provider catalogue publication ===
+  ok   (provider-publication-route) valid complete pair cannot invent retirement authority
+  ok   (provider-publication-route) valid empty local list cannot invent retirement authority
+2026-11-04 15:12:01:000 [ERROR] [adapters.json_codec] decode() failed: native JSON decoder returned no value.
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   (provider-publication-route) malformed cloud cannot invent retirement authority
+  ok   (provider-publication-route) absent cloud cannot invent retirement authority
+  ok   (provider-publication-route) wrong-shaped cloud order cannot invent retirement authority
+  ok   (provider-publication-route) duplicate cloud order cannot invent retirement authority
+  ok   (provider-publication-route) missing declared cloud descriptor cannot invent retirement authority
+  ok   (provider-publication-route) empty refused cloud list cannot invent retirement authority
+  ok   (provider-publication-route) native-erased cloud null slot cannot invent retirement authority
+  ok   (provider-publication-route) native-erased local null slot cannot invent retirement authority
+  ok   (provider-publication-route) unacknowledged cloud close cannot invent retirement authority
+  ok   (provider-publication-route) malformed local cannot invent retirement authority
+  ok   (provider-publication-route) absent local cannot invent retirement authority
+  ok   (provider-publication-route) empty object instead of local order cannot invent retirement authority
+  ok   (provider-publication-route) empty array instead of local descriptors cannot invent retirement authority
+  ok   (provider-publication-route) duplicate local order cannot invent retirement authority
+  ok   (provider-publication-route) cloud local collision cannot invent retirement authority
+  ok   (provider-publication-receipt) actual snapshots are detached from runtime map mutations
+  ok   (provider-publication-route) actual known provider permits noncatalogue custom model identifiers
+
+=== Ollama stream retirement ownership ===
+2026-11-04 15:12:02:000 [ERROR] [logger] ↑ 2 identical lines suppressed
+[logger] unified log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] [fixture-model] #1 STREAM transport failed (exit=15, stderr=) — discarding partial output.
+[logger] topical log write refused: /tmp/lua_AfIhaa_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_ollama.log: No such file or directory
+  ok   (stream-cleanup-deadline) schedules cleanup after the actual native curl ceiling
+2026-11-04 15:12:02:000 [WARNING] [llm.api_ollama] [fixture-model] #1 STREAM provider or protocol failure — discarding partial output.
+  ok   (ollama-stream-provider-error) refuses explicit failure after valid partial output
+  ok   (ollama-stream-provider-error) refuses an unterminated final error record
+2026-11-04 15:12:02:000 [WARNING] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:12:02:000 [ERROR] [adapters.json_codec] decode() failed: native JSON decoder returned no value.
+2026-11-04 15:12:02:000 [WARNING] [llm.api_ollama] [fixture-model] #1 STREAM provider or protocol failure — discarding partial output.
+  ok   (ollama-stream-provider-error) refuses a malformed record after valid partial output
+2026-11-04 15:12:02:000 [DEBUG] [llm.parser] Parsing model output block…
+2026-11-04 15:12:02:000 [INFO] [llm.parser] Fallback text parsed successfully.
+  ok   (ollama-stream-final-record) preserves valid tokens with LF framing
+2026-11-04 15:12:02:000 [DEBUG] [llm.parser] Parsing model output block…
+2026-11-04 15:12:02:000 [INFO] [llm.parser] Fallback text parsed successfully.
+  ok   (ollama-stream-final-record) preserves valid tokens with CRLF framing
+2026-11-04 15:12:02:000 [DEBUG] [llm.parser] Parsing model output block…
+2026-11-04 15:12:02:000 [INFO] [llm.parser] Fallback text parsed successfully.
+  ok   (ollama-stream-final-record) preserves valid tokens with whitespace framing
+2026-11-04 15:12:02:000 [DEBUG] [llm.parser] Parsing model output block…
+2026-11-04 15:12:02:000 [INFO] [llm.parser] Fallback text parsed successfully.
+  ok   (ollama-stream-final-record) preserves valid tokens with EOF framing
+2026-11-04 15:12:02:000 [DEBUG] [llm.parser] Parsing model output block…
+2026-11-04 15:12:02:000 [INFO] [llm.parser] Fallback text parsed successfully.
+  ok   (stream-tmpfile-before-on-done) completion removes its own payload and publishes
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Active Ollama stream cancellation remains unsettled; retained for retry: pending
+2026-11-04 15:12:02:000 [ERROR] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Cannot start Ollama stream while the previous task remains owned.
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] [fixture-model] #2 STREAM transport failed (exit=15, stderr=) — discarding partial output.
+  ok   (stream-pending-retirement) retains the task and payload until exact completion
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] STREAM completion arrived before exact task settlement; ownership retained.
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] [fixture-model] #1 STREAM transport failed (exit=15, stderr=) — discarding partial output.
+  ok   (stream-premature-completion) refuses a callback before original physical settlement
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Active Ollama stream cancellation remains unsettled; retained for retry: true
+  ok   (stream-bare-termination) refuses bare true without a settlement receipt
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Active Ollama stream cancellation remains unsettled; retained for retry: settled
+  ok   (stream-forged-settlement) rejects settled status while the original task remains live
+2026-11-04 15:12:02:000 [ERROR] [adapters.shell_runner] spawn.start(): hs.task:start() refused to launch /usr/bin/curl
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Active Ollama stream cancellation remains unsettled; retained for retry: pending
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] [fixture-model] #1 STREAM task start did not commit (result: false).
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Active Ollama stream cancellation remains unsettled; retained for retry: pending
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Cannot start Ollama stream while the previous task remains owned.
+  ok   (stream-uncommitted-retirement) retains physical cleanup after false start
+2026-11-04 15:12:02:000 [ERROR] [adapters.shell_runner] spawn.start(): hs.task:start() failed — ...modules/llm/ollama/test_api_ollama_stream_retirement.lua:52: CONTROLLED_START_REFUSAL
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Active Ollama stream cancellation remains unsettled; retained for retry: pending
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] [fixture-model] #1 STREAM task start did not commit (result: false).
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Active Ollama stream cancellation remains unsettled; retained for retry: pending
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Cannot start Ollama stream while the previous task remains owned.
+  ok   (stream-uncommitted-retirement) retains physical cleanup after throw start
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] Active Ollama stream cancellation remains unsettled; retained for retry: pending
+2026-11-04 15:12:02:000 [ERROR] [llm.api_ollama] [fixture-model] #2 STREAM transport failed (exit=15, stderr=) — discarding partial output.
+  ok   (stream-stale-completion) cannot release a successor from an old callback
+
+=== MLX stream termination waits for native retirement ===
+  ok   retains its exact curl after the watchdog's SIGTERM is accepted
+  ok   reports timeout only after its exact curl actually exits
+  ok   blocks a successor until explicit cancellation actually retires its curl
+
+=== LLM progressive reveal owns every timer transaction ===
+2026-11-04 15:12:02:000 [ERROR] [llm.progressive_reveal] Progressive reveal timer did not commit; publishing complete result: table: 0x55bedee36650.
+  ok   falls forward to the complete batch when timer commit is refused
+  ok   generation-fences a committed reveal after the request becomes stale
+
+=== llm_bridge: F-INFO-1 injection choke point ===
+  ok   hands the accepted prediction to expander.perform_text_replacement once
+  ok   posts no key and moves no buffer outside the choke point
+  ok   types the prediction and moves the buffer when the choke point runs its callbacks
+  ok   rejects the prediction when the choke point refuses it
+AUDIT TARGETED TOTAL: 90 passed, 4 failed

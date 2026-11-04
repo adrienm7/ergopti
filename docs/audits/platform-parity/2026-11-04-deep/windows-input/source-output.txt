@@ -1,0 +1,5 @@
+WI-001 SOURCE CONFIRMED: valid None hold removes hold_layer, but tab-only LAlt criterion still unconditionally enters OwnImmediateLayer
+WI-002 SOURCE CONFIRMED: unselected Save-and-use publishes used=true after a pending launch receipt, without terminal callback
+OI-001 OBSERVED (policy unresolved): registry composition reads retained KLE_State; suspend lifecycle has no reset/unload and tray mouse is outside reset keys
+OI-002 OBSERVED (custody rationale): suspend tick flushes waiting chord into raw SendEvent; drain also has no suspend admission
+2 actionable source paths and 2 observations asserted. No AHK code/native scenario executed.

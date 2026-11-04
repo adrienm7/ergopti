@@ -1,0 +1,5 @@
+MODULE tests.unit.modules.dynamic_hotstrings.rules_engine.test_rules_engine_utf8_delete_count
+
+=== dynamic UTF-8 delete count ===
+  ok   dynamic UTF-8 delete count removes codepoints rather than bytes
+RESULT 1 passed 0 failed

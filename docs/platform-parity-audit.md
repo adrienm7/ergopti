@@ -10,6 +10,33 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## Deep review by OS and module
+
+The [18-scope deep audit](audits/platform-parity/2026-11-04-deep/report.md)
+examines each combination of Windows/macOS/Linux and hotstrings, remapping,
+AI, metrics, lifecycle and gestures at commit
+`89b0b774c8c960c7ad458ac3cb98d5c97598e518`. It supersedes earlier availability
+conclusions wherever explicitly corrected. Its [intentional-difference register](audits/platform-parity/2026-11-04-deep/intentional-differences.md)
+documents rationale, user-visible effects and OS equivalents, distinguishing
+explicit policy from native constraints, guarded unfinished work and unknown
+product intent. The JSON companion preserves the same audit-snapshot data.
+
+The deep pass produced 30 OS-scoped actionable entries, including a guarded
+unfinished capability and a conditional account-context scenario. These are not
+30 native-reproduced bugs. Per-entry severity, confidence and reproduction
+basis are in the [Windows](audits/ahk/2026_11_04/report.md),
+[macOS](audits/hammerspoon/2026_11_04/report.md) and
+[Linux](audits/linux/2026_11_04/report.md) envelopes. The same restart-reporting
+root cause affects two OSes. Policy candidates and refuted hypotheses are kept
+out of the confirmed queue.
+
+**Corrections:** physical shortcut delivery/editor qualification is disabled on
+both Lua drivers as well as missing on Windows. Bridge/capture code and test
+fixtures did not establish real feature readiness. Windows inline auto-type
+inserts a completed continuation, not tokens as they arrive. Complex-key
+expansion-delay widening exists on all three drivers; older Mac-only wording
+is stale. Current declaration matrices do not establish these runtime facts.
+
 ## Independent module review, 2026-11-04
 
 Five parallel, read-only reviewers examined production code and callers at
@@ -77,9 +104,9 @@ and Fn and Spotlight belong to macOS. The source explains each restriction.
 
 | Capability                                                  | Windows                                    | macOS                                                          | Linux                                                                                      | Evidence and qualification                                                                                                                                                                           |
 | ----------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Physical shortcut editor                                    | Unavailable                                | Declared                                                       | Declared                                                                                   | `physical_shortcuts_editor` menu row and `physical_shortcuts.windows_unavailable`                                                                                                                    |
+| Physical shortcut editor                                    | Unavailable: no host                       | Unavailable: native delivery unqualified                       | Unavailable: native delivery unqualified                                                   | Actual macOS/Linux `keyboard_shortcuts.physical_delivery_available()` both return false; deep input reports supersede declaration-only readiness claims. Preserve fail-closed admission.             |
 | Token-by-token prediction display                           | Unvalidated and disabled                   | Declared                                                       | Declared                                                                                   | `llm_token_streaming` menu row; distinct from typing predictions directly into a document                                                                                                            |
-| Insert prediction directly as it arrives                    | Declared                                   | Bubble then accept                                             | Bubble then accept                                                                         | `platform_reason.inline_autotype_is_windows`                                                                                                                                                         |
+| Automatic insertion of a completed continuation             | Declared, completed response only          | Bubble then accept                                             | Bubble then accept                                                                         | Windows `inline_autotype` is not token-by-token document streaming; deep Windows AI report records the native output constraint.                                                                     |
 | Prompt profile automatically follows model                  | Declared                                   | Applied on request                                             | Declared                                                                                   | `platform_reason.llm_profile_follows_model_is_not_on_macos`                                                                                                                                          |
 | Tap-hold word-reset option                                  | Declared                                   | No equivalent option                                           | Declared                                                                                   | `platform_reason.tap_hold_word_reset_not_on_macos`; macOS Karabiner input follows the shortcut option                                                                                                |
 | Bulk copy tap assignments to chord slots                    | Not exposed                                | Declared                                                       | Declared                                                                                   | `key_combinations_group.copy_tap_to_combo`; no Windows implementation found in the driver tree                                                                                                       |

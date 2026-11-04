@@ -1,0 +1,15 @@
+MODULE tests.unit.modules.gestures.engine.test_finger_count_recovery
+
+=== a stale finger-spike candidate is reachable for clearing ===
+  ok   the candidate is retired before the finger-count branch chain
+
+=== a confirmed drop to a still-multi-finger count is a change, not an end ===
+  ok   demotes maxFingers instead of latching lifting
+
+=== a full lift-off still ends the gesture ===
+2026-11-04 15:27:31:000 [WARNING] [gestures.engine] commitGesture x1: BLOCKED — same slot+sign as previous live fire (slot=swipe_3_down sign=1)
+[logger] unified log write refused: /tmp/lua_ZmXEDX_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_ZmXEDX_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_gestures.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_ZmXEDX_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   firing stops once every finger is gone
+RESULT 3 passed 0 failed

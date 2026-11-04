@@ -1,0 +1,11 @@
+MODULE tests.unit.modules.dynamic_hotstrings.injection.test_dynamic_injection_is_private
+
+=== personal_info: the @-tag expansion reaches inject_dynamic marked private ===
+  ok   hands is_private = true to keymap.inject_dynamic
+
+=== rules_engine: the interceptor injection reaches inject_dynamic marked private ===
+  ok   hands is_private = true to keymap.inject_dynamic
+
+=== expander: is_private is forwarded to the keystats, not dropped en route ===
+  ok   perform_text_replacement passes is_private through to notify_synthetic
+RESULT 3 passed 0 failed

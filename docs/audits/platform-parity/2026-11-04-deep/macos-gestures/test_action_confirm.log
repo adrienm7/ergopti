@@ -1,0 +1,15 @@
+MODULE tests.unit.modules.gestures.actions.test_action_confirm
+
+=== action confirmation (macOS) ===
+  ok   shows a non-blocking alert with Cancel as the default button
+  ok   cancel runs nothing and frees the next question
+  ok   hands the action the application read before the alert (confirm-acted-from)
+  ok   runs even when that application cannot get its focus back (confirm-acted-from)
+  ok   with no readable application, the action runs with none (confirm-acted-from)
+  ok   refuses to run when no screen can show the question
+
+=== the macOS dispatcher confirms before destructive actions ===
+  ok   the catalogue declares the approved confirmations
+  ok   every confirm action asks, and runs only from the answer, under its parent
+  ok   an action without confirm runs at once, with no question
+RESULT 9 passed 0 failed

@@ -1,0 +1,7 @@
+MODULE tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_combo_matches_buffer
+
+=== personal_info: a pending @-combo the buffer no longer shows must not expand ===
+  ok   does not expand when the caret moved away between the combo and the trigger
+  ok   still expands normally when the buffer does show the combo
+  ok   does not expand when the buffer shows the combo without its @ sentinel
+RESULT 3 passed 0 failed

@@ -1,0 +1,4 @@
+WG-002 SOURCE CONFIRMED: Apply accepts existing backup without reading it; Restore separately requires full parse/current inventory
+WG-003 SOURCE PREMISE CONFIRMED: onboarding backs up resident HKCU then *RunAs worker uses elevated-process HKCU; cross-account Windows behavior unexecuted
+NEGATIVE CONTROL: tray writes resident HKCU before elevating only the restart worker
+NEGATIVE CONTROL: newly created backup failure prevents writes; valid prior backup retention is deliberate

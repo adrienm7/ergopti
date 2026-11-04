@@ -1,0 +1,29 @@
+MODULE tests.unit.modules.gestures.engine.test_touch_watcher_lifecycle_transaction
+
+=== gesture touch watchers are exact lifecycle transactions ===
+  ok   rejects native watcher start mode false
+  ok   rejects native watcher start mode nil
+  ok   rejects native watcher start mode throw
+  ok   rejects frame callback registration mode nil
+  ok   rejects frame callback registration mode throw
+  ok   commits running watcher while preserving pre-touch dormancy
+  ok   accepts the native userdata watcher capability
+  ok   refuses start under suspension without constructing successor owners
+  ok   retains a partially activated start until exact rollback settles
+  ok   retains and retries native watcher stop mode false
+  ok   retains and retries native watcher stop mode nil
+  ok   retains and retries native watcher stop mode throw
+  ok   rolls back and rebuilds an ON startup when primer_factory reenters suspend
+  ok   rolls back and rebuilds an ON startup when primer_start reenters suspend
+  ok   rolls back and rebuilds an ON startup when touch_factory reenters suspend
+  ok   rolls back and rebuilds an ON startup when touch_start reenters suspend
+  ok   rolls back and rebuilds an ON startup when timer_factory reenters suspend
+  ok   rolls back and rebuilds an ON startup when wake_factory reenters suspend
+  ok   rolls back and rebuilds an ON startup when wake_start reenters suspend
+  ok   retains exact primer rollback debt after reentrant suspend mode false
+  ok   retains exact primer rollback debt after reentrant suspend mode nil
+  ok   retains exact primer rollback debt after reentrant suspend mode throw
+  ok   settles interrupted startup debt before OFF and rebuilds on later ON mode false
+  ok   settles interrupted startup debt before OFF and rebuilds on later ON mode nil
+  ok   settles interrupted startup debt before OFF and rebuilds on later ON mode throw
+RESULT 25 passed 0 failed

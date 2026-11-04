@@ -1,0 +1,102 @@
+MODULE tests.unit.modules.keymap.expansion.test_expander
+2026-11-04 15:17:28:000 [WARNING] [keystats.kc_bridge] KC log EOF is untrusted at cold start — persistence stays denied until retry: open failed: /tmp/lua_jRN9RO_ergopti_home/.config/ergopti_plus/metrics/karabiner_kc.log: No such file or directory.
+[logger] unified log write refused: /tmp/lua_jRN9RO_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_jRN9RO_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_keystats.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_jRN9RO_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:17:28:000 [WARNING] [keystats.kc_bridge] Cannot create '/tmp/lua_jRN9RO_ergopti_home/.config/ergopti_plus/metrics/karabiner_kc.log' — bridge may not receive KE events.
+
+=== keymap.expander: public surface ===
+  ok   exposes the documented entry points
+
+=== keymap.expander: require_state guard ===
+  ok   HS-L-01 every state-dependent public entry fails closed before init
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] 'try_auto_expand' called before M.init() — dependencies not initialized.
+  ok   try_auto_expand returns false when init() not called
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] 'try_terminator_expand' called before M.init() — dependencies not initialized.
+  ok   try_terminator_expand returns false when init() not called
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] 'try_repeat_feature' called before M.init() — dependencies not initialized.
+  ok   try_repeat_feature returns false when init() not called
+
+=== keymap.expander: init argument validation ===
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] M.init(): core_state must be a table.
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] 'try_repeat_feature' called before M.init() — dependencies not initialized.
+  ok   init() is a no-op when core_state is not a table
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] M.init(): registry_mod must be a table.
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] 'try_repeat_feature' called before M.init() — dependencies not initialized.
+  ok   init() is a no-op when registry_mod is not a table
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] M.init(): llm_mod must be a table.
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] 'try_repeat_feature' called before M.init() — dependencies not initialized.
+  ok   init() is a no-op when llm_mod is not a table
+
+=== keymap.expander: try_repeat_feature early-returns ===
+  ok   returns false when the repeat feature is disabled
+  ok   returns false when chars is not the magic key
+  ok   returns false when buffer is shorter than the magic key
+  ok   returns false when the previous char is whitespace
+  ok   fires for a normal letter before the magic key
+
+=== keymap.expander: perform_text_replacement ===
+  ok   calls the tooltip renderer with forced hiding on expansion
+  ok   issues the requested deletes and runs the buffer_action
+  ok   paces the collected delete prefix for terminal TUI inputs (terminal-stale-render)
+  ok   refreshes chained preview only from committed replacement completion
+  ok   does not re-arm preview when stop invalidates a mid-batch transaction
+  ok   does not arm the LLM timer when LLM is disabled
+  ok   arms the LLM timer when LLM is enabled and not ignored
+  ok   skips LLM side-effects when is_ignored=true
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] emit_action failed: ...os/tests/unit/modules/keymap/expansion/test_expander.lua:550: producer failed after a partial prefix
+stack traceback:
+	[C]: in function 'error'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:550: in function <...os/tests/unit/modules/keymap/expansion/test_expander.lua:548>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/synthetic_input.lua:2618: in function 'adapters.synthetic_input.with_transaction'
+	(...tail calls...)
+	[C]: in function 'pcall'
+	...ti/static/ergopti_plus/macos/modules/keymap/expander.lua:187: in function 'modules.keymap.expander.perform_text_replacement'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:546: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:539: in function <...os/tests/unit/modules/keymap/expansion/test_expander.lua:298>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:298: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...ace/scratch/deep-parity/macos-hotstrings/run-focused.lua:8: in main chunk
+	[C]: in ?.
+  ok   cancels an emitted prefix when the producer raises before commit
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] Replacement rescan deadline preparation failed: ...os/tests/unit/modules/keymap/expansion/test_expander.lua:577: second clock read refused.
+  ok   prepares the final-result clock before mutating the engine buffer
+2026-11-04 15:17:28:000 [ERROR] [keymap.expander] emit_action failed: ...os/tests/unit/modules/keymap/expansion/test_expander.lua:616: boom
+stack traceback:
+	[C]: in function 'error'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:616: in function <...os/tests/unit/modules/keymap/expansion/test_expander.lua:616>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/synthetic_input.lua:2618: in function 'adapters.synthetic_input.with_transaction'
+	(...tail calls...)
+	[C]: in function 'pcall'
+	...ti/static/ergopti_plus/macos/modules/keymap/expander.lua:187: in function 'modules.keymap.expander.perform_text_replacement'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:614: in function <...os/tests/unit/modules/keymap/expansion/test_expander.lua:613>
+	[C]: in function 'xpcall'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:80: in upvalue 'capture_replacement_logs'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:613: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:607: in function <...os/tests/unit/modules/keymap/expansion/test_expander.lua:298>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:298: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...ace/scratch/deep-parity/macos-hotstrings/run-focused.lua:8: in main chunk
+	[C]: in ?.
+  ok   cancels the transaction when emit_action throws before output
+
+=== keymap.expander: the pause gate is not here ===
+  ok   the module names no pause or suspend state
+  ok   150 non-matching calls leave the buffer exactly where they found it
+RESULT 26 passed 0 failed

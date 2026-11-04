@@ -1,0 +1,113 @@
+
+=== gesture parameter binding publication with the real script owner ===
+  ok   binding-identity: actual script publication distinguishes current and retired qualified domains
+
+=== tap-binding: shared identity and native publication ===
+  ok   left-current
+  ok   right-one-current
+  ok   right-two-current
+  ok   removed-tap-retired
+  ok   legacy-name-retired
+  ok   exact-slot-case
+  ok   empty-tap-slot
+  ok   exact-prefix-case
+  ok   keyboard-owner-unjudged
+  ok   script-owner-unjudged
+  ok   remap-owner-unjudged
+  ok   combination-owner-unjudged
+  ok   bare-gesture-owner-unjudged
+  ok   refuses malformed or empty published tap-key receipts without judging another owner
+  ok   keeps the cold accessor effect-free and publishes detached actual source identities
+  ok   withdraws a changed native key census without reads and restores exact source
+  ok   refuses forged metatable and sparse native identity projections
+  ok   refuses malformed actual native source before publishing: not json
+  ok   refuses malformed actual native source before publishing: {"keys":[]}
+  ok   refuses malformed actual native source before publishing: {"keys":{}}
+  ok   refuses malformed actual native source before publishing: {"entries":[{"id":"slot","hs":[50],"linux":41}]}
+  ok   refuses malformed actual native source before publishing: {"keys":[{"id":"same","hs":[50],"linux":41},{"id":"same","hs":[27],"linux":12}]}
+  ok   refuses malformed actual native source before publishing: {"keys":[{"id":"nested__slot","hs":[50],"linux":41}]}
+  ok   a native owner without its malformed-source branch fails the malformed vectors (mutation)
+  ok   refuses an actual duplicate-ID file and publishes only after manual repair
+  ok   does not publish after read_throw and retries the actual source
+  ok   does not publish after read_nil and retries the actual source
+  ok   does not publish after read_false and retries the actual source
+  ok   does not publish after read_number and retries the actual source
+  ok   does not publish after close_throw and retries the actual source
+  ok   does not publish after close_nil and retries the actual source
+  ok   does not publish after close_false and retries the actual source
+  ok   does not publish after close_truthy and retries the actual source
+
+=== tap-binding: actual source ownership ===
+  ok   ignores a proven retired binding, leaves it unread and warns once
+  ok   retains current and other-owner entries without inventing judgments
+  ok   keeps unpublished tap-key choices active, consumed and unmodified
+  ok   refuses an ordinary retired setter before native publication
+  ok   keeps exact compensation snapshots independent of ordinary tap-key admission
+  ok   treats a withdrawn publication accessor as unjudged without lazy IO
+  ok   preserves obsolete raw source and typed future neighbors during a current edit
+  ok   late genuine publication neutralizes a carried retired runtime parameter
+  ok   withdraws a replaced native publisher by raw identity, equality spoof=false
+  ok   withdraws a replaced native publisher by raw identity, equality spoof=true
+  ok   withdraws an inherited accessor on a distinct registered successor, equality spoof=false
+  ok   withdraws an inherited accessor on a distinct registered successor, equality spoof=true
+
+=== binding-publication: authentic accessor authority ===
+  ok   admits each constructor once and refuses mismatched or displaced registration
+  ok   never invokes a missing, changed, inherited or proxy accessor
+  ok   supports keyboard authority and releases withdrawn closure cycles on both Lua VMs
+  ok   withdraws tap judgment when the genuine module's public getter changes
+  ok   keeps cold and displaced tap constructors unjudged until exact repair
+  ok   withdraws script judgment when the genuine module's public getter changes
+  ok   keeps cold and displaced script constructors unjudged until exact repair
+
+=== keyboard-binding: shared complete identity contract ===
+  ok   replays the independent handwritten keyboard identity vectors
+  ok   uses complete published exact identities and keeps other domains unjudged
+  ok   refuses empty sparse duplicate or disguised native inventories
+  ok   refuses malformed published keyboard metadata rather than inferring retirement
+
+=== keyboard-binding: actual source ownership ===
+  ok   retains actual case-exact physical parameters and preserves obsolete physical source until cleanup
+  ok   ignores only actual published retirement and warns once without reading its source leaf
+  ok   retains actual current and other qualified domains
+  ok   does not invent retirement before a genuine source publication
+  ok   refuses retired ordinary setters before writing and preserves detached inverse records
+  ok   preserves the complete handwritten obsolete and typed future model on a current edit
+  ok   neutralizes a carried retired parameter after actual late publication without mutating RAM or source
+  ok   withdraws inherited publication on a distinct current owner, equality spoof=false
+  ok   withdraws inherited publication on a distinct current owner, equality spoof=true
+  ok   withdraws a public getter replacement without invoking fabricated authority
+  ok   never accepts a fabricated registered successor without genuine native construction
+  ok   refuses replacement registrations before changing genuine callback authority
+
+=== script-binding: late carried parameter reads ===
+  ok   neutralizes a genuine late retirement once without dropping its raw snapshot or source
+  ok   keeps a withdrawn or substituted accessor unjudged and repairs the exact owner without IO
+  ok   refuses the retired edit and preserves the full bad fragment while publishing a valid neighbor
+  ok   keeps failed actual source completion unjudged and neutralizes only a genuine retry
+  ok   retains exact inverse admission while a late-published retired value stays neutral
+
+=== gesture private generated publication authority ===
+  ok   binding-identity: constructor publication is detached from returned rows and public runtime copies
+  ok   binding-identity: genuine package withdrawal stays unjudged for missing
+  ok   binding-identity: genuine package withdrawal stays unjudged for false
+  ok   binding-identity: genuine package withdrawal stays unjudged for equal clone
+  ok   binding-identity: genuine package withdrawal stays unjudged for proxy
+  ok   binding-identity: a retained manager cannot borrow a genuine successor constructor
+  ok   binding-identity: withdrawn and proxy accessors never execute replacements
+  ok   binding-identity: actual generated package withdrawal stays unjudged for missing
+  ok   binding-identity: actual generated package withdrawal stays unjudged for false
+  ok   binding-identity: actual generated package withdrawal stays unjudged for equal clone
+  ok   binding-identity: actual generated package withdrawal stays unjudged for proxy
+  ok   binding-identity: genuine private generated source withdraws on slots container
+  ok   binding-identity: genuine private generated source withdraws on single array
+  ok   binding-identity: genuine private generated source withdraws on axis array
+  ok   binding-identity: genuine private generated source withdraws on scalar
+  ok   binding-identity: genuine private generated source withdraws on order
+  ok   binding-identity: genuine private generated source withdraws on append
+  ok   binding-identity: genuine private generated source withdraws on hole
+  ok   binding-identity: genuine private generated source withdraws on foreign key
+  ok   binding-identity: genuine private generated source withdraws on array proxy
+  ok   binding-identity: genuine private generated source withdraws on source proxy
+  ok   binding-identity: withdrawn genuine classification consumes parameters without offering source cleanup
+AUDIT_TEST_RESULT	96	0

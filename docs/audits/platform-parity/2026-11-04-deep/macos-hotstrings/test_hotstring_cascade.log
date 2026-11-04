@@ -1,0 +1,63 @@
+MODULE tests.unit.modules.keymap.expansion.test_hotstring_cascade
+
+=== keymap: the hotstring cascade ===
+  ok   one arrow is today's behaviour: the output is final
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 1 fired (trigger of 7 char(s)).
+[logger] unified log write refused: /tmp/lua_M4vmyA_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_M4vmyA_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_hotstrings.log: No such file or directory
+  ok   two arrows complete the second hotstring in the same transaction
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 1 fired (trigger of 2 char(s)).
+2026-11-04 15:17:29:000 [DEBUG] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 2 fired (trigger of 2 char(s)).
+  ok   two arrows stop after one more link, three go on
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade stopped at step 1: the same spec would fire again.
+  ok   a replacement that ends with its own trigger does not loop
+  ok   the guard folds case: the Title variant of the same rule is the same spec
+  ok   a final_result link ends the chain
+2026-11-04 15:17:29:000 [DEBUG] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 1 fired (trigger of 2 char(s)).
+  ok   a link that is final ends it after itself
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 1 fired (trigger of 3 char(s)).
+  ok   the second hotstring may reach back into the text typed before the first
+  ok   a private link is never composed into another hotstring's output
+  ok   a private first hotstring starts no chain
+
+=== keymap: the cascade and end characters ===
+  ok   an auto link that stops before the replayed terminator waits for a key
+  ok   a link that would swallow the typed end character ends the chain instead
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 1 fired (trigger of 2 char(s)).
+  ok   a consumed delimiter still lets the end-character chain run, then swallows it once
+  ok   an end-character hotstring cascades into another end-character one
+  ok   one arrow leaves the end-character chain to the next keystroke
+
+=== keymap: the shared cascade_vectors.json corpus ===
+2026-11-04 15:17:29:000 [DEBUG] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 1 fired (trigger of 8 char(s)).
+  ok   fb_space_three_arrows_keeps_the_space (cascade-corpus)
+  ok   fb_space_consumed_swallows_the_space_once (cascade-corpus)
+  ok   fb_space_one_arrow_is_a_single_expansion (cascade-corpus)
+  ok   fb_space_one_arrow_consumed (cascade-corpus)
+  ok   fb_magic_key_consumed_chains (cascade-corpus)
+  ok   fb_enter_keeps_the_end_character (cascade-corpus)
+2026-11-04 15:17:29:000 [DEBUG] [logger] ↑ 3 identical lines suppressed
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 1 fired (trigger of 1 char(s)).
+  ok   two_arrows_stop_after_the_second_expansion (cascade-corpus)
+2026-11-04 15:17:29:000 [DEBUG] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 2 fired (trigger of 1 char(s)).
+  ok   three_arrows_stop_after_the_third_expansion (cascade-corpus)
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 1 fired (trigger of 1 char(s)).
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 2 fired (trigger of 1 char(s)).
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 3 fired (trigger of 1 char(s)).
+  ok   ten_arrows_run_the_whole_chain (cascade-corpus)
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 1 fired (trigger of 7 char(s)).
+  ok   auto_chain_needs_no_end_character (cascade-corpus)
+  ok   auto_chain_one_arrow (cascade-corpus)
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade stopped at step 1: the same spec would fire again.
+  ok   same_rule_fires_once_per_chain (cascade-corpus)
+  ok   link_that_would_swallow_the_end_character_ends_the_chain (cascade-corpus)
+  ok   swallowing_link_refused_even_when_consumed (cascade-corpus)
+  ok   word_start_rule_does_not_fire_inside_a_word (cascade-corpus)
+2026-11-04 15:17:29:000 [DEBUG] [shared.hotstring_engine.cascade] Cascade step 1 fired (trigger of 2 char(s)).
+  ok   in_word_rule_fires_inside_a_word (cascade-corpus)
+  ok   end_character_rule_needs_the_end_character (cascade-corpus)
+RESULT 32 passed 0 failed

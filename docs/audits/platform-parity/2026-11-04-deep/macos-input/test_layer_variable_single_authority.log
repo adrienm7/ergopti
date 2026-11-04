@@ -1,0 +1,25 @@
+MODULE tests.unit.platform.remap.rules.test_layer_variable_single_authority
+
+=== karabiner layer state: one authority ===
+  FAIL layer hold on and off variants produce only layer_active — ...tatic/ergopti_plus/_shared/lua/test/runner_discovery.lua:12: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+RESULT 0 passed 1 failed
+/workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua: /workspace/scratch/deep-parity/macos-input/run-focused.lua:13: assertion failed!
+stack traceback:
+	[C]: in function 'assert'
+	/workspace/scratch/deep-parity/macos-input/run-focused.lua:13: in main chunk
+	[C]: in ?

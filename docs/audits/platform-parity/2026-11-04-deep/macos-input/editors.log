@@ -1,0 +1,97 @@
+MODULE tests.unit.ui.editors.test_layer_editor_host
+
+=== macOS navigation layer editor host ===
+  ok   opens the shared page on its own bridge and sends the user's file on ready
+  ok   refuses, writes nothing and regenerates nothing for an invalid save
+  ok   publishes the page's session, regenerates, closes, and the generated layer carries it (e2e)
+  ok   keeps the window open when the regeneration is refused, and Cancel closes it
+  ok   sends the current input source's legends and the layer key (layer-editor-current-layout-legends)
+  ok   refuses to open without a remap facade to apply the layer
+MODULE tests.unit.ui.editors.test_layer_editor_cleanup_transaction
+
+=== layer editor exact cleanup ownership ===
+  ok   blocks replacement while the exact native window refuses deletion (layer-editor-cleanup)
+  ok   reports refusal and retries the same window before reopening (layer-editor-cleanup)
+  ok   rejects replacement reentry while native deletion is unresolved (layer-editor-cleanup)
+  ok   retries controller release without deleting a closed window again (layer-editor-cleanup)
+MODULE tests.unit.ui.editors.test_physical_editor_host
+
+=== Physical shortcut native host ownership ===
+  ok   (physical-editor-ui) refuses stale pages and retains failed native cleanup
+MODULE tests.unit.ui.editors.test_physical_editor_native_lifecycle
+
+=== Actual Builder physical editor exact native ownership ===
+  ok   (physical-editor-codec) bundled catalogue becomes an unaliased tree through the actual codec
+  ok   (physical-editor-codec) decoder refusal precedes native window acquisition: throw
+  ok   (physical-editor-codec) decoder refusal precedes native window acquisition: nil
+  ok   (physical-editor-codec) valid top-level null is not a physical catalogue
+  ok   (physical-editor-lifecycle) exact view retained after deletion refusal: throw
+  ok   (physical-editor-lifecycle) exact view retained after deletion refusal: false
+  ok   (physical-editor-lifecycle) exact view retained after deletion refusal: pending
+  ok   (physical-editor-lifecycle) detached bridge must acknowledge exact controller: nil
+  ok   (physical-editor-lifecycle) detached bridge must acknowledge exact controller: false
+  ok   (physical-editor-lifecycle) detached bridge must acknowledge exact controller: throw
+  ok   (physical-editor-lifecycle) detached bridge must acknowledge exact controller: foreign
+  ok   (physical-editor-lifecycle) user closing callback preserves bridge debt after explicit native retirement
+  ok   (physical-editor-lifecycle) early acquired view survives Builder late refusal: throw
+  ok   (physical-editor-lifecycle) early acquired view survives Builder late refusal: closing
+  ok   (physical-editor-lifecycle) asynchronous deletion later GC settles without double deletion or private page callbacks
+  ok   (physical-editor-lifecycle) old native closing callback cannot retire successor
+  ok   (physical-editor-lifecycle) foreground restoration receives the exact native window acknowledgement
+  ok   (physical-editor-retirement) literal editor acknowledgement precedes native teardown: false
+  ok   (physical-editor-retirement) literal editor acknowledgement precedes native teardown: throw
+  ok   (physical-editor-retirement) literal editor acknowledgement precedes native teardown: nil
+  ok   (physical-editor-retirement) reentrant retirement cannot clear or replace its host
+  ok   (physical-editor-retirement) SDK closing notification retains refused editor debt
+  ok   (physical-editor-retirement) bridge acquisition refusal retains original editor: false
+  ok   (physical-editor-retirement) bridge acquisition refusal retains original editor: throw
+  ok   (physical-editor-retirement) bridge acquisition refusal retains original editor: nil
+  ok   (physical-editor-retirement) late Builder refusal keeps editor and acquired view together
+  ok   (physical-editor-retirement) pre-Builder frame exception retains bridge until same-owner retirement retry
+  ok   (physical-editor-constructor) shared constructor refusal precedes native acquisition and permits retry: throw
+  ok   (physical-editor-constructor) shared constructor refusal precedes native acquisition and permits retry: nil
+  ok   (physical-editor-constructor) shared constructor refusal precedes native acquisition and permits retry: false
+
+=== Mac optional observational position composition ===
+  ok   (physical-editor-position) uses original loaded observer and stable registry without availability polling after enrollment
+  ok   (physical-editor-position) refuses swapped twins malformed facts modifiers and unknown native codes by stable metadata
+  ok   (physical-editor-position) revokes original callback and retains original cancel through replacement: export
+  ok   (physical-editor-position) revokes original callback and retains original cancel through replacement: module
+  ok   (physical-editor-position) revokes original callback and retains original cancel through replacement: source
+  ok   (physical-editor-position) literal availability and original export recheck precede enrollment
+  ok   (physical-editor-position) post-enrollment source refusal retains unreturned token debt for same-owner retry: false
+  ok   (physical-editor-position) post-enrollment source refusal retains unreturned token debt for same-owner retry: throw
+  ok   (physical-editor-position) own callback-frame cancellation refuses native teardown until unwind retry
+  ok   (physical-editor-position) absent loaded observer remains optional without constructing the producer
+MODULE tests.unit.ui.editors.lifecycle.test_physical_shortcuts_consumption_observer
+
+=== physical shortcut consumption does not depend on notification count ===
+  ok   retains the healthy renotified native fade control
+  ok   releases the bridge after one visible user notification and no second notification
+  ok   observes the public request even when no closing callback is delivered
+  ok   keeps observing when public timers run before native fade consumption
+  ok   waits for exact observer stop after the native window is consumed
+  ok   does not rearm a delivered early observer before its exact stop acknowledgement
+  ok   fences reentrant admission during a reobservation refusal diagnostic
+  ok   preserves bridge debt when reobservation allocation refuses nil
+  ok   preserves bridge debt when reobservation allocation refuses throw
+  ok   keeps stale observer and closing callbacks from retiring the next owner
+MODULE tests.unit.modules.shortcuts.magic_editor.test_magic_editor_keyboard_transaction
+
+=== contextual keyboard slot: ordinary persistence owner ===
+  ok   owns one editable logical slot and preserves physical explicit none
+  ok   fences explicit logical actions until exact publication
+  ok   persists a user-selected physical none through real sparse normalization and restart
+  ok   restores the prior conditional intent and bytes after publication refusal
+  ok   does not publish before conditional admission or stage across cleanup debt
+
+=== contextual keyboard slot: logger-bound source rejoin ===
+  ok   refuses a source revoked inside the actual parent logger callback
+  ok   delivers an unchanged live source exactly once after logging
+  ok   rejoins parent lifecycle after the source recheck callback
+MODULE tests.unit.modules.shortcuts.magic_editor.test_magic_editor_refresh_during_proof
+
+=== magic editor: a retarget during a running source proof ===
+  ok   accepts, waits for the running proof, then proves the source once more
+  ok   keeps a cancel that raised as cleanup debt
+RESULT 71 passed 0 failed

@@ -1,0 +1,246 @@
+MODULE tests.unit.platform.remap.generator.test_generator_combos_without_tap_holds
+
+=== key combinations without the Tap-Holds (combos-without-tap-holds) ===
+  ok   Hold Cmd + hold Tab types the hold action, bare (combos-without-tap-holds)
+  ok   Hold Esc + tap Tab types the tap action (combos-without-tap-holds)
+  ok   a non-modifier key 1 is typed natively before its slot (key1-pass-through)
+  ok   a chosen LCmd + RCmd chord types ⌥⌫ with no layer (chord-without-tap-holds)
+  ok   key 1 only tracks its variable and passes through (combos-without-tap-holds)
+  ok   with the Tap-Holds on the graph is unchanged by the switch (combos-without-tap-holds)
+  ok   with the Tap-Holds on the presets generate the pinned graph (tap-holds-on-pin)
+  ok   the pin moves when one Tap-Holds-on manipulator changes (tap-holds-on-pin)
+  ok   the combinations switched off generate no combination rule (combos-without-tap-holds)
+MODULE tests.unit.platform.remap.generator.test_generator_tap_holds_switch
+
+=== Tap-Holds feature switch in the generated rules ===
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+[logger] unified log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_karabiner.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   generates every tap/hold rule while the switch is on
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   treats an absent switch as on, like saves older than it
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   keeps only the right-Command rule when the switch is off
+MODULE tests.unit.platform.remap.generator.test_generator_layers
+
+=== Generator.build_karabiner_json: navigation-layer sentinel ===
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+[logger] unified log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_karabiner.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   emits F20 as the first key of every navigation-layer activation
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   confines F20 and F19 to the ACTIVE lease graph
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   taps F19 right before every navigation-layer deactivation (layer-wheel-slots)
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   keeps F19 out of the historical graph older releases deployed
+
+=== Generator.build_karabiner_json: a layer key on a layer another key holds ===
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   types a key held as the layer plainly when the layer does not map it
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   swallows left Command tapping Backspace on a layer another key holds
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   applies the layer's mapping to a key held as the layer when the layer maps it
+
+=== Generator.merge_into_existing_config: no existing file ===
+  ok   returns the hs_config directly when the file cannot be read
+
+=== Generator.merge_into_existing_config: existing file preservation ===
+  ok   replaces only managed rules while preserving every personal field
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Merge aborted: existing karabiner.json is not valid JSON.
+  ok   fails closed when existing JSON is invalid
+
+=== Generator.KE_PHYSICAL_KC_LOG constant ===
+  ok   is a non-empty string
+  ok   ends with karabiner_kc.log
+  ok   contains a metrics/ path segment
+MODULE tests.unit.platform.remap.generator.test_generator_nav_layer
+
+=== Navigation layer in the generated Karabiner config ===
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+[logger] unified log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_karabiner.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   deploys the layer built from state.nav_layer, gated on the lease (nav-layer-generated)
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   deploys no navigation rule without a binding
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   reads the frozen layer as the legacy anchor and never deploys it
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:07:27:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:07:27:000 [ERROR] [karabiner] Cannot build Karabiner config: navigation layer: nav_layer: Karabiner has no repeat_count resolution.
+  ok   fails the build on a layer the rule builder rejects
+MODULE tests.unit.platform.remap.rules.test_layer_variable_single_authority
+
+=== karabiner layer state: one authority ===
+  FAIL layer hold on and off variants produce only layer_active — ...tatic/ergopti_plus/_shared/lua/test/runner_discovery.lua:12: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/macos/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+MODULE tests.unit.platform.remap.rules.test_tap_hold_key_thresholds
+
+=== tap-hold delay model on macOS (par-15) ===
+  ok   no per-key delay remains in the shipped catalogue
+  ok   the global default is the timing registry's, the one Windows and Linux read
+  ok   the retired per-key delays are resolved to the driver's key ids for the migrating drivers
+  ok   refuses a retired delay that is not a positive number, or for a key the catalogue does not list
+MODULE tests.unit.platform.remap.rules.test_nav_layer_rule
+
+=== Karabiner navigation layer generated from layers.toml ===
+  ok   the recommended layer generates the hand-written layer made canonical (nav-layer-generated)
+  ok   editing one key of layers.toml changes that key only (nav-layer-generated)
+
+=== Karabiner navigation layer contracts ===
+  ok   binds nothing without a binding
+  ok   (navigation-native-case) leaves every unbound key and its case outside the layer rule
+  ok   swallows a key bound to none and takes a mouse button as a layer key
+  ok   the wheel and a repeat count have no Karabiner form
+  ok   (layer-wheel-slots) the recommended wheel is volume up and down, posted as media keys
+  ok   (layer-wheel-slots) an edited wheel slot sends its keystroke, and none swallows the turn
+2026-11-04 15:07:28:000 [WARNING] [karabiner.nav_layer] The wheel binding WheelUp is left out: a call resolution is no stroke a wheel turn can send.
+[logger] unified log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_karabiner.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_sHnBKR_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   (layer-wheel-slots) a binding a wheel turn cannot send leaves that direction scrolling
+  ok   routes brightness wheel turns and keys through genuine native media producers
+  ok   implements every macOS call handler the vocabulary declares
+  ok   a layers.toml rejected as a whole logs an error, never a success (nav-layer-generated)
+
+=== the recommended layer comes with the key that enters it ===
+  FAIL (nav-layer-fresh-install-default) a folder without layers.toml gets the preset, which generates the layer — test_nav_layer_rule.lua:367: the preset's exact bytes:
+  expected: "# _shared/keymap/layers.recommended.toml\
+#\
+# Ergopti's recommended navigation layer, as data. It is the preset the\
+# ..."
+    actual: nil
+  FAIL (nav-layer-fresh-install-default) an existing layers.toml is never replaced — test_nav_layer_rule.lua:383: empty:
+  expected: "kept"
+    actual: "imported"
+  FAIL (nav-layer-fresh-install-default) an undo removes only the file the import created, as it created it — test_nav_layer_rule.lua:401: a later edit survives:
+  expected: "# _shared/keymap/layers.recommended.toml\
+#\
+# Ergopti's recommended navigation layer, as data. It is the preset the\
+# ..."
+    actual: "# edited since\
+"
+  ok   (nav-layer-fresh-install-default) only a key whose preset hold is the layer brings it
+
+=== navigation physical inputs and virtual outputs (iso-typing-convention) ===
+  ok   names inputs and outputs in the one physical ISO domain the ANSI product passes through (iso-key-99)
+  ok   wheel Quartz strokes use the captured layout convention, without changing ordinary keys
+
+=== navigation source close acknowledgement ===
+  ok   (nav-source-close-ack) a false user close ACK isolates the real file without SUCCESS
+  ok   (nav-source-close-ack) a nil user close ACK isolates the real file without SUCCESS
+  ok   (nav-source-close-ack) a false shipped close ACK refuses context before START
+  ok   (nav-source-close-ack) a nil shipped close ACK refuses context before START
+
+=== navigation configured input observations ===
+  FAIL nav-configured captures explicit None as the genuine physical input — error loading module 'lfs' from file '/workspace/scratch/parity-toolchain/modules/lfs.so':
+	dynamic libraries not enabled; check your Lua installation
+  FAIL nav-configured never admits later source bytes as an original-load baseline — error loading module 'lfs' from file '/workspace/scratch/parity-toolchain/modules/lfs.so':
+	dynamic libraries not enabled; check your Lua installation
+  FAIL nav-configured refuses map mutation before the first capture — error loading module 'lfs' from file '/workspace/scratch/parity-toolchain/modules/lfs.so':
+	dynamic libraries not enabled; check your Lua installation
+  FAIL nav-configured detached code edits cannot change a subsequent capture — error loading module 'lfs' from file '/workspace/scratch/parity-toolchain/modules/lfs.so':
+	dynamic libraries not enabled; check your Lua installation
+  FAIL nav-configured currency refuses an observed user source replacement — error loading module 'lfs' from file '/workspace/scratch/parity-toolchain/modules/lfs.so':
+	dynamic libraries not enabled; check your Lua installation
+  FAIL nav-configured source exports cannot supply replacement observations — error loading module 'lfs' from file '/workspace/scratch/parity-toolchain/modules/lfs.so':
+	dynamic libraries not enabled; check your Lua installation
+  FAIL nav-configured rejoins original source bytes after the load logger callback — error loading module 'lfs' from file '/workspace/scratch/parity-toolchain/modules/lfs.so':
+	dynamic libraries not enabled; check your Lua installation
+  FAIL nav-configured refuses actual compiled input mutation false — error loading module 'lfs' from file '/workspace/scratch/parity-toolchain/modules/lfs.so':
+	dynamic libraries not enabled; check your Lua installation
+  FAIL nav-configured refuses actual compiled input mutation true — error loading module 'lfs' from file '/workspace/scratch/parity-toolchain/modules/lfs.so':
+	dynamic libraries not enabled; check your Lua installation
+RESULT 52 passed 13 failed
+/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua: /workspace/scratch/deep-parity/macos-input/run-focused.lua:13: assertion failed!
+stack traceback:
+	[C]: in function 'assert'
+	/workspace/scratch/deep-parity/macos-input/run-focused.lua:13: in main chunk
+	[C]: in ?

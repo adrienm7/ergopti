@@ -1,0 +1,6 @@
+MODULE tests.unit.modules.gestures.engine.test_engine_untrusted_scroll_blocker
+
+=== Engine.init(): a scroll blocker that does not enable ===
+  ok   is deferred with a warning while Accessibility is not granted
+  ok   stays an error while Accessibility is granted
+RESULT 2 passed 0 failed

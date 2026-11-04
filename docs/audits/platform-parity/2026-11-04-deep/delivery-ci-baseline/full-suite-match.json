@@ -1,0 +1,7 @@
+{
+	"full_suite_stderr": "/tmp/ergopti-js-suite-i9ndhb/failures/js-0204/stderr.txt",
+	"exact_problem_list_match": true,
+	"problem_count": 12,
+	"probe_expected_exit": 1,
+	"probe_actual_exit": 1
+}

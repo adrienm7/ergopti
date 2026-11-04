@@ -1,0 +1,7 @@
+MODULE tests.unit.modules.gestures.actions.test_actions_aux_wiring
+
+=== gesture Actions exact-owner wiring ===
+  ok   routes representative async actions and lifecycle boundaries
+  ok   pins nested axis dispatch to the gesture parent
+  ok   routes catalogue lock_screen through the scoped mouse owner
+RESULT 3 passed 0 failed

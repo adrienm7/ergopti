@@ -1,0 +1,27 @@
+{
+	"schema_version": 1,
+	"scope": "macos-hotstrings",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:25:23.847391+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/macos-hotstrings/report.md",
+	"findings": [
+		{
+			"id": "MH-001",
+			"title": "Programmable static preview metadata is parsed as output tokens on macOS",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [
+				"Static programmable preview descriptors are displayed as declared text without evaluating callback output grammar.",
+				"Literal callback output and static descriptor metadata do not acquire different token parsing by accident."
+			],
+			"reproduction": {
+				"command": "LUA_CPATH=\"/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu/lua/5.4/?.so;/workspace/scratch/parity-toolchain/modules/?.so;;\" LD_LIBRARY_PATH=/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu /workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua docs/audits/platform-parity/2026-11-04-deep/macos-hotstrings/probe-programmed-preview.lua",
+				"observed": "Exact descriptor and actual callback literal output preserve Literal {Left} {U+0041}; actual bridge row displays Literal  A. Callback runs only after physical magic dispatch, once.",
+				"boundaries": "Real programmable source/owner/keymap/deferred output and real bridge/registry/expander row builder in separate fixture phases; Hammerspoon input/AX/timer and canvas sink are native doubles. No native Mac execution."
+			},
+			"root_cause": "macos/modules/keymap/llm_bridge.lua:413 provider_plain unconditionally parses every provider string through tokens_from_repl and plain_text; :850 uses this result for static programmable preview descriptors although user_code.lua projects row.preview unchanged and callback output uses literal emit_text.",
+			"silent_failure": "No error; callback still works but braces/key-looking fragments disappear or change in its advertised static description.",
+			"regression_test": "Run actual programmable preview containing literal {Left} and {U+0041} through real bridge row builder and assert byte-exact descriptor display; retain callback-not-run-on-preview and literal-output controls plus ordinary static TOML output-token preview tests."
+		}
+	]
+}

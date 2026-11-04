@@ -1,0 +1,5 @@
+MODULE tests.unit.modules.dynamic_hotstrings.rules_engine.test_rules_engine_preview_snapshot
+
+=== dynamic rules consume the exact committed preview snapshot ===
+  ok   does not invoke a mutable resolver twice for one visible action
+RESULT 1 passed 0 failed

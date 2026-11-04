@@ -1,0 +1,12 @@
+MODULE tests.unit.modules.gestures.engine.test_engine_awake_duration
+
+=== gesture classification measures awake contact duration ===
+  ok   keeps a short tap when the civil clock jumps forward
+  ok   rejects a long stationary hold when the civil clock jumps backward
+  ok   keeps an ordinary short tap without a civil correction
+  ok   rejects an ordinary long stationary hold without a civil correction
+
+=== gesture live rearm measures awake duration ===
+  ok   does not spend the reversal delay when the civil clock jumps forward
+  ok   rearms the reversal after its awake delay despite a civil-clock rollback
+RESULT 6 passed 0 failed

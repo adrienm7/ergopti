@@ -1,0 +1,5 @@
+MODULE tests.unit.modules.dynamic_hotstrings.injection.test_personal_preview_static_ownership
+
+=== personal preview and static engine ownership ===
+  ok   G5 personal preview obeys the static mapping selected by the engine
+RESULT 1 passed 0 failed

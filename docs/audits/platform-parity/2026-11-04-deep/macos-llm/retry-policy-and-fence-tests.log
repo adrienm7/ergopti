@@ -1,0 +1,18 @@
+
+=== every LLM backend retries on the shared policy ===
+  ok   finds a retry site in each backend
+  ok   derives the retry temperature from the policy step, not a literal
+  ok   uses the same retry temperature ceiling everywhere
+  ok   derives the retry token budget from the policy too
+
+=== sequential callbacks revalidate request ownership ===
+  ok   Ollama drops a retry after the request is superseded
+  ok   Ollama drops a completed variant after supersession with streaming=false (sequential-result-fence)
+  ok   Ollama drops a completed variant after supersession with streaming=true (sequential-result-fence)
+  ok   Remote drops a retry after the request is superseded
+  ok   Remote drops a completed variant after supersession with streaming=false (sequential-result-fence)
+  ok   Remote drops a completed variant after supersession with streaming=true (sequential-result-fence)
+  ok   MLX drops a retry after the request is superseded
+  ok   MLX drops a completed variant after supersession with streaming=false (sequential-result-fence)
+  ok   MLX drops a completed variant after supersession with streaming=true (sequential-result-fence)
+AUDIT TARGETED TOTAL: 13 passed, 0 failed

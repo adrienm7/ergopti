@@ -1,0 +1,43 @@
+MODULE tests.unit.modules.keymap.registry.test_registry_mutation_transactions_dynamic_category
+
+=== Dynamic category admits its real personal-info module owner ===
+  ok   dynamic personal scope true/true
+  ok   dynamic personal scope true/false
+  ok   dynamic personal scope true/nil
+  ok   dynamic personal scope true/throw
+  ok   dynamic personal scope restores absent state after false/true
+  ok   dynamic personal scope restores absent state after nil/true
+  ok   dynamic personal scope restores absent state after throw/true
+  ok   dynamic personal scope false/true
+  ok   dynamic personal scope false/false
+  ok   dynamic personal scope false/nil
+  ok   dynamic personal scope false/throw
+  ok   dynamic personal scope restores absent state after false/false
+  ok   dynamic personal scope restores absent state after nil/false
+  ok   dynamic personal scope restores absent state after throw/false
+  ok   dynamic personal scope refuses a stale source then retries its acknowledged owner
+
+=== Dynamic module acknowledgement and selected-scope isolation ===
+  ok   dynamic personal module inverse after false/true
+  ok   dynamic personal module inverse after nil/true
+  ok   dynamic personal module inverse after throw/true
+  ok   dynamic personal conditional writer refusal then retry true
+  ok   dynamic personal module inverse after false/false
+  ok   dynamic personal module inverse after nil/false
+  ok   dynamic personal module inverse after throw/false
+  ok   dynamic personal conditional writer refusal then retry false
+  ok   dynamic personal scope refuses a missing actual module port before publication
+  ok   dynamic personal scope preserves unsupported declared future placeholders
+  ok   an unrelated category never acquires the personal module or changes its choice
+
+=== Dynamic module checkbox and untouched-runtime authority ===
+  ok   the actual shared Dynamic checkbox includes its personal-info placeholder
+  ok   a refused real registry selection never acquires the untouched module runtime
+  ok   an already selected module keeps its runtime while its category is acknowledged
+
+=== Dynamic module acknowledged publication survives UI refresh refusal ===
+  ok   a failed menu refresh cannot undo the acknowledged personal-info file and runtime choice
+
+=== registry-only personal menu diagnostics isolation ===
+  ok   restores absent, false and captured boot catalogue caches after success and refusal
+RESULT 31 passed 0 failed

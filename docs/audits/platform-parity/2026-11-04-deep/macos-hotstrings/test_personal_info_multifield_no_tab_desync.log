@@ -1,0 +1,7 @@
+MODULE tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_multifield_no_tab_desync
+
+=== personal_info production path keeps navigation out of logical text ===
+  ok   defines a tab-free `echoed` joined with no separator
+  ok   passes the tab-free value to inject_dynamic as the buffer result
+  ok   emits fields and Tabs through SyntheticInput while returning tab-free logical text
+RESULT 3 passed 0 failed

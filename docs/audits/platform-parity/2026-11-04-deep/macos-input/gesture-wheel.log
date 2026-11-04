@@ -1,0 +1,3 @@
+REPRO ON: registered layer_on writes layer_active=1, but bound wheel passes ordinary scroll (zero slot lookups)
+REPRO OFF: registered layer_off writes layer_active=0, but wheel still consumes scroll and posts SOUND_UP down/up
+CONTROL: generated F20/F19 sentinels do synchronize wheel entry/exit; same wheel owner stays healthy

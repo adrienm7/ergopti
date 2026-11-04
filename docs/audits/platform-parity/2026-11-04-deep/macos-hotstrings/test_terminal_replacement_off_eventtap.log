@@ -1,0 +1,9 @@
+MODULE tests.unit.modules.keymap.eventtap.test_terminal_replacement_off_eventtap
+
+=== keymap.expander: terminal replacement commit boundary ===
+  ok   commits pacing after exact seal and buffer but before fallible telemetry
+  ok   treats a false seal result as a refused transaction
+  ok   acquires terminator replay before committing a paced terminal replacement
+  ok   orders deferred tooltip paste and F16 behind all paced terminal deletes
+  ok   keeps Enter behind a paced plan longer than the base watchdog margin
+RESULT 5 passed 0 failed

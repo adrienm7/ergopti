@@ -1,0 +1,38 @@
+
+=== AI agent: automatic missing local model ===
+  ok   notifies once per model and never interrupts typing with a download dialog
+
+=== AI agent automatic mode: a pause, a triage, then actions ===
+  ok   triages the sentence once, and above the threshold asks System 2
+  ok   below the threshold, or for no intent, nothing follows
+  ok   never triages the same sentence twice, nor a short one
+  ok   a keystroke withdraws the triage in flight and its answer is dropped
+  ok   a hotstring preview, live mode, an excluded app, a pause or a secure field block it
+  ok   only in the automatic mode
+
+=== AI agent automatic mode: the toggle ===
+  ok   switches auto and action, from off to auto, and tells the user
+  ok   without System 1 it is refused and nothing changes
+
+=== AI agent learning: a threshold per application and intent ===
+  ok   accepting lowers it, dismissing raises it, and it survives a restart
+  ok   typing over an automatic suggestion dismisses it; a learnt threshold gates the next one
+  ok   an action the user asked for teaches nothing
+  ok   keeps at most MAX_APPS applications, dropping the least recently used
+
+=== AI agent automatic mode: beside the automatic prediction ===
+  ok   triages while the prediction is shown, and its actions replace the prediction
+  ok   waits for the prediction's request on the same backend instead of cancelling it
+  ok   an answer that holds no action leaves the prediction alone
+  ok   a keystroke cancels both the prediction and the agent's request
+  ok   an explicit AI request on screen still blocks it
+  ok   is disarmed with the AI menu switched off (ai-off-inert-linux)
+  ok   drops its pause and request when the AI is switched off, and re-arms on the next keystroke after the switch-on
+
+=== AI agent automatic mode: Jev as System 1 ===
+  ok   through TypeSafe: the jev question to the full endpoint, then System 2
+  ok   an answer without `choice` takes the most probable intent
+  ok   through Backboard with a TypeSafe model: system_one questions, then System 2
+  ok   any other Backboard model triages with the chat prompt
+  ok   a Jev provider is never System 2
+AUDIT_TEST_RESULT	25	0

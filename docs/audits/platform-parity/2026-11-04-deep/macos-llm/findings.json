@@ -1,0 +1,46 @@
+{
+	"schema_version": 1,
+	"scope": "macos-llm",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:20:03.147884+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/macos-llm/report.md",
+	"findings": [
+		{
+			"id": "ML-001",
+			"title": "Sequential local streams and retries share a request-scoped cumulative thinking filter",
+			"severity": "medium",
+			"confidence": "high_executed_real_lua_composition_with_recording_ports",
+			"guarantees": [
+				"Streaming multi display accepts valid cumulative snapshots from every independent local variant",
+				"Thinking filter prefix validation must be scoped to one actual stream, not an entire multi-stream generation"
+			],
+			"reproduction": {
+				"kind": "executed_real_production_composition",
+				"artifact": "docs/audits/platform-parity/2026-11-04-deep/macos-llm/repro-sequential-stream-filter.lua",
+				"logs": [
+					"docs/audits/platform-parity/2026-11-04-deep/macos-llm/repro-sequential-stream-filter.log",
+					"docs/audits/platform-parity/2026-11-04-deep/macos-llm/repro-sequential-stream-retry.log",
+					"docs/audits/platform-parity/2026-11-04-deep/macos-llm/repro-sequential-stream-control.log"
+				],
+				"steps": [
+					"Enable streaming and streaming-multi; choose non-batch profile and two candidates on MLX or Ollama",
+					"First independent transport streams its completion and succeeds",
+					"Second independent transport streams a different completion; handler treats new prefix as malformed and suppresses interim output until final"
+				],
+				"executed": true,
+				"runtime": "Lua 5.4.8 + repository Hammerspoon and transport doubles; no native Mac claim"
+			},
+			"root_cause": {
+				"consumer": "macos/modules/llm/streaming_handler.lua:297",
+				"prefix_rejection": "macos/modules/llm/streaming_handler.lua:310",
+				"producers": [
+					"macos/modules/llm/api_mlx_fetch.lua:224",
+					"macos/modules/llm/api_ollama.lua:2291"
+				],
+				"description": "One filter/partial_raw_seen is retained for whole request while same callback receives independent cumulative strings from multiple variants and retries."
+			},
+			"silent_failure": "Later token previews stop rendering but final candidates still succeed; only a cumulative-prefix warning identifies the mismatch. Failed partial plus retry has the same outcome.",
+			"regression_test": "Compose actual local strategy and handler for two successful independent streams and partial-failure/retry. Assert interim rendering for admitted streams and final candidates. Retain valid cumulative and malformed same-stream prefix controls, plus thinking-tag suppression."
+		}
+	]
+}

@@ -1,0 +1,36 @@
+MODULE tests.unit.modules.hotstrings.test_hotstring_bulk_scope
+
+=== hotstring category selection parity ===
+  ok   (hotstring-category-scope) enable-category
+  ok   (hotstring-category-scope) disable-category
+  ok   (hotstring-category-scope) enable-language
+  ok   (hotstring-category-scope) disable-language
+  ok   (hotstring-category-scope) enable-empty-personal-group
+  ok   (hotstring-category-scope) disable-empty-personal-group
+  ok   (hotstring-category-scope) empty-scope
+  ok   (hotstring-category-scope) unknown-category
+  ok   (hotstring-category-scope) duplicate-category
+  ok   (hotstring-category-scope) dotted-category
+  ok   (hotstring-category-scope) nonboolean-target
+  ok   (hotstring-category-scope) duplicate-section
+  ok   (hotstring-category-scope) separator-is-not-a-section
+  ok   (hotstring-category-scope) dotted-section
+  ok   (hotstring-category-scope) disable-native-replacement-magic_key
+  ok   (hotstring-category-scope) disable-native-replacement-magickey
+  ok   (hotstring-category-scope) disable-native-replacement-MagicKey
+  ok   (hotstring-category-scope) namespaced-extension-enable
+  ok   (hotstring-category-scope) namespaced-extension-disable
+
+=== personal file admission parity ===
+  ok   (personal-file-admission) one exclusive current owner
+  ok   (personal-file-admission) unknown descriptor
+  ok   (personal-file-admission) different current native path
+  ok   (personal-file-admission) different current native group
+  ok   (personal-file-admission) Linux discovery loser
+  ok   (personal-file-admission) Windows default group is not a file gate
+  ok   (personal-file-admission) flat and nested sources share one admitted gate
+  ok   (personal-file-admission) distinct Unicode components are retained
+  ok   (personal-file-admission) duplicate descriptor is not independent evidence
+  ok   (personal-file-admission) forged descriptor
+  ok   (personal-file-admission) unadmitted sibling cannot own the winner
+RESULT 30 passed 0 failed

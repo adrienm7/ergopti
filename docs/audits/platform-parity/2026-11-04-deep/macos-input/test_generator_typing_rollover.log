@@ -1,0 +1,39 @@
+MODULE tests.unit.platform.remap.generator.test_generator_typing_rollover
+
+=== typing priority for native tap-hold keys ===
+  ok   typing-rollover escape precedes the next letter without its hold
+  ok   typing-rollover escape alone types once and cancels pending timers
+  ok   typing-rollover escape long hold activates exactly at its threshold
+  ok   typing-rollover escape canceled hold never appears later
+  ok   typing-rollover escape uses the per-key threshold for tap and both timers
+  ok   typing-rollover tab precedes the next letter without its hold
+  ok   typing-rollover tab alone types once and cancels pending timers
+  ok   typing-rollover tab long hold activates exactly at its threshold
+  ok   typing-rollover tab canceled hold never appears later
+  ok   typing-rollover tab uses the per-key threshold for tap and both timers
+  ok   typing-rollover return_or_enter precedes the next letter without its hold
+  ok   typing-rollover return_or_enter alone types once and cancels pending timers
+  ok   typing-rollover return_or_enter long hold activates exactly at its threshold
+  ok   typing-rollover return_or_enter canceled hold never appears later
+  ok   typing-rollover return_or_enter uses the per-key threshold for tap and both timers
+  ok   typing-rollover spacebar precedes the next letter without its hold
+  ok   typing-rollover spacebar alone types once and cancels pending timers
+  ok   typing-rollover spacebar long hold activates exactly at its threshold
+  ok   typing-rollover spacebar canceled hold never appears later
+  ok   typing-rollover spacebar uses the per-key threshold for tap and both timers
+  ok   typing-rollover delete_or_backspace precedes the next letter without its hold
+  ok   typing-rollover delete_or_backspace alone types once and cancels pending timers
+  ok   typing-rollover delete_or_backspace long hold activates exactly at its threshold
+  ok   typing-rollover delete_or_backspace canceled hold never appears later
+  ok   typing-rollover delete_or_backspace uses the per-key threshold for tap and both timers
+  ok   typing-rollover custom taps retain their explicit action rather than becoming native
+  ok   typing-rollover other catalogue keys retain immediate modifier holds
+  ok   typing-rollover timed Control hold preserves an already held physical Shift
+  ok   typing-rollover a pending layer key never releases a layer enabled by another owner
+  ok   typing-rollover an activated layer is released and its activation marker reset
+  ok   typing-rollover another key's release never cancels a pending hold
+  ok   typing-rollover a timer cannot activate a hold after its generation is off
+  ok   typing-rollover a timer cannot activate a hold after its generation is paused
+  ok   typing-rollover a timer cannot activate a hold after its generation is revoked
+  ok   typing-rollover historical recognition retains the original immediate-hold graph
+RESULT 35 passed 0 failed

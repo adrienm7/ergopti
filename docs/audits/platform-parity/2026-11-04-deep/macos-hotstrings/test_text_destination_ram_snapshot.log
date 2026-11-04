@@ -1,0 +1,14 @@
+MODULE tests.unit.modules.keymap.eventtap.test_text_destination_ram_snapshot
+
+=== text destination RAM snapshot ===
+  ok   reads stopped tracking without any native call
+  ok   does not allocate a native timer when the destination is still unknown
+  ok   returns the retained safe receipt without native clocks or probes
+  ok   refuses secure state without scheduling or native reads
+  ok   refuses ignored state without scheduling or native reads
+  ok   refuses unreadable state without scheduling or native reads
+  ok   refuses no receipt state without scheduling or native reads
+  ok   keeps observer invalidation and explicit full AX verification outside the snapshot
+  ok   leaves periodic secure-field refresh under the existing timer owner
+  ok   does not republish a retained receipt after tracking stops
+RESULT 10 passed 0 failed

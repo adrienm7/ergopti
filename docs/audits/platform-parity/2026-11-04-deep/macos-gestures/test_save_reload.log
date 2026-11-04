@@ -1,0 +1,11 @@
+MODULE tests.unit.modules.gestures.actions.test_save_reload
+
+=== gesture Actions save/reload transaction ===
+  ok   posts no save when reload timer acquisition returns false
+  ok   rolls back reload when save dispatch returns false
+  ok   posts no save when reload timer acquisition returns nil
+  ok   rolls back reload when save dispatch returns nil
+  ok   posts no save when reload timer acquisition returns throw
+  ok   rolls back reload when save dispatch returns throw
+  ok   commits reload only after save dispatch succeeds
+RESULT 7 passed 0 failed

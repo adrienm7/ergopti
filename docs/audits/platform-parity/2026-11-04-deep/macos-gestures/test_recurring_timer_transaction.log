@@ -1,0 +1,10 @@
+MODULE tests.unit.modules.gestures.engine.test_recurring_timer_transaction
+
+=== gestures recurring timers are exact lifecycle transactions ===
+  ok   hands off startup probe to health check and fences the stale probe callback
+  ok   retains cleanup debt when timer stop refuses and retries the exact handle
+  ok   contains a partial recurring-timer acquisition until teardown can retry it
+  ok   defers engine acquisition until explicit startup and retries a refusal
+  ok   rejects a primer start refusal, rolls back, and commits a clean retry
+  ok   rolls back primer and discovery when wake-watcher start raises, then retries
+RESULT 6 passed 0 failed

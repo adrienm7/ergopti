@@ -1,0 +1,16 @@
+MODULE tests.unit.modules.gestures.engine.test_stop_detaches_watchers
+
+=== M.stop() detaches all gesture watchers ===
+  ok   stop() calls stop() on every injected watcher
+  ok   all injected watchers report running() == false after M.stop()
+  ok   touch_watchers table is empty after M.stop()
+  ok   M.stop() is safe when no watchers are registered
+
+=== M.stop() clears CoreState.enabled ===
+  ok   is_enabled() returns false immediately after M.stop()
+  ok   enabled flag stays false even when watchers were already empty
+  ok   enabled flag is false regardless of watcher count
+
+=== M.stop() idempotence ===
+  ok   calling M.stop() twice does not raise
+RESULT 8 passed 0 failed

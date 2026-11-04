@@ -1,0 +1,8 @@
+MODULE tests.unit.modules.gestures.actions.test_actions_modifier_keystrokes
+
+=== gestures.actions: modifier+key actions post the expected keystroke (G1) ===
+  ok   cmd_a posts Cmd+a
+  ok   cmd_shift_a posts Cmd+Shift+a
+  ok   ctrl_a posts Ctrl+a
+  ok   option_a posts Option+a
+RESULT 4 passed 0 failed

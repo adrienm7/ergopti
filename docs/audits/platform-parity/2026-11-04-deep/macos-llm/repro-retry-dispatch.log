@@ -1,0 +1,6 @@
+ollama retry: stream -> stream, tokens=20/25, partial callbacks=2
+ollama all-failure requests for requested=1 multiplier=2: 4
+remote retry: plain -> plain, tokens=20/25, partial callbacks=0
+remote all-failure requests for requested=1 multiplier=2: 4
+mlx retry: stream -> stream, tokens=20/25, partial callbacks=2
+mlx all-failure requests for requested=1 multiplier=2: 4

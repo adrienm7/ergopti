@@ -1,0 +1,39 @@
+{
+	"schema_version": 1,
+	"scope": "linux-metrics",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:10:08.953207+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/linux-metrics/report.md",
+	"findings": [
+		{
+			"id": "LM-001",
+			"title": "Excluded collection spans remain inside typing sequences and durations",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G5"],
+			"reproduction": {
+				"command": "/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua docs/audits/platform-parity/2026-11-04-deep/linux-metrics/probe-boundary.lua",
+				"steps": [
+					"Record a@1000; optionally flush with repository fake transport.",
+					"Enter pause/private/secure/suppressed/disabled state; attempt X@1100; exit state.",
+					"Record b@1200 and space@1300; flush."
+				],
+				"observed": "All 10 cases produce word ab count1, bigram ab count1 td200, typing_time_ms300; excluded X is absent.",
+				"expected": "An explicit exclusion terminates observed typing continuity; no invented ab word/bigram or credited cross-exclusion inter-key delay.",
+				"evidence_path": "docs/audits/platform-parity/2026-11-04-deep/linux-metrics/probe-boundary.log",
+				"limits": "Real core/shared walker with repository fake writer and isolated preferences; no real SQLite COMMIT claim."
+			},
+			"root_cause": {
+				"locations": [
+					"static/ergopti_plus/linux/modules/keystats/keystats.lua:1644",
+					"static/ergopti_plus/linux/modules/keystats/keystats.lua:782",
+					"static/ergopti_plus/linux/modules/keystats/keystats.lua:845",
+					"static/ergopti_plus/linux/modules/keystats/aggregate_walker.lua:184"
+				],
+				"description": "Policy settlement retires focus/title/hold ownership but not buffered typing-run continuity, last-key cursors or committed walker context."
+			},
+			"silent_failure": "All calls succeed and filtered text stays absent, while persisted aggregate payload invents contiguous text and includes excluded elapsed time; dashboards cannot identify the discontinuity.",
+			"regression_test": "Cover five public exclusion paths both within one pending snapshot and across an acknowledged flush; require excluded X absent, no cross-boundary ab ngram/word, zero cross-boundary timing credit, retained valid a/b history; add pending/failed/retried flush boundary case."
+		}
+	]
+}

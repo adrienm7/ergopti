@@ -1,0 +1,2 @@
+REPRO: actual ShellRunner constructs4 preference tasks but none starts; repeated recheck joins pending forever; swipe_3_left remains free
+CONTROL: starting the exact retained handles and completing native reads changes same slot to taken

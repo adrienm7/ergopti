@@ -1,0 +1,12 @@
+MODULE tests.unit.modules.dynamic_hotstrings.injection.test_start_transaction
+
+=== dynamic_hotstrings.start owns both child generations ===
+  ok   rolls PersonalInfo back when RulesEngine reports false
+  ok   rolls PersonalInfo back when RulesEngine reports throw
+  ok   fails root boot before publishing the dynamic hotfile
+
+=== personal-information boot admission ===
+  ok   applies the absent canonical choice before admitting keyboard input
+  ok   applies the disabled canonical choice before admitting keyboard input
+  ok   applies the enabled canonical choice before admitting keyboard input
+RESULT 6 passed 0 failed

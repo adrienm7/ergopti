@@ -1,0 +1,12 @@
+MODULE tests.unit.modules.gestures.engine.test_frame_clock
+
+=== gestures frame clock (three-finger-swipe-stuck) ===
+  ok   keeps the spacing of frames delivered in one burst
+  ok   times a frame without a stamp at its delivery
+  ok   re-anchors on a device stamp that runs backward
+  ok   re-anchors a stamp that lags its delivery beyond the bound
+  ok   rejects a delivery time that is not a finite number
+
+=== the touch watcher hands the engine each frame's capture stamp (three-finger-swipe-stuck) ===
+  ok   forwards the device stamp and drops an unusable one
+RESULT 6 passed 0 failed

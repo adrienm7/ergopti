@@ -1,0 +1,6 @@
+MODULE tests.unit.modules.dynamic_hotstrings.rules_engine.test_rules_engine_stop_clears_rules
+
+=== rules_engine.stop clears shared rule ownership ===
+  ok   a stop/start cycle registers one date-rule set, never two
+  ok   fails closed when preview revocation refuses teardown
+RESULT 2 passed 0 failed

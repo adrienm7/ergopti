@@ -1,0 +1,64 @@
+
+=== tap-holds end to end: the shipped defaults ===
+  ok   copies on a Shift tap and pastes on a left Ctrl tap
+  ok   ignores a bounce below the minimum and a hold past the threshold
+  ok   types Shift+A, not a copy, for a Shift chord
+  ok   makes CapsLock Ctrl when held and a hotstring-ending Enter when tapped
+  ok   never lets CapsLock toggle the lock, however long it is held
+  ok   runs the navigation layer on left Alt, with repeats and no Alt
+  ok   types Backspace for a lone left Alt tap
+  ok   shifts the next letter after a right Ctrl tap, once
+  ok   lets a shortcut and Print through the one-shot, and types a digit as it is
+  ok   types the shared one-shot results, and hands the injector what the layout lacks
+  ok   sends Alt+Tab for a Tab tap and Shift+Tab under Shift
+  ok   holds AltGr as AltGr and taps it as Tab
+  ok   keeps Ctrl down while CapsLock or left Ctrl still holds it
+  ok   gives Ctrl+Shift for CapsLock and left Shift held together
+
+=== tap-holds end to end: a tray change is live ===
+  ok   runs a new tap action on the next keystroke
+  ok   moves the navigation layer to CapsLock
+  ok   gives a key back to the keyboard when made native
+  ok   swallows a key whose tap is none and which has no hold
+  ok   holds a modifier combination
+  ok   uses a key's own delay
+  ok   clears everything, then restores the recommended preset
+  ok   switches the feature off and on from the file
+  ok   starts off when the user's file says so
+  ok   keeps the native key when the user's file is broken
+
+=== tap-holds end to end: nothing stays pressed ===
+  ok   releases a held CapsLock's Ctrl when the script pauses
+  ok   releases the layer's chord when the tray reloads mid-hold
+  ok   releases everything the engine holds when the hook stops
+  ok   leaves nothing down over a long random session on the defaults
+
+=== tap-holds end to end: every option of the hold picker ===
+  ok   (hold-picker-every-option-2026-10-01) the hold a key gets is the option picked, after Shift
+
+=== space tap-hold: an end-character trigger ===
+  ok   a plain Space completes the trigger (the reference behaviour)
+  ok   a Space tap completes the trigger exactly like a plain Space
+  ok   a Space hold does not complete the trigger
+
+=== tap-hold taps bound to an AI action (ai-off-taphold) ===
+  ok   types a space on a Space tap while the AI is off, runs the action once on
+  ok   leaves the hold alone while the AI is off
+  ok   passes a key with a tap and no hold as itself while the AI is off
+  ok   never gates the engine's own key taps
+
+=== Shared pause switch layout policy ===
+  ok   accepts a layout id or no change and refuses other stored values
+  ok   switches only when enabled, to the event's non-empty target
+  ok   refuses an unknown event and settings that are not a table
+
+=== Shared number-row typed policy ===
+  ok   rejects unsupported modes and revoked source owners
+  ok   offers an ordering only where it reorders all ten keys (number-row-availability)
+  ok   lets the edge keys join an ordering only where swapping them changes them (number-row-edge-keys)
+  ok   uses the real renderer for native-only posture and translated disabled choices
+  ok   draws live rows that store a choice, or greyed ones that keep it and say why (number-row-live-rows)
+
+=== Physical editor native readiness ===
+  ok   (physical-editor-ui) requires successful current initialization without source writes
+TOTAL 45 passed 0 failed

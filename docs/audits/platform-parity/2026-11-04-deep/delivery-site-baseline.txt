@@ -1,0 +1,16 @@
+Baseline-only replay: 89b0b774c8c960c7ad458ac3cb98d5c97598e518
+Five original modules extracted with git show into an isolated temporary tree.
+Node 22.22.2; original fixture.run(); exit 1. No changed documentation loaded.
+Modules: tools/test/fixtures/site-deploy-admission-controls.cjs, tools/ci/site-deploy-admission.cjs, tools/ci/site-artifact.cjs, tools/ci/github-api-page.cjs, tools/dev/site-context.cjs
+
+Received exact source/run output and browser proof: 123 / main
+Target branch still names admitted source: 123 / main
+Received exact source/run output and browser proof: 123 / dev
+Target branch still names admitted source: 123 / dev
+Admitted exact source/run site artifacts: 123 / main
+Error: Site deployment admission refused: target branch reference is malformed.
+    at refuse (/workspace/scratch/deep-integration/baseline-site/tools/ci/site-deploy-admission.cjs:19:17)
+    at requireCurrentTarget (/workspace/scratch/deep-integration/baseline-site/tools/ci/site-deploy-admission.cjs:411:2)
+    at async admitProducer (/workspace/scratch/deep-integration/baseline-site/tools/ci/site-deploy-admission.cjs:374:2)
+    at async Object.main (/workspace/scratch/deep-integration/baseline-site/tools/ci/site-deploy-admission.cjs:533:15)
+    at async Object.run (/workspace/scratch/deep-integration/baseline-site/tools/test/fixtures/site-deploy-admission-controls.cjs:878:3)

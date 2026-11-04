@@ -1,0 +1,18 @@
+MODULE tests.unit.modules.gestures.engine.test_three_finger_swipe_stuck
+
+=== gesture timing follows the touch frame's capture time (three-finger-swipe-stuck) ===
+  ok   a staggered swipe delivered in one burst still fires
+  ok   a thumb landing late is refused even when its frames arrive in a burst
+  ok   a one-frame palm spike in a burst is still refused
+
+=== the scroll guard follows only a real scroll (three-finger-swipe-stuck) ===
+  ok   momentum after a swipe whose scroll was swallowed does not refuse the next swipe
+  ok   momentum after a real two-finger scroll still refuses a three-finger landing
+  ok   a swipe that fired and ends as a moving pair keeps its tail and arms no guard
+
+=== a refused gesture leaves nothing armed (three-finger-swipe-stuck) ===
+  ok   a staggered four-finger lift is not a moving pair
+  ok   an aborted gesture ends when the hand drops to one resting finger
+  ok   a swipe that locks on its promotion frame is not refused by cohesion
+  ok   a thumb resting beside two scrolling fingers still never fires
+RESULT 10 passed 0 failed

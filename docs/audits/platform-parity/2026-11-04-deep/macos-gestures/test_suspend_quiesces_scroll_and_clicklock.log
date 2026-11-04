@@ -1,0 +1,10 @@
+MODULE tests.unit.modules.gestures.engine.test_suspend_quiesces_scroll_and_clicklock
+
+=== gestures suspend releases scroll-block and click-lock ===
+  ok   M.suspend() cancels the current gesture AND releases the click-lock
+  ok   keeps an OFF feature disabled when enable_all is attempted under PAUSE
+  ok   source: M.suspend reaches Engine.cancel_current_gesture and Actions.force_cleanup
+
+=== gestures engine exposes a scroll-block release ===
+  ok   unblock_scroll() leaves is_blocking_scroll() false (idempotent)
+RESULT 4 passed 0 failed

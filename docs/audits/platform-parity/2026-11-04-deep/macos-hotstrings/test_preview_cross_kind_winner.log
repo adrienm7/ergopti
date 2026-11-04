@@ -1,0 +1,5 @@
+MODULE tests.unit.modules.keymap.preview.test_preview_cross_kind_winner
+
+=== preview arbitration across mapping kinds ===
+  ok   G5 every active preview row names the cross-kind engine winner
+RESULT 1 passed 0 failed

@@ -1,0 +1,18 @@
+MODULE tests.unit.modules.keymap.expansion.test_builtin_clipboard_restore_ownership
+
+=== builtin clipboard restore follows native ownership ===
+  ok   restores the exact rich snapshot from a valid zero count (builtin-restore-rich)
+  ok   restores an absent original through the native void clear (builtin-restore-empty)
+  ok   preserves a newer native copy after actual handoff: FOREIGN  (builtin-restore-copy)
+  ok   preserves a newer native copy after actual handoff: AAAAAAAA (builtin-restore-copy)
+  ok   captures the newer copy for a successor, overlap=true (builtin-restore-successor)
+  ok   captures the newer copy for a successor, overlap=false (builtin-restore-successor)
+  ok   retains the certificate through a transient restore count refusal: nil (builtin-restore-count)
+  ok   retains the certificate through a transient restore count refusal: throw (builtin-restore-count)
+  ok   rolls back a payload failure after its exact native clear: false (builtin-restore-payload)
+  ok   retries a restore failure after its exact native clear: false (builtin-restore-retry)
+  ok   rolls back a payload failure after its exact native clear: throw (builtin-restore-payload)
+  ok   retries a restore failure after its exact native clear: throw (builtin-restore-retry)
+  ok   preserves a foreign copy after own clear plus another native generation (builtin-restore-delta-two)
+  ok   keeps an unreadable postwrite receipt closed without adopting a later count (builtin-restore-postcount)
+RESULT 14 passed 0 failed

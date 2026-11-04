@@ -1,0 +1,54 @@
+node:assert:150
+  throw new AssertionError(obj);
+  ^
+
+AssertionError [ERR_ASSERTION]: only tested production bytes reach Pages
++ actual - expected
+
++ [
++   'forward actual admission',
++   'publication step if',
++   'publication step if',
++   'publication step if',
++   'publication step if',
++   'publication step if',
++   'publication job if',
++   'exact read-only source checkout',
++   'preflight exact build ID',
++   'preflight exact proof ID',
++   'preflight actual byte and proof receiving',
++   'retain validated admission'
++ ]
+- []
+
+    at Object.<anonymous> (/workspace/scratch/deep-integration/ci-baseline/probe.cjs:18:8)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: [
+    'forward actual admission',
+    'publication step if',
+    'publication step if',
+    'publication step if',
+    'publication step if',
+    'publication step if',
+    'publication job if',
+    'exact read-only source checkout',
+    'preflight exact build ID',
+    'preflight exact proof ID',
+    'preflight actual byte and proof receiving',
+    'retain validated admission'
+  ],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v22.22.2

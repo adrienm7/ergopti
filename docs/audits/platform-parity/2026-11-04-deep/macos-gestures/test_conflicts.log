@@ -1,0 +1,42 @@
+MODULE tests.unit.modules.gestures.config.test_conflicts
+
+=== Conflicts.on_action_changed ===
+  ok   returns nil for action 'none'
+  ok   returns warning for tap_3 with non-none action
+  ok   returns nil for unknown slot
+  ok   returns warning for swipe_3_horiz
+  ok   returns warning for swipe_4_up (in vertical group)
+  ok   warning URL is a System Settings deeplink
+  ok   warning message starts with a separator dash line
+
+=== Conflicts current macOS preference checks ===
+  ok   suppresses a three-finger tap warning only when macOS reports it disabled
+  ok   keeps the warning when any current macOS source still enables the native gesture
+  ok   logs a conflict once however many menu rebuilds ask for it (issue #95)
+  ok   does not warn at startup for blank gesture values
+  ok   suppresses every active startup warning whose native gesture is confirmed disabled
+
+=== Conflicts — slots taken by a macOS gesture ===
+  ok   takes the slots of every macOS gesture that is on, and only those
+  ok   frees every slot once the macOS gestures are off, App Exposé included
+  ok   holds the slots when the read returned nothing, and frees nothing before the first read
+  ok   rechecks: a macOS gesture turned on, then off, greys then restores its slot
+  ok   arms one recheck timer and stops it at shutdown
+  ok   never writes a macOS preference
+
+=== Conflicts — purity under repetition and hostile input ===
+  ok   the same slot and action give the same answer every time
+  ok   an unknown slot answers nil, and does not poison the next real query
+  ok   non-ASCII and empty action names answer without crashing
+
+=== Conflicts.apply_all_overrides ===
+  ok   does not error with an empty actions table
+  ok   does not error with active actions
+
+=== Conflicts.restore_all_overrides ===
+  ok   is a no-op
+
+=== Conflicts — the detector reports, it never acts ===
+  ok   the module does not reach for any user-visible surface
+  ok   200 checks leave the answer unchanged
+RESULT 26 passed 0 failed

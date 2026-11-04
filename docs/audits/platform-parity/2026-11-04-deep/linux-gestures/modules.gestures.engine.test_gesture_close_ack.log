@@ -1,0 +1,13 @@
+
+=== evdev close acknowledgement ===
+  ok   accepts completed void backends and acknowledges an idle close
+  ok   retains return debt without closing a recycled descriptor
+  ok   retains throw debt without closing a recycled descriptor
+  ok   attempts close even when ungrab raises
+  ok   uses the production FFI close result and errno without retry
+  ok   refuses scope publication and restoration after a real reader close failure
+  ok   acknowledges a successful manager stop and clears reader state
+  ok   rejects a missing public close acknowledgement
+  ok   rejects a void public close acknowledgement
+  ok   rejects a throw public close acknowledgement
+AUDIT_TEST_RESULT	10	0

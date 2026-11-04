@@ -1,0 +1,89 @@
+MODULE tests.unit.ui.menu.shortcuts_and_gestures.test_menu_gesture_conflict_dialog
+
+=== gesture conflict dialog buttons (gesture-conflicts) ===
+  ok   keeps the picker parameter while showing the conflict notice
+  ok   builds a cached status submenu with explicit Settings and refresh actions
+  ok   does not warn for a refused plain assignment: false
+  ok   does not warn for a refused plain assignment: nil
+  ok   does not warn for a refused plain assignment: throw
+  ok   opens Settings from the plain picker
+  ok   dismisses the plain warning without opening Settings
+  ok   does not warn for a refused parameter assignment: false
+  ok   does not warn for a refused parameter assignment: nil
+  ok   does not warn for a refused parameter assignment: throw
+  ok   opens Settings from the parameter picker
+  ok   dismisses the parameter warning without opening Settings
+
+=== Gestures: declared cached-status refresh and actual native callback ===
+  ok   pins independent shared command and existing platform capability
+  ok   renders the existing Refresh caption and cached children: ar
+  ok   renders the existing Refresh caption and cached children: cs
+  ok   renders the existing Refresh caption and cached children: da
+  ok   renders the existing Refresh caption and cached children: de
+  ok   renders the existing Refresh caption and cached children: en
+  ok   renders the existing Refresh caption and cached children: es
+  ok   renders the existing Refresh caption and cached children: fr
+  ok   renders the existing Refresh caption and cached children: he
+  ok   renders the existing Refresh caption and cached children: hi
+  ok   renders the existing Refresh caption and cached children: it
+  ok   renders the existing Refresh caption and cached children: ja
+  ok   renders the existing Refresh caption and cached children: ko
+  ok   renders the existing Refresh caption and cached children: nl
+  ok   renders the existing Refresh caption and cached children: no
+  ok   renders the existing Refresh caption and cached children: pl
+  ok   renders the existing Refresh caption and cached children: pt
+  ok   renders the existing Refresh caption and cached children: ru
+  ok   renders the existing Refresh caption and cached children: sv
+  ok   renders the existing Refresh caption and cached children: tr
+  ok   renders the existing Refresh caption and cached children: uk
+  ok   renders the existing Refresh caption and cached children: zh
+  ok   projects the declared capability without inventing Linux refresh: ahk
+  ok   projects the declared capability without inventing Linux refresh: hs
+  ok   projects the declared capability without inventing Linux refresh: linux
+  ok   follows declared separator order and caption through the actual rendered provider
+  ok   hides only the declared command while retaining existing cached native Settings rows
+  ok   refuses an unknown declared command owner without publishing partial status
+  ok   retained callback delivers to the current native refresh method
+  ok   preserves the native refresh acknowledgement: false
+  ok   preserves the native refresh acknowledgement: nil
+  ok   preserves the native refresh acknowledgement: truthy
+  ok   preserves a throwing native refresh receipt without manufacturing completion
+  ok   retains native cached pinch presentation: enabled
+  ok   retains native cached pinch presentation: disabled
+  ok   retains native cached pinch presentation: unknown
+
+=== Gestures: complete cached system-status frames ===
+  ok   preserves prior parent and pinch captions without probes: ar
+  ok   preserves prior parent and pinch captions without probes: cs
+  ok   preserves prior parent and pinch captions without probes: da
+  ok   preserves prior parent and pinch captions without probes: de
+  ok   preserves prior parent and pinch captions without probes: en
+  ok   preserves prior parent and pinch captions without probes: es
+  ok   preserves prior parent and pinch captions without probes: fr
+  ok   preserves prior parent and pinch captions without probes: he
+  ok   preserves prior parent and pinch captions without probes: hi
+  ok   preserves prior parent and pinch captions without probes: it
+  ok   preserves prior parent and pinch captions without probes: ja
+  ok   preserves prior parent and pinch captions without probes: ko
+  ok   preserves prior parent and pinch captions without probes: nl
+  ok   preserves prior parent and pinch captions without probes: no
+  ok   preserves prior parent and pinch captions without probes: pl
+  ok   preserves prior parent and pinch captions without probes: pt
+  ok   preserves prior parent and pinch captions without probes: ru
+  ok   preserves prior parent and pinch captions without probes: sv
+  ok   preserves prior parent and pinch captions without probes: tr
+  ok   preserves prior parent and pinch captions without probes: uk
+  ok   preserves prior parent and pinch captions without probes: zh
+  ok   refuses withdrawn gesture_system_status_macos_frame without native effects
+  ok   refuses withdrawn gesture_system_status_clear without native effects
+  ok   refuses withdrawn gesture_system_macos_children without native effects
+  ok   refuses withdrawn gesture_system_pinch_frame without native effects
+  ok   refuses withdrawn gesture_system_pinch_enabled without native effects
+  ok   refuses missing actual status predicate gesture_system_pinch_is_enabled
+  ok   refuses non_boolean actual status predicate gesture_system_pinch_is_enabled
+  ok   refuses throw actual status predicate gesture_system_pinch_is_enabled
+  ok   refuses missing actual status predicate gesture_system_is_clear
+  ok   refuses non_boolean actual status predicate gesture_system_is_clear
+  ok   refuses throw actual status predicate gesture_system_is_clear
+  ok   holds the actual Settings callback selected at build time
+RESULT 81 passed 0 failed

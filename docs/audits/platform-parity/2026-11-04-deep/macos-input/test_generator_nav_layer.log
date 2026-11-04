@@ -1,0 +1,30 @@
+MODULE tests.unit.platform.remap.generator.test_generator_nav_layer
+
+=== Navigation layer in the generated Karabiner config ===
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+[logger] unified log write refused: /tmp/lua_cuEWdV_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_cuEWdV_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_karabiner.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_cuEWdV_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   deploys the layer built from state.nav_layer, gated on the lease (nav-layer-generated)
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   deploys no navigation rule without a binding
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   reads the frozen layer as the legacy anchor and never deploys it
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot build Karabiner config: navigation layer: nav_layer: Karabiner has no repeat_count resolution.
+  ok   fails the build on a layer the rule builder rejects
+RESULT 4 passed 0 failed

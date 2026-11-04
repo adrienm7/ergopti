@@ -1,0 +1,5 @@
+MODULE tests.unit.modules.keymap.preview.test_preview_provider_failure_visible
+
+=== preview provider failure visibility ===
+  ok   (preview-provider-error-once) logs off-HID and preserves static fallback
+RESULT 1 passed 0 failed

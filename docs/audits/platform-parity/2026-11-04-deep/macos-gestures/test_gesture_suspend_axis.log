@@ -1,0 +1,11 @@
+MODULE tests.unit.modules.gestures.engine.test_gesture_suspend_axis
+
+=== gestures.init: suspend/resume axis (F-MED-5) ===
+  ok   CoreState has a 'suspended' field initialised to false
+  ok   M.suspend() sets CoreState.suspended=true
+  ok   M.resume() sets CoreState.suspended=false
+  ok   M.is_suspended() is exposed for introspection
+  ok   engine live-fire gate checks both enabled AND NOT suspended
+  ok   engine commitGesture gate checks both enabled AND NOT suspended
+  ok   scroll-block n>=3 branch checks both enabled AND NOT suspended
+RESULT 7 passed 0 failed

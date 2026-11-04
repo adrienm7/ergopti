@@ -1,0 +1,5 @@
+MODULE tests.unit.modules.keymap.eventtap.test_secure_field_pass_through
+
+=== secure fields are a total keymap pass-through boundary ===
+  ok   revokes prior UI and resumes only after a known-normal focus generation
+RESULT 1 passed 0 failed

@@ -1,0 +1,25 @@
+MODULE tests.unit.modules.hotstrings.test_hotstrings_config_transaction
+
+=== hotstrings config: failed source reads stay fail-closed ===
+  ok   EACCES preserves the source and rejects every later setter
+  ok   mid-read failure preserves the source and rejects every later setter
+  ok   failed close preserves the source and rejects every later setter
+  ok   dangling symlink preserves the source and rejects every later setter
+  ok   directory preserves the source and rejects every later setter
+  ok   a dangling symlink discovered by reload retains prior memory and blocks writes
+  ok   a proven-absent override source remains writable
+
+=== hotstrings config: setters publish only after atomic commit ===
+  ok   write=nil preserves disk, memory, and the resolve cache
+  ok   close=false preserves disk, memory, and the resolve cache
+  ok   rename=false preserves disk, memory, and the resolve cache
+  ok   a symlink retarget between committed read and write publishes no candidate
+  ok   an external edit wins instead of being overwritten by a stale in-memory candidate
+  ok   clear_override rolls back when publication fails
+  ok   an old [__global__] delimiter table is no longer owned and survives a delay save byte for byte
+
+=== hotstrings config: override inputs stay data ===
+  ok   rejects hostile categories, sections, and colors before publication
+  ok   pins the complete hexadecimal color boundary
+  ok   escapes strings even when a hostile internal candidate reaches serialization
+RESULT 17 passed 0 failed

@@ -1,0 +1,6 @@
+MODULE tests.unit.modules.dynamic_hotstrings.rules_engine.test_rules_engine_trigger_char_sync
+
+=== dynamic_hotstrings.start: RulesEngine listens to keymap's trigger, not personal_info's (F-HIGH-8) ===
+  ok   interceptor fires on the fake keymap's custom trigger char, not the personal_info.toml default '★'
+  ok   accepts the French composite event for a punctuation trigger
+RESULT 2 passed 0 failed

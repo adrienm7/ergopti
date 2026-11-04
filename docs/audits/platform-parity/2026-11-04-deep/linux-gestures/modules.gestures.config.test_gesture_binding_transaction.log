@@ -1,0 +1,13 @@
+
+=== gestures: durable binding transactions ===
+  ok   gesture-scope-state: restores detached assignments and parameters without saving
+  ok   gesture-scope-state: validates the whole candidate before releasing a reader
+  ok   gesture-scope-state: a refused reader acquisition publishes no candidate assignments
+  ok   gesture-scope-state: clear requires the reader to acknowledge its stopped state
+  ok   retains one binding when the staging file cannot open
+  ok   retains one parameter when staging write fails
+  ok   retains every binding when reset publication cannot close
+  ok   retains every binding when disable-all publication cannot rename
+  ok   restores the old durable binding after a rejected change and restart
+  ok   unknown-action: refused at assignment, so nothing reverts at restart
+AUDIT_TEST_RESULT	10	0

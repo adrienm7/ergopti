@@ -1,0 +1,105 @@
+MODULE tests.unit.platform.remap.enable_transaction.test_scope_owner_navigation_layer
+
+=== macOS remap navigation-layer cohort ===
+  ok   backs up before creating a recommended sibling (scope-layer-cohort)
+  ok   removes the imported sibling before compiling a failed candidate's inverse (scope-layer-cohort)
+  ok   retains refuse_remove cleanup debt without losing the sibling (scope-layer-cohort)
+  ok   retains unreadable cleanup debt without losing the sibling (scope-layer-cohort)
+  ok   retains external_edit cleanup debt without losing the sibling (scope-layer-cohort)
+  ok   retains an unacknowledged cleanup after candidate persistence refusal (scope-layer-cohort)
+  ok   restores a parent's complete cohort using private receipt identity (scope-layer-cohort)
+  ok   refuses a forged receipt before any native effects (scope-layer-cohort)
+  ok   reverses a refused parent inverse without losing its imported sibling (scope-layer-cohort)
+  ok   keeps a conflicting parent-inverse compensation pending (scope-layer-cohort)
+  ok   a later global category refusal restores settings and the layer before completion (scope-layer-cohort)
+  ok   global retry still owes its parent target after native compensation settles (scope-layer-cohort)
+  ok   an absent success receipt never releases the global cohort (scope-layer-cohort)
+  ok   global success keeps the acknowledged import (scope-layer-cohort)
+
+=== macOS remap cohort source races ===
+  ok   detects a layer edited between cleanup admission and native undo (scope-layer-cohort)
+  ok   verifies native removal instead of accepting a false successful receipt (scope-layer-cohort)
+  ok   retains partial parent preparation until its removed bytes are restored (scope-layer-cohort)
+  ok   restores a partial removal even when the native boundary refuses (scope-layer-cohort)
+  ok   keeps an existing user's layer outside the global mutation cohort (scope-layer-cohort)
+
+=== macOS parent inverse removal-release debt ===
+  ok   retains no-effect unlink debt until native release settles (scope-layer-cohort)
+MODULE tests.unit.platform.remap.generator.test_generator_typing_rollover
+
+=== typing priority for native tap-hold keys ===
+  ok   typing-rollover escape precedes the next letter without its hold
+  ok   typing-rollover escape alone types once and cancels pending timers
+  ok   typing-rollover escape long hold activates exactly at its threshold
+  ok   typing-rollover escape canceled hold never appears later
+  ok   typing-rollover escape uses the per-key threshold for tap and both timers
+  ok   typing-rollover tab precedes the next letter without its hold
+  ok   typing-rollover tab alone types once and cancels pending timers
+  ok   typing-rollover tab long hold activates exactly at its threshold
+  ok   typing-rollover tab canceled hold never appears later
+  ok   typing-rollover tab uses the per-key threshold for tap and both timers
+  ok   typing-rollover return_or_enter precedes the next letter without its hold
+  ok   typing-rollover return_or_enter alone types once and cancels pending timers
+  ok   typing-rollover return_or_enter long hold activates exactly at its threshold
+  ok   typing-rollover return_or_enter canceled hold never appears later
+  ok   typing-rollover return_or_enter uses the per-key threshold for tap and both timers
+  ok   typing-rollover spacebar precedes the next letter without its hold
+  ok   typing-rollover spacebar alone types once and cancels pending timers
+  ok   typing-rollover spacebar long hold activates exactly at its threshold
+  ok   typing-rollover spacebar canceled hold never appears later
+  ok   typing-rollover spacebar uses the per-key threshold for tap and both timers
+  ok   typing-rollover delete_or_backspace precedes the next letter without its hold
+  ok   typing-rollover delete_or_backspace alone types once and cancels pending timers
+  ok   typing-rollover delete_or_backspace long hold activates exactly at its threshold
+  ok   typing-rollover delete_or_backspace canceled hold never appears later
+  ok   typing-rollover delete_or_backspace uses the per-key threshold for tap and both timers
+  ok   typing-rollover custom taps retain their explicit action rather than becoming native
+  ok   typing-rollover other catalogue keys retain immediate modifier holds
+  ok   typing-rollover timed Control hold preserves an already held physical Shift
+  ok   typing-rollover a pending layer key never releases a layer enabled by another owner
+  ok   typing-rollover an activated layer is released and its activation marker reset
+  ok   typing-rollover another key's release never cancels a pending hold
+  ok   typing-rollover a timer cannot activate a hold after its generation is off
+  ok   typing-rollover a timer cannot activate a hold after its generation is paused
+  ok   typing-rollover a timer cannot activate a hold after its generation is revoked
+  ok   typing-rollover historical recognition retains the original immediate-hold graph
+MODULE tests.unit.ui.menu.tap_holds.test_menu_tap_holds_feature_switch
+
+=== the macOS Tap-Holds submenu draws its feature switch ===
+  ok   renders the switch, checks the parent, and toggles it off then on
+MODULE tests.unit.ui.menu.tap_holds.test_menu_tap_holds_owned_runtime
+
+=== Tap-Holds: Ergopti's own Karabiner runtime ===
+  ok   says the user's Karabiner is closed only while Ergopti holds it closed
+  ok   shows the saved consent on an owned boot and toggles it through the facade
+  ok   explains a VirtualHIDDevice block above the closed-Karabiner row and nothing otherwise
+  ok   explains every block the owner names, above the consent row, and no other state
+  ok   explains exactly the blocks the owner declares for the user
+  ok   offers the driver-only update under an incompatible driver and only there
+MODULE tests.unit.ui.menu.tap_holds.test_menu_tap_holds_karabiner_off
+
+=== the macOS Tap-Holds submenu when Ergopti does not use Karabiner ===
+  ok   draws a disabled hint right above the greyed key rows
+  ok   draws the hint above the greyed chord rows, in their Shortcuts group
+  ok   draws no hint while the integration is on
+
+=== the declared integration-off hint retains cached native children ===
+  ok   reads the shared hint caption in key and chord providers (tap-hold-guidance)
+  ok   hides only the declared hint without mutating cached greyed key rows (tap-hold-guidance)
+MODULE tests.unit.modules.shortcuts.physical.test_layer_wheel
+
+=== shortcuts.bind_layer_wheel: the layer's sentinels arm the wheel ===
+  ok   scrolls as usual before the layer is entered
+  ok   runs the bound action once per notch while the layer is held
+  ok   runs the other direction's binding on a turn down
+  ok   scrolls again once the layer is left
+  ok   scrolls in a direction the layer leaves unbound
+  ok   sends a keystroke binding with its modifiers
+  ok   asks the horizontal slots for a sideways turn, a positive delta being a turn left
+  ok   drops its layer listener when deleted
+  ok   refuses a missing slot lookup
+
+=== shortcuts.bind_layer_wheel: a zero delta must not run a binding ===
+  ok   passes a zero-delta phase event and posts nothing
+  ok   still ignores a non-numeric delta
+RESULT 78 passed 0 failed

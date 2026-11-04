@@ -1,0 +1,16 @@
+MODULE tests.unit.modules.gestures.engine.test_click_drag_is_not_a_gesture
+
+=== a click-drag is never a gesture (click-drag-selection) ===
+2026-11-04 15:27:30:000 [WARNING] [gestures.engine] commitGesture x1: BLOCKED — same slot+sign as previous live fire (slot=swipe_2_left sign=-1)
+[logger] unified log write refused: /tmp/lua_jZpfTe_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_jZpfTe_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_gestures.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_jZpfTe_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   (click-drag-selection) the same frames without a held button are a swipe
+  ok   (click-drag-selection) two contacts sliding with a button held fire nothing
+  ok   (click-drag-selection) three contacts dragging do not block the pointer's scrolling
+  ok   (click-drag-selection) a tap during a held click is no tap
+  ok   (click-drag-selection) contacts stay the pointer's until the last lift
+
+=== the mouse button read (click-drag-selection) ===
+  ok   (click-drag-selection) any held button reads as down, none as up
+RESULT 6 passed 0 failed

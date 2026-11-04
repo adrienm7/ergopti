@@ -1,0 +1,149 @@
+
+=== keystats privacy — the posture is read, not re-typed ===
+  ok   exposes every flag the shared manifest declares
+  FAIL does not hardcode the four defaults in the driver — ...tatic/ergopti_plus/_shared/lua/test/runner_discovery.lua:12: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+
+=== keystats privacy — the off switch ===
+  ok   records nothing once disabled
+  ok   records again once re-enabled
+  ok   records normally after explicit consent
+
+=== keystats privacy — private browsing ===
+  ok   recognises the markers every major browser uses
+  ok   does not flag an ordinary window
+  ok   drops keystrokes while a private window is focused
+  ok   resumes when focus leaves the private window
+  ok   honours the filter toggle
+
+=== keystats privacy — secure fields ===
+  ok   drops keystrokes when the adapter reports a secure field
+  ok   is additive to the application-name list
+
+=== keystats privacy — focus and titles obey the same gate ===
+  ok   focus-gate: focus changes while disabled record nothing
+  ok   focus-gate: a switch made while private records no transition
+  ok   focus-gate: the title interval closes only while recording is allowed
+
+=== keystats privacy — coverage never narrows ===
+  ok   matches every privacy-critical app at the default posture
+  ok   keeps the two halves independent
+  ok   still ignores ordinary applications
+
+=== keystats privacy — the daemon supplies the signals ===
+  ok   feeds the focused window title to the private-browsing filter
+  FAIL asks AT-SPI whether the focused element is a password field — ...tatic/ergopti_plus/_shared/lua/test/runner_discovery.lua:12: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL uses the shared keyword list rather than a driver-local copy — ...tatic/ergopti_plus/_shared/lua/test/runner_discovery.lua:12: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+
+=== metrics collector logging privacy ===
+  ok   never logs a captured character (lnx-060)
+
+=== saved encryption capability refusal ===
+  ok   keeps saved ON and refuses persistence instead of silently storing plaintext
+  ok   refuses unavailable activation without changing saved OFF or current posture
+
+=== app switches: the aggregate behind the flow panel ===
+  ok   writes one row per ordered pair
+  ok   counts before the raw events are handed over
+
+=== app switches: the calendar day ===
+  ok   files a switch under the same day as the keystrokes around it
+
+=== hold durations: what is recorded ===
+  ok   accumulates the time a key spent down
+  ok   keeps the longest hold as a record
+  ok   keeps two keys apart
+  ok   writes only the increment on a second flush
+  ok   records nothing while metrics are switched off
+  ok   ignores a negative or absent duration
+
+=== hold durations: tap or hold ===
+  ok   declines the split when the configured keys disagree
+  ok   splits on the threshold the tap-hold engine runs
+
+=== physical hold exclusion epochs ===
+  ok   retires the whole hold across a private interval without another key
+  ok   never starts an eligible hold inside a private interval
+  ok   preserves included policy updates and repeat timing
+  ok   preserves a hold after a refused durable policy update
+  ok   retires the whole hold across a secure-field interval
+  ok   retires the whole hold across metrics disable and reenable
+  ok   retires the whole hold across suppression and unsuppression
+  ok   retires the whole hold through the actual main pause callback
+  ok   retires the whole hold through the actual main capture callback
+  ok   retires the whole hold across authentication focus without a key
+  ok   keeps a fresh allowed press after releasing a captured press
+  ok   retains observed authentication focus across a statistics reset
+  ok   counts the first ordinary press after leaving an authentication app
+  FAIL publishes the hold callback only after successful owned startup — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  ok   retires at pause entry even when reset synchronously resumes
+
+=== pointer metrics: what one evdev report adds ===
+  ok   counts a left or right press as a click, no other button
+  ok   counts one scroll per classic wheel report, never the high-resolution echo
+  ok   measures each frame's movement once, as one vector
+  ok   refuses a kind the hook does not report
+
+=== pointer metrics: the recorder writes them with the typing row ===
+  ok   carries clicks, scrolls and distance to the focused application's row
+  ok   writes pointer activity without typing as a row with no text, as macOS does
+  ok   records nothing for an application kept out of the metrics
+
+=== pointer metrics: the writer stores the mouse columns ===
+  ok   writes the row's clicks, scrolls and distance, not zeroes
+TOTAL 54 passed 4 failed

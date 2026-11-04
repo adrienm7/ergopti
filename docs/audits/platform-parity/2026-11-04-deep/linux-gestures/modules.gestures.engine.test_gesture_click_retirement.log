@@ -1,0 +1,30 @@
+
+=== gesture click retirement ===
+  ok   releases both buttons on disable without a touchpad reader
+  ok   releases both buttons on stop without a touchpad reader
+  ok   releases both buttons on pause without a touchpad reader
+  ok   retains false UP debt and retries only the exact refused button
+  ok   retains throw UP debt and retries only the exact refused button
+  ok   waits for physical DOWN-child settlement before dispatching any compensating UP
+  ok   does not admit another DOWN after reentrant pause during acquisition
+  ok   does not admit another DOWN after reentrant disable during acquisition
+  ok   never emits an UP without acquisition and toggles both buttons independently
+  ok   keeps the actual Main shutdown barrier pending through DOWN retirement and UP ACK
+  ok   compensates a settled false DOWN with one owned UP
+  ok   compensates a settled throw DOWN with one owned UP
+  ok   does not invent an UP when native dispatch conclusively acquired no child
+  ok   retains unknown constructor ownership without dispatching an UP before a physical receipt
+  ok   refuses acquisition if disable reenters the active-policy check before any DOWN
+  ok   blocks new button acquisition between global retirement request and final UP settlement
+  ok   keeps global retirement latched after one healthy UP while another button retains refusal debt
+  ok   diagnoses unavailable through the real logger without private process text or ERROR
+  ok   diagnoses exit_failed through the real logger without private process text or ERROR
+  ok   diagnoses deadline through the real logger without private process text or ERROR
+  ok   diagnoses constructor_unknown through the real logger without private process text or ERROR
+  ok   reports an UP failure once per debt despite retries beyond logger dedup windows
+  ok   keeps normal pause and deliberate pending-DOWN cancellation free of failure notifications
+  ok   preserves the original cleanup issuer through a reentrant logger that will retire
+  ok   preserves the original cleanup issuer through a reentrant logger that will throw
+  ok   does not hide an already failed native DOWN when pause requests cancellation afterward
+  ok   diagnoses a terminal deadline while physical cleanup remains pending without minting an UP receipt
+AUDIT_TEST_RESULT	27	0

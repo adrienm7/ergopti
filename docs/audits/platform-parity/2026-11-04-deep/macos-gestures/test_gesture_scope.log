@@ -1,0 +1,16 @@
+MODULE tests.unit.ui.menu.gestures_and_apps.test_gesture_scope
+
+=== macOS complete gesture scope ===
+  ok   clears every owned setting and parameter while preserving nested neighbors
+  ok   restores recommendations and seeds the rollback snapshot used by a later failed save
+  ok   a pause leaves every store untouched
+  ok   refused publication restores native state and both preference baselines
+  ok   refuses stale source before backup and retains failed native compensation
+  ok   the next save preserves unknown parameter neighbors when the owned registry is empty
+  ok   a clear keeps the gesture demotion and a restore ends only that one, with an inverse when publication fails
+  ok   supports an absent source and refuses nonterminal native setters
+
+=== macOS two-finger neutral recommendations ===
+  ok   clear then recommended leaves every two-contact gesture to the OS
+  ok   an explicit custom two-contact binding remains unchanged and emits its tagged key
+RESULT 10 passed 0 failed

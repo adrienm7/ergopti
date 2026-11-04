@@ -1,0 +1,2 @@
+REPRO: tap_3 dispatches lookup although system_held always true; conflict predicate not queried
+CONTROL: three-finger swipe queries same system_held predicate and dispatches no action

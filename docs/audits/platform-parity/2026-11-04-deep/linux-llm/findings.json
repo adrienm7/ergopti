@@ -1,0 +1,43 @@
+{
+	"schema_version": 1,
+	"scope": "linux-llm",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:20:17Z",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/linux-llm/report.md",
+	"findings": [
+		{
+			"id": "LL-001",
+			"scope": "linux-llm",
+			"title": "Interrupted Ollama chat overwrites successor admitted by cancellation terminal callback",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2", "G3"],
+			"reproduction": {
+				"artifact": "docs/audits/platform-parity/2026-11-04-deep/linux-llm/probe-ollama.lua",
+				"command": "LUA_CPATH='/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu/lua/5.4/?.so;/workspace/scratch/parity-toolchain/modules/?.so;;' LD_LIBRARY_PATH=/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu /workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua docs/audits/platform-parity/2026-11-04-deep/linux-llm/probe-ollama.lua",
+				"observed": "Start A; A cancellation callback starts C; start B, which cancels A. All three dispatch. Completing C produces zero terminal callbacks; B completes normally. Real API loaded, stable runtime owner and scripted asynchronous transport only.",
+				"native_reproduction": false
+			},
+			"root_cause": "api_ollama.lua M.chat:246 invokes M.cancel then resumes epoch increment (:247) and active-owner assignment (:293) without checking for a successor. M.cancel:371 publishes finish_request; its callback (:172) can admit C. The older B call overwrites C and later request_current suppresses all C callbacks. Remote cancel_exchange/open_exchange explicitly fence this kind of successor.",
+			"silent_failure": "Successor C has an admitted dispatch but never receives result or cancellation, potentially retaining its caller's pending state.",
+			"regression_test": "Real backend transcript with cancellation terminal observer admitting successor while competing chat is interrupted. Assert no overwrite and one terminal outcome per admitted request; also cover native cancel callback reentry."
+		},
+		{
+			"id": "LL-002",
+			"scope": "linux-llm",
+			"title": "Refused translation dispatch leaves permanent loading offer",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": {
+				"artifact": "docs/audits/platform-parity/2026-11-04-deep/linux-llm/probe-translation.lua",
+				"command": "LUA_CPATH='/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu/lua/5.4/?.so;/workspace/scratch/parity-toolchain/modules/?.so;;' LD_LIBRARY_PATH=/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu /workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua docs/audits/platform-parity/2026-11-04-deep/linux-llm/probe-translation.lua",
+				"observed": "Real engine/remote backend: translate A, refuse native HTTP cancellation, translate again, settle A. One HTTP post only, predicting=true, loading=true, zero offered candidates after A settles.",
+				"native_reproduction": false
+			},
+			"root_cause": "prediction_engine.lua open_offer:1632 opens loading/advances epoch; translate_selection dispatch at :2186 ignores backend.chat false. Real api_remote open_exchange:941-942 can refuse cancellation and chat:1169 returns false without terminal callback. Old response is correctly stale, leaving nobody to retire the new loading state. Ordinary prediction :1088-1097 already handles this same contract.",
+			"silent_failure": "New translation reports accepted and retains spinner/predicting forever despite owning no dispatched response; automatic predictions remain blocked until another cancel/action.",
+			"regression_test": "Actual engine and remote backend, repeated translation with native cancellation refusal then eventual old completion. Assert clean refusal or one retirement of new loading, stale response suppression, successor preservation, and synchronous completion controls."
+		}
+	]
+}

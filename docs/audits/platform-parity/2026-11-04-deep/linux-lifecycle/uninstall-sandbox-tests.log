@@ -1,0 +1,19 @@
+test_corrupt_snapshot_refuses_before_all_unlinks (__main__.UninstallTransactionTests.test_corrupt_snapshot_refuses_before_all_unlinks) ... ok
+test_external_parent_catalog_refuses_hidden_owned_startup (__main__.UninstallTransactionTests.test_external_parent_catalog_refuses_hidden_owned_startup) ... ok
+test_failed_allocator_stdout_cannot_authorize_foreign_cleanup (__main__.UninstallTransactionTests.test_failed_allocator_stdout_cannot_authorize_foreign_cleanup) ... ok
+test_manifest_unlink_failure_restores_payload_and_receipt (__main__.UninstallTransactionTests.test_manifest_unlink_failure_restores_payload_and_receipt) ... ok
+test_native_permission_failure_restores_installed_script_and_retry (__main__.UninstallTransactionTests.test_native_permission_failure_restores_installed_script_and_retry) ... ok
+test_payload_unlink_failure_restores_all_bytes_and_modes (__main__.UninstallTransactionTests.test_payload_unlink_failure_restores_all_bytes_and_modes) ... ok
+test_postcommit_cleanup_is_attempted_once_and_retains_snapshot (__main__.UninstallTransactionTests.test_postcommit_cleanup_is_attempted_once_and_retains_snapshot) ... ok
+test_restore_allocation_failure_preserves_foreign_stdout_path (__main__.UninstallTransactionTests.test_restore_allocation_failure_preserves_foreign_stdout_path) ... ok
+test_rollback_link_refusal_retains_complete_recovery (__main__.UninstallTransactionTests.test_rollback_link_refusal_retains_complete_recovery) ... ok
+test_rollback_preserves_foreign_file_directory_and_link (__main__.UninstallTransactionTests.test_rollback_preserves_foreign_file_directory_and_link) ... ok
+test_snapshot_copy_failure_precedes_all_unlinks (__main__.UninstallTransactionTests.test_snapshot_copy_failure_precedes_all_unlinks) ... ok
+test_unsearchable_owned_tree_refuses_before_mutation (__main__.UninstallTransactionTests.test_unsearchable_owned_tree_refuses_before_mutation) ... ok
+test_unverified_incumbent_mode_retains_recovery (__main__.UninstallTransactionTests.test_unverified_incumbent_mode_retains_recovery) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 14.764s
+
+OK
+[OK] Linux uninstaller removes only the validated standalone installation.

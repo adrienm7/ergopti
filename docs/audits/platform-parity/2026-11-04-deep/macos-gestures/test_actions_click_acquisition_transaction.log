@@ -1,0 +1,37 @@
+MODULE tests.unit.modules.gestures.actions.test_actions_click_acquisition_transaction
+
+=== click-hold acquisition transaction ===
+  ok   rolls back a gestures acquisition when tap 1 start reenters cleanup
+  ok   rolls back a gestures acquisition when tap 2 start reenters cleanup
+  ok   rolls back a shortcut_bindings acquisition when tap 1 start reenters cleanup
+  ok   rolls back a shortcut_bindings acquisition when tap 2 start reenters cleanup
+  ok   rejects mouseDown construction and property failures before tap acquisition (click-hold-acquisition-transaction)
+  ok   rejects nil, false, and throwing constructors before mouseDown (click-hold-acquisition-transaction)
+  ok   rejects every start boundary including activate-then-throw (click-hold-acquisition-transaction)
+  ok   serializes sibling-parent acquisition over the shared native slots
+  ok   requires isEnabled commitment from both taps (click-hold-acquisition-transaction)
+  ok   retains refused rollback and retries that exact handle before a successor (click-hold-acquisition-transaction)
+  ok   retains throwing rollback debt and retries the exact activated handle (click-hold-acquisition-transaction)
+  ok   retains a truthy stop whose tap remains enabled (click-hold-acquisition-transaction)
+  ok   passes physical mouseUp through after fencing state in the callback (click-hold-acquisition-transaction)
+  ok   passes physical mouseUp through even when diagnostic deferral throws (click-hold-acquisition-transaction)
+  ok   force cleanup releases once and retries exact stop debt (click-hold-acquisition-transaction)
+  ok   retains held state until a refused mouseUp post can be retried (click-hold-acquisition-transaction)
+  ok   retains gestures release ownership when mouseDown post reenters cleanup and emergency mouseUp false
+  ok   retains gestures release ownership when mouseDown post reenters cleanup and emergency mouseUp nil
+  ok   retains gestures release ownership when mouseDown post reenters cleanup and emergency mouseUp throw
+  ok   retains shortcut_bindings release ownership when mouseDown post reenters cleanup and emergency mouseUp false
+  ok   retains shortcut_bindings release ownership when mouseDown post reenters cleanup and emergency mouseUp nil
+  ok   retains shortcut_bindings release ownership when mouseDown post reenters cleanup and emergency mouseUp throw
+  ok   isolates held-click admission and cleanup between gesture and shortcut parents
+
+=== click-hold monotonic finger-lift grace ===
+  ok   (click-hold-monotonic-grace) left ignores a healthy release before150ms
+  ok   (click-hold-monotonic-grace) left passes a healthy release at150ms
+  ok   (click-hold-monotonic-grace) left passes release after a backwards civil-clock correction
+  ok   (click-hold-monotonic-grace) left ignores an early release despite a forwards civil-clock correction
+  ok   (click-hold-monotonic-grace) right ignores a healthy release before150ms
+  ok   (click-hold-monotonic-grace) right passes a healthy release at150ms
+  ok   (click-hold-monotonic-grace) right passes release after a backwards civil-clock correction
+  ok   (click-hold-monotonic-grace) right ignores an early release despite a forwards civil-clock correction
+RESULT 31 passed 0 failed

@@ -1,0 +1,13 @@
+MODULE tests.unit.modules.gestures.engine.test_touchdevice_fallback
+
+=== gestures touchdevice loader source invariants ===
+  ok   defines load_touchdevice_module helper
+  ok   tries hs._asm candidate first
+  ok   logs the resolved touchdevice source module
+  ok   binds touchdevice from load_touchdevice_module
+  ok   degrades with WARNING instead of ERROR when unavailable
+
+=== gestures startup degraded mode ===
+  ok   M.start degrades without losing the module, when touchdevice cannot load
+  ok   M.start logs a warning and no error on missing touchdevice
+RESULT 7 passed 0 failed

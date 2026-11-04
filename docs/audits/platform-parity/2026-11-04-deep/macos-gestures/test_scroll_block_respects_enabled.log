@@ -1,0 +1,6 @@
+MODULE tests.unit.modules.gestures.engine.test_scroll_block_respects_enabled
+
+=== gestures.engine scroll-block — respects enabled flag (gestures-engine-scroll regression) ===
+  ok   source: the n >= 3 scroll-block branch contains _state.enabled guard
+  ok   source: stopScrollBlock() on n == 0 remains unconditional (guard must not be added there)
+RESULT 2 passed 0 failed

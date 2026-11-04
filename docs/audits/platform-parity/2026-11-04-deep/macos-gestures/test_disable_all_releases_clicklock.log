@@ -1,0 +1,10 @@
+MODULE tests.unit.modules.gestures.engine.test_disable_all_releases_clicklock
+
+=== gestures disable_all releases scroll-block and click-lock (F-MED-22) ===
+  ok   M.disable_all() cancels the current gesture AND releases the click-lock
+  ok   M.enable_all() reopens action admission without repeating cleanup
+  ok   M.disable("all") (the legacy name-based entry point) also releases the click-lock
+  ok   M.enable("all") propagates enable_all refusal and preserves disabled state
+  ok   M.disable("all") propagates disable_all refusal and preserves enabled state
+  ok   source: M.disable_all reaches Engine.cancel_current_gesture and Actions.force_cleanup
+RESULT 6 passed 0 failed

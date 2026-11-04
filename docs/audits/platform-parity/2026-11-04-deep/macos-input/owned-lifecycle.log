@@ -1,0 +1,93 @@
+MODULE tests.unit.platform.remap.runtime_activation.test_runtime_activation
+
+=== owned runtime activation: what « wanted » means ===
+  ok   is running and not paused, and nothing else
+
+=== owned runtime activation: Ergopti runs ===
+  ok   starts Ergopti's runtime with the user's consent to close theirs
+  ok   does not start a second time while the runtime starts or runs
+  ok   records and announces a close only when Karabiner's own quit succeeded
+
+=== owned runtime activation: Ergopti paused ===
+  ok   stops Ergopti's runtime and gives back the Karabiner it closed
+  ok   never starts or restores anything when Ergopti closed nothing
+  ok   keeps the record after a crash and gives the Karabiner back at the next pause
+  ok   keeps the record when the restore is refused, so a later try can succeed
+
+=== owned runtime activation: Ergopti resumes ===
+  ok   reloads instead of starting a second capture in the same Lua VM
+  ok   starts again in place when no earlier start reached the capture
+MODULE tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle
+
+=== owned runtime owner: the capture request ===
+  ok   refuses a request before admission and starts nothing
+  ok   refuses a request after an unavailable admission
+  ok   does not start the capture while the owned configuration is missing
+  ok   requests the pinned capture once and spawns no process of its own
+  ok   is ready only once the capture admits its first stream
+  ok   is idempotent once ready and shares one start between callers
+  ok   fails without a retry when the capture refuses to start
+  ok   fails once, and revokes the capture, when no stream is admitted in time
+  ok   fails when the capture ends before it admitted a stream
+  ok   treats an unreadable capture status as a lost capture, never as progress
+  ok   fails and revokes the capture when the readiness check cannot be scheduled
+
+=== owned runtime owner: a lost capture ===
+  ok   reports the loss once, revokes the capture and never restarts by itself
+  ok   answers the waiting callers with the loss when it happens before readiness
+  ok   ignores a loss report while nothing was started, after a stop and after a release
+  ok   refuses a new admission while the lost capture is retained
+
+=== owned runtime owner: stop ===
+  ok   stops the capture and settles only when it is observed settled
+  ok   retries the same capture while its stop is pending and never starts another
+  ok   cancels the readiness poll and answers the waiting callers
+  ok   settles at once when nothing was started
+  ok   is idempotent once stopped and never calls the observer twice
+  ok   refuses a second, different stop observer while one is pending
+  ok   restarts only on request, through a settled stop, and asks the capture port again
+  ok   names the capture port's refusal of a second capture in one Lua VM instead of hiding it
+  ok   refuses a restart while the previous stop is pending
+
+=== owned runtime owner: release ===
+  ok   refuses while a capture is retained and allows a new binding after the stop
+MODULE tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission
+
+=== owned runtime owner: dormant until asked ===
+  ok   is uninitialized after loading and binding the ports touches nothing
+  ok   refuses a second initialization instead of replacing the ports
+  ok   rejects ports that miss a capability
+  ok   rejects a start before initialization and invalid start options
+
+=== owned runtime owner: admission ===
+  ok   admits a complete, compatible, uncontested runtime without starting anything
+  ok   names an unpinned artifact and starts nothing
+  ok   names the missing file of an incomplete install
+  ok   refuses an incompatible VirtualHIDDevice with both versions named, before any job or process
+  ok   refuses a driver signed by another team
+  ok   tells an absent, an unapproved and an unreadable driver apart
+  ok   prefers the active copy over a terminated older one
+  ok   fails, rather than assuming, when the machine state cannot be read
+  ok   names an installed job that launchd has not loaded
+
+=== owned runtime owner: coexistence ===
+  ok   does not fight another Karabiner when the close option is off
+  ok   closes the other Karabiner under the default-on option and re-checks
+  ok   reports a Karabiner that survives the request
+  ok   names a closer that is not bound instead of skipping the check
+  ok   fails when the other Karabiner cannot be asked to quit
+  ok   defaults the close option to on, as ADR 011 decided
+
+=== owned runtime owner: physical capture admission ===
+  ok   refuses an artifact that declares no capture, since the capture is the only way to a Console
+  ok   takes no capture option: the user side of the runtime always runs with the capture
+
+=== owned runtime owner: results that arrive late ===
+  ok   ignores an admission step delivered after a stop
+  ok   refuses to start while an admission is in flight
+
+=== owned runtime owner: the pinned artifact is fetched first ===
+  ok   names a refused fetch and observes nothing else
+  ok   admits after a fetch and names the waiting payload when the install is missing
+  ok   ignores a fetch that settles after a stop
+RESULT 61 passed 0 failed

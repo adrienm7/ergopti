@@ -1,0 +1,53 @@
+MODULE tests.unit.modules.keymap.preview.test_preview_never_logs_pii
+
+=== hotstring preview never logs personal-info content ===
+2026-11-04 15:17:32:000 [WARNING] [keystats.kc_bridge] KC log EOF is untrusted at cold start — persistence stays denied until retry: open failed: /tmp/lua_JeKNXE_ergopti_home/.config/ergopti_plus/metrics/karabiner_kc.log: No such file or directory.
+[logger] unified log write refused: /tmp/lua_JeKNXE_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_JeKNXE_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_keystats.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_JeKNXE_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:17:32:000 [WARNING] [keystats.kc_bridge] Cannot create '/tmp/lua_JeKNXE_ergopti_home/.config/ergopti_plus/metrics/karabiner_kc.log' — bridge may not receive KE events.
+2026-11-04 15:17:32:000 [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+2026-11-04 15:17:32:000 [ERROR] [hotstrings_config] 'resolve' called before M.init() — shared state not initialized.
+2026-11-04 15:17:32:000 [DEBUG] [keymap.llm_bridge] Hotstring preview: private mapping matched (content withheld) [provider].
+2026-11-04 15:17:32:000 [INFO] [tooltip_config] Standard timeout disabled (infinite).
+  ok   a preview provider's resolved PII never reaches the log
+2026-11-04 15:17:32:000 [DONE] [timings] Shared timings registry loaded (16 section(s)).
+2026-11-04 15:17:32:000 [DEBUG] [keymap.registry] priority.json loaded: common=10, package=30, personal=50.
+2026-11-04 15:17:32:000 [START] [keymap.llm_bridge] Initializing LLM bridge…
+2026-11-04 15:17:32:000 [START] [llm.warmup_controller] Initializing…
+2026-11-04 15:17:32:000 [SUCCESS] [llm.warmup_controller] Initialized.
+2026-11-04 15:17:32:000 [START] [llm.streaming_handler] Initializing…
+2026-11-04 15:17:32:000 [SUCCESS] [llm.streaming_handler] Initialized.
+2026-11-04 15:17:32:000 [DEBUG] [llm.prediction_engine] Prediction engine state injected (0 mapping(s)).
+2026-11-04 15:17:32:000 [SUCCESS] [keymap.llm_bridge] LLM bridge initialized (buffer: '', 0 mapping(s)).
+2026-11-04 15:17:32:000 [DEBUG] [keymap.llm_bridge] Star preview: on.
+2026-11-04 15:17:32:000 [DEBUG] [keymap.llm_bridge] Autocorrect preview: on.
+2026-11-04 15:17:32:000 [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+2026-11-04 15:17:32:000 [ERROR] [hotstrings_config] 'resolve' called before M.init() — shared state not initialized.
+2026-11-04 15:17:32:000 [DEBUG] [keymap.llm_bridge] Hotstring preview: private mapping matched (content withheld) [provider].
+2026-11-04 15:17:32:000 [INFO] [tooltip_config] Standard timeout disabled (infinite).
+  ok   still records that a private preview matched, so the path stays diagnosable
+2026-11-04 15:17:32:000 [DONE] [timings] Shared timings registry loaded (16 section(s)).
+2026-11-04 15:17:32:000 [DEBUG] [keymap.registry] priority.json loaded: common=10, package=30, personal=50.
+2026-11-04 15:17:32:000 [DEBUG] [keymap.registry] Registry initialized.
+2026-11-04 15:17:32:000 [TRACE] [keymap.registry] Sorting 3 mapping(s)…
+2026-11-04 15:17:32:000 [DONE] [keymap.registry] Mappings sorted.
+2026-11-04 15:17:32:000 [START] [keymap.llm_bridge] Initializing LLM bridge…
+2026-11-04 15:17:32:000 [START] [llm.warmup_controller] Initializing…
+2026-11-04 15:17:32:000 [SUCCESS] [llm.warmup_controller] Initialized.
+2026-11-04 15:17:32:000 [START] [llm.streaming_handler] Initializing…
+2026-11-04 15:17:32:000 [SUCCESS] [llm.streaming_handler] Initialized.
+2026-11-04 15:17:32:000 [DEBUG] [llm.prediction_engine] Prediction engine state injected (3 mapping(s)).
+2026-11-04 15:17:32:000 [SUCCESS] [keymap.llm_bridge] LLM bridge initialized (buffer: '', 3 mapping(s)).
+2026-11-04 15:17:32:000 [START] [keymap.expander] Initializing expander…
+2026-11-04 15:17:32:000 [START] [keymap.terminator_replay] Initializing terminator replay…
+2026-11-04 15:17:32:000 [SUCCESS] [keymap.terminator_replay] Terminator replay initialized.
+2026-11-04 15:17:32:000 [SUCCESS] [keymap.expander] Expander initialized.
+2026-11-04 15:17:32:000 [DEBUG] [keymap.llm_bridge] Star preview: on.
+2026-11-04 15:17:32:000 [DEBUG] [keymap.llm_bridge] Autocorrect preview: on.
+2026-11-04 15:17:32:000 [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+2026-11-04 15:17:32:000 [ERROR] [hotstrings_config] 'resolve' called before M.init() — shared state not initialized.
+2026-11-04 15:17:32:000 [DEBUG] [keymap.llm_bridge] Hotstring 'pub' → 'public-replacement' [star].
+2026-11-04 15:17:32:000 [INFO] [tooltip_config] Standard timeout disabled (infinite).
+  ok   a NON-private static mapping is still logged in full
+RESULT 3 passed 0 failed

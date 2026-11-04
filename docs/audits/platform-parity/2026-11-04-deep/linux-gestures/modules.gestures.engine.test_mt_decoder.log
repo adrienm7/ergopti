@@ -1,0 +1,53 @@
+
+=== mt decoder: how many fingers ===
+  ok   reports 2 finger(s) despite the count walking up and down
+  ok   reports 3 finger(s) despite the count walking up and down
+  ok   reports 4 finger(s) despite the count walking up and down
+  ok   reports 5 finger(s) despite the count walking up and down
+  ok   keeps counting through a frame where every BTN_TOOL bit is 0
+
+=== mt decoder: which way ===
+  ok   reads a negative dy as UP, because evdev Y grows downward
+  ok   reads a positive dy as DOWN
+  ok   reads left and right
+  ok   names a diagonal the way the slot space spells it
+  ok   names all four diagonals
+
+=== mt decoder: taps ===
+  ok   reports a motionless touch as a tap, at every finger count
+  ok   does not call a tremor a swipe
+  ok   does not call a long stationary hold a tap
+  ok   still calls a brief stationary touch a tap
+  ok   does not time-limit a swipe
+  ok   tap-fail-closed: fires nothing when the tap ceiling is unreadable
+  ok   tap-fail-closed: swipes do not need the ceiling
+
+=== mt decoder: what must not go wrong ===
+  ok   throws the gesture away on SYN_DROPPED
+  ok   remembers the slot register across frames
+  ok   ignores events that are not touch events
+
+=== mt decoder: lost queue recovery ===
+  ok   mt-drop-recovery: ignores a stale count and lift in the discarded packet
+  ok   mt-drop-recovery: cannot borrow a contact start from the discarded packet
+  ok   mt-drop-recovery: count changes of fingers still held do not become new taps
+  ok   mt-drop-recovery: a release and old positions cannot invent an observed start
+  ok   mt-drop-recovery: immediately accepts the first fresh tap
+  ok   mt-drop-recovery: immediately accepts the first fresh swipe
+  ok   mt-drop-recovery: a second loss and explicit reset cannot expose a discarded packet
+  ok   mt-drop-recovery: retains packet loss across actual binary Reader drain calls
+
+=== mt decoder: a two-finger scroll is never a three-finger swipe (three-finger-swipe-vs-scroll) ===
+  ok   a one-frame third contact keeps the scroll at two fingers
+  ok   a thumb resting beside a moving pair keeps it at two fingers
+  ok   three contacts that continue as a moving pair fire nothing
+  ok   a three-finger touch right after a scroll fires nothing
+  ok   fingers landing over 200 ms still report three fingers
+  ok   a fast short three-finger flick reports three fingers
+  ok   a deliberate three-finger swipe still reports three fingers up
+
+=== mt decoder: gestures are timed by the kernel's event stamps (three-finger-swipe-stuck) ===
+  ok   a thumb landing after the landing window is refused when the backlog is drained at once
+  ok   a hand resting a second is not a tap when its events are drained at once
+  ok   a staggered three-finger swipe drained at once still reports three fingers up
+AUDIT_TEST_RESULT	38	0

@@ -1,0 +1,41 @@
+{
+	"schema_version": 1,
+	"scope": "linux-gestures",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:29:07Z",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/linux-gestures/report.md",
+	"findings": [
+		{
+			"id": "LG-001",
+			"scope": "linux-gestures",
+			"title": "Linux advertises and accepts three unreachable horizontal-axis gesture slots",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": {
+				"artifact": "docs/audits/platform-parity/2026-11-04-deep/linux-gestures/probe.lua",
+				"observed": "Real manager accepts tab_next for swipe_3_horiz/swipe_4_horiz/swipe_5_horiz and reachability says true on five-finger hardware. Real decoder returns right and dispatch is false for each aggregator-only binding. Directional binding positive control reaches the recording emitter once.",
+				"native_reproduction": false
+			},
+			"root_cause": "manifest.toml:3287,3344,3401 and menu_gestures.lua:114 expose Linux axis slots. manager.lua:291 includes them in editable defaults and set_action:1235 accepts them. slot_report.lua:25 only checks finger count. Actual _slot_for_gesture:1918/dispatch_gesture:1952 select only tap or named direction, while shared actions.toml:116 explicitly documents axes as macOS-only.",
+			"silent_failure": "A binding saves and appears reachable but never fires; generated website inventory also declares Linux support from the false source declaration.",
+			"regression_test": "Enumerate every advertised Linux slot through actual recognizer/dispatcher traces or an explicit unsupported reason. Include each horizontal aggregator alone plus left/right positive controls, and verify menu and generated matrix agree with runtime capability."
+		},
+		{
+			"id": "LG-002",
+			"scope": "linux-gestures",
+			"title": "Clearing persistent MT coordinate registers on lift drops subsequent valid gestures",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": {
+				"artifact": "docs/audits/platform-parity/2026-11-04-deep/linux-gestures/probe.lua",
+				"observed": "Existing repository input_core_emulation constructor plus one real persistent decoder: two identical horizontal swipes produce first y_reports=3 gestures=1, second y_reports=0 gestures=0. Changed-Y control (+10 units on second swipe) produces second y_reports=3 gestures=1. Real native device not exercised.",
+				"native_reproduction": false
+			},
+			"root_cause": "mt_decoder.lua:299 drops slot.x/y at tracking ID -1; reset:220 clears all slot registers and current slot at :221-222, called on gesture completion :413. Kernel MT absolute registers persist across contacts and unchanged fields can be filtered (existing input_core_emulation.lua:42-55). centroid:241 requires both coordinates at :244, so a fresh horizontal contact lacking unchanged Y never contributes.",
+			"silent_failure": "A valid configured gesture produces no output or diagnostic until both required coordinate axes happen to be reported again.",
+			"regression_test": "Pass successive gestures through existing input-core filtering into one decoder, covering unchanged X/Y, reused slots, stationary contacts and changed-axis controls. Separate protocol-register lifetime from gesture state, with independent startup/SYN_DROPPED recovery policy."
+		}
+	]
+}

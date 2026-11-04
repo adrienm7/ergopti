@@ -1,0 +1,10 @@
+
+=== changelog_bridge: one-click release install ===
+
+=== updater: nothing installs without a click (Linux) ===
+
+=== changelog_bridge: captured post-backup resolver lineage ===
+refused restart_calls=1 answer={"action":"restore_progress","backup_path":"/cfg/backups/pre-restore-y","phase":"restored"}
+missing restart_calls=0 answer={"action":"restore_progress","backup_path":"/cfg/backups/pre-restore-y","phase":"restored"}
+shared restore_done: Configuration restored: ErgoptiPlus restarts on it.
+PASS reproduction: restored bytes acknowledged by backup fixture, refused/missing restart still publishes unconditional restart success phase.

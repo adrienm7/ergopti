@@ -1,0 +1,62 @@
+
+=== tone actions: the selection moves along the ladder ===
+  ok   registers the four actions and a preset per tone prompt
+  ok   rewrites the selection, keeps it selected, and steps from the original
+  ok   more familiar stops at the bottom with its own notice
+  ok   works through Ollama with one unstreamed request
+
+=== tone actions: refusals and dropped answers ===
+  ok   does nothing when nothing is selected
+  ok   does nothing for a blank selection
+  ok   refuses like the manual prediction while the AI is off, without probing
+  ok   refuses while paused
+  ok   drops the answer when the focus moved to another window
+  ok   ignores a superseded answer and applies the newer one
+  ok   drops a pending tone answer after changing backend (ai-pass2-revision)
+  ok   a mashed tone shortcut cancels its request in flight before the next one leaves (mashed-shortcut)
+  ok   sends a second tone step at once, without waiting for the request interval (explicit-never-held)
+  ok   drops a pending tone answer after changing local model (ai-pass2-model)
+  ok   drops a pending tone answer after choosing another API entry (ai-pass2-entry)
+  ok   drops the answer when the user typed while it ran
+  ok   types nothing when the answer holds no rewrite
+
+=== injector: one Left arrow per user-perceived character ===
+  ok   counts a character, not a byte or a code point
+
+=== selection rewrites require a known stable native focus ===
+  ok   explains a tone refusal when privacy cannot admit its text field (selection-native-focus)
+  ok   refuses tone before reading selection when focus is empty (selection-native-focus)
+  ok   refuses tone before reading selection when focus is unavailable (selection-native-focus)
+  ok   refuses a tone request when focus moves during selection capture (selection-native-focus)
+
+=== tone resident global privacy admission ===
+  ok   refuses protected ownership before reading tone selection (llm-global-privacy)
+  ok   refuses unknown ownership before reading tone selection (llm-global-privacy)
+  ok   refuses throw ownership before reading tone selection (llm-global-privacy)
+  ok   refuses nested cancellation before reading tone selection (llm-global-privacy)
+  ok   rechecks global privacy before the tone send and the physical replacement (llm-global-privacy)
+
+=== selection capture originating action authority ===
+  ok   ai-pass2-span does not revive shift_tone after cancel during capture
+  ok   ai-pass2-span does not revive shift_tone after backend during capture
+
+=== asynchronous tone native ownership ===
+  ok   ai-pass2-span waits for capture ACK before provider dispatch and fences cancellation
+  ok   ai-pass2-span waits for rewrite verification ACK cancel=false
+  ok   ai-pass2-span waits for rewrite verification ACK cancel=true
+
+=== AI selection native cleanup acknowledgement ===
+  ok   ai-pass2-span configuration quiescence awaits selected-range native cleanup
+  ok   ai-pass2-span runtime shutdown awaits selected-range native cleanup
+
+=== active API entry deletion ===
+  ok   ai-pass2-remove retires the active request before deleting its entry
+
+=== tone dispatch retains its native admission owner ===
+  ok   (tone-dispatch-owner) rechecks scope after privacy
+  ok   (tone-dispatch-owner) rechecks shutdown after privacy
+  ok   (tone-dispatch-owner) rechecks successor after privacy
+  ok   (tone-dispatch-owner) rechecks scope after focus
+  ok   (tone-dispatch-owner) rechecks shutdown after focus
+  ok   (tone-dispatch-owner) rechecks successor after focus
+AUDIT_TEST_RESULT	41	0

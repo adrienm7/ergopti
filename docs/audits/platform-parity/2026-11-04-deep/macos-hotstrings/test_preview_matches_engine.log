@@ -1,0 +1,27 @@
+MODULE tests.unit.modules.keymap.preview.test_preview_matches_engine
+
+=== would_fire is the single answer both sides get ===
+  ok   refuses a word trigger at a non-boundary buffer start
+  ok   fires the same trigger when the buffer start IS a boundary
+  ok   word-gates a separator-prefixed trigger like any other
+  ok   still fires that trigger when a boundary really does precede it
+  ok   blocks a word trigger glued to a preceding letter
+  ok   resolves case_conform identically for ★ triggers
+  ok   declines a no-op expansion rather than offering it
+
+=== the ★ preview evaluates the buffer the engine will see ===
+  ok   matches a ★ trigger only once the magic key is appended
+
+=== the old preview rule really did disagree with the engine ===
+  ok   promised a match the engine refuses at a non-boundary start
+  ok   no longer diverges on a separator-prefixed match, because the ENGINE moved
+
+=== the preview only offers what a future keystroke can still fire ===
+  ok   does not offer an auto mapping whose trigger is already complete
+  ok   still offers a terminator-driven mapping
+
+=== neither side reimplements the match decision ===
+  ok   the preview owns no word-boundary rule of its own
+  ok   the preview resolves matches through the expander
+  ok   the engine decides through the same function
+RESULT 15 passed 0 failed

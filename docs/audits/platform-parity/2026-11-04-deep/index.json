@@ -1,0 +1,133 @@
+{
+	"schema_version": 1,
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04",
+	"scopes": [
+		{
+			"scope": "windows-hotstrings",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/windows-hotstrings/report.md",
+			"source_ids": ["WH-001"],
+			"ids": ["AHK-001"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "windows-input",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/windows-input/report.md",
+			"source_ids": ["WI-001", "WI-002"],
+			"ids": ["AHK-002", "AHK-003"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "windows-llm",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/windows-llm/report.md",
+			"source_ids": ["WL-001"],
+			"ids": [],
+			"excluded_source_ids": ["WL-001"]
+		},
+		{
+			"scope": "windows-metrics",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/windows-metrics/report.md",
+			"source_ids": ["WM-001", "WM-002", "WM-003"],
+			"ids": ["AHK-004", "AHK-005", "AHK-006"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "windows-lifecycle",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/windows-lifecycle/report.md",
+			"source_ids": [],
+			"ids": [],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "windows-gestures",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/windows-gestures/report.md",
+			"source_ids": ["WG-001", "WG-002", "WG-003"],
+			"ids": ["AHK-007", "AHK-008", "AHK-009"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "macos-hotstrings",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/macos-hotstrings/report.md",
+			"source_ids": ["MH-001"],
+			"ids": ["HS-001"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "macos-input",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/macos-input/report.md",
+			"source_ids": ["MI-001"],
+			"ids": ["HS-002"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "macos-llm",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/macos-llm/report.md",
+			"source_ids": ["ML-001"],
+			"ids": ["HS-003"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "macos-metrics",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/macos-metrics/report.md",
+			"source_ids": ["MM-001", "MM-002", "MM-003", "MM-004"],
+			"ids": ["HS-004", "HS-005", "HS-006", "HS-007"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "macos-lifecycle",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/macos-lifecycle/report.md",
+			"source_ids": ["MC-001", "MC-002"],
+			"ids": ["HS-008", "HS-009"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "macos-gestures",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/macos-gestures/report.md",
+			"source_ids": ["MG001", "MG002"],
+			"ids": ["HS-010", "HS-011"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "linux-hotstrings",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/linux-hotstrings/report.md",
+			"source_ids": ["LH-001", "LH-002", "LH-003"],
+			"ids": ["LIN-001", "LIN-002", "LIN-003"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "linux-input",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/linux-input/report.md",
+			"source_ids": ["LI-001"],
+			"ids": ["LIN-004"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "linux-llm",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/linux-llm/report.md",
+			"source_ids": ["LL-001", "LL-002"],
+			"ids": ["LIN-005", "LIN-006"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "linux-metrics",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/linux-metrics/report.md",
+			"source_ids": ["LM-001"],
+			"ids": ["LIN-007"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "linux-lifecycle",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/linux-lifecycle/report.md",
+			"source_ids": ["LC-001"],
+			"ids": ["LIN-008"],
+			"excluded_source_ids": []
+		},
+		{
+			"scope": "linux-gestures",
+			"report": "docs/audits/platform-parity/2026-11-04-deep/linux-gestures/report.md",
+			"source_ids": ["LG-001", "LG-002"],
+			"ids": ["LIN-009", "LIN-010"],
+			"excluded_source_ids": []
+		}
+	]
+}

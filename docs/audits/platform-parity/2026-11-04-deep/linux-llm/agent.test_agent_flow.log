@@ -1,0 +1,60 @@
+
+=== AI agent: missing local model admission ===
+  ok   asks tags before local System 2 and offers the exact model without sending selection text
+  ok   runs the actual local agent after the listing acknowledges its model
+  ok   a withdrawn local agent preflight cannot offer or start a download
+
+=== AI agent: the selection's actions offered and run ===
+  ok   registers the three actions
+  ok   asks System 2, offers the valid actions and runs the accepted one's connector
+  ok   Tab runs the selected action, Down moves the selection
+  ok   drops the invalid actions and logs why, never offering them
+  ok   tells the user when the model proposes nothing or cannot be read
+  ok   a failing connector is told, and logged with its reason
+  ok   typing while it runs drops the answer
+
+=== AI agent: what it refuses ===
+  ok   without System 2: a notice and no request
+  ok   a provider with no default model and no model named counts as no System 2
+  ok   the agent off or a pause refuse with their notice
+  ok   works without a prediction backend when the AI is on
+  ok   refuses both manual actions with the AI notice while the AI is off (ai-off-agent)
+  ok   a System 2 provider without a stored key counts as no System 2
+  ok   nothing selected: a notice and no request
+  ok   a secure field refuses silently
+
+=== AI agent: a typed command ===
+  ok   sends the command with its own source kind
+  ok   cancelling the dialog, or confirming nothing, does nothing
+
+=== AI agent: native missing-model modal ownership ===
+  ok   real while_released resync cancellation preserves only its acknowledged consent
+  ok   actual modal affirmative cannot launch after new_action
+  ok   actual modal affirmative cannot launch after endpoint
+  ok   actual modal affirmative cannot launch after shutdown
+  ok   actual modal affirmative cannot launch after pause
+  ok   actual modal affirmative cannot launch after reinitialise
+  ok   an emergency regrab refusal revokes the affirmative native receipt
+
+=== AI agent: asynchronous model consent continuation ===
+  ok   linux-model-consent-continuation: accepted pull stays authorized after its modal returns
+
+=== AI agent: model consent terminal and withdrawal receipts ===
+  ok   linux-model-consent-continuation: exact withdrawal retires accepted consent
+  ok   linux-model-consent-continuation: exact success retires accepted consent
+  ok   linux-model-consent-continuation: exact retirement retires accepted consent
+  ok   linux-model-consent-continuation: cancel grants no asynchronous holder
+  ok   linux-model-consent-continuation: refusal grants no asynchronous holder
+  ok   linux-model-consent-continuation: error grants no asynchronous holder
+  ok   linux-model-consent-continuation: truthy grants no asynchronous holder
+
+=== AI agent: real asynchronous model download composition ===
+  ok   linux-model-consent-continuation: actual engine and pull owner accept progress after modal return
+
+=== AI agent: superseded model consent settlement ===
+  ok   linux-model-consent-continuation: old completion and retirement cannot clear successor owner
+
+=== AI agent: existing model pull is focus without new consent custody ===
+  ok   linux-model-consent-focus: existing same-tag pull on same origin grants no successor holder
+  ok   linux-model-consent-focus: existing same-tag pull on different origin grants no successor holder
+AUDIT_TEST_RESULT	39	0

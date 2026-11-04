@@ -1,0 +1,277 @@
+
+=== config_backup binding (macOS) ===
+  ok   backs up the configuration folder under the shared rules
+
+=== configuration backup binding (config-backup-binding-contract) ===
+  ok   (config-backup-binding-contract) is built only from complete ports
+  ok   (config-backup-binding-contract) builds the owner over the driver's roots and the shared rules
+  ok   (config-backup-binding-contract) refuses an unreadable or ruleless defaults file with one logged error
+  ok   (config-backup-binding-contract) refuses an unresolvable root with the driver's own line
+  ok   (config-backup-binding-contract) lets the test seam replace the roots and skip the driver's
+  ok   (config-backup-binding-contract) rebuilds the owner on each call so a moved folder is followed
+  ok   (config-backup-binding-contract) classifies entries, never walks a link to a folder and never reads a special file
+  ok   (config-backup-binding-contract) refuses a listing whose link target cannot be classified
+  ok   (config-backup-binding-contract) reports an absent folder as absent and a file as no folder
+
+=== release_installer: the authenticated asset ===
+  ok   binds the exact repository URL and GitHub's SHA-256
+  ok   refuses an archive without its digest, at another URL, or absent
+  ok   names the declared macOS archive from the shared defaults
+
+=== release_installer: staging and replacement dispatch ===
+  ok   reads the installed app and the launcher from the launcher's environment
+  ok   passes every release value as an argument and classifies the exit
+  ok   arms the replacement detached, with the previous app kept aside
+  ok   refuses outside a packaged launch
+
+=== release_installer: the staging script under /bin/sh ===
+  ok   retires only the verified owned archive before READY and refuses failed retirement
+  ok   refuses a destination parent without write access before downloading
+  ok   prints READY only after the digest, the version and the signature pass
+  ok   uses only the declared tar extractor after integrity verification
+  ok   refuses tar extraction, version and signing failures without READY
+  ok   refuses undeclared formats and foreign bundle paths before download
+  ok   stops at a failed download
+  ok   never extracts an archive whose SHA-256 differs
+  ok   refuses an archive carrying another version
+  ok   refuses an app its signing identity does not match
+
+=== release_installer: the replacement script under /bin/sh ===
+  ok   waits for the launcher, keeps the previous app and opens the chosen one
+  ok   puts the previous app back and opens it when the chosen one cannot move in
+
+=== release_installer: declared archive preference and historical compatibility ===
+  ok   uses actual shared declarations against independent exact release records
+  ok   preserves other platform assets and requires declared format-key bindings
+  ok   passes the admitted format to the actual native stage and refuses unknown formats before dispatch
+
+=== release_installer: the native stage request ===
+  ok   binds a bounded request to the original arguments and child environment
+  ok   refuses failed or oversized serialization before native acquisition
+
+=== release_installer: filesystem publication admission ===
+  ok   executes real filesystem refusals and preserves every owned original
+
+=== release_installer: concurrent filesystem publication ===
+  FAIL refuses racing destinations and serializes detached installers before arming (release-exclusive-publication) — test_release_installer.lua:516: Traceback (most recent call last):
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 553, in <module>
+    main()
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 507, in main
+    program, detach, physical, arming = emitted(
+                                        ^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 119, in emitted
+    command = command_from(
+              ^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 68, in command_from
+    arming.resolve_lua(),
+    ^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/modules/updater/release_arming_fixture.py", line 58, in resolve_lua
+    raise RuntimeError("Lua 5.4 is required for the native arming control")
+RuntimeError: Lua 5.4 is required for the native arming control
+:
+  expected: 0
+    actual: 1
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:64: in function 'tests.helpers.assert_eq'
+	...os/tests/unit/modules/updater/test_release_installer.lua:516: in function <...os/tests/unit/modules/updater/test_release_installer.lua:513>
+	[C]: in function 'xpcall'
+	...os/tests/unit/modules/updater/test_release_installer.lua:513: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	...os/tests/unit/modules/updater/test_release_installer.lua:511: in function <...os/tests/unit/modules/updater/test_release_installer.lua:510>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/modules/updater/test_release_installer.lua:510: in main chunk
+	[C]: in function 'dofile'
+	...ace/scratch/deep-parity/macos-lifecycle/run-targeted.lua:6: in main chunk
+	[C]: in ?
+
+=== release_installer: complete literal extraction ===
+  ok   rejects four valid Lua suffix expressions on both literal authorities
+
+=== release_installer: explicit native script observation ===
+  ok   executes only the explicit script observer without discovering Lua (release-native-script-scope)
+  FAIL binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope) — test_release_installer.lua:615: Traceback (most recent call last):
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 553, in <module>
+    main()
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 500, in main
+    print(json.dumps(emission_controls(args.driver.resolve(strict=True), args.root)))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 138, in emission_controls
+    _, _, physical, arming = emitted(driver, root, "actual-lua")
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 119, in emitted
+    command = command_from(
+              ^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/release_swap_concurrent_probe.py", line 68, in command_from
+    arming.resolve_lua(),
+    ^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/ergopti/static/ergopti_plus/macos/tests/support/modules/updater/release_arming_fixture.py", line 58, in resolve_lua
+    raise RuntimeError("Lua 5.4 is required for the native arming control")
+RuntimeError: Lua 5.4 is required for the native arming control
+:
+  expected: 0
+    actual: 1
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:64: in function 'tests.helpers.assert_eq'
+	...os/tests/unit/modules/updater/test_release_installer.lua:615: in function <...os/tests/unit/modules/updater/test_release_installer.lua:611>
+	[C]: in function 'xpcall'
+	...os/tests/unit/modules/updater/test_release_installer.lua:611: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	...os/tests/unit/modules/updater/test_release_installer.lua:609: in function <...os/tests/unit/modules/updater/test_release_installer.lua:588>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/modules/updater/test_release_installer.lua:588: in main chunk
+	[C]: in function 'dofile'
+	...ace/scratch/deep-parity/macos-lifecycle/run-targeted.lua:6: in main chunk
+	[C]: in ?
+
+=== shared configuration backup (config_backup) ===
+  ok   reads its rules from the shared updater defaults
+  ok   copies every configuration file, and only those, before writing its manifest
+  ok   does not copy a file root twice when it lies in the configuration folder
+  ok   refuses the whole backup when one file cannot be read, and writes no manifest
+  ok   stops at a copy it cannot write and leaves the folder without a manifest
+  ok   gives two backups of one second distinct folders
+  ok   offers the newest complete backup of a kind
+  ok   restores after backing the replaced configuration up
+  ok   refuses to report a substituted staging file as restored
+  ok   writes nothing back when a copy is missing
+  ok   refuses a manifest naming a path outside the configuration
+
+=== shared one-click release install (release_install) ===
+  ok   does nothing until the click
+  ok   backs up first, then downloads, verifies, installs and restarts
+  ok   refuses a release without this system's asset and keeps the backup
+  ok   never installs a download that failed its verification
+  ok   reports a failed download as one, and never as a verification
+  ok   downloads nothing when the backup fails
+  ok   shows an install refusal and restarts nothing
+  ok   refuses a blocked build before any backup
+  ok   refuses a tag the loaded list does not hold, with the host's reason
+  ok   refuses a tag the loaded API list lacks as an error: the page is stale
+  ok   runs one install at a time
+
+=== shared release install capabilities (release-install-capabilities) ===
+  ok   runs a sync-only capability through its actual completion
+  ok   runs an async-only capability and waits for its actual completion
+  ok   prefers async over sync without fallback after completion true
+  ok   prefers async over sync without fallback after completion false
+  ok   refuses missing install capabilities before any side effect
+  ok   refuses install false despite a valid counterpart
+  ok   refuses install_async false despite a valid counterpart
+  ok   refuses install string despite a valid counterpart
+  ok   refuses install_async string despite a valid counterpart
+
+=== Versions managed network receipt ownership ===
+  ok   classifies typed proxy evidence without exposing native secrets
+  ok   keeps untyped adapter errors unknown despite hostile detail
+  ok   never treats an unproved origin 407 as proxy evidence
+  ok   keeps failed verification separate and never installs
+  ok   requires exact operation and failure epoch before retry
+  ok   retry reruns backup-first and duplicate old callbacks cannot install
+  ok   new same-tag failure rejects the previous terminal owner
+  ok   rechecks actual owner and build policy after failure
+  ok   recomputes real external capability and never takes a page path
+  ok   reentrant native capability probe cannot lend a retired owner
+  ok   native probe failure preserves the failed phase without unbound actions
+  ok   native owner inspection cannot resurrect a retired reservation
+  ok   contract loading cannot publish a predecessor into a same-tag successor
+  ok   capability inspection cannot retire or publish into a successor
+  ok   current-owner inspection cannot replace a successor terminal
+  ok   contract loading cannot restore publication after exact page retirement
+  ok   policy-error logging cannot publish an obsolete failed phase
+  ok   keeps the original private report owner outside the public payload
+  ok   retires the exact failed reservation when native owner inspection throws
+  ok   cannot publish or clear a successor when owner fault logging reenters
+  ok   page retirement during report preserves accepted native transaction without later publication
+  ok   page retirement during backup preserves accepted native transaction without later publication
+  ok   page retirement during asset preserves accepted native transaction without later publication
+  ok   page retirement during install preserves accepted native transaction without later publication
+  ok   page retirement during success preserves accepted native transaction without later publication
+  ok   page retirement during restart preserves accepted native transaction without later publication
+  ok   reentrant blocked cannot overwrite a successor reservation before backup
+  ok   reentrant find cannot overwrite a successor reservation before backup
+  ok   retirement during pre-acceptance blocked refuses old work but permits fresh successor
+  ok   native document replacement during blocked cannot borrow pre-acceptance
+  ok   retirement during pre-acceptance find refuses old work but permits fresh successor
+  ok   native document replacement during find cannot borrow pre-acceptance
+  ok   retires action authority on close without cancelling native work
+
+=== manual updater request follows its owner lifetime ===
+  ok   answers a current request once with schedule started=false
+  ok   answers a current request once with schedule started=true
+  ok   retires a successful manual response across none
+  ok   retires a successful manual response across same
+  ok   retires a successful manual response across replacement
+  ok   retires a successful manual response across before_start
+  ok   retires a successful manual response across start
+  ok   retires a failed manual response with body=nil
+  ok   retires a failed manual response with body=[
+  ok   preserves the manual answer across a channel change without retiring its owner
+
+=== automatic and manual checks retain independent transports ===
+  ok   preserves both requests when automatic starts first (update-check-transport-isolation)
+  ok   preserves both requests when manual starts first (update-check-transport-isolation)
+  ok   keeps the automatic Atom fallback independent (update-check-transport-isolation)
+  ok   keeps the manual Atom fallback independent (update-check-transport-isolation)
+  ok   keeps the sibling request after automatic cancellation (update-check-transport-isolation)
+  ok   keeps the sibling request after manual cancellation (update-check-transport-isolation)
+  ok   fences the background result when the manual answer stops the owner (update-check-transport-isolation)
+  ok   retires both pending completions when stopped (update-check-transport-isolation)
+
+=== Changelog one-click release install (macOS) ===
+  ok   seeds the installed build and the restorable backup into the page
+  ok   greys a source run with its reason
+  ok   backs up first, stages and verifies, arms the replacement, then quits
+  ok   waits for the detached worker before quitting (release-arming-bridge)
+  ok   keeps the driver running when arming refuses (release-arming-bridge)
+  ok   refuses a release without the macOS archive and keeps the backup
+  ok   never arms a replacement for a release that failed its verification
+  ok   refuses a tag the fetched list does not hold, without a backup
+  ok   restores a backup and reloads on it
+  ok   reloads nothing when a restore fails
+
+=== changelog bridge retirement ===
+  ok   rejects old bridge messages, successor=false (changelog-bridge-owner)
+  ok   rejects old bridge messages, successor=true (changelog-bridge-owner)
+  ok   failed deletion retires replies and messages but preserves exact cleanup (changelog-bridge-owner)
+  ok   fetch logging cannot dispatch after its window retires (changelog-bridge-owner)
+
+=== Versions window feed-only hand-off to Sparkle (macOS) ===
+  ok   seeds the page with the hand-off it can offer
+  ok   hands the channel's newest feed release to Sparkle on its channel
+  ok   never hands an older release, nor another channel's tag, to Sparkle
+  ok   offers a switch of channel that channel's newest release
+  ok   refuses when the installed build is already the channel's newest
+  ok   reports a hand-off the launcher did not take
+  ok   never reaches Sparkle for an API list, whose digests install directly
+
+=== Versions native managed admission (macOS) ===
+  ok   refuses new installation while actual native paused is true
+  ok   refuses nonboolean native paused receipt nil
+  ok   refuses nonboolean native paused receipt number
+  ok   refuses nonboolean native paused receipt string
+  ok   refuses new installation while actual native pause_transition is true
+  ok   refuses nonboolean native pause_transition receipt nil
+  ok   refuses nonboolean native pause_transition receipt number
+  ok   refuses nonboolean native pause_transition receipt string
+  ok   refuses missing authoritative native port is_paused
+  ok   refuses raise authoritative native port is_paused
+  ok   refuses missing authoritative native port is_pause_transition_pending
+  ok   refuses raise authoritative native port is_pause_transition_pending
+  ok   does not borrow a replacement script-control module during probe
+  ok   does not borrow a successor native window during pause read
+  ok   rechecks fresh pause after the actual source-run probe
+  ok   failed accepted download advertises no retry while paused
+  ok   fresh pause refuses old retry and fresh resume admits the same exact terminal
+  ok   accepted install still arms and exits after later pause
+  ok   accepted install completes after retirement without publishing into successor
+  ok   phase encoding reentry does not select a successor report recipient
+  ok   terminal encoding reentry cannot publish old failure into successor
+AUDIT TARGETED TOTAL: 161 passed, 2 failed

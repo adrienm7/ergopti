@@ -1,0 +1,12 @@
+MODULE tests.unit.modules.gestures.navigation.test_native_app_switcher_action
+
+=== native switcher product action source ===
+  ok   offers a distinct native action while preserving direct previous-screen actions
+  ok   keeps full source IO separate from pure runtime and terminal seals
+  ok   withdraws an admitted operation when its exact gesture assignment changes
+  ok   refuses a missing or foreign binding before native acquisition
+  ok   joins exact cleanup and resume barriers for the native action parent
+
+=== native switcher retired binding admission ===
+  ok   refuses an old persisted identifier before native acquisition
+RESULT 6 passed 0 failed

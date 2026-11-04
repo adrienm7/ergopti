@@ -1,0 +1,67 @@
+MODULE tests.unit.platform.remap.generator.test_generator_typed_output
+
+=== one-shot Shift control output ===
+  ok   emits a distinct tag while navigation stays bare under held Control+Option (one-shot-sentinel)
+
+=== a one-shot tap under a held modifier arms it (sticky-tap-under-held-modifier) ===
+  ok   tapping sticky_shift under each held modifier key arms it
+  ok   holding the sticky_shift key holds shift under each held modifier key
+  ok   tapping sticky_ctrl under each held modifier key arms it
+  ok   holding the sticky_ctrl key holds ctrl under each held modifier key
+  ok   tapping sticky_cmd under each held modifier key arms it
+  ok   holding the sticky_cmd key holds cmd under each held modifier key
+  ok   tapping sticky_option under each held modifier key arms it
+  ok   holding the sticky_option key holds alt under each held modifier key
+  ok   tapping sticky_cmd_shift under each held modifier key arms it
+  ok   holding the sticky_cmd_shift key holds cmd_shift under each held modifier key
+  ok   tapping sticky_cmd_option under each held modifier key arms it
+  ok   holding the sticky_cmd_option key holds cmd_option under each held modifier key
+  ok   tapping sticky_cmd_ctrl under each held modifier key arms it
+  ok   holding the sticky_cmd_ctrl key holds cmd_ctrl under each held modifier key
+  ok   tapping sticky_option_shift under each held modifier key arms it
+  ok   holding the sticky_option_shift key holds option_shift under each held modifier key
+  ok   tapping sticky_option_ctrl under each held modifier key arms it
+  ok   holding the sticky_option_ctrl key holds option_ctrl under each held modifier key
+  ok   tapping sticky_ctrl_shift under each held modifier key arms it
+  ok   holding the sticky_ctrl_shift key holds ctrl_shift under each held modifier key
+  ok   tapping sticky_cmd_option_shift under each held modifier key arms it
+  ok   holding the sticky_cmd_option_shift key holds cmd_option_shift under each held modifier key
+  ok   tapping sticky_cmd_option_ctrl under each held modifier key arms it
+  ok   holding the sticky_cmd_option_ctrl key holds cmd_option_ctrl under each held modifier key
+  ok   tapping sticky_cmd_shift_ctrl under each held modifier key arms it
+  ok   holding the sticky_cmd_shift_ctrl key holds cmd_shift_ctrl under each held modifier key
+  ok   tapping sticky_option_shift_ctrl under each held modifier key arms it
+  ok   holding the sticky_option_shift_ctrl key holds option_shift_ctrl under each held modifier key
+  ok   tapping sticky_hyper under each held modifier key arms it
+  ok   holding the sticky_hyper key holds hyper under each held modifier key
+  ok   covers every sticky action of the catalogue
+
+=== tap-only keys preserve native modifier chords and immediate ordinary taps (tap-only-key-types-its-tap) ===
+  ok   keeps the Fn tap blocked by the physical thumb state at press (tap-only-thumb-blocker)
+  ok   ordinary taps repeat from key down while native modifiers reserve a quick lone release for the tap
+  ok   overlap keeps ordinary taps but uses native modifier chords without an extra tap
+  ok   a key with neither slot stays the native key
+
+=== a combo with only a tap types it at key down, like a key with only a tap (combo-tap-only-types-at-key-down) ===
+  ok   every combo with only a tap types it alone at the second key's key down, keeps it down to repeat, and adds nothing on release
+  ok   every combo with only a tap keeps it when the next key goes down before its release
+  ok   a combo tap carries none of the modifiers its holder keeps down (combo-consumes-every-hold-modifier)
+  ok   a tap-only right Command + left Option deletes words forward while held (default-delete-word-repeats)
+
+=== a chord fires, keeps its action down and leaves its first key held (chord-leaves-first-key-held) ===
+  ok   every combo chord fires when its two keys go down together (chord-matches-its-own-modifier-keys)
+  ok   a chord keeps a modifier action held, and a key action down to repeat unless its first key is a held modifier key (chord-action-stays-down)
+  ok   Caps Lock or Tab first: a key chord repeats and a modifier chord holds (chord-plain-first-key-keeps-action)
+  ok   after a chord, the second key again under the still-held first key types what holding it first types
+  ok   after a chord, a letter under the still-held first key has its held modifiers unless the chord keeps its action down (chord-first-key-modifiers)
+  ok   a chord under AltGr keeps AltGr for the letters typed after it
+  ok   in symmetric mode, a chord pressed in either order leaves the key pressed first held (chord-symmetric-restores-first-key)
+  ok   the shipped defaults emit no chord the hold-then-tap rule already types (redundant-chord-skipped)
+
+=== a trigger told apart by modifiers carries only its own (exact-modifier-trigger) ===
+  ok   marks every trigger action exact_modifiers in the catalogue
+  ok   a tap-hold key taps each trigger bare under any held modifier, and its hold keeps them (caps-lock-never-claimed)
+  ok   a combo taps each trigger bare under any held modifier
+  ok   a chord sends each trigger bare under any held modifier
+  ok   Shift held, then AltGr and a Tab tap cycles the app's windows (shift-altgr-tab)
+RESULT 53 passed 0 failed

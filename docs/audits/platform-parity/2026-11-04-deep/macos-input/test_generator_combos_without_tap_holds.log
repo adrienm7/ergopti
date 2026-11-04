@@ -1,0 +1,13 @@
+MODULE tests.unit.platform.remap.generator.test_generator_combos_without_tap_holds
+
+=== key combinations without the Tap-Holds (combos-without-tap-holds) ===
+  ok   Hold Cmd + hold Tab types the hold action, bare (combos-without-tap-holds)
+  ok   Hold Esc + tap Tab types the tap action (combos-without-tap-holds)
+  ok   a non-modifier key 1 is typed natively before its slot (key1-pass-through)
+  ok   a chosen LCmd + RCmd chord types ⌥⌫ with no layer (chord-without-tap-holds)
+  ok   key 1 only tracks its variable and passes through (combos-without-tap-holds)
+  ok   with the Tap-Holds on the graph is unchanged by the switch (combos-without-tap-holds)
+  ok   with the Tap-Holds on the presets generate the pinned graph (tap-holds-on-pin)
+  ok   the pin moves when one Tap-Holds-on manipulator changes (tap-holds-on-pin)
+  ok   the combinations switched off generate no combination rule (combos-without-tap-holds)
+RESULT 9 passed 0 failed

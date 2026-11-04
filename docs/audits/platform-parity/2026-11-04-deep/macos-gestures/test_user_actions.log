@@ -1,0 +1,84 @@
+MODULE tests.unit.modules.gestures.actions.test_user_actions
+
+=== user actions replay the shared parameter corpus (macOS) ===
+  ok   the three parameters are declared
+  ok   user action vector 'command:hidden_no_output'
+  ok   user action vector 'command:hidden_typed'
+  ok   user action vector 'command:hidden_copied'
+  ok   user action vector 'command:terminal'
+  ok   user action vector 'command:multiline_script'
+  ok   user action vector 'command:shell_metacharacters_kept'
+  ok   user action vector 'command:unicode'
+  ok   user action vector 'command:max_length'
+  ok   user action vector 'command:over_max_length'
+  ok   user action vector 'command:terminal_with_typed_output'
+  ok   user action vector 'command:terminal_with_copied_output'
+  ok   user action vector 'command:empty_command'
+  ok   user action vector 'command:blank_command'
+  ok   user action vector 'command:nul_byte'
+  ok   user action vector 'command:carriage_return'
+  ok   user action vector 'command:escape_character'
+  ok   user action vector 'command:unknown_mode'
+  ok   user action vector 'command:unknown_output'
+  ok   user action vector 'command:missing_output'
+  ok   user action vector 'command:extra_key'
+  ok   user action vector 'command:future_version'
+  ok   user action vector 'command:string_version'
+  ok   user action vector 'command:plain_text_is_not_a_value'
+  ok   user action vector 'command:json_array'
+  ok   user action vector 'command:command_not_a_string'
+  ok   user action vector 'path:folder'
+  ok   user action vector 'path:folder_trailing_slash'
+  ok   user action vector 'path:file_with_spaces'
+  ok   user action vector 'path:file_with_quotes_and_dollar'
+  ok   user action vector 'path:unicode_file'
+  ok   user action vector 'path:root'
+  ok   user action vector 'path:leading_dash_component'
+  ok   user action vector 'path:relative'
+  ok   user action vector 'path:home_tilde'
+  ok   user action vector 'path:empty'
+  ok   user action vector 'path:line_feed'
+  ok   user action vector 'path:nul_byte'
+  ok   user action vector 'path:tab'
+  ok   user action vector 'path:dot_dot_component'
+  ok   user action vector 'path:dot_component'
+  ok   user action vector 'path:over_max_length'
+  ok   user action vector 'path:url_is_not_a_path'
+  ok   user action vector 'apple_shortcut:plain'
+  ok   user action vector 'apple_shortcut:selection_in_text_typed'
+  ok   user action vector 'apple_shortcut:copied_output'
+  ok   user action vector 'apple_shortcut:lowercase_identifier'
+  ok   user action vector 'apple_shortcut:unicode_name'
+  ok   user action vector 'apple_shortcut:name_only'
+  ok   user action vector 'apple_shortcut:short_identifier'
+  ok   user action vector 'apple_shortcut:non_hex_identifier'
+  ok   user action vector 'apple_shortcut:empty_name'
+  ok   user action vector 'apple_shortcut:line_feed_in_name'
+  ok   user action vector 'apple_shortcut:unknown_input'
+  ok   user action vector 'apple_shortcut:unknown_output'
+  ok   user action vector 'apple_shortcut:extra_key'
+  ok   user action vector 'apple_shortcut:future_version'
+
+=== run_command runs the user's line hidden or in Terminal (macOS) ===
+  ok   runs it through a login /bin/sh, bounded, and copies its output
+  ok   types its output, refusing one longer than the send_text limit
+  ok   notifies a failure with its first stderr line, and logs only the exit code
+  ok   notifies the deadline and the output bound
+  ok   opens Terminal with the line as an argument, never as AppleScript source
+
+=== open_path opens an existing file or folder (macOS) ===
+  ok   refuses a path that no longer exists with a notice naming it
+  ok   opens an existing one with open, privately
+
+=== run_apple_shortcut runs a library shortcut through its owner (macOS) ===
+  ok   parses the listing and refuses a line it cannot read
+  ok   lists the library for the editor with each identifier
+  ok   runs the stored shortcut by identifier after revalidating it
+  ok   refuses a deleted shortcut by name, without running anything
+  ok   refuses a renamed shortcut by name, without running anything
+  ok   refuses a shortcut renamed or deleted between discovery and its revalidation
+  ok   passes the selection as a private file and copies the text output
+  ok   notifies a failed run with its first stderr line
+  ok   stops a run at its deadline and notifies it
+  ok   pausing its parent cancels a run without a later notice
+RESULT 74 passed 0 failed

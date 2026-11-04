@@ -1,0 +1,191 @@
+
+=== public updater release JSON admission ===
+  ok   release JSON admission: unknown escape
+  ok   release JSON admission: raw newline
+  ok   release JSON admission: raw tab
+  ok   release JSON admission: raw NUL
+  ok   release JSON admission: positive leading zero
+  ok   release JSON admission: negative leading zero
+  ok   release JSON admission: trailing decimal point
+  ok   release JSON admission: leading zero exponent
+  ok   release JSON admission: lone high surrogate
+  ok   release JSON admission: lone low surrogate
+  ok   release JSON admission: nested lone high surrogate
+  ok   release JSON admission: nested lone low surrogate
+  ok   release JSON admission: positive nonfinite number
+  ok   release JSON admission: negative nonfinite number
+  ok   release JSON admission: nested positive nonfinite
+  ok   release JSON admission: nested negative nonfinite
+  ok   release JSON admission: duplicate ignored field
+  ok   release JSON admission: duplicate nested field
+  ok   release JSON admission: duplicate selected tag
+  ok   release JSON admission: duplicate assets
+  ok   release JSON admission: duplicate asset name
+  ok   release JSON admission: duplicate after null
+  ok   release JSON admission: ordinary release
+  ok   release JSON admission: surrogate pair
+  ok   release JSON admission: literal unicode
+  ok   release JSON admission: null ignored metadata
+  ok   release JSON admission: nested null metadata
+  ok   release JSON admission: zero
+  ok   release JSON admission: negative zero
+  ok   release JSON admission: fraction
+  ok   release JSON admission: finite exponent
+  ok   release JSON admission: escaped JSON delimiters
+  ok   release JSON admission: structural whitespace
+  ok   release JSON admission: higher release ordering
+
+=== modules.updater.manager ===
+  ok   linux-updater-etag: a failed second page keeps the accepted first-page association
+  ok   a 304 keeps the release the previous 200 found available
+  ok   builds a bounded HTTPS release request for the updater owner
+  ok   accepts only a checksum record bound to the canonical filename
+  ok   refuses to install a local archive that bypassed verification
+  ok   linux-updater-temp-ownership: preserves unrelated regular .tar.gz
+  ok   linux-updater-temp-ownership: preserves unrelated dangling .tar.gz
+  ok   linux-updater-temp-ownership: preserves unrelated regular .tar.gz.part
+  ok   linux-updater-temp-ownership: preserves unrelated dangling .tar.gz.part
+  ok   linux-updater-temp-allocation: update acknowledges allocator refusal with callback true
+  ok   linux-updater-temp-allocation: update acknowledges allocator refusal with callback false
+  ok   linux-updater-temp-allocation: release acknowledges allocator refusal with callback true
+  ok   linux-updater-temp-allocation: release acknowledges allocator refusal with callback false
+  ok   linux-digest-owner: downloads and hashes a verified archive under the updater owner
+  ok   removes a downloaded archive when SHA-256 does not match
+  ok   cancel-update: a verified archive does not survive cancellation
+  ok   normalises LuaJIT numeric process failures
+
+=== modules.updater.manager ===
+  ok   set_channel refuses aliases and ids outside the registry
+  ok   init reads the persisted channel through the registry
+  ok   set_check_interval and get_check_interval round-trip through config.toml
+  ok   set_check_interval rejects negative values
+  ok   keeps the durable channel and interval when persistence fails
+  ok   clear_cached_release resets state to idle
+  ok   refuses to download a release other than the one the user chose
+  ok   get_menu_label returns a string for every state
+  ok   the idle label comes from the shared catalogue
+  ok   the check row still names a check while a release is available
+  ok   stop_background_checks is safe to call even without active timers
+  ok   reports unavailable background scheduling instead of silently dropping checks
+  ok   reports a schedule whose timer was not armed
+  ok   init loads persisted settings and initialises
+  ok   check_for_updates dispatches and publishes asynchronously
+  ok   linux-updater-etag: transport forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: conditional-transport forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: conditional-false forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: conditional-number forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: conditional-table forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: http-error forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: invalid-json forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: wrong-root forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: oversized-page forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: entries-mismatch forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: dispatch-refusal forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: cancel forces a fresh page after an unknown native validator
+
+=== modules.updater.manager ===
+  ok   resolves the complete standalone root and delegates flat package layouts
+  ok   linux-native-cwd: updater shares the actual cwd owner for a relative source
+  ok   linux-native-path-literal: updater keeps POSIX component literal\backslash
+  ok   linux-native-path-literal: updater keeps POSIX component double\\backslash
+  ok   linux-native-path-literal: updater keeps POSIX component \leading
+  FAIL upgrades the complete standalone root and keeps a verified backup — test_updater_manager_resolves_complete_standalone.lua:164: Update installation failed: could not assemble the complete candidate root.:
+  expected: true
+    actual: false
+  ok   rolls back every fallible activation stage
+  ok   delegates package-managed installations without touching the archive
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   menu_builder renders updater section when updater context is present
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   menu_builder handles nil updater context gracefully
+
+=== updater bounded pagination ===
+  ok   collects all 100 candidates through bounded pages and keeps conditional page caches
+  ok   refuses incomplete invalid and cancelled lists without partial success or duplicate callbacks
+
+=== installer-backup-ownership ===
+  ok   (installer-backup-ownership) a pre-existing backup namespace is never deleted
+
+=== installer-backup-ownership native receipts ===
+  FAIL (installer-current-ownership) regular receipts retain every actual external ownership row — test_updater_manager_resolves_complete_standalone.lua:491: could not assemble the complete candidate root:
+  expected: true
+    actual: false
+  ok   (installer-current-ownership) a fifo receipt cannot become a missing external ownership record
+  ok   (installer-current-ownership) a directory receipt cannot become a missing external ownership record
+  ok   (installer-current-ownership) a file-link receipt cannot become a missing external ownership record
+  ok   (installer-current-ownership) a dangling-link receipt cannot become a missing external ownership record
+  ok   (installer-backup-ownership) empty owned subtrees contain no unlisted personal data
+  FAIL (installer-backup-ownership) first and second native updates rotate only complete unchanged receipts — test_updater_manager_resolves_complete_standalone.lua:572: could not assemble the complete candidate root:
+  expected: true
+    actual: false
+  ok   (installer-backup-ownership) native receipt refuses modified without retiring data
+  ok   (installer-backup-ownership) native receipt refuses extra without retiring data
+  ok   (installer-backup-ownership) native receipt refuses duplicate without retiring data
+  ok   (installer-backup-ownership) native receipt refuses traversal without retiring data
+  ok   (installer-backup-ownership) native receipt refuses nul without retiring data
+  ok   (installer-backup-ownership) native receipt refuses file-link without retiring data
+  ok   (installer-backup-ownership) native receipt refuses manifest-link without retiring data
+  ok   (installer-backup-ownership) native receipt refuses manifest-fifo without retiring data
+  FAIL (installer-backup-ownership) native capture race preserves foreign tree with restore blocked=false — test_updater_manager_resolves_complete_standalone.lua:655: the real atomic backup-capture boundary must execute:
+  expected: true
+    actual: false
+  FAIL (installer-backup-ownership) native capture race preserves foreign tree with restore blocked=true — test_updater_manager_resolves_complete_standalone.lua:655: the real atomic backup-capture boundary must execute:
+  expected: true
+    actual: false
+
+=== installer rollback root ownership ===
+  FAIL (installer-smoke-root-ownership) failed real smoke cannot accept or retire a foreign replacement root — test_updater_manager_resolves_complete_standalone.lua:697: activation must reach the real smoke boundary:
+  expected: true
+    actual: nil
+  FAIL (installer-smoke-root-ownership) successful real smoke cannot accept or retire a foreign replacement root — test_updater_manager_resolves_complete_standalone.lua:697: activation must reach the real smoke boundary:
+  expected: true
+    actual: nil
+
+=== installer rollback capture admission ===
+  FAIL (installer-smoke-root-ownership) ordinary failed real smoke restores the previous root — test_updater_manager_resolves_complete_standalone.lua:724: assert_eq:
+  expected: "updated wrapper smoke failed; previous installation restored"
+    actual: "could not assemble the complete candidate root"
+  FAIL (installer-smoke-root-ownership) native rollback capture race preserves foreign root with restore blocked=false — test_updater_manager_resolves_complete_standalone.lua:786: assert_eq:
+  expected: true
+    actual: false
+  FAIL (installer-smoke-root-ownership) native rollback capture race preserves foreign root with restore blocked=true — test_updater_manager_resolves_complete_standalone.lua:786: assert_eq:
+  expected: true
+    actual: false
+
+=== updater (linux): the check falls back on the public feed ===
+  ok   check-only: a blocked API still announces the newer release
+  ok   check-only: an exhausted quota (HTTP 403) falls back too
+  ok   check-only: an up-to-date build is told so, not offered anything
+  ok   check-only: both sources failing is one network failure naming both
+  ok   check-only: a proxy page served as the feed is refused
+
+=== exact allocator refusal receiving boundary ===
+  ok   known physically settled allocation refusal preserves established callback message
+  ok   no target with unsettled allocator retains generic message and actual debt
+  ok   unknown allocator acquisition cannot borrow no-target cleanup authority
+  ok   source withdrawal inside actual physical probe preserves generic refusal
+  ok   throwing physical probe cannot select settled-allocation message
+  ok   physical ACK listener reentry cannot duplicate allocation callback
+
+=== known allocation refusal producer fact ===
+  ok   only actual closed allocator admission supplies the fixed receiving fact
+  ok   withdrawn source cannot supply the closed allocator receiving fact
+
+=== Known Pre-Reader Install Refusal ===
+  ok   known original deadline refusal joins cleanup before releasing busy
+  ok   throwing initial admission still joins fixed pre-reader reservation cleanup
+  ok   logical cancellation never substitutes for original cleanup ACK
+  ok   public child method replacement cannot borrow physical cleanup authority
+  ok   early cleanup callback is buffered until original child acquisition and ACK
+  ok   early callback followed by throwing cleanup constructor retains unknown debt
+  ok   nil unknown cleanup acquisition cannot manufacture pre-reader physical success
+  ok   physical observer reentry consumes one known-refusal completion
+
+=== Archive Phase Publication ===
+  ok   checksum source probe reentry cannot acquire archive twice
+  ok   checksum physical probe reentry cannot acquire archive twice
+  ok   adoption source probe reentry consumes one completion
+  ok   physical probe source withdrawal refuses successor acquisition
+TOTAL 128 passed 10 failed

@@ -1,0 +1,37 @@
+MODULE tests.unit.modules.dynamic_hotstrings.injection.test_prefix_expansion_never_logs_pii
+
+=== personal-info prefix expansions never log their PII ===
+2026-11-04 15:22:06:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_HB3GRZ_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_HB3GRZ_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-04 15:22:06:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-04 15:22:06:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-04 15:22:06:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-04 15:22:06:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+  ok   rules_engine tags the SSN prefix mapping as private
+2026-11-04 15:22:06:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+2026-11-04 15:22:06:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-04 15:22:06:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-04 15:22:06:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-04 15:22:06:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-04 15:22:06:000 [TRACE] [keymap.expander] Performing replacement (4 deletion(s))…
+2026-11-04 15:22:06:000 [DONE] [tooltip_config] Shared tooltip constants loaded (pad_x=14 corner=7 tmo=2.5s llm=20.0s).
+2026-11-04 15:22:06:000 [DEBUG] [tooltip_llm] HIDE predictions tooltip (was showing 0) — caller [C]:-1.
+2026-11-04 15:22:06:000 [TRACE] [keymap.utils] Emitting text (10 byte(s))…
+2026-11-04 15:22:06:000 [DONE] [keymap.utils] Text emitted as keystrokes (10 char(s)).
+2026-11-04 15:22:06:000 [DONE] [keymap.expander] Replacement complete.
+2026-11-04 15:22:06:000 [DEBUG] [keymap.expander] Auto-expand: private mapping fired (content withheld).
+  ok   firing it calls neither log_hotstring nor leaks the SSN to the log
+2026-11-04 15:22:07:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+2026-11-04 15:22:07:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-04 15:22:07:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-04 15:22:07:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-04 15:22:07:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-04 15:22:07:000 [TRACE] [keymap.expander] Performing replacement (6 deletion(s))…
+2026-11-04 15:22:07:000 [DEBUG] [tooltip_llm] HIDE predictions tooltip (was showing 0) — caller [C]:-1.
+2026-11-04 15:22:07:000 [TRACE] [keymap.utils] Emitting text (14 byte(s))…
+2026-11-04 15:22:07:000 [DONE] [keymap.utils] Text emitted as keystrokes (14 char(s)).
+2026-11-04 15:22:07:000 [DONE] [keymap.expander] Replacement complete.
+2026-11-04 15:22:07:000 [DEBUG] [keymap.expander] Auto-expand: 'zqxtrig' → 'ZQXREPLACEMENT'.
+  ok   still logs an ORDINARY (non-private) mapping — no blanket muting
+RESULT 3 passed 0 failed

@@ -1,0 +1,7 @@
+MODULE tests.unit.modules.gestures.engine.test_stop_force_cleanup
+
+=== gestures M.stop(): calls Actions.force_cleanup (gesture-stuck-click-on-stop) ===
+  ok   M.stop() invokes Actions.force_cleanup()
+  ok   force_cleanup is called even when no watchers are registered
+  ok   force_cleanup is still called on a second stop() call
+RESULT 3 passed 0 failed

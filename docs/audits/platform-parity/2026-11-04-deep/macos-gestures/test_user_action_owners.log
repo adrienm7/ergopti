@@ -1,0 +1,24 @@
+MODULE tests.unit.modules.gestures.actions.test_user_action_owners
+
+=== actions_aux_owner runs a user's child privately and bounded (macOS) ===
+  ok   spawns a payload-free task under the caller's own deadline
+  ok   stops a child whose output passes the bound and reports the overflow
+  ok   reports the deadline as false
+  ok   refuses a missing deadline or bound
+  ok   tells every pause listener which parent paused
+
+=== the user action editors store one canonical value (macOS) ===
+  ok   a command is typed, then its mode and its output are chosen
+  ok   a terminal command asks no output, and the stored mode is offered first
+  ok   a blank command is returned as typed for the validator to refuse
+  ok   a file or folder comes from the native picker
+  ok   a shortcut is picked from the library, then its input and output
+  ok   an unreadable or empty library is explained, and nothing is stored
+  ok   the file-or-folder panel accepts both and the listing is bounded
+
+=== the field run checks the Apple Shortcuts action (macOS) ===
+  ok   runs the shortcut named Ergopti Field Test
+  ok   skips the run by name when the library lacks it
+  ok   fails by name when the library cannot be listed
+  ok   is one of the field run's checks
+RESULT 16 passed 0 failed

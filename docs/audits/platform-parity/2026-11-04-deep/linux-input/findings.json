@@ -1,0 +1,36 @@
+{
+	"schema_version": 1,
+	"scope": "linux-input",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:18:39.826645+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/linux-input/report.md",
+	"findings": [
+		{
+			"id": "LI-001",
+			"title": "Production Linux physical shortcut editor and active physical-action delivery remain unqualified and unavailable",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": {
+				"command": "LUA_CPATH='/workspace/scratch/parity-toolchain/modules/?.so;;' /workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua docs/audits/platform-parity/2026-11-04-deep/linux-input/probe-physical-availability.lua",
+				"observed": "Actual production delivery getter=false, bridge available/open=false, shared menu ready/open=false, even while GUI readiness is controlled true. No GUI/capture/save invoked.",
+				"expected": "Availability inventory, README/site/TODO must state unsupported until qualified native broker/source/all-owner/output integration exists; preserve guard.",
+				"evidence_path": "docs/audits/platform-parity/2026-11-04-deep/linux-input/probe-physical-availability.log"
+			},
+			"root_cause": {
+				"locations": [
+					"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua:732",
+					"static/ergopti_plus/linux/ui/physical_shortcuts/bridge.lua:24",
+					"static/ergopti_plus/linux/infra/shortcuts_scope.lua:463",
+					"static/ergopti_plus/_shared/lua/shortcuts/physical_editor_menu.lua:15"
+				],
+				"description": "Physical delivery is deliberately unqualified and production getter returns false unconditionally. Prior audit inferred native feature support from bridge/capture components and tests with capability=true."
+			},
+			"silent_failure": "Not silent in runtime: menu/bridge correctly refuse. Audit/inventory can falsely claim conditional availability because shared editor assets, native observer and controlled host tests exist.",
+			"regression_test": "Pin documented unavailable status to actual production getter; keep a real getter -> bridge -> menu test showing unavailable regardless of GUI readiness. When enabling later, require evidence of qualified end-to-end native source/all-owner collision/output custody rather than replacing the guard with true.",
+			"other_os": "macOS keyboard_shortcuts.lua:525 also returns false (unqualified broker/output); Windows explicitly lacks editor host/runtime. Not a Linux-only gap.",
+			"intentional_guard": true,
+			"product_omission_intent": "Not established: guard safety rationale is explicit; feature qualification remains unfinished work."
+		}
+	]
+}

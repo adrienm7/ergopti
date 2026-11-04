@@ -1,0 +1,9 @@
+MODULE tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_combo_all_or_nothing
+
+=== personal_info @-combo: all or nothing ===
+  ok   resolves a combo whose every letter is known
+  ok   declines the whole combo when one letter resolves to nothing
+  ok   a field the user left blank counts as unresolvable
+  ok   returns field names alongside the values, in step
+  ok   declines gracefully on an empty or non-string combo
+RESULT 5 passed 0 failed

@@ -1,0 +1,89 @@
+{
+	"schema_version": 1,
+	"scope": "macos-metrics",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:14:15.381927+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/macos-metrics/report.md",
+	"findings": [
+		{
+			"id": "MM-001",
+			"title": "Metrics collection pause still records window activity and later credits paused pointer travel",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "Run probe.lua. With collection_suspended=true, real context_tracker appends PAUSED SECRET window_switch and real watcher appends space_change; a 1000px movement during the pause is included by exact snapshot function after resume. Exact real append_log/FIFO body forwards paused title to Rotation.",
+			"root_cause": "User pause is checked in privacy_context.allows_logging, but watcher/context_tracker production callbacks receive _is_paused that checks global script_control only. LogManager.append_log and Rotation do not apply admission; pointer baseline/state are not reset across user pause.",
+			"silent_failure": "UI reports collection suspended while identifying activity metadata continues down JSONL/SQL path and paused pointer distance backfills next typing entry. Existing tests gate global pause or typing-only paths.",
+			"regression_test": "Invoke real Metrics suspend/resume and browser title/app/spaces/mouse callbacks with shared CoreState; assert no paused metadata or pointer delta, allowing previously admitted closing rows.",
+			"evidence": [
+				"macos/modules/keystats/init.lua:650",
+				"macos/modules/keystats/init.lua:1382",
+				"macos/modules/keystats/init.lua:2193",
+				"macos/modules/keystats/context_tracker.lua:1053",
+				"macos/modules/keystats/watchers.lua:109",
+				"macos/modules/keystats/watchers.lua:152",
+				"macos/modules/keystats/log_manager.lua:722",
+				"macos/modules/keystats/rotation.lua:299"
+			]
+		},
+		{
+			"id": "MM-002",
+			"title": "macOS measured passive sleep and lock durations remain zero in dashboard aggregates",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "Run probe.lua. Actual caffeinate callback emits a 60000ms sleep and 30000ms lock passive_period; actual aggregator produces sleep_ms=0, locked_ms=0, passive_count=2.",
+			"root_cause": "Watchers put durations on passive_period(kind,duration_ms), while aggregator.events only counts that action and credits sleep/lock duration from bare wake/unlock edges. macOS has no Windows-style SQL system-duration rebuild.",
+			"silent_failure": "Nonzero passive counts accompany zero durations in system manifest and dashboards. Cache replay and foreign imports use same incorrect walker.",
+			"regression_test": "Replay actual producer event pairs through raw storage/rebuild and aggregate flush/manifest; assert exact lock/sleep durations and no double counting legacy duration-bearing edges.",
+			"evidence": [
+				"macos/modules/keystats/watchers.lua:554",
+				"macos/modules/keystats/watchers.lua:579",
+				"macos/modules/keystats/log_manager.lua:926",
+				"macos/modules/keystats/aggregator/events.lua:178",
+				"macos/modules/keystats/aggregator/sql.lua:325",
+				"macos/modules/keystats/log_manager.lua:1653",
+				"_shared/ui/metrics_apps/state.js:279",
+				"windows/modules/keystats/keystats_reader_db.ahk:1540"
+			]
+		},
+		{
+			"id": "MM-003",
+			"title": "macOS keep-awake completion events never populate keep-awake accounting",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "Run probe.lua. Feed exact producer pair passive_period(kind=awake,duration_ms=120000) and awake_focus(app=Editor,duration_ms=120000) into actual event walker; system awake_ms stays 0.",
+			"root_cause": "Keep-awake shortcuts emit both accounting records, but macOS aggregator has no duration branch for awake passive periods or app awake_focus. It initializes awake_ms to zero and never increments it.",
+			"silent_failure": "Dashboard keep-awake totals remain empty and app focus accounting cannot exclude these sessions as UI expects; replay repeats omission.",
+			"regression_test": "Exercise actual keep-awake stop and auto-stop into live/replay system and app aggregates; verify full interval once globally and expected per-app focus subtraction/toggle.",
+			"evidence": [
+				"macos/modules/shortcuts/actions/system.lua:450",
+				"macos/modules/shortcuts/actions/system.lua:457",
+				"macos/modules/shortcuts/actions/system.lua:460",
+				"macos/modules/keystats/log_manager.lua:931",
+				"macos/modules/keystats/aggregator/events.lua:173",
+				"_shared/ui/metrics_apps/state.js:282",
+				"_shared/ui/metrics_apps/state.js:343"
+			]
+		},
+		{
+			"id": "MM-004",
+			"title": "macOS nested lock and sleep transitions overwrite passive interval ownership",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "Run probe.lua. At one-second increments drive lock -> screensDidSleep -> systemWillSleep -> systemDidWake -> screensDidWake -> unlock. Actual watcher emits only one passive_period, kind sleep, duration_ms 1000; lock and earlier sleep segments disappear. Native ordering not measured, sequence uses accepted public callback inputs.",
+			"root_cause": "Single passive_started_at/passive_kind slot is blindly replaced on every lock/display/system sleep, then cleared by first wake; no independent locked/sleeping state or duplicate-edge idempotence.",
+			"silent_failure": "Missing durations are absent from raw metrics and unrecoverable by correcting aggregation. Completed count and sleep-vs-lock partition also become inaccurate.",
+			"regression_test": "Replay nested/repeated lock/sleep/display edges and assert exact non-overlapping partition, pre/post-sleep locked portions, duplicate-edge idempotence and pause/shutdown interval ownership.",
+			"evidence": [
+				"macos/modules/keystats/watchers.lua:530",
+				"macos/modules/keystats/watchers.lua:541",
+				"macos/modules/keystats/watchers.lua:560",
+				"macos/modules/keystats/watchers.lua:568",
+				"windows/modules/keystats/keystats_system_intervals.ahk:43"
+			]
+		}
+	]
+}

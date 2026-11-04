@@ -1,0 +1,62 @@
+MODULE tests.unit.modules.gestures.actions.test_composite_resume
+
+=== gesture Actions composite resume ===
+  ok   keeps aggregate admission closed during text resume false
+  ok   keeps aggregate admission closed during text resume nil
+  ok   keeps aggregate admission closed during text resume throw
+  ok   keeps aggregate admission closed during mouse resume false
+  ok   keeps aggregate admission closed during mouse resume nil
+  ok   keeps aggregate admission closed during mouse resume throw
+  ok   keeps aggregate admission closed during screenshot resume false
+  ok   keeps aggregate admission closed during screenshot resume nil
+  ok   keeps aggregate admission closed during screenshot resume throw
+  ok   retains the composite fence when text rollback pause returns false
+  ok   retains the composite fence when text rollback pause returns nil
+  ok   retains the composite fence when text rollback pause returns throw
+  ok   retains the composite fence when mouse rollback pause returns false
+  ok   retains the composite fence when mouse rollback pause returns nil
+  ok   retains the composite fence when mouse rollback pause returns throw
+  ok   retains the composite fence when screenshot rollback pause returns false
+  ok   retains the composite fence when screenshot rollback pause returns nil
+  ok   retains the composite fence when screenshot rollback pause returns throw
+  ok   fails closed on cleanup aux paused query nil
+  ok   fails closed on cleanup aux paused query throw
+  ok   fails closed on cleanup aux pending query nil
+  ok   fails closed on cleanup aux pending query throw
+  ok   fails closed on cleanup text paused query nil
+  ok   fails closed on cleanup text paused query throw
+  ok   fails closed on cleanup text pending query nil
+  ok   fails closed on cleanup text pending query throw
+  ok   fails closed on cleanup mouse paused query nil
+  ok   fails closed on cleanup mouse paused query throw
+  ok   fails closed on cleanup mouse pending query nil
+  ok   fails closed on cleanup mouse pending query throw
+  ok   fails closed on cleanup screenshot paused query nil
+  ok   fails closed on cleanup screenshot paused query throw
+  ok   fails closed on cleanup screenshot pending query nil
+  ok   fails closed on cleanup screenshot pending query throw
+  ok   fails closed on resume aux paused query nil
+  ok   fails closed on resume aux paused query throw
+  ok   fails closed on resume aux pending query nil
+  ok   fails closed on resume aux pending query throw
+  ok   fails closed on resume text paused query nil
+  ok   fails closed on resume text paused query throw
+  ok   fails closed on resume text pending query nil
+  ok   fails closed on resume text pending query throw
+  ok   fails closed on resume mouse paused query nil
+  ok   fails closed on resume mouse paused query throw
+  ok   fails closed on resume mouse pending query nil
+  ok   fails closed on resume mouse pending query throw
+  ok   fails closed on resume screenshot paused query nil
+  ok   fails closed on resume screenshot paused query throw
+  ok   fails closed on resume screenshot pending query nil
+  ok   fails closed on resume screenshot pending query throw
+  ok   retains composite debt when auxiliary rollback pause returns false
+  ok   retains composite debt when auxiliary rollback pause returns nil
+  ok   retains composite debt when auxiliary rollback pause returns throw
+  ok   passes the exact parent through every composite owner and query
+  ok   compensates auxiliary resume when screenshot resume returns false
+  ok   compensates auxiliary resume when screenshot resume returns nil
+  ok   compensates auxiliary resume when screenshot resume returns throw
+  ok   rolls both owners back when screenshot resume reenters auxiliary PAUSE
+RESULT 58 passed 0 failed

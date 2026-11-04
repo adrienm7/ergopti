@@ -1,0 +1,17 @@
+MODULE tests.unit.modules.keymap.expansion.test_builtin_clipboard_snapshot_acquisition
+
+=== builtin clipboard snapshot requires stable native acquisition ===
+  ok   accepts a healthy rich snapshot from native count zero (builtin-snapshot-rich)
+  ok   accepts a healthy absent snapshot (builtin-snapshot-empty)
+  ok   accepts a native empty-table snapshot after clearContents (builtin-snapshot-native-empty)
+  ok   captures a foreign copy already present before acquisition (builtin-snapshot-foreign-before)
+  ok   refuses a foreign copy during acquisition: during-read (builtin-snapshot-foreign)
+  ok   refuses a foreign copy during acquisition: after-read (builtin-snapshot-foreign)
+  ok   refuses a foreign copy during acquisition: debt (builtin-snapshot-foreign)
+  ok   refuses an identical-byte copy whose generation changed (builtin-snapshot-identical)
+  ok   refuses nil native count before capture (builtin-snapshot-count)
+  ok   refuses throw native count before capture (builtin-snapshot-count)
+  ok   refuses nil native count after capture (builtin-snapshot-count)
+  ok   refuses throw native count after capture (builtin-snapshot-count)
+  ok   refuses a nonfinite initial native count (builtin-snapshot-invalid)
+RESULT 13 passed 0 failed

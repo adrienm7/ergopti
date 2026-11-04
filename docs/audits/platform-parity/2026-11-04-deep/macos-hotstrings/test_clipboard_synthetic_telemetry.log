@@ -1,0 +1,9 @@
+MODULE tests.unit.modules.keymap.expansion.test_clipboard_synthetic_telemetry
+
+=== clipboard output reaches synthetic telemetry ===
+  ok   shares native time across parallel restore timers and rearms (clipboard-native-fixture-clock)
+  ok   keeps paste echoes event-only while returning the full logical output
+  ok   keeps typed and pasted token output in one ordered generation
+  ok   forwards logical clipboard output beside the replacement's exact tagged batch
+  ok   cancels the whole replacement when the pasteboard rejects its payload
+RESULT 5 passed 0 failed

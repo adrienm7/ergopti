@@ -1,0 +1,14 @@
+MODULE tests.unit.modules.gestures.navigation.test_native_app_switcher
+
+=== macOS product native switcher facade ===
+  ok   remains unavailable without the actual complete native input contract
+  ok   rejects duplicate initialization and unowned timing defaults
+  ok   calls the exact native edge owner and publishes after strict retirement
+  ok   pauses before acquisition callbacks can emit and cannot revive an old source
+  ok   retains native input debt through pause and refuses resume until exact ACK
+  ok   retains timer debt and does not advertise readiness from input-only cleanup
+  ok   compensates with captured native ports after an owner-function replacement
+  ok   source callback refusal does not invoke direct activation or paired key strokes
+  ok   uses the actual scheduler's retained uncommitted handle after startup throws
+  ok   actual scheduler rejects synchronous precommit delivery without emitting an edge
+RESULT 10 passed 0 failed

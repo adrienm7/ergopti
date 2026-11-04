@@ -1,0 +1,548 @@
+
+=== tap-hold roll: a typing key is decided by the order of the releases ===
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) Space rolled over a letter types the space, then the letter
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) a letter struck and let go under Space is held
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) Space held past its threshold is the hold for every key after it
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) a lone tap types the space, however short
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) a second key struck before either comes up is typing
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) the release of the letter before does not cancel the space
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) the layer on a hold follows the same order
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) Enter with a hold of its own follows the same order
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) a key that is not a typing key keeps its hold from key-down
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) the typing keys are the shared list
+
+=== tap-hold engine: a modifier key pressed alone (lone-tap-window) ===
+  ok   types CapsLock's Enter on a lone 600 ms press within a 1000 ms window (lone-tap-window)
+  ok   copies on a lone 600 ms Left Shift within a 1000 ms window (lone-tap-window)
+  ok   keeps a chord when a letter is struck under the key (lone-tap-window)
+  ok   is a hold past the threshold when the window is 0 (lone-tap-window)
+  ok   is a hold past the window itself (lone-tap-window)
+  ok   keeps a typing key on its own threshold (lone-tap-window)
+
+=== tap-hold storage: the window in tap_hold.toml (lone-tap-window) ===
+  ok   loads the manifest default when the file sets no window (lone-tap-window)
+  ok   round-trips the writer's value through the loader, 0 included (lone-tap-window)
+  ok   refuses an invalid window in the writer and writes nothing (lone-tap-window)
+  ok   reads an invalid stored window as the manifest default (lone-tap-window)
+  ok   lets the scope transaction write and clear the window (lone-tap-window)
+
+=== tap-hold menu choices: the manifest's one list (lone-tap-window) ===
+  ok   offers the feature's preset_values, Off first, and refuses a feature without them
+
+=== tap-hold engine: a modifier key ===
+  ok   takes the hold at key-down and taps the action on a quick lone release
+  ok   is a chord, not a tap, when another key came in between
+  ok   is a hold past its threshold and a bounce below the minimum
+  ok   holds another modifier than itself and taps a key through the pipeline
+  ok   ignores the key's own autorepeat
+  ok   is a chord when another key comes up in between (release-is-activity)
+  ok   is a chord when another tap-hold key comes up in between (release-is-activity)
+  ok   is a chord when a layer key or a native key comes up in between (release-is-activity)
+  ok   is a chord when another key auto-repeats in between (prior-key-repeat)
+  ok   lets a click or a wheel turn make it a chord
+
+=== tap-hold engine: a tap with no hold ===
+  ok   runs its action at key-down and again with each repeat (tap-no-hold-instant)
+  ok   types its key at key-down and again with each repeat (tap-no-hold-instant)
+  ok   swallows a none tap (tap-no-hold-instant)
+  ok   arms RCtrl's one-shot Shift on a quick release and holds Shift for a long press (tap-no-hold-per-key)
+  ok   shifts only the first of three rolled letters (one-shot-roll)
+  ok   types a key pressed within RCtrl's threshold unshifted (rctrl-one-shot-hold-past-threshold)
+  ok   follows each key's Windows rule for a tap with no hold (tap-no-hold-per-key)
+  ok   holds what the Windows block of a special tap holds (tap-no-hold-per-key)
+  ok   taps LCtrl only with CapsLock and LAlt up at its press (lctrl-tap-needs-caps-alt-up)
+  ok   arms LAlt's one-shot Shift at key-down and holds Shift until release (tap-no-hold-per-key)
+  ok   skips LAlt's one-shot under a held modifier or a held RCtrl, CapsLock, LShift or LCtrl (lalt-one-shot-skip)
+  ok   is still the key itself under a modifier and a layer key on the layer (tap-no-hold-instant)
+
+=== tap-hold engine: LAlt's Backspace under held keys ===
+  ok   types what Windows' BackSpaceLogic types for the keys held (lalt-backspace-logic)
+  ok   types nothing when CapsLock is down at the release of its layer hold (lalt-backspace-logic)
+  ok   decides again at each repeat when LAlt has no hold (lalt-backspace-logic)
+  ok   spends an armed one-shot Shift (lalt-backspace-logic)
+  ok   keeps up a modifier its own release just lifted (lalt-backspace-logic)
+
+=== tap-hold engine: RCtrl's Backspace under held keys ===
+  ok   types Delete under LShift, at key-down and each repeat with no hold (rctrl-backspace-logic)
+  ok   types Delete under LShift on the tap of a hold (rctrl-backspace-logic)
+  ok   types Right then Backspace under LAlt's one-shot Shift and spends it (rctrl-backspace-logic)
+
+=== tap-hold engine: thresholds and holds ===
+  ok   counts a release exactly at the threshold or the minimum as a tap
+  ok   holds AltGr and Win, and every modifier of a combination in order
+  ok   types the key itself on a tap of a native-tap key that holds
+  ok   refuses a hold modifier that is not a canonical id instead of dropping it
+  ok   types End then Enter for the layer's new-line key
+
+=== tap-hold engine: the navigation layer ===
+  ok   turns layer keys into navigation chords while held
+  ok   releases a layer chord even when the layer key came up first
+  ok   taps its own action when used alone
+
+=== tap-hold engine: the side a modifier hold takes ===
+  ok   holds the right Ctrl itself when the right Ctrl key holds ctrl
+  ok   holds the left Ctrl when the file spelled the modifier with a left alias
+  ok   holds the right Shift itself when the right Shift key holds shift
+
+=== tap-hold engine: under a modifier and on the layer ===
+  ok   types Shift+Tab, not Alt+Tab, when Shift is held
+  ok   types Ctrl+Tab under a held CapsLock and under a physical Ctrl
+  ok   keeps CapsLock a tap-hold under Shift, for Ctrl+Shift
+  ok   makes CapsLock the layer's Backspace while the layer is held
+  ok   is the layer's key or itself when its own hold is the layer another key holds (layer-under-layer)
+  ok   swallows LAlt tapping Backspace on another key's layer, as Windows does (layer-under-layer)
+  ok   makes a key with a modifier hold itself on the layer (layer-tap-holds-off)
+
+=== tap-hold engine: tap sentinels and the one-shot Shift ===
+  ok   types the key itself for an empty tap, and nothing for none
+  ok   shifts the next key, once, and lets a modifier through while armed
+  ok   expires the one-shot Shift
+  ok   ignores a disabled key and a key it does not know
+
+=== tap-hold engine: what the one-shot Shift does with the next key ===
+  ok   treats a key tapped by a tap-hold as the same key pressed by hand (one-shot-next-key)
+  ok   types the native key of a tap-hold as that key (one-shot-next-key)
+  ok   ends on Enter, Backspace, Delete, Tab and Escape, typed unshifted (one-shot-next-key)
+  ok   lets a key that types nothing through and stays armed (one-shot-next-key)
+  ok   lets Print, the volume keys, NumLock and F13 through, and stays armed (one-shot-types-nothing)
+  ok   keeps the one-shot for a keypad key with NumLock off (one-shot-types-nothing)
+  ok   passes a shortcut unshifted and stays armed (one-shot-types-nothing)
+  ok   types a digit as it is and spends the one-shot (one-shot-types-nothing)
+  ok   needs the layout's text when a key taps the one-shot Shift (one-shot-types-nothing)
+  ok   types the shared result for Space, a period, a comma and the magic key (one-shot-results-shared)
+  ok   hands the injector a result the layout cannot type (one-shot-results-shared)
+  ok   types a capital the layout puts on another key or level (one-shot-results-shared)
+  ok   lifts the Shift or AltGr the hand holds around a result (one-shot-lifts-levels)
+
+=== tap-hold engine: nothing stays pressed ===
+  ok   releases every held modifier, layer chord and one-shot key
+  ok   sends one Ctrl for two keys holding it, and lifts it with the last
+  ok   shares Ctrl with a physical Ctrl nobody configured
+  ok   types a tapped Enter again while Enter is held
+  ok   keeps a held Backspace down through the layer's Backspace
+  ok   sends one Left for two layer keys that are both Left
+  ok   releases a shared modifier once
+  ok   pairs every down it emits with an up over a random session
+
+=== tap-hold engine: a lone Alt, AltGr or Super hold ===
+  ok   masks the lone Alt of a tap before releasing it and typing the tap
+  ok   masks a lone long hold too, where no tap follows
+  ok   does not mask a chord, which opens no menu
+  ok   masks Super and AltGr, never Ctrl or Shift
+
+=== tap-hold config: the user file over the shared defaults ===
+  ok   keeps every key neutral when the user file is absent
+  ok   changes one field and keeps the others
+  ok   drops the default modifier when a layer is chosen, and the reverse
+  ok   lets an empty hold clear the default one
+  ok   starts from no key when defaults are not inherited
+  ok   reads the feature switch
+  ok   falls back to the global delay for a threshold out of range
+  ok   disables a key with a field of the wrong type
+  ok   warns once about a key or field it does not have, and applies the rest (config-outdated-tap-hold)
+  ok   keeps a bad value of the shipped defaults an ERROR (config-outdated-tap-hold-shipped)
+  ok   reports a malformed user file and keeps every key neutral
+
+=== tap-hold config: the spellings of a hold ===
+  ok   reads the other spellings of a modifier as its id
+  ok   takes the other spellings from the shared picker alone (hold-alias-single-source)
+  ok   holds every picker option however it is ordered or cased
+  ok   reads a layer in any case
+  ok   warns once about an unknown modifier or layer, and keeps the key's tap (unknown-hold-keeps-tap)
+
+=== tap-hold config: the wizard's report of a folder ===
+  ok   reports a folder without a tap-hold file as neutral
+  ok   tells an imported key from one the user set, and reads the switch
+  ok   reads every inherited key as the recommendation
+  ok   refuses a malformed file rather than report it neutral
+
+=== tap-hold config: the side a hold modifier names (PAR-15) ===
+  ok   reads a left alias as the modifier and remembers that it forces the left key
+
+=== tap-hold writer: a tray change reaches the engine ===
+  ok   sets a tap in the shared schema and reloads the engine
+  ok   writes only the keys the user changed, and keeps the earlier ones
+  ok   swaps a modifier hold for the navigation layer, and back
+  FAIL (hold-picker-brings-the-layer-2026-10-01) picking the layer as a hold creates layers.toml from the recommended layer — test_tap_hold_writer.lua:140: expected truthy — actual: false
+  ok   (hold-picker-brings-the-layer-2026-10-01) an existing layers.toml is the user's and stays byte for byte
+  ok   (hold-picker-brings-the-layer-2026-10-01) a refused key write takes the layer it created back
+  FAIL (hold-picker-brings-the-layer-2026-10-01) a saved key keeps its layer when the engine does not reload — ...ts/unit/platform/remap/tap_hold/test_tap_hold_writer.lua:172: attempt to index a nil value (field 'caps_lock')
+  ok   (hold-picker-brings-the-layer-2026-10-01) a writer bound to no layer folder writes no layer file
+  ok   (hold-picker-brings-the-layer-2026-10-01) the daemon binds the writer to the configuration folder's layer file
+  ok   stores a hold in the canonical spelling the loader reads back
+  ok   clears a default hold with the none option
+  ok   makes a key native: its own tap and no hold
+  ok   renders a clear that the defaults never come back through
+  ok   renders the shared preset explicitly and preserves unknown nested fields
+  ok   renders a clear of only owned tap-hold fields
+  ok   refuses to render a row it does not own or a malformed tap_hold table
+  ok   switches the feature off in the file
+  ok   writes a delay the loader reads back, and refuses one out of range
+  ok   refuses an unknown key, tap or hold, and writes nothing
+  ok   never overwrites a file that does not parse
+  ok   escapes what it writes and keeps data it does not own
+  ok   reports a change the engine could not reload
+
+=== tap-hold writer: the wizard imports only the checked keys ===
+  ok   imports each key's preset exactly over a backup, switches the feature on and leaves the rest
+  ok   never imports over a key the user configured, and writes nothing
+  ok   creates the file of a folder that has none
+  ok   refuses what it cannot import exactly, and writes nothing
+
+=== tap-hold writer: classified source refusal ===
+  ok   refuses permission before the ordinary setter stages or reloads
+  ok   refuses other_errno before the ordinary setter stages or reloads
+  ok   refuses no_errno before the ordinary setter stages or reloads
+  ok   refuses string_errno before the ordinary setter stages or reloads
+  ok   refuses open_raise before the ordinary setter stages or reloads
+  ok   refuses read_nil before the ordinary setter stages or reloads
+  ok   refuses read_raise before the ordinary setter stages or reloads
+  ok   refuses close_nil before the ordinary setter stages or reloads
+  ok   refuses close_false before the ordinary setter stages or reloads
+  ok   refuses close_raise before the ordinary setter stages or reloads
+  ok   refuses an unreadable source before the recommended import creates a backup
+  ok   admits native ENOENT and publishes the actual missing-file setter
+  ok   keeps unknown neighbors when the classified source read succeeds
+
+=== tap-hold writer: staging write and close acknowledgement ===
+  ok   refuses write_nil before publication and reload
+  ok   refuses write_false before publication and reload
+  ok   refuses write_table before publication and reload
+  ok   refuses write_string before publication and reload
+  ok   refuses write_foreign_handle before publication and reload
+  ok   refuses write_raise before publication and reload
+  ok   refuses close_nil before publication and reload
+  ok   refuses close_false before publication and reload
+  ok   refuses close_string before publication and reload
+  ok   refuses close_handle before publication and reload
+  ok   refuses close_raise before publication and reload
+  ok   refuses cleanup_refused before publication and reload
+  ok   publishes only after the actual file write and close acknowledge their owner
+
+=== tap-hold delay model: global default, sticky per-key delays, reset (PAR-15) ===
+  ok   ships no delay for any key
+  ok   a global change moves a key without its own delay and never one with it; a reset follows the global again
+  ok   a delay an earlier build copied into the file is not the user's; a delay the user sets afterwards is
+  ok   the wizard's report ignores a copied delay and counts the user's own
+  ok   a scope restore drops the user's global delay with the keys' delays
+
+=== tap-hold manager ===
+  ok   installs the engine at init and runs its tap actions
+  ok   transports the actual monitor tap binding through release and queued rollover
+  ok   admits a monitor tap only from its active canonical tap-hold source
+  ok   tells the engine which modifiers the live layout holds (engine-live-modifiers)
+  ok   gives the one-shot Shift the shared results and the magic key's (one-shot-results-shared)
+  ok   gives the magic key its result before the character's own (one-shot-magic-first)
+  ok   lets the engine lift the level keys the hook says are held (one-shot-lifts-levels)
+  ok   lets the engine lift the shortcut keys the hook says are held (lalt-backspace-logic)
+  ok   takes the engine out on pause and off, and back after
+  ok   applies a changed file live on reload
+  ok   keeps the running engine when a reload cannot read the defaults
+  ok   offers every hold option and the catalogue as taps
+  ok   rejects a second init and a use before init
+  ok   reports one threshold only when every key agrees
+
+=== tap-hold manager: taps this driver cannot run ===
+  ok   offers every action the shared catalogue declares for Linux as a tap
+  ok   warns once at configuration load about a tap it cannot run (config-outdated-tap-hold)
+
+=== tap-hold manager: the daemon's action executor ===
+  ok   never drops the action catalogue when the touchpad reader fails
+  ok   resets the typing buffer after a one-shot result the injector typed (one-shot-injected-text)
+  ok   preserves unknown start authority through the actual one-shot callback (one-shot-injected-text)
+  ok   binds the tap-hold executor to the catalogue once, at init
+
+=== native OneShot Manager route ===
+  FAIL loads the saved action and arms through the actual Manager callback — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL refuses all-positive public ports replaced before Manager construction — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL refuses public ports rebound after Manager construction without calling them — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL refuses missing required public arm authority at the final frame join — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL does not arm when the original source changes during command admission — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL withdraws an unspent arm before a foreign keyboard is forwarded — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL retains the ordinary generic action route — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL keeps an action outside the catalogue unavailable — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL (linux-caps-word-trigger) runs a CapsWord pair through the catalogue executor — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL does not grant a lease outside the exact Manager action frame — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL settles original inverse ACK after consumed source descriptor replacement — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL settles exact retired original output without borrowing its reopened successor — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL retires uncertain original inverse output instead of claiming healthy settlement — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+
+=== OneShot daemon Manager bootstrap ===
+  FAIL selects Hook at setup when keystats already constructed Manager before it — ...tform/remap/tap_hold/test_tap_hold_manager_lifecycle.lua:671: ergopti_hotstrings.lua: No such file or directory
+
+=== OneShot construction-original text source ===
+  FAIL refuses a rebound text getter before_manager without changing raw input — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+  FAIL refuses a rebound text getter after_manager without changing raw input — ...rgopti/static/ergopti_plus/linux/infra/device_access.lua:20: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+
+=== native navigation reload transactions ===
+  ok   retains the installed engine and admission after a malformed layer
+
+=== outdated layers.toml entries (config-outdated-layers) ===
+  ok   starts with the valid bindings and warns once per outdated entry, naming the file
+
+=== boot navigation file isolation (nav-layer-boot-refusal) ===
+  ok   (nav-layer-boot-refusal) isolates malformed TOML without retiring tap-holds
+  ok   (nav-layer-boot-refusal) isolates missing schema without retiring tap-holds
+  ok   (nav-layer-boot-refusal) isolates unsupported schema without retiring tap-holds
+  ok   (nav-layer-boot-refusal) isolates invalid layers root without retiring tap-holds
+  ok   (nav-layer-boot-refusal) isolates unreadable user file without retiring tap-holds
+  ok   (nav-layer-boot-refusal) still refuses a broken shipped registry
+  ok   (nav-layer-boot-refusal) still refuses a broken native compiler
+  ok   (nav-layer-boot-refusal) retains entry-wise filtering and valid bindings
+  ok   (nav-source-close-ack) boot isolates a false user close ACK without retiring tap-holds
+  ok   (nav-source-close-ack) boot isolates a nil user close ACK without retiring tap-holds
+  ok   (nav-source-close-ack) reload refuses a false user close ACK and retains the exact installed tuple
+  ok   (nav-source-close-ack) reload refuses a nil user close ACK and retains the exact installed tuple
+  ok   (nav-source-close-ack) a refused shipped registry close is fatal before engine installation
+
+=== original configured Navigation source reservations ===
+  ok   (nav-configured-reservation) original None bytes issue a source-bound map, never a clone or copied issuance
+  ok   (nav-configured-reservation) original read bytes stay the baseline when the file changes at its genuine close
+  ok   (nav-configured-reservation) source export replacement revokes observation without rewriting its source
+  ok   (nav-configured-reservation) retired original map and issuance collect without a weak-value backreference
+  ok   (nav-configured-reservation) a self-restoring replaced compiler cannot issue original-load provenance
+  ok   (nav-configured-reservation) a self-restoring replaced reader cannot issue original-load provenance
+  ok   (nav-configured-reservation) real bare Manager publishes detached reachable None reservations without operations
+  ok   (nav-configured-reservation) no reachable activator is proven empty, while held and private armed state refuse
+  ok   (nav-configured-reservation) genuine empty map never authenticates a replaced base map
+  ok   (nav-configured-reservation) rejected reload retains the old engine but refuses changed original Nav source
+  ok   (nav-configured-reservation) successful successor and exact inverse retain their own Nav source association
+  ok   (nav-configured-reservation) disable and pause revoke the old frame without public delivery authority
+  ok   (nav-configured-reservation) nonempty real pair wrapper stays unavailable even when tap-holds are switched off
+
+=== shared typing-priority catalogue ===
+  ok   typing-priority keys resolve through the ahk catalogue
+  ok   typing-priority keys resolve through the hs catalogue
+  ok   typing-priority keys resolve through the linux catalogue
+  ok   typing-priority refuses a empty key list
+  ok   typing-priority refuses a unknown key list
+  ok   typing-priority refuses a repeated key list
+  ok   typing-priority refuses a record key list
+  ok   typing-priority refuses a sparse key list
+  ok   typing-priority refuses a non-string key list
+TOTAL 232 passed 18 failed

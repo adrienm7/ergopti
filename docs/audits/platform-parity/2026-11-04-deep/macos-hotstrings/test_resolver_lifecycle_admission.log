@@ -1,0 +1,12 @@
+MODULE tests.unit.modules.dynamic_hotstrings.rules_engine.test_resolver_lifecycle_admission
+
+=== dynamic resolver ownership after callback execution ===
+  ok   emits a healthy resolver through the real keymap (resolver-lifecycle-positive)
+  ok   rejects a resolver after disable-group (resolver-lifecycle-disable-group)
+  ok   rejects a resolver after disable-section (resolver-lifecycle-disable-section)
+  ok   rejects a resolver after change-trigger (resolver-lifecycle-change-trigger)
+  ok   rejects a resolver after replace-data (resolver-lifecycle-replace-data)
+  ok   rejects a resolver after roundtrip-group (resolver-lifecycle-roundtrip-group)
+  ok   cannot inject an old result into a restarted owner (resolver-lifecycle-restart)
+  ok   does not publish a preview resolved across stop (resolver-lifecycle-preview-stop)
+RESULT 8 passed 0 failed

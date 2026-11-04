@@ -1,0 +1,67 @@
+[
+	{
+		"module": "modules.gestures.engine.test_mt_decoder",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t38\t0"
+	},
+	{
+		"module": "modules.gestures.engine.test_gesture_direction_vectors",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t69\t0"
+	},
+	{
+		"module": "modules.gestures.engine.test_gesture_slot_report",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t8\t0"
+	},
+	{
+		"module": "modules.gestures.engine.test_touchpad_finder",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t14\t0"
+	},
+	{
+		"module": "modules.gestures.engine.test_touchpad_record",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t5\t0"
+	},
+	{
+		"module": "modules.gestures.engine.test_gesture_close_ack",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t10\t0"
+	},
+	{
+		"module": "modules.gestures.engine.test_gesture_click_retirement",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t27\t0"
+	},
+	{
+		"module": "modules.gestures.config.test_gesture_binding_transaction",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t10\t0"
+	},
+	{
+		"module": "modules.gestures.config.test_gesture_enable_transaction",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t6\t0"
+	},
+	{
+		"module": "modules.gestures.config.test_gestures_manager_gesture_parameter_binding",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t96\t0"
+	},
+	{
+		"module": "modules.gestures.actions.test_workspace_switcher",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t14\t0"
+	},
+	{
+		"module": "modules.gestures.actions.test_system_actions",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t21\t0"
+	},
+	{
+		"module": "ui.menu.shortcuts.test_gesture_conflicts",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t37\t0"
+	}
+]

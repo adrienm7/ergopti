@@ -1,0 +1,3 @@
+REPRO: reconcile reports stop but new observer identity prevents native retry; stopping, capture_stop=1, restores=0
+CONTROL: owner.stop() retries original retained capture successfully; stopped, capture_stop=2, restores=1
+REFUTATION: ordinary deferred settlement notifies original callback, stops and restores without retry

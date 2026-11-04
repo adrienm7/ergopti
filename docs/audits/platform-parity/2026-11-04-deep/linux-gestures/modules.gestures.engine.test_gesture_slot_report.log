@@ -1,0 +1,13 @@
+
+=== gesture slot report: what the hardware cannot reach ===
+  ok   names each unreachable slot on a three-finger pad, sorted
+  ok   separates the bound unreachable slots
+  ok   reports nothing unreachable when the count is unknown
+  ok   names the bound two-finger slots and only those
+  ok   knows the nine two-finger slots by name
+
+=== gesture slot report: starting the reader names the slots ===
+  ok   (gesture-slot-report) a bound four-finger swipe on a three-finger pad is named
+  ok   (gesture-slot-report) a bound two-finger swipe is named as competing with scrolling
+  ok   (gesture-slot-report) nothing bound and every slot reachable says nothing more
+AUDIT_TEST_RESULT	8	0
