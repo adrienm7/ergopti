@@ -558,6 +558,16 @@ helpers.describe("Linux system actions", function()
 		helpers.assert_eq(leftover, "0", "the temporary capture is removed")
 	end)
 
+	helpers.it("keeps the clipboard when OCR finds no text", function()
+		local log, dir = run_with_stubs(backgrounded(Gestures, "ocr_screenshot"), {
+			slurp = 'echo "10,10 50x20"',
+			grim = 'for last; do :; done; printf PNG > "$last"',
+			tesseract = 'case "$1" in --list-langs) printf "List:\neng\n";; *) exit 0;; esac',
+			["wl-copy"] = 'cat > "$STUBS/clipboard"',
+		})
+		helpers.assert_nil(io.open(dir .. "/clipboard", "rb"), "empty OCR must not clear the clipboard: " .. log)
+	end)
+
 	for _, signal in ipairs({ "HUP", "INT", "TERM" }) do
 		helpers.it("cleans the private OCR image on SIG" .. signal, function()
 			local command = 'TMPDIR="$STUBS"; export TMPDIR; ' .. backgrounded(Gestures, "ocr_screenshot")

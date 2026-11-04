@@ -534,6 +534,7 @@ local OCR_COMMAND = '( d=$(mktemp -d "${TMPDIR:-/tmp}/ergopti-ocr.XXXXXXXX") || 
 	.. "; } && [ -s \"$f\" ]"
 	.. " && langs=$(tesseract --list-langs 2>/dev/null | tail -n +2 | grep -vx osd | tr '\\n' '+')"
 	.. " && text=$(tesseract \"$f\" - ${langs:+-l \"${langs%+}\"} 2>/dev/null)"
+	.. " && [ -n \"$text\" ]"
 	.. " && { printf '%s' \"$text\" | wl-copy 2>/dev/null || printf '%s' \"$text\" | xclip -selection clipboard; };"
 	.. " )"
 
