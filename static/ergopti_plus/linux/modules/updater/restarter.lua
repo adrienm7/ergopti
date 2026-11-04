@@ -66,15 +66,17 @@ function M.under_unit(cgroup)
 	if type(cgroup) ~= "string" then return nil end
 	-- A similarly named scope or service cannot restart this process. Match an
 	-- exact ancestor in either hierarchy format, including delegated subgroups.
+	local seen, matched = false, false
 	for line in cgroup:gmatch("[^\n]+") do
 		local path = line:match("^%d+:[^:]*:(/.*)$")
-		if path then
-			for component in path:gmatch("[^/]+") do
-				if component == M.UNIT then return true end
-			end
+		if not path then return nil end
+		seen = true
+		for component in path:gmatch("[^/]+") do
+			if component == M.UNIT then matched = true end
 		end
 	end
-	return false
+	if not seen then return nil end
+	return matched
 end
 
 --- The detached relay command for a daemon not run by systemd.
@@ -174,7 +176,7 @@ function M.restart(opts)
 	local function dispatch()
 		local under_unit = M.under_unit(opts.cgroup)
 		if under_unit == nil then
-			Logger.error(LOG, "Own cgroup unreadable — restart route cannot be determined.")
+			Logger.error(LOG, "Own cgroup unavailable or invalid — restart route cannot be determined.")
 			return nil
 		end
 		if under_unit then

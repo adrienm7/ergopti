@@ -221,6 +221,22 @@ helpers.describe("updater restart: starting the installed version", function()
 		if not ok then error(detail, 0) end
 	end)
 
+	helpers.it("(restart-cgroup-invalid) refuses empty or malformed cgroup records", function()
+		for _, cgroup in ipairs({ "", "invalid", "0::relative\n", UNIT_CGROUP .. "broken\n" }) do
+			local calls = 0
+			helpers.assert_nil(Restarter.under_unit(cgroup), "invalid native records cannot identify the route")
+			local how = Restarter.restart({ wrapper = "/x", args = {}, cgroup = cgroup, pid = 4242,
+				start_tick = "1337", run = function() calls = calls + 1; return true end })
+			helpers.assert_nil(how)
+			local daemon = helpers.load_module("infra.daemon_restart")
+			local outer = daemon.restart({ reason = "test", args = {}, cgroup = cgroup,
+				installation = function() return { kind = "standalone", wrapper = "/x" } end,
+				run = function() calls = calls + 1; return true end })
+			helpers.assert_nil(outer)
+			helpers.assert_eq(calls, 0)
+		end
+	end)
+
 	helpers.it("(restart-relay-pid-reuse) refuses relay dispatch without a valid start tick", function()
 		local calls = 0
 		local how = Restarter.restart({ wrapper = "/x", cgroup = TERMINAL_CGROUP, pid = 4242,
