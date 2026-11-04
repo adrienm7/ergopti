@@ -491,3 +491,23 @@ Consequence: The UI says no errors today despite an accepted warning, or opens a
 Regression: Six isolated owned native logger children cover main/errors, genuine native sharing denial with retained exactly-once retry, and an explicitly controlled busy-owner observation. Launch reads the genuine file at the action boundary and requires the warning; notification must remain unused. Existing resolver action tests isolate their own logger queues. Native Windows execution is pending; the original failure is source-derived.
 
 The ongoing register now contains **33 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native qualification checkpoint: 41881570724
+
+The Windows replay at commit `29a2f9066820f996a7780213d9584f9bbcb37fc8`
+completed production-entry compilation and native hotstring E2E successfully.
+Its 39 selected cases passed 36 individually; the reversed run reproduced exactly
+the same three failures. All six WPM recovery cases, the cold locale cache case,
+the native model sort case, the two environment override cases, the processor
+socket cases, PAC encoding, parser limits and error-dialog retirement passed.
+
+The failures were regression-oracle errors, not accepted production passes:
+native model refusal/paused cases indexed the raw text returned by ReadTomlFile
+instead of an uncached parsed TOML map; the keyboard-only keep-awake case demanded
+a movement timer that it intentionally never arms. Commits `010fb95` and
+`c4b855e` correct these oracles while retaining the business assertions.
+
+The next replay selects those three failed cases, the eleven token-status
+regressions, six buffered-log owner cases and three existing log-opener controls.
+That later selection has not yet produced a native verdict at this checkpoint.
+The registry remains at **33 distinct new findings**, not 1,000.
