@@ -76,11 +76,15 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 		local h2 = harness({ reset_grant = function() return false end })
 		h2.wait.start(h2.opts)
 		helpers.assert_true(h2.index("prompt") ~= nil and h2.index("settings") ~= nil)
+		h2.trusted = true
+		h2.ticks()
+		helpers.assert_true(h2.index("trusted") ~= nil, "a refused reset must not block a later grant")
 	end)
 
 	helpers.it("resumes the boot once trusted, exactly once, and closes the banner", function()
 		local h = harness()
 		h.wait.start(h.opts)
+		h.reset_done(true)
 		h.ticks()
 		helpers.assert_eq(h.index("trusted"), nil, "no resume while untrusted")
 		h.trusted = true
@@ -92,6 +96,21 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 		helpers.assert_eq(h.cancelled, "timer")
 		helpers.assert_true(h.index("close") < h.index("trusted"), "banner closes before the boot resumes")
 		helpers.assert_eq(h.wait.is_waiting(), false)
+	end)
+
+	helpers.it("waits for the grant reset before resuming a trusted boot (accessibility-reset-race)", function()
+		local h = harness()
+		h.wait.start(h.opts)
+		h.trusted = true
+		h.ticks()
+		helpers.assert_nil(h.index("trusted"), "an in-flight reset can still revoke this grant")
+		h.reset_done(true)
+		h.trusted = false
+		h.ticks()
+		helpers.assert_nil(h.index("trusted"), "the reset revoked the previously observed grant")
+		h.trusted = true
+		h.ticks()
+		helpers.assert_true(h.index("trusted") ~= nil)
 	end)
 
 	helpers.it("gives up with the elapsed time at the deadline", function()
@@ -115,6 +134,7 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 	helpers.it("shows the steps again each time ErgoptiPlus is reopened while waiting", function()
 		local h = harness()
 		h.wait.start(h.opts)
+		h.reset_done(true)
 		local function shown()
 			local count = 0
 			for _, e in ipairs(h.events) do if e == "show" then count = count + 1 end end
