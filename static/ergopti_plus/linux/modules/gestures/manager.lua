@@ -485,8 +485,10 @@ local OPEN_LOG = {
 -- failed. Stage the PNG privately so a failed or empty capture cannot erase the
 -- clipboard or stop the fallback cascade.
 local function screenshot_to_clipboard(capture, writer)
-	return '{ f=$(mktemp --suffix=.png) && { ' .. capture .. ' "$f" && [ -s "$f" ] && '
-		.. writer .. ' < "$f"; r=$?; rm -f "$f"; [ "$r" -eq 0 ]; }; }'
+	return '( d=$(mktemp -d "${TMPDIR:-/tmp}/ergopti-screenshot.XXXXXXXX") || exit 1; '
+		.. [=[f="$d/capture.png"; trap 'rm -f "$f"; rmdir "$d"' 0; ]=]
+		.. [=[trap 'exit 1' HUP INT TERM; ]=] .. capture .. ' "$f" && [ -s "$f" ] && '
+		.. writer .. ' < "$f" )'
 end
 
 local SCREENSHOT_COMMANDS = {
