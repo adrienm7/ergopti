@@ -450,6 +450,9 @@ between workers) green alone. All live checks pass, typed by the harness.
 - **Field report.** `field/win-2026-11-01-dev` ran with no driver; run it again with one.
 - **Signing follow-ups.** Delete `.github/ci/stable_windows_signing_exception.json` once SignPath is configured; flip
   update enforcement to `required` after the `off` release. The relay exe and the vendor binaries are unsigned.
+- **Hotstring word start, follow-ups of 4a91f19d1c.** The preview bubble still finds the typed word with the old
+  boundary list (`hotstring_match.ahk`); move it to `_HSE_CharOpensWord`. The boundary check rebuilds its list on
+  every call (about 30 µs per key); build it once per delimiter change.
 - **Older findings.** The seven "Remaining findings" of
   [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 36 updater production coupling (the
   first trusted PowerShell host acquisition); a408a29790 (the four longest AHK unit shards split) was never landed.
