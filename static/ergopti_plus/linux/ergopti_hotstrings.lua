@@ -593,6 +593,11 @@ local function parse_args()
 	local i = 1
 	while i <= #arg do
 		local a = arg[i]
+		if a == "--config" or a == "--device" or a == "--layout" or a == "--keymap" then
+			if type(arg[i + 1]) ~= "string" or arg[i + 1] == "" or arg[i + 1]:match("^%-%-") then
+				error("Missing value for " .. a, 0)
+			end
+		end
 		if     a == "--dry-run"               then opts.dry_run = true
 		elseif a == "--verbose" or a == "-v"  then opts.verbose = true
 		elseif a == "--tray"                  then opts.tray    = true
