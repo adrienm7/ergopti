@@ -121,7 +121,7 @@ function M.get_config_dir()
 		return M.default_config_dir()
 	end
 	local configured = Storage.get(CONFIG_DIR_STORAGE_KEY, nil)
-	if type(configured) ~= "string" or configured:sub(1, 1) ~= "/" then
+	if type(configured) ~= "string" or configured:sub(1, 1) ~= "/" or configured:find("\0", 1, true) then
 		return M.default_config_dir()
 	end
 	if configured:match("^/+$") then return "/" end

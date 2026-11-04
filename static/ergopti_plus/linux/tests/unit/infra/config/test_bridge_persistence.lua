@@ -554,6 +554,15 @@ end)
 
 
 helpers.describe("configuration filesystem root persistence", function()
+	helpers.it("linux-config-invalid-stored-path: refuses embedded NUL in persisted override", function()
+		local saved_storage = package.loaded["adapters.storage"]
+		package.loaded["adapters.storage"] = { get = function() return "/tmp\0/other" end }
+		local paths = require("infra.config_paths")
+		local ok, actual = pcall(paths.get_config_dir)
+		package.loaded["adapters.storage"] = saved_storage
+		helpers.assert_true(ok)
+		helpers.assert_eq(actual, paths.default_config_dir(), "a corrupt override must not reach native path APIs")
+	end)
 	for _, selected in ipairs({ "/", "///" }) do
 		helpers.it("linux-config-root: selected root survives bootstrap storage: " .. selected, function()
 			local saved_storage, saved_paths = package.loaded["adapters.storage"], package.loaded["infra.config_paths"]
