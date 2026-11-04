@@ -41,6 +41,11 @@ for arg in "$@"; do
 		uid="$(id -u)"
 		groups=" $(id -nG "$uid") "
 		if [[ "$groups" != *' input '* || "$groups" != *' uinput '* ]]; then
+			if ! command -v pkexec >/dev/null 2>&1; then
+				export ERGOPTI_MISSING_PROGRAM=pkexec
+				printf '%s\n' 'missing-program pkexec' >&2
+				break
+			fi
 			status=0
 			diagnostic="$(pkexec /bin/bash "$DRIVER_ROOT/install/setup_permissions.sh" --user "$uid" 2>&1 >/dev/null)" || status=$?
 			if [ -n "$diagnostic" ]; then printf '%s\n' "$diagnostic" >&2; fi

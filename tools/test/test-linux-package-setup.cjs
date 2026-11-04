@@ -428,6 +428,12 @@ fi`
 	);
 	assert.match(launched.stderr, /missing-program getent/);
 	fs.unlinkSync(daemonReceipt);
+	fs.unlinkSync(path.join(bare, 'pkexec'));
+	const noPkexec = withoutGetent('install/launch.sh', '--tray');
+	assert.equal(noPkexec.status, 0, noPkexec.stderr);
+	assert.equal(fs.readFileSync(daemonReceipt, 'utf8').trim(), 'pkexec');
+	assert.match(noPkexec.stderr, /missing-program pkexec/);
+	fs.unlinkSync(daemonReceipt);
 	bareStub('pkexec', 'exit 126');
 	const cancelled = withoutGetent('install/launch.sh', '--tray');
 	assert.equal(cancelled.status, 78, 'a cancelled authorization still stops the launch');
