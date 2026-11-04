@@ -242,7 +242,7 @@ local function open_window()
 		return false
 	end
 	-- The close hook normally clears the old request, but can admit a new one.
-	if _pending ~= nil and _pending ~= record then return false end
+	if (_pending ~= nil and _pending ~= record) or not M.is_enabled() then return false end
 	_busy, _pending = true, record
 	local opened = manager.show(APP, require("infra.i18n").get_locale())
 	-- Native callbacks may close this request and open a successor before show returns.

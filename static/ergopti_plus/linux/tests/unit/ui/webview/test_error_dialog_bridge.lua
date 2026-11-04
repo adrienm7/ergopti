@@ -283,6 +283,22 @@ helpers.describe("error window bridge (linux): policy and deferral (error-dialog
 		end)
 	end)
 
+	helpers.it("(error-dialog-open-owner) disabling during old window close cancels the pending opening", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			context.epoch = 1
+			context.on_hide = function()
+				context.on_hide = nil
+				bridge.on_window_closed(1)
+				helpers.assert_true(bridge.set_enabled(false))
+			end
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			helpers.assert_eq(context.shown, 0)
+			helpers.assert_eq(#context.notified, 0)
+		end)
+	end)
+
 	helpers.it("(error-dialog-close-refusal) retains the report until its window closes", function()
 		with_bridge(nil, function(bridge, context)
 			bridge.init()
