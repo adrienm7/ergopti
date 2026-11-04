@@ -14,7 +14,7 @@ local OWNERS = { "adapters.wake_watcher", "infra.logger" }
 
 --- Runs a fresh wake adapter over independently observable native watcher state.
 --- @param callback function Receives the adapter and native watcher inventory.
-local function with_adapter(callback)
+local function with_adapter(callback, options)
 	return helpers.with_stub_scope(OWNERS, function()
 		local natives = {}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -26,11 +26,13 @@ local function with_adapter(callback)
 					function native:start()
 						self.starts = self.starts + 1
 						self.running = true
+						if options and options.start_error then error("start interrupted") end
 						return self
 					end
 					function native:stop()
 						self.stops = self.stops + 1
 						if self.stop_error then error("stop interrupted") end
+						if options and options.stop_refused then return false end
 						self.running = false
 						return self
 					end
@@ -44,6 +46,27 @@ local function with_adapter(callback)
 end
 
 helpers.describe("wake watcher lifecycle", function()
+	helpers.it("retains partial activation until its exact rollback succeeds (wake-start-rollback)", function()
+		local options = { start_error = true, stop_refused = true }
+		with_adapter(function(Adapter, natives)
+			local calls = 0
+			local watcher = Adapter.new(function() calls = calls + 1 end)
+			helpers.assert_eq(watcher.start(), false)
+			helpers.assert_eq(natives[1].stops, 1, "a failed start must roll back the exact watcher")
+			helpers.assert_eq(watcher.start(), false, "a refused stop must block a replacement")
+			helpers.assert_eq(#natives, 1)
+			natives[1].deliver(WAKE)
+			helpers.assert_eq(calls, 0)
+			options.stop_refused = false
+			helpers.assert_eq(watcher.stop(), true)
+			helpers.assert_eq(natives[1].running, false)
+			options.start_error = false
+			helpers.assert_eq(watcher.start(), true)
+			helpers.assert_eq(#natives, 2)
+			helpers.assert_eq(watcher.stop(), true)
+		end, options)
+	end)
+
 	helpers.it("revokes queued callbacks before stop and restart (wake-watcher-revocation)", function()
 		with_adapter(function(Adapter, natives)
 			local calls = 0

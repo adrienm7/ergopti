@@ -38,7 +38,7 @@ local LOG           = "menu.keyboard_layout"
 local USER_LAYOUTS_DIR   = os.getenv("HOME") and (os.getenv("HOME") .. "/Library/Keyboard Layouts/") or "~/Library/Keyboard Layouts/"
 local SYSTEM_LAYOUTS_DIR = "/Library/Keyboard Layouts/"
 
--- highest_installed(dir) result and directory revision, keyed by directory.
+-- Installed bundle names and directory revision, keyed by directory.
 local _installed_cache = {}
 -- pick_latest_bundle(dir) result and directory revision, keyed by directory.
 local _latest_bundle_cache = {}
@@ -238,26 +238,20 @@ end
 local function find_installed_bundles(dir)
 	local out = {}
 	if type(dir) ~= "string" or dir == "" then return out end
-	-- shell_quote, not %q: the sibling function 60 lines down already documents
-	-- why (%q escapes for a Lua literal and leaves $, backticks and ! live for
-	-- /bin/sh), and every path reaching here is user-configurable.
-	local cmd = string.format("ls -1 %s 2>/dev/null", text_utils.shell_quote(dir))
-	local p = io.popen(cmd)
-	if not p then return out end
-	local dir_with_slash = NativePath.with_trailing_separator(dir)
-	for raw_line in p:lines() do
-		local line = raw_line:gsub("[\r\n]+$", "")
-		if line:match("^Ergopti_v[%d%.]+%.bundle$") then
-			local v = parse_version(line)
-			local info_plist = dir_with_slash .. line .. "/Contents/Info.plist"
-			local plist_ok = v and path_exists(info_plist)
-			Logger.debug(LOG, "Bundle probe — dir=%s name=%s plist_exists=%s.", dir, line, tostring(plist_ok))
-			if plist_ok then
-				out[#out + 1] = { name = line, version = v }
-			end
-		end
+	local revision = directory_revision(dir)
+	local hit, names = read_revision_cache(_installed_cache, dir, revision)
+	if not hit then
+		names = list_bundles(dir)
+		publish_revision_cache(_installed_cache, dir, revision, names)
 	end
-	p:close()
+	local dir_with_slash = NativePath.with_trailing_separator(dir)
+	for _, name in ipairs(names) do
+		local v = parse_version(name)
+		local info_plist = dir_with_slash .. name .. "/Contents/Info.plist"
+		local plist_ok = v and path_exists(info_plist)
+		Logger.debug(LOG, "Bundle probe — dir=%s name=%s plist_exists=%s.", dir, name, tostring(plist_ok))
+		if plist_ok then out[#out + 1] = { name = name, version = v } end
+	end
 	return out
 end
 
@@ -266,16 +260,15 @@ end
 --- @return table|nil { name = string, version = table } or nil if none.
 local function highest_installed(dir)
 	if type(dir) ~= "string" or dir == "" then return nil end
-	local revision = directory_revision(dir)
-	local hit, cached = read_revision_cache(_installed_cache, dir, revision)
-	if hit then return cached or nil end
+	-- The parent listing does not change when a plist is added or removed inside
+	-- an existing bundle. Recheck each candidate while retaining the cheap cached
+	-- name listing, so no new directory-listing subprocess is needed.
 	local best
 	for _, entry in ipairs(find_installed_bundles(dir)) do
 		if not best or version_gt(entry.version, best.version) then
 			best = entry
 		end
 	end
-	publish_revision_cache(_installed_cache, dir, revision, best)
 	return best
 end
 
