@@ -883,7 +883,7 @@ _WSC_RecognizedSource(Mode) {
 		if Mode == "legacy-comment-control"
 			Source := '; legacy = "unterminated comment quote`n' . Source
 		if Mode == "legacy-inline-comment-control"
-			Source := StrReplace(Source, 'char = "("', 'char = "(" ; legacy inline note')
+			Source := StrReplace(Source, 'char = "("', 'char = "("' . " " . Chr(59) . " legacy inline note")
 		AssertTrue(FSWriteCreateDurable(Path, Source))
 		Initialized := WrapSymbols_Init(Root . "\")
 		if Mode == "bad-disabled-type" || Mode == "bad-custom-type" {
