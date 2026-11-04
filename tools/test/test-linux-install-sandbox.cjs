@@ -112,18 +112,28 @@ function runInstaller(scenario) {
 		'systemctl',
 		`${log}\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service disabled enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
 	);
-	if (scenario.refuseUnitPublish || scenario.refuseLauncherPublish) {
+	if (
+		scenario.refuseUnitPublish ||
+		scenario.refuseLauncherPublish ||
+		scenario.refuseAutostartPublish
+	) {
 		const destination = scenario.refuseUnitPublish
 			? '*/ergopti-hotstrings.service'
-			: '*/bin/ergopti-hotstrings';
+			: scenario.refuseLauncherPublish
+				? '*/bin/ergopti-hotstrings'
+				: '*/ergopti-hotstrings.desktop';
 		stub(
 			stubs,
 			'mv',
 			`for arg in "$@"; do case "$arg" in ${destination}) exit 1 ;; esac; done\nexec /usr/bin/mv "$@"`
 		);
 	}
-	if (scenario.refuseUnitMode || scenario.refuseLauncherMode) {
-		const temporary = scenario.refuseUnitMode ? '*/.ergopti-service.*' : '*/.ergopti-launcher.*';
+	if (scenario.refuseUnitMode || scenario.refuseLauncherMode || scenario.refuseAutostartMode) {
+		const temporary = scenario.refuseUnitMode
+			? '*/.ergopti-service.*'
+			: scenario.refuseLauncherMode
+				? '*/.ergopti-launcher.*'
+				: '*/.ergopti-autostart.*';
 		stub(
 			stubs,
 			'chmod',
@@ -196,7 +206,10 @@ function runInstaller(scenario) {
 			(scenario.refuseUnitWrite
 				? 'printf() { if [[ "$1" = "%s\\n" && "${2:-}" = ExecStart=* ]]; then return 1; fi; builtin printf "$@"; }\n'
 				: '') +
-			(scenario.refuseLauncherWrite ? 'cat() { return 1; }\n' : '')
+			(scenario.refuseLauncherWrite ? 'cat() { return 1; }\n' : '') +
+			(scenario.refuseAutostartWrite
+				? 'cat() { local target; target="$(readlink "/proc/$$/fd/1")"; [[ "$target" = */.ergopti-autostart.* ]] && return 1; command cat "$@"; }\n'
+				: '')
 	);
 	env.TEST_STUBS = bashPath(stubs);
 	env.BASH_ENV = bashPath(bashEnvironment);
@@ -768,6 +781,36 @@ for (const kind of [
 		);
 		assert.notEqual(modified.status, 0, 'a modified service must not be claimed');
 		assert.match(fs.readFileSync(unit, 'utf8'), /# user modification/);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A failed XDG generation, chmod or publication leaves the previous entry complete.
+for (const fault of ['refuseAutostartWrite', 'refuseAutostartMode', 'refuseAutostartPublish']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		[fault]: true,
+		seed(home, configRoot) {
+			const file = path.join(configRoot, 'autostart/ergopti-hotstrings.desktop');
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(
+				file,
+				`Exec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\n# previous\n`
+			);
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0);
+		const directory = path.join(run.configRoot, 'autostart');
+		assert.match(
+			fs.readFileSync(path.join(directory, 'ergopti-hotstrings.desktop'), 'utf8'),
+			/# previous/
+		);
+		assert.equal(
+			fs.readdirSync(directory).filter((name) => name.startsWith('.ergopti-autostart.')).length,
+			0
+		);
 	} finally {
 		run.cleanup();
 	}
