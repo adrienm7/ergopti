@@ -180,10 +180,8 @@ load_sources = function()
 	local ok_paths, Paths = pcall(require, "infra.paths")
 	local path = ok_paths and Paths.shared("modules/updater/defaults.json") or nil
 	if not path then return nil, "shared updater defaults path is unavailable" end
-	local handle = io.open(path, "rb")
-	if not handle then return nil, "shared updater defaults are unreadable" end
-	local raw = handle:read("*a")
-	handle:close()
+	local raw, status = require("toml_codec.writer").read_classified(path)
+	if status ~= "ok" then return nil, "shared updater defaults are unreadable" end
 	local ok_json, decoded = pcall(Json.decode, raw)
 	if not ok_json then return nil, "shared updater defaults are not valid JSON" end
 	local sources, err = ReleaseSources.resolve(decoded)
