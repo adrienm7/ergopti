@@ -459,6 +459,35 @@ helpers.describe("run_apple_shortcut runs a library shortcut through its owner (
 		end)
 	end)
 
+	helpers.it("reports a synchronous discovery refusal only once for an action", function()
+		with_world(function(world)
+			world.hold_list = true
+			world.raise_timer = true
+			local outcomes = {}
+			world.Shortcut.run(shortcut(), "gestures", 500, function(ok, reason)
+				outcomes[#outcomes + 1] = { ok, reason }
+			end)
+			helpers.assert_eq(#world.notices, 1, "the callback and false return describe one refusal")
+			helpers.assert_eq(outcomes, { { false, "query_refused" } })
+		end)
+	end)
+
+	helpers.it("reports a synchronous revalidation refusal only once for an action", function()
+		with_world(function(world)
+			world.library = { { id = SHORTCUT_ID, name = "Resize Image" } }
+			world.before_list = function()
+				world.hold_list = true
+				world.raise_timer = true
+			end
+			local outcomes = {}
+			world.Shortcut.run(shortcut(), "gestures", 500, function(ok, reason)
+				outcomes[#outcomes + 1] = { ok, reason }
+			end)
+			helpers.assert_eq(#world.notices, 1)
+			helpers.assert_eq(outcomes, { { false, "query_refused" } })
+		end)
+	end)
+
 	helpers.it("pausing its parent cancels a run without a later notice", function()
 		with_world(function(world)
 			world.library = { { id = SHORTCUT_ID, name = "Resize Image" } }
