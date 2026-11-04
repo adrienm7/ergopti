@@ -335,6 +335,34 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 		helpers.assert_eq({ showing = showing, expired = expired }, { showing = true, expired = 0 })
 	end)
 
+	for _, action in ipairs({ "hide", "note_covered", "destroy" }) do
+	helpers.it("(preview-cancel-reentry) keeps a replacement opened during " .. action, function()
+		local preview, hidden, again = nil, 0, false
+		local candidate = { { replacement = "text", group = "rolls", fires = true } }
+		replace("adapters.timer_scheduler", {
+			after = function() return { armed = true } end,
+			cancel = function()
+				if not again then again = true; preview.show(candidate, "autocorrect") end
+				return true
+			end,
+		})
+		replace("adapters.graphics_renderer", {
+			is_available = function() return true end, show = function() return true end,
+			hide = function() hidden = hidden + 1; return true end,
+			destroy = function() hidden = hidden + 1; return true end,
+		})
+		package.loaded["ui.tooltip.preview"] = nil
+		preview = require("ui.tooltip.preview")
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function() return { delay = 0.25, show_tooltip = true } end } })
+		assert(preview.show(candidate, "autocorrect")); preview[action]()
+		local showing = preview.is_showing()
+		package.loaded["ui.tooltip.preview"] = nil
+		restore()
+		helpers.assert_eq({ showing = showing, hidden = hidden }, { showing = true, hidden = 0 })
+	end)
+	end
+
 	helpers.it("(preview-destroy-expiry) retires its timer and rows before a new owner draws", function()
 		local scheduler = Fakes.timer_scheduler()
 		local hidden, expired = 0, 0
