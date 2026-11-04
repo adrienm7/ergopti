@@ -50,6 +50,7 @@ local M = {}
 local Logger = require("infra.logger")
 local EmergencyExit = require("infra.emergency_exit")
 local ErrorDescription = require("error_description")
+local NumberPolicy = require("number_policy")
 
 local LOG = "infra.termination_coordinator"
 
@@ -839,11 +840,11 @@ function M.init(deps)
 		Logger.error(LOG, "M.init(): optional record_stage must be a function.")
 		return false
 	end
-	if type(deps.user_exit_deadline_seconds) ~= "number" or deps.user_exit_deadline_seconds <= 0 then
+	if NumberPolicy.timer_delay_ms(deps.user_exit_deadline_seconds) == nil or deps.user_exit_deadline_seconds <= 0 then
 		Logger.error(LOG, "M.init(): user_exit_deadline_seconds must be a positive number.")
 		return false
 	end
-	if type(deps.reload_deadline_seconds) ~= "number" or deps.reload_deadline_seconds <= 0 then
+	if NumberPolicy.timer_delay_ms(deps.reload_deadline_seconds) == nil or deps.reload_deadline_seconds <= 0 then
 		Logger.error(LOG, "M.init(): reload_deadline_seconds must be a positive number.")
 		return false
 	end

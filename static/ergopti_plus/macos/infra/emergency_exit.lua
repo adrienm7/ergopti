@@ -20,6 +20,7 @@ local M = {}
 
 local Logger = require("infra.logger")
 local ErrorDescription = require("error_description")
+local NumberPolicy = require("number_policy")
 
 local LOG = "infra.emergency_exit"
 
@@ -60,7 +61,7 @@ function M.request(options)
 		or nil
 	if type(options) ~= "table"
 		or type(options.reason) ~= "string" or options.reason == ""
-		or type(options.deadline_seconds) ~= "number" or options.deadline_seconds <= 0
+		or NumberPolicy.timer_delay_ms(options.deadline_seconds) == nil or options.deadline_seconds <= 0
 		or not is_exit_code(options.exit_code, 0)
 		or not is_exit_code(forced_exit_code, 1)
 		or type(options.schedule) ~= "function"

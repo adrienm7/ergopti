@@ -1143,6 +1143,8 @@ M.application = {
 	launchOrFocus = function(_) end,
 	open = function(_) end,
 	applicationsForBundleID = function(_) return {} end,
+	-- Hammerspoon returns nil when no bundle metadata can be resolved.
+	infoForBundlePath = function(_) return nil end,
 	applicationForPID = function(pid)
 		APPLICATION_QUERIES[#APPLICATION_QUERIES + 1] = pid
 		local active_watchers = 0
