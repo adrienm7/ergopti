@@ -143,14 +143,17 @@ GestureSystemRequestRefresh(*) {
 	SetTimer(_GestureSystemRefreshAndRebuild, -1)
 }
 
-_GestureSystemRefreshAndRebuild() {
+_GestureSystemRefreshAndRebuild(Read := 0, Rebuild := 0) {
 	State := GestureSystemState()
 	Before := State["ready"] ? State["slots"] : 0
-	GestureSystemRefresh()
-	; Without a prior snapshot no menu was built from one: the first build reads
-	; the registry itself.
-	if IsObject(Before) && !_GestureSystemSameSnapshot(Before, State["ready"] ? State["slots"] : 0)
-		RebuildTrayMenu()
+	GestureSystemRefresh(Read)
+	; A published menu can also have been built while the state was unverified.
+	if State["menu"] && !_GestureSystemSameSnapshot(Before, State["ready"] ? State["slots"] : 0) {
+		if IsObject(Rebuild)
+			Rebuild.Call()
+		else
+			RebuildTrayMenu()
+	}
 }
 
 ; True when two availability snapshots (or two "unverified" states) agree.
@@ -170,20 +173,32 @@ _GestureSystemSameSnapshot(A, B) {
 ; Ergopti's back (Windows Settings, another tool) shows in the next build, so a
 ; stale tray is closed and rebuilt once instead of showing a wrong row.
 GestureSystemOnInitPopup(Handle, *) {
+	_GestureSystemCheckPopup(Handle)
+}
+
+_GestureSystemCheckPopup(Handle, Read := 0, Cancel := 0, Schedule := 0) {
 	State := GestureSystemState()
 	if !State["menu"] || Handle != State["menu"]
 		return
 	try {
-		Fresh := GestureSystemReadSnapshot()
+		Fresh := GestureSystemReadSnapshot(Read)
 	} catch as Err {
 		LoggerError("gestures.status", "System gesture settings could not be read on menu open: {1}.", Err.Message)
-		return
+		Fresh := 0
 	}
 	if _GestureSystemSameSnapshot(State["ready"] ? State["slots"] : 0, Fresh)
 		return
 	LoggerInfo("gestures.status", "The system gesture settings changed since the menu was built; rebuilding it.")
-	TrayMenuCancelNavigation()
-	SetTimer(RebuildTrayMenu, -1)
+	if !IsObject(Fresh)
+		State["ready"] := false
+	if IsObject(Cancel)
+		Cancel.Call()
+	else
+		TrayMenuCancelNavigation()
+	if IsObject(Schedule)
+		Schedule.Call()
+	else
+		SetTimer(RebuildTrayMenu, -1)
 }
 
 ; Registers the open-time check once and remembers which HMENU it guards.
