@@ -658,6 +658,25 @@ helpers.describe("native adopted personal file gates", function()
 		end)
 	end)
 
+	helpers.it("(hotstrings-setting-validation) preserves real overrides on malformed edits", function()
+		fixture('[future]\nkeep = "exact unknown value"\n', function(f)
+			helpers.assert_eq(select(2, f.config.load_all()), true)
+			helpers.assert_eq(f.config.set_override("personal", nil, "color", "#123456"), true)
+			local path = f.root .. "/hotstrings_overrides.toml"
+			local before = Choices.read(path)
+			local previous = package.loaded["ui.hotstrings_config_window.bridge"]
+			package.loaded["ui.hotstrings_config_window.bridge"] = nil
+			local bridge = require("ui.hotstrings_config_window.bridge")
+			local ok, detail = pcall(function()
+				bridge.on_message({ action = "set_color", category = "personal", hex = "broken" }, { config = f.config })
+				bridge.on_message({ action = "set_priority", category = "personal", priority = 1.5 }, { config = f.config })
+			end)
+			package.loaded["ui.hotstrings_config_window.bridge"] = previous
+			helpers.assert_true(ok, tostring(detail))
+			helpers.assert_eq(Choices.read(path), before)
+		end)
+	end)
+
 	helpers.it("102 native refuses a held file owner after external source changes without settings publication", function()
 		fixture('[future]\nkeep = "exact unknown value"\n', function(f)
 			helpers.assert_eq(select(2, f.config.load_all()), true)
