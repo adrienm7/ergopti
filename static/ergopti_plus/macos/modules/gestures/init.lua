@@ -713,9 +713,15 @@ function M.set_mode(slot, mode)
 	return true
 end
 
-function M.get_sensitivity(slot)    return Sensitivity.coerce(CoreState.sensitivities[slot]) or M.DEFAULT_SENSITIVITY end
+local function default_sensitivity(slot)
+	return Sensitivity.coerce(M.DEFAULT_STATE.sensitivities[slot]) or M.DEFAULT_SENSITIVITY
+end
 
---- Stores a gesture sensitivity, failing closed to DEFAULT_SENSITIVITY when the
+function M.get_sensitivity(slot)
+	return Sensitivity.coerce(CoreState.sensitivities[slot]) or default_sensitivity(slot)
+end
+
+--- Stores a gesture sensitivity, falling back to the slot's manifest default when the
 --- value is outside the menu's supported range. A persisted config.toml / plist value can
 --- arrive as a string (hand edit, AHK migration, half-written plist); the engine
 --- divides by this (Geometry.incrementalSteps(abs(sd), sensitivity)) inside the gesture eventtap
@@ -735,9 +741,10 @@ function M.set_sensitivity(slot, s)
 		CoreState.sensitivities[slot] = n
 		Logger.debug(LOG, "Sensitivity['%s'] = %s.", tostring(slot), tostring(n))
 	else
-		CoreState.sensitivities[slot] = M.DEFAULT_SENSITIVITY
+		local fallback = default_sensitivity(slot)
+		CoreState.sensitivities[slot] = fallback
 		Logger.warn(LOG, "set_sensitivity('%s'): unsupported value %s — using default %s.",
-			tostring(slot), tostring(s), tostring(M.DEFAULT_SENSITIVITY))
+			tostring(slot), tostring(s), tostring(fallback))
 	end
 	return true
 end
