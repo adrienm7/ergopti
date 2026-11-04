@@ -66,6 +66,40 @@ helpers.describe("karabiner synchronous setters commit disk before live state", 
 		end)
 	end)
 
+	helpers.it("refuses invalid timing values before persisting (remap-timing-invalid)", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap()
+			local setters = {
+				{ remap.set_sticky_timeout, remap.get_sticky_timeout },
+				{ remap.set_tap_hold_timeout, remap.get_tap_hold_timeout },
+				{ remap.set_simultaneous_threshold, remap.get_simultaneous_threshold },
+			}
+			for _, pair in ipairs(setters) do
+				local original, before = pair[2](), calls.save
+				for _, value in ipairs({ 0.5, 1.5, math.huge, -math.huge, 0/0, 2^54 }) do
+					helpers.assert_eq(pair[1](value), false, "timeout must be a finite positive integer")
+					helpers.assert_eq(pair[2](), original)
+					helpers.assert_eq(calls.save, before, "invalid input must not reach persistence")
+				end
+			end
+		end)
+	end)
+
+	helpers.it("does not clear a per-key override for malformed values (remap-timing-invalid)", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap()
+			helpers.assert_true(remap.set_tap_timeout("left_shift", 321))
+			local before = calls.save
+			for _, value in ipairs({ "invalid", 0.5, 1.5, math.huge, -math.huge, 0/0, 2^54 }) do
+				helpers.assert_eq(remap.set_tap_timeout("left_shift", value), false)
+				helpers.assert_eq(remap.get_tap_timeout("left_shift"), 321)
+				helpers.assert_eq(calls.save, before)
+			end
+			helpers.assert_true(remap.set_tap_timeout("left_shift", 0), "zero intentionally clears the override")
+			helpers.assert_nil(remap.get_tap_timeout("left_shift"))
+		end)
+	end)
+
 	helpers.it("reset publishes all defaults together or preserves every prior value", function()
 		with_fixture(function(fixture)
 			local remap, calls = fixture.load_enabled_remap()

@@ -107,11 +107,11 @@ helpers.describe("remap source-bound full-document encoding", function()
 	for _, vector in ipairs({ { original = "-0.0", changed = "0.0" },
 		{ original = "0.0", changed = "-0.0" } }) do
 		helpers.it("publishes a changed owned floating-zero sign: " .. vector.original, function()
-			with_file("[tap_holds]\ntimeout_ms = " .. vector.original .. "\n", function(f)
-				f.state.tap_hold_timeout_ms = tonumber(vector.changed)
+			with_file("[tap_holds]\nlone_modifier_tap_max_ms = " .. vector.original .. "\n", function(f)
+				f.state.lone_modifier_tap_max_ms = tonumber(vector.changed)
 				helpers.assert_eq(f.config.save_user_config(f.state, f.path), true)
-				helpers.assert_contains(f.read(), "timeout_ms = " .. vector.changed .. "\n")
-				local value = f.codec.decode(f.read()).tap_holds.timeout_ms
+				helpers.assert_contains(f.read(), "lone_modifier_tap_max_ms = " .. vector.changed .. "\n")
+				local value = f.codec.decode(f.read()).tap_holds.lone_modifier_tap_max_ms
 				helpers.assert_eq(1 / value, 1 / tonumber(vector.changed))
 				if math.type then helpers.assert_eq(math.type(value), "float") end
 			end)
@@ -119,11 +119,11 @@ helpers.describe("remap source-bound full-document encoding", function()
 	end
 
 	helpers.it("publishes an explicit owned integer zero with its integer kind", function()
-		with_file("[tap_holds]\ntimeout_ms = 0.0\n", function(f)
-			f.state.tap_hold_timeout_ms = 0
+		with_file("[tap_holds]\nlone_modifier_tap_max_ms = 0.0\n", function(f)
+			f.state.lone_modifier_tap_max_ms = 0
 			helpers.assert_eq(f.config.save_user_config(f.state, f.path), true)
-			helpers.assert_contains(f.read(), "timeout_ms = 0\n")
-			helpers.assert_eq(math.type(f.codec.decode(f.read()).tap_holds.timeout_ms), "integer")
+			helpers.assert_contains(f.read(), "lone_modifier_tap_max_ms = 0\n")
+			helpers.assert_eq(math.type(f.codec.decode(f.read()).tap_holds.lone_modifier_tap_max_ms), "integer")
 		end)
 	end)
 

@@ -559,7 +559,9 @@ function M.capture(flags, parent)
 			stderr = stderr,
 			interactive = CaptureFlow.is_interactive(flags),
 			destination = "clipboard",
+			authorized = function() return operation_is_authorized(operation) end,
 		})
+		if not operation_is_authorized(operation) then return false end
 		return report_capture_outcome(operation, outcome, detail, target,
 			"shortcuts.screenshot_clipboard_failed")
 	end, "capture")

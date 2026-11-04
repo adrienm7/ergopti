@@ -13,6 +13,20 @@ local Editor = require("infra.toml.record_editor")
 local Codec = require("infra.toml.codec")
 
 helpers.describe("TOML record editor preserves bytes outside the mutation", function()
+	helpers.it("preserves trailing comments when replacing scalar or multiline values", function()
+		for _, entry in ipairs({
+			{'value = "old#text"  # keep\r\n', 'value = "new"  # keep\r\n'},
+			{'value = [\r\n  "old#text",\r\n] # keep\r\n', 'value = "new" # keep\r\n'},
+			{'value = "old#text"\r\n', 'value = "new"\r\n'},
+		}) do
+			local source = "[owned]\r\n" .. entry[1] .. "other = 2\r\n"
+			local patched = assert(Editor.patch_table_field(source, "[owned]", "value", '"new"'))
+			helpers.assert_eq(patched, "[owned]\r\n" .. entry[2] .. "other = 2\r\n")
+			local decoded = assert(Codec.decode(patched))
+			helpers.assert_eq(decoded.owned.value, "new")
+		end
+	end)
+
 	helpers.it("keeps an empty section unchanged when the requested field is absent", function()
 		local source = "[owned]\r\n# user context\r\n\r\n[next]\r\nvalue = 3\r\n"
 		local patched = assert(Editor.patch_table_field(source, "[owned]", "missing", nil,

@@ -532,6 +532,20 @@ helpers.describe("system_pixel parent scopes", function()
 			helpers.assert_eq(subject.copy_pixel_color(), true, "a later valid position can start a capture")
 		end
 	end)
+	helpers.it("does not copy an interactive capture after pause while loading the image", function()
+		local subject, fixture = fresh_pixel_owner()
+		local pause_result
+		hs.image.imageFromPath = function(path)
+			pause_result = subject.pause_pixel_actions()
+			return { path = path }
+		end
+		helpers.assert_eq(subject.interactive_screenshot(), true)
+		fixture.tasks[1]:deliver(0, "", "")
+		helpers.assert_eq(pause_result, false)
+		helpers.assert_eq(#fixture.clipboard_writes, 0)
+		helpers.assert_eq(#fixture.notifications, 0)
+		helpers.assert_eq(subject.has_pending_pixel_action(), false)
+	end)
 	for _, action in ipairs({ "copy_pixel_color", "interactive_screenshot" }) do
 		helpers.it(action .. " retains a file acquired during a reentrant pause", function()
 			local subject, fixture = fresh_pixel_owner()

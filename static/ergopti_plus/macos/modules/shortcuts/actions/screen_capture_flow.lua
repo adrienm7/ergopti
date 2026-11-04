@@ -293,7 +293,8 @@ function M.settle(capture)
 
 	if state == "image" then
 		if capture.destination ~= "clipboard" then return M.OUTCOME_SAVED end
-		local copied, copy_err = capture_adapter().copy_image_file_to_clipboard(capture.path)
+		if capture.authorized and capture.authorized() ~= true then return M.OUTCOME_CANCELLED end
+		local copied, copy_err = capture_adapter().copy_image_file_to_clipboard(capture.path, capture.authorized)
 		if copied then return M.OUTCOME_COPIED end
 		return M.OUTCOME_FAILED, "clipboard write not verified: " .. tostring(copy_err)
 	end

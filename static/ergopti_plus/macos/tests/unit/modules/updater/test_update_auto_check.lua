@@ -67,7 +67,11 @@ local function build(opts)
 		state = ctx.state,
 		save = function() ctx.saves = ctx.saves + 1; return opts.save_refused ~= true end,
 		channel = function() return ctx.channel end,
-		is_paused = function() return ctx.paused end,
+		is_paused = function()
+			if opts.pause_error then error("pause state unavailable") end
+			if opts.pause_unknown then return nil end
+			return ctx.paused
+		end,
 		on_available = function(release)
 			ctx.announced[#ctx.announced + 1] = release.tag
 			if ctx.notification_refusal == "throw" then error("notification unavailable") end
@@ -112,6 +116,23 @@ local function fire(ctx)
 end
 
 helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check", function()
+	helpers.it("does not check automatically while pause state is unknown", function()
+		for _, mode in ipairs({ "pause_error", "pause_unknown" }) do
+			local options = { now = T0, record = { seed = SEED }, defer = true }
+			options[mode] = true
+			local ctx = build(options)
+			helpers.assert_true(ctx.owner.start())
+			ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.requests, 0, "unknown pause state must not dispatch")
+			helpers.assert_nil(ctx.values[ctx.state_key].last_check_at)
+			helpers.assert_true(last_timer(ctx).armed, "pause read failures remain retryable")
+			options[mode] = false
+			ctx.clock.now = ctx.clock.now + ctx.timing.reevaluate_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.requests, 1, "the check resumes after pause state recovers")
+		end
+	end)
 	helpers.it("a retired timer cannot replace the current timer (updater-owner-boundary)", function()
 		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
 		helpers.assert_true(ctx.owner.start())
