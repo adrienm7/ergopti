@@ -704,7 +704,13 @@ function M.reload()
 		return false
 	end
 	local candidate = _engine
-	if _apply() then return true end
+	local applied, result = pcall(_apply)
+	if applied and result then return true end
+	if not applied then
+		-- A throwing hook cannot acknowledge which engine it retained.
+		_installed_engine = nil
+		Logger.error(LOG, "Tap-hold installation failed: %s.", tostring(result))
+	end
 	-- A refused hook operation can leave the previous engine installed, or it
 	-- can have removed it before a later operation failed. Keep the effective
 	-- configuration, while _installed_engine records which case actually held.
