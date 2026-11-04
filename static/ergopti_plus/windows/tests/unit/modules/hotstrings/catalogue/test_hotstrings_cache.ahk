@@ -684,3 +684,144 @@ TestHsCache_SharedSourceCustody() {
 	}
 }
 Test("hotstrings cache: callbacks preserve the admitted shared logger source", TestHsCache_SharedSourceCustody)
+
+; Canonical cache source-inventory regressions.
+; Production sources only. The test controls physical files and cold-load module
+; state, never replaces the cache parser, writer, freshness owner or registrar.
+_HSCI_Source(Trigger, Output) {
+	return '[[names]]`n"' . Trigger . '" = { output = "' . Output . '", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }`n'
+}
+
+_HSCI_ContainsNative(Trigger) {
+	global HSE_RegistryByGroup
+	for Key, Entries in HSE_RegistryByGroup
+		for Spec in Entries
+			if Spec.Trigger == Trigger
+				return true
+	return false
+}
+
+_HSCI_CurrentOwner(Mode) {
+	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
+	global _HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources
+	global _TomlFileCache, _TomlFileSectionCounts, _TomlCountCache
+	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS,
+		_HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources,
+		_TomlFileCache, _TomlFileSectionCounts, _TomlCountCache]
+	Root := A_Temp . "\ergopti_cache_inventory_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	try {
+		DirCreate(Root . "\modules\hotstrings")
+		Index := Root . "\modules\hotstrings\_index.toml"
+		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Index)
+		_SharedDir := Root
+		; Retain original memo contents independently; fixture reads still enter
+		; the genuine ReadTomlFile owner and generate their own native receipts.
+		_TomlFileCache := _TomlFileCache.Clone()
+		_TomlFileSectionCounts := _TomlFileSectionCounts.Clone()
+		_TomlCountCache := _TomlCountCache.Clone()
+		_HotstringsOverrides := Map(), HotstringGroupConfig := Map(), _HotstringBoundSources := Map()
+		HotstringsResolveBumpGen()
+		Paths := []
+		for Category in HotstringsBundledCategories() {
+			Path := _HotstringsCacheTomlPath(Category)
+			SplitPath(Path, , &Parent)
+			DirCreate(Parent)
+			if Category == "autocorrection"
+				AssertTrue(FSWriteCreateDurable(Path, Mode == "unbound-extension"
+					? _HSCI_Source("newcacheprobe", "New") : _HSCI_Source("oldcacheprobe", "Old")))
+			else
+				AssertTrue(FSWriteCreateDurable(Path, "# genuine empty declared source`n"))
+			Paths.Push(Path)
+			FileSetTime("20000101000000", Path, "M")
+		}
+		FileSetTime("20000101000000", Index, "M")
+		AssertTrue(_TomlFileCache.Has(Index), "the ordinary canonical index read must really populate its memo")
+		Source := _HotstringsCacheTomlPath("autocorrection")
+		Tsv := _HotstringsCacheTsvPath()
+		if Mode == "unbound-extension" {
+			ExtensionRoot := Root . "\extensions"
+			PackDir := ExtensionRoot . "\cacheprobe"
+			DirCreate(PackDir . "\hotstrings")
+			Manifest := '[extension]`nid = "cacheprobe"`nname = "Cache Probe"`nversion = "1.0.0"`n'
+				. '[extension.hotstring_bindings.words]`ncategory = "autocorrection"`nfeature_section = "hotstrings.autocorrection"`nsource = "common"`n'
+			AssertTrue(FSWriteCreateDurable(PackDir . "\manifest.toml", Manifest))
+			BoundPath := PackDir . "\hotstrings\words.toml"
+			AssertTrue(FSWriteCreateDurable(BoundPath, _HSCI_Source("oldcacheprobe", "Old")))
+			FileSetTime("20000101000000", BoundPath, "M")
+			; These are the genuine scanner and route producer used by Prepare.
+			; No binding receipt is manufactured by the fixture.
+			Packs := HotstringExtensions_Scan([ExtensionRoot])
+			AssertEqual(1, Packs.Length)
+			_HotstringBoundSources := HotstringExtensions_RouteBound(Packs)
+			AssertEqual(BoundPath, HotstringsBoundTomlPath("autocorrection"))
+		}
+		if Mode == "edited-during-build" {
+			; These are the exact production build and publish owners used by
+			; Ensure. The ordinary edit occupies their interruptible boundary.
+			Rows := _HotstringsCacheBuildRows()
+			AssertEqual("oldcacheprobe", Rows["autocorrection.names"][1][2])
+			AssertTrue(FSWriteDurable(Source, _HSCI_Source("newcacheprobe", "New")))
+			FileSetTime("20000102000000", Source, "M")
+			_HotstringsCacheWriteTsv(Tsv, Rows)
+		} else {
+			; First load follows the entire real Ensure production pipeline.
+			_HS_CACHE_ROWS := Map(), _HS_CACHE_LOADED := false, _GENERATED_HOTSTRINGS := Map()
+			HotstringsCacheEnsure()
+			AssertTrue(_HS_CACHE_ROWS.Has("autocorrection.names"))
+			if Mode != "unbound-extension"
+				AssertEqual("oldcacheprobe", _HS_CACHE_ROWS["autocorrection.names"][1][2])
+			if Mode == "deleted-source"
+				FileDelete(Source)
+			else if Mode == "unbound-extension" {
+				DirDelete(PackDir, true)
+				Packs := HotstringExtensions_Scan([ExtensionRoot])
+				AssertEqual(0, Packs.Length)
+				_HotstringBoundSources := HotstringExtensions_RouteBound(Packs)
+				AssertEqual("", HotstringsBoundTomlPath("autocorrection"))
+			}
+		}
+		AssertTrue(FileExist(Tsv) != "", "the real durable cache writer must have published a cache")
+		; Model an ordinary completed publication in a later clock second.
+		; No sleep or scheduler timing is used as evidence.
+		FileSetTime("20000103000000", Tsv, "M")
+		Fresh := _HotstringsCacheIsFresh(Tsv)
+		; Cold-load state is isolated exactly as on initial boot. This is an
+		; in-process production reload test, not a claim of OS-process restart.
+		_HS_CACHE_ROWS := Map(), _HS_CACHE_LOADED := false, _GENERATED_HOTSTRINGS := Map()
+		HotstringGroupConfig := Map()
+		HotstringsResolveBumpGen()
+		HSE_TestReset()
+		LoadHotstringsCategory("autocorrection", Map("names", Map("enabled", true)), Map("IsPrivate", true))
+		OldRegistered := _HSCI_ContainsNative("oldcacheprobe")
+		NewRegistered := _HSCI_ContainsNative("newcacheprobe")
+		DiskRows := _HotstringsCacheReadTsv(FileRead(Tsv, "UTF-8"))
+		if Mode == "live" {
+			AssertTrue(Fresh, "an unchanged complete source inventory retains the cache path")
+			AssertTrue(OldRegistered)
+			AssertFalse(NewRegistered)
+		} else {
+			AssertFalse(OldRegistered, "the actual production category owner must never register a removed/replaced rule")
+			if Mode != "unbound-extension"
+				AssertFalse(Fresh, "late TSV mtime cannot establish source-inventory identity")
+			if Mode == "edited-during-build" || Mode == "unbound-extension" {
+				AssertTrue(NewRegistered, "the actual rebuilt native registration must use authoritative edited content")
+				AssertEqual("newcacheprobe", DiskRows["autocorrection.names"][1][2])
+			} else {
+				AssertFalse(NewRegistered)
+				AssertFalse(DiskRows.Has("autocorrection.names"))
+			}
+		}
+	} finally {
+		HSE_TestReset()
+		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
+		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5], HotstringGroupConfig := Saved[6]
+		_HotstringBoundSources := Saved[7], _TomlFileCache := Saved[8]
+		_TomlFileSectionCounts := Saved[9], _TomlCountCache := Saved[10]
+		HotstringsResolveBumpGen()
+		HotstringsCommonCategories()
+		DirDelete(Root, true)
+	}
+}
+for _HSCI_Mode in ["live", "deleted-source", "edited-during-build", "unbound-extension"]
+	Test("hotstrings cache source inventory: " . _HSCI_Mode, _HSCI_CurrentOwner.Bind(_HSCI_Mode))
