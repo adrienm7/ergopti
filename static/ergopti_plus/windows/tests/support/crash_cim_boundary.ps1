@@ -31,10 +31,10 @@ function Get-CimInstance {
 			}
 		}
 		"Win32_Processor" {
-			return [pscustomobject]@{
-				Name = "CIM_SENTINEL_CPU"
-				NumberOfLogicalProcessors = 16
-			}
+			return @(
+				[pscustomobject]@{ Name = "CIM_SENTINEL_CPU"; NumberOfLogicalProcessors = 8 },
+				[pscustomobject]@{ Name = "CIM_SECOND_SOCKET"; NumberOfLogicalProcessors = 12 }
+			)
 		}
 		default { throw "Unexpected CIM class in crash fixture: $ClassName" }
 	}

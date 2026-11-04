@@ -421,3 +421,17 @@ Consequence: The child cannot receive the requested complete value and instead s
 Regression: After actual Map construction, authenticate its retained NUL value and require ValueError for leading, middle and trailing positions. A real native child control verifies exact Unicode, spaces and equals, empty-entry encoding, case-insensitive replacement and an unchanged parent environment.
 
 The ongoing register now contains **28 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-029: Crash reports count logical processors from only the first socket
+
+Severity: low. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+static/ergopti_plus/windows/vendor/ergopti_crash_worker.ps1 selects the first CIM processor; modules/diagnostics/crash_reporter.ahk:\_CrashReport_SysInfo likewise reads only the first WMI instance. NumberOfLogicalProcessors describes its current processor instance, not every socket.
+
+Reproduction: Collect CPU diagnostics from two Win32_Processor instances reporting8 and12 logical processors. The worker and legacy fallback report8 instead of the machine total20.
+
+Consequence: Multi-socket crash reports understate machine CPU capacity. The first model name remains a label; the logical processor count must aggregate all instances.
+
+Regression: The real isolated worker's existing CIM boundary now returns two heterogeneous8+12 sockets and requires20. The legacy aggregation helper tests the same total, first-name preservation, single socket and explicit rejection of empty or incomplete processor observations. Native Windows execution remains pending.
+
+The ongoing register now contains **29 distinct new findings**. The requested target of 1,000 remains unmet.

@@ -414,7 +414,7 @@ _CRWT_IndependentEnrichmentFaultsStillWrite() {
 				"the artifact must name the independently failed enrichment: " . Fault
 				. "; observed enrichment errors: " . Errors)
 			Healthy := Fault = "os"
-				? Map("cpu_name", "CIM_SENTINEL_CPU", "cpu_cores", "16")
+				? Map("cpu_name", "CIM_SENTINEL_CPU", "cpu_cores", "20")
 				: Map("os_build", "99001", "ram_total_gb", "32", "ram_free_gb", "12")
 			for Key, Expected in Healthy
 				AssertEqual(Expected, Result["report"][Key],
@@ -825,3 +825,23 @@ _CRWT_ControlTextThroughNativeWorker() {
 }
 Test("crash report JSON: native worker preserves control text (crash-json-control-native)",
 	_CRWT_ControlTextThroughNativeWorker)
+
+_CRWT_ProcessorSockets() {
+	Cpu := _CrashReport_ProcessorInfo([
+		{Name: " first socket ", NumberOfLogicalProcessors: 8},
+		{Name: "second socket", NumberOfLogicalProcessors: 12}
+	])
+	AssertEqual("first socket", Cpu["name"], "the first model name remains the diagnostic label")
+	AssertEqual(20, Cpu["cores"], "heterogeneous socket counts are summed rather than taking or multiplying the first")
+	Single := _CrashReport_ProcessorInfo([{Name: "single", NumberOfLogicalProcessors: 6}])
+	AssertEqual(6, Single["cores"])
+	for Processors in [[], [{Name: "invalid", NumberOfLogicalProcessors: 0}],
+		[{Name: "valid", NumberOfLogicalProcessors: 8}, {Name: "invalid", NumberOfLogicalProcessors: -1}]] {
+		Rejected := false
+		try _CrashReport_ProcessorInfo(Processors)
+		catch ValueError
+			Rejected := true
+		AssertTrue(Rejected, "an incomplete CPU observation must not become a partial machine count")
+	}
+}
+Test("crash report: logical processors include every physical socket", _CRWT_ProcessorSockets)
