@@ -1741,6 +1741,7 @@
 	"menu.layout.install_other_scope": "もう一方のKeyboard Layoutsフォルダーに配列が残っています。手動で削除してから再試行してください。",
 	"menu.layout.install_other_scope_unverified": "もう一方のKeyboard Layoutsフォルダーを確認できません。再試行する前に手動で確認してください。",
 	"menu.layout.install_system_unavailable": "認証後にランチャーを安全に検証できないため、システムへのインストールは利用できません。ユーザー向けインストールを使用し、古いシステム版があれば先に削除してください。",
+	"menu.layout.install_system_reason": "利用不可：ランチャーを安全に検証できません",
 	"menu.layout.active_layouts": "入力ソース",
 	"menu.layout.header_any": "すべての配列",
 	"menu.layout.header_custom": "カスタム配列",

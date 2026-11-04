@@ -1741,6 +1741,7 @@
 	"menu.layout.install_other_scope": "בתיקיית Keyboard Layouts האחרת קיימת פריסה. יש להסיר אותה ידנית ולנסות שוב.",
 	"menu.layout.install_other_scope_unverified": "לא ניתן לבדוק את תיקיית Keyboard Layouts האחרת. יש לבדוק אותה ידנית לפני ניסיון נוסף.",
 	"menu.layout.install_system_unavailable": "התקנה מערכתית אינה זמינה מפני שלא ניתן לאמת את תוכנית ההפעלה בבטחה לאחר ההרשאה. יש להשתמש בהתקנת משתמש ולהסיר תחילה עותק מערכתי ישן, אם קיים.",
+	"menu.layout.install_system_reason": "לא זמין: אימות תוכנית ההפעלה אינו בטוח",
 	"menu.layout.active_layouts": "מקורות קלט",
 	"menu.layout.header_any": "כל הפריסות",
 	"menu.layout.header_custom": "פריסה מותאמת אישית",

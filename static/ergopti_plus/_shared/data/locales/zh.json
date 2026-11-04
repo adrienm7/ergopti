@@ -1741,6 +1741,7 @@
 	"menu.layout.install_other_scope": "另一个 Keyboard Layouts 文件夹中仍有键盘布局。请手动移除后重试。",
 	"menu.layout.install_other_scope_unverified": "无法检查另一个 Keyboard Layouts 文件夹。请手动检查后再重试。",
 	"menu.layout.install_system_unavailable": "系统安装不可用，因为授权后无法安全验证启动器。请使用用户安装；如有旧的系统副本，请先将其移除。",
+	"menu.layout.install_system_reason": "不可用：无法安全验证启动器",
 	"menu.layout.active_layouts": "输入法",
 	"menu.layout.header_any": "所有布局",
 	"menu.layout.header_custom": "自定义布局",

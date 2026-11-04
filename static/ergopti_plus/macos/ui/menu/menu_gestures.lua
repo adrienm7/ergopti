@@ -270,7 +270,7 @@ function M.build(ctx)
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
 			if spec then
-				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+				return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 					local committed = shortcut_utils.prompt_action_parameter(gestures, slot, a, spec, picked, {
 						section = "gestures", key = slot,
 						read = function() return gestures.get_action(slot) end,
@@ -283,7 +283,6 @@ function M.build(ctx)
 						show_conflict(conflict)
 					end
 				end, "menu_gestures.action_parameter")
-				return
 			end
 			local conflict = apply_action()
 			if conflict == false then return false end

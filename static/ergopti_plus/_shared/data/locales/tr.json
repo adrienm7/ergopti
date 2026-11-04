@@ -1741,6 +1741,7 @@
 	"menu.layout.install_other_scope": "Diğer Keyboard Layouts klasöründe bir düzen var. Elle kaldırıp yeniden deneyin.",
 	"menu.layout.install_other_scope_unverified": "Diğer Keyboard Layouts klasörü kontrol edilemedi. Yeniden denemeden önce elle kontrol edin.",
 	"menu.layout.install_system_unavailable": "Yetkilendirmeden sonra başlatıcı güvenli biçimde doğrulanamadığı için sistem kurulumu kullanılamıyor. Kullanıcı kurulumunu seçin; varsa eski sistem kopyasını önce kaldırın.",
+	"menu.layout.install_system_reason": "kullanılamıyor: başlatıcı doğrulaması güvenli değil",
 	"menu.layout.active_layouts": "Giriş kaynakları",
 	"menu.layout.header_any": "Tüm düzenler",
 	"menu.layout.header_custom": "Özel klavye düzeni",

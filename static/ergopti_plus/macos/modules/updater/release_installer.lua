@@ -86,6 +86,7 @@ M.SWAP_SCRIPT = table.concat({
 	'	case "$device" in ""|*[!0-9]*) echo "The replacement filesystem identity is invalid."; exit 1 ;; esac',
 	'done',
 	'[ "$staged_device" = "$parent_device" ] || { echo "The verified app is not on the installation filesystem: nothing was replaced."; exit 1; }',
+	'if [ -e "$previous" ] || [ -L "$previous" ]; then echo "Move the existing backup at $previous before retrying."; exit 1; fi',
 	'# Stage/destination filesystem admission ends',
 	'rename_flag=' .. RENAME_FLAG,
 	'launcher="$app' .. EXECUTABLE_SUFFIX .. '"',
@@ -99,7 +100,6 @@ M.SWAP_SCRIPT = table.concat({
 	'	if [ "$waited" -gt 1200 ]; then echo "ErgoptiPlus did not quit: nothing was replaced."; exit 3; fi',
 	"	/bin/sleep 0.1",
 	"done",
-	'/bin/rm -rf -- "$previous" || { echo "The previous backup app could not be removed."; /usr/bin/open -- "$app"; exit 4; }',
 	'"$launcher" "$rename_flag" move "$app" "$previous" || { echo "The installed app could not be moved aside."; /usr/bin/open -- "$app"; exit 5; }',
 	'launcher="$previous' .. EXECUTABLE_SUFFIX .. '"',
 	'# Occupied destinations are retained rather than overwritten or nested into',
@@ -289,7 +289,8 @@ function M.arm_swap(staged_app, done)
 				staged_app, app, log)
 			done(true)
 		else
-			Logger.error(LOG, "The detached installer refused its arming receipt (completion=%s).", tostring(ok))
+			Logger.error(LOG, "The detached installer refused its arming receipt (completion=%s; log: %s). If %s exists, move it aside before retrying.",
+				tostring(ok), log, app .. ".previous")
 			done(false, "the detached installer did not acknowledge arming")
 		end
 	end

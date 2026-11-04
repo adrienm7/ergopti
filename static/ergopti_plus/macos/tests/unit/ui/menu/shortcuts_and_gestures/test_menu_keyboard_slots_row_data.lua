@@ -128,6 +128,21 @@ end)
 -- ==========================================
 
 helpers.describe("menu_keyboard_slots: adding a binding", function()
+	it("keeps the slot picker open when the next picker cannot be scheduled", function()
+		local ui, shortcuts, picker = fresh()
+		local ctx = make_ctx()
+		local group = physical_groups(shortcuts)[1]
+		local rows = ui.provide_rows(ctx, nil)
+		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
+		local deferred = require("infra.deferred_work")
+		local previous = deferred.after
+		deferred.after = function() return false end
+		local ok, accepted = pcall(picker.opened[1].confirm, group.prefix .. "j")
+		deferred.after = previous
+		helpers.assert_true(ok)
+		helpers.assert_eq(accepted, false, "refusal must reach the real picker's confirmation boundary")
+		helpers.assert_eq(#picker.opened, 1)
+	end)
 	it("offers the free slots of the group, and only those", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx = make_ctx()
@@ -398,6 +413,23 @@ local function parameter_ctx()
 end
 
 helpers.describe("menu_keyboard_slots: parameterized actions", function()
+	it("keeps the action picker open when its parameter prompt cannot be scheduled", function()
+		local ui, shortcuts, picker = fresh()
+		local ctx = parameter_ctx()
+		local group = physical_groups(shortcuts)[1]
+		local slot = group.prefix .. "w"
+		local rows = ui.provide_rows(ctx, nil)
+		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
+		picker.opened[1].confirm(slot)
+		local deferred = require("infra.deferred_work")
+		local previous = deferred.after
+		deferred.after = function() return false end
+		local ok, accepted = pcall(picker.opened[2].confirm, "wrap_selection")
+		deferred.after = previous
+		helpers.assert_true(ok)
+		helpers.assert_eq(accepted, false)
+		helpers.assert_eq(shortcuts.get_keyboard_action(slot), "none")
+	end)
 	-- A keyboard slot bound to wrap_selection (or open_url, search_web) did
 	-- nothing: the picker stored the action and never asked for its parameter,
 	-- which the handler reads under the slot's dispatch binding.

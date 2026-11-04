@@ -316,7 +316,14 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		assert(sh("mkdir -p " .. quote(app) .. " " .. quote(staged)) == 0)
 		write(app .. "/marker", "installed")
 		write(staged .. "/marker", "chosen")
-		if opts.previous then assert(sh("mkdir -p " .. quote(previous)) == 0) end
+		if opts.previous == "directory" then
+			assert(sh("mkdir -p " .. quote(previous)) == 0)
+			write(previous .. "/marker", "user backup")
+		elseif opts.previous == "file" then
+			write(previous, "user backup")
+		elseif opts.previous == "symlink" then
+			assert(sh("ln -s missing " .. quote(previous)) == 0)
+		end
 
 		local opened = dir .. "/opened"
 		local open = fake(dir, "open", 'echo "$2" >> ' .. quote(opened))
@@ -331,10 +338,12 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		local status, output = sh(require("tests.support.release_swap_ports").command() .. " --release-rename lock " .. quote(app)
 			.. " " .. quote(script) .. " " .. pid .. " " .. quote(staged) .. " " .. quote(previous)
 			.. " 3>" .. quote(acknowledgement))
-		helpers.assert_eq(read(acknowledgement), "ARMED\n", "the actual worker acknowledges before the same swap checks")
+		helpers.assert_eq(read(acknowledgement), opts.previous and "" or "ARMED\n",
+			"an occupied backup must refuse before the driver quits")
 		local result = {
 			status = status, output = output,
 			app = read(app .. "/marker"), previous = read(previous .. "/marker"), opened = read(opened) or "",
+			previous_file = read(previous), previous_link = sh("test -L " .. quote(previous)) == 0,
 			app_path = app,
 		}
 		sh("rm -rf " .. quote(dir))
@@ -347,7 +356,7 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		local completed, result = pcall(function()
 			local sleeper = producer:read("*l")
 			assert(sleeper and sleeper:match("^[1-9]%d*$"), "The retained sleeper must publish its exact PID")
-			return swap({ pid = sleeper, previous = true })
+			return swap({ pid = sleeper })
 		end)
 		-- Close this exact producer even if PID admission or swap failed. All
 		-- original result assertions run only after the parent has been reaped.
@@ -358,6 +367,19 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		helpers.assert_eq(result.app, "chosen")
 		helpers.assert_eq(result.previous, "installed")
 		helpers.assert_eq(result.opened, result.app_path .. "\n")
+	end)
+
+	helpers.it("preserves a pre-existing backup and refuses before arming", function()
+		for _, kind in ipairs({ "directory", "file", "symlink" }) do
+			local result = swap({ previous = kind })
+			helpers.assert_eq(result.status, 1)
+			helpers.assert_eq(result.app, "installed")
+			helpers.assert_eq(result.opened, "")
+			if kind == "directory" then helpers.assert_eq(result.previous, "user backup") end
+			if kind == "file" then helpers.assert_eq(result.previous_file, "user backup") end
+			if kind == "symlink" then helpers.assert_true(result.previous_link) end
+			helpers.assert_true(result.output:find("Move the existing backup", 1, true) ~= nil)
+		end
 	end)
 
 	helpers.it("puts the previous app back and opens it when the chosen one cannot move in", function()
