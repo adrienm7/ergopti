@@ -175,7 +175,8 @@ end
 --- @return string|nil host, integer|nil port
 function M.relay_address(relay)
 	if type(relay) ~= "string" then return nil, nil end
-	local scheme, authority = relay:match("^(%a[%w+%.%-]*)://([^/]+)$")
+	-- Policy and curl both use the URL authority, independently of its suffix.
+	local scheme, authority = relay:match("^(%a[%w+%.%-]*)://([^/?#]+)")
 	if not authority then return nil, nil end
 	scheme = scheme:lower()
 	authority = authority:gsub("^.*@", "")
