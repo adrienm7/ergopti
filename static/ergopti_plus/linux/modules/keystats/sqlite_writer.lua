@@ -374,14 +374,16 @@ end
 --- beside old ones would make a later retry escape them twice.
 --- @return boolean True once the store holds the current encoding.
 function M.ensure_token_encoding()
-	local version_output = _query_output("SELECT value FROM meta WHERE key='ngram_token_encoding';")
+	-- Hex preserves embedded NUL/newline and a prefix distinguishes an absent
+	-- row from a present empty or NULL marker.
+	local version_output = _query_output("SELECT 'version:' || hex(CAST(value AS BLOB)) FROM meta WHERE key='ngram_token_encoding';")
 	if version_output == nil then
 		Logger.error(LOG, "Cannot read the n-gram key migration version.")
 		return false
 	end
-	local recorded = version_output:match("^([^\n]*)")
-	if recorded == tostring(TokenEncoding.VERSION) then return true end
-	if recorded ~= "" and recorded ~= "1" then
+	local current_hex = tostring(TokenEncoding.VERSION):gsub(".", function(ch) return string.format("%02X", ch:byte()) end)
+	if version_output == "version:" .. current_hex .. "\n" then return true end
+	if version_output ~= "" and version_output ~= "version:31\n" then
 		Logger.error(LOG, "The n-gram key migration version is unsupported.")
 		return false
 	end

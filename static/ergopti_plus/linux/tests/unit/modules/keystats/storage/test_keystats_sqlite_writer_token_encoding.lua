@@ -28,7 +28,10 @@ local function migrate(answers)
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
 			content = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n"
 		elseif command:find("key='ngram_token_encoding'", 1, true) then
-			content = answers.version and (answers.version .. "\n") or ""
+			if answers.version ~= nil then
+				local hex = answers.version:gsub(".", function(ch) return string.format("%02X", ch:byte()) end)
+				content = "version:" .. hex .. "\n"
+			end
 		else
 			local family = command:match("SELECT DISTINCT hex%(token%) FROM ([%w_]+)")
 			if family then content = (answers.keys or {})[family] or "" end
@@ -108,6 +111,14 @@ helpers.describe("keystats sqlite writer: n-gram token encoding", function()
 		helpers.assert_nil(position(commands, "VACUUM INTO"))
 		helpers.assert_true(position(commands, "'ngram_token_encoding','2'") ~= nil)
 	end)
+
+	for index, version in ipairs({ "", "2\n3", "2\0tail" }) do
+		helpers.it("token-encoding refuses a corrupted stored migration marker " .. index, function()
+			local result, commands = migrate({ version = version, keys = { ngram_chars = "5B\n" } })
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(#commands, 0)
+		end)
+	end
 
 	for _, version in ipairs({ "3", "invalid", "0" }) do
 		helpers.it("token-encoding refuses unsupported migration version " .. version, function()
