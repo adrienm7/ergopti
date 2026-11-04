@@ -48,6 +48,26 @@ local function root_with(policy)
 end
 
 helpers.describe("system proxy probe: selection limits come from the shared policy (proxy-policy-single-source)", function()
+	helpers.it("proxy-policy-reader: closes and refuses an exceptional native read", function()
+		local previous = package.loaded["infra.proxy_policy"]
+		local ok, failure = pcall(function()
+			for _, method in ipairs({ "load", "override_setting" }) do
+				local closed = 0
+				local reader = { open_source = function() return {
+					read = function() error("controlled read failure") end,
+					close = function() closed = closed + 1; return true end,
+				} end }
+				local binding = helpers.load_module_with_dependency("infra.proxy_policy", "infra.regular_file_reader", reader)
+				local called, result, reason = pcall(binding[method])
+				helpers.assert_true(called, "read failure must return a refusal")
+				helpers.assert_nil(result)
+				helpers.assert_eq(reason, method == "load" and "proxy-policy-unavailable" or "proxy-override-unavailable")
+				helpers.assert_eq(closed, 1, "the acquired stream must be closed")
+			end
+		end)
+		package.loaded["infra.proxy_policy"] = previous
+		if not ok then error(failure, 0) end
+	end)
 	helpers.it("proxy-policy-single-source: refuses a valid prefix of an oversized policy", function()
 		local prefix = '{"max_selections":128,"max_proxy_bytes":65536}'
 		local root = root_with(prefix .. string.rep(" ", 32769 - #prefix) .. "not-json")
