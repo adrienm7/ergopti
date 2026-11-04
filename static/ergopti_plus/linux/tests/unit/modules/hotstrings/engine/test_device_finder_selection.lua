@@ -209,6 +209,18 @@ end)
 -- =================================================================
 
 helpers.describe("device_finder: ranking when no remap daemon is running", function()
+	helpers.it("includes an unnamed alphanumeric keyboard alongside a named keyboard (keyboard-capability-selection)", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local unnamed = block({ name = "ZSA Moonlander Mark I", sysfs = "/devices/pci0000:00/usb1/input/input4",
+			ev = "120013", handlers = "sysrq kbd event4 leds" })
+		-- Q, A and Z are keyboard keys; the bitmap is the actual procfs KEY syntax.
+		for _, bitmap in ipairs({ "100040010000", "1000 40010000" }) do
+			local described = unnamed:gsub("\n\n$", "\nB: KEY=" .. bitmap .. "\n\n")
+			local paths = finder.select_keyboards(finder.parse_devices(PHYSICAL_KEYBOARD .. described .. POWER_BUTTON))
+			helpers.assert_eq(paths, { "/dev/input/event3", "/dev/input/event4" },
+				"a second keyboard must not bypass capture merely because its product name omits keyboard")
+		end
+	end)
 
 	helpers.it("returns every physical keyboard when no consolidated remap output exists", function()
 		local finder = helpers.load_module("modules.hotstrings.device_finder")

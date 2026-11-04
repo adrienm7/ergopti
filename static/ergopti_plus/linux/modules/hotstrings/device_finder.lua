@@ -107,7 +107,7 @@ function M.parse_devices(text)
 		else
 			-- Start a new block on the "I:" identity line.
 			if line:match("^I:") then
-				current = { name = "", sysfs = "", ev_mask = 0, handlers = {} }
+				current = { name = "", sysfs = "", ev_mask = 0, key_mask_low = 0, handlers = {} }
 			end
 			if current then
 				-- N: Name="..."
@@ -124,6 +124,13 @@ function M.parse_devices(text)
 				local ev_hex = line:match("^B:%s*EV=(%x+)")
 				if ev_hex then
 					current.ev_mask = tonumber(ev_hex, 16) or 0
+				end
+				-- The low 48 key bits fit exactly in Lua's number type on both
+				-- 32- and 64-bit procfs word formats, regardless of grouping.
+				local key_hex = line:match("^B:%s*KEY=([%x%s]+)$")
+				if key_hex then
+					key_hex = key_hex:gsub("%s", "")
+					current.key_mask_low = tonumber(key_hex:sub(-12), 16) or 0
 				end
 
 				-- H: Handlers=kbd event3 ...
@@ -268,6 +275,14 @@ local function is_likely_keyboard(name)
 	return lower:find("keyboard") ~= nil or lower:find("kbd") ~= nil
 end
 
+-- Q, A and Z distinguish an alphanumeric keyboard from power/media keys,
+-- even when its manufacturer/product name never says "keyboard".
+local function has_typing_keys(dev)
+	local mask = dev.key_mask_low
+	return type(mask) == "number" and has_bit(mask, 2 ^ 16)
+		and has_bit(mask, 2 ^ 30) and has_bit(mask, 2 ^ 44)
+end
+
 --- True when the device is software-synthesised rather than physical hardware.
 --- @param dev table Device descriptor.
 --- @return boolean
@@ -308,7 +323,8 @@ end
 --- Chooses every keyboard stream to read from a parsed descriptor list.
 ---
 --- Selection rules, in order:
----   1. Every physical device whose name says "keyboard" or "kbd".
+---   1. Every physical device whose name says "keyboard" or whose key bitmap
+---      includes the ordinary Q, A and Z typing keys.
 ---   2. Every other physical EV_KEY device when none is keyboard-named.
 --- Axes and switches are excluded from both rules: the output cannot relay them.
 --- Synthetic devices never reach either rule — reading one means reading our
@@ -335,7 +351,7 @@ function M.select_keyboards(devices)
 		if not M.is_interceptable_event_mask(dev.ev_mask) then goto next_dev end
 		Logger.debug(LOG, "Physical EV_KEY device: '%s' → %s", dev.name, path)
 
-		if is_likely_keyboard(dev.name) then
+		if is_likely_keyboard(dev.name) or has_typing_keys(dev) then
 			preferred[#preferred + 1] = path
 		else
 			fallback[#fallback + 1] = path
