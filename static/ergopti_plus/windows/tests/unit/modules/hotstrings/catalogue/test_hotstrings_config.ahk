@@ -1163,3 +1163,71 @@ _HCU_UnlimitedPrecedence(Mode) {
 }
 for _HCU_Mode in ["unlimited-only", "offset-only", "unlimited-first", "offset-first"]
 	Test("HotstringsConfig unlimited precedence: " . _HCU_Mode, _HCU_UnlimitedPrecedence.Bind(_HCU_Mode))
+
+; Canonical TOML spellings must survive an unrelated public setting change.
+_HOS_ValidSyntaxRoundTrip(Mode) {
+	global Features, _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {features: Features, overrides: _HotstringsOverrides,
+		path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_override_syntax_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Features := Features.Clone()
+		Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		Field := InStr(Mode, "color") ? "color" : InStr(Mode, "priority") ? "priority" : "delay_offset"
+		if Mode == "literal-color"
+			Leaf := "color = '#123456'"
+		else if Mode == "quoted-key-color"
+			Leaf := '"color" = "#123456"'
+		else if Mode == "color-control"
+			Leaf := 'color = "#123456"'
+		else if Mode == "signed-offset"
+			Leaf := "delay_offset = +0.250"
+		else if Mode == "exponent-offset"
+			Leaf := "delay_offset = 2.5e-1"
+		else if Mode == "offset-control"
+			Leaf := "delay_offset = 0.250"
+		else if Mode == "separated-priority"
+			Leaf := "priority = 2_5"
+		else
+			Leaf := "priority = 25"
+		Source := "[magickey]`n" . Leaf . "`n[magickey.text_expansion_symbols]`n" . Leaf . "`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		Before := TOML_ParseDocument(FSReadStrict(Path))
+		AssertTrue(Before["magickey"].Has(Field), "the canonical source decoder must recognize the real owned leaf")
+		AssertTrue(HotstringsConfigReload(), "the real loader must admit the source before the public edit")
+		AssertTrue(HotstringsSetOverride("magickey", "", "show_tooltip", false))
+		AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "show_tooltip", false))
+		After := TOML_ParseDocument(FSReadStrict(Path))
+		AssertTrue(After["magickey"].Has(Field), "an unrelated acknowledged save must preserve the category's existing valid leaf")
+		AssertTrue(After["magickey"]["text_expansion_symbols"].Has(Field), "an unrelated acknowledged save must preserve the section's existing valid leaf")
+		AssertEqual(Before["magickey"][Field], After["magickey"][Field])
+		AssertEqual(Before["magickey"]["text_expansion_symbols"][Field], After["magickey"]["text_expansion_symbols"][Field])
+		AssertTrue(After["magickey"]["show_tooltip"] is TOML_Bool)
+		AssertFalse(After["magickey"]["show_tooltip"].Value)
+		AssertTrue(HotstringsConfigReload(), "the written file must remain reloadable by the production owner")
+		Expected := Before["magickey"][Field]
+		Live := HotstringsResolve("magickey", "")
+		AssertEqual(Field == "color" ? Expected : Field == "priority" ? Expected : 0.75 + Expected,
+			Field == "color" ? Live.Color : Field == "priority" ? Live.Priority : Live.Delay)
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+	} finally {
+		Features := Saved.features
+		_HotstringsOverrides := Saved.overrides
+		_HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOS_Mode in ["literal-color", "quoted-key-color", "signed-offset", "exponent-offset", "separated-priority", "color-control", "offset-control", "priority-control"]
+	Test("HotstringsConfig valid syntax persistence: " . _HOS_Mode, _HOS_ValidSyntaxRoundTrip.Bind(_HOS_Mode))
