@@ -90,10 +90,6 @@ local function starts_target_header(trimmed, target_header)
 	return true
 end
 
-local function escape_pattern(value)
-	return (value:gsub("([^%w])", "%%%1"))
-end
-
 --- Finds complete records for one field inside an exact TOML table.
 --- @param lines table[] Physical source records with exact line terminators.
 --- @param target_header string Canonical table header, including brackets.
@@ -106,7 +102,6 @@ local function scan_table(lines, target_header, field)
 	local depth = 0
 	local multiline_quote = nil
 	local open_field_range = nil
-	local field_pattern = "^" .. escape_pattern(field) .. "%s*="
 
 	for index, record in ipairs(lines) do
 		local raw = record.text
@@ -123,7 +118,9 @@ local function scan_table(lines, target_header, field)
 					in_target = false
 				end
 			else
-				if in_target and trimmed:match(field_pattern) then
+				local key_text = in_target and Scanner.split_assignment(trimmed) or nil
+				local key = key_text and KeyPath.parse(key_text) or nil
+				if key and #key == 1 and key[1] == field then
 					open_field_range = { first = index, last = index }
 					scan.field_ranges[#scan.field_ranges + 1] = open_field_range
 				else

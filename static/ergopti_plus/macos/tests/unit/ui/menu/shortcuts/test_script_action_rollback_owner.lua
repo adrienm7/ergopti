@@ -13,6 +13,7 @@ helpers.describe("script action whole-state rollback", function()
 	helpers.it("preserves a foreign action during the real preference rollback", function()
 		local state = { script_control_shortcuts = { slot = "none" } }
 		local runtime, owner, claim = "none", nil, nil
+		local restore_checked = false
 		local facade = {
 			get_shortcut_actions = function() return { slot = runtime } end,
 			set_shortcut_action = function(_, value) runtime = value; return true end,
@@ -22,7 +23,9 @@ helpers.describe("script action whole-state rollback", function()
 			initial_preferences = {},
 			read_only_reason = function() runtime = "foreign"; return "read-only" end,
 			restore_runtime = function()
-				if not owner.restore_runtime() then return false end
+				local restored = owner.restore_runtime()
+				restore_checked = true
+				if not restored then return false end
 				local projection = owner.rollback_modules({ shortcuts_mod = facade })
 				return projection.shortcuts_mod.set_shortcut_action("slot", "none")
 			end,
@@ -33,6 +36,7 @@ helpers.describe("script action whole-state rollback", function()
 			save_prefs = save,
 		})
 		helpers.assert_eq(owner.assign("slot", "save"), false)
+		helpers.assert_true(restore_checked, "preference rollback must actually check the inverse")
 		helpers.assert_eq(runtime, "foreign")
 		helpers.assert_true(claim.pending())
 	end)
@@ -40,6 +44,7 @@ helpers.describe("script action whole-state rollback", function()
 	helpers.it("refuses a foreign runtime action before ordinary sync can overwrite it", function()
 		local state = { script_control_shortcuts = { slot = "none" } }
 		local runtime, owner, claim = "none", nil, nil
+		local restore_result = "not called"
 		local facade = {
 			get_shortcut_actions = function() return { slot = runtime } end,
 			set_shortcut_action = function(_, value) runtime = value; return true end,
@@ -49,11 +54,12 @@ helpers.describe("script action whole-state rollback", function()
 			admission = function(_, fn, retained) claim = retained; return fn() end,
 			save_prefs = function()
 				runtime = "foreign"
-				helpers.assert_eq(owner.restore_runtime(), false)
+				restore_result = owner.restore_runtime()
 				return false
 			end,
 		})
 		helpers.assert_eq(owner.assign("slot", "save"), false)
+		helpers.assert_eq(restore_result, false, "the protected callback must refuse the foreign action")
 		helpers.assert_eq(runtime, "foreign")
 		helpers.assert_true(claim.pending(), "the unresolved inverse remains globally owned")
 		helpers.assert_eq(claim.retry_restore(), false)
@@ -63,6 +69,7 @@ helpers.describe("script action whole-state rollback", function()
 	helpers.it("retains the inverse across the projected whole-state sync", function()
 		local state = { script_control_shortcuts = { slot = "none" } }
 		local runtime, owner, claim = "none", nil, nil
+		local observation = {}
 		local facade = {
 			get_shortcut_actions = function() return { slot = runtime } end,
 			set_shortcut_action = function(_, value) runtime = value; return true end,
@@ -71,16 +78,19 @@ helpers.describe("script action whole-state rollback", function()
 			state = state, script_control = facade, paused = function() return false end,
 			admission = function(_, fn, retained) claim = retained; return fn() end,
 			save_prefs = function()
-				helpers.assert_true(owner.restore_runtime())
-				helpers.assert_true(claim.pending())
+				observation.restored = owner.restore_runtime()
+				observation.pending_before = claim.pending()
 				local projection = owner.rollback_modules({ shortcuts_mod = facade })
-				helpers.assert_true(projection.shortcuts_mod.set_shortcut_action("slot", "save"))
-				helpers.assert_eq(runtime, "none", "whole-state sync cannot reapply the candidate")
-				helpers.assert_true(claim.pending())
+				observation.projected = projection.shortcuts_mod.set_shortcut_action("slot", "save")
+				observation.runtime = runtime
+				observation.pending_after = claim.pending()
 				return false
 			end,
 		})
 		helpers.assert_eq(owner.assign("slot", "save"), false)
+		helpers.assert_eq(observation, { restored = true, pending_before = true,
+			projected = true, runtime = "none", pending_after = true },
+			"the protected save callback must complete and preserve its inverse")
 		helpers.assert_eq(runtime, "none")
 		helpers.assert_eq(state.script_control_shortcuts.slot, "none")
 		helpers.assert_eq(claim.pending(), false)

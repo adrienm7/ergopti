@@ -4,10 +4,9 @@
  * ==============================================================================
  * MODULE: One Hold Picker, One List
  * DESCRIPTION:
- * The hold a tap-hold key emits is chosen from a list, and every driver must
- * offer the same one in the same order — the value is written into a file all
- * three read, so a modifier one driver can pick and another cannot is a config
- * that behaves differently per OS.
+ * Windows and Linux choose holds from the same canonical list, in the same
+ * order. macOS uses its own native remap catalogue and is outside this check;
+ * its Option, Command and Fn choices need semantic comparison separately.
  *
  * WHAT THIS CAUGHT (2026-08-08):
  * the list was a hardcoded array in windows/platform/remap/tap_hold_writer.ahk
@@ -212,6 +211,6 @@ if (errors.length > 0) {
 
 const total = 1 + expectedCombos(modifiers).length + layers.length;
 console.log(
-	`\x1b[32m[OK] one hold picker: ${modifiers.length} shared modifier(s) → ${total} option(s), same ` +
-		'order on every driver, and Linux can write the choice.\x1b[0m'
+	`\x1b[32m[OK] Windows/Linux hold picker: ${modifiers.length} shared modifier(s) → ${total} option(s), same ` +
+		'order on Windows/Linux, and Linux can write the choice.\x1b[0m'
 );

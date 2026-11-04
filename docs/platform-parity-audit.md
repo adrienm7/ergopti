@@ -10,6 +10,47 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## Independent module review, 2026-11-04
+
+Five parallel, read-only reviewers examined production code and callers at
+`c2fa619`, rather than treating catalogue membership as behavioral proof. The
+integration review reopened their evidence and independently reproduced the
+phone/date matcher output using the real Lua modules with synthetic data. No
+native three-OS certification was performed.
+
+| Module                                                        | Coverage                                                                                | Result and evidence                                                                                                                                                                                                       |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Hotstrings](audits/platform-parity/2026-11-04/hotstrings.md) | Static/dynamic/personal/programmed expansion, input gates, previews, private sources    | Three behavior differences: Linux shortest phone prefix fires without magic key; Lua international output retains the national zero; Windows date triggers and boundary semantics differ. Pure Lua reproduction included. |
+| [AI](audits/platform-parity/2026-11-04/llm.md)                | Predictions, profiles, local/remote models, tone, translation, vision, agent/connectors | Linux lacks the bounded retry/refill policy implemented on Windows/macOS. Windows retry TODO refuted. Core AI families have real implementations; native connectors differ.                                               |
+| [Input](audits/platform-parity/2026-11-04/input.md)           | Tap-holds, holds/chords, layers, layouts, physical editor, gesture vocabulary           | macOS typing-priority rollover differs from release-order classification; working live number-row control is missing from its onboarding. Hold-picker test only establishes Windows/Linux agreement.                      |
+| [Metrics](audits/platform-parity/2026-11-04/metrics.md)       | Producers, persistence, ledger sync, aggregation, dashboards, WPM, privacy              | Linux lacks ledger synchronization and some producers; pointer distance units differ. Windows owns extra raw telemetry. Space-change KPI is only actually produced on macOS; night-wake is inert on every OS.             |
+| [Lifecycle](audits/platform-parity/2026-11-04/lifecycle.md)   | Installation/startup/uninstall, updater, backups, onboarding, diagnostics, bundled apps | macOS-only diagnostics availability explanation and signed newest-channel feed-install fallback. Linux packaged updates intentionally belong to the package manager. Backup scope qualifications documented.              |
+
+The detailed reports record tests actually executed, source-only conclusions,
+rejected hypotheses and remaining environmental limits. The metrics SQL tests
+were not green under this environment's Node 24 NUL-string handling; this was
+not promoted into a production parity defect. Each confirmed gap is tracked in
+TODO. Finding a behavior difference does not authorize silently changing an
+explicitly tested product contract, such as Windows's date trigger vocabulary.
+
+### Generation coverage and limits
+
+The normal generator registry and website prebuild now own the inventories.
+Website builds refresh the menu projection first, then regenerate availability;
+`npm run gen` and the standard generated-output drift guard share its declared
+output paths. Every one of the 197 restricted configuration entries has a
+translated explicit or matching-section reason. This checks declaration
+coverage, not runtime equivalence.
+
+The generated tap-hold key table reads the live `tap_hold.catalog.keys`: native
+Command/Option versus Win/AltGr identities are shown without counting them as
+missing product functions. The hold picker is not universal: the actual macOS
+picker filters its native catalogue, while Windows/Linux enumerate the shared
+PC modifier combinations. Gesture slot actuation, onboarding conditions,
+installation ownership, real provider availability and telemetry producers
+require the module-specific qualifications above. New unregistered runtime
+behaviors cannot be discovered reliably from a manifest alone.
+
 ## Sources and checks
 
 - Configuration and settings: `_shared/modules/features/manifest.toml`, resolved

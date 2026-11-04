@@ -185,7 +185,8 @@ function M.notify(title_or_msg, body, kind, on_click)
 	end
 
 	local notification = notification_or_err
-	if type(notification.send) ~= "function" then
+	local readable, send = pcall(function() return notification.send end)
+	if not readable or type(send) ~= "function" then
 		local detail = "Notification object has no send capability"
 		Logger.warn(LOG, "%s.", detail)
 		return false, detail

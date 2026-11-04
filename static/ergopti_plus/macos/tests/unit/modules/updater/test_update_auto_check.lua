@@ -533,6 +533,17 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_nil(ctx.values[ctx.list_key], "a response without an ETag leaves no copy")
 	end)
 
+	helpers.it("drops a damaged stored list before sending a conditional request", function()
+		for _, body in ipairs({ '[{"tag_name":"v0.0.0-dev.150"', '[{}]' }) do
+			local ctx = build({ now = T0, record = { seed = SEED },
+				list_copy = { url = URL, etag = '"v1"', body = body },
+				responses = { { ok = true, status = 200, body = LIST, headers = {} } } })
+			local answers = check_now(ctx, "dev")
+			helpers.assert_nil(ctx.requests[1].headers["If-None-Match"])
+			helpers.assert_eq(answers[1].state, "available")
+		end
+	end)
+
 	helpers.it("names an exhausted GitHub rate limit and its reset time", function()
 		local ctx = build({ now = T0, record = { seed = SEED }, responses = { { ok = false, status = 403,
 			headers = { ["X-RateLimit-Remaining"] = "0", ["x-ratelimit-reset"] = "86400" } } } })
