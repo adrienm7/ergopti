@@ -56,8 +56,14 @@ local function memory_fs()
 			fs.add_dir(path:gsub("/+$", ""))
 			return true
 		end,
+		make_dir_exclusive = function(path)
+			if fs.dirs[path] or fs.files[path] then return nil, "exists" end
+			fs.add_dir(path)
+			return true
+		end,
 		create = function(path, content)
 			if fs.refuse[path] == "write" then return nil, "disk full" end
+			if not fs.dirs[parent(path)] then return nil, "parent absent" end
 			if fs.files[path] ~= nil then return nil, "exists" end
 			fs.files[path] = content
 			fs.writes[#fs.writes + 1] = path
@@ -157,6 +163,24 @@ function M.register(helpers, env)
 	end
 
 	helpers.describe("shared configuration backup (config_backup)", function()
+		helpers.it("refuses a backup directory claimed after listing", function()
+			local owner, fs = fixture()
+			fs.io.make_dir_exclusive = function(path)
+				fs.add_file(path .. "/foreign", "keep")
+				return nil, "exists"
+			end
+			local record = owner.create("pre_install")
+			helpers.assert_eq(record, nil)
+			helpers.assert_eq(fs.files["/cfg/backups/pre-install-20260930-101500/foreign"], "keep")
+		end)
+		helpers.it("creates a complete backup when no configuration files exist", function()
+			local owner, fs = fixture({ roots = { { id = "config", dir = "/cfg" } } })
+			fs.files = {}
+			local record, err = owner.create("pre_install")
+			helpers.assert_true(record ~= nil, tostring(err))
+			helpers.assert_eq(#record.files, 0)
+			helpers.assert_eq(owner.latest("pre_install").id, record.id)
+		end)
 		helpers.it("reads its rules from the shared updater defaults", function()
 			helpers.assert_eq(rules.folder, "backups")
 			helpers.assert_true(rules.excluded[rules.folder] == true, "the backups folder is excluded")
@@ -275,6 +299,18 @@ function M.register(helpers, env)
 			local latest = owner.latest("pre_install")
 			helpers.assert_eq(latest and latest.id, newest.id)
 			helpers.assert_eq(latest and latest.tag, "v2")
+		end)
+
+		helpers.it("skips a newer backup whose copied file is missing or unreadable", function()
+			for _, mode in ipairs({ "missing", "unreadable" }) do
+				local owner, fs = fixture({ times = { "20260930-101500", "20260930-111500" } })
+				local healthy = assert(owner.create("pre_install", { tag = "v1" }))
+				local damaged = assert(owner.create("pre_install", { tag = "v2" }))
+				local copy = damaged.path .. "/config/config.toml"
+				if mode == "missing" then fs.files[copy] = nil else fs.refuse[copy] = "read" end
+				local latest = owner.latest("pre_install")
+				helpers.assert_eq(latest and latest.id, healthy.id, "an unusable backup cannot hide a complete one")
+			end
 		end)
 
 		helpers.it("does not let a backup with invalid metadata hide a healthy backup", function()

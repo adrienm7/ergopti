@@ -340,7 +340,7 @@ ConfigBackup_Latest(ConfigDir, Kind, Rules := 0) {
 		Rules := ConfigBackup_Rules()
 	Folder := _ConfigBackup_Join(ConfigDir, Rules["folder"])
 	Prefix := Rules["kinds"][Kind] . "-"
-	Best := 0
+	Candidates := []
 	for _, Path in FSListDirectoryStrict(Folder, true) {
 		SplitPath(Path, &Name)
 		if (SubStr(Name, 1, StrLen(Prefix)) != Prefix)
@@ -348,10 +348,27 @@ ConfigBackup_Latest(ConfigDir, Kind, Rules := 0) {
 		Record := _ConfigBackup_Load(ConfigDir, Name, Rules)
 		if !IsObject(Record) || Record["kind"] != Kind
 			continue
-		if !IsObject(Best) || _ConfigBackup_CompareOrder(Record, Best) > 0
-			Best := Record
+		Candidates.Push(Record)
 	}
-	return Best
+	while Candidates.Length {
+		Best := 1
+		for Index, Record in Candidates {
+			if _ConfigBackup_CompareOrder(Record, Candidates[Best]) > 0
+				Best := Index
+		}
+		Record := Candidates.RemoveAt(Best)
+		Complete := true
+		for _, Relative in Record["files"] {
+			try FSReadBytesStrict(_ConfigBackup_Join(Record["path"], "config/" . Relative))
+			catch {
+				Complete := false
+				break
+			}
+		}
+		if Complete
+			return Record
+	}
+	return 0
 }
 
 ; Puts a backup back: backs the current configuration up first, checks every

@@ -122,6 +122,23 @@ helpers.describe("api_remote: requests follow each provider's contract", functio
 		helpers.assert_eq(body.messages[1].role, "user")
 	end)
 
+	for _, provider in ipairs({ "anthropic", "gemini" }) do
+		helpers.it("omits an empty system instruction for " .. provider, function()
+			local remote = load_remote()
+			local request = assert(remote.build_request({ provider = provider, token = "k" },
+				{ { role = "user", content = "texte" } }, {}))
+			unload()
+			local body = Json.decode(request.body)
+			if provider == "anthropic" then
+				helpers.assert_nil(body.system)
+				helpers.assert_eq(body.messages[1].content, "texte")
+			else
+				helpers.assert_nil(body.systemInstruction)
+				helpers.assert_eq(body.contents[1].parts[1].text, "texte")
+			end
+		end)
+	end
+
 	helpers.it("Anthropic: x-api-key and a pinned version, system apart", function()
 		local remote = load_remote()
 		local request = assert(remote.build_request({ provider = "anthropic", token = "sk-ant" }, MESSAGES, {}))

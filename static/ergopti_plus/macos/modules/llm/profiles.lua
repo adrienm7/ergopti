@@ -215,7 +215,11 @@ function M.resolve_system_prompt(profile, n)
 	}
 	local result = Selector.resolve_system_prompt(profile, vars)
 
-	if result and type(result.system) == "string" and result.system ~= "" then
+	if result and type(result.system) == "string"
+		and (result.system ~= "" or (type(profile) == "table"
+			and type(profile.system_single) == "string" and profile.system_single ~= "")) then
+		-- A real template can resolve to empty: the raw profile is {context},
+		-- and the context belongs solely in the user message.
 		-- The shared selector already substituted all placeholders.
 		return result.system
 	end

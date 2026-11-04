@@ -1595,7 +1595,7 @@ local function log_models_response_refusal(operation, entry, response, reason)
 end
 
 --- Build the JSON payload for the chosen provider format. We keep the body
---- minimal but correct: one system message + one user message + temperature.
+--- minimal but correct: optional system instructions, one user message and temperature.
 --- Streaming is OFF — the engine-level pacing already protects paid quotas,
 --- and the single-shot path keeps error handling trivial.
 --- @param extras table|nil Per-model body fields from the catalogue
@@ -1614,7 +1614,7 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 	if format == "anthropic" then
 		return {
 			model      = model,
-			system     = system_prompt or "",
+			system     = type(system_prompt) == "string" and system_prompt ~= "" and system_prompt or nil,
 			messages   = { { role = "user", content = user_prompt or "" } },
 			max_tokens = max_tokens,
 			temperature = temperature,
@@ -1622,7 +1622,8 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 	end
 	if format == "gemini" then
 		return {
-			systemInstruction = { parts = { { text = system_prompt or "" } } },
+			systemInstruction = type(system_prompt) == "string" and system_prompt ~= ""
+				and { parts = { { text = system_prompt } } } or nil,
 			contents          = { { role = "user", parts = { { text = user_prompt or "" } } } },
 			generationConfig  = { temperature = temperature, maxOutputTokens = max_tokens },
 		}
@@ -1631,13 +1632,15 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 		return Formats.agent_body({ model = model, system = system_prompt, text = user_prompt or "",
 			max_tokens = max_tokens, temperature = temperature })
 	end
-	-- OpenAI Chat Completions
+	-- OpenAI Chat Completions: an empty system instruction is omitted.
+	local messages = {}
+	if type(system_prompt) == "string" and system_prompt ~= "" then
+		messages[#messages + 1] = { role = "system", content = system_prompt }
+	end
+	messages[#messages + 1] = { role = "user", content = user_prompt or "" }
 	local payload = {
 		model       = model,
-		messages    = {
-			{ role = "system", content = system_prompt or "" },
-			{ role = "user",   content = user_prompt   or "" },
-		},
+		messages    = messages,
 		temperature = temperature,
 		max_tokens  = max_tokens,
 		stream      = false,
