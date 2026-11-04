@@ -49,7 +49,9 @@ local function load_settings(options)
 
 	local logger = { levels = {}, warnings = {}, errors = {} }
 	logger.level_of = function(variant) return THRESHOLDS[variant] end
-	logger.set_level = function(level) logger.levels[#logger.levels + 1] = level end
+	local current_level = 20
+	logger.set_level = function(level) current_level = level; logger.levels[#logger.levels + 1] = level end
+	logger.get_level = function() return current_level end
 	logger.warn = function(_, message, value)
 		logger.warnings[#logger.warnings + 1] = string.format(message, value)
 	end
@@ -78,6 +80,26 @@ local function load_settings(options)
 	package.loaded["adapters.storage"] = storage
 	package.loaded["infra.script_settings"] = nil
 	local settings = require("infra.script_settings")
+	local original_set = settings.set
+	settings.set = function(value)
+		local saved_scope, saved_settings = package.loaded["infra.script_scope"], package.loaded["infra.script_settings"]
+		local saved_shim, saved_logger = package.loaded["logger.shim"], package.loaded["logger"]
+		package.loaded["infra.script_settings"], package.loaded["logger.shim"], package.loaded["logger"] = settings, logger, logger
+		package.loaded["infra.script_scope"] = { retry_edit = function() return true end, edit_setting = function(key, level)
+			if not storage.set(key, level) then return false end
+			local token = { pending = function() return false end }
+			assert(settings.scope_acquire(token))
+			local receipt = assert(settings.scope_capture(token))
+			local applied = settings.scope_apply(token, receipt, level)
+			assert(settings.scope_release(token)); assert(settings.scope_forget(token, receipt))
+			return applied
+		end }
+		local ok, result = pcall(original_set, value)
+		package.loaded["infra.script_scope"], package.loaded["infra.script_settings"] = saved_scope, saved_settings
+		package.loaded["logger.shim"], package.loaded["logger"] = saved_shim, saved_logger
+		if not ok then error(result, 0) end
+		return result
+	end
 	package.loaded["logger.shim"] = previous.logger
 	package.loaded["infra.manifest_reader"] = previous.manifest
 	package.loaded["adapters.storage"] = previous.storage
