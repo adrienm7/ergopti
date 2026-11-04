@@ -446,10 +446,53 @@ helpers.describe("Linux system actions", function()
 		end)
 	end
 
+	helpers.it("two saved window captures in the same second retain both images", function()
+		local target = os.tmpname()
+		os.remove(target)
+		assert(os.execute("mkdir '" .. target .. "'") == 0)
+		local old_getenv, old_date = os.getenv, os.date
+		os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
+		os.date = function() return "2026-11-04_16-00-00" end
+		local ok, err = pcall(function()
+			local cmd = backgrounded(Gestures, "screenshot_window_save")
+			run_with_stubs(cmd .. " & " .. cmd .. " & wait", {
+				["gnome-screenshot"] = 'printf PNG > "$2"',
+			})
+			local pipe = assert(io.popen("find '" .. target .. "' -type f | wc -l"))
+			local count = tonumber(pipe:read("*l"))
+			pipe:close()
+			helpers.assert_eq(count, 2, "both screenshots must remain")
+		end)
+		os.getenv, os.date = old_getenv, old_date
+		os.execute("rm -rf '" .. target .. "'")
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("removes an incomplete reserved screenshot after all capture tools fail", function()
+		local target = os.tmpname()
+		os.remove(target)
+		assert(os.execute("mkdir '" .. target .. "'") == 0)
+		local old_getenv = os.getenv
+		os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
+		local ok, err = pcall(function()
+			local command = backgrounded(Gestures, "screenshot_window_save")
+			run_with_stubs(command, {
+				["gnome-screenshot"] = 'printf partial > "$2"; exit 1',
+				spectacle = "exit 1", maim = "exit 1", xdotool = "exit 1",
+			})
+			local pipe = assert(io.popen("find '" .. target .. "' -mindepth 1 -print"))
+			helpers.assert_eq(pipe:read("*a"), "", "failed capture leaves no reserved artifact")
+			pipe:close()
+		end)
+		os.getenv = old_getenv
+		os.execute("rm -rf '" .. target .. "'")
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("screen_capture_instant saves the active window like screenshot_window_save (action-parity-linux-system)",
 		function()
 			local instant = backgrounded(Gestures, "screen_capture_instant")
-			helpers.assert_true(instant:find("gnome-screenshot -wf '", 1, true) ~= nil, instant)
+			helpers.assert_true(instant:find('gnome-screenshot -wf "$f"', 1, true) ~= nil, instant)
 			helpers.assert_true(instant:find("/ergopti_win_", 1, true) ~= nil, "a window capture file name: " .. instant)
 		end)
 
