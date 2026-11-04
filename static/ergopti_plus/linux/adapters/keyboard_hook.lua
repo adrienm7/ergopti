@@ -2569,8 +2569,11 @@ function LayerPointer.forward(ev, slot)
 				return
 			end
 		end
-		if LayerPointer.emit_relative(ev.code, ev.value) ~= true then
-			Logger.warn(LOG, "A mouse report under the navigation layer was not forwarded (axis %d).", ev.code)
+		local session = _capture_session
+		local called, accepted = pcall(LayerPointer.emit_relative, ev.code, ev.value)
+		if not called or accepted ~= true then
+			if _capture_session == session then M.emergency_stop("grabbed mouse relative output failed") end
+			return
 		end
 	elseif ev.type == EVDEV_TYPE_KEY and InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
 		local key = source_key(slot, ev.code)
