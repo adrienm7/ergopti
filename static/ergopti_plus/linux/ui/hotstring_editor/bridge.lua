@@ -686,7 +686,14 @@ function M.on_message(payload, state, context)
 	end
 
 	if action == "save" then
-		local saved = save_all(state, data, context)
+		local opening = _opening
+		if opening and opening.saving then
+			return { saved = false, busy = true }
+		end
+		if opening then opening.saving = true end
+		local ok, saved = pcall(save_all, state, data, context)
+		if opening then opening.saving = false end
+		if not ok then error(saved, 0) end
 		if not saved then
 			-- The page flashes its "saved" toast whatever this returns — it does not
 			-- read bridge responses — so a failed write was visible only as a log
