@@ -366,6 +366,32 @@ helpers.describe("uinput_writer: emission", function()
 		U._reset_backend()
 	end)
 
+	helpers.it("does not flush an earlier unacknowledged key with a later report (legacy-syn-failure)", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		rec.backend.close = function() return true end
+		U._set_backend(rec.backend)
+		assert(U.open())
+		local calls = 0
+		rec.backend.write = function(_, bytes)
+			calls = calls + 1
+			rec.writes[#rec.writes + 1] = bytes
+			return calls ~= 2 -- first KEY accepted; its SYN unacknowledged
+		end
+		local failed = U.emit(30, 1)
+		local after_failure = #rec.writes
+		local successor = U.emit(31, 1)
+		local after_successor = #rec.writes
+		local retired, reopened = U.close(), nil
+		if retired then reopened = U.open() end
+		local after_reopen = reopened and U.emit(31, 1)
+		U._reset_backend()
+		helpers.assert_eq(failed, false)
+		helpers.assert_eq(successor, false)
+		helpers.assert_eq(after_successor, after_failure, "later SYN must not publish a possibly buffered key")
+		helpers.assert_true(retired and reopened and after_reopen, "a recreated device can emit normally")
+	end)
+
 	helpers.it("reports failure when the EV_KEY write fails", function()
 		local U = helpers.load_module("adapters.uinput_writer")
 		local rec = recorder()

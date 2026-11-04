@@ -241,6 +241,7 @@ local _generation = 0
 local _strict_constructor = false
 local _constructor_ports = nil
 local _legacy_wire = false
+local _legacy_failed = false
 local encode_event = M.encode_event
 local encode_setup = M.encode_setup
 
@@ -391,6 +392,7 @@ function M._reset_backend()
 	_fd = nil
 	_strict_constructor = false
 	_legacy_wire = false
+	_legacy_failed = false
 	pcall(Logger.debug, LOG, "Backend reset.")
 	_busy = false
 end
@@ -780,6 +782,7 @@ function M.open()
 	_strict_constructor = strict and type(descriptor) == "number"
 		and descriptor == math.floor(descriptor) and descriptor >= 0 and descriptor <= MAX_DESCRIPTOR
 	_legacy_wire = false
+	_legacy_failed = false
 	pcall(Logger.success, LOG, "Virtual keyboard created on %s.", _uinput_path)
 	_busy = false
 	return true
@@ -800,6 +803,7 @@ function M.close()
 	if acknowledged then
 		_strict_constructor = false
 		_legacy_wire = false
+		_legacy_failed = false
 		pcall(Logger.success, LOG, "Virtual keyboard destroyed.")
 	else
 		-- A refused close may have recycled the descriptor already. Preserve the
@@ -833,6 +837,21 @@ end
 -- ======= 5/ Emission =======================
 -- ===========================================
 -- ===========================================
+
+-- Once either write is unacknowledged a later SYN could publish a withheld
+-- event. Only closing and recreating the device can safely resume output.
+local function legacy_emit(event_type, code, value)
+	if _legacy_failed then return false end
+	_busy, _legacy_wire = true, true
+	local called, acknowledged = pcall(function()
+		return _backend.write(_fd, M.encode_event(event_type, code, value)) == true
+			and _backend.write(_fd, M.encode_event(EV_SYN, SYN_REPORT, 0)) == true
+	end)
+	if not called or acknowledged ~= true then _legacy_failed = true end
+	_busy = false
+	if _legacy_failed then pcall(Logger.warn, LOG, "Unacknowledged input write; recreate the virtual device before retrying.") end
+	return called and acknowledged == true
+end
 
 --- Emits one key event, followed by the SYN_REPORT that makes it visible.
 ---
@@ -868,16 +887,7 @@ function M.emit(code, value)
 		return false
 	end
 
-	_legacy_wire = true
-	if not _backend.write(_fd, M.encode_event(EV_KEY, code, value)) then
-		Logger.warn(LOG, "emit(%d:%d): key write failed.", code, value)
-		return false
-	end
-	if not _backend.write(_fd, M.encode_event(EV_SYN, SYN_REPORT, 0)) then
-		Logger.warn(LOG, "emit(%d:%d): SYN_REPORT write failed — the key stays buffered.", code, value)
-		return false
-	end
-	return true
+	return legacy_emit(EV_KEY, code, value)
 end
 
 --- Writes one relative report (a pointer movement or a wheel notch) and its SYN.
@@ -897,16 +907,7 @@ function M.emit_relative(axis, value)
 		Logger.error(LOG, "emit_relative(): device is not open.")
 		return false
 	end
-	_legacy_wire = true
-	if not _backend.write(_fd, M.encode_event(EV_REL, axis, value)) then
-		Logger.warn(LOG, "emit_relative(%d:%d): write failed.", axis, value)
-		return false
-	end
-	if not _backend.write(_fd, M.encode_event(EV_SYN, SYN_REPORT, 0)) then
-		Logger.warn(LOG, "emit_relative(%d:%d): SYN_REPORT write failed.", axis, value)
-		return false
-	end
-	return true
+	return legacy_emit(EV_REL, axis, value)
 end
 
 --- Captures a fresh, strictly acknowledged channel before any untracked wire attempt.
