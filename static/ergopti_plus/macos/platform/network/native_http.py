@@ -487,7 +487,9 @@ class NativeHTTPResponse:
                     raise NativeHTTPError("protocol")
         self.status = metadata["status"]
         self.headers = metadata["headers"]
-        self._body_expected = 0 if self._method == "HEAD" else content_length
+        # A 304 may advertise the size of the selected representation while its
+        # own response body is empty, just like a HEAD response.
+        self._body_expected = 0 if self._method == "HEAD" or self.status == 304 else content_length
         self._body_received = 0
         if self._body_expected == 0:
             tag, payload = self._frame()

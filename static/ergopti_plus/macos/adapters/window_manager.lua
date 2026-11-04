@@ -114,7 +114,8 @@ function M.kill(spec)
 		if type(spec) ~= "string" then return false end
 		local app = running_app(spec)
 		if not app then return false end
-		app:kill()
+		-- The port promises forceful termination; kill() only asks the app to quit.
+		app:kill9()
 		return true
 	end)
 	if not ok then

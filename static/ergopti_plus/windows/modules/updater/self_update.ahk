@@ -198,6 +198,8 @@ _Updater_ScheduleDecision() {
 	global UPDATER_CHECK_INTERVAL, _UpdaterStartedAt
 	Timing := UpdateSchedule_Timing()
 	Now := _Updater_EpochNow()
+	if (Now < _UpdaterStartedAt)
+		_UpdaterStartedAt := Now
 	ReevaluateMs := Timing["reevaluate_sec"] * 1000
 	Next := UpdateSchedule_NextDue(Now, _UpdaterStartedAt, UPDATER_CHECK_INTERVAL, _Updater_CheckState())
 	if (Next.DueAt == "")

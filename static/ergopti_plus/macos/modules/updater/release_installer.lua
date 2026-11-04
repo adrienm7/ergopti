@@ -38,6 +38,7 @@ local FileSystem  = require("adapters.file_system")
 local JsonCodec   = require("adapters.json_codec")
 local ShellRunner = require("adapters.shell_runner")
 local Archives    = require("updater.release_assets")
+local ProxyPolicy = require("network.proxy_policy")
 
 local LOG = "updater.release_installer"
 local ARMING_RECEIPT = "ARMED"
@@ -244,14 +245,19 @@ function M.stage(asset, done)
 		Logger.error(LOG, "Cannot encode the chosen release download request.")
 		return false
 	end
-	-- Match the staging script's proxy precedence: only its explicit-route
-	-- branch invokes system curl; the native request does not depend on it.
-	local explicit_route = false
-	for _, name in ipairs({ "https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY" }) do
-		local value = M._getenv(name)
-		if type(value) == "string" and value ~= "" then explicit_route = true; break end
-	end
-	if explicit_route and not require("adapters.system_curl").check("the release download") then return false end
+	-- Read the shared proxy policy instead of maintaining another precedence.
+	-- Only the staging script's explicit-environment branch invokes curl.
+	local policy_path = Paths.shared("modules/network/proxy_policy.json")
+	local raw = type(policy_path) == "string" and FileSystem.read(policy_path) or nil
+	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
+	local policy = ProxyPolicy.new(decoded)
+	if not policy then Logger.error(LOG, "The release proxy policy is unavailable."); return false end
+	local environment = {}
+	for _, name in ipairs(policy.environment_names()) do environment[name] = M._getenv(name) or "" end
+	local route = policy.route(asset.url, environment)
+	if not route then Logger.error(LOG, "The release proxy route is invalid."); return false end
+	if route.mode == "environment" and not require("adapters.system_curl").check("the release download") then return false end
+	environment.ERGOPTI_RELEASE_STAGE_REQUEST = request
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
 		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)
@@ -268,7 +274,7 @@ function M.stage(asset, done)
 		local detail = string.format("exit %s: %s", tostring(exit_code), (tostring(stderr or ""):gsub("%s+$", "")))
 		Logger.error(LOG, "Release %s refused at the %s; stage path: %s (%s).", asset.tag, stage, stage_dir, detail)
 		done(nil, stage, detail)
-	end, nil, { ERGOPTI_RELEASE_STAGE_REQUEST = request })
+	end, nil, environment)
 	return type(handle) == "table" and handle.start() == true
 end
 

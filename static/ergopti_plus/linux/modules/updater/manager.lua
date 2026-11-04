@@ -1290,6 +1290,10 @@ local function _evaluate_schedule()
 	if _schedule_active ~= true then return end
 	_bg_timer_handle = nil
 	local now = M._now()
+	if _started_at and now < _started_at then
+		Logger.info(LOG, "The wall clock moved behind startup; restarting the update-check boot delay.")
+		_started_at = now
+	end
 	-- A luv timer does not advance during a suspend: a wall-clock gap longer
 	-- than the delay it was armed for is a wake, after which the network needs
 	-- the boot delay before a catch-up check.
@@ -1399,6 +1403,7 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	_schedule_active = true
 	_started_at = _started_at or M._now()
 	local now = M._now()
+	if now < _started_at then _started_at = now end
 	local due_at, reason = Schedule.next_due({
 		now = now, started_at = _started_at, interval = _check_interval,
 		state = _load_check_state(), timing = TIMING,

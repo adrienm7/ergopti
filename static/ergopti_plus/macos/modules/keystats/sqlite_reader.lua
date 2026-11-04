@@ -114,14 +114,37 @@ local function _rows(db, sql, pacer)
 	end
 end
 
---- Returns the calendar day after `date_str` (YYYY-MM-DD). Noon avoids DST
---- transitions shifting the result by a day.
+--- Shifts an ISO calendar date without using the current machine's timezone.
+--- Device data can include dates skipped by a local timezone transition.
+local function shift_day(date_str, direction)
+	local y, m, d = tostring(date_str):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+	if not y then error("sqlite_reader: invalid date " .. tostring(date_str), 3) end
+	y, m, d = tonumber(y), tonumber(m), tonumber(d)
+	local function month_days(year, month)
+		local leap = year % 4 == 0 and (year % 100 ~= 0 or year % 400 == 0)
+		local days = {31, leap and 29 or 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+		return days[month]
+	end
+	local limit = month_days(y, m)
+	if not limit or d < 1 or d > limit then error("sqlite_reader: invalid date " .. date_str, 3) end
+	d = d + direction
+	if d > limit then
+		d, m = 1, m + 1
+		if m > 12 then y, m = y + 1, 1 end
+	elseif d < 1 then
+		m = m - 1
+		if m < 1 then y, m = y - 1, 12 end
+		d = month_days(y, m)
+	end
+	if y < 0 or y > 9999 then error("sqlite_reader: date outside supported range", 3) end
+	return string.format("%04d-%02d-%02d", y, m, d)
+end
+
+--- Returns the calendar day after `date_str` (YYYY-MM-DD).
 --- @param date_str string Day.
 --- @return string next_day
 function M.next_day(date_str)
-	local y, m, d = tostring(date_str):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
-	if not y then error("sqlite_reader: invalid date " .. tostring(date_str), 2) end
-	return os.date("%Y-%m-%d", os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d) + 1, hour = 12 }))
+	return shift_day(date_str, 1)
 end
 
 --- Reset a per-app manifest entry with all numeric counters at 0.
@@ -493,11 +516,13 @@ local function _manifest_windows(db, start_date, end_date)
 	while window_lo <= hi do
 		local window_hi = window_lo
 		for _ = 2, MANIFEST_WINDOW_DAYS do
+			if window_hi == hi then break end
 			local following = M.next_day(window_hi)
 			if following > hi then break end
 			window_hi = following
 		end
 		windows[#windows + 1] = { window_lo, window_hi }
+		if window_hi == hi then break end
 		window_lo = M.next_day(window_hi)
 	end
 	return windows, complete
@@ -641,6 +666,7 @@ local function _ngram_days(db, start_date, end_date)
 	local day = lo
 	while day <= hi do
 		days[#days + 1] = day
+		if day == hi then break end
 		day = M.next_day(day)
 	end
 	return days, complete
@@ -815,10 +841,7 @@ function M.split_bounds(start_date, end_date, today_str)
 		and (not end_date or end_date == "" or end_date >= today_str)
 	-- Historical: anything strictly before today. Calendar arithmetic on the
 	-- date string avoids invalid days (2026-01-00) and DST-length days.
-	local y, m, d = tostring(today_str):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
-	if not y then error("sqlite_reader: invalid today " .. tostring(today_str), 2) end
-	local yesterday_str = os.date("%Y-%m-%d",
-		os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d) - 1, hour = 12 }))
+	local yesterday_str = shift_day(today_str, -1)
 	local historical_end = yesterday_str
 	if end_date and end_date ~= "" and end_date < today_str then historical_end = end_date end
 	return { includes_today = includes_today, historical_end = historical_end }

@@ -72,6 +72,7 @@ local function make_eventtap_stub(options)
 		function tap:start()
 			self.start_calls = self.start_calls + 1
 			_running = true
+			if options.fire_during_start then self.handler({}) end
 			if self.start_failures > 0 then
 				self.start_failures = self.start_failures - 1
 				error("native start exploded")
@@ -285,6 +286,17 @@ helpers.describe("KeyboardHook exact native ownership", function()
 		helpers.assert_eq(2, #eventtap_stub.__taps,
 			"a successor may exist only after exact cleanup commits")
 		helpers.assert_eq(true, M.stop())
+	end)
+
+	helpers.it("does not deliver an event while native start is uncommitted", function()
+		local eventtap_stub = make_eventtap_stub({ fire_during_start = true })
+		local M = helpers.load_with_stubs("adapters.keyboard_hook", { eventtap = eventtap_stub })
+		local calls = 0
+		helpers.assert_eq(M.start({ onEvent = function() calls = calls + 1 end }), true)
+		helpers.assert_eq(calls, 0)
+		eventtap_stub.__taps[1].handler({})
+		helpers.assert_eq(calls, 1)
+		helpers.assert_eq(M.stop(), true)
 	end)
 
 	helpers.it("rolls back a partially enabled tap whose start throws", function()

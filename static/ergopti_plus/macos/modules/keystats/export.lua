@@ -566,16 +566,21 @@ function M.sync_foreign_data_sql(on_applied)
 	end
 	local synced_devices = {}
 	local eligible = {}
+	local function unavailable_directory(path)
+		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
+		if type(path) ~= "string" or path == "" then return nil, "foreign metrics directory is unavailable" end
+		local called, _, status = pcall(require("adapters.file_system").classify_no_follow, path)
+		if called and status == "absent" then return synced_devices end
+		return nil, "foreign metrics directory cannot be inspected"
+	end
 
 	local md = _paths.metrics_dir
 	if not md or not fs.attributes(md) then
-		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
-		return synced_devices
+		return unavailable_directory(md)
 	end
 	local by_root = md .. "by_device/"
 	if not fs.attributes(by_root) then
-		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
-		return synced_devices
+		return unavailable_directory(by_root)
 	end
 	local entries, listed, list_err = FsDir.try_entries(by_root)
 	if listed ~= true then

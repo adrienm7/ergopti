@@ -11,6 +11,13 @@ local helpers = require("tests.helpers")
 local UnicodeCase = helpers.load_module("unicode_case")
 
 helpers.describe("Unicode case conversion", function()
+	helpers.it("folds fixed-width Unicode hotstring case pairs (hotstring-unicode-fold)", function()
+		local text = helpers.load_module("text_utils")
+		helpers.assert_eq(text.trig_lower("ÁΣ"), "áσ")
+		helpers.assert_eq(text.trig_upper("áσ"), { "ÁΣ" })
+		helpers.assert_eq(text.repl_upper("áσ"), "ÁΣ")
+	end)
+
 	helpers.it("uses the pinned complete Unicode dataset", function()
 		helpers.assert_eq(UnicodeCase.UNICODE_VERSION, "17.0")
 	end)

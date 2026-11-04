@@ -116,6 +116,16 @@ local function fire(ctx)
 end
 
 helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check", function()
+	helpers.it("restarts the boot delay if the wall clock moves behind startup", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		ctx.clock.now = T0 - 86400
+		fire(ctx)
+		helpers.assert_eq(last_timer(ctx).delay, ctx.timing.boot_check_delay_sec)
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		helpers.assert_eq(#ctx.requests, 1, "the check resumes without waiting for the old wall clock")
+	end)
 	helpers.it("does not check automatically while pause state is unknown", function()
 		for _, mode in ipairs({ "pause_error", "pause_unknown" }) do
 			local options = { now = T0, record = { seed = SEED }, defer = true }
@@ -566,6 +576,19 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 			"a release of the previous channel does not silence the new channel's announcement")
 	end)
 
+	helpers.it("does not republish a manual result after the channel changes away and back", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers = check_now(ctx, "dev")
+		ctx.channel = "main"
+		ctx.owner.on_channel_changed()
+		ctx.channel = "dev"
+		ctx.owner.on_channel_changed()
+		ctx.pending[1]({ ok = true, status = 200, body = MIXED, headers = {} })
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150", "the original window still gets its result")
+		helpers.assert_nil(ctx.owner.latest(), "a previous channel epoch cannot republish the About row")
+		helpers.assert_nil(ctx.values[ctx.state_key].last_notified_tag)
+	end)
+
 	helpers.it("says up to date and still lists newer releases of other channels", function()
 		local list = UP_TO_DATE:gsub("^%[", '[{"tag_name":"v1.0.0","prerelease":false,'
 			.. '"published_at":"2026-08-05T00:00:00Z","assets":[]},')
@@ -623,6 +646,24 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_eq(ctx.requests[1].headers["If-None-Match"], '"v1"')
 		helpers.assert_eq(answers[1].state, "available")
 		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+	end)
+
+	helpers.it("does not cache or send a malformed release ETag", function()
+		for _, etag in ipairs({ "garbage", "   ", '"unfinished' }) do
+			local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+				{ ok = true, status = 200, body = LIST, headers = { etag = etag } },
+				{ ok = true, status = 200, body = LIST, headers = {} },
+			} })
+			check_now(ctx, "dev")
+			helpers.assert_nil(ctx.values[ctx.list_key], "an invalid validator must not be saved")
+			check_now(ctx, "dev")
+			helpers.assert_nil(ctx.requests[2].headers["If-None-Match"])
+		end
+		local restored = build({ now = T0, record = { seed = SEED },
+			list_copy = { url = URL, etag = "garbage", body = LIST },
+			responses = { { ok = true, status = 200, body = LIST, headers = {} } } })
+		check_now(restored, "dev")
+		helpers.assert_nil(restored.requests[1].headers["If-None-Match"], "a restored invalid ETag is dropped")
 	end)
 
 	helpers.it("drops a stored copy of another list URL and sends a full request", function()

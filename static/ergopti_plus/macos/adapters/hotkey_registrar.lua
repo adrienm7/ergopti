@@ -195,20 +195,23 @@ local function bind_native(chord, callback, native_key, conditional, admit_capsl
 	local entry = {
 		hotkey = nil,
 		chord = type(hs_key) == "number" and ("native " .. identity) or Chord.format(parsed.mods, parsed.key),
-		enabled = true,
+		enabled = false,
 		native_settled = true,
 		identity = identity,
 		conditional = conditional == true,
 	}
 	local function deliver_if_enabled(...)
 		if entry.enabled ~= true then return nil end
-		local guard_ok, allowed_or_err = xpcall(_delivery_guard, debug.traceback)
+		local generation = entry.claim_generation or 0
+		local guard = _delivery_guard
+		local guard_ok, allowed_or_err = xpcall(guard, debug.traceback)
 		if not guard_ok then
 			Logger.error(LOG, "Delivery guard raised for %s — callback denied: %s.",
 				entry.chord, tostring(allowed_or_err))
 			return nil
 		end
-		if allowed_or_err ~= true then return nil end
+		if allowed_or_err ~= true or guard ~= _delivery_guard or entry.enabled ~= true
+			or (entry.claim_generation or 0) ~= generation then return nil end
 
 		local args = table.pack(...)
 		local callback_ok, result_or_err = xpcall(function()
@@ -232,6 +235,7 @@ local function bind_native(chord, callback, native_key, conditional, admit_capsl
 	local handle = next_handle()
 	entry.hotkey = hotkey
 	_bindings[handle] = entry
+	entry.enabled = true
 	if owns_transaction then _claim_transaction = false end
 	Logger.debug(LOG, "Bound %s → %s.", _bindings[handle].chord, handle)
 	return handle

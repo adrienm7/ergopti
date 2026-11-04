@@ -32,7 +32,10 @@ return function(run)
 			end }
 			package.loaded["adapters.shell_runner"] = { spawn = function(bin, args, callback)
 				state.pending[#state.pending + 1] = { bin = bin, args = args, callback = callback }
-				return { start = function() return state.started end }
+				return { start = function()
+					if state.on_start then state.on_start(callback) end
+					return state.started
+				end }
 			end }
 			local function classify(path)
 				state.classified[#state.classified + 1] = path

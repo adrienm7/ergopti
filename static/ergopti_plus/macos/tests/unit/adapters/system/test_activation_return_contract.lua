@@ -21,6 +21,20 @@ local helpers = require("tests.helpers")
 -- ===========================================================
 
 helpers.describe("activation adapters: false native results remain failures", function()
+	helpers.it("WindowManager.kill issues the forceful native termination", function()
+		local graceful, forceful = 0, 0
+		local app = {
+			kill = function() graceful = graceful + 1 end,
+			kill9 = function() forceful = forceful + 1 end,
+		}
+		local adapter = helpers.load_with_stubs("adapters.window_manager", {
+			application = { applicationsForBundleID = function() return { app } end },
+		})
+		helpers.assert_eq(adapter.kill("com.example.app"), true)
+		helpers.assert_eq(forceful, 1)
+		helpers.assert_eq(graceful, 0)
+	end)
+
 	helpers.it("WindowManager.activate propagates application false", function()
 		local adapter = helpers.load_with_stubs("adapters.window_manager", {
 			application = {

@@ -470,15 +470,16 @@ end
 function M.would_fire(m, buffer)
 	if type(buffer) ~= "string" or type(m) ~= "table" then return nil end
 
-	local tb = m.trigger_bytes
-	if not tb or #buffer < tb then return nil end
-	local typed = buffer:sub(-tb)
+	if type(m.tlen) ~= "number" or m.tlen < 1 then return nil end
+	local ok, start = pcall(utf8.offset, buffer, -m.tlen)
+	if not ok or not start then return nil end
+	local typed = buffer:sub(start)
 
 	local eff_plain, is_noop = HotstringCore.decide(
 		m,
 		m.plain_repl,
 		typed,
-		prev_char_before(buffer, #buffer - tb + 1),
+		prev_char_before(buffer, start),
 		_state and _state.start_is_word_boundary
 	)
 
@@ -570,20 +571,19 @@ local function resolve_terminator_match(mapping, buffer, chars, explicit_magic)
 		-- Explicit magic also permits a literal trigger ending in the space.
 		-- Preserve that direct match before treating the space as punctuation.
 		if explicit_magic and extra_bs_bytes > 0 then
-			local direct_start = #buffer - chars_bytes - tb + 1
-			if direct_start >= 1 then
-				local direct, _, _, noop = M.would_fire(mapping, buffer:sub(1, direct_start + tb - 1))
+			if #buffer > chars_bytes then
+				local direct, _, _, noop = M.would_fire(mapping, buffer:sub(1, #buffer - chars_bytes))
 				if direct or noop then extra_bs_bytes = 0 end
 			end
 		end
 	end
 
 	local effective_chars_bytes = chars_bytes + extra_bs_bytes
-	if #buffer < tb + effective_chars_bytes then return nil end
-	local buf_start = #buffer - effective_chars_bytes - tb + 1
-	local body = buffer:sub(1, buf_start + tb - 1)
+	if #buffer <= effective_chars_bytes then return nil end
+	local body = buffer:sub(1, #buffer - effective_chars_bytes)
 	local eff_plain, typed_trigger, eff_repl, is_noop = M.would_fire(mapping, body)
 	if not eff_plain and not is_noop then return nil end
+	local buf_start = #body - #typed_trigger + 1
 
 	return {
 		buf_start       = buf_start,
@@ -906,9 +906,9 @@ local function pick_cascade_step(vbuf, tail, stable_bytes)
 		local bucket = _registry.mappings_for_tail(vbuf:sub(last))
 		for _, m in ipairs(bucket or {}) do
 			if m.auto and is_cascade_link(m) and cascade_step_allowed(m, reference, stable_bytes) then
-				local eff_plain = M.would_fire(m, vbuf)
+				local eff_plain, typed = M.would_fire(m, vbuf)
 				if eff_plain then
-					auto_step = { mapping = m, start = #vbuf - m.trigger_bytes + 1, text = eff_plain }
+					auto_step = { mapping = m, start = #vbuf - #typed + 1, text = eff_plain }
 					break
 				end
 			end
@@ -1084,9 +1084,8 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 
 	local repl_text = eff_plain
 	-- 1-based byte index where the matched trigger starts, used below to splice the
-	-- replacement into the buffer. Derived from the same trigger_bytes would_fire
-	-- matched on, so the two can never disagree about where the trigger began.
-	local tstart_byte = #active_buffer - m.trigger_bytes + 1
+	-- replacement into the buffer, using the actual matched spelling.
+	local tstart_byte = #active_buffer - #typed + 1
 
 	-- The cascade: the replacement may complete further hotstrings. The chain is
 	-- one net edit, so everything below types ONE replacement whose trigger is the

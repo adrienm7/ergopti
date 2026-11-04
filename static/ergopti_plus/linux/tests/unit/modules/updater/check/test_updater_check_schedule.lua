@@ -112,6 +112,16 @@ local function record(ctx)
 end
 
 helpers.describe("updater (linux): the check schedule follows the persisted record", function()
+	helpers.it("clock rollback behind startup restarts the boot delay", function()
+		with_manager({ now = T0, record = { seed = SEED } }, function(ctx)
+			ctx.clock.now = T0 - 86400
+			fire(ctx)
+			helpers.assert_eq(last_timer(ctx).delay, ctx.M.TIMING.boot_check_delay_sec)
+			ctx.clock.now = ctx.clock.now + ctx.M.TIMING.boot_check_delay_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.dispatches, 1)
+		end)
+	end)
 	-- A local version run from source has no installation to update. It used
 	-- to check on the schedule all the same, and announce releases it could
 	-- not install; the tray now greys its update rows and nothing is armed.
