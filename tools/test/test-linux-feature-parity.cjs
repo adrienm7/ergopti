@@ -169,6 +169,44 @@ for (const file of ['src/routes/ergopti-plus/menu-gaps.json', 'docs/feature-inve
 	);
 }
 
+const layerVocabulary = require('smol-toml').parse(
+	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/keymap/layer_actions.toml'), 'utf8')
+);
+const withLayers = inventory.render(
+	inventoryModel,
+	inventoryLocales,
+	inventoryActions,
+	inventoryMenu,
+	layerVocabulary
+);
+const layerRows = JSON.parse(withLayers['src/routes/ergopti-plus/action-inventory.json']).filter(
+	(row) => row.path.startsWith('layers.')
+);
+assert.ok(layerRows.length >= 40, 'layer vocabulary must be projected');
+assert.ok(
+	JSON.parse(
+		fs.readFileSync(path.join(ROOT, 'src/routes/ergopti-plus/action-inventory.json'), 'utf8')
+	).filter((row) => row.path.startsWith('layers.')).length >= 40,
+	'published inventory must contain the layer vocabulary'
+);
+assert.strictEqual(
+	layerRows.find((row) => row.path === 'layers.parameters.repeat_count').platforms.linux,
+	false
+);
+const badLayerVocabulary = structuredClone(layerVocabulary);
+delete badLayerVocabulary.source_kinds.mouse_button.reason_key;
+assert.throws(
+	() =>
+		inventory.render(
+			inventoryModel,
+			inventoryLocales,
+			inventoryActions,
+			inventoryMenu,
+			badLayerVocabulary
+		),
+	/Missing layer reason/
+);
+
 const rows = build();
 const summary = summarize(rows);
 const canonical = fs.readFileSync(

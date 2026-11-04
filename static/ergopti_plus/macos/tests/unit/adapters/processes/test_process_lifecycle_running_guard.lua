@@ -67,6 +67,7 @@ local function load_adapter(options)
 			end
 			function candidate:stop()
 				ctx.stop_calls = ctx.stop_calls + 1
+				if options.stop_error_object and ctx.stop_calls == 1 then error(options.stop_error_object) end
 				if options.stop_throws_once and ctx.stop_calls == 1 then
 					error("native stop failed")
 				end
@@ -101,6 +102,9 @@ local function load_adapter(options)
 						end,
 						unsubscribeAll = function(self)
 							ctx.unsubscribe_calls = ctx.unsubscribe_calls + 1
+							if options.unsubscribe_error_object and ctx.unsubscribe_calls == 1 then
+								error(options.unsubscribe_error_object)
+							end
 							if options.unsubscribe_throws_once and ctx.unsubscribe_calls == 1 then
 								error("native unsubscribe failed")
 							end
@@ -117,6 +121,19 @@ local function load_adapter(options)
 end
 
 helpers.describe("process_lifecycle: native ownership is transactional", function()
+	helpers.it("keeps both watcher cleanup debts if native error formatting raises (process-stop-error-object)", function()
+		local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+		local adapter, ctx = load_adapter({ stop_error_object = hostile, unsubscribe_error_object = hostile })
+		adapter.onFocusChange(function() end)
+		helpers.assert_true(adapter.start())
+		helpers.assert_eq(adapter.stop(), false)
+		helpers.assert_eq(ctx.stop_calls, 1)
+		helpers.assert_eq(ctx.unsubscribe_calls, 1, "a failed diagnostic must not skip sibling cleanup")
+		helpers.assert_true(adapter.stop())
+		helpers.assert_eq(ctx.stop_calls, 2)
+		helpers.assert_eq(ctx.unsubscribe_calls, 2)
+	end)
+
 	helpers.it("requires the exact watcher and filter receipts (process-lifecycle-exact-receipt)", function()
 		for _, case in ipairs({
 			{ option = "start_returns_true_once", start = true },

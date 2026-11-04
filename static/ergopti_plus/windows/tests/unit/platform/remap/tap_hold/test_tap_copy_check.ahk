@@ -142,3 +142,21 @@ _TCC_UnreadableCounter() {
 	}
 }
 Test("tap-hold copy: a zero sequence number is unreadable, never a failure (tap-copy-verified)", _TCC_UnreadableCounter)
+
+_TCC_PauseCancelsRetry() {
+	global _TCC_Sends, _TCC_Warnings
+	Restore := _TCC_Install(Map())
+	try {
+		TapCopySend("left_shift", _TCC_Send)
+		TapCopyCheckStop()
+		_TCC_Fire()
+		AssertEqual(1, _TCC_Sends, "a retry from before pause must not run after resume")
+		AssertEqual(0, _TCC_Warnings, "abandoning a stale check must not warn")
+		Body := _DriverFuncBody("Ergopti_OnSuspendEnter")
+		Assert(Body != "", "the suspend lifecycle must be present")
+		Assert(InStr(Body, "TapCopyCheckStop()") > 0, "suspend must stop copy verification")
+	} finally {
+		Restore()
+	}
+}
+Test("tap-hold copy: suspend retires a pending retry (tap-copy-pause)", _TCC_PauseCancelsRetry)

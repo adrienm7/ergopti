@@ -522,6 +522,9 @@ Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
+	; A copy retry belongs to the pre-pause selection and must not survive a quick resume.
+	if IsSet(TapCopyCheckStop)
+		TapCopyCheckStop()
 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
 			() => _LifecycleSetNavEventOwnerSuspended(true), true) {
 		LifecycleTransitionFinish(Transition)
