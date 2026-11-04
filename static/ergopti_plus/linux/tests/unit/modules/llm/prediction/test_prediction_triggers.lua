@@ -237,6 +237,104 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 		restore()
 	end)
 
+	helpers.it("(preview-expiry-stale) ignores a cancelled timer after a newer preview", function()
+		local callbacks, hidden, expired = {}, 0, 0
+		replace("adapters.timer_scheduler", {
+			after = function(_, callback) callbacks[#callbacks + 1] = callback; return { armed = true } end,
+			cancel = function() return true end,
+		})
+		replace("adapters.graphics_renderer", {
+			is_available = function() return true end, show = function() return true end,
+			hide = function() hidden = hidden + 1; return true end,
+		})
+		package.loaded["ui.tooltip.preview"] = nil
+		local preview = require("ui.tooltip.preview")
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function() return { delay = 0.25, show_tooltip = true } end },
+			on_expire = function() expired = expired + 1 end })
+		local candidate = { { replacement = "text", group = "rolls", fires = true } }
+		assert(preview.show(candidate, "autocorrect")); assert(preview.show(candidate, "autocorrect"))
+		callbacks[1]()
+		local observed = { showing = preview.is_showing(), hidden = hidden, expired = expired }
+		callbacks[2]()
+		observed.after_showing, observed.after_expired = preview.is_showing(), expired
+		package.loaded["ui.tooltip.preview"] = nil
+		restore()
+		helpers.assert_eq(observed, { showing = true, hidden = 0, expired = 0, after_showing = false, after_expired = 1 })
+	end)
+
+	helpers.it("(preview-expiry-stale) ignores queued timers after a cover or failed redraw", function()
+		local callbacks, hidden, expired, draws = {}, 0, 0, 0
+		replace("adapters.timer_scheduler", {
+			after = function(_, callback) callbacks[#callbacks + 1] = callback; return { armed = true } end,
+			cancel = function() return false end,
+		})
+		replace("adapters.graphics_renderer", {
+			is_available = function() return true end,
+			show = function() draws = draws + 1; return draws ~= 3 end,
+			hide = function() hidden = hidden + 1; return true end,
+		})
+		package.loaded["ui.tooltip.preview"] = nil
+		local preview = require("ui.tooltip.preview")
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function() return { delay = 0.25, show_tooltip = true } end },
+			on_expire = function() expired = expired + 1 end })
+		local candidate = { { replacement = "text", group = "rolls", fires = true } }
+		assert(preview.show(candidate, "autocorrect")); preview.note_covered(); callbacks[1]()
+		assert(preview.show(candidate, "autocorrect")); assert(preview.show(candidate, "autocorrect") == false)
+		callbacks[2]()
+		package.loaded["ui.tooltip.preview"] = nil
+		restore()
+		helpers.assert_eq({ hidden = hidden, expired = expired }, { hidden = 0, expired = 0 })
+	end)
+
+	helpers.it("(preview-expiry-stale) does not retain a timer that fires before after returns", function()
+		local hidden, expired, cancelled = 0, 0, 0
+		replace("adapters.timer_scheduler", {
+			after = function(_, callback) callback(); return { armed = true } end,
+			cancel = function() cancelled = cancelled + 1; return true end,
+		})
+		replace("adapters.graphics_renderer", {
+			is_available = function() return true end, show = function() return true end,
+			hide = function() hidden = hidden + 1; return true end,
+		})
+		package.loaded["ui.tooltip.preview"] = nil
+		local preview = require("ui.tooltip.preview")
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function() return { delay = 0.25, show_tooltip = true } end },
+			on_expire = function() expired = expired + 1 end })
+		local accepted = preview.show({ { replacement = "text", group = "rolls", fires = true } }, "autocorrect")
+		local showing = preview.is_showing()
+		package.loaded["ui.tooltip.preview"] = nil
+		restore()
+		helpers.assert_eq({ accepted = accepted, showing = showing, hidden = hidden, expired = expired, cancelled = cancelled },
+			{ accepted = false, showing = false, hidden = 1, expired = 1, cancelled = 1 })
+	end)
+
+	helpers.it("(preview-expiry-stale) does not publish expiry over a reentrant replacement", function()
+		local callbacks, expired = {}, 0
+		replace("adapters.timer_scheduler", {
+			after = function(_, callback) callbacks[#callbacks + 1] = callback; return { armed = true } end,
+			cancel = function() return true end,
+		})
+		replace("adapters.graphics_renderer", {
+			is_available = function() return true end, show = function() return true end,
+			hide = function() return true end,
+		})
+		package.loaded["ui.tooltip.preview"] = nil
+		local preview = require("ui.tooltip.preview")
+		local candidate = { { replacement = "text", group = "rolls", fires = true } }
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function() return { delay = 0.25, show_tooltip = true } end },
+			on_hidden = function() preview.show(candidate, "autocorrect") end,
+			on_expire = function() expired = expired + 1 end })
+		assert(preview.show(candidate, "autocorrect")); callbacks[1]()
+		local showing = preview.is_showing()
+		package.loaded["ui.tooltip.preview"] = nil
+		restore()
+		helpers.assert_eq({ showing = showing, expired = expired }, { showing = true, expired = 0 })
+	end)
+
 	helpers.it("(preview-destroy-expiry) retires its timer and rows before a new owner draws", function()
 		local scheduler = Fakes.timer_scheduler()
 		local hidden, expired = 0, 0
