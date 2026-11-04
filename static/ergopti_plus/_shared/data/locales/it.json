@@ -1741,6 +1741,7 @@
 	"menu.layout.install_other_scope": "Un layout è presente nell’altra cartella Keyboard Layouts. Rimuovilo manualmente e riprova.",
 	"menu.layout.install_other_scope_unverified": "Impossibile verificare l’altra cartella Keyboard Layouts. Controllala manualmente prima di riprovare.",
 	"menu.layout.install_system_unavailable": "L’installazione di sistema non è disponibile perché il programma di avvio non può essere verificato in sicurezza dopo l’autorizzazione. Usa l’installazione utente; prima rimuovi eventuali copie di sistema precedenti.",
+	"menu.layout.install_system_reason": "non disponibile: verifica del programma di avvio non sicura",
 	"menu.layout.active_layouts": "Sorgenti di input",
 	"menu.layout.header_any": "Tutti i layout",
 	"menu.layout.header_custom": "Layout personalizzato",

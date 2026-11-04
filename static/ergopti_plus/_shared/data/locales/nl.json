@@ -1741,6 +1741,7 @@
 	"menu.layout.install_other_scope": "In de andere map Keyboard Layouts staat een indeling. Verwijder deze handmatig en probeer opnieuw.",
 	"menu.layout.install_other_scope_unverified": "De andere map Keyboard Layouts kon niet worden gecontroleerd. Controleer deze handmatig voordat je opnieuw probeert.",
 	"menu.layout.install_system_unavailable": "Systeeminstallatie is niet beschikbaar omdat de launcher na toestemming niet veilig kan worden gecontroleerd. Gebruik de gebruikersinstallatie en verwijder eerst eventuele oude systeemkopieën.",
+	"menu.layout.install_system_reason": "niet beschikbaar: launchercontrole is onveilig",
 	"menu.layout.active_layouts": "Invoerbronnen",
 	"menu.layout.header_any": "Alle indelingen",
 	"menu.layout.header_custom": "Aangepaste indeling",

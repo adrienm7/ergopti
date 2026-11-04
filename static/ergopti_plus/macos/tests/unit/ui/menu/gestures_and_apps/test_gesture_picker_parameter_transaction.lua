@@ -106,6 +106,18 @@ local function with_picker(options, callback)
 end
 
 helpers.describe("gesture picker acknowledged parameter transaction", function()
+	helpers.it("keeps the picker open when its parameter handoff is refused", function()
+		with_picker({}, function(fixture, pick)
+			local deferred = require("infra.deferred_work")
+			local previous = deferred.after
+			deferred.after = function() return false end
+			local ok, result = pcall(pick)
+			deferred.after = previous
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(fixture.assigned, "none")
+		end)
+	end)
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("does not assign after " .. mode .. " parameter refusal", function()
 			with_picker({ parameter = mode }, function(fixture, pick)

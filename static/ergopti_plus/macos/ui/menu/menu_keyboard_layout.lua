@@ -417,12 +417,14 @@ function M.build(ctx)
 			system_best and system_best.name or "none",
 			tostring(latest_installed_anywhere))
 
-		-- System scope is listed first: it is the preferred install target
-		-- because it makes the layout available for all users and avoids
-		-- duplication between ~/Library and /Library. An existing other-scope
-		-- bundle requires manual removal so a concurrent writer stays untouched.
+		-- Keep an existing system copy visible. Installation and updates in that
+		-- scope are unavailable until privileged launcher identity can be bound.
+		local system_scope_label = i18n.get("menu.layout.scope_system")
+		if not system_best or version_gt(latest_ver, system_best.version) then
+			system_scope_label = system_scope_label .. " — " .. i18n.get("menu.layout.install_system_reason")
+		end
 		bundle_rows[#bundle_rows + 1] = build_install_item(
-			i18n.get("menu.layout.scope_system"), "🔐", system_best, latest, latest_ver,
+			system_scope_label, "🔐", system_best, latest, latest_ver,
 			function()
 				run_install_and_chain(
 					function() return install_system(bundles_dir, latest) end,

@@ -1741,6 +1741,7 @@
 	"menu.layout.install_other_scope": "Det finnes et oppsett i den andre Keyboard Layouts-mappen. Fjern det manuelt og prøv igjen.",
 	"menu.layout.install_other_scope_unverified": "Den andre Keyboard Layouts-mappen kunne ikke kontrolleres. Kontroller den manuelt før du prøver igjen.",
 	"menu.layout.install_system_unavailable": "Systeminstallasjon er utilgjengelig fordi oppstarteren ikke kan kontrolleres sikkert etter godkjenning. Bruk brukerinstallasjon og fjern først eventuelle gamle systemkopier.",
+	"menu.layout.install_system_reason": "utilgjengelig: usikker kontroll av oppstarter",
 	"menu.layout.active_layouts": "Inndatakilder",
 	"menu.layout.header_any": "Alle oppsett",
 	"menu.layout.header_custom": "Egendefinert tastaturoppsett",

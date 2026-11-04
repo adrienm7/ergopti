@@ -167,7 +167,7 @@ local function with_provider(kind, options, body)
 			if kind ~= "script" then
 				helpers.assert_type(picker_callback, "function")
 				if options.cancel then return picker_callback(selected) end
-				picker_callback(selected, scalar)
+				return picker_callback(selected, scalar)
 			end
 		end, state)
 	end, debug.traceback)
@@ -180,6 +180,20 @@ end
 for _, kind in ipairs({ "keyboard", "tap", "script" }) do
 	local binding = kind == "keyboard" and "keyboard__primary_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
 	helpers.describe("program transaction through actual " .. kind .. " provider", function()
+		if kind ~= "script" then
+			helpers.it("keeps the picker open when its parameter handoff is refused", function()
+				with_provider(kind, {}, function(fixture, pick)
+					local deferred = require("infra.deferred_work")
+					local previous = deferred.after
+					deferred.after = function() return false end
+					local ok, result = pcall(pick)
+					deferred.after = previous
+					helpers.assert_true(ok)
+					helpers.assert_eq(result, false)
+					helpers.assert_eq(fixture.action, "none")
+				end)
+			end)
+		end
 		for _, stage in ipairs({ "parameter", "assign", "save" }) do
 			for _, mode in ipairs({ "false", "nil", "throw" }) do
 				helpers.it("restores both owners after " .. stage .. " " .. mode, function()

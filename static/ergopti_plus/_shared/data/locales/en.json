@@ -1736,6 +1736,7 @@
 	"menu.layout.install_other_scope": "A keyboard bundle remains in the other Keyboard Layouts folder. Remove it manually, then retry.",
 	"menu.layout.install_other_scope_unverified": "Could not check the other Keyboard Layouts folder. Check it manually before retrying.",
 	"menu.layout.install_system_unavailable": "System install is unavailable because the launcher cannot be verified safely after authorization. Use user install; remove any old system copy first.",
+	"menu.layout.install_system_reason": "unavailable: launcher verification is unsafe",
 	"menu.layout.active_layouts": "Input sources",
 	"menu.layout.header_any": "Any layout",
 	"menu.layout.header_custom": "Custom layout",

@@ -1741,6 +1741,7 @@
 	"menu.layout.install_other_scope": "W drugim folderze Keyboard Layouts znajduje się układ. Usuń go ręcznie i spróbuj ponownie.",
 	"menu.layout.install_other_scope_unverified": "Nie można sprawdzić drugiego folderu Keyboard Layouts. Sprawdź go ręcznie przed ponowną próbą.",
 	"menu.layout.install_system_unavailable": "Instalacja systemowa jest niedostępna, ponieważ nie można bezpiecznie zweryfikować programu uruchamiającego po autoryzacji. Użyj instalacji użytkownika i najpierw usuń stare kopie systemowe.",
+	"menu.layout.install_system_reason": "niedostępne: niebezpieczna weryfikacja programu uruchamiającego",
 	"menu.layout.active_layouts": "Źródła wprowadzania",
 	"menu.layout.header_any": "Wszystkie układy",
 	"menu.layout.header_custom": "Układ niestandardowy",
