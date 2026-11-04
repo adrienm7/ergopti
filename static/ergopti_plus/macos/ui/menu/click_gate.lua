@@ -277,12 +277,24 @@ function M.new(deps)
 
 	--- Writes clicks into the hand-off record, after any already written.
 	local function persist(clicks)
-		local record = { schema = REPLAY_SCHEMA, at = deps.now(), clicks = {} }
+		local now = deps.now()
+		local record = { schema = REPLAY_SCHEMA, at = now, clicks = {} }
 		local read, previous = pcall(store.get, M.REPLAY_KEY, nil)
 		if read and type(previous) == "string" then
 			local decoded, earlier = pcall(json.decode, previous)
-			if decoded and type(earlier) == "table" and type(earlier.clicks) == "table" then
+			local valid = decoded and type(earlier) == "table" and earlier.schema == REPLAY_SCHEMA
+				and type(earlier.at) == "number" and earlier.at <= now and now - earlier.at <= REPLAY_TTL_SEC
+				and type(earlier.clicks) == "table"
+			if valid then
+				for _, click in ipairs(earlier.clicks) do
+					if type(click) ~= "table" or not ClickIntent.valid_path(click.path)
+						or (click.desired ~= nil and type(click.desired) ~= "boolean") then valid = false; break end
+				end
+			end
+			if valid then
 				for _, click in ipairs(earlier.clicks) do record.clicks[#record.clicks + 1] = click end
+			else
+				Logger.warn(LOG, "The previous reload hand-off is invalid or expired; it is not renewed.")
 			end
 		end
 		for _, click in ipairs(clicks) do

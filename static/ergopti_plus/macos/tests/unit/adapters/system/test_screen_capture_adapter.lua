@@ -163,11 +163,17 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 					local _, unsupported = pcall(require("adapters.tcc_grant").reset, "All", "com.ergoptiplus.app.hammerspoon",
 						function() end)
 					helpers.assert_contains(tostring(unsupported), "unsupported service")
+					spawned = nil
+					helpers.assert_eq(adapter.reset_permission("com.other.application", function() end), false,
+						"a caller must not reset another application's grant")
+					helpers.assert_nil(spawned)
 				end)
 				with_native({}, function(adapter)
 					local bundle_id, detail = adapter.bundle_id()
 					helpers.assert_nil(bundle_id)
 					helpers.assert_contains(detail, "bundleID")
+					helpers.assert_eq(adapter.reset_permission("com.other.application", function() end), false)
+					helpers.assert_nil(spawned, "an unknown process identity must never invoke tccutil")
 				end)
 			end)
 			package.loaded["adapters.shell_runner"] = saved

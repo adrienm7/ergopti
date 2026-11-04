@@ -21,6 +21,9 @@
 --- ==============================================================================
 
 local M = {}
+local Logger = require("infra.logger")
+
+local LOG = "adapters.tcc_grant"
 
 local TCCUTIL_BIN = "/usr/bin/tccutil"
 
@@ -56,6 +59,11 @@ function M.reset(service, bundle_id, on_done)
 		error("tcc_grant.reset: bundle_id must be a non-empty string", 2)
 	end
 	if type(on_done) ~= "function" then error("tcc_grant.reset: on_done must be a function", 2) end
+	local own_bundle_id = M.bundle_id()
+	if own_bundle_id == nil or bundle_id ~= own_bundle_id then
+		Logger.error(LOG, "Refusing to reset a privacy grant outside this process's bundle identity.")
+		return false
+	end
 	local ShellRunner = require("adapters.shell_runner")
 	local handle = ShellRunner.spawn(TCCUTIL_BIN, { "reset", service, bundle_id },
 		function(exit_code, stdout, stderr)
