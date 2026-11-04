@@ -482,14 +482,14 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 			(m) => {
 				m.reference = { ref: 'refs/heads/dev', object: { type: 'commit', sha: m.run.head_sha } };
 			},
-			/target branch no longer/
+			/target branch reference is malformed/
 		],
 		[
 			'wrong target object',
 			(m) => {
 				m.reference = { ref: 'refs/heads/main', object: { type: 'tag', sha: m.run.head_sha } };
 			},
-			/target branch no longer/
+			/target branch reference is malformed/
 		]
 	];
 	for (const [name, change, reason] of mutations) {
@@ -842,9 +842,10 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		assert.equal(admitted.build_artifact_id, '301');
 		assert.equal(
 			fs.readFileSync(outputFile, 'utf8'),
-			Object.entries(admitted)
-				.map(([key, value]) => key + '=' + value + '\n')
-				.join('')
+			'superseded=false\n' +
+				Object.entries(admitted)
+					.map(([key, value]) => key + '=' + value + '\n')
+					.join('')
 		);
 		controls++;
 		const outputBefore = fs.readFileSync(outputFile);
@@ -868,6 +869,20 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 			/ENOENT/
 		);
 		controls++;
+		// A newer push moved the target past this source: the run admits nothing,
+		// writes no receipt and ends without a failure, since that push deploys.
+		const moved = fixture();
+		moved.reference = { ...moved.reference, object: { type: 'commit', sha: 'b'.repeat(40) } };
+		const supersededOutput = path.join(temporary, 'superseded-outputs.txt'),
+			supersededReceipt = path.join(temporary, 'superseded.json');
+		await owner.main(
+			['admit', eventFile, supersededReceipt],
+			{ ...cliEnv, GITHUB_OUTPUT: supersededOutput },
+			{ artifact, readApi: reader(moved).readApi }
+		);
+		assert.equal(fs.readFileSync(supersededOutput, 'utf8'), 'superseded=true\n');
+		assert.equal(fs.existsSync(supersededReceipt), false);
+		controls++;
 	} finally {
 		assert.equal(path.resolve(path.dirname(temporary)), path.resolve(os.tmpdir()));
 		assert.ok(path.basename(temporary).startsWith('ergopti-site-deploy-proof-'));
@@ -875,7 +890,7 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 	}
 	assert.equal(
 		controls,
-		103,
+		104,
 		'metadata/event, retained-role reruns, target freshness, strict CLI transport and exact downloaded-byte controls all execute'
 	);
 	const markerMutations = [

@@ -45,6 +45,7 @@ function parseVersion(tag) {
 function comparePrereleaseId(a, b) {
 	const aNum = /^\d+$/.test(a);
 	const bNum = /^\d+$/.test(b);
+	if (aNum !== bNum) return aNum ? -1 : 1;
 	if (aNum && bNum) {
 		const ai = Number(a);
 		const bi = Number(b);

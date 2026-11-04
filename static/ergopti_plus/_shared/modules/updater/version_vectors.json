@@ -9,6 +9,18 @@
 		{ "id": "major_gt", "a": "3.0.0", "b": "2.99.99", "expect": 1 },
 		{ "id": "prerelease_increment", "a": "2.5.0-dev.4", "b": "2.5.0-dev.3", "expect": 1 },
 		{ "id": "prerelease_numeric_order", "a": "2.5.0-dev.10", "b": "2.5.0-dev.4", "expect": 1 },
+		{
+			"id": "numeric_prerelease_before_text",
+			"a": "2.5.0-dev.2",
+			"b": "2.5.0-dev.1alpha",
+			"expect": -1
+		},
+		{
+			"id": "text_prerelease_after_numeric",
+			"a": "2.5.0-dev.1alpha",
+			"b": "2.5.0-dev.2",
+			"expect": 1
+		},
 		{ "id": "stable_over_prerelease", "a": "2.5.0", "b": "2.5.0-dev.4", "expect": 1 },
 		{ "id": "prerelease_under_stable", "a": "2.5.0-dev.4", "b": "2.5.0", "expect": -1 },
 		{ "id": "shorter_prerelease_is_less", "a": "2.5.0-dev", "b": "2.5.0-dev.4", "expect": -1 },
