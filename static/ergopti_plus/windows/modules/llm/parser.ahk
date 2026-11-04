@@ -150,6 +150,26 @@ _LLM_Parser_LastWord(s) {
 	return ""
 }
 
+; The transport/word limits do not bound a single model word or a diff grid.
+; Load the canonical resource policy once; malformed shipped policy fails closed.
+_LLM_Parser_DiffWithinLimits(Original, Corrected) {
+	global _SharedDir
+	static Limits := 0
+	if !(Limits is Map) {
+		Candidate := JsonParse(FSReadStrict(_SharedDir . "\modules\llm\parser_limits.json"))
+		for Name in ["max_operand_bytes", "max_grid_cells"] {
+			if !(Candidate is Map) || !Candidate.Has(Name) || !(Candidate[Name] is Integer) || Candidate[Name] < 1
+				throw ValueError("Invalid shared parser limit: " . Name)
+		}
+		Limits := Candidate
+	}
+	OriginalBytes := StrPut(Original, "UTF-8") - 1
+	CorrectedBytes := StrPut(Corrected, "UTF-8") - 1
+	; UTF-8 byte counts upper-bound both AHK code units and Lua character counts.
+	return OriginalBytes <= Limits["max_operand_bytes"] && CorrectedBytes <= Limits["max_operand_bytes"]
+		&& (OriginalBytes + 1) * (CorrectedBytes + 1) <= Limits["max_grid_cells"]
+}
+
 _LLM_Parser_CharLev(a, b) {
 	m := StrLen(a)
 	n := StrLen(b)
@@ -486,25 +506,20 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		nw := RegExReplace(nw, "\s*\]$", "")
 		nw := RegExReplace(nw, '^"', "")
 		nw := RegExReplace(nw, '"$', "")
+		if !_LLM_Parser_DiffWithinLimits("", tc) || !_LLM_Parser_DiffWithinLimits("", nw) {
+			try LoggerWarn("LLM.parser", "Prediction refused: model text exceeds the shared parser resource limits.")
+			return ""
+		}
 		tc := _LLM_Parser_ApplyFrenchTypography(tc)
 		nw := _LLM_Parser_ApplyFrenchTypography(nw)
 		nw := RegExReplace(nw, "^[\s\.…]+", "")
 		nw := RegExReplace(nw, "[\s\.…]+$", "")
 		if !is_rewrite
 			nw := _LLM_Parser_EnforceWordLimits(nw, max_words)
-		; Cap tc the same way. Its capture is bounded only by line length, and it
-		; feeds _LLM_Parser_TokenDiffOps — an O(n^2) dynamic program whose per-cell
-		; body allocates a fresh char array twice and a full (n1+1)x(n2+1) matrix
-		; once. len1 is clamped downstream but len2 was not, so a model in a
-		; repetition loop could emit a multi-KB TAIL_CORRECTED line and stall the
-		; keystroke thread (the poll chain shares AHK's single thread with the
-		; keyboard hook). The crash firewall catches exceptions, not elapsed time,
-		; so this degraded to a hang with nothing logged. A correction can never
-		; legitimately exceed the prediction budget.
-		; A rewrite is a whole sentence, not a few predicted words: capping it to
-		; max_words would erase the span and retype only its start. Its length is
-		; bounded by the span-sized token budget the engine sends instead
-		; (LLM_Rewrite_MaxTokens), and it carries no next words to require.
+		; Word limits constrain the continuation's content. The shared byte and
+		; grid limits below also bound one long word, independent of whitespace
+		; and of the provider's requested (but not guaranteed) token budget.
+		; Rewrites preserve their complete span within the same resource policy.
 		if !is_rewrite {
 			tc := _LLM_Parser_EnforceWordLimits(tc, max_words)
 			if (nw = "")
@@ -514,6 +529,11 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 			tc := _LLM_Parser_Trim(RegExReplace(tail_text, '^"', ""))
 		if (tc = "" and nw = "")
 			return ""
+
+		if !_LLM_Parser_DiffWithinLimits(full_text, tc) || !_LLM_Parser_DiffWithinLimits("", nw) {
+			try LoggerWarn("LLM.parser", "Prediction refused: correction exceeds the shared diff resource limits.")
+			return ""
+		}
 
 		; A rewrite legitimately replaces the last word ("jd" becomes "jeudi"), so
 		; the stale-snapshot guard only protects continuations.
@@ -606,6 +626,10 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		}
 
 		; 1. Diff strictly against TAIL_CORRECTED.
+		if !_LLM_Parser_DiffWithinLimits(orig_context, tc_norm) {
+			try LoggerWarn("LLM.parser", "Prediction refused: normalized correction exceeds the shared diff resource limits.")
+			return ""
+		}
 		ops := _LLM_Parser_TokenDiffOps(orig_context, tc_norm)
 
 		; 2. Strip leading context (free deletes + leading inserted spaces). A
@@ -881,6 +905,10 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 	nw := RegExReplace(nw, "i)^\[?NEXT\]?\s*:?\s*", "")
 	nw := RegExReplace(nw, "i)^SUITE\s*:\s*", "")
 	nw := RegExReplace(nw, "i)^Suite finale\s*[:.\-]*\s*", "")
+	if !_LLM_Parser_DiffWithinLimits("", nw) || !_LLM_Parser_DiffWithinLimits("", full_text) {
+		try LoggerWarn("LLM.parser", "Prediction refused: raw text exceeds the shared parser resource limits.")
+		return ""
+	}
 	nw := RegExReplace(nw, "^[-•*]+\s*", "")
 	nw := RegExReplace(nw, "^[\s\.…]+", "")
 	nw := RegExReplace(nw, "[\s\.…]+$", "")

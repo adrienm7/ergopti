@@ -377,3 +377,17 @@ Consequence: A model selection can reach the durable writer and publish new live
 Regression: Use the genuine native browser, observe its actual WM_COMMAND button event while suspended, and require no transaction/writer entry, unchanged durable/RAM state and visible UI. Resume must not replay the click; a fresh unpaused click must still durably select B.
 
 The ongoing register now contains **26 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-027: A single model word bypasses parser work and allocation limits
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+static/ergopti_plus/windows/modules/llm/parser.ahk and \_shared/lua/llm/parser.lua bound word counts but not character counts or dynamic-programming grid sizes. Character distance and token substitution consume quadratic work; substitution allocates a full matrix. Tokenization and raw cleanup also expand entire oversized words.
+
+Reproduction: Parse a 500-character a buffer and TAIL_CORRECTED containing8000 a characters with NEXT_WORDS suite. This8034-byte answer is below the transport ceiling and still contains only one corrected word. Repeat with an oversized next-word field or raw response.
+
+Consequence: A small admitted server response can stall the message/input thread or allocate excessive memory. The actual Lua baseline takes about2.08 CPU seconds and sampled87MiB for an8KiB answer; no AHK runtime measurement is claimed.
+
+Regression: Both ports read one canonical policy:4096 UTF-8 bytes per operand and262144 cells per conservative diff grid. Refuse oversized corrections, next words and raw output before expensive helpers, then recheck actual normalized diff operands. Assert inclusive byte/cell boundaries and multibyte accounting on Windows; retain all32 shared physical golden vectors. Six real Lua cases pass after the audited baseline fails the oversized-word refusal.
+
+The ongoing register now contains **27 distinct new findings**. The requested target of 1,000 remains unmet.
