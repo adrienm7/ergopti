@@ -234,6 +234,37 @@ helpers.describe("api_token_store: the secret-tool calls", function()
 		return text
 	end
 
+	helpers.it("refuses a substituted FIFO diagnostic without blocking or reporting absence", function()
+		local tool, dir = stand_in('path=$(readlink /proc/self/fd/2)\nrm -- "$path"\nmkfifo -- "$path"\nprintf "%s" "$path" > "$(dirname "$0")/fifo-path"\nexit 1')
+		local uv = require("luv")
+		local code = string.format([[package.path = %q
+local store = require("modules.llm.api_token_store")
+store._set_tool_for_test(%q)
+local _, reasons = store.lookup_many({ "secret-service:fixture#1" })
+assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics are not proof of absence")
+]], package.path, tool)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		local fifo = recorded(dir, "fifo-path")
+		local info = fifo and uv.fs_lstat(fifo)
+		if fifo then os.remove(fifo) end
+		os.execute("rm -rf '" .. dir .. "'")
+		helpers.assert_eq(expired, false, "secret-tool diagnostics must not block on a FIFO")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+		helpers.assert_eq(info and info.type, "fifo", "the substituted endpoint is not deleted")
+	end)
+
 	helpers.it("hands the key on stdin, byte for byte, never in the arguments (linux-api-key-secret-service)", function()
 		local tool, dir = stand_in("exit 0")
 		local Store = helpers.load_module("modules.llm.api_token_store")
