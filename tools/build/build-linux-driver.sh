@@ -60,6 +60,27 @@ case "$BUILD_DIR" in
   *) echo "[ERR] ERGOPTI_LINUX_BUILD_DIR must be an absolute path, got '$BUILD_DIR'" >&2; exit 1 ;;
 esac
 
+# The output is removed below. Refuse a selector that resolves to the source
+# checkout, one of its ancestors, or a source directory inside it. An existing
+# alias is also refused rather than replacing an object the builder did not own.
+if [ -e "$BUILD_DIR" ] || [ -L "$BUILD_DIR" ]; then
+  [ -d "$BUILD_DIR" ] && [ ! -L "$BUILD_DIR" ] || {
+    echo "[ERR] Linux build output must be a direct directory: $BUILD_DIR" >&2; exit 1;
+  }
+  IFS= read -r -d '' RESOLVED_BUILD < <(CDPATH= cd -Pe -- "$BUILD_DIR" && printf '%s\0' "$PWD")
+  [ "$RESOLVED_BUILD" != / ] || { echo "[ERR] Refusing the filesystem root as build output." >&2; exit 1; }
+  case "$REPO_ROOT/" in
+    "$RESOLVED_BUILD/"*) echo "[ERR] Linux build output contains the source checkout: $BUILD_DIR" >&2; exit 1 ;;
+  esac
+  case "$RESOLVED_BUILD/" in
+    "$REPO_ROOT/"*)
+      case "$RESOLVED_BUILD/" in
+        "$REPO_ROOT/build/"*) [ "$RESOLVED_BUILD" != "$REPO_ROOT/build" ] || { echo "[ERR] Refusing the shared build root." >&2; exit 1; } ;;
+        *) echo "[ERR] Linux build output overlaps source files: $BUILD_DIR" >&2; exit 1 ;;
+      esac ;;
+  esac
+fi
+
 echo "=== Ergopti Linux driver assembly ==="
 echo "  Source  : ${LINUX_SRC}"
 echo "  Shared  : ${SHARED_SRC}"
