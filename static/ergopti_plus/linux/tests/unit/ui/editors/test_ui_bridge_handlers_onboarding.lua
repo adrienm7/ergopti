@@ -133,6 +133,46 @@ helpers.describe("ui.bridge_handlers", function()
 			return handler.on_message({ action = "finish", answers = answers }, state)
 		end
 
+		helpers.it("(onboarding-page-owner) does not send a picker result to a replacement", function()
+			local state, _, captured = onboarding_state()
+			local epoch = 1
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return value == epoch end
+			state.shell = { quote = function(value) return value end, exec_checked = function() return true, "/tmp/ignored" end }
+			local picker, original = require("ui.config_dir_picker"), require("ui.config_dir_picker").pick
+			picker.pick = function() epoch = 2; return "/tmp/selected" end
+			local ok, result = pcall(handler.on_message, { action = "pickConfigDir" }, state,
+				{ app_name = "onboarding", epoch = 1 })
+			picker.pick = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(#captured.pushes, 0)
+		end)
+
+		helpers.it("(onboarding-page-owner) does not send a metrics result to a replacement", function()
+			local state, _, captured = onboarding_state()
+			local epoch = 1
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return value == epoch end
+			state.config_paths.metrics_path = function() epoch = 2; return "/tmp/metrics.sqlite" end
+			local result = handler.on_message({ action = "resolveMetricsPath", request = 1 }, state,
+				{ app_name = "onboarding", epoch = 1 })
+			helpers.assert_eq(result.pushed, false)
+			helpers.assert_eq(#captured.pushes, 0)
+		end)
+
+		helpers.it("(onboarding-page-owner) refuses stale native pages and accepts a live one", function()
+			local state, _, captured = onboarding_state()
+			local live = false
+			state.webview_manager.current_epoch = function() return 1 end
+			state.webview_manager.page_current = function() return live end
+			local context = { app_name = "onboarding", epoch = 1 }
+			helpers.assert_nil(handler.on_message({ action = "resolveMetricsPath", request = 1 }, state, context))
+			live = true
+			local result = handler.on_message({ action = "resolveMetricsPath", request = 2 }, state, context)
+			helpers.assert_true(result.pushed)
+			helpers.assert_eq(#captured.pushes, 1)
+		end)
+
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsOnboarding")
     end)
