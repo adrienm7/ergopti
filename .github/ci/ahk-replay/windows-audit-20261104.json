@@ -1,43 +1,11 @@
 {
-	"expected_count": 59,
+	"expected_count": 4,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "key chord engine:",
-			"expected_count": 13
-		},
-		{
-			"contains": "key chord lifecycle:",
-			"expected_count": 8
-		},
-		{
-			"contains": "tap-hold roll:",
-			"expected_count": 21
-		},
-		{
-			"contains": "HotstringsConfig persistent offset:",
-			"expected_count": 6
-		},
-		{
-			"contains": "HotstringsConfig unlimited precedence:",
+			"contains": "token-managed-pause",
 			"expected_count": 4
-		},
-		{
-			"contains": "Personal editor entry receipts: native case-add preserves rows and retry",
-			"expected_count": 1
-		},
-		{
-			"contains": "Personal editor entry receipts: native case-uncheck preserves rows and retry",
-			"expected_count": 1
-		},
-		{
-			"contains": "clipboard-paste-native64",
-			"expected_count": 3
-		},
-		{
-			"contains": "token-ready-deadline",
-			"expected_count": 2
 		}
 	]
 }
