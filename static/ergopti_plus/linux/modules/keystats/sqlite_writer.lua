@@ -331,13 +331,17 @@ local function _ensure_linux_device_schema()
 	if current_sql:find("linux", 1, true) then return true end
 	-- Rebuilding drops indexes and triggers attached to devices, and SQLite's
 	-- rename can rewrite dependent foreign keys or views to the old name.
-	-- Refuse when any such schema may exist; do not discard user extensions.
+	-- Refuse when such schema or an extra column may exist; preserve user extensions.
 	local dependencies = _query_scalar([[
 SELECT (SELECT count(*) FROM sqlite_master
         WHERE (type='index' AND tbl_name='devices' AND sql IS NOT NULL)
            OR type IN ('trigger','view'))
      + (SELECT count(*) FROM sqlite_master AS m JOIN pragma_foreign_key_list(m.name) AS f
-        WHERE m.type='table' AND f."table"='devices');
+        WHERE m.type='table' AND f."table"='devices')
+     + (SELECT count(*) FROM pragma_index_list('devices') WHERE origin='u')
+     + (SELECT CASE WHEN group_concat(name, '|') =
+          'device_id|name|os|os_version|host_signature|created_at|updated_at|imported_data_sql_size|imported_data_sql_sha256'
+          THEN 0 ELSE 1 END FROM pragma_table_xinfo('devices'));
 ]])
 	if dependencies ~= "0" then
 		Logger.error(LOG, "Cannot safely upgrade the device registry with dependent or unreadable schema.")
