@@ -32,7 +32,8 @@ local KEYS = { left_alt = { tap_action = "backspace", hold_layer = "nav", time_a
 --- SYN, KEY, ABS for a touchpad.
 local MASKS = { keyboard = string.char(19, 0, 18, 0), mouse = string.char(7, 0, 0, 0), touchpad = string.char(11, 0, 0, 0),
 	mouse_with_switch = string.char(39, 0, 0, 0), mouse_with_led = string.char(7, 0, 2, 0),
-	mouse_with_power = string.char(7, 0, 64, 0), mouse_with_msc = string.char(23, 0, 0, 0) }
+	mouse_with_power = string.char(7, 0, 64, 0), mouse_with_msc = string.char(23, 0, 0, 0),
+	mouse_with_gesture = string.char(23, 0, 0, 0), mouse_msc_unknown = string.char(23, 0, 0, 0) }
 
 local function fake_node(label)
 	local path = os.tmpname()
@@ -88,7 +89,13 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 	local pressed = { [pointer] = type(snapshot) == "table" and snapshot or {} }
 	local reader = helpers.load_module("adapters.evdev_reader")
 	reader._set_backend({
-		read_event_bits = function(fd) return fd == pointer and MASKS[pointer_kind] or fd == second and MASKS.mouse or MASKS.keyboard end,
+		read_event_bits = function(fd, request)
+			if request % 256 == 0x24 then
+				if pointer_kind == "mouse_msc_unknown" then return nil end
+				return string.char(pointer_kind == "mouse_with_gesture" and 0x14 or 0x10, 0, 0, 0)
+			end
+			return fd == pointer and MASKS[pointer_kind] or fd == second and MASKS.mouse or MASKS.keyboard
+		end,
 		open = function(path) return path end,
 		ioctl = function(fd, request, value)
 			if request == EVIOCGRAB and grabs[fd] then
@@ -169,6 +176,17 @@ end
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
+	helpers.it("does not seize composite pointers reporting MSC_GESTURE (mouse-msc-gesture)", function()
+		local _, grabs, _, running = drive("mouse_with_gesture", HOLD, { { 4, 2, 1, 3000 } })
+		helpers.assert_true(running)
+		helpers.assert_eq(grabs.on, 0, "a gesture report cannot be replaced by scan metadata")
+	end)
+
+	helpers.it("does not seize a pointer when MSC capabilities cannot be read (mouse-msc-gesture)", function()
+		local _, grabs, _, running = drive("mouse_msc_unknown", HOLD, {})
+		helpers.assert_true(running)
+		helpers.assert_eq(grabs.on, 0)
+	end)
 	helpers.it("still takes a normal mouse with scan metadata (mouse-unsupported-events)", function()
 		local _, grabs = drive("mouse_with_msc", HOLD, {})
 		helpers.assert_eq(grabs.on, 1)

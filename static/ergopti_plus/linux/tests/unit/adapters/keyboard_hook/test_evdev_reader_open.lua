@@ -487,6 +487,20 @@ end)
 
 
 helpers.describe("evdev_reader: open descriptor capabilities", function()
+	helpers.it("queries the MSC code bitmap on the owned descriptor (msc-capability-query)", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder()
+		local request
+		backend.read_event_bits = function(_, value, count)
+			request = value
+			return string.char(0x14, 0, 0, 0):sub(1, count)
+		end
+		reader._set_backend(backend); assert(reader.open("/dev/input/event3"))
+		local mask = reader.event_capabilities(nil, 4)
+		assert(reader.close()); reader._reset_backend()
+		helpers.assert_eq(request, 0x80044524)
+		helpers.assert_eq(mask, 0x14, "MSC_SCAN and MSC_GESTURE are separately visible")
+	end)
 	helpers.it("queries event types on the exact open fd before any grab", function()
 		local reader = helpers.load_module("adapters.evdev_reader")
 		local backend, log = recorder()
