@@ -1,11 +1,19 @@
 {
-	"expected_count": 7,
+	"expected_count": 9,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "one-shot-rearm-admission",
-			"expected_count": 7
+			"contains": "token-rawpost-owner",
+			"expected_count": 6
+		},
+		{
+			"contains": "one-shot rearm: activation-",
+			"expected_count": 2
+		},
+		{
+			"contains": "one-shot rearm: incumbent-special",
+			"expected_count": 1
 		}
 	]
 }
