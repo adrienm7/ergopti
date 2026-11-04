@@ -1,0 +1,46 @@
+[
+  {
+    "module": "tests.unit.infra.lifecycle.test_termination_coordinator",
+    "exit": 0,
+    "tail": [
+      "Passed tests:  43",
+      "Failed tests:  0",
+      "========================================",
+      "",
+      "[OK] All Lua unit tests passed."
+    ]
+  },
+  {
+    "module": "tests.unit.infra.lifecycle.test_emergency_exit",
+    "exit": 0,
+    "tail": [
+      "Passed tests:  6",
+      "Failed tests:  0",
+      "========================================",
+      "",
+      "[OK] All Lua unit tests passed."
+    ]
+  },
+  {
+    "module": "tests.unit.ui.changelog.test_changelog_release_install",
+    "exit": 0,
+    "tail": [
+      "Passed tests:  10",
+      "Failed tests:  0",
+      "========================================",
+      "",
+      "[OK] All Lua unit tests passed."
+    ]
+  },
+  {
+    "module": "tests.unit.ui.changelog.test_changelog_feed_handoff",
+    "exit": 0,
+    "tail": [
+      "Passed tests:  7",
+      "Failed tests:  0",
+      "========================================",
+      "",
+      "[OK] All Lua unit tests passed."
+    ]
+  }
+]

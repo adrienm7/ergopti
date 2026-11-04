@@ -1,0 +1,45 @@
+{
+	"schema_version": 1,
+	"scope": "macos-updater",
+	"audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+	"created_at": "2026-11-04T19:37:38.458919+00:00",
+	"report_path": "/workspace/scratch/parity-recovery/macos-updater/report.md",
+	"findings": [
+		{
+			"id": "MUR-001",
+			"title": "Refused restart reports a retained armed installation as failed and idle",
+			"severity": "medium",
+			"confidence": "high_executed_real_lua_owners_and_emitted_shell_linux_native_ports_macos_unexecuted",
+			"proof_basis": "Actual shared ReleaseInstall, macOS Installer.arm_swap and TerminationCoordinator; exact ARMED from emitted shell; private physical stage retained and kernel-exclusive Linux rename after private launcher PID exits. Native AppKit/APFS unexecuted.",
+			"guarantees": ["G3"],
+			"guarantee_details": "Asynchronous native installation ownership remains live after Lua terminalizes operation failed and clears busy; visible receipt and retry admission do not represent native pending owner. No assertion of withdrawn install consent, mandatory cancellation or promised rollback.",
+			"reproduction": {
+				"kind": "executed_real_modules_and_emitted_swap_shell_private_fixtures",
+				"artifact": "/workspace/scratch/parity-recovery/macos-updater/probes/refused-exit.py",
+				"companion": "/workspace/scratch/parity-recovery/macos-updater/probes/refused-exit.lua",
+				"log": "/workspace/scratch/parity-recovery/macos-updater/logs/refused-exit.txt",
+				"executed": true,
+				"command": "python3 /workspace/scratch/parity-recovery/macos-updater/probes/refused-exit.py",
+				"cases": [
+					"accepted publication admission with asynchronous lease pending",
+					"refused publication admission before emergency deadline",
+					"duplicate physical worker lease refusal in both scenarios",
+					"retained staged bytes publish on later private launcher PID exit"
+				],
+				"observed": "Accepted control remains restarting/busy=true. Refusal yields restarting,failed/busy=false exit=0 lease=0 schedule=0, yet original worker retains stage+lease and later publishes CHOSEN/previous ORIGINAL. Duplicate worker exit4 prevents simultaneous swap."
+			},
+			"root_cause": {
+				"binding": "static/ergopti_plus/macos/ui/changelog/init.lua:564",
+				"restart": "static/ergopti_plus/macos/ui/changelog/init.lua:570",
+				"before_watchdog_refusal": "static/ergopti_plus/macos/infra/termination_coordinator.lua:920",
+				"real_refusing_admission": "static/ergopti_plus/macos/modules/hotstrings/hotstrings_config.lua:1501",
+				"premature_terminal": "static/ergopti_plus/_shared/lua/updater/release_install.lua:319",
+				"clear_busy": "static/ergopti_plus/_shared/lua/updater/release_install.lua:133",
+				"worker": "static/ergopti_plus/macos/modules/updater/release_installer.lua:94",
+				"description": "Exact ARMED is treated as completed install by common coordinator. A later early terminal-admission refusal maps to install-failed/free, with no representation of retained pending-on-quit worker. Shared fail and actual binding perform no stage cleanup/disarm."
+			},
+			"silent_failure": "An error is visible/logged, so not fully silent. Missing information is that the installation remains armed and owns the native slot: translated UI says installation failed, permits normal retry while original may still complete on next exit. Original install consent remains valid.",
+			"regression_test": "Drive actual chosen-release bind through physical ARMED then publication-admission refusal; assert session/page stays reconciled with pending native worker (or explicit proven retirement), and no failed/idle success model while it holds slot. Include accepted async lease, deadline fallback, page close, duplicate-worker lease refusal, stage retention and worker expiry."
+		}
+	]
+}

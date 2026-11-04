@@ -1,0 +1,6 @@
+REPRO partial rewrite truncates bootstrap; restart leaves malformed bytes while reporting unchanged; complete backup never adopted
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3dn7fhch/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3dn7fhch/Library/Application Support/Ergopti/paths.toml.
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3dn7fhch/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3dn7fhch/Library/Application Support/Ergopti/config.
+INFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3dn7fhch/Library/Application Support/ErgoptiPlus.
+WARN paths.toml still names an old default folder: its backup could not be written.
+ERROR paths.toml is unreadable or malformed; default publication refused (invalid paths.toml syntax).

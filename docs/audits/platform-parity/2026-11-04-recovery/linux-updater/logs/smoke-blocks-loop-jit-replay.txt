@@ -1,0 +1,3 @@
+slow=false elapsed_ms=65.3 install_budget_ms=250 uv_ticks_during_call=0 result=true detail=nil restored_old=false
+slow=true elapsed_ms=710.3 install_budget_ms=250 uv_ticks_during_call=0 result=false detail=updated wrapper smoke failed; previous installation restored restored_old=true
+Actual install_owned transaction/default smoke + real POSIX bounded sleeper; only admitted archive-reader factory modeled. No desktop input grab or actual update/network used.

@@ -1,0 +1,25 @@
+  pass  defaults.json has all required scalar fields
+  pass  core.ahk UPDATER_GH_OWNER matches defaults.json ("adrienm7")
+  pass  core.ahk UPDATER_GH_REPO matches defaults.json ("ergopti")
+  pass  core.ahk UPDATER_DEFAULT_INTERVAL reads the generated shared default (86400)
+  pass  Updater_StartBackgroundChecks arms its first check from the shared schedule
+  pass  windows/modules/updater/core.ahk spells no frequency preset
+  pass  windows/ui/menu/menu_init.ahk spells no frequency preset
+  pass  linux/modules/updater/manager.lua spells no frequency preset
+  pass  core.ahk UPDATER_RELEASES_FEED_URL_TEMPLATE matches defaults.json release_sources.atom_feed_url
+  pass  core.ahk UPDATER_RELEASES_API_URL_TEMPLATE matches defaults.json update_check.releases_url
+  pass  core.ahk requests no /releases/latest endpoint
+  pass  updater.lua no longer has bare GH_OWNER literal (reads from defaults.json)
+  pass  updater.lua no longer has bare GH_REPO literal (reads from defaults.json)
+  pass  macOS repository fallback owner matches defaults.json
+  pass  macOS repository fallback repo matches defaults.json
+  pass  macOS automatic checks read the shared timing through the shared schedule
+  pass  linux/modules/updater/manager.lua: _DEFAULTS_FALLBACK github.owner matches defaults.json
+  pass  linux/modules/updater/manager.lua: _DEFAULTS_FALLBACK github.repo matches defaults.json
+  pass  linux/modules/updater/manager.lua: _DEFAULTS_FALLBACK timing.default_check_interval_sec matches defaults.json
+  pass  linux/modules/updater/manager.lua: _DEFAULTS_FALLBACK timing.boot_check_delay_sec matches defaults.json
+  pass  linux/modules/updater/manager.lua: reads _shared/modules/updater/defaults.json
+  pass  every github.com URL in tools/build/ matches defaults.json (4 URL(s) across 83 file(s))
+  pass  dead constants.toml is absent
+
+✅  updater-constants-single-source: all checks passed.

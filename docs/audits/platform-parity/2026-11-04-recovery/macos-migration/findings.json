@@ -1,0 +1,99 @@
+{
+	"schema_version": 1,
+	"scope": "macos-migration",
+	"audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md",
+	"findings": [
+		{
+			"id": "MFM-001",
+			"title": "Refused bootstrap rewrite leaves a backup that blocks automatic restart recovery",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"reproduction": "Run probes/run.py modes rewrite-refusal and partial-write: actual public macOS migration moves old config and creates full prior bootstrap backup; native write port then refuses before mutation or after real prefix write. Fresh public run refuses retry due existing backup, or calls malformed prefix unchanged. Actual ConfigPaths resolver keeps old absent folder; malformed control init returns false. All filesystem state is disposable POSIX scratch.",
+			"root_cause": "Shared legacy_folder_migration.rewrite_paths_file:218-228 creates backup then writes canonical bootstrap in place without commit/recovery identity; any existing backup prevents retry, and rewrite_paths_text does not parse malformed current bytes. Mac native write:84 opens final path wb and recovery never adopts confirmed prior bytes.",
+			"silent_failure": "First run warns backup could not be written even though complete backup exists and final write failed. Restart either repeats that misleading warning or reports unchanged while bootstrap is malformed; actual path init may then loudly refuse. No claim that the initial I/O error is entirely silent.",
+			"regression_test": "Public run+fresh path resolver over actual private files: backup success followed by final open/write/close refusal, partial/truncated/empty current file, process cut after backup, repeated restart; preserve unrelated locator bytes and recover a confirmed old/new pairing without overwriting unrelated existing backups.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md",
+			"basis": "See scope report for actual modules, private native ports and exclusions; source-backed manifestation is not desktop certification.",
+			"additional_property": "Durable bootstrap/config-location consistency and safe restart recovery after a refused publication; initial failure may already be loud."
+		},
+		{
+			"id": "MFM-002",
+			"title": "Refused configuration move still publishes a locator to the absent new folder",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_property": "A migrated bootstrap locator must identify the confirmed configuration location, or publication/boot must refuse truthfully.",
+			"reproduction": "Run probes/run.py rename-refusal: real public Migration.run uses real native ports except exact old-config rename returns nil,error. Old config bytes remain at old path; report.kept records refusal, but paths.toml rewrites to new root and fresh actual ConfigPaths module selects nonexistent new config. Healthy move+resolver control selects preserved data.",
+			"root_cause": "macOS adapters/legacy_folder_migration.lua:152-154 calls Core.apply then unconditional rewrite_paths_file with static old->new rules; report.kept/backed_up/moved outcomes never authorize the rewritten ConfigDirPath.",
+			"silent_failure": "Rename refusal is already WARN, so do not call it globally silent. Subsequent INFO says paths.toml now names new defaults and actual boot resolver adopts an absent location; no receipt connects that publication to failed migration.",
+			"regression_test": "Refuse each physical move/parent create while existing exact old locator is authoritative; fresh loader must continue reading old confirmed bytes or explicitly stop, not select absent new root. Cover later successful retry and distinct occupied-destination backup policy.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md",
+			"basis": "See scope report for actual modules, private native ports and exclusions; source-backed manifestation is not desktop certification."
+		},
+		{
+			"id": "MFM-003",
+			"title": "Valid explicit configuration locators become dangling after their containing folder migrates",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Run probes/run.py nested-override and literal-override. Actual mac plan renames full legacy config root. ConfigDirPath pointing to its custom subdirectory, or a valid single-quoted TOML literal naming the exact root, stays unchanged. Actual shared TOML codec+fresh ConfigPaths accepts old value and selects absent old path, while original config exists under migrated root. Outside-root custom override control stays valid.",
+			"root_cause": "macOS plan:114 moves entire old config tree, but rewrites:132-135 matches exact root spellings only; shared rewrite_paths_text:192 only recognizes double-quoted assignment lines. Valid resolver inputs outside this ad hoc match are not mapped to the confirmed relocated data.",
+			"silent_failure": "Migration reports successful move and paths_file unchanged, without identifying that a still-valid authoritative locator now points to missing data. Existing tests cover double-quoted exact defaults and unrelated overrides, not relocated nested/valid alternate TOML inputs.",
+			"regression_test": "Compose actual public migration, shared TOML parser and fresh resolver for nested old-root overrides, supported literal/basic/multiline path strings, trailing separators and unrelated custom roots; selected config must remain byte-preserved/reachable or migration must refuse before moving it.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md",
+			"basis": "See scope report for actual modules, private native ports and exclusions; source-backed manifestation is not desktop certification."
+		},
+		{
+			"id": "MFM-004",
+			"title": "Destination check followed by POSIX rename can overwrite a newer concurrently published file",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G3"],
+			"additional_property": "Explicit Never Overwrite promise in shared owner header.",
+			"reproduction": "Run probes/run.py destination-race. Actual public run checks new paths.toml absent; recording native rename boundary publishes newer sentinel at destination then invokes real POSIX os.rename. Sentinel is replaced by legacy bootstrap, then rewritten; report records ordinary moved, not conflict/kept. This is deterministic interleaving injection around real POSIX primitive, not a measured native Mac race.",
+			"root_cause": "shared move_entry:91-110 tests exists(to) separately from rename_into:75-80; macOS native rename:62 is os.rename, which permits replacement of an existing destination file. No no-replace publication receipt revalidates/adopts the intervening destination.",
+			"silent_failure": "The newer file disappears while report calls rename successful. Existing memory_ports.rename refuses an occupied target atomically, unlike actual POSIX os.rename, so vector success does not cover the native contract.",
+			"regression_test": "Actual private filesystem + interleaving boundary: create destination after absent observation, replace an empty destination after its removal, and occupy backup after its check; assert byte-exact newer content survives and conflict/new-owner outcome is truthful. Qualify Darwin native execution separately.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md",
+			"basis": "See scope report for actual modules, private native ports and exclusions; source-backed manifestation is not desktop certification."
+		},
+		{
+			"id": "MFM-005",
+			"title": "Native directory listing refusal escapes migration and aborts driver initialization",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Run probes/run.py native-list-denied as unprivileged user (executed UID1000). Actual native_ports uses LuaFileSystem POSIX ports; chmod000 on private legacy support directory lets stat identify directory but lfs.dir raises Permission denied. pcall around real public Migration.run receives error and no report. Production init:175 calls run directly, so later initialization is skipped. No Hammerspoon/macOS startup was executed.",
+			"root_cause": "Mac native_ports.list:53-60 executes fs.dir without protected closure; shared apply:146,152 and public run:152 do not contain throws. This bypasses the kept/report/log failure protocol and escapes direct init entry.",
+			"silent_failure": "Not claimed completely silent: native/Hammerspoon top-level exception may be visible. Migration report and per-path refusal reason are not emitted and the driver initialization terminates at the unhandled boundary. In-memory tests model successful listings and never exercise native enumeration denial.",
+			"regression_test": "Real macOS native fs.dir permission/missing-after-stat/iterator throw plus public migration and boot containment: return explicit kept/failed path and preserve originals; verify no unhandled startup exception, correct restart retry and faithful iterator/state arity.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md",
+			"basis": "See scope report for actual modules, private native ports and exclusions; source-backed manifestation is not desktop certification."
+		},
+		{
+			"id": "MFM-006",
+			"title": "Legacy log alias archives active files from the current destination root",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_property": "Physical identity and active-current preservation: an already current destination must stay in place when a legacy route names that same filesystem object, consistent with the explicit destination-stays-as-it-is policy.",
+			"reproduction": "Build immutable four-module bundle with probes/create-immutable-bundle.py, then run probes/run-same-root-alias.py. Actual public macOS Migration.run creates legacy-logs symlink to current logs; real LFS proves directory/file dev+ino equal before run. Shared merge classifies active.log as old/new clash and real os.rename archives that same active destination inode. Current active.log disappears, report.backed_up=1/kept=0, next public run does not restore it. Distinct-root and no-legacy controls preserve current bytes.",
+			"root_cause": "Mac plan merges legacy logs at adapters/legacy_folder_migration.lua:116; shared apply:146-150 and move_entry:90-105 use lexical from/to paths and exists-only clash classification, never source/destination physical root identity. Backup rename of supposed old entry is therefore rename of active current destination itself.",
+			"silent_failure": "A clash WARN exists and names backup, so no entirely silent G2 assertion. Report misclassifies an active destination as a distinct legacy entry instead of recognizing same physical owner; active current path is removed while policy says destination stays as it is.",
+			"regression_test": "Actual public immutable-source merge over private same-device filesystem: direct symlink/ancestor alias resolving legacy/current log roots to same dev+ino is a no-op or explicit refusal preserving current inode/path; compare distinct-root clash and no-legacy controls, repeated public restart and existing backup ownership. Do not impose a general external-symlink refusal policy.",
+			"evidence": [
+				"macos/adapters/legacy_folder_migration.lua:116",
+				"_shared/lua/legacy_folder_migration.lua:90",
+				"_shared/lua/legacy_folder_migration.lua:146"
+			],
+			"probe": "probes/run-same-root-alias.py",
+			"native_execution": "Actual Linux POSIX/LuaFileSystem/io/os.rename on private fixtures, immutable Git-blob production owners; no native macOS or live checkout modules loaded",
+			"shared_root": "legacy-migration-same-physical-root-identity",
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md",
+			"basis": "Actual public plan/core/native-port code loaded only from four immutable Git blobs; Linux POSIX/LuaFileSystem private inode/rename proof and controls; Darwin/Hammerspoon unexecuted."
+		}
+	]
+}

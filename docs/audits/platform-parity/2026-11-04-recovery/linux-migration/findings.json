@@ -1,0 +1,100 @@
+{
+	"schema_version": 1,
+	"scope": "linux-migration",
+	"audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md",
+	"findings": [
+		{
+			"id": "LFM-001",
+			"title": "Concurrent migration destination arrival is overwritten by native replacing rename",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G3"],
+			"additional_properties": ["never-overwrite migration publication"],
+			"reproduction": "Run /workspace/scratch/parity-toolchain/ci-bin/luajit /workspace/scratch/parity-recovery/linux-migration/probes/native.lua race. A real destination is created at the checked rename boundary, then original native os.rename overwrites it; the report records a successful move with no backup.",
+			"root_cause": "_shared/lua/legacy_folder_migration.lua:75\u201380,90\u2013115 checks target absence separately from effect; linux/infra/legacy_folder_migration.lua:66 uses replacing os.rename. Direct boot migration125 precedes singleton acquire822.",
+			"silent_failure": "Only successful move info is recorded; the new target bytes disappear without a kept/backup refusal. Existing in-memory ports refuse target replacement and miss native semantics.",
+			"regression_test": "Actual native race for destination and backup must preserve newer bytes and retain/refuse legacy bytes atomically; retain ordinary no-clash success.",
+			"basis": {
+				"kind": "executed-production-modules-with-private-native-filesystem",
+				"native_limits": "No full daemon, desktop, user HOME/XDG, native input, clipboard or secrets; race inserts controlled real arrival before original os.rename.",
+				"receipt": "logs/dry-pass-1.json and logs/dry-pass-2.json"
+			},
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md"
+		},
+		{
+			"id": "LFM-002",
+			"title": "Newline-bearing legacy filenames are split and silently skipped",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["complete admitted-name migration"],
+			"reproduction": "Run /workspace/scratch/parity-toolchain/ci-bin/luajit /workspace/scratch/parity-recovery/linux-migration/probes/native.lua newline. Create actual legacy filename line\\nbreak with LF; real ls returns two names; two repeated migrations report moved0/kept0 and leave original entry at obsolete root.",
+			"root_cause": "linux/infra/legacy_folder_migration.lua:57\u201361 frames ls output by lines; shared apply146\u2013150 trusts fabricated names and move_entry91 silently skips missing names.",
+			"silent_failure": "No attempted source name exists and no kept/error is generated; migration logs do not identify the unprocessed actual name.",
+			"regression_test": "Enumerate exact POSIX names including LF and require actual original bytes moved or an explicit refusal; preserve quote/tab/Unicode/dash/backslash controls.",
+			"basis": {
+				"kind": "executed-production-modules-with-private-native-filesystem",
+				"native_limits": "Real private POSIX filesystem and actual declared Lua owners only. No full daemon, desktop, live user HOME/XDG, input, clipboard or secrets; exact individual scenario is disclosed in reproduction.",
+				"receipt": "logs/dry-pass-1.json and logs/dry-pass-2.json"
+			},
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md"
+		},
+		{
+			"id": "LFM-003",
+			"title": "Relocated configuration directory retains its obsolete native bootstrap locator",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["preservation of active configuration identity"],
+			"reproduction": "Run /workspace/scratch/parity-toolchain/ci-bin/luajit /workspace/scratch/parity-recovery/linux-migration/probes/native.lua override. Seed legacy storage paths.config_dir pointing at a valid custom directory beneath legacy root; migrate; actual Storage loads moved JSON but actual ConfigPaths.config resolves the missing old path while bytes exist under new root.",
+			"root_cause": "linux/infra/legacy_folder_migration.lua:86\u2013108 moves entries without reconciling paths.config_dir. linux/infra/config_paths.lua:127\u2013139 trusts that absolute locator; storage76\u201384 reads relocated bootstrap JSON unchanged.",
+			"silent_failure": "Migration records successful moves and boot receives no warning that the selected config path was displaced.",
+			"regression_test": "Keep active identity for migrated nested overrides, including restart; default and unrelated external overrides must remain correct.",
+			"basis": {
+				"kind": "executed-production-modules-with-private-native-filesystem",
+				"native_limits": "Real private POSIX filesystem and actual declared Lua owners only. No full daemon, desktop, live user HOME/XDG, input, clipboard or secrets; exact individual scenario is disclosed in reproduction.",
+				"receipt": "logs/dry-pass-1.json and logs/dry-pass-2.json"
+			},
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md"
+		},
+		{
+			"id": "LFM-004",
+			"title": "Native directory enumeration failure is accepted as an empty successful scan",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["truthful native acquisition receipt"],
+			"reproduction": "Run /workspace/scratch/parity-toolchain/ci-bin/luajit /workspace/scratch/parity-recovery/linux-migration/probes/list-permission.lua <owned-empty-dir>. At actual uid1000 chmod legacy source directory with storage.json to000; actual ls fails but report moved0/kept0/cachetrue. Restore access and same owner moves1.",
+			"root_cause": "linux/infra/legacy_folder_migration.lua:57\u201364 ignores pipe.close exit acknowledgment; shared apply146 treats missing list as empty and152\u2013155 drops failed final removal.",
+			"silent_failure": "ls stderr is discarded and report contains no kept/refusal entry, so log_report has no failure to publish before new bootstrap lookup.",
+			"regression_test": "Actual inaccessible source must yield explicit refused enumeration; distinguish missing, truly empty, failed/partial listings and successful retry.",
+			"basis": {
+				"kind": "executed-production-modules-with-private-native-filesystem",
+				"native_limits": "Real private POSIX filesystem and actual declared Lua owners only. No full daemon, desktop, live user HOME/XDG, input, clipboard or secrets; exact individual scenario is disclosed in reproduction.",
+				"receipt": "logs/dry-pass-1.json and logs/dry-pass-2.json"
+			},
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md"
+		},
+		{
+			"id": "LFM-005",
+			"title": "Legacy root aliasing current root archives active configuration as its own conflict",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["physical source/destination identity preservation"],
+			"reproduction": "Run /workspace/scratch/parity-toolchain/ci-bin/luajit /workspace/scratch/parity-recovery/linux-migration/probes/native.lua alias. Create current ergopti/config.toml then legacy ergopti_plus symlink to ergopti. Actual migration archives ACTIVE into current backup and removes selected config. Next migration cannot restore it and tries an ancestor-to-descendant move.",
+			"root_cause": "Linux plan86\u201395 and shared apply143\u2013150/move_entry90\u2013105 compare textual names without physical root/entry identity, then back up the same source/destination object.",
+			"silent_failure": "A clash warning is emitted but represents the same live object as two independent stores; default config absence is not diagnosed or repaired.",
+			"regression_test": "Same-root symlink aliases must preserve current files and be idempotent; include intermediate aliases and genuine distinct-root conflict controls.",
+			"basis": {
+				"kind": "executed-production-modules-with-private-native-filesystem",
+				"native_limits": "Real private POSIX filesystem and actual declared Lua owners only. No full daemon, desktop, live user HOME/XDG, input, clipboard or secrets; exact individual scenario is disclosed in reproduction.",
+				"receipt": "logs/dry-pass-1.json and logs/dry-pass-2.json"
+			},
+			"source_report": "docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md",
+			"additional_property": "Preserve the active physical configuration identity when legacy and current roots alias one object; a clash warning is present and is not claimed silent."
+		}
+	]
+}

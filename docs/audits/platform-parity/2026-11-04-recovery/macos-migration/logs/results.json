@@ -1,0 +1,74 @@
+[
+  {
+    "mode": "healthy",
+    "exit": 0,
+    "stdout": "CONTROL normal public migration/real resolver preserves config bytes+unrelated bootstrap comment; second run no-op\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-eentsi_w/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-eentsi_w/Library/Application Support/Ergopti/paths.toml.\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-eentsi_w/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-eentsi_w/Library/Application Support/Ergopti/config.\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-eentsi_w/Library/Application Support/ErgoptiPlus.\nINFO paths.toml now names the new default folders; its previous text is kept beside it.\n",
+    "stderr": ""
+  },
+  {
+    "mode": "rename-refusal",
+    "exit": 0,
+    "stdout": "REPRO rename refused, old config remains; paths.toml rewritten and actual next-start resolver selects absent new config\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-gkl1whh2/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-gkl1whh2/Library/Application Support/Ergopti/paths.toml.\nWARN Kept legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-gkl1whh2/.config/ergopti_plus: it could not be moved at /workspace/scratch/parity-recovery/macos-migration/probes/tmp-gkl1whh2/Library/Application Support/Ergopti/config (synthetic native rename refusal).\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-gkl1whh2/Library/Application Support/ErgoptiPlus.\nINFO paths.toml now names the new default folders; its previous text is kept beside it.\n",
+    "stderr": ""
+  },
+  {
+    "mode": "rewrite-refusal",
+    "exit": 0,
+    "stdout": "REPRO rewrite refused after full backup/config move; retry blocked by backup; actual next-start resolver keeps nonexistent old config\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3mblydpm/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3mblydpm/Library/Application Support/Ergopti/paths.toml.\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3mblydpm/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3mblydpm/Library/Application Support/Ergopti/config.\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3mblydpm/Library/Application Support/ErgoptiPlus.\nWARN paths.toml still names an old default folder: its backup could not be written.\nWARN paths.toml still names an old default folder: its backup could not be written.\n",
+    "stderr": ""
+  },
+  {
+    "mode": "partial-write",
+    "exit": 0,
+    "stdout": "REPRO partial rewrite truncates bootstrap; restart leaves malformed bytes while reporting unchanged; complete backup never adopted\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3dn7fhch/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3dn7fhch/Library/Application Support/Ergopti/paths.toml.\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3dn7fhch/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3dn7fhch/Library/Application Support/Ergopti/config.\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-3dn7fhch/Library/Application Support/ErgoptiPlus.\nWARN paths.toml still names an old default folder: its backup could not be written.\nERROR paths.toml is unreadable or malformed; default publication refused (invalid paths.toml syntax).\n",
+    "stderr": ""
+  },
+  {
+    "mode": "nested-override",
+    "exit": 0,
+    "stdout": "REPRO valid nested-override remains unchanged after containing root moves; actual resolver selects nonexistent old path\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-p9raiu0g/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-p9raiu0g/Library/Application Support/Ergopti/paths.toml.\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-p9raiu0g/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-p9raiu0g/Library/Application Support/Ergopti/config.\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-p9raiu0g/Library/Application Support/ErgoptiPlus.\n",
+    "stderr": ""
+  },
+  {
+    "mode": "literal-override",
+    "exit": 0,
+    "stdout": "REPRO valid literal-override remains unchanged after containing root moves; actual resolver selects nonexistent old path\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-qe4nukbx/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-qe4nukbx/Library/Application Support/Ergopti/paths.toml.\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-qe4nukbx/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-qe4nukbx/Library/Application Support/Ergopti/config.\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-qe4nukbx/Library/Application Support/ErgoptiPlus.\n",
+    "stderr": ""
+  },
+  {
+    "mode": "destination-race",
+    "exit": 0,
+    "stdout": "REPRO real POSIX os.rename replaces destination created after exists check; report records moved, no clash/newer-owner warning\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-dg_0dsgj/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-dg_0dsgj/Library/Application Support/Ergopti/paths.toml.\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-dg_0dsgj/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-dg_0dsgj/Library/Application Support/Ergopti/config.\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-dg_0dsgj/Library/Application Support/ErgoptiPlus.\nINFO paths.toml now names the new default folders; its previous text is kept beside it.\n",
+    "stderr": ""
+  },
+  {
+    "mode": "symlink-source",
+    "exit": 0,
+    "stdout": "OBSERVATION legacy logs symlink followed; target drained into new logs while symlink remains; explicit follow/refuse policy unknown\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Application Support/Ergopti/paths.toml.\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Application Support/Ergopti/config.\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Logs/ergopti_plus/foreign.log to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Logs/Ergopti/foreign.log.\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Application Support/ErgoptiPlus.\nINFO paths.toml now names the new default folders; its previous text is kept beside it.\n",
+    "stderr": ""
+  },
+  {
+    "mode": "native-list-denied",
+    "exit": 0,
+    "stdout": "REPRO real unprivileged POSIX directory denial throws from public native list; original files retained; no report returned: .../ergopti_plus/macos/adapters/legacy_folder_migration.lua:56: cannot open /workspace/scratch/parity-recovery/macos-migration/probes/tmp-1yvl65qn/Library/Application Support/ErgoptiPlus: Permission denied\n",
+    "stderr": ""
+  },
+  {
+    "mode": "custom-override",
+    "exit": 0,
+    "stdout": "CONTROL unrelated custom override and user bytes preserved; legacy default still migrates\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-vmoqgl27/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-vmoqgl27/Library/Application Support/Ergopti/paths.toml.\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-vmoqgl27/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-vmoqgl27/Library/Application Support/Ergopti/config.\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-vmoqgl27/Library/Application Support/ErgoptiPlus.\n",
+    "stderr": ""
+  },
+  {
+    "mode": "destination-clash",
+    "exit": 0,
+    "stdout": "CONTROL destination and occupied backup bytes preserved; expected clash/kept diagnostic recorded\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/Library/Application Support/Ergopti/paths.toml.\nWARN Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/.config/ergopti_plus to the backup /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/Library/Application Support/Ergopti/before-folder-migration/.config/ergopti_plus: /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/Library/Application Support/Ergopti/config is already taken.\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/Library/Application Support/ErgoptiPlus.\nINFO paths.toml now names the new default folders; its previous text is kept beside it.\n",
+    "stderr": ""
+  },
+  {
+    "mode": "occupied-backup",
+    "exit": 0,
+    "stdout": "CONTROL destination and occupied backup bytes preserved; expected clash/kept diagnostic recorded\nINFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-jmwl_3ct/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-jmwl_3ct/Library/Application Support/Ergopti/paths.toml.\nWARN Kept legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-jmwl_3ct/.config/ergopti_plus: a backup already exists at /workspace/scratch/parity-recovery/macos-migration/probes/tmp-jmwl_3ct/Library/Application Support/Ergopti/before-folder-migration/.config/ergopti_plus (backup_exists).\nINFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-jmwl_3ct/Library/Application Support/ErgoptiPlus.\nINFO paths.toml now names the new default folders; its previous text is kept beside it.\n",
+    "stderr": ""
+  }
+]

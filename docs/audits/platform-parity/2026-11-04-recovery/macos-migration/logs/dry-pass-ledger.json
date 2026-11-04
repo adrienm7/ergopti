@@ -1,0 +1,136 @@
+[
+  {
+    "pass_id": "D1",
+    "started_at": "2026-11-04T19:33:55.889160+00:00",
+    "finished_at": "2026-11-04T19:33:56.605288+00:00",
+    "source_review": "Rechecked source-to-destination authority, backup publication/refusal, actual parser and loader adoption, native directory/read/write returns and restart recovery.",
+    "public_modes": 12,
+    "fresh_registered_modules": 6,
+    "registered_cases": 36,
+    "new_confirmed_roots": 0,
+    "uid": 1000
+  },
+  {
+    "pass_id": "D2",
+    "started_at": "2026-11-04T19:33:56.605319+00:00",
+    "finished_at": "2026-11-04T19:33:57.273712+00:00",
+    "source_review": "Rechecked common/newer destination policy, occupied backups, custom/nested/TOML locators, symlink/nesting uncertainty and explicit cross-OS/compiled-runtime differences; no additional confirmed root.",
+    "public_modes": 12,
+    "fresh_registered_modules": 6,
+    "registered_cases": 36,
+    "new_confirmed_roots": 0,
+    "uid": 1000
+  },
+  {
+    "pass_id": "D3",
+    "started_at": "2026-11-04T19:57:28.235731+00:00",
+    "finished_at": "2026-11-04T19:57:28.327251+00:00",
+    "source_review": "Forward full bounded migration source sweep: immutable complete facade/ports/plan/core, all move/clash/kept/rewrite/restart outcomes; direct launcher/environment/init admission and ConfigPaths read/parse/selection joins. Existing MFM001-005 remain, new alias physical identity root is MFM006; no additional confirmed root.",
+    "scope": "Full original bounded migration source and direct boot/locator joins rechecked; execution restricted to new same-root alias+healthy controls",
+    "source_files": [
+      {
+        "source_path": "static/ergopti_plus/macos/adapters/legacy_folder_migration.lua",
+        "sha256": "06e8cb87fa7c91aed379dbff58501659e62fd4a0703fa0ed3200ecc401210070",
+        "bytes": 6287
+      },
+      {
+        "source_path": "static/ergopti_plus/_shared/lua/legacy_folder_migration.lua",
+        "sha256": "2f28acbcdd006605ae03886a02597ce580d25df04a04a0253a1c6d5b00d436d5",
+        "bytes": 11497
+      },
+      {
+        "source_path": "static/ergopti_plus/_shared/lua/app_dirs.lua",
+        "sha256": "5c3038ca5d3a08bb93e9b994c72bc08145a79bfd48ce3ba8935fd90156175d2f",
+        "bytes": 2807
+      },
+      {
+        "source_path": "static/ergopti_plus/_shared/lua/native_path.lua",
+        "sha256": "df25139f80acb437ad68a7f340307e0db7f0385fe385821199b2a1c48922c7c8",
+        "bytes": 3765
+      },
+      {
+        "source_path": "static/ergopti_plus/macos/init.lua",
+        "sha256": "018e17c9bfdf53e5d8849c4d6d43cd18e34acc193ad7b8676d8a9ec434cc3a21",
+        "bytes": 112930
+      },
+      {
+        "source_path": "static/ergopti_plus/macos/infra/config_paths.lua",
+        "sha256": "8f82ec4f04810ef0bad360db1648bde538098c68b381d30f29a860dbf118d9af",
+        "bytes": 34704
+      },
+      {
+        "source_path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+        "sha256": "b4fc13e895f2d61c91e48f7de70efe98c9bf40250c17b0c9e4728ca6450a4805",
+        "bytes": 56343
+      },
+      {
+        "source_path": "static/ergopti_plus/_shared/modules/paths/app_dirs.toml",
+        "sha256": "5980d369a7338d53f44da713cca8b067c730da7d0db8874bc7561687f16f968b",
+        "bytes": 11623
+      }
+    ],
+    "immutable_source_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+    "reset_after": "MFM-006",
+    "fresh_lua_processes": 3,
+    "public_modes": 3,
+    "registered_cases": 0,
+    "new_confirmed_roots": 0,
+    "native_macos_execution": false
+  },
+  {
+    "pass_id": "D4",
+    "started_at": "2026-11-04T19:57:28.327278+00:00",
+    "finished_at": "2026-11-04T19:57:28.386222+00:00",
+    "source_review": "Reverse full bounded migration source sweep: immutable current destination/backup custody through all facade/core physical moves, default/custom/nested/literal locators and backup/final-write refusal recovery, report and boot adoption/abort joins. Rechecked native return/throw and explicit policy boundaries; no additional confirmed root.",
+    "scope": "Full original bounded migration source and direct boot/locator joins rechecked; execution restricted to new same-root alias+healthy controls",
+    "source_files": [
+      {
+        "source_path": "static/ergopti_plus/macos/adapters/legacy_folder_migration.lua",
+        "sha256": "06e8cb87fa7c91aed379dbff58501659e62fd4a0703fa0ed3200ecc401210070",
+        "bytes": 6287
+      },
+      {
+        "source_path": "static/ergopti_plus/_shared/lua/legacy_folder_migration.lua",
+        "sha256": "2f28acbcdd006605ae03886a02597ce580d25df04a04a0253a1c6d5b00d436d5",
+        "bytes": 11497
+      },
+      {
+        "source_path": "static/ergopti_plus/_shared/lua/app_dirs.lua",
+        "sha256": "5c3038ca5d3a08bb93e9b994c72bc08145a79bfd48ce3ba8935fd90156175d2f",
+        "bytes": 2807
+      },
+      {
+        "source_path": "static/ergopti_plus/_shared/lua/native_path.lua",
+        "sha256": "df25139f80acb437ad68a7f340307e0db7f0385fe385821199b2a1c48922c7c8",
+        "bytes": 3765
+      },
+      {
+        "source_path": "static/ergopti_plus/macos/init.lua",
+        "sha256": "018e17c9bfdf53e5d8849c4d6d43cd18e34acc193ad7b8676d8a9ec434cc3a21",
+        "bytes": 112930
+      },
+      {
+        "source_path": "static/ergopti_plus/macos/infra/config_paths.lua",
+        "sha256": "8f82ec4f04810ef0bad360db1648bde538098c68b381d30f29a860dbf118d9af",
+        "bytes": 34704
+      },
+      {
+        "source_path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+        "sha256": "b4fc13e895f2d61c91e48f7de70efe98c9bf40250c17b0c9e4728ca6450a4805",
+        "bytes": 56343
+      },
+      {
+        "source_path": "static/ergopti_plus/_shared/modules/paths/app_dirs.toml",
+        "sha256": "5980d369a7338d53f44da713cca8b067c730da7d0db8874bc7561687f16f968b",
+        "bytes": 11623
+      }
+    ],
+    "immutable_source_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+    "reset_after": "MFM-006",
+    "fresh_lua_processes": 3,
+    "public_modes": 3,
+    "registered_cases": 0,
+    "new_confirmed_roots": 0,
+    "native_macos_execution": false
+  }
+]

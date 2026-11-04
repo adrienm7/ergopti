@@ -1,0 +1,21 @@
+/workspace/scratch/parity-toolchain/LuaJIT-2.1/src/luajit: ...parity-recovery/linux-updater/probes/smoke-live-loop.lua:87: ...parity-recovery/linux-updater/probes/smoke-live-loop.lua:81: ...parity-recovery/linux-updater/probes/smoke-live-loop.lua:53: heartbeat must run before installer entry
+stack traceback:
+	[C]: in function 'assert'
+	...parity-recovery/linux-updater/probes/smoke-live-loop.lua:53: in function <...parity-recovery/linux-updater/probes/smoke-live-loop.lua:52>
+	[C]: in function 'xpcall'
+	...parity-recovery/linux-updater/probes/smoke-live-loop.lua:52: in function <...parity-recovery/linux-updater/probes/smoke-live-loop.lua:50>
+	[C]: in function 'run'
+	...parity-recovery/linux-updater/probes/smoke-live-loop.lua:80: in function <...parity-recovery/linux-updater/probes/smoke-live-loop.lua:15>
+	[C]: in function 'xpcall'
+	...parity-recovery/linux-updater/probes/smoke-live-loop.lua:85: in main chunk
+	[C]: at 0x558262243360
+stack traceback:
+	[C]: in function 'assert'
+	...parity-recovery/linux-updater/probes/smoke-live-loop.lua:81: in function <...parity-recovery/linux-updater/probes/smoke-live-loop.lua:15>
+	[C]: in function 'xpcall'
+	...parity-recovery/linux-updater/probes/smoke-live-loop.lua:85: in main chunk
+	[C]: at 0x558262243360
+stack traceback:
+	[C]: in function 'assert'
+	...parity-recovery/linux-updater/probes/smoke-live-loop.lua:87: in main chunk
+	[C]: at 0x558262243360

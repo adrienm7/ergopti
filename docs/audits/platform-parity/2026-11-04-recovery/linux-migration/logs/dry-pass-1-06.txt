@@ -1,0 +1,3 @@
+symlink-observation	moved=1	backed=0	kept=0	removed=0	cache=true
+symlink-source-target-drained=true	policy=unresolved-not-finding
+PASS scratch fixture retired; no live user paths or driver boot executed

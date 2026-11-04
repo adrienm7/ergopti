@@ -1,0 +1,10 @@
+
+=== Linux Reload is a daemon restart (reload-is-a-restart-2026-10-24) ===
+  ok   requests one restart and joins a later request
+  ok   reports a restart in flight so the tray's Quit can be refused (quit-admission)
+  ok   (quit-wins-over-reload) abandons the restart in flight through its cancel
+  ok   (linux-reload-budget) stamps the request before the restart and retires a refused or abandoned one
+  ok   postpones on window or program cleanup debt without restarting
+  ok   fails, and may be asked again, when no restart can be requested
+  ok   treats a raising restart as a failure
+TOTAL 7 passed 0 failed

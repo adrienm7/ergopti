@@ -1,0 +1,39 @@
+{
+	"conclusion": "failure",
+	"failedJobs": [
+		{
+			"conclusion": "failure",
+			"name": "macOS / Unit tests (meta)",
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/41889885916/job/126786703466"
+		},
+		{
+			"conclusion": "failure",
+			"name": "Common / Unit tests (Release ci)",
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/41889885916/job/126786704006"
+		},
+		{
+			"conclusion": "failure",
+			"name": "Common / Unit tests (Data and source contracts)",
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/41889885916/job/126786704270"
+		},
+		{
+			"conclusion": "failure",
+			"name": "macOS / Verdict (All mandatory results)",
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/41889885916/job/126793440857"
+		},
+		{
+			"conclusion": "failure",
+			"name": "Common / Verdict (All mandatory results)",
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/41889885916/job/126797920039"
+		},
+		{
+			"conclusion": "failure",
+			"name": "Release / Verify all lanes and original plan",
+			"url": "https://github.com/adrienm7/ergopti/actions/runs/41889885916/job/126819761351"
+		}
+	],
+	"headSha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+	"status": "completed",
+	"updatedAt": "2026-11-04T19:46:19Z",
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/41889885916"
+}

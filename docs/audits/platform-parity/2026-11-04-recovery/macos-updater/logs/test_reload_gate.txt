@@ -1,0 +1,26 @@
+Selecting exact test module: "tests.unit.infra.config.test_reload_gate"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.infra.config.test_reload_gate
+
+=== reload_gate — adaptive settle ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.infra.config.test_reload_gate","name":"scales the settle window with the number of distinct changed files","status":"pass","elapsed_ms":0.001582,"timing_error":""}
+  ok   scales the settle window with the number of distinct changed files
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.infra.config.test_reload_gate","name":"holds a bulk burst until the long window while releasing a lone edit at the short one","status":"pass","elapsed_ms":0.001743,"timing_error":""}
+  ok   holds a bulk burst until the long window while releasing a lone edit at the short one
+
+=== reload_gate — git_operation_in_progress ===
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.infra.config.test_reload_gate","name":"detects index.lock / MERGE_HEAD and is a no-op outside a repo","status":"pass","elapsed_ms":0.020230,"timing_error":""}
+  ok   detects index.lock / MERGE_HEAD and is a no-op outside a repo
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.infra.config.test_reload_gate","name":"follows a linked-worktree `.git` FILE pointer to the real git dir","status":"pass","elapsed_ms":0.005568,"timing_error":""}
+  ok   follows a linked-worktree `.git` FILE pointer to the real git dir
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.infra.config.test_reload_gate","name":"tests.unit.infra.config.test_reload_gate","status":"pass","elapsed_ms":0.297687,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  4
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

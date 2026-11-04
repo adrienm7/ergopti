@@ -1,0 +1,92 @@
+Selecting exact test module: "tests.unit.modules.updater.lifecycle.test_release_arming_receipt"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.lifecycle.test_release_arming_receipt
+
+=== detached installer waits for its arming receipt ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"does not settle from dispatch alone (release-arming-receipt)","status":"pass","elapsed_ms":0.912411,"timing_error":""}
+  ok   does not settle from dispatch alone (release-arming-receipt)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"refuses completion false/ARMED (release-arming-refusal)","status":"pass","elapsed_ms":0.206841,"timing_error":""}
+  ok   refuses completion false/ARMED (release-arming-refusal)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"refuses completion true/ (release-arming-refusal)","status":"pass","elapsed_ms":0.751159,"timing_error":""}
+  ok   refuses completion true/ (release-arming-refusal)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"refuses completion true/FOREIGN (release-arming-refusal)","status":"pass","elapsed_ms":0.211307,"timing_error":""}
+  ok   refuses completion true/FOREIGN (release-arming-refusal)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"refuses completion true/ARMED (release-arming-refusal)","status":"pass","elapsed_ms":0.309806,"timing_error":""}
+  ok   refuses completion true/ARMED (release-arming-refusal)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"refuses completion true/ARMED\u000aextra (release-arming-refusal)","status":"pass","elapsed_ms":0.603652,"timing_error":""}
+  ok   refuses completion true/ARMED
+extra (release-arming-refusal)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"admits an early receipt only after literal dispatch true (release-arming-early)","status":"pass","elapsed_ms":0.573552,"timing_error":""}
+  ok   admits an early receipt only after literal dispatch true (release-arming-early)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"revokes early and late receipts after dispatch nil (release-arming-dispatch)","status":"pass","elapsed_ms":0.281704,"timing_error":""}
+  ok   revokes early and late receipts after dispatch nil (release-arming-dispatch)
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"revokes early and late receipts after dispatch accepted (release-arming-dispatch)","status":"pass","elapsed_ms":0.360882,"timing_error":""}
+  ok   revokes early and late receipts after dispatch accepted (release-arming-dispatch)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"revokes early and late receipts after dispatch true (release-arming-dispatch)","status":"pass","elapsed_ms":0.186340,"timing_error":""}
+  ok   revokes early and late receipts after dispatch true (release-arming-dispatch)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"settles the exact request once (release-arming-one-shot)","status":"pass","elapsed_ms":0.166981,"timing_error":""}
+  ok   settles the exact request once (release-arming-one-shot)
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"requires its asynchronous observer before dispatch (release-arming-callback)","status":"pass","elapsed_ms":0.265639,"timing_error":""}
+  ok   requires its asynchronous observer before dispatch (release-arming-callback)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"refuses invalid targets without native acquisition (release-arming-target)","status":"pass","elapsed_ms":0.597507,"timing_error":""}
+  ok   refuses invalid targets without native acquisition (release-arming-target)
+
+=== physical detached arming handshake ===
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"healthy (release-arming-physical)","status":"fail","elapsed_ms":41.521957,"timing_error":""}
+  FAIL healthy (release-arming-physical) — ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"log_refused (release-arming-physical)","status":"fail","elapsed_ms":36.508366,"timing_error":""}
+  FAIL log_refused (release-arming-physical) — ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"early_exit (release-arming-physical)","status":"fail","elapsed_ms":42.115789,"timing_error":""}
+  FAIL early_exit (release-arming-physical) — ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"missing (release-arming-physical)","status":"fail","elapsed_ms":37.231151,"timing_error":""}
+  FAIL missing (release-arming-physical) — ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"foreign (release-arming-physical)","status":"fail","elapsed_ms":45.668021,"timing_error":""}
+  FAIL foreign (release-arming-physical) — ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"duplicate (release-arming-physical)","status":"fail","elapsed_ms":33.525314,"timing_error":""}
+  FAIL duplicate (release-arming-physical) — ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"no_lf (release-arming-physical)","status":"fail","elapsed_ms":45.086993,"timing_error":""}
+  FAIL no_lf (release-arming-physical) — ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"trailing_fragment (release-arming-physical)","status":"fail","elapsed_ms":41.489213,"timing_error":""}
+  FAIL trailing_fragment (release-arming-physical) — ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","name":"tests.unit.modules.updater.lifecycle.test_release_arming_receipt","status":"pass","elapsed_ms":330.191711,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  13
+Failed tests:  8
+========================================
+
+--- DETAILED FAILURES ---
+[1] healthy (release-arming-physical)
+    Error: ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+    replay: lua tests/run.lua --only 'healthy (release-arming-physical)'
+
+[2] log_refused (release-arming-physical)
+    Error: ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+    replay: lua tests/run.lua --only 'log_refused (release-arming-physical)'
+
+[3] early_exit (release-arming-physical)
+    Error: ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+    replay: lua tests/run.lua --only 'early_exit (release-arming-physical)'
+
+[4] missing (release-arming-physical)
+    Error: ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+    replay: lua tests/run.lua --only 'missing (release-arming-physical)'
+
+[5] foreign (release-arming-physical)
+    Error: ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+    replay: lua tests/run.lua --only 'foreign (release-arming-physical)'
+
+[6] duplicate (release-arming-physical)
+    Error: ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+    replay: lua tests/run.lua --only 'duplicate (release-arming-physical)'
+
+[7] no_lf (release-arming-physical)
+    Error: ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+    replay: lua tests/run.lua --only 'no_lf (release-arming-physical)'
+
+[8] trailing_fragment (release-arming-physical)
+    Error: ...tatic/ergopti_plus/macos/tests/support/command_lines.lua:26: command output did not complete: exit 1
+    replay: lua tests/run.lua --only 'trailing_fragment (release-arming-physical)'

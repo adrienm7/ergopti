@@ -1,0 +1,87 @@
+
+=== shared configuration backup (config_backup) ===
+  ok   reads its rules from the shared updater defaults
+  ok   copies every configuration file, and only those, before writing its manifest
+  ok   does not copy a file root twice when it lies in the configuration folder
+  ok   refuses the whole backup when one file cannot be read, and writes no manifest
+  ok   stops at a copy it cannot write and leaves the folder without a manifest
+  ok   gives two backups of one second distinct folders
+  ok   offers the newest complete backup of a kind
+  ok   restores after backing the replaced configuration up
+  ok   refuses to report a substituted staging file as restored
+  ok   writes nothing back when a copy is missing
+  ok   refuses a manifest naming a path outside the configuration
+
+=== configuration backup binding (config-backup-binding-contract) ===
+  ok   (config-backup-binding-contract) is built only from complete ports
+  ok   (config-backup-binding-contract) builds the owner over the driver's roots and the shared rules
+  ok   (config-backup-binding-contract) refuses an unreadable or ruleless defaults file with one logged error
+  ok   (config-backup-binding-contract) refuses an unresolvable root with the driver's own line
+  ok   (config-backup-binding-contract) lets the test seam replace the roots and skip the driver's
+  ok   (config-backup-binding-contract) rebuilds the owner on each call so a moved folder is followed
+  ok   (config-backup-binding-contract) classifies entries, never walks a link to a folder and never reads a special file
+  ok   (config-backup-binding-contract) refuses a listing whose link target cannot be classified
+  ok   (config-backup-binding-contract) reports an absent folder as absent and a file as no folder
+
+=== shared one-click release install (release_install) ===
+  ok   does nothing until the click
+  ok   backs up first, then downloads, verifies, installs and restarts
+  ok   refuses a release without this system's asset and keeps the backup
+  ok   never installs a download that failed its verification
+  ok   reports a failed download as one, and never as a verification
+  ok   downloads nothing when the backup fails
+  ok   shows an install refusal and restarts nothing
+  ok   refuses a blocked build before any backup
+  ok   refuses a tag the loaded list does not hold, with the host's reason
+  ok   refuses a tag the loaded API list lacks as an error: the page is stale
+  ok   runs one install at a time
+
+=== shared release install capabilities (release-install-capabilities) ===
+  ok   runs a sync-only capability through its actual completion
+  ok   runs an async-only capability and waits for its actual completion
+  ok   prefers async over sync without fallback after completion true
+  ok   prefers async over sync without fallback after completion false
+  ok   refuses missing install capabilities before any side effect
+  ok   refuses install false despite a valid counterpart
+  ok   refuses install_async false despite a valid counterpart
+  ok   refuses install string despite a valid counterpart
+  ok   refuses install_async string despite a valid counterpart
+
+=== configuration backup listing of special files (config-backup-special-nodes) ===
+  ok   (config-backup-special-nodes) reports a FIFO, a socket and a link to a FIFO as other and never opens them
+
+=== Versions managed network receipt ownership ===
+  ok   classifies typed proxy evidence without exposing native secrets
+  ok   keeps untyped adapter errors unknown despite hostile detail
+  ok   never treats an unproved origin 407 as proxy evidence
+  ok   keeps failed verification separate and never installs
+  ok   requires exact operation and failure epoch before retry
+  ok   retry reruns backup-first and duplicate old callbacks cannot install
+  ok   new same-tag failure rejects the previous terminal owner
+  ok   rechecks actual owner and build policy after failure
+  ok   recomputes real external capability and never takes a page path
+  ok   reentrant native capability probe cannot lend a retired owner
+  ok   native probe failure preserves the failed phase without unbound actions
+  ok   native owner inspection cannot resurrect a retired reservation
+  ok   contract loading cannot publish a predecessor into a same-tag successor
+  ok   capability inspection cannot retire or publish into a successor
+  ok   current-owner inspection cannot replace a successor terminal
+  ok   contract loading cannot restore publication after exact page retirement
+  ok   policy-error logging cannot publish an obsolete failed phase
+  ok   keeps the original private report owner outside the public payload
+  ok   retires the exact failed reservation when native owner inspection throws
+  ok   cannot publish or clear a successor when owner fault logging reenters
+  ok   page retirement during report preserves accepted native transaction without later publication
+  ok   page retirement during backup preserves accepted native transaction without later publication
+  ok   page retirement during asset preserves accepted native transaction without later publication
+  ok   page retirement during install preserves accepted native transaction without later publication
+  ok   page retirement during success preserves accepted native transaction without later publication
+  ok   page retirement during restart preserves accepted native transaction without later publication
+  ok   reentrant blocked cannot overwrite a successor reservation before backup
+  ok   reentrant find cannot overwrite a successor reservation before backup
+  ok   retirement during pre-acceptance blocked refuses old work but permits fresh successor
+  ok   native document replacement during blocked cannot borrow pre-acceptance
+  ok   retirement during pre-acceptance find refuses old work but permits fresh successor
+  ok   native document replacement during find cannot borrow pre-acceptance
+  ok   retires action authority on close without cancelling native work
+TOTAL 74 passed 0 failed

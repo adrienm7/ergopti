@@ -1,0 +1,1 @@
+[OK] all 71 updater, About-menu and Updates-menu strings are shown by a driver.

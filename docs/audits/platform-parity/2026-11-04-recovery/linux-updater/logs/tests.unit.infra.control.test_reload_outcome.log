@@ -1,0 +1,7 @@
+
+=== hotstring reload outcome ===
+  ok   reports a published catalogue as reloaded
+  ok   reports a loader refusal as refused, never as reloaded
+  ok   reports a raised error as failed
+  ok   makes the local control answer refused, not completed, when the loader refused
+TOTAL 4 passed 0 failed

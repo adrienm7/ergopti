@@ -1,0 +1,1 @@
+EXTRACTED actual_helpers=5 actual_transaction_statements=13 event_protocol_executed=0

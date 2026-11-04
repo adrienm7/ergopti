@@ -1,0 +1,12 @@
+MODULE tests.unit.infra.config.paths.test_bootstrap_toml
+
+=== bootstrap TOML syntax preserves path authority ===
+  ok   keeps an uncommented path through partial save and reload
+  ok   keeps a hash inside the quoted path
+  ok   keeps a path followed by a plain inline comment
+  ok   never treats quotes in an inline comment as part of the path
+  ok   keeps the commented logs override when only config changes
+  ok   refuses unterminated string without publishing
+  ok   refuses invalid later key without publishing
+  ok   roundtrips native quotes and backslashes through the TOML codec
+RESULT 8 passed 0 failed

@@ -1,0 +1,9 @@
+
+=== update signature gate (Linux) ===
+  ok   (signature-gate) the shipped policy is off, so an unsigned release installs
+  ok   (signature-gate) a good signature verifies in every mode
+  ok   (signature-gate) required refuses a bad signature in words
+  ok   (signature-gate) required refuses a missing signature, off only logs it
+  ok   (signature-gate) off reports a bad signature but does not stop the update
+  ok   (signature-gate) an unusable policy refuses instead of skipping the check
+TOTAL 6 passed 0 failed

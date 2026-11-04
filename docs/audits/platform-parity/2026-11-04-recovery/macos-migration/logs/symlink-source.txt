@@ -1,0 +1,6 @@
+OBSERVATION legacy logs symlink followed; target drained into new logs while symlink remains; explicit follow/refuse policy unknown
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Application Support/Ergopti/paths.toml.
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Application Support/Ergopti/config.
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Logs/ergopti_plus/foreign.log to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Logs/Ergopti/foreign.log.
+INFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-5t1w213o/Library/Application Support/ErgoptiPlus.
+INFO paths.toml now names the new default folders; its previous text is kept beside it.

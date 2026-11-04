@@ -1,0 +1,8 @@
+healthy 0 CONTROL normal public migration/real resolver preserves config bytes+unrelated bootstrap comment; second run no-op
+rename-refusal 0 REPRO rename refused, old config remains; paths.toml rewritten and actual next-start resolver selects absent new config
+rewrite-refusal 0 REPRO rewrite refused after full backup/config move; retry blocked by backup; actual next-start resolver keeps nonexistent old config
+partial-write 0 REPRO partial rewrite truncates bootstrap; restart leaves malformed bytes while reporting unchanged; complete backup never adopted
+nested-override 0 REPRO explicit nested config override remains unchanged after containing root moves; actual resolver selects nonexistent old nested path
+destination-race 0 REPRO real POSIX os.rename replaces destination created after exists check; report records moved, no clash/newer-owner warning
+symlink-source 0 REPRO legacy logs symlink followed; unrelated target drained into new logs while symlink remains; no ownership warning
+list-throw 0 REPRO public run throws during native list; init direct call has no local containment; original files retained

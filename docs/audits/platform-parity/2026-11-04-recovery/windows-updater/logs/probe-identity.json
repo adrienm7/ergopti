@@ -1,0 +1,22 @@
+[
+  {
+    "file": "probes/extract-swap.ps1",
+    "sha256": "9101dc7b2ea1a4214be5f4037d7a5b81fc7d4863e2778290e75724a30603989f"
+  },
+  {
+    "file": "probes/owned-output-posix-fixture.ps1",
+    "sha256": "ba95467310af431307cd302636f4d11054063b5625f8a6d8b6eecff613872920"
+  },
+  {
+    "file": "probes/actual-swap-helpers.ps1",
+    "sha256": "e1902ed46284f580151065b25aa7afb246a4eba4c64bed7320e692a27fa15a91"
+  },
+  {
+    "file": "probes/actual-post-parent-swap.ps1",
+    "sha256": "2535f912aff656e1ed49e27258abf11f7bd2bc1b9727bca60607b85e80029964"
+  },
+  {
+    "file": "probes/dry-pass-2.ps1",
+    "sha256": "6c4ee9a88cbb595d4b63de72a392cd841f46966fe74d763137d25831028ed6fd"
+  }
+]

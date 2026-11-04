@@ -1,0 +1,26 @@
+{
+	"baseline": "PASS metadata: 6 scopes, 17 unique OS-scoped IDs, 16 capability rows; source/TODO/shared groups/evidence/encoding/rendered table/links.\nRevision-pinned artifact validation only; no native, exhaustiveness or current-runtime certification.",
+	"mutation_scope": "Parser return values only; no real files changed",
+	"negative_controls": [
+		{
+			"case": "invalid-source-identity",
+			"refused": true
+		},
+		{
+			"case": "duplicate-os-module-scope",
+			"refused": true
+		},
+		{
+			"case": "unclassified-additional-property",
+			"refused": true
+		},
+		{
+			"case": "missing-evidence-report",
+			"refused": true
+		},
+		{
+			"case": "malformed-additional-property-container",
+			"refused": true
+		}
+	]
+}

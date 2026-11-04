@@ -1,0 +1,5 @@
+CONTROL destination and occupied backup bytes preserved; expected clash/kept diagnostic recorded
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/Library/Application Support/Ergopti/paths.toml.
+WARN Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/.config/ergopti_plus to the backup /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/Library/Application Support/Ergopti/before-folder-migration/.config/ergopti_plus: /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/Library/Application Support/Ergopti/config is already taken.
+INFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-tzyxiic2/Library/Application Support/ErgoptiPlus.
+INFO paths.toml now names the new default folders; its previous text is kept beside it.

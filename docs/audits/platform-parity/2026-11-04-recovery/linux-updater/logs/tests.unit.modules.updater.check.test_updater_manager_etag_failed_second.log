@@ -1,0 +1,20 @@
+
+=== modules.updater.manager ===
+  ok   linux-updater-etag: a failed second page keeps the accepted first-page association
+  ok   a 304 keeps the release the previous 200 found available
+  ok   builds a bounded HTTPS release request for the updater owner
+  ok   accepts only a checksum record bound to the canonical filename
+  ok   refuses to install a local archive that bypassed verification
+  ok   linux-updater-temp-ownership: preserves unrelated regular .tar.gz
+  ok   linux-updater-temp-ownership: preserves unrelated dangling .tar.gz
+  ok   linux-updater-temp-ownership: preserves unrelated regular .tar.gz.part
+  ok   linux-updater-temp-ownership: preserves unrelated dangling .tar.gz.part
+  ok   linux-updater-temp-allocation: update acknowledges allocator refusal with callback true
+  ok   linux-updater-temp-allocation: update acknowledges allocator refusal with callback false
+  ok   linux-updater-temp-allocation: release acknowledges allocator refusal with callback true
+  ok   linux-updater-temp-allocation: release acknowledges allocator refusal with callback false
+  ok   linux-digest-owner: downloads and hashes a verified archive under the updater owner
+  ok   removes a downloaded archive when SHA-256 does not match
+  ok   cancel-update: a verified archive does not survive cancellation
+  ok   normalises LuaJIT numeric process failures
+TOTAL 17 passed 0 failed

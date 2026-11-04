@@ -1,0 +1,32 @@
+Selecting exact test module: "tests.unit.modules.updater.test_update_schedule_vectors"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_update_schedule_vectors
+
+=== updater.schedule — shared vectors (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_update_schedule_vectors","name":"accepts the timing of defaults.json","status":"pass","elapsed_ms":0.010716,"timing_error":""}
+  ok   accepts the timing of defaults.json
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_update_schedule_vectors","name":"decides every due vector like the other drivers","status":"pass","elapsed_ms":0.031067,"timing_error":""}
+  ok   decides every due vector like the other drivers
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_update_schedule_vectors","name":"computes the same deterministic jitter","status":"pass","elapsed_ms":0.016074,"timing_error":""}
+  ok   computes the same deterministic jitter
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.test_update_schedule_vectors","name":"snaps retired intervals to the nearest preset","status":"pass","elapsed_ms":0.025429,"timing_error":""}
+  ok   snaps retired intervals to the nearest preset
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.test_update_schedule_vectors","name":"keeps only the valid fields of a stored record","status":"pass","elapsed_ms":0.086610,"timing_error":""}
+  ok   keeps only the valid fields of a stored record
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.test_update_schedule_vectors","name":"records a check without touching the given record","status":"pass","elapsed_ms":0.034011,"timing_error":""}
+  ok   records a check without touching the given record
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.test_update_schedule_vectors","name":"bounds every timer by the re-evaluation period","status":"pass","elapsed_ms":0.002774,"timing_error":""}
+  ok   bounds every timer by the re-evaluation period
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.test_update_schedule_vectors","name":"refuses a preset list without the never preset","status":"pass","elapsed_ms":0.469326,"timing_error":""}
+  ok   refuses a preset list without the never preset
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_update_schedule_vectors","name":"tests.unit.modules.updater.test_update_schedule_vectors","status":"pass","elapsed_ms":3.125009,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  8
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

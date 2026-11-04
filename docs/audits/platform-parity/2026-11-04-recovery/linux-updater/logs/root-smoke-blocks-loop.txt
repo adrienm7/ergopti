@@ -1,0 +1,5 @@
+/workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua: ...rity-recovery/linux-updater/probes/smoke-blocks-loop.lua:32: assertion failed!
+stack traceback:
+	[C]: in function 'assert'
+	...rity-recovery/linux-updater/probes/smoke-blocks-loop.lua:32: in main chunk
+	[C]: in ?

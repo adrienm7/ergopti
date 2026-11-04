@@ -1,0 +1,7 @@
+PASS default
+PASS owned
+PASS bad-identity
+PASS withdrawn
+PASS withdraw-before-copy
+PASS route-refused
+RESULT passed=6 failed=0 native_requests=0 filesystem_operations=0

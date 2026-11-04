@@ -1,0 +1,269 @@
+{
+	"schema_version": 1,
+	"audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+	"classifications": [
+		"explicit_policy",
+		"explicit_mechanism",
+		"implementation_constraint",
+		"observed_limit",
+		"unknown_intent"
+	],
+	"capabilities": [
+		{
+			"id": "legacy-roots",
+			"title": "Known legacy folder relocation",
+			"behavior": {
+				"windows": "Roaming locator, profile config and LocalAppData entries move to Ergopti; protected Ollama sibling remains separate.",
+				"macos": "Support locator/runtime download, config, logs, cache and control entries move to native Ergopti purpose roots.",
+				"linux": "Config/state/data legacy roots merge into ergopti under their XDG bases; cache is prepared."
+			},
+			"classification": "explicit_policy",
+			"rationale": "Maintainer-only one-time conversion; no published builds used these legacy folders. Different native purpose roots are intentional.",
+			"evidence_reports": [
+				"windows-migration/report.md",
+				"macos-migration/report.md",
+				"linux-migration/report.md"
+			]
+		},
+		{
+			"id": "clash-backup",
+			"title": "Existing destination and immutable conflict backup",
+			"behavior": {
+				"windows": "Nonempty destination wins; old entry moves to backup; occupied backup retains old entry.",
+				"macos": "Same shared policy; real POSIX rename can violate it on a concurrent arrival (MFM-004).",
+				"linux": "Same policy; native race LFM-001 and self-alias LFM-005 qualify preservation."
+			},
+			"classification": "explicit_policy",
+			"rationale": "Never Overwrite is an explicit promise; known defects do not make overwrite an intentional difference.",
+			"evidence_reports": [
+				"windows-migration/report.md",
+				"macos-migration/report.md",
+				"linux-migration/report.md"
+			]
+		},
+		{
+			"id": "locator-rebase",
+			"title": "Preserve selection after moving a chosen config",
+			"behavior": {
+				"windows": "Exact normalized default rewriter misses descendants and quoted TOML keys (WFM-002/003).",
+				"macos": "Exact text rewriter misses descendants and valid literal values (MFM-003).",
+				"linux": "Moved native storage keeps paths.config_dir pointing into old root (LFM-003)."
+			},
+			"classification": "observed_limit",
+			"rationale": "Cross-OS selected-profile displacement has related manifestations; no intentional authorization to select fresh defaults was found.",
+			"evidence_reports": [
+				"windows-migration/report.md",
+				"macos-migration/report.md",
+				"linux-migration/report.md"
+			]
+		},
+		{
+			"id": "rewrite-recovery",
+			"title": "Bootstrap text rewrite backup and recovery",
+			"behavior": {
+				"windows": "Verified prior-text copy then in-place FSWrite; no common move/rewrite recovery (WFM-001).",
+				"macos": "Prior-text backup then in-place write; existing backup can prevent restart repair (MFM-001/002).",
+				"linux": "Migration does not invoke shared paths.toml rewrite; bootstrap is native JSON under new config base."
+			},
+			"classification": "explicit_mechanism",
+			"rationale": "Different bootstrap formats and owners are intentional; failed-location consistency remains an open defect.",
+			"evidence_reports": [
+				"windows-migration/report.md",
+				"macos-migration/report.md",
+				"linux-migration/report.md"
+			]
+		},
+		{
+			"id": "transition-wal",
+			"title": "Preserve existing transition recovery namespace",
+			"behavior": {
+				"windows": "Boot recovers beside new locator after migration; old Roaming WAL remains outside it (WFM-004).",
+				"macos": "No equivalent Windows locator-WAL adoption claim established in this bounded flow.",
+				"linux": "No equivalent Windows locator-WAL adoption claim established in this bounded flow."
+			},
+			"classification": "implementation_constraint",
+			"rationale": "The Windows durable configuration-transition journal is a specific owner; absence of an identical journal is not by itself a feature gap on other OS.",
+			"evidence_reports": [
+				"windows-migration/report.md",
+				"macos-migration/report.md",
+				"linux-migration/report.md"
+			]
+		},
+		{
+			"id": "enumeration",
+			"title": "Native migration directory enumeration",
+			"behavior": {
+				"windows": "AHK native file enumeration source-reviewed; denial/iterator behavior not executed.",
+				"macos": "Native-port refusal escapes public run in Linux LFS-bound reproduction; Darwin qualification open (MFM-005).",
+				"linux": "Line-framed ls splits LF names and ignores failure receipt (LFM-002/004)."
+			},
+			"classification": "explicit_mechanism",
+			"rationale": "Native API mechanics differ; observed failure handling is not declared intentional.",
+			"evidence_reports": [
+				"windows-migration/report.md",
+				"macos-migration/report.md",
+				"linux-migration/report.md"
+			]
+		},
+		{
+			"id": "physical-alias",
+			"title": "Physical root identity and symlinks",
+			"behavior": {
+				"windows": "Reparse/junction/UNC identity behavior unqualified.",
+				"macos": "Generic external-link policy remains unknown; same-root logs alias demonstrably archives active files through immutable production plan/ports (MFM-006).",
+				"linux": "Generic drain policy unknown; same-root alias physically archives active files (LFM-005)."
+			},
+			"classification": "unknown_intent",
+			"rationale": "Generic symlink follow/refuse intent is unknown: do not infer all links must be refused. Physical self-migration of current state is independently demonstrated on macOS-owner/POSIX ports and native Linux; Windows reparse behavior remains unqualified.",
+			"evidence_reports": [
+				"windows-migration/report.md",
+				"macos-migration/report.md",
+				"linux-migration/report.md"
+			]
+		},
+		{
+			"id": "compiled-runtime",
+			"title": "Retained compiled/native runtime paths",
+			"behavior": {
+				"windows": "Managed Ollama remains a protected direct LocalAppData sibling.",
+				"macos": "Compiled owned Karabiner Runtime and karabiner roots keep ErgoptiPlus; downloaded RemapRuntime moves.",
+				"linux": "Native XDG root naming and distribution paths apply; no Karabiner counterpart."
+			},
+			"classification": "explicit_policy",
+			"rationale": "Windows ACL and macOS compiled runtime/artifact constraints are documented; unchanged names are intentional exceptions.",
+			"evidence_reports": [
+				"windows-migration/report.md",
+				"macos-migration/report.md",
+				"linux-migration/report.md"
+			]
+		},
+		{
+			"id": "installed-update",
+			"title": "Installed self replacement",
+			"behavior": {
+				"windows": "Compiled exe: verified staging, suspended worker, parent-exit handoff and boot-ready/probation.",
+				"macos": "Packaged app: Sparkle newest or separate chosen-version stage/armed swap.",
+				"linux": "Standalone tar install: owned complete-tree transaction; package/immutable modes refuse self replacement."
+			},
+			"classification": "explicit_policy",
+			"rationale": "Distribution and platform ownership constrain which installer is available. Helpers alone do not establish reachability.",
+			"evidence_reports": [
+				"windows-updater/report.md",
+				"macos-updater/report.md",
+				"linux-updater/report.md"
+			]
+		},
+		{
+			"id": "source-update",
+			"title": "Source checkout updating through scoped updater",
+			"behavior": {
+				"windows": "Self replacement/check schedule rows disabled in local-source mode; no updater git-pull owner established.",
+				"macos": "Source/DevSource updater is blocked; no in-scope source-pull owner established.",
+				"linux": "Source self replacement/automatic checks disabled; no in-scope source-pull owner established."
+			},
+			"classification": "explicit_policy",
+			"rationale": "Preserve development/distribution ownership; this is not a claim that no other repository development command exists.",
+			"evidence_reports": [
+				"windows-updater/report.md",
+				"macos-updater/report.md",
+				"linux-updater/report.md"
+			]
+		},
+		{
+			"id": "scheduled-check",
+			"title": "Channels, scheduled checks and chosen installation",
+			"behavior": {
+				"windows": "Shared channel/schedule policies with native AHK acquisition/epoch owners.",
+				"macos": "Shared channel/schedule plus native dispatch; manual check and Sparkle consent remain separate.",
+				"linux": "Shared channel/schedule with libuv and explicit pause/currentness ownership."
+			},
+			"classification": "explicit_mechanism",
+			"rationale": "Checking and automatic download/install are distinct capabilities. A scheduled check does not authorize automatic installation.",
+			"evidence_reports": [
+				"windows-updater/report.md",
+				"macos-updater/report.md",
+				"linux-updater/report.md"
+			]
+		},
+		{
+			"id": "feed-only",
+			"title": "Install when only feed discovery is available",
+			"behavior": {
+				"windows": "Feed-only historical row has no verified asset details and cannot install through custom path.",
+				"macos": "Newest offered row can hand off to Sparkle signed appcast; arbitrary historical feed rows cannot.",
+				"linux": "Feed-only discovery is check-only; chosen install requires detailed release metadata."
+			},
+			"classification": "explicit_policy",
+			"rationale": "Atom discovery lacks archive digests; Sparkle provides a separate verifying engine on macOS. This intentional fallback difference is user-visible.",
+			"evidence_reports": [
+				"windows-updater/report.md",
+				"macos-updater/report.md",
+				"linux-updater/report.md"
+			]
+		},
+		{
+			"id": "verification",
+			"title": "Digest and signature admission",
+			"behavior": {
+				"windows": "Archive digest binding implemented; shared detached-signature policy is off with empty key.",
+				"macos": "Chosen app requires digest/version/designated code requirement; Sparkle has independent signature policy.",
+				"linux": "Archive digest binding and optional detached signature owner; current shared detached policy is off."
+			},
+			"classification": "explicit_policy",
+			"rationale": "Record actual disabled configuration and macOS code-sign requirements; do not advertise universal signed-update equivalence or invent a rationale for absent key provisioning.",
+			"evidence_reports": [
+				"windows-updater/report.md",
+				"macos-updater/report.md",
+				"linux-updater/report.md"
+			]
+		},
+		{
+			"id": "config-backup",
+			"title": "Pre-install configuration snapshot and restore",
+			"behavior": {
+				"windows": "Chosen-release path snapshots rules-selected files; direct update-prompt installation does not call that sequence. Restore is separate from executable rollback.",
+				"macos": "Chosen-version path snapshots rules-selected files; hs.settings, Keychain and arbitrary app state excluded. Sparkle backup equivalence not qualified here.",
+				"linux": "Rules-selected file snapshot, per-file conditional restore and recovery backup; not whole-machine atomic state."
+			},
+			"classification": "explicit_mechanism",
+			"rationale": "Backup scope is a file contract, not a promise to clone all native settings/secrets. Existing restore/reload findings remain in earlier audit.",
+			"evidence_reports": [
+				"windows-updater/report.md",
+				"macos-updater/report.md",
+				"linux-updater/report.md"
+			]
+		},
+		{
+			"id": "restart-receipt",
+			"title": "Terminal install/restart receipt",
+			"behavior": {
+				"windows": "Exact swap events, successor boot-ready and probation; canonical/recovery rollback privately replayed.",
+				"macos": "ARMED-on-quit remains pending; refused exit can publish failed/idle while lease is held (MUR-001). No chosen-swap boot probation established.",
+				"linux": "Transaction activates/smokes then requests restart; systemd/relay receipt is admission, not successor ready."
+			},
+			"classification": "observed_limit",
+			"rationale": "Windows has a stronger successor-ready/probation contract in this chosen-release flow. No explicit rationale for the missing custom macOS/Linux receiving equivalent was established; it is not claimed impossible on either OS. ARMED-on-quit is intentional, while contradictory pending/failed state is MUR-001. Compare contract scope before implementation.",
+			"evidence_reports": [
+				"windows-updater/report.md",
+				"macos-updater/report.md",
+				"linux-updater/report.md"
+			]
+		},
+		{
+			"id": "responsiveness",
+			"title": "Deadline and event-loop responsiveness",
+			"behavior": {
+				"windows": "Native worker separates replacement from live AHK; live native latency unmeasured.",
+				"macos": "Owned tasks/native handoff; live AppKit/Hammerspoon latency unmeasured.",
+				"linux": "Default synchronous smoke stalls the real LuaJIT loop past install deadline in a private fixture (LUR-001)."
+			},
+			"classification": "observed_limit",
+			"rationale": "Linux private 250ms-budget/650ms-sleeper proof demonstrates starvation; it is not a typical desktop latency measurement or proof other OS are immune.",
+			"evidence_reports": [
+				"windows-updater/report.md",
+				"macos-updater/report.md",
+				"linux-updater/report.md"
+			]
+		}
+	]
+}

@@ -1,0 +1,106 @@
+{
+	"schema_version": 1,
+	"scope": "windows-updater",
+	"audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+	"created_at": "2026-11-04",
+	"report_path": "/workspace/scratch/parity-recovery/windows-updater/report.md",
+	"findings": [],
+	"capabilities": [
+		{
+			"id": "installed_bundle_install",
+			"windows_status": "implemented",
+			"entry": "Update prompt and Versions bridge",
+			"constraints": "Installed compiled bundle; exact asset/digest; detached signature depends on active policy",
+			"other_os_equivalent": "macOS Sparkle/chosen-app installer; Linux owned standalone archive",
+			"native_windows_executed": false
+		},
+		{
+			"id": "source_checkout_pull",
+			"windows_status": "not_exposed_by_audited_owner",
+			"entry": "Source About rows greyed; install guard refuses",
+			"constraints": "Explicit developer-tree protection; no dedicated pull entry found in bounded owner",
+			"other_os_equivalent": "Other developer/helper paths outside this scope are unverified",
+			"native_windows_executed": false
+		},
+		{
+			"id": "manual_check",
+			"windows_status": "implemented",
+			"entry": "About/manual check and cached update prompt",
+			"constraints": "Request/pause provenance; async network",
+			"other_os_equivalent": "All3 shared release/channel policy",
+			"native_windows_executed": false
+		},
+		{
+			"id": "scheduled_notification",
+			"windows_status": "implemented",
+			"entry": "Background tick and wake scheduling",
+			"constraints": "Notify only; source mode disabled; paused silent",
+			"other_os_equivalent": "Shared cadence; macOS Lua disables independent Sparkle scheduler; Linux package distinction",
+			"native_windows_executed": false
+		},
+		{
+			"id": "channel_frequency",
+			"windows_status": "implemented",
+			"entry": "About rows and Versions channel subscription",
+			"constraints": "Shared registry/presets; reload can remain pending",
+			"other_os_equivalent": "All3, native persistence/restart differs",
+			"native_windows_executed": false
+		},
+		{
+			"id": "feed_only_install",
+			"windows_status": "unavailable_by_explicit_trust_policy",
+			"entry": "Feed-only chosen release is refused with no_details",
+			"constraints": "Atom feed alone lacks executable install digest trust",
+			"other_os_equivalent": "macOS can use Sparkle signed appcast; Linux also refuses bare feed install",
+			"native_windows_executed": false
+		},
+		{
+			"id": "detached_signature_enforcement",
+			"windows_status": "implemented_policy_off",
+			"entry": "CNG gate before staging reservation",
+			"constraints": "Shared enforcement=off and empty key; must not advertise active mandatory signatures",
+			"other_os_equivalent": "Linux same policy; macOS native codesign/Sparkle",
+			"native_windows_executed": false
+		},
+		{
+			"id": "chosen_release_config_backup",
+			"windows_status": "implemented",
+			"entry": "ReleaseInstall_Start before asset/install",
+			"constraints": "Chosen-release path only; backup failure refuses; no claim all direct prompt updates snapshot config",
+			"other_os_equivalent": "Shared Lua sequence equivalent",
+			"native_windows_executed": false
+		},
+		{
+			"id": "swap_rollback_recovery",
+			"windows_status": "implemented",
+			"entry": "Post-parent-exit PS owner",
+			"constraints": "Real-file transaction fixtures passed; native process/event ports unexecuted",
+			"other_os_equivalent": "macOS previous app; Linux prior owned tree",
+			"native_windows_executed": false
+		},
+		{
+			"id": "config_restore",
+			"windows_status": "implemented_overlay_semantics",
+			"entry": "Versions restore and atomic copy owner",
+			"constraints": "Pre-restore backup; extra later files retained; mirror-deletion rationale unknown",
+			"other_os_equivalent": "Shared rules; native owner differs",
+			"native_windows_executed": false
+		},
+		{
+			"id": "reload_pending_refused",
+			"windows_status": "implemented",
+			"entry": "ReloadPreservingSuspend with native successor port",
+			"constraints": "Actual terminal acceptance later; duplicate plain joins; own callbacks refuse joining",
+			"other_os_equivalent": "macOS Hammerspoon and Linux full-daemon restart equivalents",
+			"native_windows_executed": false
+		},
+		{
+			"id": "dedicated_updater_agent_tool",
+			"windows_status": "not_established_in_bounded_scope",
+			"entry": "No dedicated built-in updater tool identified in audited caller graph",
+			"constraints": "Generic user .ps1/.cmd/.ahk tools are not updater consent/reachability",
+			"other_os_equivalent": "External tool registries outside module pair unverified",
+			"native_windows_executed": false
+		}
+	]
+}

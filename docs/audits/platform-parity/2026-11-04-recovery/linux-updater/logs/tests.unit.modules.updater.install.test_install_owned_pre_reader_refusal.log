@@ -1,0 +1,11 @@
+
+=== Known Pre-Reader Install Refusal ===
+  ok   known original deadline refusal joins cleanup before releasing busy
+  ok   throwing initial admission still joins fixed pre-reader reservation cleanup
+  ok   logical cancellation never substitutes for original cleanup ACK
+  ok   public child method replacement cannot borrow physical cleanup authority
+  ok   early cleanup callback is buffered until original child acquisition and ACK
+  ok   early callback followed by throwing cleanup constructor retains unknown debt
+  ok   nil unknown cleanup acquisition cannot manufacture pre-reader physical success
+  ok   physical observer reentry consumes one known-refusal completion
+TOTAL 8 passed 0 failed

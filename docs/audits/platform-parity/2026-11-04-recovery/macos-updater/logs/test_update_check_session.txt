@@ -1,0 +1,80 @@
+Selecting exact test module: "tests.unit.modules.updater.test_update_check_session"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_update_check_session
+
+=== updater.check_session: the update-check window's session ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"shows checking for the subscribed channel, then the answer","status":"pass","elapsed_ms":0.934305,"timing_error":""}
+  ok   shows checking for the subscribed channel, then the answer
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"installs only the offered release, then closes","status":"pass","elapsed_ms":0.540203,"timing_error":""}
+  ok   installs only the offered release, then closes
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"keeps the window and says so when the installer refuses","status":"pass","elapsed_ms":0.639793,"timing_error":""}
+  ok   keeps the window and says so when the installer refuses
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"refuses Update when the answer is up to date","status":"pass","elapsed_ms":0.359401,"timing_error":""}
+  ok   refuses Update when the answer is up to date
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"switches only to a listed channel, then checks it at once","status":"pass","elapsed_ms":0.469646,"timing_error":""}
+  ok   switches only to a listed channel, then checks it at once
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"keeps the answer when the channel owner refuses a switch","status":"pass","elapsed_ms":0.271638,"timing_error":""}
+  ok   keeps the answer when the channel owner refuses a switch
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"ignores the answer of a superseded check","status":"pass","elapsed_ms":0.266410,"timing_error":""}
+  ok   ignores the answer of a superseded check
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"shows a failure with today's log, and serves Report and the log","status":"pass","elapsed_ms":0.332490,"timing_error":""}
+  ok   shows a failure with today's log, and serves Report and the log
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"logs why a failure shows no log path","status":"pass","elapsed_ms":0.331679,"timing_error":""}
+  ok   logs why a failure shows no log path
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"turns a refused or raising check into a visible failure","status":"pass","elapsed_ms":0.789236,"timing_error":""}
+  ok   turns a refused or raising check into a visible failure
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"refuses messages that are not its actions, and opens What's new on an offer","status":"pass","elapsed_ms":0.781054,"timing_error":""}
+  ok   refuses messages that are not its actions, and opens What's new on an offer
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"a retired session shows and does nothing more","status":"pass","elapsed_ms":0.191128,"timing_error":""}
+  ok   a retired session shows and does nothing more
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"refuses to start without every port","status":"pass","elapsed_ms":0.167732,"timing_error":""}
+  ok   refuses to start without every port
+
+=== update report explicit completion ===
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) admission waits and duplicate completion cannot change the result","status":"pass","elapsed_ms":0.557378,"timing_error":""}
+  ok   (update-report-async) admission waits and duplicate completion cannot change the result
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) start retires the previous exact result owner","status":"pass","elapsed_ms":0.190577,"timing_error":""}
+  ok   (update-report-async) start retires the previous exact result owner
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) retire retires the previous exact result owner","status":"pass","elapsed_ms":0.352810,"timing_error":""}
+  ok   (update-report-async) retire retires the previous exact result owner
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) new_report retires the previous exact result owner","status":"pass","elapsed_ms":0.168053,"timing_error":""}
+  ok   (update-report-async) new_report retires the previous exact result owner
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) cancellation retirement fences the old report continuation","status":"pass","elapsed_ms":0.612751,"timing_error":""}
+  ok   (update-report-async) cancellation retirement fences the old report continuation
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) cancellation retirement fences the old start continuation","status":"pass","elapsed_ms":0.435776,"timing_error":""}
+  ok   (update-report-async) cancellation retirement fences the old start continuation
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) cancellation retirement fences the old answer continuation","status":"pass","elapsed_ms":0.374514,"timing_error":""}
+  ok   (update-report-async) cancellation retirement fences the old answer continuation
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) cancellation preserves a reentrant successor report","status":"pass","elapsed_ms":0.796007,"timing_error":""}
+  ok   (update-report-async) cancellation preserves a reentrant successor report
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) cancellation preserves a reentrant successor start","status":"pass","elapsed_ms":0.266471,"timing_error":""}
+  ok   (update-report-async) cancellation preserves a reentrant successor start
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) inline completion followed by an exception acknowledges only once","status":"pass","elapsed_ms":0.400202,"timing_error":""}
+  ok   (update-report-async) inline completion followed by an exception acknowledges only once
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"(update-report-async) a handle returned after inline replacement is cancelled","status":"pass","elapsed_ms":2.691037,"timing_error":""}
+  ok   (update-report-async) a handle returned after inline replacement is cancelled
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"seeds the page with the release body and the repository","status":"pass","elapsed_ms":2.125897,"timing_error":""}
+  ok   seeds the page with the release body and the repository
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"seeds no notes without a release body source or outside the offer","status":"pass","elapsed_ms":0.232109,"timing_error":""}
+  ok   seeds no notes without a release body source or outside the offer
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"shows the answer without notes and logs when the repository is unknown","status":"pass","elapsed_ms":0.373892,"timing_error":""}
+  ok   shows the answer without notes and logs when the repository is unknown
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"opens a repository link of the seeded notes and acknowledges it","status":"pass","elapsed_ms":1.071131,"timing_error":""}
+  ok   opens a repository link of the seeded notes and acknowledges it
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"refuses a link outside the repository, before any host opens it","status":"pass","elapsed_ms":0.443647,"timing_error":""}
+  ok   refuses a link outside the repository, before any host opens it
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"refuses a link when the answer offered no notes or the phase is not an offer","status":"pass","elapsed_ms":0.268103,"timing_error":""}
+  ok   refuses a link when the answer offered no notes or the phase is not an offer
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.modules.updater.test_update_check_session","name":"says so when the host cannot open an approved link","status":"pass","elapsed_ms":0.291769,"timing_error":""}
+  ok   says so when the host cannot open an approved link
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_update_check_session","name":"tests.unit.modules.updater.test_update_check_session","status":"pass","elapsed_ms":19.313198,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  31
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

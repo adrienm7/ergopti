@@ -1,0 +1,30 @@
+{
+  "audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+  "command": "git show <sha>:<source_path> (captured as bytes)",
+  "files": [
+    {
+      "bundle_path": "/workspace/scratch/parity-recovery/macos-migration/probes/immutable-bundle/adapters/legacy_folder_migration.lua",
+      "source_path": "static/ergopti_plus/macos/adapters/legacy_folder_migration.lua",
+      "git_blob": "ba1fe3d3bbbd66c71eb7c80fc6316f733910f443",
+      "sha256": "06e8cb87fa7c91aed379dbff58501659e62fd4a0703fa0ed3200ecc401210070"
+    },
+    {
+      "bundle_path": "/workspace/scratch/parity-recovery/macos-migration/probes/immutable-bundle/legacy_folder_migration.lua",
+      "source_path": "static/ergopti_plus/_shared/lua/legacy_folder_migration.lua",
+      "git_blob": "0552eb6e35fe37c222da5e42a31a8e5f39e66ba6",
+      "sha256": "2f28acbcdd006605ae03886a02597ce580d25df04a04a0253a1c6d5b00d436d5"
+    },
+    {
+      "bundle_path": "/workspace/scratch/parity-recovery/macos-migration/probes/immutable-bundle/app_dirs.lua",
+      "source_path": "static/ergopti_plus/_shared/lua/app_dirs.lua",
+      "git_blob": "5c5563d7f3c62829b2d68098eaed990175434565",
+      "sha256": "5c3038ca5d3a08bb93e9b994c72bc08145a79bfd48ce3ba8935fd90156175d2f"
+    },
+    {
+      "bundle_path": "/workspace/scratch/parity-recovery/macos-migration/probes/immutable-bundle/native_path.lua",
+      "source_path": "static/ergopti_plus/_shared/lua/native_path.lua",
+      "git_blob": "8861fb38d50ba82967249b1e678df6a3c7eb42eb",
+      "sha256": "df25139f80acb437ad68a7f340307e0db7f0385fe385821199b2a1c48922c7c8"
+    }
+  ]
+}

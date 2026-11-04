@@ -1,0 +1,36 @@
+Selecting exact test module: "tests.unit.ui.changelog.test_changelog_release_install"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.changelog.test_changelog_release_install
+
+=== Changelog one-click release install (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"seeds the installed build and the restorable backup into the page","status":"pass","elapsed_ms":8.090483,"timing_error":""}
+  ok   seeds the installed build and the restorable backup into the page
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"greys a source run with its reason","status":"pass","elapsed_ms":4.392473,"timing_error":""}
+  ok   greys a source run with its reason
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"backs up first, stages and verifies, arms the replacement, then quits","status":"pass","elapsed_ms":5.249559,"timing_error":""}
+  ok   backs up first, stages and verifies, arms the replacement, then quits
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"waits for the detached worker before quitting (release-arming-bridge)","status":"pass","elapsed_ms":6.721884,"timing_error":""}
+  ok   waits for the detached worker before quitting (release-arming-bridge)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"keeps the driver running when arming refuses (release-arming-bridge)","status":"pass","elapsed_ms":6.348272,"timing_error":""}
+  ok   keeps the driver running when arming refuses (release-arming-bridge)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"refuses a release without the macOS archive and keeps the backup","status":"pass","elapsed_ms":8.078986,"timing_error":""}
+  ok   refuses a release without the macOS archive and keeps the backup
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"never arms a replacement for a release that failed its verification","status":"pass","elapsed_ms":4.384831,"timing_error":""}
+  ok   never arms a replacement for a release that failed its verification
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"refuses a tag the fetched list does not hold, without a backup","status":"pass","elapsed_ms":6.147357,"timing_error":""}
+  ok   refuses a tag the fetched list does not hold, without a backup
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"restores a backup and reloads on it","status":"pass","elapsed_ms":4.081556,"timing_error":""}
+  ok   restores a backup and reloads on it
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"reloads nothing when a restore fails","status":"pass","elapsed_ms":4.996209,"timing_error":""}
+  ok   reloads nothing when a restore fails
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.changelog.test_changelog_release_install","name":"tests.unit.ui.changelog.test_changelog_release_install","status":"pass","elapsed_ms":59.935966,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  10
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

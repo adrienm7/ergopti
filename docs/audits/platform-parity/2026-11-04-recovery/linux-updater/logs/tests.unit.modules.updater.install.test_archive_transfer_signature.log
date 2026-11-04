@@ -1,0 +1,8 @@
+
+=== Archive Transfer Signature ===
+  ok   a good signature releases the archive with its sealed size and digest
+  ok   a bad signature refuses the archive in words
+  ok   a missing signature download reaches the gate as a fetch error
+  ok   a release without a signature asset still reaches the gate
+  ok   without a signature port the flow is unchanged
+TOTAL 5 passed 0 failed

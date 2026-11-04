@@ -1,0 +1,5 @@
+REPRO real POSIX os.rename replaces destination created after exists check; report records moved, no clash/newer-owner warning
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-dg_0dsgj/Library/Application Support/ErgoptiPlus/paths.toml to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-dg_0dsgj/Library/Application Support/Ergopti/paths.toml.
+INFO Moved legacy folder entry /workspace/scratch/parity-recovery/macos-migration/probes/tmp-dg_0dsgj/.config/ergopti_plus to /workspace/scratch/parity-recovery/macos-migration/probes/tmp-dg_0dsgj/Library/Application Support/Ergopti/config.
+INFO Removed the emptied legacy folder /workspace/scratch/parity-recovery/macos-migration/probes/tmp-dg_0dsgj/Library/Application Support/ErgoptiPlus.
+INFO paths.toml now names the new default folders; its previous text is kept beside it.

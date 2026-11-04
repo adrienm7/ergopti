@@ -1,0 +1,38 @@
+Selecting exact test module: "tests.unit.modules.updater.test_config_backup_binding"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_config_backup_binding
+
+=== config_backup binding (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_config_backup_binding","name":"backs up the configuration folder under the shared rules","status":"pass","elapsed_ms":5.792240,"timing_error":""}
+  ok   backs up the configuration folder under the shared rules
+
+=== configuration backup binding (config-backup-binding-contract) ===
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_config_backup_binding","name":"(config-backup-binding-contract) is built only from complete ports","status":"pass","elapsed_ms":0.012149,"timing_error":""}
+  ok   (config-backup-binding-contract) is built only from complete ports
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_config_backup_binding","name":"(config-backup-binding-contract) builds the owner over the driver's roots and the shared rules","status":"pass","elapsed_ms":0.029484,"timing_error":""}
+  ok   (config-backup-binding-contract) builds the owner over the driver's roots and the shared rules
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.test_config_backup_binding","name":"(config-backup-binding-contract) refuses an unreadable or ruleless defaults file with one logged error","status":"pass","elapsed_ms":0.019610,"timing_error":""}
+  ok   (config-backup-binding-contract) refuses an unreadable or ruleless defaults file with one logged error
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.test_config_backup_binding","name":"(config-backup-binding-contract) refuses an unresolvable root with the driver's own line","status":"pass","elapsed_ms":0.015093,"timing_error":""}
+  ok   (config-backup-binding-contract) refuses an unresolvable root with the driver's own line
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.test_config_backup_binding","name":"(config-backup-binding-contract) lets the test seam replace the roots and skip the driver's","status":"pass","elapsed_ms":0.048653,"timing_error":""}
+  ok   (config-backup-binding-contract) lets the test seam replace the roots and skip the driver's
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.test_config_backup_binding","name":"(config-backup-binding-contract) rebuilds the owner on each call so a moved folder is followed","status":"pass","elapsed_ms":0.034011,"timing_error":""}
+  ok   (config-backup-binding-contract) rebuilds the owner on each call so a moved folder is followed
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.test_config_backup_binding","name":"(config-backup-binding-contract) classifies entries, never walks a link to a folder and never reads a special file","status":"pass","elapsed_ms":0.156645,"timing_error":""}
+  ok   (config-backup-binding-contract) classifies entries, never walks a link to a folder and never reads a special file
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.updater.test_config_backup_binding","name":"(config-backup-binding-contract) refuses a listing whose link target cannot be classified","status":"pass","elapsed_ms":0.134002,"timing_error":""}
+  ok   (config-backup-binding-contract) refuses a listing whose link target cannot be classified
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.updater.test_config_backup_binding","name":"(config-backup-binding-contract) reports an absent folder as absent and a file as no folder","status":"pass","elapsed_ms":0.334913,"timing_error":""}
+  ok   (config-backup-binding-contract) reports an absent folder as absent and a file as no folder
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_config_backup_binding","name":"tests.unit.modules.updater.test_config_backup_binding","status":"pass","elapsed_ms":8.284347,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  10
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

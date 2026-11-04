@@ -1,0 +1,32 @@
+Selecting exact test module: "tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation
+
+=== automatic and manual checks retain independent transports ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation","name":"preserves both requests when automatic starts first (update-check-transport-isolation)","status":"pass","elapsed_ms":19.476729,"timing_error":""}
+  ok   preserves both requests when automatic starts first (update-check-transport-isolation)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation","name":"preserves both requests when manual starts first (update-check-transport-isolation)","status":"pass","elapsed_ms":13.499300,"timing_error":""}
+  ok   preserves both requests when manual starts first (update-check-transport-isolation)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation","name":"keeps the automatic Atom fallback independent (update-check-transport-isolation)","status":"pass","elapsed_ms":10.200525,"timing_error":""}
+  ok   keeps the automatic Atom fallback independent (update-check-transport-isolation)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation","name":"keeps the manual Atom fallback independent (update-check-transport-isolation)","status":"pass","elapsed_ms":10.190629,"timing_error":""}
+  ok   keeps the manual Atom fallback independent (update-check-transport-isolation)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation","name":"keeps the sibling request after automatic cancellation (update-check-transport-isolation)","status":"pass","elapsed_ms":9.967273,"timing_error":""}
+  ok   keeps the sibling request after automatic cancellation (update-check-transport-isolation)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation","name":"keeps the sibling request after manual cancellation (update-check-transport-isolation)","status":"pass","elapsed_ms":10.015887,"timing_error":""}
+  ok   keeps the sibling request after manual cancellation (update-check-transport-isolation)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation","name":"fences the background result when the manual answer stops the owner (update-check-transport-isolation)","status":"pass","elapsed_ms":11.098182,"timing_error":""}
+  ok   fences the background result when the manual answer stops the owner (update-check-transport-isolation)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation","name":"retires both pending completions when stopped (update-check-transport-isolation)","status":"pass","elapsed_ms":10.038921,"timing_error":""}
+  ok   retires both pending completions when stopped (update-check-transport-isolation)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation","name":"tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation","status":"pass","elapsed_ms":95.151624,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  8
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

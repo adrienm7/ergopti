@@ -1,0 +1,14 @@
+{"name": "test-release-install-contract.cjs", "command": ["npx", "--yes", "--package=node@22.22.2", "node", "tools/test/test-release-install-contract.cjs"], "expected_exit": 0, "exit_code": 0, "expected_outcome": true}
+{"name": "test-changelog-release-install.cjs", "command": ["npx", "--yes", "--package=node@22.22.2", "node", "tools/test/test-changelog-release-install.cjs"], "expected_exit": 0, "exit_code": 0, "expected_outcome": true}
+{"name": "test-updater-copy-before-consent.cjs", "command": ["npx", "--yes", "--package=node@22.22.2", "node", "tools/test/test-updater-copy-before-consent.cjs"], "expected_exit": 0, "exit_code": 0, "expected_outcome": true}
+{"name": "test-updater-copy-is-shown.cjs", "command": ["npx", "--yes", "--package=node@22.22.2", "node", "tools/test/test-updater-copy-is-shown.cjs"], "expected_exit": 0, "exit_code": 0, "expected_outcome": true}
+{"name": "test-updater-constants-single-source.cjs", "command": ["npx", "--yes", "--package=node@22.22.2", "node", "tools/test/test-updater-constants-single-source.cjs"], "expected_exit": 0, "exit_code": 0, "expected_outcome": true}
+{"name": "staging-closure", "command": ["/workspace/scratch/parity-toolchain/pwsh-7.4.6/pwsh", "-NoProfile", "-File", "tools/test/test_updater_staging_closure.ps1", "-WorkerSourcePath", "/workspace/ergopti/static/ergopti_plus/windows/vendor/ergopti_updater_staging.ps1"], "expected_exit": 0, "exit_code": 0, "expected_outcome": true}
+{"name": "owned-output", "command": ["/workspace/scratch/parity-toolchain/pwsh-7.4.6/pwsh", "-NoProfile", "-File", "tools/test/test_updater_owned_output.ps1", "-Module", "/workspace/ergopti/static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1"], "expected_exit": 0, "exit_code": 1, "expected_outcome": false}
+{"name": "owned-output-mutant-authority", "command": ["/workspace/scratch/parity-toolchain/pwsh-7.4.6/pwsh", "-NoProfile", "-File", "tools/test/test_updater_owned_output.ps1", "-Module", "/workspace/ergopti/static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1", "-Inverse", "ignore-authority"], "expected_exit": 1, "exit_code": 1, "expected_outcome": true}
+{"name": "owned-output-mutant-copy", "command": ["/workspace/scratch/parity-toolchain/pwsh-7.4.6/pwsh", "-NoProfile", "-File", "tools/test/test_updater_owned_output.ps1", "-Module", "/workspace/ergopti/static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1", "-Inverse", "ignore-copy-currentness"], "expected_exit": 1, "exit_code": 1, "expected_outcome": true}
+Traceback (most recent call last):
+  File "/workspace/scratch/parity-recovery/windows-updater/probes/run-gates.py", line 17, in <module>
+    assert all(x['expected_outcome'] for x in r)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

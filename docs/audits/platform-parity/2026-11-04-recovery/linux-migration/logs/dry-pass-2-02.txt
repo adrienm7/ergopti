@@ -1,0 +1,4 @@
+newline-list	["line","break"]
+newline	moved=0	backed=0	kept=0	removed=0	cache=true
+newline-restart-same-silent-stall=true
+PASS scratch fixture retired; no live user paths or driver boot executed

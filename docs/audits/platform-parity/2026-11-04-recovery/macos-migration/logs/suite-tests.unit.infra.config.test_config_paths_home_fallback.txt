@@ -1,0 +1,11 @@
+MODULE tests.unit.infra.config.test_config_paths_home_fallback
+
+=== config_paths falls back safely when HOME is unavailable ===
+  ok   (config-paths-home-fallback) nil HOME without override
+  ok   (config-paths-home-fallback) nil HOME with override
+  ok   (config-paths-home-fallback) empty HOME without override
+  ok   (config-paths-home-fallback) empty HOME with override
+
+=== config_paths preserves the normal HOME-derived default ===
+  ok   (config-paths-home-fallback) valid HOME still selects the support configuration folder
+RESULT 5 passed 0 failed

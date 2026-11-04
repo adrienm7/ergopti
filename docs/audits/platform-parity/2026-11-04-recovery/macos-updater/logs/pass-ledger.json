@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "scope": "macos-updater",
+  "audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+  "created_at": "2026-11-04T19:37:38.458919+00:00",
+  "passes": [
+    {
+      "id": "P0",
+      "new_roots": 0,
+      "coverage": "AGENTS/skills/memory, entry register, native/shared ownership and prior audit duplicate map"
+    },
+    {
+      "id": "P1",
+      "new_roots": 1,
+      "ids": [
+        "MUR-001"
+      ],
+      "coverage": "Exact ARMED -> actual exit admission refusal -> real shared failed/busy false -> retained physical swap worker. Probe accepted and refusal controls."
+    },
+    {
+      "id": "P2",
+      "new_roots": 0,
+      "dry": true,
+      "coverage": "Recheck actual shared fail/no cleanup, mac binding/no inverse, page retirement; compare actual publication nil API vs hard-exit fallback, focused385 tests. No additional confirmed root."
+    },
+    {
+      "id": "P3",
+      "new_roots": 0,
+      "dry": true,
+      "coverage": "Challenge intent: on-quit explicit, consent not withdrawn; add actual competing worker lease exit4 negative control. Recheck manual pause exception, generation/transport retirement, sentinel current root, open dispatch vs boot proof, native cleanup and counterpart capabilities. No additional confirmed root."
+    }
+  ],
+  "stop_reason": "Two consecutive bounded dry passes after most recent new root; native macOS/APFS/Sparkle and G4 remain unexecuted."
+}

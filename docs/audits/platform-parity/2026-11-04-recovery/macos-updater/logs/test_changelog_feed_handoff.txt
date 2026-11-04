@@ -1,0 +1,30 @@
+Selecting exact test module: "tests.unit.ui.changelog.test_changelog_feed_handoff"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.changelog.test_changelog_feed_handoff
+
+=== Versions window feed-only hand-off to Sparkle (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_feed_handoff","name":"seeds the page with the hand-off it can offer","status":"pass","elapsed_ms":5.159424,"timing_error":""}
+  ok   seeds the page with the hand-off it can offer
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_feed_handoff","name":"hands the channel's newest feed release to Sparkle on its channel","status":"pass","elapsed_ms":3.706373,"timing_error":""}
+  ok   hands the channel's newest feed release to Sparkle on its channel
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_feed_handoff","name":"never hands an older release, nor another channel's tag, to Sparkle","status":"pass","elapsed_ms":3.933704,"timing_error":""}
+  ok   never hands an older release, nor another channel's tag, to Sparkle
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_feed_handoff","name":"offers a switch of channel that channel's newest release","status":"pass","elapsed_ms":3.671470,"timing_error":""}
+  ok   offers a switch of channel that channel's newest release
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_feed_handoff","name":"refuses when the installed build is already the channel's newest","status":"pass","elapsed_ms":3.525201,"timing_error":""}
+  ok   refuses when the installed build is already the channel's newest
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_feed_handoff","name":"reports a hand-off the launcher did not take","status":"pass","elapsed_ms":3.364079,"timing_error":""}
+  ok   reports a hand-off the launcher did not take
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.changelog.test_changelog_feed_handoff","name":"never reaches Sparkle for an API list, whose digests install directly","status":"pass","elapsed_ms":3.460964,"timing_error":""}
+  ok   never reaches Sparkle for an API list, whose digests install directly
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.changelog.test_changelog_feed_handoff","name":"tests.unit.ui.changelog.test_changelog_feed_handoff","status":"pass","elapsed_ms":27.351881,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  7
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

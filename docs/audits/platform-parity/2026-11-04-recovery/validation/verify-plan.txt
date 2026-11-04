@@ -1,0 +1,14 @@
+
+> svelte-static@3.0.0 verify
+> node ./tools/test/verify-change.cjs --plan --range=HEAD
+
+verify-change: 242 changed file(s).
+verify-change: silent-failure pre-checks passed.
+
+  Gates required by this change:
+   - format  (CI checks actual Prettier/Ruff formatting before suites; formatter self-tests do not validate source files)
+       e.g. TODO.md, docs/audits/platform-parity/2026-11-04-recovery/capabilities.json, docs/audits/platform-parity/2026-11-04-recovery/capabilities.md
+   - ahk-encoding  (every .ahk must stay UTF-8 BOM + LF; a stray CRLF or a lost BOM breaks the parser in ways that are hard to read)
+       e.g. docs/audits/platform-parity/2026-11-04-recovery/windows-migration/probes/native-windows-fixtures.ahk
+   - js  (port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only)
+       e.g. TODO.md, docs/audits/platform-parity/2026-11-04-recovery/capabilities.json, docs/audits/platform-parity/2026-11-04-recovery/capabilities.md

@@ -1,0 +1,41 @@
+{
+  "audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+  "basis": "executed source assertions only; no AutoHotkey/native Windows execution",
+  "owners": [
+    {
+      "path": "/workspace/ergopti/static/ergopti_plus/windows/infra/legacy_folder_migration.ahk",
+      "sha256": "5221e089ce5b0c8735765d18adc259ca64bc82a22573211291a1d52bd487af0c"
+    },
+    {
+      "path": "/workspace/ergopti/static/ergopti_plus/windows/infra/boot.ahk",
+      "sha256": "0c61b257229c7d29ebfab82e43eb5c17eebdcbad9a4b16cb5c36b24db4a7a85c"
+    },
+    {
+      "path": "/workspace/ergopti/static/ergopti_plus/windows/adapters/file_system.ahk",
+      "sha256": "7569a461f8d2bcd5ef12cb5ec2814c855a1a106d332e73c9a4c37dce47b52f01"
+    },
+    {
+      "path": "/workspace/ergopti/static/ergopti_plus/windows/infra/config_transition.ahk",
+      "sha256": "aaa7d771fd89051d00fc092d9209597d20a7cb89573c78c4f5dbd51a59e0402c"
+    },
+    {
+      "path": "/workspace/ergopti/static/ergopti_plus/windows/infra/config_transition_runtime.ahk",
+      "sha256": "4b4e35f659064a518553bf117d2ef5cdc5b40f5203f123ce2e6c6e7d1437f585"
+    },
+    {
+      "path": "/workspace/ergopti/static/ergopti_plus/windows/infra/toml/toml_helpers.ahk",
+      "sha256": "d8b8c28875206529bb7f5ec4558ddc3824b97c110759951dfb8cf25c8b4fb6af"
+    },
+    {
+      "path": "/workspace/ergopti/static/ergopti_plus/windows/ErgoptiPlus.ahk",
+      "sha256": "520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161"
+    }
+  ],
+  "confirmed_mechanisms": [
+    "unconditional rebase after independent move outcomes",
+    "exact-only identity matching",
+    "bare-key double-quoted-string regex",
+    "old locator journal not transferred or recovered"
+  ],
+  "refuted": "ordinary concurrent drivers fenced by preboot unchanged named mutex"
+}

@@ -1,0 +1,2 @@
+cache-refusal-logged=true
+PASS scratch fixture retired; no live user paths or driver boot executed

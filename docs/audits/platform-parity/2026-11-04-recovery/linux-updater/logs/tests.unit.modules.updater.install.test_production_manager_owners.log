@@ -1,0 +1,24 @@
+
+=== Native Updater Publication ===
+  ok   missing native component refuses without pathname fallback
+  ok   logical cancellation remains busy until captured physical flow ACK
+  ok   exact captured flow method survives public method replacement
+  ok   malformed returned owner retains unknown debt and refuses new acquisition
+  ok   default tray source requires actual fresh pause observation
+  ok   selected release mutation cannot authorize another native route
+  ok   accepted Versions execution remains explicit rather than generic pause bypass
+  ok   native display path cannot enter original pathname installer
+  ok   cancelled artifact cleanup listener cannot publish the terminal twice
+  ok   physical acknowledgement source withdrawal cannot grant install authority
+  ok   physical acknowledgement pause withdrawal refuses default tray publication
+  ok   physical acknowledgement selected URL mutation refuses archive publication
+  ok   false initial source preserves previous verified artifact
+  ok   throwing initial source preserves previous verified artifact
+  ok   invalid initial source preserves previous verified artifact
+  ok   channel cleanup refusal preserves channel and cache before persistence
+  ok   channel cleanup reentry cannot borrow or persist a successor choice
+  ok   actual installer pre-reader deadline refusal releases manager only after authentic cleanup ACK
+
+=== updater receiving model storage isolation ===
+  ok   restores a warmed real storage owner after the receiving scenario (test_production_manager_owners)
+TOTAL 19 passed 0 failed

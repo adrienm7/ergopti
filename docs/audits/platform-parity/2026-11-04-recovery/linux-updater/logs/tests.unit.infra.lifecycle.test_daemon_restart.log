@@ -1,0 +1,26 @@
+
+=== daemon restart ===
+  ok   (quit-wins-over-reload) cancels the restart it requested, once
+  ok   (quit-wins-over-reload) keeps the restart pending when it cannot be cancelled
+  ok   asks systemd to restart the user unit without resolving an installation
+  ok   relays the standalone launcher with the daemon's own arguments
+  ok   (linux-cgroup-unit-owner) relays a daemon in a different unit sharing the service prefix
+  ok   (linux-cgroup-unit-owner) recognizes exact service ancestors in v1 and v2 records
+  ok   refuses to exit a daemon no launcher can bring back
+  ok   reports a restart the system refused
+  ok   requires a reason and the daemon arguments
+
+=== restart pause handoff ===
+  ok   forwards the live pause state through the daemon restart owner
+  ok   publishes the pause before either relay or systemd dispatch without transporting argv
+  ok   applies and consumes true then carries explicit false after the user resumes
+  ok   refuses unreadable or already pending handoffs before dispatch
+  ok   refuses unacknowledged publication before dispatch
+  ok   compensates its image after refused or thrown dispatch on both routes
+  ok   preserves another image when failed dispatch no longer owns the handoff
+  ok   keeps a handoff when the normal pause listener refuses or throws
+  ok   does not acknowledge startup when consuming its applied pause fails
+
+=== Main early pause restoration ===
+  ok   applies the normal transition before starting watchers and refuses a native pause failure
+TOTAL 19 passed 0 failed

@@ -1,0 +1,2 @@
+PASS JSON schema required audit fields, unique IDs, severity/confidence enums and both13-command receipts checked.
+Repository audit-workflow validator refused scratch report path before schema validation: report must be inside the repository. Parent explicitly mandated scratch-only output; no repository copy made.

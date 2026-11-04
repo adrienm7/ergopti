@@ -1,0 +1,43 @@
+
+=== config_backup (Linux): real files ===
+  ok   lists files, folders, and a link to a folder as neither
+  ok   backs up and restores the exact bytes of the configuration and the settings store
+
+=== config-backup-native-names ===
+  ok   (config-backup-native-names) preserves newline-file through backup and restore
+  ok   (config-backup-native-names) preserves newline-directory through backup and restore
+  ok   (config-backup-native-names) a dangling link cannot block unrelated configuration backup
+  ok   (config-backup-native-names) EACCES cannot certify directory absence
+
+=== config-backup-target-refusal ===
+  ok   (config-backup-target-refusal) refuses actual denied link target metadata
+  ok   (config-backup-target-refusal) refuses actual loop link target metadata
+
+=== config-backup-native-metadata ===
+  ok   (config-backup-native-metadata) unknown d_type requires actual denied metadata
+  ok   (config-backup-native-metadata) unknown d_type requires actual gone metadata
+  ok   (config-backup-native-metadata) unknown d_type requires actual file metadata
+
+=== installer-native-publication ===
+  ok   (installer-native-publication) exact directory move handles directory
+  ok   (installer-native-publication) exact directory move handles empty-directory
+  ok   (installer-native-publication) exact directory move handles directory-link
+  ok   (installer-native-publication) exact directory move handles file
+  ok   (installer-native-publication) exact directory move handles absent
+  ok   (installer-native-publication) activation race retains foreign root and original backup
+  ok   (installer-native-publication) genuine absent destinations still install and retain the rollback root
+  ok   (installer-native-publication) native refusal cannot fall back to a shell move
+
+=== config-backup-rule-source ===
+  ok   (config-backup-rule-source) classifies fifo before building a backup owner
+  ok   (config-backup-rule-source) classifies fifo-link before building a backup owner
+  ok   (config-backup-rule-source) classifies denied before building a backup owner
+  ok   (config-backup-rule-source) classifies file before building a backup owner
+  ok   (config-backup-rule-source) classifies file-link before building a backup owner
+  ok   (config-backup-rule-source) refuses valid bytes when the stream close is unacknowledged
+
+=== installer-native-exit-receipt ===
+  ok   (installer-native-exit-receipt) complete native listings retain exit 0
+  ok   (installer-native-exit-receipt) complete native listings retain exit 73
+  ok   (installer-native-exit-receipt) failed listing refuses staging and extraction
+TOTAL 28 passed 0 failed

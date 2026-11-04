@@ -1,0 +1,7 @@
+
+=== Linux reload duration across the restart (linux-reload-budget) ===
+  ok   (linux-reload-budget) measures a reload from its request to the successor's boot and judges its budget
+  ok   (linux-reload-budget) stays silent on a reload within its budget and on a boot that follows none
+  ok   (linux-reload-budget) a refused restart's stamp is cleared, so the next start reports no reload
+  ok   (linux-reload-budget) a malformed stamp or a clock that moved back is logged and retired, never reported
+TOTAL 4 passed 0 failed

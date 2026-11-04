@@ -1,0 +1,338 @@
+{
+	"basis": "Independent raw log parsing, not a new execution or aggregate native certification",
+	"scope_receipts": [
+		{
+			"scope": "linux-updater",
+			"modules": 23,
+			"passed_from_actual_logs": 354,
+			"results": [
+				{
+					"module": "tests.unit.modules.updater.install.test_archive_allocation_refusal",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_archive_allocation_refusal.log",
+					"passed": 8,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_archive_transfer_publication",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_archive_transfer_publication.log",
+					"passed": 4,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_archive_transfer_signature",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_archive_transfer_signature.log",
+					"passed": 5,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_changelog_release_install",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_changelog_release_install.log",
+					"passed": 13,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_config_backup_files",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_config_backup_files.log",
+					"passed": 28,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_install_budget",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_install_budget.log",
+					"passed": 17,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_install_owned_pre_reader_refusal",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_install_owned_pre_reader_refusal.log",
+					"passed": 8,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_production_dispatch_refusal",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_production_dispatch_refusal.log",
+					"passed": 9,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_production_manager_owners",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_production_manager_owners.log",
+					"passed": 19,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_release_install_async",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_release_install_async.log",
+					"passed": 15,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_release_install_contract",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_release_install_contract.log",
+					"passed": 74,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_signature_gate",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_signature_gate.log",
+					"passed": 6,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_transfer_budget",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_transfer_budget.log",
+					"passed": 22,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.install.test_updater_restart",
+					"log": "linux-updater/logs/tests.unit.modules.updater.install.test_updater_restart.log",
+					"passed": 19,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.control.test_reload_restart",
+					"log": "linux-updater/logs/tests.unit.infra.control.test_reload_restart.log",
+					"passed": 7,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.control.test_reload_outcome",
+					"log": "linux-updater/logs/tests.unit.infra.control.test_reload_outcome.log",
+					"passed": 4,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.lifecycle.test_reload_timing",
+					"log": "linux-updater/logs/tests.unit.infra.lifecycle.test_reload_timing.log",
+					"passed": 4,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.check.test_updater_channel_and_recheck",
+					"log": "linux-updater/logs/tests.unit.modules.updater.check.test_updater_channel_and_recheck.log",
+					"passed": 6,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.check.test_updater_check_schedule",
+					"log": "linux-updater/logs/tests.unit.modules.updater.check.test_updater_check_schedule.log",
+					"passed": 18,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.check.test_updater_check_only_fallback",
+					"log": "linux-updater/logs/tests.unit.modules.updater.check.test_updater_check_only_fallback.log",
+					"passed": 5,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.check.test_updater_manager_set_channel_refuses",
+					"log": "linux-updater/logs/tests.unit.modules.updater.check.test_updater_manager_set_channel_refuses.log",
+					"passed": 27,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.check.test_updater_manager_etag_failed_second",
+					"log": "linux-updater/logs/tests.unit.modules.updater.check.test_updater_manager_etag_failed_second.log",
+					"passed": 17,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.lifecycle.test_daemon_restart",
+					"log": "linux-updater/logs/tests.unit.infra.lifecycle.test_daemon_restart.log",
+					"passed": 19,
+					"failed": 0
+				}
+			]
+		},
+		{
+			"scope": "macos-migration",
+			"modules": 6,
+			"passed_from_actual_logs": 36,
+			"results": [
+				{
+					"module": "tests.unit.adapters.test_legacy_folder_migration",
+					"log": "macos-migration/logs/suite-tests.unit.adapters.test_legacy_folder_migration.txt",
+					"passed": 9,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.config.test_config_paths_managed_bootstrap",
+					"log": "macos-migration/logs/suite-tests.unit.infra.config.test_config_paths_managed_bootstrap.txt",
+					"passed": 6,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.config.paths.test_bootstrap_toml",
+					"log": "macos-migration/logs/suite-tests.unit.infra.config.paths.test_bootstrap_toml.txt",
+					"passed": 8,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.config.test_config_paths_first_launch",
+					"log": "macos-migration/logs/suite-tests.unit.infra.config.test_config_paths_first_launch.txt",
+					"passed": 1,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.config.test_config_paths_home_fallback",
+					"log": "macos-migration/logs/suite-tests.unit.infra.config.test_config_paths_home_fallback.txt",
+					"passed": 5,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.config.test_config_paths_write_transaction",
+					"log": "macos-migration/logs/suite-tests.unit.infra.config.test_config_paths_write_transaction.txt",
+					"passed": 7,
+					"failed": 0
+				}
+			]
+		},
+		{
+			"scope": "macos-updater",
+			"modules": 23,
+			"passed_from_actual_logs": 385,
+			"results": [
+				{
+					"module": "tests.unit.modules.updater.test_update_check_session_vectors",
+					"log": "macos-updater/logs/test_update_check_session_vectors.txt",
+					"passed": 49,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_update_channels_vectors",
+					"log": "macos-updater/logs/test_update_channels_vectors.txt",
+					"passed": 9,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_update_channel_owner",
+					"log": "macos-updater/logs/test_update_channel_owner.txt",
+					"passed": 6,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_update_schedule_vectors",
+					"log": "macos-updater/logs/test_update_schedule_vectors.txt",
+					"passed": 8,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_version_label_vectors",
+					"log": "macos-updater/logs/test_version_label_vectors.txt",
+					"passed": 4,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_release_install_contract",
+					"log": "macos-updater/logs/test_release_install_contract.txt",
+					"passed": 64,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_repository_url",
+					"log": "macos-updater/logs/test_repository_url.txt",
+					"passed": 3,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_updater_packaged_identity",
+					"log": "macos-updater/logs/test_updater_packaged_identity.txt",
+					"passed": 3,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_update_auto_check",
+					"log": "macos-updater/logs/test_update_auto_check.txt",
+					"passed": 38,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_update_check_session",
+					"log": "macos-updater/logs/test_update_check_session.txt",
+					"passed": 31,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_config_backup_binding",
+					"log": "macos-updater/logs/test_config_backup_binding.txt",
+					"passed": 10,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.test_release_installer",
+					"log": "macos-updater/logs/test_release_installer.txt",
+					"passed": 29,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.lifecycle.test_release_arming_receipt",
+					"log": "macos-updater/logs/test_release_arming_receipt.txt",
+					"passed": 21,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation",
+					"log": "macos-updater/logs/test_update_check_transport_isolation.txt",
+					"passed": 8,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.lifecycle.test_release_swap_receipts",
+					"log": "macos-updater/logs/test_release_swap_receipts.txt",
+					"passed": 5,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.modules.updater.lifecycle.test_manual_check_retirement",
+					"log": "macos-updater/logs/test_manual_check_retirement.txt",
+					"passed": 10,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.config.test_reload_guard",
+					"log": "macos-updater/logs/test_reload_guard.txt",
+					"passed": 8,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.config.test_reload_gate",
+					"log": "macos-updater/logs/test_reload_gate.txt",
+					"passed": 4,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert",
+					"log": "macos-updater/logs/test_root_controlled_reload_shutdown_inert.txt",
+					"passed": 9,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.lifecycle.test_termination_coordinator",
+					"log": "macos-updater/logs/test_termination_coordinator.txt",
+					"passed": 43,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.infra.lifecycle.test_emergency_exit",
+					"log": "macos-updater/logs/test_emergency_exit.txt",
+					"passed": 6,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.ui.changelog.test_changelog_release_install",
+					"log": "macos-updater/logs/test_changelog_release_install.txt",
+					"passed": 10,
+					"failed": 0
+				},
+				{
+					"module": "tests.unit.ui.changelog.test_changelog_feed_handoff",
+					"log": "macos-updater/logs/test_changelog_feed_handoff.txt",
+					"passed": 7,
+					"failed": 0
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,25 @@
+{
+  "audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+  "files": [
+    {
+      "source_path": "static/ergopti_plus/macos/init.lua",
+      "scratch_path": "/workspace/scratch/parity-recovery/macos-migration/logs/immutable-source-joins/macos/init.lua",
+      "sha256": "018e17c9bfdf53e5d8849c4d6d43cd18e34acc193ad7b8676d8a9ec434cc3a21"
+    },
+    {
+      "source_path": "static/ergopti_plus/macos/infra/config_paths.lua",
+      "scratch_path": "/workspace/scratch/parity-recovery/macos-migration/logs/immutable-source-joins/macos/infra/config_paths.lua",
+      "sha256": "8f82ec4f04810ef0bad360db1648bde538098c68b381d30f29a860dbf118d9af"
+    },
+    {
+      "source_path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+      "scratch_path": "/workspace/scratch/parity-recovery/macos-migration/logs/immutable-source-joins/macos/launcher/Sources/ErgoptiPlus/main.swift",
+      "sha256": "b4fc13e895f2d61c91e48f7de70efe98c9bf40250c17b0c9e4728ca6450a4805"
+    },
+    {
+      "source_path": "static/ergopti_plus/_shared/modules/paths/app_dirs.toml",
+      "scratch_path": "/workspace/scratch/parity-recovery/macos-migration/logs/immutable-source-joins/_shared/modules/paths/app_dirs.toml",
+      "sha256": "5980d369a7338d53f44da713cca8b067c730da7d0db8874bc7561687f16f968b"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+
+=== updater (linux): the check falls back on the public feed ===
+  ok   check-only: a blocked API still announces the newer release
+  ok   check-only: an exhausted quota (HTTP 403) falls back too
+  ok   check-only: an up-to-date build is told so, not offered anything
+  ok   check-only: both sources failing is one network failure naming both
+  ok   check-only: a proxy page served as the feed is refused
+TOTAL 5 passed 0 failed

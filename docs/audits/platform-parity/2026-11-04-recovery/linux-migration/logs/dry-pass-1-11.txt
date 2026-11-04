@@ -1,0 +1,13 @@
+
+=== Shared legacy folder migration ===
+  ok   moves what is free, backs up what clashes (legacy-folder-migration-moves)
+  ok   rewrites only the old default folders of paths.toml (legacy-folder-migration-paths)
+  ok   keeps the previous paths.toml text before rewriting it (legacy-folder-migration-backup)
+  ok   refuses a plan without its ports or its backup
+  ok   logs every outcome once (legacy-folder-migration-log)
+
+=== Linux legacy folder migration ===
+  ok   merges each XDG base's old folder into its ergopti folder (legacy-folder-migration-linux)
+  ok   logs every move, backup and kept entry
+  ok   runs before the logger sink and the bootstrap storage (legacy-folder-migration-boot-order)
+REGISTERED_MIGRATION_RESULT	8	0

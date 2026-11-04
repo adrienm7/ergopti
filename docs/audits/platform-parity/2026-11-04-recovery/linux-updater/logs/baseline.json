@@ -1,0 +1,104 @@
+[
+  {
+    "module": "tests.unit.modules.updater.install.test_archive_allocation_refusal",
+    "exit": 0,
+    "passed": 8,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_archive_transfer_publication",
+    "exit": 0,
+    "passed": 4,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_archive_transfer_signature",
+    "exit": 0,
+    "passed": 5,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_changelog_release_install",
+    "exit": 0,
+    "passed": 13,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_config_backup_files",
+    "exit": 0,
+    "passed": 28,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_install_budget",
+    "exit": 0,
+    "passed": 17,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_install_owned_pre_reader_refusal",
+    "exit": 0,
+    "passed": 8,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_production_dispatch_refusal",
+    "exit": 0,
+    "passed": 9,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_production_manager_owners",
+    "exit": 0,
+    "passed": 19,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_release_install_async",
+    "exit": 0,
+    "passed": 15,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_release_install_contract",
+    "exit": 0,
+    "passed": 74,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_signature_gate",
+    "exit": 0,
+    "passed": 6,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_transfer_budget",
+    "exit": 0,
+    "passed": 22,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.modules.updater.install.test_updater_restart",
+    "exit": 0,
+    "passed": 19,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.infra.control.test_reload_restart",
+    "exit": 0,
+    "passed": 7,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.infra.control.test_reload_outcome",
+    "exit": 0,
+    "passed": 4,
+    "failed": 0
+  },
+  {
+    "module": "tests.unit.infra.lifecycle.test_reload_timing",
+    "exit": 0,
+    "passed": 4,
+    "failed": 0
+  }
+]

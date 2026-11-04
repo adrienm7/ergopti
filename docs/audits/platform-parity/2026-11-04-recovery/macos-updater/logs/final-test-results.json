@@ -1,0 +1,281 @@
+{
+  "registered_passed": 385,
+  "modules": [
+    {
+      "module": "tests.unit.modules.updater.test_update_check_session_vectors",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  49",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 49
+    },
+    {
+      "module": "tests.unit.modules.updater.test_update_channels_vectors",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  9",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 9
+    },
+    {
+      "module": "tests.unit.modules.updater.test_update_channel_owner",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  6",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 6
+    },
+    {
+      "module": "tests.unit.modules.updater.test_update_schedule_vectors",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  8",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 8
+    },
+    {
+      "module": "tests.unit.modules.updater.test_version_label_vectors",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  4",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 4
+    },
+    {
+      "module": "tests.unit.modules.updater.test_release_install_contract",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  64",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 64
+    },
+    {
+      "module": "tests.unit.modules.updater.test_repository_url",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  3",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 3
+    },
+    {
+      "module": "tests.unit.modules.updater.test_updater_packaged_identity",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  3",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 3
+    },
+    {
+      "module": "tests.unit.modules.updater.test_update_auto_check",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  38",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 38
+    },
+    {
+      "module": "tests.unit.modules.updater.test_update_check_session",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  31",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 31
+    },
+    {
+      "module": "tests.unit.modules.updater.test_config_backup_binding",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  10",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 10
+    },
+    {
+      "module": "tests.unit.modules.updater.test_release_installer",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  29",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 29
+    },
+    {
+      "module": "tests.unit.modules.updater.lifecycle.test_release_arming_receipt",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  21",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 21
+    },
+    {
+      "module": "tests.unit.modules.updater.lifecycle.test_update_check_transport_isolation",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  8",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 8
+    },
+    {
+      "module": "tests.unit.modules.updater.lifecycle.test_release_swap_receipts",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  5",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 5
+    },
+    {
+      "module": "tests.unit.modules.updater.lifecycle.test_manual_check_retirement",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  10",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 10
+    },
+    {
+      "module": "tests.unit.infra.config.test_reload_guard",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  8",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 8
+    },
+    {
+      "module": "tests.unit.infra.config.test_reload_gate",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  4",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 4
+    },
+    {
+      "module": "tests.unit.infra.lifecycle.test_root_controlled_reload_shutdown_inert",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  9",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 9
+    },
+    {
+      "module": "tests.unit.infra.lifecycle.test_termination_coordinator",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  43",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 43
+    },
+    {
+      "module": "tests.unit.infra.lifecycle.test_emergency_exit",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  6",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 6
+    },
+    {
+      "module": "tests.unit.ui.changelog.test_changelog_release_install",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  10",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 10
+    },
+    {
+      "module": "tests.unit.ui.changelog.test_changelog_feed_handoff",
+      "exit": 0,
+      "tail": [
+        "Passed tests:  7",
+        "Failed tests:  0",
+        "========================================",
+        "",
+        "[OK] All Lua unit tests passed."
+      ],
+      "passed": 7
+    }
+  ]
+}

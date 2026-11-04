@@ -1,0 +1,124 @@
+{
+  "pass": "dry-pass-2",
+  "engine": "/workspace/scratch/parity-toolchain/ci-bin/lua",
+  "results": [
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "healthy"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-00.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "race"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-01.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "newline"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-02.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "refused_rename"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-03.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "override"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-04.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "alias"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-05.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "symlink"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-06.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "backup_retry"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-07.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "name_controls"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-08.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "parent_refusal"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-09.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/native.lua",
+        "cache_refusal"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-10.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/registered.lua"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-11.txt"
+    },
+    {
+      "command": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/list-permission.lua",
+        "/workspace/scratch/parity-recovery/linux-migration/probes/permission-hcyj34it"
+      ],
+      "exit": 0,
+      "log": "/workspace/scratch/parity-recovery/linux-migration/logs/dry-pass-2-12.txt"
+    }
+  ],
+  "status": "passed",
+  "new_confirmed_roots": 0
+}

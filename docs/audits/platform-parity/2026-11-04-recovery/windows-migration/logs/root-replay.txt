@@ -1,0 +1,23 @@
+  locator and personal data agree; second boot unchanged
+PASS control-complete-idempotent
+  old data retained but selected new folder has no personal config; kept warning only
+PASS refused-config-move-still-rewrites
+  locator still selects removed old folder; later boot remains blocked by same backup
+PASS refused-locator-backup-after-successful-moves
+  active locator absent after destructive failed write; backup contains lost override
+PASS refused-locator-write-removes-active-file
+  chosen descendant was physically moved but exact-only rewrite reports unchanged
+PASS custom-descendant-override-dangles
+  semantic reader key unchanged; regex only accepts bare key
+PASS valid-toml-quoted-key-missed
+  next recovery namespace is absent; old nonempty WAL and artifact remain outside it
+PASS old-locator-wal-orphaned
+  chosen folder outside moved roots unaffected
+PASS control-external-override-stays-live
+Real-path actual shared core cases=8; native Windows/AHK NOT executed
+CONTRACT PASS moves what is free, backs up what clashes (legacy-folder-migration-moves)
+CONTRACT PASS rewrites only the old default folders of paths.toml (legacy-folder-migration-paths)
+CONTRACT PASS keeps the previous paths.toml text before rewriting it (legacy-folder-migration-backup)
+CONTRACT PASS refuses a plan without its ports or its backup
+CONTRACT PASS logs every outcome once (legacy-folder-migration-log)
+Committed shared contract groups=5; Windows-only path vector NOT executed

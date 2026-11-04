@@ -1,0 +1,92 @@
+Selecting exact test module: "tests.unit.modules.updater.test_release_installer"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.updater.test_release_installer
+
+=== release_installer: the authenticated asset ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"binds the exact repository URL and GitHub's SHA-256","status":"pass","elapsed_ms":0.014381,"timing_error":""}
+  ok   binds the exact repository URL and GitHub's SHA-256
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses an archive without its digest, at another URL, or absent","status":"pass","elapsed_ms":0.097777,"timing_error":""}
+  ok   refuses an archive without its digest, at another URL, or absent
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"names the declared macOS archive from the shared defaults","status":"pass","elapsed_ms":0.256755,"timing_error":""}
+  ok   names the declared macOS archive from the shared defaults
+
+=== release_installer: staging and replacement dispatch ===
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"reads the installed app and the launcher from the launcher's environment","status":"pass","elapsed_ms":0.003415,"timing_error":""}
+  ok   reads the installed app and the launcher from the launcher's environment
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"passes every release value as an argument and classifies the exit","status":"pass","elapsed_ms":12.217962,"timing_error":""}
+  ok   passes every release value as an argument and classifies the exit
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"arms the replacement detached, with the previous app kept aside","status":"pass","elapsed_ms":0.018648,"timing_error":""}
+  ok   arms the replacement detached, with the previous app kept aside
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses outside a packaged launch","status":"pass","elapsed_ms":0.009975,"timing_error":""}
+  ok   refuses outside a packaged launch
+
+=== release_installer: the staging script under /bin/sh ===
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"retires only the verified owned archive before READY and refuses failed retirement","status":"pass","elapsed_ms":232.005412,"timing_error":""}
+  ok   retires only the verified owned archive before READY and refuses failed retirement
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses a destination parent without write access before downloading","status":"pass","elapsed_ms":35.452452,"timing_error":""}
+  ok   refuses a destination parent without write access before downloading
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"prints READY only after the digest, the version and the signature pass","status":"pass","elapsed_ms":58.507562,"timing_error":""}
+  ok   prints READY only after the digest, the version and the signature pass
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"uses only the declared tar extractor after integrity verification","status":"pass","elapsed_ms":92.992316,"timing_error":""}
+  ok   uses only the declared tar extractor after integrity verification
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses tar extraction, version and signing failures without READY","status":"pass","elapsed_ms":155.659352,"timing_error":""}
+  ok   refuses tar extraction, version and signing failures without READY
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses undeclared formats and foreign bundle paths before download","status":"pass","elapsed_ms":161.717232,"timing_error":""}
+  ok   refuses undeclared formats and foreign bundle paths before download
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"stops at a failed download","status":"pass","elapsed_ms":40.614396,"timing_error":""}
+  ok   stops at a failed download
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"never extracts an archive whose SHA-256 differs","status":"pass","elapsed_ms":44.015305,"timing_error":""}
+  ok   never extracts an archive whose SHA-256 differs
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses an archive carrying another version","status":"pass","elapsed_ms":47.946283,"timing_error":""}
+  ok   refuses an archive carrying another version
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses an app its signing identity does not match","status":"pass","elapsed_ms":50.446459,"timing_error":""}
+  ok   refuses an app its signing identity does not match
+
+=== release_installer: the replacement script under /bin/sh ===
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"waits for the launcher, keeps the previous app and opens the chosen one","status":"pass","elapsed_ms":512.150779,"timing_error":""}
+  ok   waits for the launcher, keeps the previous app and opens the chosen one
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"puts the previous app back and opens it when the chosen one cannot move in","status":"pass","elapsed_ms":202.546962,"timing_error":""}
+  ok   puts the previous app back and opens it when the chosen one cannot move in
+
+=== release_installer: declared archive preference and historical compatibility ===
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"uses actual shared declarations against independent exact release records","status":"pass","elapsed_ms":15.644330,"timing_error":""}
+  ok   uses actual shared declarations against independent exact release records
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"preserves other platform assets and requires declared format-key bindings","status":"pass","elapsed_ms":1.618057,"timing_error":""}
+  ok   preserves other platform assets and requires declared format-key bindings
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"passes the admitted format to the actual native stage and refuses unknown formats before dispatch","status":"pass","elapsed_ms":0.073571,"timing_error":""}
+  ok   passes the admitted format to the actual native stage and refuses unknown formats before dispatch
+
+=== release_installer: the native stage request ===
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"binds a bounded request to the original arguments and child environment","status":"pass","elapsed_ms":0.051959,"timing_error":""}
+  ok   binds a bounded request to the original arguments and child environment
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses failed or oversized serialization before native acquisition","status":"pass","elapsed_ms":0.317402,"timing_error":""}
+  ok   refuses failed or oversized serialization before native acquisition
+
+=== release_installer: filesystem publication admission ===
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"executes real filesystem refusals and preserves every owned original","status":"pass","elapsed_ms":1262.675770,"timing_error":""}
+  ok   executes real filesystem refusals and preserves every owned original
+
+=== release_installer: concurrent filesystem publication ===
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"refuses racing destinations and serializes detached installers before arming (release-exclusive-publication)","status":"pass","elapsed_ms":1223.208301,"timing_error":""}
+  ok   refuses racing destinations and serializes detached installers before arming (release-exclusive-publication)
+
+=== release_installer: complete literal extraction ===
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"rejects four valid Lua suffix expressions on both literal authorities","status":"pass","elapsed_ms":308.265196,"timing_error":""}
+  ok   rejects four valid Lua suffix expressions on both literal authorities
+
+=== release_installer: explicit native script observation ===
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"executes only the explicit script observer without discovering Lua (release-native-script-scope)","status":"pass","elapsed_ms":1305.664872,"timing_error":""}
+  ok   executes only the explicit script observer without discovering Lua (release-native-script-scope)
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.modules.updater.test_release_installer","name":"binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope)","status":"pass","elapsed_ms":96.531103,"timing_error":""}
+  ok   binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.updater.test_release_installer","name":"tests.unit.modules.updater.test_release_installer","status":"pass","elapsed_ms":5874.736232,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  29
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

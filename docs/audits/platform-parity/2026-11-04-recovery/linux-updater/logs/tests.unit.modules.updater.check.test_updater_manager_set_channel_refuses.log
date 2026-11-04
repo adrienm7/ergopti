@@ -1,0 +1,30 @@
+
+=== modules.updater.manager ===
+  ok   set_channel refuses aliases and ids outside the registry
+  ok   init reads the persisted channel through the registry
+  ok   set_check_interval and get_check_interval round-trip through config.toml
+  ok   set_check_interval rejects negative values
+  ok   keeps the durable channel and interval when persistence fails
+  ok   clear_cached_release resets state to idle
+  ok   refuses to download a release other than the one the user chose
+  ok   get_menu_label returns a string for every state
+  ok   the idle label comes from the shared catalogue
+  ok   the check row still names a check while a release is available
+  ok   stop_background_checks is safe to call even without active timers
+  ok   reports unavailable background scheduling instead of silently dropping checks
+  ok   reports a schedule whose timer was not armed
+  ok   init loads persisted settings and initialises
+  ok   check_for_updates dispatches and publishes asynchronously
+  ok   linux-updater-etag: transport forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: conditional-transport forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: conditional-false forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: conditional-number forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: conditional-table forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: http-error forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: invalid-json forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: wrong-root forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: oversized-page forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: entries-mismatch forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: dispatch-refusal forces a fresh page after an unknown native validator
+  ok   linux-updater-etag: cancel forces a fresh page after an unknown native validator
+TOTAL 27 passed 0 failed

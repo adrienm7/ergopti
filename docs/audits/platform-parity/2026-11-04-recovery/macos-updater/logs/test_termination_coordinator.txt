@@ -1,0 +1,102 @@
+Selecting exact test module: "tests.unit.infra.lifecycle.test_termination_coordinator"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.infra.lifecycle.test_termination_coordinator
+
+=== controlled termination coordinator ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"refuses publication debt before requesting a fence or arming the user-quit watchdog","status":"pass","elapsed_ms":0.751508,"timing_error":""}
+  ok   refuses publication debt before requesting a fence or arming the user-quit watchdog
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"retains the same admitted token across delayed reload and quit upgrade","status":"pass","elapsed_ms":0.651738,"timing_error":""}
+  ok   retains the same admitted token across delayed reload and quit upgrade
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"retains refused admission abort and caller compensation until the same release acknowledges","status":"pass","elapsed_ms":0.450476,"timing_error":""}
+  ok   retains refused admission abort and caller compensation until the same release acknowledges
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"releases an acquired token when the lease request rejects before a callback","status":"pass","elapsed_ms":0.569234,"timing_error":""}
+  ok   releases an acquired token when the lease request rejects before a callback
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"uses the existing fatal path if a retained admission is revoked after native STOPPED","status":"pass","elapsed_ms":0.796996,"timing_error":""}
+  ok   uses the existing fatal path if a retained admission is revoked after native STOPPED
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"retains an exclusive reload caller until the exact lease aborts","status":"pass","elapsed_ms":0.756786,"timing_error":""}
+  ok   retains an exclusive reload caller until the exact lease aborts
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"accepts a returning hs.reload after the exact fence and drained teardown","status":"pass","elapsed_ms":0.643055,"timing_error":""}
+  ok   accepts a returning hs.reload after the exact fence and drained teardown
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"keeps every teardown owner live until synthetic input is exactly idle","status":"pass","elapsed_ms":0.641653,"timing_error":""}
+  ok   keeps every teardown owner live until synthetic input is exactly idle
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"keeps quit and its fatal backstop behind the same synthetic drain","status":"pass","elapsed_ms":0.857327,"timing_error":""}
+  ok   keeps quit and its fatal backstop behind the same synthetic drain
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"awaits an exact asynchronous teardown boundary before drain or exit (HS-008)","status":"pass","elapsed_ms":0.611768,"timing_error":""}
+  ok   awaits an exact asynchronous teardown boundary before drain or exit (HS-008)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"fails once only after an exact pending teardown refusal (HS-008)","status":"pass","elapsed_ms":1.167933,"timing_error":""}
+  ok   fails once only after an exact pending teardown refusal (HS-008)
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"retries a pending reload teardown with the latest exit intent (HS-008)","status":"pass","elapsed_ms":0.517747,"timing_error":""}
+  ok   retries a pending reload teardown with the latest exit intent (HS-008)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"lets a synchronous exact teardown callback outrank a late failure","status":"pass","elapsed_ms":1.519831,"timing_error":""}
+  ok   lets a synchronous exact teardown callback outrank a late failure
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"runs teardown before fatal exit when pre-teardown input drain refuses","status":"pass","elapsed_ms":1.969977,"timing_error":""}
+  ok   runs teardown before fatal exit when pre-teardown input drain refuses
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"aborts without teardown when exact revocation is not proven","status":"pass","elapsed_ms":0.959510,"timing_error":""}
+  ok   aborts without teardown when exact revocation is not proven
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"invokes only an explicit emergency abort callback after a failed fence","status":"pass","elapsed_ms":0.929806,"timing_error":""}
+  ok   invokes only an explicit emergency abort callback after a failed fence
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"upgrades a pending reload to one fenced exit transaction","status":"pass","elapsed_ms":0.613731,"timing_error":""}
+  ok   upgrades a pending reload to one fenced exit transaction
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"(quit-wins-over-reload) names the kind of transition that owns the process","status":"pass","elapsed_ms":0.500732,"timing_error":""}
+  ok   (quit-wins-over-reload) names the kind of transition that owns the process
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"preserves an emergency abort callback when exit supersedes reload","status":"pass","elapsed_ms":0.504076,"timing_error":""}
+  ok   preserves an emergency abort callback when exit supersedes reload
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"returns the synchronous fence result instead of mere request acceptance","status":"pass","elapsed_ms":0.820662,"timing_error":""}
+  ok   returns the synchronous fence result instead of mere request acceptance
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"keeps termination pending until the native logger ACK drain completes","status":"pass","elapsed_ms":0.590837,"timing_error":""}
+  ok   keeps termination pending until the native logger ACK drain completes
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"exits non-zero without post-drain logging when native drain times out","status":"pass","elapsed_ms":0.506631,"timing_error":""}
+  ok   exits non-zero without post-drain logging when native drain times out
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"exits non-zero when native drain acquisition returns false","status":"pass","elapsed_ms":0.618849,"timing_error":""}
+  ok   exits non-zero when native drain acquisition returns false
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"exits non-zero when native drain acquisition raises","status":"pass","elapsed_ms":1.122615,"timing_error":""}
+  ok   exits non-zero when native drain acquisition raises
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"exits non-zero without post-stop logging when finalizer returns false","status":"pass","elapsed_ms":0.798058,"timing_error":""}
+  ok   exits non-zero without post-stop logging when finalizer returns false
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"exits non-zero without post-stop logging when finalizer raises","status":"pass","elapsed_ms":1.150166,"timing_error":""}
+  ok   exits non-zero without post-stop logging when finalizer raises
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"contains a lease request exception before any teardown","status":"pass","elapsed_ms":0.788153,"timing_error":""}
+  ok   contains a lease request exception before any teardown
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"exits non-zero when a synchronous exact fence is followed by a request throw","status":"pass","elapsed_ms":1.157688,"timing_error":""}
+  ok   exits non-zero when a synchronous exact fence is followed by a request throw
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"exits non-zero when reload sentinel commit fails after the exact fence","status":"pass","elapsed_ms":1.806751,"timing_error":""}
+  ok   exits non-zero when reload sentinel commit fails after the exact fence
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"exits non-zero after a throwing post-fence teardown","status":"pass","elapsed_ms":0.969314,"timing_error":""}
+  ok   exits non-zero after a throwing post-fence teardown
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"exits non-zero when an earlier owner stopped before teardown returned false","status":"pass","elapsed_ms":0.446139,"timing_error":""}
+  ok   exits non-zero when an earlier owner stopped before teardown returned false
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"reloads natively when a reload's local teardown fails (reload-teardown-failed)","status":"pass","elapsed_ms":3.279191,"timing_error":""}
+  ok   reloads natively when a reload's local teardown fails (reload-teardown-failed)
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"exits non-zero when the fenced callback raises before local teardown","status":"pass","elapsed_ms":1.182215,"timing_error":""}
+  ok   exits non-zero when the fenced callback raises before local teardown
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"forces one non-zero fallback when hs.reload raises after finalization","status":"pass","elapsed_ms":1.149425,"timing_error":""}
+  ok   forces one non-zero fallback when hs.reload raises after finalization
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"forces one non-zero fallback when os.exit returns after finalization","status":"pass","elapsed_ms":0.576926,"timing_error":""}
+  ok   forces one non-zero fallback when os.exit returns after finalization
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"forces one non-zero fallback when os.exit raises after finalization","status":"pass","elapsed_ms":0.887041,"timing_error":""}
+  ok   forces one non-zero fallback when os.exit raises after finalization
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"rejects invalid exit status before requesting a fence","status":"pass","elapsed_ms":0.414702,"timing_error":""}
+  ok   rejects invalid exit status before requesting a fence
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"names every reload stage to the breadcrumb before it runs (reload-breadcrumb)","status":"pass","elapsed_ms":0.469545,"timing_error":""}
+  ok   names every reload stage to the breadcrumb before it runs (reload-breadcrumb)
+# lua_timing {"schema":1,"driver":"macos","id":40,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"names a refused fence, an upgrade to exit and a raising breadcrumb changes nothing (reload-breadcrumb)","status":"pass","elapsed_ms":1.460302,"timing_error":""}
+  ok   names a refused fence, an upgrade to exit and a raising breadcrumb changes nothing (reload-breadcrumb)
+# lua_timing {"schema":1,"driver":"macos","id":41,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"reloads natively when a controlled reload's fence never settles (reload-deadline)","status":"pass","elapsed_ms":0.639891,"timing_error":""}
+  ok   reloads natively when a controlled reload's fence never settles (reload-deadline)
+# lua_timing {"schema":1,"driver":"macos","id":42,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"disarms the reload deadline once the reload settles, aborts or becomes an exit (reload-deadline)","status":"pass","elapsed_ms":2.472511,"timing_error":""}
+  ok   disarms the reload deadline once the reload settles, aborts or becomes an exit (reload-deadline)
+# lua_timing {"schema":1,"driver":"macos","id":43,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"reloads natively when an unowned reload's fence is refused (reload-fence-refused)","status":"pass","elapsed_ms":2.626822,"timing_error":""}
+  ok   reloads natively when an unowned reload's fence is refused (reload-fence-refused)
+# lua_timing {"schema":1,"driver":"macos","id":44,"kind":"case","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"refuses initialization without a positive reload deadline (reload-deadline)","status":"pass","elapsed_ms":0.764788,"timing_error":""}
+  ok   refuses initialization without a positive reload deadline (reload-deadline)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.infra.lifecycle.test_termination_coordinator","name":"tests.unit.infra.lifecycle.test_termination_coordinator","status":"pass","elapsed_ms":44.384656,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  43
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

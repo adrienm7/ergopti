@@ -1,0 +1,5 @@
+OBSERVATION synthetic_unicode_terminal_bytes=2711 consumer_budget=2048 real_windows_exception_reachability=unestablished
+PASS actual-digest valid native_requests=0
+PASS actual-digest mismatch native_requests=0
+PASS actual-digest invalid native_requests=0
+PASS actual-swap-helpers controls=4 actual-digest controls=3 real-private-file-io=true native-process-events=false

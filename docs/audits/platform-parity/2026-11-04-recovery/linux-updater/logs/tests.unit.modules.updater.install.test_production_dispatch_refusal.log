@@ -1,0 +1,14 @@
+
+=== known zero-dispatch native transaction ===
+  ok   known zero-dispatch terminal refusal waits for original physical ACK and returns false
+  ok   zero-started terminal with pending physical owner stays accepted and busy until ACK
+  ok   malformed owner never turns its early terminal into known zero-dispatch completion
+  ok   physical probe cannot change captured original started receipt
+  ok   physical ACK alone without authentic terminal preserves original owned admission
+  ok   captured closed allocator fact preserves the existing available offer despite observer field mutation
+  ok   matching historical error text without the fixed allocator fact keeps ordinary failure state
+  ok   physical-probe source withdrawal prevents restoring an old available offer
+
+=== updater receiving model storage isolation ===
+  ok   restores a warmed real storage owner after the receiving scenario (test_production_dispatch_refusal)
+TOTAL 9 passed 0 failed

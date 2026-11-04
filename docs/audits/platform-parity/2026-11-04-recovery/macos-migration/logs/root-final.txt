@@ -1,0 +1,12 @@
+healthy 0 CONTROL normal public migration/real resolver preserves config bytes+unrelated bootstrap comment; second run no-op
+rename-refusal 0 REPRO rename refused, old config remains; paths.toml rewritten and actual next-start resolver selects absent new config
+rewrite-refusal 0 REPRO rewrite refused after full backup/config move; retry blocked by backup; actual next-start resolver keeps nonexistent old config
+partial-write 0 REPRO partial rewrite truncates bootstrap; restart leaves malformed bytes while reporting unchanged; complete backup never adopted
+nested-override 0 REPRO valid nested-override remains unchanged after containing root moves; actual resolver selects nonexistent old path
+literal-override 0 REPRO valid literal-override remains unchanged after containing root moves; actual resolver selects nonexistent old path
+destination-race 0 REPRO real POSIX os.rename replaces destination created after exists check; report records moved, no clash/newer-owner warning
+symlink-source 0 OBSERVATION legacy logs symlink followed; target drained into new logs while symlink remains; explicit follow/refuse policy unknown
+native-list-denied 0 REPRO real unprivileged POSIX directory denial throws from public native list; original files retained; no report returned: .../ergopti_plus/macos/adapters/legacy_folder_migration.lua:56: cannot open /workspace/scratch/parity-recovery/macos-migration/probes/tmp-1yvl65qn/Library/Application Support/ErgoptiPlus: Permission denied
+custom-override 0 CONTROL unrelated custom override and user bytes preserved; legacy default still migrates
+destination-clash 0 CONTROL destination and occupied backup bytes preserved; expected clash/kept diagnostic recorded
+occupied-backup 0 CONTROL destination and occupied backup bytes preserved; expected clash/kept diagnostic recorded
