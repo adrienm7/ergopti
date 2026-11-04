@@ -446,3 +446,44 @@ helpers.describe("Sql.flush: semantic media retains exact refusal debt", functio
 		helpers.assert_nil(S.agg_batch.kc_ngram.mute)
 	end)
 end)
+
+helpers.describe("Sql.flush — explicit database ownership", function()
+	helpers.it("routes aggregate, title cleanup and media statements only to the supplied handle", function()
+		S.initialized = true
+		S.device_id = "override-test"
+		Core.reset_batch()
+		Core.bump_app_day("2026-01-01", "Editor", "chars", 3)
+		S.agg_batch.titles.title = { date = "2026-01-01", app = "Editor", title = "Window", c = 1, ms = 0 }
+		S.agg_batch.media_ngram.media = { date = "2026-01-01", app = "Editor", media_id = "media.play_pause", count = 2 }
+		local canonical_writes, statements = 0, {}
+		_last_db = { exec = function() canonical_writes = canonical_writes + 1; return 0 end }
+		local override = {
+			exec = function(_, sql) statements[#statements + 1] = sql; return 0 end,
+			errmsg = function() return "override failure" end,
+		}
+		helpers.assert_true(Sql.flush(override))
+		helpers.assert_eq(canonical_writes, 0)
+		local combined = table.concat(statements, "\n")
+		helpers.assert_true(combined:find("INSERT INTO agg_app_day ", 1, true) ~= nil)
+		helpers.assert_true(combined:find("DELETE FROM agg_app_day_titles", 1, true) ~= nil)
+		helpers.assert_true(combined:find("INSERT INTO ngram_media_keys", 1, true) ~= nil)
+	end)
+	helpers.it("retains failed override rows and reports failure without touching the writer", function()
+		S.initialized = true
+		S.device_id = "override-failure"
+		Core.reset_batch()
+		Core.bump_app_day("2026-01-01", "Editor", "chars", 3)
+		local canonical_writes, override_writes = 0, 0
+		_last_db = { exec = function() canonical_writes = canonical_writes + 1; return 0 end }
+		local override = {
+			exec = function() override_writes = override_writes + 1; return 1 end,
+			errmsg = function() return "simulated failure" end,
+		}
+		helpers.assert_eq(Sql.flush(override), false)
+		helpers.assert_eq(canonical_writes, 0)
+		helpers.assert_eq(override_writes, 1)
+		helpers.assert_eq(S.agg_batch.app_day["2026-01-01\1Editor"].chars, 3)
+		helpers.assert_true(Sql.flush())
+		helpers.assert_eq(canonical_writes, 1)
+	end)
+end)

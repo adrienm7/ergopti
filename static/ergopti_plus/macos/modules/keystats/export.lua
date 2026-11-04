@@ -672,6 +672,13 @@ function M.sync_foreign_data_sql(on_applied)
 							local derived_ok = true
 							if type(on_applied) == "function" then
 								local callback_ok, callback_result = pcall(on_applied, entry)
+								-- The callback can quarantine and retire this exact connection.
+								-- Do not advance a watermark or inspect another device on it.
+								local owner_ok, owner = pcall(_get_db)
+								if not owner_ok or owner ~= db then
+									if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
+									return nil, "foreign sync database ownership changed"
+								end
 								derived_ok = callback_ok and callback_result ~= false
 								if not derived_ok then
 									Logger.warn(LOG, "Foreign sync: derived rebuild failed; watermark deferred.")

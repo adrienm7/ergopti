@@ -33,6 +33,12 @@ local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 local function load_log_manager()
 	local sqlite = { open = false, open_calls = 0 }
 	local spies = { tail_reads = 0, foreign_syncs = 0 }
+	-- Match the writer's identity contract: one handle for the open session.
+	local db = {
+		nrows = function() return function() return nil end end,
+		exec = function() return 0 end,
+		errmsg = function() return "" end,
+	}
 
 	package.loaded["modules.keystats.rotation"] = {
 		init = function() end, is_initialized = function() return true end,
@@ -59,11 +65,7 @@ local function load_log_manager()
 		-- errmsg); nrows yields nothing so the restore loops are empty no-ops.
 		get_db                = function()
 			if not sqlite.open then return nil end
-			return {
-				nrows  = function() return function() return nil end end,
-				exec   = function() return 0 end,
-				errmsg = function() return "" end,
-			}
+			return db
 		end,
 		build_inserts         = function() return {} end,
 		get_next_event_id     = function() return 0 end,

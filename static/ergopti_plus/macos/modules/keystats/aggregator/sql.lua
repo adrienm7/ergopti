@@ -55,13 +55,13 @@ local C = require("modules.keystats.aggregator.core")
 --- parameter one site forgets, and the pattern below can only ever yield a bare
 --- SQL identifier ([%w_]+), so this diagnostic is structurally incapable of
 --- carrying user content no matter what a future statement interpolates.
+--- @param db table Database handle owning the transaction.
 --- @param sql string The statement to execute.
 --- @return boolean True on success; false when the db is unavailable or the
 --- statement failed (the row's caller must NOT drop its batch delta on false —
 --- see F-MED-2: a dropped delta here is unrecoverable, the source keystrokes
 --- are never replayed).
-local function exec(sql)
-	local db = SqliteWriter.get_db()
+local function execute(db, sql)
 	if not db then return false end
 	local rc = db:exec(sql)
 	if rc ~= sqlite3.OK then
@@ -116,11 +116,13 @@ end
 --- the current iteration key to nil inside pairs()); rows whose exec() call
 --- failed are left in S.agg_batch.X so the very next flush() tick retries
 --- them with the row's already-accumulated totals intact.
-function M.flush()
+--- @param db_override table|nil Transaction handle; defaults to the writer database.
+function M.flush(db_override)
 	if not C.require_init("flush") then return end
 	if not S.agg_batch then return end
-	local db = SqliteWriter.get_db()
+	local db = db_override or SqliteWriter.get_db()
 	if not db then return end
+	local function exec(sql) return execute(db, sql) end
 
 	for key, row in pairs(S.agg_batch.app_day) do
 		local cat = Export.get_native_app_category(row.app)
