@@ -17,10 +17,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 local Fixture = require("tests.support.logger_async_sink_fixture")
 
-local FOLDER = "/tmp/ergopti_logs_dir_resolver/ergopti_plus/"
+local FOLDER = "/tmp/ergopti_logs_dir_resolver/" .. AppDirs.macos.folder_name .. "/"
 
 --- Runs `callback` with os.date answering `day` for today's date.
 --- @param day string "YYYY-MM-DD" returned for os.date("%Y-%m-%d").
@@ -50,7 +51,7 @@ helpers.describe("logger: logs-folder resolver", function()
 
 	helpers.it("(logs-dir-resolver) adds the missing trailing separator", function()
 		Fixture.with_policy_logger(function(Logger)
-			Logger.init_log_path("/tmp/ergopti_logs_dir_resolver/ergopti_plus", 14)
+			Logger.init_log_path("/tmp/ergopti_logs_dir_resolver/" .. AppDirs.macos.folder_name, 14)
 			helpers.assert_eq(Logger.logs_dir(), FOLDER)
 		end)
 	end)
@@ -76,12 +77,12 @@ helpers.describe("logger: logs-folder resolver", function()
 		end)
 	end)
 
-	helpers.it("(logs-dir-default) defaults to ~/Library/Logs/ergopti_plus", function()
+	helpers.it("(logs-dir-default) defaults to ~/<app_dirs macos.relative>", function()
 		local LogFolders = require("infra.log_folders")
 		helpers.assert_eq(LogFolders.default_logs_dir("/Users/someone"),
-			"/Users/someone/Library/Logs/ergopti_plus/")
+			"/Users/someone/" .. AppDirs.macos.relative .. "/")
 		helpers.assert_eq(LogFolders.default_logs_dir("/Users/someone/"),
-			"/Users/someone/Library/Logs/ergopti_plus/")
+			"/Users/someone/" .. AppDirs.macos.relative .. "/")
 		helpers.assert_nil(LogFolders.default_logs_dir(nil), "no home folder, no default")
 		helpers.assert_nil(LogFolders.default_logs_dir(""), "no home folder, no default")
 	end)
@@ -94,7 +95,7 @@ helpers.describe("logger: logs-folder resolver", function()
 				helpers.assert_eq(Logger.FALLBACK_LOG_DIR, expected)
 				helpers.assert_eq(Logger.FALLBACK_BOOT_LOG_FILE, expected .. "ErgoptiPlus_boot.log")
 			else
-				helpers.assert_eq(Logger.FALLBACK_LOG_DIR, "/tmp/ergopti_plus/")
+				helpers.assert_eq(Logger.FALLBACK_LOG_DIR, "/tmp/" .. AppDirs.macos.folder_name .. "/")
 			end
 			helpers.assert_nil(Logger.FALLBACK_BOOT_LOG_FILE:find("^/tmp/ErgoptiPlus"),
 				"the shared /tmp root is readable by every account on the Mac")

@@ -14,6 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 -- The modules each case replaces, restored after it
 local FIXTURE_MODULES = {
@@ -254,7 +255,7 @@ helpers.describe("diagnostics probes (macOS)", function()
 
 	helpers.it("parses sysctl and df from tasks", function()
 		with_probes(function(Probes, world)
-			local _, answers = start(Probes, { logs_dir = "/Users/jdoe/Library/Logs/ergopti_plus" })
+			local _, answers = start(Probes, { logs_dir = "/Users/jdoe/" .. AppDirs.macos.relative })
 			-- The tasks of independent probes start in probe order (the PAC probe's
 			-- scutil comes first), so each is found by its executable.
 			local sysctl, df = task_of(world, "/usr/sbin/sysctl"), task_of(world, "/bin/df")

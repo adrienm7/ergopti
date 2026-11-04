@@ -15,8 +15,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
-local HOME = "/Users/test/Library/Application Support/ErgoptiPlus/RemapRuntime/16.3.0-ergopti.1"
+local HOME = "/Users/test/" .. AppDirs.macos.support_relative .. "/RemapRuntime/16.3.0-ergopti.1"
 local DIGEST = string.rep("ab", 32)
 
 --- A complete runtime pin.

@@ -14,6 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 local load_fixture = require("tests.support.paths_editor_fixture")
 
 --- Opens the editor over the fixture and runs `callback` with its observations.
@@ -44,8 +45,8 @@ helpers.describe("paths editor: logs folder field (paths-editor-logs-dir)", func
 			calls.bridge_callback({ body = { action = "ready" } })
 			helpers.assert_eq(#evaluations, 1)
 			local code = evaluations[1].code
-			helpers.assert_contains(code, "/tmp/ergopti-logs/ergopti_plus/")
-			helpers.assert_contains(code, "/Users/test/Library/Logs/ergopti_plus/")
+			helpers.assert_contains(code, "/tmp/ergopti-logs/" .. AppDirs.macos.folder_name .. "/")
+			helpers.assert_contains(code, "/Users/test/" .. AppDirs.macos.relative .. "/")
 			helpers.assert_contains(code, "paths_editor.label_logs_dir")
 		end)
 	end)

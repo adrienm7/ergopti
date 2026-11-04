@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 --- Creates a private real directory and returns it with a trailing separator.
 --- @return string
@@ -198,7 +199,7 @@ helpers.describe("ConfigPaths accepts only absolute config-directory overrides",
 
 		helpers.assert_eq(initialized, false,
 			"an ambiguous persisted path must make bootstrap initialization fail closed")
-		helpers.assert_eq(ConfigPaths.get_config_dir(), "/fixture/home/.config/ergopti_plus/",
+		helpers.assert_eq(ConfigPaths.get_config_dir(), "/fixture/home/" .. AppDirs.config.macos_relative .. "/",
 			"an invalid bootstrap must never become a cwd-relative resolver")
 		helpers.assert_eq(observations.mkdirs, 0)
 		helpers.assert_eq(observations.executes, 0)

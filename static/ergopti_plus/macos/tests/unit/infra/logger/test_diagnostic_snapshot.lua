@@ -14,6 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 local json     = require("json")
 local Logger   = require("infra.logger")
@@ -103,7 +104,7 @@ helpers.describe("Diagnostic snapshot: macOS collector", function()
 		local Logger = require("infra.logger")
 		helpers.admit_logger_privacy(Logger)
 		local real_logs_dir = Logger.logs_dir
-		Logger.logs_dir = function() return "/Users/alice/Library/Logs/ergopti_plus/" end
+		Logger.logs_dir = function() return "/Users/alice/" .. AppDirs.macos.relative .. "/" end
 		local ok_capture, lines = pcall(capture, function()
 			first = Collector.emit_once(ctx, FAKE_SYSTEM)
 			second = Collector.emit_once(ctx, FAKE_SYSTEM)
@@ -124,7 +125,7 @@ helpers.describe("Diagnostic snapshot: macOS collector", function()
 		end
 		helpers.assert_true(found[1]:find("features_enabled=2/4", 1, true) ~= nil, found[1])
 		helpers.assert_true(found[1]:find("config_dir=~/Library/Ergopti", 1, true) ~= nil, found[1])
-		helpers.assert_true(found[1]:find("logs_dir=~/Library/Logs/ergopti_plus/", 1, true) ~= nil, found[1])
+		helpers.assert_true(found[1]:find("logs_dir=~/" .. AppDirs.macos.relative .. "/", 1, true) ~= nil, found[1])
 		helpers.assert_eq(nil, found[1]:find("alice", 1, true), "the account name must not be logged")
 		Collector._reset_for_test()
 	end)

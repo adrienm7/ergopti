@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 local Fixture = require("tests.support.log_transport_fixture")
 local new_context, configure = Fixture.new_context, Fixture.configure
 local TOKEN, SESSION, LOOPBACK = Fixture.TOKEN, Fixture.SESSION, Fixture.LOOPBACK
@@ -107,8 +108,8 @@ helpers.describe("LogTransport startup transaction", function()
 			local context = new_context()
 			context.state.preflight_mode = "nack"
 			context.state.preflight_detail =
-				"log folder /u/.config/ergopti_plus/hammerspoon/logs cannot be used: "
-				.. "/u/.config/ergopti_plus/hammerspoon/logs is a symbolic link whose target does not exist"
+				"log folder /u/" .. AppDirs.config.macos_relative .. "/hammerspoon/logs cannot be used: "
+				.. "/u/" .. AppDirs.config.macos_relative .. "/hammerspoon/logs is a symbolic link whose target does not exist"
 			local started, start_err = context:start()
 			helpers.assert_eq(started, false)
 			helpers.assert_contains(start_err, "configure_failed")
