@@ -126,13 +126,17 @@ local function position_keys()
 	return canon.position.storage_x, canon.position.storage_y
 end
 
+local function finite(value)
+	return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+
 --- The pill's saved top-left corner, or nil for the default place.
 local function stored_anchor()
 	local Storage = storage()
 	local x_key, y_key = position_keys()
 	if not Storage or not x_key then return nil end
 	local x, y = tonumber(Storage.get(x_key, nil)), tonumber(Storage.get(y_key, nil))
-	if not x or not y then return nil end
+	if not finite(x) or not finite(y) then return nil end
 	return { x = x, y = y }
 end
 
@@ -148,7 +152,7 @@ end
 --- @param x number The dropped frame's top-left corner.
 --- @param y number
 local function on_moved(x, y)
-	if _restore_debt or not Preferences.admit() then return end
+	if not finite(x) or not finite(y) or _restore_debt or not Preferences.admit() then return end
 	local frame = _state.last_frame
 	local canon = Constants.load()
 	if not frame or not canon then return end
