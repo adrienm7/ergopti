@@ -8,10 +8,9 @@
 
 local M = {}
 local PersonalFiles = require("hotstrings.personal_files")
-local hs            = hs
 local Logger        = require("infra.logger")
 local DeferredWork  = require("infra.deferred_work")
-local text_utils = require("infra.text_utils")
+local ShellRunner   = require("adapters.shell_runner")
 local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
@@ -89,7 +88,8 @@ M.DEFAULT_STATE = {
 local function open_toml_path(path)
 	if type(path) ~= "string" or path == "" then return false end
 	return DeferredWork.after(0, function()
-		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
+		local ok, started = pcall(ShellRunner.open, path)
+		if not ok or started ~= true then Logger.error(LOG, "The hotstring file could not be opened.") end
 	end, "menu_hotstrings.open_toml")
 end
 
@@ -571,7 +571,7 @@ function M.build_groups(ctx, only, counts)
 						if not toml_path then return {} end
 						local row = ManifestMenu.command_row("hotstring_file_commands", require("config_keys").COMMAND.HOTSTRING_FILE_OPEN,
 							{ hotstring_file_open = function() return open_toml_path(toml_path) end },
-							{ hotstring_file_ready = function() return type(hs.execute) == "function" end })
+							{ hotstring_file_ready = function() return type(ShellRunner.open) == "function" end })
 						return row and { row } or {}
 					end,
 					["hotstring_category_sections"] = function() return sec_menu end,

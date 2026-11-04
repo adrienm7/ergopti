@@ -36,6 +36,7 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 			local notices = {}
 			with_switch_frame(function(build, fixture)
 				fixture.latest = "Ergopti_v2.2.2.bundle"
+				fixture.records = { { id = "Ergopti_v1_0_0_plus", name = "Ergopti+", selected = true } }
 				local row = assert(switch_row(assert(build()), "🔐 Install Ergopti (system)"))
 				assert(type(row.fn) == "function"); row.fn()
 				helpers.assert_eq(notices, { { labels[case[2]], "error" } })

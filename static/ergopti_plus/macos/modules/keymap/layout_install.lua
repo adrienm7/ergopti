@@ -484,18 +484,19 @@ local function other_scope_occupied(dir)
 	return #names > 0
 end
 
---- Warns when another writer populated the other scope during installation.
+--- Checks the other scope after publication before allowing input-source changes.
 --- @param dir string Other Keyboard Layouts directory.
+--- @return boolean clear Whether the other scope is known empty.
+--- @return string|nil reason Closed failure reason for the menu.
 local function warn_other_scope(dir)
 	local occupied = other_scope_occupied(dir)
-	if occupied == false then return end
+	if occupied == false then return true end
 	if occupied == nil then
 		Logger.warn(LOG, "The other keyboard layout scope could not be checked: %s.", dir)
-		pcall(notifications.notify, i18n.get("menu.layout.install_other_scope_unverified"), nil, "error")
-		return
+		return false, "other_scope_unverified"
 	end
 	Logger.warn(LOG, "Another keyboard layout bundle remains in %s; it was not removed.", dir)
-	pcall(notifications.notify, i18n.get("menu.layout.install_other_scope"), nil, "error")
+	return false, "other_scope_occupied"
 end
 
 --- The Ergopti bundles installed in both the user and the system folders.
@@ -556,7 +557,11 @@ local function install_user_unlocked(bundles_dir, bundle_name)
 	local committed, detail, reason = execute_install_transaction(
 		USER_LAYOUTS_DIR, bundles_dir, bundle_name)
 	if committed then
-		warn_other_scope(SYSTEM_LAYOUTS_DIR)
+		local clear, check_reason = warn_other_scope(SYSTEM_LAYOUTS_DIR)
+		if not clear then
+			Logger.warn(LOG, "User bundle was installed, but input-source changes are deferred.")
+			return false, check_reason
+		end
 		Logger.success(LOG, "User install done — %s.", bundle_name)
 		pcall(notifications.notify, i18n.get("menu.layout.installed_user"), nil, "success")
 		return true
@@ -603,7 +608,11 @@ local function install_system_unlocked(bundles_dir, bundle_name)
 		call_ok, native_ok, _, diagnostic = pcall(hs.osascript.applescript, script)
 	end
 	if call_ok and native_ok == true then
-		warn_other_scope(USER_LAYOUTS_DIR)
+		local clear, check_reason = warn_other_scope(USER_LAYOUTS_DIR)
+		if not clear then
+			Logger.warn(LOG, "System bundle was installed, but input-source changes are deferred.")
+			return false, check_reason
+		end
 		Logger.success(LOG, "System install done — %s.", bundle_name)
 		pcall(notifications.notify, i18n.get("menu.layout.installed_system"), nil, "success")
 		return true
