@@ -180,6 +180,26 @@ helpers.describe("input source switch: switcher", function()
 		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources current 2")
 	end)
 
+	helpers.it("serializes a selection made by a completion callback and supersedes the older queue", function()
+		local port, calls, flush = fake_port(Switch.GNOME, gnome_answers(), true)
+		local switcher = Switch.new(port)
+		local results = {}
+		local function record(name)
+			return function(ok, detail) results[#results + 1] = name .. "=" .. tostring(ok) .. ":" .. tostring(detail) end
+		end
+		switcher.select("xkb:fr", function(ok, detail)
+			record("first")(ok, detail)
+			switcher.select("ibus:mozc-jp", record("newest"))
+		end)
+		switcher.select("xkb:fr+ergopti", record("older"))
+		flush()
+		helpers.assert_eq(table.concat(results, ","),
+			"first=true:nil,older=false:superseded by a later switch,newest=true:nil")
+		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources current 2")
+		helpers.assert_eq(#calls, 8, "the superseded switch must issue no native commands")
+		helpers.assert_true(switcher.is_settled())
+	end)
+
 	helpers.it("refuses on a desktop with no supported backend without running anything", function()
 		local port, calls = fake_port(nil, {})
 		local switcher = Switch.new(port)
