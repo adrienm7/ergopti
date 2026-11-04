@@ -32,6 +32,7 @@ local ui_builder        = require("ui.ui_builder")
 local Logger            = require("infra.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ConfigSchema      = require("modules.hotstrings.hotstrings_config_schema")
+local NumberPolicy      = require("number_policy")
 local TomlReader        = require("infra.toml.reader")
 local FileSystem        = require("adapters.file_system")
 local i18n              = require("infra.i18n")
@@ -689,6 +690,19 @@ local function on_message(msg, owner)
 	if action == "set_color" and not (canonical_personal and require("hotstrings.personal_metadata").valid("color", body.hex))
 		and not ConfigSchema.is_color(body.hex) then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid color.")
+		return false
+	end
+	if action == "set_delay" and (not NumberPolicy.is_finite(body.ms) or body.ms < 0) then
+		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid delay.")
+		return false
+	end
+	if action == "set_priority" and (not NumberPolicy.is_finite(body.priority)
+		or body.priority < 0 or body.priority > 100) then
+		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid priority.")
+		return false
+	end
+	if action == "set_tooltip" and type(body.show_tooltip) ~= "boolean" then
+		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid tooltip setting.")
 		return false
 	end
 
