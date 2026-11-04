@@ -232,7 +232,7 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 		with_manager(function(manager, injections)
 			local source = daemon_source()
 			local first = assert(source:find("if prediction_engine or (dyn_hotstrings and dyn_hotstrings.is_enabled()) then", 1, true))
-			local last = assert(source:find("\n\n\n\tend\n\ton_char", first, true))
+			local last = assert(source:find("\t\t-- Finish the triggering character's prediction work", first, true))
 			local slice = source:sub(first, last - 1)
 			local compile = loadstring or load
 			local actor = assert(compile("return function(engine, prediction_engine, dyn_hotstrings, keystats)\n"
