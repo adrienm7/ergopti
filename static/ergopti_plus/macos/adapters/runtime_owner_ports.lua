@@ -27,6 +27,9 @@
 --- 7. Driver-Only Update On Request: the pinned VirtualHIDDevice replaces an
 ---    incompatible one only through platform/remap/runtime_vhid_update.lua,
 ---    which the Tap-Holds row starts after the user's confirmation.
+--- 8. First Install On Request: the runtime is installed only through
+---    platform/remap/runtime_install.lua, which the « not installed » row
+---    starts after the user's confirmation.
 --- ==============================================================================
 
 local M = {}
@@ -113,6 +116,20 @@ function M.update_virtual_hid(callback)
 		expand = FileSystem.expand_path,
 	})
 	vhid_updater.update(manifest.virtual_hid_device, callback)
+end
+
+local runtime_installer
+
+--- Installs the owned runtime through the signed launcher's install role, once
+--- the user confirmed it (platform/remap/runtime_install.lua).
+--- @param callback function fn(ok, reason|nil, detail|nil).
+function M.install_runtime(callback)
+	runtime_installer = runtime_installer or require("platform.remap.runtime_install").new({
+		launcher = function() return require("platform.remap.lease_helper").resolve() end,
+		exec = FieldCheckPorts.exec,
+		exists = FileSystem.exists,
+	})
+	runtime_installer.install(callback)
 end
 
 --- The persisted record that Ergopti closed the user's own Karabiner.
