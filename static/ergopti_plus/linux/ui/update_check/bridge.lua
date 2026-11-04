@@ -257,6 +257,8 @@ local function new_session(updater)
 	session = CheckSession.new({
 		push = push,
 		check = function(channel, on_result)
+			-- Publishing "checking" can synchronously retire this session.
+			if _session ~= session then return false end
 			local dispatched = updater.check_for_updates(channel, function(_, _, _, result)
 				on_result(result)
 				hook("on_menu_changed")
@@ -391,6 +393,7 @@ function M.open(ctx)
 	end
 	if _session ~= session then return false end
 	session.start()
+	if _session ~= session then return false end
 	Logger.success(LOG, "Update-check window opened.")
 	return true
 end
