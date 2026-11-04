@@ -208,36 +208,36 @@ KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
 
 ; Called from KL_Hook_OnChar on every character. Accumulates the current
 ; word and flushes it at word boundaries.
-KL_Roi_OnChar(c) {
+KL_Roi_OnChar(Text) {
 	if !KL_Roi_RequireInit("KL_Roi_OnChar")
 		return
-		; Word characters — accumulate
+	; A failed dead-key composition can deliver several characters in one callback.
+	Position := 1, Units := StrLen(Text)
+	while Position <= Units {
+		Width := _TextCodepointWidth(Text, Position, Units)
+		c := SubStr(Text, Position, Width)
+		Position += Width
 		if (c != " " and c != "`t" and c != "`n" and c != "`r"
-						and c != "." and c != "," and c != "!" and c != "?") {
-				; Once the run exceeds the buffer cap, stop accumulating and mark it
-				; overflowed: such a delimiter-free run (pasted JWT, long token) is not
-				; a real word candidate, and growing it char-by-char would turn this
-				; O(1) hot-path append into an O(n) concat per key. The full run is
-				; discarded at the boundary, not kept as a 64-char fragment.
-				if (KLRoi.word_overflowed)
-						return
-				if (StrLen(KLRoi.current_word) >= KLRoiConst.MAX_INPROGRESS_WORD_LEN) {
-						KLRoi.current_word := ""
-						KLRoi.word_overflowed := true
-						return
-				}
-				KLRoi.current_word .= c
-				return
+				and c != "." and c != "," and c != "!" and c != "?") {
+			if KLRoi.word_overflowed
+				continue
+			; Bound UTF-16 storage before appending the entire codepoint.
+			if StrLen(KLRoi.current_word) + Width > KLRoiConst.MAX_INPROGRESS_WORD_LEN {
+				KLRoi.current_word := ""
+				KLRoi.word_overflowed := true
+				continue
+			}
+			KLRoi.current_word .= c
+			continue
 		}
-		; Word boundary — flush current word, then reset the buffer + overflow flag
 		word := KLRoi.current_word
 		KLRoi.current_word := ""
 		overflowed := KLRoi.word_overflowed
 		KLRoi.word_overflowed := false
-		; Discard an over-long run entirely so it never becomes a candidate
 		if (overflowed)
-				return
+			continue
 		KL_Roi_ProcessWord(word)
+	}
 }
 
 ; Special keys arrive through OnKeyDown rather than the character callback.

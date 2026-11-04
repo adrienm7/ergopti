@@ -75,7 +75,7 @@ _RHL_ChildSource(Mode := "") {
 		for Relative in ["modules/keystats/keystats_constants.ahk", "modules/keystats/keystats_hook.ahk",
 			"modules/keystats/keystats_watchers.ahk", "modules/keystats/keystats_password.ahk",
 			"modules/keystats/keystats_roi_prune.ahk", "modules/keystats/keystats_walker_core.ahk",
-			"infra/hotpath_profiler.ahk"]
+			"infra/hotpath_profiler.ahk", "infra/text_utils.ahk"]
 			Source .= "#Include " . _DriverDir . "\" . StrReplace(Relative, "/", "\") . "`n"
 		for Symbol in ["_KL_CaptureLlmJournalPrivacy", "_KL_LlmJournalPrivacyStillCurrent"] {
 			Body := _DriverFuncBody(Symbol)

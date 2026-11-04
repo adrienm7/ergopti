@@ -291,3 +291,17 @@ Consequence: An arrival revoked during the ergonomic callout still clears the cu
 Regression: Use the genuine hook and ROI owners in the isolated keys fixture; revoke through the official ergonomic callback port and require the ROI seed and WPM count to remain unchanged. This qualifies the explicit callout boundary, not atomicity of the whole ROI pipeline.
 
 The ongoing register now contains **21 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-022: Multi-character InputHook payloads bypass ROI boundaries and bounds
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+static/ergopti_plus/windows/modules/keystats/keystats_trigger_roi.ahk:KL_Roi_OnChar treats its complete callback payload as one character. InputHook.OnChar can deliver multiple characters after an unsuccessful dead-key composition, and a Unicode codepoint can occupy two UTF-16 units.
+
+Reproduction: Through the genuine hook, append native documented dead-key payload ^z after 63 a characters, then a space. Separately deliver ^.world followed by a space in one callback after hello.
+
+Consequence: A candidate exceeds the 64-unit storage bound, or delimiters inside the callback are embedded in a combined word rather than separating words.
+
+Regression: Use genuine hook and ROI owners to reject a 63-unit prefix plus a two-unit payload or surrogate pair, then assert separate candidates for a callback with an internal delimiter. Native payload shape is documented by AutoHotkey InputHook.OnChar; Windows execution remains pending.
+
+The ongoing register now contains **22 distinct new findings**. The requested target of 1,000 remains unmet.
