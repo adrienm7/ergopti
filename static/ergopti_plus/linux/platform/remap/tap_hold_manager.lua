@@ -689,8 +689,14 @@ function M.init(opts)
 	_load(true)
 	_initialized = true
 	local installed = _apply()
+	if not installed then
+		-- When no engine was installed, an ordinary refusal leaves no hook
+		-- ownership to retire and a caller may retry initialization.
+		if _installed_engine == nil then _initialized = false end
+		return false
+	end
 	Logger.success(LOG, "Tap-holds initialised (%s).", M.is_active() and "active" or "inactive")
-	return installed
+	return true
 end
 
 local function apply_candidate(previous)

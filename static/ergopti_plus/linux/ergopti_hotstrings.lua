@@ -1046,7 +1046,7 @@ local function main()
 	-- reader, whose lifecycle is its own: a reader that fails and stops must not
 	-- take the tap actions with it.
 	local action_catalogue = gestures
-	TapHold.init({
+	privacy_owners.tap_hold_initialized = TapHold.init({
 		keyboard_hook = keyboard_hook,
 		dry_run = opts.dry_run,
 		execute_action = function(action, binding)
@@ -1073,6 +1073,14 @@ local function main()
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
 	})
+	if privacy_owners.tap_hold_initialized ~= true then
+		shutdown.request("tap-hold startup refused", "tap-hold startup refused")
+		if shutdown.is_pending() then
+			event_loop.run({ onIdle = shutdown.poll, onPeriodic = shutdown.poll, periodSec = 0.25 })
+		end
+		if shutdown.is_pending() then error("Tap-hold startup cleanup remains unacknowledged", 0) end
+		error("Tap-hold initialization refused; refusing input capture", 0)
+	end
 	-- The tray's tap-hold rows write the user's file through this and reload
 	-- the engine live. A hold that enters the recommended layer creates the
 	-- configuration folder's layers.toml when it has none.
