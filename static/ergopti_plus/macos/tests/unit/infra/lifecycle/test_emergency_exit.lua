@@ -54,6 +54,33 @@ local function harness(request_exit, schedule_result, timer_stop_result)
 end
 
 helpers.describe("bounded emergency exit", function()
+	helpers.it("forces exit even when deadline diagnostics contain opaque errors (emergency-opaque-error)", function()
+		local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+		for _, scenario in ipairs({
+			{ stop_raises = true, describe_raises = false },
+			{ stop_raises = false, describe_raises = false },
+			{ stop_raises = false, describe_raises = true },
+		}) do
+			local emergency = load_emergency()
+			local options, calls = harness(function() return true end)
+			local deadline
+			options.schedule = function(_, callback)
+				deadline = callback
+				return { stop = function()
+					if scenario.stop_raises then error(hostile) end
+					return true
+				end }
+			end
+			options.describe = function()
+				if scenario.describe_raises then error(hostile) end
+				return hostile
+			end
+			helpers.assert_true(emergency.request(options))
+			helpers.assert_true(pcall(deadline), "a diagnostic error must not escape the watchdog")
+			helpers.assert_eq(calls.exits, 1, "EOF must still revoke the exact lease")
+		end
+	end)
+
 	helpers.it("forces EOF when an accepted exact fence never settles", function()
 		local emergency = load_emergency()
 		local options, calls, deadline = harness(function() return true end)

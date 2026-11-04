@@ -677,7 +677,6 @@
 		"tocbot": "^4.30.0"
 	},
 	"devDependencies": {
-		"@samkirkland/ftp-deploy": "^1.2.4",
 		"@stryker-mutator/core": "^9.6.1",
 		"@sveltejs/adapter-static": "^4.0.0",
 		"@sveltejs/enhanced-img": "^1.0.0",
@@ -697,7 +696,10 @@
 		"vite": "^8.3.4"
 	},
 	"overrides": {
-		"basic-ftp": "^6.2.3",
+		"@stryker-mutator/core": {
+			"minimatch": "^11.0.4"
+		},
+		"follow-redirects": "^1.16.2",
 		"js-yaml@4": "^4.3.2",
 		"qs": "^6.16.0",
 		"sharp": "^0.35.4"
