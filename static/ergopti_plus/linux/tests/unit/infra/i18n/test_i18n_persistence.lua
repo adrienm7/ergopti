@@ -259,7 +259,7 @@ end)
 
 helpers.describe("i18n explicit wizard persistence", function()
 	local function with_owned_store(options, body)
-		local names = { "infra.i18n", "infra.locale", "adapters.storage", "infra.config_paths" }
+		local names = { "infra.i18n", "infra.locale", "adapters.storage", "infra.config_paths", "infra.script_settings" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
@@ -277,6 +277,8 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local fh = assert(io.open(path, "wb"))
 		assert(fh:write(seed)); assert(fh:close())
 		local original_rename = os.rename
+		local logger = require("logger.shim")
+		local original_level = logger.get_level()
 		local attempts = 0
 		local observations = nil
 		local ok, err = xpcall(function()
@@ -285,6 +287,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["infra.locale"] = nil
 			package.loaded["adapters.storage"] = nil
+			package.loaded["infra.script_settings"] = nil
 			package.loaded["infra.i18n"] = nil
 			local i18n = require("infra.i18n")
 			i18n.init()
@@ -302,6 +305,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 			observations = body(i18n, path, seed)
 		end, debug.traceback)
 		os.rename = original_rename
+		logger.set_level(original_level)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		os.remove(path .. ".tmp"); os.remove(path)
 		os.remove(config); os.execute("rm -f " .. string.format("%q", root .. "/config") .. "/*.bak")
@@ -318,6 +322,52 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local raw = assert(fh:read("*a")); assert(fh:close())
 		return raw
 	end
+
+	helpers.it("(log-level-atomic) leaves the source and logger unchanged on storage refusal", function()
+		local initial = '[script]\nlog_level = "INFO"\n'
+		local observed = with_owned_store({ config = initial, rename = "false" }, function(_, path)
+			local settings = require("infra.script_settings")
+			local before = settings.current()
+			local accepted = settings.set("ERROR")
+			return { accepted = accepted, before = before, active = settings.current(),
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.log_level"] }
+		end)
+		helpers.assert_eq(observed, { accepted = false, before = "INFO", active = "INFO", config = initial })
+	end)
+
+	helpers.it("(log-level-atomic) retains a failed inverse without overwriting concurrent data", function()
+		local initial, published = '[script]\nlog_level = "INFO"\n', nil
+		local once = true
+		local observed = with_owned_store({ config = initial, after_publish = function(config, path)
+			if not once then return end
+			once = false
+			published = read(path)
+			local cf = assert(io.open(config, "wb")); assert(cf:write('[script]\nlog_level = "DEBUG"\n')); assert(cf:close())
+			local sf = assert(io.open(path, "wb")); assert(sf:write('{"script.log_level":"WARNING"}')); assert(sf:close())
+		end }, function(_, path)
+			local settings = require("infra.script_settings")
+			local accepted = settings.set("ERROR")
+			local pending = require("infra.scope_registry").pending()
+			local config = read(require("infra.config_paths").config("config.toml"))
+			local sf = assert(io.open(path, "wb")); assert(sf:write(published)); assert(sf:close())
+			local recovered = settings.set("ERROR")
+			return { accepted = accepted, pending = pending, config = config, recovered = recovered,
+				still_pending = require("infra.scope_registry").pending() }
+		end)
+		helpers.assert_eq(observed, { accepted = false, pending = true, config = '[script]\nlog_level = "DEBUG"\n',
+			recovered = true, still_pending = false })
+	end)
+
+	helpers.it("(log-level-atomic) publishes configured and stored levels together", function()
+		local initial = '[script]\nlog_level = "INFO"\n'
+		local observed = with_owned_store({ config = initial }, function(_, path)
+			local settings = require("infra.script_settings")
+			local accepted = settings.set("ERROR")
+			return { accepted = accepted, active = settings.current(),
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.log_level"] }
+		end)
+		helpers.assert_eq(observed, { accepted = true, active = "ERROR", config = '[script]\nlog_level = "ERROR"\n', stored = "ERROR" })
+	end)
 
 	helpers.it("(locale-atomic) preserves a configured row when storage refuses", function()
 		local initial = '[script]\nlocale = "fr"\n'
