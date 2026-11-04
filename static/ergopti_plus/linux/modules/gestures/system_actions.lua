@@ -103,7 +103,8 @@ M.EJECT_ALL_DISKS = 'lsblk -nrpo NAME,TYPE,RM,HOTPLUG 2>/dev/null | while read -
 --- Every action this module runs as one fixed shell command, by action id.
 M.COMMANDS = {
 	-- wmctrl -m reports the EWMH "showing the desktop" mode; -k sets it.
-	show_desktop = "case \"$(wmctrl -m 2>/dev/null)\" in *'mode: ON'*) wmctrl -k off;; *) wmctrl -k on;; esac",
+	show_desktop = "desktop=$(wmctrl -m 2>/dev/null) && case \"$desktop\" in"
+		.. " *'mode: ON'*) wmctrl -k off;; *'mode: OFF'*) wmctrl -k on;; *) false;; esac",
 	-- Releasing the keys that fired it is input that would wake the displays
 	-- straight back up: they are powered off once that release has happened.
 	sleep_displays = "sleep 1 && xset dpms force off",
