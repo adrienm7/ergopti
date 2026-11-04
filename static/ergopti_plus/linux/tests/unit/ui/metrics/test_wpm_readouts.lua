@@ -690,6 +690,62 @@ helpers.describe("wpm readouts: the tray readout", function()
 		return Readout, tray, painted
 	end
 
+	helpers.it("(wpm-icon-paint-refusal) never repaints the icon still displayed", function()
+		with_storage({}, function()
+			local Readout, tray = setup()
+			local paths, calls = {}, 0
+			Readout._set_painter(function(_, path)
+				calls = calls + 1
+				paths[calls] = path
+				return calls ~= 2
+			end)
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local displayed = tray.items[1].icon
+			Readout.tick(stats(20), 20)
+			Readout.tick(stats(30), 30)
+			helpers.assert_true(paths[2] ~= displayed)
+			helpers.assert_true(paths[3] ~= displayed, "a refused paint must keep the current icon immutable")
+		end)
+	end)
+
+	helpers.it("(wpm-icon-paint-refusal) retries an ambiguous tray update before repainting", function()
+		with_storage({}, function()
+			local Readout, tray, paths = setup()
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local original_update = tray.update_item
+			local calls = 0
+			tray.update_item = function(handle, options)
+				calls = calls + 1
+				if calls == 1 then handle.icon = options.icon; return false end
+				return original_update(handle, options)
+			end
+			Readout.tick(stats(20), 20)
+			local possibly_displayed = tray.items[1].icon
+			Readout.tick(stats(30), 30)
+			helpers.assert_eq(calls, 3, "the ambiguous icon is acknowledged before the next frame")
+			helpers.assert_true(paths[3].path ~= possibly_displayed, "the potentially displayed file stays intact")
+		end)
+	end)
+
+	helpers.it("(wpm-icon-paint-refusal) keeps an unresolved update through stop refusal", function()
+		with_storage({}, function(_, preferences)
+			local Readout, tray = setup()
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local original = tray.update_item
+			tray.update_item = function() return false end
+			Readout.tick(stats(20), 20)
+			helpers.assert_nil(Readout.configuration_snapshot(), "an ambiguous icon is not a stable snapshot")
+			helpers.assert_eq(Readout.stop(), false)
+			helpers.assert_true(Readout.is_running())
+			helpers.assert_eq(preferences.get("metrics.wpm_menubar_visible"), true)
+			tray.update_item = original
+			helpers.assert_true(Readout.stop())
+		end)
+	end)
+
 	helpers.it("refuses native retirement without losing the live item or preference", function()
 		with_storage({}, function(_, preferences)
 			local Readout, tray = setup()
