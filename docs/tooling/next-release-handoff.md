@@ -107,7 +107,7 @@ branch for `.2`), and the downloaded-back asset must match the pin's digest and 
 
 ### Only a real Mac can prove
 
-- The fetch of the published asset into `~/Library/Application Support/ErgoptiPlus/RemapRuntime/16.3.0-ergopti.2/`
+- The fetch of the published asset into `~/Library/Application Support/Ergopti/RemapRuntime/16.3.0-ergopti.2/`
   and its receipt (`field_owned_runtime`).
 - The administrator install, both LaunchDaemons loaded, the DriverKit approval once, Input Monitoring and
   Accessibility for the owned Console, Login Items entries (WP9).
