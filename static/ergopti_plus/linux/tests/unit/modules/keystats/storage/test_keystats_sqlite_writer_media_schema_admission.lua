@@ -784,7 +784,7 @@ for _, fault in ipairs({ "seek_throw", "close_throw" }) do
 	end)
 end
 
-for _, receipt in ipairs({ "1", "error" }) do
+for _, receipt in ipairs({ "0", "1", "error" }) do
 	it("SQLite legacy device migration preserves dependent schema " .. receipt, function()
 		local command = require("modules.keystats.sqlite_command")
 		local build, execute, popen = command.build, os.execute, io.popen
@@ -811,9 +811,17 @@ for _, receipt in ipairs({ "1", "error" }) do
 		command.build, os.execute, io.popen = build, execute, popen
 		Writer.close_db(); os.remove(path)
 		helpers.assert_true(called)
-		helpers.assert_eq(opened, false, "dependent or unknown schema must be preserved")
+		helpers.assert_eq(opened, receipt == "0", "only a proven dependency-free schema may be migrated")
+		local observed_guard, observed_migration = false, false
 		for _, sql in ipairs(statements) do
-			helpers.assert_nil(sql:find("ALTER TABLE devices RENAME", 1, true), "unsafe device migration cannot start")
+			if sql:find("pragma_foreign_key_list", 1, true) then
+				observed_guard = true
+				helpers.assert_contains(sql, "pragma_table_xinfo")
+				helpers.assert_contains(sql, "pragma_index_list")
+			end
+			if sql:find("ALTER TABLE devices RENAME", 1, true) then observed_migration = true end
 		end
+		helpers.assert_true(observed_guard)
+		helpers.assert_eq(observed_migration, receipt == "0", "unsafe device migration cannot start")
 	end)
 end
