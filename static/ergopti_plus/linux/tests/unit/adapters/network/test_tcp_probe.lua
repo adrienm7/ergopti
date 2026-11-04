@@ -49,6 +49,16 @@ it("a listening loopback port is reachable and the child settles once its handle
 	helpers.assert_eq(child.is_settled(), true)
 end)
 
+it("rejects a NUL-bearing host before libuv can truncate it", function()
+	local server, port = listener()
+	local child, reason = Probe.probe("127.0.0.1\0different.example", port, 1000, function() end, luv)
+	if child then run_until(function() return child.is_settled() end) end
+	server:close()
+	run_until(function() return server:is_closing() end)
+	helpers.assert_nil(child, "the native resolver must not see a truncated host")
+	helpers.assert_eq(reason, "tcp probe arguments are invalid")
+end)
+
 it("tries the next resolved address when the first connection is refused", function()
 	local server, port = listener()
 	local backend = setmetatable({
