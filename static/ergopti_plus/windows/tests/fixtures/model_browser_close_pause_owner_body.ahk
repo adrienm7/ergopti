@@ -270,7 +270,10 @@ _MBPO_NativeRefused() {
 		} finally _ConfigWriteLeaseRelease(Lease)
 	}
 	_MBPO_NativeClick(ButtonHwnd, _MBPO.MutationReturns + 1)
-	Parsed := ReadTomlFile(ConfigurationFile)
+	Parsed := TOML_ParseFreshFile(ConfigurationFile)
+	_MBPO_Require(Parsed is Map && Parsed.Has("llm") && Parsed["llm"] is Map
+		&& Parsed["llm"].Has("models") && Parsed["llm"]["models"] is Map,
+		"The genuine uncached TOML parser must expose the durable model table.")
 	_MBPO_Require(_LLM_Menu["model"] == _MBPO.ModelB && Features["llm"]["models"]["ollama"] == _MBPO.ModelB
 		&& Parsed["llm"]["models"]["ollama"] == _MBPO.ModelB && _MBPO.WriterConfirmed == 1
 		&& _MBPO.MutationConfirmed == 1, "retry must really publish B through the unchanged durable writer")
