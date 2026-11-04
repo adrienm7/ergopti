@@ -281,6 +281,22 @@ end)
 
 helpers.describe("uinput_writer: emission", function()
 
+	helpers.it("refuses out-of-range keycodes before their wire encoding wraps (uinput-keycode-boundary)", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		assert(U.open())
+		local before = #rec.writes
+		local accepted = {}
+		for _, row in ipairs({ { 65566, 1 }, { 0, 1 }, { 30.5, 1 }, { 30, -1 }, { 30, 3 } }) do
+			accepted[#accepted + 1] = U.emit(row[1], row[2])
+		end -- 65566's low 16 bits encode KEY_A (30).
+		local writes = #rec.writes - before
+		U._reset_backend()
+		helpers.assert_eq(accepted, { false, false, false, false, false })
+		helpers.assert_eq(writes, 0, "an invalid key cannot inject another valid key")
+	end)
+
 	helpers.it("writes the key event and then a SYN_REPORT", function()
 		local U = helpers.load_module("adapters.uinput_writer")
 		local rec = recorder()
