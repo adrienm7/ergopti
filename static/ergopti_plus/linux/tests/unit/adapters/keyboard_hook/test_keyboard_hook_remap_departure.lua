@@ -14,6 +14,17 @@ local function select_sources(s, ids)
 end
 
 helpers.describe("keyboard source departure retires remapper input", function()
+	helpers.it("(remap-source-departure) stops if capture refuses a departed modifier release", function()
+		local options = { position_bits = true, on_capture_reacquired = function() return true end }
+		Fixture.with_session(options, function(s)
+			s.edge("a", 42, 1, 0)
+			options.capture_error = function(code, value) return code == 42 and value == 0 end
+			select_sources(s, { "b" })
+			helpers.assert_eq(s.hook.isRunning(), false, "a stale XKB modifier cannot remain active")
+			helpers.assert_eq(s.reader.is_open("keyboard:" .. s.paths.b), false)
+		end)
+	end)
+
 	helpers.it("(remap-source-departure) accepts the first new hold on the surviving keyboard", function()
 		Fixture.with_session({ on_capture_reacquired = function() return true end }, function(s)
 			s.edge("a", 58, 1, 0)
