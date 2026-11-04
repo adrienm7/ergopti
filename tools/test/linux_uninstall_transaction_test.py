@@ -129,6 +129,11 @@ class UninstallTransactionTests(unittest.TestCase):
         self.foreign.write_bytes(b"foreign application bytes\n")
         self.unknown = self.library / "personal.txt"
         self.unknown.write_bytes(b"unlisted personal bytes\n")
+        # An existing session lock remains in place across successful and
+        # rolled-back removals; unlinking it could split singleton ownership.
+        lock = self.home / ".cache/ergopti/ergopti.lock"
+        lock.parent.mkdir(parents=True)
+        lock.touch(mode=0o600)
         self.tools = self.root / "fault-tools"
         self.tools.mkdir()
         for name in ["rm", "cp", "ln", "mktemp", "stat", "find"]:
