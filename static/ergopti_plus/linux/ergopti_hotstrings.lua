@@ -478,9 +478,14 @@ local shutdown = ShutdownCoordinator.new({
 		},
 		{
 			name = "tooltip preview",
-			stop = function()
-				if tooltip_preview and type(tooltip_preview.destroy) == "function" then tooltip_preview.destroy() end
-			end,
+			wait_for_ack = true,
+			stop = (function()
+				local owner = tooltip_preview
+				local destroy = owner and owner.destroy
+				return function()
+					return not owner or (type(destroy) == "function" and destroy() == true)
+				end
+			end)(),
 		},
 		{
 			name = "gesture reader",
@@ -3252,7 +3257,6 @@ local function main()
 	-- harmless.
 	shutdown.request("event loop returned")
 	if shutdown.is_pending() then error("Native shutdown cleanup remains unacknowledged after event-loop return", 0) end
-	if tooltip_preview then tooltip_preview.destroy() end
 	if llm_overlay then llm_overlay.hide() end
 	if injector.close_fast_channel() ~= true then error("Final output retirement remains unacknowledged", 0) end
 	if file_watchers then file_watchers.stop() end
