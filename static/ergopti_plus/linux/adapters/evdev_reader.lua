@@ -554,9 +554,12 @@ end
 --- An eventN can be reused between proc discovery and open; its fd identifies
 --- the device whose complete stream EVIOCGRAB would remove from the desktop.
 --- @param slot string|nil Reader slot.
+--- @param event_type integer|nil 0 for event types, 4 for EV_MSC codes.
 --- @return number|nil mask, string|nil reason
-function M.event_capabilities(slot)
+function M.event_capabilities(slot, event_type)
 	if _busy or _native_debt then return nil, "capability query is unavailable" end
+	local kind = event_type or 0
+	if kind ~= 0 and kind ~= 4 then return nil, "unsupported capability query" end
 	local st = state(slot)
 	if st.fd == nil or st.close_error then return nil, "device is not open" end
 	local backend, fd, generation = _backend, st.fd, st.generation
@@ -576,7 +579,7 @@ function M.event_capabilities(slot)
 	end
 	if not current() then return nil, "original capability provider is unavailable" end
 	_busy = true
-	local called, bytes = pcall(query, fd, ioctl_read_request(EVIOCGBIT_NR, EVENT_TYPE_BYTES), EVENT_TYPE_BYTES)
+	local called, bytes = pcall(query, fd, ioctl_read_request(EVIOCGBIT_NR + kind, EVENT_TYPE_BYTES), EVENT_TYPE_BYTES)
 	_busy = false
 	if not called or type(bytes) ~= "string" or #bytes ~= EVENT_TYPE_BYTES or not current() then
 		return nil, "event capability query was not acknowledged"

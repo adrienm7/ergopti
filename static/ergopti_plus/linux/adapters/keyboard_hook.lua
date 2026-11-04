@@ -2534,6 +2534,13 @@ function LayerPointer.sync()
 			local slot = pointer_slot(path)
 			local mask = not LayerPointer.slots[slot] and EvdevReader.is_open(slot) and EvdevReader.event_capabilities(slot) or nil
 			if mask and LayerPointer.forwardable(mask) then
+				if LayerPointer.has_type(mask, 4) then
+					local misc = EvdevReader.event_capabilities(slot, 4)
+					if not _running or _capture_session ~= session then return end
+					-- MSC_SCAN duplicates the following key code. Other MSC reports
+					-- have independent meaning and cannot pass through this output.
+					if misc == nil or misc ~= 0 and misc ~= 0x10 then goto next_pointer end
+				end
 				local keys = EvdevReader.pressed_keys(slot, KEY_MAX)
 				if not _running or _capture_session ~= session then return end
 				if keys and next(keys) == nil then
@@ -2553,6 +2560,7 @@ function LayerPointer.sync()
 					end
 				end
 			end
+			::next_pointer::
 		end
 		if grabbed then Logger.debug(LOG, "The navigation layer took the mouse wheel.") end
 	elseif held and not wanted and next(LayerPointer.buttons) == nil then
