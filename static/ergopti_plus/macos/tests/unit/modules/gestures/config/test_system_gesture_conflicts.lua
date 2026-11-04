@@ -28,7 +28,8 @@ local function fixture(body)
 		spawn = function(bin, args, callback)
 			local task = { bin = bin, args = args, done = callback, cancelled = false }
 			pending[#pending + 1] = task
-			return { isSettled = function() return task.cancelled end,
+			return { start = function() task.started = true; return true end,
+				isSettled = function() return task.cancelled end,
 				terminate = function() task.cancelled = true; callback(1, "", "cancelled") end }
 		end,
 	}

@@ -1733,6 +1733,8 @@
 	"menu.keyboard_layout.open_system_prefs": "Ouvrir Préférences Système → Clavier",
 	"menu.layout.install_failed": "Impossible d’installer la disposition de clavier. Consultez les journaux pour les détails et les sauvegardes conservées.",
 	"menu.layout.install_launcher_required": "Ouvrez ErgoptiPlus puis réessayez d’installer la disposition de clavier.",
+	"menu.layout.install_other_scope": "Une disposition existe dans l’autre dossier Keyboard Layouts. Supprimez-la manuellement, puis réessayez.",
+	"menu.layout.install_other_scope_unverified": "Impossible de vérifier l’autre dossier Keyboard Layouts. Vérifiez-le manuellement avant de réessayer.",
 	"menu.layout.active_layouts": "Sources de saisie",
 	"menu.layout.header_any": "Toutes dispositions",
 	"menu.layout.header_custom": "Disposition personnalisée",

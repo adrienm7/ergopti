@@ -1738,6 +1738,8 @@
 	"menu.keyboard_layout.open_system_prefs": "فتح تفضيلات النظام → لوحة المفاتيح",
 	"menu.layout.install_failed": "تعذر تثبيت تخطيط لوحة المفاتيح. راجع السجلات لمعرفة التفاصيل والنسخ الاحتياطية المحفوظة.",
 	"menu.layout.install_launcher_required": "افتح ErgoptiPlus ثم أعد محاولة تثبيت تخطيط لوحة المفاتيح.",
+	"menu.layout.install_other_scope": "يوجد تخطيط في مجلد Keyboard Layouts الآخر. أزله يدوياً ثم أعد المحاولة.",
+	"menu.layout.install_other_scope_unverified": "تعذر التحقق من مجلد Keyboard Layouts الآخر. تحقّق منه يدوياً قبل إعادة المحاولة.",
 	"menu.layout.active_layouts": "مصادر الإدخال",
 	"menu.layout.header_any": "كل التخطيطات",
 	"menu.layout.header_custom": "تخطيط مخصص",

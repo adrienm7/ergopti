@@ -1738,6 +1738,8 @@
 	"menu.keyboard_layout.open_system_prefs": "Abrir Preferências do Sistema → Teclado",
 	"menu.layout.install_failed": "Não foi possível instalar o layout de teclado. Consulte os registros e os backups mantidos.",
 	"menu.layout.install_launcher_required": "Abra o ErgoptiPlus e tente instalar o layout de teclado novamente.",
+	"menu.layout.install_other_scope": "Há um layout na outra pasta Keyboard Layouts. Remova-o manualmente e tente novamente.",
+	"menu.layout.install_other_scope_unverified": "Não foi possível verificar a outra pasta Keyboard Layouts. Verifique-a manualmente antes de tentar novamente.",
 	"menu.layout.active_layouts": "Fontes de entrada",
 	"menu.layout.header_any": "Todos os layouts",
 	"menu.layout.header_custom": "Disposição personalizada",

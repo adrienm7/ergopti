@@ -1738,6 +1738,8 @@
 	"menu.keyboard_layout.open_system_prefs": "Åbn Systemindstillinger → Tastatur",
 	"menu.layout.install_failed": "Tastaturlayoutet kunne ikke installeres. Se loggene og de bevarede sikkerhedskopier.",
 	"menu.layout.install_launcher_required": "Åbn ErgoptiPlus, og prøv at installere tastaturlayoutet igen.",
+	"menu.layout.install_other_scope": "Der er et layout i den anden Keyboard Layouts-mappe. Fjern det manuelt, og prøv igen.",
+	"menu.layout.install_other_scope_unverified": "Den anden Keyboard Layouts-mappe kunne ikke kontrolleres. Kontrollér den manuelt, før du prøver igen.",
 	"menu.layout.active_layouts": "Inputkilder",
 	"menu.layout.header_any": "Alle layouts",
 	"menu.layout.header_custom": "Brugerdefineret layout",

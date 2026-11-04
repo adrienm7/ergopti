@@ -1738,6 +1738,8 @@
 	"menu.keyboard_layout.open_system_prefs": "Systeemvoorkeuren → Toetsenbord openen",
 	"menu.layout.install_failed": "De toetsenbordindeling kon niet worden geïnstalleerd. Bekijk de logs en bewaarde back-ups.",
 	"menu.layout.install_launcher_required": "Open ErgoptiPlus en probeer de toetsenbordindeling opnieuw te installeren.",
+	"menu.layout.install_other_scope": "In de andere map Keyboard Layouts staat een indeling. Verwijder deze handmatig en probeer opnieuw.",
+	"menu.layout.install_other_scope_unverified": "De andere map Keyboard Layouts kon niet worden gecontroleerd. Controleer deze handmatig voordat je opnieuw probeert.",
 	"menu.layout.active_layouts": "Invoerbronnen",
 	"menu.layout.header_any": "Alle indelingen",
 	"menu.layout.header_custom": "Aangepaste indeling",

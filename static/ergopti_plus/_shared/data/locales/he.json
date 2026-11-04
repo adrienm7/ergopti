@@ -1738,6 +1738,8 @@
 	"menu.keyboard_layout.open_system_prefs": "פתח העדפות מערכת ← מקלדת",
 	"menu.layout.install_failed": "לא ניתן להתקין את פריסת המקלדת. יש לבדוק את היומנים ואת הגיבויים שנשמרו.",
 	"menu.layout.install_launcher_required": "יש לפתוח את ErgoptiPlus ולנסות להתקין שוב את פריסת המקלדת.",
+	"menu.layout.install_other_scope": "בתיקיית Keyboard Layouts האחרת קיימת פריסה. יש להסיר אותה ידנית ולנסות שוב.",
+	"menu.layout.install_other_scope_unverified": "לא ניתן לבדוק את תיקיית Keyboard Layouts האחרת. יש לבדוק אותה ידנית לפני ניסיון נוסף.",
 	"menu.layout.active_layouts": "מקורות קלט",
 	"menu.layout.header_any": "כל הפריסות",
 	"menu.layout.header_custom": "פריסה מותאמת אישית",
