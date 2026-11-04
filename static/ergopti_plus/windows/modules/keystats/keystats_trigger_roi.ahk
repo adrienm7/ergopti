@@ -164,8 +164,6 @@ KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
 		return
 	if !KL_Roi_RequireInit("KL_Roi_OnHotstring")
 		return
-	if (net_saved <= 0)
-		return
 	; Require-init may log and therefore yield. Recheck pause inside the same short
 	; transaction as every ROI mutation; the periodic append stays outside so no
 	; privacy lookup or logger call can starve the keyboard hook under Critical.
@@ -173,7 +171,7 @@ KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
 	try {
 		if A_IsSuspended
 			return
-		KLRoi.session_saved_chars += net_saved
+		KLRoi.session_saved_chars += Max(0, net_saved)
 		KLRoi.session_fired_count += 1
 		if !is_private
 			KLRoi.trigger_last_use[StrLower(trigger)] := A_TickCount
