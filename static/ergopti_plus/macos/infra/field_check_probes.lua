@@ -116,13 +116,17 @@ end
 
 --- Reads the signing identity from `codesign -dv --verbose=2` output.
 --- @param text any The tool's stderr, where it writes the description.
---- @return string value "adhoc", "team:<id>", "unsigned" or "unknown".
+--- A self-signed stable certificate has no Team ID but names its Authority, so
+--- it is `certificate`, not ad hoc: only a certificate keeps the grants, and
+--- only it lets the owned runtime's install role vouch for its helper.
+--- @return string value "adhoc", "team:<id>", "certificate", "unsigned" or "unknown".
 function M.parse_signing_identity(text)
 	text = tostring(text or "")
 	if text:find("code object is not signed at all", 1, true) then return "unsigned" end
 	if text:match("Signature=adhoc") then return "adhoc" end
 	local team = text:match("TeamIdentifier=(%w+)")
 	if team and team ~= "not" then return "team:" .. team end
+	if text:match("Authority=[^\n]+") then return "certificate" end
 	if text:match("TeamIdentifier=not set") then return "adhoc" end
 	return "unknown"
 end
