@@ -731,11 +731,15 @@ local function _execute_action(action_name, go_next, binding)
 		-- xdg-open on a file that does not exist fails silently, so say so here
 		-- instead: a personal_*.toml the user has never created is the common case
 		-- and "nothing happened" is not a usable answer.
-		local probe = io.open(target, "r")
-		if probe then
-			probe:close()
-		elseif not target:match("/$") then
+		local kind, detail, code = require("infra.native_directory").target_kind(target)
+		if kind == nil and code == "ENOENT" and not target:match("/$") then
 			Logger.warn(LOG, "'%s' points at '%s', which does not exist yet.", name, target)
+		elseif kind == nil and code ~= "ENOENT" then
+			Logger.error(LOG, "Cannot inspect '%s': %s.", name, tostring(detail or code))
+			return true
+		elseif kind == "other" then
+			Logger.error(LOG, "Cannot open '%s': the target is not a regular file or directory.", name)
+			return true
 		end
 		run_background("xdg-open " .. shell_quote(target))
 		return true

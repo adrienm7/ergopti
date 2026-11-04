@@ -109,6 +109,57 @@ assert(manager.is_enabled() == false)
 		helpers.assert_eq(signal, 0)
 	end)
 
+	helpers.it("does not block or launch an editor for a personal-file FIFO", function()
+		local uv = require("luv")
+		local shell = require("adapters.shell_runner")
+		local path = os.tmpname()
+		os.remove(path)
+		assert(shell.run("mkfifo -- " .. shell.quote(path)))
+		local code = string.format([[package.path = %q
+local manager = require("modules.gestures.manager")
+require("infra.config_paths").config = function() return %q end
+local calls = 0
+os.execute = function() calls = calls + 1; return 0 end
+assert(manager.execute_action("open_personal_info"))
+assert(calls == 0, "a special endpoint must not be opened as a file")
+]], package.path, path)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		os.remove(path)
+		helpers.assert_eq(expired, false, "opening a personal file must not wait for a FIFO writer")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+	end)
+
+	helpers.it("still opens a regular or absent personal file", function()
+		local path = os.tmpname()
+		local Paths, original_execute = require("infra.config_paths"), os.execute
+		local original_config, calls = Paths.config, 0
+		local ok, err = pcall(function()
+			Paths.config = function() return path end
+			os.execute = function() calls = calls + 1; return 0 end
+			with_manager(false, { enabled = false, persist = false }, function(manager)
+				manager.execute_action("open_personal_info")
+				os.remove(path)
+				manager.execute_action("open_personal_info")
+			end)
+			helpers.assert_eq(calls, 2)
+		end)
+		Paths.config, os.execute = original_config, original_execute
+		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("opens the touchpad before publishing enabled and dispatches its events", function()
 		local result = with_manager(false, { enabled = false, persist = false }, function(manager, reader)
 			helpers.assert_eq(manager.is_enabled(), false, "the daemon starts this feature disabled")
