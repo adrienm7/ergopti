@@ -22,6 +22,19 @@ def render(data):
         "| --- | --- | --- | --- | --- | --- |",
     ]
 
+    if data.get("delivery_overlay"):
+        overlay = data["delivery_overlay"]
+        lines[4:4] = [
+            "Delivery review at `"
+            + overlay["reviewed_sha"]
+            + "`: "
+            + overlay["summary"]
+            + " [Details]("
+            + overlay["report"]
+            + ").",
+            "",
+        ]
+
     def cell(value):
         return value.replace("|", "\\|").replace("\n", " ")
 

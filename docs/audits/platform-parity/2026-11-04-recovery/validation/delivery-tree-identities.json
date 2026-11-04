@@ -1,0 +1,18 @@
+{
+	"audited_sha": "3a680d9f530a9af686fccc16d3f7611ec7fb034c",
+	"reviewed_delivery_base": "8eb5378b125b282c56284625f0b4459d4cdd1383",
+	"independently_verified_unchanged_trees": [
+		{
+			"subtree": "static/ergopti_plus/linux",
+			"git_tree": "6935017b48f230072f3742bd25201fedae4c2cdb"
+		},
+		{
+			"subtree": "static/ergopti_plus/_shared/lua",
+			"git_tree": "db5aa0611b9f1fb77c2883ff999b6770a4624f77"
+		},
+		{
+			"subtree": "static/ergopti_plus/_shared/modules/updater",
+			"git_tree": "ed004d019fcc48c72b1bf64b791ac1093976677b"
+		}
+	]
+}

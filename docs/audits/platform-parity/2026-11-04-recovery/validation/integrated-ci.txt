@@ -1,0 +1,44 @@
+
+> svelte-static@3.0.0 test:ci-pipeline-wiring
+> node ./tools/test/test-ci-pipeline-wiring.cjs
+
+PASS: exact Source10 raw condition controls=5; native execution unqualified.
+PAC_SOURCE_XCTEST qualified=true cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST refused; full package and installation remain unqualified.
+PAC_SOURCE_XCTEST refused; full package and installation remain unqualified.
+PAC_SOURCE_XCTEST refused; full package and installation remain unqualified.
+PAC_SOURCE_XCTEST refused; full package and installation remain unqualified.
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST qualified=false cases=10/10 candidate=dcbeb5555a218b0627d0a24eb7197209fa8cd5f2 run=123 attempt=2 arch=arm64
+PAC_SOURCE_XCTEST refused; full package and installation remain unqualified.
+PAC_SOURCE_XCTEST refused; full package and installation remain unqualified.
+PAC_SOURCE_XCTEST refused; full package and installation remain unqualified.
+PAC_SOURCE_XCTEST refused; full package and installation remain unqualified.
+PASS: native PAC source receipt controls=22; constructed transcripts/native execution unqualified.
+PASS: Linux simultaneous wiring 21 workflow and 23 custody-envelope refusals; native execution unqualified.
+PASS: native input-source exact-selector controls=12; native execution UNRUN.
+PASS: native input-source closed-cohort controls=3; native execution UNRUN.
+PASS: native input-source isolation execution controls=3; native execution UNRUN.
+PASS: native input-source execution-bypass controls=3; native execution UNRUN.
+PASS: isolated native input-source receipt controls=17; Swift/native execution UNRUN.
+PASS: publication lane membership controls=11; no release or native execution.
+PASS: Mac qualification deferral source/typed-receipt controls=77; Swift/native execution unqualified.
+PASS: Shortcuts public receipt emission controls=2; filesystem/native execution unrun.
+{"scope":"NumberRow-exact-selector-source-controls","controls":30,"names":["exact-step-removes-only-its-selector","existing-chain-keeps-full-package-unfiltered","missing-cohort","duplicate-cohort","foreign-job","foreign-step","foreign-selector","duplicate-selector","missing-judge","ignored-process-status","ignored-capture-status","foreign-source","missing-producer-copy","changed-expected-twelve","changed-received-twelve","foreign-native-method-fixture","missing-restoration-phases","ignored-sampled-current-source","disabled-cohort","forgiven-cohort","missing-retention","duplicate-retention","skipped-retention","foreign-retention-action","missing-raw-retention","selector-moved-to-full-package-is-refused","foreign-exclusion-remains-refused:--filter ForeignTests","foreign-exclusion-remains-refused:--skip ForeignTests","foreign-exclusion-remains-refused:XCTSkip","foreign-package-exclusion-remains-refused"],"native":"UNRUN"}
+PASS: native logging exact-seven receipt controls=20 selector-controls=12; all native execution UNRUN.
+PASS: numeric logger real-runner boundary controls=11; Darwin/Swift doubled, native UNRUN.
+PASS: numeric logger exact-three parser=20 selector=13 source=10; native execution UNRUN.
+PASS: unchanged logger42 parser-controls=31 selector-controls=16 real-Git/CLI-controls=48; native42/native7 UNRUN.
+PASS: selected-release exact raw receiver controls=14; Darwin native receiving UNRUN by source models.
+PASS: independent Shortcuts SDK source controls=3 positive/28 refusal; native UNRUN.
+[OK] one root (validate) with 11 plan outputs, 4 lane callers with three mandatory macOS entries plus one manual diagnostic, one Windows/Linux entry and the declared exits, and 7 release-only secrets are wired as designed, 342 conditional steps are the only ones, and the release preflight runs before any side effect.

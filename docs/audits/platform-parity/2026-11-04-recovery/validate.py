@@ -80,6 +80,16 @@ def main():
         assert group and len(group) == len(set(group)) and set(group) <= ids
     capabilities = load(DIRECTORY / "capabilities.json")
     assert capabilities["schema_version"] == 1 and capabilities["audited_sha"] == sha
+    if capabilities.get("delivery_overlay"):
+        overlay = capabilities["delivery_overlay"]
+        assert re.fullmatch(r"[0-9a-f]{40}", overlay["reviewed_sha"])
+        subprocess.run(
+            ["git", "cat-file", "-e", overlay["reviewed_sha"] + "^{commit}"], cwd=ROOT, check=True
+        )
+        assert (
+            overlay["report"] == "delivery-delta.md" and (DIRECTORY / overlay["report"]).is_file()
+        )
+        assert nonempty(overlay["summary"])
     seen = set()
     for row in capabilities["capabilities"]:
         assert row["id"] not in seen

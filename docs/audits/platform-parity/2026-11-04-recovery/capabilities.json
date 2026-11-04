@@ -18,7 +18,7 @@
 				"linux": "Config/state/data legacy roots merge into ergopti under their XDG bases; cache is prepared."
 			},
 			"classification": "explicit_policy",
-			"rationale": "Maintainer-only one-time conversion; no published builds used these legacy folders. Different native purpose roots are intentional.",
+			"rationale": "Source headers/handoff describe a temporary maintainer-only conversion and state that published builds did not use these folders; that distribution assumption was not independently verified here. Native purpose roots intentionally differ.",
 			"evidence_reports": [
 				"windows-migration/report.md",
 				"macos-migration/report.md",
@@ -265,5 +265,10 @@
 				"linux-updater/report.md"
 			]
 		}
-	]
+	],
+	"delivery_overlay": {
+		"reviewed_sha": "8eb5378b125b282c56284625f0b4459d4cdd1383",
+		"report": "delivery-delta.md",
+		"summary": "All 17 finding mechanisms remain source-applicable. Windows now keeps managed Ollama inside Ergopti/ollama; the sibling rationale below is historical. macOS runtime approval automation and native build/provision changes add unreviewed scope. Read the delivery overlay before applying this revision-pinned table to current dev."
+	}
 }
