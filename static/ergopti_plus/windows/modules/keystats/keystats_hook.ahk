@@ -592,6 +592,8 @@ _KL_Hook_CommitInput(Intent) {
 			KLHook.last_tick := 0
 	} finally Critical(PreviousCritical)
 	if !Intent.synth_active {
+		if !GuardFn.Call()
+			return false
 		try {
 			ErgoFn := HasMethod(Intent.ergo_fn, "Call") ? Intent.ergo_fn : KL_Ergo_OnKeystroke
 			if Intent.kind = "char"
@@ -599,8 +601,13 @@ _KL_Hook_CommitInput(Intent) {
 			else
 				ErgoFn.Call(delay, Intent.vk, Intent.sc, Intent.vk = 0x08)
 		}
+		; Ergonomic publication can yield and revoke this arrival.
+		if !GuardFn.Call()
+			return false
 		if Intent.kind = "char" {
 			try KL_Roi_OnChar(Intent.character)
+			if !GuardFn.Call()
+				return false
 			try WPMWidget_Push(false, false)
 		} else
 			try KL_Roi_OnKey(Intent.vk)

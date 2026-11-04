@@ -224,6 +224,17 @@
 			"root_cause": "static/ergopti_plus/windows/ui/field_check/network_check.ahk:NetworkCheck_JudgePac and ui/healthcheck/probes.ahk:_HC_PacAnswer use the default case-insensitive InStr search. JavaScript and the shared Lua judge require the exact FindProxyForURL identifier.",
 			"silent_failure": "Windows reports a valid PAC even though its required entry point is absent.",
 			"regression_test": "Require rejection of lower, upper and mixed case variants in both Windows judges; retain exact-case positive controls."
+		},
+		{
+			"id": "AHK-021",
+			"title": "Revoked input still updates ROI after ergonomic publication",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Type hello, then deliver a space through the genuine hook with its ergonomic callback pausing capture, invalidating the capture generation or changing the focus generation.",
+			"root_cause": "static/ergopti_plus/windows/modules/keystats/keystats_hook.ahk:_KL_Hook_CommitInput does not revalidate its arrival after ErgoFn.Call before dispatching the ROI sink.",
+			"silent_failure": "An arrival revoked during the ergonomic callout still clears the current ROI word and increments its candidate count.",
+			"regression_test": "Use the genuine hook and ROI owners in the isolated keys fixture; revoke through the official ergonomic callback port and require the ROI seed and WPM count to remain unchanged. This qualifies the explicit callout boundary, not atomicity of the whole ROI pipeline."
 		}
 	]
 }

@@ -204,8 +204,20 @@ _RHL_NonpositiveUsage() {
 		"All accepted fires count as usage without adding nonpositive savings.")
 }
 
+global _RHL_KeyWpm := 0
+
 WPMWidget_Push(*) {
+	global _RHL_KeyWpm
+	_RHL_KeyWpm += 1
 	return true
+}
+
+_RHL_RevokeInput(Mode, *) {
+	switch Mode {
+		case "pause": Suspend(true)
+		case "capture": KL_Hook_InvalidateCapture()
+		case "focus": MetricsFocusCache.generation += 1
+	}
 }
 
 _RHL_Public() => false
@@ -231,7 +243,7 @@ _RHL_ClearWords() {
 }
 
 _RHL_Keys() {
-	global _RHL
+	global _RHL, _RHL_KeyWpm
 	Keystats.initialized := true
 	Keystats.session_app := "roi-keys-fixture.exe"
 	KLWatch.is_session_active := true
@@ -282,6 +294,17 @@ _RHL_Keys() {
 	} finally Keystats.synth_active := false
 	_RHL_Require(KLRoi.current_word == "hello" && KLRoi.word_counts.Count == 0,
 		"Synthetic key and character intents must not modify public ROI.")
+	for Mode in ["pause", "capture", "focus"] {
+		_RHL_ClearWords()
+		_RHL_Type("hello")
+		BeforeWpm := _RHL_KeyWpm
+		try KL_Hook_OnChar(0, " ", _RHL_Public, A_TickCount, _RHL_RevokeInput.Bind(Mode))
+		finally Suspend(false)
+		_RHL_Require(KLRoi.current_word == "hello" && KLRoi.word_counts.Count == 0,
+			"Ergonomic callout revocation must fence subsequent ROI: " . Mode)
+		_RHL_Require(_RHL_KeyWpm == BeforeWpm,
+			"Ergonomic callout revocation must fence subsequent WPM: " . Mode)
+	}
 	_RHL_Key(0x08, true)
 	_RHL_Key(0x0D, true)
 	_RHL_Key(0x09, true)
