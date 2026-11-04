@@ -187,4 +187,18 @@ h.describe("Ergopti's own Python (managed-python)", function()
 		h.assert_eq(outcomes[1], outcomes[2])
 		h.assert_true(outcomes[1][1])
 	end)
+	for _, status in ipairs({ 200, 404 }) do
+		h.it("delivers all Python installation waiters when one callback raises (HTTP " .. status .. ")", function()
+			local deps, world = machine({ hold = true, status = status })
+			local Managed = h.load_module("modules.keymap.managed_python")
+			Managed._reset_for_test()
+			local answered = 0
+			Managed.ensure(deps, function() error("first waiter failed") end)
+			Managed.ensure(deps, function(ok) answered = answered + 1; h.assert_eq(ok, status == 200) end)
+			local returned = pcall(world.pending)
+			h.assert_true(returned, "a waiter cannot interrupt settlement")
+			h.assert_eq(answered, 1)
+		end)
+	end
+
 end)

@@ -103,7 +103,10 @@ local function settle(ok, value, detail)
 	local waiters = _waiters
 	_waiters = nil
 	if not ok then Logger.error(LOG, "Ergopti's Python is not installed: %s (%s).", tostring(value), tostring(detail)) end
-	for _, waiter in ipairs(waiters or {}) do waiter(ok, value, detail) end
+	for _, waiter in ipairs(waiters or {}) do
+		local delivered = pcall(waiter, ok, value, detail)
+		if not delivered then Logger.error(LOG, "A Python installation completion callback failed.") end
+	end
 end
 
 --- Runs the verified download, unpack and publication of one archive.
