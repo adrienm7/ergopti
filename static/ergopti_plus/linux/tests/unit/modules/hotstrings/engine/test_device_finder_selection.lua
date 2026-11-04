@@ -232,6 +232,42 @@ helpers.describe("device_finder: ranking when no remap daemon is running", funct
 		helpers.assert_eq(paths, { "/dev/input/event3" }, "a high-word key cannot masquerade as KEY_Z")
 	end)
 
+	helpers.it("confirms ambiguous 32-bit key words through the native fd (keyboard-32-bit-probe)", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local unnamed = block({ name = "ZSA Moonlander Mark I", sysfs = "/devices/pci0000:00/usb1/input/input4",
+			ev = "120013", handlers = "sysrq kbd event4 leds" })
+		unnamed = unnamed:gsub("\n\n$", "\nB: KEY=1000 40010000\n\n")
+		local original_open, original_ffi = io.open, package.loaded.ffi
+		for _, mode in ipairs({ "keyboard", "other", "short", "exception", "close_failure" }) do
+			local queries, closes = {}, 0
+			io.open = function(path, ...)
+				if path == "/proc/bus/input/devices" then
+					return { read = function() return PHYSICAL_KEYBOARD .. unnamed end, close = function() return true end }
+				end
+				return original_open(path, ...)
+			end
+			package.loaded.ffi = { os = "Linux", cdef = function() end,
+				new = function() return { [2] = 0, [3] = 0, [5] = 0 } end,
+				C = { open = function(path, flags) queries.path, queries.flags = path, flags; return 7 end,
+					ioctl = function(_, request, bits)
+						queries.request = request
+						if mode == "exception" then error("controlled ioctl failure") end
+						bits[2], bits[3], bits[5] = 1, 64, mode == "other" and 0 or 16
+						return mode == "short" and 5 or 6
+					end,
+					close = function() closes = closes + 1; return mode == "close_failure" and -1 or 0 end } }
+			local called, paths = pcall(finder.find_devices)
+			io.open, package.loaded.ffi = original_open, original_ffi
+			helpers.assert_true(called)
+			helpers.assert_eq(queries.path, "/dev/input/event4")
+			helpers.assert_eq(queries.flags, 0x80800)
+			helpers.assert_eq(queries.request, 0x80064521)
+			helpers.assert_eq(closes, 1)
+			helpers.assert_eq(paths, mode == "keyboard" and { "/dev/input/event3", "/dev/input/event4" }
+				or { "/dev/input/event3" }, mode)
+		end
+	end)
+
 	helpers.it("returns every physical keyboard when no consolidated remap output exists", function()
 		local finder = helpers.load_module("modules.hotstrings.device_finder")
 		local paths, reason = finder.select_keyboards(

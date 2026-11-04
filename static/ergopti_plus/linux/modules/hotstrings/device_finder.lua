@@ -107,7 +107,7 @@ function M.parse_devices(text)
 		else
 			-- Start a new block on the "I:" identity line.
 			if line:match("^I:") then
-				current = { name = "", sysfs = "", ev_mask = 0, key_mask_low = 0, handlers = {} }
+				current = { name = "", sysfs = "", ev_mask = 0, key_mask_low = 0, key_mask_32 = 0, handlers = {} }
 			end
 			if current then
 				-- N: Name="..."
@@ -131,8 +131,14 @@ function M.parse_devices(text)
 				-- on 32-bit kernels, where KEY_Z lives in the preceding word.
 				local key_hex = line:match("^B:%s*KEY=([%x%s]+)$")
 				if key_hex then
-					local last = key_hex:match("(%x+)%s*$")
+					local words = {}
+					for word in key_hex:gmatch("%x+") do words[#words + 1] = word end
+					local last, previous = words[#words], words[#words - 1]
 					current.key_mask_low = last and tonumber(last:sub(-12), 16) or 0
+					if last and #last <= 8 and previous and #previous <= 8 then
+						current.key_mask_32 = (tonumber(last, 16) or 0)
+							+ ((tonumber(previous, 16) or 0) % 65536) * 2 ^ 32
+					end
 				end
 
 				-- H: Handlers=kbd event3 ...
@@ -285,6 +291,34 @@ local function has_typing_keys(dev)
 		and has_bit(mask, 2 ^ 30) and has_bit(mask, 2 ^ 44)
 end
 
+-- The procfs words alone cannot distinguish a 32-bit keyboard from some
+-- 64-bit non-keyboards. Confirm only ambiguous candidates against their fd.
+local function probe_typing_keys(path)
+	local available, ffi = pcall(require, "ffi")
+	if not available or type(ffi) ~= "table" or ffi.os ~= "Linux" then return nil end
+	local declared, detail = pcall(ffi.cdef, [[
+		int open(const char *path, int flags);
+		int close(int fd);
+		int ioctl(int fd, unsigned long request, ...);
+	]])
+	if not declared and not tostring(detail):find("redefin", 1, true) then return nil end
+	local bound, open_port, ioctl_port, close_port = pcall(function() return ffi.C.open, ffi.C.ioctl, ffi.C.close end)
+	if not bound then return nil end
+	local opened, fd = pcall(open_port, path, 0x80800) -- O_NONBLOCK | O_CLOEXEC
+	if not opened or fd == nil or fd < 0 then return nil end
+	local called, matched = pcall(function()
+		local bits = ffi.new("uint8_t[6]")
+		-- EVIOCGBIT(EV_KEY, 6) covers KEY_Q=16, KEY_A=30 and KEY_Z=44.
+		if tonumber(ioctl_port(fd, 0x80064521, bits)) ~= 6 then return nil end
+		return tonumber(bits[2]) % 2 == 1
+			and math.floor(tonumber(bits[3]) / 64) % 2 == 1
+			and math.floor(tonumber(bits[5]) / 16) % 2 == 1
+	end)
+	local closed, acknowledged = pcall(close_port, fd)
+	if not called or not closed or acknowledged ~= 0 then return nil end
+	return matched
+end
+
 --- True when the device is software-synthesised rather than physical hardware.
 --- @param dev table Device descriptor.
 --- @return boolean
@@ -333,7 +367,7 @@ end
 --- own injections back.
 --- @param devices table Array of descriptors from parse_devices().
 --- @return table paths, string|nil reason Device paths and the rule that chose them.
-function M.select_keyboards(devices)
+function M.select_keyboards(devices, probe)
 	local preferred = {}
 	local fallback = {}
 
@@ -353,7 +387,12 @@ function M.select_keyboards(devices)
 		if not M.is_interceptable_event_mask(dev.ev_mask) then goto next_dev end
 		Logger.debug(LOG, "Physical EV_KEY device: '%s' → %s", dev.name, path)
 
-		if is_likely_keyboard(dev.name) or has_typing_keys(dev) then
+		local named, typing = is_likely_keyboard(dev.name), has_typing_keys(dev)
+		if not named and not typing and type(probe) == "function" and has_typing_keys({ key_mask_low = dev.key_mask_32 }) then
+			local called, confirmed = pcall(probe, path)
+			typing = called and confirmed == true
+		end
+		if named or typing then
 			preferred[#preferred + 1] = path
 		else
 			fallback[#fallback + 1] = path
@@ -433,7 +472,7 @@ function M.find_devices()
 		Logger.error(LOG, "find_devices(): parse failed — %s.", tostring(devices))
 		return {}, {}, nil
 	end
-	local keyboards, reason = M.select_keyboards(devices)
+	local keyboards, reason = M.select_keyboards(devices, probe_typing_keys)
 	local pointers = M.select_pointers(devices)
 	Logger.info(LOG, "Input snapshot: %d keyboard source(s), %d pointer source(s).",
 		#keyboards, #pointers)
