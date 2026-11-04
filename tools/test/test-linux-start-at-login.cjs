@@ -243,6 +243,16 @@ try {
 			fs.rmSync(desktop, { recursive: true, force: true });
 		}
 		fs.writeFileSync(desktop, disabled);
+		// Uninstall admits a complete last receipt row without a final newline.
+		// Updating startup must not discard that owned payload row.
+		const lastRow = `${'b'.repeat(64)}\tlinux/last-owned-file`;
+		fs.writeFileSync(manifest, `${'a'.repeat(64)}\t@autostart\n${lastRow}`);
+		assert.equal(run('enable').status, 0);
+		assert.ok(
+			fs.readFileSync(manifest, 'utf8').split('\n').includes(lastRow),
+			'an unterminated final ownership row survives startup changes'
+		);
+		fs.writeFileSync(desktop, disabled);
 		const previousReceipt =
 			`${'a'.repeat(64)}\tlinux/retained-file\n` +
 			`${createHash('sha256').update(disabled).digest('hex')}\t@autostart\n`;
