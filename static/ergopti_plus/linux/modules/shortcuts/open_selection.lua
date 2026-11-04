@@ -141,6 +141,19 @@ local function is_file_manager(app)
 	return FILE_MANAGERS[id] == true or FILE_MANAGERS[id:match("([^.]+)$")] == true
 end
 
+--- Retains the currently focused known file manager for a later copy chord.
+--- @return function|nil Checks that the same application is still focused.
+function M.capture_file_manager()
+	local app = deps.focused_app()
+	if type(app) ~= "string" or app == "" then app = deps.active_frame_app() end
+	if not is_file_manager(app) then return nil end
+	return function()
+		local current = deps.focused_app()
+		if type(current) ~= "string" or current == "" then current = deps.active_frame_app() end
+		return current == app and is_file_manager(current)
+	end
+end
+
 --- Copies the file manager's selected paths to the clipboard.
 --- @return boolean|nil copied True when copied, false when refused, nil when
 ---   no file is selected (the caller then opens the primary selection).

@@ -285,9 +285,57 @@ helpers.describe("Linux system actions", function()
 		helpers.assert_eq(written[1], "")
 	end)
 
+	helpers.it("never sends Ctrl+C to a terminal for make_executable_selection", function()
+		local Open = require("modules.shortcuts.open_selection")
+		Open._set_deps_for_test({ focused_app = function() return "gnome-terminal-server" end })
+		local combos = {}
+		local ok, err = pcall(function()
+			with_modules({
+				["adapters.clipboard"] = { read_selection_uri_list = function(emit)
+					emit("ctrl+c"); return false, "", "no_file_selection"
+				end },
+				["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo; return true end },
+				["adapters.event_loop"] = { sleep_ms = function() return true end },
+			}, function() Gestures.execute_action("make_executable_selection", "tap_3") end)
+		end)
+		Open._set_deps_for_test(nil)
+		if not ok then error(err, 0) end
+		helpers.assert_eq(combos, {})
+	end)
+
+	for _, boundary in ipairs({ "before copy", "after copy" }) do
+		helpers.it("refuses make-executable when focus changes " .. boundary, function()
+			local Open = require("modules.shortcuts.open_selection")
+			local app, combos = "nautilus", {}
+			Open._set_deps_for_test({ focused_app = function() return app end })
+			local ok, err = pcall(function()
+				with_modules({
+					["adapters.clipboard"] = { read_selection_uri_list = function(emit)
+						if boundary == "before copy" then app = "gnome-terminal-server" end
+						local sent = emit("ctrl+c")
+						if boundary == "before copy" then helpers.assert_eq(sent, false) end
+						app = "gnome-terminal-server"
+						return true, "file:///home/ana/run.sh", nil
+					end },
+					["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo; return true end },
+					["adapters.event_loop"] = { sleep_ms = function() return true end },
+				}, function()
+					with_recorded_shell(function(commands)
+						Gestures.execute_action("make_executable_selection", "tap_3")
+						helpers.assert_eq(#launched(commands), 0)
+					end)
+				end)
+			end)
+			Open._set_deps_for_test(nil)
+			if not ok then error(err, 0) end
+			helpers.assert_eq(combos, boundary == "before copy" and {} or { "ctrl+c" })
+		end)
+	end
+
 	helpers.it("make_executable_selection chmods exactly the copied paths (system-actions)", function()
 		local combos = {}
 		with_modules({
+			["modules.shortcuts.open_selection"] = { capture_file_manager = function() return function() return true end end },
 			["adapters.clipboard"] = {
 				read_selection_uri_list = function(emit_combo, sleep_ms)
 					helpers.assert_eq(type(emit_combo), "function")
@@ -313,6 +361,7 @@ helpers.describe("Linux system actions", function()
 			{ true, "", nil },
 		}) do
 			with_modules({
+				["modules.shortcuts.open_selection"] = { capture_file_manager = function() return function() return true end end },
 				["adapters.clipboard"] = {
 					read_selection_uri_list = function() return report[1], report[2], report[3] end,
 				},
