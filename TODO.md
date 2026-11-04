@@ -477,12 +477,16 @@ between workers) green alone. All live checks pass, typed by the harness.
   the old folders once at boot with a backup. Branch `next/one-folder-name` (handoff:
   `docs/tooling/one-folder-name-handoff.md`).
   - Done: one root per OS in `_shared/modules/paths/app_dirs.toml` (generated for Lua, AHK and Swift; Node reads it
-    through `tools/test/lib/app-dirs.cjs`); the three drivers resolve their folders from it; the boot migration moves
-    the old folders, renames an entry whose destination is taken into `<root>/before-folder-migration/`, removes the
-    emptied old folders and backs up a rewritten paths.toml; shared vectors replayed on the three drivers.
-  - In progress: test, tool, collector, CI and doc spellings of the old folders on each OS.
-  - Next: the gate `tools/test/test-legacy-folder-names.cjs`; CI on the branch; the owned Karabiner runtime folder
-    (`ErgoptiPlus`) is renamed with its next rebuild (item 31).
+    through `tools/test/lib/app-dirs.cjs`, Python through `tools/diagnostics/macos_app_dirs.py` or the TOML); the
+    three drivers, their tests, the collectors, the reload CLI, the cask zap list, the docs, the skills and the release
+    notes use it; the boot migration moves the old folders, renames an entry whose destination is taken into
+    `<root>/before-folder-migration/`, removes the emptied old folders and backs up a rewritten paths.toml; shared
+    vectors replayed on the three drivers; the gate `tools/test/test-legacy-folder-names.cjs`.
+  - In progress: CI on the branch (Swift and the full Lua suites only run there).
+  - Next: merge into dev after a green CI and the maintainer's go-ahead; the maintainer checks his machines (handoff
+    list); delete the migration once they are moved; rename the owned Karabiner runtime folder (`ErgoptiPlus`) with its
+    next rebuild (item 31). Maintainer question: keep the managed Ollama sibling `%LOCALAPPDATA%\Ergopti-ollama`, or
+    let `ollama_managed_files.ps1` admit a folder inside the root?
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
   branch `next/owned-karabiner`, [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November:
   - Done: runtime `16.3.0-ergopti.2` published (prerelease `remap-runtime-v16.3.0-ergopti.2`, downloaded back: sha256
