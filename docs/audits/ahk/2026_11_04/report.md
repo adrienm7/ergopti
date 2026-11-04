@@ -349,3 +349,17 @@ Consequence: A delayed callback from the stopped observer cancels the newly acti
 Regression: Extend the isolated keep-awake native owner fixture with actual Start/Stop and two genuine InputHooks. Controlled old-callback delivery must preserve B; current B delivery must stop B. Position and timers remain passive, without physical mouse displacement.
 
 The ongoing register now contains **24 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-025: Native model browser hides after a refused model selection
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+static/ergopti_plus/windows/ui/model_browser/init.ahk:\_LLM_ModelBrowser_PickRow ignores the transactional Boolean returned by LLM_Menu_SetModel and always hides the browser. The Web sibling closes only after an acknowledged success.
+
+Reproduction: Open the native model browser, hold a genuine configuration write lease, select model B and click Pick.
+
+Consequence: The unchanged model A remains selected but its native browser disappears, presenting the refused operation as finished.
+
+Regression: Use the genuine native browser construction, actual Pick button, full boot/configuration/menu owners and a real write lease. Require visible UI and unchanged file/RAM after refusal; release the lease and require a durable B selection and hidden UI after retry.
+
+The ongoing register now contains **25 distinct new findings**. The requested target of 1,000 remains unmet.

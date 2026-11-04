@@ -146,7 +146,7 @@ _MBPT_ChildSource(Directory) {
 	}
 	AssertEqual(1, Routes, "Only the genuine support prefix may redirect the actual writer owner")
 	_TestPrint("# model-browser-writer-diagnostic subject_routes=" . Routes . " kind=PrivateChildCatchInstrumentation")
-	for GeneratedSymbol in ["LocaleTableData", "UpdateChannelRegistryData", "UpdateScheduleData"]
+	for GeneratedSymbol in ["LocaleTableData", "UpdateChannelRegistryData", "UpdateScheduleData", "WindowTitle"]
 		Code .= "#Include " . _MBPT_GeneratedOwner(GeneratedSymbol) . "`n"
 	Owners := Map()
 	for Symbol in ["HotPath_Now", "t", "I18nGetLocale", "LLM_GetModelIndex", "LLM_Defaults_Load",
@@ -165,6 +165,9 @@ _MBPT_ChildSource(Directory) {
 			Code .= "LLM_Defaults_Load()`n"
 	}
 	AssertEqual(23, Owners.Count, "All native, data, configuration, menu and runtime owners must be included")
+	NativeGui := _DriverFuncBody("Gui_Create")
+	AssertTrue(NativeGui != "", "The native model browser requires its genuine GUI factory")
+	Code .= NativeGui . "`n"
 	Fixture := _DriverDir . "\tests\fixtures\model_browser_close_pause_owner_body.ahk"
 	AssertTrue(FileExist(Fixture))
 	return Code . "#Include " . Fixture . "`n"
@@ -275,6 +278,6 @@ _MBPT_Case(Mode) {
 		throw ExportFailure
 }
 
-for _MBPT_Mode in ["current", "during-close", "paused-entry"]
+for _MBPT_Mode in ["current", "during-close", "paused-entry", "native-refused"]
 	Test("Model browser selection: " . _MBPT_Mode . " preserves native pause ownership (model-browser-close-pause-owner)",
 		_MBPT_Case.Bind(_MBPT_Mode))
