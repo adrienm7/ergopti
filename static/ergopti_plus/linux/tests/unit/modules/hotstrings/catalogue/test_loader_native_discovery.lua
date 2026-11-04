@@ -30,6 +30,36 @@ local Shell = require("adapters.shell_runner")
 
 local ON_WINDOWS = package.config:sub(1, 1) == "\\"
 
+helpers.describe("extension manifest native read", function()
+	helpers.it("refuses a FIFO manifest without waiting for a writer", function()
+		local uv = require("luv")
+		local path = os.tmpname()
+		os.remove(path)
+		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
+		local code = string.format([[package.path = %q
+local loader = require("modules.hotstrings.loader")
+local ok = pcall(loader.read_file, %q)
+assert(ok == false, "a FIFO is not an absent manifest")
+]], package.path, path)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		os.remove(path)
+		helpers.assert_eq(expired, false, "manifest discovery must not block on a FIFO")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+	end)
+end)
+
 --- Every name the walks must classify, relative to the fixture root.
 local FILES = {
 	"a.toml", "_index.toml", "notes.txt", ".hidden.toml", ".toml", "line\nbreak.toml", "trailing .toml",

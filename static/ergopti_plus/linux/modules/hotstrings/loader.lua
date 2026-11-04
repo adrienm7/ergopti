@@ -566,11 +566,10 @@ end
 --- @return string|nil
 function M.read_file(path)
 	if type(path) ~= "string" or path == "" then return nil end
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local text = fh:read("*a")
-	fh:close()
-	return text
+	local text, status, detail = require("toml_codec.writer").read_classified(path)
+	if status == "ok" then return text end
+	if status == "absent" then return nil end
+	error("extension manifest is unreadable: " .. tostring(detail or status), 0)
 end
 
 return M
