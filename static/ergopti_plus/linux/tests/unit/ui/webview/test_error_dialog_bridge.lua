@@ -187,6 +187,46 @@ local function reported(bridge, record)
 end
 
 helpers.describe("error window bridge (linux): policy and deferral (error-dialog-linux)", function()
+	helpers.it("(error-dialog-close-refusal) retains the report until its window closes", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			bridge.on_message("ready", {}, page(context))
+			local attempts = 0
+			local owner = { app_name = "error_dialog", epoch = context.epoch, close_owned_window = function()
+				attempts = attempts + 1
+				return attempts > 1
+			end }
+			bridge.on_message({ action = "close" }, {}, owner)
+			local result = bridge.on_message({ action = "copy" }, {}, owner)
+			helpers.assert_true(result and result.ok, "the still-open page retains its report")
+			bridge.on_message({ action = "close" }, {}, owner)
+			helpers.assert_eq(attempts, 2)
+			helpers.assert_nil(bridge.on_message({ action = "copy" }, {}, owner))
+		end)
+	end)
+
+	helpers.it("(error-dialog-close-refusal) a close callback cannot settle a replacement session", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			bridge.on_message("ready", {}, page(context))
+			local old = context.epoch
+			bridge.on_message({ action = "close" }, {}, { app_name = "error_dialog", epoch = old,
+				close_owned_window = function()
+					context.epoch = nil
+					bridge.on_window_closed(old)
+					bridge.on_error("second", "second failure", "second failure")
+					run_deferred(context)
+					bridge.on_message("ready", {}, page(context))
+					return true
+				end })
+			local result = bridge.on_message({ action = "copy" }, {}, page(context))
+			helpers.assert_true(result and result.ok, "the replacement retains its own report")
+		end)
+	end)
 	helpers.it("disabling invalidates queued windows across reactivation (error-dialog-cancel)", function()
 		with_bridge(nil, function(bridge, context)
 			helpers.assert_true(bridge.init())
