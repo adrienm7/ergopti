@@ -1043,3 +1043,26 @@ helpers.describe("linux-sqlite-ngram-catalogue", function()
 		end
 	end)
 end)
+
+for _, fault in ipairs({ "read_throw", "read_nil", "close_throw", "close_false" }) do
+	helpers.it("legacy category reader refuses incomplete SQLite pipe " .. fault, function()
+		local reader = require("modules.keystats.sqlite_reader")
+		local original, closes = io.popen, 0
+		io.popen = function()
+			return { read = function()
+				if fault == "read_throw" then error("injected read error") end
+				if fault == "read_nil" then return nil end
+				return "[]\nERGOPTI_SQL_EXIT_STATUS=0\n"
+			end, close = function()
+				closes = closes + 1
+				if fault == "close_throw" then error("injected close error") end
+				return fault ~= "close_false"
+			end }
+		end
+		local called, value = pcall(reader.read_legacy_category_scores, "/db/metrics.sqlite", "local")
+		io.popen = original
+		helpers.assert_true(called, "incomplete SQLite read must be a refusal")
+		helpers.assert_nil(value, "unacknowledged source cannot replace category state")
+		helpers.assert_eq(closes, 1)
+	end)
+end
