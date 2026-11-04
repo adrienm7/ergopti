@@ -23,6 +23,25 @@ local function roster_session(s, initial)
 end
 
 helpers.describe("source-owned simultaneous standalone remap holds", function()
+	helpers.it("(remap-multisource) leaves successor input queued during a reentrant restart", function()
+		local restarted = false
+		Fixture.with_session({ on_physical = function(s, code, _, _, value)
+			if code == 30 and value == 1 and not restarted then
+				restarted = true
+				s.hook.stop()
+				assert(s.hook.set_remapper(s.engine))
+				s.hook.start(s.start_options)
+				s.edge("b", 48, 1, 2)
+			end
+		end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_true(restarted and s.hook.isRunning())
+			helpers.assert_eq(s.rows, {}, "the retired pump cannot consume the successor event")
+			s.hook.pump()
+			s.edge("b", 48, 0, 3)
+			helpers.assert_eq(s.rows, { { 48, 1 }, { 48, 0 } }, "the successor pump receives the queued event")
+		end)
+	end)
 	helpers.it("(remap-multisource) retains a physical blocker held by another keyboard", function()
 		Fixture.with_session({ keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
 			s.edge("a", 58, 1, 1); s.edge("b", 58, 1, 2); s.edge("a", 58, 0, 3)
