@@ -57,6 +57,7 @@ local _focus_callbacks  = {}
 local _launch_callbacks = {}
 local _quit_callbacks   = {}
 local _running          = false
+local _generation       = 0
 local _last_focus_key   = nil
 local _last_processes   = {}   -- set: process_name -> true
 -- Whether _last_processes came from a real snapshot. Without a baseline the
@@ -225,7 +226,11 @@ end
 function M.start()
 	if _running then return end
 	_running = true
-	_last_focus_key = _focus_key(_focused_identity())
+	_generation = _generation + 1
+	local generation = _generation
+	local focus_key = _focus_key(_focused_identity())
+	if not _running or generation ~= _generation then return end
+	_last_focus_key = focus_key
 	-- The daemon subscribes only to focus. Enumerating the whole machine has
 	-- no consumer until a launch/quit observer explicitly asks for it.
 	local seed
@@ -233,6 +238,7 @@ function M.start()
 		local ok, snapshot = pcall(_snapshot_processes)
 		if ok then seed = snapshot else Logger.debug(LOG, "start(): process snapshot failed — retrying on poll.") end
 	end
+	if not _running or generation ~= _generation then return end
 	_last_processes = seed or {}
 	_have_proc_baseline = seed ~= nil
 
@@ -263,6 +269,7 @@ end
 function M.stop()
 	if not _running then return end
 	_running = false
+	_generation = _generation + 1
 	_last_focus_key = nil
 	_last_processes = {}
 	_have_proc_baseline = false
@@ -275,15 +282,19 @@ end
 --- @param tick_count number Monotonically incrementing tick counter (used to throttle process polling).
 function M.tick(tick_count)
 	if not _running then return end
+	local generation = _generation
+	local function current() return _running and _generation == generation end
 	tick_count = tonumber(tick_count) or 0
 
 	-- Focus-change check (every tick)
 	local ok_f = pcall(function()
 		local app_name, title, native = _focused_identity()
+		if not current() then return end
 		local key = _focus_key(app_name, title, native)
 		if key ~= _last_focus_key then
 			_last_focus_key = key
 			for _, cb in ipairs(_focus_callbacks) do
+				if not current() then return end
 				pcall(cb, app_name, title)
 			end
 		end
@@ -291,12 +302,14 @@ function M.tick(tick_count)
 	if not ok_f then
 		Logger.debug(LOG, "tick(): focus poll error — suppressed.")
 	end
+	if not current() then return end
 
 	-- Process-list check (every N ticks to stay within PROCESS_POLL_S)
 	local process_every = math.max(1, math.floor(PROCESS_POLL_S / FOCUS_POLL_S))
 	if (#_launch_callbacks > 0 or #_quit_callbacks > 0) and tick_count % process_every == 0 then
 		local ok_p = pcall(function()
 			local current = _snapshot_processes()
+			if not _running or _generation ~= generation then return end
 			-- A failed snapshot keeps the last known set: there is nothing to
 			-- diff it against, and diffing an empty set would report the whole
 			-- desktop as quit.
@@ -312,16 +325,22 @@ function M.tick(tick_count)
 			-- Launched: in current but not in last
 			for name in pairs(current) do
 				if not _last_processes[name] then
-					for _, cb in ipairs(_launch_callbacks) do pcall(cb, name) end
+					for _, cb in ipairs(_launch_callbacks) do
+						if not _running or _generation ~= generation then return end
+						pcall(cb, name)
+					end
 				end
 			end
 			-- Quit: in last but not in current
 			for name in pairs(_last_processes) do
 				if not current[name] then
-					for _, cb in ipairs(_quit_callbacks) do pcall(cb, name) end
+					for _, cb in ipairs(_quit_callbacks) do
+						if not _running or _generation ~= generation then return end
+						pcall(cb, name)
+					end
 				end
 			end
-			_last_processes = current
+			if _running and _generation == generation then _last_processes = current end
 		end)
 		if not ok_p then
 			Logger.debug(LOG, "tick(): process poll error — suppressed.")
