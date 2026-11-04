@@ -67,7 +67,8 @@ local function with_installed_startup(mode, body)
 	local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-login-menu-XXXXXX"))
 	local prefix = root .. "/a space d'été Ω"
 	local environment = { PATH = root .. "/commands:" .. assert(os.getenv("PATH")), XDG_CONFIG_HOME = root .. "/config",
-		XDG_RUNTIME_DIR = root .. "/runtime", ERGOPTI_TEST_MODE = mode, ERGOPTI_TEST_CALLS = root .. "/calls" }
+		XDG_RUNTIME_DIR = root .. "/runtime", ERGOPTI_TEST_MODE = mode, ERGOPTI_TEST_CALLS = root .. "/calls",
+		ERGOPTI_TEST_FRAGMENT = root .. "/owned.service" }
 	local saved = {}
 	for key in pairs(environment) do saved[key] = os.getenv(key) end
 	local okay, detail = xpcall(function()
@@ -87,6 +88,7 @@ local function with_installed_startup(mode, body)
 		end
 		require("tests.support.shell_messages_fixture").provide(prefix .. "/lib/ergopti/linux/install")
 		local calls = root .. "/calls"
+		write(root .. "/owned.service", "[Service]\nExecStart=" .. prefix .. "/bin/ergopti-hotstrings --tray\n")
 		write(root .. "/commands/systemctl", [[#!/bin/bash
 printf '%s\n' "$*" >> "$ERGOPTI_TEST_CALLS"
 if [ "$2" = is-enabled ]; then exit 1; fi
@@ -100,6 +102,7 @@ if [ "$4" = list-unit-files ]; then
  else printf '%s\n' 'ergopti-hotstrings.service disabled enabled'; fi
  exit 0
 fi
+if [ "$2" = show ]; then printf 'FragmentPath=%s\nDropInPaths=\n' "$ERGOPTI_TEST_FRAGMENT"; exit 0; fi
 if [ "$2 $3" = '--no-reload disable' ] && [ "$ERGOPTI_TEST_MODE" = present ]; then exit 0; fi
 exit 24
 ]])
