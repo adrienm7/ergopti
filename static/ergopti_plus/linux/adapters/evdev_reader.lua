@@ -254,9 +254,8 @@ local function build_ffi_backend()
 		end,
 		read_bits = function(fd, request, count)
 			local bits = native_new("uint8_t[?]", count)
-			if native_ioctl(fd, request, bits) < 0 then
-				return nil, "ioctl failed (errno=" .. tostring(native_errno()) .. ")"
-			end
+			local copied = tonumber(native_ioctl(fd, request, bits))
+			if copied ~= count then return nil, "state ioctl did not acknowledge the full bitset" end
 			return native_string(bits, count)
 		end,
 		read_owned_key_bits = function(fd, request, count)

@@ -39,6 +39,20 @@ local helpers, recorder, encoded, controlled_held_reader =
 
 
 helpers.describe("evdev_reader: controlled fresh native held-state receipts", function()
+	for _, kind in ipairs({ "key", "led" }) do
+		helpers.it("refuses a short native " .. kind .. " state ioctl (native-short-snapshot)", function()
+			local opts = kind == "key" and { copied = 1, bytes = string.rep("\0", 96) }
+				or { led_copied = 0, led_bytes = "\0" }
+			controlled_held_reader(opts, function(reader)
+				assert(reader.open("/controlled/native-a", "a"))
+				local result
+				if kind == "key" then result = reader.pressed_keys("a", 0x2ff)
+				else result = reader.active_leds("a", 1) end
+				helpers.assert_nil(result, "a short native ioctl cannot prove unset bits")
+				assert(reader.close("a"))
+			end)
+		end)
+	end
 
 	helpers.it("(linux-modal-original-open) preserves exact original opens across a legitimate two-source regrab", function()
 		controlled_held_reader(nil, function(reader)
