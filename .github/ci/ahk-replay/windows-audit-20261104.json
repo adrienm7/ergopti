@@ -1,7 +1,7 @@
 {
-	"expected_count": 85,
+	"expected_count": 92,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"native_hotstring_e2e": true,
 	"filters": [
 		{
 			"contains": "rollover-state-recovery",
@@ -16,52 +16,28 @@
 			"expected_count": 3
 		},
 		{
-			"contains": "sticky-native-nontext",
+			"contains": "gesture-keywatcher-length",
 			"expected_count": 3
 		},
 		{
-			"contains": "sticky-actions",
-			"expected_count": 2
+			"contains": "gesture-keywatcher-owner",
+			"expected_count": 6
 		},
 		{
-			"contains": "gesture-keywatcher-length",
-			"expected_count": 2
+			"contains": "gesture-keywatcher-stop-debt",
+			"expected_count": 3
 		},
 		{
-			"contains": "layer-editor-ready-delivery-owner",
-			"expected_count": 5
-		},
-		{
-			"contains": "layer editor host:",
-			"expected_count": 10
+			"contains": "gesture-click-pause-admission",
+			"expected_count": 4
 		},
 		{
 			"contains": "layer-editor-save-admission",
 			"expected_count": 3
 		},
 		{
-			"contains": "wrap symbols TOML inline comments:",
-			"expected_count": 7
-		},
-		{
-			"contains": "wrap symbols canonical owned source:",
-			"expected_count": 12
-		},
-		{
-			"contains": "wrap-symbols-global-transaction-20260813",
-			"expected_count": 10
-		},
-		{
-			"contains": "wrap-symbols-unreadable-blocks-save",
-			"expected_count": 4
-		},
-		{
-			"contains": "wrap-symbols: a pending custom pair survives a following [[disabled]] block",
-			"expected_count": 1
-		},
-		{
-			"contains": "wrap-guillemets-length",
-			"expected_count": 1
+			"contains": "layer-editor-ready-delivery-owner",
+			"expected_count": 5
 		},
 		{
 			"contains": "personal-native-sort-owner",
@@ -69,6 +45,46 @@
 		},
 		{
 			"contains": "personal-native-default-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "personal-native-switch-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "personal-native-constructor-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "usage-integer-domain",
+			"expected_count": 6
+		},
+		{
+			"contains": "terminator-move key allocation:",
+			"expected_count": 4
+		},
+		{
+			"contains": "hotstring exact terminator identity:",
+			"expected_count": 16
+		},
+		{
+			"contains": "terminator-move exact magic membership:",
+			"expected_count": 2
+		},
+		{
+			"contains": "terminator-move exact consumption:",
+			"expected_count": 4
+		},
+		{
+			"contains": "crash-native-path-receipt",
+			"expected_count": 3
+		},
+		{
+			"contains": "app-picker-native-refusal-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "sticky-native-modifier-flags",
 			"expected_count": 2
 		}
 	]
