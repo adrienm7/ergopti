@@ -466,6 +466,15 @@ helpers.describe("word reset events: erasing what was typed (bs-word-start)", fu
 			"Ctrl+L outside a browser promises no empty field")
 	end)
 
+	helpers.it("does not treat shifted shortcuts as select-all at a field boundary (shifted-select-shortcut)", function()
+		local events = seq(chord({ K.lctrl, K.lshift }, K.a), tap(K.backspace), tap(K.r))
+		helpers.assert_eq(type_through_hook(events, on, nil, "org.gnome.TextEditor"), "r",
+			"Ctrl+Shift+A does not prove the field is selected or empty")
+		local browser = seq(chord({ K.lctrl, K.lshift }, K.l), tap(K.backspace), tap(K.r))
+		helpers.assert_eq(type_through_hook(browser, on, nil, "firefox"), "r",
+			"Ctrl+Shift+L does not prove the address bar is selected")
+	end)
+
 	helpers.it("bs-word-start: names terminals and the delete-word chord", function()
 		local WordReset = require("modules.hotstrings.word_reset")
 		for _, id in ipairs({ "org.gnome.Terminal", "org.gnome.Console", "kitty", "Alacritty", "foot",

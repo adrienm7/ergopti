@@ -474,6 +474,7 @@ local function selects_whole_field(detail, app_id)
 	if type(detail) ~= "table" or type(detail.key) ~= "string" or not M.deletes_previous_word(detail) then
 		return false
 	end
+	if detail.mods.shift == true then return false end
 	local key = detail.key:lower()
 	if key == "a" then return not M.is_terminal_app(app_id) end
 	return key == "l" and BROWSER_APPS[app_key(app_id)] == true
