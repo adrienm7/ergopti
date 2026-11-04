@@ -151,7 +151,7 @@ function M.on_message(payload, state, context)
 			local ok_save, committed, next_receipt = pcall(dynamic.save_info, payload.values, receipt, current)
 			saved = ok_save and committed == true
 			if saved and owner and current() then owner.receipt = type(next_receipt) == "table" and next_receipt or nil end
-			if not ok_save then Logger.error(LOG, "Personal-info persistence raised: %s.", tostring(committed)) end
+			if not ok_save then Logger.error(LOG, "Personal-info persistence raised; details withheld.") end
 		end
 		if not saved then
 			Logger.error(LOG, "Personal information was not committed; editor remains open.")
