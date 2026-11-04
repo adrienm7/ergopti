@@ -427,6 +427,22 @@ _CrashReport_ParseName(Name) {
 	return Integer(Match[2]) >= 2 ? Map("stem", Match[1], "attempt", Integer(Match[2])) : 0
 }
 
+; Each Win32_Processor instance describes one socket, not the whole machine.
+_CrashReport_ProcessorInfo(Processors) {
+	Name := "", Total := 0
+	for Processor in Processors {
+		Cores := Processor.NumberOfLogicalProcessors
+		if !(Cores is Integer) || Cores < 1
+			throw ValueError("A processor instance has no logical processor count.")
+		if Total == 0
+			Name := Trim(Processor.Name)
+		Total += Cores
+	}
+	if Total == 0
+		throw ValueError("No processor instance was returned.")
+	return Map("name", Name, "cores", Total)
+}
+
 ; Returns a Map with full OS, CPU, RAM, screen, AHK, and git fields.
 ; @param Hardware {Map} The diagnostics snapshot's hardware section: its
 ;   processor is reused, and WMI is asked only when it has none.
@@ -448,11 +464,9 @@ _CrashReport_SysInfo(Hardware := 0) {
 		try {
 			WMI  := ComObject("WbemScripting.SWbemLocator").ConnectServer()
 			Qry  := WMI.ExecQuery("SELECT Name, NumberOfLogicalProcessors FROM Win32_Processor")
-			Enum := Qry._NewEnum()
-			if Enum.Next(&Item) {
-				CpuName  := Trim(Item.Name)
-				CpuCores := Item.NumberOfLogicalProcessors
-			}
+			Cpu := _CrashReport_ProcessorInfo(Qry)
+			CpuName := Cpu["name"]
+			CpuCores := Cpu["cores"]
 		}
 	}
 	Info["cpu_name"]  := CpuName
