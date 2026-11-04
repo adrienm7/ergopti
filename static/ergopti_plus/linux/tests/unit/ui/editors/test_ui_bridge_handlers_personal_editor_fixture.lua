@@ -147,6 +147,23 @@ helpers.describe("personal editor opening-source admission", function()
 		end)
 	end
 
+	for _, mode in ipairs({ "missing", "invalid" }) do
+		helpers.it("(personal-save-description) refuses " .. mode .. " section description", function()
+			with_opening_file(function(f)
+				local original = '[_meta]\nsections_order = ["english"]\n[_meta.sections]\nenglish = "Existing description"\n[english]\n"old" = { output = "original" }\n'
+				f.put(original)
+				helpers.assert_true(f.ready())
+				local data = opening_model("edited")
+				if mode == "missing" then data.sections.english.description = nil
+				else data.sections.english.description = {} end
+				local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), original)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
 	helpers.it("refuses a foreign section added after the actual displayed model", function()
 		with_opening_file(function(f)
 			helpers.assert_eq(f.ready(), true)
