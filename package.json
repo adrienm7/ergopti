@@ -137,6 +137,7 @@
 		"test:log-vocabulary-scan": "node ./tools/test/test-log-vocabulary-scan.cjs",
 		"audit:log-vocabulary": "node ./tools/audit/census-log-vocabulary.cjs",
 		"test:log-file-names-single-source": "node ./tools/test/test-log-file-names-single-source.cjs",
+		"test:legacy-folder-names": "node ./tools/test/test-legacy-folder-names.cjs",
 		"test:locale-names": "node ./tools/test/test-locale-names-single-source.cjs",
 		"test:new-driver": "node ./tools/test/test-new-driver-scaffold.cjs",
 		"test:tree-parity": "node ./tools/test/test-driver-tree-parity.cjs",

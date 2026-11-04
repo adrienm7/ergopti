@@ -409,6 +409,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-write-catalogue.cjs"],
 			"repro": "npm run test:keystats-write-catalogue"
+		},
+		{
+			"id": "legacy-folder-names",
+			"ordinal": 572,
+			"name": "legacy folder names (only the one-time migration spells a data folder of the builds before the single folder name)",
+			"cmd": "node",
+			"args": ["tools/test/test-legacy-folder-names.cjs"],
+			"repro": "npm run test:legacy-folder-names"
 		}
 	]
 }
