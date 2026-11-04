@@ -394,11 +394,41 @@ helpers.describe("Linux system actions", function()
 		end
 		local ok, err = pcall(function()
 			helpers.assert_eq(backgrounded(Gestures, "pick_color", answer),
-				"{ xcolor --selection clipboard || gpick --single --output --no-newline | xclip -selection clipboard; }")
+				'{ xcolor --selection clipboard || { colour=$(gpick --single --output --no-newline) && [ -n "$colour" ] && printf "%s" "$colour" | xclip -selection clipboard; }; }')
 			wayland = "wayland-0"
 			helpers.assert_eq(backgrounded(Gestures, "pick_color", answer), "{ hyprpicker --autocopy --format=hex; }")
 		end)
 		os.getenv = real_getenv
+		if not ok then error(err, 0) end
+	end)
+
+	for _, gpick in ipairs({ "exit 1", "exit 0" }) do
+		helpers.it("keeps the clipboard when the X11 colour picker produces no colour (" .. gpick .. ")", function()
+			local old_getenv = os.getenv
+			os.getenv = function(name) if name == "WAYLAND_DISPLAY" then return "" end; return old_getenv(name) end
+			local ok, err = pcall(function()
+				local command = backgrounded(Gestures, "pick_color", function() return true end)
+				local log, dir = run_with_stubs(command, { xcolor = "exit 1", gpick = gpick,
+					xclip = 'cat > "$STUBS/clipboard"' })
+				helpers.assert_nil(io.open(dir .. "/clipboard", "rb"), "no colour must preserve clipboard: " .. log)
+			end)
+			os.getenv = old_getenv
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("copies a colour produced by the X11 fallback picker", function()
+		local old_getenv = os.getenv
+		os.getenv = function(name) if name == "WAYLAND_DISPLAY" then return "" end; return old_getenv(name) end
+		local ok, err = pcall(function()
+			local command = backgrounded(Gestures, "pick_color", function() return true end)
+			local _, dir = run_with_stubs(command, { xcolor = "exit 1", gpick = 'printf "#aabbcc"',
+				xclip = 'cat > "$STUBS/clipboard"' })
+			local file = assert(io.open(dir .. "/clipboard", "rb"))
+			helpers.assert_eq(file:read("*a"), "#aabbcc")
+			file:close()
+		end)
+		os.getenv = old_getenv
 		if not ok then error(err, 0) end
 	end)
 

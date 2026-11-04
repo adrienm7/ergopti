@@ -196,7 +196,7 @@ M.COLOR_PICKERS = {
 	},
 	x11 = {
 		{ binary = "xcolor", command = "xcolor --selection clipboard" },
-		{ binary = "gpick", command = "gpick --single --output --no-newline | xclip -selection clipboard" },
+		{ binary = "gpick", command = '{ colour=$(gpick --single --output --no-newline) && [ -n "$colour" ] && printf "%s" "$colour" | xclip -selection clipboard; }' },
 	},
 }
 
