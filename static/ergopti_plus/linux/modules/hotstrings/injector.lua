@@ -821,15 +821,19 @@ function M.close_fast_channel()
 	local clipboard_closed = retire_clipboard()
 	if not _uinput then return clipboard_closed end
 	local Broker = require("adapters.modifier_broker")
-	if Broker.for_channel(_uinput) then
-		local acknowledged = _uinput.close() == true
-		if not acknowledged and (not _uinput.is_open()) and not _uinput.has_output_debt() then acknowledged = true end
+	local channel, broker = _uinput, Broker.for_channel(_uinput)
+	if broker then
+		local acknowledged = channel.close() == true
+		if not acknowledged and (not channel.is_open()) and not channel.has_output_debt() then acknowledged = true end
 		if not acknowledged then
 			Logger.error(LOG, "Output channel retirement remains unacknowledged.")
 			return false
 		end
-		Broker.detach(_uinput)
-	else _uinput.close() end
+		if _uinput ~= channel or Broker.for_channel(channel) ~= broker then return false end
+		Broker.detach(channel)
+	else
+		if channel.close() ~= true or _uinput ~= channel then return false end
+	end
 	_uinput = nil
 	Logger.done(LOG, "Non-forking uinput channel closed.")
 	return clipboard_closed
