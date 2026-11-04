@@ -48,13 +48,17 @@ return function(callback)
 					if state.new_failure == "nil" then return nil end
 					if state.new_failure == "throw" then error("PRIVATE_DETAIL") end
 					local item = { deleted = false, titles = 0 }
-					item.delete = function(self) self.deleted = true end
+					item.delete = function(self)
+						if state.delete_failure then error("delete refused") end
+						self.deleted = true
+					end
 					item.setTitle = function(self)
 						helpers.assert_eq(self.deleted, false, "retired native item must not receive titles")
 						self.titles = self.titles + 1
 						return self
 					end
 					state.items[#state.items + 1] = item
+					if state.on_new then state.on_new() end
 					return item
 				end },
 			})

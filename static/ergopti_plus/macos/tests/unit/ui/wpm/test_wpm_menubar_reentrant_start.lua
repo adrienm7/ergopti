@@ -10,6 +10,37 @@ local helpers = require("tests.helpers")
 local with_menubar = require("tests.support.wpm_menubar_fixture")
 
 helpers.describe("WPM menubar reentrant startup", function()
+	helpers.it("retires a constructor that returns after stop and successor start", function()
+		with_menubar(function(module, state)
+			state.on_new = function()
+				state.on_new = nil
+				helpers.assert_true(module.stop())
+				helpers.assert_true(module.start())
+			end
+			helpers.assert_eq(module.start(), false)
+			helpers.assert_true(state.items[1].deleted, "retired constructor's item is released")
+			helpers.assert_eq(state.items[2].deleted, false, "successor remains owned")
+			helpers.assert_true(module.stop())
+			helpers.assert_true(state.items[2].deleted, "successor can be stopped")
+		end)
+	end)
+	helpers.it("retains a refused retired constructor cleanup for retry", function()
+		with_menubar(function(module, state)
+			state.on_new = function()
+				state.on_new = nil
+				helpers.assert_true(module.stop())
+				state.delete_failure = true
+			end
+			helpers.assert_eq(module.start(), false)
+			helpers.assert_eq(state.items[1].deleted, false)
+			helpers.assert_eq(module.start(), false, "cleanup refusal blocks a new item")
+			helpers.assert_eq(#state.items, 1)
+			state.delete_failure = false
+			helpers.assert_true(module.start())
+			helpers.assert_true(state.items[1].deleted)
+			helpers.assert_true(module.stop())
+		end)
+	end)
 	helpers.it("(wpm-menubar-reentry) failed pause resume retains inventory intent until retry commits", function()
 		with_menubar(function(module, state)
 			state.new_failure = "nil"
