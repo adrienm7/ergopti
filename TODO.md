@@ -565,8 +565,11 @@ Each closes on a named green hosted or native run, recorded here.
 - [ ] **Carbon and daemon-report Swift.** Carbon fixture compilation and both-architecture receipts; daemon-report
       allocation failures on Intel and Apple silicon.
 - [ ] **First `main` push after 1.0.9.** CodeQL scans `main` only: the 32 alerts fixed on dev on 4 November
-      (a3d69950e5..89b0b774c8) close only once that scan accepts the fixes. The Deploy site workflow runs from
-      `main`'s definition, so the superseded-push skip (bc14746520) works only from then on; check that one run.
+      (a3d69950e5..89b0b774c8) close only once that scan accepts the fixes.
+- [ ] **Deploy site after a superseded push.** A `main` push that a newer one passes before its site deploys fails
+      red ("target branch no longer names the admitted source"). The quiet skip (bc14746520) was reverted: the closed
+      publication chain of `test-ci-pipeline-wiring` forbids conditional jobs and steps. Decide whether that contract
+      may allow one admitted skip output, or keep the refusal visible.
 - [ ] **CodeQL Go.** After the `native_http` Go module is published, re-enable Go and check a non-empty analysis.
 - [ ] **Native Windows TLS fixture.** `X509Store.Add` on the CurrentUser root store blocks on the Windows security
       warning (`docs/memory/windows-ahk.md`), so these cases need a click; hosted lanes pass in LocalMachine scope.
