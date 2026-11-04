@@ -241,8 +241,12 @@ local function open_window()
 		Logger.error(LOG, "The open error window could not be replaced.")
 		return false
 	end
+	-- The close hook normally clears the old request, but can admit a new one.
+	if _pending ~= nil and _pending ~= record then return false end
 	_busy, _pending = true, record
 	local opened = manager.show(APP, require("infra.i18n").get_locale())
+	-- Native callbacks may close this request and open a successor before show returns.
+	if _pending ~= record then return false end
 	if not opened then
 		-- Without a window (no WebKitGTK, no display) the error is announced and
 		-- stays in the errors file
@@ -267,7 +271,7 @@ local function schedule(record)
 		_scheduled = nil
 		local ok, opened = xpcall(open_window, debug.traceback)
 		if not ok then Logger.error(LOG, "The error window could not open: %s", tostring(opened)) end
-		if not ok or not opened then settle() end
+		if (not ok or not opened) and _pending == record then settle() end
 	end, _policy.present_delay_ms)
 	if not queued then
 		settle()

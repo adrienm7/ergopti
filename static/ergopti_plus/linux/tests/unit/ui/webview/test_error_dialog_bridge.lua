@@ -48,11 +48,17 @@ local function load_bridge(controls)
 			show = function(app)
 				context.shown = context.shown + 1
 				context.shown_app = app
+				if context.on_show then return context.on_show() end
 				if controls.show == false then return false end
 				context.epoch = (context.epoch or 0) + 1
 				return true
 			end,
-			hide = function() context.hidden = context.hidden + 1; context.epoch = nil; return true end,
+			hide = function()
+				context.hidden = context.hidden + 1
+				context.epoch = nil
+				if context.on_hide then context.on_hide() end
+				return true
+			end,
 			eval_js = function(_, js) context.pushed[#context.pushed + 1] = js; return true end,
 			get_daemon_state = function() return {} end,
 		},
@@ -234,6 +240,46 @@ helpers.describe("error window bridge (linux): policy and deferral (error-dialog
 			helpers.assert_nil(bridge.on_message("ready", {}, owner))
 			local answer = bridge.on_message({ action = "copy" }, {}, page(context))
 			helpers.assert_true(answer and answer.ok)
+		end)
+	end)
+
+	helpers.it("(error-dialog-open-owner) failed old opening preserves a reentrant replacement", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			context.on_show = function()
+				context.on_show = nil
+				context.epoch = 1
+				bridge.on_window_closed(context.epoch)
+				context.epoch = nil
+				bridge.on_error("second", "second failure", "second failure")
+				run_deferred(context)
+				helpers.assert_eq(bridge.on_message("ready", {}, page(context)).module, "second")
+				return false
+			end
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			helpers.assert_eq(#context.notified, 0)
+			local answer = bridge.on_message({ action = "copy" }, {}, page(context))
+			helpers.assert_true(answer and answer.ok)
+		end)
+	end)
+
+	helpers.it("(error-dialog-open-owner) retiring an old window preserves a reentrant replacement", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			context.epoch = 1
+			context.on_hide = function()
+				context.on_hide = nil
+				bridge.on_window_closed(1)
+				bridge.on_error("second", "second failure", "second failure")
+				run_deferred(context)
+				helpers.assert_eq(bridge.on_message("ready", {}, page(context)).module, "second")
+			end
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			local answer = bridge.on_message({ action = "copy" }, {}, page(context))
+			helpers.assert_true(answer and answer.ok)
+			helpers.assert_eq(context.shown, 1)
 		end)
 	end)
 
