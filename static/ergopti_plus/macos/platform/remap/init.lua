@@ -5235,6 +5235,31 @@ function M.update_virtual_hid_driver(on_done)
 	return true
 end
 
+--- The owner's reasons a first install resolves: no runtime files, a job
+--- missing, or no VirtualHIDDevice driver at all.
+M.OWNED_INSTALL_REASONS = {
+	runtime_not_installed = true,
+	runtime_job_not_loaded = true,
+	virtual_hid_absent = true,
+}
+
+--- Installs Ergopti's own Karabiner runtime after the user confirmed it. The
+--- caller reloads after telling the user, so the next owner admits it or names
+--- the System Settings approval macOS may still wait for
+--- (ui/owned_runtime_install.lua).
+--- @param on_done function fn(ok, reason|nil, detail|nil) called once.
+--- @return boolean started False when the owned runtime is not blocked by a missing install.
+function M.install_owned_runtime(on_done)
+	assert(type(on_done) == "function", "install_owned_runtime(): a completion callback is required")
+	local status = M.owned_runtime_status()
+	if not M._owned.selected() or type(status) ~= "table" or not M.OWNED_INSTALL_REASONS[status.reason] then
+		Logger.error(LOG, "Owned runtime install refused: the runtime is not blocked by a missing install.")
+		return false
+	end
+	require("adapters.runtime_owner_ports").install_runtime(on_done)
+	return true
+end
+
 --- Whether Ergopti closed the user's own Karabiner-Elements and has not given
 --- it back yet, for the menu row that says so.
 --- @return boolean closed

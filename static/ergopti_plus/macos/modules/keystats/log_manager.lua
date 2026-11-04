@@ -571,7 +571,8 @@ end
 local function _detach_buffer_snapshot()
 	if #_state.buffer_events == 0
 		and _state.session_mouse_clicks == 0
-		and _state.session_mouse_scrolls == 0 then
+		and _state.session_mouse_scrolls == 0
+		and (_state.mouse_distance_px or 0) == 0 then
 		return nil
 	end
 

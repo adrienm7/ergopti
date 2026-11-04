@@ -1163,9 +1163,9 @@ local function owned_runtime_block_rows(karabiner)
 	if not ok or type(status) ~= "table" or (status.state ~= "unavailable" and status.state ~= "failed") then
 		return {}
 	end
-	local rows = BLOCK_ROWS[status.reason]
-	if not rows then return {} end
-	rows = rows() or {}
+	local rows_fn = BLOCK_ROWS[status.reason]
+	if not rows_fn then return {} end
+	local rows = rows_fn() or {}
 	if status.reason == require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE
 		and type(karabiner.update_virtual_hid_driver) == "function" then
 		-- ADR 011's driver-only update: the row opens a confirmation, never the update itself.
@@ -1177,6 +1177,22 @@ local function owned_runtime_block_rows(karabiner)
 				end, debug.traceback)
 				if not shown_ok then
 					Logger.error(LOG, "The VirtualHIDDevice driver update could not be shown: %s.", tostring(shown))
+					return false
+				end
+				return shown == true
+			end,
+		}) or {}) do rows[#rows + 1] = row end
+	end
+	if rows_fn == NOT_INSTALLED and type(karabiner.install_owned_runtime) == "function" then
+		-- WP8's first install: the row opens a confirmation, never the install itself.
+		for _, row in ipairs(ManifestMenu.template_rows("tap_hold_owned_install_rows", {
+			[ConfigKeys.COMMAND.TAP_HOLD_OWNED_INSTALL] = function()
+				Logger.info(LOG, "Showing the owned runtime install from the Tap-Holds menu.")
+				local shown_ok, shown = xpcall(function()
+					return require("ui.owned_runtime_install").open(karabiner)
+				end, debug.traceback)
+				if not shown_ok then
+					Logger.error(LOG, "The owned runtime install could not be shown: %s.", tostring(shown))
 					return false
 				end
 				return shown == true

@@ -121,7 +121,7 @@ final class OwnedRuntimeServiceLifecycleLock {
 	/// Native lock currentness alone is not transaction completion or runtime readiness.
 	func permitsInstalledImages() -> Bool {
 		lock.lock(); defer { lock.unlock() }
-		do { try verify(); return journalAbsent(".runtime-install-journal") && journalAbsent(".runtime-service-journal") && journalAbsent(".runtime-bootstrap-journal") && journalAbsent(".runtime-maintenance-journal") } catch { return false }
+		do { try verify(); return journalAbsent(".runtime-install-journal") && journalAbsent(".runtime-service-journal") && journalAbsent(".runtime-vhid-service-journal") && journalAbsent(".runtime-bootstrap-journal") && journalAbsent(".runtime-maintenance-journal") } catch { return false }
 	}
 	/// A real root recovery owner can observe service debt; unfinished image installation still refuses it.
 	func permitsServiceProvision() -> Bool {

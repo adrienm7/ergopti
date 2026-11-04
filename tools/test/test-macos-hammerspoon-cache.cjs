@@ -88,23 +88,24 @@ if (process.platform === 'win32') {
 	console.log('SKIP behavioural replay: the macOS build script is not run on Windows.');
 } else {
 	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-hs-cache-'));
-	const nodeBin = JSON.stringify(process.execPath);
 	/** Runs clean_build_dir then download_hammerspoon with the given served bytes. */
 	const build = (served, digest = OFFICIAL_SHA) => {
 		const body = path.join(scratch, 'served.zip');
 		fs.writeFileSync(body, served);
+		// Paths reach the script as environment values, never as script text, so
+		// no character of a temporary or Node path is parsed by the shell.
 		const result = spawnSync(
 			bashExecutable(),
 			[
 				'-c',
 				`set -euo pipefail
-REPO_ROOT=${JSON.stringify(scratch)}
+REPO_ROOT="$HS_TEST_SCRATCH"
 LOG="$REPO_ROOT/calls.log"
 log() { printf '%s\\n' "$*" >&2; }
 fail() { printf 'ERROR: %s\\n' "$*" >&2; exit 1; }
-curl() { local out=""; while [ "$#" -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done; echo curl >> "$LOG"; cp ${JSON.stringify(body)} "$out"; }
+curl() { local out=""; while [ "$#" -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done; echo curl >> "$LOG"; cp "$HS_TEST_SERVED" "$out"; }
 unzip() { mkdir -p "$4/Hammerspoon.app"; }
-shasum() { ${nodeBin} -e 'const c=require("node:crypto"),f=require("node:fs");process.stdout.write(c.createHash("sha256").update(f.readFileSync(process.argv[1])).digest("hex")+"  "+process.argv[1]+"\\n")' "$3"; }
+shasum() { "$HS_TEST_NODE" -e 'const c=require("node:crypto"),f=require("node:fs");process.stdout.write(c.createHash("sha256").update(f.readFileSync(process.argv[1])).digest("hex")+"  "+process.argv[1]+"\\n")' "$3"; }
 ERGOPTI_HOST_GITHUB=github.com HAMMERSPOON_VERSION=1.1.1 HAMMERSPOON_SHA256=${digest}
 BUILD_DIR="$REPO_ROOT/build/macos"
 HAMMERSPOON_CACHE_DIR="$REPO_ROOT/build/cache/hammerspoon"
@@ -115,7 +116,16 @@ ${shellFunction('download_hammerspoon')}
 clean_build_dir
 download_hammerspoon`
 			],
-			{ encoding: 'utf8', timeout: 30000 }
+			{
+				env: {
+					...process.env,
+					HS_TEST_SCRATCH: scratch,
+					HS_TEST_SERVED: body,
+					HS_TEST_NODE: process.execPath
+				},
+				encoding: 'utf8',
+				timeout: 30000
+			}
 		);
 		const log = path.join(scratch, 'calls.log');
 		const downloads = fs.existsSync(log)

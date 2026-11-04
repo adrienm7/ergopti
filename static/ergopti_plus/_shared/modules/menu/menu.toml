@@ -1521,6 +1521,15 @@ i18n = "menu.tapholds.owned_not_installed"
 platforms = ["hs"]
 unavailable = "hide"
 
+# The first install the « not installed » block offers: it opens a
+# confirmation, then the administrator prompt (ADR 011, WP8).
+[[menu.tap_hold_owned_install_rows]]
+type = "command"
+id = "tap_hold_owned_install"
+i18n = "menu.tapholds.owned_install"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.tap_hold_owned_other_running_rows]]
 type = "label"
 id = "tap_hold_owned_other_running"

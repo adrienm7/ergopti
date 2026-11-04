@@ -406,7 +406,7 @@ helpers.describe("log_manager — flush_buffer WPM formula", function()
 			for k, v in pairs(extra_state) do state[k] = v end
 		end
 		lm.init(state)
-		return lm
+		return lm, state
 	end
 
 	helpers.it("empty buffer produces no appended entry", function()
@@ -414,6 +414,20 @@ helpers.describe("log_manager — flush_buffer WPM formula", function()
 		lm.flush_buffer()
 		lm.ingest_once()
 		helpers.assert_eq(#_appended_entries, 0)
+	end)
+
+	helpers.it("flushes mouse travel alone under the originating application", function()
+		local lm, state = make_lm_with_buffer({}, {mouse_distance_px = 450, buffer_text = ""})
+		helpers.assert_eq(lm.flush_buffer(), true)
+		helpers.assert_eq(state.mouse_distance_px, 0, "the detached travel cannot leak into the next application")
+		state.session_app_name = "NextApp"
+		lm.ingest_once()
+		helpers.assert_eq(#_appended_entries, 1)
+		helpers.assert_eq(_appended_entries[1].app, "TestApp")
+		helpers.assert_eq(_appended_entries[1].mouse_distance_px, 450)
+		lm.flush_buffer()
+		lm.ingest_once()
+		helpers.assert_eq(#_appended_entries, 1, "the same distance is not published twice")
 	end)
 
 	helpers.it("non-empty buffer produces exactly one typing entry", function()

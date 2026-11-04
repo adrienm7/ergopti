@@ -26,6 +26,7 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const Requirements = require('../lib/feature-requirements.cjs');
+const { escapeRegExp } = require('../lib/text-escape.cjs');
 
 let failures = 0;
 
@@ -124,9 +125,7 @@ check('a feature that reaches a requirement without declaring it fails', () => {
 		feature.requires[os] = feature.requires[os].filter((x) => x !== id);
 		expectError(
 			mutated,
-			new RegExp(
-				`^${feature.path.replace(/\./g, '\\.')}: reaches ${id} on ${os} without declaring it`
-			)
+			new RegExp(`^${escapeRegExp(feature.path)}: reaches ${id} on ${os} without declaring it`)
 		);
 	}
 });

@@ -1292,6 +1292,16 @@ if OwnedVirtualHIDDaemonReportMainOperation.handles(arguments: CommandLine.argum
 	while reportResult.wait(timeout: .now() + 0.02) == .timedOut { RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02)) }
 }
 
+// The user's confirmed first install of the owned runtime (Tap-Holds row), behind the administrator prompt.
+if OwnedRuntimeInstallMainOperation.handles(arguments: CommandLine.arguments) {
+	let installResult = DispatchSemaphore(value: 0)
+	DispatchQueue.global(qos: .userInitiated).async {
+		// Darwin.exit never returns: the main thread pumps the run loop until it ends the process.
+		Darwin.exit(OwnedRuntimeInstallMainOperation.run(arguments: CommandLine.arguments))
+	}
+	while installResult.wait(timeout: .now() + 0.02) == .timedOut { RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02)) }
+}
+
 
 if OwnedSuspendedImageGuardian.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(OwnedSuspendedImageGuardian.run(arguments: CommandLine.arguments))

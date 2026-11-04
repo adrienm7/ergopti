@@ -98,12 +98,12 @@ class NativeHTTPError(Exception):
 
 
 def _positive_timeout(value):
-    return (
-        not isinstance(value, bool)
-        and isinstance(value, (int, float))
-        and math.isfinite(value)
-        and value > 0
-    )
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def _dev_source_names(root):

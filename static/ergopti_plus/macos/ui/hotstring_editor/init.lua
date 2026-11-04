@@ -496,10 +496,15 @@ local function handle_message(msg, owner)
 	end
 
 	if action == "save_pref" then
-		if type(data) == "table" and type(data.key) == "string" then
-			if data.key == "compact_view"    then _prefs.compact_view    = (data.value == true) end
-			if data.key == "auto_close"      then _prefs.auto_close      = (data.value == true) end
-			if data.key == "default_section" then _prefs.default_section = data.value end
+		if type(data) ~= "table" then return false end
+		local key, value = data.key, data.value
+		if (key == "compact_view" or key == "auto_close") and type(value) == "boolean" then
+			_prefs[key] = value
+		elseif key == "default_section" and (value == nil or type(value) == "string") then
+			_prefs.default_section = value
+		else
+			Logger.warn(LOG, "Hotstring editor preference message was malformed; no change applied.")
+			return false
 		end
 		invoke_controller("Hotstring preference update", _update_pref, data)
 		return

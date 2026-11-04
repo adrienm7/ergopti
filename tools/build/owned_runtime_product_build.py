@@ -85,6 +85,8 @@ REPORT_SWIFT_SOURCES = tuple(
 # replaces the files-only entry. Its owners import the same CPOSIXCompatibility
 # module and objects as the report roster, so only the live (report) profile
 # enrolls them; ERGOPTI_OWNED_IDLE_CORE selects the entry in InstallerMain.
+# The same entry then loads the VirtualHIDDevice daemon job, installing the
+# staged pqrs package first when no driver is installed (WP8).
 IDLE_CORE_SWIFT_SOURCES = tuple(
     SWIFT + "OwnedRuntime" + name + ".swift"
     for name in (
@@ -94,6 +96,7 @@ IDLE_CORE_SWIFT_SOURCES = tuple(
         "CoreLaunchctl",
         "CorePlistCustody",
         "CoreExitObservation",
+        "VirtualHIDProvisionOwner",
     )
 )
 REPORT_C_SOURCES = (

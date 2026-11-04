@@ -7587,7 +7587,10 @@ console.log(
 	}
 	assert(operatorScopes(nativeRenderer), 'one active declared program owns each complete operator');
 	for (const [step, body] of Object.entries(ownedOperators)) {
-		const changed = nativeRenderer.replace(body, body.replace('\n', '\n\t\t\tif false\n'));
+		const firstLineEnd = body.indexOf('\n') + 1;
+		assert(firstLineEnd > 0, `${step}: the operator body has a first line`);
+		const guarded = `${body.slice(0, firstLineEnd)}\t\t\tif false\n${body.slice(firstLineEnd)}`;
+		const changed = nativeRenderer.replace(body, () => guarded);
 		assert.notEqual(changed, nativeRenderer);
 		assert.equal(
 			operatorScopes(changed),

@@ -53,6 +53,7 @@ const fs = require('fs');
 const path = require('path');
 const toml = require('smol-toml');
 const KeyNames = require('../lib/key-names.cjs');
+const { escapeTableCell: cell } = require('../lib/text-escape.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -665,15 +666,6 @@ const REFRESH = 'npm run codegen:action-catalogue';
 function localeText(locale, key) {
 	const value = locale[key];
 	return typeof value === 'string' ? value : undefined;
-}
-
-/**
- * Escapes one Markdown table cell.
- * @param {string} text Cell text.
- * @returns {string}
- */
-function cell(text) {
-	return String(text).replace(/\|/g, '\\|').replace(/\n/g, ' ');
 }
 
 /**

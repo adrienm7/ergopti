@@ -32,6 +32,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { escapeRegExp } = require('../lib/text-escape.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/collect-linux-field-report.sh';
@@ -343,10 +344,7 @@ function read(folder, name) {
 				])
 					assert.match(steps, new RegExp(`^${name}\\s+exit=\\d+$`, 'm'));
 				const dayLog = `${LOG_FILES.main}${today()}${LOG_FILES.extension}`;
-				assert.match(
-					steps,
-					new RegExp(`^${dayLog.replace(/\./g, '\\.')}\\s+copied \\(scrubbed\\)$`, 'm')
-				);
+				assert.match(steps, new RegExp(`^${escapeRegExp(dayLog)}\\s+copied \\(scrubbed\\)$`, 'm'));
 				assert.match(steps, /^hotstring_collisions\s+exit=0$/m);
 				assert.doesNotMatch(
 					read(folder, dayLog),

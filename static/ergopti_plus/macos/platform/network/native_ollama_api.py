@@ -112,19 +112,10 @@ class NativeOllamaResponse(ENGINE.NativeHTTPResponse):
         if (
             type(port) is not int
             or not 1024 <= port <= 65535
-            or (
-                timeout is not None
-                and (
-                    isinstance(timeout, bool)
-                    or not isinstance(timeout, (int, float))
-                    or not math.isfinite(timeout)
-                    or timeout <= 0
-                )
-            )
-            or isinstance(idle_timeout, bool)
-            or not isinstance(idle_timeout, (int, float))
-            or not math.isfinite(idle_timeout)
-            or idle_timeout <= 0
+            or (timeout is not None and not ENGINE._positive_timeout(timeout))
+            or not ENGINE._positive_timeout(idle_timeout)
+            or (timeout is not None and timeout > ((1 << 31) - 1) / 1000)
+            or idle_timeout > ((1 << 31) - 1) / 1000
         ):
             raise ENGINE.NativeHTTPError("protocol")
         self._listener_expected = expected

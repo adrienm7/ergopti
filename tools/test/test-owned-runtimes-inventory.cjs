@@ -163,6 +163,14 @@ check('the Windows extractor finds what starts and ignores names that only compa
 	]);
 });
 
+check('a long name-table row is read in linear time', () => {
+	// One pattern for the whole row backtracked exponentially on this input.
+	const line = `"alpha"${'\t""'.repeat(24)} Run("calc.exe")`;
+	const started = Date.now();
+	assert.deepEqual([...Spawned.windowsPrograms(line)], ['calc']);
+	assert(Date.now() - started < 2000, 'the name-table reader must stay linear');
+});
+
 // A malformed registry or an undecided row fails here, before any check.
 const registry = Registry.load();
 

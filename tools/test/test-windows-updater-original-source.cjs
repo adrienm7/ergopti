@@ -177,8 +177,11 @@ function withArguments(args, body) {
 	}
 }
 function quietImport(directory) {
-	const program = `const cp=require('node:child_process'); for(const name of ['spawn','spawnSync','execFileSync']) cp[name]=()=>{throw new Error('Unexpected acquisition during import')}; require(${JSON.stringify(path.join(directory, collectorPath))}); require(${JSON.stringify(path.join(directory, modulePath))}); process.stdout.write('NO_MAIN_NO_RECEIPT_NO_NATIVE\\n');`;
-	const result = cp.spawnSync(process.execPath, ['-e', program], {
+	// The paths are arguments, not program text; the program takes them off
+	// process.argv before the imports, so the modules see the usual argv.
+	const program = `const [collectorFile, moduleFile] = process.argv.splice(1, 2); const cp=require('node:child_process'); for(const name of ['spawn','spawnSync','execFileSync']) cp[name]=()=>{throw new Error('Unexpected acquisition during import')}; require(collectorFile); require(moduleFile); process.stdout.write('NO_MAIN_NO_RECEIPT_NO_NATIVE\\n');`;
+	const files = [path.join(directory, collectorPath), path.join(directory, modulePath)];
+	const result = cp.spawnSync(process.execPath, ['-e', program, ...files], {
 		cwd: directory,
 		env,
 		encoding: 'utf8',

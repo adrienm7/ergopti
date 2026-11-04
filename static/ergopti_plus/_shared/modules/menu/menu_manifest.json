@@ -1689,6 +1689,17 @@
 			"unavailable": "hide"
 		}
 	],
+	"tap_hold_owned_install_rows": [
+		{
+			"type": "command",
+			"id": "tap_hold_owned_install",
+			"i18n": "menu.tapholds.owned_install",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"tap_hold_owned_other_running_rows": [
 		{
 			"type": "label",

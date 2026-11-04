@@ -62,9 +62,10 @@ _PrefixWatcherTomlPath(Category) {
 ; priority is retained as catalogue metadata; collision selection is engine-owned.
 ;
 ; Hoisted to a single constant because the extension-pack indexer below parses the
-; same file shape; two copies of a regex this size drift.
+; same file shape; two copies of a regex this size drift. The trigger key follows
+; _HOTSTRING_ENTRY_PATTERN (toml_loader.ahk): quoted or bare, group 1 either way.
 global HS_PREFIX_ENTRY_PATTERN :=
-	'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
+	'i)^(?|"([^"\\]*(?:\\.[^"\\]*)*)"|([A-Za-z0-9_\-]+))\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
 
 ; OnlySection / PathOverride index one section a layout extension binds from
 ; its own file (HotstringsBoundSections); without them, the category's file is
