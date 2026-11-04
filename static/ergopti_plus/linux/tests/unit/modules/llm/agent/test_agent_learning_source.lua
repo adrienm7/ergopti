@@ -45,6 +45,43 @@ local PREFIX = '{"version":1,"apps":{"Mail":{"used":'
 local SUFFIX = ',"thresholds":{"calendar":0.2}}}}'
 
 helpers.describe("agent learning source admission", function()
+	helpers.it("linux-agent-learning-timer: retains a timer when cancellation is refused", function()
+		with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
+			local timers, allow = {}, false
+			Learning._reset_for_test({ path = path, scheduler = {
+				after = function(_, callback)
+					local timer = { armed = true, callback = callback }; timers[#timers + 1] = timer; return timer
+				end,
+				cancel = function() return allow end,
+			} })
+			Learning.record(config, "Mine", "calendar", true)
+			helpers.assert_true(Learning.flush(), "an immediate save may proceed while the timer remains owned")
+			Learning.record(config, "Mine", "calendar", true)
+			helpers.assert_eq(#timers, 1, "a refused cancellation cannot be replaced")
+			timers[1].callback()
+			local saved = assert(Json.decode_lossless(assert(read(path))))
+			helpers.assert_not_nil(saved.apps.Mine, "the retained timer must save the latest map")
+			allow = true
+		end)
+	end)
+	helpers.it("linux-agent-learning-timer: stale callbacks cannot retire their successor", function()
+		with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
+			local timers = {}
+			Learning._reset_for_test({ path = path, scheduler = {
+				after = function(_, callback)
+					local timer = { armed = true, callback = callback }; timers[#timers + 1] = timer; return timer
+				end,
+				cancel = function() return true end,
+			} })
+			Learning.record(config, "Mine", "calendar", true)
+			Learning.record(config, "Mine", "calendar", true)
+			helpers.assert_eq(#timers, 2)
+			timers[1].callback()
+			helpers.assert_nil(Json.decode_lossless(assert(read(path))).apps.Mine, "a stale callback cannot publish")
+			timers[2].callback()
+			helpers.assert_not_nil(Json.decode_lossless(assert(read(path))).apps.Mine)
+		end)
+	end)
 	for _, candidate in ipairs({
 		{ name = "overflow number", source = PREFIX .. "1e999" .. SUFFIX },
 		{ name = "leading-zero number", source = PREFIX .. "01" .. SUFFIX },
