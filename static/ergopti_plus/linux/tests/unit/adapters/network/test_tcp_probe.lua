@@ -49,6 +49,26 @@ it("a listening loopback port is reachable and the child settles once its handle
 	helpers.assert_eq(child.is_settled(), true)
 end)
 
+it("tries the next resolved address when the first connection is refused", function()
+	local server, port = listener()
+	local backend = setmetatable({
+		getaddrinfo = function(host, service, hints, callback)
+			return luv.getaddrinfo(host, service, hints, function(err)
+				callback(err, { { addr = "127.0.0.2", port = port }, { addr = "127.0.0.1", port = port } })
+			end)
+		end,
+	}, { __index = luv })
+	local answers = {}
+	local child = assert(Probe.probe("localhost", port, 1000, function(reachable, reason)
+		answers[#answers + 1] = { reachable, reason }
+	end, backend))
+	run_until(function() return child.is_settled() end)
+	server:close()
+	run_until(function() return server:is_closing() end)
+	helpers.assert_eq(#answers, 1)
+	helpers.assert_eq(answers[1][1], true, "a later reachable address must keep the proxy usable")
+end)
+
 it("a closed loopback port answers unreachable with the connect reason", function()
 	local server, port = listener()
 	server:close()
