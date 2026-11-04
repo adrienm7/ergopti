@@ -142,22 +142,26 @@ M._list_proc = function()
 	end
 	return names
 end
+-- An incomplete read or close is not usable discovery evidence. Always release
+-- the acquired stream, including when a native read raises.
+local function read_bounded(file, limit)
+	if not file then return nil end
+	local read_ok, raw = pcall(file.read, file, limit)
+	local close_ok, closed = pcall(file.close, file)
+	if not read_ok or type(raw) ~= "string" or not close_ok or closed ~= true then return nil end
+	return raw
+end
+
 M._read_cmdline = function(pid)
 	-- A vanished pid or a hidden one (hidepid) cannot be opened: no row
 	local file = io.open(M._proc_root .. "/" .. tostring(pid) .. "/cmdline", "rb")
-	if not file then return nil end
-	local raw = file:read(MAX_CMDLINE_BYTES)
-	file:close()
-	return raw
+	return read_bounded(file, MAX_CMDLINE_BYTES)
 end
 M._now_ms = function() return Monotonic.now_ms() end
 M._defer = function(fn) return TimerScheduler.after(0, fn).fired ~= true end
 M._read_file = function(path)
 	local file = require("infra.regular_file_reader").open_source(path)
-	if not file then return nil end
-	local raw = file:read(MAX_SETTINGS_BYTES)
-	file:close()
-	return raw
+	return read_bounded(file, MAX_SETTINGS_BYTES)
 end
 -- The account home only: a server's settings file is never looked for in the
 -- temporary folder home() falls back to when HOME is unset.
