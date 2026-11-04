@@ -182,8 +182,13 @@ end
 --- Reads the text a finished run wrote and types or copies it.
 --- @param run table
 local function deliver(run)
+	local function admitted()
+		return _run == run and not run.cancelled and not AuxOwner.is_paused(run.parent)
+	end
+	if not admitted() then return end
 	if run.fields.output == "none" then return end
 	local status, attributes = FileSystem.path_status(run.output_path)
+	if not admitted() then return end
 	if status ~= "present" or type(attributes) ~= "table" then
 		Logger.warn(LOG, "A shortcut run returned no text output.")
 		return
@@ -194,6 +199,7 @@ local function deliver(run)
 		return
 	end
 	local output, read_status = FileSystem.read_bounded(run.output_path, M.MAX_OUTPUT_BYTES)
+	if not admitted() then return end
 	if read_status == "too_large" then
 		Logger.error(LOG, "A shortcut run returned more than %d bytes.", M.MAX_OUTPUT_BYTES)
 		UserActions.notify("user_actions.command_output_too_large", M.MAX_OUTPUT_BYTES)
