@@ -98,7 +98,8 @@ function M.new(spec)
 			logger().success(spec.log, "%s finished: %s.", spec.label, result.passed and "pass" or "fail")
 			on_result(result)
 		end
-		local env, env_err = env_services.env()
+		local built, env, env_err = pcall(env_services.env)
+		if not built then env, env_err = nil, env end
 		if not env then
 			logger().error(spec.log, "The %s is unusable: %s.", spec.label:lower(), tostring(env_err))
 			report.step(spec.unusable_step, Report.STATE_FAIL, "unusable")
