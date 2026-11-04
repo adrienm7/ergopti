@@ -2307,10 +2307,15 @@ end
 
 local function load_user_config(path)
 	if type(path) ~= "string" or path == "" then return nil end
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
+	if type(TomlWriter) ~= "table" or type(TomlWriter.read_classified) ~= "function" then
+		Logger.error(LOG, "Gesture configuration cannot be read: classified file reader unavailable.")
+		return nil
+	end
+	local content, status, detail = TomlWriter.read_classified(path)
+	if status ~= "ok" then
+		if status ~= "absent" then Logger.error(LOG, "Gesture configuration is unreadable: %s.", tostring(detail or status)) end
+		return nil
+	end
 	local ok, config = pcall(TomlCodec.decode, content)
 	if not ok or type(config) ~= "table" then return nil end
 

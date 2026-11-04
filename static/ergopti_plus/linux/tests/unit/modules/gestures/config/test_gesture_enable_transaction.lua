@@ -80,6 +80,34 @@ local function with_manager(open_fails, init_opts, body, no_touchpad)
 end
 
 helpers.describe("gestures: enabling after disabled boot", function()
+	helpers.it("refuses a gesture configuration FIFO without blocking startup", function()
+		local uv = require("luv")
+		local shell = require("adapters.shell_runner")
+		local path = os.tmpname()
+		os.remove(path)
+		assert(shell.run("mkfifo -- " .. shell.quote(path)))
+		local code = string.format([[package.path = %q
+local manager = require("modules.gestures.manager")
+manager.init({ enabled = false, persist = true, config_path = %q })
+assert(manager.is_enabled() == false)
+]], package.path, path)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		os.remove(path)
+		helpers.assert_eq(expired, false, "gesture startup must not wait for a FIFO writer")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+	end)
 
 	helpers.it("opens the touchpad before publishing enabled and dispatches its events", function()
 		local result = with_manager(false, { enabled = false, persist = false }, function(manager, reader)
