@@ -156,6 +156,33 @@ ergopti_resolve_config_home CONFIG_ROOT
 CONFIG_DIR="${CONFIG_ROOT}/ergopti/hotstrings"
 SYSTEMD_DIR="${CONFIG_ROOT}/systemd/user"
 
+# Startup paths may already belong to another application or installation.
+# Check them before copying the payload: truncating a link or a foreign unit
+# would destroy user data and make the subsequent ownership receipt misleading.
+if $INSTALL_SERVICE && ! $SETUP_PERMS_ONLY; then
+	source "${SRC_DRIVER}/install/desktop_entry.sh"
+	startup_wrapper="${BIN_DIR}/ergopti-hotstrings"
+	for startup_path in "${SYSTEMD_DIR}/ergopti-hotstrings.service" \
+		"${CONFIG_ROOT}/autostart/ergopti-hotstrings.desktop"; do
+		if [ -L "$startup_path" ] || { [ -e "$startup_path" ] && [ ! -f "$startup_path" ]; }; then
+			printf '[install] code=invalid-startup path=%q\n' "$startup_path" >&2
+			exit 1
+		fi
+		[ -f "$startup_path" ] || continue
+		case "$startup_path" in
+			*.service)
+				if grep -Fxq "$(ergopti_systemd_exec "$startup_wrapper")" "$startup_path" \
+					|| grep -Fxq "ExecStart=$startup_wrapper --tray" "$startup_path"; then continue; fi ;;
+			*.desktop)
+				if grep -Fxq "$(ergopti_desktop_exec "$startup_wrapper")" "$startup_path" \
+					|| grep -Fxq "Exec=$startup_wrapper --tray" "$startup_path" \
+					|| grep -Fxq "Exec=$startup_wrapper --session-start --tray" "$startup_path"; then continue; fi ;;
+		esac
+		printf '[install] code=foreign-startup path=%q\n' "$startup_path" >&2
+		exit 1
+	done
+fi
+
 # Single source of truth for the shared-tree location, both the repo source and
 # the install destination. A future rename of the _shared/ tree only needs editing these
 # two lines (and they must stay in sync with the daemon's runtime resolution in
