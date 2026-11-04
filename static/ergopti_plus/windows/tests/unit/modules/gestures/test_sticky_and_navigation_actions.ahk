@@ -129,3 +129,81 @@ _SNA_NativeCase(Mode) {
 for _SNA_NativeMode in ["letter", "enter", "backspace"]
 	Test("Sticky native capture: " . _SNA_NativeMode . " suppresses the original before replay (sticky-native-nontext)",
 		_SNA_NativeCase.Bind(_SNA_NativeMode))
+
+_SSM_ChildSource() {
+	global _DriverDir
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+	Code .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
+	for Symbol in ["SIHO_StartOwned", "HS_RunSyntheticInputTransaction", "_TextCompleteTailScalar"] {
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "The real transaction dependency must exist: " . Symbol)
+		Code .= "#Include " . Owner . "`n"
+	}
+	for Name in ["StickyModifierNames", "StickyModifier", "TextPressKey", "_TextSenderNormalizeModifierKey",
+		"_TextSenderModifierPrefix", "_TextSenderKeystroke", "_TextSenderModifierWords", "_TextSenderSustainedKey",
+		"_TextSenderSendInput", "_TextSenderAtSendLevel", "_SendVerdictSucceeded", "HSE_WordResetFlagCurrent",
+		"_PrefixHasIncompleteFragment", "TapHoldOwnsShortcut", "TapHoldTapInDispatch",
+		"_TH_SyntheticKeyList", "_TH_HoldMakesShortcuts"] {
+		Body := _DriverFuncBody(Name)
+		AssertTrue(Body != "", "The complete unchanged native producer must exist: " . Name)
+		Code .= Body . "`n"
+	}
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\sticky_modifier_flags_body.ahk")
+}
+_SSM_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired native sender prevents another probe.")
+	Root := A_Temp . "\ergopti_sticky_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Script := Root . "\subject.ahk"
+	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SSM_ChildSource()))
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false
+	PreviousCritical := Critical("Off")
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-edit-native-modifiers", Mode], _SICS_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The exact native flags child must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "The exact native flags child must settle.")
+		_TestPrint("# sticky-native-flags " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(0, State.Code, "Native sticky flag preservation failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText)
+		AssertContains(State.Output, "PASS sticky-native-flags " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try {
+		if !IsObject(Handle)
+			Retired := true
+		else {
+			Started := A_TickCount
+			loop {
+				Accepted := Handle.terminate()
+				Retired := Accepted is Integer && Accepted == 1
+				if Retired || TickElapsed(Started) >= 5000
+					break
+				_SR_TreePoll()
+				Sleep(10)
+			}
+		}
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired
+			RetirementDebt := Handle
+		else if !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The native sender and capture must physically retire.")
+}
+for _SSM_Mode in ["plain", "shift"]
+	Test("Sticky native modifier flags: " . _SSM_Mode . " preserves captured modifiers through the real synthetic transaction (sticky-native-modifier-flags)",
+		_SSM_Case.Bind(_SSM_Mode))
