@@ -70,6 +70,18 @@ helpers.describe("prediction triggers: ordinary typing and word boundaries", fun
 		restore()
 	end)
 
+	helpers.it("does not retain a debounce timer that fires before admission returns", function()
+		local engine, _, fired = fixture()
+		engine.init({ focus_id = function() return "owned-prediction-window" end, scheduler = {
+			after = function(_, callback) callback(); return { armed = true } end,
+			cancel = function() return true end,
+		} })
+		helpers.assert_eq(engine.on_hotstring_expired("hello", { app_id = "editor" }), false)
+		helpers.assert_eq(engine.is_predicting(), false)
+		helpers.assert_eq(#fired, 0)
+		restore()
+	end)
+
 	helpers.it("debounces every ordinary character and cancels the stale snapshot", function()
 		local engine, scheduler, fired = fixture({ instant_on_word_end = false })
 		engine.on_char("o", "hello", { app_id = "editor" })
@@ -79,6 +91,34 @@ helpers.describe("prediction triggers: ordinary typing and word boundaries", fun
 		helpers.assert_eq(scheduler.test.advance(0.001), 1)
 		helpers.assert_eq(#fired, 1)
 		helpers.assert_eq(fired[1].context, "hello!")
+		restore()
+	end)
+
+	helpers.it("retains refused debounce timer cancellation across withdrawal and configuration", function()
+		local engine, scheduler = fixture({ instant_on_word_end = false })
+		local cancel, refused = scheduler.cancel, true
+		scheduler.cancel = function(handle) if refused then return false end; return cancel(handle) end
+		engine.on_char("o", "hello", { app_id = "editor" })
+		helpers.assert_true(scheduler.activeCount() > 0)
+		engine.withdraw()
+		local owner = { pending = function() return false end }
+		helpers.assert_true(engine.acquire_configuration(owner))
+		helpers.assert_nil(engine.configuration_snapshot(owner), "a live timer cannot disappear from configuration ownership")
+		refused = false
+		helpers.assert_true(engine.release_configuration(owner))
+		restore()
+	end)
+
+	helpers.it("shutdown keeps a refused prediction timer until cancellation is acknowledged", function()
+		local engine, scheduler = fixture({ instant_on_word_end = false })
+		local original, refused = scheduler.cancel, true
+		scheduler.cancel = function(handle) if refused then return false end; return original(handle) end
+		engine.on_char("o", "hello", { app_id = "editor" })
+		helpers.assert_eq(engine.shutdown_runtime(), false)
+		helpers.assert_eq(engine.runtime_pending(), true)
+		refused = false
+		helpers.assert_true(engine.shutdown_runtime())
+		helpers.assert_eq(engine.runtime_pending(), false)
 		restore()
 	end)
 

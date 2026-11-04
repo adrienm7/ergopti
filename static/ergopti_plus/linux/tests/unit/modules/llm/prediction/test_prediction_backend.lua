@@ -214,6 +214,43 @@ helpers.describe("prediction backend: requests are paced, variants are diverse",
 		helpers.assert_eq(after_interval, 6, "then all its variants follow without waiting")
 	end)
 
+	helpers.it("retains a refused rate timer after dismissing the request", function()
+		local engine, _, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 500 })
+		local original, refused = scheduler.cancel, true
+		scheduler.cancel = function(handle) if refused then return false end; return original(handle) end
+		engine.predict("Bonjour à tous")
+		engine.predict("Bonjour à tous, et vous")
+		helpers.assert_true(scheduler.activeCount() > 0)
+		engine.dismiss()
+		local owner = { pending = function() return false end }
+		helpers.assert_true(engine.acquire_configuration(owner))
+		helpers.assert_nil(engine.configuration_snapshot(owner), "a refused pacing timer remains owned")
+		refused = false
+		helpers.assert_true(engine.release_configuration(owner))
+		helpers.assert_eq(engine.runtime_pending(), false)
+		restore()
+	end)
+
+	helpers.it("a stale pacing callback cannot discard its successor timer", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 500 })
+		local original, refused = scheduler.cancel, true
+		scheduler.cancel = function(handle) if refused then return false end; return original(handle) end
+		engine.predict("Bonjour à tous")
+		engine.predict("Bonjour à tous, et vous")
+		local old
+		for _, timer in pairs(scheduler.pending) do old = timer end
+		helpers.assert_not_nil(old)
+		engine.predict("Bonjour à tous, nouvelle phrase")
+		scheduler.pending[old.id], old.armed, old.fired = nil, false, true
+		old.fn()
+		helpers.assert_eq(#calls.remote, 3, "a stale callback must not dispatch")
+		refused = false
+		engine.dismiss()
+		helpers.assert_eq(engine.runtime_pending(), false)
+		helpers.assert_eq(scheduler.activeCount(), 0, "the successor must still be cancelled")
+		restore()
+	end)
+
 	helpers.it("waits the interval the user set between two requests, not the backend's old fixed one (request-floor-setting)", function()
 		local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 1200 })
 		engine.predict("Bonjour à tous")

@@ -273,6 +273,7 @@ local _debounce = {
 	-- How long an automatic request that found its backend busy waits to ask again.
 	busy_recheck_ms = require("infra.timings").ms("llm", "backend_busy_recheck_ms"),
 	plan = require("llm.request_plan.debounce").new(function() return TriggerSettings.get(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS) end),
+	retired = {}, timer_cancel = {}, retiring = {},
 }
 
 --- Asks the plan what pressing an explicit shortcut does while its previous
@@ -288,10 +289,37 @@ function _debounce.supersedes(key, in_flight)
 	return true
 end
 
+-- Retain every refused timer with the scheduler that originally owned it.
+function _debounce.own(timer, cancel)
+	if type(timer) == "table" then _debounce.timer_cancel[timer] = cancel end
+end
+function _debounce.retire(timer)
+	if not timer then return true end
+	if _debounce.retiring[timer] then return false end
+	local cancel = _debounce.timer_cancel[timer] or _scheduler.cancel
+	_debounce.retiring[timer] = true
+	local ok, closed = pcall(cancel, timer)
+	_debounce.retiring[timer] = nil
+	if ok and closed == true then
+		_debounce.retired[timer], _debounce.timer_cancel[timer] = nil, nil
+		return true
+	end
+	_debounce.retired[timer] = cancel
+	return false
+end
+function _debounce.drain_retired()
+	local pending = {}
+	for timer in pairs(_debounce.retired) do pending[#pending + 1] = timer end
+	for _, timer in ipairs(pending) do _debounce.retire(timer) end
+	return next(_debounce.retired) == nil
+end
+
 --- Cancels the native debounce timer and withdraws it from the plan.
 function _debounce.cancel()
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	local timer = _pending_trigger
+	_pending_trigger = nil
 	_debounce.plan:on_cancel()
+	if timer then _debounce.retire(timer) end
 end
 
 local function get_profiles()
@@ -538,8 +566,9 @@ local function schedule(context, output_context, event, live)
 	local arm
 	for _, decision in ipairs(decisions) do
 		if decision.action == "cancel" and _pending_trigger then
-			_scheduler.cancel(_pending_trigger)
+			local previous = _pending_trigger
 			_pending_trigger = nil
+			_debounce.retire(previous)
 		elseif decision.action == "arm" then
 			arm = decision
 		end
@@ -552,11 +581,19 @@ local function schedule(context, output_context, event, live)
 		-- automatic agent may replace this offer.
 		automatic = not live and not (type(output_context) == "table" and output_context.explicit == true),
 	}
-	local handle = _scheduler.after(arm.delay_ms / 1000, function()
+	local handle, fired_early
+	local cancel_timer = _scheduler.cancel
+	handle = _scheduler.after(arm.delay_ms / 1000, function()
+		if handle == nil then fired_early = true; return end
+		if _pending_trigger ~= handle then
+			_debounce.retire(handle)
+			return
+		end
+		_pending_trigger = nil
+		_debounce.retire(handle)
 		if _runtime_closed or _scope_owner then return end
 		-- A timer a newer keystroke or a cancel already superseded sends nothing.
 		if _debounce.plan:on_timer(arm.token)[1].action ~= "fire" then return end
-		_pending_trigger = nil
 		-- A preview drawn since the timer was armed keeps the window; its
 		-- expiry asks again (on_hotstring_expired).
 		if (captured.automatic or live) and _debounce.preview_holds(live) then
@@ -573,12 +610,14 @@ local function schedule(context, output_context, event, live)
 		local override = live_override()
 		if override then M.predict(context, captured, override) end
 	end)
-	if type(handle) ~= "table" or handle.armed ~= true then
+	if fired_early or type(handle) ~= "table" or handle.armed ~= true then
+		if type(handle) == "table" then _debounce.own(handle, cancel_timer); _debounce.retire(handle) end
 		_pending_trigger = nil
 		_debounce.plan:on_cancel()
 		Logger.error(LOG, "%s prediction could not be scheduled: timer unavailable.", arm.why)
 		return false
 	end
+	_debounce.own(handle, cancel_timer)
 	_pending_trigger = handle
 	Logger.debug(LOG, "%s prediction scheduled in %d ms.", arm.why, math.max(0, arm.delay_ms))
 	return true
@@ -606,6 +645,14 @@ end
 --- refuses diagnostic output without treating it as a transport failure.
 function M.init(opts)
 	if _runtime_closed or _scope_owner then return false end
+	_debounce.cancel()
+	M.drop_agent_triage("engine reinitialised")
+	if _rate_timer then
+		local timer = _rate_timer
+		_rate_timer = nil
+		_debounce.retire(timer)
+	end
+	if not _debounce.drain_retired() then return false end
 	Collision.construction = nil
 	if stop_runtime_app and not stop_runtime_app() then return false end
 	if _runtime_closed or _scope_owner then return false end
@@ -993,12 +1040,23 @@ function M.predict(context, output_context, override)
 			variant = request_index + 1,
 		}, now)[1]
 		if verdict.action == "defer" then
-			_rate_timer = _scheduler.after(verdict.delay_ms / 1000, function()
-				if _runtime_closed or _scope_owner then return end
+			local timer, cancel_timer, fired_early
+			cancel_timer = _scheduler.cancel
+			timer = _scheduler.after(verdict.delay_ms / 1000, function()
+				if timer == nil then fired_early = true; return end
+				if _rate_timer ~= timer then
+					_debounce.retire(timer)
+					return
+				end
 				_rate_timer = nil
+				_debounce.retire(timer)
+				if _runtime_closed or _scope_owner then return end
 				dispatch()
 			end)
-			if type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
+			_debounce.own(timer, cancel_timer)
+			_rate_timer = timer
+			if fired_early or type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
+				if _rate_timer then _debounce.retire(_rate_timer) end
 				_rate_timer = nil
 				_predicting = false
 				meta.loading = false
@@ -2693,8 +2751,9 @@ end
 function M.drop_agent_triage(reason)
 	_agent_generation = _agent_generation + 1
 	if _agent_timer then
-		_scheduler.cancel(_agent_timer)
+		local timer = _agent_timer
 		_agent_timer = nil
+		_debounce.retire(timer)
 	end
 	local triage = _agent_triage
 	if not triage then return end
@@ -2757,11 +2816,22 @@ local function send_when_free(generation, chat, what, send)
 	if wait_ms > 0 or busy then
 		local delay_ms = math.max(wait_ms, busy and math.max(interval, _debounce.busy_recheck_ms) or 0)
 		Logger.debug(LOG, "%s waits %d ms for its backend.", what, delay_ms)
-		_agent_timer = _scheduler.after(delay_ms / 1000, function()
+		local timer, cancel_timer, fired_early
+		cancel_timer = _scheduler.cancel
+		timer = _scheduler.after(delay_ms / 1000, function()
+			if timer == nil then fired_early = true; return end
+			if _agent_timer ~= timer then
+				_debounce.retire(timer)
+				return
+			end
 			_agent_timer = nil
+			_debounce.retire(timer)
 			send_when_free(generation, chat, what, send)
 		end)
-		if type(_agent_timer) ~= "table" or _agent_timer.armed ~= true then
+		_debounce.own(timer, cancel_timer)
+		_agent_timer = timer
+		if fired_early or type(_agent_timer) ~= "table" or _agent_timer.armed ~= true then
+			if _agent_timer then _debounce.retire(_agent_timer) end
 			_agent_timer = nil
 			Logger.error(LOG, "%s could not wait for its backend: timer unavailable.", what)
 		end
@@ -2917,13 +2987,28 @@ arm_agent = function(buffer, output_context)
 	if not _enabled then return end
 	local config = AgentSettings.config()
 	if not config then return end
-	if _agent_timer then _scheduler.cancel(_agent_timer) end
-	local generation = _agent_generation
-	_agent_timer = _scheduler.after(config.system1.pause_ms / 1000, function()
+	if _agent_timer then
+		local previous = _agent_timer
 		_agent_timer = nil
+		_debounce.retire(previous)
+	end
+	local generation = _agent_generation
+	local timer, cancel_timer, fired_early
+	cancel_timer = _scheduler.cancel
+	timer = _scheduler.after(config.system1.pause_ms / 1000, function()
+		if timer == nil then fired_early = true; return end
+		if _agent_timer ~= timer then
+			_debounce.retire(timer)
+			return
+		end
+		_agent_timer = nil
+		_debounce.retire(timer)
 		agent_pause_elapsed(generation, buffer, app)
 	end)
-	if type(_agent_timer) ~= "table" or _agent_timer.armed ~= true then
+	_debounce.own(timer, cancel_timer)
+	_agent_timer = timer
+	if fired_early or type(_agent_timer) ~= "table" or _agent_timer.armed ~= true then
+		if _agent_timer then _debounce.retire(_agent_timer) end
 		_agent_timer = nil
 		Logger.error(LOG, "The agent's typing pause could not be armed: timer unavailable.")
 	end
@@ -2979,7 +3064,7 @@ function M.dismiss(resync_owner)
 	-- Native cancellation can dispatch another user action synchronously. Detach
 	-- the old state first, then leave any successor request and offer untouched.
 	clear_offer(true)
-	if timer then _scheduler.cancel(timer) end
+	if timer then _debounce.retire(timer) end
 	if backend then
 		local ok, cancelled = pcall(backend.cancel)
 		if not ok or cancelled ~= true then
@@ -2998,7 +3083,11 @@ local function close_accepted_offer()
 	advance_request_epoch()
 	local retired_epoch = _request_epoch
 	_debounce.cancel()
-	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
+	if _rate_timer then
+		local timer = _rate_timer
+		_rate_timer = nil
+		_debounce.retire(timer)
+	end
 	local backend = _predicting and _inflight_backend or nil
 	_inflight_backend, _predicting = nil, false
 	clear_offer(true)
@@ -3331,6 +3420,14 @@ function M.stop_runtime() return stop_runtime_app() end
 function M.shutdown_runtime()
 	_runtime_closed = true
 	_enable_generation = _enable_generation + 1
+	_debounce.cancel()
+	M.drop_agent_triage("runtime shutdown")
+	if _rate_timer then
+		local timer = _rate_timer
+		_rate_timer = nil
+		_debounce.retire(timer)
+	end
+	local timers_closed = _debounce.drain_retired()
 	-- Revoke ordinary probe/download authority before a native stop can reenter.
 	local probe_closed = not _enable_admission or _enable_admission.cancel() == true
 	local download_closed = M.cancel_model_download() == true
@@ -3341,7 +3438,7 @@ function M.shutdown_runtime()
 		local checked, acknowledged = pcall(_cancel_selection)
 		selection_closed = checked and acknowledged == true
 	end
-	return probe_closed and download_closed and delete_closed and runtime_closed and selection_closed
+	return timers_closed and probe_closed and download_closed and delete_closed and runtime_closed and selection_closed
 end
 
 --- Captures existing managed lifetime before origin/settings/native readers run.
@@ -3395,7 +3492,7 @@ function M.runtime_pending()
 	local inventory_pending = profiles ~= nil and (package.loaded["modules.llm.profiles"] ~= profiles
 		or profiles.model_inventory_pending ~= Collision.inventory.pending or type(Collision.inventory.pending) ~= "function"
 		or Collision.inventory.pending() ~= false)
-	return inventory_pending or (_runtime_request ~= nil and not _runtime_request:is_settled())
+	return not _debounce.drain_retired() or inventory_pending or (_runtime_request ~= nil and not _runtime_request:is_settled())
 		or (_runtime_owner ~= nil and _runtime_owner.controller:has_debt())
 end
 --- Builds native composition lazily and classifies construction refusal.
@@ -4116,17 +4213,20 @@ function M.quiesce_configuration(owner)
 	if not stop_runtime_app() then return false end
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	if _pending_trigger then
-		if _scheduler.cancel(_pending_trigger) ~= true then return false end
+		local timer = _pending_trigger
 		_pending_trigger = nil
 		_debounce.plan:on_cancel()
+		if not _debounce.retire(timer) then return false end
 	end
 	if _rate_timer then
-		if _scheduler.cancel(_rate_timer) ~= true then return false end
+		local timer = _rate_timer
 		_rate_timer = nil
+		if not _debounce.retire(timer) then return false end
 	end
 	_tone_generation = _tone_generation + 1
 	M.drop_vision("configuration change")
 	M.drop_agent_triage("configuration change")
+	if not _debounce.drain_retired() then return false end
 	-- Backend connectivity probes share these owners, even when the prediction
 	-- engine did not start them. Model downloads have a separate HTTP owner.
 	local backends = { get_ollama(), get_remote() }
@@ -4144,7 +4244,7 @@ end
 --- @param owner table Admission identity.
 --- @return table|nil snapshot
 function M.configuration_snapshot(owner)
-	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer
+	if _scope_owner ~= owner or next(_debounce.retired) ~= nil or _predicting or _pending_trigger or _rate_timer
 		or _inflight_backend or _vision_flow or _agent_timer or _agent_triage
 		or (_enable_admission and _enable_admission.pending()) or M.runtime_pending() then return nil end
 	return { enabled = _enabled }

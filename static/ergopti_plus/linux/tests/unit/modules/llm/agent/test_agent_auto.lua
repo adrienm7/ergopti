@@ -112,6 +112,45 @@ end
 
 helpers.describe("AI agent automatic mode: a pause, a triage, then actions", function()
 
+	helpers.it("retains refused agent timers through withdrawal and scope admission", function()
+		Scenario.run({ stored = auto() }, function(world)
+			local original, refused = world.scheduler.cancel, true
+			world.scheduler.cancel = function(handle)
+				if refused and handle.at and handle.at < 5 then return false end
+				return original(handle)
+			end
+			world.type(SENTENCE)
+			world.engine.withdraw()
+			local owner = { pending = function() return false end }
+			helpers.assert_true(world.engine.acquire_configuration(owner))
+			helpers.assert_nil(world.engine.configuration_snapshot(owner), "refused agent timers remain owned")
+			refused = false
+			helpers.assert_true(world.engine.release_configuration(owner))
+			helpers.assert_eq(world.engine.runtime_pending(), false)
+		end)
+	end)
+
+	helpers.it("a stale agent pause cannot discard a newer pause", function()
+		Scenario.run({ stored = auto() }, function(world)
+			local original, refused = world.scheduler.cancel, true
+			world.scheduler.cancel = function(handle)
+				if refused and handle.at and handle.at < 5 then return false end
+				return original(handle)
+			end
+			world.type("A")
+			local old
+			for _, timer in pairs(world.scheduler.pending) do if timer.at < 5 then old = timer end end
+			helpers.assert_not_nil(old)
+			world.type("b")
+			world.scheduler.pending[old.id], old.armed, old.fired = nil, false, true
+			old.fn()
+			refused = false
+			world.engine.withdraw()
+			helpers.assert_eq(world.engine.runtime_pending(), false)
+			helpers.assert_eq(world.scheduler.activeCount(), 0, "the newer pause remains cancellable")
+		end)
+	end)
+
 	helpers.it("triages the sentence once, and above the threshold asks System 2", function()
 		Scenario.run({ stored = auto() }, function(world)
 			world.type(SENTENCE)
