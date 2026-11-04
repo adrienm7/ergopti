@@ -2566,6 +2566,9 @@ local function _read_source(source)
 	Logger.error(LOG, "Fatal evdev read on %s — %s; scheduling re-acquisition.",
 		source.path, tostring(reason))
 	_pending_events[source.slot] = nil
+	if not source.keyboard and _on_pointer_event then
+		_call_callback("pointer event callback", _on_pointer_event, "reset", nil, nil, source.slot)
+	end
 	if source.keyboard then
 		if _source_recovery.retire_remaps({ source.path }) ~= true then
 			M.emergency_stop("could not retire the failed source remapper")
@@ -2995,6 +2998,9 @@ local function _close_paths(paths, slot_for, tx)
 			if lease then _input_reader_ports.retire_source(lease) end
 		else EvdevReader.close(slot) end
 		_pending_events[slot] = nil
+		if slot_for == pointer_slot and _on_pointer_event then
+			_call_callback("pointer event callback", _on_pointer_event, "reset", nil, nil, slot)
+		end
 	end
 end
 

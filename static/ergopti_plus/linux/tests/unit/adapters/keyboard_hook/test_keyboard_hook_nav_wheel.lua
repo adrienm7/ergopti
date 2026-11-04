@@ -143,7 +143,8 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		}, function(kind, code, value, slot)
 			reports[#reports + 1] = { kind, code, value, slot }
 		end)
-		helpers.assert_eq(reports, { { "motion", REL_X, 3, source }, { "frame", 0, 0, source } })
+		helpers.assert_eq(reports, { { "motion", REL_X, 3, source }, { "frame", 0, 0, source },
+			{ "reset", nil, nil, source } })
 	end)
 	helpers.it("compiles a wheel direction under its own code, never a key's", function()
 		local layer = wheel_layer()
