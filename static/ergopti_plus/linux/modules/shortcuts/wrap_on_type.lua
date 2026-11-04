@@ -187,7 +187,7 @@ function M.new(opts)
 		if not current(owner, epoch) or not active then return false end
 
 		local ok, selected = read_primary()
-		if not current(owner, epoch) or not ok or type(selected) ~= "string" or selected == "" then return false end
+		if not current(owner, epoch) or ok ~= true or type(selected) ~= "string" or selected == "" then return false end
 		if selected == window then
 			Logger.debug(LOG, "PRIMARY unchanged since the selection window opened — typing '%s'.", char)
 			return false

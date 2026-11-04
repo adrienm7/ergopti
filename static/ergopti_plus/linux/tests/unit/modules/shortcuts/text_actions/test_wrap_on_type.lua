@@ -56,6 +56,23 @@ local function symbol(char, mods)
 end
 
 helpers.describe("wrap on type (linux): the decision", function()
+	helpers.it("requires an acknowledged selected PRIMARY read before replacing text (wrap-primary-receipt)", function()
+		local reads, typed = 0, {}
+		local controller = WrapOnType.new({
+			is_active = function() return true end,
+			get_pair = function(char) return PAIRS[char] end,
+			read_primary = function()
+				reads = reads + 1
+				if reads == 1 then return true, "old" end
+				return "unacknowledged", "selected"
+			end,
+			type_text = function(text) typed[#typed + 1] = text; return true end,
+		})
+		controller.on_pointer_down()
+		local consumed = controller.on_key(symbol("("))
+		helpers.assert_eq(consumed, false)
+		helpers.assert_eq(typed, {}, "a non-boolean read result cannot authorize replacement")
+	end)
 	for _, boundary in ipairs({ "baseline", "selected" }) do
 		helpers.it("passes input through when the " .. boundary .. " PRIMARY read raises (wrap-primary-exception)", function()
 			local controller, log, state = controller_with({ primary = "old", on_read = function(_, observed)
