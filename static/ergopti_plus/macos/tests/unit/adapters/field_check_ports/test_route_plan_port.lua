@@ -22,11 +22,12 @@ local ORIGINS = { "https://registry.ollama.ai", "https://blob.ollama.example" }
 --- @param launcher string|nil The resolved launcher (nil: none).
 --- @return table answer, table calls
 local function run(script, launcher)
-	local calls, answer = {}, nil
+	local calls, answer, timers = {}, nil, {}
 	helpers.with_stub_scope(MODULES, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.timer_scheduler"] = {
-			after = function() return { stopped = false } end, cancel = function() return true end,
+			after = function() local handle = { stopped = false }; timers[#timers + 1] = handle; return handle end,
+			cancel = function() return true end,
 		}
 		package.loaded["adapters.shell_runner"] = {
 			spawn = function(executable, args, callback)
@@ -48,7 +49,7 @@ local function run(script, launcher)
 		package.loaded["adapters.field_check_ports"] = nil
 		require("adapters.field_check_ports").new().route_plan(function(value) answer = value end)
 	end)
-	return answer, calls
+	return answer, calls, timers
 end
 
 helpers.describe("network check route plan port", function()
@@ -64,6 +65,12 @@ helpers.describe("network check route plan port", function()
 			{ origin = ORIGINS[1], route = "http://relay.corp.example:3128" },
 			{ origin = ORIGINS[2], route = "direct" },
 		})
+	end)
+
+	helpers.it("does not arm a deadline after an inline launcher completion", function()
+		local answer, _, timers = run(function() return 0, "ROUTE direct\n" end, "/launcher")
+		helpers.assert_eq(#answer.entries, 2)
+		helpers.assert_eq(#timers, 0, "completed route lookups must not leave live deadline timers")
 	end)
 
 	-- Field run 2026-10-27 19:47 read "lookup_failed" for an unreachable PAC:

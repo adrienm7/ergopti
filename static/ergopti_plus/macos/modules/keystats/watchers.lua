@@ -538,8 +538,12 @@ function M.caffeinate_cb(event)
 		or event == hs.caffeinate.watcher.screensDidSleep
 		then
 			LogManager.log_system_event("sleep", { battery_level = _state.current_battery_level })
-			_state.passive_started_at  = now
-			_state.passive_kind        = "sleep"
+			-- Display and system sleep can both arrive for the same interval.
+			-- Keep its first timestamp so the display-off period is not lost.
+			if _state.passive_kind ~= "sleep" or _state.passive_started_at == nil then
+				_state.passive_started_at = now
+			end
+			_state.passive_kind = "sleep"
 			if _state.active_app_name then
 				LogManager.log_app_switch(
 					_state.active_app_name, "SYSTEM_SLEEP",

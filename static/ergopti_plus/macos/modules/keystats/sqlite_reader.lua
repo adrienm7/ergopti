@@ -84,7 +84,9 @@ local function _q(s) return "'" .. Literal.escape(tostring(s)) .. "'" end
 local function _safe_query(label, fn, pacer)
 	local ok, err = pcall(fn)
 	if not ok then
-		Logger.error(LOG, "Query failed (%s): %s.", label, tostring(err))
+		local formatted, detail = pcall(tostring, err)
+		Logger.error(LOG, "Query failed (%s): %s.", label,
+			formatted and detail or "unprintable query error")
 	end
 	if pacer then pacer.pause() end
 	return ok

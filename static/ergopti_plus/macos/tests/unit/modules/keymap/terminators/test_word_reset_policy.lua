@@ -97,6 +97,7 @@ local function load_keymap()
 		clock_hs = scheduler_hs,
 		now = function() return scheduler.hotstring_time() end,
 		type_char = function(chars) return keydown(event(types.keyDown, 0, chars)) end,
+		backspace = function() return keydown(event(types.keyDown, 51, "")) end,
 		click = function() return mouse(event(types.leftMouseDown, 0)) end,
 		cleanup = function()
 			scheduler.hotstring_time = original_awake
@@ -127,6 +128,29 @@ local function mid_word(fixture, pause)
 	fixture.state.start_is_word_boundary = false
 	fixture.state.last_key_time = fixture.now() - pause
 end
+
+helpers.describe("hotstring backspace with composed characters (hotstring-grapheme-backspace)", function()
+	helpers.it("does not retain a fragment of a deleted combining sequence", function()
+		with_keymap(function(f)
+			for _, text in ipairs({
+				"ze" .. utf8.char(0x0301), "z👍🏽", "z👨‍👩‍👧", "z🇫🇷", "z❤️", "zé", "za",
+			}) do
+				f.state.buffer = text
+				f.state.start_is_word_boundary = true
+				f.backspace()
+				helpers.assert_eq(f.state.buffer, "z", "Backspace removes exactly the final composed character")
+			end
+			f.state.buffer = "e" .. utf8.char(0x0301)
+			f.backspace()
+			helpers.assert_eq(f.state.buffer, "", "the app deletes the composed character, not just its mark")
+			f.state.buffer = "z" .. string.char(0xFF)
+			f.state.start_is_word_boundary = true
+			f.backspace()
+			helpers.assert_eq(f.state.buffer, "")
+			helpers.assert_eq(f.state.start_is_word_boundary, false, "invalid UTF-8 cannot prove a word boundary")
+		end)
+	end)
+end)
 
 helpers.describe("hotstring Unicode buffer cap (hotstring-buffer-codepoints)", function()
 	helpers.it("keeps at most 500 codepoints without dropping shorter multibyte text", function()
