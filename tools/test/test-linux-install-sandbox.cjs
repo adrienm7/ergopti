@@ -112,18 +112,22 @@ function runInstaller(scenario) {
 		'systemctl',
 		`${log}\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service disabled enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
 	);
-	if (scenario.refuseUnitPublish) {
+	if (scenario.refuseUnitPublish || scenario.refuseLauncherPublish) {
+		const destination = scenario.refuseUnitPublish
+			? '*/ergopti-hotstrings.service'
+			: '*/bin/ergopti-hotstrings';
 		stub(
 			stubs,
 			'mv',
-			'for arg in "$@"; do case "$arg" in */ergopti-hotstrings.service) exit 1 ;; esac; done\nexec /usr/bin/mv "$@"'
+			`for arg in "$@"; do case "$arg" in ${destination}) exit 1 ;; esac; done\nexec /usr/bin/mv "$@"`
 		);
 	}
-	if (scenario.refuseUnitMode) {
+	if (scenario.refuseUnitMode || scenario.refuseLauncherMode) {
+		const temporary = scenario.refuseUnitMode ? '*/.ergopti-service.*' : '*/.ergopti-launcher.*';
 		stub(
 			stubs,
 			'chmod',
-			'for arg in "$@"; do case "$arg" in */.ergopti-service.*) exit 1 ;; esac; done\nexec /usr/bin/chmod "$@"'
+			`for arg in "$@"; do case "$arg" in ${temporary}) exit 1 ;; esac; done\nexec /usr/bin/chmod "$@"`
 		);
 	}
 	if (process.platform === 'win32') {
@@ -191,7 +195,8 @@ function runInstaller(scenario) {
 		'export PATH="$TEST_STUBS:/usr/bin:/bin"\n' +
 			(scenario.refuseUnitWrite
 				? 'printf() { if [[ "$1" = "%s\\n" && "${2:-}" = ExecStart=* ]]; then return 1; fi; builtin printf "$@"; }\n'
-				: '')
+				: '') +
+			(scenario.refuseLauncherWrite ? 'cat() { return 1; }\n' : '')
 	);
 	env.TEST_STUBS = bashPath(stubs);
 	env.BASH_ENV = bashPath(bashEnvironment);
@@ -763,6 +768,37 @@ for (const kind of [
 		);
 		assert.notEqual(modified.status, 0, 'a modified service must not be claimed');
 		assert.match(fs.readFileSync(unit, 'utf8'), /# user modification/);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// Failed launcher generation, chmod or publication leaves the old file intact.
+for (const fault of ['refuseLauncherWrite', 'refuseLauncherMode', 'refuseLauncherPublish']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		[fault]: true,
+		seed(home) {
+			const bin = path.join(home, '.local/bin');
+			fs.mkdirSync(bin, { recursive: true });
+			fs.writeFileSync(
+				path.join(bin, 'ergopti-hotstrings'),
+				`INSTALL_ROOT=${bashPath(home)}/.local/lib/ergopti\nexec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"\n# previous launcher\n`
+			);
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0);
+		const bin = path.join(run.home, '.local/bin');
+		assert.match(
+			fs.readFileSync(path.join(bin, 'ergopti-hotstrings'), 'utf8'),
+			/# previous launcher/
+		);
+		assert.equal(
+			fs.readdirSync(bin).filter((name) => name.startsWith('.ergopti-launcher.')).length,
+			0
+		);
 	} finally {
 		run.cleanup();
 	}

@@ -1078,14 +1078,24 @@ if [ -n "$NATIVE_LUV_STAGE" ]; then
 fi
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
-cat > "${BIN_DIR}/ergopti-hotstrings" << WRAPPER
+LAUNCHER_TMP="$(mktemp "${BIN_DIR}/.ergopti-launcher.XXXXXX")"
+write_public_launcher() {
+	cat << WRAPPER
 #!/usr/bin/env bash
 # Auto-généré par install.sh — ne pas éditer manuellement.
 set -euo pipefail
 INSTALL_ROOT=$(printf '%q' "${LIB_DIR}")
 exec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "\$@"
 WRAPPER
-chmod +x "${BIN_DIR}/ergopti-hotstrings"
+}
+# Keep an existing launcher usable until all replacement bytes and mode exist.
+printf -v LAUNCHER_MODE '%03o' "$((0777 & ~ 8#$(umask)))"
+if ! write_public_launcher > "$LAUNCHER_TMP" \
+	|| ! chmod "$LAUNCHER_MODE" "$LAUNCHER_TMP" \
+	|| ! mv -f -- "$LAUNCHER_TMP" "${BIN_DIR}/ergopti-hotstrings"; then
+	rm -f -- "$LAUNCHER_TMP"
+	exit 1
+fi
 ergopti_msg_with "  ✔  " install.launcher_installed "${BIN_DIR}/ergopti-hotstrings"
 
 
