@@ -398,3 +398,63 @@ Test("KLR rebuild: duplicates within one transaction keep the first copy (klr-ne
 
 Test("KLR rebuild: ambiguous tuple checkpoints restart safely (walker-composite-checkpoint)",
 	_KLRDC_CheckTeardown.Bind(_KLRNF_KilledWorkerResumes.Bind("3")))
+
+
+; This timer only releases a real filesystem obstruction after observing an
+; incorrect wait. It never supplies a lock receipt to the function under test.
+_KLRNF_ReleaseLockProbe(Path, Probe, Peer) {
+	Probe["released"] := true
+	if Peer {
+		Probe["close_ok"] := FSCloseExclusiveGuard(Probe["held"])
+		if Probe["close_ok"]
+			Probe["held"] := 0
+	} else
+		DirDelete(Path)
+}
+
+_KLRNF_GuardRefusalIsNotPeerContention(Peer) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Guard := 0
+	Deadline := 0
+	Probe := Map("released", false, "held", 0, "close_ok", false)
+	try {
+		DirCreate(KLR_CacheDir(_KLRDC_Root()))
+		Path := KLR_RebuildLockPath(_KLRDC_Root())
+		if Peer {
+			Probe["held"] := FSOpenExclusiveGuard(Path)
+			AssertTrue(Probe["held"] != 0, "a genuine native peer must own the guard")
+		} else {
+			DirCreate(Path)
+			AssertTrue(DirExist(Path), "a genuine directory obstructs the file admission")
+		}
+		Deadline := _KLRNF_ReleaseLockProbe.Bind(Path, Probe, Peer)
+		try {
+			SetTimer(Deadline, Peer ? -100 : -1000)
+			Guard := _KLR_RebuildAcquire(_KLRDC_Root(), "", &Waited)
+		} finally SetTimer(Deadline, 0)
+		_TestPrint("# KLR_NATIVE_GUARD_RETURN " . KL_JsonEncode(Map("peer", Peer,
+			"release_used", Probe["released"], "waited", Waited, "acquired", Guard != 0)))
+		if Peer {
+			AssertTrue(Probe["released"] && Probe["close_ok"], "the exact native peer actually released its ownership")
+			AssertTrue(Waited && Guard != 0, "real sharing contention must remain eligible for a later acquisition")
+		} else {
+			AssertFalse(Probe["released"], "a wrong path type must return without waiting for an invented peer")
+			AssertFalse(Waited)
+			AssertEqual(0, Guard)
+			AssertTrue(DirExist(Path), "a refused source obstruction must remain unchanged")
+		}
+	} finally {
+		if IsObject(Deadline)
+			SetTimer(Deadline, 0)
+		if Guard
+			AssertTrue(FSCloseExclusiveGuard(Guard))
+		if Probe["held"]
+			AssertTrue(FSCloseExclusiveGuard(Probe["held"]))
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR rebuild: a directory guard refusal cannot invent a peer (klr-rebuild-guard-admission)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_GuardRefusalIsNotPeerContention.Bind(false)))
+Test("KLR rebuild: actual peer contention waits for native release (klr-rebuild-guard-admission)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_GuardRefusalIsNotPeerContention.Bind(true)))
