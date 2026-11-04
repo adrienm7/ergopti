@@ -84,13 +84,31 @@ function render(features, locales, actions, menu) {
 	for (const [section, entries] of Object.entries(menu)) {
 		if (!Array.isArray(entries)) continue;
 		for (const entry of entries) {
-			if (entry.unavailable !== 'grey') continue;
-			if (!Array.isArray(entry.platforms) || !entry.reason_key || !locales.en[entry.reason_key])
+			if (!Array.isArray(entry.platforms) || entry.platforms.length === 3) continue;
+			if (
+				entry.unavailable !== 'grey' &&
+				![
+					'command',
+					'action',
+					'group',
+					'list',
+					'toggle',
+					'check',
+					'choice',
+					'feature',
+					'letter_picker'
+				].includes(entry.type)
+			)
+				continue;
+			if (entry.platforms.some((key) => !Object.values(OS).includes(key)))
+				throw new Error(`Invalid menu platforms: ${section}`);
+			if (entry.unavailable === 'grey' && (!entry.reason_key || !locales.en[entry.reason_key]))
 				throw new Error(`Invalid unavailable menu entry: ${section}`);
 			const id = entry.id || entry.path;
 			if (!id) throw new Error(`Unavailable menu entry has no identity: ${section}`);
 			menuRows.push({
 				path: `${section}.${id}`,
+				visibility: entry.unavailable || 'hide',
 				labels: Object.fromEntries(
 					['fr', 'en'].map((lang) => [lang, locales[lang][entry.i18n] || id])
 				),
@@ -103,8 +121,8 @@ function render(features, locales, actions, menu) {
 						.map(([os]) => [
 							os,
 							{
-								en: locales.en[entry.reason_key],
-								fr: locales.fr[entry.reason_key] || locales.en[entry.reason_key]
+								en: locales.en[entry.reason_key] || '',
+								fr: locales.fr[entry.reason_key] || locales.en[entry.reason_key] || ''
 							}
 						])
 				)
@@ -118,7 +136,7 @@ function render(features, locales, actions, menu) {
 		'',
 		'# Configuration, action and unavailable menu inventory',
 		'',
-		'These are complete projections of the shared configuration and action catalogues and the explicitly unavailable menu entries, not a complete inventory of all product capabilities. An absent path or action may have an equivalent on another OS, be intentional, or be a real gap. Inclusion is a declaration, not proof of runtime behavior. Review the source, tests, and platform reason before implementing anything.',
+		'These are complete projections of the shared configuration and action catalogues and the platform-restricted interactive menu entries, not a complete inventory of all product capabilities. An absent path or action may have an equivalent on another OS, be intentional, or be a real gap. Inclusion is a declaration, not proof of runtime behavior. Review the source, tests, and platform reason before implementing anything.',
 		'',
 		'Each unchecked row is a triage item, not a confirmed missing feature. To update this queue and the website data, edit the manifest and run `node tools/codegen/codegen-feature-inventory.cjs`; the Linux parity gate checks for stale outputs.',
 		''
@@ -148,9 +166,11 @@ function render(features, locales, actions, menu) {
 		lines.push('');
 	}
 	for (const os of Object.keys(OS)) {
-		lines.push(`## ${os} — unavailable menu entries`, '');
+		lines.push(`## ${os} — restricted menu entries`, '');
 		for (const row of menuRows.filter((entry) => !entry.platforms[os]))
-			lines.push(`- [ ] \`${row.path}\`: ${row.reasons[os].en}`);
+			lines.push(
+				`- [ ] \`${row.path}\` (${row.visibility}): ${row.reasons[os].en || 'Review the platform-specific presentation and equivalent.'}`
+			);
 		lines.push('');
 	}
 	const markdown = execFileSync(
