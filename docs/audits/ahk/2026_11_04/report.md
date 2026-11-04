@@ -525,3 +525,22 @@ Consequence: An old Ctrl+C may be injected into the resumed context, or an obsol
 Regression: Seven reachable tap-copy-owner cases invoke the genuine suspend-owned remap drain with private empty modifier ledgers, native Suspend/resume and retained timer delivery; producer/counter/retry/logger callouts revoke or replace ownership and assert zero stale sends/notices plus successor timer preservation. Counter/timer/send/notice are explicit passive ports. Existing five copy verification controls remain. Native Windows execution is pending; pre-fix failure is source-derived.
 
 The ongoing register now contains **34 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native qualification checkpoint: 41883594273
+
+The Windows replay at `0cd7b7f951601cedda701d3a0c84841f3726efe8` passed
+production-entry compilation and native hotstring E2E. Its selected cases passed
+**21 of 23**, individually and in reverse order: eleven token-status cases, six
+buffered-log children, three existing log-opener controls and the repaired
+keyboard-only keep-awake case.
+
+The two native model-selection tests still rejected their durable-data oracle:
+the uncached TOML reader exposes literal dotted section names, rather than the
+nested feature projection. Commit `049eaa8` corrects the oracle to
+`Parsed["llm.models"]["ollama"]`; this later repair is not yet a native pass.
+
+The next selection contains 31 cases: the two repaired model checks, twelve
+copy checks, the native paths pause case and two retirement controls, plus twelve
+explicit boot locator cases and two existing boot-selection controls. No native
+verdict for those later changes is claimed here. The two additional validation
+site fixes do not increase the register beyond **34 distinct new findings**.
