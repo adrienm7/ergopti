@@ -210,6 +210,7 @@ function M.new(opts)
 		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
 		instant_down = {},   -- keys with a tap and no hold, down since their tap fired
 		key_refs = {},       -- code -> how many of this engine's holders keep it down
+		key_order = {},      -- first-acquired keys, for reverse-order retirement
 		passed_down = {},    -- keys that went through untouched and are down (the hand's)
 		modifiers_down = {}, -- modifier keys that went through untouched, and are down
 		physical_down = {},  -- every physical key down now, whatever this engine made of it
@@ -368,6 +369,7 @@ local function press(self, out, code)
 	local refs = (self.key_refs[code] or 0) + 1
 	self.key_refs[code] = refs
 	if refs == 1 then
+		self.key_order[#self.key_order + 1] = code
 		if self.passed_down[code] then custody(self, code, DOWN)
 		else hold_row(self, out, code, DOWN) end
 	end
@@ -382,6 +384,9 @@ local function release(self, out, code)
 		return
 	end
 	self.key_refs[code] = nil
+	for index = #self.key_order, 1, -1 do
+		if self.key_order[index] == code then table.remove(self.key_order, index); break end
+	end
 	if self.passed_down[code] then custody(self, code, UP)
 	else hold_row(self, out, code, UP) end
 end
@@ -1230,13 +1235,15 @@ function M:release_all()
 	local out = {}
 	-- Every key this engine holds down, once, whoever of it holds it.
 	-- Keys the hand still holds stay down: they are the kernel's to release.
-	for code in pairs(self.key_refs) do
+	for index = #self.key_order, 1, -1 do
+		local code = self.key_order[index]
 		if self.passed_down[code] then custody(self, code, UP)
 		else hold_row(self, out, code, UP) end
 	end
 	self.held, self.layer_keys, self.layer_depth = {}, {}, 0
 	self.undecided = nil
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
+	self.key_order = {}
 	input_arms[self] = nil
 	self.one_shot_swallowed, self.instant_down = {}, {}
 	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}
