@@ -41,6 +41,7 @@ M.DEFAULT_URL = Manifest.default_for(FEATURE_PATH)
 --- @return boolean
 function M.is_valid(value)
 	return type(value) == "string" and value:match("^https?://%S+$") ~= nil
+		and value:find("%c") == nil
 end
 
 if not M.is_valid(M.DEFAULT_URL) then
