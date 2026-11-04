@@ -78,16 +78,35 @@ class NativeLocaleCatalogTests(unittest.TestCase):
                     order.write_text('{"order":["fr","en","de"]}', encoding="utf-8")
                 script = root / "probe.lua"
                 script.write_text(PROBE, encoding="utf-8")
-                environment = dict(os.environ, HOME=str(root), XDG_CONFIG_HOME=str(root),
-                                   XDG_STATE_HOME=str(root), XDG_DATA_HOME=str(root),
-                                   XDG_CACHE_HOME=str(root), XDG_RUNTIME_DIR=str(root))
-                result = subprocess.run([RUNTIME, str(script), str(driver), str(catalog), "order-" + kind],
-                                        env=environment, capture_output=True, text=True, timeout=3)
+                environment = dict(
+                    os.environ,
+                    HOME=str(root),
+                    XDG_CONFIG_HOME=str(root),
+                    XDG_STATE_HOME=str(root),
+                    XDG_DATA_HOME=str(root),
+                    XDG_CACHE_HOME=str(root),
+                    XDG_RUNTIME_DIR=str(root),
+                )
+                result = subprocess.run(
+                    [RUNTIME, str(script), str(driver), str(catalog), "order-" + kind],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                receipt = json.loads(next(line.removeprefix("CATALOG_RESULT ") for line in result.stdout.splitlines()
-                                          if line.startswith("CATALOG_RESULT ")))
+                receipt = json.loads(
+                    next(
+                        line.removeprefix("CATALOG_RESULT ")
+                        for line in result.stdout.splitlines()
+                        if line.startswith("CATALOG_RESULT ")
+                    )
+                )
                 self.assertTrue(receipt["ok"], receipt["reason"])
-                self.assertEqual(receipt["codes"], ["fr", "en", "de"] if kind == "regular" else ["de", "en", "fr"])
+                self.assertEqual(
+                    receipt["codes"],
+                    ["fr", "en", "de"] if kind == "regular" else ["de", "en", "fr"],
+                )
 
     def test_native_locale_catalog_authority(self):
         driver = Path(DRIVER).resolve()
