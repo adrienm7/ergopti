@@ -167,5 +167,6 @@ _EDOT_Case(Mode) {
 		throw ExportFailure
 }
 
-for _EDOT_Mode in ["current", "close-resolve", "reopen-resolve", "close-reject", "reopen-reject"]
+for _EDOT_Mode in ["current", "close-resolve", "reopen-resolve", "close-reject", "reopen-reject",
+	"current-refusal", "reopen-resolve-refusal"]
 	Test("Error dialog startup: " . _EDOT_Mode . " retains its current owner (error-dialog-startup-owner)", _EDOT_Case.Bind(_EDOT_Mode))

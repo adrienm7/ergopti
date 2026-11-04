@@ -391,3 +391,19 @@ Consequence: A small admitted server response can stall the message/input thread
 Regression: Both ports read one canonical policy:4096 UTF-8 bytes per operand and262144 cells per conservative diff grid. Refuse oversized corrections, next words and raw output before expensive helpers, then recheck actual normalized diff operands. Assert inclusive byte/cell boundaries and multibyte accounting on Windows; retain all32 shared physical golden vectors. Six real Lua cases pass after the audited baseline fails the oversized-word refusal.
 
 The ongoing register now contains **27 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Error-dialog sibling retirement invariant
+
+The pending-host and retryable-retirement invariant was also corrected in the
+error dialog, without incrementing the distinct-finding count. Its former
+startup fixture required the native HWND to be destroyed during the unresolved
+factory; it now requires that HWND to remain alive and hidden until the returned
+controller is closed. The same record owns startup and cleanup, including a Close
+during navigation after publication.
+
+The extended seven-mode native component checks subscription destruction before
+Close, live HWNDs during every Close attempt, current refusal/retry and old-host
+retry while B remains current. Rejected factories never transfer their fake
+controller and must incur zero Close attempts. Native execution of this extension
+is pending. The JavaScript teardown guard passes all 28 checks, and an in-memory
+mutation removing the actual subscription release makes that guard fail.
