@@ -32,9 +32,13 @@
 # missing; base.txt in the report names the base and the commit):
 #   bash tools/dev/collect-macos-field-report.sh            update, collect, commit, push
 #   bash tools/dev/collect-macos-field-report.sh --no-push  same, without the push
-#   bash tools/dev/collect-macos-field-report.sh --installed  the installed signed
-#     build (the CI dev or release app) instead of building the developer app:
-#     no in-app field run, the Debug menu checks come from the copied logs
+#   bash tools/dev/collect-macos-field-report.sh --installed  the signed dev
+#     prerelease instead of the developer app: installs or updates it from
+#     GitHub, verified (tools/dev/install-macos-dev-prerelease.sh), reopens it
+#     with this clone as its field-run root, and runs the same field run in it,
+#     the owned runtime's first install included (field_owned_install: the
+#     macOS administrator prompt and the driver approval are the only human
+#     steps, and the terminal says so)
 #
 # The owned Karabiner runtime needs the stable certificate the CI signs with,
 # so it is field-tested on the installed signed build, never on an ad hoc
@@ -436,7 +440,14 @@ run_field_run() {
 	# Lua-only change needs no rebuild: the developer app reloads it.
 	local app_binary="${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}/Contents/MacOS/${ERGOPTI_APP_NAME}"
 	local stale=""
-	if [ ! -x "${app_binary}" ]; then
+	if [ "${installed}" = true ]; then
+		rm -f "${ready_file}" || { log "Cannot remove the previous readiness."; return 1; }
+		bash "${REPO_ROOT}/tools/dev/install-macos-dev-prerelease.sh" \
+			|| { log "The signed dev prerelease could not be installed and opened (reason above)."; return 1; }
+		log "Two steps may need you: type your password if macOS asks for it (Ergopti installs its own Karabiner"
+		log "runtime), and if System Settings opens Login Items & Extensions, switch on the Karabiner driver there."
+		log "Nothing else needs a click; the run waits for both."
+	elif [ ! -x "${app_binary}" ]; then
 		stale="no developer app is built"
 	else
 		stale="$(find "${REPO_ROOT}/static/ergopti_plus/macos/launcher" "${REPO_ROOT}/tools/build" \
@@ -444,10 +455,14 @@ run_field_run() {
 	fi
 	# A readiness left by an app the runner is about to stop would send the
 	# request to that app: only the readiness of the app opened here counts.
-	if [ -n "${stale}" ] || ! ready_pid >/dev/null; then
+	if [ "${installed}" = true ]; then
+		: # Opened above with its field-run root; its readiness is the one to wait for.
+	elif [ -n "${stale}" ] || ! ready_pid >/dev/null; then
 		rm -f "${ready_file}" || { log "Cannot remove the previous readiness."; return 1; }
 	fi
-	if [ -n "${stale}" ]; then
+	if [ "${installed}" = true ]; then
+		:
+	elif [ -n "${stale}" ]; then
 		log "Building and opening the developer app (${stale#"${REPO_ROOT}/"} is newer than the build; a few minutes)..."
 		bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" || { log "The developer app could not be built."; return 1; }
 	elif ! ready_pid >/dev/null; then
@@ -531,17 +546,19 @@ run_field_run() {
 	return 0
 }
 
-if [ "${installed}" = true ]; then
-	# The installed signed build never runs the developer field run (packaged
-	# runtimes do not watch the clone); its Debug menu checks write their
-	# results to the day log this report copies.
-	printf 'skipped: --installed uses the installed signed build; its Debug field checks are in the copied logs\n' \
-		> "${out}/field_run.txt"
-	field_run_status=0
-else
-	run_field_run 2>&1 | tee "${out}/field_run.txt"
-	field_run_status=${PIPESTATUS[0]}
-fi
+run_field_run 2>&1 | tee "${out}/field_run.txt"
+field_run_status=${PIPESTATUS[0]}
+# What no command can do on its own, said once instead of faked.
+cat > "${out}/not_automated.txt" <<'NOTE'
+typing through the owned runtime: refused. Karabiner captures the keyboards at the HID level, below the event system;
+  synthetic key events (CGEvent) never reach it, and macOS offers no HID injection without a signed driver. The
+  field run's tap-hold, chord and hotstring checks prove the rules and the Quartz path; typing on the internal keyboard
+  stays a person's check.
+sleep and wake: refused. Waking the Mac on its own needs a pmset power schedule, a system setting this collector never
+  writes, and a sleeping Mac cannot run the collector.
+driver approval and administrator password: a person's steps. macOS forbids clicking them for the user; the run waits.
+reload: automated (the field run's owned_install_reload and driver_reload steps).
+NOTE
 printf '%-28s exit=%s\n' "field_run" "${field_run_status}" >> "${steps}"
 [ "${field_run_status}" -eq 0 ] || log "step 'field_run' exited ${field_run_status} (kept in ${out}/field_run.txt)"
 
