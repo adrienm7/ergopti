@@ -35,7 +35,10 @@ SKIP_DEPS=false
 # can be re-run after a kernel update without reinstalling the driver.
 SETUP_PERMS_ONLY=false
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_PARENT="${BASH_SOURCE[0]%/*}"
+[ "$SCRIPT_PARENT" != "${BASH_SOURCE[0]}" ] || SCRIPT_PARENT=.
+[ -n "$SCRIPT_PARENT" ] || SCRIPT_PARENT=/
+IFS= read -r -d '' SCRIPT_DIR < <(CDPATH= cd -Pe -- "$SCRIPT_PARENT" && printf '%s\0' "$PWD")
 
 # This script runs from TWO layouts, and assuming one of them was a bug:
 #

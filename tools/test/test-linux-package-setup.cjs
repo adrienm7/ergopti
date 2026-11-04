@@ -25,6 +25,28 @@ assert.ok(fs.existsSync(sourcePath), 'native packages need an automatic permissi
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-setup-'));
 const shellQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 try {
+	// A release archive's install.sh sits directly at the extraction root,
+	// whose name may end in a newline. Its help path must find the bundle.
+	{
+		const bundle = path.join(sandbox, 'extracted-bundle\n');
+		const script = path.join(bundle, 'install.sh');
+		const installDirectory = path.join(bundle, 'linux/install');
+		provideShellMessages(installDirectory);
+		fs.mkdirSync(path.join(bundle, '_shared/data'), { recursive: true });
+		fs.copyFileSync(path.join(ROOT, 'static/ergopti_plus/linux/install.sh'), script);
+		fs.copyFileSync(
+			path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.sh'),
+			path.join(bundle, '_shared/data/identifiers.sh')
+		);
+		for (const [args, cwd] of [
+			[[bashPath(script), '--help'], sandbox],
+			[['install.sh', '--help'], bundle]
+		]) {
+			const result = spawnSync(bashExecutable(), args, { cwd, encoding: 'utf8', timeout: 10000 });
+			assert.equal(result.status, 0, `bundle help: ${result.stderr}`);
+			assert.match(result.stdout, /--no-service/);
+		}
+	}
 	// A root shell need not have sudo installed: execute the detected package
 	// manager directly, while retaining its actual failure as a failure.
 	{
