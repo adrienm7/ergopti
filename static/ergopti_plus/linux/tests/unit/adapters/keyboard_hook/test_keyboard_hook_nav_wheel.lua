@@ -184,13 +184,13 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		local reports = {}
 		drive("mouse", HOLD, { { EV_REL, REL_X, 1, 3000 } }, function() return false end,
 			function(kind) reports[#reports + 1] = kind end)
-		helpers.assert_eq(reports, {}, "a failed output cannot publish motion to a retired session")
+		helpers.assert_eq(reports, { "reset" }, "only the source reset is published after output failure")
 	end)
 	helpers.it("does not publish a pointer press after its click callback stops capture", function()
 		local reports = {}
 		local emitted = drive("mouse", HOLD, { { EV_KEY, BTN_LEFT, 1, 3000 } }, nil,
 			function(kind) reports[#reports + 1] = kind end, false, false, function(hook) hook.stop() end)
-		helpers.assert_eq(reports, {})
+		helpers.assert_eq(reports, { "reset" }, "only the source reset is published after capture stops")
 		helpers.assert_true(not has(emitted, "key:" .. BTN_LEFT .. ":1"))
 	end)
 	helpers.it("compiles a wheel direction under its own code, never a key's", function()
