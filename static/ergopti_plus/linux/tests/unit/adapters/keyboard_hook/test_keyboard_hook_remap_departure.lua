@@ -40,6 +40,25 @@ helpers.describe("keyboard source departure retires remapper input", function()
 		end)
 	end)
 
+	helpers.it("(remap-source-departure) recognises a fresh blocker on a reused device path", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
+			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("b", 58, 1, 1)
+			select_sources(s, { "a" })
+			s.held[s.paths.b] = {}
+			select_sources(s, { "a", "b" })
+			s.edge("b", 58, 1, 2)
+			local before = #s.rows
+			s.edge("a", 56, 1, 3); s.edge("a", 56, 0, 4)
+			helpers.assert_eq(#s.rows, before, "the successor's own CapsLock blocks LAlt")
+			s.edge("b", 58, 0, 5)
+			s.edge("a", 56, 1, 6)
+			helpers.assert_eq(s.rows[#s.rows], { 42, 1 })
+			s.edge("a", 56, 0, 7)
+			helpers.assert_true(s.hook.isRunning())
+		end)
+	end)
+
 	helpers.it("(remap-source-departure) retains another keyboard's blocker after queue recovery", function()
 		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
 			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
