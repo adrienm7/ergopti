@@ -1280,3 +1280,66 @@ _HOSP_RefusesUnrepresentableSource(Mode) {
 }
 for _HOSP_Mode in ["unknown-leaf", "nested-section", "array-category", "invalid-owned-type", "extension-control"]
 	Test("HotstringsConfig source preservation: " . _HOSP_Mode, _HOSP_RefusesUnrepresentableSource.Bind(_HOSP_Mode))
+
+_HOL_LegacyDelayRoundTrip(Mode) {
+	global Features, _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	global _HotstringsLegacyDelimiters, _HotstringsCommonOverrideAdmitted
+	Saved := {features: Features, overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+		groups: HotstringGroupConfig, legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted()}
+	Root := A_Temp . "\ergopti_legacy_reload_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Features := Features.Clone(), Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		_HotstringsOverridesPath := Path, _HotstringsOverrides := Map()
+		Leaf := Mode == "offset-control" ? "delay_offset = -0.250" : "delay = 0.500"
+		Source := "[magickey]`n" . Leaf . "`n[magickey.text_expansion_symbols]`n" . Leaf . "`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		if InStr(Mode, "init-") == 1
+			HotstringsConfigInit(Path)
+		else
+			AssertTrue(HotstringsConfigReload())
+		if Mode == "reload-effective" || Mode == "offset-control" {
+			AssertEqual(0.5, HotstringsResolve("magickey", "").Delay, "runtime reload must apply a recognized absolute delay")
+			AssertEqual(0.5, HotstringsResolve("magickey", "text_expansion_symbols").Delay)
+			AssertEqual(Source, FSReadStrict(Path), "the memory-only reload may not rewrite the source")
+		}
+		if Mode == "init-clear" {
+			AssertTrue(HotstringsClearOverride("magickey", "", "delay"))
+			AssertTrue(HotstringsClearOverride("magickey", "text_expansion_symbols", "delay"))
+		} else if Mode == "init-replace" {
+			AssertTrue(HotstringsSetOverride("magickey", "", "delay", 0.25))
+			AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "delay", 0.25))
+		} else {
+			AssertTrue(HotstringsSetOverride("magickey", "", "color", "#123456"))
+			AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "color", "#234567"))
+		}
+		Disk := TOML_ParseDocument(FSReadStrict(Path))
+		for Values in [Disk.Get("magickey", Map()), Disk.Has("magickey") ? Disk["magickey"].Get("text_expansion_symbols", Map()) : Map()] {
+			if Mode == "init-clear" {
+				AssertFalse(Values.Has("delay"), "explicit clear retires legacy intention too")
+				AssertFalse(Values.Has("delay_offset"))
+			} else {
+				AssertTrue(Values.Has("delay") || Values.Has("delay_offset"), "an unrelated acknowledged save cannot lose the existing absolute delay")
+				Effective := Values.Has("delay") ? Values["delay"] : 0.75 + Values["delay_offset"]
+				AssertEqual(Mode == "init-replace" ? 0.25 : 0.5, Effective)
+			}
+		}
+		AssertTrue(HotstringsConfigReload())
+		if Mode != "init-clear" {
+			AssertEqual(Mode == "init-replace" ? 0.25 : 0.5, HotstringsResolve("magickey", "").Delay)
+			AssertEqual(Mode == "init-replace" ? 0.25 : 0.5, HotstringsResolve("magickey", "text_expansion_symbols").Delay)
+		}
+	} finally {
+		Features := Saved.features, _HotstringsOverrides := Saved.overrides
+		_HotstringsOverridesPath := Saved.path, HotstringGroupConfig := Saved.groups
+		_HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOL_Mode in ["reload-effective", "reload-save", "init-save", "init-clear", "init-replace", "offset-control"]
+	Test("HotstringsConfig legacy runtime delay: " . _HOL_Mode, _HOL_LegacyDelayRoundTrip.Bind(_HOL_Mode))
