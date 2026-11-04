@@ -410,12 +410,16 @@ local _secure_apps = _default_secure_apps()
 -- Active full list, kept for diagnostics and the stats snapshot.
 local _password_apps = _default_password_apps()
 
+-- A partially admitted SQLite store cannot safely accept or durably retain
+-- raw events. Keep the persisted user preference separate from this gate.
+local _storage_blocked = false
+
 --- The single decision point for "may this keystroke be recorded?".
 --- Every recording entry point asks this and nothing else, so a new filter is
 --- added in one place and cannot be forgotten on one of the five paths.
 --- @return boolean
 local function may_record()
-	if _flush_stopping then return false end
+	if _flush_stopping or _storage_blocked then return false end
 	if not _enabled then return false end
 	if _suppressed or _suspended then return false end
 	if _secure_filter_enabled and _secure_field then return false end
@@ -669,8 +673,14 @@ function M.init(opts)
 	-- A usable writer must also acknowledge migration and actual registration.
 	_sqlite_admitted = false
 	local sqlite_opened = SqliteWriter and SqliteWriter.open_db(_sqlite_path) == true
-	local sqlite_ready = sqlite_opened and SqliteWriter.ensure_token_encoding() == true
-		and SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname) == true
+	local migration_ok, migrated = false, false
+	if sqlite_opened then migration_ok, migrated = pcall(SqliteWriter.ensure_token_encoding) end
+	local registration_ok, registered = false, false
+	if migration_ok and migrated == true then
+		registration_ok, registered = pcall(SqliteWriter.register_device, _device_id, hostname, "linux", "", hostname)
+	end
+	local sqlite_ready = registration_ok and registered == true
+	_storage_blocked = sqlite_opened and not sqlite_ready
 	if sqlite_ready then
 		_sqlite_admitted = true
 		if SqliteReader then migrate_legacy_categories() end
@@ -702,7 +712,11 @@ function M.init(opts)
 			local closed, detail = pcall(SqliteWriter.close_db)
 			if not closed or detail == false then Logger.error(LOG, "SQLite cleanup after failed admission was refused.") end
 		end
-		Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
+		if _storage_blocked then
+			Logger.error(LOG, "Metrics capture blocked: SQLite migration or device registration was refused.")
+		else
+			Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
+		end
 	end
 
 	-- The stored encryption choice, read before the cipher is configured below:
@@ -753,6 +767,7 @@ function M.init(opts)
 
 	Logger.success(LOG, "Keystats initialised (log_dir=%s, password_apps=%d).",
 		_log_dir, #_password_apps)
+	return not _storage_blocked
 end
 
 
