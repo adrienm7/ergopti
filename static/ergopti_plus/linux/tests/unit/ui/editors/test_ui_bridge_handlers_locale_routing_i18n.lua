@@ -228,6 +228,9 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("changelog_bridge", function()
     local handler = helpers.load_module("ui.changelog.bridge")
     local original_handler = handler
+    -- The document fixture narrows the timing API; initialize the updater
+    -- against the real timing registry before the fixture installs its double.
+    require("modules.updater.manager")
     local native_document = require("tests.support.document_fixture").new("changelog", original_handler, build_mock_state())
     handler = native_document.proxy()
     local state = build_mock_state()
