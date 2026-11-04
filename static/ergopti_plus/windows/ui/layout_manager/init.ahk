@@ -41,6 +41,8 @@ global _LayMgrWeb_NavSub     := unset
 global _LayMgrWeb_ResetDone  := false
 global _LayMgrWeb_SessionEpoch := 0
 global _LayMgrWeb_ReadyEpoch := 0
+; The current presentation owns its own paths and push port.
+global _LayMgrWeb_PresentationDeps := 0
 ; Result of the last operation, shown by the page (0 when none).
 global _LayMgrWeb_Result := 0
 ; A durable catalogue operation still waits for its terminal runtime refresh.
@@ -199,6 +201,7 @@ _LayMgrWeb_Strings() {
  */
 LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 	global LAYMGR_ACTIONS, _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_SessionEpoch
+	global _LayMgrWeb_PresentationDeps
 	if !IsSet(SessionEpoch)
 		SessionEpoch := _LayMgrWeb_SessionEpoch
 	if !(Payload is Map) || !Payload.Has("action") || !(Payload["action"] is String)
@@ -213,6 +216,10 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Deps := _LayMgrWeb_DefaultDeps()
 	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 		return false
+	; Each retained callback owns the admitting page, even when Deps is reused.
+	Deps := Deps.Clone()
+	Deps["session_epoch"] := SessionEpoch
+	_LayMgrWeb_PresentationDeps := Deps
 	if (_LayMgrWeb_RuntimeRefresh is Map) && (Action == "install" || Action == "update"
 			|| Action == "uninstall" || Action == "select" || Action == "composer_save"
 			|| Action == "composer_remove") {
@@ -224,7 +231,7 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Initial := Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"]))
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
-		Deps["push"].Call("initData", Initial)
+		_LayMgrWeb_PushPayload(Deps, "initData", Initial)
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
@@ -301,33 +308,61 @@ _LayMgrWeb_CommandCurrent(SessionEpoch, Action) {
 	return SessionEpoch == _LayMgrWeb_SessionEpoch && (Action == "ready" || !A_IsSuspended)
 }
 
+_LayMgrWeb_PresentationCurrent(Deps) {
+	global _LayMgrWeb_SessionEpoch
+	return Deps.Get("session_epoch", _LayMgrWeb_SessionEpoch) == _LayMgrWeb_SessionEpoch
+}
+
+; A result belongs to one page; committing an install remains independent of it.
+_LayMgrWeb_PublishResult(Deps, Result) {
+	global _LayMgrWeb_Result
+	PreviousCritical := Critical("On")
+	try {
+		if !_LayMgrWeb_PresentationCurrent(Deps)
+			return false
+		_LayMgrWeb_Result := Result
+	} finally Critical(PreviousCritical)
+	return true
+}
+
 _LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
-	global _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
+	global _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_SessionEpoch
+	; Direct internal callers acquire the same owner as message callbacks.
+	if !Deps.Has("session_epoch") {
+		Deps := Deps.Clone()
+		Deps["session_epoch"] := _LayMgrWeb_SessionEpoch
+	}
 	if !Ok {
-		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", false, "code", String(CodeOrDetail),
-			"detail", String(Detail))
+		_LayMgrWeb_PublishResult(Deps, Map("id", Id, "action", Action, "ok", false,
+			"code", String(CodeOrDetail), "detail", String(Detail)))
 		_LayMgrWeb_PushState(Deps)
 		return false
 	}
 	if !Deps.Has("after") {
-		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", true)
+		_LayMgrWeb_PublishResult(Deps, Map("id", Id, "action", Action, "ok", true))
 		_LayMgrWeb_PushState(Deps)
 		return true
 	}
 	Pending := Map("id", Id, "action", Action)
 	_LayMgrWeb_RuntimeRefresh := Pending
-	_LayMgrWeb_Result := 0
+	_LayMgrWeb_PublishResult(Deps, 0)
 	_LayMgrWeb_PushState(Deps)
 	Finish(Ready) {
-		global _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
+		global _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_PresentationDeps
 		if _LayMgrWeb_RuntimeRefresh != Pending
 			return false
 		_LayMgrWeb_RuntimeRefresh := 0
 		Accepted := (Ready is Integer) && Ready == 1
-		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", Accepted)
+		Result := Map("id", Id, "action", Action, "ok", Accepted)
 		if !Accepted
-			_LayMgrWeb_Result["code"] := "other"
-		_LayMgrWeb_PushState(Deps)
+			Result["code"] := "other"
+		_LayMgrWeb_PublishResult(Deps, Result)
+		; A replacement page may have observed the operation as busy. Retire
+		; that projection with fresh state while preserving its own result.
+		if _LayMgrWeb_PresentationCurrent(Deps)
+			_LayMgrWeb_PushState(Deps)
+		else if _LayMgrWeb_PresentationDeps is Map
+			_LayMgrWeb_PushState(_LayMgrWeb_PresentationDeps)
 		return true
 	}
 	try Started := Deps["after"].Call(Id, Action, Finish)
@@ -343,7 +378,22 @@ _LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
 }
 
 _LayMgrWeb_PushState(Deps, *) {
-	Deps["push"].Call("updateState", LayoutManager_PageState(Deps["local_dir"]))
+	if !_LayMgrWeb_PresentationCurrent(Deps)
+		return false
+	State := LayoutManager_PageState(Deps["local_dir"])
+	if !_LayMgrWeb_PresentationCurrent(Deps)
+		return false
+	return _LayMgrWeb_PushPayload(Deps, "updateState", State)
+}
+
+_LayMgrWeb_PushPayload(Deps, Name, Payload) {
+	global _LayMgrWeb_SessionEpoch
+	if !_LayMgrWeb_PresentationCurrent(Deps)
+		return false
+	if Deps["push"] == _LayMgrWeb_Push
+		return _LayMgrWeb_Push(Name, Payload, Deps.Get("session_epoch", _LayMgrWeb_SessionEpoch))
+	Deps["push"].Call(Name, Payload)
+	return true
 }
 
 /**
@@ -608,12 +658,17 @@ _LayMgrWeb_SessionCall(SessionEpoch, Callback, Params*) {
 }
 
 ; Fire-and-forget push to the page; the window may already be gone.
-_LayMgrWeb_Push(FunctionName, Payload) {
-	global _LayMgrWeb_WebView
-	if !IsSet(_LayMgrWeb_WebView)
+_LayMgrWeb_Push(FunctionName, Payload, ExpectedEpoch := unset) {
+	global _LayMgrWeb_WebView, _LayMgrWeb_SessionEpoch
+	if !IsSet(ExpectedEpoch)
+		ExpectedEpoch := _LayMgrWeb_SessionEpoch
+	if ExpectedEpoch != _LayMgrWeb_SessionEpoch || !IsSet(_LayMgrWeb_WebView)
 		return false
-	WebView_RunScriptAsync(_LayMgrWeb_WebView,
-		"if(window." . FunctionName . ")window." . FunctionName . "(" . _LayMgrWeb_Json(Payload) . ")", "LayoutManager")
+	View := _LayMgrWeb_WebView, Epoch := ExpectedEpoch
+	Script := "if(window." . FunctionName . ")window." . FunctionName . "(" . _LayMgrWeb_Json(Payload) . ")"
+	if Epoch != _LayMgrWeb_SessionEpoch || !IsSet(_LayMgrWeb_WebView) || View != _LayMgrWeb_WebView
+		return false
+	WebView_RunScriptAsync(View, Script, "LayoutManager")
 	return true
 }
 
@@ -638,11 +693,12 @@ _LayMgrWeb_Close(*) {
 ; idempotent, because the page's close and the window's Close event both come here.
 _LayMgrWeb_Reset() {
 	global _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
-	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch
+	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch, _LayMgrWeb_PresentationDeps
 	if _LayMgrWeb_ResetDone
 		return
 	_LayMgrWeb_ResetDone := true
 	_LayMgrWeb_SessionEpoch += 1
+	_LayMgrWeb_PresentationDeps := 0
 	try {
 		_LayMgrWeb_MsgSub := unset
 		_LayMgrWeb_NavSub := unset
