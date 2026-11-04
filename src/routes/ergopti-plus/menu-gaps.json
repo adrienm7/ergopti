@@ -130,38 +130,6 @@
 		}
 	},
 	{
-		"path": "configuration_menu.karabiner_integration",
-		"visibility": "hide",
-		"labels": { "fr": "Ergopti utilise Karabiner", "en": "Ergopti uses Karabiner" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
-		"reasons": {
-			"windows": {
-				"en": "Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.",
-				"fr": "Chaque pilote remappe le clavier avec un moteur différent — Windows avec sa propre couche tap-hold, macOS avec Karabiner-Elements, Linux avec le moteur tap-hold de son propre daemon — chacun porte donc le menu du moteur qu'il exécute, et aucun ne peut configurer celui d'un autre."
-			},
-			"linux": {
-				"en": "Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.",
-				"fr": "Chaque pilote remappe le clavier avec un moteur différent — Windows avec sa propre couche tap-hold, macOS avec Karabiner-Elements, Linux avec le moteur tap-hold de son propre daemon — chacun porte donc le menu du moteur qu'il exécute, et aucun ne peut configurer celui d'un autre."
-			}
-		}
-	},
-	{
-		"path": "configuration_menu.remove_from_karabiner",
-		"visibility": "hide",
-		"labels": { "fr": "Retirer Ergopti de Karabiner", "en": "Remove Ergopti from Karabiner" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
-		"reasons": {
-			"windows": {
-				"en": "Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.",
-				"fr": "Chaque pilote remappe le clavier avec un moteur différent — Windows avec sa propre couche tap-hold, macOS avec Karabiner-Elements, Linux avec le moteur tap-hold de son propre daemon — chacun porte donc le menu du moteur qu'il exécute, et aucun ne peut configurer celui d'un autre."
-			},
-			"linux": {
-				"en": "Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.",
-				"fr": "Chaque pilote remappe le clavier avec un moteur différent — Windows avec sa propre couche tap-hold, macOS avec Karabiner-Elements, Linux avec le moteur tap-hold de son propre daemon — chacun porte donc le menu du moteur qu'il exécute, et aucun ne peut configurer celui d'un autre."
-			}
-		}
-	},
-	{
 		"path": "debug_menu.window_spy",
 		"visibility": "hide",
 		"labels": { "fr": "Window Spy", "en": "Window Spy" },
