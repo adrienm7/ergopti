@@ -17,6 +17,46 @@ local helpers, DEFAULTS, fake_hook, write, manager =
 
 
 helpers.describe("tap-hold manager", function()
+	helpers.it("refuses a FIFO one-shot table without blocking a reload", function()
+		local uv = require("luv")
+		local Shell = require("adapters.shell_runner")
+		local path = os.tmpname()
+		os.remove(path)
+		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
+		local code = string.format([[package.path = %q
+require("compat.utf8").install()
+local fixture = require("tests.support.platform.remap.tap_hold.tap_hold_manager_fixture")
+local manager, hook, _, user_path = fixture.manager()
+local original = hook.engine
+local paths = require("infra.paths")
+local shared = paths.shared
+paths.shared = function(name)
+  if name == "tap_hold/one_shot_shift.json" then return %q end
+  return shared(name)
+end
+assert(manager.reload() == false)
+assert(hook.engine == original)
+paths.shared = shared
+manager._reset_for_test()
+os.remove(user_path)
+]], package.path, path)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(exit_code, sig)
+			exited, status, signal = true, exit_code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		os.remove(path)
+		helpers.assert_eq(expired, false, "a reload must not block on a FIFO")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+	end)
 
 	helpers.it("installs the engine at init and runs its tap actions", function()
 		local Manager, hook, actions, user_path = manager()

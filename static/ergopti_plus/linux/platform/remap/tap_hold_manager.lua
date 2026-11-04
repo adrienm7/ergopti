@@ -263,10 +263,13 @@ end
 --- @return table { results = { [char] = result }, magic_key_result = string }
 local function _read_one_shot()
 	local path = Paths.shared("tap_hold/one_shot_shift.json")
-	local fh = io.open(path, "r")
+	local fh = require("infra.regular_file_reader").open_source(path)
 	if not fh then error("the one-shot Shift results are unreadable: " .. tostring(path), 0) end
-	local raw = fh:read("*a")
-	fh:close()
+	local read_ok, raw = pcall(fh.read, fh, "*a")
+	local close_ok, closed = pcall(fh.close, fh)
+	if not read_ok or type(raw) ~= "string" or not close_ok or closed ~= true then
+		error("the one-shot Shift results are unreadable: " .. tostring(path), 0)
+	end
 	local ok, data = pcall(Json.decode, raw)
 	if not ok or type(data) ~= "table" or type(data.results) ~= "table" or type(data.magic_key_result) ~= "string" then
 		error("the one-shot Shift results are malformed: " .. tostring(path), 0)
