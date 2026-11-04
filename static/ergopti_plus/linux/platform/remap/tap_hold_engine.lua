@@ -335,6 +335,7 @@ end
 --- kernel, and the first release must not lift it under the others.
 local output_holders = setmetatable({}, { __mode = "k" })
 local source_holds = setmetatable({}, { __mode = "k" })
+local source_physical = setmetatable({}, { __mode = "k" })
 
 --- Retains producer custody separately from the stable public event shape.
 local function hold_row(self, out, code, value)
@@ -888,12 +889,12 @@ end
 --- @return string|table|nil tap What to run after them: a catalogue action, or
 ---   { type_text } for text the layout cannot type
 --- @return string|nil binding Exact tap_hold__ source of a catalogue action.
-local function process(self, code, value, now_ms)
+local function process(self, code, value, now_ms, scoped)
 	local config = self.by_code[code]
 	local out = {}
-	if value == DOWN then
+	if not scoped and value == DOWN then
 		self.physical_down[code] = true
-	elseif value == UP then
+	elseif not scoped and value == UP then
 		self.physical_down[code] = nil
 	end
 
@@ -1102,6 +1103,20 @@ function M:process(code, value, now_ms, receipt)
 	local native_owner = source and rawget(receipt, "source_owner") or nil
 	local scoped = type(source) == "string" and source ~= "" and type(generation) == "number"
 	if scoped and native_owner and rawget(receipt, "source_current") ~= true then return {} end
+	if scoped then
+		-- The hook observes even physical edges the pair policy did not pass to
+		-- this engine. Direct users without that snapshot track each source here.
+		local snapshot = rawget(receipt, "physical_down")
+		if type(snapshot) == "table" then
+			self.physical_down = {}
+			for key, down in pairs(snapshot) do if down == true then self.physical_down[key] = true end end
+		else
+			local sources = source_physical[self] or {}; source_physical[self] = sources
+			local down = sources[code] or {}; sources[code] = down
+			if value == DOWN then down[source] = true elseif value == UP then down[source] = nil end
+			self.physical_down[code] = next(down) ~= nil and true or nil
+		end
+	end
 	local groups = source_holds[self]
 	if scoped and not groups then groups = {}; source_holds[self] = groups end
 	local group = groups and groups[code]
@@ -1125,7 +1140,7 @@ function M:process(code, value, now_ms, receipt)
 		elseif not own then return {}
 		elseif value == UP then
 			self.held[code], group[source] = own.state, nil
-			local out, tap, binding = process(self, code, value, now_ms)
+			local out, tap, binding = process(self, code, value, now_ms, scoped)
 			if source_holds[self] ~= groups or groups[code] ~= group then return out, tap, binding end
 			local _, remaining = next(group)
 			if remaining then self.held[code], self.physical_down[code] = remaining.state, true
@@ -1133,7 +1148,7 @@ function M:process(code, value, now_ms, receipt)
 			return out, tap, binding
 		end
 	end
-	local out, tap, binding = process(self, code, value, now_ms)
+	local out, tap, binding = process(self, code, value, now_ms, scoped)
 	if scoped and source_holds[self] == groups and value == DOWN and self.held[code] and not group then
 		groups[code] = { [source] = { state = self.held[code], generation = generation, native_owner = native_owner } }
 	end
@@ -1232,6 +1247,7 @@ end
 --- @return table events Key-ups, in the reverse of the order they went down.
 function M:release_all()
 	source_holds[self] = nil
+	source_physical[self] = nil
 	local out = {}
 	-- Every key this engine holds down, once, whoever of it holds it.
 	-- Keys the hand still holds stay down: they are the kernel's to release.

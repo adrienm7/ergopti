@@ -602,7 +602,24 @@ end
 local _owned_row_receipt = nil
 local _dispatch_owned_rows
 local _deliver_owned_rows
-local function _combination_source(source)
+-- A pair policy may suppress one keyboard's duplicate DOWN before the base
+-- engine sees it. Blocker rules need the physical cohort, including that key.
+function _source_recovery.physical_snapshot(source, code, value)
+	local physical_down = {}
+	for _, down in pairs(_physical_down) do physical_down[down.code] = true end
+	for key, down in pairs(_forwarded_down) do
+		if key == source_key(down.source, down.code)
+			and not (value == InputEvent.VALUE_UP and down.source == source and down.code == code) then
+			physical_down[down.code] = true
+		end
+	end
+	for key in pairs(_remap_orphans) do
+		local code = tonumber(key:match(":(%d+)$"))
+		if code then physical_down[code] = true end
+	end
+	return physical_down
+end
+local function _combination_source(source, code, value)
 	local receipt = M.physical_source_receipt()
 	local slot = keyboard_slot(source)
 	local owner = _input_source_owners and _input_source_owners[slot]
@@ -633,6 +650,7 @@ local function _combination_source(source)
 		end
 	end
 	return { source = source, generation = receipt.generation, ready = receipt.ready,
+		physical_down = _source_recovery.physical_snapshot(source, code, value),
 		physical = _physical_sources[source] == true,
 		source_owner = original and original.owner or owner, source_current = current }
 end
@@ -2200,7 +2218,9 @@ local function _dispatch_event(ev, source)
 		local origin_view = origin and _input_exports_current() and _input_reader_ports.event_view(origin) or nil
 		local custody = {}
 		if _remapper then
-			local receipt = _remapper.has_combinations and _combination_source(source) or nil
+			local receipt = _remapper.has_combinations and _combination_source(source, ev.code, ev.value)
+				or { source = source, generation = _remapper_generation,
+					physical_down = _source_recovery.physical_snapshot(source, ev.code, ev.value) }
 			local previous_buffer = _buffer_dispatch
 			_buffer_dispatch = {engine=_remapper,event=ev,source=source,origin=origin,at_ms=at_ms}
 			local process_started = Perf.clock()
