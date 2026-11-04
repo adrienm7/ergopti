@@ -187,6 +187,18 @@ helpers.describe("personal editor opening-source admission", function()
 		end)
 	end)
 
+	helpers.it("(personal-save-flags) refuses a missing displayed flag without clearing it", function()
+		with_opening_file(function(f)
+			helpers.assert_true(f.ready())
+			local data = opening_model("edited")
+			data.sections.english.entries[1].is_word = nil
+			local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(f.read(), OPENING_SOURCE)
+			helpers.assert_eq(f.seen.writes, 0)
+		end)
+	end)
+
 	helpers.it("refuses a foreign section added after the actual displayed model", function()
 		with_opening_file(function(f)
 			helpers.assert_eq(f.ready(), true)

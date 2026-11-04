@@ -17,7 +17,9 @@ local OPENING_FOREIGN = OPENING_SOURCE .. '[outside]\n"future" = { output = "ind
 
 local function opening_model(output)
 	return { sections_order = { "english" }, sections = {
-		english = { description = "English", entries = { { trigger = "old", output = output } } },
+		english = { description = "English", entries = { { trigger = "old", output = output,
+			is_word = true, auto_expand = false, is_case_sensitive = false,
+			final_result = false, is_case_sensitive_strict = false } } },
 	} }
 end
 

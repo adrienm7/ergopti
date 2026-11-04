@@ -560,9 +560,10 @@ helpers.describe("ui.bridge_handlers", function()
           data = {
             sections_order = { "work" },
             sections = { work = { description = "Work", entries = {
-              { trigger = "btw", output = "by the way", is_word = true,
-                is_case_sensitive = true, is_case_sensitive_strict = true },
-              { trigger = "omw", output = "on my way" },
+              { trigger = "btw", output = "by the way", is_word = true, auto_expand = false,
+                is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true },
+              { trigger = "omw", output = "on my way", is_word = false, auto_expand = false,
+                is_case_sensitive = false, final_result = false, is_case_sensitive_strict = false },
             } } },
           },
         }, state, context)
@@ -587,7 +588,8 @@ helpers.describe("ui.bridge_handlers", function()
           data = {
             sections_order = { "english" },
             sections = { english = { description = "English", entries = {
-              { trigger = "ty", output = "thank you" },
+              { trigger = "ty", output = "thank you", is_word = false, auto_expand = false,
+                is_case_sensitive = false, final_result = false, is_case_sensitive_strict = false },
             } } },
           },
         }, state, context)
