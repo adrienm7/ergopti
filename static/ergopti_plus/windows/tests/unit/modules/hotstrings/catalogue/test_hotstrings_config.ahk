@@ -1002,3 +1002,110 @@ TestHotstringsConfig_ResolveExtPriority() {
 }
 Test("HotstringsResolveExt: exposes priority with the package source default + override",
 	TestHotstringsConfig_ResolveExtPriority)
+
+; Real offset source, production projection/rebase and actual public colour/delay
+; writes. Expectations compare an independent semantic source decode or a fresh
+; production reload, never the proposed StoredOffset implementation property.
+_HCO_OffsetRetainsIntent(Mode) {
+	global Features, _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {features: Features, overrides: _HotstringsOverrides,
+		path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_offset_intent_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Features := Features.Clone()
+		Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		_HotstringsOverridesPath := Path
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		Offset := (Mode == "unclipped-control" || Mode == "base-roundtrip") ? -0.25 : -1.0
+		Leaf := Mode == "unlimited-control" ? "delay_unlimited = true" : "delay_offset = " . Offset
+		Source := '[magickey]`n' . Leaf . '`ncolor = "#123456"`n'
+			. '[magickey.text_expansion_symbols]`n' . Leaf . '`ncolor = "#234567"`n'
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		SourceModel := TOML_ParseDocument(FSReadStrict(Path))
+		_HotstringsOverrides := _ParseOverrides(Path)
+		HotstringsOverridesApplyBase()
+		HotstringsResolveBumpGen()
+		Initial := HotstringsResolve("magickey", "").Delay
+		if Mode == "unlimited-control"
+			AssertEqual(0, Initial)
+		else if Mode == "unclipped-control" || Mode == "base-roundtrip"
+			AssertEqual(0.5, Initial)
+		else
+			AssertEqual(0.001, Initial, "a finite cancelling offset clamps; it must not become unlimited")
+
+		if Mode == "replace-clipped-delay" {
+			AssertTrue(HotstringsSetOverride("magickey", "", "delay", 0.5))
+			AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "delay", 0.5))
+			AssertEqual(0.5, HotstringsResolve("magickey", "").Delay)
+			AssertEqual(0.5, HotstringsResolve("magickey", "text_expansion_symbols").Delay)
+		}
+		if Mode == "base-roundtrip" {
+			Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.1
+			HotstringsOverridesRebase(0.75, 0.1)
+			AssertEqual(0.001, HotstringsResolve("magickey", "").Delay)
+			Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+			HotstringsOverridesRebase(0.1, 0.75)
+		} else if Mode != "colour" {
+			Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 2.0
+			HotstringsOverridesRebase(0.75, 2.0)
+		}
+
+		if Mode == "colour" || Mode == "unclipped-control" || Mode == "unlimited-control" {
+			AssertTrue(HotstringsSetOverride("magickey", "", "color", "#abcdef"),
+				"the actual public writer must acknowledge the unrelated colour change")
+			AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "color", "#fedcba"))
+			Disk := TOML_ParseDocument(FSReadStrict(Path))
+			AssertEqual("#abcdef", Disk["magickey"]["color"])
+			AssertEqual("#fedcba", Disk["magickey"]["text_expansion_symbols"]["color"])
+			if Mode != "unlimited-control" {
+				AssertEqual(SourceModel["magickey"]["delay_offset"], Disk["magickey"]["delay_offset"],
+					"a colour write cannot replace the finite relative intention with its clipped projection")
+				AssertEqual(SourceModel["magickey"]["text_expansion_symbols"]["delay_offset"],
+					Disk["magickey"]["text_expansion_symbols"]["delay_offset"])
+			} else {
+				AssertTrue(Disk["magickey"]["delay_unlimited"] is TOML_Bool)
+				AssertTrue(Disk["magickey"]["delay_unlimited"].Value)
+				AssertFalse(Disk["magickey"].Has("delay_offset"))
+			}
+		}
+
+		Fresh := _ParseOverrides(Path)
+		HotstringsOverridesApplyBase(Fresh)
+		FileLive := HotstringsResolve("magickey", "").Delay
+		SectionLive := HotstringsResolve("magickey", "text_expansion_symbols").Delay
+		AssertEqual(Fresh["magickey"].Delay, FileLive,
+			"live rebasing must equal a genuine reload of the same persistent offset at the same base")
+		AssertEqual(Fresh["magickey"].Sections["text_expansion_symbols"].Delay, SectionLive)
+		if Mode == "rebase"
+			AssertEqual(1.0, FileLive, "source -1.000 plus base 2.000 is finite one second")
+		else if Mode == "base-roundtrip"
+			AssertEqual(0.5, FileLive, "returning the base must restore the pre-clamp finite delay")
+		else if Mode == "replace-clipped-delay" || Mode == "unclipped-control"
+			AssertEqual(1.75, FileLive)
+		else if Mode == "unlimited-control"
+			AssertEqual(0, FileLive)
+		if Mode == "rebase" || Mode == "base-roundtrip"
+			AssertEqual(Source, FSReadStrict(Path), "memory-only rebase must not rewrite the original offset")
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+		Probe := _ConfigWriteLeaseTryAcquire(Path, "offset-fixture-terminal-probe")
+		AssertTrue(Probe is Object)
+		try AssertTrue(_ConfigWriteLeaseOwns(Probe, Path))
+		finally _ConfigWriteLeaseRelease(Probe)
+	} finally {
+		Features := Saved.features
+		_HotstringsOverrides := Saved.overrides
+		_HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HCO_Mode in ["rebase", "colour", "base-roundtrip", "unclipped-control", "unlimited-control", "replace-clipped-delay"]
+	Test("HotstringsConfig persistent offset: " . _HCO_Mode, _HCO_OffsetRetainsIntent.Bind(_HCO_Mode))
