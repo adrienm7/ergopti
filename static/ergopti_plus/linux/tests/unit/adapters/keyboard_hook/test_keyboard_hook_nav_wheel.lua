@@ -203,6 +203,25 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		helpers.assert_eq(grabs.off, 1, "the mouse is given back once, after its button")
 	end)
 
+	helpers.it("releases a forwarded mouse button when a grabbed pointer loses its queue", function()
+		local emitted = drive("mouse", HOLD, {
+			{ EV_KEY, BTN_LEFT, 1, 3000 }, { EV_SYN, 0, 0, 3000 },
+			{ EV_SYN, 3, 0, 4000 }, { EV_REL, REL_X, 9, 4500 },
+			{ EV_SYN, 0, 0, 5000 },
+		})
+		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":1"))
+		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":0"), "the virtual button must be released")
+		helpers.assert_true(not has(emitted, "rel:" .. REL_X .. ":9"), "the lost frame cannot be forwarded")
+	end)
+
+	helpers.it("releases a forwarded mouse button when the hook stops during a hold", function()
+		local emitted = drive("mouse", HOLD, {
+			{ EV_KEY, BTN_LEFT, 1, 3000 }, { EV_SYN, 0, 0, 3000 },
+		})
+		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":1"))
+		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":0"), "stop must release the virtual button")
+	end)
+
 	helpers.it("leaves the wheel and the mouse alone outside the layer and under an unbound key", function()
 		local emitted, grabs = drive("mouse", { { KEY_K, 1, 1000 }, { KEY_K, 0, 9000 } }, {
 			{ EV_REL, REL_WHEEL, 1, 3000 }, { EV_SYN, 0, 0, 3000 },
