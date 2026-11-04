@@ -37,9 +37,10 @@ local SCROLL_AXES = { [InputEvent.REL_WHEEL] = true, [InputEvent.REL_HWHEEL] = t
 M.KIND_PRESS  = "press"
 M.KIND_MOTION = "motion"
 M.KIND_FRAME  = "frame"
+M.KIND_RESET  = "reset"
 
 -- The kinds above, for validation
-local KINDS = { [M.KIND_PRESS] = true, [M.KIND_MOTION] = true, [M.KIND_FRAME] = true }
+local KINDS = { [M.KIND_PRESS] = true, [M.KIND_MOTION] = true, [M.KIND_FRAME] = true, [M.KIND_RESET] = true }
 
 
 
@@ -65,6 +66,10 @@ function M.new()
 	--- @return table|nil delta { clicks, scrolls, distance } or nil when it adds nothing.
 	function tracker.observe(kind, code, value, source)
 		assert(KINDS[kind], "unknown pointer event kind: " .. tostring(kind))
+		if kind == M.KIND_RESET then
+			frames[source or default_source] = nil
+			return nil
+		end
 		if kind == M.KIND_PRESS then
 			if CLICK_BUTTONS[code] then return { clicks = 1, scrolls = 0, distance = 0 } end
 			return nil
