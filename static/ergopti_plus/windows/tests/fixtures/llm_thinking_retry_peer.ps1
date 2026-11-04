@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Directory,
     [Parameter(Mandatory=$true)][string]$ServicesPath,
     [Parameter(Mandatory=$true)][string]$Nonce,
-    [Parameter(Mandatory=$true)][ValidateSet('positive','cancel')][string]$Case
+    [Parameter(Mandatory=$true)][ValidateSet('positive','cancel','http400','http200')][string]$Case
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -34,7 +34,7 @@ function Test-Control([string]$Name) {
 }
 try {
     $CrLf = ([string][char]13) + [char]10
-    $Bad = '{"error":{"message":"Unknown parameter: thinking.type"}}'
+    $Bad = if ($Case -ceq 'http400') { '{"error":{"message":"owned-classification-refusal"}}' } else { '{"error":{"message":"Unknown parameter: thinking.type"}}' }
     $Good = '{"choices":[{"message":{"content":"owned-thinking-retry-ok"}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}'
     $BadResponse = 'HTTP/1.1 400 Bad Request' + $CrLf + 'Content-Type: application/json' + $CrLf +
         'Content-Length: ' + $Encoding.GetByteCount($Bad) + $CrLf + 'Connection: close' + $CrLf + $CrLf + $Bad
@@ -42,7 +42,9 @@ try {
         'Content-Length: ' + $Encoding.GetByteCount($Good) + $CrLf + 'Connection: close' + $CrLf + $CrLf + $Good
     $Server = New-Object ErgoptiWinHttpTestServer
     $Server.Mode = 'static'
-    $Server.Responses = @($BadResponse, $GoodResponse)
+    $Server.Responses = if ($Case -ceq 'http200') { @($GoodResponse) }
+        elseif ($Case -ceq 'http400') { @($BadResponse) }
+        else { @($BadResponse, $GoodResponse) }
     # Reserve the native listener, but do not start its accept thread until
     # the genuine Menu handler has returned and published its original id.
     # TcpListener.Start is idempotent; Server.Start starts the acceptor later.

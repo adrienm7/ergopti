@@ -1104,3 +1104,171 @@ Test("llm API native thinking retry: positive control (api-thinking-retry-owner)
     _LATRT_Run.Bind(false))
 Test("llm API native thinking retry: cancel at retired-original gap (api-thinking-retry-owner)",
     _LATRT_Run.Bind(true))
+
+
+; Native managed-response classification through neutral production callbacks.
+; Requires its existing owned peer / exact retirement helpers (_LATRT_*).
+; No Menu callback or window presenter is invoked by the neutral subject cases.
+global _LATHTTP_EnvironmentDebt := 0
+
+_LATHTTP_NoEffects() {
+    global _LLM_Remote_Async, _LATRT_Debt
+    return _LLM_Remote_Async.Count == 0 && _LATRT_Debt.Count == 0
+        && ManagedNetworkTerminalFailure.Owners.Count == 0
+        && !IsObject(ManagedDownloadFailureWindow.Current)
+}
+
+_LATHTTP_Restore(Saved) {
+    global _ManagedNetworkWindowsContract, _ManagedNetworkWindowsPorts, _ManagedNetworkWindowsInitializing
+    _ManagedNetworkWindowsContract := Saved.Contract
+    _ManagedNetworkWindowsPorts := Saved.Ports
+    _ManagedNetworkWindowsInitializing := Saved.Initializing
+}
+
+_LATHTTP_HostScope(Body) {
+    global _ManagedNetworkWindowsContract, _ManagedNetworkWindowsPorts, _ManagedNetworkWindowsInitializing
+    global _LATHTTP_EnvironmentDebt
+    if IsObject(_LATHTTP_EnvironmentDebt) {
+        if !_LATRT_DrainDebt() || !_LATHTTP_NoEffects()
+            throw Error("Previous managed HTTP scope still owns actual retirement debt.")
+        _LATHTTP_Restore(_LATHTTP_EnvironmentDebt)
+        _LATHTTP_EnvironmentDebt := 0
+    }
+    AssertFalse(_ManagedNetworkWindowsInitializing, "do not borrow a live host initialization")
+    AssertTrue(_LATHTTP_NoEffects(), "private host scope requires no foreign request, window or broker owner")
+    Saved := {Contract: _ManagedNetworkWindowsContract, Ports: _ManagedNetworkWindowsPorts,
+        Initializing: _ManagedNetworkWindowsInitializing}
+    _ManagedNetworkWindowsContract := 0, _ManagedNetworkWindowsPorts := 0
+    _ManagedNetworkWindowsInitializing := false
+    try {
+        AssertTrue(ManagedNetworkFailureWindows_Init(), "use genuine canonical policy and production native ports")
+        return Body.Call()
+    } finally {
+        if _LATHTTP_NoEffects()
+            _LATHTTP_Restore(Saved)
+        else {
+            ; Keep the genuine environment alive while any captured callback/owner
+            ; can still need it. Never close a window whose identity is unknown.
+            _LATHTTP_EnvironmentDebt := Saved
+            throw Error("Managed HTTP scope cannot restore host beneath live ownership; state retained.")
+        }
+    }
+}
+
+_LATHTTP_Case(Status) {
+    global _DriverDir, _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LATRT_Debt
+    AssertFalse(A_IsSuspended)
+    Nonce := DllCall("GetCurrentProcessId", "UInt") . "_" . A_TickCount . "_" . Random(100000, 999999)
+    Mode := Status == 400 ? "http400" : "http200"
+    State := {Cancel: false, Nonce: Nonce, Mode: Mode, Directory: "", Registry: "",
+        Peer: 0, PeerPid: 0, PeerCalls: 0, PeerCode: -1, PeerOutput: "", PeerErrors: "",
+        Progress: 0, ProgressHwnd: 0, Logs: [], CleanupIssues: [], Owner: 0,
+        OriginalId: 0, OriginalEntry: 0, RetryId: 0, RetryEntry: 0, Marker: 0}
+    Heard := [], Primary := 0, Retired := false, CounterBefore := _LLM_Remote_AsyncCounter
+    State.CounterBefore := CounterBefore
+    PreviousCritical := Critical("Off")
+    try {
+        State.Directory := A_Temp . "\ergopti_llm_classify_" . Nonce . "_" . Mode
+        FSCreateDirectoryExclusiveStrict(State.Directory)
+        PeerScript := _DriverDir . "\tests\fixtures\llm_thinking_retry_peer.ps1"
+        Services := _DriverDir . "\tests\fixtures\winhttp_test_services.ps1"
+        State.Peer := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
+            ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", PeerScript,
+                "-Directory", State.Directory, "-ServicesPath", Services, "-Nonce", Nonce, "-Case", Mode],
+            _LATRT_Done.Bind(State))
+        AssertEqual(1, State.Peer.start())
+        State.PeerPid := State.Peer.processId()
+        AssertTrue(State.PeerPid is Integer && State.PeerPid > 0)
+        AssertTrue(_LATRT_Wait(() => FSStrictExists(State.Directory . "\ready.json") || State.PeerCalls > 0, 30000))
+        Ready := JsonParse(FSReadUtf8Exact(State.Directory . "\ready.json"))
+        AssertEqual(Nonce, Ready["nonce"])
+        AssertEqual(Mode, Ready["case"])
+        AssertEqual(State.PeerPid, Ready["pid"])
+        AssertTrue(Ready["port"] is Integer && Ready["port"] > 0 && Ready["port"] <= 65535)
+        Entry := Map("Provider", "openai_compat", "Model", "fixture-model", "Token", "owned-fixture-secret",
+            "BaseUrl", "http://127.0.0.1:" . Ready["port"] . "/v1")
+        Id := LLM_RemoteGenerate_Async(Entry, "Fixture system.", "Fixture user.", 0.1,
+            (Text, Usage := "") => Heard.Push(Map("ok", true, "text", Text)),
+            (Info := "") => Heard.Push(Map("ok", false, "info", Info)),
+            "", 8, "managed_classification_control", 20000)
+        State.OriginalId := Id
+        AssertEqual(CounterBefore + 1, Id)
+        AssertTrue(_LLM_Remote_Async.Has(Id))
+        State.OriginalEntry := _LLM_Remote_Async[Id]
+        AssertEqual(1, _LATRT_Control(State, "release"))
+        AssertTrue(_LATRT_Wait(() => Heard.Length > 0, 30000), "genuine terminal must invoke the neutral callback")
+        AssertTrue(_LATRT_Wait(() => _LATRT_RequestsGone(State), 10000))
+        AssertEqual(1, _LATRT_Control(State, "stop"))
+        AssertTrue(_LATRT_Wait(() => State.PeerCalls > 0, 10000))
+        AssertEqual(1, State.PeerCalls)
+        AssertEqual(0, State.PeerCode, State.PeerOutput . State.PeerErrors)
+        Receipt := JsonParse(FSReadUtf8Exact(State.Directory . "\receipt.json"))
+        AssertEqual(Nonce, Receipt["nonce"])
+        AssertEqual(Mode, Receipt["case"])
+        AssertEqual(State.PeerPid, Receipt["pid"])
+        AssertTrue(Receipt["ok"] && Receipt["released"] && Receipt["stop_received"] && Receipt["listener_retired"])
+        AssertEqual(1, Receipt["http_requests"], "both controls require exactly one real HTTP POST")
+        AssertEqual(1, _LLM_Remote_AsyncCounter - CounterBefore)
+        AssertEqual(1, Heard.Length)
+        Http := State.OriginalEntry["http"]
+        AssertEqual(Status, Http.Status)
+        AssertTrue(Http.Completed && Http.ResponseEncodingValid && Http.ManagedPayloadPublished)
+        Expected := _LLMRemoteClassifyTerminal("openai", Map("exit", 0, "status", Http.Status,
+            "body_read", true, "body", Http.ResponseText), "fixture-model")
+        if Status == 400 {
+            AssertFalse(Heard[1]["ok"])
+            Info := Heard[1]["info"]
+            AssertTrue(Info is Map)
+            _TestPrint("# MANAGED_CLASSIFICATION " . KL_JsonEncode(Map("http_requests", Receipt["http_requests"],
+                "status", Info["status"], "reason", Info["reason"], "message", Info["message"],
+                "expected_reason", Expected["reason"], "expected_message", Expected["server_message"])))
+            AssertEqual("provider_error", Expected["reason"])
+            AssertEqual("owned-classification-refusal", Expected["server_message"])
+            AssertEqual(Status, Info["status"])
+            AssertEqual(Expected["reason"], Info["reason"], "managed failure must preserve production terminal classification")
+            AssertEqual(Expected["server_message"], Info["message"], "provider error text cannot be discarded")
+            ExpectedReport := ManagedNetworkFailureWindows_FromTransport(Http, () => true)
+            if ExpectedReport is Map {
+                AssertTrue(Info.Has("network_report") && Info["network_report"] is Map,
+                    "an actual managed native report must remain attached")
+                AssertEqual(ExpectedReport["cause"], Info["network_report"]["cause"])
+                AssertEqual(ExpectedReport["evidence"], Info["network_report"]["evidence"])
+            } else
+                AssertFalse(Info.Has("network_report"), "absence of native evidence cannot manufacture a report")
+        } else {
+            AssertTrue(Heard[1]["ok"] && Expected["ok"])
+            AssertEqual("owned-thinking-retry-ok", Heard[1]["text"])
+        }
+        AssertEqual(0, ManagedNetworkTerminalFailure.Owners.Count)
+        AssertFalse(IsObject(ManagedDownloadFailureWindow.Current), "neutral callbacks cannot create failure windows")
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        try Retired := _LATRT_Retire(State)
+        catch Any as Failure {
+            if !IsObject(Primary)
+                Primary := Failure
+        }
+        if Retired {
+            try _LATRT_DeletePrivate(State)
+            catch Any as Failure {
+                _LATRT_Debt[Nonce] := State
+                if !IsObject(Primary)
+                    Primary := Failure
+            }
+        } else
+            _LATRT_Debt[Nonce] := State
+        Critical(PreviousCritical)
+    }
+    if !Retired && !IsObject(Primary)
+        Primary := Error("Exact managed HTTP retirement remains pending.")
+    if IsObject(Primary)
+        throw Primary
+}
+
+_LATHTTP_Run(Status) {
+    _ManagedRemoteFixtureWithLlmTimings(_LATHTTP_HostScope.Bind(_LATHTTP_Case.Bind(Status)))
+}
+for _LATHTTP_Status in [200, 400]
+    Test("LLM managed HTTP " . _LATHTTP_Status . " preserves canonical terminal details (managed-http-classification)",
+        _LATHTTP_Run.Bind(_LATHTTP_Status))
