@@ -84,6 +84,7 @@ function M.acquire()
 		if home == nil then return false, "Neither XDG_RUNTIME_DIR nor an absolute HOME is set; no session lock folder." end
 		root = home .. FALLBACK_ROOT
 	end
+	if root:sub(1, 1) ~= "/" then return false, "The session lock root must be absolute." end
 	local ffi = ffi_c()
 	local folder = root .. "/" .. LOCK_FOLDER
 	-- The runtime or cache root may not exist yet on a fresh account.

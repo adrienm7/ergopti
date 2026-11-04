@@ -88,7 +88,19 @@ done
 
 # Every daemon launch, including a terminal launch, takes the instance lock.
 if "$DAEMON_LAUNCH"; then
-	lock_root="${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti"
+	lock_base="${XDG_RUNTIME_DIR:-}"
+	if [ -z "$lock_base" ]; then
+		if [[ "${HOME:-}" != /* ]]; then
+			printf '%s\n' '[session_lock] The session lock root must be absolute.' >&2
+			exit 78
+		fi
+		lock_base="$HOME/.cache"
+	fi
+	if [[ "$lock_base" != /* ]]; then
+		printf '%s\n' '[session_lock] The session lock root must be absolute.' >&2
+		exit 78
+	fi
+	lock_root="$lock_base/ergopti"
 	install -d -m 700 "$lock_root"
 	# Read/write open never waits for a peer on a foreign FIFO. Inspect the
 	# resulting descriptor, not the path, before accepting flock ownership.
