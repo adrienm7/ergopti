@@ -123,11 +123,12 @@ function M.new(options)
 	local cleanup_ok = true
 
 	local function publish(snapshot)
-		local before = receipt and receipt.bus .. receipt.path .. tostring(receipt.role) or nil
-		local after = snapshot and snapshot.bus .. snapshot.path .. tostring(snapshot.role) or nil
+		local changed = (receipt == nil) ~= (snapshot == nil)
+			or (receipt ~= nil and snapshot ~= nil
+				and (receipt.bus ~= snapshot.bus or receipt.path ~= snapshot.path or receipt.role ~= snapshot.role))
 		receipt = snapshot
 		AtspiFocus._publish_resident_snapshot(snapshot)
-		if callback and before ~= after then callback(snapshot) end
+		if callback and changed then callback(snapshot) end
 	end
 	local function cleanup()
 		if operation and not operation:is_settled() then return false end

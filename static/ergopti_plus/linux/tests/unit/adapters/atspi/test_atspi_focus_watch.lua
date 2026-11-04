@@ -80,6 +80,19 @@ end
 -- ===========================================
 
 helpers.describe("AT-SPI focus watcher: current native authority", function()
+	helpers.it("notifies when path and role boundaries collide in concatenation", function()
+		local state = fixture()
+		state.path, state.role = "/a1", 2
+		state.watch.on_change(function(snapshot) state.changes[#state.changes + 1] = snapshot or false end)
+		state.ready()
+		state.path, state.role = "/a", 12
+		state.message("snapshot")
+		helpers.assert_true(state.watch.pump())
+		helpers.assert_eq(#state.changes, 2, "a distinct focus must notify listeners")
+		helpers.assert_eq(state.changes[2].path, "/a")
+		helpers.assert_eq(state.changes[2].role, 12)
+	end)
+
 	helpers.it("imports the native worker without changing the caller's JIT policy", function()
 		local available, jit = pcall(require, "jit")
 		local before = nil
