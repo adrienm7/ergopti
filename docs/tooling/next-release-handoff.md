@@ -62,9 +62,14 @@ the shared Configuration manifest rows (the two macOS rows left it).
 | `ci(macos): accept the owned runtime's first install with sudo on hosted Macs`             | Remap runtime build job `install-acceptance` on `macos-15`, `macos-15-intel`, `macos-26` (`tools/build/owned_runtime_install_acceptance.sh`). It runs after the artifact job of the same dispatch.                                                                                                                                                                                                                                          |
 | `feat(field): report the whole owned runtime install in the Mac field run`                 | `field_owned_runtime` adds `vhid_job_file`, `vhid_job_loaded`, `artifact_receipt`, `install_launcher`; the stable self-signed identity reads `certificate`, no longer `adhoc`.                                                                                                                                                                                                                                                              |
 
+Later fixes, from the hosted acceptance: the Core's idle admission key never reached its built Info.plist
+(`INFOPLIST_KEY_` holds only Apple's keys; a post-build phase writes it now), and the live helper carries no driver
+payload (only the builder's SDK profile stages it), so pqrs' package is now the Lua fetch's verified download, installed
+by the install role's administrator shell before the helper, which writes the job from fixed keys.
+
 Decisions to know:
 
-- An installed pqrs driver, compatible or not, is left alone by the helper: an incompatible one is the existing
+- An installed pqrs driver, compatible or not, is left alone: an incompatible one is the existing
   `virtual_hid_incompatible` block and its driver-only update row. Activation is pqrs' manager `activate`, run as the
   user after the helper exits; macOS then may wait for the approval (`virtual_hid_not_active`).
 - With a user Karabiner-Elements installed, its own pqrs daemon job
