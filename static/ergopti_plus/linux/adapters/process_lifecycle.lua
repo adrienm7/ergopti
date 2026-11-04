@@ -58,6 +58,7 @@ local _launch_callbacks = {}
 local _quit_callbacks   = {}
 local _running          = false
 local _generation       = 0
+local _polling          = false
 local _last_focus_key   = nil
 local _last_processes   = {}   -- set: process_name -> true
 -- Whether _last_processes came from a real snapshot. Without a baseline the
@@ -280,7 +281,7 @@ end
 --- by the host event loop (typically at FOCUS_POLL_S intervals for focus,
 --- and every PROCESS_POLL_S / FOCUS_POLL_S ticks for process detection).
 --- @param tick_count number Monotonically incrementing tick counter (used to throttle process polling).
-function M.tick(tick_count)
+local function tick_once(tick_count)
 	if not _running then return end
 	local generation = _generation
 	local function current() return _running and _generation == generation end
@@ -346,6 +347,14 @@ function M.tick(tick_count)
 			Logger.debug(LOG, "tick(): process poll error — suppressed.")
 		end
 	end
+end
+
+function M.tick(tick_count)
+	if _polling then return end
+	_polling = true
+	local ok, err = pcall(tick_once, tick_count)
+	_polling = false
+	if not ok then Logger.debug(LOG, "tick(): poll error — %s", tostring(err)) end
 end
 
 return M

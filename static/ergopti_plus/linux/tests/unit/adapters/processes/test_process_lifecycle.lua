@@ -90,6 +90,16 @@ local AC = { "a", "c" }
 local PROCESS_TICK = 8
 
 helpers.describe("linux-process-reentrant-stop", function()
+	helpers.it("linux-process-reentrant-tick: nested polling does not repeat the same launch", function()
+		with_proc(AB, function(lifecycle, proc, launched)
+			local nested = false
+			lifecycle.onAppLaunch(function()
+				if not nested then nested = true; lifecycle.tick(PROCESS_TICK) end
+			end)
+			lifecycle.start(); proc.set(ABC); lifecycle.tick(PROCESS_TICK)
+			helpers.assert_eq(launched, { "c" }, "the same process must not launch twice in one poll")
+		end)
+	end)
 	helpers.it("linux-process-reentrant-stop: stopping during focus notification prevents later listeners", function()
 		local original = package.loaded["adapters.window_info"]
 		local app, delivered = "old", 0
