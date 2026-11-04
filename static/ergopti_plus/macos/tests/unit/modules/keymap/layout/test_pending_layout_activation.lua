@@ -26,8 +26,12 @@ local function load(live)
 				if state.fail_read then return false, nil end
 				return true, state.stored[key]
 			end,
-			set = function(key, value) state.stored[key] = value; return true end,
-			delete = function(key) state.stored[key] = nil; return true end,
+			set = function(key, value)
+				if not state.no_write then state.stored[key] = value end
+				if state.fail_receipt then state.fail_read = true end
+				return true
+			end,
+			delete = function(key) if not state.no_write then state.stored[key] = nil end; return true end,
 		},
 		is_live = function(name)
 			if state.unreadable then return nil, "live_state_unreadable" end
@@ -152,6 +156,38 @@ helpers.describe("pending layout activation (composer-macos26)", function()
 		helpers.assert_eq(state.stored[Pending.STORAGE_KEY], original, "a read failure must not publish an empty record")
 		state.fail_read = false
 		helpers.assert_not_nil(Pending.pending("first"))
+	end)
+
+	helpers.it("rejects a write or delete that did not change the record (pending-layout-write-receipt)", function()
+		local Pending, state = load({})
+		helpers.assert_true(Pending.record("first", "First"))
+		local original = state.stored[Pending.STORAGE_KEY]
+		state.no_write = true
+		helpers.assert_eq(Pending.record("second", "Second"), false)
+		helpers.assert_eq(Pending.request_select("first"), false)
+		helpers.assert_eq(Pending.forget("first"), false)
+		helpers.assert_eq(state.stored[Pending.STORAGE_KEY], original)
+	end)
+
+	helpers.it("does not claim success when the write receipt is unreadable (pending-layout-write-receipt)", function()
+		local Pending, state = load({})
+		state.fail_receipt = true
+		helpers.assert_eq(Pending.record("first", "First"), false)
+		state.fail_read = false
+		helpers.assert_not_nil(Pending.pending("first"), "the write may have completed despite the unreadable receipt")
+	end)
+
+	helpers.it("fences an older selection when a newer write has an unreadable receipt (pending-layout-write-receipt)", function()
+		local Pending, state = load({ ["First"] = true })
+		helpers.assert_true(Pending.record("first", "First"))
+		helpers.assert_true(Pending.request_select("first"))
+		state.defer_selection = true
+		Pending.resume()
+		state.fail_receipt = true
+		helpers.assert_eq(Pending.record("first", "New"), false)
+		state.fail_read = false
+		state.selection_done(true)
+		helpers.assert_eq(Pending.pending("first").keyboard_name, "New")
 	end)
 
 	helpers.it("re-recording keeps the selection asked for", function()

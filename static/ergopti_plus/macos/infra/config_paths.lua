@@ -191,6 +191,9 @@ local function normalize_config_dir_override(value, key)
 	if type(value) ~= "string" then
 		return nil, key .. " must be a string or empty"
 	end
+	if value:find("\0", 1, true) then
+		return nil, key .. " must not contain NUL"
+	end
 	if not NativePath.is_absolute(value) then
 		return nil, key .. " must be an absolute path"
 	end
