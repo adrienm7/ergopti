@@ -242,7 +242,13 @@ function M.show(opts)
 		if type(host.bring_to_front) == "function" then host.bring_to_front(APP_NAME) end
 		return nil
 	end
-	if _session then invalidate_failure(_session); _session.retired = true; host.hide(APP_NAME) end
+	if _session then
+		local previous = _session
+		invalidate_failure(previous)
+		previous.retired = true
+		host.hide(APP_NAME)
+		if _session ~= previous then return nil end
+	end
 	contract()
 
 	_serial = _serial + 1
