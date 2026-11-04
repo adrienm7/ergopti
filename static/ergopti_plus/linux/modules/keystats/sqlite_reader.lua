@@ -78,23 +78,16 @@ local function read_rows(sqlite_path, sql, media_owned)
 	if not cmd then return {}, false end
 	local pipe = io.popen(cmd, "r")
 	if not pipe then return {}, false end
-	local output
-	if media_owned then
-		local read_ok, result = pcall(pipe.read, pipe, "*a")
-		local close_ok, closed = pcall(pipe.close, pipe)
-		if not close_ok or closed ~= true then
-			_media_read_debt = pipe
-			Logger.warn(LOG, "Semantic media read cleanup failed; exact pipe retained without retry.")
-			return {}, false
-		end
-		if not read_ok or type(result) ~= "string" then
-			Logger.warn(LOG, "Semantic media read failed after acknowledged pipe retirement.")
-			return {}, false
-		end
-		output = result
-	else
-		output = pipe:read("*a")
-		pipe:close()
+	local read_ok, output = pcall(pipe.read, pipe, "*a")
+	local close_ok, closed = pcall(pipe.close, pipe)
+	if not close_ok or closed ~= true then
+		if media_owned then _media_read_debt = pipe end
+		Logger.warn(LOG, "SQLite read cleanup failed; result refused.")
+		return {}, false
+	end
+	if not read_ok or type(output) ~= "string" then
+		Logger.warn(LOG, "SQLite read failed after acknowledged pipe retirement.")
+		return {}, false
 	end
 	local accepted, body, reason = SqliteCommand.read_exit_receipt(output)
 	if not accepted then
