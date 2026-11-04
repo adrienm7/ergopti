@@ -30,6 +30,10 @@ on:
         description: Build, sign and package the owned runtime artifact (needs the signing secrets)
         type: boolean
         default: false
+      install_acceptance_run:
+        description: Run the hosted sudo install acceptance on the owned runtime artifact of this earlier run id (empty to skip unless an artifact is built here)
+        type: string
+        default: ''
   push:
     branches:
       - dev
@@ -288,3 +292,53 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${RUNTIME_SIGNING_KEYCHAIN:-}" ]; then security delete-keychain "$RUNTIME_SIGNING_KEYCHAIN"; fi
+
+  # WP8 hosted acceptance: the first install of the signed artifact, with sudo
+  # in place of the administrator prompt (tools/build/owned_runtime_install_acceptance.sh).
+  # It proves the helper's transaction (files, Core and VirtualHIDDevice jobs,
+  # pqrs' package, stage retired) on each hosted macOS; a hosted runner cannot
+  # approve the DriverKit extension, so typing stays the real-Mac acceptance.
+  install-acceptance:
+    name: 'Owned runtime first install with sudo (${{ matrix.os }})'
+    needs: runtime-artifact
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && (needs.runtime-artifact.result == 'success' || (inputs.install_acceptance_run != '' && needs.runtime-artifact.result == 'skipped')) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Acquire the Ergopti sources
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          path: ergopti
+
+      - name: Download the artifact of this run
+        if: ${{ needs.runtime-artifact.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: owned-remap-runtime
+          path: ${{ runner.temp }}/runtime-artifact
+
+      - name: Download the artifact of the named run
+        if: ${{ needs.runtime-artifact.result != 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.install_acceptance_run }}
+        run: |
+          set -euo pipefail
+          case "$RUN_ID" in *[!0-9]*|'') echo "::error::install_acceptance_run must be a run id"; exit 1 ;; esac
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" -n owned-remap-runtime -D "$RUNNER_TEMP/runtime-artifact"
+
+      - name: Install the owned runtime as the launcher's role does, with sudo
+        working-directory: ergopti
+        run: |
+          set -euo pipefail
+          archive="$(find "$RUNNER_TEMP/runtime-artifact" -maxdepth 1 -name 'ErgoptiPlus-Remap-Runtime-*.tar.gz' -print)"
+          [ "$(printf '%s\n' "$archive" | grep -c .)" = 1 ] || { echo "::error::expected one artifact archive, got: $archive"; exit 1; }
+          bash tools/build/owned_runtime_install_acceptance.sh "$archive"
