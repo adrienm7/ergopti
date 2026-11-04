@@ -212,6 +212,35 @@ helpers.describe("AI overlay: one window shared with the hotstring preview", fun
 	end)
 
 
+	helpers.it("(llm-deferred-redraw) leaves a newer preview in control", function()
+		local preview = { rows = nil, both = false }
+		local overlay, window, calls = overlay_with(preview)
+		assert(overlay.show({ { to_type = "suggestion" } }, {}))
+		preview.rows = { { text = "new preview" } }
+		window.rows = preview.rows
+		local skipped = overlay.redraw_if_preview_hidden()
+		local preserved, covered = window.rows == preview.rows, calls.covered
+		preview.rows = nil
+		local resumed = overlay.redraw_if_preview_hidden()
+		package.loaded["ui.tooltip.llm"] = nil
+		helpers.assert_eq({ skipped = skipped, preserved = preserved, covered = covered, resumed = resumed },
+			{ skipped = false, preserved = true, covered = 0, resumed = true })
+	end)
+
+	helpers.it("(llm-deferred-redraw) rejects a stale overlay and an unavailable preview owner", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay, draws = require("ui.tooltip.llm"), 0
+		assert(overlay.init({ style = {}, renderer = { show = function() draws = draws + 1; return true end },
+			companion = { showing = function() error("preview owner unavailable") end } }))
+		assert(overlay.show({ { to_type = "suggestion" } }, {}))
+		local refused = overlay.redraw_if_preview_hidden()
+		package.loaded["ui.tooltip.llm"] = {}
+		local stale = overlay.redraw_if_preview_hidden()
+		package.loaded["ui.tooltip.llm"] = nil
+		helpers.assert_eq({ refused = refused, stale = stale, draws = draws },
+			{ refused = false, stale = false, draws = 1 })
+	end)
+
 	helpers.it("draws the suggestions under the preview rows when both are shown", function()
 		local preview = { rows = { { text = "by the way", label = "★" } }, both = true }
 		local overlay, window = overlay_with(preview)

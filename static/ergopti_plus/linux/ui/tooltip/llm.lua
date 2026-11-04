@@ -294,6 +294,17 @@ function M.redraw()
 	return attempt_draw(_generation)
 end
 
+--- Redraws a deferred suggestion only while the preview is still absent.
+--- A newer preview or a replacement module owns the surface instead.
+--- @return boolean drawn
+function M.redraw_if_preview_hidden()
+	if not rawequal(package.loaded["ui.tooltip.llm"], M)
+		or type(_companion) ~= "table" or type(_companion.showing) ~= "function" then return false end
+	local ok, showing = pcall(_companion.showing)
+	if not ok or showing ~= false or not rawequal(package.loaded["ui.tooltip.llm"], M) then return false end
+	return M.redraw()
+end
+
 --- Hides and forgets every candidate.
 function M.hide()
 	if not settle_cleanup() then return false end
