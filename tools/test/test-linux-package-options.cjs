@@ -118,7 +118,7 @@ for (const format of ['deb', 'rpm']) {
 	console.log(`PASS package-argument-admission-${format}`);
 }
 try {
-	const alias = path.join(scratch, "project root '\n literal");
+	const alias = path.join(scratch, "project root '\n literal\n");
 	fs.symlinkSync(ROOT, alias, 'dir');
 	for (const format of ['deb', 'rpm']) {
 		const staged = spawnSync(

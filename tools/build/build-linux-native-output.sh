@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
+IFS= read -r -d '' REPO_ROOT < <(CDPATH= cd -Pe -- "${SCRIPT_DIR}/../.." && printf '%s\0' "$PWD")
 SOURCE_DIR="${REPO_ROOT}/static/ergopti_plus/linux/native/archive_output"
 OUTPUT_DIR="${REPO_ROOT}/build/linux/linux/bin"
 

@@ -25,7 +25,7 @@ if [ "$#" -ne 1 ] || [[ "$1" == */* ]] || [ -z "$1" ]; then
 fi
 ASSET="$1"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+IFS= read -r -d '' PROJECT_ROOT < <(cd -- "$SCRIPT_DIR/../.." && printf '%s\0' "$PWD")
 BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-$PROJECT_ROOT/build/linux}"
 case "$BUILD_DIR" in
 	/?*) ;;
