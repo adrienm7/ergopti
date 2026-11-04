@@ -72,11 +72,13 @@ _RHL_ChildSource(Mode := "") {
 	; KL_AppendLog and the hook sources ask the capture gate (Suspend or the
 	; metrics pause) that the collection module owns.
 	if Mode == "keys" {
-		for Relative in ["modules/keystats/keystats_constants.ahk", "modules/keystats/keystats_hook.ahk",
-			"modules/keystats/keystats_watchers.ahk", "modules/keystats/keystats_password.ahk",
-			"modules/keystats/keystats_roi_prune.ahk", "modules/keystats/keystats_walker_core.ahk",
-			"infra/hotpath_profiler.ahk", "infra/text_utils.ahk"]
-			Source .= "#Include " . _DriverDir . "\" . StrReplace(Relative, "/", "\") . "`n"
+		Source .= _DriverFileSource("keystats_constants.ahk") . "`n"
+		for Symbol in ["KL_Hook_OnChar", "KL_Watchers_OnKeystroke", "KL_InvalidatePasswordFocus",
+			"KL_Roi_SelectWordCountSurvivors", "KLW_PopLast", "HotPath_Now", "_TextCodepointWidth"] {
+			Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
+			AssertTrue(Owner != "", "The genuine key/ROI dependency must have one owner: " . Symbol)
+			Source .= "#Include " . Owner . "`n"
+		}
 		for Symbol in ["_KL_CaptureLlmJournalPrivacy", "_KL_LlmJournalPrivacyStillCurrent"] {
 			Body := _DriverFuncBody(Symbol)
 			AssertTrue(Body != "", "The real privacy receipt owner must resolve")
