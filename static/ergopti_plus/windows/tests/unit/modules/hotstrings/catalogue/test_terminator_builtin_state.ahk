@@ -187,3 +187,48 @@ Test("terminator-move key allocation: ordinary fresh allocation remains admitted
 	_HTBS_Run.Bind("key-move-fresh", "", _HTMK_Migration.Bind("fresh-control")))
 Test("terminator-move key allocation: an existing character is not duplicated",
 	_HTBS_Run.Bind("key-move-existing-char", '[[hotstrings.terminators]]`nkey="already_snow"`nchar="☃"`nlabel="Owned snow"`nconsume=true`n', _HTMK_Migration.Bind("existing-character-control")))
+
+_HTEI_MagicMove(Mode) {
+	global HSE_Terminators, _HotstringsTerminatorRecords
+	Saved := _HSDT_SaveState(), SavedTerms := HSE_Terminators
+	try {
+		HSE_Terminators := Terminators()
+		_HotstringsTerminatorRecords := 0
+		HotstringsConfigApplyMagicKey("A")
+		_HSDT_Seed("magic-exact-move-" . Mode)
+		Legacy := Mode == "lower" ? "a" : "A"
+		AssertEqual(1, HotstringsTerminatorMigrateStrings(Legacy, Legacy))
+		AssertEqual(Legacy, HotstringsGetWordDelimiters(), "a configured magic A cannot claim the case-distinct legacy scalar a")
+		AssertEqual(Legacy, HotstringsGetConsumedDelimiters())
+	} finally {
+		HSE_Terminators := SavedTerms
+		_HSDT_Restore(Saved)
+	}
+}
+for _HTEI_MagicMode in ["upper", "lower"]
+	Test("terminator-move exact magic membership: " . _HTEI_MagicMode, _HTEI_MagicMove.Bind(_HTEI_MagicMode))
+
+_HTCC_Migration(Mode) {
+	global ConfigurationFile
+	Word := HSE_TerminatorDefaultWordDelimiters() . "Aa"
+	BaseConsumed := HSE_TerminatorDefaultConsumedDelimiters()
+	Selected := Mode == "upper" ? "A" : (Mode == "lower" ? "a" : (Mode == "both-control" ? "Aa" : ""))
+	Consumed := BaseConsumed . Selected
+	AssertEqual(1, HotstringsTerminatorMigrateStrings(Word, Consumed), "the real migration writer must acknowledge the intended scalar choices")
+	AssertEqual(Word, HotstringsGetWordDelimiters(), "both case-distinct valid scalars must remain active")
+	AssertEqual(Consumed, HotstringsGetConsumedDelimiters(),
+		"migration must not consume the case-distinct scalar absent from the actual consumed string")
+	Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+	Rows := Document["hotstrings"]["terminators"]
+	AssertEqual(2, Rows.Length)
+	AssertEqual("A", Rows[1]["char"])
+	AssertEqual("a", Rows[2]["char"])
+	AssertEqual(InStr(Selected, "A", true) > 0, Rows[1]["consume"].Value)
+	AssertEqual(InStr(Selected, "a", true) > 0, Rows[2]["consume"].Value)
+	Before := FSReadUtf8Exact(ConfigurationFile)
+	AssertEqual(1, HotstringsTerminatorMigrateStrings(Word, Consumed))
+	AssertEqual(Before, FSReadUtf8Exact(ConfigurationFile), "repeating the successful move must preserve exact source")
+}
+for _HTCC_Mode in ["upper", "lower", "both-control", "neither-control"]
+	Test("terminator-move exact consumption: " . _HTCC_Mode,
+		_HTBS_Run.Bind("consumption-case-" . _HTCC_Mode, "", _HTCC_Migration.Bind(_HTCC_Mode)))
