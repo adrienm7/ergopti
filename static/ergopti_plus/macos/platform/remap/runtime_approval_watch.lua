@@ -24,10 +24,10 @@ local Vhid = require("platform.remap.runtime_vhid")
 local LOG = "remap.runtime_approval_watch"
 
 --- Seconds between two looks at the system extension listing.
-M.POLL_SEC = 3
+M.APPROVAL_POLL_SEC = 3
 
 --- Seconds the user has to allow the driver before the watch gives up.
-M.TIMEOUT_SEC = 900
+M.APPROVAL_TIMEOUT_SEC = 900
 
 --- Creates a watch bound to its ports.
 --- Port contracts:
@@ -64,7 +64,7 @@ function M.new(ports)
 				return stop("warn", "The driver was not allowed within %d s; the Tap-Holds menu keeps explaining it.", deadline)
 			end
 			local committed
-			handle, committed = ports.after(M.POLL_SEC, function() handle = nil; poll(elapsed + M.POLL_SEC) end)
+			handle, committed = ports.after(M.APPROVAL_POLL_SEC, function() handle = nil; poll(elapsed + M.APPROVAL_POLL_SEC) end)
 			if committed ~= true then stop("error", "The approval watch could not schedule its next look; it stops.") end
 		end)
 	end
@@ -73,9 +73,9 @@ function M.new(ports)
 	--- @return boolean started False when this launch already watched.
 	function watch.start()
 		if started then return false end
-		started, running, deadline = true, true, M.TIMEOUT_SEC
+		started, running, deadline = true, true, M.APPROVAL_TIMEOUT_SEC
 		Logger.start(LOG, "Opening the driver approval pane and watching for the approval…")
-		local opened, failure = pcall(ports.open_settings, Vhid.SETTINGS_URL)
+		local opened, failure = pcall(ports.open_settings, require("platform.remap.ke_paths").EXTENSIONS_SETTINGS_URL)
 		if not opened then Logger.error(LOG, "The driver approval pane could not be opened: %s.", tostring(failure)) end
 		poll(0)
 		return true
