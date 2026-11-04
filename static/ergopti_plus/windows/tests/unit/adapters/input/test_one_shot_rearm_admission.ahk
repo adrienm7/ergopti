@@ -32,6 +32,9 @@ _OSRA_ChildSource() {
 	}
 	for Name in ["OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys",
 		"TapHoldNewOwner", "TapHoldOwnerCurrent", "TapHoldDispatchTap", "HotstringEndCharOfTap", "TapHoldTapInDispatch", "TapHoldShouldCancelTap", "_TH_TakePressTakenByCombination",
+		"TapHoldReleaseSyntheticKeys", "TapCopyCheckStop", "_TH_MaskMenuModifierRelease", "_TH_SyntheticKeyList",
+		"_TH_SyntheticReleaseStaysWithUser", "_TH_ForgetSyntheticKeyForUser", "_TH_MarkSyntheticKeyReleasePending",
+		"_TH_RetrySyntheticKeyRelease", "_TH_SyntheticKeyLabel",
 		"TapHoldForgetTrackedKey", "TapHoldTapIsCommand", "_TapHoldTapEndsCapsWord", "TapHoldDuration",
 		"_TapHoldDurationValid", "TapHoldGlobalDuration",
 		"TapHoldIsEnabled", "TapHoldEntryHasKnownAction", "TapHoldTapAction", "TapHoldConfiguredTapAction",
@@ -106,5 +109,5 @@ _OSRA_Case(Mode) {
 	AssertTrue(Retired, "the exact child must retire before its source is removed")
 }
 
-for _OSRA_Mode in ["natural", "incumbent-letter", "incumbent-special", "incumbent-disabled", "paused-during-start", "revoked-during-start", "successor-disabled-during-start"]
+for _OSRA_Mode in ["natural", "incumbent-letter", "incumbent-special", "incumbent-disabled", "paused-during-start", "revoked-during-start", "successor-disabled-during-start", "activation-revoked", "activation-successor"]
 	Test("one-shot rearm: " . _OSRA_Mode . " preserves current admission (one-shot-rearm-admission)", _OSRA_Case.Bind(_OSRA_Mode))
