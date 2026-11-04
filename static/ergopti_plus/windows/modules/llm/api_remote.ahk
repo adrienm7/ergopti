@@ -1292,6 +1292,18 @@ _LLMRemoteEmptyUsage() {
     return Map("prompt_tokens", 0, "completion_tokens", 0, "total_tokens", 0, "est_cost_usd", 0.0)
 }
 
+; Usage counters cross the signed native Integer boundary. A finite JSON
+; float can still be outside that domain; casting it would produce MININT.
+_LLMRemoteUsageCount(Value) {
+    if Value is Integer
+        return Value >= 0 ? Value : 0
+    ; The Integer maximum rounds to 2^63 in a Float comparison. That exact
+    ; boundary must be excluded; the next representable Float below it is safe.
+    if Value is Float && Value >= 0 && Value < 0x7FFFFFFFFFFFFFFF
+        return Integer(Value)
+    return 0
+}
+
 _LLMRemoteExtractUsageRoot(format, root, model) {
     out := _LLMRemoteEmptyUsage()
     if !(root is Map)
@@ -1305,13 +1317,12 @@ _LLMRemoteExtractUsageRoot(format, root, model) {
     completionKey := format == "gemini" ? "candidatesTokenCount"
         : ((format == "anthropic" || format == LLM_AGENT_FORMAT) ? "output_tokens" : "completion_tokens")
     totalKey := format == "gemini" ? "totalTokenCount" : "total_tokens"
-    if usage.Has(promptKey) and usage[promptKey] is Number and usage[promptKey] >= 0
-        out["prompt_tokens"] := Integer(usage[promptKey])
-    if usage.Has(completionKey) and usage[completionKey] is Number and usage[completionKey] >= 0
-        out["completion_tokens"] := Integer(usage[completionKey])
-    if usage.Has(totalKey) and usage[totalKey] is Number and usage[totalKey] >= 0
-        out["total_tokens"] := Integer(usage[totalKey])
-    if (out["total_tokens"] == 0)
+    out["prompt_tokens"] := _LLMRemoteUsageCount(usage.Get(promptKey, 0))
+    out["completion_tokens"] := _LLMRemoteUsageCount(usage.Get(completionKey, 0))
+    out["total_tokens"] := _LLMRemoteUsageCount(usage.Get(totalKey, 0))
+    ; An unrepresentable inferred total stays unknown (zero), like any invalid
+    ; field. Keep the individually valid counters and the completion intact.
+    if out["total_tokens"] == 0 && out["prompt_tokens"] <= 0x7FFFFFFFFFFFFFFF - out["completion_tokens"]
         out["total_tokens"] := out["prompt_tokens"] + out["completion_tokens"]
     out["est_cost_usd"] := _LLMRemoteEstimateCost(model, out["prompt_tokens"], out["completion_tokens"])
     return out

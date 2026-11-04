@@ -569,3 +569,62 @@ for _NUI_Mode in ["normal", "float_outside_int64", "sum_outside_int64"] {
     Test("Remote usage integer domain: classifier " . _NUI_Mode . " (usage-integer-domain)", _NUI_Run.Bind(_NUI_Mode, false))
     Test("Remote usage integer domain: managed poll " . _NUI_Mode . " (usage-integer-domain)", _NUI_Run.Bind(_NUI_Mode, true))
 }
+
+; Append to test_llm_api_remote_requests.ahk after existing _NUI_* probes.
+; Machine integer representation boundaries only, no product token-count limit.
+_NUI_NativeBoundaries() {
+    Rows := [
+        {Id: "ordinary exponential", Usage: '{"prompt_tokens":1e3,"completion_tokens":2}', Prompt: 1000, Completion: 2, Total: 1002},
+        {Id: "ordinary fractional truncation retained", Usage: '{"prompt_tokens":3.5,"completion_tokens":2}', Prompt: 3, Completion: 2, Total: 5},
+        {Id: "signed maximum exact integer", Usage: '{"prompt_tokens":9223372036854775807}', Prompt: 9223372036854775807, Completion: 0, Total: 9223372036854775807},
+        {Id: "largest safe float below signed bound", Usage: '{"prompt_tokens":9223372036854774784.0}', Prompt: 9223372036854774784, Completion: 0, Total: 9223372036854774784},
+        {Id: "float at excluded signed bound", Usage: '{"prompt_tokens":9223372036854775808.0,"completion_tokens":2}', Prompt: 0, Completion: 2, Total: 2},
+        {Id: "invalid explicit total falls back safely", Usage: '{"prompt_tokens":2,"completion_tokens":3,"total_tokens":1e30}', Prompt: 2, Completion: 3, Total: 5},
+        {Id: "unrepresentable inferred total stays unknown", Usage: '{"prompt_tokens":9223372036854775807,"completion_tokens":1}', Prompt: 9223372036854775807, Completion: 1, Total: 0},
+        {Id: "reported valid total is retained", Usage: '{"prompt_tokens":9223372036854775807,"completion_tokens":1,"total_tokens":5}', Prompt: 9223372036854775807, Completion: 1, Total: 5}
+    ]
+    for Row in Rows {
+        Body := '{"choices":[{"message":{"content":"owned-boundary-ok"}}],"usage":' . Row.Usage . '}'
+        Result := _LLMRemoteClassifyResponse("openai", Body, "gpt-4.1")
+        Usage := Result["usage"]
+        AssertTrue(Result["ok"] && Result["text"] == "owned-boundary-ok", Row.Id)
+        AssertTrue(_NUI_UsageValid(Usage), Row.Id)
+        AssertEqual(Row.Prompt, Usage["prompt_tokens"], Row.Id)
+        AssertEqual(Row.Completion, Usage["completion_tokens"], Row.Id)
+        AssertEqual(Row.Total, Usage["total_tokens"], Row.Id)
+    }
+}
+Test("Remote usage integer domain: native representable boundary controls (usage-integer-domain)", _NUI_NativeBoundaries)
+
+; Probe only. Append to test_llm_api_remote_requests.ahk. Native AHK UNRUN.
+; Actual catalogue price admission and EstimateCost; no decoder/subject replaced.
+_NUIC_IntegerPrices() {
+    global LLM_REMOTE_MODEL_PRICES
+    Saved := LLM_REMOTE_MODEL_PRICES
+    Observed := []
+    Rows := [
+        {Id: "large integer price", InPrice: 3, OutPrice: 0, Prompt: 4000000000000000000, Completion: 0, Expected: 12000000000000.0},
+        {Id: "large float price control", InPrice: 3.0, OutPrice: 0.0, Prompt: 4000000000000000000, Completion: 0, Expected: 12000000000000.0},
+        {Id: "large integer completion price", InPrice: 0, OutPrice: 3, Prompt: 0, Completion: 4000000000000000000, Expected: 12000000000000.0},
+        {Id: "ordinary integer prices", InPrice: 3, OutPrice: 2, Prompt: 500, Completion: 10, Expected: 0.00152}
+    ]
+    try {
+        for Row in Rows {
+            Model := "owned-integer-price"
+            LLM_REMOTE_MODEL_PRICES := _LLMRemoteAdmitPrices(Map(Model, Map("in", Row.InPrice, "out", Row.OutPrice)))
+            AssertTrue(LLM_REMOTE_MODEL_PRICES.Has(Model), "these finite nonnegative Integer/Float prices are actually admitted")
+            Actual := _LLMRemoteEstimateCost(Model, Row.Prompt, Row.Completion)
+            Observed.Push(Map("case", Row.Id, "input_price_type", Type(Row.InPrice),
+                "output_price_type", Type(Row.OutPrice), "prompt_tokens", Row.Prompt,
+                "completion_tokens", Row.Completion, "actual", Actual, "expected", Row.Expected))
+        }
+    } finally LLM_REMOTE_MODEL_PRICES := Saved
+    _TestPrint("# USAGE_INTEGER_PRICE " . KL_JsonEncode(Observed))
+    ; Record every control before asserting; integer-price failure must not hide
+    ; the equivalent floating-price or normal-sized positive control.
+    for Row in Observed {
+        AssertTrue(Row["actual"] >= 0, "admitted price/count multiplication cannot wrap into negative USD: " . Row["case"])
+        AssertEqual(Row["expected"], Row["actual"], Row["case"])
+    }
+}
+Test("Remote usage cost: admitted integer prices preserve numeric domain (usage-integer-price)", _NUIC_IntegerPrices)
