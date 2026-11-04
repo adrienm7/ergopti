@@ -744,3 +744,20 @@ Consequence: An invisible non-durable added entry blocks its own retry as a dupl
 Regression: Ten reachable personal-entry-receipts cases use real GUI controls, native button messages, a real sharing-denial handle and unlocked same-form retry. They also drive actual coalesced publication, terminal deferred failure and complete-snapshot recovery, dropdown/section changes and the legacy save entry point. The fix installs detached candidates only after immediate success or explicit DEFERRED admission, keeps RAM and rows coherent, and fences completions by source/cohort/sequence. Existing modal and live transaction controls remain; native post-fix qualification is pending.
 
 The ongoing register now contains **40 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-036 additional settled-capture sibling
+
+Native replay `41901785093` at `afc1dd3` reproduced both `activation-revoked`
+and `activation-successor` failures at the exact zero-emission assertion,
+individually and reversed. The existing special-result control passed. A native
+timer pauses, invokes the genuine empty-ledger remap drain, observes that the
+already-settled SIHO capture no longer exists, resumes and optionally admits a
+fresh SIHO successor. The old OneShot body still emits its special result.
+
+The fix retains the same gesture epoch through OneShot activation and output;
+it returns without touching a successor when revoked. SICS/SICU extracted native
+children now carry the two real owner helpers. This extends AHK-036 and does not
+increase the register beyond **40 distinct findings**. The earlier seven-case
+compatibility selection refused discovery because another ownership test shares
+its tag (eight matches); no behavioral pass is claimed from that refused plan.
+The next cohort uses exact discovered case names.

@@ -8,7 +8,7 @@ _SICS_ChildSource() {
 		AssertTrue(Owner != "", "the real capture dependency must have one owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine capture function must exist: " . Name)
 		if Name == "DeadKey" || Name == "OneShotShift" {
@@ -102,7 +102,7 @@ _SICU_ChildSource() {
 		AssertTrue(Owner != "", "the native capture dependency requires its real owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_LLM_TerminalOutputSendInputNative",
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_LLM_TerminalOutputSendInputNative",
 		"MagicKeyEditor", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the native capture function requires its genuine body: " . Name)
