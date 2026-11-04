@@ -127,28 +127,25 @@ HotstringsConfigInit(OverridePath) {
 
 ; Read a quoted-string key from the ``[__global__]`` section of the override file.
 ; Returns "" when the file is missing or the key is absent.
+; A decoded replacement character is not proof of the source bytes it replaces.
+; Keep empty valid input distinct from a failed exact native UTF-8 read.
+_HotstringsOverrideReadDocument(Path, &Records := 0, &Physical := 0) {
+	Source := FSReadUtf8Exact(Path)
+	if !(Source is String)
+		throw ValueError("Hotstring overrides must be readable exact UTF-8.")
+	return TOML_ParseDocument(Source, &Records, &Physical)
+}
+
 _ParseGlobalKey(Path, KeyName) {
-		if (Path == "" or !FileExist(Path)) {
-				return ""
-		}
-		InGlobal := false
-		Pattern  := "^" . KeyName . "\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$"
-		; The override writer emits UTF-8 without a BOM, independently of ACP.
-		Content := FSReadStrict(Path)
-		loop parse, Content, "`n", "`r" {
-				Line := TOML_StripInlineComment(Trim(A_LoopField, " `t"))
-				if (Line == "[__global__]") {
-						InGlobal := true
-						continue
-				}
-				if (InGlobal and SubStr(Line, 1, 1) == "[") {
-						break
-				}
-				if InGlobal and RegExMatch(Line, Pattern, &M) {
-						return UnescapeTomlString(M[1])
-				}
-		}
+	if Path == "" || !FileExist(Path)
 		return ""
+	; Legacy migration consumes the same decoded identities and strings as the
+	; override owner. A different scanner could falsely retire unconsumed data.
+	Document := _HotstringsOverrideReadDocument(Path)
+	if !Document.Has("__global__") || !(Document["__global__"] is Map)
+		return ""
+	Values := Document["__global__"]
+	return Values.Has(KeyName) && Values[KeyName] is String ? Values[KeyName] : ""
 }
 
 ; Return the effective word-delimiter string the engine matches, derived from the
@@ -176,10 +173,11 @@ HotstringsDelimitersBoot(MigrateFn := 0) {
 		Legacy := _HotstringsLegacyDelimiters
 		if Legacy.Word == "" and Legacy.Consumed == ""
 				return true
+		RetiredLegacy := { Word: Legacy.Word, Consumed: Legacy.Consumed }
 		Moved := HasMethod(MigrateFn, "Call")
-				? MigrateFn.Call(Legacy.Word, Legacy.Consumed)
-				: HotstringsTerminatorMigrateStrings(Legacy.Word, Legacy.Consumed)
-		if !Moved {
+				? MigrateFn.Call(RetiredLegacy.Word, RetiredLegacy.Consumed)
+				: HotstringsTerminatorMigrateStrings(RetiredLegacy.Word, RetiredLegacy.Consumed)
+		if !(Moved is Integer) || Moved != 1 {
 				try LoggerError("HotstringsConfig",
 						"The delimiter strings of the override file could not be moved to config.toml; the delimiters keep their catalogue state for this session and the move is retried at the next start.")
 				return false
@@ -188,7 +186,7 @@ HotstringsDelimitersBoot(MigrateFn := 0) {
 		Persisted := false
 		if (OwnerToken is Object) {
 				try Persisted := _HotstringsPersistOverrideCandidate(_HotstringsOverrides, OwnerToken,
-						_HotstringsOverridesPath, 0, 0)
+						_HotstringsOverridesPath, 0, 0, RetiredLegacy)
 				finally _HotstringsOverrideLeaseRelease(OwnerToken)
 		}
 		if !Persisted {
@@ -267,152 +265,151 @@ _HotstringsNewOverrideSection() {
 ;   [ext.ext-name.section]           — extension section override
 ; The full dotted key is used as the Map key for ext.* entries so it never
 ; collides with a bare single-word category (e.g. "ext.ergopti-demo").
+; Decode owned scalar leaves once through the canonical typed document model.
+; Wrong types retain the shared parser's ignored-leaf policy, without coercion.
+_HotstringsOverrideProjectFields(Values, Target) {
+	if Values.Has("delay_offset") {
+		Value := Values["delay_offset"]
+		if Value is Number && TickTryDurationMsFromSeconds(Abs(Value), &Milliseconds)
+			Target.PendingOffset := Value
+	}
+	if Values.Has("delay_unlimited") {
+		Value := Values["delay_unlimited"]
+		if Value is TOML_Bool && Value.Value
+			Target.Delay := 0
+	}
+	if Values.Has("delay") {
+		Value := Values["delay"]
+		if Value is Number && TickTryDurationMsFromSeconds(Value, &Milliseconds)
+			Target.LegacyDelay := Value
+	}
+	if Values.Has("color") && Values["color"] is String
+		Target.Color := Values["color"]
+	if Values.Has("show_tooltip") && Values["show_tooltip"] is TOML_Bool
+		Target.ShowTooltip := Values["show_tooltip"].Value
+	if Values.Has("priority") && HotstringsTryPriority(Values["priority"], &Priority)
+		Target.Priority := Priority
+}
+
+_HotstringsOverrideProjectCategory(Result, CategoryName, Values) {
+	if !_HotstringsOverrideIdentifiersAreValid(CategoryName) || !(Values is Map)
+		return
+	if !Result.Has(CategoryName)
+		Result[CategoryName] := _HotstringsNewOverrideEntry()
+	Entry := Result[CategoryName]
+	_HotstringsOverrideProjectFields(Values, Entry)
+	for Name, Section in Values {
+		if !(Section is Map) || !_HotstringsOverrideIdentifiersAreValid(CategoryName, Name)
+				|| Name == ""
+			continue
+		SectionName := StrLower(Name)
+		if !Entry.Sections.Has(SectionName)
+			Entry.Sections[SectionName] := _HotstringsNewOverrideSection()
+		_HotstringsOverrideProjectFields(Section, Entry.Sections[SectionName])
+	}
+}
+
 _ParseOverrides(Path) {
-		Result := Map()
-		if (Path == "" or !FileExist(Path)) {
-				return Result
-		}
-
-		Content := FileRead(Path, "UTF-8")
-		CurrentCat := ""
-		CurrentSec := ""
-		; Tracks every section key already seen to detect duplicates
-		SeenSections := Map()
-		; The keys of the current table, and whether a multi-line array is open.
-		SeenKeys := Map()
-		InArray := false
-
-		loop parse, Content, "`n", "`r" {
-				Line := Trim(TOML_StripInlineComment(A_LoopField), " `t")
-				if (Line == "" or SubStr(Line, 1, 1) == "#") {
-						continue
-				}
-
-				if InArray {
-						InArray := SubStr(Line, 1, 1) != "]"
-						continue
-				}
-				if (SubStr(Line, 1, 1) == "[") {
-						SeenKeys := Map()
-						if !InStr(Line, "]")
-								throw ValueError("Unclosed table header in the override file: it is not valid TOML.", -1, Line)
-				}
-
-				; The reserved table of earlier builds holds the delimiter strings, read
-				; once by _ParseGlobalKey. It is no override category: keeping it in the
-				; catalogue would make every later write refuse the reserved identifier.
-				if RegExMatch(Line, "^\[__global__(?:\.[^\]]*)?\]$") {
-						CurrentCat := ""
-						CurrentSec := ""
-						continue
-				}
-
-				; Extension section header: [ext.name.section] — 3 dotted segments
-				if RegExMatch(Line, "^\[ext\.([A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]+)\]$", &ExtSecMatch) {
-						CurrentCat := "ext." . StrLower(ExtSecMatch[1])
-						CurrentSec := StrLower(ExtSecMatch[2])
-						SectionName := CurrentCat . "." . CurrentSec
-						if SeenSections.Has(SectionName)
-								throw ValueError("Duplicate table '[" . SectionName . "]' in the override file: it is not valid TOML.", -1, Path)
-						SeenSections[SectionName] := true
-						if !Result.Has(CurrentCat)
-								Result[CurrentCat] := _HotstringsNewOverrideEntry()
-						if !Result[CurrentCat].Sections.Has(CurrentSec)
-								Result[CurrentCat].Sections[CurrentSec] := _HotstringsNewOverrideSection()
-						continue
-				}
-
-				; Extension file header: [ext.name] — 2 dotted segments starting with "ext."
-				if RegExMatch(Line, "^\[ext\.([A-Za-z0-9_\-]+)\]$", &ExtMatch) {
-						CurrentCat := "ext." . StrLower(ExtMatch[1])
-						CurrentSec := ""
-						SectionName := CurrentCat
-						if SeenSections.Has(SectionName)
-								throw ValueError("Duplicate table '[" . SectionName . "]' in the override file: it is not valid TOML.", -1, Path)
-						SeenSections[SectionName] := true
-						if !Result.Has(CurrentCat)
-								Result[CurrentCat] := _HotstringsNewOverrideEntry()
-						continue
-				}
-
-				; Standard section header: [category.section]
-				if RegExMatch(Line, "^\[([A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]+)\]$", &SecMatch) {
-						CurrentCat := StrLower(SecMatch[1])
-						CurrentSec := StrLower(SecMatch[2])
-						SectionName := CurrentCat . "." . CurrentSec
-						if SeenSections.Has(SectionName)
-								throw ValueError("Duplicate table '[" . SectionName . "]' in the override file: it is not valid TOML.", -1, Path)
-						SeenSections[SectionName] := true
-						if !Result.Has(CurrentCat)
-								Result[CurrentCat] := _HotstringsNewOverrideEntry()
-						if !Result[CurrentCat].Sections.Has(CurrentSec)
-								Result[CurrentCat].Sections[CurrentSec] := _HotstringsNewOverrideSection()
-						continue
-				}
-
-				; Standard category header: [category]
-				if RegExMatch(Line, "^\[([A-Za-z0-9_\-]+)\]$", &CatMatch) {
-						CurrentCat := StrLower(CatMatch[1])
-						CurrentSec := ""
-						SectionName := CurrentCat
-						if SeenSections.Has(SectionName)
-								throw ValueError("Duplicate table '[" . SectionName . "]' in the override file: it is not valid TOML.", -1, Path)
-						SeenSections[SectionName] := true
-						if !Result.Has(CurrentCat)
-								Result[CurrentCat] := _HotstringsNewOverrideEntry()
-						continue
-				}
-
-				; A table this driver does not read (a quoted key, an array of tables).
-				if (SubStr(Line, 1, 1) == "[") {
-						CurrentCat := ""
-						CurrentSec := ""
-						continue
-				}
-
-				if !RegExMatch(Line, '^("[^"]*"|[A-Za-z0-9_\-\.]+)\s*=\s*(\S.*)$', &KeyMatch)
-						throw ValueError("A line of the override file is neither a table nor a key with a value: it is not valid TOML.", -1, Line)
-				if SeenKeys.Has(KeyMatch[1])
-						throw ValueError("Duplicate key '" . KeyMatch[1] . "' in the override file: it is not valid TOML.", -1, Path)
-				SeenKeys[KeyMatch[1]] := true
-				InArray := SubStr(KeyMatch[2], 1, 1) == "[" and !InStr(KeyMatch[2], "]")
-
-				if (CurrentCat == "") {
-						continue
-				}
-
-				Target := (CurrentSec != "")
-						? Result[CurrentCat].Sections[CurrentSec]
-						: Result[CurrentCat]
-
-				if RegExMatch(Line, "^delay_offset\s*=\s*(-?[0-9]+(?:\.[0-9]+)?)\s*$", &OffsetMatch) {
-						; The stored form of a user delay: seconds added to the base expansion
-						; delay. It stays pending until the base is known (see
-						; HotstringsOverridesApplyBase), which is not yet true at boot.
-						if TOML_TryParseNumber(OffsetMatch[1], &Offset)
-								and TickTryDurationMsFromSeconds(Abs(Offset), &OffsetMs)
-								Target.PendingOffset := Offset
-				} else if RegExMatch(Line, "^delay_unlimited\s*=\s*true\s*$") {
-						; An unlimited delay (0) is not an offset of anything.
-						Target.Delay := 0
-				} else if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
-						; The absolute spelling of earlier builds: kept for the boot migration
-						; only, which turns it into an offset of the base and rewrites the file.
-						if TOML_TryParseNumber(NumMatch[1], &Delay)
-								and TickTryDurationMsFromSeconds(Delay, &DelayMs)
-								Target.LegacyDelay := Delay
-				} else if RegExMatch(Line, "^color\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$", &ColMatch) {
-						Target.Color := UnescapeTomlString(ColMatch[1])
-				} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
-						Target.ShowTooltip := (BoolMatch[1] == "true")
-				} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-						if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
-								and HotstringsTryPriority(ParsedPriority, &Priority)
-								Target.Priority := Priority
-				}
-		}
-
+	Result := Map()
+	if Path == "" || !FileExist(Path)
 		return Result
+	Document := _HotstringsOverrideReadDocument(Path, &Records, &Physical)
+	for Record in Physical
+		if Record.Kind == "opaque"
+			throw ValueError("The override file contains an uninterpreted TOML record.")
+	for Name, Values in Document {
+		if Name == "__global__" || !(Values is Map)
+			continue
+		if StrLower(Name) == "ext" {
+			for ExtensionName, Extension in Values
+				_HotstringsOverrideProjectCategory(Result, "ext." . StrLower(ExtensionName), Extension)
+		} else
+			_HotstringsOverrideProjectCategory(Result, StrLower(Name), Values)
+	}
+	return Result
+}
+
+; The full-state serializer cannot carry foreign leaves or deeper tables.
+; Readers may ignore them under the shared projection policy; writers must
+; refuse instead of converting that read policy into durable data deletion.
+_HotstringsOverrideLeafIsRepresentable(Key, Value) {
+	switch Key {
+		case "delay_offset":
+			return Value is Number && TickTryDurationMsFromSeconds(Abs(Value), &Milliseconds)
+		case "delay":
+			return Value is Number && TickTryDurationMsFromSeconds(Value, &Milliseconds)
+		case "delay_unlimited", "show_tooltip":
+			return Value is TOML_Bool
+		case "color":
+			return Value is String
+		case "priority":
+			return HotstringsTryPriority(Value, &Priority)
+	}
+	return false
+}
+
+_HotstringsOverrideCategoryIsRepresentable(CategoryName, Values, Seen) {
+	if !_HotstringsOverrideIdentifiersAreValid(CategoryName) || !(Values is Map)
+			|| Seen.Has(CategoryName)
+		return false
+	Seen[CategoryName] := true
+	Sections := Map()
+	for Key, Value in Values {
+		if Value is Map {
+			if Key == "" || !_HotstringsOverrideIdentifiersAreValid(CategoryName, Key)
+					|| Sections.Has(StrLower(Key))
+				return false
+			Sections[StrLower(Key)] := true
+			for Leaf, Scalar in Value
+				if !_HotstringsOverrideLeafIsRepresentable(Leaf, Scalar)
+					return false
+		} else if !_HotstringsOverrideLeafIsRepresentable(Key, Value)
+			return false
+	}
+	return true
+}
+
+_HotstringsOverrideSourceIsRepresentable(Path, &Detail, RetiredLegacy := 0) {
+	Detail := ""
+	if !FileExist(Path)
+		return true
+	try {
+		Document := _HotstringsOverrideReadDocument(Path, &Records, &Physical)
+		for Record in Physical
+			if Record.Kind == "opaque"
+				throw ValueError("an uninterpreted TOML record")
+		Seen := Map()
+		for Name, Values in Document {
+			if Name == "__global__" {
+				; Ordinary writes cannot retire nonempty migration source strings.
+				; Only the boot call carrying its acknowledged exact values may.
+				if !(Values is Map)
+					throw ValueError("an unsupported reserved global value")
+				for Key, Value in Values
+					if (Key != "word_delimiters" && Key != "consumed_delimiters") || !(Value is String)
+						throw ValueError("an unowned reserved global leaf")
+				Word := Values.Get("word_delimiters", ""), Consumed := Values.Get("consumed_delimiters", "")
+				if Word != "" || Consumed != "" {
+					if !IsObject(RetiredLegacy) || !RetiredLegacy.HasOwnProp("Word")
+							|| !RetiredLegacy.HasOwnProp("Consumed")
+							|| !(RetiredLegacy.Word is String) || !(RetiredLegacy.Consumed is String)
+							|| !(Word == RetiredLegacy.Word) || !(Consumed == RetiredLegacy.Consumed)
+						throw ValueError("legacy delimiter strings have no matching durable migration receipt")
+				}
+				continue
+			}
+			if StrLower(Name) == "ext" && Values is Map {
+				for ExtensionName, Extension in Values
+					if !_HotstringsOverrideCategoryIsRepresentable("ext." . StrLower(ExtensionName), Extension, Seen)
+						throw ValueError("an unsupported extension override tree")
+			} else if !_HotstringsOverrideCategoryIsRepresentable(StrLower(Name), Values, Seen)
+				throw ValueError("an unsupported category override tree")
+		}
+		return true
+	} catch as Err {
+		Detail := Err.Message
+		return false
+	}
 }
 
 ; Single source of truth for serialising a delay (in seconds) to its on-disk
@@ -453,6 +450,10 @@ _HotstringsDelayLine(Record, Base) {
 		}
 		if (Record.HasOwnProp("PendingOffset") and Record.PendingOffset != "")
 				return "delay_offset = " . HotstringsSerialiseDelayOffset(Record.PendingOffset) . "`n"
+		; A full-state edit can run before boot adopts an absolute legacy delay.
+		; Preserve that known intention until its explicit migration or removal.
+		if Record.HasOwnProp("LegacyDelay") && Record.LegacyDelay != ""
+				return "delay = " . HotstringsSerialiseDelay(Record.LegacyDelay) . "`n"
 		return ""
 }
 
@@ -461,7 +462,7 @@ _HotstringsDelayLine(Record, Base) {
 ; swap; omitting it retains compatibility for internal full-state saves.
 ; Stable ordering: alphabetical category, alphabetical section.
 _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
-		TargetPath := unset, AuthorizeFn := 0, PublishFn := 0) {
+		TargetPath := unset, AuthorizeFn := 0, PublishFn := 0, RetiredLegacy := 0) {
 		global _HotstringsOverrides, _HotstringsOverridesPath
 		InheritedCritical := A_IsCritical
 		if InheritedCritical
@@ -489,6 +490,12 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				try LoggerError("HotstringsConfig",
 						"Cannot write overrides: {1}. The change is NOT persisted.",
 						IdentifierDetail)
+				return false
+		}
+
+		if !_HotstringsOverrideSourceIsRepresentable(Path, &SourceDetail, RetiredLegacy) {
+				try LoggerError("HotstringsConfig",
+						"Cannot rewrite overrides without losing source data: {1}. The existing file and live state are unchanged.", SourceDetail)
 				return false
 		}
 

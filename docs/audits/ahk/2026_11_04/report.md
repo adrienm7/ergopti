@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **67 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **68 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1175,3 +1175,17 @@ Consequence: For example sticky Ctrl followed by Shift+F6 becomes Ctrl+F6, chang
 Regression: The two real-hook/native-receiver probes include the production HS_RunSyntheticInputTransaction and TextPressKey pipeline. The fix unions captured Ctrl/Alt/Shift/Win groups with the sticky modifier without duplicates; it does not claim preservation of left/right modifier identity. Post-fix qualification pending.
 
 The ongoing register now contains67 distinct findings. The requested1,000 target remains unmet.
+
+## AHK-068: Full-state override saves erase valid TOML settings omitted by the regex projection
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before, source correction integrated, post-fix pending.
+
+\_ParseOverrides and \_ParseGlobalKey use partial regex scanners rather than the canonical typed TOML model. The full-state serializer then assumes that its projected Map represents the complete admitted source. Recognized but unadopted LegacyDelay and reserved migration strings expose the same read-to-write loss boundary.
+
+Reproduction: Native run41925176895 at81d5aae: five canonical syntax cases lose existing category and section leaves after genuine HotstringsConfigReload and unrelated public saves. Literal/quoted-key colors, signed/exponential offsets and separated integer priorities fail; three ordinary lexical controls pass. Four source-preservation cases also acknowledge erasure of unknown/deeper/array/wrong-type source data; the supported extension control passes. Same reverse results.
+
+Consequence: An unrelated acknowledged settings edit can permanently erase an existing delay, color, priority or future source field. Legacy delimiter intent can also be retired without proving transfer of the exact source values.
+
+Regression: Thirteen native file/public-save probes establish fail-before and controls. The fix projects canonical typed leaves, refuses source shapes the serializer cannot preserve, and requires an exact durable migration receipt before retiring nonempty legacy delimiter strings. Additional tests cover four canonical legacy spellings, eight legacy-delay states, four retirement receipts and a functional real-decoder owner check. Raw LegacyDelay survives pre-boot saves; ordinary runtime adoption preserves finite delay intent, while pending \_global default migration refuses runtime reload. Native post-fix qualification pending. These related projection/preservation variants are one finding, not one count per syntax or field.
+
+The ongoing register contains68 distinct findings. The requested1,000 target remains unmet.

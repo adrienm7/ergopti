@@ -1297,7 +1297,17 @@ _HOL_LegacyDelayRoundTrip(Mode) {
 		_HotstringsOverridesPath := Path, _HotstringsOverrides := Map()
 		Leaf := Mode == "offset-control" ? "delay_offset = -0.250" : "delay = 0.500"
 		Source := "[magickey]`n" . Leaf . "`n[magickey.text_expansion_symbols]`n" . Leaf . "`n"
+		if Mode == "global-default-refused" || Mode == "init-global-save"
+			Source := "[_global]`ndelay = 1.500`n" . Source
 		AssertTrue(FSWriteCreateDurable(Path, Source))
+		if Mode == "global-default-refused" {
+			Owner := _HotstringsOverrides
+			AssertFalse(HotstringsConfigReload(), "a runtime read cannot acknowledge the cross-file default migration")
+			AssertTrue(_HotstringsOverrides == Owner)
+			AssertEqual(0.75, HotstringsBaseDelay())
+			AssertEqual(Source, FSReadStrict(Path))
+			return
+		}
 		if InStr(Mode, "init-") == 1
 			HotstringsConfigInit(Path)
 		else
@@ -1328,6 +1338,16 @@ _HOL_LegacyDelayRoundTrip(Mode) {
 				AssertEqual(Mode == "init-replace" ? 0.25 : 0.5, Effective)
 			}
 		}
+		if Mode == "init-global-save" {
+			AssertEqual(1.5, Disk["_global"]["delay"], "a pre-boot unrelated write must preserve the absolute default intent")
+			AssertFalse(Disk["_global"].Has("delay_offset"), "the legacy default is not an ordinary category offset")
+			AfterSave := FSReadStrict(Path), Owner := _HotstringsOverrides
+			AssertFalse(HotstringsConfigReload(), "the preserved pending default still requires the startup migration")
+			AssertTrue(_HotstringsOverrides == Owner)
+			AssertEqual(AfterSave, FSReadStrict(Path))
+			AssertEqual(0.75, HotstringsBaseDelay())
+			return
+		}
 		AssertTrue(HotstringsConfigReload())
 		if Mode != "init-clear" {
 			AssertEqual(Mode == "init-replace" ? 0.25 : 0.5, HotstringsResolve("magickey", "").Delay)
@@ -1341,5 +1361,84 @@ _HOL_LegacyDelayRoundTrip(Mode) {
 		DirDelete(Root, true)
 	}
 }
-for _HOL_Mode in ["reload-effective", "reload-save", "init-save", "init-clear", "init-replace", "offset-control"]
+for _HOL_Mode in ["reload-effective", "reload-save", "init-save", "init-clear", "init-replace", "offset-control", "global-default-refused", "init-global-save"]
 	Test("HotstringsConfig legacy runtime delay: " . _HOL_Mode, _HOL_LegacyDelayRoundTrip.Bind(_HOL_Mode))
+
+_HOUTF8_ExactSource(Mode) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_override_utf8_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Invalid := Mode == "invalid-byte" || Mode == "invalid-save"
+		Value := Invalid ? "X" : "é" . Chr(0x1F600)
+		Source := Mode == "empty-control" ? "" : "[magickey]`ncolor = " . TOML_RenderString(Value) . "`n"
+		if Mode == "bom-unicode"
+			Source := Chr(0xFEFF) . Source
+		Bytes := FSUtf8Bytes(Source)
+		if Invalid {
+			Offset := InStr(Source, "X", true) - 1
+			AssertTrue(Offset >= 0)
+			NumPut("UChar", 0xFF, Bytes, Offset)
+		}
+		Stream := FileOpen(Path, "w", "UTF-8-RAW")
+		AssertTrue(IsObject(Stream))
+		try AssertEqual(Bytes.Size, Stream.RawWrite(Bytes, Bytes.Size))
+		finally Stream.Close()
+		Initial := FSReadBytesStrict(Path)
+		AssertEqual(Bytes.Size, Initial.Size)
+		if Bytes.Size
+			AssertEqual(Bytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Bytes, "Ptr", Initial, "UPtr", Bytes.Size, "UPtr"))
+		if Mode == "bom-unicode"
+			AssertEqual(0xEF, NumGet(Initial, 0, "UChar"), "the fixture physically contains its input UTF-8 BOM")
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		Owner := _HotstringsOverrides
+		if Invalid {
+			AssertFalse(FSReadUtf8Exact(Path) is String, "the native exact reader must observe malformed UTF-8")
+			if Mode == "invalid-save"
+				AssertFalse(HotstringsSetOverride("magickey", "", "show_tooltip", false), "a genuine native save must refuse before normalizing malformed source bytes")
+			AssertFalse(HotstringsConfigReload(), "invalid source bytes cannot publish normalized replacement data")
+			AssertTrue(_HotstringsOverrides == Owner)
+			RefusedGlobal := false
+			try _ParseGlobalKey(Path, "word_delimiters")
+			catch ValueError
+				RefusedGlobal := true
+			AssertTrue(RefusedGlobal, "the sibling legacy reader must refuse the same malformed bytes")
+			AssertFalse(HotstringsSetOverride("magickey", "", "show_tooltip", false), "even a valid unrelated edit cannot overwrite undecodable source data")
+			AssertTrue(_HotstringsOverrides == Owner)
+			After := FSReadBytesStrict(Path)
+			AssertEqual(Initial.Size, After.Size)
+			AssertEqual(Initial.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Initial, "Ptr", After, "UPtr", Initial.Size, "UPtr"))
+		} else {
+			AssertTrue(FSReadUtf8Exact(Path) is String, "an empty or BOM-bearing valid UTF-8 source remains readable")
+			AssertTrue(HotstringsConfigReload())
+			AssertEqual("", _ParseGlobalKey(Path, "word_delimiters"))
+			if Mode != "empty-control"
+				AssertEqual(Value, _HotstringsOverrides["magickey"].Color)
+			else
+				AssertEqual(0, _HotstringsOverrides.Count)
+			AssertTrue(HotstringsSetOverride("magickey", "", "show_tooltip", false))
+			Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			if Mode != "empty-control"
+				AssertEqual(Value, Disk["magickey"]["color"], "valid Unicode must survive a genuine unrelated native save")
+			AssertTrue(HotstringsConfigReload())
+			if Mode != "empty-control"
+				AssertEqual(Value, _HotstringsOverrides["magickey"].Color)
+		}
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+	} finally {
+		_HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOUTF8_Mode in ["invalid-byte", "invalid-save", "unicode-control", "bom-unicode", "empty-control"]
+	Test("HotstringsConfig exact source UTF-8: " . _HOUTF8_Mode, _HOUTF8_ExactSource.Bind(_HOUTF8_Mode))

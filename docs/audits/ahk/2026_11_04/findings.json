@@ -741,6 +741,17 @@
 			"root_cause": "StickyModifier sends Hook.EndKey with only the selected sticky modifiers and discards Hook.EndMods. A native captured modifier may already be released when Wait unwinds, so current key state or Blind cannot restore the captured shortcut.",
 			"silent_failure": "For example sticky Ctrl followed by Shift+F6 becomes Ctrl+F6, changing the requested application action.",
 			"regression_test": "The two real-hook/native-receiver probes include the production HS_RunSyntheticInputTransaction and TextPressKey pipeline. The fix unions captured Ctrl/Alt/Shift/Win groups with the sticky modifier without duplicates; it does not claim preservation of left/right modifier identity. Post-fix qualification pending."
+		},
+		{
+			"id": "AHK-068",
+			"title": "Full-state override saves erase valid TOML settings omitted by the regex projection",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41925176895 at81d5aae: five canonical syntax cases lose existing category and section leaves after genuine HotstringsConfigReload and unrelated public saves. Literal/quoted-key colors, signed/exponential offsets and separated integer priorities fail; three ordinary lexical controls pass. Four source-preservation cases also acknowledge erasure of unknown/deeper/array/wrong-type source data; the supported extension control passes. Same reverse results.",
+			"root_cause": "_ParseOverrides and _ParseGlobalKey use partial regex scanners rather than the canonical typed TOML model. The full-state serializer then assumes that its projected Map represents the complete admitted source. Recognized but unadopted LegacyDelay and reserved migration strings expose the same read-to-write loss boundary.",
+			"silent_failure": "An unrelated acknowledged settings edit can permanently erase an existing delay, color, priority or future source field. Legacy delimiter intent can also be retired without proving transfer of the exact source values.",
+			"regression_test": "Thirteen native file/public-save probes establish fail-before and controls. The fix projects canonical typed leaves, refuses source shapes the serializer cannot preserve, and requires an exact durable migration receipt before retiring nonempty legacy delimiter strings. Additional tests cover four canonical legacy spellings, eight legacy-delay states, four retirement receipts and a functional real-decoder owner check. Raw LegacyDelay survives pre-boot saves; ordinary runtime adoption preserves finite delay intent, while pending _global default migration refuses runtime reload. Native post-fix qualification pending. These related projection/preservation variants are one finding, not one count per syntax or field. Five exact UTF-8 source tests add invalid-byte/rewrite refusals and valid Unicode, BOM and empty-file controls through the native file boundary; all three readers share FSReadUtf8Exact admission."
 		}
 	]
 }
