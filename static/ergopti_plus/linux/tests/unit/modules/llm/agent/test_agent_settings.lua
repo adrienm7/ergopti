@@ -19,6 +19,35 @@ local helpers = require("tests.helpers")
 local ActualScenario = require("tests.support.agent_scenario")
 local i18n = require("infra.i18n")
 
+helpers.it("agent configuration refuses a FIFO rather than blocking", function()
+	local uv = require("luv")
+	local Paths = require("infra.paths")
+	local original_shared, original_settings = Paths.shared, package.loaded["modules.llm.agent_settings"]
+	local source = assert(original_shared("modules/llm/agent.json"))
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-agent-config-XXXXXX"))
+	local path = dir .. "/agent.json"
+	local made = os.execute("mkfifo '" .. path .. "'")
+	assert(made == 0 or made == true)
+	package.loaded["modules.llm.agent_settings"] = nil
+	local Settings = require("modules.llm.agent_settings")
+	Paths.shared = function(relative)
+		if relative == "modules/llm/agent.json" then return path end
+		return original_shared(relative)
+	end
+	local exited, process = false, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source } }, function()
+		exited = true
+		process:close()
+	end))
+	local ok, config = pcall(Settings.config)
+	Paths.shared, package.loaded["modules.llm.agent_settings"] = original_shared, original_settings
+	os.remove(path)
+	os.remove(dir)
+	while not exited do uv.run("once") end
+	assert(ok, config)
+	helpers.assert_nil(config, "a FIFO must not supply the agent configuration")
+end)
+
 --- Decorates a cache-restoration case with an absent genuine native owner.
 --- The inner component journal must retire its actual inserted module entry;
 --- this outer finally restores the pre-test identity, including false/absence.
