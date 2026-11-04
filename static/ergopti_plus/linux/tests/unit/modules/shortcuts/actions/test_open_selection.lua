@@ -53,6 +53,7 @@ local function record(existing)
 		notify = function(message) world.notices[#world.notices + 1] = message; return true end,
 		getenv = function(name) return ({ HOME = "/home/ada" })[name] end,
 		focused_app = function() return "" end,
+		focused_context = function() return "", nil end,
 		active_frame_app = function() return nil end,
 	})
 	return world, Subject
@@ -79,7 +80,10 @@ local function record_in(app, read, frame_app)
 		message = function(key) return key == "shortcuts.copy_path_notif" and "Path copied: %s" or key end,
 		getenv = function(name) return ({ HOME = "/home/ada" })[name] end,
 		focused_app = function() return app end,
-		focused_identity = function() return "test:file-manager-window" end,
+		focused_context = function()
+			if app == "" then world.frame_queries = world.frame_queries + 1; return frame_app, "test:file-manager-window" end
+			return app, "test:file-manager-window"
+		end,
 		active_frame_app = function()
 			world.frame_queries = world.frame_queries + 1
 			return frame_app
@@ -184,11 +188,77 @@ end)
 helpers.describe("copy_selected_path copies the selected files' paths in a file manager (linux-copy-path-file-manager)", function()
 	local NAUTILUS_COPY = "file:///home/ada/Docs/r%C3%A9sum%C3%A9.pdf\r\nfile:///home/ada/My%20Folder\r\n"
 
+	helpers.it("captures app and native window together before copy (copy-focus-snapshot)", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local window, presses = "x11:first", 0
+		Subject._set_deps_for_test({
+			focused_app = function() window = "x11:second"; return "nautilus" end,
+			focused_identity = function() return window end,
+			focused_context = function()
+				local captured = window; window = "x11:second"; return "nautilus", captured
+			end,
+			read_uri_list = function(admitted)
+				if admitted() then presses = presses + 1 end
+				return false, "", "copy_chord_failed"
+			end,
+		})
+		local result = Subject.copy_selected_path(function() return "" end)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(presses, 0, "a window changed during acquisition must not receive Ctrl+C")
+	end)
+
+	for _, mode in ipairs({ "x11", "wayland", "missing_identity" }) do
+		helpers.it("uses one native " .. mode .. " focus snapshot for file copy (copy-focus-snapshot)", function()
+			local Subject = require("modules.shortcuts.open_selection")
+			local previous_window, previous_atspi = package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"]
+			local copied, queries = {}, 0
+			package.loaded["adapters.window_info"] = {
+				focused_snapshot = function()
+					if mode == "x11" then return { appId = "nautilus" }, "x11:one" end
+					if mode == "missing_identity" then return { appId = "nautilus" }, nil end
+					return { appId = "" }, nil
+				end,
+			}
+			package.loaded["adapters.atspi_focus"] = { get_context_snapshot = function()
+				queries = queries + 1
+				return { app_id = "nautilus", window_bus_name = ":1.42", window_object_path = "/window/1" }, true
+			end }
+			Subject._set_deps_for_test({ read_uri_list = function(admitted)
+				assert(admitted()); return true, "file:///tmp/a\n"
+			end, write_clipboard = function(text) copied[#copied + 1] = text; return true end,
+				message = function() return "%s" end, notify_success = function() return true end })
+			local called, result = pcall(Subject.copy_selected_path, function() return "" end)
+			Subject._set_deps_for_test(nil)
+			package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"] = previous_window, previous_atspi
+			helpers.assert_true(called and result)
+			helpers.assert_eq(copied, { "/tmp/a" })
+			helpers.assert_eq(queries, mode ~= "x11" and 3 or 0, "one observation per boundary")
+		end)
+	end
+
+	helpers.it("refuses an AT-SPI fallback from another application (copy-focus-snapshot)", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local previous_window, previous_atspi = package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"]
+		local reads = 0
+		package.loaded["adapters.window_info"] = { focused_snapshot = function() return { appId = "nautilus" }, nil end }
+		package.loaded["adapters.atspi_focus"] = { get_context_snapshot = function()
+			return { app_id = "dolphin", window_bus_name = ":1.42", window_object_path = "/window/1" }, true
+		end }
+		Subject._set_deps_for_test({ read_uri_list = function() reads = reads + 1; return false end })
+		local called, result = pcall(Subject.copy_selected_path, function() error("unexpected fallback") end)
+		Subject._set_deps_for_test(nil)
+		package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"] = previous_window, previous_atspi
+		helpers.assert_true(called)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(reads, 0)
+	end)
+
 	helpers.it("refuses to copy after focus moves to another window of the same manager (copy-same-app-window)", function()
 		local Subject = require("modules.shortcuts.open_selection")
 		local window, presses = "x11:first", 0
 		Subject._set_deps_for_test({ focused_app = function() return "nautilus" end,
-			focused_identity = function() return window end,
+			focused_context = function() return "nautilus", window end,
 			read_uri_list = function(admitted)
 				window = "x11:second"
 				if admitted() then presses = presses + 1 end
@@ -207,7 +277,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		local Subject = require("modules.shortcuts.open_selection")
 		local window, written = "x11:first", 0
 		Subject._set_deps_for_test({ focused_app = function() return "nautilus" end,
-			focused_identity = function() return window end,
+			focused_context = function() return "nautilus", window end,
 			read_uri_list = function(admitted)
 				assert(admitted()); window = "x11:second"
 				return true, "file:///tmp/a\n"
@@ -223,7 +293,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		local Subject = require("modules.shortcuts.open_selection")
 		local reads = 0
 		Subject._set_deps_for_test({ focused_app = function() return "nautilus" end,
-			focused_identity = function() return nil end,
+			focused_context = function() return "nautilus", nil end,
 			read_uri_list = function() reads = reads + 1; return false end })
 		local result = Subject.copy_selected_path(function() error("must not fall back to another selection") end)
 		Subject._set_deps_for_test(nil)
@@ -256,7 +326,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		local app, emitted, written = "nautilus", 0, 0
 		Subject._set_deps_for_test({
 			focused_app = function() return app end,
-			focused_identity = function() return "test:file-manager-window" end,
+			focused_context = function() return app, "test:file-manager-window" end,
 			read_uri_list = function(admitted)
 				app = "gnome-terminal-server"
 				helpers.assert_type(admitted, "function")
@@ -286,7 +356,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		package.loaded[names[2]] = { press = function() emitted = emitted + 1; return true end }
 		package.loaded[names[3]] = { sleep_ms = function() return true end }
 		Subject._set_deps_for_test({ focused_app = function() return app end,
-			focused_identity = function() return "test:file-manager-window" end })
+			focused_context = function() return app, "test:file-manager-window" end })
 		local ok, err = pcall(function() helpers.assert_eq(Subject.copy_selected_path(function() return "" end), false) end)
 		Subject._set_deps_for_test(nil)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
@@ -320,7 +390,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		local Subject = require("modules.shortcuts.open_selection")
 		local frame = "nautilus"
 		Subject._set_deps_for_test({ focused_app = function() return "" end, active_frame_app = function() return frame end,
-			focused_identity = function() return "test:file-manager-window" end })
+			focused_context = function() return frame, "test:file-manager-window" end })
 		local admitted = Subject.capture_file_manager()
 		helpers.assert_type(admitted, "function")
 		helpers.assert_eq(admitted(), true)

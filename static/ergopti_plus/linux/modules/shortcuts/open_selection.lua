@@ -62,14 +62,17 @@ local DEFAULT_DEPS = {
 	message = function(key) return require("infra.i18n").get(key) end,
 	getenv = os.getenv,
 	focused_app = function() return require("adapters.window_info").getFocused().appId end,
-	focused_identity = function()
-		local identity = require("adapters.window_info").focused_identity()
-		if identity then return identity end
-		local snapshot = require("adapters.atspi_focus").get_context_snapshot()
-		if snapshot and type(snapshot.window_bus_name) == "string" and type(snapshot.window_object_path) == "string" then
-			return "atspi:" .. snapshot.window_bus_name .. ":" .. snapshot.window_object_path
+	focused_context = function()
+		local info, identity = require("adapters.window_info").focused_snapshot()
+		local app = info and type(info.appId) == "string" and info.appId ~= "" and info.appId or nil
+		if app and type(identity) == "string" and identity ~= "" then return app, identity end
+		local snapshot, conclusive = require("adapters.atspi_focus").get_context_snapshot()
+		if conclusive == true and snapshot and type(snapshot.window_bus_name) == "string"
+			and type(snapshot.window_object_path) == "string" then
+			if app and snapshot.app_id ~= app then return app, nil end
+			return snapshot.app_id, "atspi:" .. snapshot.window_bus_name .. ":" .. snapshot.window_object_path
 		end
-		return nil
+		return app, nil
 	end,
 	-- Bounded helper process with a hard deadline; needs a desktop session.
 	active_frame_app = function()
@@ -150,25 +153,20 @@ local function is_file_manager(app)
 	return FILE_MANAGERS[id] == true or FILE_MANAGERS[id:match("([^.]+)$")] == true
 end
 
-local function capture_manager(app)
-	local captured, identity = pcall(deps.focused_identity)
-	if not captured or type(identity) ~= "string" or identity == "" then return nil end
+local function capture_manager(app, identity)
+	if type(identity) ~= "string" or identity == "" then return nil end
 	return function()
-		local current = deps.focused_app()
-		if type(current) ~= "string" or current == "" then current = deps.active_frame_app() end
-		if current ~= app or not is_file_manager(current) then return false end
-		local ok, observed = pcall(deps.focused_identity)
-		return ok and observed == identity
+		local ok, current, observed = pcall(deps.focused_context)
+		return ok and current == app and is_file_manager(current) and observed == identity
 	end
 end
 
 --- Retains the currently focused known file manager for a later copy chord.
 --- @return function|nil Checks that the same native window is still focused.
 function M.capture_file_manager()
-	local app = deps.focused_app()
-	if type(app) ~= "string" or app == "" then app = deps.active_frame_app() end
-	if not is_file_manager(app) then return nil end
-	return capture_manager(app)
+	local captured, app, identity = pcall(deps.focused_context)
+	if not captured or not is_file_manager(app) then return nil end
+	return capture_manager(app, identity)
 end
 
 --- Copies the file manager's selected paths to the clipboard.
@@ -248,7 +246,8 @@ end
 --- @param read_primary function () -> string, read only when it is needed.
 --- @return boolean True when paths were copied or a target was opened.
 function M.copy_selected_path(read_primary)
-	local app = deps.focused_app()
+	local captured, app, identity = pcall(deps.focused_context)
+	if not captured then app, identity = nil, nil end
 	if type(app) ~= "string" or app == "" then
 		-- GNOME and KDE on Wayland name no foreground application.
 		app = deps.active_frame_app()
@@ -257,7 +256,7 @@ function M.copy_selected_path(read_primary)
 		end
 	end
 	if is_file_manager(app) then
-		local admitted = capture_manager(app)
+		local admitted = capture_manager(app, identity)
 		if not admitted then
 			Logger.warn(LOG, "copy_selected_path: the file-manager window identity is unavailable.")
 			return false

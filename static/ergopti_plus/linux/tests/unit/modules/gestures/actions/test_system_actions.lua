@@ -290,7 +290,8 @@ helpers.describe("Linux system actions", function()
 
 	helpers.it("never sends Ctrl+C to a terminal for make_executable_selection", function()
 		local Open = require("modules.shortcuts.open_selection")
-		Open._set_deps_for_test({ focused_app = function() return "gnome-terminal-server" end })
+		Open._set_deps_for_test({ focused_app = function() return "gnome-terminal-server" end,
+			focused_context = function() return "gnome-terminal-server", "test:terminal" end })
 		local combos = {}
 		local ok, err = pcall(function()
 			with_modules({
@@ -311,7 +312,7 @@ helpers.describe("Linux system actions", function()
 			local Open = require("modules.shortcuts.open_selection")
 			local app, combos = "nautilus", {}
 			Open._set_deps_for_test({ focused_app = function() return app end,
-				focused_identity = function() return "test:file-manager-window" end })
+				focused_context = function() return app, "test:file-manager-window" end })
 			local ok, err = pcall(function()
 				with_modules({
 					["adapters.clipboard"] = { read_selection_uri_list = function(emit)
