@@ -279,3 +279,88 @@ _WJFM_NulMapKey(Kind) {
 for Kind in ["ngram", "hourly", "hourly_min5", "bursts"]
 	Test("walker: a NUL map key stays distinct across " . Kind . " merges (windows-sqlite-nul-map-keys)",
 		_WJFM_NulMapKey.Bind(Kind))
+
+
+_WCK_CheckRows(Db, Expected) {
+	Rows := SQLite_Query(Db, "SELECT date,hex(app) AS app_hex,hex(token) AS token_hex,c,td,cd "
+		. "FROM ngram_chars ORDER BY hex(app),hex(token);")
+	AssertEqual(Expected.Length, Rows.Length, "every literal tuple must remain a distinct persisted row")
+	for Index, Spec in Expected {
+		Row := Rows[Index]
+		AssertEqual("2026-11-04", Row["date"])
+		AssertEqual(Spec[1], Row["app_hex"], "application bytes of row " . Index)
+		AssertEqual(Spec[2], Row["token_hex"], "token bytes of row " . Index)
+		AssertEqual(Spec[3], Row["c"], "count of row " . Index)
+		AssertEqual(Spec[4], Row["td"], "total delay of row " . Index)
+		AssertEqual(Spec[5], Row["cd"], "delay count of row " . Index)
+	}
+}
+
+_WCK_NulToken() {
+	SavedBatch := KLW.batch
+	Db := _WJFM_OpenMemory()
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		KLW_ResetBatch()
+		Day := "2026-11-04", App := "A"
+		NulToken := "a" . Chr(0) . "b"
+		AssertEqual(3, StrLen(NulToken), "the producer really receives all three code units")
+		AssertTrue(RegExMatch(NulToken, "\x00") > 0)
+		KLW_PushNgram("ngram_chars", Day, App, "a", 80, false, "none")
+		KLW_PushNgram("ngram_chars", Day, App, NulToken, 160, false, "none")
+		; A literal escape spelling must not alias the escaped NUL.
+		KLW_PushNgram("ngram_chars", Day, App, "a" . Chr(2) . "0b", 240, false, "none")
+		; Repetition remains additive; this is not a one-row-per-call expectation.
+		KLW_PushNgram("ngram_chars", Day, App, "a", 40, false, "none")
+		_WJFM_Flush(Db, "composite-key-device")
+		_WCK_CheckRows(Db, [["41", "61", 2, 120, 2],
+			["41", "610062", 1, 160, 1], ["41", "61023062", 1, 240, 1]])
+	} finally {
+		KLW.batch := SavedBatch
+		SQLite_Close(Db)
+	}
+}
+Test("walker: literal NUL tokens survive genuine producer and SQL flush (walker-composite-nul)", _WCK_NulToken)
+
+_WCK_FieldBoundary() {
+	SavedBatch := KLW.batch
+	Db := _WJFM_OpenMemory()
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		KLW_ResetBatch()
+		Day := "2026-11-04"
+		KLW_PushNgram("ngram_chars", Day, "A" . Chr(1) . "B", "C", 80, false, "none")
+		KLW_PushNgram("ngram_chars", Day, "A", "B" . Chr(1) . "C", 160, false, "none")
+		; This app contains an actual Chr(2), followed by the literal text 1B.
+		; It must stay distinct from the proposed escape spelling of Chr(1).
+		KLW_PushNgram("ngram_chars", Day, "A" . Chr(2) . "1B", "C", 240, false, "none")
+		_WJFM_Flush(Db, "composite-key-device")
+		_WCK_CheckRows(Db, [["41", "420143", 1, 160, 1],
+			["410142", "43", 1, 80, 1], ["41023142", "43", 1, 240, 1]])
+	} finally {
+		KLW.batch := SavedBatch
+		SQLite_Close(Db)
+	}
+}
+Test("walker: literal separators cannot move between application and token fields (walker-composite-boundary)", _WCK_FieldBoundary)
+
+; Genuine replay regression: the accepted typing replay itself reaches the same
+; defect. This is not a claim about a measured physical keyboard NUL sequence.
+_WCK_TypingReplayNul() {
+	SavedBatch := KLW.batch, SavedContext := KLW.ctx
+	Db := _WJFM_OpenMemory()
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		KLW_ResetBatch()
+		KLW.ctx := Map()
+		KLW_WalkTypingEntry(Map("timestamp", "2026-11-04 10:00:00.000", "app", "A",
+			"events", [["a", 80, Map()], ["a" . Chr(0) . "b", 160, Map()]]))
+		_WJFM_Flush(Db, "composite-key-device")
+		_WCK_CheckRows(Db, [["41", "61", 1, 80, 1], ["41", "610062", 1, 160, 1]])
+	} finally {
+		KLW.batch := SavedBatch
+		KLW.ctx := SavedContext
+		SQLite_Close(Db)
+	}
+}
+Test("walker: accepted typing replay preserves a NUL-bearing literal token (walker-composite-typing)", _WCK_TypingReplayNul)
