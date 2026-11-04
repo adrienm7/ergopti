@@ -172,8 +172,16 @@ end
 --- @param module_name string Dotted Lua module name to require.
 --- @return any The module's return value.
 function M.load_module(module_name)
+	local previous = package.loaded[module_name]
 	package.loaded[module_name] = nil
-	return require(module_name)
+	local ok, result = pcall(require, module_name)
+	if not ok then
+		-- LuaJIT leaves an error sentinel after a failed require. Restore the
+		-- original entry so later tests can still load this module normally.
+		package.loaded[module_name] = previous
+		error(result, 0)
+	end
+	return result
 end
 
 --- Loads a fresh instance of a module by name and leaves the package cache as
