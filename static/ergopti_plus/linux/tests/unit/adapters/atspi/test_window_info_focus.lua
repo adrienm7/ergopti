@@ -680,3 +680,29 @@ helpers.describe("window_info: X11 window list (linux-x11-window-list-app-ids)",
 		helpers.assert_eq(parsed, { { id = "0x0100000a", pid = 99, title = "A title  with  spaces" } })
 	end)
 end)
+
+for _, fault in ipairs({ "read_throw", "close_false", "close_throw" }) do
+	helpers.it("window list refuses an incomplete process name " .. fault, function()
+		local wi = under("x11", "xfce", {
+			{ "command -v 'wmctrl'", true }, { "wmctrl -lp", WMCTRL_LIST },
+		})
+		local original, closes = io.open, 0
+		io.open = function(path, mode)
+			if path ~= "/proc/1337/comm" then return original(path, mode) end
+			return { read = function()
+				if fault == "read_throw" then error("injected read failure") end
+				return "synthetic-browser\n"
+			end, close = function()
+				closes = closes + 1
+				if fault == "close_throw" then error("injected close failure") end
+				return fault ~= "close_false"
+			end }
+		end
+		local called, windows = pcall(wi.getAll)
+		io.open = original
+		wi._reset_state(); restore()
+		helpers.assert_true(called, "one process disappearing must not abort the window list")
+		helpers.assert_eq(windows[1].appId, "", "an unacknowledged process name is unknown")
+		helpers.assert_eq(closes, 1)
+	end)
+end

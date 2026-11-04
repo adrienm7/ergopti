@@ -116,8 +116,9 @@ end
 local function read_proc_comm(pid)
 	local handle = io.open("/proc/" .. tostring(pid) .. "/comm", "rb")
 	if not handle then return "" end
-	local comm = handle:read("*a") or ""
-	handle:close()
+	local read_ok, comm = pcall(handle.read, handle, "*a")
+	local close_ok, closed = pcall(handle.close, handle)
+	if not read_ok or type(comm) ~= "string" or not close_ok or closed ~= true then return "" end
 	return process_name_record(comm)
 end
 _read_proc_comm = read_proc_comm
