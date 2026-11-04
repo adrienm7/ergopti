@@ -62,9 +62,6 @@ function M.prepend_to(items, ctx, on_click)
 		end
 	end
 
-	-- Create a transparent canvas that spans the available menu width to force centering
-	local canvas_w = math.ceil(max_text_width)
-
 	local ok, size = pcall(hs.drawing.getTextDrawingSize, display_text, { font = "Helvetica-Bold", size = 14 })
 	local text_w = ok and size and size.w or 80
 
@@ -73,9 +70,11 @@ function M.prepend_to(items, ctx, on_click)
 	local pad_y = 10
 	local pill_w = math.ceil(text_w + (pad_x * 2))
 	local pill_h = 14 + (pad_y * 2)
+	-- Keep the entire badge visible even if the menu has only short rows.
+	local canvas_w = math.max(math.ceil(max_text_width), pill_w)
 
 	-- Mathematically center the pill horizontally inside the transparent canvas
-	local pill_x = (canvas_w - pill_w + 2 * pad_x) / 2
+	local pill_x = (canvas_w - pill_w) / 2
 
 	local is_dark = hs.host.interfaceStyle() == "Dark"
 	local bg_color   = is_dark and { white = 1 } or { white = 0.15 }
