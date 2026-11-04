@@ -36,6 +36,7 @@ local function with_remote(body)
 	local calls, clock = {}, { now = 1000, ticks = {} }
 	package.loaded["adapters.timer_scheduler"] = {
 		after = function(_, fn)
+			if clock.throw_schedule then clock.ticks[#clock.ticks + 1] = fn; error("scheduler unavailable") end
 			clock.ticks[#clock.ticks + 1] = fn
 			return { armed = true }
 		end,
@@ -258,6 +259,28 @@ helpers.describe("Access-token providers: the shipped rows", function()
 			helpers.assert_eq(endpoint.headers.Authorization, "Bearer ya29.sa")
 		end)
 	end)
+
+	helpers.it("a scheduler exception settles the token exchange and permits a later retry", function()
+		with_remote(function(remote, calls, clock)
+			local entry = { id = "sa", provider = "vertex", model = "google/gemini-3.5-flash",
+				token = service_account_key(),
+				base_url = "https://aiplatform.googleapis.com/v1/projects/p1/locations/global/endpoints/openapi" }
+			clock.throw_schedule = true
+			local answer
+			remote.prepare_access(entry, function(ok, reason) answer = { ok, reason } end)
+			helpers.assert_eq(answer[1], false)
+			helpers.assert_true(type(answer[2]) == "string" and answer[2] ~= "")
+			drain_ticks(clock)
+			helpers.assert_eq(#calls, 0, "a callback retained by a failed scheduler must be inert")
+			clock.throw_schedule = false
+			clock.now = clock.now + 61
+			remote.prepare_access(entry, function() end)
+			helpers.assert_true(#clock.ticks > 0, "the refused exchange must not remain pending")
+			drain_ticks(clock)
+			helpers.assert_eq(#calls, 1)
+		end)
+	end)
+
 end)
 
 
