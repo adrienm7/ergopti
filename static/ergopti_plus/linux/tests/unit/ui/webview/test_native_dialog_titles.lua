@@ -68,22 +68,22 @@ h.describe("native dialog captions (linux-native-titles)", function()
 		package.loaded["ui.choice_prompt"] = nil
 		local ok, command = pcall(function()
 			return require("ui.choice_prompt").command("Vision provider", "Pick one",
-				{ { value = "openai", label = "OpenAI" } })
+				{ { value = "--question", label = "--title=OpenAI" } })
 		end)
 		package.loaded["ui.choice_prompt"] = nil
 		h.assert_true(ok, tostring(command))
 		h.assert_eq(command, DIALOG .. " --list --no-markup --hide-header --title='ErgoptiPlus — Vision provider'"
-			.. " --text='Pick one' --column='' --column='' --hide-column=1 --print-column=1 'openai' 'OpenAI' 2>/dev/null")
+			.. " --text='Pick one' --column='' --column='' --hide-column=1 --print-column=1 -- '--question' '--title=OpenAI' 2>/dev/null")
 	end)
 	h.it("(linux-native-titles) the text prompt brands chrome while retaining masking, choices and exact value", function()
 		scenario(function(observed)
 			observed.answer, observed.status = " exact value \n", 0
 			local value = require("ui.text_prompt").ask("Native 'caption'", "Preserved <body>", " Initial ", true,
-				{ "First choice", "Second 'choice'" })
+				{ "--hide-text", "Second 'choice'" })
 			h.assert_eq(value, " exact value ")
 			h.assert_eq(observed.modals, 1)
 			h.assert_eq(observed.commands[1], DIALOG .. " --entry --title='ErgoptiPlus — Native '\\''caption'\\'''"
-				.. " --text='Preserved <body>' --entry-text=' Initial ' --hide-text 'First choice' 'Second '\\''choice'\\''' 2>/dev/null")
+				.. " --text='Preserved <body>' --entry-text=' Initial ' --hide-text -- '--hide-text' 'Second '\\''choice'\\''' 2>/dev/null")
 		end)
 	end)
 	h.it("(linux-native-titles) a cancelled prompt remains nil and an accepted empty answer remains empty", function()

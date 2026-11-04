@@ -85,7 +85,7 @@ function M.show(group)
 		local command = require("ui.native_dialog").command() .. " --list --hide-header --no-markup --column=" .. Shell.quote(I18n.get("dialog.action_picker.label"))
 			.. " --title=" .. Shell.quote(title)
 			.. " --text=" .. Shell.quote(message)
-			.. " " .. Shell.quote(settings) .. " " .. Shell.quote(dismiss)
+			.. " -- " .. Shell.quote(settings) .. " " .. Shell.quote(dismiss)
 		local accepted, selected = require("ui.modal").run(function() return Shell.exec_checked(command) end)
 		if not accepted then return end
 		selected = selected:gsub("[\r\n]+$", "")

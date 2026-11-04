@@ -51,6 +51,15 @@ h.describe("owned dialog host command line (owned-dialog-host)", function()
 		h.assert_eq(request.values, { "first", "second 'two'" })
 	end)
 
+	h.it("(owned-dialog-host) a separator preserves option-shaped choices", function()
+		local entry = assert(Host.parse({ "--entry", "--", "--hide-text", "--", "--unknown=value" }))
+		h.assert_eq(entry.values, { "--hide-text", "--", "--unknown=value" })
+		h.assert_nil(entry.options["hide-text"])
+		local list = assert(Host.parse({ "--list", "--column=Value", "--column=Label", "--",
+			"--question", "--title=example" }))
+		h.assert_eq(Host.rows(list), { { "--question", "--title=example" } })
+	end)
+
 	h.it("(owned-dialog-host) a list reads whole rows and its hidden printed column", function()
 		local request = assert(Host.parse({ "--list", "--no-markup", "--hide-header", "--title=T", "--text=Pick",
 			"--column=", "--column=", "--hide-column=1", "--print-column=1", "v1", "Label 1", "v2", "Label 2" }))
