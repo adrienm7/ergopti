@@ -1,11 +1,99 @@
 {
-	"expected_count": 4,
-	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"expected_count": 60,
+	"native_http_client_e2e": true,
+	"native_hotstring_e2e": true,
 	"filters": [
 		{
-			"contains": "token-managed-pause",
+			"contains": "HotstringsConfig persistent offset:",
+			"expected_count": 6
+		},
+		{
+			"contains": "HotstringsConfig unlimited precedence:",
 			"expected_count": 4
+		},
+		{
+			"contains": "Personal editor entry receipts: native case-add preserves rows and retry",
+			"expected_count": 1
+		},
+		{
+			"contains": "Personal editor entry receipts: native case-uncheck preserves rows and retry",
+			"expected_count": 1
+		},
+		{
+			"contains": "Personal editor native fallback: case checkbox owns exact matching",
+			"expected_count": 1
+		},
+		{
+			"contains": "token-managed-pause",
+			"expected_count": 5
+		},
+		{
+			"contains": "managed curl owner:",
+			"expected_count": 14
+		},
+		{
+			"contains": "keystats: recoverable day transition swap-after-proof",
+			"expected_count": 1
+		},
+		{
+			"contains": "keystats: recoverable day transition same-after-proof",
+			"expected_count": 1
+		},
+		{
+			"contains": "gesture-keywatcher-length",
+			"expected_count": 2
+		},
+		{
+			"contains": "sticky-native-nontext",
+			"expected_count": 3
+		},
+		{
+			"contains": "wrap symbols TOML inline comments:",
+			"expected_count": 7
+		},
+		{
+			"contains": "layer-editor-ready-delivery-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "HotstringsConfig: _ParseOverrides reads a file-level delay offset and color",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: _ParseOverrides reads [category.section] tables",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: _ParseOverrides keeps unlimited and legacy delays apart",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: a delay override keeps its offset when the base moves",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: an unlimited delay override survives a base change",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: the boot migration keeps every effective delay",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: clearOverride with empty field clears delay + color",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: set/clear rollback when publication fails",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: durable exact stage validation gates override publish",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: re-entrant writer cannot lose an accepted update",
+			"expected_count": 1
 		}
 	]
 }
