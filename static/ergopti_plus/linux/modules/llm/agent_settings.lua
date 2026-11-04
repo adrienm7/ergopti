@@ -277,6 +277,12 @@ end
 --- @return boolean saved
 function M.set_disabled_apps(apps)
 	if type(apps) ~= "table" then error("agent_settings.set_disabled_apps: a list is required", 2) end
+	local length, count = #apps, 0
+	for index in pairs(apps) do
+		count = count + 1
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length then return false end
+	end
+	if count ~= length then return false end
 	local list, seen = {}, {}
 	for _, app in ipairs(apps) do
 		if type(app) ~= "string" or app == "" then
