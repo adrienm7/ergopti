@@ -832,3 +832,18 @@ for _, receipt in ipairs({ "0", "1", "error", "extra_check" }) do
 		helpers.assert_eq(observed_migration, receipt == "0", "unsafe device migration cannot start")
 	end)
 end
+
+it("SQLite open distinguishes absent executable from refused store", function()
+	local prior_programs, prior_writer = package.loaded["infra.owned_programs"], package.loaded["modules.keystats.sqlite_writer"]
+	package.loaded["infra.owned_programs"] = { available = function() return false end, path = function() return "sqlite3" end }
+	package.loaded["modules.keystats.sqlite_writer"] = nil
+	local ok, detail = pcall(function()
+		local writer = require("modules.keystats.sqlite_writer")
+		local absent, why_absent = writer.open_db("/controlled/metrics.sqlite")
+		helpers.assert_eq(absent, false); helpers.assert_eq(why_absent, "sqlite_unavailable")
+		local rejected, why_rejected = writer.open_db("")
+		helpers.assert_eq(rejected, false); helpers.assert_eq(why_rejected, "store_refused")
+	end)
+	package.loaded["infra.owned_programs"], package.loaded["modules.keystats.sqlite_writer"] = prior_programs, prior_writer
+	if not ok then error(detail, 0) end
+end)

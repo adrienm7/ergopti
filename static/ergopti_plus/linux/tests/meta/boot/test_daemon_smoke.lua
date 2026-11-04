@@ -893,3 +893,24 @@ helpers.describe("daemon managed reacquisition publisher", function()
 		end)
 	end
 end)
+
+for _, result in ipairs({ true, false }) do
+  helpers.it("metrics startup notifies only when initialization refuses " .. tostring(result), function()
+    local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+    local source = assert(file:read("*a")); assert(file:close())
+    local body = assert(source:match('(BootProfiler%.stage%(%"keystats%"%).-BootProfiler%.stage_done%(%"keystats%"%))'))
+    local notices = {}
+    local env = setmetatable({
+      BootProfiler = { stage = function() end, stage_done = function() end },
+      keystats = { init = function() return result end },
+      RuntimeGuard = { optional_require = function() return { get = function(key) return key end } end },
+      notifier = { send = function(message, opts) notices[#notices + 1] = { message, opts.level }; return true end },
+    }, { __index = _G })
+    local fn
+    if setfenv then fn = assert(loadstring(body)); setfenv(fn, env)
+    else fn = assert(load(body, "metrics-startup", "t", env)) end
+    fn()
+    if result then helpers.assert_eq(notices, {})
+    else helpers.assert_eq(notices, { { "menu.metrics.unavailable", "warning" } }) end
+  end)
+end
