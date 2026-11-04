@@ -573,3 +573,20 @@ the eleven `http_client:` proxy-override E2E cases required by the changed worke
 the workflow checks their exact non-skipped completion count. All later native
 qualification remains pending here. The register contains **35 distinct new
 findings**; the target of 1,000 remains unmet.
+
+## Native qualification checkpoint: 41888187588
+
+The replay at `67eaa2b1f6463e8bbfeff22889265479fb8a15bf` completed successfully:
+33 selected AHK cases passed individually and in reverse order, all eleven
+selected HTTP-client proxy-override E2E cases executed without skips, and both
+production-entry compilation and native hotstring E2E passed. This qualifies the
+previously pending copy, native folder admission, boot-root and redirect changes
+at that exact source revision.
+
+The next pass isolates one new, unregistered modifier-ownership regression.
+It drives the actual owner across Suspend, genuine remap teardown, resume and a
+new acquisition, then requires the retired owner's unwind to preserve that new
+reference. It is deliberately tested against the still-unfixed production
+protocol before implementation. This expected-red probe adds no finding count;
+HTTP E2E is explicitly outside this unrelated selection. The register remains
+**35 distinct new findings**.

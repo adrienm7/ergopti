@@ -1,48 +1,9 @@
 {
-	"expected_count": 33,
+	"expected_count": 1,
+	"native_http_client_e2e": false,
 	"filters": [
 		{
-			"contains": "Model browser selection: native-refused ",
-			"expected_count": 1
-		},
-		{
-			"contains": "Model browser selection: native-paused ",
-			"expected_count": 1
-		},
-		{
-			"contains": "tap-copy-verified",
-			"expected_count": 5
-		},
-		{
-			"contains": "tap-copy-owner",
-			"expected_count": 7
-		},
-		{
-			"contains": "native-paths-pause-owner",
-			"expected_count": 1
-		},
-		{
-			"contains": "paths-close-request-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "boot-explicit-root",
-			"expected_count": 12
-		},
-		{
-			"contains": "config-transition-runtime-boot-unused-default",
-			"expected_count": 1
-		},
-		{
-			"contains": "config-transition-runtime-boot-exact-default",
-			"expected_count": 1
-		},
-		{
-			"contains": "managed-redirect-body-owner",
-			"expected_count": 1
-		},
-		{
-			"contains": "winhttp transport: real WinHTTP honours the managed request contract",
+			"contains": "synthetic-owner-epoch",
 			"expected_count": 1
 		}
 	]
