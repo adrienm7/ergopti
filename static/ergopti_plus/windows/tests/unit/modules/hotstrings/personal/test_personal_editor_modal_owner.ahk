@@ -694,12 +694,21 @@ _PESORT_Selected(State, Control, Row, Selected) {
 	return
 }
 
-_PESORT_Click(Hwnd, X, Y) {
+_PECT_Phase(Mode, Phase) {
+	if Mode == "constructor-current" || Mode == "constructor-successor"
+		_TestPrint("# personal-constructor-phase mode=" . Mode . " phase=" . Phase . " critical=" . A_IsCritical)
+}
+
+_PESORT_Click(Hwnd, X, Y, Mode := "") {
 	Point := (Y << 16) | (X & 0xFFFF)
+	_PECT_Phase(Mode, "row-down-before")
 	DllCall("User32\SendMessageW", "Ptr", Hwnd, "UInt", 0x201,
 		"Ptr", 1, "Ptr", Point, "Ptr")
+	_PECT_Phase(Mode, "row-down-after")
+	_PECT_Phase(Mode, "row-up-before")
 	DllCall("User32\SendMessageW", "Ptr", Hwnd, "UInt", 0x202,
 		"Ptr", 0, "Ptr", Point, "Ptr")
+	_PECT_Phase(Mode, "row-up-after")
 }
 
 _PESORT_Confirmed(State, Text, Title, Options) {
@@ -710,6 +719,8 @@ _PESORT_Confirmed(State, Text, Title, Options) {
 
 _PESORT_ButtonEntered(State, *) {
 	State.Entered += 1
+	if State.HasOwnProp("ConstructorMode")
+		_PECT_Phase(State.ConstructorMode, "save-observer-entered")
 	return
 }
 
@@ -880,28 +891,39 @@ _PESORT_Case(Operation) {
 				"The current native owner must retain its own live priority control after an older constructor retires")
 			; A genuine row click and the unchanged Save button exercise the
 			; surviving field through the normal form and durable writer too.
+			State.ConstructorMode := Operation
+			_PECT_Phase(Operation, "list-reset-before")
 			List.Modify(0, "-Select -Focus")
+			_PECT_Phase(Operation, "list-reset-after")
 			List.OnEvent("ItemSelect", _PESORT_Selected.Bind(State))
 			Rect := Buffer(16, 0)
+			_PECT_Phase(Operation, "row-rect-before")
 			AssertTrue(DllCall("User32\SendMessageW", "Ptr", List.Hwnd, "UInt", 0x100E,
 				"Ptr", 0, "Ptr", Rect.Ptr, "Ptr"))
+			_PECT_Phase(Operation, "row-rect-after")
 			_PESORT_Click(List.Hwnd, NumGet(Rect, 0, "Int") + 20,
-				(NumGet(Rect, 4, "Int") + NumGet(Rect, 12, "Int")) // 2)
+				(NumGet(Rect, 4, "Int") + NumGet(Rect, 12, "Int")) // 2, Operation)
 			Started := A_TickCount
 			while State.Selections == 0 && TickElapsed(Started) < 3000
 				Sleep(5)
+			_PECT_Phase(Operation, "selection-wait-after")
 			AssertTrue(State.Selections >= 1)
 			SelectedTrigger := List.GetText(1, 1)
 			AssertEqual(SelectedTrigger, Edits[1].Value)
 			Edits[2].Value := "Constructor retained owner output"
 			Button.OnEvent("Click", _PESORT_ButtonEntered.Bind(State), -1)
+			_PECT_Phase(Operation, "save-click-before")
 			DllCall("User32\SendMessageW", "Ptr", Button.Hwnd, "UInt", 0xF5,
 				"Ptr", 0, "Ptr", 0, "Ptr")
+			_PECT_Phase(Operation, "save-click-after")
 			Started := A_TickCount
 			while State.Entered == 0 && TickElapsed(Started) < 3000
 				Sleep(5)
+			_PECT_Phase(Operation, "save-wait-after")
 			AssertEqual(1, State.Entered)
+			_PECT_Phase(Operation, "business-read-before")
 			Fresh := ReadPersonalToml(true), Found := false
+			_PECT_Phase(Operation, "business-read-after")
 			for Entry in Fresh["sections"][_PersonalEditorSection]["entries"] {
 				if Entry["trigger"] == SelectedTrigger {
 					AssertEqual("Constructor retained owner output", Entry["output"])
@@ -909,6 +931,7 @@ _PESORT_Case(Operation) {
 				}
 			}
 			AssertTrue(Found, "The surviving real field must remain usable through a genuine durable save")
+			_PECT_Phase(Operation, "business-completed")
 			return
 		}
 		if IsSwitch {
@@ -1035,6 +1058,7 @@ _PESORT_Case(Operation) {
 	} catch as Failure {
 		Primary := Failure
 	} finally {
+		_PECT_Phase(Operation, "cleanup-entered")
 		if IsObject(CtorHook)
 			OnMessage(0x210, CtorHook, 0)
 		if IsObject(SwitchHook)
@@ -1042,11 +1066,13 @@ _PESORT_Case(Operation) {
 		TestMsgBoxResponder(Saved.Responder)
 		try {
 			if IsObject(Window) && DllCall("User32\IsWindow", "Ptr", CloseHwnd, "Int") {
+				_PECT_Phase(Operation, "cleanup-close-post-before")
 				AssertTrue(DllCall("User32\PostMessageW", "Ptr", CloseHwnd, "UInt", 0x10,
 					"Ptr", 0, "Ptr", 0, "Int"), "Cleanup must post Close to this exact native editor")
 				Started := A_TickCount
 				while DllCall("User32\IsWindow", "Ptr", CloseHwnd, "Int") && TickElapsed(Started) < 3000
 					Sleep(5)
+				_PECT_Phase(Operation, "cleanup-close-wait-after")
 				if DllCall("User32\IsWindow", "Ptr", CloseHwnd, "Int")
 					throw Error("The private production editor did not retire through its native Close")
 			}
@@ -1071,9 +1097,14 @@ _PESORT_Case(Operation) {
 		for Store in [_ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache]
 			if Store.Has(Fixture.path)
 				Store.Delete(Fixture.path)
+		_PECT_Phase(Operation, "cleanup-files-before")
 		_ScopeOwnerCleanup(Fixture)
-		if IsObject(RegistryScope)
+		_PECT_Phase(Operation, "cleanup-files-after")
+		if IsObject(RegistryScope) {
+			_PECT_Phase(Operation, "cleanup-registry-before")
 			_PECASE_RegistryScope(RegistryScope)
+			_PECT_Phase(Operation, "cleanup-registry-after")
+		}
 		Suspend(Saved.Suspended), Critical(Saved.Critical)
 	}
 	if IsObject(Primary)

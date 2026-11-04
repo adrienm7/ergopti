@@ -139,9 +139,13 @@ OpenPersonalEditor(DefaultSection := "") {
 		}
 	}
 
-	_PersonalEditorSessionEpoch += 1
-	SessionEpoch := _PersonalEditorSessionEpoch
-	_PersonalEditorOpeningSource := false
+	; The local constructor must own the epoch it increments, even when a
+	; timer opens another session between ordinary AutoHotkey statements.
+	PreviousCritical := Critical("On")
+	try {
+		SessionEpoch := ++_PersonalEditorSessionEpoch
+		_PersonalEditorOpeningSource := false
+	} finally Critical(PreviousCritical)
 	OpeningSource := Map()
 	OpeningData := ReadPersonalToml(false, OpeningSource)
 	if SessionEpoch != _PersonalEditorSessionEpoch
