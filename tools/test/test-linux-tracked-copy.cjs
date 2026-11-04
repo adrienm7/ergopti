@@ -49,6 +49,28 @@ try {
 			assert.notEqual(permitted.status, 0, 'the fake checkout has no source copier');
 			assert.ok(permitted.stdout.includes(`Source  : ${checkout}/static/ergopti_plus/linux`));
 			assert.ok(fs.existsSync(output), 'the ordinary output below build remains allowed');
+			for (const filename of [
+				'build-linux-deb.sh',
+				'build-linux-rpm.sh',
+				'build-linux-appimage.sh',
+				'build-linux-flatpak.sh',
+				'build-linux-bundle-archive.sh',
+				'build-linux-native-output.sh',
+				'build-proxy-relay.sh',
+				'write_build_stamp.sh'
+			]) {
+				const lines = fs.readFileSync(path.join(ROOT, 'tools/build', filename), 'utf8').split('\n');
+				const position = lines.findIndex((line) => line.startsWith('SCRIPT_DIR='));
+				assert.ok(position >= 0, `${filename} has a script root`);
+				const rootLine = lines[position + 1];
+				const variable = rootLine.includes('PROJECT_ROOT') ? 'PROJECT_ROOT' : 'REPO_ROOT';
+				assert.ok(rootLine.includes(variable), `${filename} has a checkout root`);
+				const probe = path.join(checkout, 'tools/build', `probe-${filename}`);
+				fs.writeFileSync(probe, `${lines[position]}\n${rootLine}\nprintf '%s\\0' "$${variable}"\n`);
+				const resolved = spawnSync('/bin/bash', [probe], { encoding: 'utf8', timeout: 10000 });
+				assert.equal(resolved.status, 0, resolved.stderr);
+				assert.equal(resolved.stdout, `${checkout}\0`, `${filename} preserves the root bytes`);
+			}
 		}
 		// An output selector that names the checkout, its ancestor, or its source
 		// tree must never authorize deleting that data.

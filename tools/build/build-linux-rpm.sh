@@ -32,7 +32,7 @@ if ! "$SKIP_RPM" && ! command -v rpmbuild >/dev/null 2>&1; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+IFS= read -r -d '' PROJECT_ROOT < <(cd -- "$SCRIPT_DIR/../.." && printf '%s\0' "$PWD")
 # The external hosts are declared once in _shared/data/identifiers.json.
 # shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
 . "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
