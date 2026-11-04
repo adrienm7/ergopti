@@ -170,8 +170,8 @@ export default {
 	'Chaque fonctionnalité se désactive d’un clic dans le menu, et l’application se retire comme n’importe quelle autre. Vos données (base SQLite locale) vous appartiennent et partent avec.':
 		'Every feature switches off with one click in the menu, and the application removes like any other. Your data (a local SQLite database) is yours and leaves with it.',
 	'Windows, macOS ou Linux ?': 'Windows, macOS or Linux?',
-	'Windows (AutoHotkey) et macOS (Hammerspoon) sont à parité et prêts à l’emploi. Le driver Linux (un daemon Lua qui gère aussi les tap-holds) est complet mais en alpha — il cherche ses premiers testeurs.':
-		'Windows (AutoHotkey) and macOS (Hammerspoon) are at parity and ready to use. The Linux driver (a Lua daemon that also runs the tap-holds) is complete but in alpha — looking for its first testers.',
+	'Windows, macOS et Linux partagent de nombreuses fonctionnalités. Leur disponibilité, leurs conditions et certains comportements diffèrent selon le système : consultez les inventaires ci-dessous et l’audit de parité du dépôt. Le pilote Linux reste en alpha.':
+		'Windows, macOS and Linux share many features. Availability, requirements and some behaviors differ by system: see the inventories below and the repository parity audit. The Linux driver remains in alpha.',
 
 	// ── Comparison ───────────────────────────────────────────────────────────
 	'Autocorr. native': 'Native autocorrect',
