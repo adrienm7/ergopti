@@ -237,7 +237,7 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
  * @param {Func|Integer} CurrentFn - Original requester admission, or 0 for a standalone request.
  * @returns {Integer} Request id, usable with LLM_RemoteCancelAsync.
  */
-LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs := 0, Kind := "", ExchangeStage := 0, CurrentFn := 0) {
+LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs := 0, Kind := "", ExchangeStage := 0, CurrentFn := 0, TransportPort := 0) {
     global _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
     if !(Resolved is Map)
         throw TypeError("LLM_RemotePostBody_Async needs a resolved entry.")
@@ -259,7 +259,7 @@ LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs 
         return req_id
     }
     if (_LLMRemote_DispatchCurl(req_id, Resolved, Url, Payload, on_success,
-            on_fail, timeout_ms, 0, reservation))
+            on_fail, timeout_ms, TransportPort, reservation))
         return req_id
     try LoggerError("LLM.remote",
         "Remote request refused because the managed non-blocking transport is unavailable.")

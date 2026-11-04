@@ -596,3 +596,121 @@ _LTE_VisionFreshToken() {
 	}
 }
 Test("Token exchange: a screen reading with a fresh token does not wait", _LTE_VisionFreshToken)
+
+
+; Raw body retries retain the current access token and original requester.
+; Existing token engine and managed facade execute unchanged; only native spawn
+; uses the existing explicit I/O port. This is not proof of native wire success.
+_LTERP_NewHttp(Control) {
+    Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(Control)))
+    Control["request"] := Request
+    return Request
+}
+
+_LTERP_Header(Control, Expected) {
+    Request := Control["request"]
+    AssertEqual(1, Control["spawns"])
+    AssertFalse(Request.ManagedPayloadPublished)
+    SetTimer(Request.ManagedAdmissionFn, 0)
+    _ManagedCurlControlAck(Control)
+    Request._PollManagedAdmission()
+    AssertTrue(Request.ManagedPayloadPublished)
+    Published := JsonParse(FSReadUtf8Exact(Control["directory"] . "transport.json"))
+    Found := []
+    for Header in Published["headers"]
+        if StrLower(Header["name"]) == "authorization"
+            Found.Push(Header["value"])
+    AssertEqual(1, Found.Length)
+    AssertEqual("Bearer " . Expected, Found[1], "the real managed transport image must use the current slot token")
+    AssertEqual(Request.CleanupDebtId, Published["request_id"])
+    return Published
+}
+
+_LTERP_Body(Mode, Posts, Lines) {
+    global LTE_PROVIDER, _LLM_Remote_Async
+    AssertEqual(0, _LLM_Remote_Async.Count, "no foreign reservation may be borrowed")
+    AssertFalse(A_IsSuspended)
+    Control := _ManagedCurlControlState()
+    Port := Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+        "create_http", _LTERP_NewHttp.Bind(Control))
+    Heard := [], Id := 0, Owner := 0
+    Slot := _LLM_TokenExchange_Slot(LTE_PROVIDER, _LTE_Key())
+    Slot["token"] := "old-token", Slot["expires_at"] := _LLM_TokenExchange_Now() + 3600
+    Resolved := _LLMRemoteResolveEntry(_LTE_Entry())
+    AssertEqual("old-token", Resolved["Token"])
+    if Mode == "renewed"
+        Slot["token"] := "new-token"
+    else if Mode != "fresh"
+        Slot["expires_at"] := _LLM_TokenExchange_Now() - 1
+    try {
+        Id := LLM_RemotePostBody_Async(Resolved, "https://token-fixture.invalid/v1/chat/completions",
+            '{"messages":[]}', (*) => Heard.Push("ok"), (Info := "") => Heard.Push(Info),
+            20000, "token_rawpost_control", 0, 0, Port)
+        AssertTrue(Id is Integer && Id > 0)
+        AssertTrue(_LLM_Remote_Async.Has(Id))
+        Owner := _LLM_Remote_Async[Id]
+        Origin := Owner["start_tick"], Duration := Owner["timeout_ms"]
+        if Mode == "fresh" || Mode == "renewed" {
+            AssertEqual(0, Posts.Length, "a fresh cached token must not start exchange")
+            Published := _LTERP_Header(Control, Mode == "fresh" ? "old-token" : "new-token")
+        } else {
+            AssertFalse(Owner.Has("http"), "expired tokens must not reach any transport before exchange")
+            AssertEqual(0, Control["spawns"])
+            _LTE_Pump()
+            AssertEqual(1, Posts.Length, "the genuine token engine must start one exchange")
+            if Mode == "cancel"
+                LLM_RemoteCancelAsync(Id)
+            else if Mode == "deadline"
+                Owner["start_tick"] := (A_TickCount - Duration - 1) & 0xFFFFFFFF
+            if Mode == "pause"
+                Suspend(true)
+            try _LTE_Answer(Posts[1], "new-token")
+            finally {
+                if Mode == "pause"
+                    Suspend(false)
+            }
+            if Mode == "exchange" {
+                AssertTrue(_LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Owner,
+                    "exchange must resume the same reservation")
+                AssertEqual(Origin, Owner["start_tick"], "exchange cannot reset the original clock")
+                AssertEqual(Duration, Owner["timeout_ms"])
+                Published := _LTERP_Header(Control, "new-token")
+            } else {
+                AssertFalse(_LLM_Remote_Async.Has(Id), "retired requester cannot resume dispatch")
+                AssertEqual(0, Control["spawns"], "cancel, expiry or pause cannot publish any managed token image")
+                if Mode == "deadline" {
+                    AssertEqual(1, Heard.Length, "a spent live request reports its original timeout once")
+                    AssertEqual("timeout", Heard[1]["reason"])
+                } else
+                    AssertEqual(0, Heard.Length, "cancelled or suspended requester cannot publish a verdict")
+            }
+        }
+        if Mode == "fresh" || Mode == "renewed" || Mode == "exchange" {
+            AssertEqual(Origin, Control["input"]["started_tick"])
+            AssertEqual(Duration, Control["input"]["deadline_ms"])
+            AssertEqual("{`"messages`":[]}", Published["body"])
+        }
+        AssertEqual(Mode == "fresh" ? "old-token" : "new-token", Slot["token"])
+    } finally {
+        if A_IsSuspended
+            Suspend(false)
+        if Owner is Map && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Owner {
+            LLM_RemoteCancelAsync(Id)
+            _LLMRemote_PollRequest(Id)
+        }
+        if Control.Has("request") {
+            Request := Control["request"]
+            Request.Abort()
+            AssertFalse(IsObject(Request.Handle), "controlled exact Job retirement must finish before releasing controls")
+        }
+        AssertFalse(_LLM_Remote_Async.Has(Id), "an exact failed retirement must stay visible and fail qualification")
+        _ManagedCurlControlRelease(Control)
+    }
+}
+
+_LTERP_Run(Mode) {
+    _ManagedRemoteFixtureWithLlmTimings(_LTE_Run.Bind(_LTERP_Body.Bind(Mode)))
+}
+for _LTERP_Mode in ["fresh", "renewed", "exchange", "cancel", "deadline", "pause"]
+    Test("Token exchange: raw POST " . _LTERP_Mode . " preserves current access and owner (token-rawpost-owner)",
+        _LTERP_Run.Bind(_LTERP_Mode))
