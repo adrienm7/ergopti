@@ -939,13 +939,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			open_init = function()
 				return DeferredWork.after(0, function()
 					_suppress_watcher_until_awake = TimerScheduler.awake_time() + 8
-					pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua"))
+					ShellRunner.open(base_dir .. "init.lua")
 				end, "menu.open_init")
 			end,
 			open_personal_toml = function()
 				return DeferredWork.after(0, function()
 					local personal_path = MenuPaths.get("PersonalTomlPath")
-					pcall(hs.execute, "open " .. text_utils.shell_quote(personal_path))
+					ShellRunner.open(personal_path)
 				end, "menu.open_personal_toml")
 			end,
 			add_hotstring = function()
@@ -979,7 +979,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			open_config = function()
 				return DeferredWork.after(0, function()
 					_suppress_watcher_until_awake = TimerScheduler.awake_time() + 8
-					pcall(hs.execute, "open " .. text_utils.shell_quote(MenuPaths.get("ConfigTomlPath")))
+					ShellRunner.open(MenuPaths.get("ConfigTomlPath"))
 				end, "menu.open_config")
 			end,
 			open_logs = function()
@@ -1022,13 +1022,18 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- The Debug log rows open through one owner, shared with the gesture
 	-- actions, with the asynchronous Launch Services opener: never a blocking
 	-- hs.execute on the run loop that also services the typing event tap.
-	local function open_async(target) return (ShellRunner.open(target)) end
+	local function open_async(target)
+		local ok, started = pcall(ShellRunner.open, target)
+		if not ok then Logger.error(LOG, "File opener raised: %s.", tostring(started)) end
+		return ok and started == true
+	end
 
 	local function open_path_via_menu(key)
 		local p = MenuPaths.get(key)
 		if type(p) == "string" and p ~= "" then
-			pcall(hs.execute, "open " .. text_utils.shell_quote(p))
+			return open_async(p)
 		end
+		return false
 	end
 
 	local actions = {
@@ -1140,14 +1145,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			local ok, m = pcall(require, "ui.metrics_apps")
 			if ok and type(m.show) == "function" then pcall(m.show) end
 		end,
-		open_script_source        = function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua")) end,
+		open_script_source        = function() return open_async(base_dir .. "init.lua") end,
 		open_personal_shortcuts   = function()
 			local ok, ps = pcall(require, "infra.personal_shortcuts")
 			if ok and type(ps.open) == "function" then pcall(ps.open) end
 		end,
-		open_personal_hotstrings  = function() open_path_via_menu("PersonalTomlPath") end,
-		open_personal_info        = function() open_path_via_menu("PersonalInfoTomlPath") end,
-		open_config               = function() open_path_via_menu("ConfigTomlPath") end,
+		open_personal_hotstrings  = function() return open_path_via_menu("PersonalTomlPath") end,
+		open_personal_info        = function() return open_path_via_menu("PersonalInfoTomlPath") end,
+		open_config               = function() return open_path_via_menu("ConfigTomlPath") end,
 		open_logs_folder          = function() return LogOpeners.open_logs_folder(open_async) end,
 		open_today_log            = function() return LogOpeners.open_today_log(open_async) end,
 		open_error_log            = function() return LogOpeners.open_today_errors(open_async) end,
