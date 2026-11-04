@@ -63,7 +63,7 @@ local function owned_inverse()
 end
 
 local LOG = "adapters.storage"
-local ENOENT = 2 -- Native Linux errno: only a proven missing store may start empty.
+local ENOENT, EINVAL = 2, 22 -- Native Linux errno: absence and non-regular source.
 
 
 -- ========================================
@@ -160,10 +160,14 @@ local function _next_recovery_path()
 		local queried, inspected, kind = pcall(Shell.exec_checked, query)
 		if not queried or inspected ~= true or (kind ~= "special" and kind ~= "ordinary") then return nil end
 		if kind == "ordinary" then
-			local ok, fh, _, errno = pcall(io.open, candidate, "r")
+			-- The candidate may change after the advisory shell inspection. Pin
+			-- and classify its descriptor so a substituted FIFO cannot block.
+			local ok, fh, _, errno = pcall(require("infra.regular_file_reader").open_source, candidate)
 			if not ok then return nil end
-			if not fh then return errno == ENOENT and candidate or nil end
-			_close(fh)
+			if not fh then
+				if errno == ENOENT then return candidate end
+				if errno ~= EINVAL then return nil end
+			elseif not _close(fh) then return nil end
 		end
 		suffix = suffix + 1
 		candidate = _CORRUPT_PATH .. "." .. suffix

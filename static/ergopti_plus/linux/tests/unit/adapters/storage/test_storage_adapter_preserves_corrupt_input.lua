@@ -34,6 +34,18 @@ local helpers, make_temp_config_root, storage_cohort_fixture =
 -- ===================================================
 
 helpers.describe("storage adapter preserves corrupt input for recovery", function()
+	helpers.it("storage recovery does not block when a candidate becomes a FIFO", function()
+		if not pcall(require, "luv") or package.config:sub(1, 1) ~= "/" then return end
+		local root = make_temp_config_root()
+		local Shell = require("adapters.shell_runner")
+		local fixture = helpers.driver_root() .. "/tests/fixtures/native_storage_recovery_fifo_race.lua"
+		local command = "timeout 4 " .. Shell.quote(assert(arg and arg[-1])) .. " " .. Shell.quote(fixture)
+			.. " " .. Shell.quote(root)
+		local result = os.execute(command)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+		helpers.assert_true(result == true or result == 0, "recovery must avoid blocking and preserve the corrupt file")
+	end)
+
 	helpers.it("moves invalid JSON aside before creating a new durable store", function()
 		local temp_root = make_temp_config_root()
 		local store_path = temp_root .. "/ergopti_plus/storage.json"
