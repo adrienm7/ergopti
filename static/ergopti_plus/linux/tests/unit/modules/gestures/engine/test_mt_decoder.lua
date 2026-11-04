@@ -114,6 +114,27 @@ end
 -- =================================================================
 
 helpers.describe("mt decoder: how many fingers", function()
+	helpers.it("refuses a tap whose clock moved backwards during contact", function()
+		local now = 100
+		local decoder = Decoder.new({ now_sec = function() return now end })
+		local events = gesture_events(3, 0, 0)
+		local result
+		for index, event in ipairs(events) do
+			if index > math.floor(#events / 2) then now = 90 end
+			result = decoder:feed({ type = event[1], code = event[2], value = event[3] }) or result
+		end
+		helpers.assert_nil(result, "a negative duration cannot establish a brief tap")
+	end)
+
+	helpers.it("does not let an old scroll guard block gestures after a clock rollback", function()
+		local now = 100
+		local decoder = Decoder.new({ now_sec = function() return now end })
+		feed_all(decoder, gesture_events(2, 0, -400))
+		now = 90
+		local result = feed_all(decoder, gesture_events(3, 0, -400))
+		helpers.assert_true(result ~= nil, "a prior scroll in the future must not suppress a new swipe")
+		helpers.assert_eq(result.fingers, 3)
+	end)
 
 	for fingers = 2, 5 do
 		helpers.it(string.format("reports %d finger(s) despite the count walking up and down", fingers), function()
