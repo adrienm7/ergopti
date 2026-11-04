@@ -323,7 +323,11 @@ local function _ensure_linux_device_schema()
 	-- sqlite_master preserves multiline DDL. The scalar helper reads only its
 	-- first line, so it missed the existing Linux CHECK and rebuilt the current
 	-- registry on every start, dropping indexes and requiring a write lock.
-	local current_sql = _query_output("SELECT sql FROM sqlite_master WHERE type='table' AND name='devices';") or ""
+	local current_sql = _query_output("SELECT sql FROM sqlite_master WHERE type='table' AND name='devices';")
+	if current_sql == nil then
+		Logger.error(LOG, "Cannot inspect the existing device registry schema.")
+		return false
+	end
 	if current_sql:find("linux", 1, true) then return true end
 	return _exec([[
 BEGIN;
