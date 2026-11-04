@@ -400,10 +400,12 @@ try {
 		return environment;
 	};
 	const sourced = (body, environment = cleanEnvironment()) => {
+		// The policy path is an environment value, not script text: no character
+		// of the checkout path is parsed by the shell.
 		const result = spawnSync(
 			bash,
-			['-c', `. '${policyFile}'\nlog_info() { printf '[T] %s\\n' "$1" >&2; }\n${body}`],
-			{ env: environment, encoding: 'utf8' }
+			['-c', `. "$ERGOPTI_TEST_POLICY_FILE"\nlog_info() { printf '[T] %s\\n' "$1" >&2; }\n${body}`],
+			{ env: { ...environment, ERGOPTI_TEST_POLICY_FILE: policyFile }, encoding: 'utf8' }
 		);
 		assert.equal(result.error, undefined, String(result.error));
 		return result;
