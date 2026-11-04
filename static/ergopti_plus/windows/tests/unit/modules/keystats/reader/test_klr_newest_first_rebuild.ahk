@@ -99,18 +99,22 @@ Test("KLR rebuild: newest day is rolled up first and the end is exact (klr-newes
 
 ; Reading backward must not change which copy of a reused event key survives:
 ; the one-pass build keeps the first copy in file order.
-_KLRNF_FirstCopyWins() {
+_KLRNF_FirstCopyWins(ChunkBytes := 700) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	try {
 		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger()
 			. _KLRDC_TypingBatch(3, "2026-03-04 12:00:00.000", "2026-03-04", "four.exe", ["x", "y", "z", "w"]))
 		Reference := _KLRDC_DerivedFingerprint(_KLRNF_Build(false))
-		Db := _KLRNF_Build(true)
+		Db := _KLRNF_Build(true, 0, 0, ChunkBytes)
 		AssertEqual(Reference, _KLRDC_DerivedFingerprint(Db),
 			"a reused key must keep its first copy when read backward (klr-newest-first-collision)")
 		AssertEqual("2026-03-01,2026-03-02,2026-03-03", _KLRNF_Days(Db),
 			"the displaced newer copy must leave no rollup behind")
+		Survivor := SQLite_Query(Db, "SELECT date,app FROM events_typing WHERE device_id='dev-one' AND id=3;")[1]
+		AssertEqual("2026-03-02", Survivor["date"])
+		AssertEqual("two.exe", Survivor["app"])
+		AssertEqual(0, _KLR_RebuildSeenTables(Db).Length, "per-span ownership must not survive publication")
 		AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM temp.sqlite_schema WHERE type='trigger';")[1]["n"],
 			"the temporary first-wins triggers must not survive into the published image")
 	} finally {
@@ -119,6 +123,9 @@ _KLRNF_FirstCopyWins() {
 }
 Test("KLR rebuild: a reused event key keeps its first copy (klr-newest-first-collision)",
 	_KLRDC_CheckTeardown.Bind(_KLRNF_FirstCopyWins))
+
+Test("KLR rebuild: same-frame duplicates keep the first copy (klr-newest-first-collision)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_FirstCopyWins.Bind(4 * 1024 * 1024)))
 
 ; A writer caught mid-append must not fail the rebuild: the torn batch is left
 ; to the next incremental refresh from the recorded offset.
@@ -147,16 +154,24 @@ Test("KLR rebuild: a torn tail is left to the next refresh (klr-newest-first-tor
 
 ; A driver reload kills the worker mid-rebuild. The next worker must continue
 ; from the last checkpoint instead of starting over, and still end exact.
-_KLRNF_KilledWorkerResumes() {
+_KLRNF_KilledWorkerResumes(Obsolete := false) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	try {
-		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger())
+		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger()
+			. _KLRDC_TypingBatch(3, "2026-03-04 12:00:00.000", "2026-03-04", "later.exe", ["x", "y"]))
 		Reference := _KLRDC_DerivedFingerprint(_KLRNF_Build(false))
 		Checkpoint := KLR_RebuildCheckpointPath(_KLRDC_Root())
 		AssertEqual(0, _KLRNF_Build(true, 0, 3), "the interrupted worker must not publish anything")
 		AssertTrue(FSExists(Checkpoint), "an interrupted rebuild must leave its checkpoint (klr-rebuild-resume)")
 		AssertFalse(FSExists(KLR_CachePath(_KLRDC_Root())), "an interrupted rebuild must not publish an image")
+		if Obsolete {
+			Stored := SQLite_Open(Checkpoint)
+			AssertTrue(Stored != 0)
+			try AssertTrue(SQLite_Exec(Stored, "UPDATE klr_rebuild_meta SET value='2' WHERE key='checkpoint_format';"))
+			finally SQLite_Close(Stored)
+		}
+
 
 		First := 0
 		Observe(Info) {
@@ -165,8 +180,11 @@ _KLRNF_KilledWorkerResumes() {
 		}
 		Resumed := _KLRNF_Build(true, Observe)
 		AssertTrue(IsObject(First))
-		AssertTrue(First["done_bytes"] > First["run_bytes"],
-			"the next worker must continue from the checkpoint, not from zero (klr-rebuild-resume)")
+		if Obsolete
+			AssertEqual(First["done_bytes"], First["run_bytes"], "an obsolete replay protocol must restart")
+		else
+			AssertTrue(First["done_bytes"] > First["run_bytes"],
+				"the next worker must continue from the checkpoint, not from zero (klr-rebuild-resume)")
 		AssertEqual(Reference, _KLRDC_DerivedFingerprint(Resumed),
 			"a resumed rebuild must end exactly where an uninterrupted one ends (klr-rebuild-resume)")
 		AssertFalse(FSExists(Checkpoint), "a published image supersedes its checkpoint")
@@ -176,6 +194,9 @@ _KLRNF_KilledWorkerResumes() {
 }
 Test("KLR rebuild: a killed worker resumes from its checkpoint (klr-rebuild-resume)",
 	_KLRDC_CheckTeardown.Bind(_KLRNF_KilledWorkerResumes))
+
+Test("KLR rebuild: obsolete first-copy checkpoints restart safely (klr-rebuild-resume)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_KilledWorkerResumes.Bind(true)))
 
 ; A checkpoint only describes the exact ledger bytes it consumed.
 _KLRNF_ReplacedLedgerDiscardsCheckpoint() {
@@ -351,3 +372,25 @@ for _KLRNF64Kind in ["round", "checkpoint"] {
 #Include test_klr_trusted_frames.ahk
 
 #Include test_klr_executed_rounds.ahk
+
+
+_KLRNF_FirstCopyWithinTransaction() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		First := _KLRDC_TypingBatch(7, "2026-03-04 10:00:00.000", "2026-03-04", "first.exe", ["a", "b"])
+		Later := _KLRDC_TypingBatch(7, "2026-03-05 10:00:00.000", "2026-03-05", "later.exe", ["x", "y", "z"])
+		InsertAt := InStr(Later, "INSERT OR IGNORE")
+		AssertTrue(InsertAt > 0, "the second fixture must contain its actual insert")
+		Ledger := _KLRNF_ThreeDayLedger() . StrReplace(First, "COMMIT;", "") . SubStr(Later, InsertAt)
+		_KLRDC_WriteLedger(Ledger)
+		Reference := _KLRDC_DerivedFingerprint(_KLRNF_Build(false))
+		Db := _KLRNF_Build(true, 0, 0, 4 * 1024 * 1024)
+		AssertEqual(Reference, _KLRDC_DerivedFingerprint(Db), "one transaction must keep its first valid copy")
+		Survivor := SQLite_Query(Db, "SELECT date,app FROM events_typing WHERE device_id='dev-one' AND id=7;")[1]
+		AssertEqual("first.exe", Survivor["app"])
+		AssertEqual("2026-03-04", Survivor["date"])
+	} finally _KLRDC_Cleanup()
+}
+Test("KLR rebuild: duplicates within one transaction keep the first copy (klr-newest-first-collision)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_FirstCopyWithinTransaction))
