@@ -70,7 +70,10 @@ function M.request_check(channel)
 	local message = i18n.get("updater.check_request_failed")
 	local dialog_ok, button = pcall(dialog.block_alert, title, message, i18n.get("button.ok"))
 	if not dialog_ok or type(button) ~= "string" or button == "" then
-		Notifier.send(title, { body = message, kind = "error" })
+		local notified, accepted = pcall(Notifier.send, title, { body = message, kind = "error" })
+		if not notified or accepted ~= true then
+			Logger.error(LOG, "The update-check failure notification could not be delivered.")
+		end
 	end
 	return false
 end

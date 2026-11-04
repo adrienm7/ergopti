@@ -1663,7 +1663,7 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 		return nil, _ignored_win_context_generation
 	end
 
-	if (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
+	if now < _ignored_win_cache_time or (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
 		-- The periodic timer should normally have refreshed first. If the main
 		-- runloop delayed it, never authorize the previous window's answer.
 		invalidate_ignored_win_cache()
@@ -1686,7 +1686,7 @@ function M.is_secure_field(now)
 		schedule_ignored_win_refresh()
 		return nil, _ignored_win_context_generation
 	end
-	if (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
+	if now < _ignored_win_cache_time or (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
 		invalidate_ignored_win_cache()
 		return nil, _ignored_win_context_generation
 	end

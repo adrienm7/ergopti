@@ -162,7 +162,12 @@ end
 local function inject_catalogue(ctx)
 	local session, view, controller = _session, _wv, _ucc
 	if _ctx ~= ctx or _wv_committed ~= true then return end
-	local payload     = build_catalogue(ctx)
+	local built, payload = pcall(build_catalogue, ctx)
+	if not built or type(payload) ~= "table" or type(payload.models) ~= "table" then
+		Logger.error(LOG, "Model catalogue could not be built; the browser was not updated.")
+		return false
+	end
+	if _ctx ~= ctx or _session ~= session or _wv ~= view or _ucc ~= controller or _wv_committed ~= true then return false end
 	payload.session = session
 	local ok, json    = pcall(hs.json.encode, payload)
 	if not ok or not json then
@@ -172,6 +177,7 @@ local function inject_catalogue(ctx)
 	Logger.done(LOG, "Injecting %d model(s) (backend=%s).", #payload.models, tostring(payload.backend))
 	if _session ~= session or _wv ~= view or _ucc ~= controller or _wv_committed ~= true then return end
 	eval("injectModels(" .. json .. ")")
+	return true
 end
 
 
@@ -329,8 +335,7 @@ function M.open(ctx)
 					and _wv == view and _ucc == controller and _session == session and _wv_committed == true
 			end })
 			if _session ~= session or _wv_committed ~= true then return false end
-			inject_catalogue(ctx)
-			return true
+			return inject_catalogue(ctx) == true
 		end
 	end
 
@@ -469,8 +474,7 @@ end
 --- @return boolean refreshed False when no page is open.
 function M.refresh()
 	if not _wv or _wv_committed ~= true or not _ctx then return false end
-	inject_catalogue(_ctx)
-	return true
+	return inject_catalogue(_ctx) == true
 end
 
 --- Shows one row's download percentage on the open page.

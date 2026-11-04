@@ -82,7 +82,7 @@ end
 local function starts_target_header(trimmed, target_header)
 	if trimmed:sub(1, #target_header) ~= target_header then return false end
 	local suffix = trimmed:sub(#target_header + 1)
-	return suffix == "" or suffix:match("^%s+#") ~= nil
+	return suffix == "" or suffix:match("^%s*#") ~= nil
 end
 
 local function escape_pattern(value)

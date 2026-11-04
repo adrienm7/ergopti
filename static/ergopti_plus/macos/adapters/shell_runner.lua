@@ -122,7 +122,7 @@ function M.exec(cmd)
 	end
 	local ok, result = run_sync(cmd)
 	if not ok then
-		Logger.error(LOG, "exec() failed for '%s': %s", RuntimeLog.program_name(cmd), tostring(result))
+		Logger.error(LOG, "exec() failed for '%s': %s", RuntimeLog.program_name(cmd), ErrorDescription.describe(result))
 		return ""
 	end
 	return type(result) == "string" and result or ""
@@ -467,7 +467,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 			-- Keep both the native task and its GC pin: this handle is the only exact
 			-- capability that can retry termination without process discovery.
 			Logger.error(LOG, "spawn.terminate(): native task stop failed; retained for retry — %s",
-				tostring(stop_result))
+				ErrorDescription.describe(stop_result))
 			return false, "refused"
 		end
 		_input_closed = true
@@ -565,7 +565,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 			end
 		end
 		if not ok then
-			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", tostring(started))
+			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", ErrorDescription.describe(started))
 		else
 			Logger.error(LOG, "spawn.start(): hs.task:start() refused to launch %s", tostring(executable))
 		end
@@ -590,7 +590,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		local ok, result = pcall(function() return _task:setInput(data) end)
 		if not ok or result == false or result == nil then
 			Logger.error(LOG, "spawn.set_input(): task input failed for %s — %s",
-				tostring(executable), tostring(result))
+				tostring(executable), ErrorDescription.describe(result))
 			return false
 		end
 		return true
@@ -607,7 +607,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		local ok, result = pcall(function() return _task:closeInput() end)
 		if not ok or result == false or result == nil then
 			Logger.error(LOG, "spawn.close_input(): closing task input failed for %s — %s",
-				tostring(executable), tostring(result))
+				tostring(executable), ErrorDescription.describe(result))
 			return false
 		end
 		_input_closed = true

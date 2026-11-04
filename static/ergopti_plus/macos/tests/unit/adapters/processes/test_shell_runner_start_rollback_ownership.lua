@@ -105,6 +105,32 @@ local function with_runner(callback)
 end
 
 helpers.describe("ShellRunner exact start-refusal rollback ownership", function()
+	helpers.it("returns native failures without invoking opaque formatters (shell-native-error-object)", function()
+		with_runner(function(runner, native)
+			local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+			_G.hs.execute = function() error(hostile) end
+			helpers.assert_eq(runner.exec("/fixture/command"), "")
+
+			local rejected = runner.spawn("/fixture/start", {}, function() end)
+			native.tasks[1].start = function() error(hostile) end
+			helpers.assert_eq(rejected.start(), false)
+
+			local handle = runner.spawn("/fixture/live", {}, function() end)
+			local task = native.tasks[2]
+			helpers.assert_true(handle.start())
+			task.setInput = function() error(hostile) end
+			task.closeInput = function() error(hostile) end
+			task.terminate = function() error(hostile) end
+			helpers.assert_eq(handle.set_input("x"), false)
+			helpers.assert_eq(handle.close_input(), false)
+			local accepted, state = handle.terminate()
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(state, "refused")
+			helpers.assert_eq(runner._active_tasks[task], true, "failed termination retains the child")
+			task:complete(0, "", "")
+		end)
+	end)
+
 	helpers.it("delivers all settlement observers after opaque callback errors (shell-opaque-settlement)", function()
 		with_runner(function(runner, native)
 			local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })

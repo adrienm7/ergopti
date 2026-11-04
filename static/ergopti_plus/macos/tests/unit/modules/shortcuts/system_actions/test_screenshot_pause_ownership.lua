@@ -28,6 +28,7 @@ local function fresh_screenshot()
 		tasks = {},
 		next_options = {},
 		notifications = {},
+		files = {},
 	}
 
 	function fixture.queue(options)
@@ -108,9 +109,12 @@ local function fresh_screenshot()
 		expand_path = function() return "/tmp/hs012-home" end,
 		create_secure_temp_file = function()
 			temp_files = temp_files + 1
-			return "/tmp/hs012-capture-" .. temp_files
+			local path = "/tmp/hs012-capture-" .. temp_files
+			fixture.files[path] = true
+			if fixture.on_allocate then fixture.on_allocate() end
+			return path
 		end,
-		remove_exact = function() return true end,
+		remove_exact = function(path) fixture.files[path] = nil; return true end,
 		classify_no_follow = function() return { mode = "file", size = 64 }, "ok" end,
 	}
 	package.loaded["adapters.screen_capture"] = {
@@ -158,6 +162,21 @@ end
 
 
 helpers.describe("shared screenshot owner: positive controls", function()
+	for _, action in ipairs({ "capture", "capture_image" }) do
+		helpers.it(action .. " retains a file acquired during a reentrant pause", function()
+			local f = fresh_screenshot()
+			f.on_allocate = function()
+				helpers.assert_eq(f.subject.pause_screenshot_actions("gestures"), false)
+			end
+			local result
+			if action == "capture" then result = f.subject.capture({}, "gestures")
+			else result = f.subject.capture_image({}, "gestures", 1024, function() error("cancelled") end) end
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(#f.tasks, 0)
+			helpers.assert_eq(next(f.files), nil)
+			helpers.assert_eq(f.subject.has_pending_screenshot_action("gestures"), false)
+		end)
+	end
 	helpers.it("completes save and direct clipboard capture exactly once", function()
 		local f = fresh_screenshot()
 		helpers.assert_eq(f.subject.save({}, "full"), true)
