@@ -897,6 +897,13 @@ LoggerFlushSettled() {
 	finally Critical(PreviousCritical)
 }
 
+; Opening a log is a read of the buffered sink. A completed flush can still
+; have requeued refused writes, so neither an active owner nor retained debt
+; may be presented as a current file (or as proof that nothing warned).
+LoggerFlushForRead() {
+	return _LoggerFlush(true) && LoggerFlushSettled() && !_LoggerHasPendingDebt()
+}
+
 ; An owner under OnExit can only resume once OnExit returns, so such a refusal
 ; ends by itself. A sink that refused holds no owner and is a real refusal.
 ; @param Refusal {Map|Integer} The evidence LoggerPrepareShutdown returned.
