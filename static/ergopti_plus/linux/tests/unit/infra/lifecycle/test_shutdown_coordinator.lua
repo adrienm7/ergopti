@@ -614,8 +614,8 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		local registry = text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]")
 		helpers.assert_true(type(registry) == "string" and registry ~= "", "actual daemon registry must exist")
 		local state = { closed = false, context_closed = false, watch_closed = false, metrics_closed = false, stops = 0, loops = 0, cancelled = 0 }
-		local native_closed = { discovery = false, programs = false, watchers = false, layouts = false }
-		local native_calls = { discovery = 0, programs = 0, watchers = 0, layouts = 0 }
+		local native_closed = { discovery = false, programs = false, watchers = false, layouts = false, tooltip = false }
+		local native_calls = { discovery = 0, programs = 0, watchers = 0, layouts = 0, tooltip = 0 }
 		local function native_stop(name)
 			return function()
 				native_calls[name] = native_calls[name] + 1
@@ -631,7 +631,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 			dyn_hotstrings = { stop_user_code = native_stop("programs") },
 			updater = false, file_watchers = { stop = native_stop("watchers") },
 			process_lifecycle = false, secure_field_detector = false, metrics = false,
-			webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
+			webview_manager = false, tooltip_preview = { destroy = native_stop("tooltip") }, gestures = false, input_capture_gate = false,
 			prediction_engine = {
 				shutdown_runtime = function() state.stops = state.stops + 1; return state.closed end,
 				cancel = function() state.cancelled = state.cancelled + 1 end,
@@ -656,6 +656,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		helpers.assert_eq(state.loops, 0)
 		helpers.assert_true(coordinator.is_pending())
 		env.prediction_engine.shutdown_runtime = function() return true end
+		env.tooltip_preview.destroy = function() return true end
 		helpers.assert_eq(coordinator.poll(), false, "foreign public replacement cannot acknowledge retained cleanup")
 		state.closed = true
 		helpers.assert_eq(coordinator.poll(), false, "context and watcher cleanup remain independent debts")
@@ -678,6 +679,8 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		native_closed.watchers = true
 		helpers.assert_eq(coordinator.poll(), false, "layout helpers require their own physical retirement ACK")
 		native_closed.layouts = true
+		helpers.assert_eq(coordinator.poll(), false, "tooltip destruction must be acknowledged before loop exit")
+		native_closed.tooltip = true
 		helpers.assert_true(coordinator.poll())
 		helpers.assert_eq(state.loops, 1)
 		helpers.assert_eq(state.cancelled, 1, "existing prediction cleanup remains one-shot")
