@@ -323,6 +323,17 @@
 			"root_cause": "static/ergopti_plus/windows/vendor/ergopti_crash_worker.ps1 selects the first CIM processor; modules/diagnostics/crash_reporter.ahk:_CrashReport_SysInfo likewise reads only the first WMI instance. NumberOfLogicalProcessors describes its current processor instance, not every socket.",
 			"silent_failure": "Multi-socket crash reports understate machine CPU capacity. The first model name remains a label; the logical processor count must aggregate all instances.",
 			"regression_test": "The real isolated worker's existing CIM boundary now returns two heterogeneous8+12 sockets and requires20. The legacy aggregation helper tests the same total, first-name preservation, single socket and explicit rejection of empty or incomplete processor observations. Native Windows execution remains pending."
+		},
+		{
+			"id": "AHK-030",
+			"title": "Cold locale loads accept stale same-second translation caches",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Publish a complete TSV containing before, replace its authoritative JSON with after, set both modification times to the same second, clear the active cache identity and load the locale.",
+			"root_cause": "_I18nTsvIsFresh in static/ergopti_plus/windows/infra/locale.ahk accepts timestamp equality despite FileGetTime exposing only whole seconds. On a cold load no prior source hash invalidates the stale complete cache.",
+			"silent_failure": "The old translation is served and associated with the new JSON hash, so subsequent identity reuse can retain stale text.",
+			"regression_test": "The reachable test_i18n.ahk cold-load regression uses real durable JSON writes, the real TSV publisher and identical native file timestamps; it asserts refreshed memory and disk values, plus a strictly-newer positive fast-path control. Native Windows execution is pending; the pre-fix failure is source-derived."
 		}
 	]
 }

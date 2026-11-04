@@ -435,3 +435,17 @@ Consequence: Multi-socket crash reports understate machine CPU capacity. The fir
 Regression: The real isolated worker's existing CIM boundary now returns two heterogeneous8+12 sockets and requires20. The legacy aggregation helper tests the same total, first-name preservation, single socket and explicit rejection of empty or incomplete processor observations. Native Windows execution remains pending.
 
 The ongoing register now contains **29 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-030: Cold locale loads accept stale same-second translation caches
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_I18nTsvIsFresh in static/ergopti_plus/windows/infra/locale.ahk accepts timestamp equality despite FileGetTime exposing only whole seconds. On a cold load no prior source hash invalidates the stale complete cache.
+
+Reproduction: Publish a complete TSV containing before, replace its authoritative JSON with after, set both modification times to the same second, clear the active cache identity and load the locale.
+
+Consequence: The old translation is served and associated with the new JSON hash, so subsequent identity reuse can retain stale text.
+
+Regression: The reachable test_i18n.ahk cold-load regression uses real durable JSON writes, the real TSV publisher and identical native file timestamps; it asserts refreshed memory and disk values, plus a strictly-newer positive fast-path control. Native Windows execution is pending; the pre-fix failure is source-derived.
+
+The ongoing register now contains **30 distinct new findings**. The requested target of 1,000 remains unmet.

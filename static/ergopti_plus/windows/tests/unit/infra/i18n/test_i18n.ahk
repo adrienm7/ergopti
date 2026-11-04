@@ -276,6 +276,42 @@ _I18nLazyCacheStaleJsonRegenerates() {
 }
 Test("i18n cache: stale .tsv (older than .json) is regenerated", _I18nLazyCacheStaleJsonRegenerates)
 
+_I18nLazyCacheEqualSecondRegenerates() {
+	global _I18nCache, _I18nActiveCacheIdentity
+	Directory := A_Temp . "\ergopti_locale_equal_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	FSCreateDirectoryExclusiveStrict(Directory)
+	Path := Directory . "\locale.json", TsvPath := Directory . "\locale.tsv"
+	_I18nTestReset()
+	try {
+		AssertTrue(FSWriteCreateDurable(Path, '{"k":"before"}'))
+		_I18nWriteTsvCache(TsvPath, Map("k", "before"))
+		AssertTrue(FileExist(TsvPath) != "", "The genuine cache writer must publish a complete old cache")
+		FileDelete(Path)
+		AssertTrue(FSWriteCreateDurable(Path, '{"k":"after"}'))
+		FileSetTime("20200101000000", Path, "M")
+		FileSetTime("20200101000000", TsvPath, "M")
+		AssertEqual(FileGetTime(Path, "M"), FileGetTime(TsvPath, "M"),
+			"The stale complete cache and edited JSON must genuinely share the same timestamp")
+		AssertFalse(IsObject(_I18nActiveCacheIdentity), "This must be a cold first load without an earlier source hash")
+		_I18nLoadFile(Path)
+		AssertEqual("after", _I18nCache["k"], "A same-second edit must be read from the authoritative JSON")
+		Status := {Complete: false}
+		Regenerated := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), "*", Status)
+		AssertTrue(Status.Complete)
+		AssertEqual("after", Regenerated["k"], "The genuine writer must replace the stale disk cache too")
+		FileSetTime("20200101000001", TsvPath, "M")
+		Result := _I18nLoadLocaleMap(Path, "*")
+		AssertTrue(Result.Ok && Result.Fast, "A strictly newer complete cache must retain the fast path")
+		AssertEqual("after", Result.Cache["k"])
+	} finally {
+		_I18nTestReset()
+		DirDelete(Directory, true)
+	}
+}
+Test("i18n cache: a cold same-second edit regenerates the complete cache (locale-equal-second)",
+	_I18nLazyCacheEqualSecondRegenerates)
+
+
 _I18nLazyCacheFreshTsvServedWithoutJson() {
 	_I18nTestReset()
 	global _I18nCache
