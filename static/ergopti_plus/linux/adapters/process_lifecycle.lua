@@ -149,8 +149,9 @@ local function _snapshot_processes()
 			if file == nil then
 				if open_errno ~= ENOENT and open_errno ~= ESRCH then return nil end
 			else
-				local line, _, read_errno = file:read("*a")
-				file:close()
+				local read_ok, line, _, read_errno = pcall(file.read, file, "*a")
+				local close_ok, closed = pcall(file.close, file)
+				if not read_ok or not close_ok or closed ~= true then return nil end
 				if line == nil then
 					if read_errno ~= ESRCH then return nil end
 				elseif line ~= "" then

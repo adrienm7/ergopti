@@ -421,3 +421,33 @@ helpers.describe("process_lifecycle: a failed snapshot fires nothing (ps-storm)"
 	end)
 
 end)
+
+for _, fault in ipairs({ "read_throw", "close_false", "close_throw" }) do
+	helpers.it("process snapshot retains baseline after " .. fault, function()
+		with_proc(AB, function(M, proc, launched, quit)
+			M.start()
+			proc.set(AC)
+			local original, closes = io.open, 0
+			io.open = function(path, mode)
+				local file, err, code = original(path, mode)
+				if not file or path ~= proc.root .. "/101/stat" then return file, err, code end
+				return { read = function(_, ...)
+					if fault == "read_throw" then error("injected read failure") end
+					return file:read(...)
+				end, close = function()
+					closes = closes + 1; assert(file:close())
+					if fault == "close_throw" then error("injected close failure") end
+					return fault ~= "close_false"
+				end }
+			end
+			M.tick(PROCESS_TICK)
+			io.open = original
+			helpers.assert_eq(closes, 1, "an acquired process stream must close even after a read exception")
+			helpers.assert_eq(launched, {}, "unacknowledged snapshot must not synthesize launches")
+			helpers.assert_eq(quit, {}, "unacknowledged snapshot must not synthesize quits")
+			M.tick(PROCESS_TICK * 2)
+			helpers.assert_eq(launched, { "c" })
+			helpers.assert_eq(quit, { "b" })
+		end)
+	end)
+end
