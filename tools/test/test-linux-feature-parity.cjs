@@ -75,6 +75,27 @@ assert.throws(
 	() => inventory.render(unexplainedModel, inventoryLocales, inventoryActions, inventoryMenu),
 	/Missing translated platform reason/
 );
+const generators = require('../build/generators.cjs').GENERATORS;
+const inventoryGenerator = generators.find(
+	(entry) => entry.script === 'codegen/codegen-feature-inventory.cjs'
+);
+assert.ok(inventoryGenerator, 'normal regeneration must include the public inventory');
+assert.deepStrictEqual(
+	[...inventoryGenerator.outputs].sort(),
+	Object.keys(beforeInventory).sort(),
+	'normal drift guard must own every inventory output'
+);
+const prebuild = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).scripts
+	.prebuild;
+assert.ok(
+	prebuild.includes('build-menu-manifest.js') &&
+		prebuild.indexOf('build-menu-manifest.js') < prebuild.indexOf('codegen-feature-inventory.cjs'),
+	'site build must refresh the menu source before projecting the inventory'
+);
+assert.ok(
+	prebuild.includes('codegen-feature-inventory.cjs'),
+	'site builds must regenerate the inventory'
+);
 const changedModel = structuredClone(inventoryModel);
 changedModel[0].platforms = ['ahk'];
 changedModel[0].reason_key = 'platform_reason.alt_gr_is_kana_remap';
@@ -85,7 +106,10 @@ const afterInventory = inventory.render(
 	inventoryMenu
 );
 for (const file of Object.keys(beforeInventory).filter(
-	(name) => !name.endsWith('action-inventory.json') && !name.endsWith('menu-gaps.json')
+	(name) =>
+		!name.endsWith('action-inventory.json') &&
+		!name.endsWith('menu-gaps.json') &&
+		!name.endsWith('input-inventory.json')
 )) {
 	assert.notStrictEqual(
 		beforeInventory[file],
@@ -205,6 +229,19 @@ assert.throws(
 			badLayerVocabulary
 		),
 	/Missing layer reason/
+);
+
+const inputInventory = JSON.parse(
+	fs.readFileSync(path.join(ROOT, 'src/routes/ergopti-plus/input-inventory.json'), 'utf8')
+);
+const tapDefaults = require('smol-toml').parse(
+	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/tap_hold/defaults.toml'), 'utf8')
+);
+assert.strictEqual(inputInventory.length, tapDefaults.tap_hold.catalog.keys.length);
+assert.ok(inputInventory.length >= 19, 'input inventory must cover the native key catalogue');
+assert.strictEqual(
+	inputInventory.find((entry) => entry.path === 'tap_hold.fn').platforms.windows,
+	false
 );
 
 const rows = build();

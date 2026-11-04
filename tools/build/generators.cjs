@@ -378,6 +378,16 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-feature-inventory.cjs',
+		outputs: [
+			'docs/feature-inventory.md',
+			'src/routes/ergopti-plus/feature-inventory.json',
+			'src/routes/ergopti-plus/action-inventory.json',
+			'src/routes/ergopti-plus/menu-gaps.json',
+			'src/routes/ergopti-plus/input-inventory.json'
+		]
+	},
+	{
 		script: 'codegen/gen-architecture-diagram.cjs',
 		note: 'runs last: it describes the tree the others have just finished writing',
 		outputs: ['static/ergopti_plus/docs/architecture.md']
