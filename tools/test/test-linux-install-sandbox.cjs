@@ -204,6 +204,7 @@ function runInstaller(scenario) {
 		TMPDIR: bashPath(sandbox),
 		LANG: 'C.UTF-8'
 	};
+	if (scenario.omitHome) delete env.HOME;
 	// Git Bash may reconstruct PATH when a child Bash starts. Keep the same
 	// inert command boundary in the installer and its newly installed helpers.
 	const bashEnvironment = path.join(sandbox, 'bash-environment');
@@ -388,6 +389,22 @@ if (process.platform === 'linux') {
 }
 
 const errors = [];
+
+// An explicit prefix allows installation even when HOME is unavailable.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		omitHome: true,
+		prefixName: 'explicit'
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		assert.ok(fs.existsSync(path.join(run.home, 'explicit/bin/ergopti-hotstrings')));
+	} finally {
+		run.cleanup();
+	}
+}
 
 // Standalone installs under a system root cannot be removed by the standalone
 // uninstaller and must not write into an OS package's namespace.
