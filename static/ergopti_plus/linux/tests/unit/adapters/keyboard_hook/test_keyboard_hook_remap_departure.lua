@@ -14,6 +14,47 @@ local function select_sources(s, ids)
 end
 
 helpers.describe("keyboard source departure retires remapper input", function()
+	helpers.it("(remap-source-departure) clears a blocker when its keyboard disappears", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
+			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("a", 58, 1, 1); s.edge("b", 58, 1, 2); s.edge("a", 58, 0, 3)
+			select_sources(s, { "a" })
+			s.edge("a", 56, 1, 10)
+			helpers.assert_eq(s.rows[#s.rows], { 42, 1 }, "the departed source must not keep blocking LAlt")
+			s.edge("a", 56, 0, 11)
+			helpers.assert_true(s.hook.isRunning())
+		end)
+	end)
+
+	helpers.it("(remap-source-departure) does not revive a blocker when a new keyboard reuses its path", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
+			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("b", 58, 1, 1)
+			select_sources(s, { "a" })
+			s.held[s.paths.b] = {}
+			select_sources(s, { "a", "b" })
+			s.edge("b", 56, 1, 10)
+			helpers.assert_eq(s.rows[#s.rows], { 42, 1 }, "a fresh source has no inherited physical blocker")
+			s.edge("b", 56, 0, 11)
+			helpers.assert_true(s.hook.isRunning())
+		end)
+	end)
+
+	helpers.it("(remap-source-departure) retains another keyboard's blocker after queue recovery", function()
+		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
+			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
+			s.edge("a", 58, 1, 1); s.edge("b", 58, 1, 2)
+			s.event("a", 0, 3, 0, 3); s.held[s.paths.a][58] = nil; s.event("a", 0, 0, 0, 4)
+			local before = #s.rows
+			s.edge("b", 56, 1, 5); s.edge("b", 56, 0, 6)
+			helpers.assert_true(s.hook.isRunning())
+			helpers.assert_eq(#s.rows, before, "the retained physical hold must still block LAlt")
+			s.edge("b", 58, 0, 7)
+			s.edge("b", 56, 1, 8)
+			helpers.assert_eq(s.rows[#s.rows], { 42, 1 }, "the blocker ends at its real release")
+			s.edge("b", 56, 0, 9)
+		end)
+	end)
 	helpers.it("(remap-source-departure) retires capture when a keyboard arrives during queue loss", function()
 		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end }, function(s)
 			select_sources(s, { "a" })
