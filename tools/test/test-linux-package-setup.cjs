@@ -293,6 +293,28 @@ show-session) case "$2" in
 	);
 	assert.match(calls, /modprobe uinput/);
 	assert.match(calls, /udevadm control --reload-rules/);
+	// Reject each unusable link without replacing it or mutating groups/devices.
+	for (const relative of [
+		'etc/udev/rules.d/99-ergopti-uinput.rules',
+		'etc/modules-load.d/ergopti-uinput.conf'
+	]) {
+		const config = path.join(sandbox, relative);
+		const original = fs.readFileSync(config);
+		fs.unlinkSync(config);
+		fs.symlinkSync(path.join(sandbox, 'missing-target'), config);
+		fs.writeFileSync(callLog, '');
+		const dangling = spawnSync(bashExecutable(), [bashPath(script), '--user', '1000'], {
+			encoding: 'utf8',
+			timeout: 15000,
+			env: { HOME: bashPath(sandbox), TEST_STUBS: bashPath(stubs), CALL_LOG: bashPath(callLog) }
+		});
+		assert.equal(dangling.status, 78, dangling.stderr);
+		assert.match(dangling.stderr, /code=dangling-configuration/);
+		assert.ok(fs.lstatSync(config).isSymbolicLink(), 'preserve dangling configuration link');
+		assert.equal(fs.readFileSync(callLog, 'utf8'), '', 'do not mutate groups or devices');
+		fs.unlinkSync(config);
+		fs.writeFileSync(config, original);
+	}
 	// Exercise the actual BusyBox branch with only command availability
 	// replaced. Group mutations still go through the recorded stubs.
 	stub('addgroup', 'printf "addgroup %s\\n" "$*" >> "$CALL_LOG"');

@@ -45,6 +45,15 @@ enroll_user() {
 
 if [ "$MODE" = --user ]; then resolve_user "$2" >/dev/null; fi
 
+# A dangling administrator-owned link is not usable configuration. Preserve it
+# and report the conflict before creating groups or changing system files.
+for config in /etc/udev/rules.d/99-ergopti-uinput.rules /etc/modules-load.d/ergopti-uinput.conf; do
+	if [ -L "$config" ] && [ ! -e "$config" ]; then
+		printf '[permissions] code=dangling-configuration path=%q\n' "$config" >&2
+		exit 78
+	fi
+done
+
 missing_groups=()
 for group in input uinput; do
 	if getent group "$group" >/dev/null; then
@@ -65,10 +74,10 @@ for group in "${missing_groups[@]}"; do
 	else addgroup -S "$group"; fi
 done
 install -d /etc/udev/rules.d /etc/modules-load.d
-if [ ! -e /etc/udev/rules.d/99-ergopti-uinput.rules ]; then
+if [ ! -e /etc/udev/rules.d/99-ergopti-uinput.rules ] && [ ! -L /etc/udev/rules.d/99-ergopti-uinput.rules ]; then
 	install -m 644 "$SCRIPT_DIR/99-ergopti-uinput.rules" /etc/udev/rules.d/99-ergopti-uinput.rules
 fi
-if [ ! -e /etc/modules-load.d/ergopti-uinput.conf ]; then
+if [ ! -e /etc/modules-load.d/ergopti-uinput.conf ] && [ ! -L /etc/modules-load.d/ergopti-uinput.conf ]; then
 	install -m 644 "$SCRIPT_DIR/ergopti-uinput.conf" /etc/modules-load.d/ergopti-uinput.conf
 fi
 
