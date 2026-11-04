@@ -485,6 +485,7 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 				'if [ "$restore_ok" -eq 1 ]; then',
 					'rm -rf "$work";',
 				'else',
+					'echo "Keyboard layout backups retained at $backup.";',
 					'echo "Keyboard layout backups retained at $backup." >&2;',
 				'fi;',
 				'return;',

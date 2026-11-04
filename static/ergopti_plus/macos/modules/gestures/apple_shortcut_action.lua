@@ -193,8 +193,17 @@ local function deliver(run)
 		UserActions.notify("user_actions.command_output_too_large", M.MAX_OUTPUT_BYTES)
 		return
 	end
-	UserActions.deliver_output(FileSystem.read(run.output_path) or "", run.fields.output, run.max_typed,
-		"A shortcut run")
+	local output, read_status = FileSystem.read_bounded(run.output_path, M.MAX_OUTPUT_BYTES)
+	if read_status == "too_large" then
+		Logger.error(LOG, "A shortcut run returned more than %d bytes.", M.MAX_OUTPUT_BYTES)
+		UserActions.notify("user_actions.command_output_too_large", M.MAX_OUTPUT_BYTES)
+		return
+	end
+	if type(output) ~= "string" then
+		Logger.error(LOG, "A shortcut run's text output could not be read.")
+		return
+	end
+	UserActions.deliver_output(output, run.fields.output, run.max_typed, "A shortcut run")
 end
 
 --- Invokes the stored shortcut once its input is ready: discovers, refuses a

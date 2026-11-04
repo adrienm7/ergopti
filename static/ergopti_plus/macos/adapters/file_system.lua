@@ -751,13 +751,18 @@ end
 --- Reads a regular file without turning lookup or stream failures into absence.
 --- @param path string Absolute path to the file.
 --- @param on_error function|nil Optional diagnostic owner receiving only a fixed failure category.
+--- @param max_bytes integer|nil Maximum bytes admitted; reads at most one byte more to detect overflow.
 --- @return string|nil content
---- @return string status `ok`, `absent`, or `error`.
+--- @return string status `ok`, `absent`, `too_large` (bounded reads), or `error`.
 --- @return string|nil detail
-function M.read_with_status(path, on_error)
+function M.read_with_status(path, on_error, max_bytes)
 	if on_error ~= nil and type(on_error) ~= "function" then
 		Logger.error(LOG, "read_with_status(): diagnostic owner must be a function.")
 		return nil, "error", "diagnostic owner must be a function"
+	end
+	if max_bytes ~= nil and (type(max_bytes) ~= "number" or max_bytes % 1 ~= 0
+		or max_bytes < 0 or max_bytes >= math.maxinteger) then
+		return nil, "error", "max_bytes must be a non-negative integer"
 	end
 	local function report(category, message, ...)
 		if on_error then
@@ -790,8 +795,9 @@ function M.read_with_status(path, on_error)
 		report("open", "read_with_status(): cannot open '%s' — %s", path, detail)
 		return nil, "error", detail
 	end
-	local read_ok, content, read_err = pcall(fh.read, fh, "*a")
+	local read_ok, content, read_err = pcall(fh.read, fh, max_bytes and (max_bytes + 1) or "*a")
 	local close_ok, closed, close_err = pcall(fh.close, fh)
+	if max_bytes ~= nil and read_ok and content == nil and read_err == nil then content = "" end
 	if not read_ok or type(content) ~= "string" then
 		detail = tostring((read_ok and read_err) or content or "read failed")
 		report("read", "read_with_status(): read failed for '%s' — %s", path, detail)
@@ -802,6 +808,7 @@ function M.read_with_status(path, on_error)
 		report("close", "read_with_status(): close failed for '%s' — %s", path, detail)
 		return nil, "error", detail
 	end
+	if max_bytes ~= nil and #content > max_bytes then return nil, "too_large" end
 
 	local unchanged, revalidate_err = revalidate_write_path(requested_path, resolved_path, chain)
 	if not unchanged then
@@ -816,6 +823,17 @@ function M.read_with_status(path, on_error)
 		return nil, "error", revalidate_err
 	end
 	return content, "ok"
+end
+
+--- Reads at most max_bytes from a regular file without trusting an earlier stat.
+--- @param path string Absolute path to the file.
+--- @param max_bytes integer Maximum accepted byte length.
+--- @return string|nil content
+--- @return string status `ok`, `absent`, `too_large`, or `error`.
+--- @return string|nil detail
+function M.read_bounded(path, max_bytes)
+	if max_bytes == nil then return nil, "error", "max_bytes is required" end
+	return M.read_with_status(path, nil, max_bytes)
 end
 
 --- Reads the entire contents of a file as a string.
