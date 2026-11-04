@@ -335,7 +335,14 @@ function M.drive(job, schedule, on_settled)
 		-- token slot never stays pending; the cause holds no key material
 		if not stepped then return on_settled(nil, "the assertion signer failed: " .. tostring(settled)) end
 		if settled then return on_settled(request, reason) end
-		if schedule(tick) ~= true then return on_settled(nil, "the assertion signature could not be resumed") end
+		-- A scheduler can throw after retaining the callback. Revoke that exact
+		-- callback on refusal so a late tick cannot send a second exchange.
+		local active = true
+		local called, armed = pcall(schedule, function() if active then tick() end end)
+		if not called or armed ~= true then
+			active = false
+			return on_settled(nil, "the assertion signature could not be resumed")
+		end
 	end
 	tick()
 end
