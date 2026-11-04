@@ -4282,12 +4282,24 @@ function M.while_released(fn, opts)
 		else M.emergency_stop(reason) end
 	end
 	if _intercept then
-		local release_call, released, release_err = pcall(_release_forwarded_sources, paths)
+		local sources = {}
+		for _, path in ipairs(paths) do sources[#sources + 1] = path end
+		for slot in pairs(LayerPointer.slots) do sources[#sources + 1] = slot end
+		local release_call, released, release_err = pcall(_release_forwarded_sources, sources)
 		if not release_call or not released then
 			stop_modal("could not release virtual keys before a dialog: " .. tostring(release_err or "release refused"))
 			observe("refused", { ok = false, reason = "release_failed" })
 			return nil, "virtual key retirement refused"
 		end
+		for slot, path in pairs(LayerPointer.slots) do
+			local called, acknowledged = pcall(EvdevReader.ungrab, slot)
+			if not called or acknowledged ~= true then
+				stop_modal("could not release the pointer before a dialog: " .. path)
+				observe("refused", { ok = false, reason = "ungrab_failed" })
+				return nil, "pointer release refused"
+			end
+		end
+		LayerPointer.slots, LayerPointer.buttons = {}, {}
 		for _, path in ipairs(paths) do
 			local called, acknowledged = pcall(EvdevReader.ungrab, keyboard_slot(path))
 			if not called or acknowledged ~= true then

@@ -112,7 +112,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 			onEmitRaw = function(code, value) emitted[#emitted + 1] = "key:" .. code .. ":" .. value; return true end,
 			onEmitRelative = function(axis, value)
 				emitted[#emitted + 1] = "rel:" .. axis .. ":" .. value
-				if on_relative then on_relative(kh, keyboard, pointer, second) end
+				if on_relative then on_relative(kh, keyboard, pointer, second, grabs, emitted) end
 				return true
 			end,
 			onClick = function() end,
@@ -248,6 +248,34 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 			{ EV_REL, REL_X, 1, 3000 },
 		}, nil, nil, false, true)
 		helpers.assert_eq(running, false, "an unacknowledged ungrab cannot leave a running silent mouse")
+	end)
+
+	helpers.it("releases a grabbed mouse and its button before entering a modal", function()
+		local entered, released, button_up = false, false, false
+		drive("mouse", HOLD, {
+			{ EV_KEY, BTN_LEFT, 1, 3000 }, { EV_REL, REL_X, 1, 3500 },
+		}, function(hook, _, pointer, _, grabs, emitted)
+			if entered then return end
+			hook.while_released(function()
+				entered = true
+				released = grabs[pointer].off > 0
+				button_up = has(emitted, "key:" .. BTN_LEFT .. ":0")
+			end)
+		end)
+		helpers.assert_true(entered)
+		helpers.assert_true(released, "the dialog must receive the physical mouse")
+		helpers.assert_true(button_up, "the virtual button must not remain held")
+	end)
+
+	helpers.it("refuses a modal if the grabbed mouse cannot be released", function()
+		local entered, attempted = false, false
+		drive("mouse", HOLD, { { EV_REL, REL_X, 1, 3500 } }, function(hook)
+			if attempted then return end
+			attempted = true
+			hook.while_released(function() entered = true end)
+		end, false, true)
+		helpers.assert_true(attempted)
+		helpers.assert_eq(entered, false, "a dialog cannot use a mouse still held by the daemon")
 	end)
 
 	helpers.it("releases a grabbed mouse button when that pointer disappears", function()
