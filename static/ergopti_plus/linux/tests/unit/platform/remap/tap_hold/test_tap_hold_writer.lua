@@ -393,6 +393,58 @@ end)
 -- The first-run wizard's Tap-Holds answer: it names a file of the folder it
 -- sets up, which may not be the running one, and restarts the daemon after.
 helpers.describe("tap-hold writer: the wizard imports only the checked keys", function()
+	helpers.it("refuses a dangling link at the proposed backup name", function()
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local path, victim = os.tmpname(), os.tmpname()
+		os.remove(victim)
+		local original = '[tap_hold]\ninherit_defaults = false\n'
+		write_file(path, original)
+		local backup = path .. ".tap_holds-20260101-000000-1.bak"
+		assert(require("luv").fs_symlink(victim, backup))
+		local date = os.date
+		local ok, err = pcall(function()
+			os.date = function(format, ...)
+				if format == "%Y%m%d-%H%M%S" then return "20260101-000000" end
+				return date(format, ...)
+			end
+			local imported = writer.import_recommended(path, { "caps_lock" }, Loader.preset_keys(DEFAULTS))
+			helpers.assert_eq(imported, false)
+			helpers.assert_nil(read_or_nil(victim), "an unrelated target must never be created")
+			helpers.assert_eq(read_file(path), original)
+		end)
+		os.date = date
+		os.remove(backup); os.remove(path); os.remove(victim)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("removes its own incomplete backup when its write is refused", function()
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local path = os.tmpname()
+		local original = '[tap_hold]\ninherit_defaults = false\n'
+		write_file(path, original)
+		local backup = path .. ".tap_holds-20260101-000000-1.bak"
+		local date, Native = os.date, require("infra.regular_file_writer")
+		local native_open = Native.open
+		local ok, err = pcall(function()
+			os.date = function(format, ...)
+				if format == "%Y%m%d-%H%M%S" then return "20260101-000000" end
+				return date(format, ...)
+			end
+			Native.open = function(target, mode)
+				local fh, detail, code, remove_owned, current = native_open(target, mode)
+				if target ~= backup or not fh then return fh, detail, code, remove_owned, current end
+				return { write = function() return nil, "injected refusal" end,
+					close = function() return fh:close() end }, detail, code, remove_owned, current
+			end
+			local imported = writer.import_recommended(path, { "caps_lock" }, Loader.preset_keys(DEFAULTS))
+			helpers.assert_eq(imported, false)
+			helpers.assert_nil(read_or_nil(backup))
+			helpers.assert_eq(read_file(path), original)
+		end)
+		os.date, Native.open = date, native_open
+		os.remove(backup); os.remove(path)
+		if not ok then error(err, 0) end
+	end)
 
 	--- A throwaway path with no file behind it.
 	local function absent_path()

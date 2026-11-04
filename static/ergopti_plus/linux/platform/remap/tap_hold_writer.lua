@@ -115,19 +115,22 @@ end
 local function back_up(path, text)
 	_backup_sequence = _backup_sequence + 1
 	local backup = string.format("%s.tap_holds-%s-%d.bak", path, os.date("%Y%m%d-%H%M%S"), _backup_sequence)
-	local existing = io.open(backup, "r")
-	if existing then
-		existing:close()
+	local opened, fh, _, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, backup, "wx")
+	if not opened or not fh then return nil end
+	if type(remove_owned) ~= "function" or type(current_image) ~= "function" then
+		pcall(fh.close, fh)
+		if type(remove_owned) == "function" then pcall(remove_owned) end
 		return nil
 	end
-	local fh = io.open(backup, "w")
-	if not fh then return nil end
-	fh:write(text)
-	fh:close()
-	local check = io.open(backup, "r")
-	local copied = check and check:read("*a")
-	if check then check:close() end
-	return copied == text and backup or nil
+	local wrote, result = pcall(fh.write, fh, text)
+	local closed, close_result = pcall(fh.close, fh)
+	if not wrote or (result ~= true and result ~= fh) or not closed or close_result ~= true then
+		pcall(remove_owned)
+		return nil
+	end
+	local checked, current = pcall(current_image, text)
+	if not checked or current ~= true then return nil end
+	return backup
 end
 
 --- The TOML spelling of one scalar or array.
