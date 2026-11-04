@@ -124,6 +124,29 @@ const installed = path.join(sandbox, 'installed');
 const config = path.join(sandbox, 'config');
 
 try {
+	// A stale PID-derived temporary name may contain unrelated bytes. The real
+	// migration must allocate a different file rather than truncate and rename it.
+	{
+		const root = path.join(sandbox, 'marker-collision');
+		const source = path.join(root, 'source');
+		const previous = path.join(root, 'previous');
+		const user = path.join(root, 'user');
+		for (const directory of [source, previous, user]) fs.mkdirSync(directory, { recursive: true });
+		const command = [
+			'set -euo pipefail',
+			`source ${shellQuote(bashPath(MIGRATOR))}`,
+			`stale=${shellQuote(bashPath(user))}/.ergopti-canonical-packs-v2.tmp.$$`,
+			'printf "user bytes\\n" > "$stale"',
+			`migrate_canonical_packs ${shellQuote(bashPath(source))} ${shellQuote(bashPath(previous))} ${shellQuote(bashPath(user))}`,
+			'test "$(cat "$stale")" = "user bytes"'
+		].join('; ');
+		const result = childProcess.spawnSync(bashExecutable(), ['-c', command], {
+			encoding: 'utf8',
+			timeout: 3000
+		});
+		if (result.status !== 0) fail(`stale marker collision was not preserved: ${result.stderr}`);
+	}
+
 	// A conflicting or special later backup must refuse without retiring an
 	// earlier seed. A FIFO also proves the migration never waits on it.
 	for (const kind of ['conflict', 'fifo', 'link']) {

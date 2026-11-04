@@ -94,8 +94,13 @@ migrate_canonical_packs() {
 		fi
 	done
 
-	marker_tmp="${marker}.tmp.$$"
-	printf '%s\n' "2" > "${marker_tmp}"
-	chmod 0644 "${marker_tmp}"
-	mv -- "${marker_tmp}" "${marker}"
+	# A PID-derived name can already hold a user's file or an interrupted
+	# attempt after PID reuse. Allocate a new sibling instead of truncating it.
+	marker_tmp="$(mktemp "${marker}.tmp.XXXXXX")" || return 1
+	if ! printf '%s\n' "2" > "${marker_tmp}" \
+		|| ! chmod 0644 "${marker_tmp}" \
+		|| ! mv -- "${marker_tmp}" "${marker}"; then
+		rm -f -- "${marker_tmp}" || return 1
+		return 1
+	fi
 }
