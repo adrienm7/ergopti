@@ -60,6 +60,13 @@ local _deps = nil
 local _transaction = nil
 local _admission_abort = nil
 local _admission_abort_active = false
+local _deadline_cleanup = {}
+local _deadline_cleanup_active = false
+
+--- Confirms the documented native timer receipt; table doubles may return true.
+local function stopped_deadline(timer, ok, result)
+	return ok and (result == timer or (type(timer) == "table" and result == true))
+end
 
 --- Hands one stage of a transition to the reload breadcrumb. A diagnostic only:
 --- neither its absence nor its failure changes the transition.
@@ -70,15 +77,36 @@ local function breadcrumb(transaction, stage)
 	pcall(_deps.record_stage, transaction.kind, stage)
 end
 
+--- Retries exact deadline timers whose native stop did not settle. Their
+--- callbacks remain inert because the owning transaction was already fenced.
+--- @return boolean settled Whether every retained timer stopped.
+local function retry_deadline_cleanup()
+	if _deadline_cleanup_active then return false end
+	_deadline_cleanup_active = true
+	local settled = true
+	for index = #_deadline_cleanup, 1, -1 do
+		local timer = _deadline_cleanup[index]
+		local ok, result = pcall(function() return timer:stop() end)
+		if stopped_deadline(timer, ok, result) then
+			table.remove(_deadline_cleanup, index)
+		else
+			settled = false
+		end
+	end
+	_deadline_cleanup_active = false
+	return settled
+end
+
 --- Stops a reload's deadline timer once its transaction has settled or become
---- an exit. A refused stop is retained: the callback checks its transaction.
+--- an exit. A refused stop is retained for exact retry.
 --- @param transaction table The transition.
 local function disarm_reload_deadline(transaction)
 	local timer = transaction.reload_deadline
 	if timer == nil then return end
 	transaction.reload_deadline = nil
 	-- Hammerspoon timers are userdata, while test doubles may be tables.
-	pcall(function() timer:stop() end)
+	local ok, result = pcall(function() return timer:stop() end)
+	if not stopped_deadline(timer, ok, result) then _deadline_cleanup[#_deadline_cleanup + 1] = timer end
 end
 
 local function require_state(func_name)
@@ -587,6 +615,7 @@ reload_natively = function(transaction, stage, message)
 	local reload_ok, reload_result = xpcall(function()
 		return _deps.reload(table.unpack(transaction.arguments, 1, transaction.arguments.n))
 	end, debug.traceback)
+	transaction.native_reload_scheduled = reload_ok
 	if reload_ok then return end
 	breadcrumb(transaction, "hs_reload_raised")
 	transaction.terminal_failure = tostring(reload_result)
@@ -612,6 +641,16 @@ local function arm_reload_deadline(transaction)
 		if not ok then pcall(Logger.error, LOG, "Controlled reload deadline raised: %s.", tostring(err)) end
 	end)
 	local handle_ok, stop = pcall(function() return timer and timer.stop end)
+	-- A scheduler can deliver the deadline before returning its handle. The
+	-- callback already replaced this transaction; retire the returned timer and
+	-- never proceed to request a lease on behalf of the retired transaction.
+	if transaction.settled then
+		if armed and handle_ok and type(stop) == "function" then
+			transaction.reload_deadline = timer
+			disarm_reload_deadline(transaction)
+		end
+		return true
+	end
 	if armed and handle_ok and type(stop) == "function" then
 		transaction.reload_deadline = timer
 		return true
@@ -623,6 +662,7 @@ end
 
 local function request(kind, reason, arguments, exit_code, on_aborted, require_fresh, prepared_admission)
 	if not require_state("request_" .. kind) then return false end
+	retry_deadline_cleanup()
 	if type(reason) ~= "string" or reason == "" then
 		Logger.error(LOG, "Controlled %s requires a non-empty reason.", kind)
 		return false
@@ -690,10 +730,14 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 	}
 	_transaction = transaction
 	breadcrumb(transaction, "accepted")
-	if kind == "reload" and not arm_reload_deadline(transaction) then
-		-- Without the deadline, a lost fence or drain can strand the driver with
-		-- remaps revoked indefinitely. Refuse while rollback is still safe.
-		return abort_transaction(transaction, "reload deadline unavailable", false)
+	if kind == "reload" then
+		local armed = arm_reload_deadline(transaction)
+		if transaction.settled then return transaction.native_reload_scheduled == true end
+		if not armed then
+			-- Without the deadline, a lost fence or drain can strand the driver with
+			-- remaps revoked indefinitely. Refuse while rollback is still safe.
+			return abort_transaction(transaction, "reload deadline unavailable", false)
+		end
 	end
 	-- Who asked is the first question about any reload or quit in a user log, and
 	-- the reason was stored on the transaction without ever being written out.
@@ -812,6 +856,12 @@ end
 --- @return boolean initialized
 function M.is_initialized()
 	return _deps ~= nil
+end
+
+--- Retries retained native reload-deadline cleanup without logging.
+--- @return boolean settled Whether every retained timer stopped.
+function M.retry_deadline_cleanup()
+	return retry_deadline_cleanup()
 end
 
 --- Requests a reload only after the exact lease fence settles.
