@@ -16,6 +16,7 @@
 --- 3. A UTF-8 or UTF-16 byte-order mark is accepted, as the managed fetch does.
 --- ==============================================================================
 
+local Utf8 = require("compat.utf8")
 local M = {}
 
 M.MAX_BYTES = 1048576
@@ -51,6 +52,39 @@ local function valid_utf8(text)
 	return true
 end
 
+--- Decode the same bounded UTF-16 image as the managed fetch, without repair.
+--- @param text string Bytes following the BOM.
+--- @param big boolean Whether the source is big-endian.
+--- @return string|nil text
+--- @return string|nil reason
+local function decode_utf16(text, big)
+	if #text % 2 ~= 0 then return nil, "PAC UTF-16 has an incomplete code unit" end
+	local parts, size, index = {}, 0, 1
+	local function unit(at)
+		local first, second = text:byte(at, at + 1)
+		if not second then return nil end
+		return big and first * 256 + second or second * 256 + first
+	end
+	while index <= #text do
+		local code = unit(index)
+		index = index + 2
+		if code >= 0xD800 and code <= 0xDBFF then
+			local low = unit(index)
+			if not low or low < 0xDC00 or low > 0xDFFF then return nil, "PAC encoding is invalid" end
+			code = 0x10000 + (code - 0xD800) * 0x400 + low - 0xDC00
+			index = index + 2
+		elseif code >= 0xDC00 and code <= 0xDFFF then
+			return nil, "PAC encoding is invalid"
+		end
+		if code == 0 then return nil, "PAC contains a null character" end
+		local encoded = Utf8.char(code)
+		size = size + #encoded
+		if size > M.MAX_BYTES then return nil, "PAC normalized UTF-8 is over the byte limit" end
+		parts[#parts + 1] = encoded
+	end
+	return table.concat(parts)
+end
+
 --- Judges one PAC answer.
 --- @param status number|nil HTTP status, nil or 0 when the request failed.
 --- @param body string|nil Response body.
@@ -71,14 +105,20 @@ function M.judge(status, body, transport_error)
 		return "error", string.format("PAC is %d bytes, over the %d byte limit", bytes, M.MAX_BYTES)
 	end
 	local utf16 = body:sub(1, 2) == "\255\254" or body:sub(1, 2) == "\254\255"
-	if not utf16 then
-		local text = body:sub(1, 3) == "\239\187\191" and body:sub(4) or body
+	local text, reason
+	if utf16 then
+		text, reason = decode_utf16(body:sub(3), body:byte(1) == 254)
+		if not text then return "error", reason end
+	else
+		text = body:sub(1, 3) == "\239\187\191" and body:sub(4) or body
 		if not valid_utf8(text) then
 			return "error", "PAC is not UTF-8 (the managed download refuses it)"
 		end
-		if not text:find("FindProxyForURL", 1, true) then
-			return "error", "PAC does not define FindProxyForURL"
-		end
+	end
+	if text == "" then return "error", "PAC is empty" end
+	if text:find("\0", 1, true) then return "error", "PAC contains a null character" end
+	if not text:find("FindProxyForURL", 1, true) then
+		return "error", "PAC does not define FindProxyForURL"
 	end
 	return "ok", string.format("HTTP 200, %d bytes, %s, FindProxyForURL found", bytes, utf16 and "UTF-16" or "UTF-8")
 end
