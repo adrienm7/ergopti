@@ -68,6 +68,23 @@ local function with_real_shortcut_prompt(raw, body)
 end
 
 helpers.describe("HS-033 shortcut prompt settlement propagation", function()
+	helpers.it("opens a repair prompt for malformed persisted modifier arrays", function()
+		for _, mods in ipairs({ { true }, { {} }, { [1] = "alt", [3] = "shift" }, { extra = "ctrl" }, false }) do
+			with_real_shortcut_prompt("ctrl+b", function(shortcuts)
+				local current = { mods = mods, key = "a" }
+				helpers.assert_eq(shortcuts.shortcut_to_config_string(current), "")
+				helpers.assert_eq(shortcuts.shortcut_to_label(current, "none"), "none")
+				local applied = false
+				helpers.assert_true(shortcuts.prompt_shortcut({ current_shortcut = current,
+					on_apply = function() applied = true; return true end }))
+				helpers.assert_true(applied, "the user can replace the malformed shortcut")
+			end)
+		end
+		with_real_shortcut_prompt("ctrl+b", function(shortcuts)
+			helpers.assert_eq(shortcuts.shortcut_to_config_string({ mods = { "ctrl" }, key = "a" }), "ctrl+a")
+			helpers.assert_eq(shortcuts.shortcut_to_label({ mods = { "ctrl" }, key = "a" }), "Ctrl + A")
+		end)
+	end)
 	for _, raw in ipairs({ "ctrrl+b", "ctrl++b", "+b", "ctrl+" }) do
 		helpers.it("rejects malformed shortcut without saving: " .. raw, function()
 			with_real_shortcut_prompt(raw, function(shortcuts)
