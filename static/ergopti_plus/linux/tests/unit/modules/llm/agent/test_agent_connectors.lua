@@ -85,6 +85,31 @@ local function with_connectors(opts, body)
 	if not ok then error(err, 0) end
 end
 
+helpers.it("agent calendar preserves the complete private directory receipt", function()
+	local Shell = require("adapters.shell_runner")
+	local previous_line, previous_checked = Shell.exec_line, Shell.exec_checked
+	local prior = package.loaded["modules.llm.agent_connectors"]
+	local dir = "/tmp/base\nwith-newline/ergopti-agent.abcdefgh"
+	Shell.exec_line = function() return "/tmp/base" end
+	Shell.exec_checked = function() return true, dir .. "\n" end
+	package.loaded["modules.llm.agent_connectors"] = nil
+	local connector = require("modules.llm.agent_connectors")
+	local written
+	connector._set_deps_for_test({
+		random_hex = function() return "00ff" end,
+		utc_stamp = function() return "20261023T120000Z" end,
+		write_file = function(path) written = path; return true end,
+		remove = function() return true end,
+		run = function(_, _, _, callback) callback({ ok = true, code = 0 }); return {} end,
+	})
+	local ok, err = pcall(connector.run, config(), { type = "reminder", title = "Reminder" }, function() end)
+	connector.shutdown()
+	Shell.exec_line, Shell.exec_checked = previous_line, previous_checked
+	package.loaded["modules.llm.agent_connectors"] = prior
+	assert(ok, err)
+	helpers.assert_eq(written, dir .. "/task.ics", "calendar file must stay in the created private directory")
+end)
+
 helpers.describe("AI agent connectors: one program per action, never a shell", function()
 
 	helpers.it("a calendar event is an .ics file in a private folder, opened with xdg-open", function()
