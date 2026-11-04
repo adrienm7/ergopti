@@ -609,9 +609,14 @@ end
 --- without closing a replacement page registered under the same application name.
 --- @param app_name string The app name.
 --- @param window_epoch number The page-context epoch captured by the callback.
---- @return boolean true when the close was handled explicitly.
+--- @return boolean true when GTK must not destroy the owned window itself.
 function M._handle_delete_event(app_name, window_epoch)
-	return M.hide(app_name, window_epoch)
+	local owned = _windows[app_name]
+	if not owned or owned.epoch ~= window_epoch then return false end
+	M.hide(app_name, window_epoch)
+	-- A refused close retains native cleanup debt for retry. GTK's default
+	-- handler would destroy the window behind that retained owner.
+	return true
 end
 
 --- Brings an existing window to the front.
