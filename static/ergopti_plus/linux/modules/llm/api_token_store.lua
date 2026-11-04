@@ -57,12 +57,11 @@ local _sequence = 0
 
 --- Reads a whole file and removes it.
 --- @param path string
---- @return string
+--- @return string|nil text Nil when the result cannot be read safely.
 local function take_file(path)
-	local fh = io.open(path, "rb")
-	local text = fh and fh:read("*a") or ""
-	if fh then fh:close() end
-	os.remove(path)
+	local text, status = require("toml_codec.writer").read_classified(path)
+	if status ~= "ok" then return nil end
+	if not os.remove(path) then return nil end
 	return text
 end
 
@@ -90,8 +89,9 @@ local function run_tool(args, input)
 	end
 	if input then pipe:write(input) else output = pipe:read("*a") or "" end
 	pipe:close()
-	local status = tonumber(take_file(status_path))
-	return status, output, take_file(err_path)
+	local status_text, stderr = take_file(status_path), take_file(err_path)
+	if status_text == nil or stderr == nil then return nil, "", "secret-tool result files are unavailable" end
+	return tonumber(status_text), output, stderr
 end
 
 --- The reason a failed call gives, its stderr on one line.
