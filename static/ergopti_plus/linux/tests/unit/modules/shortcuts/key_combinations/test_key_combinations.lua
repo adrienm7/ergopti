@@ -241,11 +241,12 @@ helpers.describe("combination binding canonical program dispatch",function()
 		local scalar = '{"version":1,"executable":"/controlled/program","arguments":["literal argument"]}'
 		local text = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab="run_program"\n[shortcuts.key_combination_holds]\ncaps_lock_then_tab="shift"\n[gesture_parameters]\n' .. binding .. '__run_program=\'' .. scalar .. '\'\n'
 		local state = make(text); local captured, admission
-		local prior_open = io.open
-		io.open = function(name,mode)
-			if name == path and mode == "r" then return {read=function() return state.bytes end,close=function() return true end} end
-			return prior_open(name,mode)
+		local config_path = os.tmpname()
+		local function publish()
+			local file = assert(io.open(config_path, "wb"))
+			assert(file:write(state.bytes)); assert(file:close())
 		end
+		publish()
 		local ok,err = pcall(function()
 			protected_modules({ ["modules.gestures.manager"]=false,
 				["adapters.file_system"]={read_with_status=function() return state.bytes,"ok" end},
@@ -257,14 +258,15 @@ helpers.describe("combination binding canonical program dispatch",function()
 				["ui.gesture_conflicts"]={notify_boot=function() end},
 			},function()
 				local manager = require("modules.gestures.manager")
-				manager.init({persist=true,enabled=false,config_path=path,is_paused=function() return state.paused end})
+				manager.init({persist=true,enabled=false,config_path=config_path,is_paused=function() return state.paused end})
 				helpers.assert_eq(manager.get_action_parameter(binding,"run_program"),scalar)
 				helpers.assert_true(manager.run_program(binding)); helpers.assert_eq(captured,scalar)
 				state.bytes = state.bytes .. "\n# edited after capture\n"
+				publish()
 				assert_false(admission(),"actual manager cannot keep a stale pair source alive")
 			end)
 		end)
-		io.open = prior_open
+		os.remove(config_path)
 		if not ok then error(err,0) end
 	end)
 end)
