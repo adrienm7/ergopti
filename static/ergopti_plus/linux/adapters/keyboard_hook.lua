@@ -2581,10 +2581,11 @@ function LayerPointer.forward(ev, slot)
 			if _capture_session == session then M.emergency_stop("grabbed mouse relative output failed") end
 			return
 		end
-	elseif ev.type == EVDEV_TYPE_KEY and InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
+	elseif ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and ev.code <= 0x2ff
+		and (ev.value == InputEvent.VALUE_DOWN or ev.value == InputEvent.VALUE_UP or ev.value == InputEvent.VALUE_REPEAT) then
 		local key = source_key(slot, ev.code)
 		if ev.value == InputEvent.VALUE_DOWN then LayerPointer.buttons[key] = true
-		else LayerPointer.buttons[key] = nil end
+		elseif ev.value == InputEvent.VALUE_UP then LayerPointer.buttons[key] = nil end
 		_forward_raw({ type = EVDEV_TYPE_KEY, code = ev.code, value = ev.value }, slot)
 	end
 end
@@ -2597,7 +2598,14 @@ local function _dispatch_pointer(ev, slot)
 		M.emergency_stop("grabbed pointer queue desynchronised")
 		return
 	end
-	if ev.type == EVDEV_TYPE_KEY and ev.code >= InputEvent.POINTER_BUTTON_FIRST then
+	if ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and ev.code < InputEvent.POINTER_BUTTON_FIRST then
+		-- A mouse may also expose keyboard/media keys on the same node. Those
+		-- keys reach the desktop and count as activity for a held tap-hold.
+		if _remapper then
+			_remapper:activity()
+			local at_ms = _event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
+		end
+	elseif ev.type == EVDEV_TYPE_KEY and ev.code >= InputEvent.POINTER_BUTTON_FIRST then
 		-- A click while a tap-hold key is down makes it a chord (Shift+click),
 		-- and so does the release of one, as on Windows (hook_dispatcher's
 		-- _OnLUp ... _OnX2Up): a click begun before the tap ends inside it.
@@ -3551,7 +3559,7 @@ local function _acquire_pointers(paths, tx)
 	for index, path in ipairs(paths) do _pointer_devices[index] = path end
 	LayerPointer.buttons = {}
 	for key, row in pairs(_forwarded_down) do
-		if LayerPointer.slots[row.owner_source] and InputEvent.is_pointer_button(row.code) then
+		if LayerPointer.slots[row.owner_source] then
 			LayerPointer.buttons[key] = true
 		end
 	end

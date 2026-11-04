@@ -154,6 +154,17 @@ end
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
+	helpers.it("preserves a mouse's keyboard-class keys while its wheel is grabbed (mouse-extra-key)", function()
+		local emitted, grabs, _, running = drive("mouse", HOLD, {
+			{ EV_KEY, KEY_K, 1, 3000 }, { EV_KEY, KEY_K, 2, 3500 }, { EV_KEY, KEY_K, 0, 10000 },
+		})
+		helpers.assert_true(running)
+		helpers.assert_true(grabs.on > 0)
+		helpers.assert_true(has(emitted, "key:" .. KEY_K .. ":1"))
+		helpers.assert_true(has(emitted, "key:" .. KEY_K .. ":2"))
+		helpers.assert_true(has(emitted, "key:" .. KEY_K .. ":0"))
+		helpers.assert_true(not has(emitted, "key:14:1"), "an extra key cancels the held layer key's tap")
+	end)
 	helpers.it("observes pointer events when no click callback is registered (pointer-observer-only)", function()
 		local reports = {}
 		local _, _, _, running, source, opened = drive("mouse", {}, {
