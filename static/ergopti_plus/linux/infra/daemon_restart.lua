@@ -38,8 +38,8 @@ function M.restart(opts)
 		end
 	local under_unit = Restarter.under_unit(opts.cgroup)
 	if under_unit == nil then
-		Logger.error(LOG, "Restart for %s refused: the process cgroup is unreadable.", opts.reason)
-		return nil, "the process cgroup is unreadable"
+		Logger.error(LOG, "Restart for %s refused: the process cgroup is unavailable or invalid.", opts.reason)
+		return nil, "the process cgroup is unavailable or invalid"
 	end
 	local wrapper
 	if not under_unit then
