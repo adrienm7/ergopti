@@ -27,7 +27,8 @@ local function read_file(path)
 	local fh = io.open(path, "r")
 	if not fh then return nil end
 	local text = fh:read("*a")
-	fh:close()
+	local closed = fh:close()
+	if type(text) ~= "string" or not closed then return nil end
 	return text
 end
 
@@ -37,6 +38,24 @@ end
 function M.own_pid(stat)
 	stat = stat or read_file("/proc/self/stat")
 	return stat and tonumber(stat:match("^(%d+)")) or nil
+end
+
+--- The kernel start tick identifies a process even if its numeric PID is reused.
+--- @param pid integer Process ID.
+--- @param stat string|nil Captured /proc/PID/stat text, read when absent.
+--- @return string|nil start_tick Exact decimal kernel value.
+function M.process_start_time(pid, stat)
+	if type(pid) ~= "number" or pid <= 0 or pid % 1 ~= 0 then return nil end
+	stat = stat or read_file("/proc/" .. string.format("%.0f", pid) .. "/stat")
+	if type(stat) ~= "string" then return nil end
+	local closing = stat:match("^.*()%) ")
+	if not closing then return nil end
+	local index = 0
+	for field in stat:sub(closing + 2):gmatch("%S+") do
+		index = index + 1
+		if index == 20 then return field:match("^%d+$") and field or nil end
+	end
+	return nil
 end
 
 --- Whether this process runs inside the daemon's systemd user unit.
@@ -63,24 +82,28 @@ end
 --- @param args table The daemon's own arguments.
 --- @param cancel_path string|nil A marker file: when it exists once the process has
 ---   exited, the relay removes it and does not start the launcher (Quit won over the reload).
+--- @param start_tick string Exact kernel start tick captured before dispatch.
 --- @return string
-function M.relay_command(pid, wrapper, args, cancel_path)
+function M.relay_command(pid, wrapper, args, cancel_path, start_tick)
+	assert(type(start_tick) == "string" and start_tick:match("^%d+$"), "relay needs the original process start tick")
 	local argv = { ShellRunner.quote(wrapper) }
 	for _, value in ipairs(args or {}) do argv[#argv + 1] = ShellRunner.quote(tostring(value)) end
-	-- A zombie has exited: its parent may reap it late (or, as PID 1 in a
-	-- container, never), and kill -0 alone would wait on it forever.
-	-- stat embeds raw comm bytes, including newlines; status escapes that name
-	-- and supplies a separate State record safe to read one line at a time.
-	-- Checked after the wait: a Quit that abandons the reload creates the marker
-	-- while this process is still shutting down.
+	-- A zombie has exited even if its parent has not reaped it. The raw comm
+	-- in stat can contain spaces, parentheses and newlines, so remove through
+	-- its final closing parenthesis before checking state and start tick. A PID
+	-- reused by a different process must not hold this relay indefinitely.
+	-- A Quit creates the cancellation marker while this process is still live.
 	local cancel = ""
 	if cancel_path ~= nil then
 		local marker = ShellRunner.quote(cancel_path)
 		cancel = string.format(" if [ -e %s ]; then rm -f %s; exit 0; fi;", marker, marker)
 	end
-	local script = string.format("while kill -0 %d 2>/dev/null"
-		.. " && [ \"$(sed -n 's/^State:[[:space:]]*\\([A-Z]\\).*/\\1/p' /proc/%d/status 2>/dev/null)\" != Z ]; do sleep 0.2; done;%s exec %s",
-		pid, pid, cancel, table.concat(argv, " "))
+	local script = string.format("while kill -0 %d 2>/dev/null; do "
+		.. "stat=$(cat /proc/%d/stat 2>/dev/null) || { sleep 0.2; continue; }; "
+		.. "rest=${stat##*) }; set -- $rest; "
+		.. "[ \"$#\" -ge 20 ] || { sleep 0.2; continue; }; state=$1; shift 19; "
+		.. "[ \"$1\" = %s ] || break; case \"$state\" in Z|X) break;; esac; sleep 0.2; done;%s exec %s",
+		pid, pid, ShellRunner.quote(start_tick), cancel, table.concat(argv, " "))
 	-- Keep dispatch in the foreground until the detached shell has forked its
 	-- relay. An outer '&' reports success even when setsid cannot start at all,
 	-- which would authorize shutdown with no process left to launch the update.
@@ -129,7 +152,7 @@ function M.cancel(how, opts)
 end
 
 --- Starts the installed version in place of this process.
---- @param opts table { wrapper, args, paused?, run?, cgroup?, pid? }
+--- @param opts table { wrapper, args, paused?, run?, cgroup?, pid?, start_tick? }
 --- @return string|nil "systemd" (systemd stops and restarts this process) or
 ---   "relay" (the caller must now exit), nil when nothing could be started.
 function M.restart(opts)
@@ -163,7 +186,12 @@ function M.restart(opts)
 			Logger.error(LOG, "Own process id unreadable — the update applies at the next start.")
 			return nil
 		end
-		if not run(M.relay_command(pid, opts.wrapper, opts.args, M.cancel_path(pid))) then
+		local start_tick = opts.start_tick or M.process_start_time(pid)
+		if type(start_tick) ~= "string" or not start_tick:match("^%d+$") then
+			Logger.error(LOG, "Own process identity unreadable — the update applies at the next start.")
+			return nil
+		end
+		if not run(M.relay_command(pid, opts.wrapper, opts.args, M.cancel_path(pid), start_tick)) then
 			Logger.error(LOG, "The restart relay could not be started — the update applies at the next start.")
 			return nil
 		end
