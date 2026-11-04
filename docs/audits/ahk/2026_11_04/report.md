@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **57 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **58 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1043,3 +1043,17 @@ Consequence: A synthetic held mouse button can remain held after later keyboard 
 Regression: Three gesture-keywatcher-length cases use the actual native hook and callbacks, keyboard injection confined to an explicitly opted-in verified child-owned Edit, and passive mouse I/O. One, three and eight refused-key sequences must retain the same observer, recover at the next allowed Up and pass the complete typed text through. The fix uses V L0 and KeyOpt All NI, preserving MinSendLevel0, notifications and visible input while ignoring text collection. Old pins are adapted; final held-state and cleanup oracles remain strict. Native three-character fail-before measured; long/text-retention coverage and post-fix qualification pending. No physical mouse injection or physical-key claim is made.
 
 The ongoing register now contains **57 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-058: Day rollover never yields when the journal ends in an incomplete record
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+KL_DayRollover repeats every successful non-EOF ingest without checking committed byte progress. The reader deliberately preserves an unterminated record, so each iteration revisits the same offset and cannot complete the rollover or yield to the resident writer.
+
+Reproduction: Native Windows run41919871873 at2298478 executes torn-drain and undelimited-drain through the real journal reader and rollover owner. Both require the bounded one-second rescue timer to revoke initialization; the committed offset stays108. The blank-batch-drain control advances over5001 empty lines and succeeds.
+
+Consequence: A final partial journal record can trap day rollover in a tight loop. The journal must remain intact until its final delimiter arrives.
+
+Regression: The three new rollover-state-recovery cases exercise actual files, reader, SQLite ledger and owner. Torn and complete-but-undelimited final records must return journal_no_progress promptly, retain the exact source and pending events, then succeed after the real delimiter is appended. Empty batches with real offset progress remain accepted. Guard added after successful non-EOF ingest; native post-fix qualification pending.
+
+The ongoing register now contains **58 distinct new findings**. The requested target of 1,000 remains unmet.
