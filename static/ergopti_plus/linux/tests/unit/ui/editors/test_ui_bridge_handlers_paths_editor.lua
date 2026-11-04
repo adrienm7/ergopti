@@ -53,6 +53,42 @@ helpers.describe("ui.bridge_handlers", function()
 			}, values, captured
 		end
 
+		helpers.it("(paths-editor-save-owner) rejects reentrant saves and cancellation during persistence", function()
+			local state, values, captured = paths_state()
+			local epoch, writes, nested, cancelled = 1, 0, nil, nil
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return epoch == value end
+			local context = { app_name = "paths_editor", epoch = 1,
+				close_owned_window = function() captured.hidden = captured.hidden + 1; return true end }
+			local write = state.config_paths.set_paths
+			state.config_paths.set_paths = function(...)
+				writes = writes + 1
+				if writes == 1 then
+					nested = handler.on_message({ action = "save", configDir = "/tmp/other" }, state, context)
+					cancelled = handler.on_message({ action = "cancel" }, state, context)
+				end
+				return write(...)
+			end
+			local result = handler.on_message({ action = "save", configDir = "/tmp/wanted" }, state, context)
+			helpers.assert_eq(nested, { saved = false, busy = true })
+			helpers.assert_eq(cancelled, { cancelled = false, hidden = false, busy = true })
+			helpers.assert_true(result.saved and result.reloaded and result.hidden)
+			helpers.assert_eq(values.config_dir, "/tmp/wanted")
+			helpers.assert_eq({ writes, captured.reloaded, captured.hidden }, { 1, 1, 1 })
+		end)
+
+		helpers.it("(paths-editor-save-owner) clears the guard after an unexpected persistence error", function()
+			local state, _, captured = paths_state()
+			local write = state.config_paths.set_paths
+			state.config_paths.set_paths = function() error("controlled persistence error") end
+			local ok = pcall(handler.on_message, { action = "save", configDir = "/tmp/wanted" }, state)
+			state.config_paths.set_paths = write
+			helpers.assert_eq(ok, false)
+			local result = handler.on_message({ action = "save", configDir = "/tmp/wanted" }, state)
+			helpers.assert_true(result.saved and result.reloaded and result.hidden)
+			helpers.assert_eq(captured.reloaded, 1)
+		end)
+
 		helpers.it("(paths-editor-owner) does not push a picked path into a replacement page", function()
 			local state, _, captured = paths_state()
 			local epoch = 1
