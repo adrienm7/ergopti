@@ -13,7 +13,7 @@ global TapHold := Map("keys", Map())
 for _OSRA_Key in ["left_alt", "right_ctrl"]
 	TapHold["keys"][_OSRA_Key] := Map("enabled", true, "tap_action", "one_shot_shift", "time_activation_seconds", 0.2, "hold_modifier", "", "hold_layer", "")
 global _TH_PressesTakenByCombination := Map(), _TH_TapHoldTrackState := Map(), _TH_LastTapHoldCancelReason := ""
-global _TapHoldTapInDispatch := ""
+global _TapHoldTapInDispatch := "", _TH_SyntheticEpoch := 0
 global _OSRA := { Mode: A_Args[1], Hooks: [], Emits: [], Activations: 0, Errors: 0,
 	TimerCalls: 0, Done: false, Failure: 0, FirstToken: 0, Successor: 0, SuccessorToken: 0, Released: 0, KeyWaits: 0 }
 
@@ -49,7 +49,7 @@ TapHoldReleasePhysicalKey(Name) {
 	return true
 }
 
-TapHoldSyntheticKeyDown(Name) {
+TapHoldSyntheticKeyDown(Name, Owner := 0) {
 	_OSRA_Require(Name == "LShift", "the real route must reach its Shift hold boundary")
 	return false
 }
