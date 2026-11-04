@@ -34,3 +34,10 @@ HealthCheck_ControlTimer(Callback, Period) {
 		return SetTimer(Callback, 0)
 	return SetTimer(Callback, -Abs(Period))
 }
+
+/** Fills SYSTEM_INFO with the host architecture even under process emulation. */
+HealthCheck_NativeSystemInfo(Info) {
+	if !(Info is Buffer) || Info.Size < 48
+		throw ValueError("Native system information requires a 48-byte buffer.")
+	DllCall("Kernel32\GetNativeSystemInfo", "Ptr", Info)
+}
