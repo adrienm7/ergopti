@@ -68,6 +68,7 @@ local _gtk = nil
 
 -- The live window and its cached drawing state.
 local _window = nil
+local _destroying = false
 local _surface_rows = nil
 local _style = nil
 local _size = { w = 0, h = 0 }
@@ -509,6 +510,7 @@ end
 ---   screen table        { x, y, w, h } the frame to clamp within.
 --- @return boolean True when something was drawn.
 function M.show(rows, opts)
+	if _destroying then return false end
 	local g = bind()
 	if not g or type(rows) ~= "table" or #rows == 0 then return false end
 
@@ -551,6 +553,7 @@ end
 
 --- Hides the preview.
 function M.hide()
+	if _destroying then return false end
 	if not _window then return true end
 	local ok, hidden = pcall(function()
 		_window:hide()
@@ -572,10 +575,16 @@ end
 
 --- Destroys the window.
 function M.destroy()
-	if not _window then return end
-	pcall(function() _window:destroy() end)
+	if _destroying then return false end
+	if not _window then return true end
+	local window = _window
+	_destroying = true
+	local called, result = pcall(function() return window:destroy() end)
+	_destroying = false
+	if not called or result == false or not rawequal(_window, window) then return false end
 	_window = nil
 	_surface_rows = nil
+	return true
 end
 
 return M

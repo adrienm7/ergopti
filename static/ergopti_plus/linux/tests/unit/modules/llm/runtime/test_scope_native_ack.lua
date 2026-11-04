@@ -89,6 +89,18 @@ helpers.describe("LLM scope native acknowledgements", function()
 			raises, refuse = false, false
 			helpers.assert_true(renderer.hide())
 			helpers.assert_eq(renderer.is_visible(), false)
+			local destroy_calls, nested = 0, nil
+			window.destroy = function()
+				destroy_calls = destroy_calls + 1
+				if destroy_calls == 1 then return false end
+				if destroy_calls == 2 then error("GTK destroy refused") end
+				nested = { renderer.hide(), renderer.show({}, {}), renderer.destroy() }
+			end
+			helpers.assert_eq(renderer.destroy(), false, "a refused destroy keeps the native owner for retry")
+			helpers.assert_eq(renderer.destroy(), false, "a throwing destroy keeps the native owner for retry")
+			helpers.assert_true(renderer.destroy())
+			helpers.assert_eq(destroy_calls, 3)
+			helpers.assert_eq(nested, { false, false, false }, "destroy owns the window through reentrant callbacks")
 		end)
 	end)
 end)

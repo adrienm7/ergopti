@@ -97,7 +97,7 @@ helpers.describe("AI overlay: one window shared with the hotstring preview", fun
 				return true
 			end,
 			hide = function() return true end,
-			destroy = function() destroyed = destroyed + 1 end,
+			destroy = function() destroyed = destroyed + 1; return true end,
 		}
 		assert(overlay.init({ style = {}, renderer = renderer, anchor_provider = function()
 			helpers.assert_eq(overlay.init({ style = {}, renderer = {} }), false)
@@ -151,13 +151,27 @@ helpers.describe("AI overlay: one window shared with the hotstring preview", fun
 		package.loaded["ui.tooltip.llm"] = nil
 	end)
 
+	helpers.it("(tooltip-destroy-refusal) retains the overlay owner until native destruction succeeds", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay, attempts = require("ui.tooltip.llm"), 0
+		assert(overlay.init({ style = {}, renderer = {
+			show = function() return true end, hide = function() return true end,
+			destroy = function() attempts = attempts + 1; return attempts > 1 end,
+		} }))
+		assert(overlay.show({ { to_type = "text" } }, {}))
+		local first, second = overlay.destroy(), overlay.destroy()
+		package.loaded["ui.tooltip.llm"] = nil
+		helpers.assert_eq({ first = first, second = second, attempts = attempts },
+			{ first = false, second = true, attempts = 2 })
+	end)
+
 	helpers.it("(llm-overlay-draw-failure) retains the surface across refused cleanup and destruction", function()
 		package.loaded["ui.tooltip.llm"] = nil
 		local overlay, hides, destroyed = require("ui.tooltip.llm"), 0, 0
 		local renderer = {
 			show = function() return false end,
 			hide = function() hides = hides + 1; return hides >= 4 end,
-			destroy = function() destroyed = destroyed + 1 end,
+			destroy = function() destroyed = destroyed + 1; return true end,
 		}
 		assert(overlay.init({ style = {}, renderer = renderer }))
 		helpers.assert_eq(overlay.show({ { to_type = "hello", deletes = 0 } }, {}), false)
@@ -482,7 +496,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 	local function preview_with()
 		local renderer, window = fake_renderer()
 		renderer.is_available = function() return true end
-		renderer.destroy = function() end
+		renderer.destroy = function() return true end
 		local held = {
 			["adapters.graphics_renderer"] = package.loaded["adapters.graphics_renderer"] or false,
 			["adapters.timer_scheduler"] = package.loaded["adapters.timer_scheduler"] or false,
@@ -502,8 +516,19 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 			package.loaded["ui.tooltip.preview"] = nil
 			for name, value in pairs(held) do package.loaded[name] = value ~= false and value or nil end
 		end
-		return preview, window, state, restore
+		return preview, window, state, restore, renderer
 	end
+
+	helpers.it("(tooltip-destroy-refusal) retains the preview owner until destruction succeeds", function()
+		local preview, _, _, restore, renderer = preview_with()
+		local attempts = 0
+		renderer.destroy = function() attempts = attempts + 1; return attempts > 1 end
+		local shown = preview.show({ { replacement = "text", group = "rolls", fires = true } }, "autocorrect")
+		local first, second = preview.destroy(), preview.destroy()
+		restore()
+		helpers.assert_eq({ shown = shown, first = first, second = second, attempts = attempts },
+			{ shown = true, first = false, second = true, attempts = 2 })
+	end)
 
 	helpers.it("(preview-covered-owner) does not hide a replacement on a late hide", function()
 		local preview, window, _, restore = preview_with()
