@@ -247,6 +247,7 @@ helpers.describe("terminator replay: real transaction ordering", function()
 				fire_hs_lifecycle(fixture)
 				local committed = false
 				local control
+				local deadline
 				if lifecycle == "pause" then
 					control = require("tests.unit.modules.shortcuts.pause_owners.fixtures")
 						.load_inventory_context({ when_idle = fixture.synthetic.when_idle })
@@ -270,7 +271,11 @@ helpers.describe("terminator replay: real transaction ordering", function()
 						exit = function() return true end,
 						fatal_exit = function() error("unexpected fatal termination") end,
 						fatal_exit_code = 70,
-						schedule = function() error("unexpected user-exit watchdog") end,
+						schedule = function(seconds)
+							helpers.assert_eq(seconds, 12)
+							deadline = { stopped = false, stop = function(self) self.stopped = true end }
+							return deadline
+						end,
 						user_exit_deadline_seconds = 12,
 						reload_deadline_seconds = 12,
 						mark_reload = function() return true end,
@@ -291,6 +296,7 @@ helpers.describe("terminator replay: real transaction ordering", function()
 					control.stop()
 				else
 					helpers.assert_true(committed)
+					helpers.assert_true(deadline.stopped, "a completed reload retires its deadline")
 					package.loaded["infra.termination_coordinator"] = nil
 				end
 			end, debug.traceback)
@@ -842,6 +848,18 @@ end)
 
 
 helpers.describe("terminator replay: malformed requests fail closed", function()
+	helpers.it("rejects invalid or unbounded delivery plans before taking ownership (terminator-delay-validation)", function()
+		for _, plan in ipairs({
+			{ min_delay = "bad" }, { dispatch_budget = {} }, { min_delay = 0 / 0 },
+			{ min_delay = -1 }, { min_delay = math.huge }, { dispatch_budget = math.huge },
+			{ min_delay = 1e308, dispatch_budget = 1e308 },
+		}) do
+			local fixture = load_gate()
+			plan.kind, plan.key, plan.chars, plan.transaction = "key", "return", "\r", {}
+			helpers.assert_nil(fixture.replay.prepare(plan))
+			helpers.assert_eq(#fixture.timers, 0, "an invalid plan must not acquire a timer")
+		end
+	end)
 	helpers.it("rejects missing characters, key names and unknown kinds", function()
 		local fixture = load_gate()
 		helpers.assert_true(not fixture.replay.arm({ kind = "key", key = "return", chars = "" }))

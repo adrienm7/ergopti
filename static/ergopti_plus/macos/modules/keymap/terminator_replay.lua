@@ -342,10 +342,11 @@ function M.prepare(spec)
 		return nil
 	end
 
-	local min_delay = tonumber(spec.min_delay) or 0
-	local dispatch_budget = tonumber(spec.dispatch_budget) or 0
-	if min_delay < 0 or min_delay ~= min_delay
-		or dispatch_budget < 0 or dispatch_budget ~= dispatch_budget then
+	local min_delay = spec.min_delay == nil and 0 or tonumber(spec.min_delay)
+	local dispatch_budget = spec.dispatch_budget == nil and 0 or tonumber(spec.dispatch_budget)
+	if min_delay == nil or dispatch_budget == nil or min_delay < 0 or min_delay ~= min_delay
+		or dispatch_budget < 0 or dispatch_budget ~= dispatch_budget
+		or min_delay + dispatch_budget == math.huge then
 		Logger.error(LOG, "arm(): delay plan is invalid — terminator NOT queued.")
 		return nil
 	end
