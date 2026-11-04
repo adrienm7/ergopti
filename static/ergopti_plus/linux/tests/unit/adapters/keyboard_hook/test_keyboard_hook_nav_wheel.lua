@@ -58,7 +58,7 @@ end
 --- @param keyboard_events table { {code, value, at_us} }
 --- @param pointer_events table { {type, code, value, at_us} }
 --- @return table emitted { "key:code:value" | "rel:axis:value" }, table grabs { [path] = {on, off} }
-local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer)
+local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer, fail_ungrab)
 	local keyboard, pointer, second = fake_node("keyboard"), fake_node(pointer_kind), fake_node("mouse")
 	local queues = { [keyboard] = {}, [pointer] = {}, [second] = {} }
 	for _, ev in ipairs(keyboard_events) do
@@ -90,6 +90,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		ioctl = function(fd, request, value)
 			if request == EVIOCGRAB and grabs[fd] then
 				if value == 1 then grabs[fd].on = grabs[fd].on + 1 else grabs[fd].off = grabs[fd].off + 1 end
+				if fd == pointer and value == 0 and fail_ungrab then return false end
 			end
 			return true
 		end,
@@ -102,7 +103,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		close = function() end,
 	})
 	local kh = helpers.load_module("adapters.keyboard_hook")
-	local emitted, before_stop = {}, {}
+	local emitted, before_stop, running = {}, {}, false
 	local ok, err = pcall(function()
 		kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			nav_layer = wheel_layer() }), function() end)
@@ -118,6 +119,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 			onPointerEvent = observer,
 		})
 		kh.pump()
+		running = kh.isRunning()
 		for index, row in ipairs(emitted) do before_stop[index] = row end
 	end)
 	kh.set_remapper(nil)
@@ -129,7 +131,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 	os.remove(pointer)
 	os.remove(second)
 	assert(ok, err)
-	return emitted, grabs[pointer], before_stop, "pointer:" .. pointer
+	return emitted, grabs[pointer], before_stop, running, "pointer:" .. pointer
 end
 
 local function has(list, item)
@@ -149,7 +151,7 @@ local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
 	helpers.it("identifies the pointer on each motion and frame report", function()
 		local reports = {}
-		local _, _, _, source = drive("mouse", {}, {
+		local _, _, _, _, source = drive("mouse", {}, {
 			{ EV_REL, REL_X, 3, 3000 }, { EV_SYN, 0, 0, 3000 },
 		}, nil, function(kind, code, value, slot)
 			reports[#reports + 1] = { kind, code, value, slot }
@@ -160,7 +162,7 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 
 	helpers.it("reports pointer queue loss to its observer", function()
 		local reports = {}
-		local _, _, _, source = drive("mouse", {}, { { EV_SYN, 3, 0, 3000 }, { EV_SYN, 0, 0, 4000 } }, nil,
+		local _, _, _, _, source = drive("mouse", {}, { { EV_SYN, 3, 0, 3000 }, { EV_SYN, 0, 0, 4000 } }, nil,
 			function(kind, code, value, slot) reports[#reports + 1] = { kind, code, value, slot } end)
 		helpers.assert_eq(reports, { { "dropped", 3, 0, source }, { "frame", 0, 0, source },
 			{ "reset", nil, nil, source } })
@@ -239,6 +241,13 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		}, nil, nil, true)
 		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":1"))
 		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":0"), "reader failure must release the virtual button immediately")
+	end)
+
+	helpers.it("stops capture if a grabbed mouse cannot be released", function()
+		local _, _, _, running = drive("mouse", HOLD, {
+			{ EV_REL, REL_X, 1, 3000 },
+		}, nil, nil, false, true)
+		helpers.assert_eq(running, false, "an unacknowledged ungrab cannot leave a running silent mouse")
 	end)
 
 	helpers.it("releases a grabbed mouse button when that pointer disappears", function()
