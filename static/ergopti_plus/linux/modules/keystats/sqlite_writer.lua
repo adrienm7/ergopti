@@ -381,6 +381,10 @@ function M.ensure_token_encoding()
 	end
 	local recorded = version_output:match("^([^\n]*)")
 	if recorded == tostring(TokenEncoding.VERSION) then return true end
+	if recorded ~= "" and recorded ~= "1" then
+		Logger.error(LOG, "The n-gram key migration version is unsupported.")
+		return false
+	end
 	local keys = {}
 	for table_name in pairs(TokenEncoding.MIGRATED_FAMILIES) do
 		local output = _query_output("SELECT DISTINCT hex(token) FROM " .. table_name .. " WHERE instr(token,'[')>0;")

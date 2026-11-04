@@ -109,6 +109,14 @@ helpers.describe("keystats sqlite writer: n-gram token encoding", function()
 		helpers.assert_true(position(commands, "'ngram_token_encoding','2'") ~= nil)
 	end)
 
+	for _, version in ipairs({ "3", "invalid", "0" }) do
+		helpers.it("token-encoding refuses unsupported migration version " .. version, function()
+			local result, commands = migrate({ version = version, keys = { ngram_chars = "5B\n" } })
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(#commands, 0, "unknown encodings cannot be migrated as old keys")
+		end)
+	end
+
 	helpers.it("token-encoding: a store already moved is left alone", function()
 		local result, commands = migrate({ version = "2" })
 		helpers.assert_true(result)
