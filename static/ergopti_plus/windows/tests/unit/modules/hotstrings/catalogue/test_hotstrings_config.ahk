@@ -1385,8 +1385,12 @@ _HOUTF8_ExactSource(Mode) {
 		}
 		Stream := FileOpen(Path, "w", "UTF-8-RAW")
 		AssertTrue(IsObject(Stream))
-		try AssertEqual(Bytes.Size, Stream.RawWrite(Bytes, Bytes.Size))
-		finally Stream.Close()
+		try {
+			if Bytes.Size
+				AssertEqual(Bytes.Size, Stream.RawWrite(Bytes, Bytes.Size))
+			else
+				AssertEqual(0, Stream.Length, "opening an empty owned fixture must create a genuinely zero-byte file")
+		} finally Stream.Close()
 		Initial := FSReadBytesStrict(Path)
 		AssertEqual(Bytes.Size, Initial.Size)
 		if Bytes.Size
@@ -1442,3 +1446,126 @@ _HOUTF8_ExactSource(Mode) {
 }
 for _HOUTF8_Mode in ["invalid-byte", "invalid-save", "unicode-control", "bom-unicode", "empty-control"]
 	Test("HotstringsConfig exact source UTF-8: " . _HOUTF8_Mode, _HOUTF8_ExactSource.Bind(_HOUTF8_Mode))
+
+; Shape validation of today's file cannot grant yesterday's Map write authority.
+_HOSS_ExternalSourceSurvivesSave(Mode) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_override_external_source_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		A := '[magickey]`ncolor = "#111111"`npriority = 10`nshow_tooltip = true`n'
+			. '[magickey.text_expansion_symbols]`ncolor = "#111111"`npriority = 10`nshow_tooltip = true`n'
+		B := StrReplace(StrReplace(A, "#111111", "#222222", true), "priority = 10", "priority = 25", true)
+		if Mode == "external-new-category"
+			B := A . '[rolls]`npriority = 77`ncolor = "#777777"`n'
+		if Mode == "unchanged-control"
+			B := A
+		AssertTrue(FSWriteCreateDurable(Path, A))
+		_HotstringsOverridesPath := Path, _HotstringsOverrides := Map()
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		AssertTrue(HotstringsConfigReload(), "the real loader first admits source A")
+		AssertEqual(10, _HotstringsOverrides["magickey"].Priority)
+		AssertEqual("#111111", _HotstringsOverrides["magickey"].Color)
+		AssertTrue(FSWriteDurable(Path, B), "an external editor finishes writing valid source B before the user's next click")
+		External := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		if Mode == "reloaded-control"
+			AssertTrue(HotstringsConfigReload(), "an explicit genuine reload admits source B")
+		Owner := _HotstringsOverrides
+		Section := Mode == "external-section-set" ? "text_expansion_symbols" : ""
+		Result := Mode == "external-clear"
+			? HotstringsClearOverride("magickey", "", "show_tooltip")
+			: HotstringsSetOverride("magickey", Section, "show_tooltip", false)
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		if Mode == "external-new-category" {
+			AssertTrue(Disk.Has("rolls"), "a full-state edit cannot delete a category the external editor already committed")
+			AssertEqual(77, Disk["rolls"]["priority"])
+			AssertEqual("#777777", Disk["rolls"]["color"])
+		}
+		for Key in ["color", "priority"] {
+			AssertEqual(External["magickey"][Key], Disk["magickey"][Key], "the real native save must preserve the newer external category " . Key)
+			AssertEqual(External["magickey"]["text_expansion_symbols"][Key], Disk["magickey"]["text_expansion_symbols"][Key], "the real native save must preserve the newer external section " . Key)
+		}
+		if Mode == "unchanged-control" || Mode == "reloaded-control"
+			AssertTrue(Result, "an unchanged or explicitly reloaded source stays writable")
+		if Result {
+			Target := Section == "" ? Disk["magickey"] : Disk["magickey"][Section]
+			if Mode == "external-clear"
+				AssertFalse(Target.Has("show_tooltip"))
+			else {
+				AssertTrue(Target["show_tooltip"] is TOML_Bool)
+				AssertFalse(Target["show_tooltip"].Value)
+			}
+			AssertEqual(External["magickey"]["color"], HotstringsResolve("magickey", "").Color)
+		} else {
+			AssertEqual(B, FSReadUtf8Exact(Path), "source-conflict refusal must retain every exact byte from the external editor")
+			AssertTrue(_HotstringsOverrides == Owner, "refusal must preserve the old live owner until an explicit reload")
+		}
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+		Probe := _ConfigWriteLeaseTryAcquire(Path, "external-source-fixture-terminal-probe")
+		AssertTrue(Probe is Object)
+		try AssertTrue(_ConfigWriteLeaseOwns(Probe, Path))
+		finally _ConfigWriteLeaseRelease(Probe)
+	} finally {
+		_HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOSS_Mode in ["external-category-set", "external-section-set", "external-clear", "external-new-category", "unchanged-control", "reloaded-control"]
+	Test("HotstringsConfig external source ownership: " . _HOSS_Mode, _HOSS_ExternalSourceSurvivesSave.Bind(_HOSS_Mode))
+
+_HOSST_ExternalSourceChangesWhileStaging(ChangeSource) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_override_stage_source_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		A := '[magickey]`ncolor = "#111111"`npriority = 10`n'
+		C := ChangeSource ? '[magickey]`ncolor = "#333333"`npriority = 35`n' : A
+		AssertTrue(FSWriteCreateDurable(Path, A))
+		_HotstringsOverridesPath := Path, _HotstringsOverrides := Map()
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		AssertTrue(HotstringsConfigReload())
+		Owner := _HotstringsOverrides, State := {Calls: 0}
+		WriteStage(StagePath, Content) {
+			State.Calls += 1
+			; The seam observes the existing cutpoint but delegates staging to
+			; the genuine durable writer; no fake result or filesystem is used.
+			AssertTrue(FSWriteDurable(StagePath, Content))
+			AssertTrue(FSWriteDurable(Path, C), "the external source changes only after the real candidate is staged")
+			return 1
+		}
+		Result := HotstringsSetOverride("magickey", "", "show_tooltip", false, WriteStage)
+		AssertEqual(1, State.Calls)
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertEqual(ChangeSource ? 35 : 10, Disk["magickey"]["priority"], "the final native commit cannot bless newly read C for a candidate constructed from A")
+		AssertEqual(ChangeSource ? "#333333" : "#111111", Disk["magickey"]["color"])
+		if ChangeSource {
+			AssertFalse(Result, "the stale staged candidate has no authority over source C")
+			AssertEqual(C, FSReadUtf8Exact(Path))
+			AssertTrue(_HotstringsOverrides == Owner)
+		} else {
+			AssertTrue(Result, "the genuine stage writer remains supported when source is unchanged")
+			AssertFalse(Disk["magickey"]["show_tooltip"].Value)
+		}
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+	} finally {
+		_HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+Test("HotstringsConfig staged source ownership: external change survives the final native commit", _HOSST_ExternalSourceChangesWhileStaging.Bind(true))
+Test("HotstringsConfig staged source ownership: unchanged real stage remains writable", _HOSST_ExternalSourceChangesWhileStaging.Bind(false))

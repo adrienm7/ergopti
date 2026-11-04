@@ -412,3 +412,11 @@ for _LRCZ_Sc in ["SC00C", "SC00D"]
 		Test("layout zoom: " . _LRCZ_Sc . " chooses its actual " . _LRCZ_Host . " host owner (layout-zoom-host-precedence)",
 			_LRPS_LevelCustody.Bind(0, false, _LRCZ_ChildSource,
 				[_LRCZ_Sc, _LRCZ_Host], "PASS layout-zoom-host-precedence"))
+
+_LRNF_ChildSource() {
+	return _LRPS_ChildSource("layout_row_native_flags_body.ahk")
+}
+for _LRNF_Mode in ["plain", "held", "released"]
+	Test("layout row native modifier flags: " . _LRNF_Mode . " (layout-row-native-flags)",
+		_LRPS_LevelCustody.Bind(0, false, _LRNF_ChildSource,
+			[_LRNF_Mode, "--allow-explicit-owned-edit-row-flags"], "PASS layout-row-native-flags"))

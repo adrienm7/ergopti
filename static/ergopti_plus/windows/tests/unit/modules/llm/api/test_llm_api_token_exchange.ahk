@@ -966,3 +966,131 @@ _LTEP_Run(Mode) {
 for _LTEP_Mode in ["success", "denied", "timeout", "pause", "resume_before_poll"]
     Test("Token exchange: actual managed " . _LTEP_Mode . " preserves correct retry policy (token-managed-pause)",
         _LTEP_Run.Bind(_LTEP_Mode))
+
+
+_LTEWB_Observe(State) {
+    State.Observed := true
+}
+_LTEWB_Body(Backend, Late, Posts, Lines) {
+    global _LLM_Remote_Async, LLM_API_PROVIDERS, LTE_PROVIDER
+    AssertFalse(A_IsSuspended)
+    AssertEqual(0, _LLM_Remote_Async.Count)
+    Heard := [], Shared := [], State := {Observed: false}, Observer := _LTEWB_Observe.Bind(State)
+    Id := 0, Owner := 0, Primary := 0, Answered := false
+    Slot := _LLM_TokenExchange_Slot(LTE_PROVIDER, _LTE_Key())
+    PreviousCritical := Critical("Off")
+    try {
+        Success := (Text, Usage := "") => Heard.Push(Map("ok", true))
+        Failure := (Info := "") => Heard.Push(Map("ok", false, "info", Info))
+        Budget := 96
+        if Backend == "generate"
+            Id := LLM_RemoteGenerate_Async(_LTE_Entry(), "Fixture system.", "Fixture user.", 0.1,
+                Success, Failure, "", 8, "token_wait_budget", Budget)
+        else {
+            Resolved := _LLMRemoteResolveEntry(_LTE_Entry())
+            Id := LLM_RemotePostBody_Async(Resolved, "https://token-fixture.invalid/v1/chat/completions", '{"messages":[]}',
+                Success, Failure, Budget, "token_wait_budget")
+        }
+        AssertTrue(_LLM_Remote_Async.Has(Id))
+        Owner := _LLM_Remote_Async[Id]
+        Origin := Owner["start_tick"]
+        AssertEqual(Budget, Owner["timeout_ms"])
+        _LTE_Pump()
+        AssertEqual(1, Posts.Length, "the actual token Begin timer must start one shared exchange")
+        Slot := _LLM_TokenExchange_Slot(LTE_PROVIDER, _LTE_Key())
+        AssertTrue(Slot["pending"])
+        AssertFalse(Owner.Has("http"), "no remote request may dispatch before access preparation")
+        AssertEqual(0, Heard.Length, "fixture must reach its pending phase before reply/deadline")
+        LLM_TokenExchange_Prepare(LTE_PROVIDER, LLM_API_PROVIDERS[LTE_PROVIDER]["Auth"], _LTE_Key(),
+            (Ok, Failure) => Shared.Push(Map("ok", Ok, "failure", Failure)))
+        if Late {
+            ; This observer timer is armed after the request and after Begin.
+            ; Any proper original deadline timer is already due earlier; no
+            ; origin is moved, no Critical region withholds its delivery.
+            SetTimer(Observer, -(Budget + 1))
+            Started := A_TickCount
+            while !State.Observed && TickElapsed(Started) < 2000
+                Sleep(1)
+            AssertTrue(State.Observed)
+            AssertTrue(_LLM_DeadlineExpired(Origin, Budget))
+            BeforeCount := Heard.Length
+            BeforePresent := _LLM_Remote_Async.Has(Id)
+            BeforeElapsed := TickElapsed(Origin)
+            BeforePending := Slot["pending"]
+            BeforeShared := Shared.Length
+            ; Preserve the shared exchange and give its genuine valid token to
+            ; another waiter, even though this particular request has expired.
+            Answered := true
+            _LTE_Answer(Posts[1], "fixture-access-token")
+            AssertEqual("fixture-access-token", LLM_TokenExchange_Current(LTE_PROVIDER,
+                LLM_API_PROVIDERS[LTE_PROVIDER]["Auth"], _LTE_Key()))
+            AssertEqual(1, Shared.Length)
+            AssertTrue(Shared[1]["ok"])
+            _TestPrint("# TOKEN_WAIT_BUDGET " . KL_JsonEncode(Map("backend", Backend, "late", Late,
+                "budget", Budget, "elapsed_before_reply", BeforeElapsed,
+                "callbacks_before_reply", BeforeCount, "reservation_before_reply", BeforePresent,
+                "shared_pending_before_reply", BeforePending, "other_waiters_before_reply", BeforeShared,
+                "callbacks_after_reply", Heard.Length, "reservation_after_reply", _LLM_Remote_Async.Has(Id),
+                "other_waiter_ok", Shared[1]["ok"], "token_posts", Posts.Length)))
+            AssertTrue(BeforePending && BeforeShared == 0, "one request budget must not cancel the shared token lease")
+            AssertEqual(1, BeforeCount, "the request's own deadline must settle without waiting for the shared exchange")
+            AssertFalse(BeforePresent, "expired request must retire while the token exchange remains pending")
+            AssertEqual(1, Heard.Length, "late token must not publish a second verdict")
+            AssertFalse(Heard[1]["ok"])
+            AssertEqual("timeout", Heard[1]["info"]["reason"])
+        } else {
+            AssertFalse(_LLM_DeadlineExpired(Origin, Budget), "the immediate control must still have its real budget")
+            Answered := true
+            _LTE_Answer(Posts[1], "", 403)
+            _TestPrint("# TOKEN_WAIT_BUDGET " . KL_JsonEncode(Map("backend", Backend, "late", Late,
+                "budget", Budget, "elapsed_after_reply", TickElapsed(Origin), "callbacks", Heard.Length,
+                "reservation_present", _LLM_Remote_Async.Has(Id), "token_posts", Posts.Length)))
+            AssertEqual(1, Heard.Length)
+            AssertFalse(Heard[1]["ok"])
+            AssertEqual("token_exchange", Heard[1]["info"]["reason"])
+            AssertEqual(403, Heard[1]["info"]["status"])
+            AssertEqual(1, Shared.Length)
+            AssertFalse(Shared[1]["ok"])
+        }
+        AssertFalse(_LLM_Remote_Async.Has(Id))
+        AssertFalse(Owner.Has("http"), "both the spent-budget and refusal controls must dispatch no remote transport")
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        try {
+            SetTimer(Observer, 0)
+            if Owner is Map && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Owner
+                LLM_RemoteCancelAsync(Id)
+            StartedCleanup := A_TickCount
+            while !Answered && Posts.Length == 0 && Slot["pending"] && TickElapsed(StartedCleanup) < 1000
+                Sleep(1)
+            if !Answered && Posts.Length {
+                ; Settle rather than forget the real token callback. HTTP403
+                ; cannot dispatch a remote request during fixture cleanup.
+                _LTE_Answer(Posts[1], "", 403)
+                Answered := true
+            }
+            if Owner is Map && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Owner {
+                LLM_RemoteCancelAsync(Id)
+                _LLMRemote_PollRequest(Id)
+            }
+            AssertFalse(_LLM_Remote_Async.Has(Id))
+            AssertFalse(Slot["pending"], "the actual shared Begin/answer must settle before fixture ports restore")
+        } catch Any as CleanupFailure {
+            _TestPrint("# TOKEN_WAIT_BUDGET_CLEANUP " . KL_JsonEncode(Map("backend", Backend,
+                "error", Type(CleanupFailure), "message", SubStr(CleanupFailure.Message, 1, 250))))
+            if !IsObject(Primary)
+                Primary := CleanupFailure
+        }
+        Critical(PreviousCritical)
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+_LTEWB_Run(Backend, Late) {
+    _ManagedRemoteFixtureWithLlmTimings(_LTE_Run.Bind(_LTEWB_Body.Bind(Backend, Late)))
+}
+for _LTEWB_Backend in ["generate", "rawpost"] {
+    Test("Token exchange request budget: " . _LTEWB_Backend . " immediate reply (token-wait-request-budget)", _LTEWB_Run.Bind(_LTEWB_Backend, false))
+    Test("Token exchange request budget: " . _LTEWB_Backend . " pending beyond deadline (token-wait-request-budget)", _LTEWB_Run.Bind(_LTEWB_Backend, true))
+}

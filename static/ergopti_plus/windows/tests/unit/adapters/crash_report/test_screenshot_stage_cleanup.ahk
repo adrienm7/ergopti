@@ -297,9 +297,9 @@ for _GSAC_Preexisting in [false, true]
 	Test("screenshot stage admission: pre-write failure " . (_GSAC_Preexisting ? "preserves foreign stage" : "without a stage") . " (screenshot-stage-admission)",
 		_GSAC_Run.Bind(_GSAC_Preexisting))
 
-; Qualify a tiny synthetic bitmap against GDI+'s real file encoder. The
-; optional metadata-only CREATE_NEW lease denies path replacement, while
-; allowing GDI+ to reopen the same exact file for writing.
+; Qualify real GDI+ encoding against native sharing. A zero-access handle
+; demonstrably does not deny deletion; it is an explicit negative control.
+; The GENERIC_READ candidate must both deny DELETE and allow native encoding.
 _GSGL_WritePixel(Stage) {
 	global GESTURE_SCREENSHOT_PIXEL_FORMAT_32BPP_ARGB, GESTURE_SCREENSHOT_PNG_ENCODER
 	Pixels := Buffer(4, 0)
@@ -312,7 +312,8 @@ _GSGL_WritePixel(Stage) {
 	finally _GestureScreenshotGdipDispose(Image)
 }
 
-_GSGL_Run(HoldLease) {
+_GSGL_Run(Mode) {
+	HoldLease := Mode != "unleased"
 	global DriverPid
 	Root := A_Temp . "\ergopti_stage_gdi_lease_" . DriverPid . "_" . A_TickCount . "_" . Random(1000, 999999)
 	Created := false, Handle := -1
@@ -320,17 +321,27 @@ _GSGL_Run(HoldLease) {
 		Created := FSCreateDirectoryExclusiveStrict(Root)
 		AssertTrue(Created)
 		Stage := Root . "\pixel.png"
-		; Zero access deliberately retains only metadata, not a writer which
-		; could conflict with the encoder's own sharing mode.
-		Handle := DllCall("Kernel32\CreateFileW", "Str", Stage, "UInt", 0,
+		; GENERIC_READ participates in native sharing; access zero does not.
+		; Keep CREATE_NEW and FILE_SHARE_READ|WRITE for every case.
+		Access := Mode == "read" ? 0x80000000 : 0
+		Handle := DllCall("Kernel32\CreateFileW", "Str", Stage, "UInt", Access,
 			"UInt", 3, "Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
-		AssertTrue(Handle != -1, "metadata-only CREATE_NEW must acquire the empty stage exclusively")
+		AssertTrue(Handle != -1, "CREATE_NEW must acquire this fixture stage without adopting an existing path")
 		Original := FSHandleSnapshot(Handle)
 		AssertTrue(Original.Get("ok", false) && Original["size"] == 0)
 		if HoldLease {
 			Deleted := DllCall("Kernel32\DeleteFileW", "Str", Stage, "Int")
 			DeleteError := A_LastError
-			AssertEqual(0, Deleted, "the metadata lease must prohibit replacement or deletion")
+			if Mode == "zero-negative" {
+				FileAppend("OBSERVATION screenshot-stage-gdi-lease mode=zero-negative delete_result=" . Deleted
+					. " delete_error=" . DeleteError . "`n", "*")
+				AssertEqual(1, Deleted, "zero access is a negative control: it does not participate in DELETE sharing")
+				AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int") != 0)
+				Handle := -1
+				AssertFalse(FSStrictExists(Stage), "the unprotected zero-access stage must be gone after delete completes")
+				return
+			}
+			AssertEqual(0, Deleted, "the GENERIC_READ lease must prohibit replacement or deletion")
 			AssertEqual(32, DeleteError, "the lease must establish a real native DELETE sharing refusal")
 		} else {
 			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int") != 0)
@@ -338,7 +349,7 @@ _GSGL_Run(HoldLease) {
 		}
 		_GestureScreenshotWithGdiplus(_GSGL_WritePixel.Bind(Stage))
 		Observed := HoldLease ? FSHandleSnapshot(Handle) : _GSFP_Snapshot(Stage)
-		FileAppend("OBSERVATION screenshot-stage-gdi-lease held=" . HoldLease . " png_bytes=" . Observed["size"]
+		FileAppend("OBSERVATION screenshot-stage-gdi-lease mode=" . Mode . " png_bytes=" . Observed["size"]
 			. " same_identity=" . (Original["volume"] == Observed["volume"]
 				&& Original["index_high"] == Observed["index_high"] && Original["index_low"] == Observed["index_low"]) . "`n", "*")
 		AssertTrue(Observed.Get("ok", false) && Observed["size"] > 8, "the native PNG encoder must produce real bytes")
@@ -360,6 +371,7 @@ _GSGL_Run(HoldLease) {
 	}
 }
 
-for _GSGL_HoldLease in [false, true]
-	Test("screenshot stage GDI lease: " . (_GSGL_HoldLease ? "metadata lease excludes replacement" : "unleased existing-file control") . " (screenshot-stage-lease-compat)",
-		_GSGL_Run.Bind(_GSGL_HoldLease))
+for _GSGL_Mode in ["unleased", "zero-negative", "read"]
+	Test("screenshot stage GDI lease: " . Map("unleased", "unleased existing-file control",
+		"zero-negative", "zero-access negative control permits deletion", "read", "GENERIC_READ excludes replacement and permits encoding")[_GSGL_Mode]
+		. " (screenshot-stage-lease-compat)", _GSGL_Run.Bind(_GSGL_Mode))
