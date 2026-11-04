@@ -67,6 +67,15 @@ helpers.describe("AI overlay: one window shared with the hotstring preview", fun
 		end)
 	end
 
+	helpers.it("(llm-overlay-draw-failure) does not offer suggestions without a renderer", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay = require("ui.tooltip.llm")
+		assert(overlay.init({ style = {}, renderer = { hide = function() return true end } }))
+		helpers.assert_eq(overlay.show({ { to_type = "hello" } }, {}), false)
+		helpers.assert_eq(overlay.is_showing(), false)
+		package.loaded["ui.tooltip.llm"] = nil
+	end)
+
 	helpers.it("(llm-overlay-draw-failure) keeps the rendering owner through reentrant lifecycle calls", function()
 		package.loaded["ui.tooltip.llm"] = nil
 		local overlay, destroyed = require("ui.tooltip.llm"), 0

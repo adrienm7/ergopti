@@ -187,7 +187,7 @@ settle_cleanup = function()
 end
 
 local function draw(generation)
-	if type(_renderer) ~= "table" or type(_renderer.show) ~= "function" then return false end
+	if type(_renderer) ~= "table" or type(_renderer.show) ~= "function" then error("suggestion renderer unavailable") end
 	local rows = M.build_rows(_candidates, _active_index, _meta)
 	if #rows == 0 then M.hide(); return false end
 	local preview_rows = companion_rows()
@@ -229,8 +229,10 @@ local function attempt_draw(generation)
 	if not called and generation == _generation then
 		_candidates, _active_index, _meta = {}, 1, {}
 		if _presenting == generation then _presenting = nil end
-		_cleanup_pending = { renderer = _renderer, companion = _companion }
-		settle_cleanup()
+		if _renderer ~= nil then
+			_cleanup_pending = { renderer = _renderer, companion = _companion }
+			settle_cleanup()
+		end
 	end
 	return called and result == true
 end
