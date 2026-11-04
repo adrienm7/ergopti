@@ -1379,6 +1379,7 @@ function checkAutomaticTriggerControls() {
 			'llm_trigger_leading',
 			'llm_instant_on_word_end',
 			'llm_after_hotstring',
+			'llm_while_hotstring_tooltip',
 			undefined,
 			'llm_url_bar_filter',
 			'llm_secure_field_filter',
@@ -1615,9 +1616,12 @@ function checkPrivacyTriggerControls() {
 		[true, true]
 	]);
 	assert.deepEqual(corpus.prediction_counts, [1, 2]);
-	assert.equal(root.llm_trigger_menu[3].type, '---');
+	// The privacy filters follow the menu's only separator, after the timing rows.
+	const separator = root.llm_trigger_menu.findIndex((row) => row.type === '---');
+	assert(separator > 0, 'the trigger menu parts its timing rows from the privacy filters');
+	assert.equal(root.llm_trigger_menu.filter((row) => row.type === '---').length, 1);
 	for (const [index, expected] of corpus.rows.entries()) {
-		const declaration = root.llm_trigger_menu[index + 4];
+		const declaration = root.llm_trigger_menu[separator + 1 + index];
 		assert.equal(declaration.type, 'check');
 		assert.equal(declaration.id, expected.id);
 		assert.equal(declaration.i18n, expected.i18n);
