@@ -26,7 +26,8 @@ function normalizeTag(tag) {
 function parseVersion(tag) {
 	const norm = normalizeTag(tag);
 	const m = norm.match(/^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$/);
-	if (!m) return null;
+	if (!m || (m[4] && (m[4].startsWith('.') || m[4].endsWith('.') || m[4].includes('..'))))
+		return null;
 	return {
 		major: Number(m[1]),
 		minor: Number(m[2]),

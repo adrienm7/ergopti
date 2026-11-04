@@ -35,6 +35,7 @@ local function parse_version(tag)
 		if suffix:sub(1, 1) ~= "-" or #suffix == 1 or suffix:find("[\r\n]")
 			or suffix:find("\226\128\168", 1, true) or suffix:find("\226\128\169", 1, true) then return nil end
 		pre = suffix:sub(2)
+		if pre:sub(1, 1) == "." or pre:sub(-1) == "." or pre:find("..", 1, true) then return nil end
 	end
 	return {
 		major = tonumber(maj),

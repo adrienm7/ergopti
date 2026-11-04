@@ -1720,6 +1720,8 @@ _Updater_ParseVersion(Tag) {
 	if !RegExMatch(Norm, "^(?P<maj>\d+)\.(?P<min>\d+)\.(?P<pat>\d+)(?:-(?P<pre>.+))?$", &M)
 		return 0
 	PreParts := 0
+	if M.pre != "" && (SubStr(M.pre, 1, 1) == "." || SubStr(M.pre, StrLen(M.pre), 1) == "." || InStr(M.pre, ".."))
+		return 0
 	if M.pre != "" {
 		PreParts := []
 		for , Part in StrSplit(M.pre, ".")
