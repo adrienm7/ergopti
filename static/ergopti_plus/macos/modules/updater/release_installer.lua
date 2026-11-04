@@ -249,15 +249,16 @@ function M.stage(asset, done)
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
 		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)
+		local expected = stage_dir .. "/app/" .. APP_NAME
 		local staged = exit_code == 0 and type(stdout) == "string"
-			and stdout:gsub("%s+$", ""):match("^READY (/.+)$") or nil
+			and stdout == "READY " .. expected .. "\n" and expected or nil
 		if staged then
 			Logger.success(LOG, "Release %s downloaded and verified.", asset.tag)
 			done(staged, nil, nil)
 			return
 		end
 		local code = tonumber(exit_code)
-		local stage = (code and code >= M.EXIT_VERIFY_FIRST) and "verify" or "download"
+		local stage = (code == 0 or (code and code >= M.EXIT_VERIFY_FIRST)) and "verify" or "download"
 		local detail = string.format("exit %s: %s", tostring(exit_code), (tostring(stderr or ""):gsub("%s+$", "")))
 		Logger.error(LOG, "Release %s refused at the %s; stage path: %s (%s).", asset.tag, stage, stage_dir, detail)
 		done(nil, stage, detail)

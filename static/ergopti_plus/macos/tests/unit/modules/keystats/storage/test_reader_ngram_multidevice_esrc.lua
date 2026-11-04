@@ -69,6 +69,7 @@ helpers.assert_true(
 )
 
 local accum_hs = src:find("item.hs  = item.hs  + (tonumber(src.hotstring)", 1, true) ~= nil
+	or src:find("item.hs  = finite_sum(item.hs, finite_number(src.hotstring", 1, true) ~= nil
 helpers.assert_true(
 	accum_hs,
 	"sqlite_reader.lua must accumulate item.hs with item.hs + (src.hotstring or 0) (keystats-storage-2)"

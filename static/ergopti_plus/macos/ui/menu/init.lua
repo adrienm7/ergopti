@@ -1591,6 +1591,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 	})
 	local ctx = {
+		is_paused = live_pause,
 		physical_shortcuts_scope = function() return preference_scope_owner("shortcuts") end,
 		physical_shortcuts_paused = live_pause,
 		commit_program_parameter = program_parameter_owner.apply,

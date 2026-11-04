@@ -563,6 +563,18 @@ local function _new_ngram_dict()
 	return { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
 end
 
+--- Refuses non-finite SQL totals rather than certifying an unusable projection.
+local function finite_number(value, fallback)
+	local number = tonumber(value) or fallback
+	assert(number == number and number ~= math.huge and number ~= -math.huge,
+		"non-finite n-gram aggregate")
+	return number
+end
+
+local function finite_sum(left, right)
+	return finite_number(left + right, 0)
+end
+
 
 --- Adds one row of the catalogue's n-gram read into a dictionary item. TOTAL
 --- returns floats, and a row whose counters are not numbers comes back raw:
@@ -571,20 +583,20 @@ end
 --- @param item table { c, t, e, hs, llm, o } accumulated in place.
 --- @param r table A ngram.tokens or ngram.tokens_by_app row.
 local function _merge_ngram_row(item, r)
-	item.c = item.c + (tonumber(r.c) or 0)
-	item.t = item.t + (tonumber(r.td) or 0)
-	item.e = item.e + (tonumber(r.e) or 0)
-	local copies = tonumber(r.source_rows) or 1
+	item.c = finite_sum(item.c, finite_number(r.c, 0))
+	item.t = finite_sum(item.t, finite_number(r.td, 0))
+	item.e = finite_sum(item.e, finite_number(r.e, 0))
+	local copies = finite_number(r.source_rows, 1)
 	-- An empty source map contributes nothing; skipping its decode is exact
 	local raw = r.esrc_json or "{}"
 	local ok, src = true, nil
 	if raw ~= "{}" then ok, src = pcall(json.decode, raw) end
 	if ok and type(src) == "table" then
-		item.hs  = item.hs  + (tonumber(src.hotstring) or 0) * copies
-		item.llm = item.llm + (tonumber(src.llm)       or 0) * copies
+		item.hs  = finite_sum(item.hs, finite_number(src.hotstring, 0) * copies)
+		item.llm = finite_sum(item.llm, finite_number(src.llm, 0) * copies)
 		for k, v in pairs(src) do
 			if KUtils.is_other_synthetic_source(k) then
-				item.o = item.o + (tonumber(v) or 0) * copies
+				item.o = finite_sum(item.o, finite_number(v, 0) * copies)
 			end
 		end
 	end
@@ -684,7 +696,7 @@ local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, 
 			item = { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 			bucket[key] = item
 		end
-		item.c = item.c + (count or 0)
+		item.c = finite_sum(item.c, finite_number(count, 0))
 	end
 
 	-- Shortcuts (counts only).
