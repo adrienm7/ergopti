@@ -1,11 +1,11 @@
 // Sources/ErgoptiPlus/OwnedRuntimeIdleServiceEntry.swift
-// One confirmed administrator transaction installs the owned files and starts only the authenticated idle Core control service.
+// One confirmed administrator transaction installs the owned files, the idle Core service and the VirtualHIDDevice daemon job.
 import Foundation
 
-/// The result never certifies Console, physical capture, VirtualHID availability or full Runtime retirement.
+/// The result never certifies Console, physical capture, DriverKit approval or full Runtime retirement.
 enum OwnedRuntimeIdleServiceEntry {
 	enum Result: String {
-		case idleCoreObservedStagingRetired = "files-published-idle-core-observed-staging-retired"
+		case servicesObservedStagingRetired = "files-published-services-observed-staging-retired"
 		case filesPublishedServiceCleanupPending = "files-published-service-cleanup-pending"
 		case refused, cleanupPending = "cleanup-pending"
 	}
@@ -21,9 +21,11 @@ enum OwnedRuntimeIdleServiceEntry {
 				result = .filesPublishedServiceCleanupPending
 				guard let provision = OwnedRuntimeCoreProvisionOwner.acquire(afterPublication: publication) else { return }
 				let core = try provision.provisionAndStartCore()
+				// Inside the same custody: the provision's observations are retired only after the daemon job loads.
+				_ = try OwnedRuntimeVirtualHIDProvisionOwner.provision(within: provision)
 				guard core.retireStartedObservation(forProvision: provision), provision.retireCommittedObservations(),
 					let stage = OwnedRuntimeBootstrapStageOwner.acquire(afterPublication: publication), stage.retire() else { return }
-				result = .idleCoreObservedStagingRetired
+				result = .servicesObservedStagingRetired
 			} catch {
 				if publication.snapshot() == .filesPublished { result = .filesPublishedServiceCleanupPending }
 				else { result = publication.rollbackUnpublishedFiles() ? .refused : .cleanupPending }
