@@ -624,12 +624,18 @@ local function resolve_config_path(config_path)
 	if type(config_path) == "string" and config_path ~= "" then
 		return config_path
 	end
-	-- Check the XDG-compliant user config directory.
-	local fh = io.open(DEFAULT_CONFIG_DIR, "r")
-	if fh then
-		fh:close()
-		return DEFAULT_CONFIG_DIR
+	-- Inspect directory metadata without opening a FIFO or other special file.
+	-- Only proven absence permits falling back to the bundled catalogue.
+	local function is_directory(path)
+		local stat, _, code = require("luv").fs_stat(path)
+		if stat then
+			if stat.type ~= "directory" then error("Hotstring catalogue path is not a directory", 0) end
+			return true
+		end
+		if code == "ENOENT" then return false end
+		error("Hotstring catalogue directory inspection failed: " .. tostring(code), 0)
 	end
+	if is_directory(DEFAULT_CONFIG_DIR) then return DEFAULT_CONFIG_DIR end
 	-- Fall back to bundled shared hotstrings.
 	-- One level up, not two: SCRIPT_DIR is the driver root and _shared is its
 	-- sibling. The old "../../" resolved outside the tree, so this fallback
@@ -637,11 +643,7 @@ local function resolve_config_path(config_path)
 	local Paths = require("infra.paths")
 	local shared = Paths.shared("modules/hotstrings")
 	if not shared then return DEFAULT_CONFIG_DIR end
-	local fh2 = io.open(shared, "r")
-	if fh2 then
-		fh2:close()
-		return shared
-	end
+	if is_directory(shared) then return shared end
 	return nil
 end
 
