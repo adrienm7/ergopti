@@ -167,6 +167,18 @@ helpers.describe("keysym: name to character", function()
 		helpers.assert_eq(ks.to_char("ISO_Level3_Shift"), nil, "nor is AltGr")
 	end)
 
+	helpers.it("rejects surrogate keysyms and non-scalar values", function()
+		local ks = helpers.load_module("infra.keysym")
+		ks._set_xkb_for_test(false)
+		for _, cp in ipairs({ 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0 / 0, 0.5 }) do
+			helpers.assert_eq(ks.utf8_encode(cp), nil, "only integer Unicode scalar values are encodable")
+		end
+		helpers.assert_eq(ks.to_char("UD800"), nil)
+		helpers.assert_eq(ks.to_char("0x100DFFF"), nil)
+		helpers.assert_eq(ks.utf8_encode(0xD7FF), "\237\159\191")
+		helpers.assert_eq(ks.utf8_encode(0xE000), "\238\128\128")
+	end)
+
 	helpers.it("encodes above the basic plane", function()
 		local ks = helpers.load_module("infra.keysym")
 		helpers.assert_eq(ks.utf8_encode(0x1F600), "\240\159\152\128",

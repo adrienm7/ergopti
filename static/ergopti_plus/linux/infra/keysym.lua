@@ -47,9 +47,10 @@ local LOG = "infra.keysym"
 --- Hand-rolled rather than utf8.char: LuaJIT is Lua 5.1 and has no utf8 library,
 --- and the shim the test runner installs is not loaded in production.
 --- @param cp integer Codepoint.
---- @return string|nil UTF-8 bytes, or nil for an out-of-range value.
+--- @return string|nil UTF-8 bytes, or nil for a non-scalar value.
 function M.utf8_encode(cp)
-	if type(cp) ~= "number" or cp < 0 or cp > 0x10FFFF then return nil end
+	if type(cp) ~= "number" or cp ~= cp or cp % 1 ~= 0 or cp < 0 or cp > 0x10FFFF
+		or (cp >= 0xD800 and cp <= 0xDFFF) then return nil end
 	if cp < 0x80 then
 		return string.char(cp)
 	elseif cp < 0x800 then
