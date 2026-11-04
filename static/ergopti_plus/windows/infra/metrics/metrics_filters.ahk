@@ -685,9 +685,7 @@ _MF_StartFocusWinEvents(AllowUnderHarness := false) {
 			try LoggerError("MetricsFilters", "SetWinEventHook raised for event 0x{1:X}: {2}.", Event, Err.Message)
 		if !Hook {
 			try LoggerError("MetricsFilters", "Focus event 0x{1:X} could not be hooked; polling instead.", Event)
-			for Done in Hooks
-				try WIRemoveEventHook(Done)
-			try CallbackFree(Callback)
+			_MF_ReleaseFocusHooks(Hooks, Callback)
 			return false
 		}
 		Hooks.Push(Hook)
@@ -717,16 +715,27 @@ _MF_StopFocusWinEvents() {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	return _MF_ReleaseFocusHooks(Hooks, Callback)
+}
+
+; Partial installation and normal teardown obey the same callback ownership rule.
+_MF_ReleaseFocusHooks(Hooks, Callback, RemoveFn := 0, FreeFn := 0) {
 	AllRemoved := true
 	for Hook in Hooks {
 		Removed := false
-		try Removed := WIRemoveEventHook(Hook)
+		try Removed := IsObject(RemoveFn) ? RemoveFn.Call(Hook) : WIRemoveEventHook(Hook)
 		catch as Err
 			try LoggerWarn("MetricsFilters", "Focus event hook teardown failed: {1}.", Err.Message)
 		AllRemoved := AllRemoved && Removed
 	}
-	if Callback && AllRemoved
-		try CallbackFree(Callback)
+	if !AllRemoved
+		try LoggerWarn("MetricsFilters", "A focus event hook remains active; retaining its callback.")
+	if Callback && AllRemoved {
+		if IsObject(FreeFn)
+			FreeFn.Call(Callback)
+		else
+			CallbackFree(Callback)
+	}
 	return AllRemoved
 }
 
