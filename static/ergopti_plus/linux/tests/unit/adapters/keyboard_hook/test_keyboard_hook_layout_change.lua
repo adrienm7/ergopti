@@ -77,6 +77,17 @@ helpers.describe("keyboard hook: a physical layout-family change", function()
 				.. "claiming to have fixed it")
 	end)
 
+	helpers.it("refuses an unknown initial layout without changing the selected family", function()
+		install_recording_reader()
+		local hook = helpers.load_module("adapters.keyboard_hook")
+		helpers.assert_true(hook.set_layout("qwerty"))
+		local started = hook.start({ layout = "dvorak-imaginary", device = "/dev/null" })
+		package.loaded["modules.hotstrings.input_reader"] = _saved_reader
+		helpers.assert_eq(started, false)
+		helpers.assert_eq(hook.isRunning(), false)
+		helpers.assert_eq(hook.get_layout(), "qwerty")
+	end)
+
 	helpers.it("rejects a non-string without changing anything", function()
 		install_recording_reader()
 		local hook = helpers.load_module("adapters.keyboard_hook")

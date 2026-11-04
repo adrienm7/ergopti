@@ -3875,6 +3875,7 @@ function M.start(opts)
 	-- retain their cold-construction originals and authenticate every returned receipt.
 	_input_reader_ports.capture_event = rawget(EvdevReader, "capture_event")
 	local options = type(opts) == "table" and opts or {}
+	if type(options.layout) == "string" and not M.set_layout(options.layout) then return false end
 	local admission = options.onHoldAdmission
 	if admission ~= nil and type(admission) ~= "function" then return false end
 	if _number_row.retire() ~= true then return false end
@@ -3905,7 +3906,6 @@ function M.start(opts)
 	if type(options.onPointerEvent) == "function" then _on_pointer_event = options.onPointerEvent end
 	_on_consume = type(options.onConsume) == "function" and options.onConsume or nil
 	_on_desync = type(options.onDesync) == "function" and options.onDesync or nil
-	if type(options.layout) == "string"  then _layout   = options.layout end
 	_intercept = options.intercept == true
 	-- Bound unconditionally (not "kept if absent" like the domain callbacks):
 	-- an emitter left over from an earlier session would satisfy the guard below
