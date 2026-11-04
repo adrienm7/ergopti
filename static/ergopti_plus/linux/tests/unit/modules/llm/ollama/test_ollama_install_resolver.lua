@@ -43,6 +43,31 @@ local function fixture()
 	return f
 end
 
+test("Ollama release catalogue refuses a FIFO without blocking", function()
+	local uv, Paths = require("luv"), require("infra.paths")
+	local original_shared = Paths.shared
+	local source_path = assert(original_shared("modules/llm/ollama_release.json"))
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-release-XXXXXX"))
+	local path = dir .. "/release.json"
+	local made = os.execute("mkfifo '" .. path .. "'")
+	assert(made == true or made == 0)
+	Paths.shared = function(relative)
+		if relative == "modules/llm/ollama_release.json" then return path end
+		return original_shared(relative)
+	end
+	local exited, process = false, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source_path } }, function()
+		exited = true; process:close()
+	end))
+	local f = fixture(); f.options.catalogue = nil
+	local called, resolver, reason = pcall(f.new)
+	Paths.shared = original_shared
+	os.remove(path); os.remove(dir)
+	while not exited do uv.run("once") end
+	assert(called, resolver)
+	expect(resolver == nil and reason == "ollama_release_unreadable", "special release files must be refused")
+end)
+
 test("canonical Linux asset comes from packaged catalogue", function()
 	local asset = assert(Policy.asset(release(), "linux", "x86_64"))
 	expect(asset.version == "0.40.4" and asset.key == "linux-amd64", "frozen authoritative version and architecture")
