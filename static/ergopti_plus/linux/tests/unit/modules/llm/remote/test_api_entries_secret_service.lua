@@ -234,8 +234,9 @@ helpers.describe("api_token_store: the secret-tool calls", function()
 		return text
 	end
 
-	helpers.it("refuses a substituted FIFO diagnostic without blocking or reporting absence", function()
-		local tool, dir = stand_in('path=$(readlink /proc/self/fd/2)\nrm -- "$path"\nmkfifo -- "$path"\nprintf "%s" "$path" > "$(dirname "$0")/fifo-path"\nexit 1')
+	local function substituted_diagnostic(replacement, expected_type)
+		local tool, dir = stand_in('path=$(readlink /proc/self/fd/2)\nrm -- "$path"\n'
+			.. replacement .. '\nprintf "%s" "$path" > "$(dirname "$0")/fifo-path"\nexit 1')
 		local uv = require("luv")
 		local code = string.format([[package.path = %q
 local store = require("modules.llm.api_token_store")
@@ -257,12 +258,45 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 		uv.run("nowait")
 		local fifo = recorded(dir, "fifo-path")
 		local info = fifo and uv.fs_lstat(fifo)
-		if fifo then os.remove(fifo) end
+		if fifo then
+			os.remove(fifo)
+			uv.fs_rmdir(require("native_path").dirname(fifo))
+		end
 		os.execute("rm -rf '" .. dir .. "'")
 		helpers.assert_eq(expired, false, "secret-tool diagnostics must not block on a FIFO")
 		helpers.assert_eq(status, 0)
 		helpers.assert_eq(signal, 0)
-		helpers.assert_eq(info and info.type, "fifo", "the substituted endpoint is not deleted")
+		helpers.assert_eq(info and info.type, expected_type, "the substituted endpoint is not deleted")
+	end
+
+	helpers.it("refuses a substituted FIFO diagnostic without blocking or reporting absence", function()
+		substituted_diagnostic('mkfifo -- "$path"', "fifo")
+	end)
+
+	helpers.it("refuses a substituted regular diagnostic without deleting it", function()
+		substituted_diagnostic(': > "$path"', "file")
+	end)
+
+	helpers.it("uses a private result directory and retires it after secret-tool finishes", function()
+		local tool, dir = stand_in('path=$(readlink /proc/self/fd/2)\n'
+			.. 'printf "%s" "$path" > "$(dirname "$0")/result-path"\n'
+			.. 'stat -c %a "$(dirname "$path")" > "$(dirname "$0")/result-mode"\nexit 0')
+		local Store = helpers.load_module("modules.llm.api_token_store")
+		Store._set_backend_for_test(nil)
+		Store._set_tool_for_test(tool)
+		local reference = Store.store("fixture", "private-token")
+		local result_path, mode = recorded(dir, "result-path"), recorded(dir, "result-mode")
+		Store._set_tool_for_test(nil)
+		Fake.uninstall()
+		local uv = require("luv")
+		local result_dir = result_path and require("native_path").dirname(result_path)
+		local file_left = result_path and uv.fs_lstat(result_path)
+		local dir_left = result_dir and uv.fs_lstat(result_dir)
+		os.execute("rm -rf '" .. dir .. "'")
+		helpers.assert_true(reference ~= nil)
+		helpers.assert_eq(mode, "700\n")
+		helpers.assert_nil(file_left)
+		helpers.assert_nil(dir_left)
 	end)
 
 	helpers.it("hands the key on stdin, byte for byte, never in the arguments (linux-api-key-secret-service)", function()
