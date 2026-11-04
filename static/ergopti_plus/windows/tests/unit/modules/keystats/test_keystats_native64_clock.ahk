@@ -266,12 +266,7 @@ _KLSCR_Native64Default(Periodic) {
 			}
 			return
 		}
-		; A physical zero is deliberately absent even when the accepted session
-		; owns a genuine zero origin. Otherwise bracket the private final sample.
-		if Origin = 0 {
-			AssertEqual(0, _Stub_AppendLogRows.Length)
-			return
-		}
+		; An accepted native origin remains valid even at tick zero.
 		Lower := Before - Origin
 		Upper := After - Origin
 		LowerCount := Lower >= KLWatchConst.SESSION_TIMEOUT_MS ? 3
@@ -312,10 +307,21 @@ _KLSCR_Native64Refusal(Mode) {
 	else if Mode = "draining"
 		KLWatch.session_close_draining := true
 	KL_Watchers_IdleTick(Origin + 0x100000000 + 300001)
+	if Mode == "synthetic-zero" {
+		AssertEqual(3, _Stub_AppendLogRows.Length, "retired key timing does not revoke accepted session activity")
+		AssertEqual("idle_start", _Stub_AppendLogRows[1]["type"])
+		AssertEqual("idle_end", _Stub_AppendLogRows[2]["type"])
+		AssertEqual("session_end", _Stub_AppendLogRows[3]["type"])
+		AssertEqual(0, _Stub_AppendLogRows[3]["duration_ms"], "the session closes at its accepted activity origin")
+		AssertFalse(KLWatch.is_session_active)
+		return
+	}
 	AssertEqual(0, _Stub_AppendLogRows.Length)
 	AssertTrue(KLWatch.is_session_active, "absence or privacy cannot acquire closing authority")
 }
-for _KLSCR_Native64Mode in ["synthetic-zero", "inactive", "private", "draining"]
+Test("Keystats native64: a retired synthetic key clock preserves accepted periodic authority",
+	_KLSCR_Native64Scope.Bind(_KLSCR_Native64Refusal.Bind("synthetic-zero")))
+for _KLSCR_Native64Mode in ["inactive", "private", "draining"]
 	Test("Keystats native64: periodic refusal=" . _KLSCR_Native64Mode . " (keystats-watcher-native64)",
 		_KLSCR_Native64Scope.Bind(_KLSCR_Native64Refusal.Bind(_KLSCR_Native64Mode)))
 
