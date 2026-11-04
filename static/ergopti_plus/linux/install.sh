@@ -198,6 +198,23 @@ ergopti_resolve_config_home CONFIG_ROOT
 CONFIG_DIR="${CONFIG_ROOT}/ergopti/hotstrings"
 SYSTEMD_DIR="${CONFIG_ROOT}/systemd/user"
 
+# A prior installation may contain a user's nested checkout. The uninstaller
+# refuses that tree; do not overwrite it or create another unremovable install.
+if ! $SETUP_PERMS_ONLY && { [ -e "$LIB_DIR" ] || [ -L "$LIB_DIR" ]; }; then
+	if [ -L "$LIB_DIR" ] || [ ! -d "$LIB_DIR" ]; then
+		printf '[install] code=invalid-library path=%q\n' "$LIB_DIR" >&2
+		exit 1
+	fi
+	if ! nested_checkout="$(find "$LIB_DIR" -name .git -print -quit)"; then
+		printf '[install] code=scan-refused path=%q\n' "$LIB_DIR" >&2
+		exit 1
+	fi
+	if [ -n "$nested_checkout" ]; then
+		printf '[install] code=source-checkout path=%q\n' "$nested_checkout" >&2
+		exit 1
+	fi
+fi
+
 # The public launcher is outside the payload tree. Do not truncate a foreign
 # command or follow a link when installing over an existing prefix.
 if ! $SETUP_PERMS_ONLY; then
