@@ -2470,7 +2470,8 @@ function LayerPointer.sync()
 	elseif held and not wanted and next(LayerPointer.buttons) == nil then
 		for slot, path in pairs(LayerPointer.slots) do
 			if EvdevReader.is_open(slot) and EvdevReader.ungrab(slot) ~= true then
-				Logger.error(LOG, "The navigation layer could not give %s back to the desktop.", path)
+				M.emergency_stop("navigation layer could not release pointer " .. path)
+				return
 			end
 		end
 		LayerPointer.slots = {}
