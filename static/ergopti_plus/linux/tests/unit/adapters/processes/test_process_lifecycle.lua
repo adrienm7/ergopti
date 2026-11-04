@@ -89,6 +89,18 @@ local AC = { "a", "c" }
 -- process_every = floor(2.0 / 0.25) = 8: the process poll runs on these ticks.
 local PROCESS_TICK = 8
 
+helpers.it("linux-process-lowercase-states: tracks traced tasks and ignores dead tasks", function()
+	with_proc(AB, function(lifecycle, proc, launched, quit)
+		lifecycle.start()
+		proc.set({ "a", "b", { "debuggee", "t" } })
+		lifecycle.tick(PROCESS_TICK)
+		helpers.assert_eq(launched, { "debuggee" }, "Linux traced-stop state t is a live process")
+		proc.set({ "a", "b", { "debuggee", "x" } })
+		lifecycle.tick(PROCESS_TICK * 2)
+		helpers.assert_eq(quit, { "debuggee" }, "Linux dead state x is not a live process")
+	end)
+end)
+
 helpers.describe("linux-process-reentrant-stop", function()
 	helpers.it("linux-process-reentrant-tick: nested polling does not repeat the same launch", function()
 		with_proc(AB, function(lifecycle, proc, launched)
