@@ -30,7 +30,8 @@ local KEYS = { left_alt = { tap_action = "backspace", hold_layer = "nav", time_a
 
 --- EVIOCGBIT(0) bytes: SYN, KEY, MSC for a keyboard; SYN, KEY, REL for a mouse;
 --- SYN, KEY, ABS for a touchpad.
-local MASKS = { keyboard = string.char(19, 0, 18, 0), mouse = string.char(7, 0, 0, 0), touchpad = string.char(11, 0, 0, 0) }
+local MASKS = { keyboard = string.char(19, 0, 18, 0), mouse = string.char(7, 0, 0, 0), touchpad = string.char(11, 0, 0, 0),
+	mouse_with_switch = string.char(39, 0, 0, 0) }
 
 local function fake_node(label)
 	local path = os.tmpname()
@@ -154,6 +155,13 @@ end
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
+	helpers.it("leaves composite pointer switches with the desktop (mouse-switch-no-grab)", function()
+		local _, grabs, _, running = drive("mouse_with_switch", HOLD, {
+			{ 5, 0, 1, 3000 }, -- EV_SW / SW_LID
+		})
+		helpers.assert_true(running)
+		helpers.assert_eq(grabs.on, 0, "an output without EV_SW cannot take the whole device")
+	end)
 	helpers.it("treats a composite pointer's high keycode as a key, not a click (mouse-high-key)", function()
 		local clicks = 0
 		local emitted = drive("mouse", HOLD, {

@@ -2492,7 +2492,7 @@ end
 -- =========================================
 
 -- Event-type bits of EVIOCGBIT(0): a mouse reports EV_REL, a touchpad or a tablet EV_ABS.
-LayerPointer.EV_REL_BIT, LayerPointer.EV_ABS_BIT = 0x02, 0x03
+LayerPointer.EV_REL_BIT, LayerPointer.EV_ABS_BIT, LayerPointer.EV_SW_BIT = 0x02, 0x03, 0x05
 
 --- Whether bit `bit` of an event-type mask is set (no bit operators under LuaJIT).
 function LayerPointer.has_type(mask, bit)
@@ -2512,8 +2512,8 @@ function LayerPointer.wanted()
 end
 
 --- Takes the mice while the layer binds the wheel, gives them back once it does
---- not and no forwarded button is still down. A touchpad is never taken: it
---- scrolls with its fingers, and its absolute reports cannot be forwarded.
+--- not and no forwarded key is still down. A touchpad or a device with switches
+--- is never taken: their absolute or switch reports cannot be forwarded.
 function LayerPointer.sync()
 	local wanted, held = LayerPointer.wanted(), next(LayerPointer.slots) ~= nil
 	if wanted then
@@ -2522,7 +2522,8 @@ function LayerPointer.sync()
 			local slot = pointer_slot(path)
 			local mask = not LayerPointer.slots[slot] and EvdevReader.is_open(slot) and EvdevReader.event_capabilities(slot) or nil
 			if mask and LayerPointer.has_type(mask, LayerPointer.EV_REL_BIT)
-				and not LayerPointer.has_type(mask, LayerPointer.EV_ABS_BIT) then
+				and not LayerPointer.has_type(mask, LayerPointer.EV_ABS_BIT)
+				and not LayerPointer.has_type(mask, LayerPointer.EV_SW_BIT) then
 				if EvdevReader.grab(slot) then
 					LayerPointer.slots[slot] = path
 					grabbed = true
