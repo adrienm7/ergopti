@@ -46,10 +46,10 @@ the field-run step or the hand action that proves it and the commits it confirms
       already resized their view. Gates: `npm run test:browser:layout-composer`, `test_webview_fit_to_window.ahk`.
 - [x] **Layout menu: layers and rows apart.** Header « Couches émulées » above the two layer rows, the four row
       switches in the submenu « Rangées émulées (apprentissage progressif) »; decision in maintainer-decisions.md.
-- [ ] **In progress: CI.** Run 41732511158 found the macOS greyed-row count, the OS-purity ratchet, the false-green
-      ratchet and the updater seal (fixed in 775e22a87f..e91ef5bfd7); its Kana installer timeout (Windows
-      config-updater) and Linux tap-hold timing cases look unrelated. Run 41738545832 checks the fixes; then land on
-      `dev` by rebase only when the maintainer asks. Never push `dev` or `main` from here.
+- [ ] **Next: land on `dev`** by rebase and fast-forward when the maintainer asks (never push `dev` or `main` from
+      here). Branch rebased on dev 41e2888d08; CI run 41742438444 green except Linux alpine integration
+      (`test_sqlite_first_open.lua` system-event capture, metrics, untouched here) and the macOS 26 build still
+      running when noted. Chromium and WebKit ran the composer gate: 24 cases.
 
 ## Release 1.0.9 (maintainer requests of 1-2 November, written so the work survives a lost session)
 
