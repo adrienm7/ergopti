@@ -724,6 +724,8 @@ for _, case in ipairs({
 		invoke = function(owner) return owner.keys() end },
 	{ name = "modifier chords", module = "modules.shortcuts.keyboard_shortcuts", path = "modules/actions/modifier_chords.json",
 		invoke = function(owner) return owner.available_slots("ctrl_") end, empty = true },
+	{ name = "physical keys", module = "modules.shortcuts.keyboard_shortcuts", path = "data/keycodes/physical_keys.json",
+		invoke = function(owner) return owner.physical_slot_descriptor("physical_ctrl_KeyA") end },
 	{ name = "hotstring keys", module = "modules.hotstrings.output_tokens", path = "modules/actions/send_keys.json",
 		invoke = function(owner) return owner.parse("{Enter}") end },
 }) do

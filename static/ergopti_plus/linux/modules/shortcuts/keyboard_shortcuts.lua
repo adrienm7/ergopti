@@ -247,11 +247,8 @@ local function physical_slots()
 		and getmetatable(PhysicalSlots) == nil and rawequal(rawget(PhysicalSlots, "new"), PhysicalSlotConstructor),
 		"physical-key constructor ownership changed")
 	local path = assert(Paths.shared("data/keycodes/physical_keys.json"), "physical-key registry path unavailable")
-	local file = assert(io.open(path, "rb"))
-	local read_ok, raw = pcall(file.read, file, "*a")
-	local close_ok, closed = pcall(file.close, file)
-	assert(read_ok and type(raw) == "string" and close_ok and closed == true,
-		"physical-key registry was not completely read and closed")
+	local raw, status = require("toml_codec.writer").read_classified(path)
+	assert(status == "ok" and type(raw) == "string", "physical-key registry was not completely read and closed")
 	_physical_slots, _physical_binding_publication = PhysicalSlotConstructor(require("json").decode(raw))
 	return _physical_slots
 end
