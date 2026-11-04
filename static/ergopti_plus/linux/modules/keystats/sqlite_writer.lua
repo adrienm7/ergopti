@@ -388,9 +388,15 @@ function M.ensure_token_encoding()
 	local statements = TokenEncoding.migration_statements(keys)
 	if #statements > 0 then
 		local backup = _db_path .. TokenEncoding.BACKUP_SUFFIX
-		local fh = io.open(backup, "rb")
+		local fh, detail, code = RegularFileReader.open(backup)
 		if fh then
-			fh:close()
+			if not fh:close() then
+				Logger.error(LOG, "Cannot close the metrics migration backup.")
+				return false
+			end
+		elseif code ~= RegularFileReader.ENOENT then
+			Logger.error(LOG, "Cannot inspect the metrics migration backup: %s.", ErrorDescription.describe(detail))
+			return false
 		elseif not _exec("VACUUM INTO '" .. backup:gsub("'", "''") .. "';") then
 			Logger.error(LOG, "Cannot back the metrics store up before migrating its n-gram keys.")
 			return false
