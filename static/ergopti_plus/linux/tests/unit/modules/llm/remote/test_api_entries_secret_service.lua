@@ -299,6 +299,34 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 		helpers.assert_nil(dir_left)
 	end)
 
+	helpers.it("retires private result files if secret-tool dispatch raises", function()
+		local tool, dir = stand_in("exit 0")
+		local uv = require("luv")
+		local mkdtemp, popen, result_dir = uv.fs_mkdtemp, io.popen, nil
+		local Store = helpers.load_module("modules.llm.api_token_store")
+		local ok, err = pcall(function()
+			Store._set_backend_for_test(nil)
+			Store._set_tool_for_test(tool)
+			uv.fs_mkdtemp = function(template)
+				result_dir = assert(mkdtemp(template))
+				return result_dir
+			end
+			io.popen = function() error("injected dispatch refusal") end
+			local reference = Store.store("fixture", "private-token")
+			helpers.assert_nil(reference)
+			helpers.assert_true(result_dir ~= nil, "dispatch was attempted after native reservation")
+			helpers.assert_nil(uv.fs_lstat(result_dir), "failed dispatch must retire its exact files and directory")
+		end)
+		uv.fs_mkdtemp, io.popen = mkdtemp, popen
+		Store._set_tool_for_test(nil)
+		Fake.uninstall()
+		if result_dir and uv.fs_lstat(result_dir) then
+			os.remove(result_dir .. "/stderr"); os.remove(result_dir .. "/status"); uv.fs_rmdir(result_dir)
+		end
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("hands the key on stdin, byte for byte, never in the arguments (linux-api-key-secret-service)", function()
 		local tool, dir = stand_in("exit 0")
 		local Store = helpers.load_module("modules.llm.api_token_store")
