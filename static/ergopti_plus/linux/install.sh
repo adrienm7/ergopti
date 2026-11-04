@@ -1090,6 +1090,14 @@ WRAPPER
 }
 # Keep an existing launcher usable until all replacement bytes and mode exist.
 printf -v LAUNCHER_MODE '%03o' "$((0777 & ~ 8#$(umask)))"
+if [ -f "${BIN_DIR}/ergopti-hotstrings" ]; then
+	if ! existing_mode="$(stat -c '%a' -- "${BIN_DIR}/ergopti-hotstrings")" \
+		|| [[ ! "$existing_mode" =~ ^[0-7]{1,4}$ ]]; then
+		rm -f -- "$LAUNCHER_TMP"
+		exit 1
+	fi
+	printf -v LAUNCHER_MODE '%03o' "$((8#$existing_mode | (0111 & ~ 8#$(umask))))"
+fi
 if ! write_public_launcher > "$LAUNCHER_TMP" \
 	|| ! chmod "$LAUNCHER_MODE" "$LAUNCHER_TMP" \
 	|| ! mv -f -- "$LAUNCHER_TMP" "${BIN_DIR}/ergopti-hotstrings"; then
@@ -1131,6 +1139,14 @@ if $INSTALL_SERVICE; then
 	source "${SRC_DRIVER}/install/desktop_entry.sh"
 	SERVICE_EXEC="$(ergopti_systemd_exec "${BIN_DIR}/ergopti-hotstrings")"
 	SERVICE_TMP="$(mktemp "${SYSTEMD_DIR}/.ergopti-service.XXXXXX")"
+	printf -v SERVICE_MODE '%03o' "$((0666 & ~ 8#$(umask)))"
+	if [ -f "${SYSTEMD_DIR}/ergopti-hotstrings.service" ]; then
+		if ! SERVICE_MODE="$(stat -c '%a' -- "${SYSTEMD_DIR}/ergopti-hotstrings.service")" \
+			|| [[ ! "$SERVICE_MODE" =~ ^[0-7]{1,4}$ ]]; then
+			rm -f -- "$SERVICE_TMP"
+			exit 1
+		fi
+	fi
 	write_service_unit() {
 		while IFS= read -r service_line || [ -n "$service_line" ]; do
 			case "$service_line" in
@@ -1142,7 +1158,7 @@ if $INSTALL_SERVICE; then
 	# Publish only complete service bytes. Truncating the live unit in place
 	# would leave an existing installation unable to start after an interruption.
 	if ! write_service_unit > "$SERVICE_TMP" \
-		|| ! chmod 0644 "$SERVICE_TMP" \
+		|| ! chmod "$SERVICE_MODE" "$SERVICE_TMP" \
 		|| ! mv -f -- "$SERVICE_TMP" "${SYSTEMD_DIR}/ergopti-hotstrings.service"; then
 		rm -f -- "$SERVICE_TMP"
 		exit 1
@@ -1211,6 +1227,13 @@ X-GNOME-Autostart-enabled=true
 AUTOSTART
 		}
 		printf -v AUTOSTART_MODE '%03o' "$((0666 & ~ 8#$(umask)))"
+		if [ -f "$AUTOSTART_FILE" ]; then
+			if ! AUTOSTART_MODE="$(stat -c '%a' -- "$AUTOSTART_FILE")" \
+				|| [[ ! "$AUTOSTART_MODE" =~ ^[0-7]{1,4}$ ]]; then
+				rm -f -- "$AUTOSTART_TMP"
+				exit 1
+			fi
+		fi
 		if ! write_autostart_entry > "$AUTOSTART_TMP" \
 			|| ! chmod "$AUTOSTART_MODE" "$AUTOSTART_TMP" \
 			|| ! mv -f -- "$AUTOSTART_TMP" "$AUTOSTART_FILE"; then

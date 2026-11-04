@@ -786,6 +786,45 @@ for (const kind of [
 	}
 }
 
+// Replacing owned startup files preserves their pre-existing access modes.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home, configRoot) {
+			const wrapper = path.join(home, '.local/bin/ergopti-hotstrings');
+			const unit = path.join(configRoot, 'systemd/user/ergopti-hotstrings.service');
+			const desktop = path.join(configRoot, 'autostart/ergopti-hotstrings.desktop');
+			for (const file of [wrapper, unit, desktop])
+				fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(
+				wrapper,
+				`INSTALL_ROOT=${bashPath(home)}/.local/lib/ergopti\nexec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"\n`,
+				{ mode: 0o700 }
+			);
+			fs.writeFileSync(unit, `ExecStart=${bashPath(wrapper)} --tray\n`, { mode: 0o600 });
+			fs.writeFileSync(desktop, `Exec=${bashPath(wrapper)} --tray\n`, { mode: 0o600 });
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		assert.equal(
+			fs.statSync(path.join(run.home, '.local/bin/ergopti-hotstrings')).mode & 0o777,
+			0o700 | (0o111 & ~process.umask())
+		);
+		assert.equal(
+			fs.statSync(path.join(run.configRoot, 'systemd/user/ergopti-hotstrings.service')).mode &
+				0o777,
+			0o600
+		);
+		assert.equal(
+			fs.statSync(path.join(run.configRoot, 'autostart/ergopti-hotstrings.desktop')).mode & 0o777,
+			0o600
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
 // A failed XDG generation, chmod or publication leaves the previous entry complete.
 for (const fault of ['refuseAutostartWrite', 'refuseAutostartMode', 'refuseAutostartPublish']) {
 	const run = runInstaller({
