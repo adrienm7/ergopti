@@ -257,3 +257,26 @@ Test("input probe: every text the checks show exists in English", _IPT_EveryShow
 #Include test_input_probe_entry_owner.ahk
 
 #Include test_input_probe_clipboard_owner.ahk
+
+
+_IPTest_RefuseHookRemoval(Hook) {
+	throw Error("simulated native removal failure")
+}
+
+_IPTest_HookCleanupOwnership() {
+	Hook := 101, Callback := 202, Removed := [], Freed := []
+	Remove := (Handle) => Removed.Push(Handle)
+	Free := (Address) => Freed.Push(Address)
+	_IP_RemoveOwnedHook(&Hook, Remove)
+	AssertEqual(0, Hook, "a successful removal clears the handle")
+	AssertTrue(_IP_ReleaseHookResources(&Hook, &Callback, Remove, Free))
+	AssertEqual(1, Removed.Length, "cleanup must not remove the old handle twice")
+	AssertEqual(1, Freed.Length, "the callback is freed after the hook is gone")
+	Hook := 303, Callback := 404
+	AssertFalse(_IP_ReleaseHookResources(&Hook, &Callback, _IPTest_RefuseHookRemoval, Free))
+	AssertEqual(303, Hook, "a refused removal retains the live hook")
+	AssertEqual(404, Callback, "a live hook retains its callback")
+	AssertEqual(1, Freed.Length, "the live callback must not be freed")
+}
+Test("input probe: hook cleanup retains live callbacks (input-probe-hook-ownership)",
+	_IPTest_HookCleanupOwnership)
