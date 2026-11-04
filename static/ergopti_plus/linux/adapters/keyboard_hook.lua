@@ -1034,9 +1034,14 @@ local function _call_callback(label, callback, ...)
 	local args = { n = select("#", ...), ... }
 	local unpack_args = table.unpack or unpack
 	local session = _capture_session
-	return RuntimeGuard.call(label, function() return callback(unpack_args(args, 1, args.n)) end, function()
-		if _capture_session == session then M.emergency_stop(label .. " failed") end
+	local retired = false
+	local ok, result = RuntimeGuard.call(label, function() return callback(unpack_args(args, 1, args.n)) end, function()
+		if _capture_session == session then
+			retired = true
+			M.emergency_stop(label .. " failed")
+		end
 	end)
+	return ok, result, retired
 end
 
 local function _resynchronise(source, snapshot, cohort)
@@ -1713,9 +1718,10 @@ local function _dispatch_post_remap(ev, source)
 	-- Down and up are both exposed so consumers can choose their metric; repeat is
 	-- not a new physical transition. This includes modifiers and CapsLock.
 	if _on_physical and ev.value ~= InputEvent.VALUE_REPEAT and ev.code > 0 then
-		if not _call_callback("physical-key callback", _on_physical,
-			ev.code, EvdevCodes.key_name(ev.code), char, ev.value, source) then
-			if _running and _capture_session ~= session then return end
+		local called, _, retired = _call_callback("physical-key callback", _on_physical,
+			ev.code, EvdevCodes.key_name(ev.code), char, ev.value, source)
+		if not called then
+			if not retired then return end
 			-- The callback already triggered the emergency stop; the grabbed
 			-- event must still reach the application before giving up on it.
 			_number_row.abandon(row_plan, ev, false)
@@ -1764,8 +1770,9 @@ local function _dispatch_post_remap(ev, source)
 			-- descriptor or a lid close, and one such reading would dominate every
 			-- average it entered for the rest of the day.
 			local held_ms = math.min(math.max(0, Monotonic.now_ms() - down_at), MAX_PLAUSIBLE_HOLD_MS)
-			if not _call_callback("key-hold callback", _on_hold, ev.code, held_ms, source) then
-				if _running and _capture_session ~= session then return end
+			local called, _, retired = _call_callback("key-hold callback", _on_hold, ev.code, held_ms, source)
+			if not called then
+				if not retired then return end
 				-- A release owns the application's key state: it must go back
 				-- even when the metrics consumer just died, or the key sticks
 				-- down over there while nothing is held here.
@@ -1806,11 +1813,11 @@ local function _dispatch_post_remap(ev, source)
 	-- the source stream. XKB and modifier state are current before the decision;
 	-- raw pass-through and semantic callbacks happen only if it declines.
 	if _intercept and not is_modifier and ev.value == InputEvent.VALUE_DOWN and _on_consume then
-		local ok_consume, consume = _call_callback("key-consumption callback", _on_consume,
+		local ok_consume, consume, retired = _call_callback("key-consumption callback", _on_consume,
 			consumption_detail(ev, source, identity, char))
 		local repeat_callback = consumed_repeat_callback(consume)
 		if not ok_consume then
-			if _running and _capture_session ~= session then return end
+			if not retired then return end
 			_number_row.abandon(row_plan, ev, false)
 			-- A missing verdict is not a suppression: the event still belongs
 			-- to the application.
