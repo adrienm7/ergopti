@@ -74,6 +74,23 @@ local function block(corpus, name, set)
 end
 
 helpers.describe("api_token_exchange replays the shared corpus", function()
+	helpers.it("settles once when a reentrant scheduler runs a tick then refuses", function()
+		for _, throws in ipairs({ false, true }) do
+			local steps, outcomes = 0, {}
+			local job = { step = function()
+				steps = steps + 1
+				if steps == 1 then return false end
+				return true, { body = "signed" }
+			end }
+			Exchange.drive(job, function(callback)
+				callback()
+				if throws then error("scheduler failed after callback") end
+				return false
+			end, function(request, reason) outcomes[#outcomes + 1] = { request, reason } end)
+			helpers.assert_eq(#outcomes, 1)
+			helpers.assert_eq(outcomes[1][1].body, "signed")
+		end
+	end)
 	local corpus = read_json("tests/corpus/llm/api_token_exchange_vectors.json")
 	local keys = read_json("tests/corpus/crypto/rs256_vectors.json").keys
 
