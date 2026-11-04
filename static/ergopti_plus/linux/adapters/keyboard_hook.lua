@@ -1037,8 +1037,8 @@ local function _call_callback(label, callback, ...)
 	local retired = false
 	local ok, result = RuntimeGuard.call(label, function() return callback(unpack_args(args, 1, args.n)) end, function()
 		if _capture_session == session then
-			retired = true
 			M.emergency_stop(label .. " failed")
+			retired = true
 		end
 	end)
 	return ok, result, retired
