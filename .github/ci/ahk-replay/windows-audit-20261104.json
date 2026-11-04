@@ -1,163 +1,267 @@
 {
-	"expected_count": 44,
+	"expected_count": 66,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"native_hotstring_e2e": true,
 	"filters": [
 		{
-			"contains": "input hooks: overlapping suppressive owners stop and unregister exactly (suppressive-inputhook-ownership)",
+			"contains": "hotstrings cache: build extracts a known entry with correct flags",
 			"expected_count": 1
 		},
 		{
-			"contains": "input hooks: exclusive suppressive state machines serialize across owner names",
+			"contains": "hotstrings cache: build covers every bundled category",
 			"expected_count": 1
 		},
 		{
-			"contains": "input hooks: refused terminal Stop retains the exact owner for retry (AHK-169)",
+			"contains": "hotstrings cache: .tsv write/read round-trip is lossless",
 			"expected_count": 1
 		},
 		{
-			"contains": "input hooks: partial Start rollback refusal remains lifecycle-owned (AHK-169)",
+			"contains": "hotstrings cache: escape/unescape handles tab, CR, LF and backslash",
 			"expected_count": 1
 		},
 		{
-			"contains": "input hooks: refused one-shot preserves a different owner's disabled latch (one-shot-rearm-admission)",
+			"contains": "hotstrings cache: priority domain rejects a corrupt row",
 			"expected_count": 1
 		},
 		{
-			"contains": "capture settlement: one-shot text keeps exact admission (suppressive-capture-settlement)",
+			"contains": "hotstrings cache: shared index moves invalidate persisted categories",
 			"expected_count": 1
 		},
 		{
-			"contains": "capture settlement: one-shot end-key keeps exact admission (suppressive-capture-settlement)",
+			"contains": "common autocorrection: cache preserves all 140 independent rules and their exact source order (common-autocorrection-reference)",
 			"expected_count": 1
 		},
 		{
-			"contains": "capture settlement: one-shot timeout keeps exact admission (suppressive-capture-settlement)",
+			"contains": "common autocorrection: the real cached loader preserves all historical registrations (common-autocorrection-reference)",
 			"expected_count": 1
 		},
 		{
-			"contains": "capture settlement: one-shot stopped-resumed keeps exact admission (suppressive-capture-settlement)",
+			"contains": "common autocorrection: the real TOML fallback preserves all historical registrations (common-autocorrection-reference)",
 			"expected_count": 1
 		},
 		{
-			"contains": "capture settlement: one-shot completed-revoked keeps exact admission (suppressive-capture-settlement)",
+			"contains": "common autocorrection: actual ordered native loader preserves interleaved sections (source-ordered-autocorrection)",
 			"expected_count": 1
 		},
 		{
-			"contains": "capture settlement: one-shot stop-reentrant keeps exact admission (suppressive-capture-settlement)",
+			"contains": "common autocorrection: TSV round-trip preserves interleaved sections and native options (source-ordered-autocorrection)",
 			"expected_count": 1
 		},
 		{
-			"contains": "capture settlement: one-shot stop-refusal keeps exact admission (suppressive-capture-settlement)",
+			"contains": "common autocorrection: ordered native loader retains the actual caps-only admission (source-ordered-autocorrection)",
 			"expected_count": 1
 		},
 		{
-			"contains": "Unicode scalar capture: one-shot a (inputhook-unicode-capture)",
+			"contains": "common autocorrection: the actual ordered category loader preserves all 140 historical registrations (common-autocorrection-reference)",
 			"expected_count": 1
 		},
 		{
-			"contains": "Unicode scalar capture: one-shot AB (inputhook-unicode-capture)",
+			"contains": "hotstrings cache: exact source-order header and complete records are required (source-ordered-autocorrection)",
 			"expected_count": 1
 		},
 		{
-			"contains": "Unicode scalar capture: one-shot surrogate (inputhook-unicode-capture)",
+			"contains": "common autocorrection: ordered consumer preserves actual bound caps owner (source-ordered-autocorrection)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar dispatch: one-shot punctuation keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"contains": "common autocorrection: missing bound caps owner cannot use bundled cached rows (source-ordered-autocorrection)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar dispatch: one-shot open-brace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"contains": "common source split: native selection all (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar dispatch: one-shot close-brace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"contains": "common source split: TSV selection all (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar dispatch: one-shot enter keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"contains": "common source split: native selection names (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar dispatch: one-shot backspace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"contains": "common source split: TSV selection names (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar dispatch: one-shot delete keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"contains": "common source split: native selection abbreviations (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar dispatch: one-shot pair-B keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"contains": "common source split: TSV selection abbreviations (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar dispatch: one-shot magic-astral preserves the complete scalar (inputhook-scalar-dispatch)",
+			"contains": "common source split: native selection technical_terms (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar dispatch: one-shot disabled-surrogate preserves the complete scalar (inputhook-scalar-dispatch)",
+			"contains": "common source split: TSV selection technical_terms (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar dispatch: one-shot disabled-magic-astral preserves the complete scalar (inputhook-scalar-dispatch)",
+			"contains": "common source split: actual native boot registrar all (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar refusal: one-shot invalid-low never emits partial text (inputhook-scalar-rejection)",
+			"contains": "common source split: actual native boot registrar names (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar refusal: one-shot invalid-high-BMP never emits partial text (inputhook-scalar-rejection)",
+			"contains": "common source split: actual native boot registrar abbreviations (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar refusal: one-shot partial-timeout never emits partial text (inputhook-scalar-rejection)",
+			"contains": "common source split: actual native boot registrar technical_terms (common-autocorrection-split)",
 			"expected_count": 1
 		},
 		{
-			"contains": "scalar refusal: one-shot control-after-high never emits partial text (inputhook-scalar-rejection)",
+			"contains": "hotstrings cache: callbacks preserve the admitted shared logger source",
 			"expected_count": 1
 		},
 		{
-			"contains": "one-shot rearm: natural preserves current admission (one-shot-rearm-admission)",
+			"contains": "hotstrings cache source inventory: live",
 			"expected_count": 1
 		},
 		{
-			"contains": "one-shot rearm: incumbent-letter preserves current admission (one-shot-rearm-admission)",
+			"contains": "hotstrings cache source inventory: deleted-source",
 			"expected_count": 1
 		},
 		{
-			"contains": "one-shot rearm: incumbent-special preserves current admission (one-shot-rearm-admission)",
+			"contains": "hotstrings cache source inventory: edited-during-build",
 			"expected_count": 1
 		},
 		{
-			"contains": "one-shot rearm: incumbent-disabled preserves current admission (one-shot-rearm-admission)",
+			"contains": "hotstrings cache source inventory: unbound-extension",
 			"expected_count": 1
 		},
 		{
-			"contains": "one-shot rearm: paused-during-start preserves current admission (one-shot-rearm-admission)",
+			"contains": "hotstring languages: the shared index declares French (hs-language-packs)",
 			"expected_count": 1
 		},
 		{
-			"contains": "one-shot rearm: revoked-during-start preserves current admission (one-shot-rearm-admission)",
+			"contains": "hotstring languages: one resolver finds every spelling of a language file (hs-language-packs)",
 			"expected_count": 1
 		},
 		{
-			"contains": "one-shot rearm: successor-disabled-during-start preserves current admission (one-shot-rearm-admission)",
+			"contains": "hotstring languages: the cache and catalogue cover every language group (hs-language-packs)",
 			"expected_count": 1
 		},
 		{
-			"contains": "one-shot rearm: activation-revoked preserves current admission (one-shot-rearm-admission)",
+			"contains": "hotstring languages: language gates are seeded and persist under their group id (hs-language-packs)",
 			"expected_count": 1
 		},
 		{
-			"contains": "one-shot rearm: activation-successor preserves current admission (one-shot-rearm-admission)",
+			"contains": "hotstring languages: every bundled hotstring section ships disabled (hs-language-packs)",
 			"expected_count": 1
 		},
 		{
-			"contains": "token-rawpost-owner",
-			"expected_count": 6
+			"contains": "personal-opening-source: real native save keeps independently replaced source",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-opening-source: closed native session cannot publish deferred UI success",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal native editor: entry confirmation returns to reopened owner (personal-native-modal-owner)",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal native editor: entry confirmation returns to section owner (personal-native-modal-owner)",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-toml-live-transaction: native and WebView saves share one gateway",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: the shipped groups load from the extension under their historical ids (ergopti-hotstrings-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: available bound sources do not report unsupported loading (bound-source-warning)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: without the Ergopti extension the groups are absent (ergopti-hotstrings-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: the bundled cache no longer compiles the moved groups (ergopti-hotstrings-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: the Hotstrings menu lists the groups under « Hotstrings Ergopti » (ergopti-hotstrings-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: without the extension its submenu lists no category (ergopti-hotstrings-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: the settings window keeps the repeat corrections row (ergopti-hotstrings-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: the actual Hotstrings menu names Ergopti+",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: all 101 distance rules load natively from the historical reference (ergopti-distance-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: disabled distance group survives native owner reload (ergopti-distance-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: disabled distance section survives native owner reload (ergopti-distance-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: the user's distance source keeps precedence and exact bytes (ergopti-distance-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "ergopti extension: every relocated suffix loads through the native registry (ergopti-suffixes-ext)",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstring extension frame: the actual empty native provider consumes current inert declaration",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstring extension frame: genuine installed catalogue retains order, native scope callbacks and withdrawal",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstring extension frame: real file-pack refusal releases every owned native child and exact dispatch bindings",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstrings cache: same-second TOML edit is judged stale, not fresh (freshness-same-second-edit-window)",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstrings cache: a strictly-newer .tsv is still fresh (freshness-same-second-edit-window)",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstrings cache: per-entry priority survives the .tsv round-trip (per-entry-priority-divergence-cache-vs-toml)",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstrings cache: cached priority matches the TOML fallback (per-entry-priority-divergence-cache-vs-toml)",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstrings priority: overflow cannot alias entry or cache rank",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstrings cache initial publication:",
+			"expected_count": 2
 		}
 	]
 }
