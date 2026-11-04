@@ -59,6 +59,8 @@ helpers.describe("system gesture probe startup", function()
 			helpers.assert_true(tasks[1].terminations >= 1)
 			for index = 2, 4 do tasks[index].finish(0, "") end
 			helpers.assert_eq(conflicts.refresh(), false)
+			helpers.assert_eq(conflicts.refresh(), false)
+			helpers.assert_eq(#tasks[1].observers, 1, "retries must not accumulate settlement observers")
 			helpers.assert_eq(#tasks, 4, "a successor cannot hide the unsettled process")
 			tasks[1].finish(15, "")
 			helpers.assert_eq(conflicts.refresh(), true)

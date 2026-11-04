@@ -261,12 +261,17 @@ end
 local function retire_probe_handle(handle)
 	local ok, settled = pcall(handle.isSettled)
 	if ok and settled == true then probe_cleanup_debt[handle] = nil; return true end
-	probe_cleanup_debt[handle] = true
+	local debt = probe_cleanup_debt[handle] or { observing = false }
+	probe_cleanup_debt[handle] = debt
 	pcall(handle.terminate)
 	ok, settled = pcall(handle.isSettled)
 	if ok and settled == true then probe_cleanup_debt[handle] = nil; return true end
-	if type(handle.onSettled) == "function" then
-		pcall(handle.onSettled, function() probe_cleanup_debt[handle] = nil end)
+	if not debt.observing and type(handle.onSettled) == "function" then
+		debt.observing = true
+		local registered, accepted = pcall(handle.onSettled, function()
+			if probe_cleanup_debt[handle] == debt then probe_cleanup_debt[handle] = nil end
+		end)
+		if not registered or accepted ~= true then debt.observing = false end
 	end
 	return false
 end
