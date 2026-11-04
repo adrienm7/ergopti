@@ -125,10 +125,14 @@ end
 --- @param path string Absolute path to personal_info.toml.
 --- @return table info, table letters
 local function _parse_personal_info_toml(path)
-	local fh = io.open(path, "r")
-	if not fh then return {}, {} end
-	local content = fh:read("*a")
-	fh:close()
+	local content, status, detail = TomlWriter.read_classified(path)
+	if status ~= "ok" then
+		if status ~= "absent" then
+			Logger.error(LOG, "personal_info.toml at '%s' is unreadable (%s) — @-tag shortcuts disabled.",
+				path, tostring(detail or status))
+		end
+		return {}, {}
+	end
 
 	-- Delegate all TOML parsing to the shared codec; decode returns nil on a
 	-- spec violation.
