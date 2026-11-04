@@ -112,8 +112,8 @@ local function handle(payload, state, request)
 		local operation = stats and (action == "pause" and stats.suspend_collection or stats.resume_collection)
 		if type(operation) ~= "function" or type(stats.is_collection_suspended) ~= "function"
 			or type(stats.is_suppressed) ~= "function" then return with_payload({ supported = false }) end
-		local called = pcall(operation)
-		if not called or not request.valid() then return with_payload({ supported = false }) end
+		local called, accepted = pcall(operation)
+		if not called or accepted == false or not request.valid() then return with_payload({ supported = false }) end
 		local read_pause, suspended = pcall(stats.is_collection_suspended)
 		local read_secure, secure = pcall(stats.is_suppressed)
 		if not read_pause or not read_secure or type(suspended) ~= "boolean" or type(secure) ~= "boolean"

@@ -114,6 +114,16 @@ H.describe("metrics flush bridge", function()
 		H.assert_eq(result.supported, false)
 		H.assert_nil(result.suppressed)
 	end)
+	H.it("(metrics-pause-privacy) reports an explicit owner refusal", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		F.K.suspend_collection = function() return false end
+		F.K.is_collection_suspended = function() return true end
+		F.K.is_suppressed = function() return false end
+		local result = F.B.on_message({ action = "pause" }, F.state, F.context)
+		H.assert_eq(result.supported, false)
+		H.assert_nil(result.suppressed)
+	end)
 	for _, app in ipairs({ "metrics_apps", "metrics_typing" }) do
 		H.it(app .. " defers ready without reading then pushes complete data", function()
 			local F = fixture(app)
