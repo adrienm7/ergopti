@@ -187,9 +187,13 @@ settle_cleanup = function()
 end
 
 local function draw(generation)
+	_presenting = generation
 	if type(_renderer) ~= "table" or type(_renderer.show) ~= "function" then error("suggestion renderer unavailable") end
 	local rows = M.build_rows(_candidates, _active_index, _meta)
-	if #rows == 0 then M.hide(); return false end
+	if #rows == 0 then
+		if _presenting == generation then _presenting = nil end
+		M.hide(); return false
+	end
 	local preview_rows = companion_rows()
 	local cover = not preview_rows and companion_showing()
 	if preview_rows then
@@ -198,9 +202,11 @@ local function draw(generation)
 	local anchor = type(_anchor_provider) == "function" and _anchor_provider() or nil
 	local screen = type(_screen_provider) == "function" and _screen_provider()
 		or { x = 0, y = 0, w = 1920, h = 1080 }
-	if generation ~= _generation then return false end
+	if generation ~= _generation then
+		if _presenting == generation then _presenting = nil end
+		return false
+	end
 	local renderer, companion = _renderer, _companion
-	_presenting = generation
 	local called, drawn = pcall(renderer.show, rows, { style = _style, accent = nil, anchor = anchor, screen = screen })
 	if _presenting == generation then _presenting = nil end
 	if generation ~= _generation then
@@ -243,6 +249,9 @@ end
 --- @return boolean
 function M.show(candidates, meta)
 	if type(candidates) ~= "table" or not settle_cleanup() then return false end
+	-- A fresh owner without a draw method has touched no surface to clean up.
+	-- An existing offer still needs the usual cleanup if its renderer changed.
+	if #_candidates == 0 and (type(_renderer) ~= "table" or type(_renderer.show) ~= "function") then return false end
 	_generation = _generation + 1
 	_candidates = candidates
 	_meta = type(meta) == "table" and meta or {}
