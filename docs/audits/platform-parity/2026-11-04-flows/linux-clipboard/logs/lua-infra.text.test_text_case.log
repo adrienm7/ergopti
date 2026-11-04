@@ -1,0 +1,10 @@
+
+=== Unicode case conversion ===
+  ok   uses the pinned complete Unicode dataset
+  ok   uppercases accents, ligatures, Greek, and Cyrillic
+  ok   lowercases context-independent Unicode mappings
+  ok   applies the contextual Greek final-sigma rule
+  ok   titlecases the first character after punctuation and hyphens
+  ok   detects whether uppercase toggle should promote or demote
+  ok   recognizes complete UTF-8 characters and international boundaries
+AUDIT_RESULT	7	0

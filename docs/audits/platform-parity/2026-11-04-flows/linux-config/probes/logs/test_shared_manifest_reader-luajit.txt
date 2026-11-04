@@ -1,0 +1,8 @@
+
+=== shared manifest reader (Linux) ===
+  ok   raises for a manifest that cannot be loaded or is not a manifest
+  ok   refuses a reader built without its ports
+  ok   answers metadata without invoking the platform hooks
+  ok   splits the absences by whether they carry a reason
+  ok   binds the driver to the generated manifest
+TOTAL 5 passed 0 failed

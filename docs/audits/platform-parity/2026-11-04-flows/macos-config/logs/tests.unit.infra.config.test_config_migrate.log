@@ -1,0 +1,248 @@
+
+=== config migration corpus (hs) ===
+  ok   joint_variant_neutral_current
+  ok   joint_variant_neutral_conflict
+  ok   joint_variant_neutral_occupied
+  ok   joint_variant_absent
+  ok   joint_variant_false
+  ok   joint_variant_true_overlay
+  ok   joint_variant_true_full
+  ok   joint_variant_registry_source
+  ok   joint_variant_matching_destination
+  ok   joint_variant_conflicting_destination
+  ok   joint_variant_unknown_destination
+  ok   joint_variant_integer_legacy
+  ok   joint_variant_string_legacy
+  ok   joint_variant_malformed_base
+  ok   joint_variant_malformed_alt_gr
+  ok   joint_variant_malformed_source
+  ok   joint_variant_ancestor_namespace
+  ok   joint_variant_destination_namespace
+  ok   joint_variant_source_namespace
+  ok   chain_runs_every_step_in_order
+  ok   chain_starts_at_file_version
+  ok   copy_orders_with_rename_and_move
+  ok   copy_preserves_occupied_namespaces
+  ok   current_version_untouched
+  ok   invalid_version_refused
+  ok   newer_version_refused
+  ok   op_delete
+  ok   op_copy_if_absent
+  ok   op_map_value
+  ok   op_merge_into
+  ok   op_move_chord_absent
+  ok   op_move_chord_ctrl_letter
+  ok   op_move_chord_descendant_target
+  ok   op_move_chord_duplicate_modifiers
+  ok   op_move_chord_existing_action
+  ok   op_move_chord_existing_none
+  ok   op_move_chord_extra_metadata
+  ok   op_move_chord_false
+  ok   op_move_chord_malformed_mods
+  ok   op_move_chord_option_punctuation
+  ok   op_move_chord_reordered_aliases
+  ok   op_move_chord_scalar_ancestor
+  ok   op_move_chord_scalar_integer
+  ok   op_move_chord_scalar_string
+  ok   op_move_chord_scalar_true
+  ok   op_move_chord_typed_destination
+  ok   op_move_chord_unknown_conditional
+  ok   op_move_chord_unknown_destination
+  ok   op_move_chord_unknown_key
+  ok   op_move_chord_unknown_modifiers
+  ok   op_move_chord_historical_table
+  ok   op_move_chord_historical_extra
+  ok   op_move_chord_historical_descendant
+  ok   op_move_chord_false_existing_choice
+  ok   op_move_chord_false_typed_choice
+  ok   op_move_chord_historical_quoted_extra
+  ok   op_move_chord_unknown_field_case
+  ok   op_move_chord_unknown_action_case
+  ok   op_move_section
+  ok   op_rename
+  ok   op_rename_prefix
+  ok   op_rename_prefix_replay
+  ok   op_rename_prefix_collision
+  ok   op_rename_prefix_occupied_namespace
+  ok   op_set_if_absent
+  ok   op_encode_value
+  ok   op_encode_value_replay
+  ok   op_wrap_value
+  ok   op_wrap_value_replay
+  ok   shipped_dynamic_switch_scalar_becomes_row
+  ok   shipped_dynamic_switch_row_replay_unchanged
+  ok   shipped_keyboard_slots_neutral_on_macos
+  ok   shipped_keyboard_slot_parameters_on_macos
+  ok   shipped_keyboard_slots_current_file_untouched
+  ok   shipped_keyboard_slots_windows_step_skips_lua
+  ok   shipped_windows_switches_step_skips_lua
+  ok   shipped_hs_ctrl_g_switch_on_becomes_slot
+  ok   shipped_hs_ctrl_g_switch_off_becomes_none
+  ok   shipped_hs_ctrl_g_slot_action_wins
+  ok   shipped_retired_keys_preserved_on_all_drivers_non_windows
+  ok   shipped_trigger_shortcut_removed_on_macos
+  ok   oldest_version_refuses_a_lower_stamp
+  ok   oldest_version_keeps_no_stamp
+  ok   oldest_version_climbs_the_chain
+  ok   unsupported_version_refused
+  ok   shipped_common_autocorrection_stamp_only_non_windows
+  ok   shipped_dynamic_master_untouched_on_lua
+  ok   joint_variant_unknown_without_legacy
+  ok   joint_variant_casealias_without_legacy
+  ok   shipped_cascade_depth_off_becomes_one_arrow
+  ok   shipped_cascade_depth_levels_gain_one_arrow
+  ok   shipped_cascade_depth_replay_is_idempotent
+  ok   shipped_cascade_depth_eleven_kept_as_outdated
+  ok   shipped_user_profiles_array_becomes_envelope_on_macos
+  ok   shipped_user_profiles_envelope_wins_on_macos
+  ok   replays enough cases for this driver
+
+=== config migration registry (hs) ===
+  ok   the shipped registry loads as a gap-free chain
+  ok   accepts the control and rejects every registry of the shared defect corpus
+  ok   touches only the records the steps change
+  ok   keeps CRLF line endings and a byte-order mark
+  ok   refuses to drop a section holding entries it cannot address
+
+=== config migration conditional copies (hs) ===
+  ok   retains every occupied namespace byte, including empty table headers
+  ok   owns each copied nested value independently of its source and sibling
+  ok   preserves the exact inline ancestor bytes and the complete source choice
+
+=== config chord action ownership (hs) ===
+  ok   builds real assignability without changing ordered native catalogue data
+  ok   backs up exact legacy data before publishing the represented chord handoff
+  ok   retains exact inline ancestor namespaces without a partial handoff
+  ok   refused handoff publication preserves the legacy file and prevents future writes
+  ok   missing catalogue data uses the existing read-only boot refusal
+  ok   rejects actual malformed and scalar JSON without publishing a legacy handoff
+  ok   an absent engine context cannot consume the explicit legacy disable record
+  ok   missing assignability owner becomes a context refusal receipt before boot
+  ok   a decoder exception becomes a receipt and leaves the legacy file read-only
+
+=== config migration at boot (hs) ===
+  ok   migrates after a byte-exact backup, then leaves a current file alone
+  ok   never writes a newer file and refuses every later write this session
+  ok   refuses a stamp below the oldest version in words and leaves it byte for byte
+  ok   treats a file with no stamp as current: no step, no backup, no refusal
+  ok   still refuses a stamped old file while no stamp is current
+  ok   still migrates a file stamped at the oldest version
+  ok   refuses an invalid schema stamp "3" at boot and on later writes
+  ok   refuses an invalid schema stamp false at boot and on later writes
+  ok   refuses an invalid schema stamp 0 at boot and on later writes
+  ok   refuses an invalid schema stamp -1 at boot and on later writes
+  ok   refuses an invalid schema stamp 1.5 at boot and on later writes
+  ok   refuses an invalid schema stamp [] at boot and on later writes
+  ok   has nothing to do when the file is absent
+  ok   stamps the current version into a file a writer creates later
+  ok   leaves the file untouched and read-only when the backup fails
+  ok   does not overwrite an edit made after the file was read
+  ok   refuses a file it cannot parse
+  ok   turns a raise inside the engine into the same read-only refusal
+  ok   refuses to run without a loadable registry
+
+=== fresh closed configuration schema admission (hs) ===
+  ok   rejects copied or callback native ports before invoking them
+  ok   refuses copied adapter before whole-write reader invocation: create_only=false
+  ok   refuses withdrawn actual reader before whole-write reader invocation: create_only=false
+  ok   refuses copied adapter before whole-write reader invocation: create_only=true
+  ok   refuses withdrawn actual reader before whole-write reader invocation: create_only=true
+  ok   refuses replacement native removal identity remove_if_unchanged_admitted before boot
+  ok   refuses replacement native removal identity remove_if_unchanged_admitted after boot
+  ok   refuses replacement native removal identity remove_exact before boot
+  ok   refuses replacement native removal identity remove_exact after boot
+  ok   refuses replacement native removal identity delete before boot
+  ok   refuses replacement native removal identity delete after boot
+  ok   refuses a genuine same-file native method aliased as delete before boot
+  ok   refuses raw native issuer withdrawal before publication without invoking its accessor
+  ok   refuses a replacement native identity getter before invoking it at boot
+  ok   refuses a copied native module borrowing the actual initializer getter
+  ok   refuses a replaced native registry reader before boot before invoking it
+  ok   refuses a replaced native registry reader during start callback before invoking it
+  ok   refuses a withdrawn actual admitted native export even with accessor fallback
+  ok   refuses newly unsupported source before preparation, publication, read and removal: 4
+  ok   refuses newly unsupported source before preparation, publication, read and removal: true
+  ok   refuses newly unsupported source before preparation, publication, read and removal: "3"
+  ok   refuses newly unsupported source before preparation, publication, read and removal: 3.5
+  ok   refuses newly unsupported source before preparation, publication, read and removal: []
+  ok   authenticates canonical current metadata: _meta = {schema_version = 3}
+  ok   authenticates canonical current metadata: _meta.schema_version = 3
+  ok   authenticates canonical current metadata: ["_meta"]
+"schema_version" = 3
+  ok   refuses non-current canonical metadata at initial boot: _meta = true
+  ok   refuses non-current canonical metadata at initial boot: [["_meta"]]
+schema_version = 3
+  ok   refuses non-current canonical metadata at initial boot: _meta = {schema_version = 4}
+  ok   refuses non-current canonical metadata at initial boot: _meta.schema_version = true
+  ok   admits actual absent/current creation but does not grant READY through public row/default setters
+  ok   does not lift an initial refused session when the physical source is manually current again
+  ok   starts PREPARING before the real logger can reenter ordinary publication
+  ok   keeps the issued registry copy private before callbacks mutate the public object
+  ok   rejects a cloned current-looking registry rather than issuing native readiness
+  ok   refuses a borrowed constructor factory call from an arbitrary consumer
+  ok   does not accept raw factory withdrawal through an __index fallback
+  ok   refuses ambiguous dot-segment spellings without rewriting the native route
+  ok   refuses future whole-write/create-only exists acknowledgement before adapter effects
+  ok   reacquires initial legacy source before backup when its first actual native read triggers drift
+  ok   retires an acquired publication epoch if actual final native read reenters boot
+
+=== captured initial version-refused reads (hs) ===
+  ok   reads initial invalid bytes without granting a write or scope effect
+  ok   reads initial invalid bytes without granting a write or scope effect
+  ok   reads initial newer bytes without granting a write or scope effect
+  ok   refuses a changed image or absence without lifting the initial write latch
+  ok   refuses a withdrawn raw native issuer without invoking its replacement
+  ok   refuses a raw native owner replacement rather than lending its readable image
+  ok   retires a captured read closure when a new boot journal replaces its epoch
+  ok   does not grant a readable image for malformed document or metadata: _meta = true
+
+  ok   does not grant a readable image for malformed document or metadata: [["_meta"]]
+schema_version = true
+
+  ok   does not grant a readable image for malformed document or metadata: broken = [
+
+  ok   grants no initial reader image to a custom read seam or failed context
+
+=== Internal helper-variant record migration (hs) ===
+  ok   transfers recognized three-key-only intent without changing metadata or independent layers
+  ok   unknown absent-source and conflicting current choices return typed refusals without candidates
+  ok   the actual mutable step refuses before consuming old or conflicting ownership
+  ok   malformed legacy and retained layer/source participants cannot reach a record candidate
+
+=== Neutral internal helper intent (hs) ===
+  ok   registry admission requires a typed neutral choice distinct from both legacy choices
+  ok   admits current neutral intent without enabling or rewriting independent layers
+  ok   refuses neutral conflict and occupied ownership before consuming any source
+
+=== config migration: independent physical records (config-migrate-records) ===
+  ok   occupied: lf
+  ok   occupied: bom-crlf
+  ok   occupied: no-final-lf
+  ok   changed: lf
+  ok   changed: bom-crlf
+  ok   changed: no-final-lf
+  ok   moves: lf
+  ok   moves: bom-crlf
+
+=== common autocorrection retained native publication capabilities ===
+  ok   (common-autocorrection-recovery) requires the actual receipt and exact callback identity
+  ok   (common-autocorrection-recovery) refuses an equal-byte foreign route even after physical settlement
+  ok   (common-autocorrection-recovery) rejects a retry without actual terminal settlement
+  ok   (common-autocorrection-recovery) fences consumer reentry at view_hook
+  ok   (common-autocorrection-recovery) fences consumer reentry at match_hook
+  ok   (common-autocorrection-recovery) fences consumer reentry at settled_hook
+  ok   (common-autocorrection-recovery) fences consumer reentry at retry_hook
+  ok   (common-autocorrection-recovery) retains release-only ownership without claiming publication
+  ok   (common-autocorrection-recovery) retains the failed forward and inverse until both physical releases settle
+
+=== common autocorrection independent override migration ===
+  ok   (common-autocorrection-split) preserves every independently authored foreign byte and explicit new choice
+  ok   (common-autocorrection-split) keeps occupied ancestor and descendant namespaces
+  ok   (common-autocorrection-split) refuses unaddressable legacy inline records and malformed operations
+  ok   (common-autocorrection-split) delegates quoted comment identity to the canonical codec
+  ok   (common-autocorrection-split) leaves absent sources absent and requires native publication acknowledgement
+  ok   (common-autocorrection-split) the actual conditional publisher preserves an intervening external replacement
+
+=== config migration: root boot order (config-migrate-boot-order) ===
+  ok   migrates config.toml before the first-run wizard and before any reader
+TOTAL 215 passed 0 failed

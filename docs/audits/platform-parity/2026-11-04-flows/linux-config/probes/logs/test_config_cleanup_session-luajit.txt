@@ -1,0 +1,12 @@
+
+=== shared configuration cleanup session ===
+  ok   opens without scanning and cancellation makes every later request inert
+  ok   exposes all eighty rows and refuses a changed source before creating any backup
+  ok   requires refresh after a change, then publishes one cleanup and an exact backup
+  ok   ignores a stale token and never adopts browser supplied paths or deletion targets
+  ok   reports a failed backup and leaves the exact original source unchanged
+  ok   refuses a reentrant clean while the first transaction owns publication
+  ok   returns a failed page state when scanning raises
+  ok   returns a failed page state when the cleanup engine raises
+  ok   keeps the published result truthful when preference adoption raises
+TOTAL 9 passed 0 failed

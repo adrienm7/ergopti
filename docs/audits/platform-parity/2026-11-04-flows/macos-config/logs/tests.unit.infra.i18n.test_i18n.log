@@ -1,0 +1,46 @@
+
+=== i18n: pure getters ===
+  ok   locales() returns 21 supported locales
+  ok   get_sorted_locales() returns a copy ordered by localized name
+  ok   build_language_menu_items() returns provider rows with label/checked/action
+
+=== i18n: detect_system_locale() ===
+  ok   returns known 2-letter prefix from e.g. fr_FR
+  ok   returns known 2-letter prefix from en_GB
+  ok   returns known 2-letter prefix from zh_Hans_CN
+  ok   falls back to 'en' for unsupported locale
+  ok   falls back to 'en' when hs.host.locale API is unavailable
+  ok   falls back to 'en' when hs.host.locale.current() returns nil
+  ok   falls back to 'en' when hs.host.locale.current() throws
+
+=== i18n: init() ===
+  ok   reads persisted locale from hs.settings when valid
+  ok   falls back to detect_system_locale when no saved locale
+  ok   falls back to detect_system_locale when saved value is invalid
+
+=== i18n: get() ===
+  ok   returns the translated string from lib.locale
+  ok   falls back to the raw key when translation is missing
+  ok   falls back to the raw key when translation is empty string
+
+=== i18n: set_locale / persist_locale / set_locale_no_reload ===
+  ok   set_locale() persists to hs.settings and schedules a debounced reload
+  ok   set_locale() debounces rapid switches: cancels pending timer
+  ok   set_locale() leaves memory and settings unchanged when reload scheduling refuses
+  ok   set_locale() rejects native persistence false and throw outcomes
+  ok   set_locale() blocks a sibling while exact timer cleanup is pending
+  ok   set_locale() ignores unknown codes
+  ok   set_locale() is a no-op when the same locale is already active
+  ok   persist_locale() writes to settings without changing in-memory locale
+  ok   persist_locale() reports native false and throw outcomes
+  ok   persist_locale() ignores unknown codes
+  ok   set_locale_no_reload() changes in-memory only
+  ok   set_locale_no_reload() ignores unknown codes
+
+=== i18n: set_locale_injector() ===
+  ok   stores the function so init() can push the active locale into lib.locale
+
+=== i18n: decorate_section / section ===
+  ok   decorate_section() delegates to menu.labels.decorate_section
+  ok   section() translates then decorates
+TOTAL 31 passed 0 failed

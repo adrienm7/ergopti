@@ -1,0 +1,10 @@
+
+=== reset failure: typed points of the global scope ===
+  ok   names commit when a category refused and every committed one was reverted
+  ok   names rollback, never a revert, when the revert itself was refused
+  ok   names acquire while a category or the composition still owns a transaction
+  ok   names finalize when the values were applied but a backup could not be forgotten
+  ok   names commit for a request the composition cannot run
+  ok   raises on a refused report that names no typed point
+  ok   translates every reason in every locale with its placeholders
+TOTAL 7 passed 0 failed

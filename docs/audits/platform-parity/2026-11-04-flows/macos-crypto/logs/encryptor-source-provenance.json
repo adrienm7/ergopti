@@ -1,0 +1,8 @@
+{
+  "path": "/workspace/ergopti/static/ergopti_plus/macos/apps/Encryptor.app/Contents/Resources/Scripts/main.applescript",
+  "sha256": "c3d8bea6eabce463eac86b8450fd6e6ffcaade9454159ed30e5893e721c8bd37",
+  "templates": [
+    "\"openssl enc -aes-256-cbc -pbkdf2 -iter 600000\" \u00ac\n\t\t\t& \" -in \" & quoted form of file_path \u00ac\n\t\t\t& \" -out \" & quoted form of dest_path \u00ac\n\t\t\t& \" -pass pass:\" & quoted form of the_password",
+    "\"openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000\" \u00ac\n\t\t\t& \" -in \" & quoted form of file_path \u00ac\n\t\t\t& \" -out \" & quoted form of dest_path \u00ac\n\t\t\t& \" -pass pass:\" & quoted form of the_password"
+  ]
+}

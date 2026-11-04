@@ -1,0 +1,5 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_text_reselection_batch
+
+=== text transform: reselection is one synthetic transaction ===
+  ok   batches every cursor key behind one broker handoff
+RESULT 1 passed 0 failed

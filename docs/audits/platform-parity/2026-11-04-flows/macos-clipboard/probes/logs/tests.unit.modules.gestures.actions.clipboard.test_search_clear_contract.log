@@ -1,0 +1,11 @@
+MODULE tests.unit.modules.gestures.actions.clipboard.test_search_clear_contract
+
+=== search clipboard clear has no native success return ===
+  ok   keeps the real Clipboard adapter healthy over the same zero-result primitive
+  ok   copies and opens the selected text after a healthy zero-result clear
+  ok   restores an initially empty clipboard and retires its owner on cleanup
+  ok   keeps a throwing clear visible and rolls back before copying
+  ok   keeps writeAllData false refusal pending and diagnostic
+  ok   keeps writeAllData nil refusal pending and diagnostic
+  ok   keeps writeAllData throw refusal pending and diagnostic
+RESULT 7 passed 0 failed

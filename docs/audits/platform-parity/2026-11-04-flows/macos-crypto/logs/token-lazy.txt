@@ -1,0 +1,15 @@
+Selecting exact test module: "tests.unit.modules.llm.remote.test_api_token_lazy_decrypt"
+Focused discovery: 1 of 2147 module(s) selected before require
+
+>>> Loading tests.unit.modules.llm.remote.test_api_token_lazy_decrypt
+[PASS] test_api_token_lazy_decrypt
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.llm.remote.test_api_token_lazy_decrypt","name":"tests.unit.modules.llm.remote.test_api_token_lazy_decrypt","status":"pass","elapsed_ms":205.071925,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  0
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

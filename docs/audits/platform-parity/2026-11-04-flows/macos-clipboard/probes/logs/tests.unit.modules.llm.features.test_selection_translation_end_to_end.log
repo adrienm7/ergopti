@@ -1,0 +1,16 @@
+MODULE tests.unit.modules.llm.features.test_selection_translation_end_to_end
+
+=== translation of the selection end to end (llm_translate_selection) ===
+  ok   translates into the interface language, offers one candidate and replaces the selection
+  ok   names a fixed target language natively, whatever the interface
+  ok   follows the interface language when it changes
+  ok   leaves the text untouched when the candidate is dismissed
+  ok   tells the user to select a text first, and sends nothing
+  ok   refuses like a manual prediction when the AI is off, before reading the selection
+  ok   tells the user when the answer holds no translation, or none came back
+  ok   ignores the answer of a superseded translation
+  ok   types nothing when the selection changed before the acceptance
+  ok   types nothing when the focus moved before the acceptance
+  ok   refuses a binding whose language contains an action separator
+  ok   translates a free language name through the existing selection owner
+RESULT 12 passed 0 failed

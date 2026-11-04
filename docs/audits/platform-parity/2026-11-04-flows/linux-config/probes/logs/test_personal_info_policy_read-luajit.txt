@@ -1,0 +1,17 @@
+
+=== personal-info-policy-read ===
+  ok   (personal-info-policy-read) refuses a native FIFO before waiting for a writer
+  ok   (personal-info-policy-shape) rejects native TOML with boolean field
+  ok   (personal-info-policy-shape) rejects native TOML with numeric field
+  ok   (personal-info-policy-shape) rejects native TOML with scalar fields
+  ok   (personal-info-policy-shape) rejects native TOML with empty array fields
+  ok   (personal-info-policy-shape) rejects native TOML with empty array field
+  ok   (personal-info-policy-shape) rejects native TOML with array fields
+  ok   (personal-info-policy-shape) rejects native TOML with string mask flag
+  ok   (personal-info-policy-shape) rejects native TOML with table mask flag
+  ok   (personal-info-policy-shape) preserves an explicitly public field in native TOML
+  ok   (personal-info-policy-shape) keeps a missing mask flag private
+  ok   (personal-info-policy-read) accepts a complete public declaration
+  ok   (personal-info-policy-read) masks everything after an unacknowledged close
+  ok   (personal-info-policy-read) closes an unreadable stream and caches its refusal
+TOTAL 14 passed 0 failed

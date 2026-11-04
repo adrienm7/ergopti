@@ -1,0 +1,50 @@
+
+=== storage adapter preserves corrupt input for recovery ===
+  ok   moves invalid JSON aside before creating a new durable store
+
+=== native script storage cohorts ===
+  ok   script-storage-cohort exact alias gates and primary pending admission
+  ok   script-storage-cohort detached private capture refuses forged and unowned updates
+  ok   script-storage-cohort actual backup order and retained inverse preserve foreign JSON kinds
+  ok   script-storage-cohort backup-time foreign source edit refuses before actual effect
+  ok   script-storage-cohort source change and same-value cooperating successor refuse stale inverse
+  ok   script-storage-cohort exact present bytes and real absence restore
+  ok   script-storage-cohort false native ACK retains actual compensation and blocks release
+  ok   script-storage-cohort same-value live module and backup callback method replacements refuse
+  ok   script-storage-cohort strict capture refuses malformed and nonobject bytes without recovery
+  ok   script-storage-cohort native FIFO and symlink source kinds refuse without mutation
+
+=== script storage receipt finalization ===
+  ok   script-storage-cohort refused capture releases its native owner without a receipt
+  ok   script-storage-cohort explicit forget finalizes without IO and breaks native owner cycles
+  ok   script-storage-cohort foreign ordinary writes remain admitted during a distinct backup publication
+
+=== script storage fake contract ===
+  ok   script-storage-cohort in-memory fake rejects owned writes and preserves foreign cells on retained inverse
+
+=== script storage opaque owner identity ===
+  ok   script-storage-cohort table equality metamethod cannot forge receipt owner or update alias ownership
+
+=== script storage numeric source admission ===
+  ok   script-storage-cohort unsafe future decimal tokens survive source-bound owned effects
+  ok   script-storage-cohort representable tokens and escaped numeric strings preserve native source
+  ok   script-storage-cohort numeric backup refusal leaves the native owner unspent
+
+=== script storage raw producer identity ===
+  ok   script-storage-cohort forged module equality cannot authorize actual native publication
+
+=== native storage exact root-member source publication ===
+  ok   preserves full handwritten bytes through owned effect, held writes and inverse
+  ok   refuses an unsafe captured numeric cell 0.1 before native effects
+  ok   refuses an unsafe captured numeric cell 9007199254740993 before native effects
+  ok   refuses an unsafe captured numeric cell 1e-400 before native effects
+  ok   refuses an unsafe captured numeric cell -0 before native effects
+  ok   rejects actual codec instance or method replacement without equality callbacks
+
+=== storage source-read foreign publication fences ===
+  ok   retains alias ownership and refuses source-read writer reentry
+  ok   refuses a codec successor inserted by actual classified source read
+
+=== storage native backup transitive codec authority ===
+  ok   rejects source-read quote replacement before backup and permits the repaired same owner
+TOTAL 29 passed 0 failed

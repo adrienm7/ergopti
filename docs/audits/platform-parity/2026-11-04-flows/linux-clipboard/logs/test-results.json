@@ -1,0 +1,182 @@
+[
+  {
+    "engine": "lua",
+    "module": "adapters.synthetic_input.test_clipboard_selection_transaction",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t33\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "adapters.synthetic_input.test_clipboard_failure_atomic",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t6\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "adapters.synthetic_input.test_clipboard_partial_write",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t12\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "adapters.synthetic_input.test_clipboard_snapshot_restorability",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t33\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "adapters.synthetic_input.test_clipboard_prepared_stage",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t27\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "adapters.synthetic_input.test_selection_write_owner",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t48\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "modules.shortcuts.text_actions.test_selection_action_destination",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t138\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "modules.shortcuts.text_actions.test_wrap_output_owner",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t34\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "modules.shortcuts.text_actions.test_wrap_on_type",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t77\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "modules.shortcuts.text_actions.test_case_transforms",
+    "exit_code": 1,
+    "summary": "AUDIT_RESULT\t72\t1"
+  },
+  {
+    "engine": "lua",
+    "module": "modules.shortcuts.text_actions.test_text_case_vectors",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t17\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t20\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "modules.shortcuts.actions.test_open_selection",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t104\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "modules.gestures.actions.test_file_selection_vectors",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t28\t0"
+  },
+  {
+    "engine": "lua",
+    "module": "infra.text.test_text_case",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t7\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "adapters.synthetic_input.test_clipboard_selection_transaction",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t33\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "adapters.synthetic_input.test_clipboard_failure_atomic",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t6\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "adapters.synthetic_input.test_clipboard_partial_write",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t12\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "adapters.synthetic_input.test_clipboard_snapshot_restorability",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t33\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "adapters.synthetic_input.test_clipboard_prepared_stage",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t27\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "adapters.synthetic_input.test_selection_write_owner",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t48\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "modules.shortcuts.text_actions.test_selection_action_destination",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t138\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "modules.shortcuts.text_actions.test_wrap_output_owner",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t34\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "modules.shortcuts.text_actions.test_wrap_on_type",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t77\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "modules.shortcuts.text_actions.test_case_transforms",
+    "exit_code": 1,
+    "summary": "AUDIT_RESULT\t72\t1"
+  },
+  {
+    "engine": "luajit",
+    "module": "modules.shortcuts.text_actions.test_text_case_vectors",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t17\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t20\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "modules.shortcuts.actions.test_open_selection",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t104\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "modules.gestures.actions.test_file_selection_vectors",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t28\t0"
+  },
+  {
+    "engine": "luajit",
+    "module": "infra.text.test_text_case",
+    "exit_code": 0,
+    "summary": "AUDIT_RESULT\t7\t0"
+  }
+]

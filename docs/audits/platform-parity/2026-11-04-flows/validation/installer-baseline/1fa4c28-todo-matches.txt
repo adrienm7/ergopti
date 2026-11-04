@@ -1,0 +1,11 @@
+11: ## Cross-platform feature inventory
+37: - [ ] Triage each OS-specific configuration entry, action and greyed menu item in the generated [feature inventory](docs/feature-inventory.md). The recorded reason and equivalent distinguish OS-specific mechanisms from actual product gaps. Recheck runtime and hardware behavior before declaring parity.
+268: - [ ] Owned Karabiner runtime: `field_owned_runtime`, then on an owned boot `field_owned_start` and
+304:       rows green for the owned-runtimes Swift and the guardian fixes; a local `swift test` run on full Xcode.app
+334:       admin prompt, installer, forceActivate; the report names the new version and the remap reloads; cancelling the
+444:   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
+470:   the installed one and the owned runtime is dormant. The runtime is published and pinned; WP8, WP9 and the real-Mac
+488:     without the owned runtime, so it waits for WP8 and WP9.
+490:     no driver is installed; the `--request-owned-runtime-install` launcher role and its Lua port behind the Tap-Holds
+503: - **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json` are all item 31 (shared
+504:   Karabiner app, owned runtime, VirtualHIDDevice). The Swift-owned managed daemon under the proxy relay needs a short

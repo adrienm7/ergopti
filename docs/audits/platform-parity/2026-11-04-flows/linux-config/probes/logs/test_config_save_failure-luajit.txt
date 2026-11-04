@@ -1,0 +1,7 @@
+
+=== Configuration save failure notice (config-save-failure-case-twin) ===
+  ok   config-save-failure-case-twin a named twin silences the generic notice
+  ok   config-save-failure-case-twin a later refusal still shows the generic notice
+  ok   config-save-failure-case-twin an unshown twin notice keeps the generic notice
+  ok   config-save-failure-case-twin no driver source reads the generic key itself
+TOTAL 4 passed 0 failed

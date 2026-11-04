@@ -1,0 +1,21 @@
+{
+	"schema_version": 1,
+	"scope": "macos-config",
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-flows/macos-config/report.md",
+	"findings": [
+		{
+			"id": "MCF-001",
+			"title": "Rejected locale changes publish canonical config before reload or settings admission",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G3"],
+			"reproduction": "Run /workspace/scratch/parity-toolchain/ci-bin/lua probes/locale-partial-commit.lua. Four independent real i18n/shared script-authority/scratch-file writer cases demonstrate false return while canonical row changes and boot adopts rejected locale. Particularly: accept de and timer A; request en; injected cancellation refusal returns false, RAM/native stay de, canonical row is en; still-owned A fires and next boot adopts rejected en. Native timer/settings acknowledgments are recording fault ports; no live macOS preference or reload is used.",
+			"root_cause": "macos/infra/i18n.lua:210 commits rewrite_configured before pending-timer cancellation (:214), timer admission (:225), or native Storage.set (:239). Refusal branches do not reverse the canonical row. persist_locale repeats the split at :264-268. _shared/lua/script_config_authority.lua:165-174 writes that row durably and macos/infra/script_scope.lua:45 adopts it before native readers on boot.",
+			"silent_failure": "Caller receives false and errors say unchanged/unsaved; current runtime remains on prior locale while existing authoritative config row contains rejected choice. During cancellation refusal the earlier accepted callback stays eligible and reloads into the newer rejected choice. Unit tests isolate i18n from the real existing-row authority owner.",
+			"regression_test": "Combine actual i18n with real authority/writer and existing [script].locale. Exercise refused timer admission, refused native persistence and refusal to cancel an earlier accepted reload. Rejected choice must not overwrite canonical prior choice or contaminate earlier callback; if saved intent is instead accepted, expose truthful committed receipt and saved-but-not-applied status. Include persist_locale and next-boot adoption.",
+			"counterparts": "Linux persist_locale similarly rewrites the row before native store; independently investigated by Linux config owner for root dedup. Windows I18nSetLocale accepts canonical saved intent then reports reload refusal explicitly; its saved-but-not-applied behavior is not the rejected-choice race reproduced here."
+		}
+	]
+}

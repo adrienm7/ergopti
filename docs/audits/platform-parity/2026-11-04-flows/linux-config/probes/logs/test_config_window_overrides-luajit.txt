@@ -1,0 +1,24 @@
+
+=== config window: delay actions ===
+  ok   applies a category delay, converting the window's milliseconds to seconds
+  ok   applies a section delay to that section
+  ok   coerces the delay to a number
+  ok   refuses a payload carrying the old `value` field instead of writing nil
+  ok   refuses a negative delay
+  ok   clears a delay by writing nil, not zero
+
+=== config window: colour and preview actions ===
+  ok   applies and clears a colour
+  ok   refuses a colour payload with no readable hex
+  ok   stores show_tooltip as a real boolean
+  ok   turns the preview ON when the user ticks the box
+  ok   does not read the string "false" as true
+  ok   clears the preview override without deciding for the user
+
+=== config window: reset ===
+  ok   clears every override
+  ok   leaves the categories the user switched off switched off
+
+=== config window: with no config module ===
+  ok   still answers the window with a usable payload
+TOTAL 15 passed 0 failed

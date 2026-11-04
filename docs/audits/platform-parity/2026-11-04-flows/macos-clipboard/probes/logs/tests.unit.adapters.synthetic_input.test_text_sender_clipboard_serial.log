@@ -1,0 +1,12 @@
+MODULE tests.unit.adapters.synthetic_input.test_text_sender_clipboard_serial
+
+=== text_sender clipboard path serializes save/restore ===
+  ok   an overlapping second send does NOT re-save, and the original survives
+
+=== text_sender clipboard path fails closed at native boundaries ===
+  ok   mutate-then-false write restores and emits no Cmd+V
+  ok   restore refusal retains ownership and autonomously retries
+  ok   timer refusal rolls back before publishing Cmd+V
+  ok   retains an uncommitted timer whose exact rollback is refused
+  ok   bounds synchronous timer and fallback callbacks instead of recursing
+RESULT 6 passed 0 failed

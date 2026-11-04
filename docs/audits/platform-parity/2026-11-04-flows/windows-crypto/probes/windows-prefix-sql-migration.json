@@ -1,0 +1,36 @@
+{
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"native_execution": false,
+	"includes": [
+		"infra/json.ahk",
+		"modules/keystats/keystats_json.ahk",
+		"_generated/keystats_queries.ahk",
+		"modules/keystats/keystats_text_cipher.ahk"
+	],
+	"exact_extracted_symbols": [
+		"KL_BuildInsertTyping",
+		"KL_GetMap",
+		"KL_EventSlots",
+		"KL_SlotNullableText",
+		"KL_SlotNullableNumber",
+		"KL_NumberOrZero",
+		"KL_SqlStr",
+		"SQLite_Q",
+		"_KL_Mig_StatementStart",
+		"_KL_Mig_MatchingParen",
+		"_KL_Mig_SplitTuple",
+		"_KL_Mig_IndexOf",
+		"_KL_Mig_Unquote",
+		"KL_Mig_ConvertStatement"
+	],
+	"artifact_sha256": "d1701b0770466c76f111368b23dcb29f97f8eae6db708d64d4a87d3669099baa",
+	"primitive_boundaries": "synthetic cached key; recording AES/hash/base64; no OS provider touched",
+	"expected_current_output": [
+		"ordinary text: SQL omits literal, two native encrypt calls",
+		"marker-prefixed raw text: SQL retains literal, only JSON invokes native encrypt",
+		"encrypt migration ok=true changed=false",
+		"decrypt migration ok=false",
+		"KL_Enc_Decrypt(marker raw)=empty"
+	],
+	"status": "source-backed, not executed; AutoHotkey/Wine absent"
+}

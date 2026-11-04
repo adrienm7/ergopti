@@ -1,0 +1,53 @@
+{
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"scope": "windows-crypto",
+	"passes": [
+		{
+			"id": "P0",
+			"kind": "discovery",
+			"new_confirmed_root_causes": ["WCR-001"],
+			"checks": [
+				"Map menu/input actions to actual owners; no generic Windows text/file encryption action owner established",
+				"Trace raw text SQL -> prefix bypass -> malformed marker decrypt/disable migration",
+				"Trace DPAPI save/load, invalid envelope and proxy seal/unseal",
+				"Compare real macOS/Linux cipher+SQL root and inspect their retained probe source/output"
+			],
+			"not_new": [
+				"WM-002 plaintext durable journal excluded",
+				"Retired provider plaintext: explicit row-preservation exception, not promoted"
+			]
+		},
+		{
+			"id": "P1",
+			"kind": "dry_pass_1",
+			"new_confirmed_root_causes": [],
+			"checks": [
+				"Re-read API private-source capture/second-read fence, prompt ownership and encryption-before-WAL",
+				"Countercheck malformed/foreign DPAPI envelopes vs overwrite semantics, legacy plaintext and reserved dpapi prefix",
+				"Trace restore/key identity, changed-token access cache and signing refusal flow",
+				"Inspect buffer/native handle ownership, cold/cached derivation and callbacks; no measured G4 claim"
+			],
+			"bounded": [
+				"DPAPI zero-output allocation native path not exercised",
+				"Access-token old key slots remain in RAM; no unbounded production-growth reproduction"
+			]
+		},
+		{
+			"id": "P2",
+			"kind": "dry_pass_2",
+			"new_confirmed_root_causes": [],
+			"checks": [
+				"Re-derive no-double-wrap root and preserve true historical-envelope idempotence as required regression control",
+				"Challenge selective at-rest columns, native prerequisites, machine identity and backup portability",
+				"Compare Windows malformed-marker decrypt with shared Lua unwrap passthrough",
+				"Re-check source equality to pin and existing TODO/audit duplicates; inspect genuine native regression registration rather than count as executed tests"
+			],
+			"bounded": [
+				"Native AHK/CNG/DPAPI and live config/menu/disk execution unavailable",
+				"No actual user files/clipboard/registry or credential services touched"
+			]
+		}
+	],
+	"consecutive_dry_passes": 2,
+	"interpretation": "Dry means no additional confirmed actionable root cause in the named bounded scope, not proof of absence under unexecuted native boundaries."
+}

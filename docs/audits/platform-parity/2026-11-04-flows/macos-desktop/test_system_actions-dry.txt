@@ -1,0 +1,25 @@
+
+=== macOS system actions start their exact native command ===
+  ok   sleep_displays runs pmset displaysleepnow
+  ok   toggle_dark_mode flips the System Events appearance
+  ok   empty_trash asks Finder to empty its trash
+  ok   minimize_all minimizes every window of every visible app
+  ok   eject_all_disks ejects through Finder and says when nothing was ejectable
+  ok   quit_frontmost_app quits the frontmost bundle, never the driver itself
+  ok   quit and force quit refuse the desktop shell
+  ok   force_quit_frontmost sends SIGKILL to the frontmost process
+  ok   a confirmed force quit kills the application read before its question (force-quit-acted-from)
+  ok   a confirmed force quit refuses the driver, the shell and a pid that changed (force-quit-acted-from)
+  ok   open_app opens by bundle identifier or by name
+  ok   clear_clipboard drops every pasteboard type
+  ok   center_mouse moves the pointer to the centre of its screen
+  ok   mic_mute_toggle mutes, then restores the level it had
+
+=== macOS Finder selection actions ===
+  ok   remove_quarantine_selection strips the attribute from each selected path
+  ok   an empty or unreadable selection starts nothing
+  ok   make_executable_selection runs chmod +x on the selected paths
+  ok   open_terminal_here opens Terminal in the Finder folder
+  ok   new_text_file_here creates a free name and reveals it
+  ok   new_text_file_here stops on a creation error
+TOTAL 20 passed, 0 failed

@@ -1,0 +1,6 @@
+
+=== auxiliary deadline publication remains parent-bound ===
+  ok   suppresses a due timeout after its parent pauses (aux-deadline-revoked)
+  ok   publishes a live timeout exactly once after native retirement (aux-deadline-live)
+  ok   preserves a sibling parent's due timeout (aux-deadline-sibling)
+TOTAL 3 passed, 0 failed

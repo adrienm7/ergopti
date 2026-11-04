@@ -1,0 +1,15 @@
+
+=== clipboard partial setter restoration ===
+  ok   restores paste after a setter false beyond mutation
+  ok   restores paste after a setter throw beyond mutation
+  ok   reports refused paste restoration after a partial setter: false
+  ok   reports refused paste restoration after a partial setter: throw
+  ok   preserves paste when its initial setter failed before mutation
+  ok   retains healthy paste delivery and original clipboard
+  ok   restores uri-list after a setter false beyond mutation
+  ok   restores uri-list after a setter throw beyond mutation
+  ok   reports refused uri-list restoration after a partial setter: false
+  ok   reports refused uri-list restoration after a partial setter: throw
+  ok   preserves uri-list when its initial setter failed before mutation
+  ok   retains healthy uri-list delivery and original clipboard
+AUDIT_RESULT	12	0

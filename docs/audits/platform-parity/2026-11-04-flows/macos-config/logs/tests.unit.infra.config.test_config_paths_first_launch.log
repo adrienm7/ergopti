@@ -1,0 +1,4 @@
+
+=== ConfigPaths on the first launch of a packaged app ===
+  ok   reads a missing managed folder as an absent bootstrap, without an error
+TOTAL 1 passed 0 failed

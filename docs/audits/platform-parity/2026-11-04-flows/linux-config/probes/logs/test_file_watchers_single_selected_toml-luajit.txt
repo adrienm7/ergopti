@@ -1,0 +1,29 @@
+
+=== file watchers single selected TOML ===
+  ok   (linux-watch-selected-file) native observes exact in-place edits and coalesces a burst
+  ok   (linux-watch-selected-file) native ignores TOML siblings with distinct lexical identities
+  ok   (linux-watch-selected-file) native follows atomic replacement and later edits
+  ok   (linux-watch-selected-file) native repairs temporary absence without accepting another source
+  ok   (linux-watch-selected-file) native stop cancels a pending reload and permits a fresh session
+  ok   (linux-watch-selected-file) native refuses a replacement directory and repairs its selected file
+  ok   (linux-watch-selected-file) pump observes exact in-place edits and coalesces a burst
+  ok   (linux-watch-selected-file) pump ignores TOML siblings with distinct lexical identities
+  ok   (linux-watch-selected-file) pump follows atomic replacement and later edits
+  ok   (linux-watch-selected-file) pump repairs temporary absence without accepting another source
+  ok   (linux-watch-selected-file) pump stop cancels a pending reload and permits a fresh session
+  ok   (linux-watch-selected-file) pump refuses a replacement directory and repairs its selected file
+  ok   (linux-watch-selected-file) native admission callback retains the exact file identity
+  ok   (linux-watch-selected-file) native retired file callback cannot reload its replacement
+  ok   (linux-watch-selected-file) native session replacement fences held file retirement
+  ok   (linux-watch-selected-topology) native rebinds when the parent directory is renamed away and replaced
+  ok   (linux-watch-selected-topology) native rebinds when an ancestor directory is renamed away and replaced
+  ok   (linux-watch-selected-topology) native waits for a file that is absent at start
+  ok   (linux-watch-selected-topology) native follows a symlinked selected file and its replaced target
+  ok   (linux-watch-selected-topology) pump rebinds when an ancestor directory is renamed away and replaced
+  ok   (linux-watch-selected-topology) pump waits for a file that is absent at start
+  ok   (linux-watch-selected-topology) pump follows a symlinked selected file and its replaced target
+  ok   (linux-watch-selected-topology) pump follows a symlinked selected file under luaposix's stat
+  ok   (linux-watch-selected-topology) pump sees another file with the same timestamp take the name
+  ok   (linux-watch-selected-topology) a selected path that is not a regular file is refused in the log
+  ok   (linux-watch-selected-file) native actual EACCES admission remains repairable
+TOTAL 26 passed 0 failed

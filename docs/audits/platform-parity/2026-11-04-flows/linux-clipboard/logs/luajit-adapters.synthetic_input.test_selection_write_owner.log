@@ -1,0 +1,61 @@
+
+=== selected writes retain field and action authority ===
+  ok   commits a stable selected ok only after cleanup
+  ok   commits a stable selected ☃ only after cleanup
+  ok   refuses selected field at read
+  ok   refuses selected password at read
+  ok   refuses selected cancel at read
+  ok   refuses selected field at write
+  ok   refuses selected password at write
+  ok   refuses selected cancel at write
+  ok   refuses selected field at settle
+  ok   refuses selected password at settle
+  ok   refuses selected cancel at settle
+  ok   refuses selected field at lookup
+  ok   refuses selected password at lookup
+  ok   refuses selected cancel at lookup
+  ok   refuses selected field at restore-wait
+  ok   refuses selected password at restore-wait
+  ok   refuses selected cancel at restore-wait
+  ok   refuses selected field at reselect
+  ok   refuses selected password at reselect
+  ok   refuses selected cancel at reselect
+  ok   retains its writing slot during capture-owner
+  ok   retains its writing slot during emit:29:1
+  ok   retains its writing slot during restore
+  ok   retains its writing slot during reselect
+  ok   revokes before cancel can acknowledge an emitting frame
+  ok   revokes before stop can acknowledge an emitting frame
+  ok   retains inconclusive selected cleanup after throw
+  ok   retains inconclusive selected cleanup after nil
+  ok   retains inconclusive selected cleanup after boolean
+  ok   retains inconclusive selected cleanup after missing-cleanup
+  ok   retains inconclusive selected cleanup after cleanup-false
+  ok   retains inconclusive selected cleanup after clipboard-restoration
+  ok   keeps a real refused clipboard restore as debt despite native key cleanup
+
+=== selected write admission reentry ===
+  ok   cannot adopt a new action after capture-owner revokes the original
+  ok   cannot adopt a new action after current revokes the original
+  ok   cannot adopt a new action after cached revokes the original
+  ok   cannot adopt a new action after authorized revokes the original
+  ok   refuses recursive publication checks without borrowing their authorization
+  ok   admits a fresh read after a completed output refusal without replaying its token
+  ok   retains outstanding physical key-UP debt after cancellation
+
+=== Main selected write publication wiring ===
+  ok   carries its private publication through the actual Main callback with moved=false
+  ok   carries its private publication through the actual Main callback with moved=true
+
+=== Main selected write owner construction ===
+  ok   pins the resident field factory in the actual daemon constructor
+
+=== selected write private final authority ===
+  ok   cannot forge a retired write by replacing its emitter view
+
+=== selected reads survive an idle action transfer ===
+  ok   keeps the immutable read for a distinct authorized edit action
+  ok   keeps the immutable read for a distinct authorized shift-tone action
+  ok   keeps the immutable read for a distinct authorized translate action
+  ok   terminal stop invalidates idle reads even for a new authorized action
+AUDIT_RESULT	48	0

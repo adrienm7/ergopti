@@ -1,0 +1,301 @@
+{
+	"schema_version": 1,
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04",
+	"classifications": {
+		"explicit_policy": "Explicit source/maintainer/corpus contract; not inferred product intent.",
+		"explicit_mechanism": "Source establishes the mechanism; no broader product rationale is invented.",
+		"implementation_constraint": "Platform/API/current-transport condition, not universal OS impossibility.",
+		"observed_limit": "Verified boundary without an established stronger promise."
+	},
+	"differences": [
+		{
+			"id": "clipboard-types",
+			"title": "Restorable clipboard formats",
+			"classification": "implementation_constraint",
+			"behavior": {
+				"windows": "Opaque all-format ClipboardAll",
+				"macos": "Native all-type pasteboard snapshots",
+				"linux": "Text-only wl-clipboard/xclip/xsel restoration; URI MIME availability differs"
+			},
+			"rationale": "Native transport/API contracts; losing borrowed formats is a follow-up, not a settled policy to discard them.",
+			"evidence_reports": [
+				"windows-clipboard/report.md",
+				"macos-clipboard/report.md",
+				"linux-clipboard/report.md"
+			]
+		},
+		{
+			"id": "selection-route",
+			"title": "How selected text is acquired",
+			"classification": "explicit_mechanism",
+			"behavior": {
+				"windows": "Sequence-owned Ctrl+C capture/UIA or native editor paths",
+				"macos": "AX/native or temporary Cmd+C borrowing depending action",
+				"linux": "PRIMARY for selected open/search; temporary clipboard for legacy transform; retained AT-SPI for LLM"
+			},
+			"rationale": "Actual owners differ by action, not just OS. No claim that all paths share the strongest destination guard.",
+			"evidence_reports": [
+				"windows-clipboard/report.md",
+				"macos-clipboard/report.md",
+				"linux-clipboard/report.md"
+			]
+		},
+		{
+			"id": "final-copy",
+			"title": "Final copy versus temporary borrowing",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Copy/clear/screenshot deliberately replaces clipboard",
+				"macos": "Copy/clear/screenshot deliberately replaces pasteboard",
+				"linux": "Same final-output semantics with native tools"
+			},
+			"rationale": "Borrowed selection/paste data must be distinguished from intentional final-copy output. This policy does not authorize stale borrower restoration.",
+			"evidence_reports": [
+				"windows-clipboard/report.md",
+				"macos-clipboard/report.md",
+				"linux-clipboard/report.md"
+			]
+		},
+		{
+			"id": "unicode-case",
+			"title": "Case transformation equivalence",
+			"classification": "implementation_constraint",
+			"behavior": {
+				"windows": "OS simple case mapping excludes certain expanding/contextual corpus vectors",
+				"macos": "Generated Unicode mappings",
+				"linux": "Generated Unicode mappings"
+			},
+			"rationale": "Same case-action presence does not guarantee identical Unicode output; shared corpus names driver-specific exclusions.",
+			"evidence_reports": [
+				"windows-clipboard/report.md",
+				"macos-clipboard/report.md",
+				"linux-clipboard/report.md"
+			]
+		},
+		{
+			"id": "typed-wrap",
+			"title": "Typed-symbol selection wrapping",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Typed-symbol/native selection path",
+				"macos": "Explicit shortcut wrapping is available; do not infer typed-symbol parity from wrap_selection",
+				"linux": "PRIMARY-based wrap-on-type avoids Ctrl+C in terminals"
+			},
+			"rationale": "Manifest platform reasons and actual entry behavior distinguish typed character interception from explicit wrapping action.",
+			"evidence_reports": [
+				"windows-clipboard/report.md",
+				"macos-clipboard/report.md",
+				"linux-clipboard/report.md"
+			]
+		},
+		{
+			"id": "clipboard-counters",
+			"title": "Copy completion strength",
+			"classification": "implementation_constraint",
+			"behavior": {
+				"windows": "Native sequence ownership",
+				"macos": "Native changeCount available; not all borrowers consult it",
+				"linux": "TIMESTAMP confirmation only on xclip/X11"
+			},
+			"rationale": "Missing session/tool confirmation remains tracked; tool presence is not proof of compositor support.",
+			"evidence_reports": [
+				"windows-clipboard/report.md",
+				"macos-clipboard/report.md",
+				"linux-clipboard/report.md"
+			]
+		},
+		{
+			"id": "api-secret-store",
+			"title": "API credential storage and transfer",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "User/machine-bound DPAPI inline blob",
+				"macos": "Keychain reference through signed helper",
+				"linux": "Secret Service reference, revisioned publication"
+			},
+			"rationale": "Native unlock, account identity and backup transferability differ; no general configuration-backup promise reconstructs every native secret.",
+			"evidence_reports": [
+				"windows-crypto/report.md",
+				"macos-crypto/report.md",
+				"linux-crypto/report.md"
+			]
+		},
+		{
+			"id": "credential-exceptions",
+			"title": "Existing credential exceptions",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Retired provider rows deliberately preserved; active entries sealed",
+				"macos": "Standard HF SDK token file/optional git store and clear proxy preferences have separate ownership",
+				"linux": "Legacy clear rows can remain until Secret Service migration; proxy preferences deliberately clear"
+			},
+			"rationale": "These scope exceptions are documented; they do not excuse newly added plaintext fallbacks or secret bytes in native argv.",
+			"evidence_reports": [
+				"windows-crypto/report.md",
+				"macos-crypto/report.md",
+				"linux-crypto/report.md"
+			]
+		},
+		{
+			"id": "metric-key",
+			"title": "Metrics cipher key source",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "MachineGuid-derived local material",
+				"macos": "Hardware UUID-derived local material",
+				"linux": "Machine-id-derived local material with native support requirements"
+			},
+			"rationale": "Machine-derived selective protection, not a password/export/key-vault feature or isolation from same-user code. Knowing or copying the derivation identity permits off-device derivation too; this layer alone must not be described as protecting a full-disk image containing that identity. Identity loss/restore has limits.",
+			"evidence_reports": [
+				"windows-crypto/report.md",
+				"macos-crypto/report.md",
+				"linux-crypto/report.md"
+			]
+		},
+		{
+			"id": "cbc-property",
+			"title": "Cipher confidentiality versus authentication",
+			"classification": "observed_limit",
+			"behavior": {
+				"windows": "Shared AES-CBC envelope",
+				"macos": "Shared AES-CBC envelope; bundled Encryptor CBC is separate",
+				"linux": "Shared AES-CBC envelope"
+			},
+			"rationale": "No MAC/AEAD integrity promise found. Controlled tamper acceptance is documented as a limitation, not invented as a violated authentication contract.",
+			"evidence_reports": [
+				"windows-crypto/report.md",
+				"macos-crypto/report.md",
+				"linux-crypto/report.md"
+			]
+		},
+		{
+			"id": "encryptor-app",
+			"title": "Bundled file Encryptor",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "No counterpart bundled file app",
+				"macos": "macOS-only app with approved overwrite prompt",
+				"linux": "No counterpart bundled file app"
+			},
+			"rationale": "This app is separate from shared metrics/text cipher protection. Missing counterparts already belong to the previous parity TODO; do not count them anew.",
+			"evidence_reports": [
+				"windows-crypto/report.md",
+				"macos-crypto/report.md",
+				"linux-crypto/report.md"
+			]
+		},
+		{
+			"id": "schema-policy",
+			"title": "Unsupported/unknown configuration data",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "ADR009 preservation and read-only future/invalid schema",
+				"macos": "Shared Lua schema policy; preserves outdated keys until explicit cleanup",
+				"linux": "Same shared policy; separate historical storage import"
+			},
+			"rationale": "Unknown retained data is not an absent cleanup feature. Explicit cleanup and ordinary saves have different permissions.",
+			"evidence_reports": [
+				"windows-config/report.md",
+				"macos-config/report.md",
+				"linux-config/report.md"
+			]
+		},
+		{
+			"id": "config-format",
+			"title": "Configuration formatting ownership",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Full-model save can canonicalize comments/format; no-op/targeted paths differ",
+				"macos": "Untouched document records preserved",
+				"linux": "Untouched document records preserved; neutral leaves sparse"
+			},
+			"rationale": "Do not promise byte preservation for every Windows full save, or treat valid sparse neutral leaves as a bug. Stale import authority is a separate defect.",
+			"evidence_reports": [
+				"windows-config/report.md",
+				"macos-config/report.md",
+				"linux-config/report.md"
+			]
+		},
+		{
+			"id": "bootstrap-scope",
+			"title": "Movable config and native bootstrap",
+			"classification": "implementation_constraint",
+			"behavior": {
+				"windows": "Early paths.toml locator and Registry/native storage",
+				"macos": "Managed/development locator and namespaced native settings",
+				"linux": "XDG config plus private bootstrap storage.json"
+			},
+			"rationale": "Moving/syncing the selected configuration folder does not move all native settings, data or secret-service items.",
+			"evidence_reports": [
+				"windows-config/report.md",
+				"macos-config/report.md",
+				"linux-config/report.md"
+			]
+		},
+		{
+			"id": "saved-intent",
+			"title": "Saved intent and rejected publication",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Canonical locale save can be accepted with explicit reload-refused result",
+				"macos": "Folder locator may remain saved after reload refusal; rejected locale must be distinguished",
+				"linux": "Some live-apply owners retain accepted saved intent; rejected locale is separately inconsistent"
+			},
+			"rationale": "A loud, truthful saved-but-unapplied receipt is not a rollback bug. MCF001/LCF002 concern explicitly rejected choices.",
+			"evidence_reports": [
+				"windows-config/report.md",
+				"macos-config/report.md",
+				"linux-config/report.md"
+			]
+		},
+		{
+			"id": "native-writer",
+			"title": "File writer lease strength",
+			"classification": "observed_limit",
+			"behavior": {
+				"windows": "WAL/native transaction/terminal handoff contracts",
+				"macos": "Advisory cooperating writer lease plus exact byte checks",
+				"linux": "Shared file lease/byte admission and native atomic publication constraints"
+			},
+			"rationale": "No generic kernel cross-process CAS or crash/power-loss guarantee is inferred merely from a successful ordinary writer test.",
+			"evidence_reports": [
+				"windows-config/report.md",
+				"macos-config/report.md",
+				"linux-config/report.md"
+			]
+		},
+		{
+			"id": "native-system",
+			"title": "Native desktop system semantics",
+			"classification": "implementation_constraint",
+			"behavior": {
+				"windows": "Endpoint mute, Explorer/WM_CLOSE and Windows theme state",
+				"macos": "Input-level mute, Finder/AppleScript/native owned tasks",
+				"linux": "PulseAudio and desktop-specific/EWMH commands"
+			},
+			"rationale": "Equivalent user intent does not make native command/result contracts identical. All three fixed-action reports document the exact variants.",
+			"evidence_reports": [
+				"windows-desktop/report.md",
+				"macos-desktop/report.md",
+				"linux-desktop/report.md"
+			]
+		},
+		{
+			"id": "async-policy",
+			"title": "Asynchronous work and error observation",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Deferred script callbacks; some native workers start without completion tracking",
+				"macos": "Owned async tasks with bounded cleanup/degraded debt, fenced callbacks",
+				"linux": "Background shell keeps grabbed-keyboard loop responsive"
+			},
+			"rationale": "Asynchronous dispatch is intentional. Losing an available refusal/error channel is a separate follow-up, not a consequence that must be accepted.",
+			"evidence_reports": [
+				"windows-desktop/report.md",
+				"macos-desktop/report.md",
+				"linux-desktop/report.md"
+			]
+		}
+	]
+}

@@ -1,0 +1,34 @@
+MODULE tests.unit.modules.shortcuts.system_actions.test_screenshot_save_capture_verdicts
+
+=== shared screenshot owner: Screen Recording gate ===
+  ok   a clipboard capture without the permission launches nothing
+  ok   a saved capture without the permission does not even create the folder
+
+=== shared screenshot owner: verified clipboard captures ===
+  ok   rejects a -c request instead of launching an unverifiable capture
+  ok   copies the captured file to the clipboard and announces success
+  ok   stays silent when an interactive capture is cancelled
+  ok   notifies an interactive failure and logs its exit code
+  ok   a full-screen capture has no cancel: a silent non-zero exit is a failure
+  ok   treats exit 0 without an image as an error
+  ok   reports an error when the pasteboard does not hold the image
+  ok   accepts a capture a held Control key sent to the clipboard
+
+=== shared screenshot owner: verified saved captures ===
+  ok   announces a save only when the file exists
+  ok   never claims a save when exit 0 left no file
+  ok   stays silent when an interactive save is cancelled
+  ok   reports a save a held Control key sent to the clipboard as copied
+  ok   rejects a save that asks for the clipboard
+
+=== gesture clipboard screenshots use the verified owner ===
+  ok   no gesture clipboard action passes -c
+
+=== shared screenshot owner retains temporary cleanup debt ===
+  ok   retains a physical permission-denied capture until recovery (screenshot-physical-unlink-debt)
+  ok   keeps a refused temporary unlink pending until the exact retry (screenshot-unlink-debt)
+  ok   retains refused cleanup after a paused capture finally exits (screenshot-paused-unlink-debt)
+  ok   keeps cleanup diagnostics fenced against reentrant admission (screenshot-unlink-reentry)
+  ok   releases cleanup after independent native absence proof (screenshot-unlink-absent)
+  ok   isolates retained screenshot cleanup from another parent (screenshot-unlink-parent)
+RESULT 22 passed 0 failed

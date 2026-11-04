@@ -1,0 +1,8 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_copy_or_open_clipboard_transaction
+
+=== copy_or_open_path: exact retained clipboard ownership ===
+  ok   retries a refused all-type restore
+  ok   timer refusal restores before Cmd+C
+  ok   copy dispatch refusal restores and leaves no live capture
+  ok   overlap cannot replace or invalidate the first snapshot
+RESULT 4 passed 0 failed

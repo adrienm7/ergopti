@@ -1,0 +1,394 @@
+[
+  {
+    "module": "tests.unit.adapters.storage.test_storage_adapter_exclusive_temporary_ownership",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_storage_adapter_exclusive_temporary_ownership-luajit.txt",
+    "total": [
+      "TOTAL 71 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.adapters.storage.test_storage_adapter_ordinary_native_cleanup",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_storage_adapter_ordinary_native_cleanup-luajit.txt",
+    "total": [
+      "TOTAL 50 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.adapters.storage.test_storage_adapter_preserves_corrupt_input",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_storage_adapter_preserves_corrupt_input-luajit.txt",
+    "total": [
+      "TOTAL 29 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.adapters.storage.test_storage_adapter_released_regular_file",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_storage_adapter_released_regular_file-luajit.txt",
+    "total": [
+      "TOTAL 24 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.adapters.storage.test_storage_owned",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_storage_owned-luajit.txt",
+    "total": [
+      "TOTAL 11 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_bridge_persistence",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_bridge_persistence-luajit.txt",
+    "total": [
+      "TOTAL 28 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_byte_limits",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_byte_limits-luajit.txt",
+    "total": [
+      "TOTAL 3 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_config_directory_target",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_directory_target-luajit.txt",
+    "total": [
+      "TOTAL 21 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_config_keys",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_keys-luajit.txt",
+    "total": [
+      "TOTAL 3 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_config_migrate",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_migrate-luajit.txt",
+    "total": [
+      "TOTAL 223 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_config_outdated",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_outdated-luajit.txt",
+    "total": [
+      "TOTAL 8 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_config_save_failure",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_save_failure-luajit.txt",
+    "total": [
+      "TOTAL 4 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_config_window_overrides",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_window_overrides-luajit.txt",
+    "total": [
+      "TOTAL 15 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_empty_config_neutral",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_empty_config_neutral-luajit.txt",
+    "total": [
+      "TOTAL 11 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_file_watchers_debounce_clock_source",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_file_watchers_debounce_clock_source-luajit.txt",
+    "total": [
+      "TOTAL 11 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_file_watchers_dev_source",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_file_watchers_dev_source-luajit.txt",
+    "total": [
+      "TOTAL 14 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_file_watchers_native_backend",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_file_watchers_native_backend-luajit.txt",
+    "total": [
+      "TOTAL 49 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_file_watchers_personal_topology",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_file_watchers_personal_topology-luajit.txt",
+    "total": [
+      "TOTAL 42 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_file_watchers_single_selected_toml",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_file_watchers_single_selected_toml-luajit.txt",
+    "total": [
+      "TOTAL 26 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_json_unicode_round_trip",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_json_unicode_round_trip-luajit.txt",
+    "total": [
+      "TOTAL 33 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_keyboard_slot_migration",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_keyboard_slot_migration-luajit.txt",
+    "total": [
+      "TOTAL 5 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_logs_dir",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_logs_dir-luajit.txt",
+    "total": [
+      "TOTAL 19 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_onboarding_answers",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_onboarding_answers-luajit.txt",
+    "total": [
+      "TOTAL 45 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_paths_shared_root_layouts",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_paths_shared_root_layouts-luajit.txt",
+    "total": [
+      "TOTAL 18 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_personal_editor_preservation",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_personal_editor_preservation-luajit.txt",
+    "total": [
+      "TOTAL 47 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_personal_file_adoption",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_personal_file_adoption-luajit.txt",
+    "total": [
+      "TOTAL 10 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_personal_file_adoption_native",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_personal_file_adoption_native-luajit.txt",
+    "total": [
+      "TOTAL 25 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_personal_info_policy_read",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_personal_info_policy_read-luajit.txt",
+    "total": [
+      "TOTAL 14 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_script_config_authority",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_script_config_authority-luajit.txt",
+    "total": [
+      "TOTAL 4 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_shared_manifest_reader",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_shared_manifest_reader-luajit.txt",
+    "total": [
+      "TOTAL 5 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_shared_probe_native",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_shared_probe_native-luajit.txt",
+    "total": [
+      "TOTAL 5 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_shared_timings",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_shared_timings-luajit.txt",
+    "total": [
+      "TOTAL 6 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_toml_codec_scan_cost",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_toml_codec_scan_cost-luajit.txt",
+    "total": [
+      "TOTAL 10 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_toml_codec_shapes",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_toml_codec_shapes-luajit.txt",
+    "total": [
+      "TOTAL 33 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_toml_codec_shared_decode",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_toml_codec_shared_decode-luajit.txt",
+    "total": [
+      "TOTAL 376 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.config.test_user_model_records_contract",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_user_model_records_contract-luajit.txt",
+    "total": [
+      "TOTAL 55 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.preferences.test_hotstring_preferences",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_hotstring_preferences-luajit.txt",
+    "total": [
+      "TOTAL 11 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.preferences.test_legacy_hotstring_storage",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_legacy_hotstring_storage-luajit.txt",
+    "total": [
+      "TOTAL 8 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.preferences.test_script_settings",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_script_settings-luajit.txt",
+    "total": [
+      "TOTAL 7 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.scope.test_config_reset_failure",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_reset_failure-luajit.txt",
+    "total": [
+      "TOTAL 7 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.scope.test_config_scope_composition",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_scope_composition-luajit.txt",
+    "total": [
+      "TOTAL 62 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.scope.test_config_scope_transaction",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_scope_transaction-luajit.txt",
+    "total": [
+      "TOTAL 106 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.infra.scope.test_global_scope",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_global_scope-luajit.txt",
+    "total": [
+      "TOTAL 12 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.ui.editors.test_config_cleanup_bridge",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_cleanup_bridge-luajit.txt",
+    "total": [
+      "TOTAL 5 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.ui.editors.test_config_cleanup_session",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_config_cleanup_session-luajit.txt",
+    "total": [
+      "TOTAL 9 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.ui.editors.test_paths_editor_logs_dir",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_paths_editor_logs_dir-luajit.txt",
+    "total": [
+      "TOTAL 15 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.ui.editors.test_ui_bridge_handlers_paths_editor",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_ui_bridge_handlers_paths_editor-luajit.txt",
+    "total": [
+      "TOTAL 64 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.ui.menu.about.test_configuration_reset_failure",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_configuration_reset_failure-luajit.txt",
+    "total": [
+      "TOTAL 9 passed 0 failed"
+    ]
+  },
+  {
+    "module": "tests.unit.ui.menu.hotstrings.test_unused_keys_cleanup",
+    "exit_code": 0,
+    "log": "docs/audits/platform-parity/2026-11-04-flows/linux-config/probes/logs/test_unused_keys_cleanup-luajit.txt",
+    "total": [
+      "TOTAL 80 passed 0 failed"
+    ]
+  }
+]

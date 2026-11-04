@@ -1,0 +1,44 @@
+MODULE tests.unit.adapters.system.test_apple_shortcuts_native
+
+=== shipped native Apple Shortcut transport ===
+  ok   uses the signed bundle role and exposes no data before exact settlement
+  ok   keeps failed cancellation owned across picker replacement
+  ok   refuses data without retirement even after helper leader completion
+  ok   preserves a structured native permission refusal rather than an empty success
+  ok   handles synchronous native construction-frame protocol without a 512-byte false refusal
+  ok   retains native cleanup uncertainty after stderr
+  ok   retains native cleanup uncertainty after oversize
+  ok   retains native cleanup uncertainty after duplicate
+  ok   retains native cleanup uncertainty after nonzero
+  ok   revalidates the actual persisted UUID and refuses remote invocation
+  ok   refuses stale or deleted persisted IDs and never starts invocation
+  ok   refuses malformed chosen descriptors before any native allocation
+
+=== native query acknowledged construction refusal ===
+  ok   releases an unstarted picker after actual ShellRunner construction nil
+  ok   settles an unstarted chosen-ID query after actual ShellRunner construction nil
+  ok   releases an unstarted picker after actual ShellRunner construction throw
+  ok   settles an unstarted chosen-ID query after actual ShellRunner construction throw
+  ok   keeps attempted query retirement debt after an observed leader exit
+  ok   retains a never-attempted query whose settlement callback lacks actual closure
+
+=== native query cross-consumer reservation ===
+  ok   fences a persisted query while a picker query owns native custody
+  ok   reserves custody before raw constructor callbacks reenter another consumer
+  ok   rejects extra native fields when revalidating persisted descriptors
+
+=== independent nested query executable ===
+  ok   refuses a missing nested helper without falling back to the main launcher
+  ok   refuses changed executable identity before held activation
+  ok   drops a completed packet when the nested executable changed
+
+=== native query admission callback identity rejoin ===
+  ok   refuses helper replacement inside raw-start admission
+  ok   refuses CLI replacement inside raw-start admission
+  ok   refuses helper replacement inside HELD admission and retains exact ACK debt
+  ok   refuses CLI replacement inside HELD admission and retains exact ACK debt
+  ok   refuses CLI replacement inside final chosen-ID admission
+  ok   preserves unchanged callback source and readonly chosen-ID refusal
+  ok   keeps cancellation authoritative inside raw-start admission
+  ok   keeps cancellation authoritative inside HELD admission
+RESULT 32 passed 0 failed

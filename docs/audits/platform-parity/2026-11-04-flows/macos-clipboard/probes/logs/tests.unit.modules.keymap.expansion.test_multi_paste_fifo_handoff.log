@@ -1,0 +1,23 @@
+MODULE tests.unit.modules.keymap.expansion.test_multi_paste_fifo_handoff
+
+=== multi-paste follows actual FIFO handoff ===
+  ok   keeps two clipboard segments healthy in a normal editor (multi-fifo-editor)
+  ok   keeps two clipboard segments behind paced Terminal deletes (multi-fifo-terminal)
+  ok   serializes three payloads and intervening key batches (multi-fifo-three)
+  ok   keeps the first payload while Terminal still owns its prefix (multi-fifo-wait)
+  ok   cancels after the first handoff without publishing the successor (multi-fifo-cancel)
+  ok   keeps dispatched clipboard data through cancel grace (multi-fifo-cancel-grace)
+  ok   keeps dispatched clipboard data through fail grace (multi-fifo-cancel-grace)
+  ok   adopts a handoff before reentrant terminal rollback (multi-fifo-inline-cancel-grace)
+  ok   preserves cancellation grace after restore timer refusal (multi-fifo-cancel-timer-grace)
+  ok   bounds persistent restore refusals until a later retry (multi-fifo-persistent-timer-grace)
+  ok   retains reentrant cancellation recovery before a successor, timer refusal=false (multi-fifo-inline-recovery-grace)
+  ok   retains reentrant cancellation recovery before a successor, timer refusal=true (multi-fifo-inline-recovery-grace)
+  ok   preserves committed Terminal output when cancellation is refused (multi-fifo-cancel-refused)
+  ok   fails the exact transaction without emitting the waiting segment (multi-fifo-fail)
+  ok   keeps exact receipts for synchronous refusal inside paced completion (multi-fifo-inline-receipt)
+  ok   owns standalone token output without an ambient transaction (multi-fifo-standalone)
+  ok   waits for a retained standalone FIFO trigger before changing payload (multi-fifo-standalone-held)
+  ok   retires an ordered timer whose first native stop refuses (multi-fifo-stop-refused)
+  ok   does not mistake an earlier Return batch for the retained paste (multi-fifo-exact-batch)
+RESULT 19 passed 0 failed

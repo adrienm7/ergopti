@@ -1,0 +1,52 @@
+MODULE tests.unit.modules.shortcuts.text_actions.clipboard.test_initial_clipboard_capture
+
+=== initial-clipboard-capture ===
+  ok   (initial-clipboard-capture) plain preserves healthy all-types
+  ok   (initial-clipboard-capture) plain preserves healthy empty
+  ok   (initial-clipboard-capture) plain preserves healthy nil-snapshot
+  ok   (initial-clipboard-capture) plain preserves copy at snapshot, identical=false
+  ok   (initial-clipboard-capture) plain preserves copy at snapshot, identical=true
+  ok   (initial-clipboard-capture) plain preserves copy at plain, identical=false
+  ok   (initial-clipboard-capture) plain preserves copy at plain, identical=true
+  ok   (initial-clipboard-capture) plain preserves copy at timer, identical=false
+  ok   (initial-clipboard-capture) plain preserves copy at timer, identical=true
+  ok   (initial-clipboard-capture) plain refuses count 1 nil
+  ok   (initial-clipboard-capture) plain refuses count 1 throw
+  ok   (initial-clipboard-capture) plain refuses count 2 nil
+  ok   (initial-clipboard-capture) plain refuses count 2 throw
+  ok   (initial-clipboard-capture) plain refuses count 3 nil
+  ok   (initial-clipboard-capture) plain refuses count 3 throw
+  ok   (initial-clipboard-capture) plain fences PAUSE from count 1
+  ok   (initial-clipboard-capture) plain fences PAUSE from count 3
+  ok   (initial-clipboard-capture) plain finally retires an interrupted healthy action
+  ok   (initial-clipboard-capture) wrap preserves healthy all-types
+  ok   (initial-clipboard-capture) wrap preserves healthy empty
+  ok   (initial-clipboard-capture) wrap preserves healthy nil-snapshot
+  ok   (initial-clipboard-capture) wrap preserves copy at snapshot, identical=false
+  ok   (initial-clipboard-capture) wrap preserves copy at snapshot, identical=true
+  ok   (initial-clipboard-capture) wrap refuses count 1 nil
+  ok   (initial-clipboard-capture) wrap refuses count 1 throw
+  ok   (initial-clipboard-capture) wrap refuses count 2 nil
+  ok   (initial-clipboard-capture) wrap refuses count 2 throw
+  ok   (initial-clipboard-capture) wrap refuses count 3 nil
+  ok   (initial-clipboard-capture) wrap refuses count 3 throw
+  ok   (initial-clipboard-capture) wrap fences PAUSE from count 1
+  ok   (initial-clipboard-capture) wrap fences PAUSE from count 3
+  ok   (initial-clipboard-capture) wrap finally retires an interrupted healthy action
+  ok   (initial-clipboard-capture) transform preserves healthy all-types
+  ok   (initial-clipboard-capture) transform preserves healthy empty
+  ok   (initial-clipboard-capture) transform preserves healthy nil-snapshot
+  ok   (initial-clipboard-capture) transform preserves copy at snapshot, identical=false
+  ok   (initial-clipboard-capture) transform preserves copy at snapshot, identical=true
+  ok   (initial-clipboard-capture) transform preserves copy at timer, identical=false
+  ok   (initial-clipboard-capture) transform preserves copy at timer, identical=true
+  ok   (initial-clipboard-capture) transform refuses count 1 nil
+  ok   (initial-clipboard-capture) transform refuses count 1 throw
+  ok   (initial-clipboard-capture) transform refuses count 2 nil
+  ok   (initial-clipboard-capture) transform refuses count 2 throw
+  ok   (initial-clipboard-capture) transform refuses count 3 nil
+  ok   (initial-clipboard-capture) transform refuses count 3 throw
+  ok   (initial-clipboard-capture) transform fences PAUSE from count 1
+  ok   (initial-clipboard-capture) transform fences PAUSE from count 3
+  ok   (initial-clipboard-capture) transform finally retires an interrupted healthy action
+RESULT 48 passed 0 failed

@@ -1,0 +1,18 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_wrap_symbols
+
+=== build_active_wrap_pairs: disabled symbols ===
+  ok   excludes a symbol disabled by its opening char ('@')
+  ok   keeps other symbols active when one is disabled
+  ok   removes BOTH keys of an asymmetric pair when its opener is disabled
+
+=== build_active_wrap_pairs: defaults and custom pairs ===
+  ok   treats a symbol with no state entry as enabled (opt-out semantics)
+  ok   registers a symmetric custom pair under its single key
+  ok   registers an asymmetric custom pair under both keys
+
+=== wrap-symbols shared catalogue ===
+  ok   exposes ordered WRAP_GROUPS with labelled groups
+  ok   includes the newly-added Unicode bracket families
+  ok   registers the asymmetric German low-high quotes from the catalogue
+  ok   still honours a disabled Unicode bracket
+RESULT 10 passed 0 failed

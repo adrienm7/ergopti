@@ -1,0 +1,15 @@
+
+=== Mac actual file exact integer scalar publication ===
+  ok   writes exact requested integer through root inline with native file and fresh reader
+  ok   writes exact requested integer through root dotted with native file and fresh reader
+  ok   writes exact requested integer through section dotted with native file and fresh reader
+  ok   writes exact requested integer through header leaf with native file and fresh reader
+  ok   writes exact requested integer through section inline with native file and fresh reader
+
+=== Mac actual file authenticated integer candidate proof ===
+  ok   refuses a wrong genuine prepared scalar then reloads repaired bytes through native Preferences
+
+=== Mac native absent inline scalar preference ===
+  ok   inserts absent known scalar with native file and fresh Preferences reader 1
+  ok   inserts absent known scalar with native file and fresh Preferences reader 2
+TOTAL 8 passed 0 failed

@@ -1,0 +1,42 @@
+
+=== shared json: text outside ASCII ===
+  ok   decodes an escaped accented letter
+  ok   joins a surrogate pair into one character
+  ok   replaces a lone surrogate instead of emitting invalid UTF-8
+  ok   keeps an escaped newline
+  ok   escapes every control character when encoding
+  ok   round-trips French text with raw UTF-8
+
+=== llm bridge: text outside ASCII ===
+  ok   decodes an escaped accented letter
+  ok   joins a surrogate pair into one character
+  ok   replaces a lone surrogate instead of emitting invalid UTF-8
+  ok   keeps an escaped newline
+  ok   escapes every control character when encoding
+  ok   round-trips French text with raw UTF-8
+
+=== llm bridge: a streamed line with an escaped accent ===
+  ok   is parsed, not dropped
+
+=== source-bound root JSON members ===
+  ok   keeps complete unowned precision, kinds, escaped keys and trivia
+  ok   retains no-op bytes and never rewrites rounded source numbers
+  ok   replaces only the a value interval
+  ok   deletes the a member without touching surviving tokens
+  ok   replaces only the b value interval
+  ok   deletes the b member without touching surviving tokens
+  ok   replaces only the c value interval
+  ok   deletes the c member without touching surviving tokens
+  ok   deletes all members and admits missing-member deletion as a no-op
+  ok   appends in decoded-key order while preserving last-member trivia
+  ok   preserves distinct case, decoded escapes and NUL or empty key identity
+  ok   rejects decoded duplicate identities at every object depth
+  ok   rejects non-object or malformed strict sources without changing legacy decoding
+  ok   isolates receipts from mutated models, cloned tables and another codec
+  ok   requires explicit Boolean cells and refuses extra or implicit values
+  ok   refuses values the legacy encoder drops, normalizes or cannot round-trip
+  ok   keeps explicit empty arrays, objects, nulls and false update values
+  ok   refuses malformed and semantically wrong output from the actual encoder
+  ok   reparses the complete spliced candidate and rejects key injection
+  ok   permits repeated independent edits from an authentic parse receipt only
+TOTAL 33 passed 0 failed

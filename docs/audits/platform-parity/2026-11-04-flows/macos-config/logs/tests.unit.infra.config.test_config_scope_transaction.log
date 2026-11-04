@@ -1,0 +1,136 @@
+
+=== scoped configuration transaction ===
+  ok   makes ordinary registered configuration writes sparse without touching unrelated files
+  ok   clears owned leaves while preserving unknown nested keys and unrelated consent
+  ok   restores recommendations without acquiring absent AI or metrics consent
+  ok   refuses a failed backup before touching runtime or the destination
+  ok   compensates a throwing native application without publishing the candidate
+  ok   compensates a refused publication without losing unknown bytes
+  ok   retains failed rollback debt and refuses another transaction until restored
+  ok   preserves an external edit arriving during runtime application
+  ok   never overwrites an existing backup
+
+=== dynamic scope publication ===
+  ok   removes only runtime-owned ordinary leaves and backs up the exact unknown neighbors
+
+=== quoted dynamic scope publication ===
+  ok   clears a quoted extension leaf with exact backup and neighbor preservation
+
+=== single-file scope admission ===
+  ok   removes only validated binding parameters while preserving other domains and unknown neighbors
+  ok   refuses a malformed inline macOS parameter table before backup or runtime publication
+  ok   clears the original inline macOS parameter with exact bytes, backup and typed reload
+  ok   refuses preset scopes before reading, backing up or touching runtime
+
+=== preset scope publication ===
+  ok   publishes the preset file with a verified backup and leaves config.toml untouched
+  ok   creates an absent preset file without creating config.toml
+  ok   keeps an external preset edit made during runtime application
+  ok   restores a published preset when the configuration publication is refused
+
+=== committed scope revert ===
+  ok   reverts runtime and every published file, removing a file it created
+  ok   puts the exact configuration bytes back after a committed single-file scope
+  ok   retains a revert refused by a later edit until the edit is undone
+  ok   release forgets the inverse so a composed commit cannot be reverted
+
+=== scope conditional unlink cleanup debt ===
+  ok   retains true unlink debt across false release
+  ok   retains true unlink debt across truthy release
+  ok   retains true unlink debt across throw release
+  ok   retains false unlink debt across false release
+  ok   retains false unlink debt across truthy release
+  ok   retains false unlink debt across throw release
+
+=== scope refused partial unlink ===
+  ok   proves absence only after the retained removal lease releases
+
+=== authentic configuration scope preparation epoch ===
+  ok   refuses boot during capture before backup and runtime
+  ok   refuses future during capture before backup and runtime
+  ok   refuses invalid during capture before backup and runtime
+  ok   refuses source receipt mutation during capture before backup and runtime
+  ok   refuses cloned and altered prepared snapshots without issuing authority
+  ok   refuses withdrawn preparation authority instead of trusting an accessor
+  ok   retires an old preparation while a fresh explicit current intent can succeed
+  ok   rechecks preparation after runtime and compensates without primary publication
+
+=== scoped configuration planning ===
+  ok   retains generated dynamic scalar types before a native runtime erases false versus zero
+  ok   removes only validated parameter domains for both clear and recommendation restore
+  ok   requires exact host ownership and refuses malformed or non-parameter actions
+  ok   (config-scope-plan) runtime-owned-leaves-collected-once-without-static-or-unknown-siblings
+  ok   (config-scope-plan) refuses incomplete inventory: unknown-group-below-a-module
+  ok   (config-scope-plan) refuses incomplete inventory: setting-outside-the-scope
+  ok   (config-scope-plan) refuses incomplete inventory: empty-path-segment
+  ok   (config-scope-plan) refuses incomplete inventory: a-later-provider-raises
+  ok   (config-scope-plan) refuses incomplete inventory: a-provider-that-is-not-a-function
+  ok   refuses a sparse or named path list instead of returning a partial successful plan
+  ok   (tap-hold-clear-keeps-switch) a clear leaves the tap_holds switch as it is
+  ok   (gestures-clear-keeps-switch) a clear leaves the gestures switch as it is
+  ok   plans global's declared rows without acquiring included presets or settings
+  ok   does not resolve an included native backend for direct planning
+  ok   (config-scope-plan) direct-plan-keeps-only-its-own-declarations-on-restore
+  ok   (config-scope-plan) direct-plan-keeps-only-its-own-declarations-on-clear
+  ok   (config-scope-plan) refuses a direct plan: unknown-scope
+  ok   (config-scope-plan) refuses a direct plan: unknown-mode
+  ok   (config-scope-plan) refuses a direct plan: unknown-parameter-path
+  ok   hands out a detached plan on every call
+  ok   (config-scope-plan) foreign-cyclic-or-missing-included-declarations-are-not-traversed
+  ok   routes separate-file presets for restore and clear without inventing config rows
+
+=== scope secondary file ===
+  ok   publishes after a verified backup and restores the exact bytes
+  ok   refuses to publish over bytes another writer changed after preparation
+  ok   keeps a refused restoration owed until the published bytes are back
+  ok   creates an absent file and removes only its own candidate on restore
+  ok   touches nothing when the plan leaves the bytes unchanged
+
+=== secondary conditional publication terminal ===
+  ok   retains cleanup after a refused publication effect=true
+  ok   retains cleanup after a refused publication effect=false
+
+=== script log runtime owned scalar ===
+  ok   retains a real native inverse across release and composition reacquisition
+  ok   refuses forged receipts, wrong owners and noncanonical values without changing state
+  ok   refuses ordinary setter reentry throughout the actual field claim
+  ok   preserves a foreign successor even when its value matches the prior publication
+  ok   refuses a replaced live module with the same scalar without touching either owner
+  ok   rejects equal-valued owner impostors by raw identity
+  ok   forgets its inverse only after primary finalization and gate release
+  ok   keeps the gate until literal primary compensation acknowledgement
+
+=== script locale source-bound native field ===
+  ok   publishes its actual consumer and restores the opaque inverse after reacquisition
+  ok   refuses wrong field kinds, foreign receipts and callback setter reentry
+  ok   keeps exact live-parent admission through an equal-valued module replacement
+  ok   refuses identity impostors whose equality metamethod claims the retained owner
+  ok   refuses the existing locale reload instead of cancelling or replaying it
+  ok   forgets only finalized native inverse data and acknowledges repeat cleanup
+
+=== script error source-bound native field ===
+  ok   publishes its actual consumer and restores the opaque inverse after reacquisition
+  ok   refuses wrong field kinds, foreign receipts and callback setter reentry
+  ok   keeps exact live-parent admission through an equal-valued module replacement
+  ok   refuses identity impostors whose equality metamethod claims the retained owner
+  ok   refuses an actual already scheduled error without canceling its presentation
+  ok   forgets only finalized native inverse data and acknowledges repeat cleanup
+
+=== direct script scope native composition ===
+  ok   publishes only its declared recommended rows and restores actual consumers
+  ok   publishes only its declared clear rows and restores actual consumers
+  ok   reconstructs actual native consumers from aliases after a sparse canonical clear
+  ok   honors the actual boot schema refusal before any backup or native alias write
+  ok   refuses paused and invalid requests before source or alias mutation
+  ok   refuses an existing wrong-kind script source: locale = false
+  ok   refuses an existing wrong-kind script source: log_level = 2
+  ok   refuses an existing wrong-kind script source: show_error_dialog = "false"
+  ok   refuses a same-valued declaration owner replacement before file or aliases are written
+  ok   refuses a same-valued declaration successor interposed by the real config read
+  ok   refuses changed declaration metadata before file or aliases are written
+  ok   compensates a real partially applied translation backend that explicitly refuses
+  ok   retains the real participant through composition finalization without replay
+
+=== script native alias descriptors ===
+  ok   script-native-aliases exposes detached descriptors of the actual participant
+TOTAL 101 passed 0 failed

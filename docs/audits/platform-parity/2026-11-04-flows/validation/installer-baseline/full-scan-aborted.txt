@@ -1,0 +1,1 @@
+The optional original full inventory-test replay over all immutable source blobs was terminated by SIGTERM to its own Node process PID575531 at parent request. It was CPU-bound and produced no completion receipt; no pass/fail outcome is claimed. Use bounded.cjs / bounded-receipt.json for the finished exact-parser baseline proof. No repository source was changed.

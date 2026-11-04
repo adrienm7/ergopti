@@ -1,0 +1,14 @@
+
+=== session demotions keep config.toml values ===
+  ok   preserves independent child values without aliasing their runtime snapshot
+  ok   serialises the saved value while the state holds the demoted one
+  ok   hands back the live state itself when no demotion applies
+  ok   ends a demotion once a save commits the user's change of that value
+  ok   keeps a demotion whose key still holds its demoted posture at commit
+  ok   keeps the first saved value when the same key is demoted again
+  ok   compares table values structurally
+  ok   rejects a record without a feature or a state key
+
+=== session demotions and global actions ===
+  ok   detaches every demotion for an explicit save and restores them on failure
+TOTAL 9 passed 0 failed

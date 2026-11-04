@@ -1,0 +1,44 @@
+
+=== hotstrings config window notifies the menubar after an edit ===
+  ok   fires the injected callback after a delay change
+  ok   fires after a colour change
+  ok   fires after a clear that restores the default
+  ok   fires after the reset_all and set_all_grey bulk operations
+
+=== hotstrings config window refresh channel is defensive ===
+  ok   does not fire on a non-mutating message
+2026-11-04 17:30:52:000 [DEBUG] [keymap] Delay 'STAR_TRIGGER': 0.500s.
+[logger] unified log write refused: /tmp/lua_S4fmcV_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+2026-11-04 17:30:52:000 [ERROR] [hotstrings_config_window] Callback 'Hotstrings configuration refresh' raised: ...windows/test_hotstrings_config_window_refreshes_menu.lua:150: menu rebuild exploded
+stack traceback:
+	[C]: in function 'error'
+	...windows/test_hotstrings_config_window_refreshes_menu.lua:150: in function 'ui.hotstrings_config_window._on_config_changed'
+	[C]: in function 'xpcall'
+	...space/ergopti/static/ergopti_plus/macos/infra/logger.lua:1794: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/ui/hotstrings_config_window/init.lua:662: in upvalue 'commit_and_push'
+	.../ergopti_plus/macos/ui/hotstrings_config_window/init.lua:817: in function 'ui.hotstrings_config_window._on_message'
+	...windows/test_hotstrings_config_window_refreshes_menu.lua:64: in upvalue 'send'
+	...windows/test_hotstrings_config_window_refreshes_menu.lua:161: in function <...windows/test_hotstrings_config_window_refreshes_menu.lua:160>
+	[C]: in function 'xpcall'
+	...windows/test_hotstrings_config_window_refreshes_menu.lua:160: in upvalue 'fn'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:847: in function <...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:845: in function 'tests.helpers.it'
+	...windows/test_hotstrings_config_window_refreshes_menu.lua:145: in function <...windows/test_hotstrings_config_window_refreshes_menu.lua:134>
+	[C]: in function 'pcall'
+	...ergopti/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...windows/test_hotstrings_config_window_refreshes_menu.lua:134: in main chunk
+	[C]: in function 'require'
+	.../scratch/parity-flows/macos-config/probes/run-module.lua:4: in function <.../scratch/parity-flows/macos-config/probes/run-module.lua:4>
+	[C]: in function 'xpcall'
+	.../scratch/parity-flows/macos-config/probes/run-module.lua:4: in main chunk
+	[C]: in ?.
+[logger] topical log write refused: /tmp/lua_S4fmcV_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_hotstrings.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_S4fmcV_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   logs and contains a callback that throws (HS-198)
+2026-11-04 17:30:52:000 [DEBUG] [keymap] Delay 'STAR_TRIGGER': 0.500s.
+  ok   works when no callback was injected
+
+=== the menubar wires its refresh callback at the open site ===
+  ok   menu_hotstrings_management injects _on_config_changed before open
+TOTAL 8 passed 0 failed

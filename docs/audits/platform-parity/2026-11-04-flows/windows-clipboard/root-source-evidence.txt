@@ -1,0 +1,5 @@
+WCP-001: startup snapshots physical generation before Save; later startup guards omit it and foreground
+WCP-002: SendInstant has no target/pause admission after its yielding clipboard snapshot
+UNEXECUTED AHK probe generated: /workspace/scratch/parity-flows/windows-clipboard/probes/sendinstant-pause-native-probe.ahk
+Exact SendInstant source sha256=87431a7010a02044a089c88425a4268f8984a313f030e0f1ce100520ca14976a
+Audited SHA=213d65af24d2aa4845ba47743c9bab6787b61964

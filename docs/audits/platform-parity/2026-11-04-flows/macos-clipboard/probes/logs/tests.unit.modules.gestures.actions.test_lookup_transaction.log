@@ -1,0 +1,34 @@
+MODULE tests.unit.modules.gestures.actions.test_lookup_transaction
+
+=== gesture Actions lookup transaction ===
+  ok   normalizes lookup binding provenance to gestures
+  ok   normalizes lookup binding provenance to shortcut_bindings
+  ok   does not click when timer acquisition returns false
+  ok   rolls back the timer when mouse position read returns false
+  ok   rolls back the timer when down_construct returns false
+  ok   rolls back the timer when up_construct returns false
+  ok   rolls back the timer when down_post returns false
+  ok   rolls back the timer when up_post returns false
+  ok   does not click when timer acquisition returns nil
+  ok   rolls back the timer when mouse position read returns nil
+  ok   rolls back the timer when down_construct returns nil
+  ok   rolls back the timer when up_construct returns nil
+  ok   rolls back the timer when down_post returns nil
+  ok   rolls back the timer when up_post returns nil
+  ok   does not click when timer acquisition returns throw
+  ok   rolls back the timer when mouse position read returns throw
+  ok   rolls back the timer when down_construct returns throw
+  ok   rolls back the timer when up_construct returns throw
+  ok   rolls back the timer when down_post returns throw
+  ok   rolls back the timer when up_post returns throw
+  ok   retains PAUSE when position read reenters the lifecycle
+  ok   posts only cleanup mouse-up work when mouse-down reenters PAUSE
+  ok   retains gestures lookup mouse-up debt after false
+  ok   retains gestures lookup mouse-up debt after nil
+  ok   retains gestures lookup mouse-up debt after throw
+  ok   retains shortcut_bindings lookup mouse-up debt after false
+  ok   retains shortcut_bindings lookup mouse-up debt after nil
+  ok   retains shortcut_bindings lookup mouse-up debt after throw
+  ok   retries retained lookup mouse-up debt before the next lookup
+  ok   reports retained lookup mouse-up debt when recovery still refuses
+RESULT 30 passed 0 failed

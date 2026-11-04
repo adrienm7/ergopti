@@ -1,0 +1,8 @@
+
+=== role-named keyboard slot migration (linux) ===
+  ok   (slot-migration) every retired slot id keeps its action under the role-named id
+  ok   (slot-migration) every retired slot's action parameters follow it to the role-named id
+  ok   (slot-migration) a parameter whose role-named key is already taken refuses the migration
+  ok   (slot-migration) an already role-named slot and a physical slot stay
+  ok   (slot-migration) a file at the new version is untouched and a newer one is refused
+TOTAL 5 passed 0 failed

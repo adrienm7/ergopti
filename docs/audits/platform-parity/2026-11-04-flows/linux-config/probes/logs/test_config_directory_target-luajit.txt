@@ -1,0 +1,24 @@
+
+=== configuration directory admission (config-directory-target) ===
+  ok   config-directory-target refuses file through single
+  ok   config-directory-target refuses parent_file through single
+  ok   config-directory-target refuses broken_link through single
+  ok   config-directory-target accepts existing through single
+  ok   config-directory-target accepts symlink through single
+  ok   config-directory-target accepts create through single
+  ok   config-directory-target accepts default through single
+  ok   config-directory-target refuses file through batch
+  ok   config-directory-target refuses parent_file through batch
+  ok   config-directory-target refuses broken_link through batch
+  ok   config-directory-target accepts existing through batch
+  ok   config-directory-target accepts symlink through batch
+  ok   config-directory-target accepts create through batch
+  ok   config-directory-target accepts default through batch
+  ok   config-directory-target refuses file through editor
+  ok   config-directory-target refuses parent_file through editor
+  ok   config-directory-target refuses broken_link through editor
+  ok   config-directory-target accepts existing through editor
+  ok   config-directory-target accepts symlink through editor
+  ok   config-directory-target accepts create through editor
+  ok   config-directory-target accepts default through editor
+TOTAL 21 passed 0 failed

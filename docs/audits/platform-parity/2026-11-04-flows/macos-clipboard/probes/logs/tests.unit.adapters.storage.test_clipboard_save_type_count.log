@@ -1,0 +1,5 @@
+MODULE tests.unit.adapters.storage.test_clipboard_save_type_count
+
+=== clipboard.save counts UTI types via pairs(), not # ===
+  ok   logs the real type count for a hash-keyed pasteboard
+RESULT 1 passed 0 failed

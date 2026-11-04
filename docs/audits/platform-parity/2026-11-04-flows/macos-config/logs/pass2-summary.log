@@ -1,0 +1,12 @@
+tests.unit.ui.hotstring_windows.test_hotstrings_config_window_transaction PASS TOTAL 18 passed 0 failed
+tests.unit.ui.hotstring_windows.test_hotstrings_config_window_pushes_delay PASS TOTAL 4 passed 0 failed
+tests.unit.ui.hotstring_windows.test_hotstrings_config_window_refreshes_menu PASS TOTAL 8 passed 0 failed
+tests.unit.ui.editors.test_layer_editor_cleanup_transaction PASS TOTAL 4 passed 0 failed
+tests.unit.infra.preferences.test_preferences_scope PASS TOTAL 11 passed 0 failed
+tests.unit.infra.preferences.test_preferences_keeps_unowned_sections_gesture_parameters PASS TOTAL 26 passed 0 failed
+tests.unit.infra.preferences.test_preferences_shared_nested_table PASS TOTAL 2 passed 0 failed
+tests.unit.infra.preferences.test_preferences_sparse PASS TOTAL 3 passed 0 failed
+tests.unit.infra.preferences.test_preferences_manifest_round_trip PASS TOTAL 1 passed 0 failed
+tests.unit.ui.menu.state.test_per_row_preference_transaction PASS TOTAL 22 passed 0 failed
+tests.unit.ui.menu.state.test_session_demotions PASS TOTAL 9 passed 0 failed
+GROUP [108, 0] bad 0

@@ -1,0 +1,46 @@
+
+=== file_watchers Personal topology ===
+  [Personal topology fixture uses native luv scan/stat port; lua-posix unavailable]
+  ok   (linux-watch-topology) native admits a moved-in populated tree and its later edits
+  ok   (linux-watch-topology) native observes a later TOML in a directory created after start
+  ok   (linux-watch-topology) native observes a new direct TOML and later in-place edits
+  ok   (linux-watch-topology) native refreshes renamed and removed/recreated directory bindings
+  ok   (linux-watch-topology) native keeps reconciled coverage after the reload callback refuses
+  ok   (linux-watch-topology) native keeps prior coverage after an unacknowledged directory scan
+  ok   (linux-watch-topology) pump admits a moved-in populated tree and its later edits
+  ok   (linux-watch-topology) pump observes a later TOML in a directory created after start
+  ok   (linux-watch-topology) pump observes a new direct TOML and later in-place edits
+  ok   (linux-watch-topology) pump refreshes renamed and removed/recreated directory bindings
+  ok   (linux-watch-topology) pump keeps reconciled coverage after the reload callback refuses
+  ok   (linux-watch-topology) pump keeps prior coverage after an unacknowledged directory scan
+  ok   (linux-watch-topology) native ignores unrelated regular files without scanning Personal
+  ok   (linux-watch-topology) native retains original coverage across a refused descendant activation
+  ok   (linux-watch-topology) native rejects an obsolete callback after removal and after a new session
+  ok   (linux-watch-topology) native admits nil-filename keyed rename receipts
+  ok   (linux-watch-topology) native replaces an obsolete inode binding after atomic TOML publication
+  ok   (linux-watch-topology) native preserves distinct overlapping Hotstrings and base owners
+  ok   (linux-watch-topology) native observes a file created while a new directory census is open
+  ok   (linux-watch-topology) native old reconciliation cannot rearm a replacement session
+  ok   (linux-watch-topology) native close ownership survives until the actual retirement ACK
+  ok   (linux-watch-topology) native rejects a duplicate native directory result without shadowed handles
+  ok   (linux-watch-topology) native pending Personal refusal preserves accepted main and base bursts
+  ok   (linux-watch-topology) native repaired unobserved coverage refreshes the consumer's latest bytes once
+  ok   (linux-watch-topology) native no-posix irrelevant events use no shell directory probe
+  ok   (linux-watch-topology) native retired initial construction cannot arm its obsolete base root
+  ok   (linux-watch-topology) native no-posix LF sibling cannot revoke ordinary TOML coverage
+  ok   (linux-watch-topology) pump no-posix LF sibling cannot revoke ordinary TOML coverage
+  ok   (linux-watch-topology) native no-posix checked shell refuses command_refusal
+  ok   (linux-watch-topology) native no-posix checked shell refuses capture_refusal
+  ok   (linux-watch-topology) pump no-posix checked shell refuses command_refusal
+  ok   (linux-watch-topology) pump no-posix checked shell refuses capture_refusal
+  ok   (linux-watch-topology) native retains owned retirement after stop_refused
+  ok   (linux-watch-topology) native retains owned retirement after close_refused
+  ok   (linux-watch-root-anchor) native recovers an empty removed and recreated Personal root
+  ok   (linux-watch-root-anchor) pump recovers an empty removed and recreated Personal root
+  ok   (linux-watch-root-anchor) native ignores distinct parent siblings without recursive scans
+  ok   (linux-watch-root-anchor) native refused anchor preserves healthy coverage and retries admission
+  ok   (linux-watch-root-anchor) native retirement ACK and session fence include the parent anchor
+  ok   (linux-watch-root-anchor) native committed source repair refreshes bytes while only its parent refuses
+  ok   (linux-watch-root-anchor) native nil-filename errors retain diagnostics and repair ownership
+  ok   (linux-watch-root-anchor) native ambiguous rename port receipt rebinds unchanged metadata
+TOTAL 42 passed 0 failed

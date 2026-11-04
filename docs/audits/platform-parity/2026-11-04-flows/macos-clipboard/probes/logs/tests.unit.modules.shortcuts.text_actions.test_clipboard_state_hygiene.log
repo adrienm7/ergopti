@@ -1,0 +1,10 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_clipboard_state_hygiene
+
+=== a second text transform cannot start while one owns the clipboard ===
+  ok   guards the pipeline with an in-flight flag
+  ok   arms a failsafe release so the flag cannot stick
+
+=== the wrap-text cache is invalidated once the selection is consumed ===
+  ok   marks the cached selection consumed after wrapping
+  ok   keeps the entry valid as a negative rather than clearing it
+RESULT 4 passed 0 failed

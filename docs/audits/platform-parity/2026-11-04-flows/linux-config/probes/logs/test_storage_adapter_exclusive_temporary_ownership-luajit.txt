@@ -1,0 +1,92 @@
+
+=== storage exclusive temporary ownership ===
+  ok   linux-storage-exclusive-temp: set refuses foreign regular staging
+  ok   linux-storage-exclusive-temp: set refuses foreign symlink staging
+  ok   linux-storage-exclusive-temp: set refuses foreign hardlink staging
+  ok   linux-storage-exclusive-temp: set refuses foreign dangling staging
+  ok   linux-storage-exclusive-temp: set_many refuses foreign regular staging
+  ok   linux-storage-exclusive-temp: set_many refuses foreign symlink staging
+  ok   linux-storage-exclusive-temp: set_many refuses foreign hardlink staging
+  ok   linux-storage-exclusive-temp: set_many refuses foreign dangling staging
+  ok   linux-storage-exclusive-temp: delete refuses foreign regular staging
+  ok   linux-storage-exclusive-temp: delete refuses foreign symlink staging
+  ok   linux-storage-exclusive-temp: delete refuses foreign hardlink staging
+  ok   linux-storage-exclusive-temp: delete refuses foreign dangling staging
+  ok   linux-storage-exclusive-temp: clear refuses foreign regular staging
+  ok   linux-storage-exclusive-temp: clear refuses foreign symlink staging
+  ok   linux-storage-exclusive-temp: clear refuses foreign hardlink staging
+  ok   linux-storage-exclusive-temp: clear refuses foreign dangling staging
+
+=== storage concurrent backup ownership ===
+  ok   linux-storage-backup-link: checks native fallback EEXIST receipts
+  ok   linux-storage-backup-link: checks native fallback EACCES receipts
+  ok   linux-storage-backup-link: checks native fallback unlink-refused receipts
+  ok   linux-storage-backup-link: checks native fallback success receipts
+  ok   linux-storage-backup-race: retains concurrent regular at suffix 0
+  ok   linux-storage-backup-race: retains concurrent regular at suffix 1
+  ok   linux-storage-backup-race: retains concurrent dangling at suffix 0
+  ok   linux-storage-backup-race: retains concurrent dangling at suffix 1
+
+=== storage backup path inspection ===
+  ok   linux-storage-backup-type: skips occupied dangling at suffix 0
+  ok   linux-storage-backup-type: skips occupied dangling at suffix 1
+  ok   linux-storage-backup-type: skips occupied directory at suffix 0
+  ok   linux-storage-backup-type: skips occupied directory at suffix 1
+  ok   linux-storage-backup-type: skips occupied symlink at suffix 0
+  ok   linux-storage-backup-type: skips occupied symlink at suffix 1
+  ok   linux-storage-backup-type: skips occupied regular at suffix 0
+  ok   linux-storage-backup-type: skips occupied regular at suffix 1
+  ok   linux-storage-backup-type: refuses refused native inspection
+  ok   linux-storage-backup-type: refuses empty native inspection
+  ok   linux-storage-backup-type: refuses unknown native inspection
+  ok   linux-storage-backup-type: refuses raised native inspection
+
+=== storage regular-source descriptor receipts ===
+  ok   linux-storage-special-source: descriptor receipt 1
+  ok   linux-storage-special-source: descriptor receipt 2
+  ok   linux-storage-special-source: descriptor receipt 3
+  ok   linux-storage-special-source: descriptor receipt 4
+  ok   linux-storage-special-source: descriptor receipt 5
+  ok   linux-storage-special-source: descriptor receipt 6
+  ok   linux-storage-special-source: descriptor receipt 7
+  ok   linux-storage-special-source: descriptor receipt 8
+  ok   linux-storage-special-source: descriptor receipt 9
+
+=== storage native open receipts ===
+  ok   linux-storage-read-receipts: blocks mutation after 13
+  ok   linux-storage-read-receipts: blocks mutation after 1
+  ok   linux-storage-read-receipts: blocks mutation after 20
+  ok   linux-storage-read-receipts: blocks mutation after 5
+  ok   linux-storage-read-receipts: blocks mutation after 24
+  ok   linux-storage-read-receipts: blocks mutation after 40
+  ok   linux-storage-read-receipts: blocks mutation after unknown
+  ok   linux-storage-read-receipts: blocks mutation after throw
+
+=== storage root JSON shape ===
+  ok   linux-storage-shape-receipts: preserves array history 1
+  ok   linux-storage-shape-receipts: preserves array history 2
+  ok   linux-storage-shape-receipts: preserves array history 3
+  ok   linux-storage-shape-receipts: preserves array history 4
+
+=== storage durable snapshot ownership ===
+  ok   linux-storage-snapshot-receipts: set detaches input
+  ok   linux-storage-snapshot-receipts: set detaches returned
+  ok   linux-storage-snapshot-receipts: set detaches refused
+  ok   linux-storage-snapshot-receipts: set_many detaches input
+  ok   linux-storage-snapshot-receipts: set_many detaches returned
+  ok   linux-storage-snapshot-receipts: set_many detaches refused
+
+=== storage backup open receipts ===
+  ok   linux-storage-backup-receipts: preserves prior backup after 13
+  ok   linux-storage-backup-receipts: preserves prior backup after 5
+  ok   linux-storage-backup-receipts: preserves prior backup after unknown
+  ok   linux-storage-backup-receipts: preserves prior backup after throw
+
+=== storage adapter uses the shared JSON codec ===
+  ok   preserves nested tables, arrays, and unicode across a persist/reload cycle
+
+=== storage adapter publishes only durable mutations ===
+  ok   rolls memory back on mkdir, open, write, close, and rename failures
+  ok   commits a related preference set with one durable snapshot
+  ok   reports failure under an unwritable config root without a memory-only success
+TOTAL 71 passed 0 failed

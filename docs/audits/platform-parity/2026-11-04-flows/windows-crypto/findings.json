@@ -1,0 +1,22 @@
+{
+	"schema_version": 1,
+	"scope": "windows-crypto",
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-flows/windows-crypto/report.md",
+	"findings": [
+		{
+			"id": "WCR-001",
+			"title": "Marker-prefixed raw typing bypasses the protected SQL text encryption path",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_property": "Confidentiality of unrestricted literal typed-text SQL columns under enabled at-rest encryption; raw input must not impersonate trusted stored ciphertext.",
+			"reproduction": "Enable metrics encryption, type/paste a legitimate synthetic string starting ergopti-enc-v1:SENTINEL-PRIVATE-CONTENT in a recorded editor, flush typing snapshot. Real Windows SQL builder passes raw e.text to prefix-idempotent cipher; it returns the literal and SQL accepts it. Encrypt migration skips it; Windows malformed-prefix decrypt returns empty and decrypt migration refuses. Source-backed native AHK probe probes/windows-prefix-sql-migration.ahk is supplied but not executed (no AHK/Wine/CNG). Same root exercised by inspected real macOS/Linux cipher+SQL artifacts; no live Windows or user-state claim.",
+			"root_cause": "windows/modules/keystats/keystats_sql.ahk:64–85 passes unrestricted raw text into KL_Enc_Encrypt; windows/modules/keystats/keystats_text_cipher.ahk:169/220 treats any ergopti-enc-v1: prefix as already encrypted and returns before native protection. Migration uses the same predicate at keystats_text_migration.ahk:428. Shared Lua text_cipher.encrypt has the same lost-provenance guard, so deduplicate as one cross-driver root.",
+			"silent_failure": "Returned raw marker text is nonempty, so SQL insertion and enabled UI posture report no encryption error; only the other JSON column is encrypted. Existing no-double-wrap controls cover actual generated envelopes, not marker-like raw user input. Decrypt migration later logs a real failure and preserves the ledger; this secondary refusal is not presented as silent data destruction.",
+			"regression_test": "Drive actual raw SQL writer/cipher with malformed prefix and fully shaped valid-envelope-lookalike raw text plus ordinary/binary-safe controls. Require no clear canary in protected SQL and exact raw literal on decrypt. Separately preserve trusted historical ciphertext idempotence, corrupt-envelope refusal, native-failure retry and successful reverse migration. Run native Windows probe and same shared contract on macOS/Linux.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/windows-crypto/report.md"
+		}
+	]
+}

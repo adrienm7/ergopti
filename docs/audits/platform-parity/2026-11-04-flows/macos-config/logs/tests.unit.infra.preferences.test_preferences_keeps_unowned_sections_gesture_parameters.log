@@ -1,0 +1,41 @@
+
+=== Published gesture parameter identity source preservation ===
+  ok   ignores a retired binding, leaves it unconsumed, warns once and keeps exact bytes
+  ok   preserves the obsolete row across a complete save and an ordinary current-binding edit
+  ok   keeps unavailable-catalogue entries without guessing their retirement
+
+=== macOS real preference root dotted scalar publication ===
+  ok   uses the actual conditional preference publisher for header
+  ok   uses the actual conditional preference publisher for root dotted
+  ok   uses the actual conditional preference publisher for root inline
+  ok   uses the actual conditional preference publisher for obsolete scalar
+
+=== macOS real root dotted numeric admission ===
+  ok   acknowledges the exact requested finite temperature through the conditional publisher
+
+=== macOS real finite header numeric admission ===
+  ok   reloads an acknowledged exact temperature from its actual conditional source publisher
+  ok   retains acknowledged negative zero through actual conditional preference restart
+  ok   retains the actual source on wrong numeric admission and permits an explicit repaired retry
+
+=== Mac real root inline scalar publication ===
+  ok   acknowledges precise inline temperature and restarts the actual preferences owner
+  ok   retains acknowledged inline negative zero and foreign bytes through restart
+  ok   resets only the explicit inline leaf and reloads its actual absence
+  ok   refuses an inexact optional literal without native publication then accepts repaired intent
+  ok   preserves an actual external inline source on stale save and permits reviewed fresh retry
+
+=== Mac real section-relative dotted scalar publication ===
+  ok   acknowledges precise section-relative dotted temperature and restarts the actual preferences owner
+  ok   retains acknowledged section-relative dotted negative zero and foreign bytes through restart
+  ok   resets only the explicit section-relative dotted leaf and reloads its actual absence
+  ok   refuses an inexact optional literal without native publication then accepts repaired intent
+  ok   preserves an actual external section-relative dotted source on stale save and permits reviewed fresh retry
+
+=== Mac real section-relative inline scalar publication ===
+  ok   acknowledges precise section-relative inline temperature and restarts the actual preferences owner
+  ok   retains acknowledged section-relative inline negative zero and foreign bytes through restart
+  ok   resets only the explicit section-relative inline leaf and reloads its actual absence
+  ok   refuses an inexact optional literal without native publication then accepts repaired intent
+  ok   preserves an actual external section-relative inline source on stale save and permits reviewed fresh retry
+TOTAL 26 passed 0 failed

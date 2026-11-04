@@ -1,0 +1,6 @@
+MODULE tests.unit.modules.shortcuts.system_actions.test_copy_pixel_color_clipboard_refusal
+
+=== copy_pixel_color: native clipboard refusal is not success ===
+  ok   reports an error when setContents returns false
+  ok   keeps terminal clipboard delivery visible to a re-entrant PAUSE
+RESULT 2 passed 0 failed

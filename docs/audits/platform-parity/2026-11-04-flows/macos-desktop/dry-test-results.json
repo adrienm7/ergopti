@@ -1,0 +1,17 @@
+[
+	{
+		"module": "tests.unit.modules.gestures.actions.test_actions_aux_pause_ownership",
+		"exit": 0,
+		"tail": ["TOTAL 31 passed, 0 failed"]
+	},
+	{
+		"module": "tests.unit.modules.gestures.actions.test_aux_deadline_publication",
+		"exit": 0,
+		"tail": ["TOTAL 3 passed, 0 failed"]
+	},
+	{
+		"module": "tests.unit.modules.gestures.actions.test_system_actions",
+		"exit": 0,
+		"tail": ["TOTAL 20 passed, 0 failed"]
+	}
+]

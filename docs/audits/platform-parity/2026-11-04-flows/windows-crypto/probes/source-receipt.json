@@ -1,0 +1,73 @@
+{
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"checked_at": "2026-11-04T17:17:00.076360+00:00",
+	"sources": [
+		{
+			"path": "static/ergopti_plus/windows/modules/keystats/keystats_text_cipher.ahk",
+			"matches_pin": true,
+			"sha256": "311c0db498a4b7c35a0887081cc2622cc42c45c7da09a4bc71c544a7e2bbd491"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keystats/keystats_sql.ahk",
+			"matches_pin": true,
+			"sha256": "86865ef1149f68739d7084c9e159b8b90bede133f1900b079c0c5ef9337c5a41"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keystats/keystats_text_migration.ahk",
+			"matches_pin": true,
+			"sha256": "bf911ed21b70862a917fdce4e72512b724e5a67dcdc0c03c520df3b2d162852f"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/llm/api_token_crypto.ahk",
+			"matches_pin": true,
+			"sha256": "9144584e99a0e9bbd22aca27f759875437fc82cdbd7aa66bb15ef9961566eb37"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_llm/menu_api_entries.ahk",
+			"matches_pin": true,
+			"sha256": "d3d15505343396a59f7c32da7a4635d951b88e6e47d5739780c89eb69ad91cf4"
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/crypto.ahk",
+			"matches_pin": true,
+			"sha256": "b8f4f3ddc2081f96ed38548ba78d910c215a1f65f37eddb628644a880fa247f5"
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/proxy_override.ahk",
+			"matches_pin": true,
+			"sha256": "42c806250d8eec0f9d246d317c6d11b1fdb8ffb2f99d3e903c87d1c33d8b09c5"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/llm/api_token_exchange.ahk",
+			"matches_pin": true,
+			"sha256": "91961366fe7459c997b3194ff34cced4bf482a5cc988216ce2354b2b4119884a"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/llm/rs256_signer.ahk",
+			"matches_pin": true,
+			"sha256": "59b565d7377a2b8ca01efd7ea06c5b3d0e9b3c8763c94044b67a99e1c60d9ff1"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keystats/text_crypto.lua",
+			"matches_pin": true,
+			"sha256": "1aebbf2e683ad1e337505f0c29c09a2c2a21d9c743f6bfa2bedc2e0197c14e2a"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keystats/text_cipher.lua",
+			"matches_pin": true,
+			"sha256": "65fba70de930b5ac2d3257a291a21971d0dd299cd8e0b624f92ca1e331b0cc3d"
+		}
+	],
+	"native_ahk_executed": false,
+	"native_probe": "probes/windows-prefix-sql-migration.ahk",
+	"executed_static_gates": [
+		"find-false-greens.cjs: within baseline (0 vs 0)",
+		"test-text-crypto-envelope-parity.cjs: shared marker/AES/PBKDF parameters agree"
+	],
+	"comparison_artifacts_inspected": [
+		"docs/audits/platform-parity/2026-11-04-flows/macos-crypto/probes/cipher-prefix.lua",
+		"docs/audits/platform-parity/2026-11-04-flows/macos-crypto/logs/cipher-prefix.txt",
+		"docs/audits/platform-parity/2026-11-04-flows/linux-crypto/probes/marker-collision.lua",
+		"docs/audits/platform-parity/2026-11-04-flows/linux-crypto/logs/marker-collision.log"
+	]
+}

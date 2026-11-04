@@ -1,0 +1,19 @@
+{
+  "modules": [
+    "tests.unit.infra.i18n.test_i18n",
+    "tests.unit.infra.config.test_script_config_authority",
+    "tests.unit.infra.config.test_factory_reset_journal",
+    "tests.unit.infra.config.test_config_paths_managed_bootstrap",
+    "tests.unit.infra.config.test_config_paths_first_launch",
+    "tests.unit.infra.config.test_config_save_failure",
+    "tests.unit.infra.config.test_config_reset_failure",
+    "tests.unit.infra.preferences.test_preferences_current_view_reason",
+    "tests.unit.infra.preferences.test_preferences_retired_hotstring_choices",
+    "tests.unit.ui.menu.state.test_preferences_runtime_restore_behavior",
+    "tests.unit.modules.hotstrings.test_hotstrings_config_transaction",
+    "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_config_transaction"
+  ],
+  "passed": 101,
+  "failed": 0,
+  "bad_modules": []
+}

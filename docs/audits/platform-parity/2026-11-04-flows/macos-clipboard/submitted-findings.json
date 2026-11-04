@@ -1,0 +1,42 @@
+{
+	"schema_version": 1,
+	"scope": "macos-clipboard",
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04T17:22:20.142822+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/report.md",
+	"findings": [
+		{
+			"id": "MCP-001",
+			"title": "Apps selection capture restores an obsolete clipboard over a newer copy",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G3"],
+			"reproduction": "Run probes/apps-foreign-clipboard.lua: actual selection copy/read completes, first native restore refuses, a new all-type clipboard write succeeds, retained Apps retry overwrites it with prior ORIGINAL; generation API is supplied but read zero times. Healthy no-writer and separate Search preserves-new-generation controls pass. Native board/Quartz/URL ports record only.",
+			"root_cause": "macos/modules/shortcuts/actions/apps.lua:468-495 restores the old snapshot unconditionally; queue_copy_restore_retry:537 repeats it without a native changeCount/owner receipt.",
+			"silent_failure": "Refresh/capture/retry logs no ownership change because no generation is observed; newer clipboard content is lost or wrongly searched as the selection.",
+			"regression_test": "Compose real Apps+broker+scheduler with native count and failed restore; require newer generations including identical-text/new-type changes to win; cover false/nil/throw and late/cancelled retries."
+		},
+		{
+			"id": "MCP-002",
+			"title": "Independent macOS clipboard borrowers snapshot another family’s temporary payload",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G3"],
+			"reproduction": "Run probes/cross-owner-clipboard.lua: actual Text plain paste borrows original text+HTML; while pending actual Apps copy capture admits and saves Text-only payload. Both settle; original HTML is lost. Plain-paste-alone control restores all types. No external writer, native clipboard or real input is used.",
+			"root_cause": "Text text_scope/any_text_owner_pending and Apps _copy_capture_in_flight serialize only their own families. Separate snapshot owners lack a common process-global clipboard admission authority, so the second adopts borrowed output as genuine user clipboard.",
+			"silent_failure": "Each owner correctly retires its own local state; no diagnostic identifies borrowed snapshot provenance, and original non-text types vanish.",
+			"regression_test": "Use real Text/Apps/Search/senders over one all-type native board; require rejection or queued admission while another family owns snapshot, both ordering permutations, delayed FIFO, cancellation and restoration debt; assert original rich types survive."
+		},
+		{
+			"id": "MCP-003",
+			"title": "Ordinary delayed selection transforms paste captured text into another focused app",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2", "G3"],
+			"reproduction": "Run probes/transform-focus-switch.lua: actual Text selection_lowercase reads APP_A selection and writes lowercase payload; change mutable window_info native focus/routing to APP_B before delayed paste; real global Cmd+V posts selected words to APP_B and restores original clipboard. Same-focus control targets APP_A. Native effects are recorders.",
+			"root_cause": "Ordinary Text case/wrap callers supply no continuation receipt; TextContinuation.new(nil) admits forever within parent generation. Paste publication checks owner and clipboard count, not original application/field; global emit_guarded_key_stroke has no target or destination check.",
+			"silent_failure": "Transformation reports completion and clipboard cleanup succeeds despite stale selected text being pasted and reselected in another document.",
+			"regression_test": "Capture original destination before ordinary copy and recheck full/cached field authority before paste/reselection. Test app/field/caret change, same-focus control, delayed FIFO, pause and failed cleanup without corrupting clipboard restoration."
+		}
+	]
+}

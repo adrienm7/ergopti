@@ -1,0 +1,6 @@
+MODULE tests.unit.adapters.storage.test_clipboard_all_types
+
+=== clipboard: save/restore uses all pasteboard types ===
+  ok   a save, a text write and a restore give back the image and the text
+  ok   an image-only clipboard is saved and restored, never cleared
+RESULT 2 passed 0 failed

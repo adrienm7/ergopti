@@ -1,0 +1,300 @@
+
+=== api_entries: keys live in the desktop secret service ===
+  ok   writes a reference, never the key, and reads the key back from the service (linux-api-key-secret-service)
+  ok   refuses a save without a service, writes no plaintext and keeps the reason (linux-api-key-secret-service)
+  ok   refuses a save the service rejects and deletes nothing it did not store (linux-api-key-secret-service)
+  ok   a load alone never rewrites a plaintext file (linux-api-key-secret-service)
+  ok   the daemon migrates plaintext keys once at boot (linux-api-key-secret-service)
+  ok   moves a plaintext key of an earlier build to the service once (linux-api-key-secret-service)
+  ok   leaves a plaintext file as it was when no service is available (linux-api-key-secret-service)
+  ok   deletes the key it stored when the file cannot be published (linux-api-key-secret-service)
+  ok   deletes a removed entry's key once the file no longer names it (linux-api-key-secret-service)
+  ok   keeps an entry whose key cannot be read as written, and does not use it (linux-api-key-secret-service)
+
+=== api_token_store: the secret-tool calls ===
+  ok   hands the key on stdin, byte for byte, never in the arguments (linux-api-key-secret-service)
+  ok   reports the service's message when it refuses, and reads an absent key as absent (linux-api-key-secret-service)
+  ok   reads a key exactly as the service prints it (linux-api-key-secret-service)
+  ok   refuses with the reason when secret-tool is not installed (linux-api-key-secret-service)
+
+=== api_entries: a private, durable store ===
+  ok   creates the file readable by its owner only
+  ok   keeps the entries and the selection across a restart
+  ok   stores the label it is given
+  ok   removing the selected entry leaves none selected
+  ok   refuses an entry without a key
+  ok   loads without the FFI, which only its libc primitive needs
+  ok   keeps a malformed file aside instead of overwriting it
+  ok   never replaces an earlier set-aside, nor one made at the same instant (api-entries-corrupt-no-replace)
+  ok   never rewrites a file it cannot write back whole: typed future selection (config-outdated-api-keys-write)
+  ok   never rewrites a file it cannot write back whole: entries keyed by id (config-outdated-api-keys-write)
+  ok   never rewrites a file it cannot write back whole: another version (config-outdated-api-keys-write)
+  ok   writes back each entry's fields and a warned selection unchanged (config-outdated-api-keys-write)
+  ok   warns about an older build's entry and never deletes its key (config-outdated-api-keys)
+
+=== Local API optional authentication: durable identity (local-api-optional-auth) (local-api-optional-auth) ===
+  ok   saves and reloads a keyless known local provider with its custom address (local-api-optional-auth)
+  ok   keeps foreign rows and nested fields at their original positions during selection (local-api-optional-auth)
+
+=== Local API foreign JSON identities ===
+  ok   keeps independent null, empty-array and empty-object fields (local-api-optional-auth)
+  ok   keeps a future typed model row unowned and unchanged (local-api-optional-auth)
+
+=== API entry source ownership for local discovery ===
+  ok   refuses every cached mutation after an external replacement and rolls back RAM
+  ok   does not treat a once-absent file as authority over a new external file
+  ok   rechecks exact source after private staging and never acknowledges the staged loser
+
+=== API entry physical source refusals ===
+  ok   an unreadable source never becomes a new empty writable store
+  ok   a reentrant selection cannot acquire the private publication owner
+
+=== local model selections own their physical API source ===
+  ok   updates a local entry in place and preserves foreign row order and fields across restart
+  ok   a held model choice refuses private-source drift and a forged receipt before staging
+  ok   requires live admission both before publication and after the actual stage
+  ok   creates only catalogue-owned typed local entries and preserves the selected model on refusal
+
+=== local server configuration preserves the current prediction target ===
+  ok   address and credential edits do not select a different saved local model
+
+=== final local API admission cannot borrow physical source authority ===
+  ok   an admitted post-stage callback replacing disk bytes refuses before native rename
+
+=== malformed API source quarantine acknowledgement ===
+  ok   a refused source-to-corrupt rename cannot authorize replacement of foreign bytes
+
+=== Atomic selection on addition (api-entry-add-selection) ===
+  ok   (api-entry-add-selection) persists an unselected entry without losing a stored unmatched selection
+  ok   (api-entry-add-selection) leaves a newly created non-chat store without a selection
+  ok   (api-entry-add-selection) refuses an untyped selection option before touching the store
+
+=== API entry identity after restart (api-entry-id-restart) ===
+  ok   (api-entry-id-restart) preserves two same-provider entries created in the same second across reload
+
+=== API entry selection prewarms the access token (access-token-lease) ===
+  ok   adding a selected entry prewarms it, an unselected one does not (access-token-lease)
+  ok   selecting an entry or giving it a model prewarms that entry (access-token-lease)
+
+=== shared typed-text cipher policy (Linux) ===
+  ok   returns the plaintext untouched and starts nothing while disabled
+  ok   round-trips through the envelope once enabled
+  ok   does not wrap an envelope twice and leaves empty or non-string values alone
+  ok   fails closed: no key means nil, never the plaintext, and the failure is latched
+  ok   answers nil when the primitive refuses to encrypt or is not ready
+  ok   fails open on decryption: a plain value reads as itself, an unreadable envelope as empty
+  ok   refuses a cipher built without its ports
+
+=== text_crypto — the stored envelope ===
+  ok   round-trips through wrap and unwrap
+  ok   carries a version marker so a format change can migrate
+  ok   recognises its own envelopes and nothing else
+  ok   refuses an envelope whose IV is the wrong length
+  ok   leaves a plaintext value alone
+
+=== text_crypto — the per-row IV ===
+  ok   is stable for the same row
+  ok   differs between rows
+  ok   differs between devices
+  ok   is exactly one AES block
+  ok   returns nil rather than a short IV when the digest is unusable
+
+=== text_crypto — the commands ===
+  ok   never re-derives the key on a per-value command
+  ok   derives with a high iteration count exactly where it is affordable
+  ok   refuses to put the secret in the process table
+  ok   refuses a malformed key or IV instead of encrypting with it
+  ok   parses the derived key and rejects junk
+
+=== text_cipher — default machine-ID candidate receipts ===
+  ok   uses the canonical native machine-ID candidate 1 (machine-id-fallback-receipts)
+  ok   uses the canonical native machine-ID candidate 2 (machine-id-fallback-receipts)
+  ok   uses the canonical native machine-ID candidate 3 (machine-id-fallback-receipts)
+  ok   uses the canonical native machine-ID candidate 4 (machine-id-fallback-receipts)
+  ok   uses the canonical native machine-ID candidate 5 (machine-id-fallback-receipts)
+  ok   uses the canonical native machine-ID candidate 6 (machine-id-fallback-receipts)
+
+=== text_cipher — disabled means untouched ===
+  ok   returns the plaintext and spawns nothing
+
+=== text_cipher — enabled changes what is stored ===
+  ok   stores an envelope, not the typed text
+  ok   derives the key once however many values it encrypts
+  ok   gives each row its own IV
+  ok   does not double-wrap a value that is already encrypted
+  ok   leaves an empty value alone
+
+=== text_cipher — the payload reaches openssl unchanged ===
+  ok   delivers every binary byte directly to EVP 1 (cipher-binary-receipts)
+  ok   delivers every binary byte directly to EVP 2 (cipher-binary-receipts)
+  ok   delivers every binary byte directly to EVP 3 (cipher-binary-receipts)
+  ok   delivers every binary byte directly to EVP 4 (cipher-binary-receipts)
+  ok   delivers every binary byte directly to EVP 5 (cipher-binary-receipts)
+  ok   truncates the newline a heredoc is forced to append
+  ok   writes the payload's own trailing newlines into the body
+  ok   counts bytes, not characters
+  ok   encrypts trailing newlines and decrypts canonical binary bytes without shell framing
+
+=== text_cipher — failure never falls back to plaintext ===
+  ok   requires supervision for the native exact-stdin producer (openssl-stdin-producer)
+  ok   supervises the entire exact-stdin pipeline without interpreting its bytes 1 (openssl-stdin-producer)
+  ok   supervises the entire exact-stdin pipeline without interpreting its bytes 2 (openssl-stdin-producer)
+  ok   supervises the entire exact-stdin pipeline without interpreting its bytes 3 (openssl-stdin-producer)
+  ok   supervises the entire exact-stdin pipeline without interpreting its bytes 4 (openssl-stdin-producer)
+  ok   requires a pipeline supervisor only for checked pipelines true (openssl-pipeline-receipts)
+  ok   requires a pipeline supervisor only for checked pipelines false (openssl-pipeline-receipts)
+  ok   retains only the current complete native stdout receipt 1 (openssl-capture-receipts)
+  ok   retains only the current complete native stdout receipt 2 (openssl-capture-receipts)
+  ok   retains only the current complete native stdout receipt 3 (openssl-capture-receipts)
+  ok   retains only the current complete native stdout receipt 4 (openssl-capture-receipts)
+  ok   retains only the current complete native stdout receipt 5 (openssl-capture-receipts)
+  ok   retains only the current complete native stdout receipt 6 (openssl-capture-receipts)
+  ok   retains only the current complete native stdout receipt 7 (openssl-capture-receipts)
+  ok   rejects invalid native command or textual stdin before execution (openssl-capture-receipts)
+  ok   refuses useful derive stdout after native failure 1 (cipher-exit-receipts)
+  ok   refuses useful derive stdout after native failure 7 (cipher-exit-receipts)
+  ok   refuses useful derive stdout after native failure 23 (cipher-exit-receipts)
+  ok   refuses useful derive stdout after native failure 143 (cipher-exit-receipts)
+  ok   refuses useful derive stdout after native failure 137 (cipher-exit-receipts)
+  ok   refuses useful derive stdout after native failure false (cipher-exit-receipts)
+  ok   refuses encrypt native failure without a CLI retry
+  ok   refuses decrypt native failure without a CLI retry
+  ok   refuses missing EVP before any KDF and preserves disabled and historical passthrough
+  ok   returns nil when the key cannot be derived
+  ok   reports itself unavailable when there is no machine id
+
+=== text_cipher — decryption ===
+  ok   passes a non-envelope value straight through
+
+=== sqlite_writer — encryption is not optional once enabled ===
+  ok   routes the typed-text columns through the cipher
+  ok   drops the batch rather than storing plaintext on failure
+
+=== native AES acknowledgement ownership ===
+  ok   refuses missing native capability without acquisition no_ffi
+  ok   refuses missing native capability without acquisition declaration
+  ok   refuses missing native capability without acquisition no_cipher
+  ok   refuses missing native capability without acquisition missing_symbol
+  ok   refuses missing native capability without acquisition missing_symbol
+  ok   releases checked encrypt context and every transient byte buffer
+  ok   refuses encrypt useful partial bytes after init status 0
+  ok   refuses encrypt useful partial bytes after init status -1
+  ok   refuses encrypt useful partial bytes after init status 2
+  ok   cleans up encrypt after an exception from init
+  ok   refuses encrypt useful partial bytes after update status 0
+  ok   refuses encrypt useful partial bytes after update status -1
+  ok   refuses encrypt useful partial bytes after update status 2
+  ok   cleans up encrypt after an exception from update
+  ok   refuses encrypt useful partial bytes after final status 0
+  ok   refuses encrypt useful partial bytes after final status -1
+  ok   refuses encrypt useful partial bytes after final status 2
+  ok   cleans up encrypt after an exception from final
+  ok   releases checked decrypt context and every transient byte buffer
+  ok   refuses decrypt useful partial bytes after init status 0
+  ok   refuses decrypt useful partial bytes after init status -1
+  ok   refuses decrypt useful partial bytes after init status 2
+  ok   cleans up decrypt after an exception from init
+  ok   refuses decrypt useful partial bytes after update status 0
+  ok   refuses decrypt useful partial bytes after update status -1
+  ok   refuses decrypt useful partial bytes after update status 2
+  ok   cleans up decrypt after an exception from update
+  ok   refuses decrypt useful partial bytes after final status 0
+  ok   refuses decrypt useful partial bytes after final status -1
+  ok   refuses decrypt useful partial bytes after final status 2
+  ok   cleans up decrypt after an exception from final
+  ok   refuses invalid native output length 1
+  ok   refuses invalid native output length 2
+  ok   refuses invalid native output length 3
+  ok   refuses invalid native output length 4
+  ok   refuses absent context and malformed key/IV/ciphertext without admitting bytes
+
+=== native canonical Base64 ownership ===
+  ok   matches independent RFC 4648 bytes
+  ok   matches independent RFC 4648 bytes Zg==
+  ok   matches independent RFC 4648 bytes Zm8=
+  ok   matches independent RFC 4648 bytes Zm9v
+  ok   matches independent RFC 4648 bytes Zm9vYg==
+  ok   matches independent RFC 4648 bytes Zm9vYmE=
+  ok   matches independent RFC 4648 bytes Zm9vYmFy
+  ok   matches independent RFC 4648 bytes YQBi
+  ok   rejects malformed or noncanonical Base64 Zg=
+  ok   rejects malformed or noncanonical Base64 Zg===
+  ok   rejects malformed or noncanonical Base64 Zg==LF
+  ok   rejects malformed or noncanonical Base64  Zg==
+  ok   rejects malformed or noncanonical Base64 !!!!
+  ok   rejects malformed or noncanonical Base64 =AAA
+  ok   rejects malformed or noncanonical Base64 A=AA
+  ok   rejects malformed or noncanonical Base64 AA=A
+  ok   rejects malformed or noncanonical Base64 ====
+  ok   rejects malformed or noncanonical Base64 Zh==
+  ok   rejects malformed or noncanonical Base64 Zm9=
+  ok   does not admit useful Base64 bytes after a refused true length ACK
+  ok   does not admit useful Base64 bytes after a refused false length ACK
+
+=== crypto adapter ===
+  ok   linux-crypto-cli-exit-receipts: rejects useful text digest after status 1
+  ok   linux-crypto-cli-exit-receipts: rejects useful text digest after status 7
+  ok   linux-crypto-cli-exit-receipts: rejects useful text digest after status 23
+  ok   linux-crypto-cli-exit-receipts: rejects useful text digest after status 143
+  ok   linux-crypto-cli-exit-receipts: rejects useful text digest after status 137
+  ok   linux-crypto-cli-exit-receipts: rejects useful text digest after status false
+  ok   linux-crypto-cli-exit-receipts: supervises text input without quoting its payload twice
+  ok   linux-crypto-cli-exit-receipts: rejects useful binary digest after status 1
+  ok   linux-crypto-cli-exit-receipts: rejects useful binary digest after status 7
+  ok   linux-crypto-cli-exit-receipts: rejects useful binary digest after status 23
+  ok   linux-crypto-cli-exit-receipts: rejects useful binary digest after status 143
+  ok   linux-crypto-cli-exit-receipts: rejects useful binary digest after status 137
+  ok   linux-crypto-cli-exit-receipts: rejects useful binary digest after status false
+  ok   linux-crypto-cli-exit-receipts: supervises binary input without quoting its payload twice
+  ok   linux-crypto-byte-receipts: frames empty without argv NUL
+  ok   linux-crypto-byte-receipts: frames abc without argv NUL
+  ok   linux-crypto-byte-receipts: frames nul without argv NUL
+  ok   linux-crypto-byte-receipts: frames leading-nul without argv NUL
+  ok   linux-crypto-byte-receipts: frames middle-nul without argv NUL
+  ok   linux-crypto-byte-receipts: frames trailing-nul without argv NUL
+  ok   linux-crypto-byte-receipts: frames all-bytes without argv NUL
+  ok   linux-crypto-byte-receipts: frames utf8 without argv NUL
+  ok   linux-crypto-byte-receipts: frames literal-shell without argv NUL
+  ok   linux-crypto-byte-receipts: frames trailing-newlines without argv NUL
+  ok   linux-crypto-byte-receipts: frames long without argv NUL
+  ok   linux-crypto-byte-receipts: frames boundary-16384 without argv NUL
+  ok   linux-crypto-byte-receipts: frames boundary-16385 without argv NUL
+  ok   linux-crypto-byte-receipts: frames large-ascii without argv NUL
+  ok   linux-crypto-byte-receipts: frames large-quotes without argv NUL
+  ok   linux-crypto-byte-receipts: frames large-nul without argv NUL
+  ok   linux-crypto-byte-receipts: frames large-unicode without argv NUL
+  ok   linux-crypto-byte-receipts: frames large-all-bytes without argv NUL
+  ok   linux-crypto-native-receipts: delegates exact bytes for empty
+  ok   linux-crypto-native-receipts: delegates exact bytes for abc
+  ok   linux-crypto-native-receipts: delegates exact bytes for nul
+  ok   linux-crypto-native-receipts: delegates exact bytes for leading-nul
+  ok   linux-crypto-native-receipts: delegates exact bytes for middle-nul
+  ok   linux-crypto-native-receipts: delegates exact bytes for trailing-nul
+  ok   linux-crypto-native-receipts: delegates exact bytes for all-bytes
+  ok   linux-crypto-native-receipts: delegates exact bytes for utf8
+  ok   linux-crypto-native-receipts: delegates exact bytes for literal-shell
+  ok   linux-crypto-native-receipts: delegates exact bytes for trailing-newlines
+  ok   linux-crypto-native-receipts: delegates exact bytes for long
+  ok   linux-crypto-native-receipts: delegates exact bytes for boundary-16384
+  ok   linux-crypto-native-receipts: delegates exact bytes for boundary-16385
+  ok   linux-crypto-native-receipts: delegates exact bytes for large-ascii
+  ok   linux-crypto-native-receipts: delegates exact bytes for large-quotes
+  ok   linux-crypto-native-receipts: delegates exact bytes for large-nul
+  ok   linux-crypto-native-receipts: delegates exact bytes for large-unicode
+  ok   linux-crypto-native-receipts: delegates exact bytes for large-all-bytes
+  ok   linux-crypto-native-receipts: preserves native refusal without a CLI retry
+
+=== module structure ===
+  ok   exports sha256
+
+=== sha256() ===
+  ok   returns a string, never nil
+  ok   returns empty string on failure (no openssl)
+  ok   returns empty string for nil input
+  ok   returns empty string for non-string input
+  ok   returns correct SHA-256 for empty string
+  ok   does not crash on any input
+  ok   does not crash with long input
+  ok   does not crash with Unicode input
+  ok   does not crash with special characters
+TOTAL 239 passed 0 failed

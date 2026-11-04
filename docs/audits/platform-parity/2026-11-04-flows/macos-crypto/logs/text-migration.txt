@@ -1,0 +1,64 @@
+Selecting exact test module: "tests.unit.modules.keystats.lifecycle.test_text_migration"
+Focused discovery: 1 of 2147 module(s) selected before require
+
+>>> Loading tests.unit.modules.keystats.lifecycle.test_text_migration
+
+=== keystats.text_migration: enabling encrypts the rows already stored ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"wraps every pre-existing row and round-trips it byte for byte","status":"pass","elapsed_ms":2.905263,"timing_error":""}
+  ok   wraps every pre-existing row and round-trips it byte for byte
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"gives each row and each column its own IV","status":"pass","elapsed_ms":1.877128,"timing_error":""}
+  ok   gives each row and each column its own IV
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"derives the key once for the whole migration","status":"pass","elapsed_ms":1.994877,"timing_error":""}
+  ok   derives the key once for the whole migration
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"never asks the store to write anything but the two text columns","status":"pass","elapsed_ms":1.355744,"timing_error":""}
+  ok   never asks the store to write anything but the two text columns
+
+=== keystats.text_migration: disabling decrypts the rows in place ===
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"returns every row to the exact bytes it started from","status":"pass","elapsed_ms":1.534607,"timing_error":""}
+  ok   returns every row to the exact bytes it started from
+
+=== keystats.text_migration: an interrupted pass converges ===
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"finishes a half-migrated table without double-wrapping","status":"pass","elapsed_ms":1.503520,"timing_error":""}
+  ok   finishes a half-migrated table without double-wrapping
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"re-running a finished pass converts nothing and loses nothing","status":"pass","elapsed_ms":1.857308,"timing_error":""}
+  ok   re-running a finished pass converts nothing and loses nothing
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"resumes nothing when no pass was ever started in that direction","status":"pass","elapsed_ms":1.505051,"timing_error":""}
+  ok   resumes nothing when no pass was ever started in that direction
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"reads in bounded batches rather than the whole table","status":"pass","elapsed_ms":2.376729,"timing_error":""}
+  ok   reads in bounded batches rather than the whole table
+
+=== keystats.text_migration: the pass is sliced, not looped ===
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"schedules the next batch instead of converting the table in one go","status":"pass","elapsed_ms":1.634398,"timing_error":""}
+  ok   schedules the next batch instead of converting the table in one go
+
+=== Migration fixture native identity ownership ===
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"restores cold and conflicting native identities after success (migration-fixture-isolation)","status":"pass","elapsed_ms":2.079356,"timing_error":""}
+  ok   restores cold and conflicting native identities after success (migration-fixture-isolation)
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"restores cold and conflicting native identities after failure (migration-fixture-isolation)","status":"pass","elapsed_ms":3.162115,"timing_error":""}
+  ok   restores cold and conflicting native identities after failure (migration-fixture-isolation)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"resumes an accepted request cancelled before its first slice (migration-durable-intent)","status":"pass","elapsed_ms":0.933602,"timing_error":""}
+  ok   resumes an accepted request cancelled before its first slice (migration-durable-intent)
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"rejects an initial resume receipt returning false (migration-durable-intent)","status":"pass","elapsed_ms":1.204294,"timing_error":""}
+  ok   rejects an initial resume receipt returning false (migration-durable-intent)
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"retires work after a batch resume receipt returning false (migration-durable-intent)","status":"pass","elapsed_ms":1.396707,"timing_error":""}
+  ok   retires work after a batch resume receipt returning false (migration-durable-intent)
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"does not announce completion after a final resume receipt returning false (migration-durable-intent)","status":"pass","elapsed_ms":0.870415,"timing_error":""}
+  ok   does not announce completion after a final resume receipt returning false (migration-durable-intent)
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"rejects an initial resume receipt returning nil (migration-durable-intent)","status":"pass","elapsed_ms":1.288492,"timing_error":""}
+  ok   rejects an initial resume receipt returning nil (migration-durable-intent)
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"retires work after a batch resume receipt returning nil (migration-durable-intent)","status":"pass","elapsed_ms":1.203452,"timing_error":""}
+  ok   retires work after a batch resume receipt returning nil (migration-durable-intent)
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"does not announce completion after a final resume receipt returning nil (migration-durable-intent)","status":"pass","elapsed_ms":1.145894,"timing_error":""}
+  ok   does not announce completion after a final resume receipt returning nil (migration-durable-intent)
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"cancels and resumes after a committed partial pass (migration-durable-intent)","status":"pass","elapsed_ms":0.983067,"timing_error":""}
+  ok   cancels and resumes after a committed partial pass (migration-durable-intent)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keystats.lifecycle.test_text_migration","name":"tests.unit.modules.keystats.lifecycle.test_text_migration","status":"pass","elapsed_ms":43.664902,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  20
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

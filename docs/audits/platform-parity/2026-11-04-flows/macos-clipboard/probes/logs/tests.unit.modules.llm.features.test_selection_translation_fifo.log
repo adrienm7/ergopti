@@ -1,0 +1,14 @@
+MODULE tests.unit.modules.llm.features.test_selection_translation_fifo
+
+=== selection translation final Quartz publication ===
+  ok   publishes a healthy translation with a real classified destination (translation-fifo-positive)
+  ok   waits for a retained copy before reading its clipboard (translation-fifo-copy-delay)
+  ok   keeps translated clipboard until a retained paste is handed off (translation-fifo-paste-delay)
+  ok   revokes paste after its broker trigger was posted (translation-fifo-focus)
+  ok   revokes paste across reset after its broker trigger was posted (translation-fifo-reset)
+  ok   retains clipboard grace after paste handoff and reset (translation-fifo-grace-reset)
+  ok   retains clipboard grace after paste handoff and pause (translation-fifo-grace-pause)
+  ok   accepts a healthy answer after native classification TTL (translation-fifo-ttl)
+  ok   refuses a stopped native destination tracker before copying (translation-fifo-unknown)
+  ok   settles the exact copy when native build reenters pause (translation-fifo-build-pause)
+RESULT 10 passed 0 failed

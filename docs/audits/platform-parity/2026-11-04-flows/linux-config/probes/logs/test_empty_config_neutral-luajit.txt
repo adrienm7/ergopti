@@ -1,0 +1,16 @@
+
+=== empty tap-hold configuration is neutral ===
+  ok   neutral-config: dynamic rule availability never grants activation
+  ok   neutral-config: enabling the dynamic master does not import date families
+  ok   neutral-config: personal and extension sections remain off without explicit intent
+  ok   neutral-config: does not acquire recommended keys when the user file is absent
+  ok   neutral-config: preserves desired keys behind an absent master without filling other bindings
+
+=== sparse recommended scope operations ===
+  ok   deletes neutral scalar settings on restore
+  ok   deletes neutral feature leaves on restore
+  ok   keeps runtime-owned dynamic recommendations sparse and scoped
+  ok   retains consent exclusions and explicit deletion during clear
+  ok   writes the off value of an entry active by default during clear
+  ok   writes every declared off value in the scopes that own it
+TOTAL 11 passed 0 failed

@@ -1,0 +1,56 @@
+
+=== onboarding answers (linux) ===
+  ok   names only this driver's configuration paths, with their neutral values
+  ok   names this engine's tap-hold keys, never as configuration paths
+  ok   claims a page's sub-switch as a switch the answer writes
+  ok   claims a persistent control's paths with its choices' values
+  ok   routes a checked tap-hold key to the tap-hold writer, never to config.toml
+  ok   reports the tap-hold keys and switch the tap-hold owner reads
+  ok   turns declined and accepted answers into sparse manifest rows
+  ok   refuses the whole batch on any answer outside the catalogue
+  ok   refuses malformed trigger scalar overlong zero before publication
+  ok   refuses malformed trigger scalar UTF-16 surrogate before publication
+  ok   refuses malformed trigger scalar above Unicode limit before publication
+  ok   keeps valid BMP and non-BMP trigger scalars unchanged
+  ok   writes one versioned batch and never writes a refused one
+  ok   reads the values in force by the same paths
+
+=== wizard native publication receiving ===
+  ok   retires only a completed owner without lending its withdrawn provider
+  ok   pins current helpers when constructing a successor and preserves the previous helper owner
+  ok   claims scalar callbacks before a forward writer and refuses a cloned completion token
+  ok   retains the actual callback through repeated refused release
+  ok   settles no-effect cleanup while preserving a foreign successor
+  ok   restores one published image only after exact release settlement
+  ok   restores proven original absence after published cleanup
+  ok   refuses a published inverse over foreign source and retains the request
+  ok   retains an inverse's own release without repeating the accepted inverse
+  ok   rejects nil or textual effect flags and keeps the exact callback
+  ok   retains a throwing cleanup rather than admitting another publication
+  ok   refuses an unbound opaque native object instead of invoking methods
+  ok   passes the exact captured preimage into a drifting native batch
+  ok   rejects reentrant Finish while settling the retained native callback
+  ok   settles native release before a retained scalar rollback callback
+  ok   refuses withdrawn providers without preventing exact release-only cleanup
+  ok   refuses a native callback that withdraws the genuine shared compensation helpers
+  ok   refuses a replaced admitted native inverse before granting source mutation
+  ok   requires literal native settlement as well as literal effect
+  ok   keeps an unknown throwing writer outcome retained without synthesizing an effect
+  ok   preserves a foreign successor after an inverse was published with outstanding release
+  ok   keeps the native callback stack claimed until its exact handler returns
+  ok   verifies original absence after acknowledged success withdraws its native owner
+  ok   verifies absence after the withdrawn success removal's own cleanup settles
+  ok   keeps ordinary successful writes compatible with the existing commit gateway
+
+=== Linux wizard retained native publication phases ===
+  ok   defers and retains exact scalar rollback after native cleanup, without replaying accepted phases
+
+=== Linux wizard validation and scalar successor authority ===
+  ok   retains a scalar inverse whose host returns a nonliteral acknowledgment
+  ok   claims the initial validation stack before locale discovery can publish a nested request
+  ok   does not adopt a native writer's foreign scalar successor as rollback authority
+  ok   retains scalar compensation when its native getters throw after publication refuses
+
+=== Linux wizard unchanged forward refusal ===
+  ok   does not invent scalar debt when a refusing forward folder owner left its snapshot unchanged
+TOTAL 45 passed 0 failed

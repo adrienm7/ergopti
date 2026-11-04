@@ -1,0 +1,6 @@
+hangul_jamo codepoints=2 current_cursor_steps=2
+decomposed_latin codepoints=2 current_cursor_steps=1
+devanagari_vowel codepoints=2 current_cursor_steps=2
+emoji_modifier codepoints=2 current_cursor_steps=1
+flag codepoints=2 current_cursor_steps=1
+LIMIT: no native application caret navigation executed; Hangul/Indic behavior remains a qualification question

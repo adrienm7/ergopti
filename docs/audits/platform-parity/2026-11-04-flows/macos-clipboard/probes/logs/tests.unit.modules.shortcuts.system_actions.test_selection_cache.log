@@ -1,0 +1,16 @@
+MODULE tests.unit.modules.shortcuts.system_actions.test_selection_cache
+
+=== shortcuts.actions.system: bind_wrap_text_if_selected AX cache (shortcuts-wrap-ax-uncached regression) ===
+  ok   N rapid wrap-key presses within the TTL trigger at most 1 real AX call
+  ok   a press after the TTL window elapses triggers a second real AX call
+  ok   N rapid presses with NO selection also trigger at most 1 real AX call
+  ok   accepted negative tap refreshes the real AX reader inside the selection TTL
+  ok   accepted positive tap refreshes the real AX reader inside the selection TTL
+  ok   refused queue tap preserves the existing AX selection cache
+  ok   modified tap preserves the existing AX selection cache
+  ok   unassigned tap preserves the existing AX selection cache
+  ok   closed admission tap preserves the existing AX selection cache
+  ok   owned tap preserves the existing AX selection cache
+  ok   unreadable provenance tap preserves the existing AX selection cache
+  ok   autorepeat tap preserves the existing AX selection cache
+RESULT 12 passed 0 failed

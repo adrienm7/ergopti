@@ -1,0 +1,10 @@
+{
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"source": "original immutable system_actions.lua command table, dependencies unused recording imports",
+	"command": "case \"$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)\" in *prefer-dark*) gsettings set org.gnome.desktop.interface color-scheme default;; *) gsettings set org.gnome.desktop.interface color-scheme prefer-dark;; esac",
+	"healthy_sequential_two_toggles": "get default\nset prefer-dark\nget prefer-dark\nset default\n",
+	"concurrent_two_toggles": "get default\nget default\nset prefer-dark\nset prefer-dark\n",
+	"final_after_two_concurrent_toggles": "prefer-dark",
+	"expected_serial_toggle_result": "default",
+	"native": "quoted GVariant get output, real POSIX shell and scratch fake gsettings; no real desktop preferences mutated"
+}

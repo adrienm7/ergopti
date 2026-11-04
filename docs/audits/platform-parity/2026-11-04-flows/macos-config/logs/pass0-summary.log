@@ -1,0 +1,13 @@
+tests.unit.infra.config.test_config_migrate PASS TOTAL 215 passed 0 failed
+tests.unit.infra.config.test_config_cleanup_session PASS TOTAL 9 passed 0 failed
+tests.unit.infra.config.test_config_scope_transaction PASS TOTAL 101 passed 0 failed
+tests.unit.infra.config.test_config_scope_composition PASS TOTAL 62 passed 0 failed
+tests.unit.infra.config.test_config_paths_write_transaction PASS TOTAL 7 passed 0 failed
+tests.unit.infra.preferences.test_preferences_keeps_unowned_sections_save PASS TOTAL 43 passed 0 failed
+tests.unit.infra.preferences.test_preferences_keeps_unowned_sections_actual_file PASS TOTAL 8 passed 0 failed
+tests.unit.infra.preferences.test_preferences_existing_key_spellings PASS TOTAL 4 passed 0 failed
+tests.unit.infra.config.test_config_outdated PASS TOTAL 8 passed 0 failed
+tests.unit.ui.menu.configuration.test_unused_keys_cleanup PASS TOTAL 96 passed 0 failed
+tests.unit.ui.menu.configuration.test_cleanup_adoption_receipts PASS TOTAL 6 passed 0 failed
+tests.unit.ui.menu.scope.test_global_reset_transaction PASS TOTAL 22 passed 0 failed
+GROUP [581, 0] bad 0

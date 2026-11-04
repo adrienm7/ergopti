@@ -1,0 +1,4 @@
+WCF-001: actual paired storage writes are separate; both rollback receipts discarded
+Actual owner body sha256=182006c6db91caf583c900c45919b1aab25aa1a4a6b69739ebb348f6d27f47b6
+Generated unexecuted probe: wpm-position-rollback-native.ahk
+Audited SHA=213d65af24d2aa4845ba47743c9bab6787b61964

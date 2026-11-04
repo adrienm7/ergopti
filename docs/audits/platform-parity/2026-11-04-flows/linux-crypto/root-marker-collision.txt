@@ -1,0 +1,4 @@
+case1: enabled=true; raw text preserved; native encrypt bypassed; original writer SQL contains canary; decrypt returns original literal
+case2: enabled=true; raw text preserved; native encrypt bypassed; original writer SQL contains canary; decrypt returns empty/changed literal
+CONTROL: ordinary binary-safe text round-trips through genuine native EVP; only synthetic key and bytes used.
+MIGRATION: original decrypt runner aborts at literal prefix row, no apply; later rows in same migration remain untouched. No ciphertext corruption was needed.

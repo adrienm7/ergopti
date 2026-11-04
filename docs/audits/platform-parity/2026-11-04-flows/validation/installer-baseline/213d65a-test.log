@@ -1,0 +1,29 @@
+PASS the extractor finds each spawn shape the drivers use
+PASS the extractor ignores logs, SQL, phases, comments and shell functions
+PASS the Windows extractor finds what starts and ignores names that only compare
+PASS a long name-table row is read in linear time
+FAIL the macos rows list every program the macos driver starts
+AssertionError [ERR_ASSERTION]: add each program to the "programs" of a macos row of static/ergopti_plus/_shared/data/owned_runtimes.json, with its decision, then run node tools/codegen/codegen-owned-runtimes.cjs:
+installer (static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreLaunchctl.swift)
++ actual - expected
+
++ [
++   'installer (static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreLaunchctl.swift)'
++ ]
+- []
+
+    at /immutable-git/213d65af24d2aa4845ba47743c9bab6787b61964/tools/test/test-owned-runtimes-inventory.cjs:189:10
+    at check (/immutable-git/213d65af24d2aa4845ba47743c9bab6787b61964/tools/test/test-owned-runtimes-inventory.cjs:53:3)
+    at /immutable-git/213d65af24d2aa4845ba47743c9bab6787b61964/tools/test/test-owned-runtimes-inventory.cjs:178:2
+    at load (/workspace/scratch/parity-flows/installer-baseline/replay.cjs:24:3)
+    at Object.<anonymous> (/workspace/scratch/parity-flows/installer-baseline/replay.cjs:26:6)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+PASS the linux rows list every program the linux driver starts
+PASS the windows rows list every program the windows driver starts
+PASS the registry load refuses a row without a decided class
+PASS a Linux row is not left open for a source-checkout install alone
+[FAIL] owned runtimes inventory: 1 of 9 checks failed.

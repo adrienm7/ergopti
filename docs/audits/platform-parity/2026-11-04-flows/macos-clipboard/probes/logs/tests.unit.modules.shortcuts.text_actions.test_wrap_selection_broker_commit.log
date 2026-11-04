@@ -1,0 +1,16 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_wrap_selection_broker_commit
+
+=== selection wrap waits for the real broker ===
+  ok   retains wrapped clipboard before queued paste handoff (wrap-broker-commit)
+  ok   keeps exact admission closed until queued paste settles (wrap-broker-commit)
+  ok   restores every original type after the actual paste completion (wrap-broker-commit)
+  ok   joins cancelled paste before restoring during PAUSE (wrap-broker-commit)
+  ok   preserves the full settling interval after late completion (wrap-broker-late-completion)
+  ok   keeps completed paste grace during PAUSE without business replay (wrap-pause-paste-grace)
+  ok   preserves handed-off paste grace when cancellation precedes completion (wrap-pause-paste-grace)
+  ok   joins reentrant rollback after native paste handoff (wrap-rollback-custody)
+  ok   joins reentrant rollback after native paste completion (wrap-rollback-custody)
+  ok   retains exact cleanup timer after stop false (wrap-pause-paste-grace)
+  ok   retains exact cleanup timer after stop nil (wrap-pause-paste-grace)
+  ok   retains exact cleanup timer after stop throw (wrap-pause-paste-grace)
+RESULT 12 passed 0 failed

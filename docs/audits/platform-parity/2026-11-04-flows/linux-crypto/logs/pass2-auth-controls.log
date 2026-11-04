@@ -1,0 +1,200 @@
+
+=== Access-token providers: the key is exchanged, never sent ===
+  ok   the first request waits for the token; the next carries it as Bearer
+  ok   a token near its end is still sent while a new one is fetched
+  ok   a refused key is not asked again for a minute, and the reason reaches the request
+  ok   the key test waits for the token, then sends the probe with it
+  ok   the key test reports a refused exchange without sending the probe
+
+=== Access-token providers: the shipped rows ===
+  ok   a watsonx entry exchanges its IBM API key at IBM's token service
+  ok   a Vertex AI entry refreshes the token of its authorized_user credentials
+  ok   a Vertex AI service-account key is exchanged for a signed assertion, one slice per tick
+
+=== Access-token providers: the catalogue block ===
+  ok   a provider whose auth block is invalid is refused whole
+
+=== Access-token providers: the first request waits for the token (access-token-lease) ===
+  ok   a chat waits for the exchange, then is sent with the token (access-token-lease)
+  ok   a cancelled chat is never sent nor answered once the token arrives (access-token-lease)
+  ok   a refused exchange answers the waiting chat with its reason (access-token-lease)
+  ok   the model listing waits for the token too (access-token-lease)
+  ok   a key change starts the exchange before any request (access-token-lease)
+
+=== api_token_exchange replays the shared corpus ===
+  ok   the corpus pins the lifetime bounds and holds every section
+  ok   parse: the IBM block
+  ok   parse: the Google block
+  ok   parse: another kind
+  ok   parse: an http token address
+  ok   parse: a body that never reads the key
+  ok   parse: an unknown placeholder
+  ok   parse: a bad field name
+  ok   parse: a lifetime below the minimum
+  ok   parse: a margin of half the default lifetime
+  ok   parse: a fractional lifetime
+  ok   parse: an assertion of another key type name
+  ok   parse: an assertion body that never reads the assertion
+  ok   parse: an assertion body that sends the stored key
+  ok   parse: an assertion valid over an hour
+  ok   parse: an assertion scope that is no https address
+  ok   parse: an assertion without an issuer field
+  ok   parse: an assertion without a key id field
+  ok   request: the IBM API key goes in apikey, encoded
+  ok   request: the Google credentials file gives its three fields
+  ok   request: a credentials file without its refresh token
+  ok   request: a plain key where the credentials file is expected
+  ok   request: an empty key
+  ok   request: a service-account key is exchanged for its signed assertion
+  ok   request: a service-account key without a key id still signs
+  ok   request: a service-account key without its private key
+  ok   request: a service-account key without its client email
+  ok   request: a service-account key holding no PEM
+  ok   request: a service-account key where the block takes none
+  ok   the catalogue's Vertex AI block is the corpus's Google block
+  ok   a signed assertion settles over several steps, each one slice
+  ok   an authorized_user key settles on its first step
+  ok   the exchange needs the wall-clock time in whole seconds
+  ok   answer: a token and its lifetime
+  ok   answer: no lifetime takes the default
+  ok   answer: a lifetime below the minimum is raised to it
+  ok   answer: an HTTP refusal
+  ok   answer: no token
+  ok   answer: a token holding a space
+  ok   state: fresh
+  ok   state: within the margin
+  ok   state: expired
+  ok   state: never fetched
+
+=== Local API optional authentication policy (local-api-optional-auth) ===
+  ok   settings-file key: omlx-row-scanned-key (local-api-optional-auth)
+  ok   settings-file key: manual-openai-compat-same-loopback-port (local-api-optional-auth)
+  ok   settings-file key: manual-openai-compat-other-port (local-api-optional-auth)
+  ok   settings-file key: remote-url-never-gets-local-key (local-api-optional-auth)
+  ok   settings-file key: stopped-server (local-api-optional-auth)
+  ok   settings-file key: server-without-key (local-api-optional-auth)
+  ok   settings-file key: cloud-provider-never-gets-local-key (local-api-optional-auth)
+  ok   auth material: omlx-empty (local-api-optional-auth)
+  ok   auth material: omlx-provided (local-api-optional-auth)
+  ok   auth material: omlx-boolean (local-api-optional-auth)
+  ok   auth material: omlx-number (local-api-optional-auth)
+  ok   auth material: omlx-object (local-api-optional-auth)
+  ok   auth material: omlx-null (local-api-optional-auth)
+  ok   auth material: lmstudio-empty (local-api-optional-auth)
+  ok   auth material: lmstudio-provided (local-api-optional-auth)
+  ok   auth material: lmstudio-boolean (local-api-optional-auth)
+  ok   auth material: lmstudio-number (local-api-optional-auth)
+  ok   auth material: lmstudio-object (local-api-optional-auth)
+  ok   auth material: lmstudio-null (local-api-optional-auth)
+  ok   auth material: llamacpp-empty (local-api-optional-auth)
+  ok   auth material: llamacpp-provided (local-api-optional-auth)
+  ok   auth material: llamacpp-boolean (local-api-optional-auth)
+  ok   auth material: llamacpp-number (local-api-optional-auth)
+  ok   auth material: llamacpp-object (local-api-optional-auth)
+  ok   auth material: llamacpp-null (local-api-optional-auth)
+  ok   auth material: jan-empty (local-api-optional-auth)
+  ok   auth material: jan-provided (local-api-optional-auth)
+  ok   auth material: jan-boolean (local-api-optional-auth)
+  ok   auth material: jan-number (local-api-optional-auth)
+  ok   auth material: jan-object (local-api-optional-auth)
+  ok   auth material: jan-null (local-api-optional-auth)
+  ok   auth material: openai-empty (local-api-optional-auth)
+  ok   auth material: openai-provided (local-api-optional-auth)
+  ok   auth material: openai-boolean (local-api-optional-auth)
+  ok   auth material: openai-number (local-api-optional-auth)
+  ok   auth material: openai-object (local-api-optional-auth)
+  ok   auth material: openai-null (local-api-optional-auth)
+  ok   auth material: openai_compat-empty (local-api-optional-auth)
+  ok   auth material: openai_compat-provided (local-api-optional-auth)
+  ok   auth material: openai_compat-boolean (local-api-optional-auth)
+  ok   auth material: openai_compat-number (local-api-optional-auth)
+  ok   auth material: openai_compat-object (local-api-optional-auth)
+  ok   auth material: openai_compat-null (local-api-optional-auth)
+  ok   auth material: future-provider-empty (local-api-optional-auth)
+  ok   auth material: future-provider-provided (local-api-optional-auth)
+  ok   auth material: future-provider-boolean (local-api-optional-auth)
+  ok   auth material: future-provider-number (local-api-optional-auth)
+  ok   auth material: future-provider-object (local-api-optional-auth)
+  ok   auth material: future-provider-null (local-api-optional-auth)
+  ok   native models receipt: valid-two (local-api-optional-auth)
+  ok   native models receipt: valid-empty (local-api-optional-auth)
+  ok   native models receipt: object-not-array (local-api-optional-auth)
+  ok   native models receipt: invalid-row (local-api-optional-auth)
+  ok   native models receipt: bad-json (local-api-optional-auth)
+  ok   native models receipt: foreign-service (local-api-optional-auth)
+  ok   native models receipt: auth-required (local-api-optional-auth)
+  ok   native models receipt: forbidden (local-api-optional-auth)
+  ok   native models receipt: redirect (local-api-optional-auth)
+  ok   native models receipt: transport-failed (local-api-optional-auth)
+  ok   native models receipt: body-truncated (local-api-optional-auth)
+  ok   native models receipt: empty-id (local-api-optional-auth)
+  ok   native models receipt: numeric-id (local-api-optional-auth)
+  ok   native models receipt: array-root (local-api-optional-auth)
+  ok   native models receipt: row-is-array (local-api-optional-auth)
+  ok   native models receipt: created-not-listed (local-api-optional-auth)
+  ok   cannot grant cloud, duplicate or malformed capabilities (local-api-optional-auth)
+
+=== Shared local discovery controller ===
+  ok   local discovery trace: ordered joint publication and exact cache-age boundary
+  ok   local discovery trace: empty sweep publishes once and zero-model service remains reachable
+  ok   local discovery trace: superseded responses cannot publish and earlier waiters hear newest verdict
+  ok   local discovery trace: captured provider and address cannot be reassigned by later input mutation
+  ok   local discovery trace: duplicate responses and synchronous settle before refused dispatch are inert
+  ok   local discovery trace: probe refusals and observer errors preserve one joint publication
+  ok   local discovery trace: an unchanged sweep ignores model metadata but respects model order and address
+  ok   local discovery trace: malformed models and ordinary HTTP failures never create a server row
+
+=== Configured endpoint affinity (local-configured-affinity) ===
+  ok   explicit catalogue provider owns custom endpoint (local-configured-affinity)
+  ok   generic canonical localhost (local-configured-affinity)
+  ok   generic openai IPv4 alias and trailing slash (local-configured-affinity)
+  ok   generic IPv6 loopback alias (local-configured-affinity)
+  ok   generic hostname case (local-configured-affinity)
+  ok   generic other declared server (local-configured-affinity)
+  ok   generic entry at a shared address belongs to its default row only (local-configured-affinity)
+  ok   generic entry at the shared 5000 address belongs to text-generation-webui (local-configured-affinity)
+  ok   generic entry at the shared 5000 address is not TabbyAPI's (local-configured-affinity)
+  ok   explicit vLLM provider owns the shared address (local-configured-affinity)
+  ok   different port (local-configured-affinity)
+  ok   foreign host (local-configured-affinity)
+  ok   different base path (local-configured-affinity)
+  ok   case sensitive path (local-configured-affinity)
+  ok   userinfo (local-configured-affinity)
+  ok   query (local-configured-affinity)
+  ok   fragment (local-configured-affinity)
+  ok   backslash (local-configured-affinity)
+  ok   whitespace (local-configured-affinity)
+  ok   control (local-configured-affinity)
+  ok   invalid port (local-configured-affinity)
+  ok   oversized port (local-configured-affinity)
+  ok   wrong scheme (local-configured-affinity)
+  ok   empty configured endpoint (local-configured-affinity)
+  ok   other registered provider is not generic (local-configured-affinity)
+  ok   unknown server cannot gain exact capability (local-configured-affinity)
+  ok   invalid provider type (local-configured-affinity)
+  ok   invalid endpoint type (local-configured-affinity)
+  ok   accepts literal oMLX model identifiers without using them as endpoint identity (local-configured-affinity)
+
+=== Configured loopback optional credentials (local-configured-affinity) ===
+  ok   canonical keyless OpenAI (local-configured-affinity)
+  ok   nondefault keyless compatible (local-configured-affinity)
+  ok   IPv6 keyless compatible (local-configured-affinity)
+  ok   remote empty key refused (local-configured-affinity)
+  ok   foreign HTTP empty key refused (local-configured-affinity)
+  ok   userinfo cannot grant keyless capability (local-configured-affinity)
+  ok   query cannot grant keyless capability (local-configured-affinity)
+  ok   fragment cannot grant keyless capability (local-configured-affinity)
+  ok   invalid loopback port refused (local-configured-affinity)
+  ok   empty generic context refused (local-configured-affinity)
+  ok   local URL cannot grant unrelated provider (local-configured-affinity)
+  ok   provided generic credential retained (local-configured-affinity)
+  ok   nonstring credential refused (local-configured-affinity)
+
+=== Configured generic endpoint view projection (local-configured-views) ===
+  ok   canonical endpoints are already declared (local-configured-views)
+  ok   nondefault known generic views retain configured order (local-configured-views)
+  ok   different owned base path is truthfully generic (local-configured-views)
+  ok   foreign remote secret never enters search (local-configured-views)
+  ok   unrelated and exact local providers are not generic views (local-configured-views)
+  ok   invalid entry authority is refused (local-configured-views)
+TOTAL 179 passed 0 failed

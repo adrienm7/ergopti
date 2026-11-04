@@ -1,0 +1,16 @@
+
+=== personal-info configuration transactions ===
+  ok   (personal-config-conflict) refuses an invalid external winner without adopting defaults
+  ok   (personal-config-value) preserves known field syntax 1
+  ok   (personal-config-value) preserves known field syntax 2
+  ok   (personal-config-value) preserves known field syntax 3
+  ok   (personal-config-value) preserves known field syntax 4
+  ok   (personal-config-value) preserves known field syntax 5
+  ok   (personal-config-refusal) rejects invalid declared data 1
+  ok   (personal-config-refusal) rejects invalid declared data 2
+  ok   (personal-config-refusal) rejects invalid declared data 3
+  ok   (personal-config-refusal) rejects invalid declared data 4
+  ok   (personal-config-refusal) rejects invalid declared data 5
+  ok   (personal-config-refusal) rejects invalid declared data 6
+  ok   (personal-config-refusal) rejects invalid declared data 7
+TOTAL 13 passed 0 failed

@@ -1,0 +1,50 @@
+[
+  {
+    "engine": "lua",
+    "version": "Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio",
+    "probe": "clipboard-flows.lua",
+    "exit_code": 0
+  },
+  {
+    "engine": "lua",
+    "version": "Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio",
+    "probe": "range-owner.lua",
+    "exit_code": 0
+  },
+  {
+    "engine": "lua",
+    "version": "Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio",
+    "probe": "atspi-range-control.lua",
+    "exit_code": 0
+  },
+  {
+    "engine": "lua",
+    "version": "Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio",
+    "probe": "file-copy-focus.lua",
+    "exit_code": 0
+  },
+  {
+    "engine": "luajit",
+    "version": "LuaJIT 2.1.1793383622 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/",
+    "probe": "clipboard-flows.lua",
+    "exit_code": 0
+  },
+  {
+    "engine": "luajit",
+    "version": "LuaJIT 2.1.1793383622 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/",
+    "probe": "range-owner.lua",
+    "exit_code": 0
+  },
+  {
+    "engine": "luajit",
+    "version": "LuaJIT 2.1.1793383622 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/",
+    "probe": "atspi-range-control.lua",
+    "exit_code": 0
+  },
+  {
+    "engine": "luajit",
+    "version": "LuaJIT 2.1.1793383622 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/",
+    "probe": "file-copy-focus.lua",
+    "exit_code": 0
+  }
+]

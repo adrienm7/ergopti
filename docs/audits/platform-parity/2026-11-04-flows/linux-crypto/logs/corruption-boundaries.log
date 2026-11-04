@@ -1,0 +1,6 @@
+REFUSED wrong_key
+REFUSED truncated_block
+REFUSED empty_cipher
+REFUSED invalid_key
+OBSERVED CBC integrity limit: one-bit IV change passes EVP padding and changes only first plaintext byte; no authentication promised by v1 format.
+PASS native refusal, canonical Base64 and binary/64KiB round-trip controls; no real password or key files used.

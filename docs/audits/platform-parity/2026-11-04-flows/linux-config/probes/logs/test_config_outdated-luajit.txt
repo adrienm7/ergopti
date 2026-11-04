@@ -1,0 +1,11 @@
+
+=== shared outdated-entry rule (config-outdated-contract) ===
+  ok   warns once per entry and reason, and again for another stale value
+  ok   never raises on a key a hand edit can write, and never promises to cut a quoted one
+  ok   names the file and entry to fix outside config.toml, once, and never feeds a cleanup scan
+  ok   replays the independent process-lifetime file warning sequence
+  ok   partitions known entries, marks exactly them and reports the rest
+  ok   reads a table of settings and reports any other shape
+  ok   records every report of a scan, even one already logged, and closes on error
+  ok   checks a value against its manifest entry, platform, type, enum and owner rule
+TOTAL 8 passed 0 failed

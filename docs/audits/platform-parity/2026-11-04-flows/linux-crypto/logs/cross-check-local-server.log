@@ -1,0 +1,84 @@
+
+=== Linux local server discovery ownership ===
+  ok   probes a server at the port its scan found and skips a server that does not run (local-server-ports)
+  ok   vLLM answering on oMLX's port is one row named vLLM (local-server-fingerprint)
+  ok   an oMLX row whose answer is vLLM's is named vLLM (local-server-fingerprint)
+  ok   no running server probes nothing and still publishes none (local-server-ports)
+  ok   probes four catalogue URLs under independent native owners with optional credentials
+  ok   logical cancellation cannot replace a GET until exact native exit and close settlement
+  ok   held model and private-source changes fence acquisition and publication
+  ok   probes no server and keeps the rows inert while the AI is off (issue #97)
+  ok   models rows are usable with the AI on and expose JSON ACK/backend refusal separately
+  ok   a scope acquired during a blocking address prompt refuses publication and any backend setter
+
+=== local selection terminal acknowledgement ===
+  ok   a scope acquired after JSON ACK leaves a saved model without acquiring the backend setter
+  ok   late native refusal and bad JSON cannot publish models or retry through another owner
+
+=== local discovery constructor and terminal source fences ===
+  ok   a reentrant sweep cannot replace a native GET still constructing or continue the older dispatch loop
+  ok   private disk drift after native acquisition refuses every old positive response
+
+=== Configured generic loopback discovery (local-configured-affinity) ===
+  ok   probes and persists the originating openai row (local-configured-affinity)
+  ok   probes and persists the originating openai_compat row (local-configured-affinity)
+
+=== Configured explicit loopback discovery views (local-configured-view) ===
+  ok   discovers a nondefault openai address without rebranding its identity (local-configured-view)
+  ok   discovers a nondefault openai_compat address without rebranding its identity (local-configured-view)
+
+=== Configured discovery view custody (local-configured-view) ===
+  ok   retains removed configured native owners until exact physical retirement (local-configured-view)
+  ok   preserves foreign private fields and row positions through configured selection (local-configured-view)
+  ok   authentication, malformed bodies, pause and changed configured identities refuse models (local-configured-view)
+
+=== Configured native menu publication (local-configured-view) ===
+  ok   selects a checked originating openai menu row and fences held callbacks (local-configured-view)
+  ok   selects a checked originating openai_compat menu row and fences held callbacks (local-configured-view)
+  ok   moves an edited configured address into its canonical view while retaining the same source row (local-configured-view)
+
+=== Native discovery infrastructure receipts (local-probe-unavailable) ===
+  ok   reports native throw as unavailable while retaining cleanup ownership (local-probe-unavailable)
+  ok   reports native unsupported as unavailable while retaining cleanup ownership (local-probe-unavailable)
+  ok   reports native dead_start as unavailable while retaining cleanup ownership (local-probe-unavailable)
+  ok   reports native observation_false as unavailable while retaining cleanup ownership (local-probe-unavailable)
+  ok   reports native observation_throw as unavailable while retaining cleanup ownership (local-probe-unavailable)
+  ok   keeps ordinary connection refusal, malformed JSON and HTTP authentication distinct (local-probe-unavailable)
+
+=== Native synchronous discovery ownership (local-probe-unavailable) ===
+  ok   acknowledges a zero-resource dead-start refusal without replaying its body (local-probe-unavailable)
+  ok   preserves a synchronously completed valid response before retirement observation (local-probe-unavailable)
+  ok   keeps a native dead-start after admission loss as a refused stale source (local-probe-unavailable)
+
+=== Native empty models presentation (local-empty-models) ===
+  ok   keeps literal empty OpenAI lists reachable with disabled native no-models rows (local-empty-models)
+  ok   keeps object instead of array down without reporting infrastructure failure (local-empty-models)
+  ok   keeps array root down without reporting infrastructure failure (local-empty-models)
+  ok   keeps HTTP 404 down without reporting infrastructure failure (local-empty-models)
+
+=== Private discovery cache origin (local-cache-identity) ===
+  ok   refreshes actual menu cache after same-ID url source change (local-cache-identity)
+  ok   refreshes actual menu cache after same-ID provider source change (local-cache-identity)
+  ok   refreshes actual menu cache after same-ID token source change (local-cache-identity)
+  ok   refreshes actual menu cache after same-ID root_metadata source change (local-cache-identity)
+  ok   refreshes actual menu cache after same-ID foreign_row source change (local-cache-identity)
+  ok   refreshes actual menu cache after same-ID same_bytes_reload source change (local-cache-identity)
+
+=== Same-ID native cache retirement (local-cache-identity) ===
+  ok   retains exact native cleanup debt during a same-ID credential-source refresh (local-cache-identity)
+
+=== Scripted startup discovery transport custody (startup-local-http-edge) ===
+  ok   models absent default listeners through acknowledged operations rather than disabling dispatch (startup-local-http-edge)
+  ok   forwards every unrelated owner with its original arguments and operation identity (startup-local-http-edge)
+
+=== Local discovery startup ownership ===
+  ok   publishes loading without acquiring HTTP before the first real keyboard pump
+  ok   shutdown retires queued acquisition and never publishes after the loop begins
+  ok   cancelled queued work cannot acquire or notify but a successor can recover
+  ok   superseding sweeps acquire only the latest captured target
+  ok   revoked admission before dispatch acquires no native owner
+  ok   a source mutation before the queued tick cannot acquire stale credentials
+  ok   retirement in the first input pump cannot dispatch on that tick or a later run
+  ok   reentrant shutdown inside queued admission cannot acquire or publish
+  ok   an exact physical GET debt still fences the deferred successor
+TOTAL 55 passed 0 failed

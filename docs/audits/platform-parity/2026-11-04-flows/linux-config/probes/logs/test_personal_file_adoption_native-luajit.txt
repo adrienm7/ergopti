@@ -1,0 +1,44 @@
+
+=== native adopted personal file gates ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   102 native keeps empty personal sources reachable through actual file controls
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   102 native exposes actual unreadable personal files with disabled controls and no publication
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   102 native renders five actual personal controls and preserves section choices through file gates
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   102 native disables only ambiguous metadata fields and refuses retained stale personal rows
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   102 native exposes skipped linked and depth-limited directories as actual read-only menu rows
+  ok   102 native requires an acknowledged rendered page owner before metadata publication
+  ok   102 native refuses metadata from a rendered window after its source catalogue changes
+  ok   102 native edits the actual canonical override owner and preserves its inactive legacy sibling
+  ok   102 native refuses a canonical section choice that would rename its stored case-distinct sibling
+  ok   102 native refuses to overwrite a foreign engine generation during a gate inverse
+  ok   102 native reserves a symlinked primary target against an additional regular hardlink
+  ok   102 native restores its exact gate image after refused preferences and concurrent foreign source edit
+  ok   102 native retains a refused gate inverse lease until the engine acknowledges its exact retry
+  ok   102 native durably enables canonical gates over explicit false
+  ok   102 native durably enables canonical gates over section-only neutral false
+  ok   102 native durably enables canonical gates over override-only neutral false
+  ok   102 native leaves unsupported quoted rule identities read-only
+  ok   102 native persists literal dotted-section bulk choices without opening its sibling
+  ok   102 native commits actual per-file and section metadata with live priority and retained gates
+  ok   102 native keeps a foreign metadata generation after publisher acknowledgement false
+  ok   102 native keeps a foreign metadata generation after publisher acknowledgement true
+  ok   102 native refuses source publication and restores the exact previous engine image
+  ok   102 native activates distinct dotted and nested sources with exact live/preview identities
+  ok   102 native persists disabling one source and remains disabled after a genuine choices reload
+  ok   102 native refuses a held file owner after external source changes without settings publication
+TOTAL 25 passed 0 failed

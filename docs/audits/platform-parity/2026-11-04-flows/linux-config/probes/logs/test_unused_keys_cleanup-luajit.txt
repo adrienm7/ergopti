@@ -1,0 +1,99 @@
+
+=== config unused keys engine (linux): byte-preserving removal ===
+  ok   unused keys: keeps CRLF, comments, a BOM and every unlisted byte
+  ok   unused keys: a header-looking line inside a multiline value is data
+  ok   unused keys: a mark on a table consumes every key inside it
+  ok   unused keys: an inline table holding one consumed field is kept whole
+  ok   unused keys: dotted keys are addressed by their full path
+  ok   unused keys: a known section left empty keeps its header
+
+=== config unused keys engine (linux): never offered ===
+  ok   unused keys: root keys, quoted keys and arrays of tables are left alone
+  ok   unused keys: metadata tables such as the [_meta] schema stamp are never offered
+  ok   unused keys: an unterminated value is malformed, not cleanable
+
+=== config unused keys engine (linux): dialog text ===
+  ok   unused keys: caps the list at DISPLAY_LIMIT and counts the rest
+  ok   unused keys: fills placeholders literally, even with a percent sign
+  ok   unused keys: names the backup next to the file
+
+=== config unused keys (linux): detection follows the driver's readers ===
+  ok   unused keys: lists exactly the keys no reader of this driver consumes
+  ok   unused keys: a protected file is never scanned or offered (protected-schema-cleanup)
+  ok   unused keys: a missing config has nothing to clean
+  ok   unused keys: a malformed config is reported, never cleaned
+
+=== config unused keys (linux): removal ===
+  ok   unused keys: removes exactly the unused keys after a byte-exact backup
+  ok   unused keys: never removes a key the user was not shown
+  ok   unused keys: a refused backup aborts before the writer, file byte-identical
+  ok   unused keys: an occupied backup path is never overwritten and aborts the cleanup
+  ok   unused keys: a backup that does not read back exactly aborts before the writer
+  ok   unused keys: an unreadable file is refused before any backup
+  ok   unused keys: a refused write keeps the config and the exact backup
+  ok   unused keys: an edit landing after the backup wins: the stale rewrite is refused
+
+=== config unused keys (linux): menu flow ===
+  ok   unused keys: reports a clean file without asking anything
+  ok   unused keys: a declined confirmation changes nothing
+  ok   unused keys: no dialog to confirm with means nothing is removed
+  ok   unused keys: a confirmed cleanup reports the backup it wrote
+  ok   unused keys: a failed backup is reported with its reason and the file kept
+  ok   unused keys: an unreadable file is reported without asking
+
+=== unused keys (linux): the rule is exactly the readers' ===
+  ok   unused keys: the cleaned file loads to the same driver state
+  ok   unused keys: every key left behind changes the driver state when removed
+  ok   unused keys: a malformed shortcut switch is read (it fails closed), so it is kept
+  ok   unused keys: the subscribed update channel is read, an unknown one is offered
+  ok   unused keys: live bindings are kept, retired actions are offered (config-outdated-shortcuts)
+  ok   unused keys: what the readers warn about is exactly what is offered (config-outdated-warned-offered)
+  ok   unused keys: an outdated inline-table member is offered and cut alone (config-outdated-inline)
+  ok   unused keys: an old-shape hotstring choice is offered, not fatal (config-outdated-hotstrings)
+  ok   unused keys: an invalid gesture parameter is ignored by the loader and offered
+
+=== unused keys (linux): tray wiring ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   unused keys: the Configuration submenu opens the cleanup host without native dialogs
+  ok   unused keys: the engine refuses an unavailable confirmation without modifying the file
+  ok   unused keys: a confirmed engine cleanup removes the keys and keeps a backup
+  ok   unused keys: the menu forwards trusted ownership and reports a refused WebView
+  ok   whole unread root: actual linux dotted collector and exact native-file publication
+  ok   whole unread root: actual linux inline collector and exact native-file publication
+  ok   whole unread root: actual linux array collector and exact native-file publication
+  ok   whole unread root: clone capability refuses before backup
+  ok   whole unread root: forged_key capability refuses before backup
+  ok   whole unread root: field capability refuses before backup
+  ok   whole unread root: path capability refuses before backup
+  ok   whole unread root: extra capability refuses before backup
+  ok   whole unread root: foreign capability refuses before backup
+  ok   whole unread root: unbound capability refuses before backup
+  ok   whole unread root: duplicate capability refuses before backup
+  ok   whole unread root: stale neighbor refuses and fresh scan preserves later source
+  ok   whole unread root: consumed authority cannot revive after exact external restoration
+  ok   whole unread root: backup-time field changes refuse publication
+  ok   whole unread root: backup-time collection changes refuse publication
+  ok   whole unread root: backup-time source changes refuse publication
+  ok   whole unread root: backup-time live_read changes refuse publication
+  ok   unread table array below a read root: offered and removed whole with every generation
+  ok   whole unread root: protected and partially consumed roots cannot obtain whole-root preview
+  ok   whole unread root: explicit mode never changes historical source-only addressing
+  ok   whole unread root: proven quoted equals identity permits exact unrelated root cleanup
+  ok   whole unread root: a current marked descendant refuses a forged whole root before backup
+  ok   whole unread root: ordinary leaf removal and the selected root compose without deleting a live sibling
+  ok   whole unread root: removing the first physical assignment preserves BOM CRLF and final-line spelling
+  ok   whole unread root: backup-time row_identity cannot substitute captured identity
+  ok   whole unread root: backup-time selection_metatable cannot substitute captured identity
+  ok   physical equals boundary: native cleanup and backup basic neighbor
+  ok   physical equals boundary: native cleanup and backup literal neighbor
+  ok   physical equals boundary: native cleanup and backup escaped quote
+  ok   physical equals boundary: native cleanup and backup escaped equals
+  ok   physical equals boundary: native cleanup and backup dotted quoted parent
+  ok   physical equals boundary: native cleanup and backup multiline value
+  ok   physical equals boundary: native cleanup and backup quoted retired child
+  ok   physical equals boundary: native cleanup and backup header child and case sibling
+  ok   physical equals boundary: changed source refuses before backup and a fresh preview preserves the successor
+  ok   physical equals boundary: malformed or duplicate key still refuses actual native scan
+  ok   physical equals boundary: malformed or duplicate key still refuses actual native scan
+TOTAL 80 passed 0 failed

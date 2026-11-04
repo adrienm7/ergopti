@@ -1,0 +1,147 @@
+
+=== explicit selection actions retain the originating destination ===
+  ok   selection-action-owner commits stable x11 selection_uppercase
+  ok   selection-action-owner refuses copy-wait x11 selection_uppercase
+  ok   selection-action-owner refuses paste-wait x11 selection_uppercase
+  ok   selection-action-owner refuses snapshot x11 selection_uppercase
+  ok   selection-action-owner refuses replacement x11 selection_uppercase
+  ok   selection-action-owner refuses layout x11 selection_uppercase
+  ok   selection-action-owner refuses key-down x11 selection_uppercase
+  ok   selection-action-owner refuses privacy x11 selection_uppercase
+  ok   selection-action-owner refuses absent x11 selection_uppercase
+  ok   selection-action-owner commits stable x11 wrap_selection
+  ok   selection-action-owner refuses copy-wait x11 wrap_selection
+  ok   selection-action-owner refuses paste-wait x11 wrap_selection
+  ok   selection-action-owner refuses snapshot x11 wrap_selection
+  ok   selection-action-owner refuses replacement x11 wrap_selection
+  ok   selection-action-owner refuses layout x11 wrap_selection
+  ok   selection-action-owner refuses key-down x11 wrap_selection
+  ok   selection-action-owner refuses privacy x11 wrap_selection
+  ok   selection-action-owner refuses absent x11 wrap_selection
+  ok   selection-action-owner commits stable wayland selection_uppercase
+  ok   selection-action-owner refuses copy-wait wayland selection_uppercase
+  ok   selection-action-owner refuses paste-wait wayland selection_uppercase
+  ok   selection-action-owner refuses snapshot wayland selection_uppercase
+  ok   selection-action-owner refuses replacement wayland selection_uppercase
+  ok   selection-action-owner refuses layout wayland selection_uppercase
+  ok   selection-action-owner refuses key-down wayland selection_uppercase
+  ok   selection-action-owner refuses privacy wayland selection_uppercase
+  ok   selection-action-owner refuses absent wayland selection_uppercase
+  ok   selection-action-owner commits stable wayland wrap_selection
+  ok   selection-action-owner refuses copy-wait wayland wrap_selection
+  ok   selection-action-owner refuses paste-wait wayland wrap_selection
+  ok   selection-action-owner refuses snapshot wayland wrap_selection
+  ok   selection-action-owner refuses replacement wayland wrap_selection
+  ok   selection-action-owner refuses layout wayland wrap_selection
+  ok   selection-action-owner refuses key-down wayland wrap_selection
+  ok   selection-action-owner refuses privacy wayland wrap_selection
+  ok   selection-action-owner refuses absent wayland wrap_selection
+
+=== plain paste retains its destination before reading the clipboard ===
+  ok   plain-paste-owner commits stable x11
+  ok   plain-paste-owner refuses snapshot x11
+  ok   plain-paste-owner refuses privacy x11
+  ok   plain-paste-owner refuses metrics x11
+  ok   plain-paste-owner refuses absent x11
+  ok   plain-paste-owner refuses read-refused x11
+  ok   plain-paste-owner commits stable wayland
+  ok   plain-paste-owner refuses snapshot wayland
+  ok   plain-paste-owner refuses privacy wayland
+  ok   plain-paste-owner refuses metrics wayland
+  ok   plain-paste-owner refuses absent wayland
+  ok   plain-paste-owner refuses read-refused wayland
+
+=== compound actions retain one originating text destination ===
+  ok   compound-action-owner surround_parens stable
+  ok   compound-action-owner surround_parens after-navigation
+  ok   compound-action-owner surround_parens aba
+  ok   compound-action-owner surround_parens password
+  ok   compound-action-owner surround_parens absent
+  ok   compound-action-owner surround_parens metrics
+  ok   compound-action-owner surround_parens during-down
+  ok   compound-action-owner surround_parens closed
+  ok   compound-action-owner surround_parens native-refused
+  ok   compound-action-owner surround_parens after-opening
+  ok   compound-action-owner select_word stable
+  ok   compound-action-owner select_word after-navigation
+  ok   compound-action-owner select_word aba
+  ok   compound-action-owner select_word password
+  ok   compound-action-owner select_word absent
+  ok   compound-action-owner select_word metrics
+  ok   compound-action-owner select_word during-down
+  ok   compound-action-owner select_word closed
+  ok   compound-action-owner select_word native-refused
+  ok   compound-action-owner select_line stable
+  ok   compound-action-owner select_line after-navigation
+  ok   compound-action-owner select_line aba
+  ok   compound-action-owner select_line password
+  ok   compound-action-owner select_line absent
+  ok   compound-action-owner select_line metrics
+  ok   compound-action-owner select_line during-down
+  ok   compound-action-owner select_line closed
+  ok   compound-action-owner select_line native-refused
+
+=== configured printable insertions retain their original destination ===
+  ok   configured-insertion-owner send_text direct x11 stable
+  ok   configured-insertion-owner send_text direct x11 absent
+  ok   configured-insertion-owner send_text direct x11 capture-refused
+  ok   configured-insertion-owner send_text direct x11 capture-threw
+  ok   configured-insertion-owner send_text direct x11 configuration
+  ok   configured-insertion-owner send_text direct x11 native-refused
+  ok   configured-insertion-owner send_text direct x11 after-first
+  ok   configured-insertion-owner send_text clipboard x11 stable
+  ok   configured-insertion-owner send_text clipboard x11 snapshot
+  ok   configured-insertion-owner send_text clipboard x11 publication
+  ok   configured-insertion-owner send_text clipboard x11 settle
+  ok   configured-insertion-owner send_text clipboard x11 password
+  ok   configured-insertion-owner send_text clipboard x11 aba
+  ok   configured-insertion-owner send_text clipboard x11 absent
+  ok   configured-insertion-owner send_text clipboard x11 capture-refused
+  ok   configured-insertion-owner send_text clipboard x11 capture-threw
+  ok   configured-insertion-owner send_text clipboard x11 configuration
+  ok   configured-insertion-owner send_text clipboard x11 native-refused
+  ok   configured-insertion-owner send_text clipboard wayland stable
+  ok   configured-insertion-owner send_text clipboard wayland snapshot
+  ok   configured-insertion-owner send_text clipboard wayland publication
+  ok   configured-insertion-owner send_text clipboard wayland settle
+  ok   configured-insertion-owner send_text clipboard wayland password
+  ok   configured-insertion-owner send_text clipboard wayland aba
+  ok   configured-insertion-owner send_text clipboard wayland absent
+  ok   configured-insertion-owner send_text clipboard wayland capture-refused
+  ok   configured-insertion-owner send_text clipboard wayland capture-threw
+  ok   configured-insertion-owner send_text clipboard wayland configuration
+  ok   configured-insertion-owner send_text clipboard wayland native-refused
+  ok   configured-insertion-owner send_key direct x11 stable
+  ok   configured-insertion-owner send_key direct x11 absent
+  ok   configured-insertion-owner send_key direct x11 capture-refused
+  ok   configured-insertion-owner send_key direct x11 capture-threw
+  ok   configured-insertion-owner send_key direct x11 configuration
+  ok   configured-insertion-owner send_key direct x11 native-refused
+  ok   configured-insertion-owner send_key clipboard x11 stable
+  ok   configured-insertion-owner send_key clipboard x11 snapshot
+  ok   configured-insertion-owner send_key clipboard x11 publication
+  ok   configured-insertion-owner send_key clipboard x11 settle
+  ok   configured-insertion-owner send_key clipboard x11 password
+  ok   configured-insertion-owner send_key clipboard x11 aba
+  ok   configured-insertion-owner send_key clipboard x11 absent
+  ok   configured-insertion-owner send_key clipboard x11 capture-refused
+  ok   configured-insertion-owner send_key clipboard x11 capture-threw
+  ok   configured-insertion-owner send_key clipboard x11 configuration
+  ok   configured-insertion-owner send_key clipboard x11 native-refused
+  ok   configured-insertion-owner send_key clipboard wayland stable
+  ok   configured-insertion-owner send_key clipboard wayland snapshot
+  ok   configured-insertion-owner send_key clipboard wayland publication
+  ok   configured-insertion-owner send_key clipboard wayland settle
+  ok   configured-insertion-owner send_key clipboard wayland password
+  ok   configured-insertion-owner send_key clipboard wayland aba
+  ok   configured-insertion-owner send_key clipboard wayland absent
+  ok   configured-insertion-owner send_key clipboard wayland capture-refused
+  ok   configured-insertion-owner send_key clipboard wayland capture-threw
+  ok   configured-insertion-owner send_key clipboard wayland configuration
+  ok   configured-insertion-owner send_key clipboard wayland native-refused
+  ok   configured-insertion-owner preserves non-text command send_key Tab
+  ok   configured-insertion-owner preserves non-text command send_key Enter
+  ok   configured-insertion-owner preserves non-text command send_key page_down
+  ok   configured-insertion-owner preserves non-text command send_shortcut alt+F4
+  ok   configured-insertion-owner preserves non-text command send_shortcut super+Tab
+AUDIT_RESULT	138	0

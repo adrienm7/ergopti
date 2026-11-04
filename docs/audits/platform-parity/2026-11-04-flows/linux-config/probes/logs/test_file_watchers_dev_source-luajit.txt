@@ -1,0 +1,17 @@
+
+=== file_watchers developer source trees ===
+  ok   (linux-dev-mode-autoreload) restarts on a nested driver .lua, not the hotstring reload
+  ok   (source-watch-path-framing) keeps a newline in the source root through polling
+  ok   (source-watch-path-framing) keeps a newline in the source directory through polling
+  ok   (source-watch-path-framing) keeps a newline in the source filename through polling
+  ok   (source-watch-path-framing) keeps a newline in the source root through inotify
+  ok   (source-watch-path-framing) keeps a newline in the source directory through inotify
+  ok   (source-watch-path-framing) keeps a newline in the source filename through inotify
+  ok   (source-watch-path-framing) refuses failed walk with partial output and retires prior watches
+  ok   (source-watch-path-framing) refuses truncated record and retires prior watches
+  ok   (source-watch-path-framing) refuses empty record and retires prior watches
+  ok   (linux-dev-mode-autoreload) ignores a saved test file
+  ok   (linux-dev-mode-autoreload) keeps a TOML edit on the hotstring reload
+  ok   (linux-dev-mode-autoreload) arms no source restart outside a developer run
+  ok   refuses source trees without their restart callback
+TOTAL 14 passed 0 failed

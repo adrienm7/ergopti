@@ -1,0 +1,317 @@
+
+=== shortcut case transforms ===
+  ok   toggles an international selection between uppercase and lowercase
+  ok   toggles title case like the macOS and Windows actions
+  ok   lowercases explicitly without applying toggle semantics
+
+=== CapsWord selection checkbox ownership ===
+  ok   renders the shared state off (selection-caps-word)
+  ok   renders the shared state on (selection-caps-word)
+  ok   renders the shared state reserved-off (selection-caps-word)
+  ok   renders the shared state reserved-on (selection-caps-word)
+  ok   returns an exact publication receipt from the actual native owner (selection-caps-word)
+  ok   draws no live CapsWord checkbox while shortcuts are off (selection-caps-word)
+  ok   acknowledges the published state before menu refresh after live pause (selection-caps-word)
+  ok   toggles the latest published state rather than the retained checkmark (selection-caps-word)
+  ok   refuses a retained callback while the actual configuration owner holds it (selection-caps-word)
+  ok   does not refresh after the native owner's false receipt (selection-caps-word)
+  ok   does not refresh after the native owner's nil receipt (selection-caps-word)
+  ok   does not refresh after the native owner's zero receipt (selection-caps-word)
+  ok   does not refresh after the native owner's truthy-string receipt (selection-caps-word)
+  ok   announces each committed CapsWord switch with its new state and never a refused one (selection-caps-word)
+  ok   rechecks a real reservation acquired inside protected metric delivery (selection-caps-word)
+  ok   keeps a metric callback's acknowledged reservation even when it throws (selection-caps-word)
+  ok   refuses missing or malformed native readiness instead of borrowing a default (selection-caps-word)
+  ok   keeps the existing linux platform boundary (selection-caps-word)
+  ok   keeps the existing hs platform boundary (selection-caps-word)
+  ok   keeps the existing ahk platform boundary (selection-caps-word)
+
+=== shared selection case command ownership ===
+  ok   publishes the declared uppercase_selection Unicode action (selection-case-command)
+  ok   retires held uppercase_selection while configuration is reserved (selection-case-command)
+  ok   rechecks uppercase_selection reservation after protected metrics (selection-case-command)
+  ok   requires strict uppercase_selection acknowledgement (selection-case-command)
+  ok   refuses malformed uppercase_selection capabilities (selection-case-command)
+  ok   publishes the declared selection_lowercase Unicode action (selection-case-command)
+  ok   retires held selection_lowercase while configuration is reserved (selection-case-command)
+  ok   rechecks selection_lowercase reservation after protected metrics (selection-case-command)
+  ok   requires strict selection_lowercase acknowledgement (selection-case-command)
+  ok   refuses malformed selection_lowercase capabilities (selection-case-command)
+  ok   publishes the declared titlecase_selection Unicode action (selection-case-command)
+  ok   retires held titlecase_selection while configuration is reserved (selection-case-command)
+  ok   rechecks titlecase_selection reservation after protected metrics (selection-case-command)
+  ok   requires strict titlecase_selection acknowledgement (selection-case-command)
+  ok   refuses malformed titlecase_selection capabilities (selection-case-command)
+  ok   keeps linux selection command placement (selection-case-command)
+  ok   keeps ahk selection command placement (selection-case-command)
+  ok   keeps hs selection command placement (selection-case-command)
+  ok   keeps direct catalogue case semantics and refuses reserved aliases (selection-case-command)
+
+=== shared selection helper command ownership ===
+  ok   dispatches actual selection_select_word effects (selection-helper-command)
+  ok   fences retained selection_select_word during reservation (selection-helper-command)
+  ok   requires current selection_select_word receipts (selection-helper-command)
+  ok   refuses withdrawn selection_select_word capabilities (selection-helper-command)
+  ok   dispatches actual selection_select_line effects (selection-helper-command)
+  ok   fences retained selection_select_line during reservation (selection-helper-command)
+  ok   requires current selection_select_line receipts (selection-helper-command)
+  ok   refuses withdrawn selection_select_line capabilities (selection-helper-command)
+  ok   dispatches actual selection_paste_plain effects (selection-helper-command)
+  ok   fences retained selection_paste_plain during reservation (selection-helper-command)
+  ok   requires current selection_paste_plain receipts (selection-helper-command)
+  ok   refuses withdrawn selection_paste_plain capabilities (selection-helper-command)
+  ok   retains native select_word step 1 refusal (selection-helper-command)
+  ok   retains native select_word step 2 refusal (selection-helper-command)
+  ok   retains native select_line step 1 refusal (selection-helper-command)
+  ok   retains native select_line step 2 refusal (selection-helper-command)
+  ok   retains actual paste refuse_read and retry (selection-helper-command)
+  ok   retains actual paste refuse_injection and retry (selection-helper-command)
+  ok   preserves linux placement (selection-helper-command)
+  ok   preserves ahk placement (selection-helper-command)
+  ok   preserves hs placement (selection-helper-command)
+  ok   preserves the composed helper order and separator (selection-helper-command)
+  ok   follows changed shared helper order and caption (selection-helper-command)
+  FAIL uses actual helper captions in all 21 locales (selection-helper-command) — test_case_transforms.lua:50: shortcut case probe must not throw: .../modules/shortcuts/text_actions/test_case_transforms.lua:708: attempt to index a nil value — actual: false
+
+=== shared selection presentation boundaries ===
+  ok   keeps the complete physical order under an actual configured native owner
+  ok   keeps both boundaries and the retained action refusal under a real reservation
+  ok   consumes the genuine selection_case_boundary and refuses missing or unbound replacements
+  ok   consumes the genuine selection_helper_boundary and refuses missing or unbound replacements
+  ok   keeps the truthful linux boundary projection without an action
+  ok   keeps the truthful ahk boundary projection without an action
+  ok   keeps the truthful hs boundary projection without an action
+AUDIT_RESULT	72	1
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+/workspace/scratch/parity-toolchain/LuaJIT-2.1/src/luajit: .../scratch/parity-flows/linux-clipboard/probes/run-one.lua:8: focused cases failed
+stack traceback:
+	[C]: in function 'assert'
+	.../scratch/parity-flows/linux-clipboard/probes/run-one.lua:8: in main chunk
+	[C]: at 0x563044bfc360

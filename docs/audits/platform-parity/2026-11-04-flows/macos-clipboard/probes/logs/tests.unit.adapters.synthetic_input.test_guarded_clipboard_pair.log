@@ -1,0 +1,19 @@
+MODULE tests.unit.adapters.synthetic_input.test_guarded_clipboard_pair
+
+=== clipboard pair owns its payload at the native publication boundary ===
+  ok   keeps healthy paste and restoration behavior (guarded-clipboard-pair)
+  ok   refuses a foreign copy while the native pair is queued (guarded-clipboard-pair)
+  ok   does not return a queued paste through an ambient callback (guarded-clipboard-pair)
+  ok   fails closed when the final native ownership receipt is unreadable (guarded-clipboard-pair)
+  ok   never replays an uncertain Down and preserves paste grace after compensation (guarded-clipboard-pair)
+  ok   retains Up beyond the ordinary retry budget and blocks its FIFO sibling (guarded-clipboard-pair)
+  ok   cancellation after Down never removes the required Up (guarded-clipboard-pair)
+  ok   waits for the exact periodic stop acknowledgement before terminal (guarded-clipboard-pair)
+  ok   treats an identical external copy as a different payload owner (guarded-clipboard-pair)
+  ok   ignores a recursive tick before native Down effect (guarded-clipboard-pair)
+  ok   ignores a recursive tick before native Up effect (guarded-clipboard-pair)
+  ok   keeps Up when the post-attempt epoch probe reenters cancellation (guarded-clipboard-pair)
+  ok   refuses cancelled admission after native timer start reentry (guarded-clipboard-pair)
+  ok   leaves a successor opened by synchronous stop settlement intact (guarded-clipboard-pair)
+  ok   discards late construction tags after native cancellation reentry (guarded-clipboard-pair)
+RESULT 15 passed 0 failed

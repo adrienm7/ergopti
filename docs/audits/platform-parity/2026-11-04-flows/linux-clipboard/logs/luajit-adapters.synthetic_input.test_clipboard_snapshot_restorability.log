@@ -1,0 +1,36 @@
+
+=== clipboard snapshot restorability ===
+  ok   snapshot preflight: stage refuses NUL before mutation
+  ok   snapshot preflight: stage refuses canary NUL before mutation
+  ok   snapshot preflight: stage restores ASCII exactly
+  ok   snapshot preflight: stage restores empty exactly
+  ok   snapshot preflight: stage restores UTF8 exactly
+  ok   snapshot preflight: stage restores UTF8 two final LF exactly
+  ok   snapshot preflight: paste_text refuses NUL before mutation
+  ok   snapshot preflight: paste_text refuses canary NUL before mutation
+  ok   snapshot preflight: paste_text restores ASCII exactly
+  ok   snapshot preflight: paste_text restores empty exactly
+  ok   snapshot preflight: paste_text restores UTF8 exactly
+  ok   snapshot preflight: paste_text restores UTF8 two final LF exactly
+  ok   snapshot preflight: read_selection refuses NUL before mutation
+  ok   snapshot preflight: read_selection refuses canary NUL before mutation
+  ok   snapshot preflight: read_selection restores ASCII exactly
+  ok   snapshot preflight: read_selection restores empty exactly
+  ok   snapshot preflight: read_selection restores UTF8 exactly
+  ok   snapshot preflight: read_selection restores UTF8 two final LF exactly
+  ok   snapshot preflight: read_selection_uri_list refuses NUL before mutation
+  ok   snapshot preflight: read_selection_uri_list refuses canary NUL before mutation
+  ok   snapshot preflight: read_selection_uri_list restores ASCII exactly
+  ok   snapshot preflight: read_selection_uri_list restores empty exactly
+  ok   snapshot preflight: read_selection_uri_list restores UTF8 exactly
+  ok   snapshot preflight: read_selection_uri_list restores UTF8 two final LF exactly
+  ok   snapshot preflight: transform_selection refuses NUL before mutation
+  ok   snapshot preflight: transform_selection refuses canary NUL before mutation
+  ok   snapshot preflight: transform_selection restores ASCII exactly
+  ok   snapshot preflight: transform_selection restores empty exactly
+  ok   snapshot preflight: transform_selection restores UTF8 exactly
+  ok   snapshot preflight: transform_selection restores UTF8 two final LF exactly
+  ok   snapshot preflight: raw read_checked retains NUL without writes
+  ok   snapshot preflight: raw read_primary retains NUL without writes
+  ok   snapshot preflight: existing writer hard guard still refuses NUL before dispatch
+AUDIT_RESULT	33	0

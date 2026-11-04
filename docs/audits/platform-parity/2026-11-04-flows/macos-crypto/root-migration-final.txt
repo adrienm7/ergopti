@@ -1,0 +1,7 @@
+case=1 literal_text_in_SQL=false primitive_encrypt_calls=2 decrypted_text=ordinary synthetic fixture
+case=2 literal_text_in_SQL=true primitive_encrypt_calls=1 decrypted_text=ergopti-enc-v1:SENTINEL-PRIVATE-CONTENT
+case=3 literal_text_in_SQL=true primitive_encrypt_calls=1 decrypted_text=DECODED-FIXTURE
+Actual raw typing SQL path verified; no DB/keychain/files/user secrets accessed; crypto ports synthetic.
+timer_refusal: start_reported=true running=true committed_timer=false rewritten_rows=0
+healthy_timer_control: rewritten_rows=1 running=false
+Actual mac wrapper/shared runner/cipher/SQL module/TimerScheduler; native hs.timer and data ports recording-only.

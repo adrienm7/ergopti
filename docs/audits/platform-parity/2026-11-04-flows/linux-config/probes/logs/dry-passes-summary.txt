@@ -1,0 +1,16 @@
+{'phase': 'dry-pass-1', 'module': 'infra.config.test_script_config_authority', 'exit_code': 0, 'totals': ['TOTAL 4 passed 0 failed']}
+{'phase': 'dry-pass-1', 'module': 'infra.i18n.test_i18n_persistence', 'exit_code': 0, 'totals': ['TOTAL 22 passed 0 failed']}
+{'phase': 'dry-pass-1', 'module': 'infra.preferences.test_legacy_hotstring_storage', 'exit_code': 0, 'totals': ['TOTAL 8 passed 0 failed']}
+{'phase': 'dry-pass-1', 'module': 'adapters.storage.test_storage_adapter_preserves_corrupt_input', 'exit_code': 0, 'totals': ['TOTAL 29 passed 0 failed']}
+{'phase': 'dry-pass-1', 'module': 'infra.config.test_config_migrate', 'exit_code': 0, 'totals': ['TOTAL 223 passed 0 failed']}
+{'phase': 'dry-pass-1', 'module': 'infra.config.test_config_save_failure', 'exit_code': 0, 'totals': ['TOTAL 4 passed 0 failed']}
+{'phase': 'dry-pass-1', 'module': 'infra.scope.test_config_scope_transaction', 'exit_code': 0, 'totals': ['TOTAL 106 passed 0 failed']}
+{'phase': 'dry-pass-2', 'module': 'ui.editors.test_config_cleanup_bridge', 'exit_code': 0, 'totals': ['TOTAL 5 passed 0 failed']}
+{'phase': 'dry-pass-2', 'module': 'ui.editors.test_config_cleanup_session', 'exit_code': 0, 'totals': ['TOTAL 9 passed 0 failed']}
+{'phase': 'dry-pass-2', 'module': 'ui.menu.hotstrings.test_unused_keys_cleanup', 'exit_code': 0, 'totals': ['TOTAL 80 passed 0 failed']}
+{'phase': 'dry-pass-2', 'module': 'ui.editors.test_ui_bridge_handlers_paths_editor', 'exit_code': 0, 'totals': ['TOTAL 64 passed 0 failed']}
+{'phase': 'dry-pass-2', 'module': 'ui.editors.test_paths_editor_logs_dir', 'exit_code': 0, 'totals': ['TOTAL 15 passed 0 failed']}
+{'phase': 'dry-pass-2', 'module': 'infra.scope.test_global_scope', 'exit_code': 0, 'totals': ['TOTAL 12 passed 0 failed']}
+{'phase': 'dry-pass-2', 'module': 'infra.scope.test_config_scope_composition', 'exit_code': 0, 'totals': ['TOTAL 62 passed 0 failed']}
+{'phase': 'dry-pass-2', 'module': 'adapters.storage.test_storage_adapter_ordinary_native_cleanup', 'exit_code': 0, 'totals': ['TOTAL 50 passed 0 failed']}
+{'phase': 'dry-pass-2', 'module': 'adapters.storage.test_storage_owned', 'exit_code': 0, 'totals': ['TOTAL 11 passed 0 failed']}

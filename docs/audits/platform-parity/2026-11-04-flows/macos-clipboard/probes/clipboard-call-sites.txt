@@ -1,0 +1,56 @@
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:267:	local ok, count = pcall(function() return pasteboard.changeCount() end)
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:345:			restore_ok, restore_result = mutate_owned_clipboard(owner, pasteboard.writeAllData, owner.clipboard_prior)
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:347:			restore_ok, restore_result = pcall(pasteboard.writeAllData, owner.clipboard_prior)
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:352:			restore_ok, restore_result = mutate_owned_clipboard(owner, pasteboard.clearContents)
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:354:			restore_ok, restore_result = pcall(pasteboard.clearContents)
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:487:	local snapshot_ok, snapshot = call_text_boundary(owner, pasteboard.readAllData)
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:494:		plain_ok, plain = call_text_boundary(owner, pasteboard.getContents)
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:1065:		local ok_selection, selection = guarded_boundary(pasteboard.getContents)
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:1131:			local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, transformed)
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:1153:		return pasteboard.clearContents()
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:1373:		local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, plain or "")
+static/ergopti_plus/macos/modules/shortcuts/actions/text.lua:2260:		local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, left .. sel .. right)
+static/ergopti_plus/macos/modules/shortcuts/actions/apps.lua:430:	-- Publish the acquisition before crossing into the native pasteboard. A
+static/ergopti_plus/macos/modules/shortcuts/actions/apps.lua:435:	local ok_read, prior_or_error = pcall(pasteboard.readAllData)
+static/ergopti_plus/macos/modules/shortcuts/actions/apps.lua:485:		ok_restore, restore_result = pcall(pasteboard.writeAllData, prior)
+static/ergopti_plus/macos/modules/shortcuts/actions/apps.lua:488:		ok_restore, restore_result = pcall(pasteboard.clearContents)
+static/ergopti_plus/macos/modules/shortcuts/actions/apps.lua:874:		local ok_clear, clear_error = pcall(pasteboard.clearContents)
+static/ergopti_plus/macos/modules/shortcuts/actions/apps.lua:886:			local ok_p, p = pcall(pasteboard.getContents)
+static/ergopti_plus/macos/modules/shortcuts/actions/apps.lua:909:				local ok_sel, sel = pcall(pasteboard.getContents)
+static/ergopti_plus/macos/modules/shortcuts/actions/apps.lua:940:	local ok_clear, clear_error = pcall(pasteboard.clearContents)
+static/ergopti_plus/macos/modules/shortcuts/actions/apps.lua:952:		local ok_sel, sel = pcall(pasteboard.getContents)
+static/ergopti_plus/macos/modules/shortcuts/actions/system_pixel.lua:593:		local ok_write, write_result = pcall(pasteboard.setContents, hex)
+static/ergopti_plus/macos/modules/shortcuts/actions/screen_capture_flow.lua:26:---    never claimed without an image on the pasteboard.
+static/ergopti_plus/macos/modules/shortcuts/actions/screen_capture_flow.lua:261:--- clipboard destination by copying the file and verifying the pasteboard.
+static/ergopti_plus/macos/ui/field_check/init.lua:52:		copy = function(text) return hs.pasteboard.setContents(text) end,
+static/ergopti_plus/macos/modules/gestures/actions.lua:1727:			ok_restore, restore_result = Clipboard.restore(next(saved or {}) ~= nil and saved or nil, receipt)
+static/ergopti_plus/macos/modules/gestures/actions.lua:1737:				ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
+static/ergopti_plus/macos/modules/gestures/actions.lua:1739:				ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
+static/ergopti_plus/macos/modules/gestures/actions.lua:1969:	local ok_snapshot, snapshot_or_error = pcall(hs.pasteboard.readAllData)
+static/ergopti_plus/macos/modules/gestures/actions.lua:1984:	local ok_clear, clear_error = pcall(hs.pasteboard.clearContents)
+static/ergopti_plus/macos/modules/gestures/actions.lua:2011:		local ok_selected, selected = pcall(hs.pasteboard.getContents)
+static/ergopti_plus/macos/modules/gestures/system_actions.lua:341:	local cleared = Clipboard.restore(nil)
+static/ergopti_plus/macos/modules/gestures/user_actions.lua:136:		local written = Clipboard.write(value)
+static/ergopti_plus/macos/modules/keymap/utils.lua:224:	if type(hs.pasteboard.changeCount) ~= "function" then return nil end
+static/ergopti_plus/macos/modules/keymap/utils.lua:225:	local ok, count = pcall(hs.pasteboard.changeCount)
+static/ergopti_plus/macos/modules/keymap/utils.lua:328:		ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
+static/ergopti_plus/macos/modules/keymap/utils.lua:337:		ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
+static/ergopti_plus/macos/modules/keymap/utils.lua:513:			return hs.pasteboard.readAllData()
+static/ergopti_plus/macos/modules/keymap/utils.lua:567:	local ok_write, write_result = pcall(hs.pasteboard.setContents, value)
+static/ergopti_plus/macos/modules/keymap/utils.lua:832:				-- pasteboard. A keystroke posted immediately behind the Cmd+V
+static/ergopti_plus/macos/modules/keymap/utils.lua:1075:		-- to reading the pasteboard. Anything the caller emits after this — the
+static/ergopti_plus/macos/modules/keymap/terminator_replay.lua:224:--- read the pasteboard. The emitter's settle delay therefore remains mandatory.
+static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:661:		local clipboard_token_raw = hs.pasteboard and hs.pasteboard.getContents
+static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:662:			and hs.pasteboard.getContents() or ""
+static/ergopti_plus/macos/adapters/text_sender.lua:234:	local ok_restore, restored = pcall(Clipboard.restore, _paste_saved_original, receipt)
+static/ergopti_plus/macos/adapters/text_sender.lua:244:		return false, count_error or (ok_restore and "Clipboard.restore returned " .. tostring(restored) or restored)
+static/ergopti_plus/macos/adapters/text_sender.lua:333:--- Uses the Clipboard port (Clipboard.save / Clipboard.write / Clipboard.restore)
+static/ergopti_plus/macos/adapters/text_sender.lua:384:					local saved, snapshot_ok = Clipboard.save()
+static/ergopti_plus/macos/adapters/text_sender.lua:402:				local accepted = Clipboard.write(text, receipt)
+static/ergopti_plus/macos/adapters/clipboard.lua:44:		return hs.pasteboard.getContents()
+static/ergopti_plus/macos/adapters/clipboard.lua:64:	local ok, count = pcall(function() return hs.pasteboard.changeCount() end)
+static/ergopti_plus/macos/adapters/clipboard.lua:78:--- Refuses a private conditional mutation before touching a foreign pasteboard.
+static/ergopti_plus/macos/adapters/clipboard.lua:102:		return hs.pasteboard.setContents(text)
+static/ergopti_plus/macos/adapters/clipboard.lua:122:		return hs.pasteboard.readAllData()
+static/ergopti_plus/macos/adapters/clipboard.lua:159:			hs.pasteboard.clearContents()
+static/ergopti_plus/macos/adapters/clipboard.lua:162:			return hs.pasteboard.writeAllData(saved)

@@ -1,0 +1,12 @@
+
+=== script settings restore ===
+  ok   applies the manifest default when no choice is stored
+  ok   restores a persisted choice
+  ok   accepts every enum value declared by the manifest
+  ok   rejects a corrupt persisted value and uses the shipped default
+
+=== script settings mutation ===
+  ok   normalises, persists, and then applies a menu choice
+  ok   leaves the active level unchanged when persistence fails
+  ok   rejects an undeclared level without touching storage or logger
+TOTAL 7 passed 0 failed

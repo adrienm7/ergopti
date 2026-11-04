@@ -1,0 +1,11 @@
+MODULE tests.unit.modules.llm.features.test_selection_translation_focus_lifecycle
+
+=== selection translation retains its original focus ===
+  ok   keeps a healthy selection translation working (translation-focus-positive)
+  ok   refuses unknown focus before copying (translation-focus-unknown)
+  ok   does not rebind a copied selection to another window (translation-focus-copy)
+  ok   refuses focus lost during the acceptance copy (translation-focus-accept-copy)
+  ok   refuses focus lost after copy but before paste (translation-focus-paste)
+  ok   does not reselect text in the new window after paste (translation-focus-reselect)
+  ok   cancels an accepted replacement across reset (translation-focus-reset)
+RESULT 7 passed 0 failed

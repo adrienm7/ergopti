@@ -1,0 +1,46 @@
+
+=== canonical TOML optional shape receipts ===
+  ok   retains exact nested and empty array identities separately from empty dictionaries
+  ok   keeps multiline arrays and quoted array-looking strings distinct
+  ok   exposes no partial receipt on malformed input and owns independent decode generations
+  ok   rejects mutations that would discard data through an array receipt
+
+=== tap-hold candidate shape ownership ===
+  ok   refuses a foreign decoder receipt instead of blessing an empty array as a table
+
+=== canonical optional numeric preservation ===
+  ok   round-trips high-precision source numbers without changing default encoding
+
+=== canonical source-bound numeric tokens ===
+  ok   retains unchanged raw numbers and refuses to reuse tokens after a field mutation
+
+=== canonical special numeric source tokens ===
+  ok   retains signed special-float source tokens through optional evidence
+
+=== optional TOML document source receipts ===
+  ok   keeps the default value model and encoder independent of source receipts
+  ok   preserves an unchanged root numeric token: 9_223_372_036_854_775_807
+  ok   preserves an unchanged root numeric token: 1.2345678901234567
+  ok   preserves an unchanged root numeric token: 1.0
+  ok   preserves an unchanged root numeric token: -0.0
+  ok   preserves an unchanged root numeric token: 1.2345678901234567e+42
+  ok   preserves an unchanged root numeric token: -1.23456789012345e-120
+  ok   threads exact identities through nested maps and array dictionary members
+  ok   does not reuse numeric authority after mutation
+  ok   retains signed-zero authority only for the same sign: -0.0
+  ok   retains signed-zero authority only for the same sign: 0.0
+  ok   retains a fresh negative zero without changing default or integer encoding
+  ok   keeps integer-zero ownership distinct from floating source receipts
+  ok   refuses a document from a different read generation
+  ok   refuses named and sparse slots in source arrays instead of discarding them
+  ok   retains an unchanged existing temporal fallback token: 1979-05-27
+  ok   retains an unchanged existing temporal fallback token: 07:32:00
+  ok   retains an unchanged existing temporal fallback token: 07:32:00.123456
+  ok   retains an unchanged existing temporal fallback token: 1979-05-27T07:32:00
+  ok   retains an unchanged existing temporal fallback token: 1979-05-27 07:32:00.123456
+  ok   retains an unchanged existing temporal fallback token: 1979-05-27T07:32:00Z
+  ok   retains an unchanged existing temporal fallback token: 1979-05-27t07:32:00z
+  ok   retains an unchanged existing temporal fallback token: 1979-05-27T07:32:00.123456-07:00
+  ok   keeps quoted temporal strings distinct and does not reuse changed fallback tokens
+  ok   threads temporal receipts through inline records and arrays with exact owners
+TOTAL 33 passed 0 failed

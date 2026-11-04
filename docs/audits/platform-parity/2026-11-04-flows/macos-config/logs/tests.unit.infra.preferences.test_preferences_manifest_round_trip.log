@@ -1,0 +1,4 @@
+
+=== every manifest setting survives config.toml load and save (preferences-manifest-round-trip) ===
+  ok   loads each value at its owner and saves it back unchanged
+TOTAL 1 passed 0 failed

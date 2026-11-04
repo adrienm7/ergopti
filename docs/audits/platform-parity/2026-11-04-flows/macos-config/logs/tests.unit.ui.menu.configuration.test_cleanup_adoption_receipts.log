@@ -1,0 +1,9 @@
+
+=== macOS cleanup observes preference adoption receipts ===
+  ok   reports a real stale-baseline refusal after an external unused-key edit (cleanup-adoption-receipt)
+  ok   adopts a matching real preference baseline without an error (cleanup-adoption-receipt)
+  ok   reports a nil adoption receipt without undoing publication (cleanup-adoption-receipt)
+  ok   reports a false adoption receipt without undoing publication (cleanup-adoption-receipt)
+  ok   reports a truthy non-boolean adoption receipt without undoing publication (cleanup-adoption-receipt)
+  ok   keeps the existing thrown-adoption observer and committed result (cleanup-adoption-receipt)
+TOTAL 6 passed 0 failed

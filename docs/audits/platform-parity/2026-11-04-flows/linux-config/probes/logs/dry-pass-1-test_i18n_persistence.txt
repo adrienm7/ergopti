@@ -1,0 +1,52 @@
+
+=== i18n persistence ===
+
+=== module structure ===
+  ok   i18n exports the expected methods
+  ok   locale module exports set_trigger_provider
+
+=== locale discovery ===
+Native locale catalog receipt: {"mode": "healthy", "active": "fr", "codes": ["de", "en", "fr"], "ok": true, "reason": "", "recovered": {}, "retained": false, "selected": false, "unavailable_refused": false}
+Native locale catalog receipt: {"mode": "failed-ls", "active": "fr", "codes": ["de", "en", "fr"], "ok": true, "reason": "", "recovered": {}, "retained": false, "selected": false, "unavailable_refused": false}
+Native locale catalog receipt: {"mode": "literal-name", "active": "fr", "codes": ["de", "en", "fr"], "ok": true, "reason": "", "recovered": {}, "retained": false, "selected": false, "unavailable_refused": false}
+Native locale catalog receipt: {"mode": "directory-entry", "active": "fr", "codes": ["de", "en", "fr"], "ok": true, "reason": "", "recovered": {}, "retained": false, "selected": false, "unavailable_refused": false}
+Native locale catalog receipt: {"mode": "regular-link", "active": "ja", "codes": ["de", "en", "fr", "ja"], "ok": true, "reason": "", "recovered": {}, "retained": false, "selected": true, "stored": "ja", "unavailable_refused": false}
+Native locale catalog receipt: {"mode": "unreadable", "active": "fr", "codes": {}, "ok": false, "reason": "Locale directory '/tmp/tmp7o31_gf2/locales' could not be enumerated: EACCES: permission denied: /tmp/tmp7o31_gf2/locales", "recovered": ["de", "en", "fr"], "retained": false, "selected": false, "unavailable_refused": true}
+Native locale catalog receipt: {"mode": "empty", "active": "fr", "codes": {}, "ok": false, "reason": "/workspace/ergopti/static/ergopti_plus/linux/infra/i18n.lua:134: i18n: no locale files are available in /tmp/tmpyvqazl1r/locales", "recovered": ["de", "en", "fr"], "retained": false, "selected": false, "unavailable_refused": true}
+Native locale catalog receipt: {"mode": "cached", "active": "fr", "codes": ["de", "en", "fr"], "ok": true, "reason": "", "recovered": {}, "retained": true, "selected": false, "unavailable_refused": false}
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.121s
+
+OK
+  ok   native-locale-catalog: only actual locale files establish availability
+  ok   list_locales returns at least fr and en
+  ok   display_name returns human-readable names for known codes
+  ok   display_name returns code as-is for unknown locales
+
+=== locale persistence ===
+  ok   set_locale + get_locale round-trips
+  ok   does not publish a locale whose durable write failed
+  ok   _cleanup_reset_locale_to_fr
+  ok   set_locale with unknown code is ignored
+  ok   set_locale with nil/empty is safe
+
+=== trigger provider ===
+  ok   set_trigger_provider does not crash
+  ok   set_trigger_provider with nil is safe
+
+=== menu language submenu ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   language submenu items have callbacks and valid shape
+
+=== i18n explicit wizard persistence ===
+  ok   (wizard-locale-ack) refuses fr after an actual false rename
+  ok   (wizard-locale-ack) refuses fr after an actual throw rename
+  ok   (wizard-locale-ack) refuses en after an actual false rename
+  ok   (wizard-locale-ack) refuses en after an actual throw rename
+  ok   (wizard-locale-ack) reads back the acknowledged fr selection
+  ok   (wizard-locale-ack) reads back the acknowledged en selection
+  ok   (wizard-locale-ack) rejects invalid input before publication
+  ok   (wizard-locale-ack) leaves the ordinary same-locale menu setter unchanged
+TOTAL 22 passed 0 failed

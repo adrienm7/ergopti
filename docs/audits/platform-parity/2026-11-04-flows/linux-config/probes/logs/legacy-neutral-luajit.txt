@@ -1,0 +1,5 @@
+CASE delete_refused=true first=false neutral_save=true second=true expected_neutral=true actual_after_restart=false
+BYTES # private synthetic audit fixture |  | [hotstrings] | preview_ai_enabled = false | repeat_key_enabled = true |
+CASE delete_refused=false first=true neutral_save=true second=true expected_neutral=true actual_after_restart=true
+BYTES # private synthetic audit fixture |  | [hotstrings] | repeat_key_enabled = true |
+CONFIRMED failed legacy deletion reimports the old nonneutral choice; successful cleanup control preserves neutral

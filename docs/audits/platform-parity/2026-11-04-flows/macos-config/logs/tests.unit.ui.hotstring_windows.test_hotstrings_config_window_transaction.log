@@ -1,0 +1,23 @@
+
+=== hotstrings config window: personal writes are transactional ===
+  ok   write=nil returns false and preserves the live UI state
+  ok   close=false returns false and preserves the live UI state
+  ok   rename=false returns false and preserves the live UI state
+  ok   a committed write updates the file and then notifies the UI
+  ok   resolves personal files from the native catalogue, never the bridge path (hs-071)
+  ok   canonical provenance and retired display stems never grant an uncaptured native binding
+  ok   rejects hostile colors before any personal or shared publication
+  ok   rejects hostile section names before constructing a TOML header
+  ok   accepts the shortest and longest supported hexadecimal colors
+  ok   a nested array cannot hide the existing personal field
+  ok   EACCES returns false without calling the writer
+  ok   failed source close returns false without calling the writer
+  ok   dangling symlink returns false without calling the writer
+  ok   directory returns false without calling the writer
+  ok   absent personal file returns false without calling the writer
+  ok   a symlink retarget after the read suppresses runtime and UI publication
+  ok   preserves an external edit that lands after the patch read
+
+=== hotstrings config window: incomplete TOML reads are withheld ===
+  ok   omits personal and extension entries returned with committed=false
+TOTAL 18 passed 0 failed

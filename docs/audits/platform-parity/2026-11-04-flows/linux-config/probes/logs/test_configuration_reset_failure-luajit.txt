@@ -1,0 +1,30 @@
+
+=== Configuration restore and clear failure reason (Linux) ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   common.restore_recommended names the rollback failure point
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   common.clear_to_system names the rollback failure point
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   common.restore_recommended names the finalize failure point
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   common.clear_to_system names the finalize failure point
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   common.restore_recommended names the commit failure point
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   common.clear_to_system names the commit failure point
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   common.restore_recommended names the acquire failure point
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   common.clear_to_system names the acquire failure point
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   a committed restore shows nothing
+TOTAL 9 passed 0 failed

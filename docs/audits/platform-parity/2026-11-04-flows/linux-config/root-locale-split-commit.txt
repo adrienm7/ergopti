@@ -1,0 +1,5 @@
+CASE existing_config_row=true setter=false active_and_native_alias_on_return=fr native_refusals=1 startup_locale=en
+BYTES [script] | locale = "en" |
+CASE existing_config_row=false setter=false active_and_native_alias_on_return=fr native_refusals=1 startup_locale=fr
+BYTES # no explicit script locale |
+CONFIRMED existing config row changes despite rejected locale setter; absent-row control preserves fr

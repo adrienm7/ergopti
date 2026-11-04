@@ -1,0 +1,140 @@
+
+=== wrap on type (linux): the decision ===
+  ok   wraps a mouse selection and swallows the symbol
+  ok   wraps a Shift+Arrow selection with a multi-byte pair
+  ok   types the symbol with no selection, without reading anything
+  ok   types the symbol after a deselecting click (stale PRIMARY)
+  ok   types the symbol once any other key ended the selection
+  ok   passes the symbol through while disabled or paused
+  ok   leaves a modifier chord alone
+  ok   types the symbol when the wrap could not be typed
+
+=== wrap selection read owner ===
+  ok   revokes output when PRIMARY reading pauses the feature
+  ok   explicit retirement during baseline read cannot resurrect or type
+  ok   explicit retirement during selected read cannot resurrect or type
+  ok   a newer ordinary key during PRIMARY reading retires the older wrap
+  ok   an older baseline read cannot replace a nested pointer's baseline
+  ok   a nested selection opening during a wrap read survives the old request
+  ok   rechecks ownership after the baseline activity callback itself retires it
+  ok   rechecks ownership after the selected activity callback itself retires it
+  ok   captures the typed pair before PRIMARY reading can mutate its shared table
+  ok   acknowledged typing consumes the symbol while preserving a newly opened selection
+  ok   Ctrl+A opens a fresh owned window and Shift navigation extends it without rereading
+
+=== wrap on type (linux): the probe never types into the window ===
+  ok   reads PRIMARY with no key sent and no clipboard write
+
+=== wrap on type (linux): the tray row ===
+  ok   draws the wrap-on-type toggle in the shortcuts submenu
+  ok   matches a multi-byte wrap symbol from the shared catalogue
+
+=== wrap feature callback ownership ===
+  ok   acknowledges the real durable preference before refresh (wrap-feature-owner)
+  ok   toggles fresh external state rather than a held checkmark (wrap-feature-owner)
+  ok   refuses held callbacks while real configuration is reserved (wrap-feature-owner)
+  ok   keeps refusal bytes and runtime when the actual setter cannot publish (wrap-feature-owner)
+  ok   preserves the existing master gate after its row was retained (wrap-feature-owner)
+  ok   refuses the setter's false receipt (wrap-feature-owner)
+  ok   refuses the setter's nil receipt (wrap-feature-owner)
+  ok   refuses the setter's numeric receipt (wrap-feature-owner)
+  ok   refuses the setter's truthy receipt (wrap-feature-owner)
+  ok   rejects missing or malformed live readiness without a setter call (wrap-feature-owner)
+  ok   refuses malformed wrap preference instead of inventing its opposite (wrap-feature-owner)
+  ok   rechecks reservation acquired by the current preference getter (wrap-feature-owner)
+
+=== configured wrap-symbol collision reservations ===
+  ok   (wrap-configured-reservation) emits genuine plain/Shift trigger claims without reading PRIMARY
+  ok   (wrap-configured-reservation) proves empty configured claims when enabled is off
+  ok   (wrap-configured-reservation) proves empty configured claims when wrap_text_if_selected is off
+  ok   (wrap-configured-reservation) invalidates an old frame after a real switch round trip
+  ok   (wrap-configured-reservation) refuses changed genuine catalogue bytes without adopting a new baseline
+  ok   (wrap-configured-reservation) refuses a changed actual map or replaced dispatch getter
+  ok   (wrap-configured-reservation) refuses stale configured switches rather than rereading them as runtime
+  ok   (wrap-configured-reservation) original catalogue load refuses a false close ACK
+  ok   (wrap-configured-reservation) original catalogue load refuses a nil close ACK
+  ok   (wrap-configured-reservation) original configuration load refuses a false close ACK
+  ok   (wrap-configured-reservation) original configuration load refuses a nil close ACK
+  ok   (wrap-configured-reservation) configuration ownership revokes a previously captured frame
+
+=== Corrupt wrap reservation configuration refusal ===
+  ok   (wrap-configured-reservation) corrupt actual config refuses rather than manufacturing empty claims
+
+=== wrap on type: genuine daemon lifetime wiring ===
+  ok   keeps normal mouse selection through the actual privacy reset callback
+  ok   retires the pre-pause window and admits a fresh mouse selection after resume
+  ok   retires the previous application's window before the first focus observer
+  ok   retires the pre-capture window and preserves exact capture release ownership
+  ok   does not read PRIMARY or open a global window for a pointer inside captured UI
+  ok   allows early pause and capture callbacks before the Wrap owner is published
+
+=== wrap on type: committed shortcut context epochs ===
+  ok   retires the previous window after a committed wrap switch
+  ok   retires the previous window after a committed master switch
+  ok   retires the previous window after a committed configuration reservation
+  ok   retires the previous window after a committed configuration rollback
+  ok   retires the previous window after a committed initialization
+  ok   refuses a committed roundtrip during opening activity
+  ok   refuses a committed roundtrip during opening PRIMARY
+  ok   refuses a committed roundtrip during selected PRIMARY
+  ok   refuses a committed roundtrip during pair lookup
+  ok   refuses a committed roundtrip during final activity
+  ok   keeps the epoch and admitted selection when durable publication refuses
+  ok   refuses an explicitly supplied nil context epoch before PRIMARY
+  ok   refuses an explicitly supplied false context epoch before PRIMARY
+  ok   refuses an explicitly supplied string context epoch before PRIMARY
+  ok   refuses an explicitly supplied negative context epoch before PRIMARY
+  ok   refuses an explicitly supplied fraction context epoch before PRIMARY
+  ok   refuses an explicitly supplied NaN context epoch before PRIMARY
+  ok   refuses an explicitly supplied infinity context epoch before PRIMARY
+  ok   refuses an explicitly supplied table context epoch before PRIMARY
+  ok   rejects a malformed optional context getter
+  ok   preserves a successor opened reentrantly by the context getter
+  ok   does not open after its context getter revokes the local selection owner
+  ok   discards an admitted window when its context becomes unavailable
+  ok   still consumes confirmed output if its callback advances the context
+AUDIT_RESULT	77	0
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.

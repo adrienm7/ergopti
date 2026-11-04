@@ -1,0 +1,39 @@
+
+=== wrap output publication ownership ===
+  ok   commits a stable Unicode wrap through the actual Main and clipboard
+  ok   keeps per-DOWN publication checks in RAM
+  ok   refuses focus during clipboard-read without borrowing the new field (wrap-output-owner)
+  ok   refuses focus during clipboard-write without borrowing the new field (wrap-output-owner)
+  ok   refuses focus during clipboard-settle without borrowing the new field (wrap-output-owner)
+  ok   refuses focus during paste-lookup without borrowing the new field (wrap-output-owner)
+  ok   refuses focus during ctrl-down without borrowing the new field (wrap-output-owner)
+  ok   refuses password during clipboard-read without borrowing the new field (wrap-output-owner)
+  ok   refuses password during clipboard-write without borrowing the new field (wrap-output-owner)
+  ok   refuses password during clipboard-settle without borrowing the new field (wrap-output-owner)
+  ok   refuses password during paste-lookup without borrowing the new field (wrap-output-owner)
+  ok   refuses password during ctrl-down without borrowing the new field (wrap-output-owner)
+  ok   refuses pause during clipboard-read without borrowing the new field (wrap-output-owner)
+  ok   refuses pause during clipboard-write without borrowing the new field (wrap-output-owner)
+  ok   refuses pause during clipboard-settle without borrowing the new field (wrap-output-owner)
+  ok   refuses pause during paste-lookup without borrowing the new field (wrap-output-owner)
+  ok   refuses pause during ctrl-down without borrowing the new field (wrap-output-owner)
+  ok   refuses pause-aba during clipboard-read without borrowing the new field (wrap-output-owner)
+  ok   refuses pause-aba during clipboard-write without borrowing the new field (wrap-output-owner)
+  ok   refuses pause-aba during clipboard-settle without borrowing the new field (wrap-output-owner)
+  ok   refuses pause-aba during paste-lookup without borrowing the new field (wrap-output-owner)
+  ok   refuses pause-aba during ctrl-down without borrowing the new field (wrap-output-owner)
+  ok   refuses configuration-aba during clipboard-read without borrowing the new field (wrap-output-owner)
+  ok   refuses configuration-aba during clipboard-write without borrowing the new field (wrap-output-owner)
+  ok   refuses configuration-aba during clipboard-settle without borrowing the new field (wrap-output-owner)
+  ok   refuses configuration-aba during paste-lookup without borrowing the new field (wrap-output-owner)
+  ok   refuses configuration-aba during ctrl-down without borrowing the new field (wrap-output-owner)
+  ok   preserves a successor selection opened during clipboard I/O
+  ok   keeps clipboard restoration false observable and fatal
+  ok   keeps clipboard restoration throw observable and fatal
+  ok   keeps an exception from Main type_text observable as an error
+  ok   keeps a simultaneous Ctrl DOWN refusal and destination revocation fatal
+  ok   keeps a real native paste failure fatal and restores the clipboard
+
+=== wrap fixture constructor isolation ===
+  ok   keeps a cold real store writable after the actual wrap scenarios
+AUDIT_RESULT	34	0

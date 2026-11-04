@@ -1,0 +1,19 @@
+MODULE tests.unit.modules.gestures.actions.clipboard.test_search_result_ownership
+
+=== search result retains only its exact native clipboard generation ===
+  ok   keeps the healthy selected-text search and all-type restoration
+  ok   preserves a later user copy during recovery even when its text is USER COPY
+  ok   preserves a later user copy during recovery even when its text is selected words
+  ok   keeps the receipt captured before a reentrant error diagnostic after clear-false
+  ok   keeps the receipt captured before a reentrant error diagnostic after mutating-throw
+  ok   retains explicit recovery debt while native count is unavailable: nil
+  ok   retains explicit recovery debt while native count is unavailable: throw
+  ok   does not adopt a copy arriving during the native selected-text read
+  ok   does not publish an old receipt after selected-text reading opens a successor
+  ok   never adopts a later count when the initial result observation is unavailable: nil
+  ok   never adopts a later count when the initial result observation is unavailable: throw
+  ok   fences a successor opened by the ownership revocation diagnostic
+  ok   does not queue or publish after the restore-failure diagnostic opens a successor
+  ok   revokes the old snapshot on cleanup instead of retrying a later user copy
+  ok   uses native-shaped generations for the legacy fixture's private clipboard
+RESULT 15 passed 0 failed
