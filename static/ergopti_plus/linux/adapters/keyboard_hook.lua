@@ -2499,6 +2499,12 @@ function LayerPointer.has_type(mask, bit)
 	return math.floor(mask / 2 ^ bit) % 2 == 1
 end
 
+-- A wheel-capable capture needs mouse reports even without observer callbacks;
+-- the navigation layer may be enabled or replaced after capture starts.
+function LayerPointer.wants_sources()
+	return _on_click ~= nil or _on_pointer_event ~= nil or (_intercept and LayerPointer.emit_relative ~= nil)
+end
+
 --- Whether the held navigation layer binds a wheel direction now.
 function LayerPointer.wanted()
 	return _running and _intercept and LayerPointer.emit_relative ~= nil and _remapper ~= nil
@@ -2744,7 +2750,7 @@ function LayerPointer.pump_once()
 		return
 	end
 
-	if _on_click or _on_pointer_event then
+	if LayerPointer.wants_sources() then
 		for _, path in ipairs(_pointer_devices) do
 			local slot = pointer_slot(path)
 			if EvdevReader.is_open(slot) then
@@ -3740,7 +3746,7 @@ function M.check_device()
 	
 		local keyboards, pointers = {}, {}
 		if _pinned_device then
-			pointers = (_on_click or _on_pointer_event) and _best_pointers() or {}
+			pointers = LayerPointer.wants_sources() and _best_pointers() or {}
 			local available = EvdevReader.is_available(_pinned_device)
 			if not available then
 				_pinned_missing = true
@@ -3775,7 +3781,7 @@ function M.check_device()
 			keyboards = { _pinned_device }
 		else
 			keyboards, pointers = _best_devices()
-			if not _on_click and not _on_pointer_event then pointers = {} end
+			if not LayerPointer.wants_sources() then pointers = {} end
 		end
 		if #keyboards == 0 then
 			if not _reported_missing then
@@ -4076,10 +4082,10 @@ function M.start(opts)
 	local targets, pointers = {}, {}
 	if type(options.device) == "string" and options.device ~= "" then
 		targets = { options.device }
-		if _on_click or _on_pointer_event then pointers = _best_pointers() end
+		if LayerPointer.wants_sources() then pointers = _best_pointers() end
 	else
 		targets, pointers = _best_devices()
-		if not _on_click and not _on_pointer_event then pointers = {} end
+		if not LayerPointer.wants_sources() then pointers = {} end
 		if #targets == 0 then
 			Logger.error(LOG, "start(): no keyboard device found (set --device or check /proc/bus/input/devices).")
 			return
@@ -4142,7 +4148,7 @@ function M.start(opts)
 		-- It simply cannot notice a click, which is the behaviour this driver had for
 		-- its whole life until now.
 		-- Managed capture must also retain its complete original cleanup cohort.
-		if (_on_click or _on_pointer_event) and _acquire_pointers(pointers, tx) == false then return false end
+		if LayerPointer.wants_sources() and _acquire_pointers(pointers, tx) == false then return false end
 	
 		_ticks_since_check = 0
 		_reported_missing = false
