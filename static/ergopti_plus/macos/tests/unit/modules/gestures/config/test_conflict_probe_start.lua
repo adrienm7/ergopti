@@ -12,8 +12,8 @@ local function with_probe(body)
 	helpers.with_fresh_modules({ "modules.gestures.conflicts", "adapters.shell_runner", "infra.logger" }, function()
 		local tasks = {}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.shell_runner"] = { spawn = function(_, _, callback)
-			local task = { callback = callback, starts = 0, observers = {}, settled = false }
+		package.loaded["adapters.shell_runner"] = { spawn = function(_, args, callback)
+			local task = { args = args, callback = callback, starts = 0, observers = {}, settled = false }
 			function task.start()
 				task.starts = task.starts + 1
 				return not task.refuse_start
@@ -38,6 +38,23 @@ local function with_probe(body)
 end
 
 helpers.describe("system gesture probe startup", function()
+	helpers.it("models disabled and enabled macOS gestures through the real conflict policy", function()
+		local World = require("tests.e2e.boot.world")
+		for _, enabled in ipairs({ false, true }) do
+			with_probe({ run = function(conflicts, tasks)
+				helpers.assert_eq(conflicts.refresh(), true)
+				for _, task in ipairs(tasks) do
+					local answer = assert(World.gesture_preferences_answer(task.args, enabled))
+					task.finish(answer.code, answer.stdout, answer.stderr)
+				end
+				helpers.assert_eq(conflicts.slot_system_state("tap_3"), enabled and "taken" or "free")
+				local warning = conflicts.on_action_changed("tap_3", "lookup")
+				if enabled then helpers.assert_type(warning, "table") else helpers.assert_nil(warning) end
+			end })
+		end
+		helpers.assert_nil(World.gesture_preferences_answer({ "read", "unknown.domain" }, false),
+			"the model must not turn unknown defaults calls into success")
+	end)
 	helpers.it("starts all prepared processes and publishes only after all complete", function()
 		with_probe({ run = function(conflicts, tasks)
 			local calls = 0
