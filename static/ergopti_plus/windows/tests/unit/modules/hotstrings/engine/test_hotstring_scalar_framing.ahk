@@ -164,8 +164,9 @@ _HTEI_Engine(Mode) {
 		HSE_Terminators := Terminators()
 		_HotstringsTerminatorRecords := 0
 		UnicodeBoundary := InStr(Mode, "unicode-boundary-") == 1
+		; Configure the actual detached factory; trigger validation belongs to its boot suite.
 		if UnicodeBoundary
-			HotstringsConfigApplyMagicKey(Chr(0xC9))
+			HSE_Terminators.updateMagicKey(Chr(0xC9))
 		Both := InStr(Mode, "consume-") == 1 || InStr(Mode, "noop-") == 1
 		Source := '[hotstrings]`nterminators = [{key="upper",char="A",label="Upper",consume=true}'
 			. (Both ? ',{key="lower",char="a",label="Lower",consume=false}' : "") . ']`n'
