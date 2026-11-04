@@ -129,12 +129,12 @@ function M.isElementSecure(element, observe)
 		if observe then observe(false) end
 		return false
 	end
-	local ok_role, role, role_error = read_attribute(element, "AXRole")
+	local ok_role, role = read_attribute(element, "AXRole")
 	local ok_sub, subrole, subrole_error = read_attribute(element, "AXSubrole")
 	-- Native AX failures return nil plus an error without raising a Lua exception.
 	-- Optional nil-only subroles remain valid; a transport refusal is unknown.
-	local role_read = ok_role and not (role == nil and role_error ~= nil)
-	local subrole_read = ok_sub and not (subrole == nil and subrole_error ~= nil)
+	local role_read = ok_role and type(role) == "string" and role ~= ""
+	local subrole_read = ok_sub and (type(subrole) == "string" or (subrole == nil and subrole_error == nil))
 	if observe then
 		local confirmed_secure = (role_read and role == SECURE_ROLE) or (subrole_read and subrole == SECURE_ROLE)
 		observe(confirmed_secure or (role_read and subrole_read and type(role) == "string" and role ~= ""

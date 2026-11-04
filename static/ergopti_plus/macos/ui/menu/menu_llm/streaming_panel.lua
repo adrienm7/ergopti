@@ -146,11 +146,20 @@ function M.build(ctx)
 			end,
 			[require("config_keys").COMMAND.LLM_SHOW_ALL] = function()
 				if not show_all_ready() then return false end
+				local current = streaming_snapshot()
+				if streaming_source.blocked ~= false or streaming_source.paused ~= false
+					or current.blocked ~= false or current.paused ~= false
+					or not Preferences.source_matches(streaming_source.source, current.source) then return false end
+				for _, field in ipairs({ "owner", "generation", "backend", "enabled", "progressive" }) do
+					if streaming_source[field] ~= current[field] then return false end
+				end
 				return settings_mgr.apply_setting_transaction({
 					key = "llm_streaming_multi",
-					value = not state.llm_streaming_multi,
+					value = not current.progressive,
 					runtime_fn = "set_llm_streaming_multi",
 					publish_setting = false,
+					publication_guard = SettingsManager.publication_guard(Preferences,
+						ConfigPaths.get("ConfigTomlPath"), current.source),
 				})
 			end,
 			[require("config_keys").COMMAND.LLM_TOKEN_STREAMING] = function()

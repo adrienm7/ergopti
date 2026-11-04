@@ -28,13 +28,15 @@ local function with_filter(callback)
 			if c.mode == "absent" then return nil end
 			return field
 		end }
-		local front = { pid = function() return 4242 end,
+		local front = { pid = function() if c.mode == "pid_error" then error("PID unavailable") end; return 4242 end,
 			bundleID = function() return c.bundle end, path = function() return "/Applications/Editor.app" end,
 			name = function() return "Editor" end }
 		_G.hs = { application = { frontmostApplication = function() return front end },
 			window = { focusedWindow = function() return { application = function() return front end } end },
 			axuielement = { applicationElementForPID = function(pid)
 				helpers.assert_eq(pid, 4242)
+				if c.mode == "app_error" then error("AX application unavailable") end
+				if c.mode == "app_absent" then return nil end
 				return app_element
 			end } }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -103,6 +105,14 @@ helpers.describe("Native AX focus refusal in the AI app filter", function()
 				c.mode = "exception"
 				blocked(f, c, selection == "secure", selection == "url", true, 1,
 					"A failed focus read must retain AI exclusion")
+			end)
+		end)
+	end
+	for _, mode in ipairs({ "pid_error", "app_error", "app_absent" }) do
+		helpers.it("(native-ai-application) blocks when AX application acquisition fails: " .. mode, function()
+			with_filter(function(f, c)
+				c.mode = mode
+				blocked(f, c, true, true, true, 0, "unavailable AX application cannot prove input is safe")
 			end)
 		end)
 	end

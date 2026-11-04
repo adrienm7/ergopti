@@ -238,6 +238,17 @@ assert.deepEqual(actualWorkspaceCases, expectedWorkspaceCases);
 process.stdout.write(mlxWorkspaces.stdout);
 process.stdout.write(mlxWorkspaces.stderr);
 
+const networkWorkspace = spawnSync(
+	pythonExecutable(),
+	['tools/test/macos_network_check_workspace_test.py'],
+	{ cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 10000 }
+);
+assert.equal(networkWorkspace.error, undefined);
+assert.equal(networkWorkspace.signal, null);
+assert.equal(networkWorkspace.status, 0, networkWorkspace.stderr || networkWorkspace.stdout);
+assert.match(networkWorkspace.stderr, /Ran 2 tests in/);
+assert.match(networkWorkspace.stderr, /\bOK\b/);
+
 // The field run's blob probe against the fake registry, which answers a blob
 // HEAD itself and sends its GET to storage with a 307, as the real registry
 // does (field run 2026-11-03: blob_range fail http_307 before the probe

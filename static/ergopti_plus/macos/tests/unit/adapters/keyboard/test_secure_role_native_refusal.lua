@@ -44,9 +44,10 @@ local CASES = {
 	{ "ordinary explicit subrole", { role = "AXTextField", subrole = "AXTextEntryArea" }, false, true },
 	{ "native secure role", { role = SECURE }, true, true },
 	{ "browser secure subrole", { role = "AXTextField", subrole = SECURE }, true, true },
-	{ "nil-only role", { nil_role = true }, false, false },
-	{ "malformed role", { role = 7 }, false, false },
-	{ "malformed subrole", { role = "AXTextField", subrole = {} }, false, false },
+	{ "nil-only role", { nil_role = true }, true, false },
+	{ "malformed role", { role = 7 }, true, false },
+	{ "empty role", { role = "" }, true, false },
+	{ "malformed subrole", { role = "AXTextField", subrole = {} }, true, false },
 	{ "native role error", { role = SECURE, role_refused = true }, true, false },
 	{ "native subrole error", { role = "AXTextField", subrole = SECURE, subrole_refused = true }, true, false },
 	{ "both native errors", { role_refused = true, subrole_refused = true }, true, false },
@@ -74,6 +75,18 @@ helpers.describe("Native AXRole and AXSubrole error returns", function()
 			end)
 		end)
 	end
+	helpers.it("suppresses an incomplete role at the keymap and cached metrics boundaries (secure-role-malformed)", function()
+		with_detector(function(detector, control)
+			control.role = nil
+			local secure = detector.inspectFocusedElement(4242)
+			helpers.assert_eq(secure, true, "keymap must not treat a missing AX role as normal")
+			detector.refresh()
+			helpers.assert_eq(detector.isSecureField(), true, "the cached verdict must also fail closed")
+			control.role = "AXTextField"
+			detector.refresh()
+			helpers.assert_eq(detector.isSecureField(), false, "a complete normal read reopens capture")
+		end)
+	end)
 	helpers.it("keeps exactly two public inspection results and the exact inspected PID", function()
 		with_detector(function(detector, control)
 			control.subrole_refused = true

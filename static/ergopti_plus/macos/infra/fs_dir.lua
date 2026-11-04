@@ -43,7 +43,9 @@ local LOG = "fs_dir"
 --- @return string|nil error_message
 local function collect_entries(dir, quiet)
 	local names = {}
-	if type(dir) ~= "string" or dir == "" then return names, false, "invalid directory path" end
+	if type(dir) ~= "string" or dir == "" or dir:find("\0", 1, true) then
+		return names, false, "invalid directory path"
+	end
 	local ok, err = pcall(function()
 		for name in hs.fs.dir(dir) do
 			names[#names + 1] = name
