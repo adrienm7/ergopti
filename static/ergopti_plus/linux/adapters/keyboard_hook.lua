@@ -4261,9 +4261,13 @@ function M.set_layout(layout)
 end
 
 function M.stop()
-	if _number_row.retire() ~= true then M.emergency_stop("native number-row stop cleanup pending"); return false end
+	local session = _capture_session
+	local retired = _number_row.retire()
+	if _capture_session ~= session then return false end
+	if retired ~= true then M.emergency_stop("native number-row stop cleanup pending"); return false end
 	-- First, while the daemon's device can still carry the unlock.
 	_locks.end_word(true, "keyboard hook stopped")
+	if _capture_session ~= session then return false end
 	_capture_session = nil
 	if not _running and not _reacquiring then return end
 	if _release_remapped() == false then

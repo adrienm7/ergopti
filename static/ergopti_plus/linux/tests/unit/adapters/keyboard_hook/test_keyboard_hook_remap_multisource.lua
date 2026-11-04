@@ -23,6 +23,25 @@ local function roster_session(s, initial)
 end
 
 helpers.describe("source-owned simultaneous standalone remap holds", function()
+	helpers.it("does not stop a capture restarted by the CapsWord loss callback (caps-loss-successor)", function()
+		local capture = { is_ready = function() return true end, reset_state = function() return true end,
+			caps_locked = function() return true end, cancel_compose = function() return true end,
+			modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code] end,
+			process = function() return nil end, peek_text = function() return nil end }
+		Fixture.with_session({ capture = capture }, function(s)
+			local restarted = false
+			assert(s.hook.lock_caps_for_word(function() return true end, function()
+				s.hook.stop()
+				s.hook.start(s.start_options)
+				restarted = s.hook.isRunning()
+			end))
+			s.hook.stop()
+			helpers.assert_true(restarted, "the callback actually opened a successor")
+			helpers.assert_true(s.hook.isRunning(), "the old stop must not retire the successor")
+			s.edge("a", 30, 1, 1); s.edge("a", 30, 0, 2)
+			helpers.assert_eq(s.rows, { { 30, 1 }, { 30, 0 } }, "the successor still forwards input")
+		end)
+	end)
 	helpers.it("(remap-multisource) leaves successor input queued during a reentrant restart", function()
 		local restarted = false
 		Fixture.with_session({ on_physical = function(s, code, _, _, value)
