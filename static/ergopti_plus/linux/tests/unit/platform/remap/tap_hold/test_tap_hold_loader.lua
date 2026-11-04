@@ -36,6 +36,13 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		helpers.assert_nil(loaded.user_error)
 	end)
 
+	helpers.it("reports an inaccessible user path rather than treating it as absent", function()
+		local loaded = Config.load(DEFAULTS, DEFAULTS .. "/child")
+		helpers.assert_eq(loaded.user_error, "unreadable")
+		helpers.assert_eq(loaded.enabled, false)
+		helpers.assert_nil(next(loaded.keys))
+	end)
+
 	helpers.it("changes one field and keeps the others", function()
 		local loaded = load('[tap_hold.keys.left_shift]\ntap_action = "paste"\n')
 		helpers.assert_eq(loaded.keys.left_shift.tap_action, "paste")

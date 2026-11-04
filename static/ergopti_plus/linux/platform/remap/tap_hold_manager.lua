@@ -624,6 +624,7 @@ local function _load(boot)
 	assert(config_exports_current(),"original tap-hold loader exports changed")
 	local decoded=original_config_load(_defaults_path,_user_path)
 	assert(config_exports_current(),"original tap-hold loader exports changed during read")
+	if not boot and decoded.user_error then error("tap-hold user file " .. tostring(decoded.user_error), 0) end
 	local loaded,one_shot,engine,combinations=_build(decoded,boot)
 	assert(config_exports_current(),"original tap-hold loader exports changed during construction")
 	_loaded,_one_shot,_engine,_combinations=loaded,one_shot,engine,combinations
