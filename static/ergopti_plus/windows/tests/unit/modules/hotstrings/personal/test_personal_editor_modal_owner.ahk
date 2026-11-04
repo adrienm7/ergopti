@@ -760,7 +760,7 @@ _PESORT_Case(Operation) {
 		for Control in Window {
 			if Control.Type == "ListView"
 				List := Control
-			if Control.Type == "DropDownList"
+			if Control.Type == "DDL"
 				Drop := Control
 			if Control.Type == "Edit"
 				Edits.Push(Control)
