@@ -57,7 +57,7 @@ try {
 		[
 			'#!/bin/bash',
 			'printf "%s\\n" "$*" >> "$CALL_LOG"',
-			'if [ "$2" = is-enabled ]; then exit 1; fi',
+			'if [ "$2" = is-enabled ]; then [ "${SYSTEMD_ENABLED:-0}" = 1 ]; exit $?; fi',
 			'if [ "$4" = list-unit-files ]; then',
 			'  [ "${QUERY_REFUSE:-0}" != 1 ] || exit 23',
 			'  if [ "${NO_UNIT:-0}" = 1 ]; then',
@@ -105,6 +105,11 @@ try {
 	assert.equal(run('disable').status, 0);
 	assert.equal(run('status').stdout.trim(), 'disabled');
 	assert.match(fs.readFileSync(desktop, 'utf8'), /^Hidden=true$/m);
+	assert.equal(
+		run('status', { SYSTEMD_ENABLED: '1' }).stdout.trim(),
+		'enabled',
+		'a separately enabled systemd unit still starts despite Hidden=true'
+	);
 	assert.doesNotMatch(
 		fs.readFileSync(calls, 'utf8'),
 		/--now|restart|stop|start\b/,

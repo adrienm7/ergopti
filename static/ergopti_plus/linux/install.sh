@@ -1255,7 +1255,13 @@ if $INSTALL_SERVICE; then
 	if [ -f "$AUTOSTART_FILE" ] && grep -Fxq 'X-Ergopti-Startup=true' "$AUTOSTART_FILE"; then
 		# Updates preserve an explicit menu choice; installation is not consent
 		# to re-enable a startup entry the user disabled.
-		STARTUP_CHOICE="$(bash "$LIB_DIR/linux/install/start_at_login.sh" status)"
+		# Preserve the explicit XDG preference even if an independently enabled
+		# unit currently makes the effective startup state enabled.
+		if grep -Eq '^(Hidden=true|X-GNOME-Autostart-enabled=false)$' "$AUTOSTART_FILE"; then
+			STARTUP_CHOICE=disabled
+		else
+			STARTUP_CHOICE="$(bash "$LIB_DIR/linux/install/start_at_login.sh" status)"
+		fi
 		case "$STARTUP_CHOICE" in
 			enabled) bash "$LIB_DIR/linux/install/start_at_login.sh" enable ;;
 			disabled) bash "$LIB_DIR/linux/install/start_at_login.sh" disable ;;
