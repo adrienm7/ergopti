@@ -554,9 +554,12 @@ local function compute_range(query, pacer)
 	local sqlite_path = readable_sqlite_path()
 	if not sqlite_path then return { payload = '{"historical":[],"today":[]}', complete = true } end
 	local apps = type(query.apps) == "table" and query.apps or nil
+	-- The page names the history it holds, so an unchanged one is not resent
+	local held = math.tointeger(query.historical_serial)
 	local session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
-	local payload, range_complete = session.range(query.start_date, query.end_date, apps)
+	local payload, range_complete = session.range(query.start_date, query.end_date, apps,
+		held and held > 0 and held or nil)
 	return { payload = payload, complete = range_complete == true }
 end
 
