@@ -52,11 +52,11 @@ helpers.describe("updater restart: starting the installed version", function()
 	end)
 
 	helpers.it("(quit-wins-over-reload) a relay command checks the cancellation marker after the wait", function()
-		local command = Restarter.relay_command(4242, "/home/u/launcher", {}, "/run/user/1/ergopti/relay-cancel-4242")
+		local command = Restarter.relay_command(4242, "/home/u/launcher", {}, "/run/user/1/ergopti/relay-cancel-4242", "1337")
 		local wait, check, launch = command:find("sleep 0.2; done;", 1, true), command:find("relay-cancel-4242", 1, true), command:find("exec ", 1, true)
 		helpers.assert_true(wait and check and launch and wait < check and check < launch,
 			"the marker is read after the old daemon exited and before the launcher starts")
-		helpers.assert_nil(Restarter.relay_command(4242, "/home/u/launcher", {}):find("relay-cancel", 1, true),
+		helpers.assert_nil(Restarter.relay_command(4242, "/home/u/launcher", {}, nil, "1337"):find("relay-cancel", 1, true),
 			"without a marker the relay command is unchanged")
 	end)
 
@@ -75,7 +75,7 @@ helpers.describe("updater restart: starting the installed version", function()
 		local pid = tonumber(pipe:read("*l"))
 		pipe:close()
 		os.execute("touch '" .. marker .. "'")
-		helpers.assert_true(os.execute(Restarter.relay_command(pid, launcher, {}, marker)) ~= nil)
+		helpers.assert_true(os.execute(Restarter.relay_command(pid, launcher, {}, marker, assert(Restarter.process_start_time(pid)))) ~= nil)
 		local gone = false
 		for _ = 1, 100 do
 			local handle = io.open(marker, "r")
@@ -86,6 +86,29 @@ helpers.describe("updater restart: starting the installed version", function()
 		os.execute("sleep 0.3")
 		helpers.assert_nil(io.open(started, "r"), "a cancelled relay never starts the launcher")
 		os.execute("rm -rf '" .. dir .. "'")
+	end)
+
+	helpers.it("(restart-relay-pid-reuse) does not wait on a different process with the same numeric pid", function()
+		if ON_WINDOWS then return end
+		local Shell = require("adapters.shell_runner")
+		local dir = os.tmpname(); os.remove(dir); assert(Shell.run("mkdir " .. Shell.quote(dir)))
+		local marker, launcher = dir .. "/started", dir .. "/launcher"
+		local file = assert(io.open(launcher, "w")); file:write("#!/bin/sh\necho started > " .. Shell.quote(marker) .. "\n"); file:close()
+		assert(Shell.run("chmod 700 " .. Shell.quote(launcher)))
+		local pipe = assert(io.popen("sleep 4 & echo $!"))
+		local pid = assert(tonumber(pipe:read("*l"))); pipe:close()
+		-- Zero is not this live sleep's start tick: model a PID already reused.
+		local command = Restarter.relay_command(pid, launcher, {}, nil, "0")
+		assert(Shell.run(command))
+		local observed = false
+		for _ = 1, 15 do
+			local probe = io.open(marker, "r")
+			if probe then probe:close(); observed = true; break end
+			os.execute("sleep 0.1")
+		end
+		os.execute("kill " .. pid .. " 2>/dev/null")
+		os.remove(marker); os.remove(launcher); os.remove(dir)
+		helpers.assert_true(observed, "a reused pid must not delay the new daemon")
 	end)
 
 	helpers.it("asks systemd to restart the unit that runs the daemon", function()
@@ -99,7 +122,7 @@ helpers.describe("updater restart: starting the installed version", function()
 	helpers.it("otherwise relaunches the installed launcher once this process has exited", function()
 		local ran = {}
 		local how = Restarter.restart({ wrapper = "/home/u/.local/bin/ergopti-hotstrings", args = { "--tray", "--verbose" },
-			cgroup = TERMINAL_CGROUP, pid = 4242, run = function(cmd) ran[#ran + 1] = cmd; return true end })
+			cgroup = TERMINAL_CGROUP, pid = 4242, start_tick = "1337", run = function(cmd) ran[#ran + 1] = cmd; return true end })
 		helpers.assert_eq(how, "relay", "the caller must now exit")
 		helpers.assert_true(ran[1]:find("^setsid sh %-c ") ~= nil, "detached from the dying daemon")
 		helpers.assert_true(ran[1]:find("kill -0 4242", 1, true) ~= nil,
@@ -174,6 +197,14 @@ helpers.describe("updater restart: starting the installed version", function()
 		end)
 	end
 
+	helpers.it("(restart-relay-pid-reuse) refuses relay dispatch without a valid start tick", function()
+		local calls = 0
+		local how = Restarter.restart({ wrapper = "/x", cgroup = TERMINAL_CGROUP, pid = 4242,
+			start_tick = "invalid", run = function() calls = calls + 1; return true end })
+		helpers.assert_nil(how)
+		helpers.assert_eq(calls, 0, "uncertain process identity must not arm a relay")
+	end)
+
 	helpers.it("reports a restart it could not start", function()
 		helpers.assert_nil(Restarter.restart({ wrapper = "/x", cgroup = UNIT_CGROUP, run = function() return false end }))
 		helpers.assert_nil(Restarter.restart({ wrapper = "/x", cgroup = TERMINAL_CGROUP, pid = 1,
@@ -182,6 +213,11 @@ helpers.describe("updater restart: starting the installed version", function()
 
 	helpers.it("reads its process id from its stat line, and its unit from its cgroup", function()
 		helpers.assert_eq(Restarter.own_pid(SELF_STAT), 4242)
+		helpers.assert_eq(Restarter.process_start_time(4242, SELF_STAT), "1337")
+		local unusual = SELF_STAT:gsub("%(luajit%)", "(name) with\nparentheses)")
+		helpers.assert_eq(Restarter.process_start_time(4242, unusual), "1337")
+		helpers.assert_eq(Restarter.process_start_time(4242, "4242 (name with ) parentheses) S 1"), nil)
+
 		helpers.assert_nil(Restarter.own_pid("(luajit) S"), "a line without a leading id is no id")
 		helpers.assert_true(not Restarter.under_unit(TERMINAL_CGROUP))
 		helpers.assert_true(Restarter.under_unit(UNIT_CGROUP))
