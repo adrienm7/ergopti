@@ -94,6 +94,19 @@ helpers.describe("ui.bridge_handlers", function()
     -- send and this bridge did not answer (set_priority, clear_priority,
     -- set_all_grey, close) went unnoticed: the suite was green and comparing
     -- nothing.
+    helpers.it("(hotstrings-setting-validation) refuses malformed colours and fractional priorities", function()
+      local s2, seen = build_mock_state(), {}
+      s2.config.set_override = function(...) seen[#seen + 1] = { ... }; return true end
+      for _, color in ipairs({ "blue", "#xyz", "#12", "#123456789" }) do
+        handler.on_message({ action = "set_color", category = "accents", hex = color }, s2)
+      end
+      handler.on_message({ action = "set_priority", category = "accents", priority = 2.5 }, s2)
+      helpers.assert_eq(#seen, 0, "malformed settings must not reach persistence")
+      handler.on_message({ action = "set_color", category = "accents", hex = "#123abc" }, s2)
+      handler.on_message({ action = "set_priority", category = "accents", priority = 2 }, s2)
+      helpers.assert_eq(#seen, 2)
+    end)
+
     helpers.it("'set_color' records the override for the category the user clicked", function()
       local seen = {}
       local s2 = build_mock_state()

@@ -438,7 +438,7 @@ function M.on_message(payload, state, context)
 		-- Guarded like both references: an empty select is the page's "no choice",
 		-- and writing it as an override would pin the category to nothing.
 		local hex = payload.hex
-		if type(hex) ~= "string" or hex == "" then
+		if type(hex) ~= "string" or not require("hotstrings.personal_metadata").valid("color", hex) then
 			Logger.warn(LOG, "Refusing colour %s for '%s' — not a colour string.",
 				tostring(hex), tostring(payload.category))
 			return push_state(state, context)
@@ -478,7 +478,7 @@ function M.on_message(payload, state, context)
 	if action == "set_priority" and payload.category then
 		local value = (type(payload.priority) == "number" or type(payload.priority) == "string")
 			and tonumber(payload.priority) or nil
-		if not NumberPolicy.is_finite(value) or value < PRIORITY_MIN or value > PRIORITY_MAX then
+		if not NumberPolicy.is_finite(value) or value % 1 ~= 0 or value < PRIORITY_MIN or value > PRIORITY_MAX then
 			Logger.warn(LOG, "Refusing priority %s for '%s' — outside %d-%d.",
 				tostring(payload.priority), tostring(payload.category), PRIORITY_MIN, PRIORITY_MAX)
 			return push_state(state, context)
