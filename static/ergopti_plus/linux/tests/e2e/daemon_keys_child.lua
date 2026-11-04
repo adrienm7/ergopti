@@ -137,6 +137,8 @@ package.preload["adapters.keyboard_layout"] = function()
 end
 
 local scripted_writer, injected_refusal = nil, false
+local callbacks = {}
+local queued_during_output = false
 package.preload["adapters.uinput_writer"] = function()
 	-- Actual Writer transactions over controlled byte ports, never native input.
 	scripted_writer = require("tests.fakes").uinput_writer({
@@ -151,6 +153,12 @@ package.preload["adapters.uinput_writer"] = function()
 				elseif char_of[code] then
 					if selection.focused then screen = {}; selection.focused = false end
 					screen[#screen + 1] = char_of[code]
+					if os.getenv("ERGOPTI_E2E_QUEUE_OUTPUT") == "1" and not queued_during_output
+						and table.concat(screen) == "parce que" then
+						queued_during_output = true
+						screen[#screen + 1] = "x"
+						callbacks.onChar("x", 30)
+					end
 				end
 			end
 			return true
@@ -159,7 +167,6 @@ package.preload["adapters.uinput_writer"] = function()
 	return scripted_writer
 end
 
-local callbacks = {}
 local hook = require("adapters.keyboard_hook")
 hook.start = function(options)
 	callbacks = options
