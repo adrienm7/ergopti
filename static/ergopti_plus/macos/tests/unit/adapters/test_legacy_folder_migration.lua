@@ -8,8 +8,9 @@
 --- folder, the old default configuration folder becomes Ergopti/config, the old
 --- logs, cache and control folders merge (a clash goes to the backup folder),
 --- the owned runtime's karabiner folder stays, and paths.toml is rewritten
---- after a backup. init.lua runs it before config_paths reads paths.toml. Nothing here
---- touches a real user folder.
+--- after a backup. init.lua runs it after the instance admission and before the
+--- breadcrumb and config_paths read the folders. Nothing here touches a real user
+--- folder.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -23,13 +24,6 @@ local HOME = "/Users/u"
 local OLD = HOME .. "/" .. AppDirs.migration.macos.legacy_support_relative
 local NEW = HOME .. "/" .. AppDirs.macos.support_relative
 local OLD_CONFIG = HOME .. "/" .. AppDirs.migration.macos.legacy_config_relative
-
-local function read(path)
-	local file = assert(io.open(path, "rb"))
-	local content = assert(file:read("*a"))
-	assert(file:close())
-	return content
-end
 
 --- Memory ports that also read and write file contents.
 local function ports_with_files(tree, files)
@@ -144,13 +138,17 @@ helpers.describe("macOS legacy folder migration", function()
 			"the compiled configuration home keeps the owned runtime folder")
 	end)
 
-	helpers.it("runs before config_paths reads paths.toml (legacy-folder-migration-boot-order)", function()
-		local source = read(helpers.driver_root() .. "/init.lua")
-		local run_at = source:find('require("adapters.legacy_folder_migration").run(Logger)', 1, true)
+	helpers.it("runs after the instance admission, before the folders are read (legacy-folder-migration-boot-order)", function()
+		local call = 'require("adapters.legacy_folder_migration").run(Logger)'
+		local source = assert(helpers.read_driver_source(call), "init.lua runs it")
+		local run_at = source:find(call, 1, true)
+		local admission_at = source:find("InstanceAdmission.ADMIT", 1, true)
+		local breadcrumb_at = source:find('require("adapters.reload_breadcrumb")', 1, true)
 		local paths_at = source:find('require("infra.config_paths")', 1, true)
-		local logger_at = source:find('require("infra.logger")', 1, true)
-		helpers.assert_true(run_at ~= nil and paths_at ~= nil and logger_at ~= nil, "init.lua runs it")
-		helpers.assert_true(logger_at < run_at and run_at < paths_at,
-			"after the logger, before the configuration paths")
+		helpers.assert_true(admission_at ~= nil and breadcrumb_at ~= nil and paths_at ~= nil, "init.lua anchors")
+		-- A refused process must leave every folder as it found it.
+		helpers.assert_true(admission_at < run_at, "after the instance admission")
+		helpers.assert_true(run_at < breadcrumb_at and run_at < paths_at,
+			"before the reload breadcrumb and the configuration paths")
 	end)
 end)
