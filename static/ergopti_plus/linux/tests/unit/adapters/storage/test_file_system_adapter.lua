@@ -1025,12 +1025,21 @@ helpers.describe("file_system adapter", function()
       helpers.assert_eq(fs.write(nil, "content"), false, "write nil path returns false")
     end)
 
-    helpers.it("write nil content writes empty string", function()
-      local nil_file = tmp_base .. "_nil_content.txt"
-      local ok = fs.write(nil_file, nil)
-      helpers.assert_true(ok, "write nil content returns true")
-      helpers.assert_eq(fs.read(nil_file), "", "nil content stored as empty string")
-      os.remove(nil_file)
+    helpers.it("invalid write and append contents preserve the existing file", function()
+      local path = tmp_base .. "_invalid_content.txt"
+      helpers.assert_true(fs.write(path, "original"))
+      for _, value in ipairs({ false, 0, {}, true }) do
+        helpers.assert_eq(fs.write(path, value), false)
+        helpers.assert_eq(fs.read(path), "original")
+        helpers.assert_eq(fs.append(path, value), false)
+        helpers.assert_eq(fs.read(path), "original")
+      end
+      helpers.assert_eq(fs.write(path, nil), false)
+      helpers.assert_eq(fs.append(path, nil), false)
+      helpers.assert_eq(fs.read(path), "original")
+      helpers.assert_true(fs.write(path, ""), "explicit empty content remains valid")
+      helpers.assert_eq(fs.read(path), "")
+      os.remove(path)
     end)
   end)
 
