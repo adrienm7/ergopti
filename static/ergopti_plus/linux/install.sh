@@ -152,6 +152,14 @@ _standalone_prefix_allowed() {
 }
 if ! $SETUP_PERMS_ONLY; then
 	[ -n "$PREFIX" ] || { ergopti_msg uninstall.missing_prefix_value >&2; exit 64; }
+	# Permission setup always rejects system accounts. Detect an invalid target
+	# before copying the payload or installing dependencies, not at the end.
+	install_uid="$(id -u)"
+	if [ "$install_uid" = 0 ]; then install_uid="${SUDO_UID:-$install_uid}"; fi
+	if ! { [[ "$install_uid" =~ ^[0-9]+$ ]] && [ "$install_uid" -ge 1000 ] && [ "$install_uid" -ne 65534 ]; }; then
+		ergopti_msg permissions.non_desktop_account >&2
+		exit 1
+	fi
 	_standalone_prefix_allowed "$PREFIX" || { ergopti_msg uninstall.system_prefix >&2; exit 1; }
 	mkdir -p -- "$PREFIX"
 	IFS= read -r -d '' PREFIX < <(CDPATH= cd -Pe -- "$PREFIX" && printf '%s\0' "$PWD")

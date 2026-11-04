@@ -107,6 +107,14 @@ function runInstaller(scenario) {
 			(scenario.busybox ? 'case "$1" in usermod|groupadd) exit 127 ;; esac\n' : '') +
 			'exit 0'
 	);
+	if (scenario.rootWithoutCaller) {
+		stub(stubs, 'id', '[ "$1" = -u ] && { echo 0; exit 0; }; exec /usr/bin/id "$@"');
+		fs.writeFileSync(
+			path.join(stubs, 'bash'),
+			'#!/bin/bash\ncase "${1:-}" in */setup_permissions.sh) exit 1 ;; esac\nexec /bin/bash "$@"\n',
+			{ mode: 0o755 }
+		);
+	}
 	stub(
 		stubs,
 		'systemctl',
@@ -204,6 +212,7 @@ function runInstaller(scenario) {
 		TMPDIR: bashPath(sandbox),
 		LANG: 'C.UTF-8'
 	};
+	if (scenario.sudoUid !== undefined) env.SUDO_UID = scenario.sudoUid;
 	if (scenario.omitHome) delete env.HOME;
 	// Git Bash may reconstruct PATH when a child Bash starts. Keep the same
 	// inert command boundary in the installer and its newly installed helpers.
@@ -389,6 +398,36 @@ if (process.platform === 'linux') {
 }
 
 const errors = [];
+
+// A root shell without a desktop caller cannot enroll UID 0. Refuse before
+// replacing payload files, not at the final permission-setup step.
+for (const sudoUid of [undefined, '0', '999', '65534', 'invalid']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		rootWithoutCaller: true,
+		sudoUid,
+		seed(home) {
+			const file = path.join(home, '.local/lib/ergopti/linux/ergopti_hotstrings.lua');
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(file, 'existing installation\n');
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0);
+		assert.match(run.output, /Refusing a non-desktop account/);
+		assert.equal(
+			fs.readFileSync(
+				path.join(run.home, '.local/lib/ergopti/linux/ergopti_hotstrings.lua'),
+				'utf8'
+			),
+			'existing installation\n'
+		);
+		assert.equal(fs.existsSync(path.join(run.home, '.local/bin/ergopti-hotstrings')), false);
+	} finally {
+		run.cleanup();
+	}
+}
 
 // An explicit prefix allows installation even when HOME is unavailable.
 {
