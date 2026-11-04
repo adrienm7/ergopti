@@ -308,7 +308,8 @@ local function build_ffi_backend()
 				many[index - 1].revents = 0
 			end
 			local rc = tonumber(native_poll(many, count, timeout_ms))
-			return rc ~= nil and rc > 0
+			if rc == nil or rc < 0 then return nil end
+			return rc > 0
 		end,
 		close = function(fd)
 			if native_close(fd) == 0 then return true end
@@ -677,8 +678,8 @@ function M.wait_any_readable(timeout_ms)
 	_busy = true
 	local ok, ready = pcall(many, _wait_fds, count, timeout_ms)
 	_busy = false
-	if not ok then return nil end
-	return ready == true
+	if not ok or type(ready) ~= "boolean" then return nil end
+	return ready
 end
 
 --- Checks private provider/session identity, not an unobserved kernel state lease.
