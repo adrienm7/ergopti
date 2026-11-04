@@ -300,3 +300,40 @@ _PTIO_BareRowFiresFromDiskImpl() {
 }
 Test("personal-editor-row-loads: a bare trigger key on disk fires (personal-paren-left)",
 	() => _HCA_Run(1, _PTIO_BareRowFiresFromDiskImpl))
+
+; The shared editor page names the strict flag is_case_sensitive_strict, as the
+; TOML and the macOS and Linux models do. The Windows model called it
+; strict_case, so a box ticked in the WebView editor was dropped on save.
+_PTIO_WebViewStrictFlagSurvivesSave() {
+	global ScriptInformation, _ReadPersonalTomlCache
+	TargetPath := A_Temp . "\ergopti_personal_strict_flag_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	OldCache := _ReadPersonalTomlCache
+	try {
+		try FileDelete(TargetPath)
+		FileAppend(_PTIO_PersoSource(""), TargetPath, "UTF-8")
+		ScriptInformation["PersonalTomlPath"] := TargetPath
+		_ReadPersonalTomlCache := false
+		Payload := JsonParse('{"sections_order":["perso"],"sections":{"perso":{"description":"Perso",'
+			. '"entries":[{"trigger":"sru","output":"SRU","is_word":true,"auto_expand":false,'
+			. '"is_case_sensitive":true,"final_result":false,"is_case_sensitive_strict":true}]}}}')
+		AssertTrue(WritePersonalToml(Map("meta_description", "Perso",
+			"sections_order", Payload["sections_order"], "sections", Payload["sections"])),
+			"the editor save of a strict entry must be written")
+		AssertTrue(InStr(FileRead(TargetPath, "UTF-8"), "is_case_sensitive_strict = true") > 0,
+			"the strict flag the page sent reaches the file")
+		_ReadPersonalTomlCache := false
+		Entry := ReadPersonalToml(true)["sections"]["perso"]["entries"][1]
+		AssertEqual(true, Entry.Get("is_case_sensitive_strict", false) ? true : false,
+			"and the model reads it back under the same name")
+	} finally {
+		try FileDelete(TargetPath)
+		try _PersonalTomlInvalidateCaches(TargetPath)
+		try _ParseTomlGroupConfig_InvalidatePath(TargetPath)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+		_ReadPersonalTomlCache := OldCache
+	}
+}
+Test("personal-editor-strict-flag: the WebView strict flag survives a save (personal-strict-name)",
+	_PTIO_WebViewStrictFlagSurvivesSave)

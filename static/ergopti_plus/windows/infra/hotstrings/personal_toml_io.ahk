@@ -516,7 +516,7 @@ ReadPersonalToml(Refresh := false, OpeningSource := 0, ExactContent := unset) {
 			"auto_expand", (EM[4] == "true"),
 			"is_case_sensitive", (EM[5] == "true"),
 			"final_result", (EM[6] == "true"),
-			"strict_case", (EM[7] == "true"),
+			"is_case_sensitive_strict", (EM[7] == "true"),
 			; Empty string means "inherit the source default" (no per-entry key)
 			"priority", _ParseEntryPriority(Line, ""),
 			"line_index", LineIndex,
@@ -1030,12 +1030,12 @@ _PersonalTomlModelFieldsAreValid(Data, CanonicalOrder, &Detail) {
 					return false
 				}
 			}
-			if Entry.Has("strict_case")
-					and (!(Entry["strict_case"] is Integer)
-						or (Entry["strict_case"] != 0
-							&& Entry["strict_case"] != 1)) {
+			if Entry.Has("is_case_sensitive_strict")
+					and (!(Entry["is_case_sensitive_strict"] is Integer)
+						or (Entry["is_case_sensitive_strict"] != 0
+							&& Entry["is_case_sensitive_strict"] != 1)) {
 				Detail := "section '" . SectionName . "' entry " . EntryIndex
-					. " has a non-Boolean strict_case"
+					. " has a non-Boolean is_case_sensitive_strict"
 				return false
 			}
 		}
@@ -2385,7 +2385,7 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 					Flags .= "*"
 				if !E["is_word"]
 					Flags .= "?"
-				if E.Has("strict_case") and E["strict_case"]
+				if E.Has("is_case_sensitive_strict") and E["is_case_sensitive_strict"]
 					Flags .= "C"
 				; Collision priority: the individual per-hotstring override when set,
 				; otherwise the personal source default (50). Passing Category + Priority

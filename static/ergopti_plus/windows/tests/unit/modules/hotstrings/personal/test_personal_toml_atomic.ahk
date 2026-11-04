@@ -583,8 +583,8 @@ _PTIO_RejectsWrongTypedFullModelPayloads() {
 		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "missing Boolean")
 
 		Candidate := _PTIO_RaceModel("strict")
-		Candidate["sections"]["race"]["entries"][1]["strict_case"] := "false"
-		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "string strict_case")
+		Candidate["sections"]["race"]["entries"][1]["is_case_sensitive_strict"] := "false"
+		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "string is_case_sensitive_strict")
 
 		Candidate := _PTIO_RaceModel("meta")
 		Candidate["meta_description"] := 42
