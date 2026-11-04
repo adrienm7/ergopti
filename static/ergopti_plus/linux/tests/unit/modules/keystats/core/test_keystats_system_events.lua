@@ -132,15 +132,22 @@ helpers.describe("keystats system events: the writer", function()
 	end)
 end)
 
-for _, failure in ipairs({ "migration", "registration" }) do
+for _, failure in ipairs({ "migration", "registration", "migration_throw", "registration_throw" }) do
 	it("metrics do not use SQLite after failed " .. failure, function()
 		local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system_metrics" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local starts, closes, registers = 0, 0, 0
 		local writer = setmetatable({
 			open_db = function() return true end,
-			ensure_token_encoding = function() return failure ~= "migration" end,
-			register_device = function() registers = registers + 1; return failure ~= "registration" end,
+			ensure_token_encoding = function()
+				if failure == "migration_throw" then error("injected migration failure") end
+				return failure ~= "migration"
+			end,
+			register_device = function()
+				registers = registers + 1
+				if failure == "registration_throw" then error("injected registration failure") end
+				return failure ~= "registration"
+			end,
 			read_open_walk = function() return nil, true end,
 			is_available = function() return true end,
 			close_db = function() closes = closes + 1; return true end,
@@ -154,15 +161,21 @@ for _, failure in ipairs({ "migration", "registration" }) do
 			acknowledge = function() end, take_events = function() return {} end }
 		local called, detail = pcall(function()
 			local keystats = require(names[2])
-			keystats.init(Home.options())
+			helpers.assert_eq(keystats.init(Home.options()), false, "failed migration or registration blocks initialization")
 			require("tests.support.metrics_consent_fixture").enable(keystats)
 			keystats.on_keydown("a", 1000, "owned-app")
+			helpers.assert_nil(keystats.get_app_stats()["owned-app"], "unpersistable events must not be captured")
 			keystats.flush()
+			helpers.assert_eq(starts, 0, "unadmitted SQLite must never accept a flush")
+			helpers.assert_eq(closes, 1, "failed SQLite initialization releases the store")
+			helpers.assert_eq(registers, (failure == "registration" or failure == "registration_throw") and 1 or 0)
+			failure = "none"
+			helpers.assert_true(keystats.init(Home.options()), "healthy retry must restore admission")
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			keystats.on_keydown("b", 2000, "recovered-app")
+			helpers.assert_true(keystats.get_app_stats()["recovered-app"] ~= nil, "capture resumes after successful retry")
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 		assert(called, detail)
-		helpers.assert_eq(starts, 0, "unadmitted SQLite must never accept a flush")
-		helpers.assert_eq(closes, 1, "failed SQLite initialization releases the store")
-		helpers.assert_eq(registers, failure == "registration" and 1 or 0)
 	end)
 end
