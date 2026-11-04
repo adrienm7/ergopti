@@ -704,3 +704,27 @@ records hotstring E2E as `not-selected`, with `full_suite_qualified: false`;
 HTTP E2E is also outside this file-publication selection. Neither exclusion is
 reported as a behavioral pass. AHK-039 awaits its 111-case aggregation, migration
 and rebuild replay; the register remains **39 distinct new findings**.
+
+## Native qualification checkpoint: 41898714754
+
+At `1a7b4bd`, **111 selected aggregation, tuple, context, rollover, distribution,
+cache and checkpoint cases passed individually and 111/111 in reverse order**.
+The measured replay summary records 111 selected cases, zero failures and
+113 children including discovery and reverse, with `full_suite_qualified: false`.
+Production-entry compilation passed without skips; the 15 native SQLite / CLI
+preparation controls also passed. Evidence: [replay artifact](https://github.com/adrienm7/ergopti/actions/runs/41898714754/artifacts/13357308073)
+and [entry artifact](https://github.com/adrienm7/ergopti/actions/runs/41898714754/artifacts/13357163460).
+
+This qualifies AHK-039 after its three measured native row-collision failures.
+Hotstring E2E is explicitly `not-selected`; HTTP E2E is also outside this
+statistics-only selection. All **39 registered Windows findings** now have
+source corrections and targeted native qualification. The requested 1,000 is
+still unmet and further candidates remain under investigation.
+
+The unregistered thinking-retry probe at `78a0050`, run `41898825207`, failed
+before reaching its intended business assertion. Its positive control did not
+reach the refusal log: the fixture said `thinking` while the shared parser
+requires the complete generic-leaf path `thinking.type`. A separate fixture
+cleanup also read a destroyed GUI object's handle. These are test-fixture defects,
+not evidence for the proposed production cancellation finding; the register
+count is unchanged while the fixture is repaired.
