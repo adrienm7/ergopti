@@ -558,3 +558,18 @@ Consequence: The adapter violates its explicit cross-origin payload policy by co
 Regression: A reachable managed-redirect-body-owner AHK case launches the genuine worker with its real admission handshake and WinHTTP engine against two owned loopback peers. Twelve native controls require denial before target contact, empty-GET and 303 controls, same-origin body preservation, and existing POST denial. Native peers record only body lengths and SHA256 digests. The original raw transport controls remain. Native Windows execution is pending.
 
 The ongoing register now contains **35 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native parse refusal checkpoint: 41886475613
+
+The replay at `abcebe48f6a361237413e2ea74bcbfe984701093` was blocked before
+behavioral qualification: the measured compiler rejected an unbraced
+`if / try / else` in the new copy completion logger branch. Commit `07fb9c0`
+adds the required blocks. This failed checkpoint certifies no behavioral pass
+for the 31-case selection.
+
+The next run retains those cases and adds the actual managed redirect worker
+and existing raw WinHTTP controls (33 selected AHK cases). It also selects only
+the eleven `http_client:` proxy-override E2E cases required by the changed worker;
+the workflow checks their exact non-skipped completion count. All later native
+qualification remains pending here. The register contains **35 distinct new
+findings**; the target of 1,000 remains unmet.

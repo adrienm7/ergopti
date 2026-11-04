@@ -1,5 +1,5 @@
 {
-	"expected_count": 31,
+	"expected_count": 33,
 	"filters": [
 		{
 			"contains": "Model browser selection: native-refused ",
@@ -35,6 +35,14 @@
 		},
 		{
 			"contains": "config-transition-runtime-boot-exact-default",
+			"expected_count": 1
+		},
+		{
+			"contains": "managed-redirect-body-owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "winhttp transport: real WinHTTP honours the managed request contract",
 			"expected_count": 1
 		}
 	]
