@@ -14,9 +14,10 @@ local PersonalFileScope = require("infra.personal_file_scope")
 local PersonalFiles = require("hotstrings.personal_files")
 local PersonalFileMenu = require("menu.personal_files")
 local M = {}
-local hs     = hs
 local i18n   = require("infra.i18n")
 local DeferredWork = require("infra.deferred_work")
+local ShellRunner = require("adapters.shell_runner")
+local Logger = require("infra.logger")
 local Labels = require("menu.labels")
 local text_utils = require("infra.text_utils")
 local dialog = require("infra.dialog_util")
@@ -270,7 +271,8 @@ end
 local function open_toml_path(path)
 	if type(path) ~= "string" or path == "" then return false end
 	return DeferredWork.after(0, function()
-		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
+		local ok, started = pcall(ShellRunner.open, path)
+		if not ok or started ~= true then Logger.error("menu_hotstrings_custom", "The personal hotstring file could not be opened.") end
 	end, "menu_hotstrings_custom.open_toml")
 end
 

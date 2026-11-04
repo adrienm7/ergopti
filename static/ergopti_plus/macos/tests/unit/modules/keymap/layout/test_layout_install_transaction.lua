@@ -120,8 +120,10 @@ helpers.describe("layout_install: transactional replacement", function()
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
 				osascript = { applescript = function() return true end },
 			})
-			helpers.assert_eq(install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle"), true)
-			helpers.assert_eq(notices[1], require("infra.i18n").get("menu.layout.install_other_scope_unverified"))
+			local committed, reason = install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle")
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(reason, "other_scope_unverified")
+			helpers.assert_eq(notices, {}, "a partial publication must not claim success")
 		end, debug.traceback)
 		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"], package.loaded["infra.notifications"] =
 			old_dir, old_fs, old_notify
@@ -346,10 +348,11 @@ helpers.describe("layout_install: transactional replacement", function()
 						return "", true, "exit", 0
 					end,
 				})
-				helpers.assert_eq(install.install_user("/tmp/layout source/", "Ergopti_v2.0.0.bundle"), true)
+				local committed, reason = install.install_user("/tmp/layout source/", "Ergopti_v2.0.0.bundle")
+				helpers.assert_eq(committed, false)
+				helpers.assert_eq(reason, "other_scope_occupied")
 				helpers.assert_eq(#commands, 1, "no second command may delete the concurrent bundle")
-				helpers.assert_eq(notices[1], require("infra.i18n").get("menu.layout.install_other_scope"),
-					"the duplicate must be reported")
+				helpers.assert_eq(notices, {}, "a partial publication must not claim success")
 			end, debug.traceback)
 			package.loaded["infra.notifications"] = saved
 			if not ok then error(err, 0) end
