@@ -185,6 +185,25 @@ _RHL_Exercise() {
 	_RHL_Observe("complete")
 }
 
+_RHL_NonpositiveUsage() {
+	global _RHL
+	SavedChars := KLRoi.session_saved_chars
+	Fired := KLRoi.session_fired_count
+	_RHL.PushTick += 500
+	KL_Roi_OnHotstring(_RHL.Trigger, 0, false)
+	_RHL_Require(KLRoi.trigger_last_use[_RHL.Trigger] == _RHL.PushTick,
+		"A zero-saving fire must refresh public last use.")
+	_RHL.PushTick += 500
+	KL_Roi_OnHotstring(_RHL.Trigger, -3, false)
+	_RHL_Require(KLRoi.trigger_last_use[_RHL.Trigger] == _RHL.PushTick,
+		"A negative-saving fire must refresh public last use.")
+	Private := "private-zero-saving-fixture"
+	KL_Roi_OnHotstring(Private, 0, true)
+	_RHL_Require(!KLRoi.trigger_last_use.Has(Private), "Private trigger names must remain absent.")
+	_RHL_Require(KLRoi.session_fired_count == Fired + 3 && KLRoi.session_saved_chars == SavedChars,
+		"All accepted fires count as usage without adding nonpositive savings.")
+}
+
 _RHL_Main() {
 	if A_Args.Length != 2
 		ExitApp(2)
@@ -195,7 +214,10 @@ _RHL_Main() {
 		ActivityCalls: 0, ActivityDone: false, CutpointProtected: false, TickTimer: _RHL_ObserveTick, ActivityTimer: _RHL_AdmitNewFire,
 		Failure: 0, Errors: 0}
 	Primary := 0
-	try _RHL_Exercise()
+	try {
+		_RHL_Exercise()
+		_RHL_NonpositiveUsage()
+	}
 	catch Any as Failure
 		Primary := Failure
 	finally {
