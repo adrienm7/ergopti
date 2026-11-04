@@ -80,6 +80,21 @@ function M.virtual_hid_version()
 	return require("platform.remap.runtime_manifest").virtual_hid_version(manifest)
 end
 
+--- Whether the pinned artifact was downloaded and verified: its receipt names
+--- the pinned digest (the same test as OwnedRuntimeDownloadedHelper.swift).
+--- @return string state `fetched:<version>`, `absent`, `mismatch` or `unpinned`.
+function M.artifact_receipt_state()
+	local manifest = load_manifest()
+	local runtime = manifest and manifest.runtime
+	if type(runtime) ~= "table" or type(runtime.version) ~= "string" or type(runtime.sha256) ~= "string" then
+		return "unpinned"
+	end
+	local receipt = FileSystem.expand_path(require("platform.remap.ke_paths").OWNED.ARTIFACT_HOME
+		.. "/" .. runtime.version .. "/receipt")
+	if FileSystem.exists(receipt) ~= true then return "absent" end
+	return FileSystem.read(receipt) == runtime.sha256 .. "\n" and ("fetched:" .. runtime.version) or "mismatch"
+end
+
 local fetcher
 
 --- Downloads and verifies the pinned artifact the first time, then reuses it.
