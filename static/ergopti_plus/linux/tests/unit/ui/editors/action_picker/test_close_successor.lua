@@ -63,6 +63,37 @@ helpers.describe("Action picker exact close successor", function()
 		logger.error = original
 		if not ok then error(err, 0) end
 	end)
+	helpers.it("(picker-close-refusal) retries closing without replaying an accepted selection", function()
+		with_picker(function(f)
+			f.open("Original binding")
+			local hide = f.host.hide
+			f.host.hide = function() return false end
+			f.message("confirm", "tab_new")
+			helpers.assert_eq(#f.seen.picks, 1)
+			helpers.assert_true(f.bridge.is_open())
+			f.host.hide = hide
+			f.message("confirm", "tab_new")
+			helpers.assert_eq(#f.seen.picks, 1, "the accepted callback must not run twice")
+			helpers.assert_eq(f.bridge.is_open(), false)
+		end)
+	end)
+
+	helpers.it("(picker-close-refusal) retries closing without replaying cancellation", function()
+		with_picker(function(f)
+			local cancelled = 0
+			helpers.assert_true(f.bridge.open({ title = "Picker", items = {} }, function() end,
+				function() cancelled = cancelled + 1; f.message("cancel") end))
+			local hide = f.host.hide
+			f.host.hide = function() return false end
+			f.message("cancel")
+			helpers.assert_eq(cancelled, 1)
+			f.host.hide = hide
+			f.message("cancel")
+			helpers.assert_eq(cancelled, 1)
+			helpers.assert_eq(f.bridge.is_open(), false)
+		end)
+	end)
+
 	for _, action in ipairs({ "confirm", "cancel" }) do
 		helpers.it("(picker-close-successor) keeps the replacement opened during " .. action, function()
 			with_picker(function(f)
