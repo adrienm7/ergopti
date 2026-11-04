@@ -1576,9 +1576,10 @@ local function discard_capture(capture)
 	for _, path in ipairs({ capture.path, capture.dir }) do
 		local removed, err = os.remove(path)
 		if not removed then
-			local left = io.open(path, "rb")
-			if left then
-				left:close()
+			local checked, kind, _, code = pcall(function()
+				return require("infra.native_directory").target_kind(path)
+			end)
+			if not checked or kind ~= nil or code ~= "ENOENT" then
 				Logger.error(LOG, "A screenshot file could not be deleted: %s", tostring(err))
 			end
 		end
@@ -1879,9 +1880,8 @@ local function finish_capture(flow, spec, outcome)
 		_vision_unscaled_logged = true
 		Logger.info(LOG, "Screenshots are sent at their full size: install ImageMagick to downscale them.")
 	end
-	local handle = io.open(capture.path, "rb")
-	local image = handle and handle:read("*a") or nil
-	if handle then handle:close() end
+	local read_ok, image, read_status = pcall(require("toml_codec.writer").read_classified, capture.path)
+	if not read_ok or read_status ~= "ok" then image = nil end
 	discard_capture(capture)
 	if type(image) ~= "string" or image == "" then
 		_vision_flow = nil
