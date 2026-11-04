@@ -23,7 +23,7 @@ set -euo pipefail
 # ======================================
 # ======================================
 
-PREFIX="${HOME}/.local"
+PREFIX="${HOME:+${HOME}/.local}"
 INSTALL_SERVICE=true
 # Skips every package-manager call. The path for a distribution this script has
 # no arm for, and for anyone who prefers to install dependencies themselves —
@@ -151,6 +151,7 @@ _standalone_prefix_allowed() {
 	case "$candidate" in /|/usr|/usr/local|/app|/nix|/nix/*) return 1 ;; esac
 }
 if ! $SETUP_PERMS_ONLY; then
+	[ -n "$PREFIX" ] || { ergopti_msg uninstall.missing_prefix_value >&2; exit 64; }
 	_standalone_prefix_allowed "$PREFIX" || { ergopti_msg uninstall.system_prefix >&2; exit 1; }
 	mkdir -p -- "$PREFIX"
 	IFS= read -r -d '' PREFIX < <(CDPATH= cd -Pe -- "$PREFIX" && printf '%s\0' "$PWD")

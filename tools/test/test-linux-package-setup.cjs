@@ -52,6 +52,27 @@ try {
 		);
 		assert.equal(setup.status, 0, setup.stderr);
 		assert.match(fs.readFileSync(receipt, 'utf8'), /--user 1001\n$/);
+		const noHome = {
+			...process.env,
+			SUDO_UID: '1234',
+			TMPDIR: sandbox,
+			PATH: `${tools}:/usr/bin:/bin`
+		};
+		delete noHome.HOME;
+		for (const args of [['--help'], ['--setup-perms']]) {
+			const minimal = spawnSync(
+				bashExecutable(),
+				[bashPath(path.join(ROOT, 'static/ergopti_plus/linux/install.sh')), ...args],
+				{ encoding: 'utf8', timeout: 10000, env: noHome }
+			);
+			assert.equal(minimal.status, 0, `${args}: ${minimal.stderr}`);
+		}
+		const noPrefix = spawnSync(
+			bashExecutable(),
+			[bashPath(path.join(ROOT, 'static/ergopti_plus/linux/install.sh'))],
+			{ encoding: 'utf8', timeout: 10000, env: noHome }
+		);
+		assert.equal(noPrefix.status, 64, 'a normal install without HOME needs an explicit prefix');
 		fs.writeFileSync(
 			path.join(tools, 'bash'),
 			`#!/bin/bash\nprintf '%s\\n' "$*" > ${shellQuote(receipt)}\n`,
