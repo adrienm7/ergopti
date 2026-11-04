@@ -103,11 +103,12 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		close = function() end,
 	})
 	local kh = helpers.load_module("adapters.keyboard_hook")
-	local emitted, before_stop, running = {}, {}, false
+	local emitted, before_stop, running, pointer_open = {}, {}, false, false
 	local ok, err = pcall(function()
 		kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			nav_layer = wheel_layer() }), function() end)
-		kh.start({
+		local start_options
+		start_options = {
 			intercept = true,
 			onEmitRaw = function(code, value) emitted[#emitted + 1] = "key:" .. code .. ":" .. value; return true end,
 			onEmitRelative = function(axis, value)
@@ -116,10 +117,14 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 				return true
 			end,
 			onClick = function(code) if on_click then on_click(kh, code) end end,
-			onPointerEvent = observer,
-		})
+			onPointerEvent = observer and function(kind, code, value, slot)
+				return observer(kind, code, value, slot, kh, start_options)
+			end or nil,
+		}
+		kh.start(start_options)
 		kh.pump()
 		running = kh.isRunning()
+		pointer_open = reader.is_open("pointer:" .. pointer)
 		for index, row in ipairs(emitted) do before_stop[index] = row end
 	end)
 	kh.set_remapper(nil)
@@ -131,7 +136,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 	os.remove(pointer)
 	os.remove(second)
 	assert(ok, err)
-	return emitted, grabs[pointer], before_stop, running, "pointer:" .. pointer
+	return emitted, grabs[pointer], before_stop, running, "pointer:" .. pointer, pointer_open
 end
 
 local function has(list, item)
@@ -185,6 +190,20 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 			if kind == "reset" then resets = resets + 1 end
 		end, true)
 		helpers.assert_eq(resets, 1, "fatal read and emergency cleanup refer to the same closed source")
+	end)
+
+	helpers.it("does not read a successor pointer from the retired pump", function()
+		local restarted = false
+		local _, _, _, running, _, pointer_open = drive("mouse", HOLD, { { EV_REL, REL_X, 1, 3000 } }, nil,
+			function(kind, _, _, _, hook, options)
+				if kind == "reset" and not restarted then
+					restarted = true
+					hook.stop()
+					hook.start(options)
+				end
+			end, true)
+		helpers.assert_true(restarted and running)
+		helpers.assert_true(pointer_open, "the old pump cannot consume the successor's reader lifetime")
 	end)
 
 	helpers.it("retires a grabbed mouse when its motion observer raises", function()
