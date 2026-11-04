@@ -107,9 +107,11 @@ M.COMMANDS = {
 	-- Releasing the keys that fired it is input that would wake the displays
 	-- straight back up: they are powered off once that release has happened.
 	sleep_displays = "sleep 1 && xset dpms force off",
-	toggle_dark_mode = "case \"$(gsettings get " .. COLOR_SCHEME .. " 2>/dev/null)\" in"
-		.. " *prefer-dark*) gsettings set " .. COLOR_SCHEME .. " default;;"
-		.. " *) gsettings set " .. COLOR_SCHEME .. " prefer-dark;; esac",
+	toggle_dark_mode = "scheme=$(gsettings get " .. COLOR_SCHEME .. " 2>/dev/null) && case \"$scheme\" in"
+		.. " \"'prefer-dark'\") gsettings set " .. COLOR_SCHEME .. " default;;"
+		.. " \"'default'\"|\"'prefer-light'\") gsettings set " .. COLOR_SCHEME .. " prefer-dark;;"
+		.. " *) false;; esac",
+
 	mic_mute_toggle = "pactl set-source-mute @DEFAULT_SOURCE@ toggle",
 	empty_trash = "gio trash --empty",
 	minimize_all = M.MINIMIZE_ALL,

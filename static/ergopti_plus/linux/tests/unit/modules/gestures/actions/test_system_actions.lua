@@ -117,9 +117,11 @@ local EXPECTED = {
 	show_desktop = "{ case \"$(wmctrl -m 2>/dev/null)\" in *'mode: ON'*) wmctrl -k off;; *) wmctrl -k on;; esac; }",
 	-- Powered off at once, the release of the triggering keys woke them again.
 	sleep_displays = "{ sleep 1 && xset dpms force off; }",
-	toggle_dark_mode = "{ case \"$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)\" in"
-		.. " *prefer-dark*) gsettings set org.gnome.desktop.interface color-scheme default;;"
-		.. " *) gsettings set org.gnome.desktop.interface color-scheme prefer-dark;; esac; }",
+	toggle_dark_mode = "{ scheme=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null) && case \"$scheme\" in"
+		.. " \"'prefer-dark'\") gsettings set org.gnome.desktop.interface color-scheme default;;"
+		.. " \"'default'\"|\"'prefer-light'\") gsettings set org.gnome.desktop.interface color-scheme prefer-dark;;"
+		.. " *) false;; esac; }",
+
 	mic_mute_toggle = "{ pactl set-source-mute @DEFAULT_SOURCE@ toggle; }",
 	-- The desktop and the panels belong to the desktop shell: signalling their
 	-- process removed the desktop and the panels for the session.
@@ -376,6 +378,24 @@ helpers.describe("Linux system actions", function()
 			end)
 		end
 	end)
+
+	for _, response in ipairs({ "exit 1", 'printf "unexpected"' }) do
+		helpers.it("does not change the colour scheme after an unreadable setting (" .. response .. ")", function()
+			local log = run_with_stubs(backgrounded(Gestures, "toggle_dark_mode"), {
+				gsettings = 'if [ "$1" = get ]; then ' .. response .. '; fi',
+			})
+			helpers.assert_true(not log:find("gsettings set", 1, true), "unobserved state must not be changed: " .. log)
+		end)
+	end
+
+	for _, vector in ipairs({ { "default", "prefer-dark" }, { "prefer-light", "prefer-dark" }, { "prefer-dark", "default" } }) do
+		helpers.it("toggles the observed " .. vector[1] .. " colour scheme", function()
+			local log = run_with_stubs(backgrounded(Gestures, "toggle_dark_mode"), {
+				gsettings = 'if [ "$1" = get ]; then printf "\\047%s\\047\\n" "' .. vector[1] .. '"; fi',
+			})
+			helpers.assert_true(log:find("gsettings set org.gnome.desktop.interface color-scheme " .. vector[2], 1, true) ~= nil, log)
+		end)
+	end
 
 	helpers.it("minimize_all minimizes every listed window but the sticky ones (action-parity-linux-system)", function()
 		local log = run_with_stubs(backgrounded(Gestures, "minimize_all"), {
