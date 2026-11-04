@@ -20,7 +20,7 @@
 --- remove. The channel has to be non-forking, not batched.
 ---
 --- FEATURES & RATIONALE:
---- 1. Pure encoder. `encode_event()` builds the 24-byte `struct input_event`
+--- 1. Pure encoder. `encode_event()` builds the native `struct input_event`
 ---    with hand-rolled little-endian packing rather than `string.pack`, which
 ---    LuaJIT (5.1) does not have. One code path on every interpreter beats a
 ---    version branch that only one side of CI ever executes.
@@ -103,9 +103,9 @@ local KEY_CODE_MAX = 0x2FF
 -- File descriptors are non-negative signed native int values.
 local MAX_DESCRIPTOR = 0x7FFFFFFF
 
--- struct input_event is 24 bytes on 64-bit: timeval (2 × 8) + type/code (2 × 2)
--- + value (4).
-local INPUT_EVENT_SIZE = 24
+-- The payload is always 8 bytes; the two timeval fields use the native long width.
+local INPUT_EVENT_SIZE = require("infra.input_event").native_size()
+local TIME_FIELD_SIZE = (INPUT_EVENT_SIZE - 8) / 2
 
 -- Bus type and identifiers reported by the virtual device (linux/input.h).
 -- BUS_VIRTUAL is what a software-synthesised keyboard should claim; a real bus
@@ -186,10 +186,10 @@ end
 --- @param value integer Event value (0 release, 1 press, 2 autorepeat).
 --- @param sec integer|nil tv_sec, default 0.
 --- @param usec integer|nil tv_usec, default 0.
---- @return string A 24-byte struct.
+--- @return string A native-size struct.
 function M.encode_event(ev_type, code, value, sec, usec)
-	return pack_uint_le(sec or 0, 8)
-		.. pack_uint_le(usec or 0, 8)
+	return pack_uint_le(sec or 0, TIME_FIELD_SIZE)
+		.. pack_uint_le(usec or 0, TIME_FIELD_SIZE)
 		.. pack_uint_le(ev_type, 2)
 		.. pack_uint_le(code, 2)
 		.. pack_i32_le(value)
