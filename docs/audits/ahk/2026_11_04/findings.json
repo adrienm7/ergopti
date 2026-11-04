@@ -719,6 +719,28 @@
 			"root_cause": "_LLMRemote_TrimAsyncRegistry detaches and cleans up the oldest request but calls its on_fail callback without honoring the cancelled flag. CancelAsync deliberately marks logical cancellation before deferred cleanup.",
 			"silent_failure": "An explicitly cancelled request can later publish a stale error through a callback whose owner already revoked delivery.",
 			"regression_test": "Two remote-trim-cancel cases use the public request/cancellation pipeline and actual managed facade with controlled Job I/O. The fix suppresses only the cancelled predecessor callback while retaining cleanup and live eviction notification; post-fix pending."
+		},
+		{
+			"id": "AHK-066",
+			"title": "Remote usage casts and inferred totals overflow the signed native integer domain",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41924556519 at9a8ebad: the real classifier and managed Poll both accept a finite1e30 usage count as MININT, publish a negative inferred total and negative estimated cost. Individually valid MAXINT prompt plus1 completion also wraps the inferred total to MININT. Both normal controls pass, and actual callbacks and exact handle/registry retirement still complete in all modes.",
+			"root_cause": "_LLMRemoteExtractUsageRoot treats every nonnegative finite Number as safely castable to signed64 Integer and adds two valid counters without a representation check. JSON validity alone does not establish the native consumer domain.",
+			"silent_failure": "A successful response can publish negative usage totals and estimated costs even though its provider supplied nonnegative values.",
+			"regression_test": "Six genuine classifier/managed-completion probes plus an eight-row boundary test preserve valid response text, exact callback count and retirement. The fix admits only representable counts and infers a total only when subtraction proves the addition safe; otherwise total remains unknown0. No product token cap is introduced. Native post-fix pending."
+		},
+		{
+			"id": "AHK-067",
+			"title": "Sticky replay drops modifier flags released before the captured key is replayed",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41924556519 at9a8ebad: sticky-native-modifier-flags plain passes, shift fails after native capture reports EndMods=<+, Shift is released, and replay reaches the receiving F6 handler with Ctrl1/Shift0. Actual synthetic transaction is Critical, finalization is not Critical, and both canonical buffers remain unchanged. Same inverse result; input injection is confined to a verified owned Edit, not a claim about physical keys.",
+			"root_cause": "StickyModifier sends Hook.EndKey with only the selected sticky modifiers and discards Hook.EndMods. A native captured modifier may already be released when Wait unwinds, so current key state or Blind cannot restore the captured shortcut.",
+			"silent_failure": "For example sticky Ctrl followed by Shift+F6 becomes Ctrl+F6, changing the requested application action.",
+			"regression_test": "The two real-hook/native-receiver probes include the production HS_RunSyntheticInputTransaction and TextPressKey pipeline. The fix unions captured Ctrl/Alt/Shift/Win groups with the sticky modifier without duplicates; it does not claim preservation of left/right modifier identity. Post-fix qualification pending."
 		}
 	]
 }
