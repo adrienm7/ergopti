@@ -4,6 +4,9 @@
 --- No real LGI, WebKit, Crypto, desktop notification or timer ACK qualification.
 local helpers=require("tests.helpers")
 local function run(body)
+	-- The document fixture narrows infra.timings for its own native lease. Load
+	-- the real updater first so its bounds come from the actual timing registry.
+	require("modules.updater.manager")
 	local previous=package.loaded["ui.changelog.bridge"]
 	package.loaded["ui.changelog.bridge"]=nil
 	local Bridge=require("ui.changelog.bridge")
