@@ -884,6 +884,27 @@ _section install.section_files
 source "${SRC_DRIVER}/install/layout_registry.sh"
 SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
 
+# --no-service leaves the previous startup files untouched. Carry their old
+# receipts into the replacement manifest so a later uninstall can still remove
+# unchanged entries and refuse modified ones.
+PRESERVED_STARTUP_RECEIPTS=()
+if ! $INSTALL_SERVICE; then
+	prior_manifest="${LIB_DIR}/.ergopti-owned-files"
+	if [ -e "$prior_manifest" ] || [ -L "$prior_manifest" ]; then
+		[ -f "$prior_manifest" ] && [ ! -L "$prior_manifest" ] || exit 1
+		declare -A preserved_startup_seen=()
+		while IFS=$'\t' read -r prior_digest prior_relative || [ -n "$prior_digest$prior_relative" ]; do
+			case "$prior_relative" in
+				@unit|@autostart)
+					[[ "$prior_digest" =~ ^[0-9a-f]{64}$ ]] || exit 1
+					[ -z "${preserved_startup_seen[$prior_relative]:-}" ] || exit 1
+					preserved_startup_seen["$prior_relative"]=1
+					PRESERVED_STARTUP_RECEIPTS+=("$prior_digest"$'\t'"$prior_relative") ;;
+			esac
+		done < "$prior_manifest"
+	fi
+fi
+
 # Source installations compile before replacing the current installation.
 # Release bundles carry their target-built helper; absent binaries are refused,
 # never rebuilt from an unrelated checkout or borrowed from a system location.
@@ -1023,6 +1044,9 @@ if [ -n "${SRC_REGISTRY}" ]; then
 else
 	bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}"
 fi
+for startup_receipt in "${PRESERVED_STARTUP_RECEIPTS[@]}"; do
+	printf '%s\n' "$startup_receipt" >> "${LIB_DIR}/.ergopti-owned-files"
+done
 
 if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
 	# This generated checkout artifact is outside the input source tree, so its

@@ -197,6 +197,7 @@ function runInstaller(scenario) {
 		home,
 		configRoot,
 		stubs,
+		env,
 		calls,
 		cleanup: () => fs.rmSync(sandbox, { recursive: true, force: true })
 	};
@@ -709,6 +710,39 @@ for (const kind of [
 	});
 	try {
 		assert.equal(run.status, 0, run.output);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// Skipping service setup on an upgrade must not erase ownership of the startup
+// files that the earlier install left in place.
+{
+	const run = runInstaller({ desktopProvided: true });
+	try {
+		assert.equal(run.status, 0, run.output);
+		const updated = spawnSync(bashExecutable(), [bashPath(INSTALLER), '--no-service'], {
+			env: run.env,
+			encoding: 'utf8',
+			timeout: 60000
+		});
+		assert.equal(updated.status, 0, updated.stderr);
+		verifyOwnership(run);
+		const uninstall = spawnSync(
+			bashExecutable(),
+			[bashPath(path.join(path.dirname(INSTALLER), 'uninstall.sh')), '--check'],
+			{ env: run.env, encoding: 'utf8', timeout: 60000 }
+		);
+		assert.equal(uninstall.status, 0, uninstall.stderr);
+		const unit = path.join(run.configRoot, 'systemd/user/ergopti-hotstrings.service');
+		fs.appendFileSync(unit, '# user modification\n');
+		const modified = spawnSync(
+			bashExecutable(),
+			[bashPath(path.join(path.dirname(INSTALLER), 'uninstall.sh')), '--check'],
+			{ env: run.env, encoding: 'utf8', timeout: 60000 }
+		);
+		assert.notEqual(modified.status, 0, 'a modified service must not be claimed');
+		assert.match(fs.readFileSync(unit, 'utf8'), /# user modification/);
 	} finally {
 		run.cleanup();
 	}
