@@ -39,6 +39,35 @@ assert.equal(built.status, 0, built.stderr || built.stdout || built.error?.messa
 // Both packagers carry the AppImage's private runtime; its native content is
 // the oldest-LTS stager's to prove, so an existence fixture stands in here.
 stageAppDir(BUILD);
+{
+	const installer = path.join(BUILD, 'install.sh');
+	const before = fs.readFileSync(installer);
+	try {
+		const refused = run('build-linux-bundle-archive.sh', ['install.sh']);
+		assert.notEqual(refused.status, 0, 'the bundle may not overwrite its own installer input');
+		assert.deepEqual(fs.readFileSync(installer), before);
+	} finally {
+		fs.writeFileSync(installer, before);
+	}
+	if (process.platform === 'linux') {
+		for (const suffix of ['', '.sha256']) {
+			const foreign = path.join(scratch, `foreign-bundle${suffix || '-archive'}`);
+			const output = path.join(BUILD, `linked.tar.gz${suffix}`);
+			fs.writeFileSync(foreign, 'user data\n');
+			fs.symlinkSync(foreign, output);
+			const refused = run('build-linux-bundle-archive.sh', ['linked.tar.gz']);
+			assert.notEqual(refused.status, 0, 'linked bundle outputs must be refused');
+			assert.equal(fs.readFileSync(foreign, 'utf8'), 'user data\n');
+			if (suffix) assert.equal(fs.existsSync(path.join(BUILD, 'linked.tar.gz')), false);
+			fs.unlinkSync(output);
+		}
+	}
+	const unusual = '--bundle.tar.gz';
+	const builtBundle = run('build-linux-bundle-archive.sh', [unusual]);
+	assert.equal(builtBundle.status, 0, builtBundle.stderr || builtBundle.stdout);
+	assert.ok(fs.statSync(path.join(BUILD, unusual)).size > 0);
+	assert.ok(fs.statSync(path.join(BUILD, `${unusual}.sha256`)).size > 0);
+}
 let refusals = 0;
 for (const format of ['deb', 'rpm']) {
 	const script = `build-linux-${format}.sh`;
