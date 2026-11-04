@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **53 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **54 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -979,3 +979,17 @@ Consequence: An application receives an unmodified editing/navigation action in 
 Regression: Three sticky-native-nontext cases extract the actual StickyModifier/Names owner and include genuine SIHO. Actual SendEvent input is explicitly opted in and confined to a verified child-owned foreground Edit; TextPressKey alone is passive. Native WM_KEYDOWN, edit content, exact modified output and cleanup must agree. Letter and Enter are native controls, not claimed failing variants; Backspace proves the defect. Setting VisibleNonText=false retains standard modifier visibility under the native InputHook policy. Native fail-before measured; post-fix pending.
 
 The ongoing register now contains **53 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-054: A stale navigation-layer editor can overwrite a newer configuration
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+The Windows layer editor reads text for the page but retains no source receipt bound to its exact host, epoch, folders and target. GUI Save then uses an explicit unconditional writer, so it can adopt and replace later bytes from another editor.
+
+Reproduction: Native run41912869071 ate4e5e62 opens the actual layer host with sourceA, independently writes valid sourceB, then delivers the old page save through the real SDK bridge and host dispatch. Its receipt records save_entered1, save_returned1, apply_calls1 and newer_bytes_preserved0, individually and reversed. The three adjacent ready-delivery controls pass.
+
+Consequence: Saving an unchanged older page erases a newer navigation binding and requests applying that stale content. A retired host must also lose authority to request apply after a successful durable save.
+
+Regression: The real LRDT host/native GUI, SDK callback, host timer dispatch and canonical corpus drive source-stale plus a fresh-host successful save. The fix captures the offered source once per host and uses the existing lease and admitted unchanged-source publisher; explicit non-GUI Save retains its existing contract. Exact host/epoch/folders/target admission persists through publication and is checked again after success logging before apply. A separate real WM_CLOSE-at-success-log probe observes saved=true/applied=false with zero apply calls. FakeHost save cases become explicitly inert rather than manufacturing consent. Native stale-source fail-before measured; post-fix pending. Linux already retains this opening receipt; the macOS sibling remains outside this Windows correction.
+
+The ongoing register now contains **54 distinct new findings**. The requested target of 1,000 remains unmet.

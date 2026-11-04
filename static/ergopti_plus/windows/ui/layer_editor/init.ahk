@@ -128,13 +128,16 @@ LayerEditor_Validate(Text, Ctx) {
  * @param {Any} Text - The payload's text.
  * @param {Map} Ctx - The loader context.
  * @param {string} ConfigDir - The configuration folder.
+ * @param {Object|Integer} Opening - The retained GUI source, or zero for an explicit write.
+ * @param {WebViewHost|Integer} Host - The opening source's host, or zero for an explicit write.
  * @returns {Map} saved (Boolean), path, errors (Array).
  */
-LayerEditor_Save(Text, Ctx, ConfigDir) {
+LayerEditor_Save(Text, Ctx, ConfigDir, Opening := 0, Host := 0) {
+	global FS_STATUS_OK, FS_STATUS_ABSENT
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return LayerEditor_Save(Text, Ctx, ConfigDir)
+		try return LayerEditor_Save(Text, Ctx, ConfigDir, Opening, Host)
 		finally Critical(InheritedCritical)
 	}
 	Path := KeymapLayers_UserFilePath(Ctx, ConfigDir)
@@ -146,12 +149,30 @@ LayerEditor_Save(Text, Ctx, ConfigDir) {
 	; This native guard closes admission even when pause arrives during loading,
 	; validation or staging. Only the final rename uses a short Critical span.
 	Admission := () => !A_IsSuspended && _ConfigWriteLeaseOwns(Owner, Path)
+		&& (!(Opening is Object) || (_LayerEditor_OpeningCurrent(Host, Opening)
+			&& _ConfigWriteLeaseKey(Path) == Opening.TargetKey
+			&& _ConfigWriteLeaseKey(Opening.Path) == Opening.TargetKey))
 	try {
 		Errors := LayerEditor_Validate(Text, Ctx)
 		if (Errors.Length > 0)
 			return Map("saved", false, "path", Path, "errors", Errors)
 		if !Admission.Call()
 			return _LayerEditor_SaveRefused(Path, "the configuration write is no longer admitted")
+		if Opening is Object {
+			Expected := Opening.Source
+			if !Opening.Offered || (Expected["status"] != FS_STATUS_OK && Expected["status"] != FS_STATUS_ABSENT)
+				return _LayerEditor_SaveRefused(Path, "the layer editor has no admitted opening source")
+			SourceAdmission := () => Admission.Call() && Opening.Source == Expected
+			Result := FSWriteIfUnchangedAdmitted(Path, Text, Expected, 0, SourceAdmission)
+			if !Result["committed"]
+				return _LayerEditor_SaveRefused(Path, Result["detail"])
+			PreviousCritical := Critical("On")
+			try {
+				if _LayerEditor_OpeningCurrent(Host, Opening) && Opening.Source == Expected
+					Opening.Source := Map("status", FS_STATUS_OK, "content", Text, "detail", "")
+			} finally Critical(PreviousCritical)
+			return Map("saved", true, "path", Path, "errors", [])
+		}
 		Stage := Path . ".tmp"
 		if !FSWriteDurable(Stage, Text) {
 			try FSDeleteStrict(Stage)
@@ -418,18 +439,30 @@ _LayerEditor_StringsJson(Values) {
  * @param {string} ConfigDir - The configuration folder.
  * @param {Map} Legends - From LayerEditor_Legends; the layout in force by default.
  * @param {Array} LayerKeys - From LayerEditor_LayerKeys; the retained tap-holds' by default.
+ * @param {Object|Integer} Opening - The captured GUI source, or zero to read the file directly.
  * @returns {string} JavaScript to evaluate in the page.
  */
-LayerEditor_InitJs(Ctx, ConfigDir, Legends := "", LayerKeys := "") {
-	global LAYER_EDITOR_OS, LAYER_EDITOR_FILE_UNREADABLE
+LayerEditor_InitJs(Ctx, ConfigDir, Legends := "", LayerKeys := "", Opening := 0) {
+	global LAYER_EDITOR_OS, LAYER_EDITOR_FILE_UNREADABLE, FS_STATUS_OK, FS_STATUS_ABSENT
 	if !IsObject(Legends)
 		Legends := LayerEditor_CurrentLegends(Ctx)
 	if !IsObject(LayerKeys)
 		LayerKeys := _LayerEditor_CurrentLayerKeys()
-	Path := KeymapLayers_UserFilePath(Ctx, ConfigDir)
+	Path := Opening is Object ? Opening.Path : KeymapLayers_UserFilePath(Ctx, ConfigDir)
 	TextJson := "null"
 	Errors := []
-	if FileExist(Path) {
+	if Opening is Object {
+		if Opening.Source["status"] == FS_STATUS_OK {
+			Text := Opening.Source["content"]
+			; The page sees the same BOM-free text the ordinary UTF-8 reader
+			; offers; publication still compares the byte-faithful source.
+			if SubStr(Text, 1, 1) == Chr(0xFEFF)
+				Text := SubStr(Text, 2)
+			TextJson := JsonStringLiteral(Text)
+			Errors := _LayerEditor_ErrorsOnEveryOs(Text, Ctx)
+		} else if Opening.Source["status"] != FS_STATUS_ABSENT
+			Errors := [_LayerEditor_Error(LAYER_EDITOR_FILE_UNREADABLE, Opening.Source["detail"])]
+	} else if FileExist(Path) {
 		try {
 			Text := FSReadStrict(Path)
 			TextJson := JsonStringLiteral(Text)
@@ -496,10 +529,63 @@ LayerEditor_Open(*) {
 	return true
 }
 
+_LayerEditor_PageCurrent(Host, Opening) {
+	global LAYER_EDITOR_APP_ID
+	return Host is WebViewHost && Opening is Object && Host.HasOwnProp("LayerOpening")
+		&& Host.LayerOpening == Opening && Host.Epoch == Opening.Epoch
+		&& !Host.ResetDone && !Host.CloseRequested
+		&& WebViewHost._Instances.Get(LAYER_EDITOR_APP_ID, 0) == Host
+}
+
+_LayerEditor_OpeningCurrent(Host, Opening) {
+	global _ConfigDir, _SharedDir
+	return _LayerEditor_PageCurrent(Host, Opening)
+		&& _ConfigWriteLeaseKey(_ConfigDir) == Opening.ConfigKey
+		&& _ConfigWriteLeaseKey(_SharedDir) == Opening.SharedKey
+}
+
+; The successful save survives a retired page, but that page cannot admit a
+; fresh apply after the completion logger has yielded to another GUI owner.
+_LayerEditor_SavedSourceCurrent(Host, Opening, Path, Text) {
+	global FS_STATUS_OK
+	return _LayerEditor_OpeningCurrent(Host, Opening) && Opening.Offered
+		&& _ConfigWriteLeaseKey(Path) == Opening.TargetKey
+		&& _ConfigWriteLeaseKey(Opening.Path) == Opening.TargetKey
+		&& Opening.Source["status"] == FS_STATUS_OK && Opening.Source["content"] == Text
+}
+
 _LayerEditor_OnReady(Host) {
-	global _ConfigDir
+	global _ConfigDir, _SharedDir
 	try {
-		Host.Eval(LayerEditor_InitJs(_LayerEditor_Context(), _ConfigDir))
+		if !Host.HasOwnProp("LayerOpening") {
+			Dir := _ConfigDir, Shared := _SharedDir, Epoch := Host.Epoch
+			Ctx := _LayerEditor_Context()
+			Path := KeymapLayers_UserFilePath(Ctx, Dir)
+			Source := FSReadWithStatus(Path)
+			Candidate := {Epoch: Epoch, ConfigKey: _ConfigWriteLeaseKey(Dir),
+				SharedKey: _ConfigWriteLeaseKey(Shared), Directory: Dir, Path: Path,
+				TargetKey: _ConfigWriteLeaseKey(Path),
+				Source: Source, Offered: false, Busy: false}
+			PreviousCritical := Critical("On")
+			try {
+				if Host.ResetDone || Host.CloseRequested || Host.Epoch != Epoch
+					return
+				if !Host.HasOwnProp("LayerOpening")
+					Host.LayerOpening := Candidate
+			} finally Critical(PreviousCritical)
+		}
+		Opening := Host.LayerOpening
+		if !_LayerEditor_OpeningCurrent(Host, Opening)
+			return
+		Js := LayerEditor_InitJs(_LayerEditor_Context(), Opening.Directory, , , Opening)
+		if !_LayerEditor_OpeningCurrent(Host, Opening) || A_IsSuspended
+			return
+		Host.Eval(Js)
+		PreviousCritical := Critical("On")
+		try {
+			if _LayerEditor_OpeningCurrent(Host, Opening) && !A_IsSuspended
+				Opening.Offered := true
+		} finally Critical(PreviousCritical)
 	} catch as Err {
 		LoggerError("LayerEditor", "The layer data could not be read: {1}.", Err.Message)
 	}
@@ -544,8 +630,19 @@ _LayerEditor_OnMessage(Host, Payload, ApplyFn := ReloadPreservingSuspend) {
 			(Action is String) ? Action : Type(Action))
 		return
 	}
-	Host.Eval(LayerEditor_SaveResultJs(LayerEditor_SaveAndApply(
-		Payload.Has("text") ? Payload["text"] : JSON_NULL, _SharedDir, _ConfigDir, ApplyFn)))
+	Opening := Host.HasOwnProp("LayerOpening") ? Host.LayerOpening : 0
+	PreviousCritical := Critical("On")
+	try {
+		if !_LayerEditor_PageCurrent(Host, Opening) || !Opening.Offered || Opening.Busy
+			return
+		Opening.Busy := true
+	} finally Critical(PreviousCritical)
+	try {
+		Result := LayerEditor_SaveAndApply(Payload.Has("text") ? Payload["text"] : JSON_NULL,
+			_SharedDir, Opening.Directory, ApplyFn, Opening, Host)
+		if _LayerEditor_PageCurrent(Host, Opening)
+			Host.Eval(LayerEditor_SaveResultJs(Result))
+	} finally Opening.Busy := false
 }
 
 /**
@@ -554,14 +651,16 @@ _LayerEditor_OnMessage(Host, Payload, ApplyFn := ReloadPreservingSuspend) {
  * @param {string} SharedDir - The _shared folder.
  * @param {string} ConfigDir - The configuration folder.
  * @param {Func} ApplyFn - Applies the saved layer; returns false when refused.
+ * @param {Object|Integer} Opening - The retained GUI source, or zero for an explicit write.
+ * @param {WebViewHost|Integer} Host - The opening source's host, or zero for an explicit write.
  * @returns {Map} saved, path, errors and, once saved, applied.
  */
-LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn) {
+LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn, Opening := 0, Host := 0) {
 	global LAYER_EDITOR_WRITE_FAILED
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn)
+		try return LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn, Opening, Host)
 		finally Critical(InheritedCritical)
 	}
 	if A_IsSuspended
@@ -577,7 +676,7 @@ LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn) {
 		LoggerError("LayerEditor", "The navigation layer was not saved: {1}.", Err.Message)
 		return Map("saved", false, "errors", [_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, Err.Message)])
 	}
-	Result := LayerEditor_Save(Text, Ctx, ConfigDir)
+	Result := LayerEditor_Save(Text, Ctx, ConfigDir, Opening, Host)
 	if !Result["saved"] {
 		for Err in Result["errors"]
 			LoggerWarn("LayerEditor", "Refused: {1} ({2}.{3}.{4}) — {5}.", Err["code"], Err["layer"],
@@ -590,8 +689,12 @@ LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn) {
 	; its own log and leaves the saved file for the next start.
 	; The writer released its lease before Reload can acquire the terminal
 	; barrier. A pause during the completion log keeps the durable save but
-	; cannot authorize a fresh apply request. Never report that save as undone.
-	Result["applied"] := !A_IsSuspended && ApplyFn.Call() ? true : false
+	; cannot authorize a fresh apply request. The exact GUI source also remains
+	; necessary after a completion log retires its page or changes folders.
+	; Never report that durable save as undone.
+	Result["applied"] := !A_IsSuspended
+		&& (!(Opening is Object) || _LayerEditor_SavedSourceCurrent(Host, Opening, Result["path"], Text))
+		&& ApplyFn.Call() ? true : false
 	if !Result["applied"]
 		LoggerError("LayerEditor", "The saved navigation layer is not applied: the reload was refused.")
 	return Result
