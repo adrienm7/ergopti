@@ -203,6 +203,30 @@ end)
 -- ==========================================
 
 helpers.describe("log retention purge reports a refused folder and keeps logging", function()
+	helpers.it("linux-log-purge-stat-error: a native metadata exception cannot prevent sink installation", function()
+		local dir = os.tmpname()
+		os.remove(dir)
+		assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
+		local previous = package.loaded["infra.native_directory"]
+		local real = require("infra.native_directory")
+		package.loaded["infra.native_directory"] = {
+			entries = function() return { { name = "ErgoptiPlus_2000-01-01.log", kind = "file" } } end,
+			join = real.join,
+			stat = function() error("controlled metadata failure") end,
+		}
+		local Sink = helpers.load_module("infra.logger_sink")
+		package.loaded["infra.native_directory"] = previous
+		local logger, stderr, reported = fake_logger(), io.stderr, {}
+		io.stderr = { write = function(_, text) reported[#reported + 1] = text; return true end }
+		local ok, result = pcall(Sink.install, logger, { log_dir = dir, redaction_context = IDENTITY })
+		io.stderr = stderr
+		Sink.uninstall(logger)
+		helpers.load_module("infra.logger_sink")
+		assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+		helpers.assert_true(ok and result == true, "metadata failure must not prevent logging")
+		helpers.assert_eq(#reported, 1)
+		helpers.assert_true(reported[1]:find("retention purge could not inspect", 1, true) ~= nil)
+	end)
 	helpers.it("writes one redacted stderr line when the folder cannot be listed", function()
 		local dir = os.tmpname()
 		os.remove(dir)
