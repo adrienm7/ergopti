@@ -34,7 +34,7 @@ _UCNO_ChildSource(Fixture) {
 	for Symbol in ["WindowTitle", "UpdateChannelRegistryData"]
 		Source .= "#Include " . _UCNO_GeneratedOwner(Symbol) . "`n"
 	for Symbol in ["Gui_Create", "Gui_HarmoniseButtonWidths", "_Updater_NewRequestContext", "_Updater_ChannelLabel",
-		"_Updater_NormalizeTag", "_Updater_ParseVersion", "_Updater_ComparePreId", "_Updater_ComparePre", "_Updater_CompareVersions"] {
+		"_Updater_NormalizeTag", "_Updater_ParseVersion", "_Updater_CompareDecimal", "_Updater_ComparePreId", "_Updater_ComparePre", "_Updater_CompareVersions"] {
 		Body := _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "Every genuine reached function must be nonempty: " . Symbol)
 		Source .= Body . "`n"
