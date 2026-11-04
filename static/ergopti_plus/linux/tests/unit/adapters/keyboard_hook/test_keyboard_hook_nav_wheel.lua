@@ -154,6 +154,15 @@ end
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
+	helpers.it("treats a composite pointer's high keycode as a key, not a click (mouse-high-key)", function()
+		local clicks = 0
+		local emitted = drive("mouse", HOLD, {
+			{ EV_KEY, 0x160, 1, 3000 }, { EV_KEY, 0x160, 0, 4000 }, -- KEY_OK
+		}, nil, nil, nil, nil, function() clicks = clicks + 1 end)
+		helpers.assert_eq(clicks, 0, "KEY_OK must not reset click-dependent state")
+		helpers.assert_true(has(emitted, "key:352:1") and has(emitted, "key:352:0"))
+		helpers.assert_true(not has(emitted, "key:14:1"), "the key cancels the layer key's tap")
+	end)
 	helpers.it("preserves a mouse's keyboard-class keys while its wheel is grabbed (mouse-extra-key)", function()
 		local emitted, grabs, _, running = drive("mouse", HOLD, {
 			{ EV_KEY, KEY_K, 1, 3000 }, { EV_KEY, KEY_K, 2, 3500 }, { EV_KEY, KEY_K, 0, 10000 },
