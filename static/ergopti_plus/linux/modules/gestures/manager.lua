@@ -1555,11 +1555,21 @@ function M.stop_programs()
 end
 
 function M.when_programs_settled(callback)
-	if _program_owner == nil then
-		if type(callback) ~= "function" then return false end
-		pcall(callback); return true
+	if type(callback) ~= "function" then return false end
+	local commands_done, programs_done, delivered = false, _program_owner == nil, false
+	local function notify()
+		if commands_done and programs_done and not delivered then
+			delivered = true
+			local ok = pcall(callback)
+			if not ok then Logger.error(LOG, "Program settlement listener failed.") end
+		end
 	end
-	return _program_owner.when_settled(callback)
+	if UserActions.when_settled(function() commands_done = true; notify() end) ~= true then return false end
+	if _program_owner ~= nil then
+		if _program_owner.when_settled(function() programs_done = true; notify() end) ~= true then return false end
+	end
+	notify()
+	return true
 end
 
 --- Captures canonical action ownership and the current physical input generation.

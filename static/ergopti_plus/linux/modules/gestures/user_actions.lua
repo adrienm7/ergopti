@@ -71,7 +71,18 @@ M.TERMINAL_SCRIPT = '/bin/sh -c "$1"; exec "${SHELL:-/bin/sh}"'
 -- The commands in flight and whether new ones are admitted. Declared above
 -- every reader.
 local _handles = {}
+local _settled_waiters = {}
 local _paused = false
+
+local function publish_settled()
+	if next(_handles) ~= nil then return end
+	local listeners = _settled_waiters
+	_settled_waiters = {}
+	for _, listener in ipairs(listeners) do
+		local ok = pcall(listener)
+		if not ok then Logger.error(LOG, "User command settlement listener failed.") end
+	end
+end
 
 --- Shows a failure notice; a notice that cannot be shown is logged.
 --- @param key string Locale key.
@@ -259,6 +270,7 @@ function M.run_command(fields, max_typed)
 		{ timeout_ms = M.COMMAND_TIMEOUT_MS, max_output_bytes = M.MAX_OUTPUT_BYTES }, function(answer)
 			finished = true
 			_handles[token] = nil
+			publish_settled()
 			finish_hidden(answer, fields, max_typed)
 		end)
 	if not handle then
@@ -267,7 +279,12 @@ function M.run_command(fields, max_typed)
 		return false
 	end
 	-- A child that settled during admission has already reported itself
-	if not finished then _handles[token] = handle end
+	if not finished then
+		_handles[token] = handle
+		if type(handle.on_settled) == "function" then
+			pcall(handle.on_settled, function() _handles[token] = nil; publish_settled() end)
+		end
+	end
 	Logger.info(LOG, "Started the command of a run_command binding.")
 	return true
 end
@@ -286,11 +303,27 @@ end
 function M.stop()
 	local settled = true
 	for token, handle in pairs(_handles) do
-		_handles[token] = nil
 		local ok, cancelled = pcall(handle.cancel)
-		if not ok or cancelled == false then settled = false end
+		if ok and cancelled == true then
+			_handles[token] = nil
+		else
+			settled = false
+		end
 	end
-	return settled
+	publish_settled()
+	return settled and next(_handles) == nil
+end
+
+--- Notifies after every currently owned hidden command has settled.
+function M.when_settled(listener)
+	if type(listener) ~= "function" then return false end
+	if next(_handles) == nil then
+		local ok = pcall(listener)
+		if not ok then Logger.error(LOG, "User command settlement listener failed.") end
+	else
+		_settled_waiters[#_settled_waiters + 1] = listener
+	end
+	return true
 end
 
 --- Whether a hidden command is in flight.
