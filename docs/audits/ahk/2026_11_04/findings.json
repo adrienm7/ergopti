@@ -499,6 +499,17 @@
 			"root_cause": "KeyCombinationChordTick treats suspension as a reason to flush a waiting key, and KeyCombinationChordDrain sends its retained queue without pause admission. Neither batch retains lifecycle authority, so resume before delivery and reentrant successor callbacks also require fencing.",
 			"silent_failure": "The paused driver can inject a key it retained before pause. A retired callback can also act on a newly admitted waiting or queued batch after lifecycle teardown and resume.",
 			"regression_test": "Four chord-native-pause cases deliver real native poll/drain timers around Suspend; production chord policy and engine remain genuine while keyboard transport is observed through its existing recorder. Two positive controls prove actual replay; two paused cases must discard unsent work and keep it retired after resume. No balancing-Up change or physical keyboard proof is claimed. Native fail-before measured; The fix retains an exact batch owner from the existing synthetic lifecycle epoch, retires unsent state, checks callback identity and admits each short send atomically under Critical. Four additional regressions cover pause/resume before timer delivery and genuine held-state/logger callouts that admit a successor. Busy reads in roll admission also retire stale batches. Arbitrary actions remain outside Critical. Native post-fix qualification is pending."
+		},
+		{
+			"id": "AHK-046",
+			"title": "Clipboard native monotonic ages are truncated into DWORD aliases",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Native run41909512571 ata6373a4 passes the ordinary clock control but both one-era and two-era cases fail the full copy-age assertion, individually and reversed. Genuine accepted copy/paste producers own the timestamps; only the actual paste clock observation is bound to a later native64 value.",
+			"root_cause": "KL_Clip_OnPaste computes native A_TickCount differences with an explicit UInt32 mask for copy_lag_ms and retained paste_ticks. These origins are full-width monotonic ticks rather than clipboard sequence DWORDs. Retained old copy/burst state can therefore alias recent activity after 2^32 milliseconds.",
+			"silent_failure": "Long-lived retained clipboard metadata reports a short copy age and can turn ancient pastes into a fresh burst after roughly49.7 days or a multiple thereof.",
+			"regression_test": "Three clipboard-paste-native64 cases use actual accepted copy/paste producers, native privacy/context/queue owners and an isolated existing child. Only the unique current paste-clock read is bound; no timestamp state is assigned. Ordinary activity, one/two DWORD eras and subsequent fresh activity must preserve full lag and burst retirement. TickElapsed64 replaces the two masks without changing copy provenance. Native fail-before measured; post-fix pending. No49-day native uptime is claimed."
 		}
 	]
 }

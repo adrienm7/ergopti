@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **45 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **46 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -855,3 +855,17 @@ The ongoing register now contains **45 distinct new findings**. The requested ta
 ## AHK-045 correction under native qualification
 
 The chord batch now retains exact lifecycle authority through waiting, queued replay and yielded probes. Each directly owned short send is admitted atomically; old callbacks cannot clear a successor batch. Four additional owner cases cover resume before timer delivery and held-state/logger interruptions. The fixture refuses foreign live chords and restores exact inactive state; physical key-release behavior is unchanged and unqualified here. Native post-fix results are pending.
+
+## AHK-046: Clipboard native monotonic ages are truncated into DWORD aliases
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+KL_Clip_OnPaste computes native A_TickCount differences with an explicit UInt32 mask for copy_lag_ms and retained paste_ticks. These origins are full-width monotonic ticks rather than clipboard sequence DWORDs. Retained old copy/burst state can therefore alias recent activity after 2^32 milliseconds.
+
+Reproduction: Native run41909512571 ata6373a4 passes the ordinary clock control but both one-era and two-era cases fail the full copy-age assertion, individually and reversed. Genuine accepted copy/paste producers own the timestamps; only the actual paste clock observation is bound to a later native64 value.
+
+Consequence: Long-lived retained clipboard metadata reports a short copy age and can turn ancient pastes into a fresh burst after roughly49.7 days or a multiple thereof.
+
+Regression: Three clipboard-paste-native64 cases use actual accepted copy/paste producers, native privacy/context/queue owners and an isolated existing child. Only the unique current paste-clock read is bound; no timestamp state is assigned. Ordinary activity, one/two DWORD eras and subsequent fresh activity must preserve full lag and burst retirement. TickElapsed64 replaces the two masks without changing copy provenance. Native fail-before measured; post-fix pending. No49-day native uptime is claimed.
+
+The ongoing register now contains **46 distinct new findings**. The requested target of 1,000 remains unmet.

@@ -310,10 +310,10 @@ KL_Clip_OnPaste() {
 		return
 
 	Now := A_TickCount
-	CopyLag := (CopyTick > 0) ? ((Now - CopyTick) & 0xFFFFFFFF) : -1
+	CopyLag := (CopyTick > 0) ? TickElapsed64(CopyTick, Now) : -1
 	Fresh := []
 	for PasteTick in PreviousTicks {
-		if (((Now - PasteTick) & 0xFFFFFFFF) <= KLClipConst.PASTE_BURST_WINDOW_MS)
+		if (TickElapsed64(PasteTick, Now) <= KLClipConst.PASTE_BURST_WINDOW_MS)
 			Fresh.Push(PasteTick)
 	}
 	Fresh.Push(Now)
