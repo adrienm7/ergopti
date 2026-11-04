@@ -176,17 +176,22 @@ end
 --- @return table|nil values Empty for absent files, nil when one is unreadable.
 local function values_of(state, path)
 	local values = {}
-	local fh, err, code = io.open(path, "r")
+	local reader = require("infra.regular_file_reader")
+	local fh, err, code = reader.open_source(path)
 	if fh then
-		local raw = fh:read("*a")
-		fh:close()
+		local read, raw = pcall(fh.read, fh, "*a")
+		local closed, accepted = pcall(fh.close, fh)
+		if not read or type(raw) ~= "string" or not closed or accepted ~= true then
+			Logger.error(LOG, "The configuration in force could not be read and closed.")
+			return nil
+		end
 		local ok, parsed = pcall(TomlCodec.decode, raw)
 		if not ok or type(parsed) ~= "table" then
 			Logger.error(LOG, "The configuration in force could not be decoded.")
 			return nil
 		end
 		values = M.config_values(parsed)
-	elseif code ~= 2 then
+	elseif code ~= reader.ENOENT then
 		Logger.error(LOG, "The configuration in force could not be read: %s.", tostring(err))
 		return nil
 	end

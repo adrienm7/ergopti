@@ -29,6 +29,35 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("onboarding_bridge", function()
     local handler = helpers.load_module("ui.onboarding.bridge")
 
+		helpers.it("(onboarding-config-fifo) refuses a chosen FIFO without blocking", function()
+			if package.config:sub(1, 1) == "\\" then return end
+			local quote, root = require("text_utils").shell_quote, helpers.driver_root()
+			local dir = os.tmpname(); os.remove(dir)
+			local made = os.execute("mkdir " .. quote(dir) .. " && mkfifo " .. quote(dir .. "/config.toml"))
+			assert(made == true or made == 0)
+			local source = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/?/init.lua;"
+				.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;")
+				.. "..package.path; local b=require('ui.onboarding.bridge'); local r=b.on_message("
+				.. "{action='loadExistingConfig',request=1,config_dir=" .. string.format("%q", dir) .. "},"
+				.. "{config_paths={default_config_dir=function()return '/' end}}); assert(r.loaded==false)"
+			local status = os.execute("timeout 3 " .. quote(assert(require("luv").exepath())) .. " -e " .. quote(source))
+			assert(os.remove(dir .. "/config.toml")); assert(os.remove(dir))
+			helpers.assert_true(status == true or status == 0, "a FIFO must be refused without waiting for a writer")
+		end)
+
+		helpers.it("(onboarding-config-fifo) refuses an unacknowledged configuration close", function()
+			local reader = require("infra.regular_file_reader")
+			local original = reader.open_source
+			reader.open_source = function() return { read = function() return "" end,
+				close = function() return nil, "close failed" end } end
+			local ok, result = pcall(handler.on_message,
+				{ action = "loadExistingConfig", request = 1, config_dir = "/tmp/fixture" },
+				{ config_paths = { default_config_dir = function() return "/" end } })
+			reader.open_source = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result.loaded, false)
+		end)
+
 		-- A folder name no test creates, so the pages start from neutral values
 		-- unless a case writes a configuration on purpose.
 		local function scratch_dir()
