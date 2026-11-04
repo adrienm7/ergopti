@@ -69,6 +69,17 @@ if [ -e "$BUILD_DIR" ] || [ -L "$BUILD_DIR" ]; then
   }
   IFS= read -r -d '' RESOLVED_BUILD < <(CDPATH= cd -Pe -- "$BUILD_DIR" && printf '%s\0' "$PWD")
   [ "$RESOLVED_BUILD" != / ] || { echo "[ERR] Refusing the filesystem root as build output." >&2; exit 1; }
+  if [ -e "$RESOLVED_BUILD/.git" ] || [ -L "$RESOLVED_BUILD/.git" ]; then
+    echo "[ERR] Refusing a Git checkout as build output: $BUILD_DIR" >&2; exit 1
+  fi
+  # A sibling checkout can be nested inside its own source tree too. Preserve
+  # native path bytes while removing Git's one output-record newline.
+  if IFS= read -r -d '' BUILD_GIT_ROOT < <(git -C "$RESOLVED_BUILD" rev-parse --show-toplevel 2>/dev/null && printf '\0'); then
+    BUILD_GIT_ROOT="${BUILD_GIT_ROOT%$'\n'}"
+    if [ "$BUILD_GIT_ROOT" != "$REPO_ROOT" ]; then
+      echo "[ERR] Linux build output belongs to another Git checkout: $BUILD_DIR" >&2; exit 1
+    fi
+  fi
   case "$REPO_ROOT/" in
     "$RESOLVED_BUILD/"*) echo "[ERR] Linux build output contains the source checkout: $BUILD_DIR" >&2; exit 1 ;;
   esac

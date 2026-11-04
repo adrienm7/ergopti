@@ -52,6 +52,28 @@ try {
 			assert.notEqual(result.status, 0, `${kind} must be refused`);
 			assert.equal(fs.readFileSync(sentinel, 'utf8'), 'keep\n', `${kind} must remain intact`);
 		}
+		for (const nested of [false, true]) {
+			const parent = path.join(scratch, `sibling-guard-${nested}`);
+			const checkout = path.join(parent, 'builder-checkout');
+			const sibling = path.join(parent, 'other-checkout');
+			const builder = path.join(checkout, 'tools/build/build-linux-driver.sh');
+			fs.mkdirSync(path.dirname(builder), { recursive: true });
+			fs.writeFileSync(builder, subject);
+			fs.mkdirSync(sibling);
+			const initialized = spawnSync('git', ['init', '--quiet', sibling], { encoding: 'utf8' });
+			assert.equal(initialized.status, 0, initialized.stderr);
+			const target = nested ? path.join(sibling, 'source') : sibling;
+			fs.mkdirSync(target, { recursive: true });
+			const sentinel = path.join(target, 'keep');
+			fs.writeFileSync(sentinel, 'other checkout\n');
+			const result = spawnSync('/bin/bash', [builder, '--skip-smoke'], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, ERGOPTI_LINUX_BUILD_DIR: target }
+			});
+			assert.notEqual(result.status, 0);
+			assert.equal(fs.readFileSync(sentinel, 'utf8'), 'other checkout\n');
+		}
 	}
 	git('init', '--quiet');
 	const names = ['space name.txt', 'caf\u00e9.txt', '-leading.txt'];
