@@ -328,6 +328,30 @@ os.remove(user_path)
 		os.remove(user_path)
 	end)
 
+	for _, fault in ipairs({ "refusal", "exception" }) do
+		helpers.it("keeps the enabled switch after a hook " .. fault .. " (enabled-apply-refusal)", function()
+			local Manager, hook, _, user_path = manager()
+			local original, install = hook.engine, hook.set_remapper
+			hook.set_remapper = function()
+				if fault == "exception" then error("controlled failure") end
+				return false
+			end
+			local called, result = pcall(Manager.set_enabled, false)
+			local enabled, installed = Manager.is_enabled(), hook.engine
+			hook.set_remapper = install
+			local retried = Manager.set_enabled(false)
+			local after = Manager.is_enabled()
+			Manager._reset_for_test()
+			os.remove(user_path)
+			helpers.assert_true(called)
+			helpers.assert_eq(result, false)
+			helpers.assert_true(enabled, "the refused switch must keep its previous value")
+			helpers.assert_true(installed == original)
+			helpers.assert_true(retried)
+			helpers.assert_eq(after, false)
+		end)
+	end
+
 	helpers.it("applies a changed file live on reload", function()
 		local Manager, hook, _, user_path = manager()
 		write(user_path, '[tap_hold.keys.caps_lock]\nenabled = false\n')

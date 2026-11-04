@@ -788,10 +788,19 @@ function M.set_enabled(enabled)
 		Logger.error(LOG, "Tap-hold state must be a boolean — nothing changed.")
 		return false
 	end
+	local previous = _enabled
 	_enabled = enabled
-	local installed = _apply()
+	local called, installed = pcall(_apply)
+	if not called or not installed then
+		if _enabled == enabled then _enabled = previous end
+		if not called then
+			_installed_engine = nil
+			Logger.error(LOG, "Tap-hold switch installation failed: %s.", tostring(installed))
+		end
+		return false
+	end
 	Logger.info(LOG, "Tap-holds switched %s.", enabled and "on" or "off")
-	return installed
+	return true
 end
 
 --- How long a modifier key pressed alone still taps, in milliseconds (0 = strict):
