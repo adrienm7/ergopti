@@ -530,9 +530,6 @@ KL_Mouse_FlushScroll(NowTick?, FilterFn?, RefreshFn?, PositionFn?, AppendFn?) {
 				KLMouse.scroll_last := 0
 				return
 		}
-		if (KLMouse.scroll_ticks = 0 and KLMouse.scroll_h_ticks = 0)
-				return
-
 		; Claim before a yielding privacy query so subsequent input retains its
 		; own burst. Restore the caller's Critical state before any port call.
 		previous_critical := Critical("On")
@@ -547,6 +544,10 @@ KL_Mouse_FlushScroll(NowTick?, FilterFn?, RefreshFn?, PositionFn?, AppendFn?) {
 		} finally {
 				Critical(previous_critical)
 		}
+
+		; A zero-net burst still owns timestamps that must be retired.
+		if (ticks = 0 and h_ticks = 0)
+				return
 
 		filtered := _KL_Mouse_ShouldFilter(FilterFn?)
 		if filtered
