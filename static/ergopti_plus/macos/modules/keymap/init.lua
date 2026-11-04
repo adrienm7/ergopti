@@ -1952,11 +1952,24 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	CoreState.last_key_was_complex = is_complex
 
 	-- Populate module-level upvalues consumed by run_trigger_checks / mapping_fires.
-	-- Single-codepoint fast path: for ASCII and 2-byte latin, byte length IS
-	-- char length; the expensive pcall(utf8.len) is only needed for 3-4 byte chars.
+	-- One byte is one ASCII scalar, but a two-byte event may contain two
+	-- separate ASCII characters rather than one two-byte Unicode scalar.
 	local chars_bytes = #chars
-	_tc_chars        = chars
-	_tc_char_len     = (chars_bytes <= 2) and 1 or (text_utils.utf8_len(chars))
+	_tc_chars = chars
+	if chars_bytes == 1 then
+		_tc_char_len = 1
+	elseif chars_bytes == 2 then
+		local first, second = chars:byte(1, 2)
+		if first >= 0xC2 and first <= 0xDF and second >= 0x80 and second <= 0xBF then
+			_tc_char_len = 1
+		elseif first < 0x80 and second < 0x80 then
+			_tc_char_len = 2
+		else
+			_tc_char_len = text_utils.utf8_len(chars)
+		end
+	else
+		_tc_char_len = text_utils.utf8_len(chars)
+	end
 	_tc_dt           = dt
 	_tc_complex_mult = complex_mult
 	-- The same two values for the cascade's further steps (expander.lua).

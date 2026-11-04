@@ -31,8 +31,9 @@ import tarfile
 # The version of the owned runtime artifact. It names the upstream release the
 # fork re-anchors on (16.3.0) and the Ergopti revision of that fork; bump the
 # last number whenever the signed products or the artifact shape change (.2:
-# the artifact became the signed installer helper instead of Runtime/).
-RUNTIME_VERSION = "16.3.0-ergopti.2"
+# the artifact became the signed installer helper instead of Runtime/; .3: its
+# first install also starts the Core service and loads the VirtualHIDDevice job).
+RUNTIME_VERSION = "16.3.0-ergopti.3"
 FILE_PREFIX = "ErgoptiPlus-Remap-Runtime-"
 FILE_SUFFIX = ".tar.gz"
 RELEASE_TAG_PREFIX = "remap-runtime-v"

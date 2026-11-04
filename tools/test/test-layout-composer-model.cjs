@@ -778,6 +778,16 @@ for (const [id, reference] of Object.entries(REFERENCE)) {
 			refused = error.code;
 		}
 		check(refused === 'keylayout_malformed_tag', `a malformed key tag gave ${refused}`);
+
+		// A comment that never closes is refused instead of being read as tags.
+		const unclosed = quoted.keylayout.replace(/<keyboard\b/, '<!-- never closed\n<keyboard');
+		let unclosedCode = null;
+		try {
+			Composer.parseModel(unclosed);
+		} catch (error) {
+			unclosedCode = error.code;
+		}
+		check(unclosedCode === 'keylayout_malformed_tag', `an unclosed comment gave ${unclosedCode}`);
 	}
 }
 

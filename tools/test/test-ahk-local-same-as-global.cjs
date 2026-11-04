@@ -33,6 +33,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
 	BUILTINS,
+	mask,
 	analyse,
 	hitsAmong,
 	localSameAsGlobal
@@ -172,6 +173,21 @@ for (const name of [
 ])
 	check(BUILTINS.has(name), `the built-in set must name ${name}`);
 check(!BUILTINS.has('Promise'), 'the vendored Promise class is a script class, not a built-in');
+
+// A continuation-section opener is read word by word: a long line of option
+// words with a stray character at its end is code, and reading it stays fast
+// (one pattern for the whole line backtracked exponentially on this input).
+{
+	const opener = `(C${'\t`'.repeat(24)}x`;
+	const started = Date.now();
+	const masked = mask(`${opener}\nx := 1\n)\n`);
+	check(Date.now() - started < 2000, 'a long continuation opener is read in linear time');
+	check(masked.startsWith(opener), 'an opener with a stray word is code, not a section');
+	check(
+		mask('(Join`n LTrim0\nx := 1\n)\n') === `${' '.repeat(14)}\n      \n)\n`,
+		'a continuation section with options is masked to its closing parenthesis'
+	);
+}
 
 // ── 2. Production library ───────────────────────────────────────────────────
 

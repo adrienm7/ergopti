@@ -298,8 +298,19 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 		local restore_normal_window = force_normal_window()
 		local now = 100
 		hs_stub.timer.secondsSinceEpoch = function() return now end
+		hs_stub.timer.absoluteTime = function() return math.floor(now * 1e9) end
 
 		Keymap.add("slow" .. STAR, SLOW_REPLACEMENT, {
+			auto_expand = true,
+			is_case_sensitive = true,
+			is_case_sensitive_strict = true,
+		})
+		Keymap.add("é", "TWO_BYTE_SCALAR", {
+			auto_expand = true,
+			is_case_sensitive = true,
+			is_case_sensitive_strict = true,
+		})
+		Keymap.add("ab", "TWO_ASCII_AUTO", {
 			auto_expand = true,
 			is_case_sensitive = true,
 			is_case_sensitive_strict = true,
@@ -338,6 +349,13 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 		end
 
 		local ok, err = xpcall(function()
+			reset_context()
+			helpers.assert_eq(press("ab"), true, "two ASCII scalars in one event must match the final b bucket")
+			helpers.assert_eq(effects.emitted, { "TWO_ASCII_AUTO" })
+			reset_context()
+			helpers.assert_eq(press("é"), true, "one two-byte Unicode scalar remains one character")
+			helpers.assert_eq(effects.emitted, { "TWO_BYTE_SCALAR" })
+			reset_context()
 			for _, character in ipairs({ "s", "l", "o", "w" }) do press(character) end
 			drain_immediate_timers(hs_stub)
 			helpers.assert_true(type(effects.rows) == "table" and effects.rows[1].text == SLOW_REPLACEMENT,

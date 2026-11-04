@@ -23,7 +23,9 @@ runtime, never a Karabiner installed on the Mac.
   `remap_switch.lua`. Local proof: those modules, the macOS E2E and the menu gates pass; the AHK test of the
   Configuration order passes. Merge it only after WP8 and WP9.
 
-Next steps, in order: the rest of WP8 below (native install), WP9 on a real Mac, then merge the flip branch.
+Update 2026-11-04 evening: `next/owned-karabiner` is on `dev`, and WP8 landed on `dev` too (section « WP8 » below).
+No runtime release is published for `16.3.0-ergopti.3` (maintainer: no release or prerelease for now); the
+manifest still pins `.2`. Next: the signed developer app, WP9, then the flip.
 
 ### What this branch does
 
@@ -49,38 +51,36 @@ restores the recommended preset on a Mac without the runtime.
 Every change is macOS only: Karabiner exists only in the macOS driver. Windows is touched in one AHK test that lists
 the shared Configuration manifest rows (the two macOS rows left it).
 
-### Do not merge the flip before the native install exists
+### WP8: the native install (landed on `dev`, 2026-11-04)
 
-The pinned `16.3.0-ergopti.2` helper runs `OwnedRuntimeInstallerEntry.runFirstInstallation()`: it publishes
-`/Library/Application Support/ErgoptiPlus/Runtime` and nothing else. The source on this branch now also provisions
-and starts `com.ergoptiplus.runtime.core` (WP8 step 1, not in a published artifact yet). Nothing in the tree:
+| Commit                                                                                     | What                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `feat(build): load the VirtualHIDDevice daemon job from the owned runtime's first install` | After the idle Core starts, the helper installs pqrs' package from its sealed `VirtualHIDDriverPayload` when no pqrs daemon is installed (pkgutil chain: Developer ID Installer, team `G43BCU2T37`), then writes pqrs' daemon plist under `com.ergoptiplus.runtime.vhid` through the Core's plist custody (own ledger `.runtime-vhid-service-journal`) and bootstraps it. Result line: `files-published-services-observed-staging-retired`. |
+| `test(boot): count the owned runtime's two install deadlines in the AHK boot ceiling`      | The two new `[launcher]` timings raise the Windows boot's `toml.flat_values` (2181 and 1199).                                                                                                                                                                                                                                                                                                                                               |
+| `feat(macos): install Ergopti's own Karabiner runtime from the Tap-Holds menu`             | Launcher role `--request-owned-runtime-install` (`OwnedRuntimeInstallMainOperation.swift`, same staging shell as the daemon report), `platform/remap/runtime_install.lua` (one answer line, named reasons, then pqrs' manager `activate`), the row « Install Ergopti's remapping engine… » under the « not installed » block, its confirmation (`ui/owned_runtime_install.lua`). 21 locales.                                                |
+| `build(macos): name the next owned runtime artifact 16.3.0-ergopti.3`                      | `RUNTIME_VERSION`.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `ci(macos): accept the owned runtime's first install with sudo on hosted Macs`             | Remap runtime build job `install-acceptance` on `macos-15`, `macos-15-intel`, `macos-26` (`tools/build/owned_runtime_install_acceptance.sh`); input `install_acceptance_run` reruns it on an earlier artifact.                                                                                                                                                                                                                              |
+| `feat(field): report the whole owned runtime install in the Mac field run`                 | `field_owned_runtime` adds `vhid_job_file`, `vhid_job_loaded`, `artifact_receipt`, `install_launcher`; the stable self-signed identity reads `certificate`, no longer `adhoc`.                                                                                                                                                                                                                                                              |
 
-1. starts that helper with the administrator prompt for an install (the only launcher role that stages it,
-   `--request-virtual-hid-daemon-report`, is a read-only report);
-2. writes `com.ergoptiplus.runtime.vhid` (no source writes this LaunchDaemon; only the uninstaller removes it);
-3. installs the pqrs VirtualHIDDevice package on a Mac that has none (only the driver-only update of an
-   incompatible one exists, `runtime_vhid_update.lua`);
-4. reads the helper's `OWNED_RUNTIME_INSTALL|1|<result>` line (the live values are now
-   `files-published-idle-core-observed-staging-retired` and `files-published-service-cleanup-pending`).
+Decisions to know:
 
-`runtime_owner.lua` requires the files and both jobs, so with the flip a Mac without a hand-installed runtime stops at
-`runtime_not_installed` and its tap-holds stay off. The new Tap-Holds row and notice say so; they do not install it.
-Native work that remains (WP8), in this order:
+- An installed pqrs driver, compatible or not, is left alone by the helper: an incompatible one is the existing
+  `virtual_hid_incompatible` block and its driver-only update row. Activation is pqrs' manager `activate`, run as the
+  user after the helper exits; macOS then may wait for the approval (`virtual_hid_not_active`).
+- With a user Karabiner-Elements installed, its own pqrs daemon job
+  (`org.pqrs.service.daemon.Karabiner-VirtualHIDDevice-Daemon`) keeps running beside ours: both run the same pqrs
+  program. WP9 must show whether that is harmless (a field report lists both jobs).
 
-1. Done 2026-11-04: the idle Core service in the live helper (above). Left in the helper: the
-   `com.ergoptiplus.runtime.vhid` LaunchDaemon (the pqrs daemon plist is already a helper resource,
-   `VIRTUAL_HID_RESOURCE_NAMES`) and the pkg install when no driver is active; prove each roster change with
-   `owned_runtime_helper_compile_check.py` (dispatch "Remap runtime build" without the artifact input).
-2. A launcher role `--request-owned-runtime-install` modelled on `OwnedVirtualHIDDaemonReportMainOperation`: same
-   `OwnedRuntimeDownloadedHelper.current()` source, same staging program, last line
-   `… --owned-install-first` instead of the report worker; a Lua port that calls it after the user confirms, from the
-   `owned_not_installed` row.
-3. Bump `RUNTIME_VERSION` to `16.3.0-ergopti.3`, dispatch "Remap runtime build" on a branch, then publish and pin
-   that artifact as below. `16.3.0-ergopti.2`, published now, already lets the fetch, digest and receipt path run on
-   a real Mac.
-4. WP8 hosted acceptance on `macos-15`, `macos-15-intel`, `macos-26`: install with `sudo` (the hosted runner has
-   passwordless sudo; the AppleScript prompt does not exist there), boot the driver owned, `field_owned_runtime`,
-   `field_owned_start`, `field_owned_pause`, and the coexistence inputs `none`, `ke_idle`, `ke_running` of the plan.
+### Why the flip is not on `dev`
+
+The maintainer's developer app is signed ad hoc (field report `mac-2026-11-04_093844`: `signing_identity=adhoc`,
+`developer_adhoc_legacy_only`). The install role takes the helper only when it carries the launcher's own certificate
+leaf, and the installed-source capture (`OwnedRuntimeInstalledPeerOwner`) needs the same leaf, so an ad hoc developer
+app can neither install nor run the owned runtime: it answers `refused|launcher_unsigned`
+(`install_launcher=refused:adhoc` in the field run). With the flip, that Mac's tap-holds would be off with an install
+row that cannot succeed, so the flip stays on `next/owned-karabiner-flip` (rebased on this work). It lands once the
+developer app is signed with the stable certificate (`MACOS_SIGNING_CERTIFICATE_BASE64` and `_PASSWORD` set when
+`tools/dev/run-macos-dev-app.sh` builds, the identity of `tools/build/create_macos_signing_identity.sh`) and WP9 holds.
 
 ### Publishing the runtime artifact (done 2026-11-03)
 
@@ -120,36 +120,33 @@ branch for `.2`), and the downloaded-back asset must match the pin's digest and 
   wake, reload and crash returning the keyboard to native input, uninstall leaving no Ergopti job.
 - The heatmap counting physical keys from the stream (ADR 011 decisions 6 and 7).
 
-### WP9: the real-Mac acceptance
+### WP9: the real-Mac acceptance (maintainer checklist)
 
-The maintainer's Mac takes no copy-paste, so each pass is one command typed in the clone; the field-report collector
-runs every Debug field check in the developer app, then commits and pushes the evidence to a `field/mac-…` branch the
-agent reads (`docs/field-reports/`).
-
-Now (baseline, before the install exists), on the shared default:
+No copy-paste on the Mac: each pass is this one command, typed in the clone. The collector rebuilds and opens the
+developer app when needed, runs every Debug field check, then pushes the evidence to a `field/mac-…` branch.
 
 ```sh
-git switch next/owned-karabiner && bash tools/dev/collect-macos-field-report.sh
+git switch dev && git pull && bash tools/dev/collect-macos-field-report.sh
 ```
 
-It proves what `field_owned_runtime` reports on that Mac today: the owned runtime dormant, which stock Karabiner and
-VirtualHIDDevice are installed or running, and whether the owner would accept that driver.
+Pass 1, now (shared default, nothing to click): `field_owned_runtime` shows `artifact_receipt`, `job_loaded`,
+`vhid_job_loaded`, `driver_state` (the DriverKit approval) and `install_launcher`. With the ad hoc developer app it
+reads `refused:adhoc`: that is the blocker above, not a failure.
 
-After WP8 (install role, `16.3.0-ergopti.3` pinned), the same command on `next/owned-karabiner-flip`
-(`git switch next/owned-karabiner-flip && bash tools/dev/collect-macos-field-report.sh`), with the checklist:
+Once the developer app is signed with the stable certificate and the flip is on `dev`, the same command, then:
 
-1. Tap-Holds shows « not installed »; its row installs with one administrator prompt; `field_owned_runtime` reads
-   the receipt of `16.3.0-ergopti.3` and both jobs loaded.
-2. The DriverKit approval in System Settings (once), Input Monitoring and Accessibility for the owned Console, the
-   Login Items entries.
-3. `field_owned_start` passes; a running Karabiner-Elements is closed with the notice, and reopens on pause and on
-   quit; `field_owned_pause` passes; the next run's `field_owned_start` proves close-on-resume.
-4. Typing (the maintainer, by hand): tap-holds, chords and the navigation layer on the internal keyboard with
-   fn/globe, autorepeat, sleep and wake; a reload and a crash return the keyboard to native input.
-5. A shared-mode `karabiner.json` loses exactly Ergopti's rules; personal rules stay byte-identical.
-6. Uninstall leaves no Ergopti job.
+1. Tap-Holds shows « not installed » and « Install Ergopti's remapping engine… ». Click it, confirm, type the
+   administrator password once. Ergopti restarts.
+2. If macOS asks, allow the driver in System Settings > General > Login Items & Extensions, and Input Monitoring for
+   the owned Console.
+3. Run the command again: `field_owned_runtime` reads `artifact_receipt=fetched:16.3.0-ergopti.3`, both jobs
+   `loaded`, `driver_state=activated_enabled`; `field_owned_start` and `field_owned_pause` pass (a running
+   Karabiner-Elements is closed with the notice and reopens on pause).
+4. By hand: tap-holds, chords and the navigation layer on the internal keyboard with fn/globe, autorepeat, sleep and
+   wake; a reload returns the keyboard to native input.
 
-When the six hold, merge `next/owned-karabiner-flip` (rebase, fast-forward) and start the shared-mode deletion.
+When these hold, start the shared-mode deletion (the `karabiner.json` migration and uninstall checks of the list
+above ride on the same passes).
 
 ### Proof
 

@@ -701,10 +701,13 @@ for (const host of ['windows', 'macos', 'linux']) {
 				publishLoadedAppsData(page, host, manifest);
 				if (vector.lastDayHours !== undefined) {
 					const [previous, latest] = vector.dates.slice(-2);
-					const actualHours = vm.runInContext(
-						`(() => { const localMidnight = key => { const [y,m,d] = key.split('-').map(Number); return new Date(y,m-1,d).getTime(); }; return (localMidnight(${JSON.stringify(latest)}) - localMidnight(${JSON.stringify(previous)})) / 3600000; })()`,
+					// The function is compiled in the page context, so it reads that
+					// context's Date; the day keys are arguments, not source text.
+					const localMidnight = vm.runInContext(
+						"(key) => { const [y,m,d] = key.split('-').map(Number); return new Date(y,m-1,d).getTime(); }",
 						page.context
 					);
+					const actualHours = (localMidnight(latest) - localMidnight(previous)) / 3600000;
 					assert.equal(
 						actualHours,
 						vector.lastDayHours,

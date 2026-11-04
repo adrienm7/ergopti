@@ -10,11 +10,35 @@ enum OwnedRuntimeCoreLaunchctl {
 	struct Observation { let status: Int32, bytes: Data }
 	private struct ChildObservation { let status: Int32, bytes: Data, timedOut: Bool }
 	static func run(arguments: [String]) throws -> Observation {
-		guard arguments == ["print", "system/\(Identifiers.ServiceLabels.macosCore)"]
-			|| arguments == ["bootout", "system/\(Identifiers.ServiceLabels.macosCore)"]
-			|| arguments == ["bootstrap", "system", "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"]
-			|| arguments == ["kickstart", "system/\(Identifiers.ServiceLabels.macosCore)"] else { throw OwnedRuntimeInstallFailure.source }
+		let core = Identifiers.ServiceLabels.macosCore, virtualHID = Identifiers.ServiceLabels.macosVirtualHid
+		guard arguments == ["print", "system/\(core)"]
+			|| arguments == ["bootout", "system/\(core)"]
+			|| arguments == ["bootstrap", "system", "/Library/LaunchDaemons/\(core).plist"]
+			|| arguments == ["kickstart", "system/\(core)"]
+			|| arguments == ["print", "system/\(virtualHID)"]
+			|| arguments == ["bootstrap", "system", "/Library/LaunchDaemons/\(virtualHID).plist"] else { throw OwnedRuntimeInstallFailure.source }
 		let result = try child(path: "/bin/launchctl", arguments: arguments, timeout: 3)
+		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		return Observation(status: result.status, bytes: result.bytes)
+	}
+	/// pqrs' VirtualHIDDevice package is checked and installed only from this helper's own sealed payload.
+	private static func payloadPackage(_ package: URL) throws -> String {
+		guard let resources = Bundle.main.resourceURL?.standardizedFileURL,
+			package.standardizedFileURL.deletingLastPathComponent().path == resources.appendingPathComponent(OwnedRuntimeVirtualHIDProvisionOwner.payloadDirectory, isDirectory: true).path,
+			package.pathExtension == "pkg" else { throw OwnedRuntimeInstallFailure.source }
+		return package.standardizedFileURL.path
+	}
+	/// `pkgutil --check-signature` of the payload package; the caller judges the printed chain.
+	static func packageSignature(_ package: URL) throws -> Observation {
+		let result = try child(path: "/usr/sbin/pkgutil", arguments: ["--check-signature", try payloadPackage(package)],
+			timeout: LauncherTimings.ownedRuntimeVhidSignatureCheck.seconds)
+		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		return Observation(status: result.status, bytes: result.bytes)
+	}
+	/// `installer -pkg` of the payload package onto the boot volume.
+	static func installPackage(_ package: URL) throws -> Observation {
+		let result = try child(path: "/usr/sbin/installer", arguments: ["-pkg", try payloadPackage(package), "-target", "/"],
+			timeout: LauncherTimings.ownedRuntimeVhidPackageInstall.seconds)
 		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		return Observation(status: result.status, bytes: result.bytes)
 	}

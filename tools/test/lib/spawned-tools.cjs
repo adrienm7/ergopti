@@ -322,6 +322,41 @@ function programsOf(relative) {
 	return programs;
 }
 
+// One token of a name-table row, read in place: a quoted name, a flag, a comma
+// or the closing parenthesis, each after optional whitespace.
+const NAME_TABLE_TOKEN = /\s*(?:("[^"]*")|(true|false)|(,)|(\)))/iy;
+
+/**
+ * Tells whether a line is only a row of a name table: quoted names, each
+ * optionally followed by a comma and by one true or false flag with its own
+ * optional comma, then an optional ")" that ends the line. A token-by-token
+ * reading keeps a long row linear, where one pattern for the whole row
+ * backtracks exponentially over its optional separators.
+ * @param {string} line Source line, comment removed.
+ * @returns {boolean}
+ */
+function isNameTableRow(line) {
+	// States: start, name, nameComma, flag, flagComma, closed.
+	let state = 'start';
+	let position = 0;
+	while (position < line.length) {
+		NAME_TABLE_TOKEN.lastIndex = position;
+		const token = NAME_TABLE_TOKEN.exec(line);
+		if (!token) break;
+		if (state === 'closed') return false;
+		if (token[1] !== undefined) state = 'name';
+		else if (token[2] !== undefined && (state === 'name' || state === 'nameComma')) state = 'flag';
+		else if (token[3] !== undefined && state === 'name') state = 'nameComma';
+		else if (token[3] !== undefined && state === 'flag') state = 'flagComma';
+		else if (token[4] !== undefined && state !== 'start') state = 'closed';
+		else return false;
+		position = NAME_TABLE_TOKEN.lastIndex;
+	}
+	if (state === 'start') return false;
+	const rest = line.slice(position);
+	return state === 'closed' ? rest === '' : /^\s*$/.test(rest);
+}
+
 /**
  * Derives the programs one Windows source line starts. A row of a name table
  * (a per-app category, a password manager, a terminal) only compares window
@@ -330,7 +365,7 @@ function programsOf(relative) {
  * @returns {string[]}
  */
 function windowsLinePrograms(line) {
-	if (/^\s*(?:"[^"]*"\s*,?\s*(?:(?:true|false)\s*,?\s*)?)+\)?$/i.test(line)) return [];
+	if (isNameTableRow(line)) return [];
 	const programs = [];
 	const code = line.replace(/ahk_exe\s+[^"']*/gi, ' ').replace(/==\s*"[^"]*"/g, ' ');
 	for (const match of code.matchAll(/(?:^|[\s"'\\/(])([A-Za-z][A-Za-z0-9_-]*)\.exe\b/gi))

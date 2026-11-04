@@ -10,6 +10,7 @@ const path = require('node:path');
 const { validateFeatureJournals } = require('./lib/js-feature-results.cjs');
 const { collectJournals } = require('../ci/validate-js-feature-results.cjs');
 const { createMatrix, displayPlan, selectLot } = require('../ci/js-feature-matrix.cjs');
+const { prependObjectMember } = require('./lib/json-text-mutations.cjs');
 
 const context = { source: 'a'.repeat(40), run_id: '123', run_attempt: '2', platform: 'linux' };
 const inventory = {
@@ -222,7 +223,13 @@ for (const ref of ['refs/heads/main', 'refs/heads/dev', 'refs/pull/42/merge']) {
 		);
 	}
 	assert.throws(
-		() => selectLot(inventory, ref, displayed.matrix.lot[0], encoded.replace('{', '{"Menus":{},')),
+		() =>
+			selectLot(
+				inventory,
+				ref,
+				displayed.matrix.lot[0],
+				prependObjectMember(encoded, '"Menus":{}')
+			),
 		/complete authored inventory/
 	);
 }

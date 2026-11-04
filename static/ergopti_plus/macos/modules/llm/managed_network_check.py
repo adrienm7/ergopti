@@ -370,6 +370,17 @@ def ranged_blob_verdict(bootstrap, url, planned):
             status = response.status
             location = header(response, "location")
             content_range = header(response, "content-range")
+            if status == 206 and blob_range_verdict(status, content_range) == ("pass", "honoured"):
+                received = 0
+                while True:
+                    chunk = response.read(3 - received)
+                    if not chunk:
+                        break
+                    received += len(chunk)
+                    if received > 2:
+                        return "fail", "wrong_length"
+                if received != 2:
+                    return "fail", "wrong_length"
         if status not in REDIRECT_STATUSES:
             return blob_range_verdict(status, content_range)
         target = urllib.parse.urljoin(url, location) if location else None

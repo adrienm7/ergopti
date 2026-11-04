@@ -11,7 +11,7 @@ from pathlib import Path
 import stat
 import sys
 
-BUILD_SHA = "927fd1aa377381bc3bc9c13b0dd9e8c3f50b560bf3a6cff0f90306315ef33a01"
+BUILD_SHA = "38d274968afb90beac083dce21386bb3666dbd27e150550dc50c8a6f68e0381b"
 FACTORY_SHA = "9caa7c6b7a89fd1420452b59c4c5697a7a2aaaa9293498652f6b8a6628094c9d"
 _BUILD = None
 _BUILD_INPUT = None

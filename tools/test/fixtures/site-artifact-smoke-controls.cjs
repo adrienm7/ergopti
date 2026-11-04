@@ -634,19 +634,18 @@ async function run() {
 					'/* Inert smoke fixture; live analytics are unqualified. */'
 				]
 			];
+			const { startTags } = require('../lib/html-scan.cjs');
 			const authored = [];
-			for (const match of html
-				.replace(/<!--[\s\S]*?-->/g, '')
-				.matchAll(/<(link|script)\b[^>]*>/g)) {
+			for (const element of startTags(html, ['link', 'script'])) {
 				const attribute = (name) => {
 					const values = [
-						...match[0].matchAll(new RegExp('\\b' + name + '\\s*=\\s*(["\'])(.*?)\\1', 'g'))
+						...element.tag.matchAll(new RegExp('\\b' + name + '\\s*=\\s*(["\'])(.*?)\\1', 'g'))
 					];
 					assert.ok(values.length <= 1, 'authored resource attribute must be unique');
 					return values[0]?.[2];
 				};
 				const url =
-					match[1] === 'script'
+					element.name === 'script'
 						? attribute('src')
 						: attribute('rel') === 'stylesheet'
 							? attribute('href')

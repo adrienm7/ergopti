@@ -42,6 +42,8 @@ enum LauncherTimings {
 	static let ownedRuntimeChildReapPoll = RegistryDuration(section: "launcher", key: "owned_runtime_child_reap_poll_ms", milliseconds: 10)
 	static let ownedRuntimeCoreServicePoll = RegistryDuration(section: "launcher", key: "owned_runtime_core_service_poll_ms", milliseconds: 10)
 	static let ownedRuntimeConsolePoll = RegistryDuration(section: "launcher", key: "owned_runtime_console_poll_ms", milliseconds: 25)
+	static let ownedRuntimeVhidSignatureCheck = RegistryDuration(section: "launcher", key: "owned_runtime_vhid_signature_check_ms", milliseconds: 30000)
+	static let ownedRuntimeVhidPackageInstall = RegistryDuration(section: "launcher", key: "owned_runtime_vhid_package_install_ms", milliseconds: 300000)
 	static let vhidReportQueryPoll = RegistryDuration(section: "launcher", key: "vhid_report_query_poll_ms", milliseconds: 10)
 	static let vhidReportMainPoll = RegistryDuration(section: "launcher", key: "vhid_report_main_poll_ms", milliseconds: 20)
 	static let vhidReportRequestPoll = RegistryDuration(section: "launcher", key: "vhid_report_request_poll_ms", milliseconds: 20)

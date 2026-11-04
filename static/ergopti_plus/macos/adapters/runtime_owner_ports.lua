@@ -27,6 +27,9 @@
 --- 7. Driver-Only Update On Request: the pinned VirtualHIDDevice replaces an
 ---    incompatible one only through platform/remap/runtime_vhid_update.lua,
 ---    which the Tap-Holds row starts after the user's confirmation.
+--- 8. First Install On Request: the runtime is installed only through
+---    platform/remap/runtime_install.lua, which the « not installed » row
+---    starts after the user's confirmation.
 --- ==============================================================================
 
 local M = {}
@@ -77,6 +80,21 @@ function M.virtual_hid_version()
 	return require("platform.remap.runtime_manifest").virtual_hid_version(manifest)
 end
 
+--- Whether the pinned artifact was downloaded and verified: its receipt names
+--- the pinned digest (the same test as OwnedRuntimeDownloadedHelper.swift).
+--- @return string state `fetched:<version>`, `absent`, `mismatch` or `unpinned`.
+function M.artifact_receipt_state()
+	local manifest = load_manifest()
+	local runtime = manifest and manifest.runtime
+	if type(runtime) ~= "table" or type(runtime.version) ~= "string" or type(runtime.sha256) ~= "string" then
+		return "unpinned"
+	end
+	local receipt = FileSystem.expand_path(require("platform.remap.ke_paths").OWNED.ARTIFACT_HOME
+		.. "/" .. runtime.version .. "/receipt")
+	if FileSystem.exists(receipt) ~= true then return "absent" end
+	return FileSystem.read(receipt) == runtime.sha256 .. "\n" and ("fetched:" .. runtime.version) or "mismatch"
+end
+
 local fetcher
 
 --- Downloads and verifies the pinned artifact the first time, then reuses it.
@@ -113,6 +131,20 @@ function M.update_virtual_hid(callback)
 		expand = FileSystem.expand_path,
 	})
 	vhid_updater.update(manifest.virtual_hid_device, callback)
+end
+
+local runtime_installer
+
+--- Installs the owned runtime through the signed launcher's install role, once
+--- the user confirmed it (platform/remap/runtime_install.lua).
+--- @param callback function fn(ok, reason|nil, detail|nil).
+function M.install_runtime(callback)
+	runtime_installer = runtime_installer or require("platform.remap.runtime_install").new({
+		launcher = function() return require("platform.remap.lease_helper").resolve() end,
+		exec = FieldCheckPorts.exec,
+		exists = FileSystem.exists,
+	})
+	runtime_installer.install(callback)
 end
 
 --- The persisted record that Ergopti closed the user's own Karabiner.

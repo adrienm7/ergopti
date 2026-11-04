@@ -5,9 +5,15 @@ import Darwin
 import Foundation
 
 final class OwnedRuntimeCorePlistCustody {
-	private static let name = "\(Identifiers.ServiceLabels.macosCore).plist"
-	private static let ledgerName = ".runtime-service-journal"
-	private static let pending = Data("CORE_PLIST|1|pending\n".utf8)
+	/// One owned LaunchDaemon: its plist name, its durable ledger and the ledger's record tag.
+	struct Job {
+		let name: String, ledgerName: String, tag: String
+		var pending: Data { Data((tag + "|1|pending\n").utf8) }
+		static let core = Job(name: "\(Identifiers.ServiceLabels.macosCore).plist", ledgerName: ".runtime-service-journal", tag: "CORE_PLIST")
+		/// The VirtualHIDDevice daemon job keeps its own ledger, so a Core debt never names its plist.
+		static let virtualHID = Job(name: "\(Identifiers.ServiceLabels.macosVirtualHid).plist", ledgerName: ".runtime-vhid-service-journal", tag: "VHID_PLIST")
+	}
+	private let job: Job
 	private let plistParent: OwnedRuntimeInstallTree, ledgerParent: OwnedRuntimeInstallTree
 	private let plistDirectory: Int32, ledgerDirectory: Int32, ledger: Int32
 	private let protected: Bool, bytes: Data, admission: () throws -> Void
@@ -19,8 +25,8 @@ final class OwnedRuntimeCorePlistCustody {
 	private static let initializerObservationKey = "com.ergoptiplus.tests.core-plist-custody-initializer-retirement"
 	private var initializerRetirementObservation: InitializerRetirementObservation?
 	#endif
-	private init(plistParentURL: URL, ledgerParentURL: URL, bytes: Data, protected: Bool, admission: @escaping () throws -> Void) throws {
-		self.protected = protected; self.bytes = bytes; self.admission = admission
+	private init(job: Job = .core, plistParentURL: URL, ledgerParentURL: URL, bytes: Data, protected: Bool, admission: @escaping () throws -> Void) throws {
+		self.job = job; self.protected = protected; self.bytes = bytes; self.admission = admission
 		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
 		initializerRetirementObservation = Thread.current.threadDictionary[Self.initializerObservationKey] as? InitializerRetirementObservation
 		#endif
@@ -34,34 +40,34 @@ final class OwnedRuntimeCorePlistCustody {
 		try admission(); try plistParent.verifyAnchor(); try ledgerParent.verifyAnchor()
 		// Refuse a foreign destination before creating a new transaction; existing debt still requires exact native recovery.
 		var priorLedger = stat(); errno = 0
-		let ledgerAbsent = fstatat(ledgerDirectory, Self.ledgerName, &priorLedger, AT_SYMLINK_NOFOLLOW) == -1
+		let ledgerAbsent = fstatat(ledgerDirectory, job.ledgerName, &priorLedger, AT_SYMLINK_NOFOLLOW) == -1
 		if ledgerAbsent {
 			guard errno == ENOENT else { throw OwnedRuntimeInstallFailure.cleanupPending }
 			var priorPlist = stat(); errno = 0
-			guard fstatat(plistDirectory, Self.name, &priorPlist, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else {
+			guard fstatat(plistDirectory, job.name, &priorPlist, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else {
 				throw OwnedRuntimeInstallFailure.destination
 			}
 		}
-		ledger = openat(ledgerDirectory, Self.ledgerName, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+		ledger = openat(ledgerDirectory, job.ledgerName, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
 		let created = ledger >= 0
 		if !created {
 			guard errno == EEXIST else { throw OwnedRuntimeInstallFailure.cleanupPending }
-			ledger = openat(ledgerDirectory, Self.ledgerName, O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
+			ledger = openat(ledgerDirectory, job.ledgerName, O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
 		}
 		guard ledger >= 0, flock(ledger, LOCK_EX | LOCK_NB) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		var identity = stat(); guard fstat(ledger, &identity) == 0 else { throw OwnedRuntimeInstallFailure.source }
 		self.ledger = ledger; ledgerIdentity = identity
 		completed = true // All stored properties are initialized; subsequent ledger/file debt belongs to deinit.
 		if created {
-			try writeLedger(Self.pending)
+			try writeLedger(job.pending)
 			guard fsync(ledgerDirectory) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		} else {
 			try protection(ledger, identity, mode: 0o600)
 			guard identity.st_size > 0, identity.st_size <= 256 else { throw OwnedRuntimeInstallFailure.cleanupPending }
 			ledgerBytes = try read(ledger, count: Int(identity.st_size))
-			if ledgerBytes != Self.pending {
-				guard let parsed = Self.parse(ledgerBytes, bytes: bytes) else { throw OwnedRuntimeInstallFailure.cleanupPending }
-				openedFile = openat(plistDirectory, Self.name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
+			if ledgerBytes != job.pending {
+				guard let parsed = Self.parse(ledgerBytes, bytes: bytes, tag: job.tag) else { throw OwnedRuntimeInstallFailure.cleanupPending }
+				openedFile = openat(plistDirectory, job.name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
 				file = openedFile
 				guard file >= 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
 				var value = stat(); guard fstat(file, &value) == 0, UInt64(bitPattern: Int64(value.st_dev)) == parsed.0, UInt64(value.st_ino) == parsed.1 else {
@@ -79,10 +85,10 @@ final class OwnedRuntimeCorePlistCustody {
 		#endif
 	}
 	private static func digest(_ bytes: Data) -> String { SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined() }
-	private static func parse(_ data: Data, bytes: Data) -> (UInt64, UInt64)? {
+	private static func parse(_ data: Data, bytes: Data, tag: String) -> (UInt64, UInt64)? {
 		guard let text = String(data: data, encoding: .utf8), text.hasSuffix("\n"), !text.contains("\0") else { return nil }
 		let parts = text.dropLast().split(separator: "|", omittingEmptySubsequences: false)
-		guard parts.count == 6, parts[0] == "CORE_PLIST", parts[1] == "1", parts[2] == "owned",
+		guard parts.count == 6, parts[0] == Substring(tag), parts[1] == "1", parts[2] == "owned",
 			parts[3].utf8.allSatisfy({ (48...57).contains($0) }), parts[4].utf8.allSatisfy({ (48...57).contains($0) }),
 			let device = UInt64(parts[3]), let inode = UInt64(parts[4]), inode > 0,
 			String(device) == parts[3], String(inode) == parts[4], parts[5] == Substring(digest(bytes)) else { return nil }
@@ -116,7 +122,7 @@ final class OwnedRuntimeCorePlistCustody {
 		guard !closed, !removed else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		try admission(); try ledgerParent.verifyAnchor(); try plistParent.verifyAnchor()
 		var held = stat(), named = stat()
-		guard fstat(ledger, &held) == 0, fstatat(ledgerDirectory, Self.ledgerName, &named, AT_SYMLINK_NOFOLLOW) == 0,
+		guard fstat(ledger, &held) == 0, fstatat(ledgerDirectory, job.ledgerName, &named, AT_SYMLINK_NOFOLLOW) == 0,
 			held.st_dev == ledgerIdentity.st_dev, held.st_ino == ledgerIdentity.st_ino,
 			named.st_dev == held.st_dev, named.st_ino == held.st_ino, held.st_size == ledgerBytes.count,
 			try read(ledger, count: ledgerBytes.count) == ledgerBytes else { throw OwnedRuntimeInstallFailure.cleanupPending }
@@ -126,7 +132,7 @@ final class OwnedRuntimeCorePlistCustody {
 		try verifyLedger()
 		guard let identity = fileIdentity, file >= 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		var held = stat(), named = stat()
-		guard fstat(file, &held) == 0, fstatat(plistDirectory, Self.name, &named, AT_SYMLINK_NOFOLLOW) == 0,
+		guard fstat(file, &held) == 0, fstatat(plistDirectory, job.name, &named, AT_SYMLINK_NOFOLLOW) == 0,
 			held.st_dev == identity.st_dev, held.st_ino == identity.st_ino, named.st_dev == held.st_dev, named.st_ino == held.st_ino,
 			held.st_size == bytes.count, try read(file, count: bytes.count) == bytes else { throw OwnedRuntimeInstallFailure.mutated }
 		try protection(file, held, mode: 0o644)
@@ -135,14 +141,14 @@ final class OwnedRuntimeCorePlistCustody {
 		try verifyLedger()
 		if fileIdentity != nil { try verifyFile(); return }
 		var existing = stat(); errno = 0
-		guard fstatat(plistDirectory, Self.name, &existing, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else {
+		guard fstatat(plistDirectory, job.name, &existing, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else {
 			throw OwnedRuntimeInstallFailure.destination
 		}
-		file = openat(plistDirectory, Self.name, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+		file = openat(plistDirectory, job.name, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
 		guard file >= 0 else { throw OwnedRuntimeInstallFailure.copy }
 		var value = stat(); guard fstat(file, &value) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }; fileIdentity = value
 		// Durable inode admission precedes the first plist byte. A crash before this record conservatively keeps unknown debt.
-		try writeLedger(Data(("CORE_PLIST|1|owned|" + String(UInt64(bitPattern: Int64(value.st_dev))) + "|" + String(UInt64(value.st_ino)) + "|" + Self.digest(bytes) + "\n").utf8))
+		try writeLedger(Data((job.tag + "|1|owned|" + String(UInt64(bitPattern: Int64(value.st_dev))) + "|" + String(UInt64(value.st_ino)) + "|" + Self.digest(bytes) + "\n").utf8))
 		guard bytes.withUnsafeBytes({ pwrite(file, $0.baseAddress, $0.count, 0) }) == bytes.count,
 			fchmod(file, 0o644) == 0, fsync(file) == 0, fsync(plistDirectory) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		try verifyFile()
@@ -154,10 +160,10 @@ final class OwnedRuntimeCorePlistCustody {
 			try verifyLedger()
 			if fileIdentity != nil {
 				try verifyFile()
-				guard unlinkat(plistDirectory, Self.name, 0) == 0, fsync(plistDirectory) == 0 else { return false }
+				guard unlinkat(plistDirectory, job.name, 0) == 0, fsync(plistDirectory) == 0 else { return false }
 			} else {
 				var value = stat(); errno = 0
-				guard fstatat(plistDirectory, Self.name, &value, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else { return false }
+				guard fstatat(plistDirectory, job.name, &value, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else { return false }
 			}
 			return removeLedger()
 		} catch { return false }
@@ -167,10 +173,16 @@ final class OwnedRuntimeCorePlistCustody {
 		guard core.startedCoreObservation(forProvision: owner) else { return false }
 		do { try verifyFile(); return removeLedger() } catch { return false }
 	}
+	/// The VirtualHIDDevice daemon is pqrs' signed program, not an owned Core peer: its custody commits once
+	/// launchd answers for the exact label the caller bootstrapped from this exact plist.
+	func commitLoaded(_ loaded: OwnedRuntimeCoreLaunchctl.Observation) -> Bool {
+		guard job.name == Job.virtualHID.name, loaded.status == 0 else { return false }
+		do { try verifyFile(); return removeLedger() } catch { return false }
+	}
 	private func removeLedger() -> Bool {
 		do {
 			try verifyLedger()
-			guard unlinkat(ledgerDirectory, Self.ledgerName, 0) == 0 else { return false }
+			guard unlinkat(ledgerDirectory, job.ledgerName, 0) == 0 else { return false }
 			removed = true
 			guard fsync(ledgerDirectory) == 0 else { return false }
 			return closeOwnedDescriptors()
@@ -185,6 +197,14 @@ final class OwnedRuntimeCorePlistCustody {
 	static func createProduction(owner: OwnedRuntimeCoreProvisionOwner) throws -> OwnedRuntimeCorePlistCustody {
 		try OwnedRuntimeCorePlistCustody(plistParentURL: URL(fileURLWithPath: "/Library/LaunchDaemons"),
 			ledgerParentURL: URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus"), bytes: try owner.fixedPlistBytes(), protected: true, admission: { [weak owner] in
+				guard let owner else { throw OwnedRuntimeInstallFailure.principal }; try owner.verifyForPlistCustody()
+			})
+	}
+	/// The VirtualHIDDevice daemon job, admitted by the same Core provision custody that started the Core.
+	static func createProductionVirtualHID(owner: OwnedRuntimeCoreProvisionOwner, bytes: Data) throws -> OwnedRuntimeCorePlistCustody {
+		try owner.verifyForPlistCustody()
+		return try OwnedRuntimeCorePlistCustody(job: .virtualHID, plistParentURL: URL(fileURLWithPath: "/Library/LaunchDaemons"),
+			ledgerParentURL: URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus"), bytes: bytes, protected: true, admission: { [weak owner] in
 				guard let owner else { throw OwnedRuntimeInstallFailure.principal }; try owner.verifyForPlistCustody()
 			})
 	}

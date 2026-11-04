@@ -16,6 +16,7 @@ const { installHostCapabilities } = require('./host-capabilities.cjs');
 const { installThemeTokens } = require('./theme-tokens.cjs');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
+const { scriptElements } = require('../lib/html-scan.cjs');
 const root = path.resolve(__dirname, '../../../static/ergopti_plus/_shared/ui/metrics_typing');
 
 function frontend(host = 'macos') {
@@ -152,8 +153,8 @@ function bootstrapFrontend(host) {
 			return JSON.parse(raw);
 		}
 	});
-	const bootstrap = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
-		.map((match) => match[1])
+	const bootstrap = scriptElements(html)
+		.map((element) => element.body)
 		.find((source) => source.includes('let cached_historical'));
 	assert.ok(bootstrap);
 	vm.runInContext(bootstrap, f.context, { filename: 'typing-bootstrap.js' });

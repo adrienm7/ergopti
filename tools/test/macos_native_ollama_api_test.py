@@ -135,6 +135,31 @@ class WireReceiving(unittest.TestCase):
             self.discover()
         self.assertEqual(caught.exception.reason, "protocol")
 
+    def test_huge_timeouts_are_rejected_before_spawning(self):
+        for role in ("http", "ollama"):
+            for field in ("timeout", "idle_timeout"):
+                with self.subTest(role=role, field=field):
+                    options = {"timeout": 2, "idle_timeout": 1}
+                    options[field] = 10**1000
+                    with self.assertRaises(self.api.ENGINE.NativeHTTPError) as caught:
+                        if role == "http":
+                            self.api.ENGINE.NativeHTTPResponse(
+                                "https://example.test", (), **options
+                            )
+                        else:
+                            self.api.discover(
+                                "/private/verified/ollama", "123", "456", 11434, **options
+                            )
+                    self.assertEqual(caught.exception.reason, "protocol")
+                    self.assertEqual(self.children, [])
+        for field in ("timeout", "idle_timeout"):
+            options = {"timeout": 2, "idle_timeout": 1}
+            options[field] = 1e308
+            with self.assertRaises(self.api.ENGINE.NativeHTTPError) as caught:
+                self.api.discover("/private/verified/ollama", "123", "456", 11434, **options)
+            self.assertEqual(caught.exception.reason, "protocol")
+        self.assertEqual(self.children, [])
+
     def request(self):
         body = '{"model":"fixture"}'
         headers = [

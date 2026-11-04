@@ -15,6 +15,7 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from urllib.parse import urlsplit
 
 
 ROOT = Path(
@@ -686,6 +687,8 @@ class OllamaBlobHost(unittest.TestCase):
         manifest=None,
         blob=(307, None),
         ranged=(206, "bytes 1-2/9"),
+        range_payload=b"ab",
+        range_terminal_failure=False,
         get_redirects=None,
     ):
         """Runs main_blob over a stand-in transport; blob is (status, location).
@@ -699,11 +702,15 @@ class OllamaBlobHost(unittest.TestCase):
         ).encode()
 
         class Response:
-            def __init__(self, status, headers=(), payload=b""):
+            def __init__(self, status, headers=(), payload=b"", terminal_failure=False):
                 self.status, self.headers, self._payload = status, list(headers), payload
+                self.terminal_failure = terminal_failure
 
             def read(self, maximum=None):
-                chunk, self._payload = self._payload, b""
+                if not self._payload and self.terminal_failure:
+                    raise ValueError("terminal failed")
+                maximum = maximum or len(self._payload)
+                chunk, self._payload = self._payload[:maximum], self._payload[maximum:]
                 return chunk
 
             def __enter__(self):
@@ -727,7 +734,12 @@ class OllamaBlobHost(unittest.TestCase):
                     if get_redirects and url in get_redirects:
                         status, location = get_redirects[url]
                         return Response(status, [["Location", location]] if location else [])
-                    return Response(ranged[0], [["Content-Range", ranged[1]]] if ranged[1] else [])
+                    return Response(
+                        ranged[0],
+                        [["Content-Range", ranged[1]]] if ranged[1] else [],
+                        range_payload,
+                        range_terminal_failure,
+                    )
                 status, location = blob
                 return Response(status, [["Location", location]] if location else [])
 
@@ -787,6 +799,16 @@ class OllamaBlobHost(unittest.TestCase):
                 lines, _ = self.run_blob(blob=(200, None), ranged=(206, value))
                 self.assertIn("step blob_range pass honoured", lines)
 
+    def test_range_probe_requires_exactly_two_bytes_and_terminal(self):
+        for payload in (b"", b"a", b"abc"):
+            with self.subTest(payload=payload):
+                lines, _ = self.run_blob(blob=(200, None), range_payload=payload)
+                self.assertIn("step blob_range fail wrong_length", lines)
+        lines, _ = self.run_blob(blob=(200, None), range_payload=b"ab")
+        self.assertIn("step blob_range pass honoured", lines)
+        lines, _ = self.run_blob(blob=(200, None), range_terminal_failure=True)
+        self.assertIn("step blob_range fail unavailable", lines)
+
     def test_a_registry_that_serves_the_head_but_redirects_the_get_is_followed(self):
         # Field run 2026-11-03: blob_host registry_served, then blob_range fail
         # http_307, because the ranged GET did not follow the storage redirect.
@@ -838,7 +860,12 @@ class OllamaBlobHost(unittest.TestCase):
         self.assertIn("step blob_host pass registry_served", self.run_blob(blob=(200, None))[0])
 
     def test_the_inventory_plans_the_registry_and_its_blob_host(self):
-        self.assertTrue(self.registry.startswith("https://registry.ollama.ai"))
+        registry = urlsplit(self.registry)
+        self.assertEqual(
+            (registry.scheme, registry.hostname, registry.path),
+            ("https", "registry.ollama.ai", ""),
+            "the registry is the HTTPS origin of registry.ollama.ai",
+        )
         self.assertGreaterEqual(len(self.planned), 2)
 
 

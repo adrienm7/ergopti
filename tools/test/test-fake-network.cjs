@@ -214,8 +214,20 @@ function fetchThroughProxy(proxyPort, registry, target) {
 		socket.write('CONNECT registry.ollama.ai:443 HTTP/1.1\r\nHost: registry.ollama.ai:443\r\n\r\n');
 		socket.once('data', (head) => {
 			assert.match(String(head), / 200 /);
+			// The fake registry's own certificate is the only trust anchor, and the
+			// pin replaces the host-name check: its subject is not registry.ollama.ai.
+			const digestOf = (certificate) =>
+				crypto.createHash('sha256').update(certificate.raw).digest('hex');
 			const secure = tls.connect(
-				{ socket, rejectUnauthorized: false, servername: 'registry.ollama.ai' },
+				{
+					socket,
+					ca: registry.cert,
+					servername: 'registry.ollama.ai',
+					checkServerIdentity: (_, certificate) =>
+						digestOf(certificate) === registry.sha256
+							? undefined
+							: new Error('the registry certificate is not the pinned one')
+				},
 				() => {
 					const pin = crypto
 						.createHash('sha256')
@@ -331,6 +343,13 @@ async function testOllamaRegistry() {
 }
 
 async function testPac() {
+	// A route outside the PAC grammar never becomes script text.
+	for (const route of ['PROXY a"; b:1', 'DIRECT\\', '', 'PROXY host'])
+		assert.throws(() => pacScript(route), /is not a PAC route/, JSON.stringify(route));
+	assert.equal(
+		pacScript('PROXY 127.0.0.1:3128; DIRECT'),
+		'function FindProxyForURL(url, host) { return "PROXY 127.0.0.1:3128; DIRECT"; }\n'
+	);
 	const pac = await startFakePacServer({ script: pacScript('PROXY 127.0.0.1:3128') });
 	const read = (url) =>
 		new Promise((resolve, reject) => {
