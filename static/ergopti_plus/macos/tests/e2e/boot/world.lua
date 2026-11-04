@@ -567,7 +567,9 @@ local function owned_artifact_paths(args)
 	local paths = 0
 	for _, arg in ipairs(args) do
 		if tostring(arg):sub(1, 1) ~= "-" then
-			if not tostring(arg):find("/Library/Application Support/ErgoptiPlus/RemapRuntime/", 1, true) then
+			-- The owned folder's name comes from app_dirs (one Ergopti folder per OS).
+			local artifact_home = require("platform.remap.ke_paths").OWNED.ARTIFACT_HOME:gsub("^~", "")
+			if not tostring(arg):find(artifact_home .. "/", 1, true) then
 				return false
 			end
 			paths = paths + 1
