@@ -10,6 +10,7 @@ the field-run step or the hand action that proves it and the commits it confirms
 
 ## Cross-platform feature inventory
 
+- [ ] **Layers:** evaluate repeat-count support on macOS/Linux (`parameters.repeat_count` currently Windows-only), and mouse-button layer sources on Linux (`source_kinds.mouse_button` excludes Linux because the observed button cannot be suppressed). Fn remains a macOS-specific modifier; layer Spotlight is a macOS-specific action. Source: `_shared/keymap/layer_actions.toml`.
 - [ ] **Windows:** implement the physical shortcuts editor (`physical_shortcuts.windows_unavailable`) and validate token-by-token prediction display (`platform_reason.token_streaming_unvalidated_on_windows`).
 - [ ] **macOS:** review the tap-hold word-reset option and automatic model-to-prompt-profile switching (`hotstrings.tap_hold_resets_word`, `llm.profiles.auto_profile_for_model`). Provide shortcut-only restore/clear if feasible; the configuration menu currently restores Karabiner settings together with other settings.
 - [ ] **macOS and Linux:** evaluate direct streaming insertion of AI predictions; both currently show a bubble and insert on acceptance (`platform_reason.inline_autotype_is_windows`).

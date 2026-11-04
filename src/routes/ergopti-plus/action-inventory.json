@@ -2466,5 +2466,350 @@
 				"equivalents": ["doc_start", "doc_end"]
 			}
 		}
+	},
+	{
+		"path": "layers.actions.arrow_up",
+		"labels": { "fr": "↑ Flèche Haut", "en": "↑ Arrow Up" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.arrow_down",
+		"labels": { "fr": "↓ Flèche Bas", "en": "↓ Arrow Down" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.arrow_left",
+		"labels": { "fr": "← Flèche Gauche", "en": "← Arrow Left" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.arrow_right",
+		"labels": { "fr": "→ Flèche Droite", "en": "→ Arrow Right" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_up",
+		"labels": { "fr": "✎ ↑ Sélection Haut", "en": "✎ ↑ Select Up" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_down",
+		"labels": { "fr": "✎ ↓ Sélection Bas", "en": "✎ ↓ Select Down" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_left",
+		"labels": { "fr": "✎ ← Sélection Gauche", "en": "✎ ← Select Left" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_right",
+		"labels": { "fr": "✎ → Sélection Droite", "en": "✎ → Select Right" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.word_prev",
+		"labels": { "fr": "W ← Mot précédent", "en": "W ← Previous word" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.word_next",
+		"labels": { "fr": "W → Mot suivant", "en": "W → Next word" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_word_prev",
+		"labels": { "fr": "✎ W ← Sél. Mot préc.", "en": "✎ W ← Sel. prev. word" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_word_next",
+		"labels": { "fr": "✎ W → Sél. Mot suiv.", "en": "✎ W → Sel. next word" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.line_start",
+		"labels": { "fr": "⇤ Début de ligne", "en": "⇤ Line start" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.line_end",
+		"labels": { "fr": "⇥ Fin de ligne", "en": "⇥ Line end" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_line_start",
+		"labels": { "fr": "sel_line_start", "en": "sel_line_start" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_line_end",
+		"labels": { "fr": "sel_line_end", "en": "sel_line_end" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.para_prev",
+		"labels": { "fr": "¶ ↑ Paragraphe précédent", "en": "¶ ↑ Previous paragraph" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.para_next",
+		"labels": { "fr": "¶ ↓ Paragraphe suivant", "en": "¶ ↓ Next paragraph" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_para_prev",
+		"labels": { "fr": "sel_para_prev", "en": "sel_para_prev" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_para_next",
+		"labels": { "fr": "sel_para_next", "en": "sel_para_next" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.doc_start",
+		"labels": { "fr": "⤒ Début du document", "en": "⤒ Document start" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.doc_end",
+		"labels": { "fr": "⤓ Fin du document", "en": "⤓ Document end" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_doc_start",
+		"labels": { "fr": "sel_doc_start", "en": "sel_doc_start" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.sel_doc_end",
+		"labels": { "fr": "sel_doc_end", "en": "sel_doc_end" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.move_line_up",
+		"labels": { "fr": "move_line_up", "en": "move_line_up" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.move_line_down",
+		"labels": { "fr": "move_line_down", "en": "move_line_down" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.duplicate_line_up",
+		"labels": { "fr": "duplicate_line_up", "en": "duplicate_line_up" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.duplicate_line_down",
+		"labels": { "fr": "duplicate_line_down", "en": "duplicate_line_down" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.new_line_below",
+		"labels": { "fr": "new_line_below", "en": "new_line_below" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.backspace",
+		"labels": { "fr": "⌫ Suppr. arrière", "en": "⌫ Backspace" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.delete",
+		"labels": { "fr": "⌦ Suppr. avant", "en": "⌦ Delete" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.enter",
+		"labels": { "fr": "↵ Entrée", "en": "↵ Enter" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.tab",
+		"labels": { "fr": "⇥ Tab", "en": "⇥ Tab" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.escape",
+		"labels": { "fr": "⎋ Échap", "en": "⎋ Escape" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.escape_or_option_shift",
+		"labels": { "fr": "escape_or_option_shift", "en": "escape_or_option_shift" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.none",
+		"labels": { "fr": "∅ Rien", "en": "∅ Nothing" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.maximize",
+		"labels": { "fr": "🔲 Maximiser", "en": "🔲 Maximize" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.snap_left",
+		"labels": { "fr": "◧ ← Ancrer à gauche", "en": "◧ ← Snap left" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.snap_right",
+		"labels": { "fr": "◨ → Ancrer à droite", "en": "◨ → Snap right" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.window_to_monitor_left",
+		"labels": { "fr": "window_to_monitor_left", "en": "window_to_monitor_left" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.window_to_monitor_right",
+		"labels": { "fr": "window_to_monitor_right", "en": "window_to_monitor_right" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.brightness_up",
+		"labels": { "fr": "☀ + Luminosité +", "en": "☀ + Brightness +" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.brightness_down",
+		"labels": { "fr": "☀ - Luminosité -", "en": "☀ - Brightness -" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.vol_up",
+		"labels": { "fr": "🔊 + Volume +", "en": "🔊 + Volume +" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.vol_down",
+		"labels": { "fr": "🔊 - Volume -", "en": "🔊 - Volume -" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.mute",
+		"labels": { "fr": "🔇 Muet/Unmute", "en": "🔇 Mute/Unmute" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
+	},
+	{
+		"path": "layers.actions.spotlight",
+		"labels": { "fr": "🔍 Spotlight", "en": "🔍 Spotlight" },
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"reasons": {
+			"windows": {
+				"en": "macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead.",
+				"fr": "macOS uniquement : cette action ouvre Spotlight, la recherche de macOS. Sous Windows ou Linux, associez plutôt le raccourci de recherche propre à votre bureau comme combinaison de touches.",
+				"equivalents": []
+			},
+			"linux": {
+				"en": "macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead.",
+				"fr": "macOS uniquement : cette action ouvre Spotlight, la recherche de macOS. Sous Windows ou Linux, associez plutôt le raccourci de recherche propre à votre bureau comme combinaison de touches.",
+				"equivalents": []
+			}
+		}
+	},
+	{
+		"path": "layers.modifiers.fn",
+		"labels": { "fr": "fn", "en": "fn" },
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"reasons": {
+			"windows": {
+				"en": "macOS only: Fn is a modifier only on a Mac. A PC keyboard handles Fn inside the keyboard itself, so Windows and Linux never receive it and cannot send it.",
+				"fr": "macOS uniquement : Fn n'est un modificateur que sur Mac. Un clavier de PC traite Fn dans le clavier lui-même, donc Windows et Linux ne la reçoivent jamais et ne peuvent pas l'envoyer.",
+				"equivalents": []
+			},
+			"linux": {
+				"en": "macOS only: Fn is a modifier only on a Mac. A PC keyboard handles Fn inside the keyboard itself, so Windows and Linux never receive it and cannot send it.",
+				"fr": "macOS uniquement : Fn n'est un modificateur que sur Mac. Un clavier de PC traite Fn dans le clavier lui-même, donc Windows et Linux ne la reçoivent jamais et ne peuvent pas l'envoyer.",
+				"equivalents": []
+			}
+		}
+	},
+	{
+		"path": "layers.source_kinds.mouse_button",
+		"labels": { "fr": "mouse_button", "en": "mouse_button" },
+		"platforms": { "windows": true, "macos": true, "linux": false },
+		"reasons": {
+			"linux": {
+				"en": "Not on Linux: the Linux hook watches the mouse without grabbing it, so it cannot cancel the button press that a layer binding would replace. Grabbing the mouse would take the pointer away from the desktop.",
+				"fr": "Pas sous Linux : le crochet Linux observe la souris sans la saisir, il ne peut donc pas annuler l’appui sur le bouton qu’une liaison de couche remplacerait. Saisir la souris retirerait le pointeur au bureau.",
+				"equivalents": []
+			}
+		}
+	},
+	{
+		"path": "layers.parameters.repeat_count",
+		"labels": { "fr": "repeat_count", "en": "repeat_count" },
+		"platforms": { "windows": true, "macos": false, "linux": false },
+		"reasons": {
+			"macos": {
+				"en": "Windows only: a repeat count needs the layer to remember a number until the next key, which the Windows layer does itself. Karabiner-Elements on macOS and the Linux driver’s own tap-hold engine map each key press on its own and keep no count between two keys.",
+				"fr": "Windows uniquement : un nombre de répétitions exige que la couche retienne un nombre jusqu’à la touche suivante, ce que la couche de Windows fait elle-même. Karabiner-Elements sous macOS et le moteur tap-hold propre au pilote Linux traitent chaque appui de touche isolément et ne gardent aucun compte entre deux touches.",
+				"equivalents": []
+			},
+			"linux": {
+				"en": "Windows only: a repeat count needs the layer to remember a number until the next key, which the Windows layer does itself. Karabiner-Elements on macOS and the Linux driver’s own tap-hold engine map each key press on its own and keep no count between two keys.",
+				"fr": "Windows uniquement : un nombre de répétitions exige que la couche retienne un nombre jusqu’à la touche suivante, ce que la couche de Windows fait elle-même. Karabiner-Elements sous macOS et le moteur tap-hold propre au pilote Linux traitent chaque appui de touche isolément et ne gardent aucun compte entre deux touches.",
+				"equivalents": []
+			}
+		}
+	},
+	{
+		"path": "layers.parameters.keystroke",
+		"labels": { "fr": "keystroke", "en": "keystroke" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	}
 ]

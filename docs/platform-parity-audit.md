@@ -26,6 +26,12 @@ hardware test.
   runtime entry points, platform-specific action reasons, and the bundled macOS
   app descriptions. Files with matching names are leads, not proof of parity.
 
+The layer editor has an additional canonical vocabulary:
+`_shared/keymap/layer_actions.toml`. Its actions, modifier restrictions, input
+source kinds and parameters are included in the generated action inventory as
+`layers.*`. Mouse-button sources exclude Linux, repeat counts are Windows-only,
+and Fn and Spotlight belong to macOS. The source explains each restriction.
+
 ## Findings beyond individual configuration paths
 
 | Capability                                                  | Windows                                    | macOS                                                          | Linux                                                                                      | Evidence and qualification                                                                                                                                                                           |
@@ -57,6 +63,12 @@ Some missing menu rows have equivalent providers rather than missing features: L
 `llm_generation` provider exposes min/max words, temperature, prediction count
 and context length even though the native Windows/macOS presentation rows are
 absent. See `linux/ui/menu/menu_llm.lua` and `modules/llm/settings.lua`.
+
+Windows programmable hotstrings are an equivalent presentation rather than an
+absence: `ui/menu/menu_submenus.ahk` calls `_HS_ProgrammableHotstringRows`, whose
+commands open, reload or repair the user's source. Likewise Linux prompt actions
+reach `prediction_engine.trigger_prompt` through `llm_prompt_prediction`; the
+absence of macOS's per-profile shortcut dialog does not remove prompt actions.
 
 The English catalogue also contains stale Linux claims. The reason
 `platform_reason.llm_configuration_surface_is_not_on_linux` says Linux has no
