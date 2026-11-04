@@ -670,7 +670,8 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 	end
 
 	local function with_real_locale(options)
-		local names = { "infra.i18n", "infra.locale", "infra.config_paths", "adapters.storage" }
+		local names = { "infra.i18n", "infra.locale", "infra.config_paths", "adapters.storage",
+			"infra.script_scope", "infra.scope_registry" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
@@ -692,6 +693,8 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["infra.locale"] = nil
 			package.loaded["adapters.storage"] = nil
+			package.loaded["infra.script_scope"] = nil
+			package.loaded["infra.scope_registry"] = nil
 			package.loaded["infra.i18n"] = nil
 			local i18n = require("infra.i18n")
 			i18n.init()
@@ -746,6 +749,8 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 		os.rename = original_rename
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		os.remove(storage_path .. ".tmp"); os.remove(storage_path); os.remove(config_path)
+		os.execute("rm -f " .. string.format("%q", root .. "/ergopti_plus") .. "/*.bak "
+			.. string.format("%q", root .. "/config") .. "/*.bak")
 		os.execute("rmdir " .. string.format("%q", root .. "/ergopti_plus")
 			.. " " .. string.format("%q", root .. "/config"))
 		os.execute("rmdir " .. string.format("%q", root))
