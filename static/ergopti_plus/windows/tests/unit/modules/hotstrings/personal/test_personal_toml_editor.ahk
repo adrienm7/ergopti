@@ -683,32 +683,21 @@ Test("Personal TOML: ReloadPersonalSection skips a disabled section (personal-ho
 ; WebView initData — hidden strict-case state
 ; ============================================
 
-TestPE_BuildEntryPreservesHiddenStrictCase() {
+TestPE_BuildEntryCheckboxOwnsStrictCase() {
 	global _PersonalEditorPrioCtrl
 	OldPriorityCtrl := _PersonalEditorPrioCtrl
 	_PersonalEditorPrioCtrl := false
 	try {
-		TriggerEdit := { Value: "strict-trigger" }
-		OutputEdit := { Value: "strict output" }
-		ChkIsWord := { Value: 1 }
-		ChkAutoExp := { Value: 1 }
-		ChkCaseSens := { Value: 1 }
-		ChkFinal := { Value: 0 }
-
-		StrictEntry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord,
-			ChkAutoExp, ChkCaseSens, ChkFinal, true)
-		DefaultEntry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord,
-			ChkAutoExp, ChkCaseSens, ChkFinal)
-		AssertEqual(true, StrictEntry["strict_case"],
-			"editing must preserve the hidden strict-case flag")
-		AssertEqual(false, DefaultEntry["strict_case"],
-			"new entries must retain the non-strict default")
-	} finally {
-		_PersonalEditorPrioCtrl := OldPriorityCtrl
-	}
+		for Checked in [0, 1] {
+			Entry := _BuildEntry({Value: "case-trigger"}, {Value: "Case output"},
+				{Value: 1}, {Value: 1}, {Value: Checked}, {Value: 0})
+			AssertEqual(Checked, Entry["is_case_sensitive"])
+			AssertEqual(Checked, Entry["strict_case"], "The native case checkbox owns exact-match behavior")
+		}
+	} finally _PersonalEditorPrioCtrl := OldPriorityCtrl
 }
-Test("Personal editor native fallback: hidden strict-case state survives edits",
-	TestPE_BuildEntryPreservesHiddenStrictCase)
+Test("Personal editor native fallback: case checkbox owns exact matching",
+	TestPE_BuildEntryCheckboxOwnsStrictCase)
 
 TestPE_WebViewCarriesStrictCase() {
 	global ScriptInformation, _ReadPersonalTomlCache

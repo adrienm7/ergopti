@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **49 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **50 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -915,3 +915,21 @@ Consequence: A valid explicit unlimited setting silently acquires a finite activ
 Regression: Four HotstringsConfig unlimited precedence cases use real typed TOML, the actual parser/base projection/resolver and both category and section scope. Both leaf orders must be unlimited; single-leaf controls preserve finite and unlimited behavior. The fix clears finite projection state and returns when explicit unlimited has already been parsed. No format change. Native fail-before measured; post-fix pending.
 
 The ongoing register now contains **49 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-050: The native personal-editor case checkbox does not control exact matching
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_BuildEntry derives is_case_sensitive from the checkbox but derives strict_case from an unrelated hidden argument. Add defaults that argument false and Save supplies the previous entry flag regardless of the current checkbox. The shared editor already maps this checkbox to both producer flags, matching the documented exact-match UI contract.
+
+Reproduction: Native run41910772341 atf7e7b2f fails both genuine GUI probes individually and reversed: Add with the case checkbox checked persists strict_case=false; unchecking an existing strictly matched entry preserves strict_case=true after Save. Both use actual BM_CLICK and the durable native writer.
+
+Consequence: The checked native editor can still match a differently cased trigger, while unchecking can leave exact matching enabled. The persisted configuration contradicts the visible option.
+
+Regression: Two real PEER native GUI cases verify durable typed flags and then observe the registry actually published by the real commit through the genuine matcher, without output injection. A detached registry/matcher scope refuses an active prefix watcher, drains its genuine auxiliary timer and restores original state. The obsolete hidden-argument unit oracle becomes a checkbox matrix, and the unused argument is removed. Generic parsing/cache/dispatch preserve the independent flags. Native fail-before measured; post-fix pending. macOS/Linux shared editor producer already implements this mapping.
+
+The ongoing register now contains **50 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native partial qualification checkpoint: 41910772341
+
+At `f7e7b2f`, **52 selected cases passed and seven probes failed**, identically in individual and reversed execution. All 21 chord engine/lifecycle cases and 21 roll cases passed, qualifying AHK-045 with its adjacent admission callers. All three clipboard clock cases and both readiness deadline cases passed, qualifying AHK-046/AHK-047. The seven failures are the independently measured AHK-048/AHK-049/AHK-050. The full production graph compiled; hotstring and HTTP E2E were outside selection and no full-suite qualification is claimed.
