@@ -524,11 +524,13 @@ function M.open_db(db_path)
 		local fh, detail, code = RegularFileReader.open(_db_path)
 		local existed = false
 		if fh then
-			local size, seek_error = fh:seek("end")
-			local closed, close_error = fh:close()
-			if type(size) ~= "number" or closed ~= true then
+			local seek_ok, size, seek_error = pcall(fh.seek, fh, "end")
+			local close_ok, closed, close_error = pcall(fh.close, fh)
+			if not seek_ok or type(size) ~= "number" or size < 0 or not close_ok or closed ~= true then
+				local detail = not seek_ok and size or (type(size) ~= "number" and seek_error)
+					or (not close_ok and closed) or close_error
 				Logger.error(LOG, "Cannot inspect and close the existing SQLite database at %s: %s.",
-					_db_path, ErrorDescription.describe(type(size) ~= "number" and seek_error or close_error))
+					_db_path, ErrorDescription.describe(detail))
 				_db_path = nil
 				return false
 			end
