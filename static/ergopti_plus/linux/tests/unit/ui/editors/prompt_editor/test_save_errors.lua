@@ -78,6 +78,21 @@ local function with_editor(body, logger)
 end
 
 helpers.describe("prompt editor save error ownership", function()
+	helpers.it("(prompt-private-exception) withholds the saved prompt from callback errors", function()
+		local logger, lines = require("logger.shim"), {}
+		local original = logger.error
+		logger.error = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
+		local ok, err = pcall(function()
+			with_editor(function(f)
+				local payload, context = f.open(function(candidate) error("failed " .. candidate.system_single) end)
+				payload.prompt = "secret-canary"
+				helpers.assert_eq(f.save(payload, context).saved, false)
+				helpers.assert_true(not table.concat(lines, "\n"):find("secret-canary", 1, true))
+			end)
+		end)
+		logger.error = original
+		if not ok then error(err, 0) end
+	end)
 	helpers.it("reports a real outdated profile registry without changing its bytes", function()
 		with_editor(function(f)
 			local original = "[llm]\nuser_profiles = []\n"
