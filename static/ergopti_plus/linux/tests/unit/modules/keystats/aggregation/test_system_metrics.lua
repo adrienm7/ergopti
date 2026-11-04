@@ -677,3 +677,34 @@ helpers.describe("system-event-capture-policy", function()
 		end)
 	end)
 end)
+
+for _, fault in ipairs({ "read_throw", "close_false", "close_throw" }) do
+	helpers.it("wireless sample refuses an incomplete listing " .. fault, function()
+		with_shell({ missing = { nmcli = true, iwgetid = true } }, function(metrics, sample)
+			local original, failing, closes = io.open, false, 0
+			io.open = function(path, mode)
+				if path ~= "/proc/net/wireless" then return original(path, mode) end
+				local lines = { "header", "header", failing and "wlan1: 0000" or "wlan0: 0000" }
+				local index = 0
+				return { read = function()
+					index = index + 1
+					if failing and fault == "read_throw" then error("injected read failure") end
+					return lines[index]
+				end, close = function()
+					closes = closes + 1
+					if failing and fault == "close_throw" then error("injected close failure") end
+					return not (failing and fault == "close_false")
+				end }
+			end
+			local called, detail = pcall(function()
+				sample(0, "2026-08-06")
+				failing = true
+				sample(metrics._sample_interval_ms(), "2026-08-06")
+			end)
+			io.open = original
+			assert(called, detail)
+			helpers.assert_eq(closes, 2, "each listing is closed even after a read exception")
+			helpers.assert_eq(metrics.current().wifi_changes, 0, "an unacknowledged listing is not a network change")
+		end)
+	end)
+end
