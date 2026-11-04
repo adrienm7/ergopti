@@ -46,7 +46,12 @@ var ReleaseVersionOrder = (function () {
 	 */
 	function parse(tag) {
 		var match = normalize(tag).match(SEMVER);
-		if (!match) return null;
+		if (
+			!match ||
+			(match[4] &&
+				(match[4].charAt(0) === '.' || match[4].slice(-1) === '.' || match[4].indexOf('..') !== -1))
+		)
+			return null;
 		return {
 			major: Number(match[1]),
 			minor: Number(match[2]),

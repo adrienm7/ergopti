@@ -107,4 +107,32 @@ helpers.describe("App Cloner Python offer", function()
 		helpers.assert_eq(order, { { "launch", 0 } })
 		restore()
 	end)
+
+	helpers.it("opens App Cloner when the failure dialog raises", function()
+		local Offer, world = load("apps.cloner.python_offer.install")
+		local dialog = package.loaded["infra.dialog_util"]
+		local original = dialog.block_alert
+		dialog.block_alert = function(...)
+			if #world.alerts > 0 then error("result dialog failed") end
+			return original(...)
+		end
+		local launched = 0
+		Offer.open(owner(false, { false, "pyobjc_install_failed" }), function(environment)
+			launched = launched + 1
+			helpers.assert_eq(environment, {})
+		end)
+		helpers.assert_eq(launched, 1)
+		restore()
+	end)
+
+	helpers.it("still installs after the user agrees if the progress notice raises", function()
+		local Offer = load("apps.cloner.python_offer.install")
+		package.loaded["infra.notifications"].notify = function() error("notification failed") end
+		local double, calls = owner(false, { true, LINK })
+		local launched = 0
+		Offer.open(double, function() launched = launched + 1 end)
+		helpers.assert_eq(calls.installs, 1)
+		helpers.assert_eq(launched, 1)
+		restore()
+	end)
 end)
