@@ -30,7 +30,10 @@ local function load(live)
 			if state.unreadable then return nil, "live_state_unreadable" end
 			return state.live[name] == true, nil
 		end,
-		select = function(id, on_done) state.selected[#state.selected + 1] = id; on_done(true, { id = id }) end,
+		select = function(id, on_done)
+			state.selected[#state.selected + 1] = id
+			if state.defer_selection then state.selection_done = on_done else on_done(true, { id = id }) end
+		end,
 		encode_json = Json.encode,
 		decode_json = Json.decode,
 		now = function() return 1800000000 end,
@@ -75,6 +78,33 @@ helpers.describe("pending layout activation (composer-macos26)", function()
 		Pending.resume()
 		helpers.assert_eq(#state.selected, 0)
 		helpers.assert_nil(Pending.pending("ergol"))
+	end)
+
+	helpers.it("keeps selection intent until the asynchronous selection succeeds (pending-layout-selection)", function()
+		local Pending, state = load({ ["Ergo-L"] = true })
+		Pending.record("ergol", "Ergo-L")
+		Pending.request_select("ergol")
+		state.defer_selection = true
+		Pending.resume()
+		helpers.assert_not_nil(Pending.pending("ergol"), "the in-flight request remains durable")
+		state.selection_done(false, "refused", "selection failed")
+		helpers.assert_not_nil(Pending.pending("ergol"), "a failure is retried at the next boot")
+		Pending.resume()
+		state.selection_done(true)
+		helpers.assert_nil(Pending.pending("ergol"))
+	end)
+
+	helpers.it("does not erase a newer request when an older selection settles (pending-layout-selection)", function()
+		local Pending, state = load({ ["Ergo-L"] = true })
+		Pending.record("ergol", "Ergo-L")
+		Pending.request_select("ergol")
+		state.defer_selection = true
+		Pending.resume()
+		Pending.resume()
+		helpers.assert_eq(#state.selected, 1, "one in-flight selection owns the layout")
+		Pending.record("ergol", "Ergo-L")
+		state.selection_done(true)
+		helpers.assert_not_nil(Pending.pending("ergol"), "the newer request survives the old callback")
 	end)
 
 	helpers.it("keeps a layout whose live state cannot be read, and refuses to select an unrecorded one", function()

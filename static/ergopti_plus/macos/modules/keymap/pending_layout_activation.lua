@@ -32,6 +32,12 @@ M.STORAGE_KEY = "pending_layout_activation"
 
 -- The collaborators init() received; nil until then.
 local _deps = nil
+local _revisions = {}
+local _selecting = {}
+
+local function changed(id)
+	_revisions[id] = (_revisions[id] or 0) + 1
+end
 
 --- Refuses a call before init().
 --- @param name string Entry point name.
@@ -109,6 +115,7 @@ function M.record(id, keyboard_name)
 	}
 	local written = write_entries(entries)
 	if written then
+		changed(id)
 		Logger.info(LOG, "The '%s' layout waits for the next login: macOS turns it on then.", tostring(id))
 	end
 	return written
@@ -127,7 +134,10 @@ function M.request_select(id)
 	end
 	entries[id].select = true
 	local written = write_entries(entries)
-	if written then Logger.info(LOG, "The '%s' layout will be selected after the next login.", tostring(id)) end
+	if written then
+		changed(id)
+		Logger.info(LOG, "The '%s' layout will be selected after the next login.", tostring(id))
+	end
 	return written
 end
 
@@ -144,7 +154,10 @@ function M.forget(id)
 	if entries[id] == nil then return true end
 	entries[id] = nil
 	local written = write_entries(entries)
-	if written then Logger.debug(LOG, "The '%s' layout is no longer pending.", tostring(id)) end
+	if written then
+		changed(id)
+		Logger.debug(LOG, "The '%s' layout is no longer pending.", tostring(id))
+	end
 	return written
 end
 
@@ -155,6 +168,30 @@ function M.pending(id)
 	require_init("pending")
 	local entries = read_entries()
 	return entries and entries[id] or nil
+end
+
+--- Retains the durable request until its exact asynchronous selection settles.
+--- @param id string Layout id.
+local function select_pending(id)
+	if _selecting[id] then return end
+	local revision = _revisions[id] or 0
+	local owner = {}
+	_selecting[id] = owner
+	local started, start_error = pcall(_deps.select, id, function(ok, code, detail)
+		if _selecting[id] ~= owner then return end
+		_selecting[id] = nil
+		if ok then
+			if (_revisions[id] or 0) == revision then M.forget(id) end
+			Logger.info(LOG, "Selected the '%s' layout, as asked before the login.", id)
+		else
+			Logger.warn(LOG, "The '%s' layout is on but could not be selected (%s): %s.", id,
+				tostring(code), tostring(detail))
+		end
+	end)
+	if not started or start_error == false then
+		_selecting[id] = nil
+		Logger.error(LOG, "Selection of the '%s' layout could not start: %s.", id, tostring(start_error))
+	end
 end
 
 --- At boot: confirms each pending layout macOS turned on (selecting it when
@@ -179,16 +216,10 @@ function M.resume()
 			summary.confirmed = summary.confirmed + 1
 			Logger.info(LOG, "macOS turned on the '%s' layout installed at %s.", id, os.date("!%Y-%m-%dT%H:%M:%SZ",
 				tonumber(entry.recorded_at) or 0))
-			M.forget(id)
 			if entry.select == true then
-				_deps.select(id, function(ok, code, detail)
-					if ok then
-						Logger.info(LOG, "Selected the '%s' layout, as asked before the login.", id)
-					else
-						Logger.warn(LOG, "The '%s' layout is on but could not be selected (%s): %s.", id,
-							tostring(code), tostring(detail))
-					end
-				end)
+				select_pending(id)
+			else
+				M.forget(id)
 			end
 		else
 			summary.waiting = summary.waiting + 1
@@ -218,6 +249,6 @@ function M.production_deps()
 end
 
 --- Test seam: forgets the collaborators.
-function M._reset() _deps = nil end
+function M._reset() _deps = nil; _revisions = {}; _selecting = {} end
 
 return M
