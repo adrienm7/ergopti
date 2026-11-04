@@ -34,6 +34,8 @@
 ;                ``selected_array`` is an Array of lowercase process names.
 ;                ``receipt`` must be claimed inside the durable candidate build.
 ;     ok_label : optional override for the OK button caption
+;     durable  : optional Boolean; a durable callback reports its writer outcome
+;                through AppPicker_BeginDurableSave and preserves failed choices.
 ;     on_open  : optional callable(gui, receipt), strict true admits Show.
 ;                Allows a caller to retain and retire this exact native window.
 ;
@@ -173,19 +175,81 @@ AppPicker_RetireReceipt(Receipt) {
 		if _AppPickerActiveReceipts.Has(Owner)
 				&& _AppPickerActiveReceipts[Owner] == Receipt
 			_AppPickerActiveReceipts.Delete(Owner)
-		if (Receipt.Get("state", "") == "open")
+		if (Receipt.Get("state", "") == "open"
+				|| (Receipt.Get("durable_mode", false) && Receipt.Get("state", "") == "claimed"))
 			Receipt["state"] := "retired"
 		return true
 	} finally Critical(PreviousCritical)
 }
 
+; A durable attempt keeps its result outside the callback return: apply may
+; return false or throw after the writer has already acknowledged publication.
+AppPicker_BeginDurableSave(Receipt) {
+	if !(Receipt is Map) || !Receipt.Get("durable_mode", false)
+			|| !Receipt.Has("owner") || !Receipt.Has("epoch") || !Receipt.Has("base")
+		return 0
+	Result := Map("status", "not_started", "committed", false, "applied", false)
+	Receipt["durable_result"] := Result
+	return Result
+}
+
+AppPicker_DurableResult(Receipt) {
+	return Receipt is Map ? Receipt.Get("durable_result", 0) : 0
+}
+
+; A failed attempt can restore only its original logical owner. Cancel and a
+; newer picker are terminal, even if the old callback later reports no commit.
+_AppPicker_RearmReceipt(Receipt) {
+	global _AppPickerOwnerEpochs, _AppPickerActiveReceipts
+	PreviousCritical := Critical("On")
+	try {
+		Owner := Receipt["owner"]
+		if _AppPickerOwnerEpochs.Get(Owner, 0) != Receipt["epoch"]
+				|| (Receipt.Get("state", "") != "open" && Receipt.Get("state", "") != "claimed")
+			return false
+		Active := _AppPickerActiveReceipts.Get(Owner, 0)
+		if !(((Active is Integer) && Active == 0) || Active == Receipt)
+			return false
+		Receipt["state"] := "open"
+		_AppPickerActiveReceipts[Owner] := Receipt
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 AppPicker_InvokeSave(OnSave, Selected, Receipt) {
-	if !HasMethod(OnSave, "Call") {
-		AppPicker_RetireReceipt(Receipt)
-		return false
+	Durable := Receipt is Map && Receipt.Get("durable_mode", false)
+	if Durable {
+		if Receipt.Get("saving", false)
+			return false
+		Receipt["saving"] := true, Receipt["close_after_save"] := true
+		if Receipt.Has("durable_result")
+			Receipt.Delete("durable_result")
 	}
-	try return OnSave.Call(Selected, Receipt)
-	finally AppPicker_RetireReceipt(Receipt)
+	Returned := false
+	try {
+		if !HasMethod(OnSave, "Call")
+			return false
+		CallbackResult := OnSave.Call(Selected, Receipt)
+		Returned := true
+		return CallbackResult
+	} finally {
+		Keep := false, MissingResult := false
+		if Durable {
+			Result := AppPicker_DurableResult(Receipt)
+			MissingResult := Returned && !(Result is Map)
+			; Only an explicitly confirmed non-commit permits a retry. Unknown
+			; outcomes and accepted durability can never replay the old command.
+			if Result is Map && !Result.Get("committed", false)
+					&& (Result.Get("status", "") == "not_started" || Result.Get("status", "") == "refused")
+				Keep := _AppPicker_RearmReceipt(Receipt)
+			Receipt["close_after_save"] := !Keep
+			Receipt["saving"] := false
+		}
+		if !Keep
+			AppPicker_RetireReceipt(Receipt)
+		if MissingResult
+			throw TypeError("A durable app-picker callback must report its explicit publication outcome.")
+	}
 }
 
 
@@ -211,6 +275,10 @@ AppPicker_Show(opts) {
 		owner := opts.Has("owner") ? opts["owner"] : ""
 		if !HasMethod(on_save, "Call") || !(owner is String) || owner == ""
 				return false
+
+		Durable := opts.Get("durable", false)
+		if !(Durable is Integer) || (Durable != 0 && Durable != 1)
+				throw TypeError("App picker durable contract must be Boolean.")
 
 		initial := Map()
 		if opts.Has("initial") && opts["initial"] is Array {
@@ -253,6 +321,8 @@ AppPicker_Show(opts) {
 				g.Destroy()
 				return false
 		}
+		if Durable
+				receipt["durable_mode"] := true
 		try {
 				btn_ok.OnEvent("Click", (*) => AppPicker_OnOK(g, lv, on_save, receipt))
 				btn_cancel.OnEvent("Click", (*) => AppPicker_OnCancel(g, receipt))
@@ -292,6 +362,8 @@ AppPicker_Show(opts) {
 ; index). The control is the only object the sort touches, so it is the only
 ; object allowed to answer "which app is on row N".
 AppPicker_OnOK(g, lv, on_save, receipt) {
+		if receipt.Get("saving", false)
+				return false
 		selected := []
 		row_idx := 0
 		loop {
@@ -303,8 +375,15 @@ AppPicker_OnOK(g, lv, on_save, receipt) {
 						continue
 				selected.Push(proc)
 		}
-		g.Destroy()
-		return AppPicker_InvokeSave(on_save, selected, receipt)
+		if !receipt.Get("durable_mode", false) {
+				g.Destroy()
+				return AppPicker_InvokeSave(on_save, selected, receipt)
+		}
+		try return AppPicker_InvokeSave(on_save, selected, receipt)
+		finally {
+				if receipt.Get("close_after_save", true)
+						g.Destroy()
+		}
 }
 
 AppPicker_OnCancel(g, receipt) {

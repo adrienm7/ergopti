@@ -325,12 +325,29 @@ _APD_NativeOpen(State, Window, Receipt) {
 
 _APD_NativeNotify(State, Message, Options) {
 	State.Notifications += 1
+	if State.Mode == "cancel-after-refusal" {
+		AssertTrue(DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int"),
+			"The genuine refused picker must still exist when its user dismisses the notification")
+		AssertTrue(DllCall("User32\PostMessageW", "Ptr", State.Hwnd, "UInt", 0x10,
+			"Ptr", 0, "Ptr", 0, "Int"))
+		Started := A_TickCount
+		while DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int") && TickElapsed(Started) < 3000
+			Sleep(5)
+		State.CancelObserved := !DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int")
+	}
 	return true
+}
+
+_APD_ApplyRefused(State) {
+	State.ApplyCalls += 1
+	return false
 }
 
 _APD_NativeCommit(State, Selected, Receipt) {
 	State.Calls += 1
-	Committed := MF_CommitDisabledApps(Selected, 0, _APD_NativeNotify.Bind(State), Receipt)
+	Committed := State.Mode == "apply-refused"
+		? _MetricsSaveAppPickerAndReload(Selected, 0, _APD_NativeNotify.Bind(State), _APD_ApplyRefused.Bind(State), Receipt)
+		: MF_CommitDisabledApps(Selected, 0, _APD_NativeNotify.Bind(State), Receipt)
 	State.Results.Push(Committed)
 	return Committed
 }
@@ -348,14 +365,14 @@ _APD_NativeRefusedPicker(Mode) {
 		Critical: A_IsCritical, Suspended: A_IsSuspended}
 	HadReady := IsSet(_SaveFullConfigReady), SavedReady := HadReady ? _SaveFullConfigReady : unset
 	Fixture := _ScopeOwnerFixture('[metrics]`ndisabled_apps = ["private_keep.exe", "private_remove.exe"]`n')
-	State := {Hwnd: 0, Receipt: 0, Calls: 0, Results: [], ButtonEntries: 0, Notifications: 0}
+	State := {Mode: Mode, Hwnd: 0, Receipt: 0, Calls: 0, Results: [], ButtonEntries: 0, Notifications: 0, ApplyCalls: 0, CancelObserved: false}
 	Window := 0, Lease := 0, Lock := 0, Primary := 0, CleanupFailure := 0
 	try {
 		Critical("Off"), Suspend(false)
 		_APG_ResetOwners()
 		ConfigurationFile := Fixture.path, _SaveFullConfigReady := true
 		MetricsFilters.disabled_apps := Map("private_keep.exe", true, "private_remove.exe", true)
-		Receipt := AppPicker_Show(Map("owner", "metrics:disabled_apps",
+		Receipt := AppPicker_Show(Map("owner", "metrics:disabled_apps", "durable", true,
 			"title", t("dialog.metrics.exclude_title"), "prompt", t("dialog.metrics.exclude_prompt"),
 			"ok_label", t("dialog.metrics.exclude_ok"), "initial", MF_DisabledList(),
 			"on_open", _APD_NativeOpen.Bind(State), "on_save", _APD_NativeCommit.Bind(State)))
@@ -392,7 +409,7 @@ _APD_NativeRefusedPicker(Mode) {
 		if Mode == "lease" {
 			Lease := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "app-picker-refusal-fixture")
 			AssertTrue(Lease is Object, "The independent genuine configuration owner must hold this exact path")
-		} else {
+		} else if Mode == "sharing" || Mode == "cancel-after-refusal" {
 			; Reads remain allowed; writes and atomic replacement are genuinely
 			; denied. This refusal occurs after the candidate claimed its receipt.
 			Lock := FileOpen(ConfigurationFile, "r-wd", "UTF-8")
@@ -407,6 +424,32 @@ _APD_NativeRefusedPicker(Mode) {
 		AssertEqual(1, State.ButtonEntries)
 		AssertEqual(1, State.Calls, "The actual callback must reach the genuine durable metrics producer")
 		AssertEqual(1, State.Results.Length)
+		if Mode == "apply-refused" {
+			AssertFalse(State.Results[1], "The historical combined callback still reports refused apply")
+			AssertEqual(1, State.ApplyCalls, "The actual callback must reach its isolated postcommit apply port once")
+			AssertFalse(FSUtf8ExactMatches(ConfigurationFile, Fixture.source), "This control must really acknowledge changed durable bytes")
+			Fresh := ParseTomlFile(ConfigurationFile), Apps := IniCacheGet(Fresh, "metrics", "disabled_apps")
+			AssertTrue(Apps is Array && Apps.Length == 1 && Apps[1] == "private_keep.exe")
+			AssertEqual(1, MetricsFilters.disabled_apps.Count)
+			AssertTrue(MetricsFilters.disabled_apps.Has("private_keep.exe"))
+			_TestPrint("# app-picker-native-refusal mode=apply-refused callback_result=" . State.Results[1]
+				. " apply_calls=" . State.ApplyCalls . " durable_changed=1 window_closed="
+				. !DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int"))
+			AssertFalse(DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int"),
+				"A confirmed durable commit must close the picker even when apply returns false")
+			return
+		}
+		if Mode == "cancel-after-refusal" {
+			AssertFalse(State.Results[1])
+			AssertTrue(State.CancelObserved, "A genuine native Close must complete inside the real failure presentation")
+			AssertTrue(FSUtf8ExactMatches(ConfigurationFile, Fixture.source))
+			AssertTrue(MetricsFilters.disabled_apps.Has("private_remove.exe"))
+			AssertFalse(DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int"))
+			global _AppPickerActiveReceipts
+			AssertTrue(_AppPickerActiveReceipts.Get("metrics:disabled_apps", 0) != Receipt,
+				"The old refusal cannot reinsert an active receipt for the native window the user already retired")
+			return
+		}
 		AssertFalse(State.Results[1], "The real lease/sharing actor must refuse the write")
 		AssertTrue(State.Notifications >= 1, "The genuine persistence refusal must be explained through its presentation port")
 		AssertTrue(FSUtf8ExactMatches(ConfigurationFile, Fixture.source))
@@ -484,6 +527,6 @@ _APD_NativeRefusedPicker(Mode) {
 	if IsObject(CleanupFailure)
 		throw CleanupFailure
 }
-for _APD_Mode in ["lease", "sharing"]
+for _APD_Mode in ["lease", "sharing", "apply-refused", "cancel-after-refusal"]
 	Test("App picker native refusal: " . _APD_Mode . " preserves checkbox state and a fresh durable retry (app-picker-native-refusal-owner)",
 		_APD_NativeRefusedPicker.Bind(_APD_Mode))
