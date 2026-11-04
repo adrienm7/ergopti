@@ -432,6 +432,20 @@ helpers.describe("Linux system actions", function()
 		end)
 	end
 
+	for _, signal in ipairs({ "HUP", "INT", "TERM" }) do
+		helpers.it("removes the staged screenshot when its shell receives SIG" .. signal, function()
+			local command = 'TMPDIR="$STUBS"; export TMPDIR; ' .. backgrounded(Gestures, "screenshot_fullscreen_clipboard")
+			local log, dir = run_with_stubs(command, {
+				grim = 'for last; do :; done; printf PNG > "$last"; kill -' .. signal .. ' "$PPID"; exit 0',
+				["wl-copy"] = 'cat > "$STUBS/clipboard"', ["gnome-screenshot"] = "exit 1",
+				spectacle = "exit 1", maim = "exit 1",
+			})
+			local stream = assert(io.popen("find '" .. dir .. "' -name 'ergopti-screenshot.*' -print"))
+			helpers.assert_eq(stream:read("*a"), "", "the private capture directory must be removed: " .. log)
+			stream:close()
+		end)
+	end
+
 	helpers.it("screen_capture_instant saves the active window like screenshot_window_save (action-parity-linux-system)",
 		function()
 			local instant = backgrounded(Gestures, "screen_capture_instant")
