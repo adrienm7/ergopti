@@ -363,3 +363,17 @@ Consequence: The unchanged model A remains selected but its native browser disap
 Regression: Use the genuine native browser construction, actual Pick button, full boot/configuration/menu owners and a real write lease. Require visible UI and unchanged file/RAM after refusal; release the lease and require a durable B selection and hidden UI after retry.
 
 The ongoing register now contains **25 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-026: Native model selection persists while the driver is paused
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+static/ergopti_plus/windows/ui/model_browser/init.ahk:\_LLM_ModelBrowser_PickRow has no pause admission guard. Native GUI callbacks bypass Suspend, and the downstream menu transaction validates schema and leases rather than input pause. The Web sibling explicitly rejects suspended model actions.
+
+Reproduction: Open the native model browser before Suspend(true), select B and deliver a genuine Pick button click while still suspended.
+
+Consequence: A model selection can reach the durable writer and publish new live configuration despite the user's driver pause.
+
+Regression: Use the genuine native browser, observe its actual WM_COMMAND button event while suspended, and require no transaction/writer entry, unchanged durable/RAM state and visible UI. Resume must not replay the click; a fresh unpaused click must still durably select B.
+
+The ongoing register now contains **26 distinct new findings**. The requested target of 1,000 remains unmet.

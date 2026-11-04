@@ -154,7 +154,7 @@ _MBPO_Prepare() {
 	_MBPO.OriginalHash := CryptoSha256Bytes(_MBPO.Original)
 	_MBPO_Require(_MBPO.OriginalHash != "", "The independent original RAW image must be measurable.")
 	_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(_MBPO_Repaint, _MBPO_IsPaused, _MBPO_BuildError)
-	if _MBPO.Mode == "native-refused"
+	if InStr(_MBPO.Mode, "native-") == 1
 		return
 	; Deliberately component-only: no ShowWeb constructor, Edge, subscription or
 	; controller is fabricated. The real SDK command owns this real private Gui.
@@ -201,13 +201,22 @@ _MBPO_Receipt(Hash) {
 			. " boundary_line=" . _MBPO.Failure.Line . "`n", "*", "UTF-8-RAW")
 }
 
+_MBPO_NativeCommand(WParam, LParam, Message, Hwnd) {
+	global _MBPO
+	if LParam == _MBPO.NativePick && ((WParam >> 16) & 0xFFFF) == 0
+		_MBPO.NativeCommands += 1
+}
+
 _MBPO_NativeClick(ButtonHwnd, ExpectedReturns) {
 	global _MBPO
+	BeforeCommands := _MBPO.NativeCommands
 	DllCall("User32\SendMessageW", "Ptr", ButtonHwnd, "UInt", 0xF5, "Ptr", 0, "Ptr", 0, "Ptr")
 	Started := A_TickCount
-	while _MBPO.MutationReturns < ExpectedReturns && !IsObject(_MBPO.Failure) && TickElapsed(Started) < 3000
+	while (_MBPO.NativeCommands == BeforeCommands || _MBPO.MutationReturns < ExpectedReturns) && !IsObject(_MBPO.Failure) && TickElapsed(Started) < 3000
 		Sleep(10)
-	_MBPO_Require(_MBPO.MutationReturns == ExpectedReturns && !IsObject(_MBPO.Failure),
+	_MBPO_Observe()
+	_MBPO_Require(_MBPO.NativeCommands == BeforeCommands + 1
+		&& _MBPO.MutationReturns == ExpectedReturns && !IsObject(_MBPO.Failure),
 		"the actual native Pick event must settle its real model transaction")
 }
 
@@ -230,20 +239,37 @@ _MBPO_NativeRefused() {
 			ButtonHwnd := Control.Hwnd
 	}
 	_MBPO_Require(ButtonHwnd != 0, "the actual native Pick button must resolve")
-	Lease := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "native-browser-test")
-	_MBPO_Require(Lease is Object, "a genuine configuration lease must own the deterministic refusal")
-	try {
-		_MBPO_NativeClick(ButtonHwnd, 1)
-		_MBPO_Require(DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
-			"a refused native model selection must keep the browser visible")
-		_MBPO_Require(CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash
-			&& _LLM_Menu["model"] == _MBPO.ModelA && Features["llm"]["models"]["ollama"] == _MBPO.ModelA
-			&& _MBPO.WriterEntries == 0 && _MBPO.MutationConfirmed == 0,
-			"the actual lease refusal must preserve both durable and live model A")
-		_MBPO_Require(_MBPO.Errors.Length == 1 && InStr(_MBPO.Errors[1], "another configuration transaction owns the global barrier"),
-			"only the intentional, identified lease refusal can explain the negative result")
-	} finally _ConfigWriteLeaseRelease(Lease)
-	_MBPO_NativeClick(ButtonHwnd, 2)
+	_MBPO.NativePick := ButtonHwnd
+	if _MBPO.Mode == "native-paused" {
+		Suspend(true)
+		try {
+			_MBPO_NativeClick(ButtonHwnd, 0)
+			_MBPO_Require(_MBPO.WriterEntries == 0 && _MBPO.Errors.Length == 0
+				&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash
+				&& _LLM_Menu["model"] == _MBPO.ModelA && Features["llm"]["models"]["ollama"] == _MBPO.ModelA
+				&& DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
+				"a real native Pick click while paused must not enter persistence or hide its browser")
+		} finally Suspend(false)
+		_MBPO_Observe()
+		_MBPO_Require(_MBPO.MutationReturns == 0
+			&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash,
+			"resuming must not replay a native selection refused while paused")
+	} else {
+		Lease := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "native-browser-test")
+		_MBPO_Require(Lease is Object, "a genuine configuration lease must own the deterministic refusal")
+		try {
+			_MBPO_NativeClick(ButtonHwnd, 1)
+			_MBPO_Require(DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
+				"a refused native model selection must keep the browser visible")
+			_MBPO_Require(CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash
+				&& _LLM_Menu["model"] == _MBPO.ModelA && Features["llm"]["models"]["ollama"] == _MBPO.ModelA
+				&& _MBPO.WriterEntries == 0 && _MBPO.MutationConfirmed == 0,
+				"the actual lease refusal must preserve both durable and live model A")
+			_MBPO_Require(_MBPO.Errors.Length == 1 && InStr(_MBPO.Errors[1], "another configuration transaction owns the global barrier"),
+				"only the intentional, identified lease refusal can explain the negative result")
+		} finally _ConfigWriteLeaseRelease(Lease)
+	}
+	_MBPO_NativeClick(ButtonHwnd, _MBPO.MutationReturns + 1)
 	Parsed := ReadTomlFile(ConfigurationFile)
 	_MBPO_Require(_LLM_Menu["model"] == _MBPO.ModelB && Features["llm"]["models"]["ollama"] == _MBPO.ModelB
 		&& Parsed["llm"]["models"]["ollama"] == _MBPO.ModelB && _MBPO.WriterConfirmed == 1
@@ -256,7 +282,7 @@ _MBPO_NativeRefused() {
 _MBPO_Run() {
 	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_MBW_SessionEpoch
 	_MBPO_Prepare()
-	if _MBPO.Mode == "native-refused" {
+	if InStr(_MBPO.Mode, "native-") == 1 {
 		_MBPO_NativeRefused()
 		return
 	}
@@ -312,8 +338,8 @@ _MBPO_Main() {
 		OriginalHash: "", ReadyReads: 0, PauseImage: 0, PauseHash: "", ModelA: "", ModelB: "", CommandIssued: false,
 		DestroyCalls: 0, PauseObserved: false, WriterEntries: 0, WriterConfirmed: 0,
 		PausedWriterEntries: 0, MutationReturns: 0, MutationConfirmed: 0, RepaintRequests: 0,
-		Pulses: 0, Cleaning: false, Errors: [], Failure: 0}
-	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused",
+		Pulses: 0, Cleaning: false, Errors: [], Failure: 0, NativePick: 0, NativeCommands: 0}
+	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused",
 		"The model browser mode must be explicit.")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_MBPO_OnError)
@@ -321,6 +347,7 @@ _MBPO_Main() {
 	Primary := 0, WasSuspended := A_IsSuspended, PreviousCritical := Critical("Off")
 	Thread("Interrupt", 0)
 	OnMessage(0x2, _MBPO_Destroy)
+	OnMessage(0x111, _MBPO_NativeCommand)
 	try {
 		Suspend(false)
 		SetTimer(_MBPO_Pulse, 10)
@@ -353,6 +380,7 @@ _MBPO_Main() {
 				Primary := Failure
 		}
 		OnMessage(0x2, _MBPO_Destroy, 0)
+		OnMessage(0x111, _MBPO_NativeCommand, 0)
 		LoggerClearTestSink()
 		OnError(_MBPO_OnError, 0)
 		Suspend(WasSuspended)

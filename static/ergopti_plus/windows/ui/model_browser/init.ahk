@@ -315,6 +315,8 @@ _LLM_ModelBrowser_GetInstalledTags() {
  */
 _LLM_ModelBrowser_PickRow(LV, RowNumber) {
 	global _LLM_ModelBrowser_Gui
+	if A_IsSuspended
+		return false
 	Window := LV.Gui
 	if (!RowNumber or RowNumber < 1)
 		return
