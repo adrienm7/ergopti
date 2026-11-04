@@ -206,6 +206,35 @@ local function scenario(opts, body)
 	end, { initial = stored })
 end
 
+helpers.it("vision configuration refuses a FIFO rather than blocking", function()
+	local uv = require("luv")
+	local Paths = require("infra.paths")
+	local original_shared, original_request = Paths.shared, package.loaded["modules.llm.vision_request"]
+	local source = assert(original_shared("modules/llm/vision.json"))
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-vision-XXXXXX"))
+	local path = dir .. "/vision.json"
+	local made = os.execute("mkfifo '" .. path .. "'")
+	assert(made == 0 or made == true)
+	package.loaded["modules.llm.vision_request"] = nil
+	local Request = require("modules.llm.vision_request")
+	Paths.shared = function(relative)
+		if relative == "modules/llm/vision.json" then return path end
+		return original_shared(relative)
+	end
+	local exited, process = false, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source } }, function()
+		exited = true
+		process:close()
+	end))
+	local ok, config = pcall(Request.config)
+	Paths.shared, package.loaded["modules.llm.vision_request"] = original_shared, original_request
+	os.remove(path)
+	os.remove(dir)
+	while not exited do uv.run("once") end
+	assert(ok, config)
+	helpers.assert_nil(config, "a FIFO must not supply the vision configuration")
+end)
+
 helpers.describe("screen answers: missing local model admission", function()
 	helpers.it("offers the absent vision model before transmitting the screenshot", function()
 		scenario({ download_choice = true }, function(world)
