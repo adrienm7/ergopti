@@ -1508,14 +1508,14 @@ function M.set_app_category(app_name, category, score)
 		Logger.error(LOG, "set_app_category(): a category is required for '%s'.", app_name)
 		return false
 	end
-	local model = AppCategoryFile.load()
+	local model, _, source = AppCategoryFile.load()
 	if not model then return false end
 	local stored, reason = AppCategoryStore.set(model, app_name, category, tonumber(score) or 0)
 	if not stored then
 		Logger.error(LOG, "set_app_category(): refused for '%s': %s.", app_name, tostring(reason))
 		return false
 	end
-	if not AppCategoryFile.save(model) then return false end
+	if not AppCategoryFile.save(model, source) then return false end
 	-- The cached manifest was built before the edit, and the page re-reads
 	-- immediately after it. Without this the user sees their change reverted and
 	-- tries again.
