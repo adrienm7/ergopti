@@ -91,3 +91,19 @@ and report-format corrections. See [complete initial output](delivery-verify-cha
 
 Native Windows/macOS/hardware/provider acceptance remains unexecuted regardless
 of source-check success.
+
+## Checks after rebasing onto reviewed dev
+
+The audit commits were rebased onto reviewed dev `601fde0284333199620c8b405c50878efa03b19d`.
+Generator-owned formatting now uses the Prettier API so its output is independent
+of the manual formatter's ignore policy. This preserves readable projections
+while preventing manual formatting from becoming a second output owner.
+Regeneration preserves the JSON values and rendered Markdown; it changes no
+application behavior or inventory declarations.
+
+The inventory/parity and formatter-ownership checks passed. Whole-tree formatting,
+strict conventions, AHK encoding and both official audit envelope validators
+passed on the rebased tree. The integration check also verified every scope,
+TODO ID, difference classification and relative Markdown link. The full
+570-check run above remains attached to its original source baseline; it was not
+rerun or reclassified as a green full run on the intervening runtime changes.
