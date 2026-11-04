@@ -10,6 +10,7 @@
 --- =============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 local MODULES = {
 	"adapters.file_system",
@@ -28,7 +29,7 @@ local function with_fixture(run)
 	local saved = {}
 	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name] end
 	local original_open = io.open
-	local secure_path = "/Users/fixture/.config/ergopti_plus/hammerspoon/mlx_active_model.txt"
+	local secure_path = "/Users/fixture/" .. AppDirs.config.macos_relative .. "/hammerspoon/mlx_active_model.txt"
 	local content = "/Users/fixture/model-snapshot"
 	local identity = {
 		mode = "file",

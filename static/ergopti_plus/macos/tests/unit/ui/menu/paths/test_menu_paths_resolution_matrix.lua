@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 --- Every named path the driver asks for. Kept as data so a new key added to
 --- M.get() without a row here is visible as a count mismatch below.
@@ -288,7 +289,7 @@ helpers.describe("menu_paths: personal bootstrap distinguishes absence from unre
 		local home = make_tmp_dir():gsub("[/\\]$", "")
 		local Paths = load_paths({ home = home, paths_toml = nil, base_dir = base })
 		Paths.init(base, function() end)
-		local personal_dir = home .. "/.config/ergopti_plus/hotstrings/"
+		local personal_dir = home .. "/" .. AppDirs.config.macos_relative .. "/hotstrings/"
 		os.execute('mkdir "' .. personal_dir .. '"')
 		local personal_path = personal_dir .. "personal_hotstrings.toml"
 		local sentinel = "PRIVATE-PATH-BOOTSTRAP-SENTINEL"

@@ -677,7 +677,8 @@ end
 --- @return table env
 function M.launcher_environment(app_root, home)
 	local bundle = app_root .. "/ErgoptiPlus.app"
-	local logs = home .. "/Library/Logs/ergopti_plus"
+	local AppDirs = require("app_dirs")
+	local logs = home .. "/" .. AppDirs.macos.relative
 	return {
 		ERGOPTI_KEYBOARD_GEOMETRY_V1 = require("tests.support.keyboard_geometry").launcher_value(),
 		ERGOPTI_LAUNCHER_PID = "4242",
@@ -686,13 +687,13 @@ function M.launcher_environment(app_root, home)
 		ERGOPTI_LOG_TOKEN = string.rep("e2e-token-", 5),
 		ERGOPTI_LAUNCHER_VERSION = "0.0.0-e2e",
 		ERGOPTI_CONFIG_DIR = bundle .. "/Contents/Resources/static/ergopti_plus/macos",
-		ERGOPTI_PATHS_FILE = home .. "/Library/Application Support/ErgoptiPlus/paths.toml",
+		ERGOPTI_PATHS_FILE = home .. "/" .. AppDirs.config.macos_paths_file,
 		ERGOPTI_LAUNCHER_EXECUTABLE = bundle .. "/Contents/MacOS/ErgoptiPlus",
 		ERGOPTI_REMAP_GUARDIAN_STATUS = "ready",
 		ERGOPTI_LAUNCHER_DEVICE = "16777233",
 		ERGOPTI_LAUNCHER_INODE = "424242",
-		ERGOPTI_FATAL_REPORT_FILE = logs .. "/hammerspoon-fatal.txt",
-		ERGOPTI_LAUNCHER_LOG_FILE = logs .. "/launcher.log",
+		ERGOPTI_FATAL_REPORT_FILE = logs .. "/" .. AppDirs.macos.fatal_report,
+		ERGOPTI_LAUNCHER_LOG_FILE = logs .. "/" .. AppDirs.macos.launcher_log,
 		HOME = home,
 	}
 end

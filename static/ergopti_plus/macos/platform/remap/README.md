@@ -51,7 +51,7 @@ implemented today.
   `vendor/remap-runtime/manifest.json`, which pins `16.3.0-ergopti.2`, the
   hosted `runtime-artifact` job's digest (`tools/build/remap_runtime_publish.py
 apply`); `runtime_artifact_fetch.lua` downloads and verifies it into
-  `~/Library/Application Support/ErgoptiPlus/RemapRuntime/` on the first
+  `~/Library/Application Support/Ergopti/RemapRuntime/` on the first
   admission and reuses it after. That helper publishes the runtime files only:
   nothing installs it or writes the Core and VirtualHIDDevice jobs yet, so an
   opted-in boot stops at `runtime_not_installed`. The artifact is the signed privileged

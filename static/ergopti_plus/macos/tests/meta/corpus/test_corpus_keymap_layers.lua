@@ -19,6 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 local json = require("json")
 local toml_codec = require("toml_codec")
 local Layers = require("keymap.layers")
@@ -131,7 +132,7 @@ end)
 -- =========================================
 
 helpers.describe("keymap_layers — the user's layers.toml", function()
-	local config_dir = "/Users/someone/.config/ergopti_plus"
+	local config_dir = "/Users/someone/" .. AppDirs.config.macos_relative
 
 	helpers.it("lives at the root of the configuration folder under the vocabulary's name", function()
 		helpers.assert_eq(Layers.user_file_path(config_dir .. "/", ctx), config_dir .. "/layers.toml")

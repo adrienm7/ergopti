@@ -533,6 +533,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.legacy_folder_migration",
+		contract = { "native_ports", "plan", "rewrites", "run" },
+		-- init.lua moves the old folders once at boot, before paths.toml is read.
+		wired    = true,
+	},
+	{
 		id       = "adapters.metadata_command_stats",
 		contract = { "clock", "record", "snapshot" },
 		-- Slow ingest and slow preferences save reports count the metadata forks.
