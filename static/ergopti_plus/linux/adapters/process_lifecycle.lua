@@ -129,7 +129,7 @@ local function _parse_stat(line)
 	if open == nil or close == nil or close <= open then return nil end
 	if line:sub(close + 1, close + 1) ~= " " then return nil end
 	local state = line:sub(close + 2, close + 2)
-	if not state:match("^%u$") then return nil end
+	if not state:match("^[%uxt]$") then return nil end
 	return line:sub(open + 1, close - 1), state
 end
 
@@ -159,7 +159,7 @@ local function _snapshot_processes()
 				elseif line ~= "" then
 					local name, state = _parse_stat(line)
 					if name == nil then return nil end
-					if name ~= "" and state ~= "Z" and state ~= "X" then snapshot[name] = true end
+					if name ~= "" and state ~= "Z" and state ~= "X" and state ~= "x" then snapshot[name] = true end
 				end
 			end
 		end
