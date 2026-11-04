@@ -1178,7 +1178,10 @@ number_row_level_text_bytes = 1024
 # Largest release-list response the update check reads, and so the largest
 # stored copy it reuses. LX: modules/updater/manager.lua (transport cap).
 # Lua: _shared/lua/updater/list_cache.lua (stored copy bound).
-release_list_body_bytes = 2097152
+# A page of 20 releases weighed 2.4 MB on 2026-11-04 (about 120 KB each: notes
+# and some 40 assets), over the former 2 MiB, and the Linux update check failed;
+# 8 MiB leaves room for about 65 such releases.
+release_list_body_bytes = 8388608
 
 # What the digest tool may print for one file, beyond the file's own path: the
 # hexadecimal digest and its separators. LX: adapters/file_digest.lua.

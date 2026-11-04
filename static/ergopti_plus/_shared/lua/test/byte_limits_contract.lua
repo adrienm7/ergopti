@@ -21,7 +21,7 @@ local M = {}
 M.PINNED = {
 	{ "layer_file_bytes", 65536 },
 	{ "number_row_level_text_bytes", 1024 },
-	{ "release_list_body_bytes", 2097152 },
+	{ "release_list_body_bytes", 8388608 },
 	{ "program_catalogue_bytes", 65536 },
 	{ "http_diagnostic_bytes", 65536 },
 	{ "proxy_packet_bytes", 65536 },
