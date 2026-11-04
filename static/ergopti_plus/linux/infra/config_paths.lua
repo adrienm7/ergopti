@@ -248,6 +248,7 @@ end
 --- @return string|nil error_message
 function M.normalize_logs_dir(path)
 	if type(path) ~= "string" then return nil, "the logs folder must be a string" end
+	if path:find("\0", 1, true) then return nil, "the logs folder must not contain NUL" end
 	local normalized = path:gsub("/+$", "")
 	if normalized == "" then return "" end
 	if normalized:sub(1, 1) ~= "/" then
