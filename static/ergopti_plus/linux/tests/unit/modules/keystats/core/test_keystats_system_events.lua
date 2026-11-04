@@ -134,9 +134,9 @@ end)
 
 for _, failure in ipairs({ "migration", "registration", "migration_throw", "registration_throw", "open_refused", "open_throw", "open_unavailable" }) do
 	it("metrics do not use SQLite after failed " .. failure, function()
-		local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system_metrics" }
+		local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system_metrics", "modules.keystats.text_migration" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-		local starts, closes, registers = 0, 0, 0
+		local starts, closes, registers, resumes, conversions = 0, 0, 0, 0, 0
 		local writer = setmetatable({
 			open_db = function()
 				if failure == "open_throw" then error("injected open failure") end
@@ -161,6 +161,9 @@ for _, failure in ipairs({ "migration", "registration", "migration_throw", "regi
 		local start = writer.start_flush
 		writer.start_flush = function(...) starts = starts + 1; return start(...) end
 		package.loaded[names[1]], package.loaded[names[2]] = writer, nil
+		package.loaded[names[4]] = { resume = function() resumes = resumes + 1 end,
+			start = function() conversions = conversions + 1; return true end, cancel = function() end,
+			pump = function() end, is_running = function() return false end }
 		package.loaded[names[3]] = { bind = function() end, bind_event_capture = function() end,
 			current = function() return nil end, snapshot = function() return { values = {}, owners = {} } end,
 			acknowledge = function() end, take_events = function() return {} end }
@@ -169,6 +172,9 @@ for _, failure in ipairs({ "migration", "registration", "migration_throw", "regi
 			local blocked = failure ~= "open_unavailable"
 			helpers.assert_eq(keystats.init(Home.options()), not blocked, "only explicit missing sqlite uses fallback")
 			helpers.assert_eq(keystats.get_privacy_state().storage_blocked, blocked, "diagnostics can observe the capture gate")
+			helpers.assert_eq(resumes, 0, "an unadmitted store cannot resume historical conversion")
+			helpers.assert_eq(keystats.migrate_stored_text(), false)
+			helpers.assert_eq(conversions, 0, "an unadmitted store cannot start historical conversion")
 			require("tests.support.metrics_consent_fixture").enable(keystats)
 			keystats.on_keydown("a", 1000, "owned-app")
 			helpers.assert_eq(keystats.get_app_stats()["owned-app"] == nil, blocked, "rejected stores cannot capture unpersistable events")
