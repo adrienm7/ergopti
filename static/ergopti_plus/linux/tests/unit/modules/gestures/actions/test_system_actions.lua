@@ -114,7 +114,8 @@ local function backgrounded(Gestures, action, answer)
 end
 
 local EXPECTED = {
-	show_desktop = "{ case \"$(wmctrl -m 2>/dev/null)\" in *'mode: ON'*) wmctrl -k off;; *) wmctrl -k on;; esac; }",
+	show_desktop = "{ desktop=$(wmctrl -m 2>/dev/null) && case \"$desktop\" in"
+		.. " *'mode: ON'*) wmctrl -k off;; *'mode: OFF'*) wmctrl -k on;; *) false;; esac; }",
 	-- Powered off at once, the release of the triggering keys woke them again.
 	sleep_displays = "{ sleep 1 && xset dpms force off; }",
 	toggle_dark_mode = "{ scheme=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null) && case \"$scheme\" in"
@@ -378,6 +379,24 @@ helpers.describe("Linux system actions", function()
 			end)
 		end
 	end)
+
+	for _, response in ipairs({ "exit 1", 'printf "unknown"' }) do
+		helpers.it("does not change desktop visibility after an unreadable query (" .. response .. ")", function()
+			local log = run_with_stubs(backgrounded(Gestures, "show_desktop"), {
+				wmctrl = 'if [ "$1" = -m ]; then ' .. response .. '; fi',
+			})
+			helpers.assert_true(not log:find("wmctrl -k", 1, true), "unobserved state must not be changed: " .. log)
+		end)
+	end
+
+	for _, vector in ipairs({ { "ON", "off" }, { "OFF", "on" } }) do
+		helpers.it("toggles observed desktop visibility " .. vector[1], function()
+			local log = run_with_stubs(backgrounded(Gestures, "show_desktop"), {
+				wmctrl = 'if [ "$1" = -m ]; then printf "%s\\n" "showing the desktop mode: ' .. vector[1] .. '"; fi',
+			})
+			helpers.assert_true(log:find("wmctrl -k " .. vector[2], 1, true) ~= nil, log)
+		end)
+	end
 
 	for _, response in ipairs({ "exit 1", 'printf "unexpected"' }) do
 		helpers.it("does not change the colour scheme after an unreadable setting (" .. response .. ")", function()
