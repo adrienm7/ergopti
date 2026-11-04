@@ -41,7 +41,7 @@ local function overlay_with(preview)
 			rows = function() return preview.both and preview.rows or nil end,
 			showing = function() return preview.rows ~= nil end,
 			covered = function() calls.covered = calls.covered + 1; preview.rows = nil end,
-			redraw = function() calls.redraw = calls.redraw + 1; window.rows = preview.rows end,
+			redraw = function() calls.redraw = calls.redraw + 1; window.rows = preview.rows; return true end,
 		},
 	})
 	return overlay, window, calls
@@ -149,6 +149,73 @@ helpers.describe("AI overlay: one window shared with the hotstring preview", fun
 		helpers.assert_eq(overlay.is_showing(), false)
 		helpers.assert_eq(hides, 1)
 		package.loaded["ui.tooltip.llm"] = nil
+	end)
+
+	helpers.it("(tooltip-shared-destroy) keeps the preview surface when detaching the LLM overlay", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay, destroyed, showing = require("ui.tooltip.llm"), 0, true
+		assert(overlay.init({ style = {}, renderer = {
+			show = function() return true end, hide = function() return true end,
+			destroy = function() destroyed = destroyed + 1; return true end,
+		}, companion = {
+			showing = function() return showing end, rows = function() return { { text = "preview" } } end,
+			redraw = function() return true end,
+		} }))
+		assert(overlay.show({ { to_type = "suggestion" } }, {}))
+		local detached = overlay.destroy()
+		package.loaded["ui.tooltip.llm"] = nil
+		helpers.assert_eq({ detached = detached, destroyed = destroyed, showing = showing },
+			{ detached = true, destroyed = 0, showing = true })
+	end)
+
+	helpers.it("(tooltip-shared-destroy) retains the renderer if companion redraw refuses", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay, showing, destroyed = require("ui.tooltip.llm"), true, 0
+		assert(overlay.init({ style = {}, renderer = {
+			show = function() return true end, hide = function() return true end,
+			destroy = function() destroyed = destroyed + 1; return true end,
+		}, companion = {
+			showing = function() return showing end, rows = function() return { { text = "preview" } } end,
+			redraw = function() showing = false; return false end,
+		} }))
+		assert(overlay.show({ { to_type = "suggestion" } }, {}))
+		local detached = overlay.destroy()
+		package.loaded["ui.tooltip.llm"] = nil
+		helpers.assert_eq({ detached = detached, destroyed = destroyed }, { detached = false, destroyed = 0 })
+	end)
+
+	helpers.it("(tooltip-shared-destroy) refuses an unavailable or changing companion owner", function()
+		for _, mode in ipairs({ "throw", "replace" }) do
+			package.loaded["ui.tooltip.llm"] = nil
+			local overlay, hidden, destroyed, revision = require("ui.tooltip.llm"), 0, 0, 1
+			assert(overlay.init({ style = {}, renderer = {
+				show = function() return true end,
+				hide = function() hidden = hidden + 1; return true end,
+				destroy = function() destroyed = destroyed + 1; return true end,
+			}, companion = {
+				revision = function() return revision end,
+				showing = function() if mode == "throw" then error("unavailable") end; revision = revision + 1; return false end,
+			} }))
+			local detached = overlay.destroy()
+			package.loaded["ui.tooltip.llm"] = nil
+			helpers.assert_eq({ detached = detached, hidden = hidden, destroyed = destroyed },
+				{ detached = false, hidden = 0, destroyed = 0 })
+		end
+	end)
+
+	helpers.it("(tooltip-shared-destroy) fences reentrant overlay lifecycle calls", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay, nested = require("ui.tooltip.llm"), nil
+		local renderer = { show = function() return true end, hide = function() return true end }
+		renderer.destroy = function()
+			nested = { overlay.show({ { to_type = "replacement" } }, {}), overlay.init({ style = {}, renderer = renderer }), overlay.destroy() }
+			return true
+		end
+		assert(overlay.init({ style = {}, renderer = renderer }))
+		local detached = overlay.destroy()
+		package.loaded["ui.tooltip.llm"] = nil
+		helpers.assert_eq({ detached = detached, nested = nested },
+			{ detached = true, nested = { false, false, false } })
 	end)
 
 	helpers.it("(tooltip-destroy-refusal) retains the overlay owner until native destruction succeeds", function()
