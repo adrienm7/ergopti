@@ -55,13 +55,9 @@ local TapKeys = ShortcutCatalogue.new_tap_keys({
 	-- Resolved on every read: tests redirect Paths.shared to a throwaway file.
 	resolve_path = function(rel) return Paths.shared(rel) end,
 	read = function(path)
-		local handle = path and io.open(path, "r")
-		if not handle then error("tap_keys: cannot read " .. tostring(path)) end
-		local read_ok, body = pcall(handle.read, handle, "*a")
-		local close_ok, closed = pcall(handle.close, handle)
-		if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
-			error("tap_keys: cannot complete read of " .. tostring(path))
-		end
+		local body, status
+		if path then body, status = require("toml_codec.writer").read_classified(path) end
+		if status ~= "ok" then error("tap_keys: cannot read " .. tostring(path)) end
 		return body
 	end,
 	decode = function(body)

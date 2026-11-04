@@ -200,15 +200,8 @@ local function catalogue_keys()
 		Logger.error(LOG, "Cannot locate the shared tree — no key catalogue, so no slots are offered.")
 		return nil
 	end
-	local handle = io.open(path, "r")
-	if not handle then
-		_catalogue = false
-		Logger.error(LOG, "Cannot read '%s' — no slots are offered.", path)
-		return nil
-	end
-	local read_ok, body = pcall(handle.read, handle, "*a")
-	local close_ok, closed = pcall(handle.close, handle)
-	if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
+	local body, status = require("toml_codec.writer").read_classified(path)
+	if status ~= "ok" then
 		_catalogue = false
 		Logger.error(LOG, "The key catalogue at '%s' was not completely read and closed — no slots are offered.", path)
 		return nil
