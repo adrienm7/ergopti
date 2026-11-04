@@ -15,11 +15,19 @@
 ; Runs Body on an isolated engine with the chords given, and a recorder.
 _KCCE_With(Chords, Symmetric, Body) {
 	global KeyCombinationChords, KeyCombinationChordConfig, _KeyCombinationChordPolicy, _KeyCombinationChordFirsts
+	global _KeyCombinationChordOwner
 	global _KeyCombinationChordWaiting, _KeyCombinationChordTaken, _KeyCombinationChordQueue, _KeyCombinationChordBusy
+	global _KeyCombinationChordWaitAt, _KeyCombinationChordReplaying
 	global CategoryEnabled, _KeyCombinationScanNames, _KeyCombinationKeysByScanName, _KeyCombinationTaken, _KeyCombinationHandled
 	global _KeyCombinationPressAssignments, KeyCombinationTaps, KeyCombinationHolds, _KeyCombinationFirstKeys, LayerEnabled
+	AssertTrue(_KeyCombinationChordWaiting == "" && _KeyCombinationChordQueue.Length == 0
+		&& _KeyCombinationChordTaken.Count == 0 && !_KeyCombinationChordBusy,
+		"A foreign live chord batch cannot be parked across lifecycle teardown")
+	SavedChord := {Waiting: _KeyCombinationChordWaiting, At: _KeyCombinationChordWaitAt,
+		Taken: _KeyCombinationChordTaken, Queue: _KeyCombinationChordQueue, Busy: _KeyCombinationChordBusy,
+		Replaying: _KeyCombinationChordReplaying}
 	Saved := [KeyCombinationChords, KeyCombinationChordConfig, _KeyCombinationChordPolicy, _KeyCombinationChordFirsts,
-		CategoryEnabled, LayerEnabled]
+		CategoryEnabled, LayerEnabled, IsSet(_KeyCombinationChordOwner) ? _KeyCombinationChordOwner : 0]
 	World := { Now: 1000, Held: Map(), Sends: [], Actions: [], Polls: [], Drains: 0, Log: [] }
 	Ports := Map(
 		"tick", () => World.Now,
@@ -34,6 +42,7 @@ _KCCE_With(Chords, Symmetric, Body) {
 	Cache["mod_combos"] := Map("simultaneous_threshold_ms", 100, "symmetric", Symmetric)
 	CategoryEnabled := Map("KeyCombinations", true)
 	LayerEnabled := false
+	_KeyCombinationChordOwner := 0
 	_KeyCombinationChordWaiting := "", _KeyCombinationChordTaken := Map()
 	_KeyCombinationChordQueue := [], _KeyCombinationChordBusy := false
 	Scans := Map(), Keys := Map()
@@ -50,8 +59,10 @@ _KCCE_With(Chords, Symmetric, Body) {
 		KeyCombinationChords := Saved[1], KeyCombinationChordConfig := Saved[2]
 		_KeyCombinationChordPolicy := Saved[3], _KeyCombinationChordFirsts := Saved[4]
 		CategoryEnabled := Saved[5], LayerEnabled := Saved[6]
-		_KeyCombinationChordWaiting := "", _KeyCombinationChordTaken := Map()
-		_KeyCombinationChordQueue := [], _KeyCombinationChordBusy := false
+		_KeyCombinationChordOwner := IsObject(Saved[7]) && !TapHoldOwnerCurrent(Saved[7]) ? 0 : Saved[7]
+		_KeyCombinationChordWaiting := SavedChord.Waiting, _KeyCombinationChordWaitAt := SavedChord.At
+		_KeyCombinationChordTaken := SavedChord.Taken, _KeyCombinationChordQueue := SavedChord.Queue
+		_KeyCombinationChordBusy := SavedChord.Busy, _KeyCombinationChordReplaying := SavedChord.Replaying
 		_KeyCombinationScanNames := SavedScans, _KeyCombinationKeysByScanName := SavedKeys
 	}
 }
@@ -311,14 +322,14 @@ Test("key chord engine: plain typing stays inside the hot path budget (item2-bud
 
 ; Deliver the actual poll/drain through native SetTimer after native Suspend.
 ; The real engine/policy owns admission and queueing; only keyboard edges are observed.
-_KCCE_NativePauseDelivery(Queued, Pause) {
-	_KCCE_With(Map("space_then_tab", "copy"), false, _KCCE_NativePauseBody.Bind(Queued, Pause))
+_KCCE_NativePauseDelivery(Queued, Pause, RetireBeforeDelivery := false) {
+	_KCCE_With(Map("space_then_tab", "copy"), false, _KCCE_NativePauseBody.Bind(Queued, Pause, RetireBeforeDelivery))
 }
 
-_KCCE_NativePauseBody(Queued, Pause, World, Ports) {
+_KCCE_NativePauseBody(Queued, Pause, RetireBeforeDelivery, World, Ports) {
 	global _KeyCombinationChordQueue, _KeyCombinationChordWaiting, _KeyCombinationChordBusy
 	WasSuspended := A_IsSuspended, PreviousCritical := Critical("On")
-	Delivered := 0, Failure := 0, Before := 0
+	Delivered := 0, Failure := 0, Before := 0, BusyAfterResume := false
 	Deliver() {
 		try {
 			if Queued
@@ -349,7 +360,13 @@ _KCCE_NativePauseBody(Queued, Pause, World, Ports) {
 			World.Now += 5
 		}
 		Before := World.Sends.Length
-		Suspend(Pause)
+		if RetireBeforeDelivery {
+			Suspend(true)
+			try AssertTrue(TapHoldReleaseSyntheticKeys())
+			finally Suspend(false)
+			BusyAfterResume := TapHoldRollUndecided()
+		} else
+			Suspend(Pause)
 		Critical("Off")
 		Started := A_TickCount
 		while Delivered == 0 && A_TickCount - Started < 3000
@@ -357,15 +374,17 @@ _KCCE_NativePauseBody(Queued, Pause, World, Ports) {
 		AssertEqual(1, Delivered, "one genuine native timer must deliver the production callback")
 		if IsObject(Failure)
 			throw Failure
-		AssertEqual(Before + (Pause ? 0 : 1), World.Sends.Length,
+		AssertEqual(Before + ((Pause || RetireBeforeDelivery) ? 0 : 1), World.Sends.Length,
 			"a paused poll/drain must never inject; its unpaused control must genuinely replay")
+		if RetireBeforeDelivery
+			AssertFalse(BusyAfterResume, "a retired criterion must not intercept new typing before its old timer delivers")
 		AssertEqual(0, _KeyCombinationChordQueue.Length, "a retired queue must not replay after resume")
 		AssertEqual("", _KeyCombinationChordWaiting)
 		AssertFalse(_KeyCombinationChordBusy)
 		Suspend(false)
 		KeyCombinationChordDrain(Ports)
 		KeyCombinationChordTick(Ports)
-		AssertEqual(Before + (Pause ? 0 : 1), World.Sends.Length, "resume cannot revive the retired replay")
+		AssertEqual(Before + ((Pause || RetireBeforeDelivery) ? 0 : 1), World.Sends.Length, "resume cannot revive the retired replay")
 	} finally {
 		SetTimer(Deliver, 0)
 		Suspend(WasSuspended)
@@ -376,3 +395,97 @@ for _KCCE_QueuedNative in [false, true]
 	for _KCCE_PauseNative in [false, true]
 		Test("key chord lifecycle: native queued=" . _KCCE_QueuedNative . " paused=" . _KCCE_PauseNative . " fences replay (chord-native-pause)",
 			_KCCE_NativePauseDelivery.Bind(_KCCE_QueuedNative, _KCCE_PauseNative))
+
+
+_KCCE_NativeResumeBeforeDelivery(Queued) {
+	_TSUH_Begin(Map(), Map())
+	try _KCCE_NativePauseDelivery(Queued, false, true)
+	finally _TSUH_End()
+}
+for _KCCE_ResumeQueued in [false, true]
+	Test("key chord lifecycle: queued=" . _KCCE_ResumeQueued . " pause and resume before native delivery revoke replay (chord-native-resume)",
+		_KCCE_NativeResumeBeforeDelivery.Bind(_KCCE_ResumeQueued))
+
+; A real lifecycle cleanup retires A, then B enters through the real criterion/handler.
+_KCCE_PublishResumedFirst(World, Ports) {
+	Suspend(true)
+	try AssertTrue(TapHoldReleaseSyntheticKeys())
+	finally Suspend(false)
+	World.Held := Map()
+	return _KCCE_Press(World, Ports, "space")
+}
+
+_KCCE_SuccessorDuringHeldRead() {
+	_TSUH_Begin(Map(), Map())
+	try _KCCE_With(Map("space_then_tab", "copy"), false, _KCCE_SuccessorHeldBody)
+	finally _TSUH_End()
+}
+_KCCE_SuccessorHeldBody(World, Ports) {
+	global _KeyCombinationChordWaiting, _KeyCombinationChordQueue, _KeyCombinationChordBusy
+	WasSuspended := A_IsSuspended, Ready := false, Replaced := false, BResult := ""
+	OriginalHeld := Ports["is_held"]
+	Read(Key) {
+		if Ready && !Replaced && Key == "space" {
+			Replaced := true
+			BResult := _KCCE_PublishResumedFirst(World, Ports)
+		}
+		return OriginalHeld.Call(Key)
+	}
+	Ports["is_held"] := Read
+	try {
+		Suspend(false)
+		AssertEqual("wait", _KCCE_Press(World, Ports, "space"))
+		Ready := true
+		KeyCombinationChordInterrupt(0x010, Ports)
+		AssertTrue(Replaced, "the actual held-state callout must run lifecycle teardown and admit B")
+		AssertEqual(0, World.Sends.Length, "old A must not emit after its held-state callback publishes B")
+		AssertEqual("wait", BResult, "the resumed first key must start its own real wait")
+		AssertEqual("space", _KeyCombinationChordWaiting)
+		AssertEqual(0, _KeyCombinationChordQueue.Length, "old Interrupt must not append its character into B's queue")
+		AssertTrue(_KeyCombinationChordBusy)
+	} finally Suspend(WasSuspended)
+}
+Test("key chord lifecycle: held-state callback preserves a resumed successor (chord-callout-successor)", _KCCE_SuccessorDuringHeldRead)
+
+_KCCE_SuccessorDuringLog() {
+	global _LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_MIN_SEVERITY
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime, _LOGGER_REPEAT_ENABLED
+	Saved := {Sink: _LOGGER_TEST_SINK, Info: _LOGGER_INFO_ENABLED, Severity: _LOGGER_MIN_SEVERITY,
+		Dedup: _LOGGER_DEDUP_KEY, Level: _LOGGER_DEDUP_LEVEL, Count: _LOGGER_DEDUP_COUNT,
+		Time: _LastErrTime, Repeat: _LOGGER_REPEAT_ENABLED}
+	_TSUH_Begin(Map(), Map())
+	try {
+		_LOGGER_INFO_ENABLED := true, _LOGGER_MIN_SEVERITY := 10
+		_LOGGER_DEDUP_KEY := "", _LOGGER_REPEAT_ENABLED := false
+		_KCCE_With(Map("space_then_tab", "copy"), false, _KCCE_SuccessorLogBody)
+	} finally {
+		_LOGGER_TEST_SINK := Saved.Sink, _LOGGER_INFO_ENABLED := Saved.Info, _LOGGER_MIN_SEVERITY := Saved.Severity
+		_LOGGER_DEDUP_KEY := Saved.Dedup, _LOGGER_DEDUP_LEVEL := Saved.Level, _LOGGER_DEDUP_COUNT := Saved.Count
+		_LastErrTime := Saved.Time, _LOGGER_REPEAT_ENABLED := Saved.Repeat
+		_TSUH_End()
+	}
+}
+_KCCE_SuccessorLogBody(World, Ports) {
+	global _KeyCombinationChordWaiting, _KeyCombinationChordQueue, _KeyCombinationChordBusy
+	WasSuspended := A_IsSuspended, Replaced := false, BResult := ""
+	Observe(Line) {
+		if Replaced || !InStr(Line, "[KeyCombinations] Chord '")
+			return
+		Replaced := true
+		BResult := _KCCE_PublishResumedFirst(World, Ports)
+	}
+	try {
+		Suspend(false)
+		AssertEqual("wait", _KCCE_Press(World, Ports, "space"))
+		LoggerSetTestSink(Observe)
+		World.Now += 10
+		KeyCombinationChordHandle("tab", Ports)
+		AssertTrue(Replaced, "the actual chord log must reach the controlled lifecycle interruption")
+		AssertEqual(0, World.Actions.Length, "old A must not fire its action after logging publishes B")
+		AssertEqual("wait", BResult)
+		AssertEqual("space", _KeyCombinationChordWaiting)
+		AssertEqual(0, _KeyCombinationChordQueue.Length)
+		AssertTrue(_KeyCombinationChordBusy)
+	} finally Suspend(WasSuspended)
+}
+Test("key chord lifecycle: logging cannot fire a retired action or erase its successor (chord-callout-successor)", _KCCE_SuccessorDuringLog)

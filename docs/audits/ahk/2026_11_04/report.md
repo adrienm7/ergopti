@@ -851,3 +851,7 @@ Consequence: The paused driver can inject a key it retained before pause. A reti
 Regression: Four chord-native-pause cases deliver real native poll/drain timers around Suspend; production chord policy and engine remain genuine while keyboard transport is observed through its existing recorder. Two positive controls prove actual replay; two paused cases must discard unsent work and keep it retired after resume. No balancing-Up change or physical keyboard proof is claimed. Native fail-before measured; source correction and extended owner regressions are under review.
 
 The ongoing register now contains **45 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-045 correction under native qualification
+
+The chord batch now retains exact lifecycle authority through waiting, queued replay and yielded probes. Each directly owned short send is admitted atomically; old callbacks cannot clear a successor batch. Four additional owner cases cover resume before timer delivery and held-state/logger interruptions. The fixture refuses foreign live chords and restores exact inactive state; physical key-release behavior is unchanged and unqualified here. Native post-fix results are pending.
