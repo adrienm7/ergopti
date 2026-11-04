@@ -9,6 +9,18 @@ helpers.describe("linux/infra/locale.lua", function()
 		helpers.assert_true(type(mod) == "table", "should return a table")
 	end)
 
+	helpers.it("locale refuses a missing JSON decoder before reading data", function()
+		local saved_json, saved_preload = package.loaded.json, package.preload.json
+		local saved_locale, saved_core = package.loaded["infra.locale"], package.loaded["locale.core"]
+		package.loaded.json, package.loaded["infra.locale"] = nil, nil
+		package.preload.json = function() error("controlled missing decoder") end
+		local ok, detail = pcall(require, "infra.locale")
+		package.loaded.json, package.preload.json = saved_json, saved_preload
+		package.loaded["infra.locale"], package.loaded["locale.core"] = saved_locale, saved_core
+		helpers.assert_eq(ok, false, "a missing JSON decoder must not become an executable data fallback")
+		helpers.assert_true(tostring(detail):find("JSON decoder", 1, true) ~= nil)
+	end)
+
 	helpers.it("locale.get returns a non-empty string for a known key", function()
 		local locale = require("infra.locale")
 		-- The default locale is 'fr', so "menu.global.quit" should exist
@@ -37,6 +49,22 @@ helpers.describe("linux/infra/locale.lua", function()
 		helpers.assert_true(type(all) == "table", "all() returns a table")
 		local count = 0; for _ in pairs(all) do count = count + 1 end
 		helpers.assert_true(count > 10, "should have more than 10 keys")
+	end)
+end)
+
+helpers.describe("Linux keycode JSON admission", function()
+	helpers.it("input reader refuses a missing JSON decoder before loading keycodes", function()
+		local saved_json, saved_preload = package.loaded.json, package.preload.json
+		local saved_reader, saved_evdev = package.loaded["modules.hotstrings.input_reader"], package.loaded["keycodes.evdev"]
+		local calls = 0
+		package.loaded.json, package.loaded["modules.hotstrings.input_reader"] = nil, nil
+		package.preload.json = function() error("controlled missing decoder") end
+		package.loaded["keycodes.evdev"] = { load = function() calls = calls + 1; return {} end }
+		local ok = pcall(require, "modules.hotstrings.input_reader")
+		package.loaded.json, package.preload.json = saved_json, saved_preload
+		package.loaded["modules.hotstrings.input_reader"], package.loaded["keycodes.evdev"] = saved_reader, saved_evdev
+		helpers.assert_eq(ok, false, "missing JSON must refuse keycode admission")
+		helpers.assert_eq(calls, 0, "no keycode data is read with an executable fallback")
 	end)
 end)
 
