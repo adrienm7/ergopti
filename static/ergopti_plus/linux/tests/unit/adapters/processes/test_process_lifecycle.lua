@@ -89,6 +89,22 @@ local AC = { "a", "c" }
 -- process_every = floor(2.0 / 0.25) = 8: the process poll runs on these ticks.
 local PROCESS_TICK = 8
 
+helpers.it("linux-process-empty-stat: retains baseline on incomplete data but detects actual disappearance", function()
+	with_proc(AB, function(lifecycle, proc, launched, quit)
+		lifecycle.start()
+		local file = assert(io.open(proc.root .. "/102/stat", "wb"))
+		assert(file:close())
+		lifecycle.tick(PROCESS_TICK)
+		helpers.assert_eq(quit, {}, "an empty stat record is not proof of process exit")
+		proc.set(AB)
+		lifecycle.tick(PROCESS_TICK * 2)
+		helpers.assert_eq(launched, {}, "a recovered snapshot must not create a synthetic launch")
+		proc.set({ "a" })
+		lifecycle.tick(PROCESS_TICK * 3)
+		helpers.assert_eq(quit, { "b" }, "a genuinely absent process still produces a quit")
+	end)
+end)
+
 helpers.it("linux-process-lowercase-states: tracks traced tasks and ignores dead tasks", function()
 	with_proc(AB, function(lifecycle, proc, launched, quit)
 		lifecycle.start()
