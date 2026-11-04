@@ -199,3 +199,57 @@ Severity: high. Confidence: high. The production AHK execution path was inspecte
 `_KLR_RebuildInstallFirstWins` in `modules/keystats/keystats_reader_rebuild.ahk` removes every conflict, but `_KLR_RebuildStep` executes statements forward within each backward-read frame. The existing `_KLRNF_FirstCopyWins` fixture uses 700-byte reads that separate the duplicates. Repeat it with a large frame and compare the real derived fingerprint, surviving event and aggregate days against one-pass replay. Cache and checkpoint qualification must accompany the correction.
 
 This adds one independently reproduced finding, for **15 new distinct findings** in this ongoing audit. The goal of 100 remains unmet. Append-receipt failure remains an unconfirmed candidate and is not counted.
+
+## Third sweep of the same audited revision
+
+Four additional source-confirmed defects bring the ongoing register to **19 distinct new findings**. No native Windows reproduction is claimed for this sweep.
+
+### AHK-016: A private source title is lost before app-switch filtering
+
+Severity: high. Evidence: source-derived.
+
+static/ergopti_plus/windows/modules/keystats/keystats.ahk:KL_LogAppSwitch: The app-switch row retains only prev_app, and the central filter receives no source title.
+
+Reproduction: Leave a browser window titled Fixture (Private Browsing) for a public application, with private-browsing filtering enabled and the browser not disabled by process name.
+
+Consequence: Live focus names the public destination, so private source application and duration are queued.
+
+Regression: Use genuine focus, context and append owners, retaining public history; assert no private switch row and no persisted source title.
+
+### AHK-017: Keep-awake mixes client and physical mouse coordinates
+
+Severity: medium. Evidence: source-derived.
+
+static/ergopti_plus/windows/modules/shortcuts/win.ahk:StartActivitySimulation, AwakeCheckMouseMoved, SimulateActivity: MouseGetPos uses the thread coordinate mode while MCSetPos always uses physical screen pixels.
+
+Reproduction: Enable keep-awake with Mouse CoordMode Client and a window offset from the screen origin.
+
+Consequence: The jitter and return can jump away from the physical origin and self-cancel.
+
+Regression: Use an offset window and Client, Window and Screen modes; record passive physical writes and assert origin-relative bounds.
+
+### AHK-018: Binary registry methods violate their Buffer contract
+
+Severity: medium. Evidence: source-derived.
+
+static/ergopti_plus/windows/infra/registry.ahk:Reg_ReadBinary and Reg_WriteBinary: AutoHotkey native registry calls exchange hexadecimal strings; the wrappers promise Buffers but omit encoding and decoding.
+
+Reproduction: Write native REG_BINARY hexadecimal00A9FF77 and call Reg_ReadBinary; then attempt Reg_WriteBinary with a four-byte Buffer.
+
+Consequence: Reads return a String and Buffer writes fail. No current production caller was found, so impact is the public adapter API.
+
+Regression: Round-trip exact NUL, A9, FF and77 bytes under a private HKCU key, include an empty buffer and clean up in finally.
+
+### AHK-019: Hardware diagnostics label ARM64 as x64
+
+Severity: low. Evidence: source-derived.
+
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:\_HealthCheck_Hardware and infra/diagnostic_snapshot.ahk:DiagSnapshot_Collect: A_Is64bitOS is converted to x64, although it expresses width rather than native machine architecture.
+
+Reproduction: Run AutoHotkey x64 emulated on Windows ARM64 and collect diagnostics.
+
+Consequence: Both diagnostic collectors label the ARM64 host x64.
+
+Regression: Use a native architecture port and test machine ARM64 with process x64, native x64, and supported x86.
+
+Cross-midnight partitioning and detached-worker foreground overlays remain unconfirmed candidates and are not counted. The keep-awake timer rearming hypothesis also remains uncounted. The requested total of 100 remains unmet.

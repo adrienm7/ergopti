@@ -169,6 +169,50 @@
 			"root_cause": "static/ergopti_plus/windows/modules/keystats/keystats_reader_rebuild.ahk:_KLR_RebuildInstallFirstWins deletes every conflicting row, assuming every incoming insert is older. A frame executes its own statements forward, so this is false inside the frame.",
 			"silent_failure": "The existing first-copy regression intentionally uses a small frame size that separates the copies. Wrong survivors change event dates and derived aggregates without a SQL error.",
 			"regression_test": "Run the existing one-pass-versus-segmented fingerprint fixture with a frame large enough for both copies; retain the small-frame test and check duplicates inside one transaction."
+		},
+		{
+			"id": "AHK-016",
+			"title": "A private source title is lost before app-switch filtering",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Leave a browser window titled Fixture (Private Browsing) for a public application, with private-browsing filtering enabled and the browser not disabled by process name.",
+			"root_cause": "static/ergopti_plus/windows/modules/keystats/keystats.ahk:KL_LogAppSwitch: The app-switch row retains only prev_app, and the central filter receives no source title.",
+			"silent_failure": "Live focus names the public destination, so private source application and duration are queued.",
+			"regression_test": "Use genuine focus, context and append owners, retaining public history; assert no private switch row and no persisted source title."
+		},
+		{
+			"id": "AHK-017",
+			"title": "Keep-awake mixes client and physical mouse coordinates",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Enable keep-awake with Mouse CoordMode Client and a window offset from the screen origin.",
+			"root_cause": "static/ergopti_plus/windows/modules/shortcuts/win.ahk:StartActivitySimulation, AwakeCheckMouseMoved, SimulateActivity: MouseGetPos uses the thread coordinate mode while MCSetPos always uses physical screen pixels.",
+			"silent_failure": "The jitter and return can jump away from the physical origin and self-cancel.",
+			"regression_test": "Use an offset window and Client, Window and Screen modes; record passive physical writes and assert origin-relative bounds."
+		},
+		{
+			"id": "AHK-018",
+			"title": "Binary registry methods violate their Buffer contract",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Write native REG_BINARY hexadecimal00A9FF77 and call Reg_ReadBinary; then attempt Reg_WriteBinary with a four-byte Buffer.",
+			"root_cause": "static/ergopti_plus/windows/infra/registry.ahk:Reg_ReadBinary and Reg_WriteBinary: AutoHotkey native registry calls exchange hexadecimal strings; the wrappers promise Buffers but omit encoding and decoding.",
+			"silent_failure": "Reads return a String and Buffer writes fail. No current production caller was found, so impact is the public adapter API.",
+			"regression_test": "Round-trip exact NUL, A9, FF and77 bytes under a private HKCU key, include an empty buffer and clean up in finally."
+		},
+		{
+			"id": "AHK-019",
+			"title": "Hardware diagnostics label ARM64 as x64",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Run AutoHotkey x64 emulated on Windows ARM64 and collect diagnostics.",
+			"root_cause": "static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:_HealthCheck_Hardware and infra/diagnostic_snapshot.ahk:DiagSnapshot_Collect: A_Is64bitOS is converted to x64, although it expresses width rather than native machine architecture.",
+			"silent_failure": "Both diagnostic collectors label the ARM64 host x64.",
+			"regression_test": "Use a native architecture port and test machine ARM64 with process x64, native x64, and supported x86."
 		}
 	]
 }
