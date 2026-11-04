@@ -160,7 +160,7 @@ helpers.describe("Dynamic module acknowledgement and selected-scope isolation", 
 		helpers.assert_eq(f.ctx.state.personal_info, true)
 		helpers.assert_eq(f.registry.is_group_enabled("dynamichotstrings"), true)
 		for _, name in ipairs(f.names) do
-			helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_dynamichotstrings_" .. name), true)
+			helpers.assert_eq(hs.settings.get("ergopti." .. require("modules.keymap.section_keys").current("dynamichotstrings", name)), true)
 		end
 		helpers.assert_eq(f.registry.is_group_enabled("spare"), false)
 		helpers.assert_eq(f.ctx.state.keymap, false)

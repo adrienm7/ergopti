@@ -257,7 +257,7 @@ helpers.describe("Registry section enable/disable", function()
 
 	helpers.it("(hs-opt-in-default) an explicit true survives the disabled default", function()
 		fresh_registry()
-		_G.hs.settings.set("ergopti.hotstrings_section_french_autocorrection_accents", true)
+		_G.hs.settings.set("ergopti." .. require("modules.keymap.section_keys").current("french_autocorrection", "accents"), true)
 		helpers.assert_eq(Registry.is_section_enabled("french_autocorrection", "accents"), true)
 	end)
 

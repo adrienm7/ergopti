@@ -414,3 +414,33 @@ helpers.describe("layout_install: fresh bundle resources", function()
 		if not ok then error(err, 0) end
 	end)
 end)
+
+helpers.describe("layout_install: failed listings are not cached", function()
+	helpers.it("retries an incomplete listing without reusing its partial result", function()
+		local original_popen = io.popen
+		local scans = 0
+		local ok, err = xpcall(function()
+			io.popen = function()
+				scans = scans + 1
+				local delivered = false
+				local succeeded = scans > 1
+				return {
+					lines = function() return function()
+						if delivered then return nil end
+						delivered = true
+						return "Ergopti_v1.0.0.bundle"
+					end end,
+					close = function() return succeeded end,
+				}
+			end
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				fs = { attributes = function() return { mode = "directory", size = 1, modification = 1 } end },
+			})
+			helpers.assert_nil(install.highest_installed("/layouts"))
+			helpers.assert_eq(install.highest_installed("/layouts").name, "Ergopti_v1.0.0.bundle")
+			helpers.assert_eq(scans, 2)
+		end, debug.traceback)
+		io.popen = original_popen
+		if not ok then error(err, 0) end
+	end)
+end)

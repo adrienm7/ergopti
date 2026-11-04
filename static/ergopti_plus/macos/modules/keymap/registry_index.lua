@@ -20,6 +20,7 @@ local ManifestReader = require("infra.manifest_reader")
 local Languages = require("hotstrings.languages")
 local PersonalFiles = require("hotstrings.personal_files")
 local ConfigKeys = require("config_keys")
+local SectionKeys = require("modules.keymap.section_keys")
 local LOG    = "keymap.registry"
 
 local _state = nil
@@ -203,7 +204,8 @@ end
 -- =====================================
 
 --- Returns the section's effective enable state.
---- hs.settings stores the user's explicit choice (`true` or `false`). A section
+--- hs.settings caches the user's explicit choice (`true` or `false`). The
+--- canonical preferences are projected before the input tap starts. A section
 --- the user never touched takes the feature manifest's shipped default — every
 --- bundled section ships disabled — and a section the manifest does not declare
 --- (personal and extension packs) is the user's own and stays enabled.
@@ -211,7 +213,13 @@ end
 --- @param section_name string
 --- @return boolean
 function M.is_section_enabled(group_name, section_name)
-	local stored = Storage.get("hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(section_name))
+	local stored = Storage.get(M.section_setting_key(group_name, section_name))
+	-- An underscore inside either component makes the old concatenation
+	-- ambiguous. Only the canonical preference projection can resolve it.
+	if stored == nil and not tostring(group_name):find("_", 1, true)
+		and not tostring(section_name):find("_", 1, true) then
+		stored = Storage.get(M.legacy_section_setting_key(group_name, section_name))
+	end
 	if stored ~= nil then return stored ~= false end
 	local shipped = Languages.section_default(ManifestReader.features(), group_name, section_name)
 	if shipped == nil then return true end
@@ -247,9 +255,15 @@ end
 --- @param group_name string
 --- @param section_name string
 --- @return string
-local function section_setting_key(group_name, section_name)
-	return "hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(section_name)
-end
+M.legacy_section_setting_key = SectionKeys.legacy
+
+--- Builds an injective identity for one section, separate from legacy keys.
+--- @param group_name string
+--- @param section_name string
+--- @return string
+M.section_setting_key = SectionKeys.current
+
+local section_setting_key = M.section_setting_key
 
 --- Writes one setting and verifies the stored postcondition.
 --- `set` normally returns nil and `clear` may return false for an absent key,
@@ -262,6 +276,43 @@ local function write_section_setting(key, value)
 	if Storage.set(key, value) ~= true then return false end
 	local read_ok, stored = Storage.read_exact(key)
 	return read_ok == true and stored == value
+end
+
+--- Copies only unambiguous historical entries after the complete inventory is
+--- registered. Canonical TOML projection still runs afterwards and wins.
+--- @return boolean committed
+function M.migrate_legacy_section_settings()
+	if not require_state("migrate_legacy_section_settings") then return false end
+	local owners = {}
+	for group, entry in pairs(_state.groups) do
+		for _, section in ipairs(entry.sections or {}) do
+			if type(section.name) == "string" and section.name ~= "" then
+				local old = M.legacy_section_setting_key(group, section.name)
+				local current = section_setting_key(group, section.name)
+				if owners[old] == nil then owners[old] = current
+				elseif owners[old] ~= current then owners[old] = false end
+			end
+		end
+	end
+	local updates = {}
+	for old, current in pairs(owners) do
+		if current then
+			local old_ok, value = Storage.read_exact(old)
+			local new_ok, existing = Storage.read_exact(current)
+			if not old_ok or not new_ok then return false end
+			if existing == nil and type(value) == "boolean" then updates[current] = { value = value } end
+		end
+	end
+	local written = {}
+	for key, record in pairs(updates) do
+		if write_section_setting(key, record.value) ~= true then
+			for _, prior in ipairs(written) do Storage.delete_exact(prior) end
+			Storage.delete_exact(key)
+			return false
+		end
+		written[#written + 1] = key
+	end
+	return true
 end
 
 --- Restores settings captured before a failed mutation.

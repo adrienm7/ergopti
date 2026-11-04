@@ -139,6 +139,7 @@ end
 --- Pure-Lua via lfs-less directory scan using io.popen (cross-platform-ish).
 --- @param dir string Absolute path of the bundles directory.
 --- @return table List of basenames (no trailing slash).
+--- @return boolean listed Whether the listing completed successfully.
 local function list_bundles(dir)
 	local out = {}
 	local cmd
@@ -149,15 +150,16 @@ local function list_bundles(dir)
 		cmd = string.format("ls -1 %s", text_utils.shell_quote(dir))
 	end
 	local p = io.popen(cmd)
-	if not p then return out end
+	if not p then return out, false end
 	for raw_line in p:lines() do
 		local line = raw_line:gsub("[\r\n]+$", "")
 		if line:match("^Ergopti_v[%d%.]+%.bundle$") then
 			out[#out + 1] = line
 		end
 	end
-	p:close()
-	return out
+	local completed = p:close()
+	if completed ~= true then return {}, false end
+	return out, true
 end
 
 --- Picks the highest-version bundle inside dir.
@@ -168,8 +170,10 @@ local function pick_latest_bundle(dir)
 	local revision = directory_revision(dir)
 	local hit, cached = read_revision_cache(_latest_bundle_cache, dir, revision)
 	if hit then return cached or nil end
+	local names, listed = list_bundles(dir)
+	if not listed then return nil end
 	local best, best_ver = nil, nil
-	for _, name in ipairs(list_bundles(dir)) do
+	for _, name in ipairs(names) do
 		local ver = parse_version(name)
 		if ver and (not best_ver or version_gt(ver, best_ver)) then
 			best, best_ver = name, ver
@@ -238,7 +242,9 @@ local function find_installed_bundles(dir)
 	local revision = directory_revision(dir)
 	local hit, names = read_revision_cache(_installed_cache, dir, revision)
 	if not hit then
-		names = list_bundles(dir)
+		local listed
+		names, listed = list_bundles(dir)
+		if not listed then return out end
 		publish_revision_cache(_installed_cache, dir, revision, names)
 	end
 	local dir_with_slash = NativePath.with_trailing_separator(dir)

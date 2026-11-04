@@ -99,14 +99,20 @@ function M.parse_shortcut_input(raw, default_mods)
 	if normalized == "" then return nil end
 
 	local parts = {}
-	for part in normalized:gmatch("[^+]+") do
+	for part in (normalized .. "+"):gmatch("(.-)%+") do
+		part = TextUtils.trim(part)
+		if part == "" then return nil end
 		table.insert(parts, part)
 	end
 	if #parts < 1 then return nil end
 
 	local key = parts[#parts]
 	local mods = {}
-	for i = 1, #parts - 1 do table.insert(mods, parts[i]) end
+	for i = 1, #parts - 1 do
+		local mod = parts[i]
+		if mod ~= "option" and mod ~= "control" and not VALID_MODS[mod] then return nil end
+		table.insert(mods, mod)
+	end
 	return M.normalize_shortcut(mods, key, default_mods)
 end
 

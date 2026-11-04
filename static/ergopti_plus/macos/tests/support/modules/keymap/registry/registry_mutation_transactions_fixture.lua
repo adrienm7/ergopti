@@ -76,7 +76,7 @@ local function dynamic_personal_scope_fixture(enabled, outcome, absent)
 	add_group_mapping(registry, "spare", "untouched")
 	local spare_mapping = registry_state.mappings[1]
 	for _, name in ipairs(names) do
-		hs.settings.set("ergopti.hotstrings_section_dynamichotstrings_" .. name, not enabled)
+		hs.settings.set("ergopti." .. require("modules.keymap.section_keys").current("dynamichotstrings", name), not enabled)
 	end
 	registry.set_post_load_hook("dynamichotstrings", function()
 		for _, name in ipairs(names) do
@@ -133,7 +133,7 @@ local function assert_dynamic_personal_scope(f, desired)
 	helpers.assert_eq(f.personal.is_enabled(), desired, "the actual external module shares the selected target")
 	helpers.assert_eq(f.registry.is_group_enabled("dynamichotstrings"), desired)
 	for _, name in ipairs(f.names) do
-		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_dynamichotstrings_" .. name), desired)
+		helpers.assert_eq(hs.settings.get("ergopti." .. require("modules.keymap.section_keys").current("dynamichotstrings", name)), desired)
 	end
 	helpers.assert_eq(f.registry.is_group_enabled("spare"), true)
 	local retained = false
