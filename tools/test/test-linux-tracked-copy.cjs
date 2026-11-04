@@ -74,6 +74,49 @@ try {
 			assert.notEqual(result.status, 0);
 			assert.equal(fs.readFileSync(sentinel, 'utf8'), 'other checkout\n');
 		}
+		for (const kind of ['own-source', 'shared-build', 'other-checkout', 'other-alias']) {
+			const parent = path.join(scratch, `missing-output-${kind}`);
+			const checkout = path.join(parent, 'builder-checkout');
+			const builder = path.join(checkout, 'tools/build/build-linux-driver.sh');
+			fs.mkdirSync(path.dirname(builder), { recursive: true });
+			fs.writeFileSync(builder, subject);
+			const sibling = path.join(parent, 'other-checkout');
+			if (kind === 'other-checkout' || kind === 'other-alias') {
+				fs.mkdirSync(sibling);
+				const initialized = spawnSync('git', ['init', '--quiet', sibling], { encoding: 'utf8' });
+				assert.equal(initialized.status, 0, initialized.stderr);
+				if (kind === 'other-alias') fs.symlinkSync(sibling, path.join(parent, 'alias'));
+			}
+			const target =
+				kind === 'own-source'
+					? path.join(checkout, 'static/new')
+					: kind === 'shared-build'
+						? path.join(checkout, 'build') + '/'
+						: path.join(kind === 'other-alias' ? path.join(parent, 'alias') : sibling, 'new');
+			const result = spawnSync('/bin/bash', [builder, '--skip-smoke'], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, ERGOPTI_LINUX_BUILD_DIR: target }
+			});
+			assert.notEqual(result.status, 0);
+			assert.equal(fs.existsSync(target), false, `${kind} must not gain an output directory`);
+		}
+		// A new child of the checkout's build directory remains an allowed
+		// output. This fixture has no sources, so the later copy must still fail.
+		{
+			const checkout = path.join(scratch, 'allowed-new-output');
+			const builder = path.join(checkout, 'tools/build/build-linux-driver.sh');
+			const target = path.join(checkout, 'build/linux');
+			fs.mkdirSync(path.dirname(builder), { recursive: true });
+			fs.writeFileSync(builder, subject);
+			const result = spawnSync('/bin/bash', [builder, '--skip-smoke'], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, ERGOPTI_LINUX_BUILD_DIR: target }
+			});
+			assert.notEqual(result.status, 0);
+			assert.ok(fs.existsSync(target), 'the guard must admit a new build output');
+		}
 	}
 	git('init', '--quiet');
 	const names = ['space name.txt', 'caf\u00e9.txt', '-leading.txt'];
