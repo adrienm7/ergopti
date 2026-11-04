@@ -339,6 +339,10 @@ local function _handle_table(data, state, context)
 		local session = _active_session
 		if session then
 			if session.settling then return nil end
+			if session.confirmed or session.cancelled then
+				close_session(session, context)
+				return nil
+			end
 			session.settling = true
 			local id = type(data.id) == "string" and data.id or "none"
 			-- A value the page's editor collected travels with the pick.
@@ -365,6 +369,8 @@ local function _handle_table(data, state, context)
 				Logger.warn(LOG, "Action picker confirmation was refused; keeping the session open.")
 				return nil
 			end
+			if _active_session ~= session then return nil end
+			session.confirmed = true
 			close_session(session, context)
 		elseif type(M.on_confirm) == "function" then
 			pcall(M.on_confirm, data.id, state)
@@ -376,9 +382,16 @@ local function _handle_table(data, state, context)
 		Logger.info(LOG, "Action picker cancelled.")
 		local session = _active_session
 		if session then
+			if session.settling then return nil end
+			if session.confirmed or session.cancelled then
+				close_session(session, context)
+				return nil
+			end
+			session.cancelled, session.settling = true, true
 			if type(session.on_cancel) == "function" then
 				pcall(session.on_cancel, state)
 			end
+			session.settling = false
 			close_session(session, context)
 		elseif type(M.on_cancel) == "function" then
 			pcall(M.on_cancel, state)
