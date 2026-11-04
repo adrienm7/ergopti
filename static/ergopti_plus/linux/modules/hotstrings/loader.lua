@@ -73,10 +73,8 @@ local function tiers()
 	_tiers = Priority.DEFAULT_TIERS
 	local ok, result = pcall(function()
 		local path = Paths.shared("modules/hotstrings/priority.json")
-		local fh   = io.open(path, "r")
-		if not fh then return nil end
-		local raw = fh:read("*a")
-		fh:close()
+		local raw, status = require("toml_codec.writer").read_classified(path)
+		if status ~= "ok" then return nil end
 		return require("json").decode(raw)
 	end)
 	if not ok or type(result) ~= "table" then
