@@ -319,3 +319,19 @@ Consequence: An abandoned session never expires until another manual key; explic
 Regression: Run genuine capture, synthesis, idle, pointer and session-close owners against the recording append boundary. Cover idle expiry, reset, pointer activity extending reset, and a session legitimately starting at tick zero. Preserve the key clock sentinel for the next manual key's delay.
 
 The ongoing register now contains **23 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-010 implementation qualification
+
+The update window now retains one exact pending host while the synchronous
+WebView factory pumps messages. Closing it revokes admission and hides its HWND;
+a late controller is retired before that HWND is destroyed. Completion cannot
+publish into a replacement request. Failed cleanup retains the same owner for
+retry instead of destroying the controller's parent early.
+
+Seven isolated native GUI regressions cover current success, closure, reopening,
+late rejection, current rejection with native fallback, and refused controller
+cleanup after both late and partial acquisition. They use the shipped Promise,
+real GUI close events and the public update API, with a passive browser factory.
+The fake controller checks that its HWND exists and its subscription count is
+zero at Close. These regressions are added but remain unexecuted on this Linux
+host; they do not constitute a real Edge runtime test.

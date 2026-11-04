@@ -72,6 +72,8 @@ global _UC_Native      := false
 global _UC_WindowEpoch := 0
 global _UC_ResetDone   := true
 global _UC_RetiredHosts := []
+; A synchronous WebView factory pumps messages while its host must stay alive.
+global _UC_PendingHost := 0
 
 
 
@@ -491,56 +493,143 @@ _UpdateCheck_Present(State, Reopen := false, Current := 0) {
 _UpdateCheck_Open() {
 	global _VendorDir, _SharedDir, _I18nLocale, UC_VHOST, UC_HOST_ACCESS_ALLOW
 	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_ResetDone, _UC_WindowEpoch, _UC_Native
+	global _UC_PendingHost
+	Owner := _UpdateCheck_CaptureActionOwner()
 	LoggerStart("UpdateCheck", "Opening the update-check window…")
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return false
 	_UC_WindowEpoch += 1
 	Epoch := _UC_WindowEpoch
 	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
 		&& !WebView_ShouldUseNativeFallback()
+	if Epoch != _UC_WindowEpoch
+		return false
 	if !UseWV {
 		_UC_Native := true
 		_UC_ResetDone := false
 		_UpdateCheck_BuildNative()
 		LoggerSuccess("UpdateCheck", "Update-check window opened (native, without WebView2).")
-		return true
+		return Epoch == _UC_WindowEpoch && !_UC_ResetDone
 	}
-	_UC_Native := false
 	Geo := WebViewHost.AppGeometry("update_check")
 	G := _UpdateCheck_NewWindow()
-	G.MarginX := 0
-	G.MarginY := 0
-	ContentCtl := G.Add("Text", "x0 y0 w" . Geo.w . " h" . Geo.h, "")
-	G.WVC := 0
-	G.OnEvent("Close",  (*) => _UpdateCheck_CloseWindow(Epoch))
-	G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow(Epoch))
-	; No position: Gui.Show centers the window on the screen
-	G.Show("w" . Geo.w . " h" . Geo.h)
-	_UC_Gui := G
-	_UC_ResetDone := false
+	Host := {gui: G, controller: 0, view: 0, subscription: 0, closing: false,
+		building: true, cancelled: false, epoch: Epoch}
+	PreviousCritical := Critical("On")
 	try {
-		WVC := WebView2.create(ContentCtl.Hwnd, , WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll"))
-		G.WVC := WVC
+		if Epoch != _UC_WindowEpoch {
+			Host.cancelled := true
+			_UpdateCheck_QueueHost(Host)
+		} else {
+			_UC_PendingHost := Host
+			_UC_Gui := G
+			_UC_Native := false
+			_UC_ResetDone := false
+		}
+	} finally Critical(PreviousCritical)
+	Failed := false
+	try {
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		G.MarginX := 0, G.MarginY := 0
+		ContentCtl := G.Add("Text", "x0 y0 w" . Geo.w . " h" . Geo.h, "")
+		G.OnEvent("Close", (*) => _UpdateCheck_CloseWindow(Epoch))
+		G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow(Epoch))
+		G.Show("w" . Geo.w . " h" . Geo.h)
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		Environment := WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll")
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		; Even a cancelled factory's returned controller belongs to this exact
+		; host. Its HWND is retained until that controller can be closed.
+		Host.controller := WebView2.create(ContentCtl.Hwnd, , Environment)
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		Host.view := Host.controller.CoreWebView2
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		try {
+			Settings := Host.view.Settings
+			Settings.AreDevToolsEnabled := false
+			Settings.AreDefaultContextMenusEnabled := false
+			Settings.IsStatusBarEnabled := false
+			Settings.AreBrowserAcceleratorKeysEnabled := false
+		}
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
+		try Host.view.AddScriptToExecuteOnDocumentCreated(
+			"window.__i18n_base='https://" . UC_VHOST . "/data/locales/';window._i18n_locale='" . Locale . "';")
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		Host.subscription := Host.view.WebMessageReceived(_UpdateCheck_OnWebMessage.Bind(Epoch))
+		PreviousCritical := Critical("On")
+		try {
+			if !_UpdateCheck_StartupCurrent(Host)
+				return false
+			_UC_Controller := Host.controller
+			_UC_WebView := Host.view
+			_UC_MsgSub := Host.subscription
+		} finally Critical(PreviousCritical)
+		try Host.view.SetVirtualHostNameToFolderMapping(UC_VHOST, _SharedDir, UC_HOST_ACCESS_ALLOW)
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		try Host.view.Navigate("https://" . UC_VHOST . "/ui/update_check/index.html?cb=" . A_TickCount)
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		try Host.controller.Fill()
+		if !_UpdateCheck_StartupCurrent(Host)
+			return false
+		LoggerSuccess("UpdateCheck", "Update-check window opened.")
+		return _UpdateCheck_StartupCurrent(Host)
 	} catch as Err {
+		Failed := _UpdateCheck_StartupCurrent(Host)
 		LoggerError("UpdateCheck", "WebView2 could not be created for the update-check window: {1}", Err.Message)
-		return _UpdateCheck_FallBackToNative(Epoch, G)
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			Host.building := false
+			if Failed && _UpdateCheck_StartupCurrent(Host) {
+				_UC_Gui := unset
+				_UC_Controller := unset
+				_UC_WebView := unset
+				_UC_MsgSub := unset
+			}
+			if !_UpdateCheck_StartupCurrent(Host) || Failed {
+				Host.cancelled := true
+				_UpdateCheck_QueueHost(Host)
+			}
+			if _UC_PendingHost == Host
+				_UC_PendingHost := 0
+		} finally Critical(PreviousCritical)
+		if Host.cancelled && IsObject(Host.gui)
+			try Host.gui.Hide()
+		_UpdateCheck_RetireHosts()
 	}
-	_UC_Controller := WVC
-	_UC_WebView := WVC.CoreWebView2
-	try {
-		s := _UC_WebView.Settings
-		s.AreDevToolsEnabled               := false
-		s.AreDefaultContextMenusEnabled    := false
-		s.IsStatusBarEnabled               := false
-		s.AreBrowserAcceleratorKeysEnabled := false
+	if Failed && IsObject(Host.gui) {
+		; A refused controller close still owns its HWND. Leave its record
+		; retryable; a later presentation may open a separate current host.
+		if Epoch == _UC_WindowEpoch
+			_UC_ResetDone := true
+		return false
 	}
-	Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
-	try _UC_WebView.AddScriptToExecuteOnDocumentCreated(
-		"window.__i18n_base='https://" . UC_VHOST . "/data/locales/';window._i18n_locale='" . Locale . "';")
-	_UC_MsgSub := _UC_WebView.WebMessageReceived(_UpdateCheck_OnWebMessage.Bind(Epoch))
-	try _UC_WebView.SetVirtualHostNameToFolderMapping(UC_VHOST, _SharedDir, UC_HOST_ACCESS_ALLOW)
-	try _UC_WebView.Navigate("https://" . UC_VHOST . "/ui/update_check/index.html?cb=" . A_TickCount)
-	try _UC_Controller.Fill()
-	LoggerSuccess("UpdateCheck", "Update-check window opened.")
-	return true
+	return Failed ? _UpdateCheck_FallBackToNative(Epoch, G) : false
+}
+
+_UpdateCheck_StartupCurrent(Host) {
+	global _UC_PendingHost, _UC_Gui, _UC_ResetDone, _UC_WindowEpoch
+	return !Host.cancelled && _UC_PendingHost == Host && !_UC_ResetDone
+		&& Host.epoch == _UC_WindowEpoch && IsSet(_UC_Gui) && _UC_Gui == Host.gui
+}
+
+; Caller holds Critical; native disposal is always deferred to the drain.
+_UpdateCheck_QueueHost(Host) {
+	global _UC_RetiredHosts
+	for Existing in _UC_RetiredHosts
+		if Existing == Host
+			return
+	_UC_RetiredHosts.Push(Host)
 }
 
 ; Replaces a WebView2 host whose WebView could not be created (no Evergreen
@@ -552,7 +641,7 @@ _UpdateCheck_Open() {
 ; @param BuildFn {Func|Integer} Replacement of _UpdateCheck_BuildNative (tests only).
 ; @returns {Boolean} opened
 _UpdateCheck_FallBackToNative(Epoch, HostGui, BuildFn := 0) {
-	global _UC_Gui, _UC_ResetDone, _UC_WindowEpoch, _UC_Native
+	global _UC_Gui, _UC_ResetDone, _UC_WindowEpoch, _UC_Native, _UC_Controller, _UC_WebView, _UC_MsgSub
 	try HostGui.Destroy()
 	; The environment's boot pumps messages: a window the user closed meanwhile
 	; stays closed, and a window opened since then is not replaced
@@ -561,6 +650,9 @@ _UpdateCheck_FallBackToNative(Epoch, HostGui, BuildFn := 0) {
 		return false
 	}
 	_UC_Gui := unset
+	_UC_Controller := unset
+	_UC_WebView := unset
+	_UC_MsgSub := unset
 	_UC_Native := true
 	Build := HasMethod(BuildFn, "Call") ? BuildFn : _UpdateCheck_BuildNative
 	Build.Call()
@@ -654,7 +746,7 @@ _UpdateCheck_NativeClick(Owner, Name, Channel, *) {
 ; the window.
 _UpdateCheck_CloseWindow(ExpectedEpoch := unset) {
 	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_ResetDone, _UC_WindowEpoch, _UC_State
-	global _UC_Release, _UC_RequestId, _UC_Native, _UC_RetiredHosts
+	global _UC_Release, _UC_RequestId, _UC_Native, _UC_RetiredHosts, _UC_PendingHost
 	PreviousCritical := Critical("On")
 	try {
 		if IsSet(ExpectedEpoch) && ExpectedEpoch != _UC_WindowEpoch
@@ -668,9 +760,14 @@ _UpdateCheck_CloseWindow(ExpectedEpoch := unset) {
 			SavedView := IsSet(_UC_WebView) ? _UC_WebView : 0
 			SavedSub := IsSet(_UC_MsgSub) ? _UC_MsgSub : 0
 			SavedFailure := ManagedNetworkTerminalFailure.Owners.Get("updater_check", 0)
-			Host := {gui: SavedGui, controller: SavedController, view: SavedView,
-				subscription: SavedSub, closing: false}
-			_UC_RetiredHosts.Push(Host)
+			if IsObject(_UC_PendingHost) && _UC_PendingHost.gui == SavedGui {
+				Host := _UC_PendingHost
+				Host.cancelled := true
+				_UC_PendingHost := 0
+			} else
+				Host := {gui: SavedGui, controller: SavedController, view: SavedView,
+					subscription: SavedSub, closing: false}
+			_UpdateCheck_QueueHost(Host)
 			_UC_ResetDone := true
 			_UC_WindowEpoch += 1
 			_UC_State := 0
@@ -687,6 +784,8 @@ _UpdateCheck_CloseWindow(ExpectedEpoch := unset) {
 		return _UpdateCheck_RetireHosts()
 	; The retained host now owns the subscription's last reference.
 	SavedSub := 0
+	if Host.HasOwnProp("building") && Host.building && IsObject(Host.gui)
+		try Host.gui.Hide()
 	if IsObject(SavedFailure)
 		ManagedNetworkTerminalFailure.Retire("updater_check", SavedFailure)
 	Retired := _UpdateCheck_RetireHosts()
@@ -703,7 +802,7 @@ _UpdateCheck_RetireHosts() {
 	for Host in _UC_RetiredHosts.Clone() {
 		PreviousCritical := Critical("On")
 		try {
-			if Host.closing {
+			if Host.closing || (Host.HasOwnProp("building") && Host.building) {
 				AllRetired := false
 				continue
 			}
