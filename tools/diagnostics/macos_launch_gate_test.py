@@ -18,6 +18,7 @@ import unittest
 from unittest import mock
 
 import hs_delayed_timer_probe as timer_probe
+import macos_app_dirs as app_dirs
 import hs_karabiner_config_probe as karabiner_probe
 import hs_native_bootstrap_probe as bootstrap
 
@@ -1070,7 +1071,7 @@ class VerdictTests(unittest.TestCase):
         )
         self.assertEqual(len(gate.evaluate("dangling_logs", generic)), 1)
         named = observe(
-            launcher_log="[t] FATAL: log folder /u/gitcfg/ergopti_plus is a "
+            launcher_log=f"[t] FATAL: log folder /u/gitcfg/{app_dirs.FOLDER_NAME} is a "
             "symbolic link whose target does not exist\n",
             boot_log=REFUSED_BOOT_LOG,
             alive_after_window=False,
@@ -1079,7 +1080,7 @@ class VerdictTests(unittest.TestCase):
 
     def test_refused_state_must_not_keep_running(self):
         observation = observe(
-            launcher_log="FATAL: gitcfg/ergopti_plus is a symbolic link to nothing\n",
+            launcher_log=f"FATAL: gitcfg/{app_dirs.FOLDER_NAME} is a symbolic link to nothing\n",
             boot_log=REFUSED_BOOT_LOG,
         )
         self.assertEqual(len(gate.evaluate("dangling_logs", observation)), 1)
@@ -1147,7 +1148,7 @@ class StateTests(unittest.TestCase):
                 state = gate.seed("configured_symlink", home, "", "2026-09-22")
             except OSError as error:
                 self.skipTest(f"symbolic links unavailable here: {error}")
-            default = home / ".config/ergopti_plus"
+            default = home / app_dirs.CONFIG_RELATIVE
             self.assertTrue(default.is_symlink())
             self.assertTrue((default / "hammerspoon/config.toml").is_file())
             self.assertEqual(state["symlinks"], [str(default)])
@@ -1163,20 +1164,21 @@ class StateTests(unittest.TestCase):
             except OSError as error:
                 self.skipTest(f"symbolic links unavailable here: {error}")
             self.assertNotEqual(synced["paths_toml"], dangling["paths_toml"])
-            self.assertEqual(synced["logs_dir"], synced_home / "SyncedLogs/ergopti_plus")
+            self.assertEqual(synced["logs_dir"], synced_home / "SyncedLogs" / app_dirs.FOLDER_NAME)
             self.assertIn(
                 f'LogsDirPath = "{synced_home}/SyncedLogs"',
                 synced["paths_toml"].read_text(encoding="utf-8"),
             )
             self.assertIn(
-                f'LogsDirPath = "{dangling_home}/gitcfg/ergopti_plus"',
+                f'LogsDirPath = "{dangling_home}/gitcfg/{app_dirs.FOLDER_NAME}"',
                 dangling["paths_toml"].read_text(encoding="utf-8"),
             )
             self.assertTrue((synced_home / "SyncedLogs").is_symlink())
-            self.assertTrue((dangling_home / "gitcfg/ergopti_plus").is_symlink())
-            self.assertFalse((dangling_home / "gitcfg/ergopti_plus").exists())
+            self.assertTrue((dangling_home / "gitcfg" / app_dirs.FOLDER_NAME).is_symlink())
+            self.assertFalse((dangling_home / "gitcfg" / app_dirs.FOLDER_NAME).exists())
             self.assertIn("symlink_logs_dir", gate.SCENARIOS)
-            self.assertEqual(gate.logs_folder(home), home / "Library/Logs/ergopti_plus")
+            self.assertEqual(gate.logs_folder(home), home / app_dirs.LOGS_RELATIVE)
+            self.assertEqual(app_dirs.LOGS_RELATIVE, "Library/Logs/" + app_dirs.FOLDER_NAME)
 
     def test_picked_logs_folder_losing_its_permissions_is_reported(self):
         if os.name != "posix":

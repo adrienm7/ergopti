@@ -31,6 +31,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const appDirs = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/collect-macos-field-report.sh';
@@ -996,8 +997,8 @@ function reportFolder(paths) {
 		await check('Ctrl-C during the field run still commits its results and logs', async () => {
 			const paths = fixture('interrupted');
 			// LogsDirPath moves the day logs; the launcher's own log stays in the default folder
-			const defaultLogs = path.join(paths.home, 'Library/Logs/ergopti_plus');
-			const logs = path.join(paths.home, 'moved-logs/ergopti_plus');
+			const defaultLogs = path.join(paths.home, ...appDirs.segments('logs.macos', 'macos'));
+			const logs = path.join(paths.home, 'moved-logs', appDirs.folderName('macos'));
 			fs.mkdirSync(defaultLogs, { recursive: true });
 			fs.mkdirSync(logs, { recursive: true });
 			fs.writeFileSync(
@@ -1024,12 +1025,12 @@ function reportFolder(paths) {
 			// A configuration folder moved by the launcher's paths.toml, as
 			// config_paths.lua reads it: the collisions must follow it.
 			const moved = path.join(paths.home, 'moved-config');
-			const pathsFile = path.join(paths.home, 'Library/Application Support/ErgoptiPlus');
-			fs.mkdirSync(pathsFile, { recursive: true });
-			fs.writeFileSync(
-				path.join(pathsFile, 'paths.toml'),
-				`ConfigDirPath = "${moved}/"\nLogsDirPath = "${logs}/"\n`
+			const pathsFile = path.join(
+				paths.home,
+				...appDirs.segments('config.macos', 'macos', 'paths_file')
 			);
+			fs.mkdirSync(path.dirname(pathsFile), { recursive: true });
+			fs.writeFileSync(pathsFile, `ConfigDirPath = "${moved}/"\nLogsDirPath = "${logs}/"\n`);
 			const personal = path.join(moved, 'hotstrings');
 			fs.mkdirSync(personal, { recursive: true });
 			fs.writeFileSync(

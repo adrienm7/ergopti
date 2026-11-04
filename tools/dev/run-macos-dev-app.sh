@@ -117,4 +117,8 @@ python3 "$REPO_ROOT/tools/dev/stage-macos-dev-ollama-catalogue.py" || catalogue_
 open "$APP_PATH"
 log "Opened $APP_PATH; its Lua runs from $REPO_ROOT/static/ergopti_plus/macos."
 log "A saved .lua edit reloads the driver; the menu's Reload does it on demand."
-log "Launcher trail: ~/Library/Logs/ergopti_plus/launcher.log (look for 'developer source mode')."
+# The launcher log's folder and name come from their shared declaration.
+field_paths="$(python3 "$REPO_ROOT/tools/dev/field-report-paths.py" "$REPO_ROOT/static/ergopti_plus/_shared")" \
+	|| fail "Cannot resolve the driver folders from app_dirs.toml."
+eval "$field_paths"
+log "Launcher trail: $LOG_DEFAULT_DIR/$LOG_LAUNCHER (look for 'developer source mode')."

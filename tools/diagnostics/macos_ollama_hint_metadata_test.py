@@ -13,6 +13,8 @@ import tempfile
 import unittest
 from unittest import mock
 
+import macos_app_dirs as app_dirs
+
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path(os.environ.get("ERGOPTI_SOURCE_ROOT", ROOT))
 
@@ -166,7 +168,7 @@ class HintSelection(unittest.TestCase):
         retry_data.write_bytes(
             b'{"schema_version":1,"admission_seconds":30,"idle_seconds":60,"retirement_seconds":600}'
         )
-        self.directory = self.home / "Library/Application Support/Ergopti/ollama-native-http"
+        self.directory = self.home / app_dirs.SUPPORT_RELATIVE / "ollama-native-http"
         self.directory.mkdir(parents=True)
         self.binary = self.directory / "ollama"
         self.binary.write_bytes(b"provisional executable, deliberately not native authority")

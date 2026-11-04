@@ -70,6 +70,42 @@ const BUNDLE_ID = identifiers.bundle_ids.launcher;
 // Base cask token; channels other than the most stable one add @<id>
 const TOKEN_BASE = 'ergoptiplus';
 
+// The launcher's folder constants, generated from app_dirs.toml. The release
+// job runs this script without node_modules, so it reads the generated file
+// instead of parsing the TOML.
+const APP_DIRS_SWIFT = path.join(
+	__dirname,
+	'..',
+	'..',
+	'static',
+	'ergopti_plus',
+	'macos',
+	'launcher',
+	'Sources',
+	'ErgoptiPlus',
+	'AppDirs.generated.swift'
+);
+
+/**
+ * Returns one string constant of the generated launcher folder file.
+ * @param {string} name Swift constant name, e.g. "kMacOSSupportHomeRelativePath".
+ * @return {string}
+ */
+function appDirsConstant(name) {
+	const source = fs.readFileSync(APP_DIRS_SWIFT, 'utf8');
+	const match = source.match(new RegExp(`^let ${name} = "([^"\\\\]+)"$`, 'm'));
+	if (!match) throw new Error(`homebrew-cask: ${name} is absent from ${APP_DIRS_SWIFT}.`);
+	return match[1];
+}
+
+// The Ergopti folders --zap removes: the support root, which holds the
+// configuration, paths.toml and the managed runtimes, then the logs and the cache
+const ZAP_FOLDERS = [
+	'kMacOSSupportHomeRelativePath',
+	'kMacOSLogsHomeRelativePath',
+	'kMacOSCacheHomeRelativePath'
+].map((name) => `~/${appDirsConstant(name)}`);
+
 // Oldest macOS the bundle declares (LSMinimumSystemVersion 11.0)
 const MINIMUM_MACOS = ':big_sur';
 
@@ -159,7 +195,7 @@ function renderCask(tag, sha256, assetName = ASSET_NAME) {
 		'  end',
 		'',
 		'  zap trash: [',
-		'    "~/.config/ergopti_plus",',
+		...ZAP_FOLDERS.map((folder) => `    "${folder}",`),
 		`    "~/Library/Caches/${BUNDLE_ID}",`,
 		`    "~/Library/HTTPStorages/${BUNDLE_ID}",`,
 		`    "~/Library/Preferences/${BUNDLE_ID}.plist",`,
@@ -208,5 +244,6 @@ module.exports = {
 	ASSET_NAME,
 	APP_NAME,
 	BUNDLE_ID,
-	MINIMUM_MACOS
+	MINIMUM_MACOS,
+	ZAP_FOLDERS
 };

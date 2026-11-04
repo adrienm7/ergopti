@@ -25,7 +25,7 @@
  * macOS 26 then moved out of the package job into its own E2E cell on the
  * build host (role launcher-native), so Build only builds, packages and signs
  * and packages nothing until it passed. The tests append to the real
- * ~/Library/Logs/ergopti_plus/launcher.log, which the release smoke refuses to
+ * ~/Library/Logs/Ergopti/launcher.log, which the release smoke refuses to
  * launch over: on a runner of their own that log never reaches the build host.
  *
  * FEATURES & RATIONALE:
@@ -60,6 +60,7 @@ const pipeline = require('./ci-full-default.cjs');
 const macRole = require('./fixtures/macos-stage-source.cjs');
 const macPlans = require('../ci/macos-stage-roles.cjs');
 const { canRunSymlinkCase } = require('./lib/host-capabilities.cjs');
+const appDirs = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS_BOX = '.github/workflows/ci-macos.yml';
@@ -69,6 +70,8 @@ const PACKAGE = fs.readFileSync(
 	'utf8'
 );
 const SWIFT_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'launcher');
+// The default logs folder that holds launcher.log (app_dirs.toml).
+const MACOS_LOGS_FOLDER = appDirs.segments('logs.macos', 'macos').join('/');
 const MAIN_SWIFT = fs.readFileSync(
 	path.join(SWIFT_ROOT, 'Sources', 'ErgoptiPlus', 'main.swift'),
 	'utf8'
@@ -185,7 +188,7 @@ check(
 );
 
 // The launcher build precedes the app build, which precedes its smoke test.
-// LauncherLogTests append to the real ~/Library/Logs/ergopti_plus/launcher.log,
+// LauncherLogTests append to the real ~/Library/Logs/Ergopti/launcher.log,
 // and the release smoke refuses a launcher log it did not start fresh: the
 // tests run on the launcher cell's own runner, so the build host never has one.
 const PACKAGE_ORDER = [
@@ -202,8 +205,8 @@ check(
 	`package-macos must run ${PACKAGE_ORDER.join(' < ')}; got: ${packageStepNames.join(' | ')}`
 );
 check(
-	!/Library\/Logs\/ergopti_plus/.test(swiftJob) &&
-		/Library\/Logs\/ergopti_plus|LauncherLog/.test(readSwiftTree(path.join(SWIFT_ROOT, 'Tests'))),
+	!swiftJob.includes(MACOS_LOGS_FOLDER) &&
+		/kMacOSLogsHomeRelativePath|LauncherLog/.test(readSwiftTree(path.join(SWIFT_ROOT, 'Tests'))),
 	'no package step may touch the launcher log; the launcher cell writes it on a runner of its own'
 );
 check(

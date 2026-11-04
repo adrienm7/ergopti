@@ -15,6 +15,7 @@ import sys
 import time
 
 from hs274_hammerspoon import native_lifecycle
+import macos_app_dirs as app_dirs
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 PREFIX = Path("static/ergopti_plus")
@@ -309,7 +310,7 @@ def receive_owned(app, output, expected_sha):
     home.mkdir(mode=0o700)
     temporary = output / "tmp"
     temporary.mkdir(mode=0o700)
-    support = home / "Library/Application Support/Ergopti"
+    support = home / app_dirs.SUPPORT_RELATIVE
     driver = resources / PREFIX / "macos"
     config = {
         "home": str(home),
