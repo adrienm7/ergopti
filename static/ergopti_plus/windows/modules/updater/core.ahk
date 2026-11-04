@@ -1714,7 +1714,7 @@ _Updater_NormalizeTag(Tag) {
 }
 
 ; Semver helpers — canonical algorithm in _shared/modules/updater/version.js.
-; Parses "2.5.0-dev.3" into { Maj, Min, Pat, PreParts } or 0 on failure.
+; Parses "2.5.0-dev.3" into decimal strings { Maj, Min, Pat, PreParts } or 0 on failure.
 _Updater_ParseVersion(Tag) {
 	Norm := _Updater_NormalizeTag(Tag)
 	if !RegExMatch(Norm, "^(?P<maj>\d+)\.(?P<min>\d+)\.(?P<pat>\d+)(?:-(?P<pre>.+))?$", &M)
@@ -1727,7 +1727,16 @@ _Updater_ParseVersion(Tag) {
 		for , Part in StrSplit(M.pre, ".")
 			PreParts.Push(Part)
 	}
-	return { Maj: Integer(M.maj), Min: Integer(M.min), Pat: Integer(M.pat), PreParts: PreParts }
+	return { Maj: M.maj, Min: M.min, Pat: M.pat, PreParts: PreParts }
+}
+
+; Compares arbitrary-length decimal strings without numeric conversion.
+_Updater_CompareDecimal(A, B) {
+	ai := RegExReplace(A, "^0+", ""), bi := RegExReplace(B, "^0+", "")
+	if (StrLen(ai) != StrLen(bi))
+		return StrLen(ai) > StrLen(bi) ? 1 : -1
+	Cmp := StrCompare(ai, bi, true)
+	return (Cmp > 0) ? 1 : (Cmp < 0) ? -1 : 0
 }
 
 ; Compares two prerelease identifier segments (numeric when all digits).
@@ -1736,12 +1745,7 @@ _Updater_ComparePreId(A, B) {
 	if (aNumeric != bNumeric)
 		return aNumeric ? -1 : 1
 	if (aNumeric and bNumeric) {
-		ai := Integer(A), bi := Integer(B)
-		if (ai > bi)
-			return 1
-		if (ai < bi)
-			return -1
-		return 0
+		return _Updater_CompareDecimal(A, B)
 	}
 	Cmp := StrCompare(A, B)
 	return (Cmp > 0) ? 1 : (Cmp < 0) ? -1 : 0
@@ -1782,12 +1786,11 @@ _Updater_CompareVersions(A, B) {
 		; lock-step by the version-compare parity gate (D-1)
 		return 0
 	}
-	if (Pa.Maj != Pb.Maj)
-		return (Pa.Maj > Pb.Maj) ? 1 : -1
-	if (Pa.Min != Pb.Min)
-		return (Pa.Min > Pb.Min) ? 1 : -1
-	if (Pa.Pat != Pb.Pat)
-		return (Pa.Pat > Pb.Pat) ? 1 : -1
+	for , Key in ["Maj", "Min", "Pat"] {
+		Cmp := _Updater_CompareDecimal(Pa.%Key%, Pb.%Key%)
+		if (Cmp != 0)
+			return Cmp
+	}
 	return _Updater_ComparePre(Pa.PreParts, Pb.PreParts)
 }
 

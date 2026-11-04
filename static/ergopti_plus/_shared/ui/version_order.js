@@ -60,16 +60,22 @@ var ReleaseVersionOrder = (function () {
 		};
 	}
 
+	/** Compare decimal strings exactly without floating-point conversion. */
+	function compareDecimal(a, b) {
+		var left = a.replace(/^0+/, '');
+		var right = b.replace(/^0+/, '');
+		if (left.length !== right.length) return left.length > right.length ? 1 : -1;
+		if (left === right) return 0;
+		return left > right ? 1 : -1;
+	}
+
 	/** Orders two prerelease identifiers, numerically when both are digits. */
 	function compareIdentifier(a, b) {
 		var aNum = DIGITS.test(a);
 		var bNum = DIGITS.test(b);
 		if (aNum !== bNum) return aNum ? -1 : 1;
 		if (aNum && bNum) {
-			var left = Number(a);
-			var right = Number(b);
-			if (left === right) return 0;
-			return left > right ? 1 : -1;
+			return compareDecimal(a, b);
 		}
 		if (a === b) return 0;
 		return a > b ? 1 : -1;
@@ -101,9 +107,12 @@ var ReleaseVersionOrder = (function () {
 		var left = parse(a);
 		var right = parse(b);
 		if (!left || !right) return 0;
-		if (left.major !== right.major) return left.major > right.major ? 1 : -1;
-		if (left.minor !== right.minor) return left.minor > right.minor ? 1 : -1;
-		if (left.patch !== right.patch) return left.patch > right.patch ? 1 : -1;
+		var leftCore = normalize(a).match(/^(\d+)\.(\d+)\.(\d+)/);
+		var rightCore = normalize(b).match(/^(\d+)\.(\d+)\.(\d+)/);
+		for (var index = 1; index <= 3; index += 1) {
+			var order = compareDecimal(leftCore[index], rightCore[index]);
+			if (order !== 0) return order;
+		}
 		return comparePrerelease(left.prerelease, right.prerelease);
 	}
 

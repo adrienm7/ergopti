@@ -36,6 +36,14 @@ function parseVersion(tag) {
 	};
 }
 
+/** Compare decimal strings exactly without floating-point conversion. */
+function compareDecimal(a, b) {
+	const left = a.replace(/^0+/, '');
+	const right = b.replace(/^0+/, '');
+	if (left.length !== right.length) return left.length > right.length ? 1 : -1;
+	return left === right ? 0 : left > right ? 1 : -1;
+}
+
 /**
  * Semver prerelease identifier compare (numeric when all digits).
  * @param {string} a
@@ -47,11 +55,7 @@ function comparePrereleaseId(a, b) {
 	const bNum = /^\d+$/.test(b);
 	if (aNum !== bNum) return aNum ? -1 : 1;
 	if (aNum && bNum) {
-		const ai = Number(a);
-		const bi = Number(b);
-		if (ai > bi) return 1;
-		if (ai < bi) return -1;
-		return 0;
+		return compareDecimal(a, b);
 	}
 	if (a > b) return 1;
 	if (a < b) return -1;
@@ -95,9 +99,13 @@ function compareVersions(a, b) {
 		// three are kept in lock-step by the version-compare parity gate (D-1).
 		return 0;
 	}
-	if (pa.major !== pb.major) return pa.major > pb.major ? 1 : -1;
-	if (pa.minor !== pb.minor) return pa.minor > pb.minor ? 1 : -1;
-	if (pa.patch !== pb.patch) return pa.patch > pb.patch ? 1 : -1;
+	// Retain parseVersion's public numeric fields; compare the original digits.
+	const aCore = normalizeTag(a).match(/^(\d+)\.(\d+)\.(\d+)/);
+	const bCore = normalizeTag(b).match(/^(\d+)\.(\d+)\.(\d+)/);
+	for (let index = 1; index <= 3; index += 1) {
+		const order = compareDecimal(aCore[index], bCore[index]);
+		if (order !== 0) return order;
+	}
 	return comparePrerelease(pa.prerelease, pb.prerelease);
 }
 
