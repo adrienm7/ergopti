@@ -1,6 +1,6 @@
 {
 	"scope": "Earlier fixes from this same macOS audit, reviewed after the explicit 100-defect request. Native macOS execution is not established.",
-	"count": 66,
+	"count": 86,
 	"entries": [
 		{
 			"commit": "e0eeb4c",
@@ -798,6 +798,304 @@
 			"source_inventory": "installation",
 			"inventory_id": "I15",
 			"id": 79
+		},
+		{
+			"commit": "2051852",
+			"scenario": "CoreGraphics mirroring configuration failure was reported as success.",
+			"module": "test_system_mouse_pause_ownership.lua",
+			"verification": "43/43",
+			"source_inventory": "features-extra",
+			"id": 80
+		},
+		{
+			"commit": "9e156b6",
+			"scenario": "Partial application-switcher initialization prevented a subsequent retry.",
+			"module": "test_switcher_initialization_retry.lua",
+			"verification": "1/1",
+			"source_inventory": "features-extra",
+			"id": 81
+		},
+		{
+			"commit": "d2ed664",
+			"scenario": "A refused bundled-app start lost a process whose state was still unknown.",
+			"module": "test_menu_apps_discovery_outcome.lua",
+			"verification": "53/53",
+			"source_inventory": "features-extra",
+			"id": 82
+		},
+		{
+			"commit": "c6c665d",
+			"scenario": "Rapid editor shortcut changes misclassified normal deferred cancellation as cleanup failure.",
+			"module": "test_magic_editor_refresh_during_proof.lua",
+			"verification": "2/2",
+			"source_inventory": "features-extra",
+			"id": 83
+		},
+		{
+			"commit": "c1d417f",
+			"scenario": "Window cycling could target the driver itself.",
+			"module": "test_app_switch_direct.lua",
+			"verification": "11/11",
+			"source_inventory": "features-extra",
+			"id": 84
+		},
+		{
+			"fix_commit": "c6f7196",
+			"scenario": "A truthy malformed emergency timer let exit proceed with no proven deadline.",
+			"source_path": "static/ergopti_plus/macos/infra/emergency_exit.lua",
+			"test_module": "tests.unit.infra.lifecycle.test_emergency_exit",
+			"test_path": "static/ergopti_plus/macos/tests/unit/infra/lifecycle/test_emergency_exit.lua",
+			"regression_test": "rejects a malformed deadline handle before starting the fence",
+			"baseline_exit_code": 1,
+			"baseline_failure": "FAIL rejects a malformed deadline handle before starting the fence (emergency-deadline-handle) \u2014 test_emergency_exit.lua:140: assert_eq:",
+			"current_exit_code": 0,
+			"current_summary": ["Passed tests:  8", "Failed tests:  0"],
+			"commit": "c6f7196",
+			"source_inventory": "runtime-extra",
+			"id": 85
+		},
+		{
+			"fix_commit": "af7e6f3",
+			"scenario": "Overlapping microphone toggles raced on stale input state.",
+			"source_path": "static/ergopti_plus/macos/modules/gestures/system_actions.lua",
+			"test_module": "tests.unit.modules.gestures.actions.test_system_actions",
+			"test_path": "static/ergopti_plus/macos/tests/unit/modules/gestures/actions/test_system_actions.lua",
+			"regression_test": "serializes microphone toggles until the previous result is known",
+			"baseline_exit_code": 1,
+			"baseline_failure": "FAIL serializes microphone toggles until the previous result is known \u2014 test_system_actions.lua:291: assert_eq:",
+			"current_exit_code": 0,
+			"current_summary": ["Passed tests:  23", "Failed tests:  0"],
+			"commit": "af7e6f3",
+			"source_inventory": "runtime-extra",
+			"id": 86
+		},
+		{
+			"commit": "512bff0",
+			"scenario": "A failed driver-update result dialog prevented the required reload.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/dialogs/test_virtual_hid_update.lua",
+			"production_file": "static/ergopti_plus/macos/ui/virtual_hid_update.lua",
+			"current": {
+				"exit_code": 0,
+				"passed": 4,
+				"failed": 0,
+				"failures": []
+			},
+			"baseline_overlay": {
+				"exit_code": 1,
+				"passed": 3,
+				"failed": 1,
+				"failures": [
+					"FAIL reloads after a successful install even if its result dialog fails \u2014 .../macos/tests/unit/ui/dialogs/test_virtual_hid_update.lua:97: result dialog unavailable",
+					"--- DETAILED FAILURES ---"
+				]
+			},
+			"source_inventory": "ui-extra",
+			"id": 87
+		},
+		{
+			"commit": "1a9d728",
+			"scenario": "Concurrent gesture-conflict notices opened duplicate dialogs for one group.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/editors/test_gesture_conflict_notice.lua",
+			"production_file": "static/ergopti_plus/macos/ui/gesture_conflict_notice.lua",
+			"current": {
+				"exit_code": 0,
+				"passed": 4,
+				"failed": 0,
+				"failures": []
+			},
+			"baseline_overlay": {
+				"exit_code": 1,
+				"passed": 0,
+				"failed": 4,
+				"failures": [
+					"FAIL honours the menu.gestures.open_settings button \u2014 test_gesture_conflict_notice.lua:49: duplicate requests share the pending dialog:",
+					"FAIL honours the gestures.system.dismiss button \u2014 test_gesture_conflict_notice.lua:49: duplicate requests share the pending dialog:",
+					"FAIL honours the close button \u2014 test_gesture_conflict_notice.lua:49: duplicate requests share the pending dialog:",
+					"FAIL honours the refused button \u2014 test_gesture_conflict_notice.lua:49: duplicate requests share the pending dialog:",
+					"--- DETAILED FAILURES ---"
+				]
+			},
+			"source_inventory": "ui-extra",
+			"id": 88
+		},
+		{
+			"commit": "941e53a",
+			"scenario": "A stale WPM icon was created after its owner stopped.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/wpm/test_wpm_menubar_reentrant_start.lua",
+			"production_file": "static/ergopti_plus/macos/ui/wpm/wpm_menubar.lua",
+			"current": {
+				"exit_code": 0,
+				"passed": 8,
+				"failed": 0,
+				"failures": []
+			},
+			"baseline_overlay": {
+				"exit_code": 1,
+				"passed": 6,
+				"failed": 2,
+				"failures": [
+					"FAIL retires a constructor that returns after stop and successor start \u2014 test_wpm_menubar_reentrant_start.lua:21: retired constructor's item is released \u2014 actual: false",
+					"FAIL retains a refused retired constructor cleanup for retry \u2014 test_wpm_menubar_reentrant_start.lua:36: cleanup refusal blocks a new item:",
+					"--- DETAILED FAILURES ---"
+				]
+			},
+			"source_inventory": "ui-extra",
+			"id": 89
+		},
+		{
+			"commit": "e52a1b3",
+			"scenario": "WPM metrics could start while pause state was unknown.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/menu/metrics_and_about/test_menu_metrics_wpm_lifecycle_transaction.lua",
+			"production_file": "static/ergopti_plus/macos/ui/menu/menu_metrics.lua",
+			"current": {
+				"exit_code": 0,
+				"passed": 13,
+				"failed": 0,
+				"failures": []
+			},
+			"baseline_overlay": {
+				"exit_code": 1,
+				"passed": 10,
+				"failed": 3,
+				"failures": [
+					"FAIL keeps WPM stopped when pause state is unavailable: nil \u2014 test_menu_metrics_wpm_lifecycle_transaction.lua:138: unknown pause state must not arm the widget:",
+					"FAIL keeps WPM stopped when pause state is unavailable: throw \u2014 ...nd_about/test_menu_metrics_wpm_lifecycle_transaction.lua:132: pause read failed",
+					"FAIL does not start saved WPM widgets during a failed pause read on menu build \u2014 ...nd_about/test_menu_metrics_wpm_lifecycle_transaction.lua:144: pause read failed",
+					"--- DETAILED FAILURES ---"
+				]
+			},
+			"source_inventory": "ui-extra",
+			"id": 90
+		},
+		{
+			"commit": "a52960c",
+			"scenario": "A concatenated hotstring group/section identity collided for different pairs, causing saved section choices to alias; migration now distinguishes ambiguous legacy entries.",
+			"module": "tests.unit.modules.keymap.registry.test_registry_mutation_transactions_exact_commitment",
+			"cases": [
+				"projects distinct canonical choices over one ambiguous legacy key (section-cache-identity)",
+				"migrates only unique historical identities from the complete inventory (section-cache-identity)"
+			],
+			"passed": 41,
+			"failed": 0,
+			"count": 1,
+			"source_inventory": "configuration-extra",
+			"id": 91
+		},
+		{
+			"commit": "5a52680",
+			"scenario": "An integral floating-point replay offset outside the host integer range passed validation and reached ledger replay.",
+			"module": "tests.unit.modules.keystats.storage.test_ledger_replay_state_bounds",
+			"cases": ["rejects an integral float outside the host integer range before replay"],
+			"passed": 1,
+			"failed": 0,
+			"count": 1,
+			"source_inventory": "configuration-extra",
+			"id": 92
+		},
+		{
+			"commit": "5a52680",
+			"scenario": "A stale or malformed prior menu-click handoff could be renewed or contaminate later clicks when writing a new handoff.",
+			"module": "tests.unit.ui.menu.tray.test_menu_click_gate",
+			"cases": [
+				"does not renew an expired hand-off when a later reload hands off a click",
+				"does not let a malformed earlier hand-off poison a new click"
+			],
+			"passed": 18,
+			"failed": 0,
+			"count": 1,
+			"deduplication": "Distinct from 38b4e13: this is validation of successfully read old records; 38b4e13 handles storage read/write failure.",
+			"source_inventory": "configuration-extra",
+			"id": 93
+		},
+		{
+			"commits": ["28bab06", "a8be18a"],
+			"scenario": "Configured CSS hexadecimal tooltip colors were inconsistently validated or interpreted, including shorthand colors.",
+			"modules": [
+				"tests.unit.modules.hotstrings.test_hotstrings_config_transaction",
+				"tests.unit.ui.tooltip.test_tooltip_tint_contract"
+			],
+			"passed": [17, 9],
+			"failed": 0,
+			"count": 1,
+			"deduplication": "Validation and rendering of CSS color forms grouped as one defect.",
+			"source_inventory": "configuration-extra",
+			"id": 94
+		},
+		{
+			"scenario": "The validated user-controlled launcher path could be replaced before a privileged system keyboard-layout install executed it. The fix refuses system installation until execution can be bound safely.",
+			"fix_commits": ["be4989b", "fc48089"],
+			"test_module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+			"test_case": "refuses system installation before authorization (layout-system-unavailable)",
+			"result": "Focused module passed on Linux with Lua 5.4 and luv at edf4888; this verifies refusal, not native macOS privilege-boundary behavior.",
+			"inventory_id": "X01",
+			"id": 95,
+			"source_inventory": "installation-extra"
+		},
+		{
+			"fix_commit": "2c641b0",
+			"scenario": "Unknown power state enabled aggressive mains recovery pacing.",
+			"source_path": "static/ergopti_plus/macos/adapters/power_source.lua",
+			"test_module": "tests.unit.adapters.runtime.test_power_source",
+			"test_path": "static/ergopti_plus/macos/tests/unit/adapters/runtime/test_power_source.lua",
+			"regression_test": "paces for the battery unless native power is known to be mains",
+			"baseline_exit_code": 1,
+			"baseline_failure": "FAIL paces for the battery unless native power is known to be mains \u2014 test_power_source.lua:19: UPS Power:",
+			"current_exit_code": 0,
+			"current_summary": ["Passed tests:  1", "Failed tests:  0"],
+			"id": 96,
+			"source_inventory": "runtime-extra2"
+		},
+		{
+			"fix_commit": "aed2818",
+			"scenario": "A restarted editor bridge reused a caret from its previous session.",
+			"source_path": "static/ergopti_plus/macos/infra/vscode_bridge.lua",
+			"test_module": "tests.unit.infra.vscode_bridge.test_vscode_bridge_caret_ingest",
+			"test_path": "static/ergopti_plus/macos/tests/unit/infra/vscode_bridge/test_vscode_bridge_caret_ingest.lua",
+			"regression_test": "discards the last caret when the server is stopped and restarted",
+			"baseline_exit_code": 1,
+			"baseline_failure": "FAIL discards the last caret when the server is stopped and restarted \u2014 test_vscode_bridge_caret_ingest.lua:74: stopped sessions must not expose stale caret data: expected nil, got {line=7 _ts=1793803504 active=true character=4 visibleStartLine=2}",
+			"current_exit_code": 0,
+			"current_summary": ["Passed tests:  3", "Failed tests:  0"],
+			"id": 97,
+			"source_inventory": "runtime-extra2"
+		},
+		{
+			"fix_commit": "dce5e16",
+			"scenario": "Repeated conflict-probe cleanup retries accumulated duplicate settlement observers.",
+			"source_path": "static/ergopti_plus/macos/modules/gestures/conflicts.lua",
+			"test_module": "tests.unit.modules.gestures.config.test_conflict_probe_start",
+			"test_path": "static/ergopti_plus/macos/tests/unit/modules/gestures/config/test_conflict_probe_start.lua",
+			"regression_test": "retains a failed start until its exact process settles",
+			"baseline_exit_code": 1,
+			"baseline_failure": "FAIL retains a failed start until its exact process settles \u2014 test_conflict_probe_start.lua:80: retries must not accumulate settlement observers:",
+			"current_exit_code": 0,
+			"current_summary": ["Passed tests:  7", "Failed tests:  0"],
+			"id": 98,
+			"source_inventory": "runtime-extra2"
+		},
+		{
+			"commit": "4d8944e",
+			"scenario": "Menu badges are clipped or miscentered for different label lengths.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/menu/tray/test_canvas_badge_no_leak.lua",
+			"production_file": "static/ergopti_plus/macos/ui/menu/canvas_badge.lua",
+			"current": {
+				"exit_code": 0,
+				"passed": 52,
+				"failed": 0,
+				"failures": []
+			},
+			"baseline_overlay": {
+				"exit_code": 1,
+				"passed": 49,
+				"failed": 3,
+				"failures": [
+					"FAIL cleans up a canvas when native rendering raises \u2014 ...os/tests/unit/ui/menu/tray/test_canvas_badge_no_leak.lua:61: render failed",
+					"FAIL retries refused canvas cleanup before allocating another \u2014 ...os/tests/unit/ui/menu/tray/test_canvas_badge_no_leak.lua:72: delete failed",
+					"FAIL centers the whole badge for both short and long menu rows \u2014 test_canvas_badge_no_leak.lua:148: badge must not start outside its canvas \u2014 actual: false"
+				]
+			},
+			"id": 100,
+			"source_inventory": "ui-extra2"
 		}
 	],
 	"configuration_module_results": [
@@ -833,5 +1131,8 @@
 		}
 	],
 	"deduplication": "Repeated commit references, malformed modifier variants, copy context variants, temporary-allocation variants, and menu reason improvements are excluded from additional counts.",
-	"installation_validation": "Five focused macOS Lua modules were rerun on Linux at baseline and passed. Filesystem rename tests use a portable test port; native Swift/macOS and Windows executions were not established by this run."
+	"installation_validation": "Five focused macOS Lua modules were rerun on Linux at baseline and passed. Filesystem rename tests use a portable test port; native Swift/macOS and Windows executions were not established by this run.",
+	"pending_revalidation": [
+		"d609b63: protected callback can swallow regression assertions; external observation requested."
+	]
 }

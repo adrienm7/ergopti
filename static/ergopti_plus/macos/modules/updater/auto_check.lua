@@ -259,6 +259,17 @@ function M.new(opts)
 			Logger.warn(LOG, "Dropped the unusable stored copy of the release list: %s.", reason)
 			return nil
 		end
+		local decoded, decode_error = JsonCodec.decode(copy.body)
+		if decode_error or type(decoded) ~= "table" then
+			Logger.warn(LOG, "Dropped the malformed stored copy of the release list.")
+			return nil
+		end
+		for _, entry in pairs(decoded) do
+			if type(entry) ~= "table" or type(entry.tag_name) ~= "string" or entry.tag_name == "" then
+				Logger.warn(LOG, "Dropped the stored release list containing an invalid entry.")
+				return nil
+			end
+		end
 		return copy
 	end
 	list_cache = load_list_cache()

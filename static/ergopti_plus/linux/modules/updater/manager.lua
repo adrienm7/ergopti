@@ -470,6 +470,13 @@ local function _load_list_cache()
 	end
 	for key, raw in pairs(stored) do
 		local copy, reason = ListCache.validate(raw)
+		if copy then
+			local valid, decoded = pcall(Json.decode_lossless, copy.body)
+			local entries = valid and type(decoded) == "table" and Parser.split_releases_array(copy.body) or nil
+			if not entries or #entries ~= #decoded or #entries > RELEASE_PAGE_SIZE then
+				copy, reason = nil, "invalid release page JSON"
+			end
+		end
 		if copy and type(key) == "string" and _list_cache[key] == nil then
 			_list_cache[key] = { body = copy.body, validator = copy.etag, effective_url = copy.url, restored = true }
 		else

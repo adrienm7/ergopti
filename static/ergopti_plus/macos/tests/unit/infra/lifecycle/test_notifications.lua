@@ -95,6 +95,17 @@ helpers.describe("notifications.notify", function()
 			"an explicit native refusal must never produce a success diagnostic")
 	end)
 
+	helpers.it("refuses malformed native notification receipts without raising (notification-bad-receipt)", function()
+		local hostile = setmetatable({}, { __index = function() error("native lookup failed") end })
+		for _, receipt in ipairs({ true, hostile }) do
+			_G.hs.notify.new = function() return receipt end
+			local called, dispatched, detail = pcall(notifications.notify, "hello")
+			helpers.assert_true(called, "a malformed native receipt must remain a refusal")
+			helpers.assert_eq(dispatched, false)
+			helpers.assert_contains(detail, "no send capability")
+		end
+	end)
+
 	helpers.it("routes notification-click callback failures into the logger", function()
 		local click_callback = nil
 		local activation_attempts = 0

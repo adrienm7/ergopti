@@ -2178,6 +2178,8 @@ _Updater_ParseListCache(Text, Url) {
 	Body := Parts[4]
 	if (SubStr(LTrim(Body, " `t`r`n"), 1, 1) != "[" || SubStr(RTrim(Body, " `t`r`n"), -1) != "]")
 		return 0
+	if !(_Updater_DecodeRelease(Body) is Array)
+		return 0
 	return { Etag: Parts[3], Json: Body }
 }
 

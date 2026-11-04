@@ -13,6 +13,29 @@ local Editor = require("infra.toml.record_editor")
 local Codec = require("infra.toml.codec")
 
 helpers.describe("TOML record editor preserves bytes outside the mutation", function()
+	helpers.it("leaves a quoted key containing an equals sign and other sections untouched", function()
+		local source = "[_meta]\n\"delay=other\" = 4\n'delay' = 250\n"
+			.. "[other]\ndelay = 99\n"
+		local expected = "[_meta]\n\"delay=other\" = 4\ndelay = 750\n"
+			.. "[other]\ndelay = 99\n"
+		local patched = assert(Editor.patch_table_field(source, "[_meta]", "delay", "750"))
+		helpers.assert_eq(patched, expected)
+		local decoded = assert(Codec.decode(patched))
+		helpers.assert_eq(decoded._meta["delay=other"], 4)
+		helpers.assert_eq(decoded._meta.delay, 750)
+		helpers.assert_eq(decoded.other.delay, 99)
+	end)
+
+	helpers.it("updates quoted spellings of a field instead of adding a duplicate", function()
+		for _, key in ipairs({'"delay"', "'delay'"}) do
+			local source = "[_meta]\n" .. key .. " = 250\nother = true\n"
+			local patched = assert(Editor.patch_table_field(source, "[_meta]", "delay", "750"))
+			helpers.assert_eq(patched, "[_meta]\ndelay = 750\nother = true\n")
+			local decoded = assert(Codec.decode(patched))
+			helpers.assert_eq(decoded._meta.delay, 750)
+		end
+	end)
+
 	helpers.it("recognizes quoted and spaced spellings of the same section", function()
 		for _, header in ipairs({'[ "_meta" ]', "[ '_meta' ]"}) do
 			local source = header .. " # retained\ndelay = 250\nother = true\n"

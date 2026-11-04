@@ -43,6 +43,6 @@ export const FAQ_DATA = [
 	},
 	{
 		q: 'Windows, macOS ou Linux ?',
-		a: 'Windows (AutoHotkey) et macOS (Hammerspoon) sont à parité et prêts à l’emploi. Le driver Linux (un daemon Lua qui gère aussi les tap-holds) est complet mais en alpha — il cherche ses premiers testeurs.'
+		a: 'Windows, macOS et Linux partagent de nombreuses fonctionnalités. Leur disponibilité, leurs conditions et certains comportements diffèrent selon le système : consultez les inventaires ci-dessous et l’audit de parité du dépôt. Le pilote Linux reste en alpha.'
 	}
 ];
