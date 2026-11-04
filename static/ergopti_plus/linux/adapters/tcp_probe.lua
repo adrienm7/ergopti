@@ -39,6 +39,7 @@ function M.probe(host, port, timeout_ms, callback, luv)
 	luv = luv or require("luv")
 	local answered, cancelled, settled, closing_batch = false, false, false, false
 	local open_handles, resolving, listeners = 0, false, {}
+	local retiring = {}
 	local timer, tcp, request, result
 
 	local function settle()
@@ -59,12 +60,34 @@ function M.probe(host, port, timeout_ms, callback, luv)
 	end
 
 	local function close(handle)
-		if handle == nil or handle:is_closing() then return end
-		open_handles = open_handles + 1
-		handle:close(function()
+		if handle == nil then return end
+		local entry = retiring[handle]
+		if not entry then
+			entry = { closing = false, closed = false }
+			retiring[handle] = entry
+			open_handles = open_handles + 1
+		end
+		if entry.closed or entry.closing then return end
+		local inspected, closing = pcall(handle.is_closing, handle)
+		if not inspected then
+			Logger.error(LOG, "TCP probe handle inspection failed; retirement remains pending.")
+			return
+		end
+		if closing then return end
+		entry.closing = true
+		local called, ack, detail = pcall(handle.close, handle, function()
+			if entry.closed then return end
+			entry.closed = true
+			retiring[handle] = nil
 			open_handles = open_handles - 1
 			settle()
 		end)
+		if not entry.closed and (not called or ack == false or detail ~= nil) then
+			Logger.error(LOG, "TCP probe handle close was refused; retirement remains pending.")
+			local observed, scheduled = pcall(handle.is_closing, handle)
+			-- A close that may already be scheduled is never issued twice.
+			if observed and scheduled == false then entry.closing = false end
+		end
 	end
 
 	local function answer(reachable, reason)
@@ -123,7 +146,13 @@ function M.probe(host, port, timeout_ms, callback, luv)
 	local child = {}
 	function child.cancel()
 		cancelled = true
-		answer(false, "cancelled")
+		if not answered then answer(false, "cancelled")
+		else
+			closing_batch = true
+			for handle in pairs(retiring) do close(handle) end
+			closing_batch = false
+			settle()
+		end
 		return true
 	end
 	function child.is_settled() return settled end

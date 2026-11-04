@@ -69,6 +69,45 @@ it("tries the next resolved address when the first connection is refused", funct
 	helpers.assert_eq(answers[1][1], true, "a later reachable address must keep the proxy usable")
 end)
 
+for _, failure in ipairs({ "throw", "return", "inspect" }) do
+it("retains a refused native close until cancellation retries it: " .. failure, function()
+	local resolve, connect, delivered = nil, nil, false
+	local attempts, fail = 0, true
+	local function handle(is_timer)
+		return {
+			is_closing = function()
+				if is_timer and fail and failure == "inspect" then error("controlled inspection refusal") end
+				return false
+			end,
+			close = function(_, callback)
+				if is_timer then
+					attempts = attempts + 1
+					if fail and failure == "throw" then error("controlled close refusal") end
+					if fail and failure == "return" then return false, "controlled close refusal" end
+				end
+				callback()
+			end,
+			connect = function(_, _, _, callback) connect = callback; return true end,
+		}
+	end
+	local backend = {
+		new_timer = function() return handle(true) end, new_tcp = function() return handle(false) end,
+		update_time = function() end, timer_start = function() return true end,
+		getaddrinfo = function(_, _, _, callback) resolve = callback; return {} end,
+	}
+	local child = assert(Probe.probe("example", 80, 1000, function() delivered = true end, backend))
+	resolve(nil, { { addr = "127.0.0.1", port = 80 } })
+	helpers.assert_true(pcall(connect, nil), "native close refusal cannot escape the event loop")
+	helpers.assert_eq(child.is_settled(), false)
+	helpers.assert_eq(delivered, false)
+	fail = false
+	helpers.assert_true(child.cancel())
+	helpers.assert_true(child.is_settled())
+	helpers.assert_eq(attempts, failure == "inspect" and 1 or 2)
+	helpers.assert_eq(delivered, false, "cancellation revokes the unanswered probe")
+end)
+end
+
 it("does not publish during a reentrant close callback", function()
 	local resolve, connect, closed = nil, nil, 0
 	local function handle()
