@@ -637,6 +637,7 @@ _LTERP_Body(Mode, Posts, Lines) {
     Slot := _LLM_TokenExchange_Slot(LTE_PROVIDER, _LTE_Key())
     Slot["token"] := "old-token", Slot["expires_at"] := _LLM_TokenExchange_Now() + 3600
     Resolved := _LLMRemoteResolveEntry(_LTE_Entry())
+    AssertFalse(_LLMRemote_NeedsAccess(Resolved), "the original access preparation must really consume its fresh slot")
     AssertEqual("old-token", Resolved["Token"])
     if Mode == "renewed"
         Slot["token"] := "new-token"
