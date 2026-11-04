@@ -389,6 +389,17 @@
 			"root_cause": "ergopti_managed_http_worker.ps1 in static/ergopti_plus/windows/vendor checks only whether a cross-origin method differs from GET. It does not inspect the current SendBody state and actual body length, while the genuine WinHTTP transport sends bodies independently of the method.",
 			"silent_failure": "The adapter violates its explicit cross-origin payload policy by contacting the second origin with the original GET body. No current production caller sending a nonempty GET body was found; this is an exposed adapter-contract defect, not an observed end-user disclosure.",
 			"regression_test": "A reachable managed-redirect-body-owner AHK case launches the genuine worker with its real admission handshake and WinHTTP engine against two owned loopback peers. Twelve native controls require denial before target contact, empty-GET and 303 controls, same-origin body preservation, and existing POST denial. Native peers record only body lengths and SHA256 digests. The original raw transport controls remain. Native Windows execution is pending."
+		},
+		{
+			"id": "AHK-036",
+			"title": "Retired tap-hold frames can release or overwrite a resumed gesture",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "Acquire a real immediate modifier, enter native Suspend and genuine remap teardown, resume and acquire the same modifier again before the old KeyWait frame returns. The retired frame consumes the new reference. The native fail-before replay41889866195 at7ee17bcef5076c4238a2e090cf41cb6d70ccf90b reports the exact missing-successor-ledger assertion.",
+			"root_cause": "The remap owner protocol in platform/remap/constants.ahk identifies release authority only by key name. Native Suspend leaves waiting frames alive. A late finally therefore consumes a new reference, while paired Tab-up/finally paths can consume twice in the same epoch. Companion AltGr handback, roll decisions and layer teardown carry similarly unqualified identity across callouts.",
+			"silent_failure": "A held Ctrl/Alt/Shift can be released under another gesture or a newly physical-held key; an old frame may remove successor metadata or dispatch an obsolete tap after resume.",
+			"regression_test": "Fourteen reachable synthetic-owner cases drive the genuine modifier, Tab, AltGr, rollover and navigation-layer owners with native Suspend/resume and the real lifecycle drain. Passive input, clock and wait ports expose release receipts, debt, physical observations and exact successor preservation without typing into the desktop. Two additional dispatch cases use the genuine logger test sink to revoke during the actual cancellation log and preserve resumed tracking. Native qualification is recorded separately with exact revisions."
 		}
 	]
 }
