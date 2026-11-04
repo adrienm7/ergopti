@@ -1,6 +1,6 @@
 {
 	"_comment": "Vectors of _shared/lua/updater/list_cache.lua: which stored release-list copies a restart may send as a conditional request again. Replayed by the Linux and macOS Lua suites. valid is whether validate accepts the value; reason_contains is a fragment of the refusal.",
-	"max_body_bytes": 2097152,
+	"max_body_bytes": 8388608,
 	"cases": [
 		{
 			"id": "complete-copy",
@@ -84,7 +84,7 @@
 			"stored": {
 				"url": "https://api.github.com/x",
 				"etag": "\"e\"",
-				"body_repeat": { "prefix": "[", "unit": "x", "count": 2097152 }
+				"body_repeat": { "prefix": "[", "unit": "x", "count": 8388608 }
 			},
 			"valid": false,
 			"reason_contains": "exceeds"
