@@ -129,6 +129,7 @@ local function with_world(body)
 		end }
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function(_, fn)
+				if world.raise_timer then error("timer unavailable") end
 				local handle = { fn = fn }
 				world.timers[#world.timers + 1] = handle
 				return handle, not world.refuse_timer
@@ -158,6 +159,7 @@ local function with_world(body)
 			handle.settle = settle
 			function handle.start()
 				if args[1] == "list" then
+					if world.hold_list then return true end
 					if world.before_list then world.before_list(#world.spawned) end
 					local lines = {}
 					for _, row in ipairs(world.library) do lines[#lines + 1] = row.name .. " (" .. row.id .. ")" end
@@ -441,6 +443,19 @@ helpers.describe("run_apple_shortcut runs a library shortcut through its owner (
 			helpers.assert_true(run ~= nil, "the refused deadline must follow process start")
 			helpers.assert_eq(run.terminated, true, "an unbounded shortcut must be stopped")
 			helpers.assert_eq(world.Shortcut.busy(), false)
+		end)
+	end)
+
+	helpers.it("stops an unbounded library query when its deadline raises", function()
+		with_world(function(world)
+			world.hold_list = true
+			world.raise_timer = true
+			local result, reason
+			local accepted = world.Shortcut.list(function(rows, refused) result, reason = rows, refused end)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(world.spawned[1].terminated, true)
+			helpers.assert_nil(result, "a refused query cannot publish a library")
+			helpers.assert_eq(reason, "query_refused")
 		end)
 	end)
 

@@ -24,6 +24,27 @@ const OUT_ACTIONS = 'src/routes/ergopti-plus/action-inventory.json';
 const OUT_MENU = 'src/routes/ergopti-plus/menu-gaps.json';
 const OS = { windows: 'ahk', macos: 'hs', linux: 'linux' };
 
+// A section reason applies only when it describes precisely the same drivers.
+function withSectionReasons(features, sections) {
+	return features.map((feature) => {
+		if (feature.reason_key) return feature;
+		const parts = feature.section.split('.');
+		while (parts.length) {
+			let section = sections;
+			for (const part of parts) section = section?.[part];
+			if (section?.reason_key && Array.isArray(section.platforms)) {
+				const same =
+					section.platforms.length === feature.platforms.length &&
+					section.platforms.every((platform) => feature.platforms.includes(platform));
+				if (same) return { ...feature, reason_key: section.reason_key };
+				return feature;
+			}
+			parts.pop();
+		}
+		return feature;
+	});
+}
+
 function render(features, locales, actions, menu) {
 	if (features.length < 300) throw new Error('Feature inventory unexpectedly small');
 	const seen = new Set();
@@ -36,6 +57,12 @@ function render(features, locales, actions, menu) {
 		) {
 			throw new Error(`Invalid platforms: ${feature.path}`);
 		}
+		if (
+			feature.platforms.length < Object.keys(OS).length &&
+			(!feature.reason_key || !locales.en[feature.reason_key] || !locales.fr[feature.reason_key])
+		) {
+			throw new Error(`Missing translated platform reason: ${feature.path}`);
+		}
 		const labels = Object.fromEntries(
 			['fr', 'en'].map((lang) => [lang, locales[lang][feature.description_key] || feature.path])
 		);
@@ -46,7 +73,12 @@ function render(features, locales, actions, menu) {
 			platforms: Object.fromEntries(
 				Object.entries(OS).map(([os, key]) => [os, feature.platforms.includes(key)])
 			),
-			reason_key: feature.reason_key || null
+			reason_key: feature.reason_key || null,
+			reason: feature.reason_key
+				? Object.fromEntries(
+						['fr', 'en'].map((lang) => [lang, locales[lang][feature.reason_key] || ''])
+					)
+				: null
 		};
 	});
 	const actionRows = [];
@@ -220,7 +252,13 @@ function outputs() {
 			'utf8'
 		)
 	);
-	return render(loadFeatureModel().features, locales, actions, menu);
+	const model = loadFeatureModel();
+	return render(
+		withSectionReasons(model.features, model.manifest.sections),
+		locales,
+		actions,
+		menu
+	);
 }
 
 function check() {
@@ -241,4 +279,4 @@ if (require.main === module) {
 			fs.writeFileSync(path.join(ROOT, name), content);
 }
 
-module.exports = { render, check };
+module.exports = { render, check, withSectionReasons };
