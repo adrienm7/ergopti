@@ -186,7 +186,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 			show = function() return true end,
 			hide = function() hidden = hidden + 1; return true end,
 			is_visible = function() return hidden == 0 end,
-			destroy = function() end,
+			destroy = function() return true end,
 		})
 		package.loaded["ui.tooltip.preview"] = nil
 		local preview = require("ui.tooltip.preview")
@@ -213,7 +213,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 			show = function() return true end,
 			hide = function() return true end,
 			is_visible = function() return true end,
-			destroy = function() end,
+			destroy = function() return true end,
 		})
 		package.loaded["ui.tooltip.preview"] = nil
 		local preview = require("ui.tooltip.preview")
@@ -401,7 +401,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 			show = function() return true end,
 			hide = function() hidden = hidden + 1; return true end,
 			is_visible = function() return true end,
-			destroy = function() end,
+			destroy = function() return true end,
 		})
 		package.loaded["ui.tooltip.preview"] = nil
 		local preview = require("ui.tooltip.preview")

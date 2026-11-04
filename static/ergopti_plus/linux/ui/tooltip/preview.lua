@@ -633,11 +633,12 @@ function M.destroy()
 	local revision = _revision + 1
 	M.note_covered()
 	if revision ~= _revision then return false end
-	Renderer.destroy()
-	if revision ~= _revision then return false end
+	local called, destroyed = pcall(Renderer.destroy)
+	if not called or destroyed ~= true or revision ~= _revision then return false end
 	_on_expire = nil
 	_on_hidden = nil
 	_on_render_failed = nil
+	return true
 end
 
 return M

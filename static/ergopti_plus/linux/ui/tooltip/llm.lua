@@ -407,7 +407,10 @@ end
 --- Destroys the shared renderer surface.
 function M.destroy()
 	if _presenting ~= nil or M.hide() ~= true then return false end
-	if _renderer and type(_renderer.destroy) == "function" then _renderer.destroy() end
+	if _renderer and type(_renderer.destroy) == "function" then
+		local called, destroyed = pcall(_renderer.destroy)
+		if not called or destroyed ~= true then return false end
+	end
 	_renderer = nil
 	_style = nil
 	return true
