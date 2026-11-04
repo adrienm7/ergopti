@@ -1568,6 +1568,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		state = state, script_control = core_mods.shortcuts_mod, admission = run_global_exclusive,
 		paused = live_pause, save_prefs = transactional_save_prefs,
 	})
+	local script_action_owner = require("ui.menu.script_action_transaction").new({
+		state = state, script_control = core_mods.shortcuts_mod, admission = run_global_exclusive,
+		paused = live_pause, save_prefs = transactional_save_prefs,
+	})
 	local program_parameter_owner = ProgramParameterTransaction.new({
 		gestures = gestures, preferences = Preferences, checkpoint = preference_checkpoint,
 		path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
@@ -1592,6 +1596,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		commit_preview           = preview_owner.toggle,
 		commit_base_delay        = base_delay_owner.set,
 		commit_script_chords     = script_chords_owner.toggle,
+		commit_script_action     = script_action_owner.assign,
 		notify_feature           = notify_feature,
 		do_reload                = do_reload,
 		applyTriggerChar         = applyTriggerChar,

@@ -648,12 +648,10 @@ function M.build(ctx)
 						action   = (not paused) and (function(a) return function()
 							local function assign()
 								if a == "run_program" then ctx.updateMenu(); return true end
-								state.script_control_shortcuts[slot_id] = a
-								if type(script_control.set_shortcut_action) == "function" then
-									pcall(script_control.set_shortcut_action, slot_id, a)
-								end
-								if ctx.save_prefs() ~= true then return false end
+								if type(ctx.commit_script_action) ~= "function"
+									or ctx.commit_script_action(slot_id, a) ~= true then return false end
 								ctx.updateMenu()
+								return true
 							end
 
 							-- open_url / search_web do nothing without their parameter:
@@ -698,7 +696,7 @@ function M.build(ctx)
 								return
 							end
 
-							assign()
+							return assign()
 						end end)(act) or nil,
 					})
 				end
