@@ -228,6 +228,37 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 end)
 
 helpers.describe("Linux builtin dynamic word-start owners", function()
+	helpers.it("dynamic family fixture owns different paths in concurrent processes", function()
+		local uv = require("luv")
+		local code = "package.path = " .. string.format("%q", package.path) .. "; " .. [[
+			package.loaded["infra.hotstring_preferences"] = { _set_file_for_test = function() return true end }
+			os.time = function() return 42 end
+			math.random = function() return 123456 end
+			local restore, path = require("tests.support.dynamic_hotstrings_fixture").route()
+			print(path)
+			restore()
+		]]
+		local outputs, completed, closed = { "", "" }, 0, 0
+		for index = 1, 2 do
+			local pipe = assert(uv.new_pipe(false))
+			local child
+			child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code }, stdio = { nil, pipe, nil } },
+				function(status, signal)
+					assert(status == 0 and signal == 0, "fixture child failed")
+					completed = completed + 1
+					child:close()
+				end))
+			pipe:read_start(function(err, chunk)
+				assert(not err, err)
+				if chunk then outputs[index] = outputs[index] .. chunk
+				else pipe:read_stop(); pipe:close(); closed = closed + 1 end
+			end)
+		end
+		while completed < 2 or closed < 2 do uv.run("once") end
+		helpers.assert_true(outputs[1] ~= "" and outputs[2] ~= "", "both processes must return a path")
+		helpers.assert_true(outputs[1] ~= outputs[2], "process-local clocks and random generators cannot own a path")
+	end)
+
 	helpers.it("the actual daemon captures boundary with its buffer before prediction callbacks", function()
 		with_manager(function(manager, injections)
 			local source = daemon_source()
