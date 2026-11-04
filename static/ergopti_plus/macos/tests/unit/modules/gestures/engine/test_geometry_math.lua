@@ -50,5 +50,11 @@ helpers.describe("gesture geometry", function()
 		for _, step in ipairs({ 0, -1 }) do
 			helpers.assert_eq(pcall(Geometry.incrementalSteps, 10, step), false)
 		end
+		for _, invalid in ipairs({ 0 / 0, math.huge, -math.huge }) do
+			helpers.assert_eq(pcall(Geometry.incrementalSteps, 10, invalid), false)
+			helpers.assert_eq(pcall(Geometry.incrementalSteps, invalid, 1), false)
+		end
+		helpers.assert_eq(pcall(Geometry.incrementalSteps, 10, 1e-320), false,
+			"overflow in a corrupted internal step must never produce an infinite loop count")
 	end)
 end)

@@ -494,6 +494,16 @@ local function triggerIncrementalActions(action, sign, slot, count)
 	return fired
 end
 
+--- Rejects an implausible frame before its requested actions can block the tap.
+local function incrementalCountAdmitted(count, slot)
+	if count <= Geometry.MAX_INCREMENTAL_ACTIONS_PER_FRAME then return true end
+	Logger.error(LOG, "Gesture '%s' requested %s incremental actions in one frame; gesture aborted.",
+		tostring(slot), tostring(count))
+	gs.aborted = true
+	if not gs.hadLiveFire then stopScrollBlock() end
+	return false
+end
+
 --- Triggers non-scalable horizontal actions during the gesture to reduce latency.
 --- @param slot string|nil The action slot resolved from direction and finger count.
 --- @param pos table Current centroid position.
@@ -577,6 +587,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 		local diff = targetSteps - gs.stepsCommitted
 
 		if diff > 0 then
+			if not incrementalCountAdmitted(diff, slot) then return end
 			local prior_steps = gs.stepsCommitted
 			local fired = triggerIncrementalActions(action, sd, slot, diff)
 			if fired > 0 then
@@ -769,6 +780,7 @@ local function commitGesture(now)
 		local sd = signedDistAxis(gs.endPos, dir)
 		local targetSteps = Geometry.incrementalSteps(math.abs(sd), sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
+		if diff > 0 and not incrementalCountAdmitted(diff, slot) then return end
 		Logger.info(LOG, "commitGesture INCREMENTAL: sd=%.2f targetSteps=%d prevSteps=%d diff=%d",
 			sd, targetSteps, gs.stepsCommitted, diff)
 
