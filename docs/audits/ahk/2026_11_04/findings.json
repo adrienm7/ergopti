@@ -367,6 +367,17 @@
 			"root_cause": "LogOpeners_OpenTodayErrors in static/ergopti_plus/windows/ui/log_openers.ahk checks FileExist without first settling the real logger queues. Warnings are intentionally buffered until the periodic flush. The main-log sibling likewise opens a stale disk snapshot. A flush return alone is insufficient because refused appends are requeued.",
 			"silent_failure": "The UI says no errors today despite an accepted warning, or opens a file missing the latest diagnostic. A locked sink can produce the same false answer unless retained delivery debt is checked.",
 			"regression_test": "Six isolated owned native logger children cover main/errors, genuine native sharing denial with retained exactly-once retry, and an explicitly controlled busy-owner observation. Launch reads the genuine file at the action boundary and requires the warning; notification must remain unused. Existing resolver action tests isolate their own logger queues. Native Windows execution is pending; the original failure is source-derived."
+		},
+		{
+			"id": "AHK-034",
+			"title": "Deferred tap-copy retries survive suspend and can overwrite successor ownership",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "Start a tap-copy check, enter native Suspend and the production remap teardown, resume before the retained 300 ms callback, then deliver that old callback with an unchanged clipboard counter. Also start a newer copy inside the counter or retry sender of an older check.",
+			"root_cause": "TapCopyCheckStop in static/ergopti_plus/windows/platform/remap/constants.ahk was never reached by production cleanup. The timer checked only the instantaneous suspended flag. Producer and timer continuations also mutated the global pending record after counter, sender or logger callouts without revalidating their exact generation.",
+			"silent_failure": "An old Ctrl+C may be injected into the resumed context, or an obsolete check may clear a newer copy and issue its stale failure notification.",
+			"regression_test": "Seven reachable tap-copy-owner cases invoke the genuine suspend-owned remap drain with private empty modifier ledgers, native Suspend/resume and retained timer delivery; producer/counter/retry/logger callouts revoke or replace ownership and assert zero stale sends/notices plus successor timer preservation. Counter/timer/send/notice are explicit passive ports. Existing five copy verification controls remain. Native Windows execution is pending; pre-fix failure is source-derived."
 		}
 	]
 }

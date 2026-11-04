@@ -991,6 +991,9 @@ TapHoldSyntheticKeyUp(Key) {
 }
 
 TapHoldReleaseSyntheticKeys() {
+	; Deferred copy retries are synthetic input owners too: revoke them before
+	; the first yielding key-release operation of suspend or shutdown.
+	TapCopyCheckStop()
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
 	Keys := []
 	Seen := Map()
@@ -1474,99 +1477,151 @@ global _TapCopyWarnFn := () => NotifierSend(t("notify.tap_hold.copy_failed"), Ma
 ;   The retry calls it again.
 TapCopySend(KeyId, SendFn) {
 	global _TapCopyCounterFn
+	if A_IsSuspended
+		return false
+	Generation := TapCopyCheckStop()
 	Baseline := _TapCopyCounterFn.Call()
+	if !_TapCopyGenerationCurrent(Generation)
+		return false
 	Sent := SendFn.Call()
-	TapCopyCheckStart(Baseline, KeyId, SendFn)
+	if _TapCopyGenerationCurrent(Generation)
+		TapCopyCheckStart(Baseline, KeyId, SendFn, Generation)
 	return Sent
 }
 
-; Starts checking one copy keystroke.
-; @param Baseline {Integer} The sequence number read before the keystroke.
-; @param Source {String} What sent the copy, for the log.
-; @param SendFn {Func} Sends the copy keystroke again for the retry.
-; @return {Boolean} Whether a check is now pending.
-TapCopyCheckStart(Baseline, Source, SendFn) {
+; Starts checking only the copy whose sender still owns this lifecycle generation.
+TapCopyCheckStart(Baseline, Source, SendFn, ExpectedGeneration := unset) {
 	global _TapCopyPending, _TapCopyGeneration, _TapCopyTimerFn, TAP_COPY_VERIFY_MS
-	if IsObject(_TapCopyPending)
-		try LoggerDebug("TapHoldCopy", "Tap-hold copy check from {1} superseded by a newer copy.", _TapCopyPending["source"])
-	_TapCopyGeneration += 1
-	_TapCopyPending := 0
-	; GetClipboardSequenceNumber returns 0 when the session gives no access to
-	; the clipboard (a locked or another window station): nothing can be checked.
-	if !(Baseline is Integer) or Baseline == 0 {
-		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Source)
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || (IsSet(ExpectedGeneration) && ExpectedGeneration != _TapCopyGeneration)
+			return false
+		_TapCopyGeneration += 1
+		Generation := _TapCopyGeneration
+		_TapCopyPending := 0
+		if (Baseline is Integer) && Baseline != 0 {
+			Pending := Map("baseline", Baseline, "attempts", 1, "source", Source,
+				"generation", Generation, "send", SendFn)
+			_TapCopyPending := Pending
+		}
+	} finally Critical(PreviousCritical)
+	; GetClipboardSequenceNumber returns zero when the session cannot access it.
+	if !IsSet(Pending) {
+		if _TapCopyGenerationCurrent(Generation)
+			try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Source)
 		return false
 	}
-	_TapCopyPending := Map("baseline", Baseline, "attempts", 1, "source", Source,
-		"generation", _TapCopyGeneration, "send", SendFn)
-	Generation := _TapCopyGeneration
+	if !_TapCopyCheckCurrent(Pending)
+		return false
 	_TapCopyTimerFn.Call(() => _TapCopyCheckTick(Generation), TAP_COPY_VERIFY_MS)
-	return true
+	return _TapCopyCheckCurrent(Pending)
 }
 
-; Abandons the pending check without a report (pause, reload).
+; Abandons both a pending check and any sender that has not published one yet.
 TapCopyCheckStop() {
 	global _TapCopyPending, _TapCopyGeneration
-	_TapCopyPending := 0
-	_TapCopyGeneration += 1
+	PreviousCritical := Critical("On")
+	try {
+		_TapCopyPending := 0
+		_TapCopyGeneration += 1
+		return _TapCopyGeneration
+	} finally Critical(PreviousCritical)
 }
 
-; Reads the counter once an attempt has had its time.
-; @param Generation {Integer} The check this timer belongs to.
+_TapCopyGenerationCurrent(Generation) {
+	global _TapCopyGeneration
+	return !A_IsSuspended && Generation == _TapCopyGeneration
+}
+_TapCopyCheckCurrent(Pending) {
+	global _TapCopyPending
+	return IsObject(Pending) && _TapCopyPending == Pending
+		&& _TapCopyGenerationCurrent(Pending["generation"])
+}
+
+; Completion may retire only its exact record, never a copy started in a callout.
+_TapCopyCheckRetire(Pending, Revoke := false) {
+	global _TapCopyPending, _TapCopyGeneration
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(Pending) || _TapCopyPending != Pending || Pending["generation"] != _TapCopyGeneration
+			return false
+		_TapCopyPending := 0
+		if Revoke
+			_TapCopyGeneration += 1
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 _TapCopyCheckTick(Generation) {
-	global _TapCopyPending, _TapCopyCounterFn, _TapCopySendFn, _TapCopyTimerFn, _TapCopyWarnFn
+	global _TapCopyPending, _TapCopyCounterFn, _TapCopyTimerFn
 	global TAP_COPY_RETRIES, TAP_COPY_VERIFY_MS
 	Pending := _TapCopyPending
-	if !IsObject(Pending) or Pending["generation"] != Generation
+	if !IsObject(Pending) || Pending["generation"] != Generation
 		return
-	; A paused driver sends nothing: the check ends with the pause.
 	if A_IsSuspended {
-		_TapCopyPending := 0
+		_TapCopyCheckRetire(Pending, true)
 		return
 	}
 	Counter := _TapCopyCounterFn.Call()
+	if !_TapCopyCheckCurrent(Pending) {
+		if A_IsSuspended
+			_TapCopyCheckRetire(Pending, true)
+		return
+	}
 	WaitedMs := Pending["attempts"] * TAP_COPY_VERIFY_MS
-	if !(Counter is Integer) or Counter == 0 {
-		_TapCopyPending := 0
-		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Pending["source"])
+	if !(Counter is Integer) || Counter == 0 {
+		if _TapCopyCheckRetire(Pending) && _TapCopyGenerationCurrent(Generation)
+			try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Pending["source"])
 		return
 	}
 	if Counter != Pending["baseline"] {
-		_TapCopyPending := 0
-		if (Pending["attempts"] > 1) {
+		if !_TapCopyCheckRetire(Pending) || !_TapCopyGenerationCurrent(Generation)
+			return
+		if Pending["attempts"] > 1
 			try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} reached the clipboard only when sent again ({2} ms).", Pending["source"], WaitedMs)
-		} else {
+		else
 			try LoggerDebug("TapHoldCopy", "Tap-hold copy from {1} verified: the clipboard changed within {2} ms.", Pending["source"], WaitedMs)
-		}
 		return
 	}
 	if Pending["attempts"] > TAP_COPY_RETRIES {
-		_TapCopyPending := 0
+		if !_TapCopyCheckRetire(Pending) || !_TapCopyGenerationCurrent(Generation)
+			return
 		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} never reached the clipboard (not_copied after {2} ms); the user is warned.", Pending["source"], WaitedMs)
-		_TapCopyWarnUser()
+		_TapCopyWarnUser(Generation)
 		return
 	}
-	Pending["attempts"] += 1
-	Pending["baseline"] := Counter
+	PreviousCritical := Critical("On")
+	try {
+		if !_TapCopyCheckCurrent(Pending)
+			return
+		Pending["attempts"] += 1
+		Pending["baseline"] := Counter
+	} finally Critical(PreviousCritical)
 	Refusal := ""
+	if !_TapCopyCheckCurrent(Pending)
+		return
 	try {
 		if !Pending["send"].Call()
 			Refusal := "the sender refused the keystroke"
-	} catch as Err {
+	} catch as Err
 		Refusal := Err.Message
-	}
-	if (Refusal != "") {
-		_TapCopyPending := 0
+	if !_TapCopyCheckCurrent(Pending)
+		return
+	if Refusal != "" {
+		if !_TapCopyCheckRetire(Pending) || !_TapCopyGenerationCurrent(Generation)
+			return
 		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} never reached the clipboard (retry_refused after {2} ms: {3}); the user is warned.", Pending["source"], WaitedMs, Refusal)
-		_TapCopyWarnUser()
+		_TapCopyWarnUser(Generation)
 		return
 	}
 	_TapCopyTimerFn.Call(() => _TapCopyCheckTick(Generation), TAP_COPY_VERIFY_MS)
 }
 
 ; Shows the localized notice; a refused notice is logged, never fatal.
-_TapCopyWarnUser() {
+_TapCopyWarnUser(Generation) {
 	global _TapCopyWarnFn
+	if !_TapCopyGenerationCurrent(Generation)
+		return
 	try {
 		Shown := _TapCopyWarnFn.Call()
 	} catch as Err {
