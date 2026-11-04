@@ -19,6 +19,12 @@ function refuse(ok, detail) {
 	if (!ok) throw new Error('Site deployment admission refused: ' + detail);
 }
 
+/**
+ * A newer push moved the target branch past the admitted source: that source's
+ * CI finished after it was superseded, and the newer push brings its own deployment.
+ */
+class SupersededSource extends Error {}
+
 function number(value) {
 	const text = typeof value === 'number' ? String(value) : value;
 	refuse(
@@ -403,11 +409,13 @@ async function requireCurrentTarget(admitted, readApi) {
 	validateAdmission(admitted);
 	const reference = await readApi('/repos/' + REPOSITORY + '/git/ref/heads/' + admitted.target);
 	refuse(
-		reference.ref === 'refs/heads/' + admitted.target &&
-			reference.object?.type === 'commit' &&
-			reference.object.sha === admitted.source_sha,
-		'target branch no longer names the admitted source.'
+		reference.ref === 'refs/heads/' + admitted.target && reference.object?.type === 'commit',
+		'target branch reference is malformed.'
 	);
+	if (reference.object.sha !== admitted.source_sha)
+		throw new SupersededSource(
+			'Site deployment admission refused: target branch no longer names the admitted source.'
+		);
 }
 
 /** Read only a bounded canonical producer admission before any subsequent Git operation. */
@@ -516,20 +524,32 @@ async function main(argv = process.argv.slice(2), env = process.env, ports = {})
 			capture: true
 		}).content;
 		const event = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-		const admitted = await admitProducer(selectionFromEvent(env, event), readApi);
-		fs.writeFileSync(argv[2], JSON.stringify(admitted, null, 2) + '\n', {
-			flag: 'wx',
-			encoding: 'utf8'
-		});
 		refuse(
 			typeof env.GITHUB_OUTPUT === 'string' && env.GITHUB_OUTPUT.length > 0,
 			'actual output path is required.'
 		);
+		let admitted;
+		try {
+			admitted = await admitProducer(selectionFromEvent(env, event), readApi);
+		} catch (error) {
+			if (!(error instanceof SupersededSource)) throw error;
+			// Not a failure: the run that moved the branch deploys its own source.
+			fs.appendFileSync(env.GITHUB_OUTPUT, 'superseded=true\n', { encoding: 'utf8' });
+			console.log(
+				'::notice::' + error.message + ' A newer push deploys instead; nothing to publish.'
+			);
+			return;
+		}
+		fs.writeFileSync(argv[2], JSON.stringify(admitted, null, 2) + '\n', {
+			flag: 'wx',
+			encoding: 'utf8'
+		});
 		fs.appendFileSync(
 			env.GITHUB_OUTPUT,
-			Object.entries(admitted)
-				.map(([key, value]) => key + '=' + value + '\n')
-				.join(''),
+			'superseded=false\n' +
+				Object.entries(admitted)
+					.map(([key, value]) => key + '=' + value + '\n')
+					.join(''),
 			{ encoding: 'utf8' }
 		);
 		console.log(
@@ -574,6 +594,7 @@ module.exports = {
 	selectionFromEvent,
 	readAdmission,
 	requireCurrentTarget,
+	SupersededSource,
 	main,
 	REPOSITORY
 };
