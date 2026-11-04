@@ -3022,7 +3022,10 @@ _release_forwarded_sources = function(paths)
 		_track_modifier(entry.owner_source or entry.source, entry.code, InputEvent.VALUE_UP)
 		local retained = false
 		for _, current in ipairs(_modifier_order) do if current.code == entry.code then retained = true end end
-		if role and not retained then _capture(entry.code, InputEvent.VALUE_UP) end
+		if role and not retained then
+			local _, _, capture_err = _capture(entry.code, InputEvent.VALUE_UP)
+			if capture_err then return false, "departed modifier capture refused: " .. tostring(capture_err) end
+		end
 	end
 	-- Reconciliation may already have dropped an orphan's physical record.
 	-- Its encoded source still owns that old suppressed press, not a later

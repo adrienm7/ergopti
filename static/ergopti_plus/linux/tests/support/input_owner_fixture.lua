@@ -129,6 +129,7 @@ function M.with_session(options, body)
 		end,
 		process = function(code, value)
 			s.captures[#s.captures + 1] = { code, value }
+			if options.capture_error and options.capture_error(code, value) then return nil, nil, "capture refused" end
 			if value == 1 then down[code] = true elseif value == 0 then down[code] = nil end
 			return code == 30 and value ~= 0 and (down[42] and "A" or "a") or nil
 		end,
