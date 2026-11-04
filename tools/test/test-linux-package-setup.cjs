@@ -25,6 +25,60 @@ assert.ok(fs.existsSync(sourcePath), 'native packages need an automatic permissi
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-setup-'));
 const shellQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 try {
+	// An unprivileged invocation must enroll its own UID, even when it inherited
+	// SUDO_UID from an earlier `sudo -u` context.
+	{
+		const tools = path.join(sandbox, 'installer-identity-tools');
+		const receipt = path.join(sandbox, 'installer-identity-receipt');
+		fs.mkdirSync(tools);
+		fs.writeFileSync(
+			path.join(tools, 'id'),
+			'#!/bin/bash\n[ "$1" = -u ] && echo "${TEST_UID:-1001}"\n',
+			{ mode: 0o755 }
+		);
+		fs.writeFileSync(
+			path.join(tools, 'sudo'),
+			`#!/bin/bash\nprintf '%s\\n' "$*" > ${shellQuote(receipt)}\n`,
+			{ mode: 0o755 }
+		);
+		const setup = spawnSync(
+			bashExecutable(),
+			[bashPath(path.join(ROOT, 'static/ergopti_plus/linux/install.sh')), '--setup-perms'],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, HOME: sandbox, SUDO_UID: '1234', PATH: `${tools}:/usr/bin:/bin` }
+			}
+		);
+		assert.equal(setup.status, 0, setup.stderr);
+		assert.match(fs.readFileSync(receipt, 'utf8'), /--user 1001\n$/);
+		fs.writeFileSync(
+			path.join(tools, 'bash'),
+			`#!/bin/bash\nprintf '%s\\n' "$*" > ${shellQuote(receipt)}\n`,
+			{ mode: 0o755 }
+		);
+		const elevated = spawnSync(
+			'/bin/bash',
+			[bashPath(path.join(ROOT, 'static/ergopti_plus/linux/install.sh')), '--setup-perms'],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: {
+					...process.env,
+					HOME: sandbox,
+					SUDO_UID: '1234',
+					TEST_UID: '0',
+					PATH: `${tools}:/usr/bin:/bin`
+				}
+			}
+		);
+		assert.equal(elevated.status, 0, elevated.stderr);
+		assert.match(
+			fs.readFileSync(receipt, 'utf8'),
+			/--user 1234\n$/,
+			'root retains the sudo caller'
+		);
+	}
 	const stubs = path.join(sandbox, 'stubs');
 	const callLog = path.join(sandbox, 'calls');
 	fs.mkdirSync(stubs);

@@ -282,14 +282,19 @@ _setup_permissions() {
 	ergopti_msg_with "     " install.security_warning_body
 	echo ""
 
-	local target_uid
-	target_uid="${SUDO_UID:-$(id -u)}"
-	if [ "$(id -u)" = 0 ]; then
+	local target_uid current_uid
+	current_uid="$(id -u)"
+	if [ "$current_uid" = 0 ]; then
+		target_uid="${SUDO_UID:-$current_uid}"
 		bash "${SRC_DRIVER}/install/setup_permissions.sh" --user "$target_uid"
-	elif command -v sudo >/dev/null 2>&1; then
-		sudo bash "${SRC_DRIVER}/install/setup_permissions.sh" --user "$target_uid"
 	else
-		pkexec /bin/bash "${SRC_DRIVER}/install/setup_permissions.sh" --user "$target_uid"
+		# SUDO_UID can describe the caller of `sudo -u`, not this account.
+		target_uid="$current_uid"
+		if command -v sudo >/dev/null 2>&1; then
+			sudo bash "${SRC_DRIVER}/install/setup_permissions.sh" --user "$target_uid"
+		else
+			pkexec /bin/bash "${SRC_DRIVER}/install/setup_permissions.sh" --user "$target_uid"
+		fi
 	fi
 	echo ""
 	ergopti_msg_with "  ⚠  " install.relogin_notice
