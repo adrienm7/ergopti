@@ -47,10 +47,9 @@ startup_manual_unit_matches() {
 
 # A same-named user unit can belong to a second installation. Never disable it
 # merely because systemd lists the name; only admit an unambiguous launcher.
-startup_user_unit_compatible() {
-	local expected line count=0
-	if [ ! -e "$USER_UNIT" ] && [ ! -L "$USER_UNIT" ]; then return 0; fi
-	[ -f "$USER_UNIT" ] && [ ! -L "$USER_UNIT" ] || return 1
+startup_unit_compatible() {
+	local unit_path="$1" expected line count=0
+	[ -f "$unit_path" ] && [ ! -L "$unit_path" ] || return 1
 	expected="$(ergopti_systemd_exec "$LAUNCHER")" || return 1
 	while IFS= read -r line || [ -n "$line" ]; do
 		case "$line" in
@@ -62,10 +61,10 @@ startup_user_unit_compatible() {
 					*) return 1 ;;
 				esac ;;
 		esac
-	done < "$USER_UNIT"
+	done < "$unit_path"
 	[ "$count" -eq 1 ]
 }
-if ! startup_user_unit_compatible; then
+if { [ -e "$USER_UNIT" ] || [ -L "$USER_UNIT" ]; } && ! startup_unit_compatible "$USER_UNIT"; then
 	if [ "$ACTION" = status ]; then printf 'other\n'; exit 0; fi
 	printf '[startup] code=foreign-unit path=%q\n' "$USER_UNIT" >&2
 	exit 78
@@ -226,9 +225,28 @@ if command -v systemctl >/dev/null 2>&1; then
 	# the complete successful inventory instead of filtering the native query.
 	unit_files="$(systemctl --user --no-pager --no-legend list-unit-files)"
 	unit_present=false
-	while read -r unit_name unit_metadata; do
+	while read -r unit_name unit_state unit_metadata; do
 		if [ "$unit_name" = ergopti-hotstrings.service ]; then unit_present=true; break; fi
 	done <<< "$unit_files"
-	if "$unit_present"; then systemctl --user --no-reload disable ergopti-hotstrings.service; fi
+	if "$unit_present"; then
+		if unit_properties="$(systemctl --user show ergopti-hotstrings.service --all -p FragmentPath -p DropInPaths 2>/dev/null)"; then
+			fragment= dropins= fragment_count=0 dropin_count=0
+			while IFS='=' read -r property value; do
+				case "$property" in
+					FragmentPath) fragment="$value"; fragment_count=$((fragment_count + 1)) ;;
+					DropInPaths) dropins="$value"; dropin_count=$((dropin_count + 1)) ;;
+				esac
+			done <<< "$unit_properties"
+			if [ "$fragment_count" -ne 1 ] || [ "$dropin_count" -ne 1 ] || [ -n "$dropins" ] \
+				|| [[ "$fragment" != /* ]] || ! startup_unit_compatible "$fragment"; then
+				startup_record foreign-unit unit "$fragment"
+				exit 78
+			fi
+			systemctl --user --no-reload disable ergopti-hotstrings.service
+		elif [ "$unit_state" != disabled ] || { ! "$receipt_allowed" && [ "$ACTION" = enable ]; }; then
+			startup_record unit-unverified unit ergopti-hotstrings.service
+			exit 78
+		fi
+	fi
 fi
 committed=true

@@ -58,12 +58,13 @@ try {
 			'#!/bin/bash',
 			'printf "%s\\n" "$*" >> "$CALL_LOG"',
 			'if [ "$2" = is-enabled ]; then [ "${SYSTEMD_ENABLED:-0}" = 1 ]; exit $?; fi',
+			'if [ "$2" = show ]; then [ "${SHOW_REFUSE:-0}" != 1 ] || exit 1; printf "FragmentPath=%s\\nDropInPaths=%s\\n" "$UNIT_FRAGMENT" "${UNIT_DROPINS:-}"; exit 0; fi',
 			'if [ "$4" = list-unit-files ]; then',
 			'  [ "${QUERY_REFUSE:-0}" != 1 ] || exit 23',
 			'  if [ "${NO_UNIT:-0}" = 1 ]; then',
 			'    [ "$#" -eq 4 ] || exit 1',
 			'    printf "%s\\n" "fooergopti-hotstrings.service disabled enabled" "ergopti-hotstrings.service.other disabled enabled"',
-			'  else echo "ergopti-hotstrings.service disabled enabled"; fi',
+			'  else echo "ergopti-hotstrings.service ${UNIT_STATE:-disabled} enabled"; fi',
 			'  exit 0',
 			'fi',
 			'[ "${NO_UNIT:-0}" != 1 ] && [ "${REFUSE:-0}" != 1 ]',
@@ -71,12 +72,16 @@ try {
 		].join('\n'),
 		{ mode: 0o755 }
 	);
+	const fragment = path.join(sandbox, 'selected-unit.service');
+	const selectedLauncher = path.resolve(installed, '../../../../bin/ergopti-hotstrings');
+	fs.writeFileSync(fragment, `[Service]\nExecStart=/bin/bash "${posix(selectedLauncher)}" --tray\n`);
 	const env = {
 		...process.env,
 		HOME: posix(sandbox),
 		XDG_CONFIG_HOME: posix(config),
 		CALL_LOG: posix(calls),
-		TEST_STUBS: posix(stubs)
+		TEST_STUBS: posix(stubs),
+		UNIT_FRAGMENT: posix(fragment)
 	};
 	const run = (action, extra = {}, cwd = sandbox) =>
 		spawnSync(
@@ -208,6 +213,23 @@ try {
 	assert.equal(run('disable', { NO_UNIT: '1' }).status, 0);
 	assert.equal(run('status').stdout.trim(), 'disabled');
 	assert.match(fs.readFileSync(desktop, 'utf8'), /^Hidden=true$/m);
+	const foreignFragment = path.join(sandbox, 'foreign-unit.service');
+	fs.writeFileSync(foreignFragment, '[Service]\nExecStart=/other/program\n');
+	for (const extra of [
+		{ UNIT_FRAGMENT: posix(foreignFragment), UNIT_STATE: 'enabled' },
+		{ UNIT_DROPINS: '/some/override.conf', UNIT_STATE: 'enabled' },
+		{ SHOW_REFUSE: '1', UNIT_STATE: 'enabled' }
+	]) {
+		const before = fs.readFileSync(desktop, 'utf8');
+		const callOffset = fs.readFileSync(calls, 'utf8').length;
+		assert.notEqual(run('enable', extra).status, 0, 'unverified service cannot be disabled');
+		assert.equal(fs.readFileSync(desktop, 'utf8'), before, 'refusal restores startup choice');
+		assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(callOffset), /--no-reload disable/);
+	}
+	const offlineCalls = fs.readFileSync(calls, 'utf8').length;
+	assert.equal(run('enable', { SHOW_REFUSE: '1' }).status, 0, 'offline disabled service permits XDG startup');
+	assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(offlineCalls), /--no-reload disable/);
+	assert.equal(run('disable', { SHOW_REFUSE: '1' }).status, 0);
 	fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
 	assert.equal(
 		run('status').stdout.trim(),
@@ -238,10 +260,12 @@ try {
 			provideShellMessages(nativeInstall);
 			const foreignReceipt = path.join(nativeRoot, '../.ergopti-owned-files');
 			fs.writeFileSync(foreignReceipt, 'foreign receipt\n');
+			const nativeFragment = path.join(sandbox, 'native-unit.service');
+			fs.writeFileSync(nativeFragment, '[Service]\nExecStart=/usr/bin/ergopti --service --tray\n');
 			const native = spawnSync(bashExecutable(), [posix(nativeScript), 'enable'], {
 				encoding: 'utf8',
 				timeout: 10000,
-				env: { ...env, ERGOPTI_TEST_PACKAGE_ROOT: nativeRoot }
+				env: { ...env, ERGOPTI_TEST_PACKAGE_ROOT: nativeRoot, UNIT_FRAGMENT: posix(nativeFragment) }
 			});
 			assert.equal(native.status, 0, native.stderr);
 			assert.equal(fs.readFileSync(foreignReceipt, 'utf8'), 'foreign receipt\n');
@@ -481,7 +505,24 @@ try {
 		);
 		fs.unlinkSync(manifest);
 		fs.unlinkSync(path.join(stubs, 'mv'));
-		fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
+		const foreignFragment = path.join(sandbox, 'foreign-unit.service');
+	fs.writeFileSync(foreignFragment, '[Service]\nExecStart=/other/program\n');
+	for (const extra of [
+		{ UNIT_FRAGMENT: posix(foreignFragment), UNIT_STATE: 'enabled' },
+		{ UNIT_DROPINS: '/some/override.conf', UNIT_STATE: 'enabled' },
+		{ SHOW_REFUSE: '1', UNIT_STATE: 'enabled' }
+	]) {
+		const before = fs.readFileSync(desktop, 'utf8');
+		const callOffset = fs.readFileSync(calls, 'utf8').length;
+		assert.notEqual(run('enable', extra).status, 0, 'unverified service cannot be disabled');
+		assert.equal(fs.readFileSync(desktop, 'utf8'), before, 'refusal restores startup choice');
+		assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(callOffset), /--no-reload disable/);
+	}
+	const offlineCalls = fs.readFileSync(calls, 'utf8').length;
+	assert.equal(run('enable', { SHOW_REFUSE: '1' }).status, 0, 'offline disabled service permits XDG startup');
+	assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(offlineCalls), /--no-reload disable/);
+	assert.equal(run('disable', { SHOW_REFUSE: '1' }).status, 0);
+	fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
 		assert.deepEqual(
 			receiptRefusals,
 			[],
