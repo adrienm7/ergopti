@@ -48,6 +48,7 @@ M.OUTCOME_FAILED = "failed"
 -- the first time an application asks, and resetting again while the user is
 -- still deciding would remove the switch they are about to turn on.
 local _permission_prompt_requested = false
+local _permission_reset_pending = false
 
 
 
@@ -132,7 +133,9 @@ local function reset_then_prompt(Adapter)
 		return
 	end
 	Logger.start(LOG, "Resetting the Screen Recording entry of %s…", bundle_id)
+	_permission_reset_pending = true
 	local started = Adapter.reset_permission(bundle_id, function(ok, detail)
+		_permission_reset_pending = false
 		if ok then
 			Logger.success(LOG, "Screen Recording entry of %s reset.", bundle_id)
 			prompt_user(Adapter, "shortcuts.screen_recording_reset")
@@ -142,6 +145,7 @@ local function reset_then_prompt(Adapter)
 		prompt_user(Adapter, "shortcuts.screen_recording_required")
 	end)
 	if started ~= true then
+		_permission_reset_pending = false
 		Logger.warn(LOG, "tccutil could not be started; prompting without resetting %s.", bundle_id)
 		prompt_user(Adapter, "shortcuts.screen_recording_required")
 	end
@@ -156,6 +160,12 @@ end
 function M.ensure_permission(context)
 	local Adapter = capture_adapter()
 	local Logger = logger()
+	-- A positive read during tccutil's reset can be revoked before capture.
+	if _permission_reset_pending then
+		Logger.warn(LOG, "%s refused: the Screen Recording grant reset is still pending.", tostring(context))
+		notify_refusal("shortcuts.screen_recording_required")
+		return false
+	end
 	local granted, detail = Adapter.permission_state()
 	if granted == true then return true end
 
