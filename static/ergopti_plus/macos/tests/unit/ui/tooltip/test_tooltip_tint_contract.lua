@@ -167,6 +167,24 @@ helpers.describe("Tooltip: tint contract vectors", function()
 	-- module-level canvas creation does not crash.
 	local renderer = helpers.load_with_stubs("ui.tooltip.renderer")
 
+	helpers.it("uses CSS short and alpha colors for hotstring tint (tooltip-css-hex)", function()
+		local config = require("ui.tooltip.config")
+		local original = package.loaded["modules.hotstrings.hotstrings_config"]
+		local ok, err = xpcall(function()
+			for _, value in ipairs({ "#f80", "#f80a", "#ff8800", "#ff880080" }) do
+				package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return { color = value } end }
+				local color = config.tint("hotstring_star")
+				helpers.assert_eq(rgba_to_hex(color), "#FF8800")
+			end
+		end, debug.traceback)
+		package.loaded["modules.hotstrings.hotstrings_config"] = original
+		if not ok then error(err, 0) end
+		local parse = require("color.hex").parse
+		for _, invalid in ipairs({ "#abcd0", "#1234567", "#12xz", "##abc" }) do
+			helpers.assert_nil(parse(invalid), "invalid CSS hexadecimal color: " .. invalid)
+		end
+	end)
+
 	helpers.it("renderer.apply_tint is available", function()
 		helpers.assert_true(type(renderer.apply_tint) == "function",
 			"renderer.apply_tint must be a function")

@@ -56,6 +56,7 @@ local snapshot_incomplete = false
 local snapshot_all_absent = false
 local pending_probe = nil
 local probe_cleanup_debt = {}
+local recheck_pending = false
 -- The recheck timer and whoever wants to hear that a slot changed state.
 local watch_handle = nil
 local state_listener = nil
@@ -584,8 +585,11 @@ end
 --- state, so the menu greys or restores it without a reload.
 --- @return boolean accepted
 function M.recheck()
+	if recheck_pending then return true end
+	recheck_pending = true
 	local before = state_digest()
-	return M.refresh(function()
+	local accepted = M.refresh(function()
+		recheck_pending = false
 		if state_digest() == before then return end
 		Logger.info(LOG, "System gesture settings changed: %s.", state_digest())
 		if type(state_listener) == "function" then
@@ -593,6 +597,8 @@ function M.recheck()
 			if not ok then Logger.error(LOG, "Gesture state listener failed: %s.", tostring(err)) end
 		end
 	end)
+	if not accepted then recheck_pending = false end
+	return accepted
 end
 
 --- Names who hears a slot change state (the menu's rebuild request).
@@ -667,6 +673,7 @@ end
 --- Cancels owned probes during shutdown; system preferences are never modified.
 function M.restore_all_overrides()
 	local timer_settled = M.stop_watch()
+	recheck_pending = false
 	local probe = pending_probe
 	pending_probe = nil
 	if probe then

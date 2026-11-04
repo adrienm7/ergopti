@@ -479,9 +479,9 @@ _HCW_SetOverride(Entry, Sec, Field, Value) {
 			"Refusing non-Boolean show_tooltip value: '{1}'.", Value)
 		return false
 	}
-	if (Field == "color" and !(Value is String)) {
+	if (Field == "color" and !HotstringsIsHexColor(Value)) {
 		try LoggerError("HotstringsConfigWindow",
-			"Refusing non-string color override.")
+			"Refusing color without 3, 4, 6 or 8 hexadecimal digits.")
 		return false
 	}
 	if Entry.IsPersonal {

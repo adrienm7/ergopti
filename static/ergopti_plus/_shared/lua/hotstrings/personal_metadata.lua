@@ -27,8 +27,7 @@ function M.valid(field, value)
 	if field == "delay" then return finite(value) and value >= 0 end
 	if field == "priority" then return finite(value) and value % 1 == 0 and value >= 0 and value <= 100 end
 	if field == "show_tooltip" then return type(value) == "boolean" end
-	local hex = type(value) == "string" and value:gsub("^#", "")
-	return type(hex) == "string" and #hex >= 3 and #hex <= 8 and hex:match("^[0-9a-fA-F]+$") ~= nil
+	return require("color.hex").parse(value) ~= nil
 end
 
 --- Returns an injective identity of a path whose segments compare case-folded.

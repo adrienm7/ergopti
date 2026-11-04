@@ -249,6 +249,28 @@
 			"safe_field": "color",
 			"safe_value": "#445566",
 			"preserve": "delay = true # preserve raw invalid leaf"
+		},
+		{
+			"name": "file color five hex digits remains unowned",
+			"source": "[_meta]\ncolor = \"#12345\" # preserve invalid color\npriority = 31\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "color",
+			"value": "#112233",
+			"allowed": false,
+			"safe_field": "priority",
+			"safe_value": 41,
+			"preserve": "color = \"#12345\" # preserve invalid color",
+			"native_refusal": true
+		},
+		{
+			"name": "file color seven hex digits remains unowned",
+			"source": "[_meta]\ncolor = \"#1234567\" # preserve invalid color\npriority = 31\nfuture = { untouched = [], enabled = false }\n[[words.team]]\n\"hello\" = \"Source\"\n",
+			"field": "color",
+			"value": "#112233",
+			"allowed": false,
+			"safe_field": "priority",
+			"safe_value": 41,
+			"preserve": "color = \"#1234567\" # preserve invalid color",
+			"native_refusal": true
 		}
 	]
 }

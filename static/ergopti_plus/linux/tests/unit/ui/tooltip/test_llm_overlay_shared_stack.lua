@@ -111,7 +111,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 	--- @return table preview
 	--- @return table window
 	--- @return table state { hidden }
-	local function preview_with()
+	local function preview_with(color)
 		local renderer, window = fake_renderer()
 		renderer.is_available = function() return true end
 		renderer.destroy = function() end
@@ -127,7 +127,7 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 		local state = { hidden = 0 }
 		preview.init({
 			style = { positioning = { window_bottom_inset = 0 } },
-			config = { resolve = function() return { delay = 0.25, color = "#1e88e5", show_tooltip = true } end },
+			config = { resolve = function() return { delay = 0.25, color = color or "#1e88e5", show_tooltip = true } end },
 			on_hidden = function() state.hidden = state.hidden + 1 end,
 		})
 		local function restore()
@@ -136,6 +136,18 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 		end
 		return preview, window, state, restore
 	end
+
+	helpers.it("uses short and alpha CSS colors for preview accents (tooltip-css-hex)", function()
+		for _, color in ipairs({ "#f80", "#f80a", "#ff8800", "#ff880080" }) do
+			local preview, window, _, restore = preview_with(color)
+			local ok, err = xpcall(function()
+				helpers.assert_true(preview.show({ { trigger = "btw", replacement = "by the way", group = "rolls", fires = true } }, "autocorrect"))
+				helpers.assert_eq(window.rows[1].accent, { red = 1, green = 136 / 255, blue = 0 })
+			end, debug.traceback)
+			restore()
+			if not ok then error(err, 0) end
+		end
+	end)
 
 	helpers.it("reports its rows while shown and forgets them once hidden or covered", function()
 		local preview, window, state, restore = preview_with()
