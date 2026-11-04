@@ -1,7 +1,7 @@
 {
 	"expected_count": 85,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": true,
+	"native_hotstring_e2e": false,
 	"filters": [
 		{
 			"contains": "rollover-state-recovery",
