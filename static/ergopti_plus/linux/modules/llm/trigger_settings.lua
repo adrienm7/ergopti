@@ -98,18 +98,29 @@ local function default_for(name)
 	return value
 end
 
+-- ipairs alone silently discards everything after a hole. Confirm every index
+-- before normalising or publishing a user's exclusion list.
+local function dense_apps(value)
+	if type(value) ~= "table" or #value > MAX_APPS then return false end
+	local count, length = 0, #value
+	for index in pairs(value) do
+		count = count + 1
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length then return false end
+	end
+	return count == length
+end
+
 --- Whether a value is a dense list of distinct, normalised application identifiers.
 --- @param value any
 --- @return boolean
 local function valid_apps(value)
-	if type(value) ~= "table" or #value > MAX_APPS then return false end
-	local seen, count = {}, 0
-	for index, app in pairs(value) do
-		count = count + 1
-		if type(index) ~= "number" or type(app) ~= "string" or AppIdentity.normalize(app) ~= app or seen[app] then return false end
+	if not dense_apps(value) then return false end
+	local seen = {}
+	for _, app in ipairs(value) do
+		if type(app) ~= "string" or AppIdentity.normalize(app) ~= app or seen[app] then return false end
 		seen[app] = true
 	end
-	return count == #value
+	return true
 end
 
 --- Whether a value is one of the manifest's values for an enum setting.
@@ -189,7 +200,7 @@ end
 --- @param admission function|nil Final originating configuration admission.
 --- @return boolean committed
 function M.set_disabled_apps(apps, expected_source, admission)
-	if type(apps) ~= "table" then return false end
+	if not dense_apps(apps) then return false end
 	local list, seen = {}, {}
 	for _, app in ipairs(apps) do
 		local key = AppIdentity.normalize(app)
