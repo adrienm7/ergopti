@@ -60,7 +60,7 @@ local function policy_limits()
 	if not file then return nil end
 	local read_ok, bytes = pcall(file.read, file, 32769)
 	local close_ok, closed = pcall(file.close, file)
-	if not read_ok or not close_ok or not closed then return nil end
+	if not read_ok or not close_ok or not closed or type(bytes) ~= "string" or #bytes > 32768 then return nil end
 	local decoded, policy = pcall(Json.decode, bytes or "")
 	if not decoded or type(policy) ~= "table" then return nil end
 	for _, key in ipairs({ "max_selections", "max_proxy_bytes" }) do
