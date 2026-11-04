@@ -80,6 +80,8 @@ local _config = nil
 -- The handle of the pending auto-hide, so a new bubble cancels the previous
 -- one's timer rather than letting it fire over the top of the replacement.
 local _expiry = nil
+local _expiry_token = nil
+local _revision = 0
 local _on_expire = nil
 -- The rows this preview drew while it holds the shared window, nil once it is
 -- hidden or covered. The window itself cannot say whose rows it shows: the AI
@@ -332,21 +334,31 @@ end
 --- trigger never expires", and a bubble for it is left up.
 --- @param group string|nil
 --- @param section string|nil
-local function arm_expiry(group, section)
-	if _expiry then
-		Scheduler.cancel(_expiry)
-		_expiry = nil
-	end
+local function cancel_expiry()
+	local old = _expiry
+	_expiry, _expiry_token = nil, nil
+	if old then pcall(Scheduler.cancel, old) end
+end
+
+local function arm_expiry(group, section, revision)
+	cancel_expiry()
+	if revision ~= _revision then return false end
 	if not _config or type(_config.resolve) ~= "function" or not group then return true end
 
 	local ok, resolved = pcall(_config.resolve, group, section)
+	if revision ~= _revision then return false end
 	if not ok or type(resolved) ~= "table" then return true end
 	local delay = tonumber(resolved.delay)
 	if not delay or delay <= 0 then return true end
 
-	local handle = Scheduler.after(delay, function()
-		_expiry = nil
+	local token = {}
+	_expiry_token = token
+	local called, handle = pcall(Scheduler.after, delay, function()
+		if _expiry_token ~= token then return end
+		_expiry, _expiry_token = nil, nil
+		local hidden_revision = _revision + 1
 		M.hide()
+		if _revision ~= hidden_revision then return end
 		if _on_expire then
 			local ok_callback, callback_err = pcall(_on_expire)
 			if not ok_callback then
@@ -354,11 +366,15 @@ local function arm_expiry(group, section)
 			end
 		end
 	end)
-	if type(handle) ~= "table" or handle.armed ~= true then
-		Logger.warn(LOG, "Preview expiry could not be armed; hiding the stale preview now.")
-		M.hide()
+	if not called or type(handle) ~= "table" or handle.armed ~= true then
+		if _expiry_token == token then
+			_expiry_token = nil
+			Logger.warn(LOG, "Preview expiry could not be armed; hiding the stale preview now.")
+			M.hide()
+		end
 		return false
 	end
+	if _expiry_token ~= token then pcall(Scheduler.cancel, handle); return false end
 	_expiry = handle
 	return true
 end
@@ -431,6 +447,10 @@ function M.show(candidates, kind)
 	if not _style then return false end
 	if kind and _enabled[kind] == false then return false end
 	if not Renderer.is_available() then return false end
+	_revision = _revision + 1
+	local revision = _revision
+	cancel_expiry()
+	if revision ~= _revision then return false end
 
 	local rows = M.build_rows(candidates, { kind = kind })
 	if #rows == 0 then
@@ -462,26 +482,29 @@ function M.show(candidates, kind)
 		anchor = M.resolve_anchor(),
 		screen = M.screen_frame(),
 	}
+	if revision ~= _revision then return false end
 	local drawn = Renderer.show(rows, draw_opts)
+	if revision ~= _revision then return false end
 
 	_showing_rows = drawn and rows or nil
 	_showing_opts = drawn and draw_opts or nil
-	if drawn and not arm_expiry(group, section) then return false end
+	if not drawn then cancel_expiry(); return false end
+	if not arm_expiry(group, section, revision) then return false end
 	return drawn
 end
 
 --- Hides the preview.
 function M.hide()
+	_revision = _revision + 1
+	local revision = _revision
 	-- The pending expiry goes with it, so a bubble hidden by the next keystroke
 	-- does not leave a timer that fires over the top of its replacement.
-	if _expiry then
-		Scheduler.cancel(_expiry)
-		_expiry = nil
-	end
+	cancel_expiry()
 	local was_showing = _showing_rows ~= nil
 	_showing_rows = nil
 	_showing_opts = nil
 	Renderer.hide()
+	if revision ~= _revision then return end
 	if was_showing and _on_hidden then
 		local ok, err = pcall(_on_hidden)
 		if not ok then Logger.warn(LOG, "Preview hide observer failed: %s", tostring(err)) end
@@ -491,10 +514,8 @@ end
 --- Forgets the rows another owner drew over: the preview is gone from the
 --- window, so neither its expiry nor its hide may withdraw what replaced it.
 function M.note_covered()
-	if _expiry then
-		Scheduler.cancel(_expiry)
-		_expiry = nil
-	end
+	_revision = _revision + 1
+	cancel_expiry()
 	_showing_rows = nil
 	_showing_opts = nil
 end
