@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **43 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **44 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -819,3 +819,21 @@ The ongoing register now contains **43 distinct new findings**. The requested ta
 ## Native cache and editor qualification: 41907002685
 
 At `14c9580`, all **66 selected cases passed individually and in reverse**, including the complete selected cache provenance family and the five editor gateway/isolation adapters. This qualifies AHK-041 and completes the AHK-040 native evidence alongside the previously passing 71 UI cases. The complete production graph compiled, all 15 selected SQLite regressions passed and native hotstring E2E passed **90/90**. Native HTTP E2E was outside selection; no complete-suite qualification is claimed.
+
+## AHK-044: Cancelled API tests can dispatch a thinking-field retry after losing their original reservation
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+The Menu API test supplies callbacks and a request kind to Generate without its supported CurrentFn authority. CancelAsync(original) cannot find a retry that has not yet been reserved, so the retry sender is admitted after the progress owner is gone.
+
+Reproduction: Native run41908674329 at944d513 passes the two-POST thinking-retry control. At the actual refusal logger cutpoint the original reservation is already retired; cancel the genuine progress window there. Its owner and window retire, but a new second reservation and second native HTTP POST still appear. The exact expected1/observed2 failure reproduces individually and reversed.
+
+Consequence: Clicking Cancel can still send another prompt to the provider after the native progress window closes and the auxiliary test owner is retired.
+
+Regression: Two api-thinking-retry-owner cases drive the actual native Menu progress GUI, genuine Generate/managed HTTP and an owned loopback peer. A real logger sink cancels exactly between original retirement and retry admission; the positive control must issue two requests and settle successfully, while cancellation must leave one request, no retry link and no retired UI publication. The fix binds the exact progress owner through the existing Generate CurrentFn argument. Native fail-before measured; post-fix qualification pending.
+
+The ongoing register now contains **44 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native LLM qualification checkpoints: 41908552045 and 41908674329
+
+At `36e7a60`, all **15 selected access-token/RawPost cases passed individually and reversed**, with complete production compile and the 15 SQLite controls. This qualifies AHK-042. At `944d513`, both native HTTP classification cases passed, including the actual HTTP400 provider message, qualifying AHK-043; the positive thinking retry also passed, while its cancellation sibling reproduced AHK-044. No aggregate green is claimed for that four-case mixed run. Both E2E families were explicitly outside these selections.

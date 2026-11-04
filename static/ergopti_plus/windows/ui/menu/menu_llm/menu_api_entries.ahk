@@ -941,6 +941,7 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 		return false
 	}
 	Progress := _LLM_Menu_ApiTestProgress
+	RequestCurrent := _LLM_Menu_ApiTestProgressIsCurrent.Bind(Progress)
 	OnSucc := (Text, Usage) => _LLM_Menu_OnApiTestDone(true, Text,
 		EntryId, Name, StartedTick, Owner, NotifyFn)
 	OnFail := (Info := "") => _LLM_Menu_OnApiTestDone(false, "",
@@ -973,7 +974,7 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 			ReqId := LLM_RemoteGenerate_Async(snapshot, spec["system_prompt"],
 				spec["user_text"], spec["temperature"], OnSucc, OnFail, "",
 				spec["max_tokens"], LLM_REMOTE_KIND_API_TEST,
-				LLM_API_TEST_TIMEOUT_MS)
+				LLM_API_TEST_TIMEOUT_MS, RequestCurrent)
 		}
 		if _LLM_Menu_ApiTestProgressIsCurrent(Progress)
 			Progress["req_id"] := ReqId
