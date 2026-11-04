@@ -713,6 +713,30 @@ _PESORT_ButtonEntered(State, *) {
 	return
 }
 
+
+_PESW_Destroy(State, WParam, LParam, Message, Hwnd) {
+	global _PersonalEditorGui, _PersonalEditorSessionEpoch, _PersonalEditorSection
+	if Hwnd != State.OldHwnd || State.DestroyEvents > 0
+		return
+	State.DestroyEvents += 1
+	try {
+		AssertFalse(IsObject(_PersonalEditorGui), "The actual old native owner must retire before its WM_DESTROY")
+		AssertEqual(State.OldEpoch + 1, _PersonalEditorSessionEpoch)
+		if State.Mode == "switch-successor" {
+			OpenPersonalEditor("alpha")
+			AssertTrue(_PersonalEditorGui is Gui && _PersonalEditorSection == "alpha")
+			State.NewerHwnd := _PersonalEditorGui.Hwnd
+			State.NewerEpoch := _PersonalEditorSessionEpoch
+			AssertTrue(State.NewerHwnd != State.OldHwnd
+				&& DllCall("User32\IsWindow", "Ptr", State.NewerHwnd, "Int"),
+				"One genuine public successor must really exist inside the old native Destroy callback")
+		}
+	} catch as Failure {
+		State.Failure := Failure
+	}
+	return
+}
+
 _PESORT_Case(Operation) {
 	global ScriptInformation, ConfigurationFile, Features, _ReadPersonalTomlCache
 	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
@@ -730,7 +754,7 @@ _PESORT_Case(Operation) {
 	Fixture := IsDefault ? _ScopeOwnerFixture('[personal_editor]`ndefault_section = "'
 		. (Operation == "default-missing" ? "deleted_section" : "alpha") . '"`n') : _ScopeOwnerFixture()
 	RegistryScope := 0, Window := 0, CloseHwnd := 0
-	Primary := 0, CleanupFailure := 0, WindowEpoch := 0
+	Primary := 0, CleanupFailure := 0, WindowEpoch := 0, SwitchHook := 0
 	State := {HeaderClicks: 0, HeaderColumn: 0, Selections: 0, Confirmations: 0, Confirmation: "", Entered: 0}
 	Source := '[_meta]`ndescription = "Native sort owner fixture"`nsections_order = ["alpha"]`n'
 		. '[_meta.sections.alpha]`ndescription = "Alpha"`n'
@@ -746,6 +770,12 @@ _PESORT_Case(Operation) {
 		MasterGateState()["features"] := _PersonalTomlCloneDetached(Saved.Desired)
 		_PersonalEditorGui := "", _PersonalEditorOpeningSource := false
 		_PersonalEditorEntryCohort := 0, _PersonalEditorEntryBusy := false
+		IsSwitch := Operation == "switch-current" || Operation == "switch-successor"
+		if IsSwitch {
+			Source := StrReplace(Source, 'sections_order = ["alpha"]', 'sections_order = ["alpha", "beta"]')
+				. '[_meta.sections.beta]`ndescription = "Beta"`n[[beta]]`n'
+				. '"beta_native_switch" = { output = "Beta unchanged", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
+		}
 		AssertTrue(FSWriteDurable(PersonalTomlPath(), Source))
 		if IsDefault
 			OpenPersonalEditor()
@@ -771,6 +801,50 @@ _PESORT_Case(Operation) {
 			}
 		}
 		AssertTrue(IsObject(List) && Edits.Length == 3 && IsObject(Button))
+		if IsSwitch {
+			AssertTrue(_PersonalEditorData["sections"].Has("beta"))
+			Transition := {Mode: Operation, OldHwnd: CloseHwnd, OldEpoch: WindowEpoch,
+				DestroyEvents: 0, NewerHwnd: 0, NewerEpoch: 0, Failure: 0}
+			SwitchHook := _PESW_Destroy.Bind(Transition)
+			OnMessage(0x2, SwitchHook)
+			try OpenPersonalEditor("beta")
+			finally {
+				OnMessage(0x2, SwitchHook, 0), SwitchHook := 0
+				; Capture the actual live successor for native cleanup even when
+				; the old return wrongly replaced the callback's newer window.
+				if _PersonalEditorGui is Gui {
+					Window := _PersonalEditorGui
+					CloseHwnd := Window.Hwnd, WindowEpoch := _PersonalEditorSessionEpoch
+				}
+			}
+			if IsObject(Transition.Failure)
+				throw Transition.Failure
+			AssertEqual(1, Transition.DestroyEvents, "Only the exact original HWND can trigger this native observer")
+			NewerAlive := Transition.NewerHwnd != 0 && DllCall("User32\IsWindow", "Ptr", Transition.NewerHwnd, "Int")
+			_TestPrint("# personal-native-switch mode=" . Operation . " destroys=" . Transition.DestroyEvents
+				. " newer_seen=" . (Transition.NewerHwnd != 0) . " newer_alive_after=" . NewerAlive
+				. " final_section=" . _PersonalEditorSection . " newer_is_current=" . (Transition.NewerHwnd == CloseHwnd))
+			if Operation == "switch-successor" {
+				AssertTrue(Transition.NewerHwnd != 0 && NewerAlive,
+					"The old section switch cannot destroy a newer native window published during its own Destroy")
+				AssertEqual(Transition.NewerHwnd, CloseHwnd)
+				AssertEqual(Transition.NewerEpoch, _PersonalEditorSessionEpoch)
+				AssertEqual("alpha", _PersonalEditorSection, "The newer public section request must retain its exact owner")
+			} else {
+				AssertEqual(0, Transition.NewerHwnd)
+				AssertEqual("beta", _PersonalEditorSection, "The ordinary no-reentry switch must still complete")
+				AssertTrue(DllCall("User32\IsWindow", "Ptr", CloseHwnd, "Int"))
+			}
+			FreshList := 0
+			for Control in Window
+				if Control.Type == "ListView"
+					FreshList := Control
+			AssertTrue(IsObject(FreshList))
+			AssertEqual(Operation == "switch-successor" ? 2 : 1, FreshList.GetCount())
+			AssertTrue(FSUtf8ExactMatches(ConfigurationFile, Fixture.source))
+			AssertTrue(FSUtf8ExactMatches(PersonalTomlPath(), Source), "Section presentation cannot mutate personal content")
+			return
+		}
 		if IsDefault {
 			AssertTrue(IsObject(Drop))
 			AssertEqual(1, Drop.Value, "The genuine dropdown must already display the first live section")
@@ -851,6 +925,8 @@ _PESORT_Case(Operation) {
 	} catch as Failure {
 		Primary := Failure
 	} finally {
+		if IsObject(SwitchHook)
+			OnMessage(0x2, SwitchHook, 0)
 		TestMsgBoxResponder(Saved.Responder)
 		try {
 			if IsObject(Window) && DllCall("User32\IsWindow", "Ptr", CloseHwnd, "Int") {
@@ -901,3 +977,7 @@ for _PESORT_Mode in ["save", "delete"]
 for _PEDEFAULT_Mode in ["default-missing", "default-live"]
 	Test("Personal editor native default: " . _PEDEFAULT_Mode . " keeps the displayed section entries visible (personal-native-default-owner)",
 		_PESORT_Case.Bind(_PEDEFAULT_Mode))
+
+for _PESW_Mode in ["switch-current", "switch-successor"]
+	Test("Personal editor native switch: " . _PESW_Mode . " preserves the latest HWND published during Destroy (personal-native-switch-owner)",
+		_PESORT_Case.Bind(_PESW_Mode))
