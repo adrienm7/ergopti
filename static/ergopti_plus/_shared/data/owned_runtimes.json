@@ -350,7 +350,7 @@
 			"os": "macos",
 			"tool": "`/usr/bin/codesign`, `hdiutil`, `xcrun`, `pkgutil`, `installer`",
 			"programs": ["codesign", "hdiutil", "xcrun", "pkgutil", "installer"],
-			"used_for": "Signature verification of the downloaded runtimes, mounting the Karabiner DMG (`macos/modules/llm/managed_ollama_runtime.py:352`, `macos/modules/keystats/physical_capture.lua:531`, `macos/platform/remap/onboarding.lua:908`); the installer signature of the pinned VirtualHIDDevice package (`macos/platform/remap/runtime_vhid_update.lua`); the owned runtime helper checks and installs the VirtualHIDDevice package it carries (`macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeVirtualHIDProvisionOwner.swift`)",
+			"used_for": "Signature verification of the downloaded runtimes, mounting the Karabiner DMG (`macos/modules/llm/managed_ollama_runtime.py:352`, `macos/modules/keystats/physical_capture.lua:531`, `macos/platform/remap/onboarding.lua:908`); the installer signature of the pinned VirtualHIDDevice package (`macos/platform/remap/runtime_vhid_update.lua`); the owned runtime install role checks and installs the pinned VirtualHIDDevice package behind its administrator prompt (`macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallMainOperation.swift`)",
 			"today": "System",
 			"current_class": "SYS",
 			"version_needed": "n/a",

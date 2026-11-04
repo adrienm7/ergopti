@@ -36,7 +36,7 @@ enum OwnedRuntimeIdleServiceEntry {
 				let core = try provision.provisionAndStartCore()
 				// Inside the same custody: the provision's observations are retired only after the daemon job loads.
 				step = "vhid-provision"
-				OwnedRuntimeInstallTrail.note(try OwnedRuntimeVirtualHIDProvisionOwner.provision(within: provision).rawValue)
+				try OwnedRuntimeVirtualHIDProvisionOwner.provision(within: provision)
 				step = "retire"
 				guard core.retireStartedObservation(forProvision: provision), provision.retireCommittedObservations(),
 					let stage = OwnedRuntimeBootstrapStageOwner.acquire(afterPublication: publication), stage.retire() else {

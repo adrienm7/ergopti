@@ -143,6 +143,13 @@ function M.install_runtime(callback)
 		launcher = function() return require("platform.remap.lease_helper").resolve() end,
 		exec = FieldCheckPorts.exec,
 		exists = FileSystem.exists,
+		fetch_driver = function(fetched)
+			local Update = require("platform.remap.runtime_vhid_update")
+			local manifest = load_manifest()
+			if not manifest then return fetched(false, Update.REASON.UNPINNED, "the runtime manifest could not be read") end
+			vhid_updater = vhid_updater or Update.new({ exec = FieldCheckPorts.exec, expand = FileSystem.expand_path })
+			vhid_updater.fetch(manifest.virtual_hid_device, fetched)
+		end,
 	})
 	runtime_installer.install(callback)
 end

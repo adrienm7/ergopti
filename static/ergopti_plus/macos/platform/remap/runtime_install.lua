@@ -34,6 +34,11 @@ local LOG = "remap.runtime_install"
 --- The launcher role (OwnedRuntimeInstallMainOperation.swift).
 M.FLAG = "--request-owned-runtime-install"
 
+--- pqrs' daemon program, which the driver package installs
+--- (OwnedVirtualHIDDaemonReportReference.daemonExecutable).
+M.DAEMON = "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/"
+	.. "Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon"
+
 --- The administrator prompt, the helper and pqrs' installer together take as
 --- long as the driver-only update's prompt and installer.
 M.INSTALL_TIMEOUT_SEC = Update.INSTALL_TIMEOUT_SEC
@@ -57,6 +62,8 @@ M.REASON = {
 	CLEANUP_PENDING = "install_cleanup_pending",
 	UNANSWERED = "install_unanswered",
 	ACTIVATE = "install_activation_failed",
+	-- pqrs' driver package could not be downloaded, verified or installed.
+	DRIVER = "install_driver_failed",
 	-- The facade refused to start: the owned runtime is not blocked by a missing install.
 	NOT_OFFERED = "install_not_offered",
 }
@@ -104,6 +111,10 @@ function M.parse(code, stdout)
 				"the staged helper failed its checks or refused the install (an earlier install is still on this Mac)"
 		end
 		if number == HELPER_CLEANUP then return false, REASON.CLEANUP_PENDING, "the helper left cleanup pending" end
+		if number == Update.EXIT_DIGEST or number == Update.EXIT_SIGNATURE then
+			return false, REASON.DRIVER, "the kept VirtualHIDDevice package failed its "
+				.. (number == Update.EXIT_DIGEST and "digest" or "signature") .. " check as root"
+		end
 		return false, REASON.FAILED, "administrator shell status " .. status
 	end
 	return false, REASON.UNANSWERED, "unexpected answer: " .. line
@@ -123,12 +134,14 @@ end
 --- Port contracts:
 ---   launcher() -> executable|nil, detail, environment: the signed launcher (platform/remap/lease_helper.lua);
 ---   exec(executable, args, timeout, fn(code|nil, stdout, stderr), environment) runs one command;
----   exists(path) -> boolean.
---- @param ports table launcher, exec, exists.
+---   exists(path) -> boolean;
+---   fetch_driver(fn(ok, reason|nil, detail|nil)) downloads and verifies pqrs' pinned package into
+---     Ergopti's folder (runtime_vhid_update.lua fetch), which the role installs when no driver is.
+--- @param ports table launcher, exec, exists, fetch_driver.
 --- @return table installer { install }.
 function M.new(ports)
 	assert(type(ports) == "table", "Missing owned runtime install ports")
-	for _, name in ipairs({ "launcher", "exec", "exists" }) do
+	for _, name in ipairs({ "launcher", "exec", "exists", "fetch_driver" }) do
 		assert(type(ports[name]) == "function", "Missing owned runtime install port: " .. name)
 	end
 	local installer = {}
@@ -177,11 +190,21 @@ function M.new(ports)
 		local executable, detail, environment = ports.launcher()
 		if not executable then return settle(false, REASON.LAUNCHER, detail) end
 		Logger.start(LOG, "Installing Ergopti's own Karabiner runtime on the user's request…")
-		ports.exec(executable, { M.FLAG }, M.INSTALL_TIMEOUT_SEC, function(code, stdout)
-			local installed, reason, why = M.parse(code, stdout)
-			if not installed then return settle(false, reason, why) end
-			activate()
-		end, environment)
+		local function run_role()
+			ports.exec(executable, { M.FLAG }, M.INSTALL_TIMEOUT_SEC, function(code, stdout)
+				local installed, reason, why = M.parse(code, stdout)
+				if not installed then return settle(false, reason, why) end
+				activate()
+			end, environment)
+		end
+		if ports.exists(M.DAEMON) == true then return run_role() end
+		-- No pqrs driver yet: the role installs the pinned package in the same administrator prompt.
+		ports.fetch_driver(function(fetched, reason, why)
+			if fetched ~= true then
+				return settle(false, REASON.DRIVER, tostring(reason) .. ": " .. tostring(why))
+			end
+			run_role()
+		end)
 	end
 
 	return installer

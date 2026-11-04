@@ -54,6 +54,25 @@ had_driver=no
 [ -e "$DAEMON" ] && had_driver=yes
 log "pqrs daemon installed before the install: $had_driver"
 
+# The launcher's role installs pqrs' pinned package in the same administrator
+# shell when no driver is installed (OwnedRuntimeInstallMainOperation
+# driverProgram): download it as the Lua fetch does, then check it as root.
+manifest="$REPO_ROOT/static/ergopti_plus/macos/vendor/remap-runtime/manifest.json"
+pin() { plutil -extract "virtual_hid_device.$1" raw -o - "$manifest"; }
+if [ "$had_driver" = no ]; then
+	package="$work/$(pin file_name)"
+	curl -L --fail --silent --show-error --proto =https --output "$package" "$(pin source_url)"
+	[ "$(shasum -a 256 "$package" | cut -d' ' -f1)" = "$(pin sha256)" ] || fail "the driver package is not the pinned one"
+	sudo /bin/sh -c '
+		set -eu
+		signature=$(/usr/sbin/pkgutil --check-signature "$1")
+		printf "%s\n" "$signature" | /usr/bin/grep -q "^ *Status: signed by a developer certificate issued by Apple"
+		printf "%s\n" "$signature" | /usr/bin/grep -Eq "^ *1\. Developer ID Installer: .*\($2\)$"
+		/usr/sbin/installer -pkg "$1" -target / >/dev/null
+	' sh "$package" "$(pin team_identifier)"
+	[ -e "$DAEMON" ] || fail "pqrs' package installed no daemon program"
+fi
+
 # The same staging as OwnedVirtualHIDDaemonReportMainOperation.stagedHelperProgram.
 stage_dir="$PARENT/.runtime-installer-$(uuidgen)"
 stage="$stage_dir/Helper.app"
