@@ -236,6 +236,7 @@ function M.with_session(options, body)
 		s.start_options = { intercept = true, requireOutputBroker = true, onEmitRaw = s.writer.emit,
 			onChar = options.on_char,
 			onPhysical = options.on_physical and function(...) return options.on_physical(s, ...) end or nil,
+			onConsume = options.on_consume and function(...) return options.on_consume(s, ...) end or nil,
 			onCaptureReacquired = options.on_capture_reacquired }
 		s.hook.start(s.start_options)
 		assert(s.hook.isRunning())

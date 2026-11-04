@@ -1649,6 +1649,7 @@ end
 --- Dispatches the original post-remapper path without widening the LuaJIT closure.
 --- The event/source and all native capture, modifier, callback and IO guards stay live.
 local function _dispatch_post_remap(ev, source)
+	local session = _capture_session
 	local original_source = source
 	if ev.remapped and not ev.original_owner then
 		local holder_key = _remapper_generation .. ":" .. (ev.holder or "transient") .. ":" .. ev.code
@@ -1710,6 +1711,7 @@ local function _dispatch_post_remap(ev, source)
 			_forward_raw(ev, source)
 			return
 		end
+		if not _running or _capture_session ~= session then return end
 	end
 
 	-- XKB has already consumed the transition above. Modifiers still produce no
@@ -1759,6 +1761,7 @@ local function _dispatch_post_remap(ev, source)
 				_forward_raw(ev, source)
 				return
 			end
+			if not _running or _capture_session ~= session then return end
 		end
 	end
 
@@ -1799,6 +1802,8 @@ local function _dispatch_post_remap(ev, source)
 			-- A missing verdict is not a suppression: the event still belongs
 			-- to the application.
 			_forward_raw(ev, source)
+			return
+		elseif not _running or _capture_session ~= session then
 			return
 		elseif consume == true or repeat_callback ~= nil then
 			if _number_row.abandon(row_plan, ev, true) == false then
