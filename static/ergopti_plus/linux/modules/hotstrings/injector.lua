@@ -607,10 +607,15 @@ end
 --- @param prepared table|nil Ordinary replacement guards checked before any output reservation.
 --- @param data_attempt function|nil Private mutation latch after admission, before native ACK.
 --- @return table Commit result.
-local function run_transaction(label, body, publication, prepared, data_attempt)
+local function private_failure(reason, is_private)
+	if is_private and reason ~= Errors.PROGRAMMABLE_PUBLICATION_STALE then return "private replacement failed" end
+	return tostring(reason)
+end
+
+local function run_transaction(label, body, publication, prepared, data_attempt, is_private)
 	if prepared then
 		local checked, reason = pcall(prepared.current)
-		if not checked then return { ok = false, error = tostring(reason), failed_phase = "replacement preflight", cleanup_ok = true } end
+		if not checked then return { ok = false, error = private_failure(reason, is_private), failed_phase = "replacement preflight", cleanup_ok = true } end
 	end
 	local native_tx = OutputTransaction.new(prepared and prepared.channel or _uinput)
 	Perf.count("hotstring.expansions")
@@ -666,6 +671,7 @@ local function run_transaction(label, body, publication, prepared, data_attempt)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end
 	local result = tx.finish()
 	Perf.span("hotstring.expand", transaction_started)
+	if not result.ok then result.error = private_failure(result.error, is_private) end
 	if not result.ok and not (publication ~= nil and result.cleanup_ok == true
 		and result.error == Errors.PROGRAMMABLE_PUBLICATION_STALE) then stop_after_failure(result, label) end
 	return result
@@ -856,10 +862,10 @@ end
 --- Tells the observer of typed text; its failure is logged, never raised into
 --- an injection that already succeeded.
 --- @param text string Exactly what was typed.
-local function notify_output(text)
+local function notify_output(text, is_private)
 	if not _output_observer or text == "" then return end
 	local ok, err = pcall(_output_observer, text)
-	if not ok then Logger.error(LOG, "The output observer failed: %s.", tostring(err)) end
+	if not ok then Logger.error(LOG, "The output observer failed: %s.", private_failure(err, is_private)) end
 end
 
 --- Performs a hotstring injection: erases the trigger then types the replacement.
@@ -901,14 +907,14 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	end
 	local checked, prepared = pcall(prepare_replacement, replacement_text, publication, owner)
 	if not checked then
-		if is_private then Logger.error(LOG, "Cannot prepare a private replacement before erasure: %s.", tostring(prepared))
+		if is_private then Logger.error(LOG, "Cannot prepare a private replacement before erasure (content withheld).")
 		else Logger.error(LOG, "Cannot deliver '%s' before erasing its trigger: %s.", replacement_text, tostring(prepared)) end
-		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
+		return { ok = false, error = private_failure(prepared, is_private), failed_phase = "replacement preflight", cleanup_ok = true }
 	end
 	local ready, preparation_error = pcall(prepared.prepare_clipboard)
 	if not ready then
 		local closed = prepared.close_clipboard()
-		local failure = { ok = false, error = closed and tostring(preparation_error) or "clipboard restoration failed",
+		local failure = { ok = false, error = closed and private_failure(preparation_error, is_private) or "clipboard restoration failed",
 			failed_phase = "replacement preflight", cleanup_ok = closed }
 		if not closed then failure.native_cleanup_ok = true end
 		if not closed then stop_after_failure(failure, "inject()") end
@@ -933,7 +939,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 			require_publication(publication, false)
 			send_terminator(tx, replay_terminator)
 		end
-	end, publication, prepared)
+	end, publication, prepared, nil, is_private)
 	local clipboard_closed = prepared.close_clipboard()
 	if not ran then
 		result = { ok = false, error = "output transaction raised before its cleanup receipt", failed_phase = "output transaction",
@@ -947,7 +953,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 
 	if result.ok then
 		Logger.done(LOG, "inject(): done (bc=%d).", backspace_count)
-		notify_output(replacement_text .. (replay_terminator or ""))
+		notify_output(replacement_text .. (replay_terminator or ""), is_private)
 	end
 	return result
 end
@@ -1039,7 +1045,7 @@ function M.inject_fields(backspace_count, values, is_private)
 	local checked, prepared, fields = pcall(prepare_fields, values, owner)
 	if not checked then
 		Logger.error(LOG, "Cannot prepare %d replacement field(s) before erasure (content withheld).", #values)
-		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
+		return { ok = false, error = private_failure(prepared, is_private), failed_phase = "replacement preflight", cleanup_ok = true }
 	end
 
 	local result = run_transaction("inject_fields()", function(tx)
@@ -1062,11 +1068,11 @@ function M.inject_fields(backspace_count, values, is_private)
 				sleep_ms(INTER_PHASE_DELAY_MS)
 			end
 		end
-	end, nil, prepared)
+	end, nil, prepared, nil, is_private)
 
 	if result.ok then
 		Logger.done(LOG, "inject_fields(): done (bc=%d, %d field(s)).", backspace_count, #values)
-		notify_output(table.concat(values, "\t"))
+		notify_output(table.concat(values, "\t"), is_private)
 	end
 	return result
 end
@@ -1100,7 +1106,7 @@ function M.inject_tokens(backspace_count, tokens, is_private, replay_terminator,
 	local checked, prepared, fields = pcall(prepare_fields, values, owner, publication)
 	if not checked then
 		Logger.error(LOG, "Cannot prepare a replacement with keys before erasure (content withheld).")
-		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
+		return { ok = false, error = private_failure(prepared, is_private), failed_phase = "replacement preflight", cleanup_ok = true }
 	end
 
 	local result = run_transaction("inject_tokens()", function(tx)
@@ -1130,11 +1136,11 @@ function M.inject_tokens(backspace_count, tokens, is_private, replay_terminator,
 			require_publication(publication, false)
 			send_terminator(tx, replay_terminator)
 		end
-	end, publication, prepared)
+	end, publication, prepared, nil, is_private)
 
 	if result.ok then
 		Logger.done(LOG, "inject_tokens(): done (bc=%d).", backspace_count)
-		notify_output(table.concat(values) .. (replay_terminator or ""))
+		notify_output(table.concat(values) .. (replay_terminator or ""), is_private)
 	end
 	return result
 end
