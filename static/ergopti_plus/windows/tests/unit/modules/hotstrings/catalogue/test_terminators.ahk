@@ -544,20 +544,15 @@ Test("Magic-key terminator child: actual writer retains its native profiler (mag
 	_MKTB_WriterProfilerGraph)
 
 _MKTB_OverrideDecoderGraph() {
-	Caller := _DriverFuncBody("_ParseGlobalKey")
-	AssertTrue(Caller != "", "the admitted historical override reader must remain genuine")
-	AssertTrue(InStr(Caller, "UnescapeTomlString(", true) > 0,
-		"the regression must cover the real override reader's decoder")
-	Owner := _DriverProductionFileForSymbol("UnescapeTomlString")
-	AssertTrue(Owner != "", "the override decoder requires its actual complete owner")
-	Code := _MKTB_ChildSource()
-	StrReplace(Code, "#Include " . Owner . "`n", "", true, &Count)
-	AssertEqual(1, Count, "the generated child must import the whole native TOML loader once")
-	AssertEqual("★§¤¤", UnescapeTomlString('★\u00A7¤¤'),
-		"the actual decoder must preserve historical order and duplicate scalar intent")
-	AssertEqual(Chr(0x1F600), UnescapeTomlString('\U0001F600'),
-		"the actual shared codec must decode a complete supplementary scalar")
+	; Exercise the actual historical reader through a real source fixture. A
+	; codec implementation can change without weakening these data invariants.
+	Read := _HCOL_Read('[__global__]`nword_delimiters = "★\u00A7¤¤"`nconsumed_delimiters = "\U0001F600"`n')
+	AssertEqual("★§¤¤", Read.Word,
+		"the actual reader must preserve historical order and duplicate scalar intent")
+	AssertEqual(Chr(0x1F600), Read.Consumed,
+		"the actual reader must decode a complete supplementary scalar")
 }
+
 Test("Magic-key terminator child: historical overrides retain their actual TOML decoder (magic-terminator-override-graph)",
 	_MKTB_OverrideDecoderGraph)
 

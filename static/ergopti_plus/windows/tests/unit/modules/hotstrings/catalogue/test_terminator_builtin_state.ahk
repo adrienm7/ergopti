@@ -275,3 +275,52 @@ _HOSG_CanonicalLegacyMigration(Mode) {
 for _HOSG_Mode in ["literal", "multiline-literal", "quoted-keys", "basic-control"]
 	Test("HotstringsConfig canonical legacy migration: " . _HOSG_Mode,
 		_HTBS_Run.Bind("canonical-legacy-" . _HOSG_Mode, "", _HOSG_CanonicalLegacyMigration.Bind(_HOSG_Mode)))
+
+_HOSR_LegacyRetirementReceipt(Mode) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, _HotstringsLegacyDelimiters
+	global _HotstringsCommonOverrideAdmitted
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+		legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted()}
+	Root := A_Temp . "\ergopti_override_retirement_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		Empty := Mode == "empty-control"
+		Source := "[__global__]`nword_delimiters = " . TOML_RenderString(Empty ? "" : ".")
+			. "`nconsumed_delimiters = " . TOML_RenderString(Empty ? "" : ".") . "`n[magickey]`npriority = 25`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		HotstringsConfigInit(Path)
+		Owner := _HotstringsOverrides
+		if Mode == "receipt-source-changed" {
+			Changed := StrReplace(Source, 'word_delimiters = "."', 'word_delimiters = ".¤"', true)
+			Move(Word, Consumed) {
+				Result := HotstringsTerminatorMigrateStrings(Word, Consumed)
+				AssertEqual(1, Result, "the original source must genuinely commit at its destination")
+				AssertTrue(FSWriteDurable(Path, Changed), "the real source changes after its old values were transferred")
+				return Result
+			}
+			AssertFalse(HotstringsDelimitersBoot(Move), "a receipt for the earlier values cannot retire the new source")
+			AssertEqual(Changed, FSReadStrict(Path))
+			AssertEqual(".", _HotstringsLegacyDelimiters.Word, "the unretired request remains retryable")
+		} else if Empty {
+			AssertTrue(HotstringsSetOverride("magickey", "", "color", "#123456"), "empty legacy strings carry no pending character intent")
+			Disk := TOML_ParseDocument(FSReadStrict(Path))
+			AssertEqual("#123456", Disk["magickey"]["color"])
+		} else {
+			Result := Mode == "ordinary-clear"
+				? HotstringsClearOverride("magickey", "", "priority")
+				: HotstringsSetOverride("magickey", "", "color", "#123456")
+			AssertFalse(Result, "ordinary writes cannot retire legacy delimiters before a destination acknowledgment")
+			AssertEqual(Source, FSReadStrict(Path))
+			AssertTrue(_HotstringsOverrides == Owner)
+		}
+	} finally {
+		_HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		_HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOSR_Mode in ["ordinary-set", "ordinary-clear", "receipt-source-changed", "empty-control"]
+	Test("HotstringsConfig delimiter retirement receipt: " . _HOSR_Mode,
+		_HTBS_Run.Bind("retirement-receipt-" . _HOSR_Mode, "", _HOSR_LegacyRetirementReceipt.Bind(_HOSR_Mode)))

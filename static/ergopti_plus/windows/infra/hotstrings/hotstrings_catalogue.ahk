@@ -574,11 +574,11 @@ _HotstringsPublishOverrideCandidate(Candidate) {
 ; Persist one detached catalogue while retaining the exact owner and path that
 ; admitted its snapshot.
 _HotstringsPersistOverrideCandidate(Candidate, OwnerToken, BoundPath,
-		WriterFn, ReplaceFn) {
+		WriterFn, ReplaceFn, RetiredLegacy := 0) {
 		return _SaveOverrides(Candidate, WriterFn, ReplaceFn,
 				BoundPath,
 				_HotstringsAuthorizeOverrideCommit.Bind(OwnerToken, BoundPath),
-				_HotstringsPublishOverrideCandidate.Bind(Candidate))
+				_HotstringsPublishOverrideCandidate.Bind(Candidate), RetiredLegacy)
 }
 
 ; Validate the shared priority domain before any backend can stage or publish a
@@ -692,6 +692,7 @@ _HotstringsSetOverrideOwned(Cat, Sec, Field, Value, WriterFn, ReplaceFn,
 
 		if (Field == "delay") {
 				Target.Delay := Value
+				Target.LegacyDelay := ""
 				Target.PendingOffset := ""
 				Target.StoredOffset := Value == "" || Value == 0 ? "" : Value - HotstringsBaseDelay()
 		} else if (Field == "color") {
@@ -774,6 +775,7 @@ _HotstringsClearOverrideOwned(Cat, Sec, Field, WriterFn, ReplaceFn,
 
 		if (Field == "" or Field == "delay") {
 				Target.Delay := ""
+				Target.LegacyDelay := ""
 				Target.PendingOffset := ""
 				Target.StoredOffset := ""
 		}
@@ -837,6 +839,23 @@ _HotstringsConfigReloadOwned(OwnerToken, BoundPath, ParseFn := 0) {
 						"Cannot reload overrides from '{1}': the parser returned no Map. The live catalogue is unchanged.",
 						BoundPath)
 				return false
+		}
+
+		; The old default delay crosses into config.toml. A memory-only reload
+		; cannot acknowledge that migration or reinterpret it as a category.
+		if Candidate.Has("_global") && _HotstringsRecordIsLegacy(Candidate["_global"]) {
+				try LoggerError("HotstringsConfig",
+						"Cannot reload overrides before the legacy default delay is migrated at startup. The source and live state are unchanged.")
+				return false
+		}
+
+		; Runtime reload has the same recognized legacy delay semantics as boot.
+		; Adopt only this detached parse result; later explicit clears must not
+		; revive a legacy field retained on a previous live record.
+		for _, Entry in Candidate {
+				_HotstringsRecordAdoptLegacy(Entry)
+				for _, SectionRecord in Entry.Sections
+						_HotstringsRecordAdoptLegacy(SectionRecord)
 		}
 
 		Authorized := false
