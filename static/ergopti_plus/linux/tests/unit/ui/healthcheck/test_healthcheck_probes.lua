@@ -17,6 +17,9 @@
 
 local helpers = require("tests.helpers")
 
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
+
 -- Two samples of the /proc files the processor probe reads, 1500 ticks apart:
 -- 700 of them idle, 75 spent by the daemon, whose command name holds a space
 -- and parentheses
@@ -104,7 +107,7 @@ end
 local function start(Probes, state)
 	local schema = helpers.load_module("ui.healthcheck.bridge").config().schema
 	local answers = {}
-	local run = Probes.start(schema, { logs_dir = "/home/jdoe/.local/state/ergopti_plus/logs" }, state or {},
+	local run = Probes.start(schema, { logs_dir = "/home/jdoe/.local/state/" .. FOLDER .. "/logs" }, state or {},
 		function(id, result, sections) answers[id] = { result = result, sections = sections } end)
 	return run, answers
 end

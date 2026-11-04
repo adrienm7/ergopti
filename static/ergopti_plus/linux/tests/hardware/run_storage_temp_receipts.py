@@ -13,6 +13,11 @@ import signal
 import stat
 import subprocess
 import tempfile
+import tomllib
+
+# The application folder under every XDG base, read from the one declaration.
+APP_DIRS = pathlib.Path(__file__).resolve().parents[3] / "_shared/modules/paths/app_dirs.toml"
+FOLDER = tomllib.loads(APP_DIRS.read_text(encoding="utf-8"))["app"]["linux_folder_name"]
 
 
 WORKER = r"""
@@ -76,7 +81,7 @@ def main():
 
         def alias_case(kind):
             case_root = root / kind
-            directory = case_root / "ergopti_plus"
+            directory = case_root / FOLDER
             directory.mkdir(parents=True)
             store = directory / "storage.json"
             staging = directory / "storage.json.tmp"
@@ -137,7 +142,7 @@ def main():
 
         def healthy_case(fresh):
             case_root = root / ("fresh" if fresh else "healthy")
-            directory = case_root / "ergopti_plus"
+            directory = case_root / FOLDER
             if not fresh:
                 directory.mkdir(parents=True)
                 (directory / "storage.json").write_bytes(original)
@@ -151,7 +156,7 @@ def main():
 
         def limited_write():
             case_root = root / "write-limit"
-            directory = case_root / "ergopti_plus"
+            directory = case_root / FOLDER
             directory.mkdir(parents=True)
             store = directory / "storage.json"
             store.write_bytes(original)

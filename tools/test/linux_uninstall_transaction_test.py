@@ -10,10 +10,15 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 
 ROOT = Path(sys.argv.pop(1)).resolve()
 DRIVER = ROOT / "static/ergopti_plus/linux"
+# The application folder under XDG_CONFIG_HOME, read from the one declaration.
+FOLDER = tomllib.loads(
+    (ROOT / "static/ergopti_plus/_shared/modules/paths/app_dirs.toml").read_text(encoding="utf-8")
+)["app"]["linux_folder_name"]
 FAULT_TOOLS = r"""#!/bin/bash
 set -eu
 program="${0##*/}"
@@ -121,7 +126,7 @@ class UninstallTransactionTests(unittest.TestCase):
         self.manifest.chmod(0o640)
         self.modified = self.library / "linux/modified.lua"
         self.modified.write_bytes(b"-- personal modified payload\n")
-        self.personal = self.home / ".config/ergopti_plus/personal.toml"
+        self.personal = self.home / ".config" / FOLDER / "personal.toml"
         self.personal.parent.mkdir(parents=True)
         self.personal.write_bytes(b'personal="keep"\n')
         self.foreign = self.prefix / "lib/another-app/keep"

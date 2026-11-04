@@ -160,7 +160,7 @@ print("Native ordinary-user fixture writes: 2 directories admitted")
 # The suite's module groups of tests/support/module_groups.lua run at once, each with
 # a private TMPDIR and HOME: the whole suite in one process held every archive
 # cell for about four minutes. A shared HOME let one group's writes to the
-# user's ~/.config/ergopti_plus reach another group's fixture that proves its
+# user's ~/.config/ergopti reach another group's fixture that proves its
 # parent bootstrap stays untouched. openSUSE's sudo session adds pam_env's
 # XDG_*_HOME defaults (aaa_base xdg.conf) from the ACCOUNT home, which outrank
 # HOME, so they are removed too or every group shares one ~/.config again.

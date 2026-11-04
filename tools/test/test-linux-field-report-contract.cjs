@@ -33,6 +33,7 @@ const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 const { escapeRegExp } = require('../lib/text-escape.cjs');
+const AppDirs = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/collect-linux-field-report.sh';
@@ -130,7 +131,7 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 	const origin = path.join(base, 'origin.git');
 	const bin = path.join(base, 'bin');
 	const home = path.join(base, 'home');
-	const logs = path.join(home, 'state/ergopti_plus/logs');
+	const logs = path.join(home, 'state', ...AppDirs.segments('logs.linux', 'linux'));
 	for (const relative of [
 		SCRIPT,
 		FIELD_GIT,

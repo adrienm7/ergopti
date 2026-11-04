@@ -10,6 +10,9 @@
 
 local M = {}
 local helpers = require("tests.helpers")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 local uv = require("luv")
 
 --- Checks the public storage API after one actual updater fixture lifetime.
@@ -23,7 +26,7 @@ function M.check(scenario)
 	local paths_name, storage_name = "infra.config_paths", "adapters.storage"
 	local previous_paths, previous_storage = package.loaded[paths_name], package.loaded[storage_name]
 	local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-updater-storage-XXXXXX"))
-	local path = directory .. "/ergopti_plus/storage.json"
+	local path = directory .. "/" .. FOLDER .. "/storage.json"
 	local paths = {}
 	for key, value in pairs(previous_paths) do paths[key] = value end
 	paths.config_home = function() return directory end
@@ -44,7 +47,7 @@ function M.check(scenario)
 	for _, suffix in ipairs({ ".tmp", ".corrupt", "" }) do
 		if uv.fs_lstat(path .. suffix) then assert(os.remove(path .. suffix)) end
 	end
-	if uv.fs_lstat(directory .. "/ergopti_plus") then assert(uv.fs_rmdir(directory .. "/ergopti_plus")) end
+	if uv.fs_lstat(directory .. "/" .. FOLDER) then assert(uv.fs_rmdir(directory .. "/" .. FOLDER)) end
 	assert(uv.fs_rmdir(directory))
 	if not ok then error(err, 0) end
 end

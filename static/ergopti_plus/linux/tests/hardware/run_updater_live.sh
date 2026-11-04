@@ -74,9 +74,6 @@ ERGOPTI_BUILD_VERSION=0.0.0-dev.1 bash "${REPO}/tools/build/build-linux-driver.s
 export HOME="${WORK}/home"
 export XDG_CONFIG_HOME="${HOME}/.config" XDG_DATA_HOME="${HOME}/.local/share" XDG_CACHE_HOME="${HOME}/.cache"
 export XDG_STATE_HOME="${HOME}/.local/state"
-# Where the daemon writes its logs: state, not data (infra/config_paths.lua).
-# The check read the data folder, which only builds before v0.0.0-dev.140 used.
-LOGS="${XDG_STATE_HOME}/ergopti_plus/logs"
 PHASE=install
 ( cd "${WORK}/unpacked" && bash install.sh --no-deps --no-service ) > "${WORK}/install.log" 2>&1 \
 	|| { CAUSE_STATUS=$?; tail -20 "${WORK}/install.log"; echo "FAIL install.sh failed"; exit 1; }
@@ -107,6 +104,12 @@ wait "${STDERR_PID}" || echo "Updater stderr evidence could not be copied." >&2
 # from the installed launcher, it must report the version just installed.
 PHASE=restart
 NEW="$(sed -n 's/^version=//p' "${LIB}/_shared/build_stamp.txt")"
+# Where that daemon writes its logs: state, not data (infra/config_paths.lua),
+# in the folder its own installed registry names. It is the newest published
+# release, which may predate this checkout's folder name, so the name is read
+# from the installed _shared/lua/app_dirs.lua (LUA_PATH above), not spelled.
+LOGS="${XDG_STATE_HOME}/$(luajit -e 'io.write(require("app_dirs").linux.relative)')" \
+	|| { CAUSE_STATUS=$?; echo "FAIL the installed logs folder could not be read"; exit 1; }
 for _ in $(seq 1 40); do
 	grep -qs "daemon starting (version ${NEW}," "${LOGS}/"*.log && break
 	sleep 0.5

@@ -6,6 +6,9 @@
 
 local helpers = require("tests.helpers")
 
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
+
 helpers.describe("i18n persistence", function()
 
   -- ==========================================================================
@@ -227,9 +230,9 @@ helpers.describe("i18n explicit wizard persistence", function()
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
 		os.remove(root)
-		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/ergopti_plus"))
+		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/" .. FOLDER))
 		helpers.assert_true(made == true or made == 0)
-		local path = root .. "/ergopti_plus/storage.json"
+		local path = root .. "/" .. FOLDER .. "/storage.json"
 		local seed = '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
 		local fh = assert(io.open(path, "wb"))
 		assert(fh:write(seed)); assert(fh:close())
@@ -258,7 +261,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 		os.rename = original_rename
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		os.remove(path .. ".tmp"); os.remove(path)
-		os.execute("rmdir " .. string.format("%q", root .. "/ergopti_plus"))
+		os.execute("rmdir " .. string.format("%q", root .. "/" .. FOLDER))
 		os.execute("rmdir " .. string.format("%q", root))
 		if not ok then error(err, 0) end
 		return observations, attempts

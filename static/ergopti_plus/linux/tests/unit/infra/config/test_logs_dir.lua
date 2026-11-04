@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Logs Folder Resolution (Linux)
 --- DESCRIPTION:
---- The daemon's logs folder is ${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/
---- logs, or the LogsDirPath override kept in bootstrap storage. The sink's
+--- The daemon's logs folder is ${XDG_STATE_HOME:-~/.local/state}/ergopti/logs,
+--- or the LogsDirPath override kept in bootstrap storage. The sink's
 --- log_dir(), main_log_path(), errors_log_path() and crash_reports_dir() are
 --- the one resolver every consumer asks: the tray, the gesture actions, the
 --- health check and the crash reporter.
@@ -13,7 +13,7 @@
 --- 1. The folder was $XDG_DATA_HOME/ergopti/logs: logs are state in the XDG
 ---    layout, and the folder had a different name on every driver.
 --- 2. It could not be moved; the override now can, and a folder the user
----    merely picked gets an ergopti_plus subfolder so the retention purge never
+---    merely picked gets an application subfolder so the retention purge never
 ---    deletes in the user's own folder.
 --- 3. Crash dumps went to ~/.local/share/ergopti/crashes, away from the log
 ---    that explains them.
@@ -27,6 +27,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 
 --- Runs `body` with controlled environment variables and bootstrap storage.
 --- @param env table Variables returned by os.getenv (others fall through).
@@ -63,49 +66,51 @@ local function with_paths(env, stored, body)
 end
 
 helpers.describe("logs folder resolution (logs-dir-resolver)", function()
-	helpers.it("defaults to $XDG_STATE_HOME/ergopti_plus/logs", function()
+	-- Pins the exact spelling on purpose: the maintainer chose one lowercase
+	-- `ergopti` folder under each XDG base (2026-11-03).
+	helpers.it("defaults to $XDG_STATE_HOME/ergopti/logs", function()
 		with_paths({ XDG_STATE_HOME = "/state", HOME = "/home/u" }, {}, function(ConfigPaths, Sink)
-			helpers.assert_eq(ConfigPaths.default_logs_dir(), "/state/ergopti_plus/logs")
-			helpers.assert_eq(Sink.log_dir(), "/state/ergopti_plus/logs")
+			helpers.assert_eq(ConfigPaths.default_logs_dir(), "/state/ergopti/logs")
+			helpers.assert_eq(Sink.log_dir(), "/state/ergopti/logs")
 		end)
 	end)
 
 	helpers.it("falls back to ~/.local/state when XDG_STATE_HOME is empty", function()
 		with_paths({ XDG_STATE_HOME = "", HOME = "/home/u" }, {}, function(ConfigPaths)
-			helpers.assert_eq(ConfigPaths.default_logs_dir(), "/home/u/.local/state/ergopti_plus/logs")
+			helpers.assert_eq(ConfigPaths.default_logs_dir(), "/home/u/.local/state/" .. FOLDER .. "/logs")
 		end)
 	end)
 
 	helpers.it("follows the override and appends the application folder to a foreign one", function()
 		with_paths({ XDG_STATE_HOME = "/state" }, { ["paths.logs_dir"] = "/sync/logs/" },
 			function(ConfigPaths, Sink)
-				helpers.assert_eq(ConfigPaths.get_logs_dir(), "/sync/logs/ergopti_plus")
+				helpers.assert_eq(ConfigPaths.get_logs_dir(), "/sync/logs/" .. FOLDER)
 				local day = os.date("%Y-%m-%d")
-				helpers.assert_eq(Sink.main_log_path(), "/sync/logs/ergopti_plus/ErgoptiPlus_" .. day .. ".log")
+				helpers.assert_eq(Sink.main_log_path(), "/sync/logs/" .. FOLDER .. "/ErgoptiPlus_" .. day .. ".log")
 				helpers.assert_eq(Sink.errors_log_path(),
-					"/sync/logs/ergopti_plus/ErgoptiPlus_errors_" .. day .. ".log")
-				helpers.assert_eq(Sink.crash_reports_dir(), "/sync/logs/ergopti_plus/crash_reports")
+					"/sync/logs/" .. FOLDER .. "/ErgoptiPlus_errors_" .. day .. ".log")
+				helpers.assert_eq(Sink.crash_reports_dir(), "/sync/logs/" .. FOLDER .. "/crash_reports")
 			end)
 	end)
 
 	helpers.it("keeps a folder already named after the application", function()
-		with_paths({ XDG_STATE_HOME = "/state" }, { ["paths.logs_dir"] = "/sync/ergopti_plus" },
+		with_paths({ XDG_STATE_HOME = "/state" }, { ["paths.logs_dir"] = "/sync/" .. FOLDER },
 			function(ConfigPaths)
-				helpers.assert_eq(ConfigPaths.get_logs_dir(), "/sync/ergopti_plus")
+				helpers.assert_eq(ConfigPaths.get_logs_dir(), "/sync/" .. FOLDER)
 			end)
 	end)
 
 	helpers.it("ignores a relative stored override", function()
 		with_paths({ XDG_STATE_HOME = "/state" }, { ["paths.logs_dir"] = "logs" }, function(ConfigPaths)
-			helpers.assert_eq(ConfigPaths.get_logs_dir(), "/state/ergopti_plus/logs")
+			helpers.assert_eq(ConfigPaths.get_logs_dir(), "/state/" .. FOLDER .. "/logs")
 		end)
 	end)
 
 	helpers.it("stores a normalized override and clears the default", function()
 		with_paths({ XDG_STATE_HOME = "/state" }, {}, function(ConfigPaths, _, values)
 			helpers.assert_true(ConfigPaths.set_logs_dir("/sync/logs") == true)
-			helpers.assert_eq(values["paths.logs_dir"], "/sync/logs/ergopti_plus")
-			helpers.assert_true(ConfigPaths.set_logs_dir("/state/ergopti_plus/logs") == true)
+			helpers.assert_eq(values["paths.logs_dir"], "/sync/logs/" .. FOLDER)
+			helpers.assert_true(ConfigPaths.set_logs_dir("/state/" .. FOLDER .. "/logs") == true)
 			helpers.assert_nil(values["paths.logs_dir"], "the default is never stored as an override")
 			local refused, err = ConfigPaths.set_logs_dir("relative")
 			helpers.assert_true(refused == false, "a relative folder is refused")
@@ -122,7 +127,7 @@ helpers.describe("logs folder resolution (logs-dir-resolver)", function()
 		local base = os.tmpname()
 		os.remove(base)
 		local first = base .. "_first"
-		local second = base .. "_moved/ergopti_plus"
+		local second = base .. "_moved/" .. FOLDER
 		local day = os.date("%Y-%m-%d")
 		local function remove_day_files(dir)
 			os.remove(dir .. "/ErgoptiPlus_" .. day .. ".log")
@@ -176,7 +181,7 @@ helpers.describe("logs folder resolution (logs-dir-resolver)", function()
 		local base = os.tmpname()
 		os.remove(base)
 		with_paths({ XDG_STATE_HOME = "/state" }, {}, function(_, Sink)
-			local fresh = base .. "_prepared/ergopti_plus"
+			local fresh = base .. "_prepared/" .. FOLDER
 			local ready, err = Sink.prepare_dir(fresh)
 			helpers.assert_true(ready == true, "a new folder is created: " .. tostring(err))
 			local probe = io.open(fresh .. "/probe.txt", "w")
@@ -188,11 +193,11 @@ helpers.describe("logs folder resolution (logs-dir-resolver)", function()
 			local handle = assert(io.open(blocker, "w"))
 			handle:write("x")
 			handle:close()
-			local refused, why = Sink.prepare_dir(blocker .. "/ergopti_plus")
+			local refused, why = Sink.prepare_dir(blocker .. "/" .. FOLDER)
 			os.remove(blocker)
 			helpers.assert_true(refused == false, "a folder under a file cannot be created")
 			helpers.assert_not_nil(why)
-			helpers.assert_true(Sink.prepare_dir("relative/ergopti_plus") == false, "a relative folder is refused")
+			helpers.assert_true(Sink.prepare_dir("relative/" .. FOLDER) == false, "a relative folder is refused")
 		end)
 	end)
 
@@ -200,7 +205,7 @@ helpers.describe("logs folder resolution (logs-dir-resolver)", function()
 		with_paths({ XDG_STATE_HOME = "/state" }, {}, function()
 			package.loaded["modules.diagnostics.crash_reporter"] = nil
 			local CrashReporter = require("modules.diagnostics.crash_reporter")
-			helpers.assert_eq(CrashReporter.get_crash_dir(), "/state/ergopti_plus/logs/crash_reports")
+			helpers.assert_eq(CrashReporter.get_crash_dir(), "/state/" .. FOLDER .. "/logs/crash_reports")
 			package.loaded["modules.diagnostics.crash_reporter"] = nil
 		end)
 	end)
@@ -214,9 +219,9 @@ helpers.describe("absolute Linux user directories (xdg-absolute-bases)", functio
 				helpers.assert_eq(Paths.config_home(), "/account with spaces/.config")
 				helpers.assert_eq(Paths.data_home(), "/account with spaces/.local/share")
 				helpers.assert_eq(Paths.state_home(), "/account with spaces/.local/state")
-				helpers.assert_eq(Paths.default_config_dir(), "/account with spaces/.config/ergopti")
-				helpers.assert_eq(Paths.metrics_path(), "/account with spaces/.local/share/ergopti/metrics.sqlite")
-				helpers.assert_eq(Paths.default_logs_dir(), "/account with spaces/.local/state/ergopti_plus/logs")
+				helpers.assert_eq(Paths.default_config_dir(), "/account with spaces/.config/" .. FOLDER)
+				helpers.assert_eq(Paths.metrics_path(), "/account with spaces/.local/share/" .. FOLDER .. "/metrics.sqlite")
+				helpers.assert_eq(Paths.default_logs_dir(), "/account with spaces/.local/state/" .. FOLDER .. "/logs")
 			end)
 		end)
 	end
@@ -268,9 +273,9 @@ helpers.describe("absolute Linux user directories (xdg-absolute-bases)", functio
 			helpers.assert_eq(Paths.config_home(), "/")
 			helpers.assert_eq(Paths.data_home(), "/")
 			helpers.assert_eq(Paths.state_home(), "/")
-			helpers.assert_eq(Paths.default_config_dir(), "/ergopti")
-			helpers.assert_eq(Paths.metrics_path(), "/ergopti/metrics.sqlite")
-			helpers.assert_eq(Paths.default_logs_dir(), "/ergopti_plus/logs")
+			helpers.assert_eq(Paths.default_config_dir(), "/" .. FOLDER)
+			helpers.assert_eq(Paths.metrics_path(), "/" .. FOLDER .. "/metrics.sqlite")
+			helpers.assert_eq(Paths.default_logs_dir(), "/" .. FOLDER .. "/logs")
 		end)
 	end)
 
@@ -279,7 +284,7 @@ helpers.describe("absolute Linux user directories (xdg-absolute-bases)", functio
 			XDG_DATA_HOME = false, XDG_STATE_HOME = false }, {}, function(Paths)
 			helpers.assert_nil(Paths.account_home())
 			helpers.assert_eq(Paths.home(), "/tmp")
-			helpers.assert_eq(Paths.default_config_dir(), "/tmp/.config/ergopti")
+			helpers.assert_eq(Paths.default_config_dir(), "/tmp/.config/" .. FOLDER)
 		end)
 	end)
 end)
