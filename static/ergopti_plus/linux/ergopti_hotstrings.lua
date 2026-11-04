@@ -1348,7 +1348,11 @@ local function main()
 			if not (hotstrings_config and type(hotstrings_config.resolve) == "function") then return true end
 			local ok_delay, resolved = pcall(hotstrings_config.resolve, result.group, result.section)
 			local delay_sec = ok_delay and type(resolved) == "table" and tonumber(resolved.delay) or nil
-			if delay_sec and not ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),
+			if not delay_sec or delay_sec ~= delay_sec or delay_sec == math.huge or delay_sec < 0 then
+				Logger.error(LOG, "Expansion delay could not be resolved — the match was refused.")
+				return false
+			end
+			if not ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),
 				key_is_complex, previous_key_was_complex, result.group) then
 				Logger.debug(LOG,
 					"Expired: trigger of %d byte(s) waited %.2fs for its expander, its category allows %.2fs.",
