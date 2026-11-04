@@ -50,6 +50,42 @@ class SessionLockTests(unittest.TestCase):
                     if marker is not None:
                         self.assertIn("[session_lock]", result.stderr)
 
+    def test_relative_runtime_refuses_both_entry_points(self):
+        driver = pathlib.Path(__file__).resolve().parents[2]
+        runtime = shutil.which("luajit")
+        self.assertIsNotNone(runtime, "This native regression requires Linux LuaJIT")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            stubs = root / "bin"
+            stubs.mkdir()
+            (stubs / "luajit").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            (stubs / "luajit").chmod(0o755)
+            environment = dict(os.environ)
+            environment["XDG_RUNTIME_DIR"] = "relative-runtime"
+            environment["PATH"] = str(stubs) + os.pathsep + environment["PATH"]
+            code = (
+                "package.path = "
+                + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/lua/?.lua"))
+                + "; local lock = require('infra.session_lock'); local ok, reason = lock.acquire(); "
+                + "if ok then lock.release() else io.stderr:write(reason .. '\\n') end; os.exit(ok and 0 or 78)"
+            )
+            for entry, command in (
+                ("launcher", ["bash", str(driver / "install/launch.sh"), "--service"]),
+                ("direct", [runtime, "-e", code]),
+            ):
+                for source in ("runtime", "home"):
+                    with self.subTest(entry=entry, source=source):
+                        selected = dict(environment)
+                        if source == "home":
+                            selected.pop("XDG_RUNTIME_DIR")
+                            selected["HOME"] = "relative-home"
+                        result = subprocess.run(
+                            command, cwd=root, env=selected, capture_output=True, timeout=5
+                        )
+                        self.assertEqual(result.returncode, 78, result.stderr)
+                        self.assertIn(b"absolute", result.stderr)
+            self.assertFalse((root / "relative-runtime").exists(), "refusal precedes lock creation")
+
     def test_nonregular_lock_never_blocks_or_admits_startup(self):
         driver = pathlib.Path(__file__).resolve().parents[2]
         runtime = shutil.which("luajit")
