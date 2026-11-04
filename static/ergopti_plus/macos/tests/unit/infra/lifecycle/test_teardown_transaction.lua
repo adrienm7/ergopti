@@ -25,6 +25,27 @@ local function load_transaction()
 end
 
 helpers.describe("retryable local teardown transaction", function()
+	helpers.it("retains validated steps and finalizer across reentrant mutation (teardown-step-mutation)", function()
+		local transaction = load_transaction()
+		local state = transaction.new_state()
+		local calls = {}
+		local second = { name = "second", run = function() calls[#calls + 1] = "second" end }
+		local finalizer = { name = "finalizer", run = function() calls[#calls + 1] = "finalizer" end }
+		local steps = {}
+		steps[1] = { name = "first", run = function()
+			calls[#calls + 1] = "first"
+			steps[2] = nil
+			second.run = function() calls[#calls + 1] = "replacement" end
+			finalizer.run = function() calls[#calls + 1] = "replacement-finalizer" end
+		end }
+		steps[2] = second
+		helpers.assert_true(transaction.run_with_finalizer(state, steps, finalizer))
+		helpers.assert_eq(calls, { "first", "second", "finalizer" },
+			"validation must retain the actual capabilities until their execution")
+		helpers.assert_true(state.completed.second)
+		helpers.assert_true(state.completed.finalizer)
+	end)
+
 	helpers.it("rejects sparse step lists before cleanup or finalization (teardown-sparse-steps)", function()
 		local transaction = load_transaction()
 		local calls = 0

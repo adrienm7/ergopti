@@ -86,10 +86,16 @@ function M.run(state, steps)
 		return false
 	end
 	if not validate_steps(steps) then return false end
+	-- A cleanup can re-enter other owners and mutate its caller's list. Freeze
+	-- both the order and the validated capabilities before crossing that boundary.
+	local snapshot = {}
+	for index, step in ipairs(steps) do
+		snapshot[index] = { name = step.name, run = step.run }
+	end
 
 	state.running = true
 	local all_complete = true
-	for _, step in ipairs(steps) do
+	for _, step in ipairs(snapshot) do
 		if state.completed[step.name] ~= true then
 			local ok, result_or_err = xpcall(step.run, debug.traceback)
 			if ok and result_or_err ~= false then
@@ -104,7 +110,7 @@ function M.run(state, steps)
 	state.running = false
 
 	if all_complete then
-		for _, step in ipairs(steps) do
+		for _, step in ipairs(snapshot) do
 			if state.completed[step.name] ~= true then
 				all_complete = false
 				break
@@ -138,8 +144,9 @@ function M.run_with_finalizer(state, steps, finalizer)
 	complete_transaction[#complete_transaction + 1] = finalizer
 	if not validate_steps(complete_transaction) then return false end
 
+	local finalizer_snapshot = { name = finalizer.name, run = finalizer.run }
 	if M.run(state, steps) ~= true then return false end
-	return M.run(state, { finalizer })
+	return M.run(state, { finalizer_snapshot })
 end
 
 return M
