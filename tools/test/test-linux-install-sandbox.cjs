@@ -343,6 +343,19 @@ if (process.platform === 'linux') {
 
 const errors = [];
 
+// Lua interprets these bytes inside every module-search template, so a driver
+// installed under either prefix cannot load its own modules.
+for (const prefixName of ['invalid;prefix', 'invalid?prefix']) {
+	const run = runInstaller({ desktopProvided: true, noService: true, prefixName });
+	try {
+		assert.notEqual(run.status, 0);
+		assert.match(run.output, /code=unsupported-prefix/);
+		assert.equal(fs.existsSync(path.join(run.home, prefixName, 'lib/ergopti')), false);
+	} finally {
+		run.cleanup();
+	}
+}
+
 // Runtime configuration and systemd use the same XDG config root. A legacy
 // canonical pack there must retire before the new installed bundle replaces it.
 {

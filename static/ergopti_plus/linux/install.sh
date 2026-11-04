@@ -147,6 +147,12 @@ done
 if ! $SETUP_PERMS_ONLY; then
 	mkdir -p -- "$PREFIX"
 	IFS= read -r -d '' PREFIX < <(CDPATH= cd -Pe -- "$PREFIX" && printf '%s\0' "$PWD")
+	# Lua's module search path treats semicolons as separators and every
+	# question mark as a module-name placeholder. Neither can be escaped in
+	# LUA_PATH or LUA_CPATH, so such a prefix cannot load the installed driver.
+	case "$PREFIX" in
+		*';'*|*'?'*) printf '[install] code=unsupported-prefix path=%q\n' "$PREFIX" >&2; exit 1 ;;
+	esac
 fi
 
 LIB_DIR="${PREFIX}/lib/ergopti"
