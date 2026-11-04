@@ -544,6 +544,15 @@ local function install_user_unlocked(bundles_dir, bundle_name)
 		if entry.name == bundle_name then in_system = true end
 	end
 	if in_system then
+		local user_occupied = other_scope_occupied(USER_LAYOUTS_DIR)
+		if user_occupied == nil then
+			Logger.error(LOG, "User install refused: the user layout directory could not be checked.")
+			return false, "other_scope_unverified"
+		end
+		if user_occupied then
+			Logger.warn(LOG, "User install refused: a keyboard bundle remains in the user scope.")
+			return false, "other_scope_occupied"
+		end
 		Logger.info(LOG, "%s is already installed in %s: no second copy is written to the user folder.",
 			bundle_name, SYSTEM_LAYOUTS_DIR)
 		return true

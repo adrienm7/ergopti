@@ -74,7 +74,7 @@ local function cleanup_app_watcher()
 	end
 	local watcher = _app_watcher
 	local ok, result = xpcall(function() return watcher:stop() end, debug.traceback)
-	if not ok or not result then
+	if not ok or result ~= watcher then
 		_app_cleanup_pending = true
 		Logger.error(LOG, "Application watcher stop failed; retaining the exact handle for retry: %s.",
 			tostring(result))
@@ -94,7 +94,7 @@ local function cleanup_window_filter()
 	end
 	local filter = _window_filter
 	local ok, result = xpcall(function() return filter:unsubscribeAll() end, debug.traceback)
-	if not ok or not result then
+	if not ok or result ~= filter then
 		_window_cleanup_pending = true
 		Logger.error(LOG, "Window filter stop failed; retaining the exact handle for retry: %s.",
 			tostring(result))
@@ -257,7 +257,7 @@ function M.start()
 		app_acquired = true
 		local ok_start, start_result = xpcall(function() return candidate:start() end,
 			debug.traceback)
-		if not ok_start or not start_result then
+		if not ok_start or start_result ~= candidate then
 			rollback_start(true, false)
 			Logger.error(LOG, "Application watcher start failed: %s.", tostring(start_result))
 			return false
@@ -299,7 +299,7 @@ function M.start()
 				end
 			end)
 		end, debug.traceback)
-		if not ok_subscribe or not subscribed then
+		if not ok_subscribe or subscribed ~= candidate then
 			rollback_start(app_acquired, true)
 			Logger.error(LOG, "Window filter subscription failed: %s.", tostring(subscribed))
 			return false

@@ -62,6 +62,7 @@ local function load_adapter(options)
 				if options.start_throws_once and ctx.start_calls == 1 then
 					error("native start failed")
 				end
+				if options.start_returns_true_once and ctx.start_calls == 1 then return true end
 				return self
 			end
 			function candidate:stop()
@@ -70,6 +71,7 @@ local function load_adapter(options)
 					error("native stop failed")
 				end
 				if options.stop_returns_nil_once and ctx.stop_calls == 1 then return nil end
+				if options.stop_returns_true_once and ctx.stop_calls == 1 then return true end
 				return self
 			end
 			return candidate
@@ -94,6 +96,7 @@ local function load_adapter(options)
 								error("native subscribe failed")
 							end
 							if options.subscribe_returns_nil_once and ctx.subscribe_calls == 1 then return nil end
+							if options.subscribe_returns_true_once and ctx.subscribe_calls == 1 then return true end
 							return self
 						end,
 						unsubscribeAll = function(self)
@@ -101,6 +104,7 @@ local function load_adapter(options)
 							if options.unsubscribe_throws_once and ctx.unsubscribe_calls == 1 then
 								error("native unsubscribe failed")
 							end
+							if options.unsubscribe_returns_true_once and ctx.unsubscribe_calls == 1 then return true end
 							return self
 						end,
 					}
@@ -113,6 +117,27 @@ local function load_adapter(options)
 end
 
 helpers.describe("process_lifecycle: native ownership is transactional", function()
+	helpers.it("requires the exact watcher and filter receipts (process-lifecycle-exact-receipt)", function()
+		for _, case in ipairs({
+			{ option = "start_returns_true_once", start = true },
+			{ option = "subscribe_returns_true_once", start = true, focus = true },
+			{ option = "stop_returns_true_once" },
+			{ option = "unsubscribe_returns_true_once", focus = true },
+		}) do
+			local adapter, ctx = load_adapter({ [case.option] = true })
+			if case.focus then adapter.onFocusChange(function() end) end
+			if case.start then
+				helpers.assert_eq(adapter.start(), false, case.option .. " cannot prove activation")
+				helpers.assert_true(adapter.start(), "settled rollback permits a new start")
+			else
+				helpers.assert_true(adapter.start())
+				helpers.assert_eq(adapter.stop(), false, case.option .. " cannot prove cleanup")
+			end
+			helpers.assert_true(adapter.stop(), "the exact cleanup remains retryable")
+			helpers.assert_true(#ctx.errors >= 1)
+		end
+	end)
+
 	helpers.it("defers subscribers registered during dispatch to the next event (process-event-subscription)", function()
 		for _, event in ipairs({
 			{ method = "onAppLaunch", code = 1 },
