@@ -180,6 +180,9 @@ AwakeCancelOnMouse(*) {
 }
 
 AwakeCancelOnKeypress(ih, arg1:="", arg2:="") {
+		global ActivitySimulation, AwakeInputHook
+		if !IsObject(ih) || ih != AwakeInputHook
+				return
 		if A_IsSuspended
 				return
 		; Ignore key presses with modifiers to prevent the trigger hotkey
@@ -192,8 +195,7 @@ AwakeCancelOnKeypress(ih, arg1:="", arg2:="") {
 						or GetKeyState(KS_AltGrKeyName())
 						return
 		}
-		global ActivitySimulation
-		if ActivitySimulation {
+		if ih == AwakeInputHook && ActivitySimulation {
 				StopActivitySimulation()
 		}
 }

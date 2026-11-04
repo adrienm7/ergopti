@@ -325,23 +325,25 @@ Test("Shortcuts/menu: shortcut menu items are registered via RegisterMenuItem, n
 	TestShortcuts_MenuItemsUseRegisterMenuItem)
 
 TestShortcuts_KeepAwakeDeactivation() {
-	; Test that the keep-awake mode (ActivitySimulation) properly cancels on user input
-	global ActivitySimulation, AwakeOriginX, AwakeOriginY
-	ActivitySimulation := true
-	AwakeOriginX := 100
-	AwakeOriginY := 100
-
-	; Keyboard input should stop simulation
-	AwakeCancelOnKeypress("", "")
-	Sleep(10)
-	AssertFalse(ActivitySimulation, "Keyboard input should immediately deactivate keep-awake simulation")
-
-	; Reset
-	ActivitySimulation := true
-	AwakeCancelOnMouse()
-	Sleep(10)
-	AssertFalse(ActivitySimulation, "Mouse click should immediately deactivate keep-awake simulation")
+	global ActivitySimulation, AwakeOriginX, AwakeOriginY, AwakeInputHook
+	SavedActive := ActivitySimulation, SavedHook := AwakeInputHook
+	SavedX := AwakeOriginX, SavedY := AwakeOriginY
+	try {
+		ActivitySimulation := true
+		AwakeOriginX := 100, AwakeOriginY := 100
+		Hook := InputHook()
+		AwakeInputHook := Hook
+		AwakeCancelOnKeypress(Hook, "")
+		AssertFalse(ActivitySimulation, "The current keyboard observer cancels keep-awake")
+		ActivitySimulation := true
+		AwakeCancelOnMouse()
+		AssertFalse(ActivitySimulation, "Mouse clicks cancel keep-awake")
+	} finally {
+		ActivitySimulation := SavedActive, AwakeInputHook := SavedHook
+		AwakeOriginX := SavedX, AwakeOriginY := SavedY
+	}
 }
+
 Test("Shortcuts: keep-awake simulation cancels on mouse or keyboard input", TestShortcuts_KeepAwakeDeactivation)
 
 class _KeepAwakeStopRetryStub {

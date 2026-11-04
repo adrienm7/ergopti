@@ -111,6 +111,18 @@ _KATO_Exercise() {
 	global _KATO, AwakeInputHook, ActivitySimulation, AWAKE_JITTER_PX
 	Started := A_TickCount
 	_KATO.A := _KATO_Start()
+	if _KATO.Mode == "retired-keyboard" {
+		_KATO_Require(StopActivitySimulation(false), "A's native key observer must acknowledge retirement")
+		_KATO.B := _KATO_Start()
+		AwakeCancelOnKeypress(_KATO.A, 0x41, 0x1E)
+		_KATO_Require(ActivitySimulation && AwakeInputHook == _KATO.B && _KATO.B.InProgress,
+			"a controlled queued callback from retired A must preserve B")
+		AwakeCancelOnKeypress(_KATO.B, 0x41, 0x1E)
+		_KATO_Require(!ActivitySimulation && !IsObject(AwakeInputHook) && !_KATO.B.InProgress,
+			"the current native key observer must still cancel its own session")
+		return
+	}
+
 	_KATO.X += AWAKE_JITTER_PX + 1
 	_KATO.Capturing := true
 	try AwakeCheckMouseMoved()
