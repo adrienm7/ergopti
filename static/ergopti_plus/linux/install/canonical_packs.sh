@@ -35,6 +35,8 @@ migrate_canonical_packs() {
 	local marker="${config_dir}/${CANONICAL_PACK_MIGRATION_MARKER}"
 	local backup_dir="${config_dir}/${CANONICAL_PACK_BACKUP_DIR}"
 	local source_pack name user_pack installed_pack backup marker_tmp
+	local index
+	local -a user_packs=() backups=() backup_present=()
 
 	if [ -f "${marker}" ]; then
 		return 0
@@ -55,8 +57,10 @@ migrate_canonical_packs() {
 
 		user_pack="${config_dir}/${name}"
 		installed_pack="${installed_dir}/${name}"
-		[ -f "${user_pack}" ] || continue
-		[ -f "${installed_pack}" ] || continue
+		# A link is a user-selected reference, not an installer-created seed;
+		# moving it would also change the meaning of a relative link target.
+		[ -f "${user_pack}" ] && [ ! -L "${user_pack}" ] || continue
+		[ -f "${installed_pack}" ] && [ ! -L "${installed_pack}" ] || continue
 		# Status 1 means the bytes differ: a user override stays active. Any other
 		# status is an unreadable pack, which must abort the migration.
 		if same_bytes "${user_pack}" "${installed_pack}"; then
@@ -69,11 +73,24 @@ migrate_canonical_packs() {
 		# The suffix deliberately does not end in .toml: Loader.find_toml_files()
 		# scans recursively, so a normal TOML backup would remain an active pack.
 		backup="${backup_dir}/${name}.legacy-seed"
-		if [ -e "${backup}" ]; then
+		if [ -e "${backup}" ] || [ -L "${backup}" ]; then
+			[ -f "${backup}" ] && [ ! -L "${backup}" ] || return 1
 			same_bytes "${user_pack}" "${backup}" || return 1
-			rm -f -- "${user_pack}"
+			backup_present+=(true)
 		else
-			mv -- "${user_pack}" "${backup}"
+			backup_present+=(false)
+		fi
+		user_packs+=("${user_pack}")
+		backups+=("${backup}")
+	done
+
+	# Admit every existing backup before moving the first seed. A conflict in a
+	# later category must not leave an otherwise untouched migration half-applied.
+	for index in "${!user_packs[@]}"; do
+		if "${backup_present[$index]}"; then
+			rm -f -- "${user_packs[$index]}"
+		else
+			mv -- "${user_packs[$index]}" "${backups[$index]}"
 		fi
 	done
 

@@ -124,6 +124,41 @@ const installed = path.join(sandbox, 'installed');
 const config = path.join(sandbox, 'config');
 
 try {
+	// A conflicting or special later backup must refuse without retiring an
+	// earlier seed. A FIFO also proves the migration never waits on it.
+	for (const kind of ['conflict', 'fifo', 'link']) {
+		if (kind !== 'conflict' && process.platform !== 'linux') continue;
+		const root = path.join(sandbox, `refuse-${kind}`);
+		const source = path.join(root, 'source');
+		const previous = path.join(root, 'previous');
+		const user = path.join(root, 'user');
+		for (const name of ['a.toml', 'z.toml']) {
+			write(path.join(source, name), 'new\n');
+			write(path.join(previous, name), 'old\n');
+			write(path.join(user, name), 'old\n');
+		}
+		const backup = path.join(user, '.ergopti-migrations/canonical-seeds/z.toml.legacy-seed');
+		fs.mkdirSync(path.dirname(backup), { recursive: true });
+		if (kind === 'conflict') fs.writeFileSync(backup, 'foreign\n');
+		else if (kind === 'link') fs.symlinkSync(path.join(user, 'z.toml'), backup);
+		else {
+			const fifo = childProcess.spawnSync('mkfifo', [backup], { encoding: 'utf8' });
+			if (fifo.status !== 0) fail(`could not create FIFO fixture: ${fifo.stderr}`);
+		}
+		const command = `source ${shellQuote(bashPath(MIGRATOR))}; migrate_canonical_packs ${shellQuote(bashPath(source))} ${shellQuote(bashPath(previous))} ${shellQuote(bashPath(user))}`;
+		const refused = childProcess.spawnSync(bashExecutable(), ['-c', command], {
+			encoding: 'utf8',
+			timeout: 3000
+		});
+		if (refused.error || refused.status === 0) fail(`${kind} backup was not promptly refused`);
+		for (const name of ['a.toml', 'z.toml']) {
+			if (fs.readFileSync(path.join(user, name), 'utf8') !== 'old\n')
+				fail(`${kind} backup changed ${name} before refusal`);
+		}
+		if (fs.existsSync(path.join(user, '.ergopti-canonical-packs-v2')))
+			fail(`${kind} backup incorrectly committed the migration`);
+	}
+
 	const oldCanonical = '[pack]\ncorrected = "old"\nremoved = true\n';
 	const newCanonical = '[pack]\ncorrected = "new"\nadded = true\n';
 	const oldCustomized = '[pack]\nvalue = "old default"\n';
@@ -144,8 +179,18 @@ try {
 	write(path.join(config, 'moved.toml'), movedPack);
 	write(path.join(installed, 'movededited.toml'), movedPack);
 	write(path.join(config, 'movededited.toml'), '[pack]\nmoved = "my edit"\n');
+	if (process.platform === 'linux') {
+		write(path.join(installed, 'linked.toml'), oldCanonical);
+		write(path.join(config, 'linked-target.txt'), oldCanonical);
+		fs.symlinkSync('linked-target.txt', path.join(config, 'linked.toml'));
+	}
 
 	runMigration(sourceN2, installed, config);
+	if (process.platform === 'linux') {
+		const linked = path.join(config, 'linked.toml');
+		if (!fs.lstatSync(linked).isSymbolicLink() || fs.readFileSync(linked, 'utf8') !== oldCanonical)
+			fail('a user-owned relative symlink must remain in its original directory');
+	}
 
 	const marker = path.join(config, '.ergopti-canonical-packs-v2');
 	const backup = path.join(
