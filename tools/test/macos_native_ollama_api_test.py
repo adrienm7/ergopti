@@ -50,6 +50,7 @@ if request.get('method'):
 if mode=='pid_change':identity['pid']=43
 if mode=='boolean_pid':identity['pid']=True
 if mode=='noncanonical_start':identity['start_seconds']='01234'
+if mode=='oversized_start':identity['start_seconds']='9'*5000
 receipt={'version':1,'success':mode!='admission','reason':'admission' if mode=='admission' else 'complete',
  'listener':None if mode=='admission' else identity}
 if mode=='duplicate':
@@ -127,6 +128,12 @@ class WireReceiving(unittest.TestCase):
 
     def discover(self):
         return self.api.discover("/private/verified/ollama", "123", "456", 11434, 2, 1)
+
+    def test_oversized_listener_number_is_a_closed_protocol_error(self):
+        os.environ["ERGOPTI_PEER_MODE"] = "oversized_start"
+        with self.assertRaises(self.api.ENGINE.NativeHTTPError) as caught:
+            self.discover()
+        self.assertEqual(caught.exception.reason, "protocol")
 
     def request(self):
         body = '{"model":"fixture"}'

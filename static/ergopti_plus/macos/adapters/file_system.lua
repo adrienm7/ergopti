@@ -489,7 +489,14 @@ function M.followed_mode(path)
 	local ok, followed, follow_err, errno = pcall(hs.fs.attributes, path)
 	if not ok then return "error", tostring(followed) end
 	if type(followed) == "table" then return "present", followed.mode end
-	if errno == 2 or tostring(follow_err):find("No such file", 1, true) then return "absent" end
+	-- hs.fs.attributes includes the filename in its error text. Match only the
+	-- terminal native reason, otherwise a filename containing that phrase can
+	-- turn a permission error into a false proof of absence.
+	local missing = "No such file or directory"
+	if errno == 2 or (errno == nil and type(follow_err) == "string"
+		and (follow_err == missing or follow_err:sub(-(#missing + 2)) == ": " .. missing)) then
+		return "absent"
+	end
 	return "error", tostring(follow_err or "cannot inspect the link target")
 end
 

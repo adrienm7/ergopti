@@ -11,6 +11,8 @@ local function with_filter(callback)
 		local c = { mode = "healthy", role = "AXTextField", subrole = nil,
 			bundle = "com.apple.Safari", ignored = false, focus_reads = 0, calls = {} }
 		local field = { attributeValue = function(_, attribute)
+			if attribute == "AXRole" and c.role_error then return nil, "Messaging failed" end
+			if attribute == "AXRole" and c.role_throws then error("AX role unavailable") end
 			if attribute == "AXRole" then return c.role end
 			if attribute == "AXSubrole" then return c.subrole end
 			return nil
@@ -29,10 +31,22 @@ local function with_filter(callback)
 			return field
 		end }
 		local front = { pid = function() if c.mode == "pid_error" then error("PID unavailable") end; return 4242 end,
-			bundleID = function() return c.bundle end, path = function() return "/Applications/Editor.app" end,
-			name = function() return "Editor" end }
-		_G.hs = { application = { frontmostApplication = function() return front end },
-			window = { focusedWindow = function() return { application = function() return front end } end },
+			bundleID = function() if c.mode == "bundle_error" then error("bundle unavailable") end; if c.mode == "bundle_bad" then return 7 end; return c.bundle end,
+			path = function() if c.mode == "path_error" then error("path unavailable") end; if c.mode == "path_bad" then return {} end; return "/Applications/Editor.app" end,
+			name = function() if c.mode == "name_error" then error("name unavailable") end; if c.mode == "name_bad" then return 7 end; return "Editor" end }
+		_G.hs = { application = { frontmostApplication = function()
+				if c.mode == "front_error" then error("front application unavailable") end
+				return front
+			end },
+			window = { focusedWindow = function()
+				if c.mode == "window_error" then error("focused window unavailable") end
+				if c.mode == "no_window" or c.mode == "front_error" then return nil end
+				return { application = function()
+					if c.mode == "window_app_error" then error("window application unavailable") end
+					if c.mode == "window_app_absent" then return nil end
+					return front
+				end }
+			end },
 			axuielement = { applicationElementForPID = function(pid)
 				helpers.assert_eq(pid, 4242)
 				if c.mode == "app_error" then error("AX application unavailable") end
@@ -72,6 +86,24 @@ helpers.describe("Native AX focus refusal in the AI app filter", function()
 			blocked(f, c, false, true, true, 1)
 		end)
 	end)
+	helpers.it("(native-ai-url-role) admits a known non-text browser role", function()
+		with_filter(function(f, c)
+			c.role = "AXButton"
+			blocked(f, c, false, true, false, 1)
+		end)
+	end)
+	for _, mode in ipairs({ "nil", "empty", "malformed", "native_error", "exception" }) do
+		helpers.it("(native-ai-url-role) blocks an unclassifiable browser role: " .. mode, function()
+			with_filter(function(f, c)
+				if mode == "nil" then c.role = nil
+				elseif mode == "empty" then c.role = ""
+				elseif mode == "malformed" then c.role = 7
+				elseif mode == "native_error" then c.role_error = true
+				else c.role_throws = true end
+				blocked(f, c, false, true, true, 1, "an unknown browser role cannot rule out a URL bar")
+			end)
+		end)
+	end
 	for _, filter in ipairs({ "secure", "url" }) do
 		helpers.it("(native-ai-focus) preserves nil-only absence with " .. filter .. " filtering", function()
 			with_filter(function(f, c)
@@ -108,6 +140,36 @@ helpers.describe("Native AX focus refusal in the AI app filter", function()
 			end)
 		end)
 	end
+	for _, mode in ipairs({ "bundle_error", "path_error", "name_error", "bundle_bad", "path_bad", "name_bad" }) do
+		helpers.it("(native-ai-metadata) blocks when the focused application's metadata raises: " .. mode, function()
+			with_filter(function(f, c)
+				c.mode = mode
+				blocked(f, c, false, false, true, 0, "an unreadable app cannot be checked against exclusions")
+			end)
+		end)
+	end
+	helpers.it("(native-ai-metadata) blocks a bundle error before URL classification", function()
+		with_filter(function(f, c)
+			c.mode = "bundle_error"
+			blocked(f, c, false, true, true, 0)
+		end)
+	end)
+	for _, mode in ipairs({ "window_error", "window_app_error", "window_app_absent", "front_error" }) do
+		helpers.it("(native-ai-focus-owner) blocks an unreadable focused application: " .. mode, function()
+			with_filter(function(f, c)
+				c.mode = mode
+				blocked(f, c, true, true, true, 0, "a failed window-owner read must not use another application")
+				helpers.assert_nil(f.focused_app_id())
+			end)
+		end)
+	end
+	helpers.it("(native-ai-focus-owner) retains frontmost fallback when no window exists", function()
+		with_filter(function(f, c)
+			c.mode = "no_window"
+			blocked(f, c, true, true, false, 1)
+			helpers.assert_eq(f.focused_app_id(), c.bundle)
+		end)
+	end)
 	for _, mode in ipairs({ "pid_error", "app_error", "app_absent" }) do
 		helpers.it("(native-ai-application) blocks when AX application acquisition fails: " .. mode, function()
 			with_filter(function(f, c)
