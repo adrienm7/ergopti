@@ -10,6 +10,15 @@ import ssl
 import subprocess
 import tempfile
 import threading
+import tomllib
+
+# The driver's cache folder under XDG_CACHE_HOME, read from the one declaration;
+# boot creates it and the updater only sends conditional requests when it exists.
+FOLDER = tomllib.loads(
+    (pathlib.Path(__file__).resolve().parents[3] / "_shared/modules/paths/app_dirs.toml").read_text(
+        encoding="utf-8"
+    )
+)["app"]["linux_folder_name"]
 
 
 def main():
@@ -17,7 +26,7 @@ def main():
     os.umask(0o077)
     with tempfile.TemporaryDirectory(prefix="ergopti-updater-release-tags-") as folder:
         root = pathlib.Path(folder)
-        (root / ".cache").mkdir()
+        (root / "cache" / FOLDER).mkdir(parents=True)
         cert, key = root / "cert.pem", root / "key.pem"
         subprocess.run(
             [

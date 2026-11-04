@@ -16,7 +16,6 @@ import time
 def run_case(mode):
     with tempfile.TemporaryDirectory(prefix="ergopti-updater-conditional-") as folder:
         root = pathlib.Path(folder)
-        (root / ".cache").mkdir()
         cert, key = root / "cert.pem", root / "key.pem"
         subprocess.run(
             [
