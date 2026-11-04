@@ -439,6 +439,10 @@ helpers.describe("release_installer: declared archive preference and historical 
 			function(value) value.release_install.macos_archives[1].asset_key = "missing" end,
 			function(value) value.release_install.macos_archives[1].format = "zip" end,
 			function(value) value.release_install.macos_archives[2] = value.release_install.macos_archives[1] end,
+			function(value)
+				value.release_assets.extra_zip = "Other.app.zip"
+				value.release_install.macos_archives[1] = { asset_key = "extra_zip", format = "zip" }
+			end,
 			function(value) value.release_install.macos_archives.future = {} end,
 			function(value) value.github.owner = "../foreign" end,
 		}) do
