@@ -569,9 +569,9 @@ _personal_metadata = function(path)
 	-- manager's layout) names the file it points to, so it is judged by what it
 	-- resolves to. Directory roots keep the no-follow policy below.
 	if _personal_file and path == _personal_root and luv and type(luv.fs_stat) == "function" then
-		local called, attributes = pcall(luv.fs_stat, path)
+		local called, attributes, _, code = pcall(luv.fs_stat, path)
 		if not called or type(attributes) ~= "table" or attributes.dev == nil or attributes.ino == nil then
-			return nil, "selected TOML file metadata is unavailable: " .. path
+			return nil, "selected TOML file metadata is unavailable: " .. path, called and code or nil
 		end
 		return { dev = attributes.dev, ino = attributes.ino, kind = attributes.type }
 	end
@@ -993,11 +993,15 @@ function M.start(opts)
 		local is_file = false
 		if selected then
 			_personal_file, _personal_root = true, clean_dir
-			local attributes = _personal_metadata(clean_dir)
+			local attributes, detail, code = _personal_metadata(clean_dir)
 			_personal_file, _personal_root = false, nil
 			if attributes == nil then
 				is_file = true
-				Logger.info(LOG, "Selected TOML file '%s' is absent; waiting for it to appear.", clean_dir)
+				if code == "ENOENT" then
+					Logger.info(LOG, "Selected TOML file '%s' is absent; waiting for it to appear.", clean_dir)
+				else
+					Logger.warn(LOG, "Selected TOML file metadata is unavailable: %s; retrying.", tostring(detail))
+				end
 			elseif _personal_regular_file(attributes) then
 				is_file = true
 			else
