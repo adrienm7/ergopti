@@ -342,6 +342,57 @@ helpers.describe("screen actions: a region read by an API model, answered by the
 		end)
 	end)
 
+	helpers.it("refuses a FIFO screenshot without sending its contents", function()
+		scenario({}, function(world)
+			local uv = require("luv")
+			helpers.assert_true(world.handlers.llm_screen_region("tap_3", "openai|gpt-4.1-mini"))
+			local capture = world.captures[1]
+			assert(os.remove(capture.path))
+			local made = os.execute("mkfifo '" .. capture.path .. "'")
+			assert(made == 0 or made == true)
+			-- Release a blocking reader so the regression fails rather than hanging.
+			local exited, process = false, nil
+			process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; printf x > "$1"', "fixture", capture.path } }, function()
+				exited = true
+				process:close()
+			end))
+			capture.on_done({ status = "ok", scaled = true })
+			while not exited do uv.run("once") end
+			helpers.assert_eq(#world.posts, 0, "special files must not be sent as screenshots")
+			helpers.assert_eq(uv.fs_lstat(capture.path), nil)
+			helpers.assert_eq(uv.fs_lstat(capture.dir), nil)
+		end)
+	end)
+
+	helpers.it("does not block checking an undeletable FIFO screenshot", function()
+		scenario({}, function(world)
+			local uv = require("luv")
+			helpers.assert_true(world.handlers.llm_screen_region("tap_3", "openai|gpt-4.1-mini"))
+			local capture = world.captures[1]
+			assert(os.remove(capture.path))
+			local made = os.execute("mkfifo '" .. capture.path .. "'")
+			assert(made == 0 or made == true)
+			local exited, exit_code, process = false, nil, nil
+			process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; printf x > "$1"', "fixture", capture.path } }, function(code)
+				exit_code, exited = code, true
+				process:close()
+			end))
+			local remove = os.remove
+			os.remove = function(path)
+				if path == capture.path then return nil, "injected deletion failure" end
+				return remove(path)
+			end
+			local ok, err = pcall(capture.on_done, { status = "ok", scaled = true })
+			os.remove = remove
+			remove(capture.path)
+			remove(capture.dir)
+			while not exited do uv.run("once") end
+			assert(ok, err)
+			helpers.assert_true(exit_code ~= 0, "cleanup opened the FIFO and consumed the writer")
+			helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+
 	helpers.it("captures, reads, drafts three answers in order, and types the accepted one", function()
 		scenario({}, function(world)
 			helpers.assert_eq(world.handlers.llm_screen_region("tap_3", "openai|gpt-4.1-mini"), true)
