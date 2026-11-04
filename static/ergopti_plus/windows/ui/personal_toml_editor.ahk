@@ -173,9 +173,11 @@ OpenPersonalEditor(DefaultSection := "") {
 
 	_SelectDropDown(SectionDrop, _PersonalEditorSection)
 
+	; The native handlers retain TOML insertion indexes; automatic header sorting
+	; would redirect a displayed selection to another durable entry.
 	; ── Entry list ──
 	LV := W.Add("ListView",
-		"xm y+10 w860 r12 -Multi +LV0x10000",
+		"xm y+10 w860 r12 -Multi +LV0x10000 NoSort",
 		[t("editor.hotstrings.col_trigger"), t("editor.hotstrings.col_result"), t("editor.hotstrings.col_word"), t("editor.hotstrings.col_auto"), t("editor.hotstrings.col_case"), t("editor.hotstrings.col_final"), t("editor.hotstrings.col_priority")])
 	LV.ModifyCol(1, 160)
 	LV.ModifyCol(2, 445)
