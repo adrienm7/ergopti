@@ -11,7 +11,7 @@
 ExternalUrl_IsHttp(Url) {
 	if !(Url is String)
 		return false
-	return RegExMatch(Url, "i)^https?://[^/?#\s\x00-\x1F\x7F][^\s\x00-\x1F\x7F]*$") > 0
+	return RegExMatch(Url, "i)^https?://[^/?#\s\x00-\x1F\x7F][^\s\x00-\x1F\x7F]*\z") > 0
 }
 
 ExternalUrl_OpenHttp(Url, RunFn := 0) {

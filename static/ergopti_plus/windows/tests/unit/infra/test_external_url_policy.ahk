@@ -18,6 +18,8 @@ _ExternalUrlPolicy_Allowlist() {
 		"javascript:alert(1)",
 		"https:///missing-host",
 		"https://safe.example/path`nfile:///C:/fixture.txt",
+		"https://safe.example/path`n",
+		"https://safe.example/path`r`n",
 		123
 	]
 
