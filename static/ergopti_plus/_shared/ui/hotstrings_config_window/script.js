@@ -211,8 +211,8 @@ function bindDelay(field, cat, sec) {
 	field.classList.toggle('overridden', !!overridden);
 
 	input.addEventListener('change', () => {
-		const v = parseInt(input.value, 10);
-		if (Number.isFinite(v) && v >= 0) {
+		const v = Number(input.value);
+		if (input.value !== '' && Number.isSafeInteger(v) && v >= 0) {
 			send({
 				action: 'set_delay',
 				category: cat.name,
@@ -253,8 +253,8 @@ function bindPriority(field, cat, sec) {
 	field.classList.toggle('overridden', !!overridden);
 
 	input.addEventListener('change', () => {
-		const v = parseInt(input.value, 10);
-		if (Number.isFinite(v) && v >= 0 && v <= 100) {
+		const v = Number(input.value);
+		if (input.value !== '' && Number.isSafeInteger(v) && v >= 0 && v <= 100) {
 			send({
 				action: 'set_priority',
 				category: cat.name,

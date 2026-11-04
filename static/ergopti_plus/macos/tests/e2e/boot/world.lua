@@ -1302,6 +1302,10 @@ function M.install(hs, options)
 	install_natives(hs, env, options.arch, options.machine_root)
 	install_extension_searcher(hs)
 	install_file_system(hs, options)
+	-- This headless world models an empty SQLite database, including the native
+	-- backup/revision protocol used by first-run aggregate recovery.
+	require("tests.e2e.boot.empty_sqlite").install(hs,
+		options.app_root .. "/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared")
 	hs.configdir = env.ERGOPTI_CONFIG_DIR
 	local real_exit = os.exit
 	os.exit = function(code)

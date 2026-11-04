@@ -33,6 +33,17 @@ local function read_source(selector)
 	return source
 end
 
+local function upvalue(fn, wanted, replacement)
+	for index = 1, math.huge do
+		local name, current = debug.getupvalue(fn, index)
+		assert(name, "missing production ownership: " .. wanted)
+		if name == wanted then
+			if replacement then debug.setupvalue(fn, index, replacement) end
+			return current
+		end
+	end
+end
+
 helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", function()
 	helpers.it("defers the foreign watermark until the derived callback succeeds", function()
 		local source = read_source("function M._last_complete_batch_offset") -- modules/keystats/export.lua
@@ -87,9 +98,12 @@ helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", func
 	helpers.it("rebuilds only the imported device before invalidating UI snapshots", function()
 		local source = read_source("local function _mark_aggregate_cache_rebuilt") -- modules/keystats/log_manager.lua
 		local callback_pos = assert(source:find("_sync_foreign_data_sql(function(device_id)", 1, true))
-		local rebuild_pos = assert(source:find("_rebuild_aggregates_from_raw(db, { device_id })", callback_pos, true))
-		local mark_pos = assert(source:find("_mark_aggregate_cache_rebuilt(db, true)", rebuild_pos, true))
-		helpers.assert_true(callback_pos < rebuild_pos and rebuild_pos < mark_pos,
+		local rebuild_pos = assert(source:find("_publish_rebuilt_partitions(db, { device_id })", callback_pos, true))
+		local owner_pos = assert(source:find("local function _publish_rebuilt_partitions", 1, true))
+		local revision_pos = assert(source:find('Queries.render("meta.rev_bump", "native")', owner_pos, true))
+		local publish_pos = assert(source:find("RebuildSnapshot.publish(snapshot, _sq(device), finish_sql)", revision_pos, true))
+		helpers.assert_true(owner_pos < revision_pos and revision_pos < publish_pos
+			and publish_pos < callback_pos and callback_pos < rebuild_pos,
 			"foreign rows must be rebuilt and invalidate the DB revision before their watermark advances")
 		helpers.assert_true(source:find("DERIVED_DEVICE_TABLES", 1, true) ~= nil,
 			"rebuild must clear the old additive aggregate partition before replaying raw rows")
@@ -152,6 +166,15 @@ helpers.describe("keystats-device-log-privacy", function()
 					end,
 				}
 				local manager = EmptyLedger.load()
+				local publish = upvalue(manager.ingest_once, "_publish_rebuilt_partitions")
+				upvalue(publish, "_typing_replay_cutoffs", function() return {} end)
+				upvalue(publish, "RebuildSnapshot", {
+					witness = function() return {} end,
+					same = function() return true end,
+					open = function() return { db = db, captured = {} } end,
+					publish = function() error("failed replay must not publish") end,
+					close = function() return true end,
+				})
 				manager.ingest_once()
 				helpers.assert_eq(calls, 1)
 				helpers.assert_eq(applied, false)

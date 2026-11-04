@@ -137,7 +137,7 @@ helpers.describe("keystats/log_manager: fresh cache id ownership", function()
 		helpers.assert_true(recovery ~= nil, "the recovery coroutine body must be locatable")
 		local replay = assert(recovery:find("_replay_local_data_sql(db, replay_state)", 1, true))
 		local persist = recovery:find("_persist_recovery_state(db, cursor)", 1, true)
-		local rebuild = assert(recovery:find("_rebuild_aggregates_from_raw(db)", 1, true))
+		local rebuild = assert(recovery:find("_publish_rebuilt_partitions(db)", 1, true))
 		helpers.assert_true(persist ~= nil and replay < persist and persist < rebuild,
 			"the replay cursor and id counter must be published before the aggregate rebuild can fail")
 	end)

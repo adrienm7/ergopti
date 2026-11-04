@@ -54,6 +54,8 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local PowerSource = require("adapters.power_source")
 local LOG     = "keystats.log_manager"
 
+local TextCipher = require("modules.keystats.text_cipher")
+local RebuildSnapshot = require("modules.keystats.rebuild_snapshot")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local Aggregator   = require("modules.keystats.aggregator")
 local Rotation     = require("modules.keystats.rotation")
@@ -171,6 +173,7 @@ local _pending_rollover = false
 --- The one running cooperative aggregate recovery, or nil. It owns the shared
 --- Aggregator state while it runs, so ingest waits for it (today.log buffers).
 local _recovery = nil
+local _staging_recovery = false
 
 --- Runtime fence mirroring the durable pending replay row until publication commits.
 local _local_ledger_replay_pending = false
@@ -1301,7 +1304,7 @@ end
 ---@return table|nil progress
 local function _running_recovery_progress()
 	local job = _recovery
-	if job == nil or coroutine.running() ~= job.co then return nil end
+	if _staging_recovery or job == nil or coroutine.running() ~= job.co then return nil end
 	return job.progress
 end
 
@@ -1314,7 +1317,7 @@ local function _flush_recovery_batch(db)
 		Logger.error(LOG, "Cannot begin aggregate recovery transaction: %s.", db:errmsg() or "?")
 		return false
 	end
-	local ok, flushed_or_err = pcall(Aggregator.flush)
+	local ok, flushed_or_err = pcall(Aggregator.flush, db)
 	if not ok or not flushed_or_err then
 		pcall(function() db:exec("ROLLBACK;") end)
 		Logger.error(LOG, "Aggregate recovery flush failed: %s.", tostring(flushed_or_err or "pending aggregate rows"))
@@ -1630,12 +1633,29 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 					range = range .. after_resume_point("typing", segment)
 					for row in db:nrows("SELECT ts, app, title, layout, events_json, id FROM events_typing WHERE device_id="
 						.. quoted_device .. range .. " ORDER BY ts, id") do
-						local decoded_ok, events = pcall(json.decode, row.events_json or "[]")
-						if decoded_ok and type(events) == "table" then
-							Aggregator.walk_typing({ timestamp=row.ts, app=row.app, title=row.title, layout=row.layout, events=events })
-							reached("typing", segment, row)
-							if not walked() then error("typing aggregate flush failed") end
+						local decrypt_ok, plaintext = pcall(TextCipher.decrypt, row.events_json)
+						if not decrypt_ok or type(plaintext) ~= "string" then error("typing event decryption failed", 0) end
+						-- The producer writes an event array; older empty records may be
+						-- encoded as {}. A JSON object or sparse/malformed array must not
+						-- be certified as an empty successful reconstruction.
+						if not plaintext:match("^%s*%[") and not plaintext:match("^%s*{%s*}%s*$") then
+							error("typing event shape refused", 0)
 						end
+						local decoded_ok, events = pcall(json.decode, plaintext)
+						if not decoded_ok or type(events) ~= "table" then error("typing event decoding failed", 0) end
+						local count = 0
+						for key, event in pairs(events) do
+							count = count + 1
+							if math.type(key) ~= "integer" or key < 1 or type(event) ~= "table"
+								or type(event[1]) ~= "string" then error("typing event shape refused", 0) end
+						end
+						for index = 1, count do
+							if events[index] == nil then error("typing event shape refused", 0) end
+						end
+						Aggregator.walk_typing({ timestamp=row.ts, app=row.app, title=row.title, layout=row.layout, events=events })
+						plaintext = nil
+						reached("typing", segment, row)
+						if not walked() then error("typing aggregate flush failed") end
 					end
 					if upper ~= nil then
 						-- Discard the retired generation, then retain any cache-only outbox rows above it.
@@ -1701,6 +1721,113 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 	return true
 end
 
+--- Rebuild each partition in a private SQLite snapshot, then atomically publish
+--- only if the canonical handle and its complete change witness are unchanged.
+--- No intermediate stage cursor is durable: an interrupted job starts again.
+local _aggregate_cache_revision
+local function _publish_rebuilt_partitions(owner, requested_device_ids)
+	local devices, seen = {}, {}
+	local function add(id)
+		if type(id) == "string" and id ~= "" and not seen[id] then
+			seen[id] = true; devices[#devices + 1] = id
+		end
+	end
+	local initial = RebuildSnapshot.witness(owner)
+	if not initial or SqliteWriter.get_db() ~= owner then return false end
+	if type(requested_device_ids) == "table" then
+		for _, id in ipairs(requested_device_ids) do add(id) end
+	else
+		local enumerated = pcall(function()
+			for row in owner:nrows([[SELECT DISTINCT device_id FROM (
+				SELECT device_id FROM events_typing UNION SELECT device_id FROM events_app_switch
+				UNION SELECT device_id FROM events_window_switch UNION SELECT device_id FROM events_system
+			) ORDER BY device_id;]]) do add(row.device_id) end
+		end)
+		if not enumerated then return false end
+		for i = #devices, 1, -1 do if devices[i] == _device_id then table.remove(devices, i) end end
+		seen[_device_id] = nil; add(_device_id)
+	end
+	if #devices == 0 then return true end
+	-- Revoke the old global certificate before publishing any partition. The
+	-- same lock verifies that enumeration observed the captured source.
+	local previous_revision, begin_open = nil, false
+	local fenced = pcall(function()
+		assert(owner:exec("BEGIN IMMEDIATE;") == sqlite3.OK, "rebuild fence refused")
+		begin_open = true
+		assert(SqliteWriter.get_db() == owner and RebuildSnapshot.same(initial, RebuildSnapshot.witness(owner)), "source changed")
+		previous_revision = _aggregate_cache_revision(owner)
+		assert(owner:exec("INSERT OR REPLACE INTO meta(key,value) VALUES('aggregate_cache_revision','0');") == sqlite3.OK,
+			"cannot revoke old certificate")
+		initial = assert(RebuildSnapshot.witness(owner), "cannot observe fenced source")
+		assert(owner:exec("COMMIT;") == sqlite3.OK, "cannot commit rebuild fence")
+		begin_open = false
+	end)
+	if not fenced then
+		if begin_open then
+			local rolled, rc = pcall(owner.exec, owner, "ROLLBACK;")
+			if not rolled or rc ~= sqlite3.OK then SqliteWriter.quarantine_db(owner) end
+		end
+		return false
+	end
+	local job = _recovery
+	local snapshot, failure, poisoned = RebuildSnapshot.open(owner, sqlite3, DERIVED_DEVICE_TABLES,
+		SqliteWriter.get_db, _recovery_pace, timer.absoluteTime, function(cleanup)
+			if job and coroutine.running() == job.co then job.stage_cleanup = cleanup end
+		end, { acquire = SqliteWriter.acquire_backup_source, release = SqliteWriter.release_backup_source })
+	if not snapshot then
+		if poisoned then SqliteWriter.quarantine_db(owner) end
+		if job then job.stage_cleanup = nil end
+		Logger.error(LOG, "Cannot create aggregate reconstruction snapshot: %s.", tostring(failure))
+		return false
+	end
+	local worked, accepted = pcall(function()
+		if not RebuildSnapshot.same(initial, snapshot.captured) then return false end
+		-- Refuse any unproved ledger before publishing the first partition.
+		for _, device in ipairs(devices) do
+			local ok, cutoffs = pcall(_typing_replay_cutoffs, snapshot.db, device)
+			if not ok or not cutoffs then return false end
+		end
+		for index, device in ipairs(devices) do
+			_staging_recovery = true
+			local walked, result = pcall(_rebuild_aggregates_from_raw, snapshot.db, { device })
+			_staging_recovery = false
+			if not walked or result ~= true then return false end
+			-- Every published partition invalidates readers even if a later
+			-- partition fails; only the last can certify the whole rebuild.
+			local finish_sql = Queries.render("meta.rev_bump", "native")
+			if index == #devices then
+				local full = requested_device_ids == nil
+				local compatible = full or previous_revision == AGGREGATE_CACHE_REVISION
+				local parts = {}
+				if compatible then
+					local encoded_ok, context = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+					if not encoded_ok or type(context) ~= "string" then return false end
+					parts[#parts + 1] = "UPDATE meta SET value=" .. _sq(context) .. " WHERE key='ngram_ctx_json';"
+					parts[#parts + 1] = "UPDATE meta SET value=" .. _sq(AGGREGATE_CACHE_REVISION) .. " WHERE key='aggregate_cache_revision';"
+					parts[#parts + 1] = "DELETE FROM meta WHERE key=" .. _sq(RECOVERY_PROGRESS_KEY) .. ";"
+				end
+				parts[#parts + 1] = Queries.render("meta.rev_bump", "native")
+				finish_sql = table.concat(parts, "\n")
+			end
+			local published, next_witness, poisoned = RebuildSnapshot.publish(snapshot, _sq(device), finish_sql)
+			if poisoned then SqliteWriter.quarantine_db(owner) end
+			if not published then return false end
+			snapshot.captured = next_witness
+			-- Do not recopy already published partitions into the next attachment.
+			for _, name in ipairs(DERIVED_DEVICE_TABLES) do
+				if snapshot.db:exec("DELETE FROM temp." .. name .. " WHERE device_id=" .. _sq(device) .. ";") ~= sqlite3.OK then
+					return false
+				end
+			end
+		end
+		return true
+	end)
+	_staging_recovery = false
+	local closed = RebuildSnapshot.close(snapshot)
+	if job then job.stage_cleanup = nil end
+	return worked and accepted == true and closed
+end
+
 --- Synchronise cache metadata after a successful fresh-cache recovery.
 ---@param db userdata
 ---@param cursor table
@@ -1751,7 +1878,7 @@ end
 --- Return the aggregate-cache compatibility marker from meta.
 ---@param db userdata
 ---@return string
-local function _aggregate_cache_revision(db)
+_aggregate_cache_revision = function(db)
 	local revision = "0"
 	for row in db:nrows("SELECT value FROM meta WHERE key='aggregate_cache_revision'") do
 		revision = tostring(row.value or "0")
@@ -1954,12 +2081,10 @@ local function _recover_aggregate_cache(db, replay_state)
 	-- walk leaves them to ingest, whose partition rebuild counts what they add:
 	-- a row imported here could land before its resume point and never be walked.
 	if _running_recovery_progress() == nil then _sync_foreign_data_sql() end
-	if not _rebuild_aggregates_from_raw(db) then
+	if not _publish_rebuilt_partitions(db) then
 		Logger.error(LOG, "Aggregate cache recovery failed; raw events remain durable for retry.")
-	elseif _mark_aggregate_cache_rebuilt(db) then
-		Logger.success(LOG, "Rebuilt aggregate cache from durable raw ledgers.")
 	else
-		Logger.error(LOG, "Aggregate cache rebuild completed but could not be marked for reuse.")
+		Logger.success(LOG, "Rebuilt aggregate cache from durable raw ledgers.")
 	end
 end
 
@@ -2016,6 +2141,12 @@ local function _run_recovery_slice(job)
 		Logger.error(LOG, "Aggregate cache recovery raised: %s.", tostring(resume_err))
 	end
 	if coroutine.status(job.co) == "dead" then
+		if job.stage_cleanup then
+			local ok, cleaned = pcall(job.stage_cleanup)
+			if not ok or not cleaned then return end
+			job.stage_cleanup = nil
+		end
+		_staging_recovery = false
 		if job.durability_off and not _restore_replay_durability(job.db, job) then return end
 		_recovery = nil
 		if not _local_ledger_replay_pending then _restore_live_aggregator(job.db) end
@@ -2040,7 +2171,8 @@ local function _start_aggregate_recovery(db, replay_state)
 	local job = { db = db, slices = 0, started_ns = timer.absoluteTime(), handle = nil }
 	job.co = coroutine.create(function() _recover_aggregate_cache(db, replay_state) end)
 	-- A pending ledger replay means a fresh cache: nothing of a rebuild survived.
-	job.progress = replay_state == nil and _read_recovery_progress(db) or nil
+	-- Staging is private and transient; a restarted process rebuilds all partitions.
+	job.progress = nil
 	if job.progress ~= nil then
 		Logger.info(LOG, "Aggregate cache recovery resumes at device %d of %d (%s).",
 			job.progress.index, #job.progress.devices, tostring(job.progress.stage))
@@ -2066,8 +2198,12 @@ _cancel_aggregate_recovery = function()
 			pcall(Logger.error, LOG, "Aggregate recovery timer cleanup remains pending: %s.", tostring(cancelled))
 		end
 	end
+	if job.stage_cleanup then
+		local ok, cleaned = pcall(job.stage_cleanup)
+		if not ok or not cleaned then settled = false else job.stage_cleanup = nil end
+	end
 	if job.durability_off and not _restore_replay_durability(job.db, job) then settled = false end
-	if settled then _recovery = nil end
+	if settled then _staging_recovery = false; _recovery = nil end
 	pcall(Logger.warn, LOG, "Aggregate cache recovery interrupted after %d slice(s); it continues at the next start.",
 		job.slices)
 	if not _local_ledger_replay_pending then pcall(_restore_live_aggregator, job.db) end
@@ -2112,10 +2248,16 @@ function M.ingest_once()
 	if not db then return end
 
 	local foreign_devices = _sync_foreign_data_sql(function(device_id)
-		if not _rebuild_aggregates_from_raw(db, { device_id }) then return false end
-		return _mark_aggregate_cache_rebuilt(db, true)
+		return _publish_rebuilt_partitions(db, { device_id })
 	end)
 	trace.mark("foreign")
+	-- Foreign reconstruction can quarantine and consume the exact writer. Never
+	-- use the handle captured before that callback without reacquiring ownership.
+	if SqliteWriter.get_db() ~= db then
+		Logger.error(LOG, "Ingest stopped after its SQLite writer was quarantined.")
+		trace.finish()
+		return false
+	end
 	-- A previous cache transaction may have committed while data.sql was locked.
 	-- Drain that exact source batch first so a tmp-cache loss can never make it
 	-- invisible to sync/replay, and so we never allocate new ids for old JSONL.
@@ -2388,11 +2530,11 @@ M.ROLLOVER_WAITS_FOR_RECOVERY = "recovering"
 --- @return string|nil reason ROLLOVER_WAITS_FOR_RECOVERY when nothing was tried.
 function M.day_rollover()
 	if not _require_state("day_rollover") then return false end
+	if _recovery ~= nil or _local_ledger_replay_pending then return false, M.ROLLOVER_WAITS_FOR_RECOVERY end
 	if _pending_rollover then return _resume_pending_rollover() end
 	-- Ingest waits for the recovery, so a drain could only report a stall. On a
 	-- months-old ledger on battery that lasted 33 min over midnight, with three
 	-- warnings at each tick (field report 2026-11-02); today.log loses nothing.
-	if _recovery ~= nil or _local_ledger_replay_pending then return false, M.ROLLOVER_WAITS_FOR_RECOVERY end
 
 	-- read_new_entries caps at INGEST_BATCH_LINES per call, so a single
 	-- ingest_once may leave data behind. Loop until empty or stalled to prevent

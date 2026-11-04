@@ -63,6 +63,8 @@ local _device_id = nil
 
 --- Open SQLite handle. nil until M.open_db() succeeds.
 local _db = nil
+-- A native backup keeps this exact source handle live across paced steps.
+local _backup_source_lease = nil
 
 --- Unadmitted startup handle whose native SQLite close refused cleanup.
 local _startup_db_debt = nil
@@ -414,7 +416,7 @@ end
 --- Close the SQLite handle cleanly without losing retry ownership.
 --- @return boolean closed True only after SQLite accepted close and no startup file debt remains.
 function M.close_db()
-	if _terminal_db_close_debt ~= nil then return false end
+	if _backup_source_lease ~= nil or _terminal_db_close_debt ~= nil then return false end
 	local db = _startup_db_debt or _db
 	if db == nil then return _schema_close_debt == nil end
 	local closed, retryable = _close_owned_db(db)
@@ -428,6 +430,43 @@ function M.close_db()
 	if _db == db then _db = nil end
 	if _startup_db_debt == db then _startup_db_debt = nil end
 	return _db == nil and _startup_db_debt == nil and _schema_close_debt == nil
+end
+
+--- Retain the exact source while native SQLite backup steps may yield.
+function M.acquire_backup_source(expected)
+	if _db == nil or _db ~= expected or _backup_source_lease ~= nil then return false end
+	_backup_source_lease = expected
+	return true
+end
+
+--- Release only the lease whose backup handle has been consumed.
+function M.release_backup_source(expected)
+	if _backup_source_lease ~= expected or expected == nil then return false end
+	_backup_source_lease = nil
+	if _startup_db_debt == expected then
+		local closed, retryable = _close_owned_db(expected)
+		if closed or not retryable then _startup_db_debt = nil end
+		-- The lease is released; get_db() still refuses the quarantined owner.
+		return true
+	end
+	return true
+end
+
+--- Quarantine the exact writer after an uncertain transaction. No other writer
+--- method may observe it while native cleanup is pending.
+--- @param expected userdata The exact handle whose rollback or detach failed.
+--- @return boolean retired True only when native close confirmed retirement.
+function M.quarantine_db(expected)
+	if _db == nil or _db ~= expected then return false end
+	local db = _db
+	_db = nil
+	_startup_db_debt = db
+	-- Never close a source while a backup retains it. The lease release retires
+	-- this unpublished exact owner as soon as finish consumes the backup.
+	if _backup_source_lease == db then return false end
+	local closed, retryable = _close_owned_db(db)
+	if closed or not retryable then _startup_db_debt = nil end
+	return closed
 end
 
 --- Return the raw SQLite handle. Log manager uses this for ingest transactions.

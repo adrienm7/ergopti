@@ -786,6 +786,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hotstrings-config-zero-delay.cjs"],
 			"repro": "node tools/test/test-hotstrings-config-zero-delay.cjs"
+		},
+		{
+			"id": "js-hotstrings-config-number-input",
+			"ordinal": 583,
+			"name": "hotstring numeric settings retain the entered numeric value",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstrings-config-number-input.cjs"],
+			"repro": "node tools/test/test-hotstrings-config-number-input.cjs"
 		}
 	]
 }

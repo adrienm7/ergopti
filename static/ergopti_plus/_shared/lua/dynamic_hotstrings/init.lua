@@ -293,46 +293,34 @@ end
 -- ==========================================
 -- ==========================================
 
+-- Capture one local-calendar snapshot for all components. Separate os.date
+-- calls can cross midnight and combine a weekday with another calendar day.
+local function date_strings()
+	local day = os.date("*t")
+	local days = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
+	local months = { "janvier", "février", "mars", "avril", "mai", "juin",
+		"juillet", "août", "septembre", "octobre", "novembre", "décembre" }
+	return {
+		iso = string.format("%04d_%02d_%02d", day.year, day.month, day.day),
+		fr = string.format("%02d/%02d/%04d", day.day, day.month, day.year),
+		long_fr = days[day.wday] .. " " .. day.day .. " " .. months[day.month] .. " " .. day.year,
+	}
+end
+
 --- Registers the three standard date rules (ISO, French short, French long).
---- Called by each driver's start() function after the engine is initialized.
---- @param trigger string The trigger character (e.g. "★") — used only for logging.
+--- @param trigger string The trigger character, used only for logging.
 function M.register_date_rules(trigger)
 	local t = trigger or "★"
-
 	M.add_rule("td", "date", function() return os.date("%Y_%m_%d") end, true)
 	M.add_rule("dt", "datefr", function() return os.date("%d/%m/%Y") end, true)
-	M.add_rule("date", "datelongfr", function()
-		local days   = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
-		local months = { "janvier", "février", "mars", "avril", "mai", "juin",
-		                 "juillet", "août", "septembre", "octobre", "novembre", "décembre" }
-		local wday = tonumber(os.date("%w")) + 1  -- os.date %w: 0 = Sunday
-		local mday = tonumber(os.date("%d"))
-		local mon  = tonumber(os.date("%m"))
-		local year = os.date("%Y")
-		return days[wday] .. " " .. mday .. " " .. months[mon] .. " " .. year
-	end, true)
-
+	M.add_rule("date", "datelongfr", function() return date_strings().long_fr end, true)
 	Logger.info(LOG, "Date rules registered (trigger='%s').", t)
 end
 
-
---- Resolves today's date strings for section descriptions.
---- Returns a table with iso, fr, and long_fr fields so callers can embed
---- live date previews in UI section labels without reimplementing os.date logic.
+--- Resolves all section date previews from one local-calendar snapshot.
 --- @return table {iso, fr, long_fr}
 function M.today_date_strings()
-	local days   = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
-	local months = { "janvier", "février", "mars", "avril", "mai", "juin",
-	                 "juillet", "août", "septembre", "octobre", "novembre", "décembre" }
-	local wday   = tonumber(os.date("%w")) + 1
-	local mday   = tonumber(os.date("%d"))
-	local mon    = tonumber(os.date("%m"))
-	local year   = os.date("%Y")
-	return {
-		iso     = os.date("%Y_%m_%d"),
-		fr      = os.date("%d/%m/%Y"),
-		long_fr = days[wday] .. " " .. mday .. " " .. months[mon] .. " " .. year,
-	}
+	return date_strings()
 end
 
 return M
