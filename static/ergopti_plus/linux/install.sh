@@ -1120,12 +1120,20 @@ if $INSTALL_SERVICE; then
 	# rewritten and everything else is taken verbatim.
 	source "${SRC_DRIVER}/install/desktop_entry.sh"
 	SERVICE_EXEC="$(ergopti_systemd_exec "${BIN_DIR}/ergopti-hotstrings")"
+	SERVICE_TMP="$(mktemp "${SYSTEMD_DIR}/.ergopti-service.XXXXXX")"
 	while IFS= read -r service_line || [ -n "$service_line" ]; do
 		case "$service_line" in
 			ExecStart=*) printf '%s\n' "$SERVICE_EXEC" ;;
 			*) printf '%s\n' "$service_line" ;;
 		esac
-	done < "${SRC_DRIVER}/ergopti-hotstrings.service" > "${SYSTEMD_DIR}/ergopti-hotstrings.service"
+	done < "${SRC_DRIVER}/ergopti-hotstrings.service" > "$SERVICE_TMP"
+	chmod 0644 "$SERVICE_TMP"
+	# Publish only complete service bytes. Truncating the live unit in place
+	# would leave an existing installation unable to start after an interruption.
+	if ! mv -f -- "$SERVICE_TMP" "${SYSTEMD_DIR}/ergopti-hotstrings.service"; then
+		rm -f -- "$SERVICE_TMP"
+		exit 1
+	fi
 
 	# Guarded, because systemd is not universal: Alpine runs OpenRC, Void runs
 	# runit, and Gentoo may run either. Those systems get the XDG autostart entry

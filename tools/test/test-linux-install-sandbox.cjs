@@ -112,6 +112,13 @@ function runInstaller(scenario) {
 		'systemctl',
 		`${log}\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service disabled enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
 	);
+	if (scenario.refuseUnitPublish) {
+		stub(
+			stubs,
+			'mv',
+			'for arg in "$@"; do case "$arg" in */ergopti-hotstrings.service) exit 1 ;; esac; done\nexec /usr/bin/mv "$@"'
+		);
+	}
 	if (process.platform === 'win32') {
 		stub(
 			stubs,
@@ -743,6 +750,31 @@ for (const kind of [
 		);
 		assert.notEqual(modified.status, 0, 'a modified service must not be claimed');
 		assert.match(fs.readFileSync(unit, 'utf8'), /# user modification/);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A failed service publication keeps the previous unit complete.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		refuseUnitPublish: true,
+		seed(home, configRoot) {
+			const unit = path.join(configRoot, 'systemd/user/ergopti-hotstrings.service');
+			fs.mkdirSync(path.dirname(unit), { recursive: true });
+			fs.writeFileSync(
+				unit,
+				`[Service]\nExecStart=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\n# previous unit\n`
+			);
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, 'refused publication must stop installation');
+		assert.equal(
+			fs.readFileSync(path.join(run.configRoot, 'systemd/user/ergopti-hotstrings.service'), 'utf8'),
+			`[Service]\nExecStart=${bashPath(run.home)}/.local/bin/ergopti-hotstrings --tray\n# previous unit\n`
+		);
 	} finally {
 		run.cleanup();
 	}
