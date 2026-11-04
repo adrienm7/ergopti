@@ -107,11 +107,8 @@ end
 --- @return string|nil content
 local function read_shared(relative)
 	local path = Paths.shared(relative)
-	local fh = path and io.open(path, "r") or nil
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	return content
+	if not path then return nil end
+	return require("infra.regular_file_reader").read_source(path)
 end
 
 local function locale_strings(code)

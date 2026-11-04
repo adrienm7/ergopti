@@ -38,10 +38,8 @@ local normalise_name = ModelCatalogue.normalise_name
 local function load_catalogue()
 	if _catalogue then return _catalogue end
 	local path = Paths.shared("modules/llm/models.json")
-	local handle = path and io.open(path, "r") or nil
-	if not handle then return nil end
-	local body = handle:read("*a")
-	handle:close()
+	local body = path and require("infra.regular_file_reader").read_source(path) or nil
+	if not body then return nil end
 	local ok, decoded = pcall(Json.decode, body)
 	if not ok or type(decoded) ~= "table" then
 		Logger.error(LOG, "Shared model catalogue could not be decoded.")

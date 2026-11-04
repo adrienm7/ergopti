@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.ui.test_shared_catalogue_sources",
 	"tests.unit.modules.llm.runtime.test_shared_loader_sources",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_semantic_controls",
 	"tests.unit.adapters.layout.test_xkb_capture_semantic_controls",
