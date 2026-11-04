@@ -145,12 +145,13 @@ local DEFAULT_DEPS = {
 	has_command = function(name) return ShellRunner.has_command(name) end,
 	private_dir = private_dir,
 	write_file = function(path, content)
-		local fh = io.open(path, "wb")
-		if not fh then return false end
-		-- A buffered write is not a complete calendar until close acknowledges it.
+		local fh, _, _, remove_owned, current_image = require("infra.regular_file_writer").open(path, "wx")
+		if not fh then return false, nil, nil, false end
+		-- Retain the native cleanup receipt even on an incomplete write.
 		local wrote, written = pcall(fh.write, fh, content)
 		local closed, flushed = pcall(fh.close, fh)
-		return wrote and written ~= nil and written ~= false and closed and flushed == true
+		return wrote and written ~= nil and written ~= false and closed and flushed == true,
+			remove_owned, current_image, true
 	end,
 	remove = function(path) return os.remove(path) end,
 	utc_stamp = function() return os.date("!%Y%m%dT%H%M%SZ") end,
@@ -182,7 +183,16 @@ function M.cleanup()
 			kept[#kept + 1] = file
 		else
 			local removed_file = true
-			if file.path then
+			if file.remove_owned then
+				local called, removed = pcall(file.remove_owned)
+				removed_file = called and removed == true
+				if not removed_file then
+					local checked, kind, _, code = pcall(function()
+						return require("infra.native_directory").target_kind(file.path)
+					end)
+					removed_file = checked and kind == nil and code == "ENOENT"
+				end
+			elseif file.path then
 				local removed, _, errno = _deps.remove(file.path)
 				removed_file = removed or errno == 2 -- Already absent after an interrupted write.
 			end
@@ -354,8 +364,14 @@ local function open_ics(config, action, on_done, frame)
 	local path = dir .. "/" .. (action.type == "calendar" and "event" or "task") .. ".ics"
 	if _stopping then return false end
 	pending.path = path
-	local written = _deps.write_file(path, content)
+	local written, remove_owned, current_image, owned = _deps.write_file(path, content)
+	if owned == false then pending.path = nil end
+	if type(remove_owned) == "function" then pending.remove_owned = remove_owned end
 	if _stopping then return false end
+	if written and type(current_image) == "function" then
+		local checked, current = pcall(current_image, content)
+		written = checked and current == true
+	end
 	if not written then
 		M.cleanup()
 		on_done(false, "the calendar file could not be written")

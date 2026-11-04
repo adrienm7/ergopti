@@ -155,6 +155,53 @@ helpers.describe("agent file completion receipts", function()
 	end
 end)
 
+helpers.it("calendar refuses an existing FIFO without removing it", function()
+	with_files("modules.llm.agent_connectors", function(Connector, dir)
+		local uv = require("luv")
+		local private, path = dir .. "/calendar", dir .. "/calendar/task.ics"
+		assert(uv.fs_mkdir(private, 448))
+		local made = os.execute("mkfifo " .. Shell.quote(path)); assert(made == 0 or made == true)
+		local starts = 0
+		Connector._set_deps_for_test({ private_dir = function() return private end,
+			random_hex = function() return "00ff" end, utc_stamp = function() return "20261023T120000Z" end,
+			run = function(_, _, _, callback) starts = starts + 1; callback({ ok = true, code = 0 }); return {} end })
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/llm/agent.json", "r"))
+		local config = assert(Json.decode(file:read("*a"))); assert(file:close())
+		local exited, process = false, nil
+		process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$1" > /dev/null', "fixture", path } }, function()
+			exited = true; process:close()
+		end))
+		local called, started = pcall(Connector.run, config, { type = "reminder", title = "Owned reminder" }, function() end)
+		local remains = uv.fs_lstat(path)
+		os.remove(path); os.remove(private)
+		while not exited do uv.run("once") end
+		assert(called, started)
+		helpers.assert_eq(started, false)
+		helpers.assert_eq(starts, 0)
+		helpers.assert_eq(remains and remains.type, "fifo", "a refused foreign FIFO is not ours to delete")
+	end)
+end)
+
+helpers.it("calendar cleanup preserves a replaced temporary file", function()
+	with_files("modules.llm.agent_connectors", function(Connector, dir)
+		local uv = require("luv")
+		local private, path = dir .. "/calendar", dir .. "/calendar/task.ics"
+		assert(uv.fs_mkdir(private, 448))
+		Connector._set_deps_for_test({ private_dir = function() return private end,
+			random_hex = function() return "00ff" end, utc_stamp = function() return "20261023T120000Z" end,
+			run = function(_, _, _, callback) callback({ ok = true, code = 0 }); return {} end })
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/llm/agent.json", "r"))
+		local config = assert(Json.decode(file:read("*a"))); assert(file:close())
+		helpers.assert_true(Connector.run(config, { type = "reminder", title = "Owned reminder" }, function() end))
+		assert(os.rename(path, path .. ".old"))
+		local replacement = assert(io.open(path, "wb")); assert(replacement:write("foreign data")); assert(replacement:close())
+		assert(os.remove(path .. ".old"))
+		helpers.assert_eq(Connector.cleanup(), false)
+		local preserved = assert(io.open(path, "rb")); helpers.assert_eq(preserved:read("*a"), "foreign data"); assert(preserved:close())
+		os.remove(path); os.remove(private)
+	end)
+end)
+
 --- Restores native reader exports and closes every controlled real image stream.
 --- @param backend string Native branch exercised by the scope.
 --- @param body function Receives writer, reader, private path and observations.
