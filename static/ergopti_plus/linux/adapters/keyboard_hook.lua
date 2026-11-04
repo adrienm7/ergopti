@@ -2598,14 +2598,16 @@ local function _dispatch_pointer(ev, slot)
 		M.emergency_stop("grabbed pointer queue desynchronised")
 		return
 	end
-	if ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and ev.code < InputEvent.POINTER_BUTTON_FIRST then
+	local pointer_key = ev.type == EVDEV_TYPE_KEY and (InputEvent.is_pointer_button(ev.code)
+		or ev.code >= 0x140 and ev.code <= 0x14f) -- BTN_DIGI contacts and tools
+	if ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and not pointer_key then
 		-- A mouse may also expose keyboard/media keys on the same node. Those
 		-- keys reach the desktop and count as activity for a held tap-hold.
 		if _remapper then
 			_remapper:activity()
 			local at_ms = _event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
 		end
-	elseif ev.type == EVDEV_TYPE_KEY and ev.code >= InputEvent.POINTER_BUTTON_FIRST then
+	elseif pointer_key then
 		-- A click while a tap-hold key is down makes it a chord (Shift+click),
 		-- and so does the release of one, as on Windows (hook_dispatcher's
 		-- _OnLUp ... _OnX2Up): a click begun before the tap ends inside it.
@@ -2640,7 +2642,7 @@ local function _dispatch_pointer(ev, slot)
 		-- The value and the frame's SYN_REPORT let the metrics measure a movement.
 		if ev.type == InputEvent.EV_REL then
 			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value, slot)
-		elseif ev.type == EVDEV_TYPE_KEY and ev.value == InputEvent.VALUE_DOWN then
+		elseif pointer_key and ev.value == InputEvent.VALUE_DOWN then
 			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
 		elseif ev.type == InputEvent.EV_SYN then
 			if ev.code == InputEvent.SYN_REPORT then
