@@ -41,6 +41,8 @@ local LOG = "adapters.timer_scheduler"
 -- Weak values let GC erase a fire-and-forget repeater while its native timer
 -- remained live, making cancelAll() report success without stopping it.
 local _live_timers = {}
+-- A scheduled close remains owned until libuv delivers its actual callback.
+local _closing_timers = {}
 
 -- Monotonically increasing ID used to key entries in _live_timers.
 local _next_id = 0
@@ -68,6 +70,27 @@ if not ok_luv then luv = nil end
 
 M.HAS_ASYNC = luv ~= nil
 
+--- Schedules close while retaining the exact native handle until its callback.
+--- @param timer any Native timer owned by the scheduler.
+--- @return boolean accepted, string|nil error
+local function _close_timer(timer)
+	local receipt = {}
+	_closing_timers[timer] = receipt
+	local called, ack, detail = pcall(luv.close, timer, function()
+		if _closing_timers[timer] == receipt then _closing_timers[timer] = nil end
+	end)
+	if not called or ack == false or detail ~= nil then
+		if _closing_timers[timer] ~= receipt then return true end
+		if type(luv.is_closing) == "function" then
+			local inspected, closing = pcall(luv.is_closing, timer)
+			if inspected and closing == true then return true end
+		end
+		_closing_timers[timer] = nil
+		return false, tostring(detail or ack)
+	end
+	return true
+end
+
 --- Stops and closes an owned timer, retaining it when the backend refuses either operation.
 --- luv.timer_stop returns a receipt; luv.close returns void on success.
 --- @param timer any Native timer owned by the scheduler.
@@ -78,19 +101,14 @@ local function _retire_timer(timer)
 	if not stopped or ack == nil or ack == false or detail ~= nil then
 		return false, tostring(detail or ack)
 	end
-	local closed, close_ack, close_detail = pcall(luv.close, timer)
-	if not closed or close_ack == false or close_detail ~= nil then
-		return false, tostring(close_detail or close_ack)
-	end
-	return true
+	return _close_timer(timer)
 end
 
 --- Closes an allocated timer that was never successfully started.
 --- @param timer any Native timer owned by the scheduler.
 --- @return boolean accepted
 local function _rollback_timer(timer)
-	local called, ack, detail = pcall(luv.close, timer)
-	return called and ack ~= false and detail == nil
+	return _close_timer(timer)
 end
 
 --- Number of timers that are actually armed.
@@ -264,7 +282,7 @@ function M.cancelAll()
 		end
 		if handle and handle.timer == nil then _live_timers[id] = nil end
 	end
-	return cancelled
+	return cancelled and next(_closing_timers) == nil
 end
 
 return M
