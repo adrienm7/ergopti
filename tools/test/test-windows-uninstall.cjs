@@ -111,6 +111,16 @@ foreach ($ownedPath in @($manualPaths) + @($canonicalPath)) {
 if (-not (Test-Path -LiteralPath $foreignPath) -or -not (Test-Path -LiteralPath $unrelatedPath)) {
  throw 'Startup cleanup removed foreign content'
 }
+$missingStartup = Join-Path (Split-Path $target) 'missing-startup'
+$script:absentStartupRecycled = 0
+$absentStartupUnregister = { param($Path) Remove-ErgoptiStartupShortcuts $Path $missingStartup }
+if (-not (Invoke-ErgoptiRemoval $target $hash { $true } { $true } { $script:absentStartupRecycled++ } $absentStartupUnregister)) {
+ throw 'A missing Startup folder must not refuse executable removal'
+}
+if ($script:absentStartupRecycled -ne 1 -or (Test-Path -LiteralPath $missingStartup)) {
+ throw 'Missing Startup cleanup must recycle only the executable without creating the folder'
+}
+Remove-ErgoptiStartupShortcuts $target ''
 $script:recycled = @()
 $recycle = { param($Path) $script:recycled += $Path }
 $failed = $false

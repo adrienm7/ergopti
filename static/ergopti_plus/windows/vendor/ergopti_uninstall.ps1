@@ -100,6 +100,10 @@ function Remove-ErgoptiStartupShortcut {
 # filename. Removal must inspect the complete folder before retiring the image.
 function Remove-ErgoptiStartupShortcuts {
 	param([string]$ExecutablePath, [string]$StartupFolder)
+	if ([string]::IsNullOrEmpty($StartupFolder)) { return }
+	try { $folder = Get-Item -LiteralPath $StartupFolder -Force -ErrorAction Stop }
+	catch [System.Management.Automation.ItemNotFoundException] { return }
+	if (-not $folder.PSIsContainer) { throw 'The Startup path is not a directory.' }
 	foreach ($entry in Get-ChildItem -LiteralPath $StartupFolder -Force) {
 		if ($entry.PSIsContainer -or $entry.Extension -ne '.lnk') { continue }
 		Remove-ErgoptiStartupShortcut $ExecutablePath $entry.FullName
