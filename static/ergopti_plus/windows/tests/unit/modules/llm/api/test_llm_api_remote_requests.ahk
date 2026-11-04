@@ -628,3 +628,113 @@ _NUIC_IntegerPrices() {
     }
 }
 Test("Remote usage cost: admitted integer prices preserve numeric domain (usage-integer-price)", _NUIC_IntegerPrices)
+
+
+_NUF_Poll(Resolved, Body) {
+    global _LLM_Remote_Async
+    AssertEqual(0, _LLM_Remote_Async.Count)
+    Control := _ManagedCurlControlState(), Heard := [], Id := 0, Entry := 0, Primary := 0, Result := 0
+    Port := Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+        "create_http", _NUI_Create.Bind(Control))
+    try {
+        Id := LLM_RemotePostBody_Async(Resolved, "https://finite-cost-fixture.invalid/v1/chat/completions", '{"messages":[]}',
+            (Text, Usage := "") => Heard.Push(Map("ok", true, "text", Text, "usage", Usage)),
+            (Info := "") => Heard.Push(Map("ok", false, "info", Info)), 20000, "finite_cost_control", 0, 0, Port)
+        AssertTrue(_LLM_Remote_Async.Has(Id))
+        Entry := _LLM_Remote_Async[Id], Http := Control["request"]
+        AssertTrue(Entry["http"] == Http)
+        _ManagedCurlControlAck(Control)
+        Http._PollManagedAdmission()
+        AssertTrue(Http.ManagedPayloadPublished)
+        AssertTrue(FSWrite(Http.BodyPath, Body))
+        AssertTrue(FSWrite(Http.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+        HandoffCritical := Critical("On")
+        try {
+            Control["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+            _LLMRemote_PollRequest(Id)
+        } finally Critical(HandoffCritical)
+        AssertTrue(Http.Completed && Http.ResponseEncodingValid)
+        AssertEqual(200, Http.Status)
+        AssertFalse(_LLM_Remote_Async.Has(Id))
+        AssertFalse(IsObject(Http.Handle))
+        AssertEqual(1, Heard.Length)
+        AssertTrue(Heard[1]["ok"] && Heard[1]["text"] == "owned-finite-cost-ok")
+        Result := Map("usage", Heard[1]["usage"], "callbacks", Heard.Length,
+            "reservation_present", _LLM_Remote_Async.Has(Id), "http_handle_retired", !IsObject(Http.Handle))
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        try {
+            if Entry is Map && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Entry {
+                LLM_RemoteCancelAsync(Id)
+                _LLMRemote_PollRequest(Id)
+            }
+            if Control.Has("request") {
+                AssertTrue(Control["request"].Abort())
+                AssertFalse(IsObject(Control["request"].Handle))
+                _ManagedCurlControlRelease(Control)
+            }
+        } catch Any as Failure {
+            _TestPrint("# FINITE_COST_CLEANUP " . KL_JsonEncode(Map("error", Type(Failure), "message", SubStr(Failure.Message, 1, 250))))
+            if !IsObject(Primary)
+                Primary := Failure
+        }
+    }
+    if IsObject(Primary)
+        throw Primary
+    return Result
+}
+
+_NUF_Run(ViaPoll) {
+    global LLM_REMOTE_MODEL_PRICES
+    SavedPrices := LLM_REMOTE_MODEL_PRICES, Observed := []
+    Rows := [
+        {Id: "ordinary finite", PriceIn: 2.0, PriceOut: 0.0, Prompt: 2, Completion: 0, Expected: 0.000004},
+        {Id: "finite prompt cost despite intermediate overflow", PriceIn: 1e308, PriceOut: 0.0, Prompt: 2, Completion: 0, Expected: 2e302},
+        {Id: "finite output cost despite intermediate overflow", PriceIn: 0.0, PriceOut: 1e308, Prompt: 0, Completion: 2, Expected: 2e302},
+        {Id: "unrepresentable final sum stays unknown", PriceIn: 1e308, PriceOut: 1e308, Prompt: 1000000, Completion: 1000000, Expected: 0.0}
+    ]
+    try {
+        for Row in Rows {
+            Model := "owned-finite-cost"
+            LLM_REMOTE_MODEL_PRICES := _LLMRemoteAdmitPrices(Map(Model, Map("in", Row.PriceIn, "out", Row.PriceOut)))
+            AssertTrue(LLM_REMOTE_MODEL_PRICES.Has(Model), "finite nonnegative prices are admitted by the genuine domain")
+            Body := '{"choices":[{"message":{"content":"owned-finite-cost-ok"}}],"usage":{"prompt_tokens":'
+                . Row.Prompt . ',"completion_tokens":' . Row.Completion . '}}'
+            if ViaPoll {
+                Resolved := _LLMRemoteResolveEntry(Map("Provider", "openai_compat", "Model", Model,
+                    "Token", "owned-fixture-secret", "BaseUrl", "https://finite-cost-fixture.invalid/v1"))
+                Result := _NUF_Poll(Resolved, Body)
+                Usage := Result["usage"]
+            } else {
+                Result := _LLMRemoteClassifyResponse("openai", Body, Model)
+                AssertTrue(Result["ok"] && Result["text"] == "owned-finite-cost-ok")
+                Usage := Result["usage"]
+            }
+            Cost := Usage["est_cost_usd"]
+            ; Never serialize raw infinity into JSON evidence. The same finite
+            ; Number predicate already governs catalogue admission; no new cap.
+            Finite := _LLMRemote_CatalogPriceIsValid(Cost)
+            Seen := Map("case", Row.Id, "via_poll", ViaPoll, "cost_text", String(Cost),
+                "cost_type", Type(Cost), "finite_nonnegative", Finite, "expected", Row.Expected,
+                "prompt_tokens", Usage["prompt_tokens"], "completion_tokens", Usage["completion_tokens"])
+            Seen["matches_expected"] := Finite && (Row.Expected == 0.0 ? Cost == 0.0 : Abs(Cost / Row.Expected - 1.0) < 0.000000001)
+            if ViaPoll {
+                Seen["callbacks"] := Result["callbacks"]
+                Seen["reservation_present"] := Result["reservation_present"]
+                Seen["http_handle_retired"] := Result["http_handle_retired"]
+            }
+            Observed.Push(Seen)
+        }
+    } finally LLM_REMOTE_MODEL_PRICES := SavedPrices
+    _TestPrint("# FINITE_COST_DOMAIN " . KL_JsonEncode(Observed))
+    for Row in Observed {
+        AssertTrue(Row["finite_nonnegative"], "estimated cost must fit the already-admitted native finite Number domain: " . Row["case"])
+        AssertTrue(Row["matches_expected"], "representable cost must survive intermediate arithmetic; an unrepresentable final estimate remains unknown: " . Row["case"])
+    }
+}
+_NUF_Timings(ViaPoll) {
+    _ManagedRemoteFixtureWithLlmTimings(_NUF_Run.Bind(ViaPoll))
+}
+Test("Remote usage cost: finite domain through actual classifier (usage-finite-cost)", _NUF_Timings.Bind(false))
+Test("Remote usage cost: finite domain through actual managed Poll (usage-finite-cost)", _NUF_Timings.Bind(true))
