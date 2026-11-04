@@ -115,6 +115,9 @@ function runInstaller(scenario) {
 			{ mode: 0o755 }
 		);
 	}
+	if (scenario.refuseLibraryScan) {
+		stub(stubs, 'find', 'case "${1:-}" in */lib/ergopti) exit 73 ;; esac\nexec /usr/bin/find "$@"');
+	}
 	stub(
 		stubs,
 		'systemctl',
@@ -417,6 +420,65 @@ for (const viaAlias of [false, true]) {
 	try {
 		assert.notEqual(run.status, 0, 'a prefix inside a checkout must be refused');
 		assert.equal(fs.existsSync(path.join(run.home, 'checkout/new-prefix')), false);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A checkout already inside an installation is user-owned too.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		seed(home) {
+			const checkout = path.join(home, '.local/lib/ergopti/linux/custom-checkout');
+			fs.mkdirSync(checkout, { recursive: true });
+			const initialized = spawnSync('git', ['init', '--quiet', checkout], { encoding: 'utf8' });
+			assert.equal(initialized.status, 0, initialized.stderr);
+			fs.writeFileSync(path.join(checkout, 'keep'), 'user data\n');
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, 'an installation containing a checkout must be refused');
+		assert.equal(
+			fs.readFileSync(path.join(run.home, '.local/lib/ergopti/linux/custom-checkout/keep'), 'utf8'),
+			'user data\n'
+		);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A refused scan cannot certify that replacing an existing tree is safe.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		refuseLibraryScan: true,
+		seed(home) {
+			const file = path.join(home, '.local/lib/ergopti/linux/ergopti_hotstrings.lua');
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(file, 'retained\n');
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0);
+		assert.match(run.output, /code=scan-refused/);
+		assert.equal(
+			fs.readFileSync(
+				path.join(run.home, '.local/lib/ergopti/linux/ergopti_hotstrings.lua'),
+				'utf8'
+			),
+			'retained\n'
+		);
 		assert.equal(
 			run.calls.some((call) => call.startsWith('sudo ')),
 			false
