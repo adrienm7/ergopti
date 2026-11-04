@@ -159,8 +159,10 @@ helpers.describe("linux-sqlite-writer-receipts", function()
 				return {
 					read = function(_, mode)
 						if mode == "*l" then return "CREATE TABLE devices (os CHECK (os IN ('linux')))" end
+						local body = command:find("SELECT sql FROM sqlite_master", 1, true)
+							and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n" or ""
 						return command:find("ERGOPTI_SQL_EXIT_STATUS=", 1, true)
-							and ("\nERGOPTI_SQL_EXIT_STATUS=" .. terminal_status .. "\n") or ""
+							and (body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. terminal_status .. "\n") or ""
 					end,
 					close = function() return true end, -- LuaJIT's ambiguous success is deliberate.
 				}
@@ -309,7 +311,9 @@ helpers.describe("sqlite_writer", function()
               return "CREATE TABLE devices (os CHECK (os IN ('darwin','windows','linux')))"
             end
             -- Mirror the reservation SELECT and the actual terminal status.
-            local body = command:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or ""
+            local body = command:find("SELECT sql FROM sqlite_master", 1, true)
+              and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n"
+              or (command:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or "")
             return body .. "\nERGOPTI_SQL_EXIT_STATUS=0\n"
           end,
           close = function() return true end,
@@ -777,5 +781,39 @@ for _, fault in ipairs({ "seek_throw", "close_throw" }) do
 		helpers.assert_eq(opened, false)
 		helpers.assert_eq(closes, 1, "every inspected stream is closed")
 		helpers.assert_true(retry, "a later healthy inspection can reopen the store")
+	end)
+end
+
+for _, receipt in ipairs({ "1", "error" }) do
+	it("SQLite legacy device migration preserves dependent schema " .. receipt, function()
+		local command = require("modules.keystats.sqlite_command")
+		local build, execute, popen = command.build, os.execute, io.popen
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); assert(file:write("existing database fixture") and file:close())
+		local statements, current = {}, nil
+		command.build = function(selected, sql, options)
+			current = sql; statements[#statements + 1] = sql
+			return build(selected, sql, options)
+		end
+		os.execute = function() return 0 end
+		io.popen = function()
+			local body, status = "", 0
+			if current:find("SELECT sql FROM sqlite_master", 1, true) then
+				body = "CREATE TABLE devices (os CHECK (os IN ('darwin','windows')));\n"
+			elseif current:find("pragma_foreign_key_list", 1, true) then
+				if receipt == "error" then status = 7 else body = receipt .. "\n" end
+			end
+			return { read = function() return body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,
+				close = function() return true end }
+		end
+		local Writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local called, opened = pcall(Writer.open_db, path)
+		command.build, os.execute, io.popen = build, execute, popen
+		Writer.close_db(); os.remove(path)
+		helpers.assert_true(called)
+		helpers.assert_eq(opened, false, "dependent or unknown schema must be preserved")
+		for _, sql in ipairs(statements) do
+			helpers.assert_nil(sql:find("ALTER TABLE devices RENAME", 1, true), "unsafe device migration cannot start")
+		end
 	end)
 end
