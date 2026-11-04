@@ -192,6 +192,10 @@ fi
 if $INSTALL_SERVICE && ! $SETUP_PERMS_ONLY; then
 	source "${SRC_DRIVER}/install/desktop_entry.sh"
 	startup_wrapper="${BIN_DIR}/ergopti-hotstrings"
+	# Validate both formats before installing files or requesting permissions.
+	# A newline, carriage return or tab cannot be represented by either owner.
+	startup_unit_exec="$(ergopti_systemd_exec "$startup_wrapper")" || exit 1
+	startup_desktop_exec="$(ergopti_desktop_exec "$startup_wrapper")" || exit 1
 	for startup_path in "${SYSTEMD_DIR}/ergopti-hotstrings.service" \
 		"${CONFIG_ROOT}/autostart/ergopti-hotstrings.desktop"; do
 		if [ -L "$startup_path" ] || { [ -e "$startup_path" ] && [ ! -f "$startup_path" ]; }; then
@@ -201,10 +205,10 @@ if $INSTALL_SERVICE && ! $SETUP_PERMS_ONLY; then
 		[ -f "$startup_path" ] || continue
 		case "$startup_path" in
 			*.service)
-				if grep -Fxq "$(ergopti_systemd_exec "$startup_wrapper")" "$startup_path" \
+				if grep -Fxq "$startup_unit_exec" "$startup_path" \
 					|| grep -Fxq "ExecStart=$startup_wrapper --tray" "$startup_path"; then continue; fi ;;
 			*.desktop)
-				if grep -Fxq "$(ergopti_desktop_exec "$startup_wrapper")" "$startup_path" \
+				if grep -Fxq "$startup_desktop_exec" "$startup_path" \
 					|| grep -Fxq "Exec=$startup_wrapper --tray" "$startup_path" \
 					|| grep -Fxq "Exec=$startup_wrapper --session-start --tray" "$startup_path"; then continue; fi ;;
 		esac

@@ -382,6 +382,22 @@ if (process.platform === 'linux') {
 
 const errors = [];
 
+// A service entry cannot encode control characters in the launcher path. The
+// installer must discover that before copying a payload or asking for access.
+for (const name of ['service\ninvalid', 'service\rinvalid', 'service\tinvalid']) {
+	const run = runInstaller({ desktopProvided: true, prefixName: name });
+	try {
+		assert.notEqual(run.status, 0);
+		assert.equal(fs.existsSync(path.join(run.home, name, 'lib/ergopti')), false);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
 {
 	const missingPrefix = spawnSync(bashExecutable(), [bashPath(INSTALLER), '--prefix'], {
 		encoding: 'utf8',
