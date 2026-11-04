@@ -83,6 +83,30 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 		end)
 	end)
 
+	helpers.it("(remap-multisource) does not salvage an old press after its callback stops and raises", function()
+		Fixture.with_session({ on_physical = function(s, code, _, _, value)
+			if code == 30 and value == 1 then
+				s.hook.stop()
+				error("old callback failed after stop")
+			end
+		end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.rows, {}, "an intentional stop revoked the old output")
+		end)
+	end)
+
+	helpers.it("(remap-multisource) does not salvage an old press after its consumer stops and raises", function()
+		Fixture.with_session({ on_consume = function(s)
+			s.hook.stop()
+			error("old consumer failed after stop")
+		end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.rows, {})
+		end)
+	end)
+
 	helpers.it("(remap-multisource) does not stop a successor when the old consumer raises", function()
 		local restarted = false
 		Fixture.with_session({ on_consume = function(s)
