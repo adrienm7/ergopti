@@ -441,6 +441,42 @@ try {
 			[],
 			'xdg-shell-lua-root: native startup and the daemon use the same XDG rule'
 		);
+		// The daemon falls back to absolute TMPDIR when HOME is not absolute.
+		// Startup must use that same root instead of the caller's directory.
+		{
+			const temp = path.join(sandbox, 'fallback-temp');
+			const cwd = path.join(sandbox, 'fallback-cwd');
+			fs.mkdirSync(temp);
+			fs.mkdirSync(cwd);
+			const changed = run(
+				'enable',
+				{ HOME: 'relative-home', TMPDIR: temp, XDG_CONFIG_HOME: '' },
+				cwd
+			);
+			assert.equal(changed.status, 0, changed.stderr || changed.error?.message);
+			assert.ok(fs.existsSync(path.join(temp, '.config/autostart/ergopti-hotstrings.desktop')));
+			assert.equal(fs.existsSync(path.join(cwd, 'relative-home/.config')), false);
+			for (const variables of [
+				{ HOME: '', TMPDIR: temp },
+				{ HOME: 'relative-home', TMPDIR: 'relative-temp' }
+			]) {
+				const shell = spawnSync(
+					bashExecutable(),
+					[
+						'-c',
+						'source "$1"; ergopti_resolve_config_home result; printf "%s" "$result"',
+						'resolve',
+						path.join(installed, 'config_home.sh')
+					],
+					{ cwd, encoding: 'utf8', env: { ...process.env, ...variables, XDG_CONFIG_HOME: '' } }
+				);
+				assert.equal(shell.status, 0, shell.stderr);
+				assert.equal(
+					shell.stdout,
+					path.join(path.isAbsolute(variables.TMPDIR) ? temp : '/tmp', '.config')
+				);
+			}
+		}
 
 		// Exercise the bundle's tracked copier and real required-file scan.
 		// These are presence controls, not native binary qualification.
