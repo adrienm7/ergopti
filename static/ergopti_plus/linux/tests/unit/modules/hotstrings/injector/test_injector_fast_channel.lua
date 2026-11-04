@@ -66,6 +66,27 @@ helpers.describe("injector: unbrokered channel retirement", function()
 		helpers.assert_eq(injector.close_fast_channel(), true)
 		helpers.assert_eq(closed, 1, "the successor remains available to its own retirement")
 	end)
+
+	helpers.it("does not detach a replacement broker installed during channel close", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local previous = package.loaded["adapters.modifier_broker"]
+		local original, successor, detached = {}, {}, 0
+		local current = original
+		package.loaded["adapters.modifier_broker"] = {
+			for_channel = function() return current end,
+			detach = function() detached = detached + 1; current = nil end,
+		}
+		local channel = { close = function() current = successor; return true end }
+		injector._set_uinput(channel)
+		local ok, err = pcall(function()
+			helpers.assert_eq(injector.close_fast_channel(), false)
+			helpers.assert_eq(current, successor)
+			helpers.assert_eq(detached, 0)
+		end)
+		injector._set_uinput(nil)
+		package.loaded["adapters.modifier_broker"] = previous
+		if not ok then error(err, 0) end
+	end)
 end)
 
 
