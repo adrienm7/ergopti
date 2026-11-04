@@ -114,13 +114,24 @@ function M.on_message(payload, state, context)
 	local manager = dependency(state, "webview_manager", "ui.webview_manager")
 	local epoch = type(context) == "table" and context.epoch or nil
 	local current_epoch = manager and manager.current_epoch
+	local native_current = manager and manager.page_current
 	local function page_current()
 		if epoch == nil then return true end
 		if context.app_name ~= APP_NAME or type(current_epoch) ~= "function"
 			or dependency(state, "webview_manager", "ui.webview_manager") ~= manager
 			or manager.current_epoch ~= current_epoch then return false end
 		local ok, observed = pcall(current_epoch, APP_NAME)
-		return ok and observed == epoch and manager.current_epoch == current_epoch
+		if not ok or observed ~= epoch or manager.current_epoch ~= current_epoch
+			or dependency(state, "webview_manager", "ui.webview_manager") ~= manager then return false end
+		if action == "ready" or action == "cancel" then return true end
+		if type(native_current) ~= "function" or manager.page_current ~= native_current then return false end
+		local checked, live = pcall(native_current, APP_NAME, epoch)
+		if not checked or live ~= true or manager.current_epoch ~= current_epoch
+			or manager.page_current ~= native_current then return false end
+		local reread, final = pcall(current_epoch, APP_NAME)
+		return reread and final == epoch and dependency(state, "webview_manager", "ui.webview_manager") == manager
+			and manager.current_epoch == current_epoch
+			and manager.page_current == native_current
 	end
 	if not page_current() then return nil end
 	if action == "ready" then
@@ -191,7 +202,6 @@ function M.on_message(payload, state, context)
         Logger.error(LOG, "Configuration directory was not persisted; editor remains open.")
 			return { saved = false }
 		end
-		if not page_current() then return { saved = true, hidden = false, reloaded = false } end
 		if logs_dir ~= nil then
 			-- The daemon outlives this editor's reload, so the running sink is
 			-- moved now; until it is, every opener names the folder it writes.
@@ -203,7 +213,6 @@ function M.on_message(payload, state, context)
 					tostring(move_err))
 				return { saved = false }
 			end
-			if not page_current() then return { saved = true, hidden = false, reloaded = false } end
 			Logger.info(LOG, "Logs now written to %s.", config_paths.get_logs_dir())
 		end
 		local reloaded = false

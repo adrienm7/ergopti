@@ -68,6 +68,31 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(#captured.pushes, 0)
 		end)
 
+		helpers.it("(paths-editor-owner) refuses a picker result when native cleanup is owed", function()
+			local state, _, captured = paths_state()
+			local ready = true
+			state.webview_manager.current_epoch = function() return 1 end
+			state.webview_manager.page_current = function() return ready end
+			local picker, original = require("ui.config_dir_picker"), require("ui.config_dir_picker").pick
+			picker.pick = function() ready = false; return "/tmp/selected" end
+			local ok, result = pcall(handler.on_message, { action = "browse" }, state,
+				{ app_name = "paths_editor", epoch = 1 })
+			picker.pick = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(#captured.pushes, 0)
+		end)
+
+		helpers.it("(paths-editor-owner) rechecks the epoch after the native page probe", function()
+			local state, _, captured = paths_state()
+			local epoch = 1
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function() epoch = 2; return true end
+			local result = handler.on_message({ action = "save", configDir = "/tmp/saved" }, state,
+				{ app_name = "paths_editor", epoch = 1 })
+			helpers.assert_nil(result)
+			helpers.assert_eq(captured.reloaded, 0)
+		end)
+
 		helpers.it("(paths-editor-owner) does not close a replacement page after reload", function()
 			local state, _, captured = paths_state()
 			local epoch = 1
@@ -79,6 +104,25 @@ helpers.describe("ui.bridge_handlers", function()
 			local result = handler.on_message({ action = "save", configDir = "/tmp/saved" }, state, context)
 			helpers.assert_eq(result.saved, true)
 			helpers.assert_eq(result.hidden, false)
+			helpers.assert_eq(captured.hidden, 0)
+		end)
+
+		helpers.it("(paths-editor-owner) applies a committed change after the page is replaced", function()
+			local state, _, captured = paths_state()
+			local epoch, applied, moved = 1, 0, 0
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return epoch == value end
+			state.config_paths.normalize_logs_dir = function(path) return path end
+			state.logger_sink = { prepare_dir = function() return true end,
+				repoint = function() moved = moved + 1; return true end }
+			local write = state.config_paths.set_paths
+			state.config_paths.set_paths = function(...) local ok = write(...); epoch = 2; return ok end
+			state.on_reload = function() helpers.assert_eq(moved, 1); applied = applied + 1; return true end
+			local result = handler.on_message({ action = "save", configDir = "/tmp/saved", logsDir = "/tmp/logs" }, state,
+				{ app_name = "paths_editor", epoch = 1 })
+			helpers.assert_eq(result, { saved = true, hidden = false, reloaded = true })
+			helpers.assert_eq(applied, 1)
+			helpers.assert_eq(moved, 1)
 			helpers.assert_eq(captured.hidden, 0)
 		end)
 
