@@ -169,7 +169,8 @@ _KATO_Case(Mode) {
 		AssertEqual("", State.ErrorText)
 		AssertTrue(Receipt is Map)
 		for Pair in [["pid", Pid], ["mode", Mode], ["source_sha256", Hash], ["runtime_sha256", RuntimeHash],
-			["owner_sha256", Owners["owner_sha256"]], ["subject_arms", 1],
+			["owner_sha256", Owners["owner_sha256"]], ["subject_arms", Mode == "retired-keyboard" ? 0 : 1],
+			["controlled_keyboard_deliveries", Mode == "retired-keyboard" ? 2 : 0],
 			["hooks_retired", 1], ["mouse_injected", 0], ["suspended", 0]]
 			AssertEqual(Pair[2], Receipt[Pair[1]], "the terminal receipt must bind actual native cleanup: " . Pair[1])
 	} catch Any as Failure {
