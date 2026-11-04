@@ -1,10 +1,19 @@
 {
-	"expected_count": 3,
+	"expected_count": 13,
 	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "walker-composite-",
-			"expected_count": 3
+			"contains": "personal native final admission:",
+			"expected_count": 5
+		},
+		{
+			"contains": "personal metadata native final admission:",
+			"expected_count": 2
+		},
+		{
+			"contains": "personal information native final admission:",
+			"expected_count": 6
 		}
 	]
 }
