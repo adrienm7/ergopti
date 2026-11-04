@@ -10,13 +10,20 @@ the field-run step or the hand action that proves it and the commits it confirms
 
 ## Cross-platform feature inventory
 
-- [ ] **macOS:** review parity for resetting a word on tap-holds and automatically switching the prompt profile with the selected model (`hotstrings.tap_hold_resets_word`, `llm.profiles.auto_profile_for_model`). The manifest reason describes the current alternatives and constraints.
-- [ ] **macOS and Linux:** evaluate direct streaming insertion of AI predictions (`platform_reason.inline_autotype_is_windows`); both currently show a bubble and insert on acceptance.
-- [ ] **Windows and Linux:** evaluate incremental touchpad gesture modes and step sizes; macOS tracks finger movement, whereas the other drivers receive or execute discrete gestures (`platform_reason.gesture_modes_and_steps_are_macos`).
-- [ ] **Windows:** evaluate a notification-area WPM readout; the manifest documents the floating widget as the current alternative (`platform_reason.wpm_readout_needs_a_menubar`).
-- [ ] **Linux:** evaluate remapping shortcut chords on accented keys for layouts where those keys are not shortcut letters; the manifest records a Windows implementation and no Linux equivalent (`platform_reason.accented_shortcuts_are_windows`).
-- [ ] Triage every OS-specific manifest entry in the generated [feature inventory](docs/feature-inventory.md): confirm equivalent behavior, intentional platform differences, or a real missing capability before implementing a parity change. The queue covers configuration entries, not unregistered product features; audit those separately.
-- [ ] Triage every OS-specific bindable action in the generated inventory using its recorded reason and equivalent. Audit capabilities outside the configuration and action catalogues (including macOS bundled App Cloner and Encryptor and their possible equivalents on Windows and Linux, as well as platform-specific implementations) and add independently evidenced gaps to this TODO. A declaration or an existing source file alone does not prove runtime behavior.
+- [ ] **Windows:** implement the physical shortcuts editor (`physical_shortcuts.windows_unavailable`) and validate token-by-token prediction display (`platform_reason.token_streaming_unvalidated_on_windows`).
+- [ ] **macOS:** review the tap-hold word-reset option and automatic model-to-prompt-profile switching (`hotstrings.tap_hold_resets_word`, `llm.profiles.auto_profile_for_model`). Provide shortcut-only restore/clear if feasible; the configuration menu currently restores Karabiner settings together with other settings.
+- [ ] **macOS and Linux:** evaluate direct streaming insertion of AI predictions; both currently show a bubble and insert on acceptance (`platform_reason.inline_autotype_is_windows`).
+- [ ] **Windows and Linux:** evaluate incremental touchpad gesture modes and step sizes; macOS tracks finger movement while the other drivers handle discrete gestures (`platform_reason.gesture_modes_and_steps_are_macos`).
+- [ ] **Windows:** evaluate a notification-area WPM readout; the floating widget is the current alternative (`platform_reason.wpm_readout_needs_a_menubar`).
+- [ ] **Linux:** correct stale platform-reason translations after checking all consumers and all locales: `platform_reason.llm_configuration_surface_is_not_on_linux` contradicts the Linux model/profile/generation providers, and `platform_reason.metrics_extras_are_not_on_linux` contradicts the exclusion handler. Avoid treating these stale strings as proof of missing functionality.
+- [ ] **Linux:** add user management of wrap-symbol pairs (custom add/delete, enable/disable and bulk actions): the existing menu only invokes the shared fixed pairs. Inspect `linux/ui/menu/menu_shortcuts.lua` and the Windows/macOS wrap menu owners.
+- [ ] **Linux Wayland:** investigate supported compositor interfaces for focused-application identity on GNOME, KDE, COSMIC and Weston; the current adapter cannot supply it there, limiting per-application rules. Preserve unknown/fail-closed behavior where no safe interface exists.
+- [ ] **Linux:** investigate a safe copy-confirmation mechanism on Wayland and X11 without xclip; tap-hold copy currently sends the keys without the retry/confirmation used when a clipboard change counter is available.
+- [ ] **Linux:** investigate `open_personal_shortcuts`: the action opens `personal_shortcuts.toml`, but the menu and loader describe keyboard slots stored in `config.toml`, and no production reader of that file was found. Route it to the actual owner or remove the misleading action after runtime verification.
+- [ ] **Linux:** evaluate accented-key shortcut remapping on layouts where those keys are not shortcut letters (`platform_reason.accented_shortcuts_are_windows`).
+- [ ] **Linux:** evaluate X11 implementations of pointer centering, pointer teleportation and mouse spotlight; Wayland restricts these operations (`sg_actions.center_mouse`, `teleport_mouse`, `spotlight_mouse`). Evaluate file-manager-specific implementations of open-terminal-here and new-text-file-here.
+- [ ] **Windows and Linux:** evaluate equivalents of the macOS bundled App Cloner (isolated application copies and profiles) and Encryptor (file encryption/decryption by drag-and-drop). These are bundled apps, distinct from the shared text and metrics encryption features.
+- [ ] Triage each OS-specific configuration entry, action and greyed menu item in the generated [feature inventory](docs/feature-inventory.md). The recorded reason and equivalent distinguish OS-specific mechanisms from actual product gaps. Recheck runtime and hardware behavior before declaring parity.
 
 ## Handoff, 2026-11-03 late evening (read first if the session was lost)
 
@@ -402,22 +409,33 @@ between workers) green alone. All live checks pass, typed by the harness.
   230 ms cold: event_taps `runloop_late_ms` 294); keystats start runs `ioreg -d2` (151 ms) on the main thread at
   boot+1 s; the first menu build forks two `find` (44 ms; three menu_apps tests are built on find output).
 - **Next release after 1.0.9, maintainer priority: switch the driver to the owned Karabiner.** Today the driver still uses
-  the installed one and the owned runtime is dormant. Publish the runtime, write its pin, then WP8, WP9 and the real-Mac
-  acceptance below, and make `runtime = "owned"` the default.
+  the installed one and the owned runtime is dormant. The runtime is published and pinned; WP8, WP9 and the real-Mac
+  acceptance of item 31 below come next, then `runtime = "owned"` becomes the default.
 - **One folder name for Ergopti on the three OS (maintainer, 3 November).** macOS has three folders in Application
   Support: `ErgoptiPlus` (paths.toml, runtime, locks, karabiner.json), `Ergopti` (managed Ollama, embedded Python, MLX)
   and `ergopti_plus` (the local reload control); Windows mixes `%LOCALAPPDATA%ergopti_plus` and `Ergoptiundle`, and the
   config, logs and caches use other spellings. Decided: `Ergopti` on macOS and
   Windows, `ergopti` under XDG on Linux, no "Plus" in folder names; put each driver's data under one root, name it once in the shared identifiers,
   and migrate the old folders once at boot with a backup.
-- **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)). WP3, WP6
-  and WP7 are built and dormant behind `[karabiner] runtime = "owned"`. Left: a green hosted runtime build of the
-  installer shape is done (dev run 41276215019, artifact `owned-remap-runtime`): the maintainer publishes
-  `ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.2.tar.gz` (sha256 `ad1541f8…de8e`, 12176523 bytes) under the tag
-  `remap-runtime-v16.3.0-ergopti.2`, then runs `python3 tools/build/remap_runtime_publish.py apply runtime-pin.json`
-  to write the `runtime.*` pin; WP8 native and WP9 real-Mac acceptance; then the
-  `RUNTIME_DEFAULT` flip and the shared-mode deletion. Done on 1 November: the per-OS feature requirements table
-  (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
+- **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
+  branch `next/owned-karabiner`, [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November:
+  - Done: runtime `16.3.0-ergopti.2` published (prerelease `remap-runtime-v16.3.0-ergopti.2`, downloaded back: sha256
+    `ad1541f8…2de8e`, 12176523 bytes) and pinned in `macos/vendor/remap-runtime/manifest.json`; shared-rule migration,
+    Tap-Holds block rows and notice; WP8 step 1: the live helper's first install also provisions and starts the idle
+    Core service (`OwnedRuntimeIdleServiceEntry`), compiled unsigned for both architectures on a hosted Mac (Remap
+    runtime build run 41813372448).
+  - In progress (ready, not merged): the `RUNTIME_DEFAULT = "owned"` flip with the two Configuration rows
+    (`menu.global.karabiner_integration`, `menu.global.remove_from_karabiner`, `macos/ui/menu/remap_switch.lua`)
+    deleted, one commit on branch `next/owned-karabiner-flip` stacked on this one. It turns tap-holds off on any Mac
+    without the owned runtime, so it waits for WP8 and WP9.
+  - Next (WP8, in order): the `com.ergoptiplus.runtime.vhid` LaunchDaemon writer and the VirtualHIDDevice pkg install
+    in the helper; a `--request-owned-runtime-install` launcher role and its Lua port from the `owned_not_installed`
+    row; `RUNTIME_VERSION` `16.3.0-ergopti.3`, a signed Remap runtime build, its publication (maintainer go-ahead) and
+    pin; a hosted `sudo` install acceptance job. A hosted runner cannot approve the DriverKit extension, so typing
+    through the owned runtime is proven only by WP9 on a real Mac.
+  - Then: WP9 (handoff checklist), the flip, the shared-mode deletion.
+    Done on 1 November: the per-OS feature requirements table
+    (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
 - **When the owned Karabiner is the one used:** delete the Configuration rows `menu.global.karabiner_integration` and
   `menu.global.remove_from_karabiner` (`macos/ui/menu/remap_switch.lua`), which act on the installed Karabiner.
 - **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json` are all item 31 (shared

@@ -1513,6 +1513,35 @@ i18n = "menu.tapholds.vhid_not_active"
 platforms = ["hs"]
 unavailable = "hide"
 
+# Why Ergopti's own runtime does not run, by the owner's stable reason.
+[[menu.tap_hold_owned_not_installed_rows]]
+type = "label"
+id = "tap_hold_owned_not_installed"
+i18n = "menu.tapholds.owned_not_installed"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_owned_other_running_rows]]
+type = "label"
+id = "tap_hold_owned_other_running"
+i18n = "menu.tapholds.owned_other_running"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_owned_close_failed_rows]]
+type = "label"
+id = "tap_hold_owned_close_failed"
+i18n = "menu.tapholds.owned_close_failed"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_owned_fetch_failed_rows]]
+type = "label"
+id = "tap_hold_owned_fetch_failed"
+i18n = "menu.tapholds.owned_fetch_failed"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.tap_hold_key_rows]]
 type = "include"
 section = "tap_hold_key_head"
