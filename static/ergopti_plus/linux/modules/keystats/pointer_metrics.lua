@@ -55,14 +55,15 @@ local KINDS = { [M.KIND_PRESS] = true, [M.KIND_MOTION] = true, [M.KIND_FRAME] = 
 --- @return table tracker { observe(kind, code, value) }
 function M.new()
 	local tracker = {}
-	local dx, dy = 0, 0
+	local frames, default_source = {}, {}
 
 	--- Observes one pointer report and returns what it adds to the metrics.
 	--- @param kind string "press" (a button pressed), "motion" (an EV_REL report) or "frame" (SYN_REPORT).
 	--- @param code integer evdev code of the report.
 	--- @param value integer evdev value of the report.
+	--- @param source any|nil Identity of the pointer producing this frame.
 	--- @return table|nil delta { clicks, scrolls, distance } or nil when it adds nothing.
-	function tracker.observe(kind, code, value)
+	function tracker.observe(kind, code, value, source)
 		assert(KINDS[kind], "unknown pointer event kind: " .. tostring(kind))
 		if kind == M.KIND_PRESS then
 			if CLICK_BUTTONS[code] then return { clicks = 1, scrolls = 0, distance = 0 } end
@@ -71,12 +72,19 @@ function M.new()
 		if kind == M.KIND_MOTION then
 			if SCROLL_AXES[code] then return { clicks = 0, scrolls = 1, distance = 0 } end
 			assert(type(value) == "number", "a pointer motion report needs its evdev value")
-			if code == InputEvent.REL_X then dx = dx + value elseif code == InputEvent.REL_Y then dy = dy + value end
+			if code == InputEvent.REL_X or code == InputEvent.REL_Y then
+				local key = source or default_source
+				local frame = frames[key] or { dx = 0, dy = 0 }
+				frames[key] = frame
+				if code == InputEvent.REL_X then frame.dx = frame.dx + value else frame.dy = frame.dy + value end
+			end
 			return nil
 		end
-		if dx == 0 and dy == 0 then return nil end
-		local distance = math.sqrt(dx * dx + dy * dy)
-		dx, dy = 0, 0
+		local key = source or default_source
+		local frame = frames[key]
+		frames[key] = nil
+		if not frame or (frame.dx == 0 and frame.dy == 0) then return nil end
+		local distance = math.sqrt(frame.dx * frame.dx + frame.dy * frame.dy)
 		return { clicks = 0, scrolls = 0, distance = distance }
 	end
 

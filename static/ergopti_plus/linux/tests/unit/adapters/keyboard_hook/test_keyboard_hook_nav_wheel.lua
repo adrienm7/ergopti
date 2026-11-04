@@ -58,7 +58,7 @@ end
 --- @param keyboard_events table { {code, value, at_us} }
 --- @param pointer_events table { {type, code, value, at_us} }
 --- @return table emitted { "key:code:value" | "rel:axis:value" }, table grabs { [path] = {on, off} }
-local function drive(pointer_kind, keyboard_events, pointer_events)
+local function drive(pointer_kind, keyboard_events, pointer_events, observer)
 	local keyboard, pointer = fake_node("keyboard"), fake_node(pointer_kind)
 	local queues = { [keyboard] = {}, [pointer] = {} }
 	for _, ev in ipairs(keyboard_events) do
@@ -106,6 +106,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events)
 			onEmitRaw = function(code, value) emitted[#emitted + 1] = "key:" .. code .. ":" .. value; return true end,
 			onEmitRelative = function(axis, value) emitted[#emitted + 1] = "rel:" .. axis .. ":" .. value; return true end,
 			onClick = function() end,
+			onPointerEvent = observer,
 		})
 		kh.pump()
 	end)
@@ -117,7 +118,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events)
 	os.remove(keyboard)
 	os.remove(pointer)
 	assert(ok, err)
-	return emitted, grabs[pointer]
+	return emitted, grabs[pointer], "pointer:" .. pointer
 end
 
 local function has(list, item)
@@ -135,6 +136,15 @@ end
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
+	helpers.it("identifies the pointer on each motion and frame report", function()
+		local reports = {}
+		local _, _, source = drive("mouse", {}, {
+			{ EV_REL, REL_X, 3, 3000 }, { EV_SYN, 0, 0, 3000 },
+		}, function(kind, code, value, slot)
+			reports[#reports + 1] = { kind, code, value, slot }
+		end)
+		helpers.assert_eq(reports, { { "motion", REL_X, 3, source }, { "frame", 0, 0, source } })
+	end)
 	helpers.it("compiles a wheel direction under its own code, never a key's", function()
 		local layer = wheel_layer()
 		local up = layer[InputEvent.wheel_layer_code("vertical", 1)]

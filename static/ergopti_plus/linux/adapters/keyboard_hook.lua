@@ -2548,11 +2548,11 @@ local function _dispatch_pointer(ev, slot)
 	if _on_pointer_event then
 		-- The value and the frame's SYN_REPORT let the metrics measure a movement.
 		if ev.type == InputEvent.EV_REL then
-			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value)
+			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value, slot)
 		elseif ev.type == EVDEV_TYPE_KEY and ev.value == InputEvent.VALUE_DOWN then
-			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value)
+			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
 		elseif ev.type == InputEvent.EV_SYN and ev.code == InputEvent.SYN_REPORT then
-			_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value)
+			_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot)
 		end
 	end
 end
