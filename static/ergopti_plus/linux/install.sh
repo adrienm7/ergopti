@@ -145,9 +145,16 @@ done
 # Publish only the physical absolute prefix, never the installer's working
 # directory or a selected directory alias. mkdir preserves existing modes;
 # NUL framing preserves trailing newlines that command substitution removes.
+_standalone_prefix_allowed() {
+	local candidate="$1"
+	while [[ "$candidate" != / && "$candidate" == */ ]]; do candidate="${candidate%/}"; done
+	case "$candidate" in /|/usr|/usr/local|/app|/nix|/nix/*) return 1 ;; esac
+}
 if ! $SETUP_PERMS_ONLY; then
+	_standalone_prefix_allowed "$PREFIX" || { ergopti_msg uninstall.system_prefix >&2; exit 1; }
 	mkdir -p -- "$PREFIX"
 	IFS= read -r -d '' PREFIX < <(CDPATH= cd -Pe -- "$PREFIX" && printf '%s\0' "$PWD")
+	_standalone_prefix_allowed "$PREFIX" || { ergopti_msg uninstall.system_prefix >&2; exit 1; }
 	# Lua's module search path treats semicolons as separators and every
 	# question mark as a module-name placeholder. Neither can be escaped in
 	# LUA_PATH or LUA_CPATH, so such a prefix cannot load the installed driver.
