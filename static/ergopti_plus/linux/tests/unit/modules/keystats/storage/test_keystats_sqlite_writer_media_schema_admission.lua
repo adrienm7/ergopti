@@ -741,3 +741,41 @@ it("SQLite device migration refuses an unreadable schema instead of rebuilding",
 		helpers.assert_nil(sql:find("ALTER TABLE devices RENAME", 1, true), "failed schema inspection must not rebuild devices")
 	end
 end)
+
+for _, fault in ipairs({ "seek_throw", "close_throw" }) do
+	it("SQLite open safely refuses file inspection " .. fault, function()
+		local Reader = require("infra.regular_file_reader")
+		local open, execute, popen = Reader.open, os.execute, io.popen
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); assert(file:write("existing database fixture") and file:close())
+		local closes, failing = 0, true
+		Reader.open = function(target, ...)
+			local stream, detail, code = open(target, ...)
+			if target ~= path or not stream or not failing then return stream, detail, code end
+			return { seek = function(_, ...)
+				if fault == "seek_throw" then error("injected seek failure") end
+				return stream:seek(...)
+			end, close = function()
+				closes = closes + 1; assert(stream:close())
+				if fault == "close_throw" then error("injected close failure") end
+				return true
+			end }, detail, code
+		end
+		os.execute = function() return 0 end
+		io.popen = function(command)
+			local content = command:find("SELECT sql FROM sqlite_master", 1, true)
+				and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n" or ""
+			return { read = function() return content .. "\nERGOPTI_SQL_EXIT_STATUS=0\n" end, close = function() return true end }
+		end
+		local Writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local called, opened = pcall(Writer.open_db, path)
+		failing = false
+		local retry = called and opened == false and Writer.open_db(path)
+		Reader.open, os.execute, io.popen = open, execute, popen
+		Writer.close_db(); os.remove(path)
+		helpers.assert_true(called, "inspection exceptions must become explicit refusal")
+		helpers.assert_eq(opened, false)
+		helpers.assert_eq(closes, 1, "every inspected stream is closed")
+		helpers.assert_true(retry, "a later healthy inspection can reopen the store")
+	end)
+end
