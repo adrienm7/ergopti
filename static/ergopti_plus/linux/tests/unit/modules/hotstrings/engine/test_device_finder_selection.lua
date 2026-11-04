@@ -209,6 +209,11 @@ end)
 -- =================================================================
 
 helpers.describe("device_finder: ranking when no remap daemon is running", function()
+	helpers.it("keeps a complete final device block without a trailing newline (device-final-block)", function()
+		local text = PHYSICAL_KEYBOARD:gsub("\n+$", "")
+		local path = select_from(text)
+		helpers.assert_eq(path, "/dev/input/event3", "the last complete device must not disappear")
+	end)
 	helpers.it("includes an unnamed alphanumeric keyboard alongside a named keyboard (keyboard-capability-selection)", function()
 		local finder = helpers.load_module("modules.hotstrings.device_finder")
 		local unnamed = block({ name = "ZSA Moonlander Mark I", sysfs = "/devices/pci0000:00/usb1/input/input4",

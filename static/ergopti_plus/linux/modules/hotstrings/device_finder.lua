@@ -95,9 +95,9 @@ function M.parse_devices(text)
 	local devices = {}
 	local current = nil
 
-	-- The trailing newline makes the final block flush through the same branch as
-	-- every other one, instead of needing a copy of the flush after the loop.
-	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+	-- A final blank line flushes the last block even when the input has no
+	-- trailing newline at all.
+	for line in (text .. "\n\n"):gmatch("([^\n]*)\n") do
 		-- Blank line separates device blocks.
 		if line:match("^%s*$") then
 			if current then
