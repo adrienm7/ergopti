@@ -840,7 +840,7 @@ _LTEP_Terminal(Control, Status) {
 
 _LTEP_Body(Mode, Posts, Lines) {
     global _LLM_TokenExchange_PostFn, LLM_API_PROVIDERS, LTE_PROVIDER, LLM_REMOTE_TIMEOUT_MS
-    Controls := [], Results := [], Primary := 0, Slot := 0
+    Controls := [], Results := [], CleanupIssues := [], Primary := 0, Slot := 0
     SavedPost := _LLM_TokenExchange_PostFn, SavedTimeout := LLM_REMOTE_TIMEOUT_MS
     PreviousCritical := Critical("Off")
     try {
@@ -852,24 +852,32 @@ _LTEP_Body(Mode, Posts, Lines) {
         Auth := LLM_API_PROVIDERS[LTE_PROVIDER]["Auth"]
         Slot := _LLM_TokenExchange_Slot(LTE_PROVIDER, _LTE_Key())
         LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(),
-            (Ok, Failure) => Results.Push(Map("ok", Ok, "failure", Failure)))
+            (Ok, Failure) => Results.Push(Map("ok", Ok, "failure", Failure, "paused", A_IsSuspended)))
         AssertTrue(_LTEP_Wait(() => Controls.Length == 1), "the real token Begin timer must create its facade")
         Control := Controls[1], Http := Control["request"]
         _LTEP_Admit(Control)
-        if Mode == "pause" {
-            Suspend(true)
-            AssertTrue(A_IsSuspended)
-            ; A late native response really crosses the facade while paused.
-            ; We do not call OnAnswer or inject a failed status into token code.
-            _LTEP_Terminal(Control, 200)
+        if Mode == "pause" || Mode == "resume_before_poll" {
+            ReplyCritical := Critical("On")
+            try {
+                Suspend(true)
+                AssertTrue(A_IsSuspended)
+                ; Same genuine late terminal, but the consumer can be held until
+                ; AFTER resume. The provenance must survive that scheduling gap.
+                _LTEP_Terminal(Control, 200)
+                if Mode == "resume_before_poll" {
+                    AssertTrue(Slot["pending"], "the token consumer must not have run under this short controlled critical section")
+                    Suspend(false)
+                }
+            } finally Critical(ReplyCritical)
         } else if Mode != "timeout"
             _LTEP_Terminal(Control, Mode == "denied" ? 403 : 200)
         AssertTrue(_LTEP_Wait(() => !Slot["pending"]), "the actual token polling timer must settle its slot")
         AssertEqual(1, Results.Length)
         AssertFalse(IsObject(Http.Handle), "native controlled ownership must retire before resume")
-        if Mode == "pause" {
+        if Mode == "pause" || Mode == "resume_before_poll" {
             AssertTrue(Http.Aborted, "actual managed admission must reject the late response while suspended")
             AssertEqual(0, Http.Status)
+            AssertEqual(Mode == "pause", Results[1]["paused"], "real token timer must observe the requested settlement phase")
             Suspend(false)
         }
         if Mode == "timeout" {
@@ -878,8 +886,8 @@ _LTEP_Body(Mode, Posts, Lines) {
         }
         BeforeNext := Controls.Length
         LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(),
-            (Ok, Failure) => Results.Push(Map("ok", Ok, "failure", Failure)))
-        if Mode == "pause"
+            (Ok, Failure) => Results.Push(Map("ok", Ok, "failure", Failure, "paused", A_IsSuspended)))
+        if Mode == "pause" || Mode == "resume_before_poll"
             _LTEP_Wait(() => Controls.Length == BeforeNext + 1 || Results.Length > 1)
         RetryActive := Slot.Has("retry_at") && Slot["retry_at"] > _LLM_TokenExchange_Now()
         FirstFailure := Results[1]["failure"]
@@ -887,10 +895,11 @@ _LTEP_Body(Mode, Posts, Lines) {
             "first_ok", Results[1]["ok"], "first_status", FirstFailure is Map ? FirstFailure["status"] : 0,
             "first_key_refused", FirstFailure is Map ? FirstFailure["key_refused"] : false,
             "http_completed", Http.Completed, "http_aborted", Http.Aborted,
+            "settled_while_paused", Results[1]["paused"],
             "payload_published", Http.ManagedPayloadPublished,
             "retry_active", RetryActive, "post_count_before_resume", BeforeNext,
             "post_count_after_resume", Controls.Length, "verdicts", Results.Length)))
-        if Mode == "pause" {
+        if Mode == "pause" || Mode == "resume_before_poll" {
             AssertFalse(Results[1]["ok"])
             AssertFalse(RetryActive, "revocation by user pause must not impose a provider-failure cooldown after resume")
             AssertEqual(2, Controls.Length, "resume must be able to start a real next exchange immediately")
@@ -917,6 +926,7 @@ _LTEP_Body(Mode, Posts, Lines) {
                 AssertTrue(Http.Abort(), "the exact controlled Job must retire")
                 AssertFalse(IsObject(Http.Handle))
             } catch Any as Failure {
+                CleanupIssues.Push(Map("phase", "facade-abort", "error", Type(Failure), "message", SubStr(Failure.Message, 1, 300)))
                 if !IsObject(Primary)
                     Primary := Failure
             }
@@ -924,17 +934,27 @@ _LTEP_Body(Mode, Posts, Lines) {
         if Slot is Map {
             try AssertTrue(_LTEP_Wait(() => !Slot["pending"]), "all actual token timers must settle before slot reset")
             catch Any as Failure {
+                CleanupIssues.Push(Map("phase", "slot-settlement", "error", Type(Failure), "message", SubStr(Failure.Message, 1, 300)))
                 if !IsObject(Primary)
                     Primary := Failure
             }
         }
         for Control in Controls {
-            if !IsObject(Control["request"].Handle)
-                _ManagedCurlControlRelease(Control)
+            try {
+                if !IsObject(Control["request"].Handle)
+                    _ManagedCurlControlRelease(Control)
+            } catch Any as Failure {
+                CleanupIssues.Push(Map("phase", "control-release", "error", Type(Failure), "message", SubStr(Failure.Message, 1, 300)))
+                if !IsObject(Primary)
+                    Primary := Failure
+            }
         }
         _LLM_TokenExchange_PostFn := SavedPost
         LLM_REMOTE_TIMEOUT_MS := SavedTimeout
         Critical(PreviousCritical)
+        if CleanupIssues.Length > 0
+            _TestPrint("# TOKEN_PAUSE_CLEANUP " . KL_JsonEncode(Map("case", Mode, "issues", CleanupIssues,
+                "slot_pending", Slot is Map ? Slot["pending"] : false)))
     }
     if IsObject(Primary)
         throw Primary
@@ -943,6 +963,6 @@ _LTEP_Body(Mode, Posts, Lines) {
 _LTEP_Run(Mode) {
     _ManagedRemoteFixtureWithLlmTimings(_LTE_Run.Bind(_LTEP_Body.Bind(Mode)))
 }
-for _LTEP_Mode in ["success", "denied", "timeout", "pause"]
+for _LTEP_Mode in ["success", "denied", "timeout", "pause", "resume_before_poll"]
     Test("Token exchange: actual managed " . _LTEP_Mode . " preserves correct retry policy (token-managed-pause)",
         _LTEP_Run.Bind(_LTEP_Mode))
