@@ -232,3 +232,45 @@ _HTCC_Migration(Mode) {
 for _HTCC_Mode in ["upper", "lower", "both-control", "neither-control"]
 	Test("terminator-move exact consumption: " . _HTCC_Mode,
 		_HTBS_Run.Bind("consumption-case-" . _HTCC_Mode, "", _HTCC_Migration.Bind(_HTCC_Mode)))
+
+_HOSG_CanonicalLegacyMigration(Mode) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, _HotstringsLegacyDelimiters
+	global _HotstringsCommonOverrideAdmitted, HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+		legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted()}
+	Root := A_Temp . "\ergopti_override_legacy_syntax_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		if Mode == "literal"
+			Leaves := "word_delimiters = '.¤'`nconsumed_delimiters = '¤'`n"
+		else if Mode == "multiline-literal"
+			Leaves := "word_delimiters = '''.¤'''`nconsumed_delimiters = '''¤'''`n"
+		else if Mode == "quoted-keys"
+			Leaves := '"word_delimiters" = ".¤"`n"consumed_delimiters" = "¤"`n'
+		else
+			Leaves := 'word_delimiters = ".¤"`nconsumed_delimiters = "¤"`n'
+		Source := "[__global__]`n" . Leaves . "[magickey]`npriority = 25`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		Typed := TOML_ParseDocument(FSReadStrict(Path))
+		AssertEqual(".¤", Typed["__global__"]["word_delimiters"])
+		AssertEqual("¤", Typed["__global__"]["consumed_delimiters"])
+		HotstringsConfigInit(Path)
+		AssertTrue(HotstringsDelimitersBoot(), "real native boot must durably transfer the legacy strings")
+		AssertEqual(".¤", HSE_WORD_TERMINATORS, "the canonical source strings must reach the actual delimiter owner")
+		AssertEqual("¤", HSE_CONSUMED_DELIMITERS)
+		Disk := TOML_ParseDocument(FSReadStrict(Path))
+		AssertFalse(Disk.Has("__global__"), "legacy source is retired only after its real destination commit")
+		AssertEqual(25, Disk["magickey"]["priority"])
+		AssertEqual("", _HotstringsLegacyDelimiters.Word)
+		AssertEqual("", _HotstringsLegacyDelimiters.Consumed)
+	} finally {
+		_HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		_HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOSG_Mode in ["literal", "multiline-literal", "quoted-keys", "basic-control"]
+	Test("HotstringsConfig canonical legacy migration: " . _HOSG_Mode,
+		_HTBS_Run.Bind("canonical-legacy-" . _HOSG_Mode, "", _HOSG_CanonicalLegacyMigration.Bind(_HOSG_Mode)))
