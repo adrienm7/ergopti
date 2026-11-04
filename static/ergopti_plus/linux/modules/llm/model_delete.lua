@@ -156,8 +156,11 @@ function M.start(base_url, tag, on_done, admission)
 	end
 	request.operation, request.settled, request.retire = operation, operation.is_settled, operation.cancel
 	if operation.started ~= true then
-		request.terminal = true
-		if _active == request then _active = nil end
+		-- A refused start may still own resources awaiting physical retirement.
+		-- Keep the slot until the transport acknowledges closure, without publishing
+		-- a result for an operation the caller was told did not start.
+		request.cancelled = true
+		operation:on_settled(function() finish(request) end)
 		Logger.warn(LOG, "Deletion of the Ollama model '%s' was refused before it was sent.", tag)
 		return false
 	end
