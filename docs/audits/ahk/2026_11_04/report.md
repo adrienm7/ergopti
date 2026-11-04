@@ -407,3 +407,17 @@ retry while B remains current. Rejected factories never transfer their fake
 controller and must incur zero Close attempts. Native execution of this extension
 is pending. The JavaScript teardown guard passes all 28 checks, and an in-memory
 mutation removing the actual subscription release makes that guard fail.
+
+## AHK-028: Native environment overrides accept an embedded NUL value
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+static/ergopti_plus/windows/adapters/shell_runner.ahk:ShellRunner_BuildEnvironment validates String types but does not refuse NUL before serializing overrides into a launchable NUL-delimited Unicode block.
+
+Reproduction: Build an environment from Map(ERGOPTI_PROBE, keep plus Chr(0) plus drop). The actual Map value preserves its complete length but the native environment uses NUL as its entry delimiter.
+
+Consequence: The child cannot receive the requested complete value and instead sees a shortened value or malformed block. Arbitrary variable injection or execution has not been measured. Ordinary Map keys truncate NUL before enumeration, so that earlier candidate is explicitly not claimed.
+
+Regression: After actual Map construction, authenticate its retained NUL value and require ValueError for leading, middle and trailing positions. A real native child control verifies exact Unicode, spaces and equals, empty-entry encoding, case-insensitive replacement and an unchanged parent environment.
+
+The ongoing register now contains **28 distinct new findings**. The requested target of 1,000 remains unmet.
