@@ -737,6 +737,40 @@ _PESW_Destroy(State, WParam, LParam, Message, Hwnd) {
 	return
 }
 
+
+_PECT_ParentCreated(State, WParam, LParam, Message, Hwnd) {
+	global _PersonalEditorGui, _PersonalEditorSessionEpoch, _PersonalEditorSection, _PersonalEditorPrioCtrl
+	if (WParam & 0xFFFF) != 1 || State.Observed > 0 || IsObject(_PersonalEditorGui)
+		return
+	if _PersonalEditorSessionEpoch != State.BeforeEpoch + 1
+		return
+	Parent := GuiFromHwnd(Hwnd)
+	if !(Parent is Gui) || Parent.Title != WindowTitle(t("editor.hotstrings.window_title"))
+		return
+	State.Observed += 1, State.OriginalHwnd := Hwnd
+	try {
+		Edits := 0
+		for Control in Parent
+			if Control.Type == "Edit"
+				Edits += 1
+		AssertTrue(Edits < 3, "The native child-create message must precede the pending constructor's priority publication")
+		if State.Mode == "constructor-successor" {
+			OpenPersonalEditor("beta")
+			AssertTrue(_PersonalEditorGui is Gui && _PersonalEditorSection == "beta")
+			State.NewerHwnd := _PersonalEditorGui.Hwnd
+			State.NewerEpoch := _PersonalEditorSessionEpoch
+			State.NewerPriorityHwnd := _PersonalEditorPrioCtrl.Hwnd
+			AssertTrue(State.NewerHwnd != State.OriginalHwnd
+				&& DllCall("User32\IsWindow", "Ptr", State.NewerHwnd, "Int")
+				&& DllCall("User32\IsWindow", "Ptr", State.NewerPriorityHwnd, "Int"),
+				"One real public successor and its own priority control must already be native before the old constructor resumes")
+		}
+	} catch as Failure {
+		State.Failure := Failure
+	}
+	return
+}
+
 _PESORT_Case(Operation) {
 	global ScriptInformation, ConfigurationFile, Features, _ReadPersonalTomlCache
 	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
@@ -754,7 +788,7 @@ _PESORT_Case(Operation) {
 	Fixture := IsDefault ? _ScopeOwnerFixture('[personal_editor]`ndefault_section = "'
 		. (Operation == "default-missing" ? "deleted_section" : "alpha") . '"`n') : _ScopeOwnerFixture()
 	RegistryScope := 0, Window := 0, CloseHwnd := 0
-	Primary := 0, CleanupFailure := 0, WindowEpoch := 0, SwitchHook := 0
+	Primary := 0, CleanupFailure := 0, WindowEpoch := 0, CtorHook := 0, SwitchHook := 0
 	State := {HeaderClicks: 0, HeaderColumn: 0, Selections: 0, Confirmations: 0, Confirmation: "", Entered: 0}
 	Source := '[_meta]`ndescription = "Native sort owner fixture"`nsections_order = ["alpha"]`n'
 		. '[_meta.sections.alpha]`ndescription = "Alpha"`n'
@@ -776,17 +810,35 @@ _PESORT_Case(Operation) {
 				. '[_meta.sections.beta]`ndescription = "Beta"`n[[beta]]`n'
 				. '"beta_native_switch" = { output = "Beta unchanged", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
 		}
+		IsCtor := Operation == "constructor-current" || Operation == "constructor-successor"
+		if IsCtor {
+			Source := StrReplace(Source, 'sections_order = ["alpha"]', 'sections_order = ["alpha", "beta"]')
+				. '[_meta.sections.beta]`ndescription = "Beta"`n[[beta]]`n'
+				. '"beta_native_constructor" = { output = "Beta unchanged", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
+		}
 		AssertTrue(FSWriteDurable(PersonalTomlPath(), Source))
-		if IsDefault
-			OpenPersonalEditor()
-		else
-			OpenPersonalEditor("alpha")
+		Ctor := 0
+		if IsCtor {
+			Ctor := {Mode: Operation, BeforeEpoch: _PersonalEditorSessionEpoch, Observed: 0,
+				OriginalHwnd: 0, NewerHwnd: 0, NewerEpoch: 0, NewerPriorityHwnd: 0, Failure: 0}
+			CtorHook := _PECT_ParentCreated.Bind(Ctor)
+			OnMessage(0x210, CtorHook)
+		}
+		try {
+			if IsDefault
+				OpenPersonalEditor()
+			else
+				OpenPersonalEditor("alpha")
+		} finally {
+			if IsObject(CtorHook)
+				OnMessage(0x210, CtorHook, 0), CtorHook := 0
+		}
 		Window := _PersonalEditorGui
 		CloseHwnd := Window.Hwnd, WindowEpoch := _PersonalEditorSessionEpoch
 		AssertTrue(Window is Gui && _PersonalEditorOpeningSource["window"] == Window,
 			"The production native constructor must publish its own actual source and controls")
 		List := 0, Drop := 0, Edits := [], Button := 0, ButtonY := -1
-		Caption := t(Operation == "save" ? "editor.hotstrings.btn_edit" : "editor.hotstrings.btn_delete_entry")
+		Caption := t((Operation == "save" || IsCtor) ? "editor.hotstrings.btn_edit" : "editor.hotstrings.btn_delete_entry")
 		for Control in Window {
 			if Control.Type == "ListView"
 				List := Control
@@ -801,6 +853,64 @@ _PESORT_Case(Operation) {
 			}
 		}
 		AssertTrue(IsObject(List) && Edits.Length == 3 && IsObject(Button))
+		if IsCtor {
+			if IsObject(Ctor.Failure)
+				throw Ctor.Failure
+			AssertEqual(1, Ctor.Observed, "A genuine early native child-create notification must be observable")
+			if Operation == "constructor-successor" {
+				AssertTrue(Ctor.NewerHwnd != 0 && CloseHwnd == Ctor.NewerHwnd)
+				AssertEqual(Ctor.NewerEpoch, _PersonalEditorSessionEpoch)
+				AssertEqual("beta", _PersonalEditorSection)
+				AssertTrue(DllCall("User32\IsWindow", "Ptr", Ctor.NewerHwnd, "Int"))
+				AssertTrue(DllCall("User32\IsWindow", "Ptr", Ctor.NewerPriorityHwnd, "Int"))
+				AssertEqual(Ctor.NewerPriorityHwnd, Edits[3].Hwnd)
+			} else {
+				AssertEqual(0, Ctor.NewerHwnd)
+				AssertEqual(Ctor.OriginalHwnd, CloseHwnd)
+			}
+			PriorityHwnd := 0, PriorityError := ""
+			try PriorityHwnd := _PersonalEditorPrioCtrl.Hwnd
+			catch as Failure
+				PriorityError := Type(Failure)
+			_TestPrint("# personal-native-constructor mode=" . Operation . " parent_create=" . Ctor.Observed
+				. " newer_seen=" . (Ctor.NewerHwnd != 0) . " native_priority_alive="
+				. DllCall("User32\IsWindow", "Ptr", Edits[3].Hwnd, "Int")
+				. " global_priority_matches=" . (PriorityHwnd == Edits[3].Hwnd) . " priority_error=" . PriorityError)
+			AssertEqual(Edits[3].Hwnd, PriorityHwnd,
+				"The current native owner must retain its own live priority control after an older constructor retires")
+			; A genuine row click and the unchanged Save button exercise the
+			; surviving field through the normal form and durable writer too.
+			List.Modify(0, "-Select -Focus")
+			List.OnEvent("ItemSelect", _PESORT_Selected.Bind(State))
+			Rect := Buffer(16, 0)
+			AssertTrue(DllCall("User32\SendMessageW", "Ptr", List.Hwnd, "UInt", 0x100E,
+				"Ptr", 0, "Ptr", Rect.Ptr, "Ptr"))
+			_PESORT_Click(List.Hwnd, NumGet(Rect, 0, "Int") + 20,
+				(NumGet(Rect, 4, "Int") + NumGet(Rect, 12, "Int")) // 2)
+			Started := A_TickCount
+			while State.Selections == 0 && TickElapsed(Started) < 3000
+				Sleep(5)
+			AssertTrue(State.Selections >= 1)
+			SelectedTrigger := List.GetText(1, 1)
+			AssertEqual(SelectedTrigger, Edits[1].Value)
+			Edits[2].Value := "Constructor retained owner output"
+			Button.OnEvent("Click", _PESORT_ButtonEntered.Bind(State), -1)
+			DllCall("User32\SendMessageW", "Ptr", Button.Hwnd, "UInt", 0xF5,
+				"Ptr", 0, "Ptr", 0, "Ptr")
+			Started := A_TickCount
+			while State.Entered == 0 && TickElapsed(Started) < 3000
+				Sleep(5)
+			AssertEqual(1, State.Entered)
+			Fresh := ReadPersonalToml(true), Found := false
+			for Entry in Fresh["sections"][_PersonalEditorSection]["entries"] {
+				if Entry["trigger"] == SelectedTrigger {
+					AssertEqual("Constructor retained owner output", Entry["output"])
+					Found := true
+				}
+			}
+			AssertTrue(Found, "The surviving real field must remain usable through a genuine durable save")
+			return
+		}
 		if IsSwitch {
 			AssertTrue(_PersonalEditorData["sections"].Has("beta"))
 			Transition := {Mode: Operation, OldHwnd: CloseHwnd, OldEpoch: WindowEpoch,
@@ -925,6 +1035,8 @@ _PESORT_Case(Operation) {
 	} catch as Failure {
 		Primary := Failure
 	} finally {
+		if IsObject(CtorHook)
+			OnMessage(0x210, CtorHook, 0)
 		if IsObject(SwitchHook)
 			OnMessage(0x2, SwitchHook, 0)
 		TestMsgBoxResponder(Saved.Responder)
@@ -981,3 +1093,7 @@ for _PEDEFAULT_Mode in ["default-missing", "default-live"]
 for _PESW_Mode in ["switch-current", "switch-successor"]
 	Test("Personal editor native switch: " . _PESW_Mode . " preserves the latest HWND published during Destroy (personal-native-switch-owner)",
 		_PESORT_Case.Bind(_PESW_Mode))
+
+for _PECT_Mode in ["constructor-current", "constructor-successor"]
+	Test("Personal editor native constructor: " . _PECT_Mode . " retains the current priority control (personal-native-constructor-owner)",
+		_PESORT_Case.Bind(_PECT_Mode))
