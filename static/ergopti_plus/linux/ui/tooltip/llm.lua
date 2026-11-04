@@ -30,6 +30,7 @@ local _cleanup_pending = nil
 local _cleanup_busy = false
 local _generation = 0
 local _presenting = nil
+local _retiring = false
 local settle_cleanup
 -- The hotstring preview sharing the window: { rows = fn, showing = fn,
 -- covered = fn }. rows() answers the preview rows to draw above the
@@ -126,7 +127,7 @@ end
 --- @param opts table { style, renderer?, anchor_provider?, screen_provider? }
 --- @return boolean
 function M.init(opts)
-	if _presenting ~= nil or (_cleanup_pending and not settle_cleanup()) then return false end
+	if _retiring or _presenting ~= nil or (_cleanup_pending and not settle_cleanup()) then return false end
 	opts = type(opts) == "table" and opts or {}
 	_style = opts.style
 	_renderer = opts.renderer
@@ -180,6 +181,22 @@ local function prepare_companion(companion)
 		return revision == nil or (type(companion.revision) == "function" and companion.revision() == revision)
 	end)
 	return ok and ready == true
+end
+
+--- Reads a stable companion ownership decision, or refuses it on reentry.
+local function companion_owner_status()
+	local companion, generation = _companion, _generation
+	if companion == nil then return false end
+	if type(companion.showing) ~= "function" then return nil end
+	local ok, result = pcall(function()
+		local revision = type(companion.revision) == "function" and companion.revision() or nil
+		local showing = companion.showing()
+		if type(showing) ~= "boolean" then return nil end
+		if revision ~= nil and (type(companion.revision) ~= "function" or companion.revision() ~= revision) then return nil end
+		return showing
+	end)
+	if not ok or companion ~= _companion or generation ~= _generation then return nil end
+	return result
 end
 
 --- Settles a possibly partial draw through the surface owner captured with it.
@@ -293,6 +310,7 @@ end
 --- @param meta table|nil
 --- @return boolean
 function M.show(candidates, meta)
+	if _retiring then return false end
 	local before = _generation
 	if type(candidates) ~= "table" or not prepare_companion(_companion) or not settle_cleanup()
 		or before ~= _generation then return false end
@@ -310,6 +328,7 @@ end
 --- @param index integer
 --- @return boolean
 function M.select(index)
+	if _retiring then return false end
 	local before = _generation
 	if not prepare_companion(_companion) or before ~= _generation then return false end
 	if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #_candidates then return false end
@@ -322,6 +341,7 @@ end
 --- @param delta integer
 --- @return boolean
 function M.move(delta)
+	if _retiring then return false end
 	local before = _generation
 	if not prepare_companion(_companion) or before ~= _generation then return false end
 	if #_candidates < 2 or type(delta) ~= "number" then return false end
@@ -340,6 +360,7 @@ end
 --- they stand now. Does nothing while no candidate is shown.
 --- @return boolean drawn
 function M.redraw()
+	if _retiring then return false end
 	local before = _generation
 	if #_candidates == 0 or not prepare_companion(_companion) or not settle_cleanup()
 		or before ~= _generation then return false end
@@ -366,18 +387,29 @@ end
 
 --- Hides and forgets every candidate.
 function M.hide()
+	if _retiring then return false end
 	local before = _generation
 	if not prepare_companion(_companion) or not settle_cleanup() or before ~= _generation then return false end
 	_generation = _generation + 1
 	-- The preview drawn over the suggestions keeps the window; it hides itself.
-	if not companion_showing() and _renderer and type(_renderer.hide) == "function"
-		and _renderer.hide() ~= true then return false end
+	local showing = companion_owner_status()
+	if showing == nil then return false end
+	if not showing and _renderer and type(_renderer.hide) == "function" then
+		_retiring = true
+		local called, hidden = pcall(_renderer.hide)
+		_retiring = false
+		if not called or hidden ~= true then return false end
+	end
 	local shared = #_candidates > 0 and companion_rows() ~= nil
 	_candidates = {}
 	_active_index = 1
 	_meta = {}
 	-- Shown together, the preview stays on screen alone.
-	if shared and _companion and type(_companion.redraw) == "function" then pcall(_companion.redraw) end
+	if shared then
+		if not _companion or type(_companion.redraw) ~= "function" then return false end
+		local called, redrawn = pcall(_companion.redraw)
+		if not called or redrawn ~= true then return false end
+	end
 	return true
 end
 
@@ -406,9 +438,16 @@ end
 
 --- Destroys the shared renderer surface.
 function M.destroy()
-	if _presenting ~= nil or M.hide() ~= true then return false end
+	if _retiring or _presenting ~= nil or M.hide() ~= true then return false end
+	local generation = _generation
+	if not prepare_companion(_companion) or generation ~= _generation then return false end
+	local showing = companion_owner_status()
+	if showing == nil then return false end
+	if showing then _renderer, _style = nil, nil; return true end
 	if _renderer and type(_renderer.destroy) == "function" then
+		_retiring = true
 		local called, destroyed = pcall(_renderer.destroy)
+		_retiring = false
 		if not called or destroyed ~= true then return false end
 	end
 	_renderer = nil
