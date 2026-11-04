@@ -789,16 +789,26 @@ end
 function M.close()
 	if _busy or _debt then return false end
 	if _output ~= nil then return close_owned(_output.capability) end
-	if not _fd then return end
+	if not _fd then return true end
 	_busy = true
 	pcall(Logger.start, LOG, "Destroying the virtual keyboard…")
-	pcall(_backend.ioctl, _fd, UI_DEV_DESTROY, 0)
-	pcall(_backend.close, _fd)
-	_fd = nil
-	_strict_constructor = false
-	_legacy_wire = false
-	pcall(Logger.success, LOG, "Virtual keyboard destroyed.")
+	local fd, ports = _fd, _constructor_ports
+	local destroyed, destroy_ack = pcall(ports.ioctl, fd, UI_DEV_DESTROY, 0)
+	local closed, close_ack = pcall(ports.close, fd)
+	if closed and close_ack == true then _fd = nil end
+	local acknowledged = destroyed and destroy_ack == true and closed and close_ack == true
+	if acknowledged then
+		_strict_constructor = false
+		_legacy_wire = false
+		pcall(Logger.success, LOG, "Virtual keyboard destroyed.")
+	else
+		-- A refused close may have recycled the descriptor already. Preserve the
+		-- debt, but never retry an fd that could now belong to another owner.
+		_debt = true
+		pcall(Logger.error, LOG, "Virtual keyboard retirement remains unacknowledged.")
+	end
 	_busy = false
+	return acknowledged
 end
 
 --- @return boolean True when the device is open and emit() will work.
