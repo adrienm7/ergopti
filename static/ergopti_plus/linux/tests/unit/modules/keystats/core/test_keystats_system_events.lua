@@ -132,13 +132,18 @@ helpers.describe("keystats system events: the writer", function()
 	end)
 end)
 
-for _, failure in ipairs({ "migration", "registration", "migration_throw", "registration_throw" }) do
+for _, failure in ipairs({ "migration", "registration", "migration_throw", "registration_throw", "open_refused", "open_throw", "open_unavailable" }) do
 	it("metrics do not use SQLite after failed " .. failure, function()
 		local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system_metrics" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local starts, closes, registers = 0, 0, 0
 		local writer = setmetatable({
-			open_db = function() return true end,
+			open_db = function()
+				if failure == "open_throw" then error("injected open failure") end
+				if failure == "open_refused" then return false, "store_refused" end
+				if failure == "open_unavailable" then return false, "sqlite_unavailable" end
+				return true
+			end,
 			ensure_token_encoding = function()
 				if failure == "migration_throw" then error("injected migration failure") end
 				return failure ~= "migration"
@@ -161,13 +166,16 @@ for _, failure in ipairs({ "migration", "registration", "migration_throw", "regi
 			acknowledge = function() end, take_events = function() return {} end }
 		local called, detail = pcall(function()
 			local keystats = require(names[2])
-			helpers.assert_eq(keystats.init(Home.options()), false, "failed migration or registration blocks initialization")
+			local blocked = failure ~= "open_unavailable"
+			helpers.assert_eq(keystats.init(Home.options()), not blocked, "only explicit missing sqlite uses fallback")
+			helpers.assert_eq(keystats.get_privacy_state().storage_blocked, blocked, "diagnostics can observe the capture gate")
 			require("tests.support.metrics_consent_fixture").enable(keystats)
 			keystats.on_keydown("a", 1000, "owned-app")
-			helpers.assert_nil(keystats.get_app_stats()["owned-app"], "unpersistable events must not be captured")
+			helpers.assert_eq(keystats.get_app_stats()["owned-app"] == nil, blocked, "rejected stores cannot capture unpersistable events")
 			keystats.flush()
 			helpers.assert_eq(starts, 0, "unadmitted SQLite must never accept a flush")
-			helpers.assert_eq(closes, 1, "failed SQLite initialization releases the store")
+			helpers.assert_eq(closes, (failure == "open_refused" or failure == "open_throw" or failure == "open_unavailable") and 0 or 1,
+				"only a successfully opened store is closed")
 			helpers.assert_eq(registers, (failure == "registration" or failure == "registration_throw") and 1 or 0)
 			failure = "none"
 			helpers.assert_true(keystats.init(Home.options()), "healthy retry must restore admission")

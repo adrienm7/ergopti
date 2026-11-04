@@ -521,29 +521,30 @@ end
 --- canonical schema on first open.
 --- @param db_path string Absolute path to the .sqlite file (e.g. ~/.local/share/ergopti/metrics.sqlite).
 --- @return boolean True on success.
+--- @return string|nil failure "sqlite_unavailable" or "store_refused".
 function M.open_db(db_path)
 	if M.has_private_file_debt() then
 		Logger.error(LOG, "Private SQLite file cleanup remains unresolved; reopening is refused.")
-		return false
+		return false, "store_refused"
 	end
-	if _flush_owner and not _flush_owner:is_settled() then return false end
+	if _flush_owner and not _flush_owner:is_settled() then return false, "store_refused" end
 	if _media_terminal_debt ~= nil then
 		Logger.error(LOG, "Cannot reopen SQLite while semantic media terminal ownership is unresolved.")
-		return false
+		return false, "store_refused"
 	end
 	if type(db_path) ~= "string" or db_path == "" then
 		Logger.error(LOG, "open_db(): db_path must be a non-empty string.")
-		return false
+		return false, "store_refused"
 	end
 
 	-- Bootstrap and schema admission belong to the open store. Repointing it
 	-- would reuse the old admission and a later refusal would lose that owner.
 	if _db_path ~= nil and _db_path ~= db_path then
 		Logger.error(LOG, "Cannot switch SQLite stores before explicitly closing the current store.")
-		return false
+		return false, "store_refused"
 	end
 
-	if not _check_sqlite3() then return false end
+	if not _check_sqlite3() then return false, "sqlite_unavailable" end
 
 	_db_path = db_path
 
@@ -557,7 +558,7 @@ function M.open_db(db_path)
 	if not private then
 		Logger.error(LOG, "SQLite permissions admission refused: %s.", privacy_error)
 		_db_path = nil
-		return false
+		return false, "store_refused"
 	end
 
 	-- Bootstrap schema on first open.
@@ -566,7 +567,7 @@ function M.open_db(db_path)
 		if not schema then
 			Logger.error(LOG, "Schema bootstrap failed — cannot open database.")
 			_db_path = nil
-			return false
+			return false, "store_refused"
 		end
 
 		-- Check if the DB file already exists (has a non-zero size).
@@ -581,13 +582,13 @@ function M.open_db(db_path)
 				Logger.error(LOG, "Cannot inspect and close the existing SQLite database at %s: %s.",
 					_db_path, ErrorDescription.describe(detail))
 				_db_path = nil
-				return false
+				return false, "store_refused"
 			end
 			existed = size > 0
 		elseif code ~= RegularFileReader.ENOENT then
 			Logger.error(LOG, "Cannot inspect the SQLite database at %s: %s.", _db_path, ErrorDescription.describe(detail))
 			_db_path = nil
-			return false
+			return false, "store_refused"
 		end
 
 		if not existed then
@@ -595,7 +596,7 @@ function M.open_db(db_path)
 			if not _exec(schema) then
 				Logger.error(LOG, "Schema execution failed.")
 				_db_path = nil
-				return false
+				return false, "store_refused"
 			end
 			Logger.success(LOG, "Schema bootstrapped successfully.")
 		end
@@ -604,14 +605,14 @@ function M.open_db(db_path)
 		Logger.error(LOG, "Unable to upgrade device registry for Linux support.")
 		_bootstrapped = false
 		_db_path = nil
-		return false
+		return false, "store_refused"
 	end
 
 	if not _ensure_media_schema() then
 		_media_policy = nil
 		_bootstrapped = false
 		_db_path = nil
-		return false
+		return false, "store_refused"
 	end
 
 	-- This admission belongs to the successfully opened store. A failed
