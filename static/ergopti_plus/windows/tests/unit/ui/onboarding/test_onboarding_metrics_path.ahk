@@ -22,13 +22,13 @@ _TOMP_ChosenFolderNamesItsStore() {
 
 _TOMP_EmptyFieldNamesTheDefaultStore() {
 	; boot.ahk is not part of the test build; pin the default it would compute.
-	global _DefaultConfigDir := "C:\Users\me\.config\ergopti_plus\"
+	global _DefaultConfigDir := "C:\Users\me\AppData\Local\Ergopti\config\"
 	global _ConfigDir
 	Previous := IsSet(_ConfigDir) ? _ConfigDir : ""
 	try {
 		; A redirected boot folder must not leak into the empty-field answer.
 		_ConfigDir := "E:\Redirected\"
-		AssertEqual(_Onboarding_MetricsPathFor(""), "C:/Users/me/.config/ergopti_plus/metrics",
+		AssertEqual(_Onboarding_MetricsPathFor(""), "C:/Users/me/AppData/Local/Ergopti/config/metrics",
 			"an empty field commits to the OS default, so the consent text must name its store")
 	} finally {
 		_ConfigDir := Previous
