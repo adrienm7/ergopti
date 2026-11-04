@@ -887,8 +887,11 @@ on Linux, never "Plus"), each OS root and its purpose folders, each OS default
 logs folder, the LogsDirPath key, every log file-name prefix and the old
 folder names of the one-time boot migration. One root per OS, named once:
 macOS `~/Library/Application Support/Ergopti/` (beside `~/Library/Logs/Ergopti/`
-and `~/Library/Caches/Ergopti/`), Windows `%LOCALAPPDATA%\Ergopti\` (plus the
-protected `Ergopti-ollama` sibling), Linux one `ergopti` folder per XDG base.
+and `~/Library/Caches/Ergopti/`), Windows `%LOCALAPPDATA%\Ergopti\` (the managed
+Ollama runtime is `ollama\` inside it, with its own protected DACL;
+`Open-OllamaManagedRoot` admits it only below a direct LocalAppData child that
+grants no write, delete or re-permission right to another principal, held open
+without DELETE sharing), Linux one `ergopti` folder per XDG base.
 A new data folder is a purpose folder under that root declared in the TOML,
 never a new spelling; `test-legacy-folder-names.cjs` rejects an old spelling
 outside the migration tables. The macOS owned Karabiner runtime keeps

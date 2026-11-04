@@ -19,23 +19,28 @@ read the TOML itself.
 | OS      | Root and purpose folders                                                                                                                                                                                                                                                                      |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | macOS   | `~/Library/Application Support/Ergopti/` (paths.toml, `config/`, `control/`, managed runtimes, locks, LeaseGuardian, pty-sources, RemapRuntime), `~/Library/Logs/Ergopti/`, `~/Library/Caches/Ergopti/`                                                                                       |
-| Windows | `%LOCALAPPDATA%\Ergopti\` (paths.toml, `config\`, `logs\`, `cache\`, `control\`, `updater\`, `updates\`, `diagnostics\`, `bundle\`, `_generated\`, `field-run\`)                                                                                                                              |
+| Windows | `%LOCALAPPDATA%\Ergopti\` (paths.toml, `config\`, `logs\`, `cache\`, `control\`, `updater\`, `updates\`, `diagnostics\`, `bundle\`, `_generated\`, `field-run\`, `ollama\`)                                                                                                                   |
 | Linux   | `$XDG_CONFIG_HOME/ergopti` (config, storage.json, api_keys.json), `$XDG_STATE_HOME/ergopti` (logs, agent_learning.json, llm_thinking_refused.json), `$XDG_DATA_HOME/ergopti` (metrics, managed Ollama), `$XDG_CACHE_HOME/ergopti` (updater ETags), `$XDG_RUNTIME_DIR/ergopti` (control, lock) |
 
-Two deliberate exceptions, each documented in the TOML:
+The Windows managed Ollama runtime is `%LOCALAPPDATA%\Ergopti\ollama` (maintainer
+decision, 4 November). `Open-OllamaManagedRoot` creates it with a protected
+DACL (the user and SYSTEM only) and admits it only below a direct
+LocalApplicationData child that is not a reparse point and grants no write,
+delete, re-permission or take-ownership right to any principal but the user,
+SYSTEM and Administrators; that parent is held open without DELETE sharing.
+`test_ollama_install_files.ps1` weakens each ACL on the real folders and
+expects a refusal.
 
-1. **Windows managed Ollama** goes to `%LOCALAPPDATA%\Ergopti-ollama`, a
-   sibling of the root. `ollama_managed_files.ps1` `Open-OllamaManagedRoot`
-   admits only a direct LocalApplicationData child and gives it a protected
-   DACL. **Maintainer question:** accept the sibling, or change the admission?
-2. **macOS owned Karabiner runtime** keeps `ErgoptiPlus`
-   (`[owned_runtime.macos]`): the root-owned
-   `/Library/Application Support/ErgoptiPlus/**` tree and the per-user
-   `~/Library/Application Support/ErgoptiPlus/karabiner` are compiled into the
-   patched C++ sources (`remap_runtime_patch.py`) and the pending runtime
-   artifact (TODO item 31). Rename them in the change that rebuilds the
-   runtime; `tools/test/test-legacy-folder-names.cjs` exempts exactly these two
-   spellings.
+One deliberate exception, documented in the TOML:
+
+- **macOS owned Karabiner runtime** keeps `ErgoptiPlus`
+  (`[owned_runtime.macos]`): the root-owned
+  `/Library/Application Support/ErgoptiPlus/**` tree and the per-user
+  `~/Library/Application Support/ErgoptiPlus/karabiner` are compiled into the
+  patched C++ sources (`remap_runtime_patch.py`) and the pending runtime
+  artifact (TODO item 31). Rename them in the change that rebuilds the
+  runtime; `tools/test/test-legacy-folder-names.cjs` exempts exactly these two
+  spellings.
 
 The log file prefixes `ErgoptiPlus_`, the app and script names and the bundle
 ids `com.ergoptiplus.*` are not folder names and are unchanged.
@@ -74,7 +79,9 @@ Drivers:
 - **Windows** `infra/legacy_folder_migration.ahk`, from `boot.ahk` before the
   transition recovery and never under the startup smoke: the Roaming
   `%APPDATA%\Ergopti\paths.toml`, `%USERPROFILE%\.config\ergopti_plus`, every
-  entry of `%LOCALAPPDATA%\ergopti_plus` and `ergopti_plus_ollama`.
+  entry of `%LOCALAPPDATA%\ergopti_plus`, then `ergopti_plus_ollama` and the
+  `Ergopti-ollama` sibling into `%LOCALAPPDATA%\Ergopti\ollama` (the second one
+  to the backup when the first already moved).
 
 The migration is for the maintainer's machines only (no published build used
 the old folders) and is deleted once they are moved.
@@ -84,7 +91,7 @@ the old folders) and is deleted once they are moved.
 - **Windows:** after the first boot, `%LOCALAPPDATA%\Ergopti\logs\` holds the
   "Moved legacy folder entry" lines; `%APPDATA%\Ergopti`,
   `%USERPROFILE%\.config\ergopti_plus`, `%LOCALAPPDATA%\ergopti_plus` and
-  `ergopti_plus_ollama` are gone; `%LOCALAPPDATA%\Ergopti\config\` holds the
+  `ergopti_plus_ollama` and `Ergopti-ollama` are gone; `%LOCALAPPDATA%\Ergopti\config\` holds the
   configuration; anything under `%LOCALAPPDATA%\Ergopti\before-folder-migration\`
   was a clash to look at.
 - **macOS:** after the first launch, `~/Library/Application Support/Ergopti/`
