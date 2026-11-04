@@ -60,9 +60,10 @@ end
 
 --- Whether this process runs inside the daemon's systemd user unit.
 --- @param cgroup string|nil The text of /proc/self/cgroup (read when nil).
---- @return boolean
+--- @return boolean|nil in_unit nil when the native cgroup cannot be read.
 function M.under_unit(cgroup)
-	cgroup = cgroup or read_file("/proc/self/cgroup") or ""
+	if cgroup == nil then cgroup = read_file("/proc/self/cgroup") end
+	if type(cgroup) ~= "string" then return nil end
 	-- A similarly named scope or service cannot restart this process. Match an
 	-- exact ancestor in either hierarchy format, including delegated subgroups.
 	for line in cgroup:gmatch("[^\n]+") do
@@ -171,7 +172,12 @@ function M.restart(opts)
 	end
 	local run = opts.run or ShellRunner.run
 	local function dispatch()
-		if M.under_unit(opts.cgroup) then
+		local under_unit = M.under_unit(opts.cgroup)
+		if under_unit == nil then
+			Logger.error(LOG, "Own cgroup unreadable — restart route cannot be determined.")
+			return nil
+		end
+		if under_unit then
 			-- --no-block: systemd restarts the unit after this call returns, by
 			-- stopping this process the way a logout does.
 			if run("systemctl --user --no-block restart " .. M.UNIT) then

@@ -197,6 +197,30 @@ helpers.describe("updater restart: starting the installed version", function()
 		end)
 	end
 
+	helpers.it("(restart-cgroup-read-refusal) never guesses the restart route", function()
+		local original_open = io.open
+		local calls = 0
+		io.open = function(path, ...)
+			if path == "/proc/self/cgroup" then return nil, "controlled read refusal", 13 end
+			return original_open(path, ...)
+		end
+		local ok, detail = pcall(function()
+			helpers.assert_nil(Restarter.under_unit())
+			local how = Restarter.restart({ wrapper = "/x", args = {}, pid = 4242, start_tick = "1337",
+				run = function() calls = calls + 1; return true end })
+			helpers.assert_nil(how)
+			helpers.assert_eq(calls, 0, "unreadable cgroup must not dispatch a guessed relay")
+			local daemon = helpers.load_module("infra.daemon_restart")
+			local outer = daemon.restart({ reason = "test", args = {},
+				installation = function() return { kind = "standalone", wrapper = "/x" } end,
+				run = function() calls = calls + 1; return true end })
+			helpers.assert_nil(outer)
+			helpers.assert_eq(calls, 0, "the daemon must also refuse an unknown cgroup")
+		end)
+		io.open = original_open
+		if not ok then error(detail, 0) end
+	end)
+
 	helpers.it("(restart-relay-pid-reuse) refuses relay dispatch without a valid start tick", function()
 		local calls = 0
 		local how = Restarter.restart({ wrapper = "/x", cgroup = TERMINAL_CGROUP, pid = 4242,
