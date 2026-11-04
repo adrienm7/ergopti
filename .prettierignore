@@ -16,6 +16,12 @@ yarn.lock
 # them (tools/build/generators.cjs lists every output; test-prettier-ignore
 # keeps this list complete).
 **/_generated/
+# Feature inventory projections are owned by codegen-feature-inventory.cjs.
+docs/feature-inventory.md
+src/routes/ergopti-plus/feature-inventory.json
+src/routes/ergopti-plus/action-inventory.json
+src/routes/ergopti-plus/menu-gaps.json
+src/routes/ergopti-plus/input-inventory.json
 static/ergopti_plus/_shared/core/ports/contracts.json
 static/ergopti_plus/_shared/data/metrics_general_category_aliases.json
 static/ergopti_plus/_shared/go/native_http/managed_ollama_bootstrap.json
