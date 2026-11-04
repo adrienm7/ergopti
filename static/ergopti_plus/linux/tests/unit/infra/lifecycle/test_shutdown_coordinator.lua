@@ -1602,13 +1602,21 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 
 	for _, mode in ipairs({ "deadline", "native-refused", "native-threw", "signal-refused", "input-refused", "runtime-first" }) do
 		helpers.it("(webview-main-shutdown-ack) retains " .. mode .. " until original native ACK", function()
-			local c = DocumentFixture.new("changelog", { bridge_name = "changelog_bridge", on_message = function() return {} end }, {})
+			local admitted, cancels, epoch = false, 0, nil
+			local fixture_state = {}
+			if mode == "input-refused" then
+				fixture_state.input_capture_gate = { release = function(app, supplied_epoch)
+					helpers.assert_eq(app, "changelog"); helpers.assert_eq(supplied_epoch, epoch)
+					return admitted
+				end }
+			end
+			local c = DocumentFixture.new("changelog", { bridge_name = "changelog_bridge", on_message = function() return {} end }, fixture_state)
 			local view = c.start_load()
-			local epoch, timer = c.manager.current_epoch("changelog"), c.timers[1]
+			epoch = c.manager.current_epoch("changelog")
+			local timer = c.timers[1]
 			local destroy, native_shutdown = view.destroy, c.manager.shutdown
 			local gobject = package.loaded.lgi.GObject
 			local disconnect = gobject.signal_handler_disconnect
-			local admitted, cancels = false, 0
 			local coordinator, state
 			local ok, detail = pcall(function()
 				coordinator, state = actual_main(c.manager, mode == "runtime-first")
@@ -1626,11 +1634,6 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 						if not admitted then return false end
 						return disconnect(...)
 					end
-				elseif mode == "input-refused" then
-					c.state.input_capture_gate = { release = function(app, supplied_epoch)
-						helpers.assert_eq(app, "changelog"); helpers.assert_eq(supplied_epoch, epoch)
-						return admitted
-					end }
 				end
 				helpers.assert_true(coordinator.request("tray quit"))
 				if mode == "runtime-first" then
