@@ -53,6 +53,8 @@ local function migrate(answers)
 		}
 	end
 	local uv = require("luv")
+	local Reader = require("infra.regular_file_reader")
+	local original_reader = Reader.open
 	local backup = path .. require("keystats.token_encoding").BACKUP_SUFFIX
 	local exited, process = false, nil
 	local ok, result = xpcall(function()
@@ -61,6 +63,13 @@ local function migrate(answers)
 		if answers.existing_backup then
 			local existing = assert(io.open(backup, "wb"))
 			assert(existing:write("previous backup") and existing:close())
+		end
+		if answers.backup_close_throw then
+			Reader.open = function(target, ...)
+				local stream, detail, code = original_reader(target, ...)
+				if target ~= backup or not stream then return stream, detail, code end
+				return { close = function() assert(stream:close()); error("injected backup close failure") end }, detail, code
+			end
 		end
 		if answers.fifo then
 			local made = previous_execute("mkfifo '" .. backup .. "'")
@@ -73,6 +82,7 @@ local function migrate(answers)
 		return writer.ensure_token_encoding()
 	end, debug.traceback)
 	os.execute, io.popen = previous_execute, previous_popen
+	Reader.open = original_reader
 	writer.close_db()
 	os.remove(path)
 	if answers.fifo then
@@ -146,6 +156,12 @@ helpers.describe("keystats sqlite writer: n-gram token encoding", function()
 		helpers.assert_true(result)
 		helpers.assert_nil(position(commands, "VACUUM INTO"))
 		helpers.assert_true(position(commands, "UPDATE OR ROLLBACK") ~= nil)
+	end)
+
+	helpers.it("token-encoding refuses a backup close exception", function()
+		local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, existing_backup = true, backup_close_throw = true })
+		helpers.assert_eq(result, false)
+		helpers.assert_nil(position(commands, "UPDATE OR ROLLBACK"))
 	end)
 
 	helpers.it("token-encoding: a FIFO backup refuses migration without blocking", function()
