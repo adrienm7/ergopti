@@ -153,7 +153,7 @@ end
 M._now_ms = function() return Monotonic.now_ms() end
 M._defer = function(fn) return TimerScheduler.after(0, fn).fired ~= true end
 M._read_file = function(path)
-	local file = io.open(path, "rb")
+	local file = require("infra.regular_file_reader").open_source(path)
 	if not file then return nil end
 	local raw = file:read(MAX_SETTINGS_BYTES)
 	file:close()

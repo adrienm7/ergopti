@@ -28,6 +28,25 @@ helpers.describe("Local server port discovery (local-server-ports)", function()
 		read("modules/llm/local_servers.json"), Json.decode, helpers)
 end)
 
+helpers.it("local server settings refuse a FIFO without waiting for its writer", function()
+	local uv = require("luv")
+	local scanner = require("modules.llm.local_server_ports")
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-settings-XXXXXX"))
+	local path = dir .. "/settings.json"
+	local made = os.execute("mkfifo '" .. path .. "'")
+	assert(made == true or made == 0)
+	local exited, process = false, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; printf settings > "$1"', "fixture", path } }, function()
+		exited = true
+		process:close()
+	end))
+	local content = scanner._read_file(path)
+	os.remove(path)
+	os.remove(dir)
+	while not exited do uv.run("once") end
+	helpers.assert_eq(content, nil, "a FIFO must not be treated as local server settings")
+end)
+
 helpers.describe("Linux local server port scan from /proc (local-server-ports)", function()
 	local uv = require("luv")
 
