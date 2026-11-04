@@ -358,14 +358,14 @@ end
 --- @param current_name string|nil Current layout name.
 local function select_unique_record(records, current_name)
 	local match = nil
+	local ambiguous = false
 	for _, record in ipairs(records) do
 		record.selected = false
-		if is_record_selected(record.id, record.name, current_name) then
-			if match then return end
-			match = record
+		if is_record_selected(record.id or "", record.name or "", current_name) then
+			if match then ambiguous = true else match = record end
 		end
 	end
-	if match then match.selected = true end
+	if match and not ambiguous then match.selected = true end
 end
 
 --- Parses the enabled input sources the HIToolbox probe printed into menu
@@ -621,9 +621,7 @@ local function list_active_keyboard_layouts()
 	local current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
 		and hs.keycodes.currentLayout() or nil
 	if _active_layouts_cache then
-		for _, r in ipairs(_active_layouts_cache) do
-			r.selected = is_record_selected(r.id or "", r.name or "", current_name)
-		end
+		select_unique_record(_active_layouts_cache, current_name)
 		maybe_refresh_active_layouts(false)
 		return _active_layouts_cache
 	end

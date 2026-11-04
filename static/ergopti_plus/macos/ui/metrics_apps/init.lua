@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local ManifestKeys = require("keystats.manifest_keys")
 local WebviewResult = require("adapters.webview_result")
 local RunningApplication = require("adapters.running_application")
 local OwnWindow = require("adapters.own_window")
@@ -459,7 +460,7 @@ end
 
 --- On-disk snapshot of the last successful render (instant pre-fill).
 local UI_TMP_DIR    = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
-local UI_CACHE_FILE = UI_TMP_DIR .. "ergopti_metrics_apps_cache.json"
+local UI_CACHE_FILE = UI_TMP_DIR .. "ergopti_metrics_apps_cache_v3.json"
 
 
 
@@ -836,11 +837,12 @@ local function with_live_active_app_duration(manifest)
 	for app_name, app_data in pairs(original_day) do day_copy[app_name] = app_data end
 	projected[date_str] = day_copy
 
-	local original_app = original_day[snapshot.app] or {}
+	local app_key = ManifestKeys.encode(snapshot.app)
+	local original_app = original_day[app_key] or {}
 	local app_copy = {}
 	for key, value in pairs(original_app) do app_copy[key] = value end
 	app_copy.app_time_ms = (tonumber(app_copy.app_time_ms) or 0) + snapshot.duration_ms
-	day_copy[snapshot.app] = app_copy
+	day_copy[app_key] = app_copy
 	return projected
 end
 
@@ -989,8 +991,9 @@ local function load_and_inject(generation, webview)
 		local icon_lookups = 0
 		local seen_apps    = {}
 		for _, day_data in pairs(manifest) do
-			for app_name, _ in pairs(day_data) do
-				if not seen_apps[app_name] then
+			for app_key, _ in pairs(day_data) do
+				local app_name = ManifestKeys.decode(app_key)
+				if app_key ~= "_system" and app_key ~= "_sys" and not seen_apps[app_name] then
 					seen_apps[app_name] = true
 					local cached = M._app_icon_cache[app_name]
 					if cached ~= nil then

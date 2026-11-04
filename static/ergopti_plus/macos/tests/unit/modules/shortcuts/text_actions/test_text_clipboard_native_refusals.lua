@@ -30,6 +30,7 @@ local function load_fixture(options)
 	local selection_reads = 0
 	local pasteboard = {
 		changeCount = function() return change_count end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function() return original end,
 		getContents = function()
 			selection_reads = selection_reads + 1

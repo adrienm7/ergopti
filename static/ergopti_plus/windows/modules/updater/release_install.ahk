@@ -114,7 +114,11 @@ ReleaseInstall_Start(Tag, Channel, Deps) {
 	}
 	BackupPath := (Backup is Map && Backup.Has("path")) ? Backup["path"] : ""
 	Current["backup_path"] := BackupPath
-	Asset := Deps["asset"].Call(Release)
+	try Asset := Deps["asset"].Call(Release)
+	catch {
+		try LoggerError("ReleaseInstall", "Install of {1} refused: the release asset resolver failed.", Tag)
+		return _ReleaseInstall_Fail(Deps, Tag, "unexpected", BackupPath, Current)
+	}
 	if !IsObject(Asset) {
 		try LoggerError("ReleaseInstall", "Install of {1} refused: the release has no asset for Windows.", Tag)
 		return _ReleaseInstall_Fail(Deps, Tag, "no_asset", BackupPath, Current)

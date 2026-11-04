@@ -421,7 +421,16 @@ end
 --- @return table state
 local function _load_check_state()
 	if _check_state then return _check_state end
-	local state, dropped = Schedule.sanitize_state(_storage_get(CHECK_STATE_KEY, nil))
+	if not Storage or type(Storage.read_exact) ~= "function" then
+		Logger.error(LOG, "The update-check storage cannot perform an exact read.")
+		return nil
+	end
+	local called, read_ok, stored = pcall(Storage.read_exact, CHECK_STATE_KEY)
+	if not called or read_ok ~= true then
+		Logger.error(LOG, "The update-check record could not be read; retrying without overwriting it.")
+		return nil
+	end
+	local state, dropped = Schedule.sanitize_state(stored)
 	for _, field in ipairs(dropped) do
 		Logger.warn(LOG, "Dropped the invalid '%s' of the stored update-check record.", field)
 	end
@@ -1251,7 +1260,9 @@ end
 --- @param generation number Captured logical schedule owner.
 local function _complete_background_check(ok, available, release, generation)
 	if not _schedule_current(generation) then return end
-	local state = Schedule.record_check(_load_check_state(), M._now(), ok)
+	local previous = _load_check_state()
+	if not previous then return end
+	local state = Schedule.record_check(previous, M._now(), ok)
 	_save_check_state(state)
 	Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
 		ok and "success" or "failure", state.failures)
@@ -1302,9 +1313,11 @@ local function _evaluate_schedule()
 			now - _armed_at, _armed_for)
 		_started_at = now
 	end
+	local state = _load_check_state()
+	if not state then _arm_schedule(TIMING.reevaluate_sec); return end
 	local due_at, reason = Schedule.next_due({
 		now = now, started_at = _started_at or now, interval = _check_interval,
-		state = _load_check_state(), timing = TIMING,
+		state = state, timing = TIMING,
 	})
 	if due_at == nil then
 		Logger.debug(LOG, "Automatic update checks are off (%s).", reason)
@@ -1404,10 +1417,12 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	_started_at = _started_at or M._now()
 	local now = M._now()
 	if now < _started_at then _started_at = now end
-	local due_at, reason = Schedule.next_due({
+	local state = _load_check_state()
+	local due_at, reason
+	if state then due_at, reason = Schedule.next_due({
 		now = now, started_at = _started_at, interval = _check_interval,
-		state = _load_check_state(), timing = TIMING,
-	})
+		state = state, timing = TIMING,
+	}) else reason = "record_unavailable" end
 	local first_delay = due_at and Schedule.delay_until(due_at, now, TIMING) or TIMING.reevaluate_sec
 	Logger.start(LOG, "Background checks every %ds on channel '%s' (next evaluation in %ds, %s).",
 		_check_interval, _channel, first_delay, reason)

@@ -624,6 +624,18 @@ helpers.describe("keystats events_json controls are escaped (json-controls)", fu
 end)
 
 helpers.describe("manual-marker-chars", function()
+  it("manual-marker-chars: live reserved app labels use distinct manifest keys", function()
+		keystats.init({ sqlite_path = fresh_db() })
+		require("tests.support.metrics_consent_fixture").enable(keystats)
+		keystats.on_keydown("a", 1000, "_system")
+		keystats.on_keydown("b", 1100, "_sys")
+		keystats.on_keydown("c", 1200, "~app")
+		local today = os.date("%Y-%m-%d")
+		local day = keystats.get_dashboard_payload({ include_prefetch = false }).metrics_manifest[today]
+		helpers.assert_eq(day["~_system"].chars, 1)
+		helpers.assert_eq(day["~_sys"].chars, 1)
+		helpers.assert_eq(day["~~app"].chars, 1)
+	end)
   it("manual-marker-chars: public corrections preserve literal typed-character counts", function()
     keystats.init({ sqlite_path = fresh_db() })
     require("tests.support.metrics_consent_fixture").enable(keystats)

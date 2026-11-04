@@ -293,6 +293,10 @@ local function name_modifier_holds(actions)
 			end
 			action.label = KeyNames.modifiers_heading(action.modifiers, "macos", i18n.get)
 			action.short_label = KeyNames.modifiers_label(action.modifiers, "macos", i18n.get)
+			if action.id == "hyper" then
+				action.label = "Hyper — " .. action.label
+				action.short_label = "Hyper"
+			end
 		end
 	end
 end

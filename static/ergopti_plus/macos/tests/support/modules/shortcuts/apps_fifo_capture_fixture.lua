@@ -34,6 +34,7 @@ function M.with_world(options, callback)
 		end
 		f.key_observer = observe
 		hs.pasteboard = {
+			allContentTypes = function() return { {} } end,
 			readAllData = function() return board end,
 			clearContents = function() board = {} end,
 			getContents = function() reads = reads + 1; return board['public.utf8-plain-text'] end,

@@ -58,6 +58,7 @@ function M.with_world(options, scenario)
 			local w = { native = f, synthetic = synthetic, now = 0, board = original,
 				original = original, generation = 0, restores = 0, writes = {}, pastes = {}, keys = {} }
 			hs.pasteboard = {
+				allContentTypes = function() return { {} } end,
 				readAllData = function() return w.board end,
 				writeAllData = function(saved)
 					w.board = saved; w.generation = w.generation + 1; w.restores = w.restores + 1

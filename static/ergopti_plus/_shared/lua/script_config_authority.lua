@@ -162,6 +162,61 @@ end
 --- @param options table { path, file_adapter, manifest, key (canonical path), value }.
 --- @return boolean committed True when the file needs no change or was rewritten.
 --- @return string|nil detail Why the change was refused.
+function M.rewrite_owned(options)
+	assert(type(options) == "table" and type(options.key) == "string", "script authority rewrite needs its key")
+	local document, source, detail = read_document(options.path, options.file_adapter)
+	if document == nil then return false, detail end
+	local held = source_value(document, options.key)
+	if held == nil or held == options.value then
+		return true, nil, { path = options.path, file_adapter = options.file_adapter,
+			before = source.content, after = source.content, status = source.status, noop = true }
+	end
+	local operation = options.manifest.sparse_operation(options.key, options.value)
+	local committed, write_detail, content, cleanup, candidate = Writer.batch_write(options.path, { operation }, options.file_adapter, source)
+	if committed ~= true then
+		local receipt
+		if type(cleanup) == "function" and type(candidate) == "string" and source.status == "ok" then
+			receipt = { path = options.path, file_adapter = options.file_adapter, before = source.content,
+				after = candidate, publication_cleanup = cleanup }
+		end
+		return false, "config.toml was not rewritten: " .. tostring(write_detail), receipt
+	end
+	if type(content) ~= "string" or source.status ~= "ok" then return false, "config.toml rewrite receipt is unavailable" end
+	local receipt = { path = options.path, file_adapter = options.file_adapter, before = source.content, after = content }
+	local observed, status = Writer.read_classified(options.path, options.file_adapter)
+	if status ~= "ok" or observed ~= content then
+		return false, "config.toml rewrite readback did not match", receipt
+	end
+	return true, nil, receipt
+end
+
+--- Restores only the exact bytes this rewrite published, never a later writer.
+function M.restore_rewrite(receipt)
+	if receipt == nil then return true end
+	if type(receipt) == "table" and receipt.noop == true then return true end
+	if type(receipt) ~= "table" or type(receipt.before) ~= "string" or type(receipt.after) ~= "string" then return false end
+	if receipt.publication_cleanup ~= nil and Writer.retry_publication_cleanup(receipt) ~= true then return false end
+	local current, status = Writer.read_classified(receipt.path, receipt.file_adapter)
+	if status == "ok" and current == receipt.before then return true end
+	if status ~= "ok" or current ~= receipt.after then return false end
+	local _, _, cleanup = Writer.publish_if_unchanged(receipt.path, receipt.before, receipt.file_adapter,
+		{ status = "ok", content = receipt.after })
+	if type(cleanup) == "function" then receipt.publication_cleanup = cleanup; return false end
+	local restored, restored_status = Writer.read_classified(receipt.path, receipt.file_adapter)
+	return restored_status == "ok" and restored == receipt.before
+end
+
+function M.verify_rewrite(receipt)
+	if receipt == nil then return true end
+	if type(receipt) ~= "table" then return false end
+	local observed, status = Writer.read_classified(receipt.path, receipt.file_adapter)
+	if receipt.noop == true then
+		return status == receipt.status and (status ~= "ok" or observed == receipt.after)
+	end
+	if type(receipt.after) ~= "string" then return false end
+	return status == "ok" and observed == receipt.after
+end
+
 function M.rewrite(options)
 	assert(type(options) == "table" and type(options.key) == "string", "script authority rewrite needs its key")
 	local document, source, detail = read_document(options.path, options.file_adapter)

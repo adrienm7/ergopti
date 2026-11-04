@@ -70,6 +70,25 @@ local function with_windows(options, callback)
 end
 
 helpers.describe("window focus refuses a detached native window", function()
+	helpers.it("restores a window minimized after it was inventoried", function()
+		local minimized, restores = true, 0
+		local app = {}
+		local win = {
+			application = function() return app end,
+			isMinimized = function() return minimized end,
+			unminimize = function(self) restores = restores + 1; minimized = false; return self end,
+			focus = function(self) return self end,
+		}
+		local manager = helpers.load_with_stubs("adapters.window_manager", {
+			window = { get = function() return win end },
+		})
+		helpers.assert_eq(manager.focus_window({ window = win, id = 1, minimized = false }), true)
+		helpers.assert_eq(restores, 1)
+		minimized = true
+		helpers.assert_eq(manager.activate(1), true)
+		helpers.assert_eq(restores, 2)
+	end)
+
 	helpers.it("activate rejects a chain result with no application (window-focus-lifetime)", function()
 		with_windows({ behavior = "exited" }, function(f)
 			helpers.assert_eq(f.manager.activate(22), false,

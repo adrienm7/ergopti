@@ -116,8 +116,9 @@ function rebuildFilterButtons() {
 	// ── Categories ────────────────────────────────────────────────────
 	const allCats = new Set();
 	Object.values(manifestData || {}).forEach((day) => {
-		Object.entries(day || {}).forEach(([name, app]) => {
-			if (name === '_sys' || name === '_system') return;
+		Object.entries(day || {}).forEach(([key, app]) => {
+			if (key === '_sys' || key === '_system') return;
+			const name = metricsManifestLabel(key);
 			const c = getAppCategory(name, app.category).type || 'Général';
 			allCats.add(c);
 		});

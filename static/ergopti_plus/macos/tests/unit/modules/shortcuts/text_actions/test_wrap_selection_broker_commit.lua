@@ -29,6 +29,7 @@ local function with_broker(callback)
 		local change_count = 0
 		f.hs_overrides.pasteboard = {
 			changeCount = function() return change_count end,
+			allContentTypes = function() return { {} } end,
 			readAllData = function() return clipboard end,
 			setContents = function(value)
 				change_count = change_count + 1

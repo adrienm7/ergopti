@@ -55,6 +55,9 @@ helpers.describe("Config.load_available_actions: shared modifier chords", functi
 		helpers.assert_eq(by_id.fn_shift.label, "key_name.fn + key_name.shift", "Fn has no glyph")
 		helpers.assert_eq(by_id.cmd_option_shift_ctrl, nil)
 		helpers.assert_eq(by_id.cmd_shift_ctrl.label, "⌘⇧⌃ key_name.cmd + key_name.shift + key_name.ctrl")
+		helpers.assert_eq(by_id.hyper.label, "Hyper — ⌘⌥⇧⌃ key_name.cmd + key_name.option + key_name.shift + key_name.ctrl",
+			"Hyper must use the same localized modifier names as the other holds")
+		helpers.assert_eq(by_id.hyper.short_label, "Hyper")
 	end)
 
 	helpers.it("names the layer hold as the hold picker names its layer", function()

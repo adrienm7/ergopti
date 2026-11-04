@@ -115,7 +115,7 @@ local dashboard,context=require('tests.support.metrics_typing_fixture')({
 local codec=package.loaded['hs.json'];codec.encode=json.encode;codec.decode=json.decode
 local payload='{"manifest":{"2026-09-01":{"Cache":{"chars":1}}},"app_icons":{},"initial_data":null,"kc_layout":{}}'
 package.loaded['adapters.file_system'].read_with_status=function()
- return 'ERGOPTI_TYPING_METRICS_SNAPSHOT 2 1790000000 '..#payload..'\\n'..payload,'ok'
+ return 'ERGOPTI_TYPING_METRICS_SNAPSHOT 3 1790000000 '..#payload..'\\n'..payload,'ok'
 end
 package.loaded['hs.fs'].attributes=function()return {}end
 local manager=package.loaded['modules.keystats.log_manager'];manager.get_sqlite_path=function()return '/virtual/db'end

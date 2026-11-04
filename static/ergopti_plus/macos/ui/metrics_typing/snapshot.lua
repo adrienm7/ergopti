@@ -37,9 +37,9 @@ local LOG = "metrics_typing.snapshot"
 -- ============================
 -- ============================
 
---- Current snapshot format. The unversioned JSON cache that preceded it is
---- format 1 and is rejected by the header check.
-M.FORMAT_VERSION = 2
+--- Current snapshot format. Earlier snapshots use unescaped application keys
+--- and cannot be interpreted under the collision-free manifest contract.
+M.FORMAT_VERSION = 3
 
 --- Header magic; the header line is `MAGIC version generated_at bytes`.
 local MAGIC = "ERGOPTI_TYPING_METRICS_SNAPSHOT"

@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 
 local PAYLOAD = '{"manifest":{},"app_icons":{},"initial_data":null,"kc_layout":{}}'
-local SNAPSHOT = "ERGOPTI_TYPING_METRICS_SNAPSHOT 2 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD
+local SNAPSHOT = "ERGOPTI_TYPING_METRICS_SNAPSHOT 3 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD
 
 --- Returns the index of the last readiness probe for one page capability.
 local function last_probe(evaluations, capability)

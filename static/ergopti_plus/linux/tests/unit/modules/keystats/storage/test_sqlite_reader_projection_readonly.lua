@@ -988,6 +988,39 @@ end)
 
 
 helpers.describe("linux-sqlite-system-day", function()
+	helpers.it("linux-sqlite-system-day: manifest key codec follows shared vectors", function()
+		local file = assert(io.open(require("infra.paths").shared("tests/corpus/keystats/manifest_key_vectors.json"), "r"))
+		local vectors = Json.decode(file:read("*a"))
+		file:close()
+		local keys = require("keystats.manifest_keys")
+		for _, vector in ipairs(vectors) do
+			helpers.assert_eq(keys.encode(vector.label), vector.key)
+			helpers.assert_eq(keys.decode(vector.key), vector.label)
+		end
+	end)
+
+	helpers.it("linux-sqlite-system-day: reserved app names do not collide with system metrics", function()
+		local function rows(sql)
+			if sql:find("FROM agg_system_day", 1, true) then
+				return Json.encode({{date = "2026-10-01", wifi_changes = 1}})
+			end
+			if sql:find("FROM agg_app_day ", 1, true) then
+				return Json.encode({{date = "2026-10-01", app_json = Json.encode("_system"), chars = 7, category_json = "null"},
+					{date = "2026-10-01", app_json = Json.encode("_sys"), chars = 8, category_json = "null"},
+					{date = "2026-10-01", app_json = Json.encode("~app"), chars = 9, category_json = "null"}})
+			end
+			return "[]"
+		end
+		with_stubbed_sqlite(rows, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_true(complete)
+			local day = manifest["2026-10-01"]
+			helpers.assert_eq(day["~_system"].chars, 7)
+			helpers.assert_eq(day["~_sys"].chars, 8)
+			helpers.assert_eq(day["~~app"].chars, 9)
+			helpers.assert_eq(day._system.wifi_changes, 1)
+		end)
+	end)
 	-- Both pages read manifest[day]._system, which only the Windows reader
 	-- published; Linux had read_system_days with no caller, and its plain MIN
 	-- let a device without a battery report a zero minimum (PAR-67 census).

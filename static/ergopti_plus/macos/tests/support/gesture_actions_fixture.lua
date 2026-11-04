@@ -815,6 +815,7 @@ local function fresh_actions(options)
 		},
 		pasteboard = {
 			changeCount = function() return clipboard_count end,
+			allContentTypes = function() return { {} } end,
 			readAllData = function()
 				return clone_clipboard(clipboard_data)
 			end,

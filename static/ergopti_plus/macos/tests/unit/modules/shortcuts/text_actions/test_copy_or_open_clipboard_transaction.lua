@@ -65,6 +65,7 @@ local function load_fixture(options)
 		cancel = function(tx) return complete(tx, "cancelled") end,
 	}
 	local pasteboard = {
+		allContentTypes = function() return { {} } end,
 		readAllData = function() snapshots = snapshots + 1; return original end,
 		clearContents = function() current = {} end,
 		getContents = function() return "selected words" end,

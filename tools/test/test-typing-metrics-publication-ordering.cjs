@@ -64,6 +64,10 @@ function fixture() {
 		}
 	});
 	context.window = context;
+	vm.runInContext(
+		fs.readFileSync(path.join(root, '_shared/ui/metrics_manifest_keys.js'), 'utf8'),
+		context
+	);
 	vm.runInContext(source, context);
 	vm.runInContext(
 		'compute_manifest_metrics=function(){};update_app_btn_text=function(){};ensure_live_refresh=function(){};render_current_tab=function(){};',
