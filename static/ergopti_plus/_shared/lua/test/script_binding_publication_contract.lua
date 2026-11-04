@@ -113,9 +113,12 @@ function M.register(helpers, driver)
 			helpers.it("does not publish after " .. mode .. " and retries the actual source", function()
 				scope(function()
 					local owner = fresh_catalogue()
-					local source = bytes(shared_file("modules/actions/script_chords.json"))
+					local path = shared_file("modules/actions/script_chords.json")
+					local source = bytes(path)
+					local restore = driver == "linux" and helpers.route_source_through_stdio(path) or nil
 					local original_open, closes = io.open, 0
-					io.open = function()
+					io.open = function(candidate, open_mode)
+						if candidate ~= path then return original_open(candidate, open_mode) end
 						return {
 							read = function()
 								if mode == "read_throw" then error("controlled read failure") end
@@ -136,8 +139,9 @@ function M.register(helpers, driver)
 					end
 					local okay, detail = pcall(publish, owner)
 					io.open = original_open
+					if restore then restore() end
 					helpers.assert_eq(okay, false)
-					helpers.assert_contains(tostring(detail), "cannot complete read")
+					helpers.assert_contains(tostring(detail), driver == "linux" and "cannot read" or "cannot complete read")
 					helpers.assert_eq(closes, 1, "failed read still retires its exact handle")
 					helpers.assert_nil(owner.published_binding_catalogue())
 					helpers.assert_true(type(publish(owner)) == "table")
@@ -452,16 +456,21 @@ function M.register_late(helpers, driver)
 		end)
 		helpers.it("keeps failed actual source completion unjudged and neutralizes only a genuine retry", function()
 			with_file(function(f)
+				local path = driver == "macos" and helpers.shared("modules/actions/script_chords.json")
+					or require("infra.paths").shared("modules/actions/script_chords.json")
+				local restore = driver == "linux" and helpers.route_source_through_stdio(path) or nil
 				local original, closes = io.open, 0
-				io.open = function(path, mode)
-					local handle = assert(original(path, mode))
+				io.open = function(candidate, mode)
+					local handle = assert(original(candidate, mode))
+					if candidate ~= path then return handle end
 					return { read = function() return handle:read("*a") end,
 						close = function() closes = closes + 1; assert(handle:close()); return false end }
 				end
 				local okay, detail = pcall(publish, f.owner)
 				io.open = original
+				if restore then restore() end
 				helpers.assert_eq(okay, false)
-				helpers.assert_contains(tostring(detail), "cannot complete read")
+				helpers.assert_contains(tostring(detail), driver == "linux" and "cannot read" or "cannot complete read")
 				helpers.assert_eq(closes, 1)
 				helpers.assert_nil(f.owner.published_binding_catalogue())
 				helpers.assert_eq(f.parameters.get_action_parameter(retired, "open_url"), "https://obsolete.example")

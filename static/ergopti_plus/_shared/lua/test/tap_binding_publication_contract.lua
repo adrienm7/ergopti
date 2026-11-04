@@ -232,11 +232,14 @@ function M.register(helpers, driver)
 			helpers.it("does not publish after " .. mode .. " and retries the actual source", function()
 				scope(function()
 					local owner = fresh_catalogue()
-					local source = bytes(shared_file("modules/actions/tap_keys.json"))
+					local path = shared_file("modules/actions/tap_keys.json")
+					local source = bytes(path)
+					local restore = driver == "linux" and helpers.route_source_through_stdio(path) or nil
 					local original_open, closes = io.open, 0
-					io.open = function(path)
+					io.open = function(candidate, open_mode)
 						-- Count only the catalogue handle: the driver logger may open (and retire) its own.
-						local catalogue = is_catalogue(path)
+						local catalogue = is_catalogue(candidate)
+						if not catalogue then return original_open(candidate, open_mode) end
 						return {
 							read = function()
 								if mode == "read_throw" then error("controlled read failure") end
@@ -257,8 +260,9 @@ function M.register(helpers, driver)
 					end
 					local okay, detail = pcall(publish, owner)
 					io.open = original_open
+					if restore then restore() end
 					helpers.assert_eq(okay, false)
-					helpers.assert_contains(tostring(detail), "cannot complete read",
+					helpers.assert_contains(tostring(detail), driver == "linux" and "cannot read" or "cannot complete read",
 						"a failed read is reported as a read failure, never as malformed content")
 					helpers.assert_eq(closes, 1, "failed read still retires its exact handle")
 					helpers.assert_nil(owner.published_binding_catalogue())
