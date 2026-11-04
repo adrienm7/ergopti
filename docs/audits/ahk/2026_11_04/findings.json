@@ -411,6 +411,17 @@
 			"root_cause": "TapHoldRestoreLiftedKey in platform/remap/constants.ahk directly sends a compensating Up after detecting a physical release racing its successful scalar re-press. Unlike failed Array-acquisition rollback, this independent producer never transfers the proven Down to the release-pending ledger when that Up fails.",
 			"silent_failure": "The restored modifier can remain logically down after the user lets go. Suspend or shutdown reports no outstanding key and never retries the missing balancing Up.",
 			"regression_test": "Two reachable raced-repress-release-debt cases run the actual hotstring lift/restore path on the production Kana key mapping with an explicit passive transport and physical-state observations. They distinguish successful delivery from refused attempts, require retained debt through refused real lifecycle cleanup, and verify subsequent cleanup or a fresh owner repairs it before further acquisition. Native fail-before proof is retained; post-fix native execution remains pending."
+		},
+		{
+			"id": "AHK-038",
+			"title": "Personal file publication can outlive its final editor or pause authorization",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "At the genuine native replacement cutpoint after existing admission checks, close the real personal-hotstring editor, suspend the driver, release the exact path lease, relocate the configured path, or retire the captured information editor/resident map. Native run41897311070 at70481abbcdfc32060a2424b2a17b48fd19ac87ca passed the three live controls and reproduced all ten stale replacements, individually and reversed.",
+			"root_cause": "_PersonalTomlWriteAtomic and _PersonalInfoReplaceUnchanged in infra/hotstrings/personal_toml_io.ahk restore interruption after their pure authority checks, then invoke unguarded FSAtomicMoveReplace. The final native producer never resamples the revocable facts. Metadata patches also omit their already-issued owner from that final boundary.",
+			"silent_failure": "A cancelled or paused save can still replace the personal file and publish a stale intention after the editor or path authority has retired. This differs from AHK-014 external source-byte mutation: the violated facts here are in-process owner, pause, configured identity and session authority.",
+			"regression_test": "Thirteen reachable personal native final admission cases use real private files, durable stages, actual GUI/source and lease owners, a declared interruptible internal cutpoint, and the genuine native rename producer. Three controls prove actual successful replacement; ten withdrawal variants require original target bytes, no publication and cleaned stage. Existing arbitrary two-argument ReplaceFn ports stay outside Critical. The fixed native branch uses FSConfigAtomicMoveReplace with a pure final guard; external-process filesystem compare-and-swap is outside this guarantee. Post-fix native qualification is pending."
 		}
 	]
 }

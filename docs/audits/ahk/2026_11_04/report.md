@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **37 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **38 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -661,3 +661,17 @@ have targeted native qualification for their source fixes. It does not qualify
 the entire OS suite or promise the absence of other bugs. The next unregistered
 probe tests literal control characters through genuine keystats producers and
 SQLite; it adds no finding count before confirmation.
+
+## AHK-038: Personal file publication can outlive its final editor or pause authorization
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_PersonalTomlWriteAtomic and \_PersonalInfoReplaceUnchanged in infra/hotstrings/personal_toml_io.ahk restore interruption after their pure authority checks, then invoke unguarded FSAtomicMoveReplace. The final native producer never resamples the revocable facts. Metadata patches also omit their already-issued owner from that final boundary.
+
+Reproduction: At the genuine native replacement cutpoint after existing admission checks, close the real personal-hotstring editor, suspend the driver, release the exact path lease, relocate the configured path, or retire the captured information editor/resident map. Native run41897311070 at70481abbcdfc32060a2424b2a17b48fd19ac87ca passed the three live controls and reproduced all ten stale replacements, individually and reversed.
+
+Consequence: A cancelled or paused save can still replace the personal file and publish a stale intention after the editor or path authority has retired. This differs from AHK-014 external source-byte mutation: the violated facts here are in-process owner, pause, configured identity and session authority.
+
+Regression: Thirteen reachable personal native final admission cases use real private files, durable stages, actual GUI/source and lease owners, a declared interruptible internal cutpoint, and the genuine native rename producer. Three controls prove actual successful replacement; ten withdrawal variants require original target bytes, no publication and cleaned stage. Existing arbitrary two-argument ReplaceFn ports stay outside Critical. The fixed native branch uses FSConfigAtomicMoveReplace with a pure final guard; external-process filesystem compare-and-swap is outside this guarantee. Post-fix native qualification is pending.
+
+The ongoing register now contains **38 distinct new findings**. The requested target of 1,000 remains unmet.
