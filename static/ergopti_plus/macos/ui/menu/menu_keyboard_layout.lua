@@ -618,7 +618,16 @@ function M.build(ctx)
 	if #records == 0 then
 		local ManifestMenu = require("infra.manifest_menu")
 		return ManifestMenu.template_rows("layout_active_source_empty_commands", {
-			[require("config_keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
+			[require("config_keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function()
+				local ok, started = pcall(function()
+					return require("adapters.shell_runner").open(KEYBOARD_PREFS_URL)
+				end)
+				if not ok or started ~= true then
+					Logger.error(LOG, "Keyboard settings could not be opened.")
+					return false
+				end
+				return true
+			end,
 		}, {}, {}) or {}
 	else
 		for _, r in ipairs(records) do

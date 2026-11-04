@@ -358,6 +358,8 @@ helpers.describe("hotstrings config: override inputs stay data", function()
 			{ 'rolls]\n[injected', nil, "color", "#abcdef" },
 			{ "rolls", 'safe]\n[injected', "color", "#abcdef" },
 			{ "rolls", nil, "color", '#abc"\n[injected]\nvalue = "owned' },
+			{ "rolls", nil, "color", "#12345" },
+			{ "rolls", nil, "color", "#1234567" },
 		}) do
 			helpers.assert_eq(mod.set_override(table.unpack(mutation)), false)
 		end
@@ -373,15 +375,15 @@ helpers.describe("hotstrings config: override inputs stay data", function()
 
 	helpers.it("pins the complete hexadecimal color boundary", function()
 		local schema = require("modules.hotstrings.hotstrings_config_schema")
-		for _, valid in ipairs({ "#abc", "#AbCdEf", "#01234567" }) do
+		for _, valid in ipairs({ "#abc", "#abcd", "#AbCdEf", "#01234567" }) do
 			helpers.assert_eq(schema.is_color(valid), true, valid .. " must remain supported")
 		end
 		helpers.assert_eq(schema.is_color(nil), false)
 		for _, invalid in ipairs({
-			false, "", "abc", "#ab", "#123456789", "#12xz", '#abc"', "#abc\n",
+			false, "", "abc", "#ab", "#12345", "#1234567", "#123456789", "#12xz", '#abc"', "#abc\n",
 		}) do
 			helpers.assert_eq(schema.is_color(invalid), false,
-				"only 3-to-8-digit hexadecimal literals are valid colors")
+				"only CSS hexadecimal lengths are valid colors")
 		end
 	end)
 

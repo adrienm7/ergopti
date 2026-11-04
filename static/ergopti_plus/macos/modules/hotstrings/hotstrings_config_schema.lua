@@ -50,12 +50,12 @@ function M.is_section(value)
 	return value == nil or M.normalize_section(value) ~= nil
 end
 
---- Returns whether a color is a 3-to-8-digit hexadecimal CSS literal.
+--- Returns whether a color is a hexadecimal CSS literal.
 --- @param value any Candidate color.
 --- @return boolean valid
 function M.is_color(value)
-	if type(value) ~= "string" or #value < 4 or #value > 9 then return false end
-	return value:match("^#[0-9a-fA-F]+$") ~= nil
+	return type(value) == "string" and value:sub(1, 1) == "#"
+		and require("color.hex").parse(value) ~= nil
 end
 
 --- Returns whether a value is a finite, non-negative activation delay.

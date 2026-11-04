@@ -151,4 +151,26 @@ helpers.describe("system gesture snapshots (gesture-conflicts)", function()
 			helpers.assert_nil(subject.on_action_changed("tap_2", "lookup"))
 		end)
 	end)
+
+	helpers.it("coalesces repeated rechecks into one state change notification", function()
+		fixture(function(subject, pending)
+			subject.refresh()
+			for index = 1, 4 do pending[index].done(0, "TrackpadThreeFingerTapGesture = 0;", "") end
+			local changes = 0
+			subject.set_state_listener(function() changes = changes + 1 end)
+			for _ = 1, 20 do helpers.assert_eq(subject.recheck(), true) end
+			helpers.assert_eq(#pending, 8, "one probe serves every overlapping recheck")
+			for index = 5, 8 do pending[index].done(0, "TrackpadThreeFingerTapGesture = 1;", "") end
+			helpers.assert_eq(changes, 1, "one changed snapshot triggers one menu rebuild")
+		end)
+	end)
+
+	helpers.it("accepts a fresh recheck after shutdown cancels an earlier one", function()
+		fixture(function(subject, pending)
+			helpers.assert_eq(subject.recheck(), true)
+			helpers.assert_eq(subject.restore_all_overrides(), true)
+			helpers.assert_eq(subject.recheck(), true)
+			helpers.assert_eq(#pending, 8)
+		end)
+	end)
 end)

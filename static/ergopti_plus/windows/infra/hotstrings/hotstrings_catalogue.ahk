@@ -575,6 +575,11 @@ HotstringsTryPriority(Value, &Priority) {
 	return true
 }
 
+; Validate the CSS hexadecimal forms the tooltip renderer accepts.
+HotstringsIsHexColor(Value) {
+	return Value is String && RegExMatch(Value, "^#?(?:[0-9A-Fa-f]{3,4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$")
+}
+
 ; AHK represents booleans as Integer 0/1. Reject every other value explicitly
 ; so strings such as "false" cannot become true through ordinary truthiness at
 ; the TOML serializer boundary.
@@ -623,9 +628,9 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value,
 						"SetOverride: show_tooltip must be a Boolean, got '{1}'.", Value)
 				return false
 		}
-		if (Field == "color" and !(Value is String)) {
+		if (Field == "color" and !HotstringsIsHexColor(Value)) {
 				try LoggerError("HotstringsConfig",
-						"SetOverride: color must be a String.")
+						"SetOverride: color must have 3, 4, 6 or 8 hexadecimal digits.")
 				return false
 		}
 		if !_HotstringsOverrideIdentifiersAreValid(CategoryName, SectionName) {

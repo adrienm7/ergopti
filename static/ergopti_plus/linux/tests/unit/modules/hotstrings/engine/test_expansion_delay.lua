@@ -53,6 +53,21 @@ end
 -- =========================================================
 
 helpers.describe("expansion delay: what the settings window writes is what resolves", function()
+	helpers.it("refuses malformed CSS color overrides (hotstring-css-color)", function()
+		local logger = require("logger.shim")
+		local old_error, messages = logger.error, {}
+		logger.error = function(_, message) messages[#messages + 1] = message end
+		local ok, err = xpcall(function()
+			for _, color in ipairs({ "#12345", "#1234567" }) do
+				helpers.assert_eq(Config.set_override("rolls", nil, "color", color), false)
+				helpers.assert_eq(Config.set_personal_metadata("personal", nil, "color", color), false)
+			end
+			helpers.assert_eq(#messages, 4)
+			for _, message in ipairs(messages) do helpers.assert_contains(message, "3, 4, 6 or 8") end
+		end, debug.traceback)
+		logger.error = old_error
+		if not ok then error(err, 0) end
+	end)
 
 	helpers.it("a category override wins over the global default", function()
 		Config._set_overrides_for_test({})
