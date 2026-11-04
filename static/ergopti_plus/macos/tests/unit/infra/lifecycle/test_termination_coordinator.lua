@@ -51,6 +51,7 @@ local function load_coordinator(options)
 			calls.reason = reason
 			calls.lease_callback = callback
 			append("request-lease")
+			if options.request_error_object then error(options.request_error_object) end
 			if options.request_raises then error("synthetic lease request failure") end
 			if options.synchronous_result ~= nil then
 				callback(options.synchronous_result, "synchronous")
@@ -74,6 +75,7 @@ local function load_coordinator(options)
 			calls.teardowns = calls.teardowns + 1
 			calls.teardown_kind = kind
 			append("teardown-" .. kind)
+			if options.teardown_error_object then error(options.teardown_error_object) end
 			if options.teardown_synchronous_ready ~= nil and not calls.teardown_released then
 				calls.teardown_released = true
 				on_ready(options.teardown_synchronous_ready, "synchronous teardown boundary")
@@ -167,6 +169,20 @@ local function load_coordinator(options)
 end
 
 helpers.describe("controlled termination coordinator", function()
+	helpers.it("contains opaque errors before and after the lease fence (termination-error-object)", function()
+		local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+		local before, before_calls = load_coordinator({ request_error_object = hostile })
+		helpers.assert_eq(before.request_reload("opaque_request"), false)
+		helpers.assert_eq(before.is_pending(), false, "pre-fence refusal must release the transaction")
+		helpers.assert_eq(before_calls.reloads, 0)
+
+		local after, after_calls = load_coordinator({ teardown_error_object = hostile })
+		helpers.assert_true(after.request_reload("opaque_teardown"))
+		after_calls.lease_callback(true, "stopped")
+		helpers.assert_eq(after_calls.reloads, 1, "post-fence teardown failure must reload natively")
+		helpers.assert_eq(after.is_pending(), false)
+	end)
+
 	helpers.it("refuses publication debt before requesting a fence or arming the user-quit watchdog", function()
 		local captures = 0
 		local coordinator, calls = load_coordinator({ capture_publication_admission = function()

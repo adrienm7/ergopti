@@ -119,6 +119,7 @@ local function with_world(body)
 			read = function(path) return world.files[path] end,
 			read_bounded = function(path, limit)
 				local content = world.files[path]
+				if world.before_output_read then world.before_output_read() end
 				if content == nil then return nil, "absent" end
 				if #content > limit then return nil, "too_large" end
 				return content, "ok"
@@ -535,6 +536,20 @@ helpers.describe("run_apple_shortcut runs a library shortcut through its owner (
 			helpers.assert_eq(#world.notices, 0)
 			helpers.assert_eq(#world.typed, 0)
 			helpers.assert_eq(world.Shortcut.busy(), false)
+		end)
+	end)
+
+	helpers.it("does not publish shortcut output after pause during the bounded read", function()
+		with_world(function(world)
+			world.library = { { id = SHORTCUT_ID, name = "Resize Image" } }
+			world.run_output = "private result"
+			world.before_output_read = function() world.listeners.run_apple_shortcut("gestures") end
+			local outcome
+			world.Shortcut.run(shortcut({ output = "copy" }), "gestures", 500, function(ok, category)
+				outcome = { ok, category }
+			end)
+			helpers.assert_eq(outcome, { false, "cancelled" })
+			helpers.assert_eq(world.clipboard, {}, "an old result cannot cross the pause boundary")
 		end)
 	end)
 
