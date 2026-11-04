@@ -91,9 +91,18 @@ function M.new(opts)
 		return owner == generation and actual == epoch
 	end
 
+	local function read_primary()
+		local called, ok, text = pcall(opts.read_primary)
+		if not called then
+			pcall(Logger.warn, LOG, "PRIMARY selection read failed; passing the input through.")
+			return false, nil
+		end
+		return ok, text
+	end
+
 	--- Opens the selection window, remembering what PRIMARY held before it.
 	local function open_window(owner, epoch)
-		local ok, text = opts.read_primary()
+		local ok, text = read_primary()
 		if not current(owner, epoch) or ok ~= true or type(text) ~= "string" then return end
 		local active = opts.is_active()
 		if not current(owner, epoch) or not active then return end
@@ -177,7 +186,7 @@ function M.new(opts)
 		local active = opts.is_active()
 		if not current(owner, epoch) or not active then return false end
 
-		local ok, selected = opts.read_primary()
+		local ok, selected = read_primary()
 		if not current(owner, epoch) or not ok or type(selected) ~= "string" or selected == "" then return false end
 		if selected == window then
 			Logger.debug(LOG, "PRIMARY unchanged since the selection window opened — typing '%s'.", char)
