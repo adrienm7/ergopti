@@ -147,6 +147,36 @@ try {
 	assert.notEqual(run('disable').status, 0, 'foreign startup commands are never replaced');
 	assert.equal(fs.readFileSync(desktop, 'utf8'), '[Desktop Entry]\nExec=/other/program\n');
 	if (process.platform === 'linux') {
+		// Native packages have no standalone ownership receipt: a similarly
+		// named file beside /usr/lib/ergopti belongs to someone else.
+		{
+			const nativeRoot = path.join(sandbox, 'native/lib/ergopti');
+			const nativeInstall = path.join(nativeRoot, 'install');
+			fs.mkdirSync(nativeInstall, { recursive: true });
+			const nativeScript = path.join(nativeInstall, 'start_at_login.sh');
+			fs.writeFileSync(
+				nativeScript,
+				fs
+					.readFileSync(script, 'utf8')
+					.replace(
+						'[ "$DRIVER_ROOT" = /usr/lib/ergopti ]',
+						'[ "$DRIVER_ROOT" = "$ERGOPTI_TEST_PACKAGE_ROOT" ]'
+					)
+			);
+			for (const helper of ['desktop_entry.sh', 'config_home.sh'])
+				fs.copyFileSync(path.join(installed, helper), path.join(nativeInstall, helper));
+			provideShellMessages(nativeInstall);
+			const foreignReceipt = path.join(nativeRoot, '../.ergopti-owned-files');
+			fs.writeFileSync(foreignReceipt, 'foreign receipt\n');
+			const native = spawnSync(bashExecutable(), [posix(nativeScript), 'enable'], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...env, ERGOPTI_TEST_PACKAGE_ROOT: nativeRoot }
+			});
+			assert.equal(native.status, 0, native.stderr);
+			assert.equal(fs.readFileSync(foreignReceipt, 'utf8'), 'foreign receipt\n');
+			assert.ok(fs.existsSync(path.join(config, 'autostart/ergopti.desktop')));
+		}
 		const manifest = path.resolve(installed, '../../.ergopti-owned-files');
 		const manifestArgument = path.dirname(installed) + '/../.ergopti-owned-files';
 		const receiptTarget = path.join(sandbox, 'unrelated-receipt');

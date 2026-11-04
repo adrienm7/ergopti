@@ -17,9 +17,11 @@ case "$ACTION" in status|enable|disable) ;; *) exit 64 ;; esac
 if [ "$DRIVER_ROOT" = /usr/lib/ergopti ]; then
 	DESKTOP_NAME=ergopti.desktop
 	LAUNCHER=/usr/bin/ergopti
+	receipt_allowed=false
 elif [[ "$DRIVER_ROOT" = */lib/ergopti/linux ]]; then
 	DESKTOP_NAME=ergopti-hotstrings.desktop
 	LAUNCHER="${DRIVER_ROOT%/lib/ergopti/linux}/bin/ergopti-hotstrings"
+	receipt_allowed=true
 else
 	ergopti_msg startup.requires_installed >&2
 	exit 78
@@ -71,7 +73,7 @@ fi
 # source cannot authorize publishing a preference that removal cannot own.
 manifest="$DRIVER_ROOT/../.ergopti-owned-files"
 receipt_present=false
-if [ -e "$manifest" ] || [ -L "$manifest" ]; then
+if "$receipt_allowed" && { [ -e "$manifest" ] || [ -L "$manifest" ]; }; then
 	[ ! -L "$manifest" ] && [ -f "$manifest" ] \
 		|| {
 			if [ -L "$manifest" ]; then ergopti_msg startup.linked_receipt >&2; fi
