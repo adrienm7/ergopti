@@ -314,6 +314,17 @@ helpers.describe("tap-hold manager", function()
 		os.remove(user_path)
 	end)
 
+	helpers.it("keeps the running engine when the user file becomes malformed", function()
+		local Manager, hook, _, user_path = manager()
+		local running = hook.engine
+		local file = assert(io.open(user_path, "w"))
+		file:write("[tap_hold\n"); file:close()
+		helpers.assert_eq(Manager.reload(), false)
+		helpers.assert_true(hook.engine == running, "a failed reload cannot publish a neutral replacement")
+		Manager._reset_for_test()
+		os.remove(user_path)
+	end)
+
 	helpers.it("offers every hold option and the catalogue as taps", function()
 		local Manager, _, _, user_path = manager()
 		helpers.assert_eq(Manager.canonical_hold("layer", "nav"), "nav")
