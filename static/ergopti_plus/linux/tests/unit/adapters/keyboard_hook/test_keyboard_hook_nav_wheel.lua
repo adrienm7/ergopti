@@ -186,6 +186,15 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		end, true)
 		helpers.assert_eq(resets, 1, "fatal read and emergency cleanup refer to the same closed source")
 	end)
+
+	helpers.it("retires a grabbed mouse when its motion observer raises", function()
+		local emitted, _, _, running = drive("mouse", HOLD, {
+			{ EV_KEY, BTN_LEFT, 1, 2500 }, { EV_REL, REL_X, 1, 3000 }, { EV_REL, REL_X, 2, 4000 },
+		}, nil, function(kind) if kind == "motion" then error("controlled observer failure") end end)
+		helpers.assert_eq(running, false)
+		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":0"), "cleanup releases the virtual button")
+		helpers.assert_true(not has(emitted, "rel:" .. REL_X .. ":2"), "later motion is not consumed")
+	end)
 	for _, failure in ipairs({ "refusal", "exception" }) do
 		helpers.it("stops a grabbed mouse after relative output " .. failure, function()
 			local emitted, _, _, running = drive("mouse", HOLD, {
