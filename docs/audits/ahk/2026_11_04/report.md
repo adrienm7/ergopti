@@ -463,3 +463,17 @@ Consequence: The highlighted row can designate a different model, so accepting t
 Regression: Extend the reachable model-browser-close-pause-owner native child with native-sort: genuine boot and catalogue, real Gui/ListView construction, active row identity and 9B-before-27B assertions after construction, refresh, filtering and filter removal; no-match and durable-no-write controls. Native Windows execution is pending; pre-fix failure is source-derived.
 
 The ongoing register now contains **31 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-032: Token exchange throttling and timeouts are reported as invalid API keys
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_LLM_TokenExchange_OnAnswer in static/ergopti_plus/windows/modules/llm/api_token_exchange.ahk labels every 4xx response key_refused. \_LLMRemote_ReadyOnAccess consequently rewrites a throttling or timeout response to HTTP 401 and the menu selects the invalid-key diagnosis.
+
+Reproduction: Return HTTP 429 or 408 with temporarily_unavailable from the managed access-token exchange used by an API-entry validation.
+
+Consequence: A valid stored credential is blamed for transient service or endpoint failures; the actual diagnostic status disappears from validation.
+
+Regression: Eleven reachable owner-level tests retain 400/401/403 authentication refusals and replay 404/405/408/413/429/503 through genuine exchange settlement, retained retry backoff and waiter reuse; 408/429 additionally exercise actual remote readiness and menu failure classification. Existing OAuth 400 and 401 authentication controls remain. Transport is a declared passive PostFn port; native AHK execution is pending.
+
+The ongoing register now contains **32 distinct new findings**. The requested target of 1,000 remains unmet.
