@@ -121,7 +121,7 @@ function runInstaller(scenario) {
 	stub(
 		stubs,
 		'systemctl',
-		`${log}\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service disabled enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
+		`${log}\n[ "$2" = is-enabled ] && [ "${scenario.systemdEnabled ? 1 : 0}" = 1 ] && exit 0\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service disabled enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
 	);
 	if (
 		scenario.refuseUnitPublish ||
@@ -1181,6 +1181,7 @@ for (const fault of ['refuseUnitWrite', 'refuseUnitMode', 'refuseUnitPublish']) 
 {
 	const run = runInstaller({
 		desktopProvided: true,
+		systemdEnabled: true,
 		seed(home) {
 			const directory = path.join(home, '.config/autostart');
 			fs.mkdirSync(directory, { recursive: true });
