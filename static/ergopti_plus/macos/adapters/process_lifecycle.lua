@@ -231,16 +231,19 @@ function M.start()
 			return hs.application.watcher.new(function(app_name, event_type, app_obj)
 				if watcher_generation ~= _app_generation or not _app_watcher_active then return end
 				if event_type == hs.application.watcher.launched then
-					for _, callback in ipairs(_launch_callbacks) do
-						invoke_callback(callback, "Application launch", app_name)
+					for index = 1, #_launch_callbacks do
+						if watcher_generation ~= _app_generation or not _app_watcher_active then break end
+						invoke_callback(_launch_callbacks[index], "Application launch", app_name)
 					end
 				elseif event_type == hs.application.watcher.terminated then
-					for _, callback in ipairs(_quit_callbacks) do
-						invoke_callback(callback, "Application quit", app_name)
+					for index = 1, #_quit_callbacks do
+						if watcher_generation ~= _app_generation or not _app_watcher_active then break end
+						invoke_callback(_quit_callbacks[index], "Application quit", app_name)
 					end
 				elseif event_type == hs.application.watcher.activated then
-					for _, callback in ipairs(_activate_callbacks) do
-						invoke_callback(callback, "Application activation", app_name, app_obj)
+					for index = 1, #_activate_callbacks do
+						if watcher_generation ~= _app_generation or not _app_watcher_active then break end
+						invoke_callback(_activate_callbacks[index], "Application activation", app_name, app_obj)
 					end
 				end
 			end)
@@ -290,8 +293,9 @@ function M.start()
 				end
 				local ok_title, title = pcall(function() return win:title() end)
 				if ok_title and type(title) == "string" then win_title = title end
-				for _, callback in ipairs(_focus_callbacks) do
-					invoke_callback(callback, "Window focus", app_name, win_title)
+				for index = 1, #_focus_callbacks do
+					if filter_generation ~= _window_generation or not _window_filter_active then break end
+					invoke_callback(_focus_callbacks[index], "Window focus", app_name, win_title)
 				end
 			end)
 		end, debug.traceback)
