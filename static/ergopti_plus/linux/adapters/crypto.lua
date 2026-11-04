@@ -69,7 +69,12 @@ function M.sha256(data)
 		end
 		-- openssl output: "SHA2-256(stdin)= <hex>" or "(stdin)= <hex>"
 		local hex = output:match("[0-9a-f]+%s*$") or ""
-		return (hex:gsub("%s+", ""))
+		hex = hex:gsub("%s+", "")
+		if #hex ~= 64 then
+			Logger.error(LOG, "sha256(): CLI digest output is malformed")
+			return ""
+		end
+		return hex
 	end)
 	if not ok then
 		Logger.error(LOG, "sha256(): unexpected error — %s", tostring(result))
