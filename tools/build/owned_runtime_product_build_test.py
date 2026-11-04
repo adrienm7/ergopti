@@ -261,6 +261,46 @@ class DaemonReportBuildControls(unittest.TestCase):
             for relative in product.REPORT_SWIFT_SOURCES:
                 self.assertEqual(installer.count(str(self.root / relative)), 1)
 
+    def test_live_helper_enrolls_the_idle_core_service_and_default_does_not(self):
+        # WP6 install half: before this, the live helper published files only
+        # and nothing wrote or started com.ergoptiplus.runtime.core.
+        expected = tuple(
+            product.SWIFT + "OwnedRuntime" + name + ".swift"
+            for name in (
+                "IdleServiceEntry",
+                "CoreProvisionOwner",
+                "CoreServiceOwner",
+                "CoreLaunchctl",
+                "CorePlistCustody",
+                "CoreExitObservation",
+            )
+        )
+        self.assertEqual(product.IDLE_CORE_SWIFT_SOURCES, expected)
+        selected = product.product_source_paths(daemon_report=True)
+        original, report = self.commands(False), self.commands(True)
+        for relative in expected:
+            self.assertEqual(selected.count(relative), 1)
+            self.assertNotIn(relative, product.SOURCE_PATHS)
+        for arch in ("arm64", "x86_64"):
+            live, default = report["installer_" + arch], original["installer_" + arch]
+            self.assertEqual(live.count("ERGOPTI_OWNED_IDLE_CORE"), 1)
+            self.assertNotIn("ERGOPTI_OWNED_IDLE_CORE", default)
+            for relative in expected:
+                self.assertEqual(live.count(str(self.root / relative)), 1)
+                self.assertNotIn(str(self.root / relative), default)
+            self.assertNotIn("ERGOPTI_OWNED_IDLE_CORE", report["validator_" + arch])
+
+    def test_installer_main_selects_the_idle_core_entry_only_in_the_live_profile(self):
+        text = (
+            Path(__file__).resolve().parent / "owned-runtime-installer/InstallerMain.swift"
+        ).read_text(encoding="utf-8")
+        live, _, rest = text.partition("#if ERGOPTI_OWNED_IDLE_CORE")[2].partition("#else")
+        files_only = rest.partition("#endif")[0]
+        self.assertIn("OwnedRuntimeIdleServiceEntry.runFirstInstallation()", live)
+        self.assertNotIn("OwnedRuntimeInstallerEntry", live)
+        self.assertIn("OwnedRuntimeInstallerEntry.runFirstInstallation()", files_only)
+        self.assertNotIn("OwnedRuntimeIdleServiceEntry", files_only)
+
     def test_validator_module_lifecycle_and_lipo_commands_are_unchanged(self):
         original, report = self.commands(False), self.commands(True)
         for name, argv in original.items():
@@ -330,7 +370,12 @@ class SwiftRosterClosureControls(unittest.TestCase):
     def test_rosters_using_identifiers_compile_their_declaration(self):
         # Run 41263664973: LauncherConstants used Identifiers without its file.
         for name, roster in (
-            ("helper", product.HELPER_SOURCES + product.REPORT_SWIFT_SOURCES),
+            (
+                "helper",
+                product.HELPER_SOURCES
+                + product.REPORT_SWIFT_SOURCES
+                + product.IDLE_CORE_SWIFT_SOURCES,
+            ),
             ("validator", product.VALIDATOR_SOURCES),
         ):
             with self.subTest(roster=name):
