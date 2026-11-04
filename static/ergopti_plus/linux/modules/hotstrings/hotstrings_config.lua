@@ -37,6 +37,7 @@ local Priority = require("hotstring_priority")
 local Extensions = require("hotstrings.extensions")
 local ConfigPaths = require("infra.config_paths")
 local Paths = require("infra.paths")
+local RegularFile = require("infra.regular_file_reader")
 local TomlReader = require("infra.toml.reader")
 local TomlCodec = require("toml_codec")
 local Overrides = require("hotstrings.overrides")
@@ -1054,13 +1055,18 @@ function M.init(engine, config_dir, on_change)
 	_on_change = type(on_change) == "function" and on_change or nil
 	_magic_key = nil
 	_canonical_magic_key = nil
+	_config_dir = nil
 	if type(config_dir) == "string" and config_dir ~= "" then
 		_config_dir = config_dir
 	else
 		local home = require("infra.config_paths").home()
 		local xdg = home .. "/.config/ergopti/hotstrings"
-		local fh = io.open(xdg, "r")
-		if fh then fh:close(); _config_dir = xdg end
+		local kind, detail, code = require("infra.native_directory").target_kind(xdg)
+		if kind == "directory" then _config_dir = xdg
+		elseif kind ~= nil or code ~= "ENOENT" then
+			Logger.error(LOG, "Hotstring directory is unavailable: %s.", tostring(detail or kind))
+			return false
+		end
 	end
 	_scope_owner = nil
 	_personal_transaction_owner, _prepared_personal_sources, _personal_debt = nil, nil, nil
@@ -1312,10 +1318,13 @@ local _language_packs = nil
 function M.language_packs()
 	if _language_packs then return _language_packs end
 	local path = Paths.shared("modules/hotstrings/_index.toml")
-	local fh = io.open(path, "r")
+	local fh = RegularFile.open_source(path)
 	if not fh then error("[hotstrings_config] hotstring index is unreadable: " .. tostring(path)) end
 	local raw = fh:read("*a")
-	fh:close()
+	local closed = fh:close()
+	if type(raw) ~= "string" or not closed then
+		error("[hotstrings_config] hotstring index could not be read: " .. tostring(path))
+	end
 	_language_packs = Languages.packs(TomlCodec.decode(raw))
 	return _language_packs
 end
@@ -1435,11 +1444,14 @@ local function resolve_paths()
 				local rel = "/" .. pack.id .. "/" .. stem .. ".toml"
 				local path = bundled .. rel
 				if _config_dir then
-					local fh = io.open(_config_dir .. rel, "r")
+					local candidate = _config_dir .. rel
+					local fh, detail, code = RegularFile.open_source(candidate)
 					if fh then
-						fh:close()
-						path = _config_dir .. rel
+						if not fh:close() then error("[hotstrings_config] language override close failed: " .. candidate) end
+						path = candidate
 						user_paths[path] = true
+					elseif code ~= RegularFile.ENOENT then
+						error("[hotstrings_config] language override unreadable: " .. candidate .. ": " .. tostring(detail))
 					end
 				end
 				paths[#paths + 1] = { path = path, category = Languages.group_id(pack.id, stem) }
@@ -1524,7 +1536,11 @@ function M.load_all(personal_owner, cold_boot)
 		return #_mappings, false, "common-autocorrection-overrides-unadmitted"
 	end
 
-	local staged_paths, staged_personal_sources, staged_personal_adoptions = resolve_paths()
+	local resolved, staged_paths, staged_personal_sources, staged_personal_adoptions = pcall(resolve_paths)
+	if not resolved then
+		Logger.error(LOG, "Hotstring source discovery failed; keeping the active catalogue: %s.", tostring(staged_paths))
+		return #_mappings, false, "source-unavailable"
+	end
 	if common_unavailable then
 		local admitted_paths = {}
 		for _, source in ipairs(staged_paths) do
