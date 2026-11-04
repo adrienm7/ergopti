@@ -244,8 +244,14 @@ function M.stage(asset, done)
 		Logger.error(LOG, "Cannot encode the chosen release download request.")
 		return false
 	end
-	-- The stage script downloads with the system curl, checked at this use.
-	if not require("adapters.system_curl").check("the release download") then return false end
+	-- Match the staging script's proxy precedence: only its explicit-route
+	-- branch invokes system curl; the native request does not depend on it.
+	local explicit_route = false
+	for _, name in ipairs({ "https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY" }) do
+		local value = M._getenv(name)
+		if type(value) == "string" and value ~= "" then explicit_route = true; break end
+	end
+	if explicit_route and not require("adapters.system_curl").check("the release download") then return false end
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
 		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)

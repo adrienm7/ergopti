@@ -56,7 +56,7 @@ local function with_apps(callback)
 			}
 			local module = helpers.load_with_stubs("ui.menu.menu_apps", {
 				fs = { attributes = function() return { mode = "directory" } end },
-				application = { infoForBundlePath = function() return {} end },
+				application = { infoForBundlePath = function() return state.metadata or {} end },
 				image = { imageFromPath = function(path)
 					state.images[#state.images + 1] = path
 					if state.have_icon then return {} end
@@ -91,6 +91,20 @@ local function with_apps(callback)
 end
 
 helpers.describe("Bundled app discovery outcome", function()
+	helpers.it("ignores malformed bundle display and icon metadata", function()
+		with_apps(function(module, state, ctx)
+			state.output = "/virtual/First.app\0"
+			state.metadata = { CFBundleDisplayName = {}, CFBundleName = "Valid Name", CFBundleIconFile = {} }
+			local ok, menu = pcall(module.build, ctx)
+			helpers.assert_true(ok, "invalid optional metadata must not break the Applications menu")
+			helpers.assert_eq(menu.submenu[1].label, "Valid Name")
+		end)
+		with_apps(function(module, state, ctx)
+			state.output = "/virtual/First.app\0"
+			state.metadata = { CFBundleDisplayName = false, CFBundleName = {} }
+			helpers.assert_eq(module.build(ctx).submenu[1].label, "First")
+		end)
+	end)
 	for _, probe in ipairs({ "running", "unknown", "throw" }) do
 		helpers.it("retains a refused launch until settlement when the probe is " .. probe, function()
 			with_apps(function(module, state, ctx)

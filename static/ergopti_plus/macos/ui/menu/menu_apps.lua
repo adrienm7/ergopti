@@ -179,7 +179,7 @@ local function load_icon(app_path, info)
 
 	-- Try the .icns declared in Info.plist
 	local icon_file = type(info) == "table" and info.CFBundleIconFile or nil
-	if icon_file then
+	if type(icon_file) == "string" and icon_file ~= "" then
 		local candidates = {
 			resources .. "/" .. icon_file,
 			resources .. "/" .. icon_file .. ".icns",
@@ -229,8 +229,10 @@ local function discover_bundled_apps(ctx)
 		local raw_name = app_path:match("([^/]+)%.app$")
 		if raw_name then
 			local info    = hs.application.infoForBundlePath(app_path)
-			local display = (type(info) == "table" and info.CFBundleDisplayName ~= "" and info.CFBundleDisplayName)
-			             or (type(info) == "table" and info.CFBundleName ~= "" and info.CFBundleName)
+			local display = (type(info) == "table" and type(info.CFBundleDisplayName) == "string"
+				and info.CFBundleDisplayName ~= "" and info.CFBundleDisplayName)
+			             or (type(info) == "table" and type(info.CFBundleName) == "string"
+				and info.CFBundleName ~= "" and info.CFBundleName)
 			             or raw_name
 
 			table.insert(entries, {

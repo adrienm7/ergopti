@@ -40,4 +40,50 @@ vm.runInContext(source.slice(saveStart, saveEnd), context);
 context.doSave();
 assert.strictEqual(context.message.prompt, 'First\n' + original);
 assert.strictEqual(context.message.edit_id, 'edit-1');
+context.editorElement = { childNodes: context.parseToNodes('  Prefix {context}\n\n') };
+context.doSave();
+assert.strictEqual(
+	context.message.prompt,
+	'  Prefix {context}\n\n',
+	'intentional whitespace must survive save'
+);
+const initStart = source.indexOf('var activePromptContext =');
+const initEnd = source.indexOf('var post = makeHostBridge', initStart);
+assert(initStart > 0 && initEnd > initStart);
+const fields = { title: {}, 'p-name': {}, 'p-mode': {} };
+context.document.getElementById = (id) => fields[id];
+context.editorElement = {
+	childNodes: [],
+	set innerHTML(_) {
+		this.childNodes = [];
+	},
+	appendChild(node) {
+		this.childNodes.push(node);
+	}
+};
+context.checkPlaceholder = () => {};
+context.setTimeout = () => {};
+vm.runInContext(source.slice(initStart, initEnd), context);
+const data = {
+	edit_id: 'context-a',
+	epoch: 1,
+	title: 'Title',
+	name: 'Name',
+	mode: 'single',
+	prompt: 'original'
+};
+context.init(data);
+context.editorElement.childNodes[0].textContent = 'unsaved draft';
+context.init(data);
+assert.strictEqual(
+	context.serializeEditor(context.editorElement),
+	'unsaved draft',
+	'duplicate init must not erase a draft'
+);
+context.init({ ...data, edit_id: 'context-b', epoch: 2, prompt: 'next profile' });
+assert.strictEqual(
+	context.serializeEditor(context.editorElement),
+	'next profile',
+	'new context must still initialize'
+);
 console.log('prompt editor preserves literal brace text');

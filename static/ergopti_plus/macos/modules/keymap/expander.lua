@@ -559,13 +559,22 @@ local function resolve_terminator_match(mapping, buffer, chars, explicit_magic)
 	local chars_bytes = #chars
 	local extra_bs_bytes = 0
 	local is_typo_endchar = (chars == ":" or chars == ";")
-	if is_typo_endchar and not explicit_magic then
+	if is_typo_endchar then
 		local nnbsp_pos = #buffer - chars_bytes - #NNBSP + 1
 		local nbsp_pos  = #buffer - chars_bytes - #NBSP + 1
 		if nnbsp_pos >= 1 and buffer:sub(nnbsp_pos, nnbsp_pos + #NNBSP - 1) == NNBSP then
 			extra_bs_bytes = #NNBSP
 		elseif nbsp_pos >= 1 and buffer:sub(nbsp_pos, nbsp_pos + #NBSP - 1) == NBSP then
 			extra_bs_bytes = #NBSP
+		end
+		-- Explicit magic also permits a literal trigger ending in the space.
+		-- Preserve that direct match before treating the space as punctuation.
+		if explicit_magic and extra_bs_bytes > 0 then
+			local direct_start = #buffer - chars_bytes - tb + 1
+			if direct_start >= 1 then
+				local direct, _, _, noop = M.would_fire(mapping, buffer:sub(1, direct_start + tb - 1))
+				if direct or noop then extra_bs_bytes = 0 end
+			end
 		end
 	end
 
@@ -689,10 +698,22 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 		end
 
 		if buffer ~= "" and _registry.is_terminator(magic) then
+			local end_buckets = {}
 			local end_bucket = tail_char and _registry.mappings_for_tail(tail_char) or nil
-			if end_bucket then
-				local end_buffer = buffer .. physical_magic
-				for _, mapping in ipairs(end_bucket) do
+			if end_bucket then end_buckets[#end_buckets + 1] = end_bucket end
+			-- A separately typed typographic space can precede the magic colon or
+			-- semicolon; also consider the trigger ending immediately before it.
+			if physical_magic == magic and (magic == ":" or magic == ";")
+				and (tail_char == NBSP or tail_char == NNBSP) then
+				local before_space = buffer:sub(1, #buffer - #tail_char)
+				local ok, offset = pcall(utf8.offset, before_space, -1)
+				local preceding = ok and offset and before_space:sub(offset) or nil
+				local spaced_bucket = preceding and _registry.mappings_for_tail(preceding) or nil
+				if spaced_bucket and spaced_bucket ~= end_bucket then end_buckets[#end_buckets + 1] = spaced_bucket end
+			end
+			local end_buffer = buffer .. physical_magic
+			for _, bucket in ipairs(end_buckets) do
+				for _, mapping in ipairs(bucket) do
 					if not mapping.auto and mapping_group_active(mapping) then
 						local match = resolve_terminator_match(mapping, end_buffer, physical_magic, true)
 						if match then
@@ -708,6 +729,11 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 						end
 					end
 				end
+			end
+			if #end_buckets > 1 then
+				table.sort(end_attempts, function(a, b)
+					return (a.mapping.registry_rank or math.huge) < (b.mapping.registry_rank or math.huge)
+				end)
 			end
 		end
 	end

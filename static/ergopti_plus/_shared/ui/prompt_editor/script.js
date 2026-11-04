@@ -81,16 +81,6 @@ function parseToNodes(text) {
 function serializeEditor(element) {
 	var nodes = Array.from(element.childNodes);
 
-	// Strip trailing breaks that aren't chips
-	while (nodes.length > 0) {
-		var last = nodes[nodes.length - 1];
-		if (last.nodeType === 1 && last.tagName === 'BR' && !last.classList.contains('token-chip')) {
-			nodes.pop();
-		} else {
-			break;
-		}
-	}
-
 	var serializedString = '';
 	nodes.forEach(function (node) {
 		if (node.nodeType === 3) {
@@ -561,7 +551,7 @@ function init(data) {
 	var nextContext = readPromptContext(data);
 	if (
 		(activePromptContext.epoch > 0 && nextContext.epoch === 0) ||
-		(nextContext.epoch > 0 && nextContext.epoch < activePromptContext.epoch)
+		(nextContext.epoch > 0 && nextContext.epoch <= activePromptContext.epoch)
 	) {
 		return;
 	}
@@ -604,9 +594,9 @@ function doCancel() {
 function doSave() {
 	var promptName = document.getElementById('p-name').value.trim();
 	var promptMode = document.getElementById('p-mode').value;
-	var promptContent = serializeEditor(editorElement).trim();
+	var promptContent = serializeEditor(editorElement);
 
-	if (!promptName || !promptContent) {
+	if (!promptName || !promptContent.trim()) {
 		return alert(window._i18n_strings['prompt_editor.required_fields']);
 	}
 

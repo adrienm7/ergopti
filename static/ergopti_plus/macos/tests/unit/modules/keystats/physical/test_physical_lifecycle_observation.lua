@@ -172,6 +172,7 @@ local function with_fixture(options, scenario)
 		start = function() return false end,
 	}
 	local scheduler = {}
+	function scheduler.hotstring_time() return fixture.now_ms / 1000 end
 	function scheduler.after(_, callback)
 		local mode = options.after_mode or "commit"
 		if mode == "throw" then error("context timer constructor exploded") end
