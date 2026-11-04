@@ -334,6 +334,39 @@ Test("config transition runtime: explicit boot override bypasses unused default 
 	_CTRT_BootOverrideIgnoresUnusedDefault)
 
 
+_CTRT_BootLocatorOverride(PathValue, Accept) {
+	Directory := A_Temp . "\ergopti_boot_override_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	FSCreateDirectoryExclusiveStrict(Directory)
+	Locator := Directory . "\paths.toml"
+	Content := "ConfigDirPath = " . TOML_RenderString(PathValue) . "`n"
+	try {
+		AssertTrue(FSWriteCreateDurable(Locator, Content))
+		Overrides := ReadPathsToml(Locator)
+		Expected := StrReplace(PathValue, "/", "\")
+		AssertTrue(Overrides.Has("ConfigDirPath"), "The genuine locator parser must preserve the explicit override")
+		AssertEqual(Expected, Overrides["ConfigDirPath"], "The actual decoded locator value must reach boot selection")
+		if Accept
+			AssertEqual(Expected, ConfigTransitionSelectBootConfigDir(Overrides, "\invalid-unused-default\"),
+				"A valid explicit root must preserve its decoded bytes without validating an unused default")
+		else {
+			Refused := false
+			try ConfigTransitionSelectBootConfigDir(Overrides, "C:\valid-unused-default\")
+			catch ValueError
+				Refused := true
+			AssertTrue(Refused, "A selected invalid locator root must fail before boot creates or reads a profile")
+		}
+		AssertEqual(Content, FSReadStrict(Locator), "Selecting or refusing a root must never rewrite its locator")
+	} finally DirDelete(Directory, true)
+}
+for _CTRT_InvalidOverride in ["relative-profile", "C:relative-profile", "\root-relative", "..\outside",
+	"\\server-only", "C:\profile\..\outside", "C:\bad|component", "C:\NUL", "\\?\C:\profile"]
+	Test("config transition runtime: explicit invalid locator " . _CTRT_InvalidOverride . " is refused (boot-explicit-root)",
+		_CTRT_BootLocatorOverride.Bind(_CTRT_InvalidOverride, false))
+for _CTRT_ValidOverride in ["C:/Owned Profile/é/", "\\server\share\profile\", "D:\"]
+	Test("config transition runtime: explicit absolute locator " . _CTRT_ValidOverride . " stays supported (boot-explicit-root)",
+		_CTRT_BootLocatorOverride.Bind(_CTRT_ValidOverride, true))
+
+
 
 
 
