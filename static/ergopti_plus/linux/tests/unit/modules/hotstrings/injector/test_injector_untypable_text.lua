@@ -244,10 +244,10 @@ helpers.describe("injector: the complete field set is prepared before erasure", 
 	for _, invalid in ipairs({ "second-type", "hole", "metatable" }) do
 		helpers.it("(injection-fields-preflight) refuses " .. invalid .. " before any planning callback", function()
 			local clip, restore = stub_clipboard(false)
-			local ch, plans = fake_channel(true), 0
+			local ch, plans, layout_owner, original_plan = fake_channel(true), 0, nil, nil
 			local injector = load_injector(ch, function(layout)
-				local plan = layout.plan
-				layout.plan = function(text) plans = plans + 1; return plan(text) end
+				layout_owner, original_plan = layout, layout.plan
+				layout.plan = function(text) plans = plans + 1; return original_plan(text) end
 			end)
 			local values = invalid == "second-type" and { "seor", 17 } or invalid == "hole" and { [1] = "seor", [3] = "or" }
 				or setmetatable({ "seor", "or" }, { __len = function() error("caller length metamethod must not run") end })
@@ -259,6 +259,7 @@ helpers.describe("injector: the complete field set is prepared before erasure", 
 				helpers.assert_eq(#ch.emitted, 0)
 				helpers.assert_eq(#clip.calls, 0)
 			end)
+			layout_owner.plan = original_plan
 			restore()
 			if not ok then error(why, 0) end
 		end)
