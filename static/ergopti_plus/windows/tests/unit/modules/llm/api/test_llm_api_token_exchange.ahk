@@ -794,3 +794,155 @@ _LTED_Run(Expired) {
 }
 Test("Token exchange: readiness accepts a timely actual token timer (token-ready-deadline)", _LTED_Run.Bind(false))
 Test("Token exchange: readiness refuses a late actual token timer (token-ready-deadline)", _LTED_Run.Bind(true))
+
+; Actual token engine, private Post, managed facade, timers and Suspend state.
+; Existing controlled Job supplies only the native process I/O boundary.
+_LTEP_NewHttp(Controls) {
+    Control := _ManagedCurlControlState()
+    Http := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(Control)))
+    Control["request"] := Http
+    Controls.Push(Control)
+    return Http
+}
+
+_LTEP_Post(Controls, Request, OnAnswer) {
+    Reader := (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", "")
+    Port := Map("managed_settings", Reader, "create_http", _LTEP_NewHttp.Bind(Controls))
+    _LLM_TokenExchange_Post(Request, OnAnswer, Port)
+}
+
+_LTEP_Wait(Predicate, Budget := 2000) {
+    Start := A_TickCount
+    while !Predicate.Call() && TickElapsed(Start) < Budget
+        Sleep(1)
+    return Predicate.Call()
+}
+
+_LTEP_Admit(Control) {
+    Http := Control["request"]
+    AssertEqual(1, Control["spawns"])
+    AssertFalse(Http.Completed || Http.Aborted)
+    AssertTrue(IsObject(Http.Handle))
+    _ManagedCurlControlAck(Control)
+    Http._PollManagedAdmission()
+    AssertTrue(Http.ManagedPayloadPublished, "actual exchange body must reach real managed publication")
+}
+
+_LTEP_Terminal(Control, Status) {
+    Http := Control["request"]
+    Body := Status == 200 ? '{"access_token":"fixture-access-token","expires_in":3600}' : '{"error":"invalid_grant"}'
+    AssertTrue(FSWrite(Http.BodyPath, Body))
+    AssertTrue(FSWrite(Http.HeaderPath, "HTTP/1.1 " . Status . " Owned`r`nContent-Type: application/json`r`n`r`n"))
+    Control["callback"].Call(0, '{"schema_version":1,"ok":true,"status":' . Status
+        . ',"child_quiesced":true,"receipt":{}}', "")
+    AssertTrue(Http.Completed)
+}
+
+_LTEP_Body(Mode, Posts, Lines) {
+    global _LLM_TokenExchange_PostFn, LLM_API_PROVIDERS, LTE_PROVIDER, LLM_REMOTE_TIMEOUT_MS
+    Controls := [], Results := [], Primary := 0, Slot := 0
+    SavedPost := _LLM_TokenExchange_PostFn, SavedTimeout := LLM_REMOTE_TIMEOUT_MS
+    PreviousCritical := Critical("Off")
+    try {
+        AssertFalse(A_IsSuspended)
+        _LLM_TokenExchange_PostFn := _LTEP_Post.Bind(Controls)
+        ; Timeout control uses a genuine short owned deadline, never a moved tick.
+        if Mode == "timeout"
+            LLM_REMOTE_TIMEOUT_MS := 250
+        Auth := LLM_API_PROVIDERS[LTE_PROVIDER]["Auth"]
+        Slot := _LLM_TokenExchange_Slot(LTE_PROVIDER, _LTE_Key())
+        LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(),
+            (Ok, Failure) => Results.Push(Map("ok", Ok, "failure", Failure)))
+        AssertTrue(_LTEP_Wait(() => Controls.Length == 1), "the real token Begin timer must create its facade")
+        Control := Controls[1], Http := Control["request"]
+        _LTEP_Admit(Control)
+        if Mode == "pause" {
+            Suspend(true)
+            AssertTrue(A_IsSuspended)
+            ; A late native response really crosses the facade while paused.
+            ; We do not call OnAnswer or inject a failed status into token code.
+            _LTEP_Terminal(Control, 200)
+        } else if Mode != "timeout"
+            _LTEP_Terminal(Control, Mode == "denied" ? 403 : 200)
+        AssertTrue(_LTEP_Wait(() => !Slot["pending"]), "the actual token polling timer must settle its slot")
+        AssertEqual(1, Results.Length)
+        AssertFalse(IsObject(Http.Handle), "native controlled ownership must retire before resume")
+        if Mode == "pause" {
+            AssertTrue(Http.Aborted, "actual managed admission must reject the late response while suspended")
+            AssertEqual(0, Http.Status)
+            Suspend(false)
+        }
+        if Mode == "timeout" {
+            AssertTrue(Http.Aborted)
+            AssertEqual(0, Http.Status)
+        }
+        BeforeNext := Controls.Length
+        LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(),
+            (Ok, Failure) => Results.Push(Map("ok", Ok, "failure", Failure)))
+        if Mode == "pause"
+            _LTEP_Wait(() => Controls.Length == BeforeNext + 1 || Results.Length > 1)
+        RetryActive := Slot.Has("retry_at") && Slot["retry_at"] > _LLM_TokenExchange_Now()
+        FirstFailure := Results[1]["failure"]
+        _TestPrint("# TOKEN_PAUSE_RETRY " . KL_JsonEncode(Map("case", Mode,
+            "first_ok", Results[1]["ok"], "first_status", FirstFailure is Map ? FirstFailure["status"] : 0,
+            "first_key_refused", FirstFailure is Map ? FirstFailure["key_refused"] : false,
+            "http_completed", Http.Completed, "http_aborted", Http.Aborted,
+            "payload_published", Http.ManagedPayloadPublished,
+            "retry_active", RetryActive, "post_count_before_resume", BeforeNext,
+            "post_count_after_resume", Controls.Length, "verdicts", Results.Length)))
+        if Mode == "pause" {
+            AssertFalse(Results[1]["ok"])
+            AssertFalse(RetryActive, "revocation by user pause must not impose a provider-failure cooldown after resume")
+            AssertEqual(2, Controls.Length, "resume must be able to start a real next exchange immediately")
+            AssertEqual(1, Results.Length, "the new requester waits for its new exchange instead of hearing a cached refusal")
+        } else if Mode == "success" {
+            AssertTrue(Results[1]["ok"] && Results[2]["ok"])
+            AssertFalse(RetryActive)
+            AssertEqual(1, Controls.Length, "the usable token answers from cache")
+        } else {
+            AssertFalse(Results[1]["ok"] || Results[2]["ok"])
+            AssertEqual(Mode == "denied" ? 403 : 0, FirstFailure["status"])
+            AssertEqual(Mode == "denied", FirstFailure["key_refused"])
+            AssertTrue(RetryActive, "genuine 403 and timeout failures retain the intended bounded cooldown")
+            AssertEqual(1, Controls.Length)
+        }
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        if A_IsSuspended
+            Suspend(false)
+        for Control in Controls {
+            Http := Control["request"]
+            try {
+                AssertTrue(Http.Abort(), "the exact controlled Job must retire")
+                AssertFalse(IsObject(Http.Handle))
+            } catch Any as Failure {
+                if !IsObject(Primary)
+                    Primary := Failure
+            }
+        }
+        if Slot is Map {
+            try AssertTrue(_LTEP_Wait(() => !Slot["pending"]), "all actual token timers must settle before slot reset")
+            catch Any as Failure {
+                if !IsObject(Primary)
+                    Primary := Failure
+            }
+        }
+        for Control in Controls {
+            if !IsObject(Control["request"].Handle)
+                _ManagedCurlControlRelease(Control)
+        }
+        _LLM_TokenExchange_PostFn := SavedPost
+        LLM_REMOTE_TIMEOUT_MS := SavedTimeout
+        Critical(PreviousCritical)
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+
+_LTEP_Run(Mode) {
+    _ManagedRemoteFixtureWithLlmTimings(_LTE_Run.Bind(_LTEP_Body.Bind(Mode)))
+}
+for _LTEP_Mode in ["success", "denied", "timeout", "pause"]
+    Test("Token exchange: actual managed " . _LTEP_Mode . " preserves correct retry policy (token-managed-pause)",
+        _LTEP_Run.Bind(_LTEP_Mode))

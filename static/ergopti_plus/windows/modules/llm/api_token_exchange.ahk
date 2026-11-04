@@ -543,10 +543,11 @@ _LLM_TokenExchange_Settle(Slot, Failure, Pause := true) {
 
 ; Posts the form through the managed worker and polls it. The exchange has no
 ; requester of its own: it stops only on a pause or at its deadline.
-_LLM_TokenExchange_Post(Request, OnAnswer) {
+_LLM_TokenExchange_Post(Request, OnAnswer, Port := 0) {
 	global LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_CONNECT_TIMEOUT_MS
-	Http := CurlAsyncRequest()
-	Http.SetManagedRouting(0, () => !A_IsSuspended)
+	CreateHttp := _LLM_CurlArtifactPortFn(Port, "create_http", () => CurlAsyncRequest())
+	Http := CreateHttp.Call()
+	Http.SetManagedRouting(Port is Map ? Port.Get("managed_settings", 0) : 0, () => !A_IsSuspended)
 	Http.SetDeadline(A_TickCount, LLM_REMOTE_TIMEOUT_MS)
 	Http.ConnectTimeoutMs := LLM_REMOTE_CONNECT_TIMEOUT_MS
 	Http.RevocationBestEffort := false
