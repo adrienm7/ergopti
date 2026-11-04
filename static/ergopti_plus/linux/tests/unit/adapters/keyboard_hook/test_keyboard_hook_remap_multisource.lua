@@ -58,6 +58,24 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 			helpers.assert_eq(s.rows, {}, "a stopped consumer cannot authorize output")
 		end)
 	end)
+
+	helpers.it("(remap-multisource) balances a press salvaged after a physical callback raises", function()
+		Fixture.with_session({ on_physical = function(_, code, _, _, value)
+			if code == 30 and value == 1 then error("controlled failure") end
+		end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.rows, { { 30, 1 }, { 30, 0 } }, "a salvaged press must not remain held")
+		end)
+	end)
+
+	helpers.it("(remap-multisource) balances a press salvaged after a consumer raises", function()
+		Fixture.with_session({ on_consume = function() error("controlled failure") end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.rows, { { 30, 1 }, { 30, 0 } }, "the virtual key is released after delivery")
+		end)
+	end)
 	for _, order in ipairs({ { "a", "b" }, { "b", "a" } }) do
 		local first, last = order[1], order[2]
 		helpers.it("(remap-multisource) keeps Ctrl until last UP in order " .. first .. last, function()

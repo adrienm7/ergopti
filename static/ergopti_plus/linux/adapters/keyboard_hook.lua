@@ -996,6 +996,15 @@ local function _forward_raw(ev, source)
 	return false
 end
 
+-- A callback failure has already stopped capture and released old owners.
+-- Preserve a grabbed press as a complete tap; no later UP belongs to us.
+function _source_recovery.salvage_press(ev, source)
+	if ev.value ~= InputEvent.VALUE_DOWN then return end
+	if _forward_raw(ev, source) then
+		_forward_raw({ type = EVDEV_TYPE_KEY, code = ev.code, value = InputEvent.VALUE_UP }, source)
+	end
+end
+
 --- Whether this pass-through transition changes the aggregate desktop key.
 --- A coalesced dead-key press must not feed Compose when the desktop sees none.
 --- @param ev table Post-remap key event.
@@ -1708,7 +1717,7 @@ local function _dispatch_post_remap(ev, source)
 			-- The callback already triggered the emergency stop; the grabbed
 			-- event must still reach the application before giving up on it.
 			_number_row.abandon(row_plan, ev, false)
-			_forward_raw(ev, source)
+			_source_recovery.salvage_press(ev, source)
 			return
 		end
 		if not _running or _capture_session ~= session then return end
@@ -1801,7 +1810,7 @@ local function _dispatch_post_remap(ev, source)
 			_number_row.abandon(row_plan, ev, false)
 			-- A missing verdict is not a suppression: the event still belongs
 			-- to the application.
-			_forward_raw(ev, source)
+			_source_recovery.salvage_press(ev, source)
 			return
 		elseif not _running or _capture_session ~= session then
 			return
