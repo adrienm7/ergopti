@@ -475,3 +475,45 @@ Test("LLM remote formats: Backboard and the decisions providers are no vision ba
 	_LRF_ScreenReadingExcludesBothFormats)
 
 #Include test_llm_backboard_cancel_exchange.ahk
+
+
+_NUAT_Body(ProbeCase) {
+    global _LLM_COMMON_INFERENCE, _LLM_COMMON_INFERENCE_RAW, _LLM_ThinkingRefused
+    HadInference := IsSet(_LLM_COMMON_INFERENCE), HadRaw := IsSet(_LLM_COMMON_INFERENCE_RAW)
+    SavedInference := HadInference ? _LLM_COMMON_INFERENCE : 0
+    SavedRaw := HadRaw ? _LLM_COMMON_INFERENCE_RAW : 0
+    SavedRefused := _LLM_ThinkingRefused
+    try {
+        _LLM_COMMON_INFERENCE := unset
+        _LLM_COMMON_INFERENCE_RAW := unset
+        _LLM_Common_GetInference()
+        _LLM_ThinkingRefused := Map()
+        Input := ProbeCase == "ordinary" ? 0.2 : (ProbeCase == "configured_maximum" ? 2.0 : LLM_ApiCommon_GetDiversityTemp(0.9, 2))
+        if ProbeCase == "diversity"
+            AssertTrue(Input > 1.0, "the shared shipped diversity tuning must exercise the provider's upper boundary")
+        Resolved := _LLMRemoteResolveEntry(Map("Provider", "anthropic", "Model", "claude-haiku-4-5",
+            "Token", "owned-fixture-secret", "BaseUrl", ""))
+        Wire := _LLMRemoteApplyThinkingOff(Resolved,
+            _LLMRemoteBuildPayload("anthropic", Resolved["Model"], "Fixture system.", "Fixture user.", Input, 16))
+        Payload := JsonParse(Wire)
+        OpenAi := JsonParse(_LLMRemoteBuildPayload("openai", "fixture-model", "s", "u", Input, 16))
+        _TestPrint("# ANTHROPIC_TEMPERATURE " . KL_JsonEncode(Map("case", ProbeCase, "input", Input,
+            "anthropic_temperature", Payload.Get("temperature", "absent"), "openai_temperature", OpenAi["temperature"])))
+        AssertTrue(Payload.Has("temperature"), "the documented legacy Haiku4.5 fixture supports sampling")
+        AssertTrue(Payload["temperature"] >= 0.0 && Payload["temperature"] <= 1.0,
+            "Anthropic Messages temperature must remain in its documented provider domain")
+        AssertTrue(Abs(Payload["temperature"] - Min(1.0, Input)) < 0.000000001)
+        AssertTrue(Abs(OpenAi["temperature"] - Input) < 0.000000001,
+            "the Anthropic bound must not lower other formats' permitted diversity")
+    } finally {
+        _LLM_COMMON_INFERENCE := HadInference ? SavedInference : unset
+        _LLM_COMMON_INFERENCE_RAW := HadRaw ? SavedRaw : unset
+        _LLM_ThinkingRefused := SavedRefused
+    }
+}
+_NUAT_Run(ProbeCase) {
+    _LTO_WithoutListingFetch(_NUAT_Body.Bind(ProbeCase))
+}
+for _NUAT_ProbeCase in ["ordinary", "diversity", "configured_maximum"]
+    Test("Remote Anthropic sampling: " . _NUAT_ProbeCase . " fits Messages protocol (anthropic-temperature-domain)",
+        _NUAT_Run.Bind(_NUAT_ProbeCase))
