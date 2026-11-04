@@ -490,6 +490,29 @@ helpers.describe("wpm readouts: the floating widget", function()
 		end)
 	end)
 
+	helpers.it("(wpm-widget-hide-refusal) retains an ambiguous hide until native acknowledgment", function()
+		with_storage(compact(), function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			Widget.tick(stats(42), 10)
+			local original = surface.hide
+			surface.hide = function() surface.visible = false; return false end
+			surface.pointer = { 300, 400 }
+			Widget.tick(stats(0), 10.5)
+			helpers.assert_eq(surface.visible, false)
+			helpers.assert_nil(Widget.configuration_snapshot(), "partially hidden surface is not a stable snapshot")
+			local draws = #surface.draws
+			Widget.tick(stats(42), 11)
+			helpers.assert_eq(#surface.draws, draws, "a refused hide must settle before a new frame")
+			surface.hide = original
+			Widget.tick(stats(42), 12)
+			helpers.assert_true(surface.visible, "after the hide ACK the visible frame is drawn again")
+			helpers.assert_type(Widget.configuration_snapshot(), "table")
+		end)
+	end)
+
 	helpers.it("(wpm-draw-partial) hides a surface when drawing partially fails", function()
 		with_storage(compact(), function()
 			local Widget = require("ui.wpm.widget")
