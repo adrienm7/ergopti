@@ -319,13 +319,15 @@ local function load_modifier_chords()
 		Logger.error(LOG, "Could not resolve the shared modifier chords JSON path.")
 		return nil
 	end
-	local fh = io.open(path, "r")
-	if not fh then
+	if type(TomlWriter) ~= "table" or type(TomlWriter.read_classified) ~= "function" then
+		Logger.warn(LOG, "Shared modifier chords JSON cannot be read: classified reader unavailable.")
+		return nil
+	end
+	local raw, status = TomlWriter.read_classified(path)
+	if status ~= "ok" then
 		Logger.warn(LOG, "Shared modifier chords JSON unreadable at '%s'.", path)
 		return nil
 	end
-	local raw = fh:read("*a")
-	fh:close()
 	local ok_json, json = pcall(require, "json")
 	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
 		Logger.warn(LOG, "JSON decoder unavailable — modifier chord actions skipped.")
