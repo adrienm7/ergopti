@@ -208,16 +208,26 @@ end
 
 --- Retires only the handles owned by this loop, including partial startup.
 local function _cleanup_luv()
-	if _idle_handle then
-		pcall(luv.idle_stop, _idle_handle)
-		pcall(luv.close, _idle_handle)
-		_idle_handle = nil
+	local function retire(handle, stop)
+		if not handle then return true end
+		if type(luv.is_closing) == "function" then
+			local inspected, closing = pcall(luv.is_closing, handle)
+			if not inspected then return false end
+			if closing then return true end
+		end
+		local called, ack, detail = pcall(stop, handle)
+		if not called or ack == nil or ack == false or detail ~= nil then return false end
+		called, ack, detail = pcall(luv.close, handle)
+		if not called or ack == false or detail ~= nil then return false end
+		if type(luv.is_closing) == "function" then
+			local inspected, closing = pcall(luv.is_closing, handle)
+			return inspected and closing == true
+		end
+		return true
 	end
-	if _timer_handle then
-		pcall(luv.timer_stop, _timer_handle)
-		pcall(luv.close, _timer_handle)
-		_timer_handle = nil
-	end
+	if retire(_idle_handle, luv.idle_stop) then _idle_handle = nil end
+	if retire(_timer_handle, luv.timer_stop) then _timer_handle = nil end
+	return _idle_handle == nil and _timer_handle == nil
 end
 
 --- Admits a periodic duration in both units before either loop allocates.
@@ -247,14 +257,7 @@ local function _run_luv(opts)
 	_idle_handle = luv.new_idle()
 	if not _idle_handle then error("Unable to allocate event loop idle handle", 0) end
 	local idle_started, idle_error = luv.idle_start(_idle_handle, function()
-		if not _running then
-			if _idle_handle then
-				luv.idle_stop(_idle_handle)
-				luv.close(_idle_handle)
-				_idle_handle = nil
-			end
-			return
-		end
+		if not _running then return end
 		local started = Perf.clock()
 		Perf.count("loop.idle_ticks")
 		_safe_idle(onIdle)
@@ -271,14 +274,7 @@ local function _run_luv(opts)
 		_timer_handle = luv.new_timer()
 		if not _timer_handle then error("Unable to allocate event loop timer handle", 0) end
 		local timer_started, timer_error = NativeTimer.start(luv, _timer_handle, periodMs, periodMs, function()
-			if not _running then
-				if _timer_handle then
-					luv.timer_stop(_timer_handle)
-					luv.close(_timer_handle)
-					_timer_handle = nil
-				end
-				return
-			end
+			if not _running then return end
 			_safe_periodic(onPeriodic)
 		end)
 		if timer_started == nil or timer_started == false then
@@ -396,6 +392,11 @@ function M.run(opts)
 		return
 	end
 
+	-- A prior failed native cleanup still owns these exact handles. Retry it
+	-- before a new run can replace their references.
+	if luv and (_idle_handle or _timer_handle) and not _cleanup_luv() then
+		error("Event loop native cleanup remains pending", 0)
+	end
 	_run_active = true
 	_running = true
 	_idle_wait = options.idleWait
@@ -405,7 +406,9 @@ function M.run(opts)
 		Logger.debug(LOG, "Starting luv native event loop (idle + periodic @ %.2fs).",
 			tonumber(options.periodSec) or 0.25)
 		ran, run_error = pcall(_run_luv, options)
-		_cleanup_luv()
+		if not _cleanup_luv() then
+			ran, run_error = false, "Event loop native cleanup remains pending"
+		end
 	else
 		Logger.debug(LOG, "Starting pump fallback loop (1 ms sleep, periodic @ %.2fs).",
 			tonumber(options.periodSec) or 0.25)
