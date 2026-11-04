@@ -68,6 +68,31 @@ if not ok_luv then luv = nil end
 
 M.HAS_ASYNC = luv ~= nil
 
+--- Stops and closes an owned timer, retaining it when the backend refuses either operation.
+--- luv.timer_stop returns a receipt; luv.close returns void on success.
+--- @param timer any Native timer owned by the scheduler.
+--- @return boolean accepted, string|nil error
+local function _retire_timer(timer)
+	if not luv then return false, "luv unavailable" end
+	local stopped, ack, detail = pcall(luv.timer_stop, timer)
+	if not stopped or ack == nil or ack == false or detail ~= nil then
+		return false, tostring(detail or ack)
+	end
+	local closed, close_ack, close_detail = pcall(luv.close, timer)
+	if not closed or close_ack == false or close_detail ~= nil then
+		return false, tostring(close_detail or close_ack)
+	end
+	return true
+end
+
+--- Closes an allocated timer that was never successfully started.
+--- @param timer any Native timer owned by the scheduler.
+--- @return boolean accepted
+local function _rollback_timer(timer)
+	local called, ack, detail = pcall(luv.close, timer)
+	return called and ack ~= false and detail == nil
+end
+
 --- Number of timers that are actually armed.
 --- @return integer
 function M.activeCount()
@@ -115,10 +140,7 @@ function M.after(delaySec, fn)
 			handle.fired = true
 			handle.armed = false
 			_live_timers[handle.id] = nil
-			local cleanup_ok, cleanup_error = pcall(function()
-				luv.timer_stop(t)
-				luv.close(t)
-			end)
+			local cleanup_ok, cleanup_error = _retire_timer(t)
 			if cleanup_ok then
 				handle.timer = nil
 			else
@@ -136,7 +158,7 @@ function M.after(delaySec, fn)
 	end)
 	if not ok then
 		if allocated_timer then
-			local closed = pcall(luv.close, allocated_timer)
+			local closed = _rollback_timer(allocated_timer)
 			if not closed then
 				handle.timer = allocated_timer
 				_live_timers[handle.id] = handle
@@ -190,7 +212,7 @@ function M.every(intervalSec, fn)
 	end)
 	if not ok then
 		if allocated_timer then
-			local closed = pcall(luv.close, allocated_timer)
+			local closed = _rollback_timer(allocated_timer)
 			if not closed then
 				handle.timer = allocated_timer
 				_live_timers[handle.id] = handle
@@ -211,12 +233,7 @@ end
 --- @param handle table|nil Cancellation token returned by after() or every().
 function M.cancel(handle)
 	if type(handle) ~= "table" or not handle.timer then return true end
-	local ok, err = pcall(function()
-		if luv then
-			luv.timer_stop(handle.timer)
-			luv.close(handle.timer)
-		end
-	end)
+	local ok, err = _retire_timer(handle.timer)
 	if not ok then
 		Logger.error(LOG, "cancel(): timer ownership retained — %s", tostring(err))
 		return false
@@ -234,10 +251,7 @@ function M.cancelAll()
 	local cancelled = true
 	for id, handle in pairs(_live_timers) do
 		if handle and handle.timer and luv then
-			local ok, err = pcall(function()
-				luv.timer_stop(handle.timer)
-				luv.close(handle.timer)
-			end)
+			local ok, err = _retire_timer(handle.timer)
 			if ok then
 				handle.fired = true
 				handle.armed = false
