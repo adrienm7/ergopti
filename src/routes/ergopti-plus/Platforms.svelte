@@ -127,7 +127,7 @@ under another configuration path.
 		</details>
 
 		<details class="table-wrap" use:reveal>
-			<summary>{t('Options indisponibles dans le menu')} ({actions.length})</summary>
+			<summary>{t('Options de menu propres à certains systèmes')} ({actions.length})</summary>
 			<table class="matrix">
 				<thead>
 					<tr>

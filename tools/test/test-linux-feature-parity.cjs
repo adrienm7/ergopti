@@ -125,6 +125,25 @@ for (const file of ['src/routes/ergopti-plus/menu-gaps.json', 'docs/feature-inve
 	);
 }
 
+// Hidden platform-specific commands must be inventoried as well as grey rows.
+const hiddenMenu = structuredClone(inventoryMenu);
+const editShortcuts = hiddenMenu.shortcuts_menu.find((item) => item.id === 'edit_shortcuts');
+assert.ok(editShortcuts && !editShortcuts.platforms.includes('linux'));
+editShortcuts.platforms.push('linux');
+const hiddenMenuInventory = inventory.render(
+	inventoryModel,
+	inventoryLocales,
+	inventoryActions,
+	hiddenMenu
+);
+for (const file of ['src/routes/ergopti-plus/menu-gaps.json', 'docs/feature-inventory.md']) {
+	assert.notStrictEqual(
+		beforeInventory[file],
+		hiddenMenuInventory[file],
+		`${file} must reflect hidden menu changes`
+	);
+}
+
 const rows = build();
 const summary = summarize(rows);
 const canonical = fs.readFileSync(
