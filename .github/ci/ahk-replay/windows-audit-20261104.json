@@ -1,90 +1,22 @@
 {
-	"expected_count": 92,
+	"expected_count": 17,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": true,
+	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "rollover-state-recovery",
-			"expected_count": 12
+			"contains": "HotstringsConfig valid syntax persistence:",
+			"expected_count": 8
 		},
 		{
-			"contains": "meta keystats rollover:",
-			"expected_count": 6
-		},
-		{
-			"contains": "ingest-offset-ignores-batch-limit",
-			"expected_count": 3
-		},
-		{
-			"contains": "gesture-keywatcher-length",
-			"expected_count": 3
-		},
-		{
-			"contains": "gesture-keywatcher-owner",
-			"expected_count": 6
-		},
-		{
-			"contains": "gesture-keywatcher-stop-debt",
-			"expected_count": 3
-		},
-		{
-			"contains": "gesture-click-pause-admission",
-			"expected_count": 4
-		},
-		{
-			"contains": "layer-editor-save-admission",
-			"expected_count": 3
-		},
-		{
-			"contains": "layer-editor-ready-delivery-owner",
+			"contains": "HotstringsConfig source preservation:",
 			"expected_count": 5
 		},
 		{
-			"contains": "personal-native-sort-owner",
+			"contains": "klr-rebuild-guard-admission",
 			"expected_count": 2
 		},
 		{
-			"contains": "personal-native-default-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-native-switch-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-native-constructor-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "usage-integer-domain",
-			"expected_count": 6
-		},
-		{
-			"contains": "terminator-move key allocation:",
-			"expected_count": 4
-		},
-		{
-			"contains": "hotstring exact terminator identity:",
-			"expected_count": 16
-		},
-		{
-			"contains": "terminator-move exact magic membership:",
-			"expected_count": 2
-		},
-		{
-			"contains": "terminator-move exact consumption:",
-			"expected_count": 4
-		},
-		{
-			"contains": "crash-native-path-receipt",
-			"expected_count": 3
-		},
-		{
-			"contains": "app-picker-native-refusal-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "sticky-native-modifier-flags",
+			"contains": "remote-trim-cancel",
 			"expected_count": 2
 		}
 	]

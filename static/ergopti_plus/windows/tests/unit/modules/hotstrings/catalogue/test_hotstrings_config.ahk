@@ -1231,3 +1231,52 @@ _HOS_ValidSyntaxRoundTrip(Mode) {
 }
 for _HOS_Mode in ["literal-color", "quoted-key-color", "signed-offset", "exponent-offset", "separated-priority", "color-control", "offset-control", "priority-control"]
 	Test("HotstringsConfig valid syntax persistence: " . _HOS_Mode, _HOS_ValidSyntaxRoundTrip.Bind(_HOS_Mode))
+
+; A projection can ignore future data for reading, but may not erase it on save.
+_HOSP_RefusesUnrepresentableSource(Mode) {
+	global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+	Saved := {overrides: _HotstringsOverrides, path: _HotstringsOverridesPath, groups: HotstringGroupConfig}
+	Root := A_Temp . "\ergopti_override_preservation_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\overrides.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Source := '[magickey]`ncolor = "#123456"`n'
+		switch Mode {
+			case "unknown-leaf": Source .= 'future_enabled = true`n'
+			case "nested-section": Source .= '[magickey.text_expansion_symbols.future]`nflag = true`n'
+			case "array-category": Source .= '[[future_records]]`nvalue = "keep"`n'
+			case "invalid-owned-type": Source .= 'delay_offset = "future-mode"`n'
+			case "extension-control": Source .= '[ext.demo.main]`npriority = 25`n'
+		}
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		TOML_ParseDocument(FSReadStrict(Path))
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		AssertTrue(HotstringsConfigReload(), "the shared read projection may ignore foreign data")
+		Owner := _HotstringsOverrides
+		if Mode == "extension-control" {
+			AssertTrue(HotstringsSetOverride("magickey", "", "show_tooltip", false))
+			Disk := TOML_ParseDocument(FSReadStrict(Path))
+			AssertEqual(25, Disk["ext"]["demo"]["main"]["priority"], "the supported extension route stays writable")
+		} else {
+			AssertFalse(HotstringsSetOverride("magickey", "", "show_tooltip", false),
+				"a serializer cannot acknowledge an edit that loses unrepresented source data")
+			AssertEqual(Source, FSReadStrict(Path), "refusal must preserve the exact foreign source bytes")
+			AssertTrue(_HotstringsOverrides == Owner, "refusal cannot publish a detached candidate")
+		}
+		Stages := 0
+		loop files, Root . "\*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages)
+	} finally {
+		_HotstringsOverrides := Saved.overrides
+		_HotstringsOverridesPath := Saved.path
+		HotstringGroupConfig := Saved.groups
+		HotstringsResolveBumpGen()
+		DirDelete(Root, true)
+	}
+}
+for _HOSP_Mode in ["unknown-leaf", "nested-section", "array-category", "invalid-owned-type", "extension-control"]
+	Test("HotstringsConfig source preservation: " . _HOSP_Mode, _HOSP_RefusesUnrepresentableSource.Bind(_HOSP_Mode))
