@@ -466,6 +466,17 @@
 			"root_cause": "LLM_RemotePostBody_Async in modules/llm/api_remote.ahk reserves its request then dispatches the retained Resolved.Token directly. Generate calls _LLMRemote_NeedsAccess and _LLMRemote_WithAccess, but thinking retries and screen-reading bodies using RawPost omit that preparation. NeedsAccess must be called even when it returns false because it refreshes the retained Token from the current slot.",
 			"silent_failure": "A later body can carry an expired or superseded credential and receive an avoidable authentication refusal despite a valid current cached access token or available refresh.",
 			"regression_test": "Six token-rawpost-owner cases run the actual resolver, original access preparation, token engine, RawPost reservation, managed facade and transport.json serializer. Only exchange HTTP and process spawning use existing explicitly controlled I/O ports; this is no native wire-success claim. The actual published header must use current access; expired slots await exchange under the same id, clock and deadline. Cancellation, elapsed deadline and native pause must prevent dispatch. The optional final TransportPort defaults to zero and forwards the preexisting downstream test boundary without changing current callers. Native fail-before proof is measured; native post-fix qualification is pending."
+		},
+		{
+			"id": "AHK-043",
+			"title": "Managed HTTP failures discard the provider classification and message",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Native loopback run41907263356 at8a5643a passes the real HTTP200 completion control. The HTTP400 peer receives exactly one POST and returns owned-classification-refusal, but the genuine callback receives transport and an empty server_message rather than provider_error and the actual refusal. The same failure occurs individually and reversed.",
+			"root_cause": "_LLMRemote_PollRequest classifies the actual managed response then replaces reason and server_message with hard-coded transport and an empty string when terminal_ok is false. The curl consumer already forwards these classifier fields.",
+			"silent_failure": "Provider refusals lose their explanation and cannot reach existing request-field retry decisions; callers instead receive an inaccurate transport failure.",
+			"regression_test": "Two managed-http-classification cases use the actual Generate path, native owned loopback peer, real managed HTTP body and neutral callback collectors. The genuine network host is initialized and restored under an exclusive fixture scope. HTTP200 must complete once; HTTP400 must preserve the actual classifier reason, exact server message and retained network report. Native fail-before measured; post-fix qualification pending."
 		}
 	]
 }

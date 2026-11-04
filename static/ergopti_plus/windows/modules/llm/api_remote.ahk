@@ -1272,7 +1272,7 @@ _LLMRemote_PollRequest(req_id) {
         return
     if !Classified["terminal_ok"] {
         _LLM_InvokeCallback(on_fail, "on_fail",
-            _LLMRemote_FailInfo("transport", status, "", NetworkReport))
+            _LLMRemote_FailInfo(Classified["reason"], status, Classified["server_message"], NetworkReport))
         return
     }
     if !Classified["ok"] {

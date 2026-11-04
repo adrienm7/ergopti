@@ -801,3 +801,21 @@ The earlier six RawPost failures at `afc1dd3` only exposed a fixture setup omiss
 resolver output intentionally starts without an access token, so the setup now
 performs the same genuine initial access preparation as Generate.
 No aggregate green verdict is claimed for this mixed 44-case discovery run.
+
+## AHK-043: Managed HTTP failures discard the provider classification and message
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_LLMRemote_PollRequest classifies the actual managed response then replaces reason and server_message with hard-coded transport and an empty string when terminal_ok is false. The curl consumer already forwards these classifier fields.
+
+Reproduction: Native loopback run41907263356 at8a5643a passes the real HTTP200 completion control. The HTTP400 peer receives exactly one POST and returns owned-classification-refusal, but the genuine callback receives transport and an empty server_message rather than provider_error and the actual refusal. The same failure occurs individually and reversed.
+
+Consequence: Provider refusals lose their explanation and cannot reach existing request-field retry decisions; callers instead receive an inaccurate transport failure.
+
+Regression: Two managed-http-classification cases use the actual Generate path, native owned loopback peer, real managed HTTP body and neutral callback collectors. The genuine network host is initialized and restored under an exclusive fixture scope. HTTP200 must complete once; HTTP400 must preserve the actual classifier reason, exact server message and retained network report. Native fail-before measured; post-fix qualification pending.
+
+The ongoing register now contains **43 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native cache and editor qualification: 41907002685
+
+At `14c9580`, all **66 selected cases passed individually and in reverse**, including the complete selected cache provenance family and the five editor gateway/isolation adapters. This qualifies AHK-041 and completes the AHK-040 native evidence alongside the previously passing 71 UI cases. The complete production graph compiled, all 15 selected SQLite regressions passed and native hotstring E2E passed **90/90**. Native HTTP E2E was outside selection; no complete-suite qualification is claimed.
