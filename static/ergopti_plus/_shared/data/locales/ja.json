@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "{tag} のダウンロードに失敗しました。何もインストールしていません。接続を確認して再試行してください。",
 	"changelog_window.install_error_handoff": "内蔵アップデーターに接続できませんでした。何もインストールされていません。詳細は本日のログにあります。",
 	"changelog_window.install_error_install": "{tag} のインストールに失敗しました。詳細は本日のログにあります。",
+	"changelog_window.install_error_previous_backup": "以前のアプリのバックアップが残っています。再試行する前に、アプリの隣にあるErgoptiPlus.app.previousを移動してください。",
 	"changelog_window.install_error_no_asset": "バージョン {tag} にはこのシステム用のインストールファイルがありません。何もインストールしていません。",
 	"changelog_window.install_error_no_details": "GitHub からはダウンロードするファイルが載っていないリリースフィードしか返されませんでした。何もインストールしていません。数分後にもう一度お試しください。",
 	"changelog_window.install_error_unexpected": "予期しないエラーでインストールが停止しました。詳細は本日のログにあります。",

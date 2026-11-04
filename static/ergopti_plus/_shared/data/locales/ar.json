@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "فشل تنزيل {tag}: لم يُثبَّت شيء. تحقّق من اتصالك وأعد المحاولة.",
 	"changelog_window.install_error_handoff": "تعذّر الوصول إلى المحدّث المدمج: لم يُثبَّت أي شيء. التفاصيل في سجل اليوم.",
 	"changelog_window.install_error_install": "فشل تثبيت {tag}. التفاصيل في سجل اليوم.",
+	"changelog_window.install_error_previous_backup": "لا تزال نسخة احتياطية سابقة للتطبيق موجودة. انقل ErgoptiPlus.app.previous الموجود بجانب التطبيق قبل إعادة المحاولة.",
 	"changelog_window.install_error_no_asset": "لا يحتوي الإصدار {tag} على ملف تثبيت لهذا النظام: لم يُثبَّت شيء.",
 	"changelog_window.install_error_no_details": "لم يُرجع GitHub إلا موجز الإصدارات الذي لا يسرد الملفات المطلوب تنزيلها: لم يُثبَّت شيء. أعد المحاولة بعد بضع دقائق.",
 	"changelog_window.install_error_unexpected": "توقف التثبيت بسبب خطأ غير متوقع. التفاصيل في سجل اليوم.",

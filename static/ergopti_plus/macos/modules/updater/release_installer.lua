@@ -295,6 +295,13 @@ function M.arm_swap(staged_app, done)
 		else
 			Logger.error(LOG, "The detached installer refused its arming receipt (completion=%s; log: %s). If %s exists, move it aside before retrying.",
 				tostring(ok), log, app .. ".previous")
+			if type(FileSystem.classify_no_follow) == "function" then
+				local checked, _, status = pcall(FileSystem.classify_no_follow, app .. ".previous")
+				if checked and status == "ok" then
+					done(false, "previous_backup_occupied")
+					return
+				end
+			end
 			done(false, "the detached installer did not acknowledge arming")
 		end
 	end

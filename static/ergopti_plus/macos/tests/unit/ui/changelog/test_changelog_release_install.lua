@@ -69,6 +69,7 @@ local function owners(opts)
 			end,
 			arm_swap = function(staged, done)
 				event("arm:" .. tostring(staged))
+				if opts.previous then done(false, "previous_backup_occupied"); return true end
 				if opts.armed == false then return false, "refused" end
 				if opts.defer_arm then opts.arm_done = done; return true end
 				if done then done(true) end
@@ -115,6 +116,15 @@ local function last_install_message(state)
 end
 
 helpers.describe("Changelog one-click release install (macOS)", function()
+	helpers.it("tells the user to move an existing app backup before retrying", function()
+		with_changelog(function(changelog, state, post)
+			local deps, events = owners({ previous = true })
+			open_listed(changelog, state, post, deps)
+			post({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" })
+			helpers.assert_true(last_install_message(state):find("changelog_window.install_error_previous_backup", 1, true) ~= nil)
+			helpers.assert_true(table.concat(events, ","):find("exit:", 1, true) == nil)
+		end)
+	end)
 	helpers.it("seeds the installed build and the restorable backup into the page", function()
 		with_changelog(function(changelog, state)
 			local deps = owners({ latest = { id = "pre-install-b", created_at = "2026-09-30T10:00:00Z", tag = "v1" } })

@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "Не вдалося завантажити {tag}: нічого не встановлено. Перевірте з’єднання та спробуйте ще раз.",
 	"changelog_window.install_error_handoff": "Не вдалося зв’язатися з вбудованим модулем оновлення: нічого не встановлено. Подробиці — у сьогоднішньому журналі.",
 	"changelog_window.install_error_install": "Не вдалося встановити {tag}. Подробиці в сьогоднішньому журналі.",
+	"changelog_window.install_error_previous_backup": "Попередня резервна копія все ще існує. Перед повторною спробою перемістіть ErgoptiPlus.app.previous з папки програми.",
 	"changelog_window.install_error_no_asset": "Версія {tag} не містить інсталяційного файлу для цієї системи: нічого не встановлено.",
 	"changelog_window.install_error_no_details": "GitHub повернув лише стрічку версій, у якій немає файлів для завантаження: нічого не встановлено. Спробуйте ще раз за кілька хвилин.",
 	"changelog_window.install_error_unexpected": "Встановлення перервано через неочікувану помилку. Подробиці в сьогоднішньому журналі.",

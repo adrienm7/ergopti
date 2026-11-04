@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "La descarga de {tag} falló: no se instaló nada. Compruebe su conexión e inténtelo de nuevo.",
 	"changelog_window.install_error_handoff": "No se pudo contactar con el actualizador integrado: no se instaló nada. Los detalles están en el registro de hoy.",
 	"changelog_window.install_error_install": "La instalación de {tag} falló. Los detalles están en el registro de hoy.",
+	"changelog_window.install_error_previous_backup": "Aún existe una copia anterior. Saca ErgoptiPlus.app.previous de la carpeta de la aplicación antes de reintentar.",
 	"changelog_window.install_error_no_asset": "La versión {tag} no incluye un archivo de instalación para este sistema: no se instaló nada.",
 	"changelog_window.install_error_no_details": "GitHub solo devolvió el feed de versiones, que no indica los archivos que hay que descargar: no se instaló nada. Vuelva a intentarlo en unos minutos.",
 	"changelog_window.install_error_unexpected": "La instalación se detuvo por un error inesperado. Los detalles están en el registro de hoy.",

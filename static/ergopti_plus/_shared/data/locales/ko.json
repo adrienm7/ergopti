@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "{tag} 다운로드에 실패했습니다. 아무것도 설치하지 않았습니다. 연결을 확인하고 다시 시도하세요.",
 	"changelog_window.install_error_handoff": "내장 업데이터에 연결할 수 없습니다. 아무것도 설치되지 않았습니다. 자세한 내용은 오늘 로그에 있습니다.",
 	"changelog_window.install_error_install": "{tag} 설치에 실패했습니다. 자세한 내용은 오늘 로그에 있습니다.",
+	"changelog_window.install_error_previous_backup": "이전 앱 백업이 남아 있습니다. 다시 시도하기 전에 앱 옆의 ErgoptiPlus.app.previous를 옮기세요.",
 	"changelog_window.install_error_no_asset": "버전 {tag}에는 이 시스템용 설치 파일이 없습니다. 아무것도 설치하지 않았습니다.",
 	"changelog_window.install_error_no_details": "GitHub가 다운로드할 파일이 없는 릴리스 피드만 반환했습니다. 아무것도 설치하지 않았습니다. 몇 분 후 다시 시도하세요.",
 	"changelog_window.install_error_unexpected": "예기치 않은 오류로 설치가 중단되었습니다. 자세한 내용은 오늘 로그에 있습니다.",

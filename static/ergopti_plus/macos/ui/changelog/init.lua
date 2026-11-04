@@ -563,7 +563,9 @@ local function install_session()
 		end,
 		install_async = function(staged, release, asset, done)
 			return deps().installer.arm_swap(staged, function(armed, detail)
-				done(armed == true, ReleaseInstall.REASON.install, detail)
+				local reason = detail == "previous_backup_occupied" and ReleaseInstall.REASON.previous_backup
+					or ReleaseInstall.REASON.install
+				done(armed == true, reason, detail)
 			end) == true
 		end,
 		restart = function()

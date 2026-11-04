@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "A transferência de {tag} falhou: nada foi instalado. Verifique a ligação e tente novamente.",
 	"changelog_window.install_error_handoff": "Não foi possível contactar o atualizador integrado: nada foi instalado. Os detalhes estão no registo de hoje.",
 	"changelog_window.install_error_install": "A instalação de {tag} falhou. Os detalhes estão no registo de hoje.",
+	"changelog_window.install_error_previous_backup": "Ainda existe um backup anterior. Mova ErgoptiPlus.app.previous para fora da pasta do aplicativo antes de tentar novamente.",
 	"changelog_window.install_error_no_asset": "A versão {tag} não tem um ficheiro de instalação para este sistema: nada foi instalado.",
 	"changelog_window.install_error_no_details": "O GitHub só devolveu o feed de versões, que não indica os ficheiros a transferir: nada foi instalado. Tente novamente dentro de alguns minutos.",
 	"changelog_window.install_error_unexpected": "A instalação parou devido a um erro inesperado. Os detalhes estão no registo de hoje.",

@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "Das Herunterladen von {tag} ist fehlgeschlagen: Es wurde nichts installiert. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
 	"changelog_window.install_error_handoff": "Der integrierte Updater war nicht erreichbar: Es wurde nichts installiert. Details stehen im heutigen Protokoll.",
 	"changelog_window.install_error_install": "Die Installation von {tag} ist fehlgeschlagen. Details stehen im heutigen Protokoll.",
+	"changelog_window.install_error_previous_backup": "Eine ältere App-Sicherung ist noch vorhanden. Verschiebe ErgoptiPlus.app.previous aus dem App-Ordner, bevor du es erneut versuchst.",
 	"changelog_window.install_error_no_asset": "Version {tag} enthält keine Installationsdatei für dieses System: Es wurde nichts installiert.",
 	"changelog_window.install_error_no_details": "GitHub hat nur den Versions-Feed geliefert, der die herunterzuladenden Dateien nicht auflistet: Es wurde nichts installiert. Versuchen Sie es in einigen Minuten erneut.",
 	"changelog_window.install_error_unexpected": "Die Installation wurde durch einen unerwarteten Fehler abgebrochen. Details stehen im heutigen Protokoll.",
