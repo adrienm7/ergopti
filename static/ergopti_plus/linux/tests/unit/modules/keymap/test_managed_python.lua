@@ -40,12 +40,26 @@ local function machine(options)
 		end,
 		download = function(url, path, bytes, callback)
 			world.downloads[#world.downloads + 1] = { url = url, path = path, bytes = bytes }
+			local operation = { started = true, closed = false, listeners = {} }
+			function operation:is_settled() return self.closed end
+			function operation:settled_result() return self.result end
+			function operation:on_settled(fn)
+				self.listeners[#self.listeners + 1] = fn
+				if self.closed then fn() end
+				return true
+			end
 			world.pending = function()
 				world.files[path] = true
-				callback({ ok = (options.status or 200) == 200, status = options.status or 200 })
+				operation.result = { ok = (options.status or 200) == 200, status = options.status or 200 }
+				callback(operation.result)
+				world.retire = function()
+					operation.closed = true
+					for _, listener in ipairs(operation.listeners) do listener() end
+				end
+				if not options.hold_physical then world.retire() end
 			end
 			if not options.hold then world.pending() end
-			return true
+			return true, operation
 		end,
 		size = function(path) return world.files[path] and (options.bytes or archive.bytes) or nil end,
 		sha256 = function(_, callback) callback(options.digest or archive.sha256, nil) end,
@@ -200,5 +214,68 @@ h.describe("Ergopti's own Python (managed-python)", function()
 			h.assert_eq(answered, 1)
 		end)
 	end
+
+	h.it("retains a refused download until its physical settlement", function()
+		local deps, world = machine()
+		local operation = { started = false, closed = false, listeners = {} }
+		function operation:is_settled() return self.closed end
+		function operation:settled_result() return { ok = false, status = 0, error = "shutdown" } end
+		function operation:on_settled(fn) self.listeners[#self.listeners + 1] = fn; if self.closed then fn() end; return true end
+		deps.download = function() return false, operation end
+		local Managed = h.load_module("modules.keymap.managed_python")
+		Managed._reset_for_test()
+		local outcomes = {}
+		Managed.ensure(deps, function(ok, value) outcomes[#outcomes + 1] = { ok, value } end)
+		Managed.ensure(deps, function(ok, value) outcomes[#outcomes + 1] = { ok, value } end)
+		h.assert_eq(#outcomes, 0, "refusal does not acknowledge native retirement")
+		h.assert_eq(#world.removed, 1, "staging must remain until the transport closes")
+		operation.closed = true
+		for _, listener in ipairs(operation.listeners) do listener() end
+		h.assert_eq(#outcomes, 2)
+		h.assert_eq(outcomes[1], { false, Managed.FAILURE_DOWNLOAD })
+		h.assert_eq(outcomes[2], outcomes[1])
+		h.assert_eq(#world.removed, 2)
+	end)
+
+	h.it("answers an already settled refused download without a logical callback", function()
+		local deps = machine()
+		local operation = { started = false }
+		function operation:is_settled() return true end
+		function operation:settled_result() return { ok = false, status = 0, error = "shutdown" } end
+		function operation:on_settled(fn) fn(); return true end
+		deps.download = function() return false, operation end
+		local result, Managed = ensure(deps)
+		h.assert_eq(result.calls, 1)
+		h.assert_eq(result.ok, false)
+		h.assert_eq(result.value, Managed.FAILURE_DOWNLOAD)
+	end)
+
+	h.it("waits for native HTTP retirement after logical success before unpacking", function()
+		local deps, world = machine({ hold = true, hold_physical = true })
+		local result = ensure(deps)
+		world.pending()
+		h.assert_eq(result.calls, 0)
+		h.assert_eq(world.unpacked, 0)
+		world.retire()
+		h.assert_eq(result.calls, 1)
+		h.assert_true(result.ok)
+		h.assert_eq(world.unpacked, 1)
+	end)
+
+	h.it("retains staging if settlement subscription invokes inline then refuses", function()
+		local deps, world = machine()
+		local operation = { started = false, listener = nil }
+		function operation:is_settled() return true end
+		function operation:settled_result() return { ok = false, status = 0 } end
+		function operation:on_settled(fn) self.listener = fn; fn(); return false end
+		deps.download = function() return false, operation end
+		local result, Managed = ensure(deps)
+		h.assert_eq(result.calls, 0)
+		h.assert_eq(#world.removed, 1)
+		operation.listener()
+		h.assert_eq(result.calls, 0, "a refused subscription cannot later authorize cleanup")
+		h.assert_eq(#world.removed, 1)
+		Managed._reset_for_test()
+	end)
 
 end)

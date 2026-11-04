@@ -126,7 +126,7 @@ local function install(deps, key, archive)
 			return
 		end
 		Logger.start(LOG, "Downloading Ergopti's Python (%d bytes) for %s…", archive.bytes, key)
-		deps.download(archive.url, download, archive.bytes, function(result)
+		local function downloaded(result)
 			if type(result) ~= "table" or result.ok ~= true or result.status ~= 200 then
 				fail(M.FAILURE_DOWNLOAD, type(result) == "table" and tostring(result.error or result.status) or "no result")
 				return
@@ -158,7 +158,38 @@ local function install(deps, key, archive)
 					settle(true, root .. "/" .. M.INTERPRETER, nil)
 				end)
 			end)
-		end)
+		end
+		-- The boolean alone cannot prove that a refused or completed transfer
+		-- has released its process, pipes and destination. Wait for its exact
+		-- physical receipt before reading or removing the staging directory.
+		local called, started, operation = pcall(deps.download, archive.url, download, archive.bytes, function() end)
+		if not called or type(started) ~= "boolean" or type(operation) ~= "table"
+			or operation.started ~= started or type(operation.is_settled) ~= "function"
+			or type(operation.on_settled) ~= "function" or type(operation.settled_result) ~= "function" then
+			Logger.error(LOG, "Python download ownership is unknown; staging remains reserved.")
+			return
+		end
+		local attaching, delivered, subscribed = true, false, false
+		local function settled()
+			if attaching or not subscribed or delivered then return end
+			local observed, closed = pcall(operation.is_settled, operation)
+			if not observed or closed ~= true then return end
+			local read, result = pcall(operation.settled_result, operation)
+			delivered = true
+			if not started or not read or type(result) ~= "table" then
+				fail(M.FAILURE_DOWNLOAD, "the download was not admitted or did not return a settled result")
+			else
+				downloaded(result)
+			end
+		end
+		local registered, accepted = pcall(operation.on_settled, operation, settled)
+		subscribed = registered and accepted == true
+		attaching = false
+		if not subscribed then
+			Logger.error(LOG, "Python download settlement registration failed; staging remains reserved.")
+			return
+		end
+		settled()
 	end)
 end
 
