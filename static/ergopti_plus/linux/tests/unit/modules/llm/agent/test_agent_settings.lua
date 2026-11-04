@@ -221,6 +221,13 @@ end
 -- ======================================
 
 helpers.describe("AI agent settings: stored like every llm.* setting", function()
+	helpers.it("matches excluded applications across identifier case changes (agent-apps-identity)", function()
+		Scenario.run({}, function()
+			local settings = require("modules.llm.agent_settings")
+			assert(settings.set_disabled_apps({ "Firefox" }))
+			helpers.assert_true(settings.is_app_disabled("firefox"), "a changed identifier case must not re-enable agent triage")
+		end)
+	end)
 	helpers.it("preserves excluded applications when an agent list has a hole (agent-apps-sparse)", function()
 		Scenario.run({}, function(world)
 			local settings = require("modules.llm.agent_settings")
