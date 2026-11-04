@@ -176,6 +176,17 @@ end
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
+	helpers.it("preserves a successor started during emergency pointer cleanup (emergency-pointer-successor)", function()
+		local restarted = false
+		local _, _, _, running, _, pointer_open = drive("mouse", {}, { { EV_KEY, BTN_LEFT, 1, 3000 } }, nil,
+			function(kind, _, _, _, hook, options)
+				if kind == "reset" and not restarted then
+					hook.stop(); hook.start(options); restarted = hook.isRunning()
+				end
+			end, nil, nil, function(hook) hook.emergency_stop("controlled failure") end)
+		helpers.assert_true(restarted and running)
+		helpers.assert_true(pointer_open, "the old emergency cleanup cannot close the successor pointer")
+	end)
 	helpers.it("preserves a successor started from pointer retirement during stop (stop-pointer-successor)", function()
 		local restarted = false
 		local _, _, _, running, _, pointer_open = drive("mouse", {}, { { EV_KEY, BTN_LEFT, 1, 3000 } }, nil,

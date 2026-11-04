@@ -4321,13 +4321,17 @@ end
 --- the descriptor is the kernel-guaranteed emergency ungrab.
 --- @param reason string|nil
 function M.emergency_stop(reason)
+	local session = _capture_session
 	_number_row.retire() -- Unknown original row/output debt stays retained.
+	if _capture_session ~= session then return false end
 	_capture_session = nil
 	local message = tostring(reason or "keyboard output path failed")
 	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
+	if _capture_session ~= nil then return false end
 	-- Best effort as below: a CapsLock left locked types every later letter in
 	-- capitals, and Ergopti's CapsLock key taps Enter instead of unlocking it.
 	pcall(_locks.end_word, true, "emergency keyboard stop")
+	if _capture_session ~= nil then return false end
 	-- Best effort, before the descriptors close: a Ctrl the virtual keyboard
 	-- still holds would stay down in every application once nothing forwards
 	-- its release. The output path may be what failed, so nothing here throws.
@@ -4337,19 +4341,24 @@ function M.emergency_stop(reason)
 			pcall(original.release_all, original.engine)
 		else pcall(function() _remapper:release_all() end) end
 	end
+	if _capture_session ~= nil then return false end
 	if _broker and _broker.has_debt() then
 		_broker.retire()
+		if _capture_session ~= nil then return false end
 	elseif _broker and type(_emit_raw) == "function" then
 		for key, entry in pairs(_forwarded_down) do
 			local owner = _output_owners[key]
 			if owner then
 				local receipt = _broker.edge(owner, entry.code, InputEvent.VALUE_UP, _emit_raw)
+				if _capture_session ~= nil then return false end
 				if not receipt.ok then _broker.retire(); break end
 			end
 		end
 	end
-	_close_paths(_pointer_devices, pointer_slot)
-	_close_paths(_devices, keyboard_slot)
+	if _capture_session ~= nil then return false end
+	local function successor() return _capture_session ~= nil end
+	if not _close_paths(_pointer_devices, pointer_slot, nil, successor) then return false end
+	if not _close_paths(_devices, keyboard_slot, nil, successor) then return false end
 	_buffered_reader_cleanup=nil
 	_pointer_devices = {}
 	LayerPointer.slots, LayerPointer.buttons = {}, {}
