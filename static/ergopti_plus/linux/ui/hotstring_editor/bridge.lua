@@ -144,7 +144,7 @@ end
 --- @return boolean|string
 local function pref(key)
 	local stored = Storage.get(PREF_PREFIX .. key, nil)
-	if stored == nil then return PREF_DEFAULTS[key] end
+	if type(stored) ~= type(PREF_DEFAULTS[key]) then return PREF_DEFAULTS[key] end
 	return stored
 end
 
