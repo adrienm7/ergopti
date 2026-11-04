@@ -31,7 +31,8 @@ local KEYS = { left_alt = { tap_action = "backspace", hold_layer = "nav", time_a
 --- EVIOCGBIT(0) bytes: SYN, KEY, MSC for a keyboard; SYN, KEY, REL for a mouse;
 --- SYN, KEY, ABS for a touchpad.
 local MASKS = { keyboard = string.char(19, 0, 18, 0), mouse = string.char(7, 0, 0, 0), touchpad = string.char(11, 0, 0, 0),
-	mouse_with_switch = string.char(39, 0, 0, 0) }
+	mouse_with_switch = string.char(39, 0, 0, 0), mouse_with_led = string.char(7, 0, 2, 0),
+	mouse_with_power = string.char(7, 0, 64, 0), mouse_with_msc = string.char(23, 0, 0, 0) }
 
 local function fake_node(label)
 	local path = os.tmpname()
@@ -168,6 +169,17 @@ end
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
+	helpers.it("still takes a normal mouse with scan metadata (mouse-unsupported-events)", function()
+		local _, grabs = drive("mouse_with_msc", HOLD, {})
+		helpers.assert_eq(grabs.on, 1)
+	end)
+	for _, kind in ipairs({ "mouse_with_led", "mouse_with_power" }) do
+		helpers.it("does not seize an unforwardable composite event on " .. kind .. " (mouse-unsupported-events)", function()
+			local _, grabs, _, running = drive(kind, HOLD, {})
+			helpers.assert_true(running)
+			helpers.assert_eq(grabs.on, 0, "unsupported event types must stay with the desktop")
+		end)
+	end
 	helpers.it("does not grab a pointer while a previously delivered button is held (pointer-held-before-grab)", function()
 		local _, grabs, _, running = drive("mouse", { { LEFT_ALT, 1, 2000 } }, {
 			{ EV_KEY, BTN_LEFT, 1, 1000 },

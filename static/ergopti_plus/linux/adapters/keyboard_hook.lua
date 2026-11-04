@@ -2491,12 +2491,23 @@ end
 -- =========================================
 -- =========================================
 
--- Event-type bits of EVIOCGBIT(0): a mouse reports EV_REL, a touchpad or a tablet EV_ABS.
-LayerPointer.EV_REL_BIT, LayerPointer.EV_ABS_BIT, LayerPointer.EV_SW_BIT = 0x02, 0x03, 0x05
+-- Event-type bit of EVIOCGBIT(0): a mouse reports EV_REL.
+LayerPointer.EV_REL_BIT = 0x02
 
 --- Whether bit `bit` of an event-type mask is set (no bit operators under LuaJIT).
 function LayerPointer.has_type(mask, bit)
 	return math.floor(mask / 2 ^ bit) % 2 == 1
+end
+
+function LayerPointer.forwardable(mask)
+	if type(mask) ~= "number" or not LayerPointer.has_type(mask, LayerPointer.EV_REL_BIT)
+		or not LayerPointer.has_type(mask, 1) then return false end
+	-- EV_SYN, EV_KEY and EV_REL are relayed; EV_MSC includes scan metadata.
+	-- Every other event type would be lost while the whole device is grabbed.
+	for bit = 3, 31 do
+		if bit ~= 4 and LayerPointer.has_type(mask, bit) then return false end
+	end
+	return true
 end
 
 -- A wheel-capable capture needs mouse reports even without observer callbacks;
@@ -2512,8 +2523,8 @@ function LayerPointer.wanted()
 end
 
 --- Takes the mice while the layer binds the wheel, gives them back once it does
---- not and no forwarded key is still down. A touchpad or a device with switches
---- is never taken: their absolute or switch reports cannot be forwarded.
+--- not and no forwarded key is still down. Devices with absolute axes, switches,
+--- LEDs or other unsupported event types remain with the desktop.
 function LayerPointer.sync()
 	local session = _capture_session
 	local wanted, held = LayerPointer.wanted(), next(LayerPointer.slots) ~= nil
@@ -2522,9 +2533,7 @@ function LayerPointer.sync()
 		for _, path in ipairs(_pointer_devices) do
 			local slot = pointer_slot(path)
 			local mask = not LayerPointer.slots[slot] and EvdevReader.is_open(slot) and EvdevReader.event_capabilities(slot) or nil
-			if mask and LayerPointer.has_type(mask, LayerPointer.EV_REL_BIT)
-				and not LayerPointer.has_type(mask, LayerPointer.EV_ABS_BIT)
-				and not LayerPointer.has_type(mask, LayerPointer.EV_SW_BIT) then
+			if mask and LayerPointer.forwardable(mask) then
 				local keys = EvdevReader.pressed_keys(slot, KEY_MAX)
 				if not _running or _capture_session ~= session then return end
 				if keys and next(keys) == nil then
