@@ -14,6 +14,29 @@ local function select_sources(s, ids)
 end
 
 helpers.describe("keyboard source departure retires remapper input", function()
+	helpers.it("(remap-source-departure) retires capture when a departed source close is unacknowledged", function()
+		local options = { position_bits = true, on_capture_reacquired = function() return true end }
+		Fixture.with_session(options, function(s)
+			options.fail_reader_close = true
+			select_sources(s, { "b" })
+			helpers.assert_eq(s.hook.isRunning(), false, "a failed source retirement cannot publish a new cohort")
+			helpers.assert_eq(s.hook.capture_input_owner(), nil)
+			options.fail_reader_close = false
+		end)
+	end)
+
+	helpers.it("(remap-source-departure) releases a remapped hold before a source close is refused", function()
+		local options = { position_bits = true, on_capture_reacquired = function() return true end }
+		Fixture.with_session(options, function(s)
+			s.edge("a", 58, 1, 0)
+			helpers.assert_eq(s.rows, { { 29, 1 } })
+			options.fail_reader_close = true
+			select_sources(s, { "b" })
+			helpers.assert_eq(s.rows, { { 29, 1 }, { 29, 0 } })
+			helpers.assert_eq(s.hook.isRunning(), false)
+			options.fail_reader_close = false
+		end)
+	end)
 	helpers.it("(remap-source-departure) clears a blocker when its keyboard disappears", function()
 		Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end,
 			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
