@@ -1164,9 +1164,9 @@ end
 --- focused application and are written with its next typing row, as macOS
 --- carries them to the next flushed run. Gated like every recording entry
 --- point, and never for an application whose input stays out of the metrics.
---- @param kind string "press", "motion" or "frame" (pointer_metrics).
---- @param code integer evdev code.
---- @param value integer evdev value.
+--- @param kind string "press", "motion", "frame", "dropped" or "reset" (pointer_metrics).
+--- @param code integer|nil evdev code.
+--- @param value integer|nil evdev value.
 --- @param source any|nil Pointer device identity.
 function M.record_pointer(kind, code, value, source)
 	local delta = _pointer.observe(kind, code, value, source)

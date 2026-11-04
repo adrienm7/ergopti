@@ -2551,8 +2551,12 @@ local function _dispatch_pointer(ev, slot)
 			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value, slot)
 		elseif ev.type == EVDEV_TYPE_KEY and ev.value == InputEvent.VALUE_DOWN then
 			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
-		elseif ev.type == InputEvent.EV_SYN and ev.code == InputEvent.SYN_REPORT then
-			_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot)
+		elseif ev.type == InputEvent.EV_SYN then
+			if ev.code == InputEvent.SYN_REPORT then
+				_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot)
+			elseif ev.code == SYN_DROPPED then
+				_call_callback("pointer event callback", _on_pointer_event, "dropped", ev.code, ev.value, slot)
+			end
 		end
 	end
 end
