@@ -41,14 +41,36 @@ local function migrate(answers)
 			close = function() return true end,
 		}
 	end
+	local uv = require("luv")
+	local backup = path .. require("keystats.token_encoding").BACKUP_SUFFIX
+	local exited, process = false, nil
 	local ok, result = xpcall(function()
 		helpers.assert_true(writer.open_db(path))
 		commands = {}
+		if answers.existing_backup then
+			local existing = assert(io.open(backup, "wb"))
+			assert(existing:write("previous backup") and existing:close())
+		end
+		if answers.fifo then
+			local made = previous_execute("mkfifo '" .. backup .. "'")
+			assert(made == 0 or made == true)
+			process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; printf fake > "$1"', "fixture", backup } }, function()
+				exited = true
+				process:close()
+			end))
+		end
 		return writer.ensure_token_encoding()
 	end, debug.traceback)
 	os.execute, io.popen = previous_execute, previous_popen
 	writer.close_db()
 	os.remove(path)
+	if answers.fifo then
+		os.remove(backup)
+		assert(uv.fs_mkdir(backup, 448))
+		while not exited do uv.run("once") end
+		os.remove(backup)
+	end
+	if answers.existing_backup then os.remove(backup) end
 	if not ok then error(result, 0) end
 	return result, commands
 end
@@ -83,6 +105,19 @@ helpers.describe("keystats sqlite writer: n-gram token encoding", function()
 		local result, commands = migrate({ version = "2" })
 		helpers.assert_true(result)
 		helpers.assert_eq(#commands, 0, "keys already escaped are never escaped twice")
+	end)
+
+	helpers.it("token-encoding: an existing regular backup remains usable", function()
+		local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, existing_backup = true })
+		helpers.assert_true(result)
+		helpers.assert_nil(position(commands, "VACUUM INTO"))
+		helpers.assert_true(position(commands, "UPDATE OR ROLLBACK") ~= nil)
+	end)
+
+	helpers.it("token-encoding: a FIFO backup refuses migration without blocking", function()
+		local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, fifo = true })
+		helpers.assert_eq(result, false)
+		helpers.assert_nil(position(commands, "UPDATE OR ROLLBACK"))
 	end)
 
 	helpers.it("token-encoding: a refused backup rewrites nothing", function()
