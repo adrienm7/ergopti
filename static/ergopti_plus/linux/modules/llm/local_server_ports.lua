@@ -98,13 +98,13 @@ local function read_command_lines(pids, keep, timeout_ms, on_text)
 			if command ~= "" and keep(command) then rows[#rows + 1] = tostring(pid) .. " " .. command end
 		end
 		index = last + 1
-		if index > #pids then on_text(table.concat(rows, "\n")); return end
 		if M._now_ms() > deadline then
 			local cause = string.format("/proc walk did not finish within %d ms", timeout_ms)
 			Logger.warn(LOG, "%s: no reading this sweep.", cause)
 			on_text(nil, cause)
 			return
 		end
+		if index > #pids then on_text(table.concat(rows, "\n")); return end
 		if not M._defer(slice) then
 			Logger.warn(LOG, "The /proc walk could not yield to the loop: no reading this sweep.")
 			on_text(nil, "/proc walk was not scheduled")

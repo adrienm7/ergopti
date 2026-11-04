@@ -122,6 +122,17 @@ helpers.describe("Linux local server port scan from /proc (local-server-ports)",
 	-- What busybox answers to procps-only flags: the old scan read it as no server
 	local BUSYBOX = { exit_code = 1, stdout = "", error = "pgrep: unrecognized option: a" }
 
+	helpers.it("a final process slice that exceeds the deadline is not accepted", function()
+		local Timings = require("infra.timings")
+		local budget = Timings.ms("llm", "local_server_process_lookup_timeout_ms")
+		local calls = 0
+		local _, runs = scan_with({ [700] = "/usr/bin/llama-server\0--port\0008181\0" }, nil, function()
+			calls = calls + 1
+			return calls == 1 and 0 or budget + 1
+		end)
+		helpers.assert_eq(runs[1].program, "ss", "a late final slice must fall back to listener discovery")
+	end)
+
 	helpers.it("a command-line port is read from /proc with no external tool (linux-proc-scan)", function()
 		local results, runs = scan_with({
 			[700] = "/usr/bin/llama-server\0--port\0008181\0",
