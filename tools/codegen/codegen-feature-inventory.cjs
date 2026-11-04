@@ -259,26 +259,10 @@ function render(features, locales, actions, menu, layers = {}, tapHolds = {}) {
 			`| ${row.path} | ${row.native_ids.windows || '—'} | ${row.native_ids.macos || '—'} | ${row.native_ids.linux || '—'} |`
 		);
 	lines.push('');
-	const markdown = execFileSync(
-		process.execPath,
-		[require.resolve('prettier/bin/prettier.cjs'), '--stdin-filepath', OUT_MD],
-		{ cwd: ROOT, input: `${lines.join('\n')}\n`, encoding: 'utf8' }
-	);
-	const actionJson = execFileSync(
-		process.execPath,
-		[require.resolve('prettier/bin/prettier.cjs'), '--stdin-filepath', OUT_ACTIONS],
-		{ cwd: ROOT, input: JSON.stringify(actionRows), encoding: 'utf8' }
-	);
-	const menuJson = execFileSync(
-		process.execPath,
-		[require.resolve('prettier/bin/prettier.cjs'), '--stdin-filepath', OUT_MENU],
-		{ cwd: ROOT, input: JSON.stringify(menuRows), encoding: 'utf8' }
-	);
-	const inputJson = execFileSync(
-		process.execPath,
-		[require.resolve('prettier/bin/prettier.cjs'), '--stdin-filepath', OUT_INPUT],
-		{ cwd: ROOT, input: JSON.stringify(inputRows), encoding: 'utf8' }
-	);
+	const markdown = formatOwnedOutput(`${lines.join('\n')}\n`, OUT_MD);
+	const actionJson = formatOwnedOutput(JSON.stringify(actionRows), OUT_ACTIONS);
+	const menuJson = formatOwnedOutput(JSON.stringify(menuRows), OUT_MENU);
+	const inputJson = formatOwnedOutput(JSON.stringify(inputRows), OUT_INPUT);
 	return {
 		[OUT_INPUT]: inputJson,
 		[OUT_MENU]: menuJson,
@@ -286,6 +270,26 @@ function render(features, locales, actions, menu, layers = {}, tapHolds = {}) {
 		[OUT_ACTIONS]: actionJson,
 		[OUT_MD]: markdown
 	};
+}
+
+/** Format owned outputs without applying the manual formatter's ignore policy. */
+function formatOwnedOutput(source, filepath) {
+	return execFileSync(
+		process.execPath,
+		[
+			'--input-type=module',
+			'-e',
+			`import * as prettier from 'prettier';
+process.stdin.setEncoding('utf8');
+let source = '';
+for await (const chunk of process.stdin) source += chunk;
+const filepath = process.argv[1];
+const config = await prettier.resolveConfig(filepath);
+process.stdout.write(await prettier.format(source, { ...config, filepath }));`,
+			filepath
+		],
+		{ cwd: ROOT, input: source, encoding: 'utf8' }
+	);
 }
 
 function outputs() {
