@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Пути",
 	"paths_editor.label_config_dir": "Папка конфигурации",
 	"paths_editor.label_logs_dir": "Папка журналов",
-	"paths_editor.hint_logs_dir": "Журналы записываются во вложенную папку ergopti_plus выбранной папки.",
+	"paths_editor.hint_logs_dir": "Журналы записываются в отдельную вложенную папку выбранной папки.",
 	"paths_editor.subtitle": "Все личные файлы (ярлыки, хотстринги…) загружаются из этой папки.",
 	"paths_editor.tag_default": "по умолчанию",
 	"paths_editor.default_label": "По умолчанию:",

@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Chemins",
 	"paths_editor.label_config_dir": "Dossier de configuration",
 	"paths_editor.label_logs_dir": "Dossier des journaux",
-	"paths_editor.hint_logs_dir": "Les journaux sont écrits dans un sous-dossier ergopti_plus du dossier choisi.",
+	"paths_editor.hint_logs_dir": "Les journaux sont écrits dans un sous-dossier dédié du dossier choisi.",
 	"paths_editor.subtitle": "Tous les fichiers personnels (raccourcis, hotstrings…) sont résolus depuis ce dossier.",
 	"paths_editor.tag_default": "par défaut",
 	"paths_editor.default_label": "Par défaut :",

@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "נתיבים",
 	"paths_editor.label_config_dir": "תיקיית הגדרות",
 	"paths_editor.label_logs_dir": "תיקיית יומנים",
-	"paths_editor.hint_logs_dir": "היומנים נכתבים לתת־תיקייה ergopti_plus בתוך התיקייה שנבחרה.",
+	"paths_editor.hint_logs_dir": "היומנים נכתבים לתת־תיקייה ייעודית בתוך התיקייה שנבחרה.",
 	"paths_editor.subtitle": "כל הקבצים האישיים (קיצורים, hotstrings…) מתפענחים מתיקייה זו.",
 	"paths_editor.tag_default": "ברירת מחדל",
 	"paths_editor.default_label": "ברירת מחדל:",

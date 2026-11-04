@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Ścieżki",
 	"paths_editor.label_config_dir": "Folder konfiguracji",
 	"paths_editor.label_logs_dir": "Folder logów",
-	"paths_editor.hint_logs_dir": "Logi są zapisywane w podfolderze ergopti_plus wybranego folderu.",
+	"paths_editor.hint_logs_dir": "Logi są zapisywane w osobnym podfolderze wybranego folderu.",
 	"paths_editor.subtitle": "Wszystkie pliki osobiste (skróty, hotstring'i…) są wczytywane z tego folderu.",
 	"paths_editor.tag_default": "domyślny",
 	"paths_editor.default_label": "Domyślnie:",

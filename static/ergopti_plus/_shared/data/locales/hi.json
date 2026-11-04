@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "पथ",
 	"paths_editor.label_config_dir": "कॉन्फ़िगरेशन फ़ोल्डर",
 	"paths_editor.label_logs_dir": "लॉग फ़ोल्डर",
-	"paths_editor.hint_logs_dir": "लॉग चुने गए फ़ोल्डर के ergopti_plus उप-फ़ोल्डर में लिखे जाते हैं।",
+	"paths_editor.hint_logs_dir": "लॉग चुने गए फ़ोल्डर के एक अलग उप-फ़ोल्डर में लिखे जाते हैं।",
 	"paths_editor.subtitle": "सभी व्यक्तिगत फ़ाइलें (shortcuts, hotstrings…) इस फ़ोल्डर से हल की जाती हैं।",
 	"paths_editor.tag_default": "डिफ़ॉल्ट",
 	"paths_editor.default_label": "डिफ़ॉल्ट:",

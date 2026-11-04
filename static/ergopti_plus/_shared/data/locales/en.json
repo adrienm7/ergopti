@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Paths",
 	"paths_editor.label_config_dir": "Configuration folder",
 	"paths_editor.label_logs_dir": "Logs folder",
-	"paths_editor.hint_logs_dir": "Logs are written to an ergopti_plus subfolder of the chosen folder.",
+	"paths_editor.hint_logs_dir": "Logs are written to their own subfolder of the chosen folder.",
 	"paths_editor.subtitle": "All personal files (shortcuts, hotstrings…) are resolved from this folder.",
 	"paths_editor.tag_default": "default",
 	"paths_editor.default_label": "Default:",

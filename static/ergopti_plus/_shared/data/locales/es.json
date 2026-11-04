@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Rutas",
 	"paths_editor.label_config_dir": "Carpeta de configuración",
 	"paths_editor.label_logs_dir": "Carpeta de registros",
-	"paths_editor.hint_logs_dir": "Los registros se escriben en una subcarpeta ergopti_plus de la carpeta elegida.",
+	"paths_editor.hint_logs_dir": "Los registros se escriben en una subcarpeta propia de la carpeta elegida.",
 	"paths_editor.subtitle": "Todos los archivos personales (atajos, hotstrings…) se resuelven desde esta carpeta.",
 	"paths_editor.tag_default": "predeterminado",
 	"paths_editor.default_label": "Predeterminado:",

@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Paden",
 	"paths_editor.label_config_dir": "Configuratiemap",
 	"paths_editor.label_logs_dir": "Logmap",
-	"paths_editor.hint_logs_dir": "Logs worden geschreven naar een submap ergopti_plus van de gekozen map.",
+	"paths_editor.hint_logs_dir": "Logs worden geschreven naar een eigen submap van de gekozen map.",
 	"paths_editor.subtitle": "Alle persoonlijke bestanden (snelkoppelingen, hotstrings…) worden opgelost vanuit deze map.",
 	"paths_editor.tag_default": "standaard",
 	"paths_editor.default_label": "Standaard:",

@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Percorsi",
 	"paths_editor.label_config_dir": "Cartella di configurazione",
 	"paths_editor.label_logs_dir": "Cartella dei log",
-	"paths_editor.hint_logs_dir": "I log vengono scritti in una sottocartella ergopti_plus della cartella scelta.",
+	"paths_editor.hint_logs_dir": "I log vengono scritti in una sottocartella dedicata della cartella scelta.",
 	"paths_editor.subtitle": "Tutti i file personali (scorciatoie, hotstring…) vengono risolti da questa cartella.",
 	"paths_editor.tag_default": "predefinito",
 	"paths_editor.default_label": "Predefinito:",

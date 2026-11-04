@@ -2522,7 +2522,7 @@
 	"paths_editor.heading": "Sökvägar",
 	"paths_editor.label_config_dir": "Konfigurationsmapp",
 	"paths_editor.label_logs_dir": "Loggmapp",
-	"paths_editor.hint_logs_dir": "Loggarna skrivs till en undermapp ergopti_plus i den valda mappen.",
+	"paths_editor.hint_logs_dir": "Loggarna skrivs till en egen undermapp i den valda mappen.",
 	"paths_editor.subtitle": "Alla personliga filer (genvägar, hotstrings…) löses från denna mapp.",
 	"paths_editor.tag_default": "standard",
 	"paths_editor.default_label": "Standard:",
