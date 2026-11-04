@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "מפרידי המילים עודכנו.",
 	"hs_config.notify_reset_all": "העיכובים והצבעים אופסו.",
 	"hs_config.override_active": "עקיפה פעילה",
+	"hs_config.reset_all_personal_unavailable": "לא ניתן לאפס הכול כאשר קיימים קובצי קיצורי טקסט אישיים. אף הגדרה לא שונתה.",
 	"hs_config.section_prefix": "סעיף: ",
 	"hs_config.window_title": "השהיות וצבעי Hotstring",
 	"init.reload_files": "קבצים שונו — טוען מחדש…",

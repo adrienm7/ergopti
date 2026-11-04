@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "단어 구분자가 업데이트되었습니다.",
 	"hs_config.notify_reset_all": "지연 및 색상이 초기화되었습니다.",
 	"hs_config.override_active": "오버라이드 활성",
+	"hs_config.reset_all_personal_unavailable": "개인 핫스트링 파일이 있으면 전체 초기화를 사용할 수 없습니다. 변경된 설정은 없습니다.",
 	"hs_config.section_prefix": "섹션: ",
 	"hs_config.window_title": "핫스트링 지연 및 색상",
 	"init.reload_files": "파일이 변경됨 — 다시 로드 중…",

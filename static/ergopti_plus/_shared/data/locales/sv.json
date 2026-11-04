@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Ordavgränsare uppdaterade.",
 	"hs_config.notify_reset_all": "Fördröjningar och färger har återställts.",
 	"hs_config.override_active": "åsidosättande aktivt",
+	"hs_config.reset_all_personal_unavailable": "Återställ alla är inte tillgängligt när det finns personliga textgenvägsfiler. Inga inställningar ändrades.",
 	"hs_config.section_prefix": "Avsnitt: ",
 	"hs_config.window_title": "Hotstring-fördröjningar och färger",
 	"init.reload_files": "Filer ändrade — laddar om…",

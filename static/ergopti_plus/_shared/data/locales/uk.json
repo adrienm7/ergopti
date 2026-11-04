@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Роздільники слів оновлено.",
 	"hs_config.notify_reset_all": "Затримки та кольори скинуто.",
 	"hs_config.override_active": "перевизначення активне",
+	"hs_config.reset_all_personal_unavailable": "Скидання всіх налаштувань недоступне за наявності особистих файлів текстових скорочень. Жодних налаштувань не змінено.",
 	"hs_config.section_prefix": "Розділ: ",
 	"hs_config.window_title": "Затримки та кольори хотстрингів",
 	"init.reload_files": "Файли змінено — перезавантаження…",

@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "单词分隔符已更新。",
 	"hs_config.notify_reset_all": "延迟和颜色已重置.",
 	"hs_config.override_active": "覆盖已激活",
+	"hs_config.reset_all_personal_unavailable": "存在个人文本快捷方式文件时，无法重置全部设置。没有更改任何设置。",
 	"hs_config.section_prefix": "章节：",
 	"hs_config.window_title": "热字符串延迟与颜色",
 	"init.reload_files": "文件已修改 — 重新加载中…",
