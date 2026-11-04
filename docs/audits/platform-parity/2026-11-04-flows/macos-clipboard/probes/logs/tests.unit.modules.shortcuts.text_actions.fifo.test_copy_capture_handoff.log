@@ -1,0 +1,12 @@
+MODULE tests.unit.modules.shortcuts.text_actions.fifo.test_copy_capture_handoff
+
+=== Apps copy capture native FIFO handoff ===
+  ok   keeps the empty FIFO control healthy
+  ok   starts the capture interval after a real paced FIFO predecessor
+  ok   pause cancels the queued copy without cancelling the FIFO sibling
+  ok   retains the all-type snapshot when the native restore refuses
+  ok   Finder path capture also waits for handoff
+  ok   Finder fallback owns a second copy handoff
+  ok   a short FIFO wait still preserves the full post-handoff interval
+  ok   pause after handoff fences a late capture and its successor
+RESULT 8 passed 0 failed

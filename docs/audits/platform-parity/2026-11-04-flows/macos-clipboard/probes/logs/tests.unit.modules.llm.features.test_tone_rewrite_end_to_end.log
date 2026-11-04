@@ -1,0 +1,13 @@
+MODULE tests.unit.modules.llm.features.test_tone_rewrite_end_to_end
+
+=== tone rewrite of the selection end to end (llm-tone) ===
+  ok   climbs the ladder from the original, stops at the top and wraps with _cycle
+  ok   goes down the ladder and stops at the most familiar register
+  ok   reselects an emoji with a skin tone as one character
+  ok   does nothing when nothing is selected
+  ok   refuses like a manual prediction when the AI is off
+  ok   types nothing when the focus moved before the answer
+  ok   types nothing when the selection changed before the answer
+  ok   ignores the answer of a superseded step
+  ok   types nothing when the answer holds no rewrite
+RESULT 9 passed 0 failed

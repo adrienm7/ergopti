@@ -1,0 +1,84 @@
+Selecting exact test module: "tests.unit.modules.llm.remote.test_api_entry_persistence_async"
+Focused discovery: 1 of 2147 module(s) selected before require
+
+>>> Loading tests.unit.modules.llm.remote.test_api_entry_persistence_async
+
+=== LLM API persistence transaction ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"persists and reloads keyless openai at http://127.0.0.1:8000/v1 without credential work (api-local-keyless-persistence)","status":"pass","elapsed_ms":23.990766,"timing_error":""}
+  ok   persists and reloads keyless openai at http://127.0.0.1:8000/v1 without credential work (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"persists and reloads keyless openai at http://localhost:8517/v1 without credential work (api-local-keyless-persistence)","status":"pass","elapsed_ms":5.696426,"timing_error":""}
+  ok   persists and reloads keyless openai at http://localhost:8517/v1 without credential work (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"persists and reloads keyless openai_compat at http://127.0.0.1:8000/v1 without credential work (api-local-keyless-persistence)","status":"pass","elapsed_ms":9.900639,"timing_error":""}
+  ok   persists and reloads keyless openai_compat at http://127.0.0.1:8000/v1 without credential work (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"persists and reloads keyless openai_compat at http://localhost:8517/v1 without credential work (api-local-keyless-persistence)","status":"pass","elapsed_ms":6.267183,"timing_error":""}
+  ok   persists and reloads keyless openai_compat at http://localhost:8517/v1 without credential work (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"persists and reloads keyless omlx at http://127.0.0.1:8000/v1 without credential work (api-local-keyless-persistence)","status":"pass","elapsed_ms":7.362141,"timing_error":""}
+  ok   persists and reloads keyless omlx at http://127.0.0.1:8000/v1 without credential work (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"persists and reloads keyless omlx at http://localhost:8517/v1 without credential work (api-local-keyless-persistence)","status":"pass","elapsed_ms":11.212851,"timing_error":""}
+  ok   persists and reloads keyless omlx at http://localhost:8517/v1 without credential work (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses keyless openai outside the explicit local grant https://api.openai.com/v1 (api-local-keyless-persistence)","status":"pass","elapsed_ms":4.529852,"timing_error":""}
+  ok   refuses keyless openai outside the explicit local grant https://api.openai.com/v1 (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses keyless openai_compat outside the explicit local grant https://api.openai.com/v1 (api-local-keyless-persistence)","status":"pass","elapsed_ms":4.907870,"timing_error":""}
+  ok   refuses keyless openai_compat outside the explicit local grant https://api.openai.com/v1 (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses keyless openai outside the explicit local grant http://example.invalid:8000/v1 (api-local-keyless-persistence)","status":"pass","elapsed_ms":4.465315,"timing_error":""}
+  ok   refuses keyless openai outside the explicit local grant http://example.invalid:8000/v1 (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses keyless openai_compat outside the explicit local grant http://example.invalid:8000/v1 (api-local-keyless-persistence)","status":"pass","elapsed_ms":4.641560,"timing_error":""}
+  ok   refuses keyless openai_compat outside the explicit local grant http://example.invalid:8000/v1 (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses keyless openai outside the explicit local grant http://127.0.0.1:8000/v1?token=private (api-local-keyless-persistence)","status":"pass","elapsed_ms":4.417814,"timing_error":""}
+  ok   refuses keyless openai outside the explicit local grant http://127.0.0.1:8000/v1?token=private (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses keyless openai_compat outside the explicit local grant http://127.0.0.1:8000/v1?token=private (api-local-keyless-persistence)","status":"pass","elapsed_ms":5.238097,"timing_error":""}
+  ok   refuses keyless openai_compat outside the explicit local grant http://127.0.0.1:8000/v1?token=private (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses keyless openai outside the explicit local grant http://personal@localhost:8000/v1 (api-local-keyless-persistence)","status":"pass","elapsed_ms":4.679096,"timing_error":""}
+  ok   refuses keyless openai outside the explicit local grant http://personal@localhost:8000/v1 (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses keyless openai_compat outside the explicit local grant http://personal@localhost:8000/v1 (api-local-keyless-persistence)","status":"pass","elapsed_ms":4.724345,"timing_error":""}
+  ok   refuses keyless openai_compat outside the explicit local grant http://personal@localhost:8000/v1 (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses keyless openai outside the explicit local grant  (api-local-keyless-persistence)","status":"pass","elapsed_ms":4.876754,"timing_error":""}
+  ok   refuses keyless openai outside the explicit local grant  (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses keyless openai_compat outside the explicit local grant  (api-local-keyless-persistence)","status":"pass","elapsed_ms":4.638675,"timing_error":""}
+  ok   refuses keyless openai_compat outside the explicit local grant  (api-local-keyless-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"commits accepted menu fields through the actual credential transaction openai (api-add-quarantined-persistence)","status":"pass","elapsed_ms":27.333042,"timing_error":""}
+  ok   commits accepted menu fields through the actual credential transaction openai (api-add-quarantined-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"commits accepted menu fields through the actual credential transaction openai_compat (api-add-quarantined-persistence)","status":"pass","elapsed_ms":21.792511,"timing_error":""}
+  ok   commits accepted menu fields through the actual credential transaction openai_compat (api-add-quarantined-persistence)
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"migrates legacy plaintext without copying it into the combined state","status":"pass","elapsed_ms":2.688944,"timing_error":""}
+  ok   migrates legacy plaintext without copying it into the combined state
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"migrates reference-only legacy keys into one combined snapshot","status":"pass","elapsed_ms":2.807612,"timing_error":""}
+  ok   migrates reference-only legacy keys into one combined snapshot
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"refuses a malformed combined state instead of resurrecting stale legacy keys","status":"pass","elapsed_ms":2.175411,"timing_error":""}
+  ok   refuses a malformed combined state instead of resurrecting stale legacy keys
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"rejects sparse arrays before a hidden plaintext token can bypass validation","status":"pass","elapsed_ms":2.212697,"timing_error":""}
+  ok   rejects sparse arrays before a hidden plaintext token can bypass validation
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"rejects a dense combined entry missing canonical identity fields","status":"pass","elapsed_ms":3.033281,"timing_error":""}
+  ok   rejects a dense combined entry missing canonical identity fields
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"rejects malformed, duplicate, and inconsistent combined identities","status":"pass","elapsed_ms":25.522330,"timing_error":""}
+  ok   rejects malformed, duplicate, and inconsistent combined identities
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"rejects cross-entry Keychain references in combined and legacy snapshots","status":"pass","elapsed_ms":5.531909,"timing_error":""}
+  ok   rejects cross-entry Keychain references in combined and legacy snapshots
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"never writes plaintext and reports encryption failure without success","status":"pass","elapsed_ms":3.433793,"timing_error":""}
+  ok   never writes plaintext and reports encryption failure without success
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"keeps ownership of the live second writer after synchronous first completion","status":"pass","elapsed_ms":5.185347,"timing_error":""}
+  ok   keeps ownership of the live second writer after synchronous first completion
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"does not retain or cancel handles for synchronously completed writers","status":"pass","elapsed_ms":2.873451,"timing_error":""}
+  ok   does not retain or cancel handles for synchronously completed writers
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"finishes exactly once when encryption fails synchronously","status":"pass","elapsed_ms":3.438510,"timing_error":""}
+  ok   finishes exactly once when encryption fails synchronously
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"rejects a successful encryption callback for a different Keychain account","status":"pass","elapsed_ms":4.036029,"timing_error":""}
+  ok   rejects a successful encryption callback for a different Keychain account
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"rejects a mismatched final readback and restores the tombstoned prior state","status":"pass","elapsed_ms":4.086365,"timing_error":""}
+  ok   rejects a mismatched final readback and restores the tombstoned prior state
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"waits for superseded native completion and cleanup before starting a successor","status":"pass","elapsed_ms":4.320997,"timing_error":""}
+  ok   waits for superseded native completion and cleanup before starting a successor
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"never starts a successor while exact writer termination is refused","status":"pass","elapsed_ms":5.776366,"timing_error":""}
+  ok   never starts a successor while exact writer termination is refused
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"keeps a durable delete tombstone until Keychain deletion succeeds","status":"pass","elapsed_ms":2.547221,"timing_error":""}
+  ok   keeps a durable delete tombstone until Keychain deletion succeeds
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","name":"tests.unit.modules.llm.remote.test_api_entry_persistence_async","status":"pass","elapsed_ms":242.885434,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  34
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

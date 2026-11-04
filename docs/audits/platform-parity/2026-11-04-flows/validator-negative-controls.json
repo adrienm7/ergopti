@@ -1,0 +1,21 @@
+{
+	"baseline": "current real campaign validates; mutations isolated in parser return values only",
+	"negative_controls": [
+		{
+			"case": "invalid-source-identity",
+			"refused": true
+		},
+		{
+			"case": "duplicate-os-module-scope",
+			"refused": true
+		},
+		{
+			"case": "unclassified-additional-property",
+			"refused": true
+		},
+		{
+			"case": "missing-evidence-report",
+			"refused": true
+		}
+	]
+}

@@ -1,0 +1,22 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_surround_with_parens_transaction
+
+=== surround_with_parens: opening terminal gate ===
+  ok   does not schedule or emit a close before the exact opening terminal
+  ok   schedules the closing delay only after opening on_dispatched
+  ok   buffers synchronous terminals without running the close before dispatch returns
+  ok   fails before opening when the void observer registration throws
+  ok   waits for terminal proof after opening dispatch false
+  ok   waits for terminal proof after opening dispatch nil
+  ok   waits for terminal proof after opening dispatch throw
+
+=== surround_with_parens: closing retry ownership ===
+  ok   retries autonomously after synchronous close false
+  ok   retries autonomously after synchronous close nil
+  ok   retries autonomously after synchronous close throw
+  ok   waits for a late close failure and ignores its duplicate callback
+  ok   closes immediately when the post-opening cosmetic timer refuses
+  ok   closes autonomously when the retry timer refuses cleanly
+  ok   retries exactly once after retained retry-timer debt settles
+  ok   bounds repeated synchronous failures and retains one recovery intent
+  ok   retains exact timer rollback debt after completing both parentheses
+RESULT 16 passed 0 failed

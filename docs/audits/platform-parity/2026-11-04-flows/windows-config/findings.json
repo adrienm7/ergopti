@@ -1,0 +1,23 @@
+{
+	"schema_version": 1,
+	"scope": "windows-config",
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-flows/windows-config/report.md",
+	"findings": [
+		{
+			"id": "WCF-001",
+			"title": "Widget coordinates can persist a mixed pair after failed compensation or reentrant position writes",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"reproduction": "Start with persisted and in-memory position (10,20). Request (100,200), let the X storage write succeed, then refuse Y and both rollback writes. The actual helper returns false and retains old RAM, while storage contains (100,20), accepted as two numeric coordinates at next boot. A second recording-boundary case reenters after outer X with request (300,400); all writes succeed but durable coordinates become (300,200). Actual production owner was extracted verbatim into an isolated AHK probe; that native probe remains unexecuted. Executed Python source assertions verify the separate write and unchecked rollback mechanism; no native Registry state was changed.",
+			"root_cause": "windows/ui/wpm/wpm_config.ahk:_WPMWidget_StorePosition at lines306-327 writes X and Y through separate Store.Call operations, without tuple serialization. The failure branch discards both compensation receipts and retains no recovery obligation, despite its explicit promise that half-written pairs cannot reach next boot. Drag-end surface restoration uses unchanged RAM and coordinate loading accepts both valid integers.",
+			"silent_failure": "The initial persistence refusal is loudly reported, but failed compensation and the mixed durable pair are not acknowledged separately or retained for recovery. In the conditional reentrant-success schedule both operations return true, producing an unrequested tuple without any failure notice. Real Windows reentrancy timing was not executed or measured.",
+			"regression_test": "Run the real owner with recording native Storage ports, covering X/Y refusal, rollback false/throw and reentrant successful position changes at each write boundary. Require atomic tuple persistence or an exact retained recovery obligation, then exercise actual drag/reset/graph callers and next-boot readback on isolated Windows. Preserve the deliberate auxiliary-Storage location. Linux set_many is the comparison; macOS separate settings writes require their own independent ownership review.",
+			"additional_property": "Consistency of an explicitly promised durable coordinate pair and acknowledged compensation.",
+			"integration_qualification": "Primary retained schedule is refused second write plus refused compensation, source-derived. Initial failure is logged; durable mixed pair/recovery debt is not acknowledged. The reentrant-success schedule is conditional native timing evidence, not independently executed proof of G3.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/windows-config/report.md"
+		}
+	]
+}

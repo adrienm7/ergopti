@@ -1,0 +1,7 @@
+
+=== layer editor exact cleanup ownership ===
+  ok   blocks replacement while the exact native window refuses deletion (layer-editor-cleanup)
+  ok   reports refusal and retries the same window before reopening (layer-editor-cleanup)
+  ok   rejects replacement reentry while native deletion is unresolved (layer-editor-cleanup)
+  ok   retries controller release without deleting a closed window again (layer-editor-cleanup)
+TOTAL 4 passed 0 failed

@@ -1,0 +1,42 @@
+MODULE tests.unit.modules.shortcuts.text_actions.clipboard.test_payload_generation_ownership
+
+=== payload owners preserve the native clipboard generation ===
+  ok   wrap keeps healthy paste, selection stages and all original types
+  ok   wrap preserves a post-handoff copy, identical=false
+  ok   wrap refuses a queued foreign copy, identical=false
+  ok   wrap preserves a post-handoff copy, identical=true
+  ok   wrap refuses a queued foreign copy, identical=true
+  ok   wrap refuses a copy after trigger posting and before HID delivery
+  ok   wrap keeps the payload throughout a long real queue wait
+  ok   wrap holds failed native-count cleanup until its exact receipt is readable
+  ok   wrap cancels before Down only after native timer retirement
+  ok   wrap keeps conservative grace after uncertain native Down
+  ok   wrap keeps mandatory Up and stop debt independent of cancellation
+  ok   wrap retains exact native stop debt after Up
+  ok   wrap never adopts a missing payload generation later
+  ok   wrap preserves an originally empty all-type snapshot
+  ok   wrap retries a throwing partial restore with its exact generation
+  ok   wrap preserves a new copy after handoff and cancellation
+  ok   wrap rolls a throwing payload mutation back with its immediate receipt
+  ok   wrap retries partial restore without discarding its post-mutation count
+  ok   wrap preserves a new copy during refused restoration recovery
+  ok   transform keeps healthy paste, selection stages and all original types
+  ok   transform preserves a post-handoff copy, identical=false
+  ok   transform refuses a queued foreign copy, identical=false
+  ok   transform preserves a post-handoff copy, identical=true
+  ok   transform refuses a queued foreign copy, identical=true
+  ok   transform refuses a copy after trigger posting and before HID delivery
+  ok   transform keeps the payload throughout a long real queue wait
+  ok   transform holds failed native-count cleanup until its exact receipt is readable
+  ok   transform cancels before Down only after native timer retirement
+  ok   transform keeps conservative grace after uncertain native Down
+  ok   transform keeps mandatory Up and stop debt independent of cancellation
+  ok   transform retains exact native stop debt after Up
+  ok   transform never adopts a missing payload generation later
+  ok   transform preserves an originally empty all-type snapshot
+  ok   transform retries a throwing partial restore with its exact generation
+  ok   transform preserves a new copy after handoff and cancellation
+  ok   transform rolls a throwing payload mutation back with its immediate receipt
+  ok   transform retries partial restore without discarding its post-mutation count
+  ok   transform preserves a new copy during refused restoration recovery
+RESULT 38 passed 0 failed

@@ -1,0 +1,6 @@
+
+=== config_keys: generated constants ===
+  ok   answers the dotted key, the leaf and the command id
+  ok   raises on an unknown constant instead of answering nil
+  ok   refuses a write so no caller can redefine a key
+TOTAL 3 passed 0 failed

@@ -1,0 +1,11 @@
+
+=== managed ConfigPaths bootstrap lives outside the app bundle ===
+  ok   managed bootstrap: writes first-boot and user overrides outside the bundle
+  ok   managed bootstrap: migrates a legacy adjacent override
+  ok   managed bootstrap: expands and persists a legacy tilde override (legacy-tilde)
+  ok   managed bootstrap: still refuses a relative override
+
+=== managed bootstrap memory namespace identity ===
+  ok   pins opened inodes and distinguishes foreign file and directory recreation
+  ok   the actual publisher refuses a recreated staging directory and preserves its foreign inode
+TOTAL 6 passed 0 failed

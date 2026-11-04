@@ -1,0 +1,9 @@
+
+=== shared timings reader (Linux) ===
+  ok   reads milliseconds, seconds and counts from one value
+  ok   raises for an unreachable shared tree
+  ok   raises for an empty or unreadable registry
+  ok   raises for a missing section and for a non-numeric key
+  ok   refuses a reader built without its ports
+  ok   binds the driver to the real registry
+TOTAL 6 passed 0 failed

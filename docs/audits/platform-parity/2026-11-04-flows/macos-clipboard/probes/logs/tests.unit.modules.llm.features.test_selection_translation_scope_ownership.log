@@ -1,0 +1,8 @@
+MODULE tests.unit.modules.llm.features.test_selection_translation_scope_ownership
+
+=== selection translation fixture restores transitive owners ===
+  ok   restores cold native owners after successful construction
+  ok   restores cold native owners after an assertion failure
+  ok   restores pre-existing native owners after successful construction
+  ok   restores pre-existing native owners after an assertion failure
+RESULT 4 passed 0 failed

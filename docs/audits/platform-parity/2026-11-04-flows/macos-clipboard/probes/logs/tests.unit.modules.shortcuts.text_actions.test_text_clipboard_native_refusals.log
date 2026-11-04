@@ -1,0 +1,11 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_text_clipboard_native_refusals
+
+=== text actions: clipboard refusals fail closed ===
+  ok   transform mutate-then-false restores exact data and posts no Cmd+V
+  ok   plain paste mutate-then-false restores exact data and posts no Cmd+V
+  ok   plain paste retries a refused all-type restore
+  ok   transform restores after capture timer refusal following completed Cmd+C
+  ok   transform restores when Cmd+C dispatch is refused
+  ok   a throwing capture callback restores instead of only reaching the global logger
+  ok   a synchronous retry dispatcher cannot recurse or release ownership
+RESULT 7 passed 0 failed

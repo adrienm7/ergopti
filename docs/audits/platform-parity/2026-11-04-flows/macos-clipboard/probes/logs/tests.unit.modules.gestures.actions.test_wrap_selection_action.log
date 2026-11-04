@@ -1,0 +1,6 @@
+MODULE tests.unit.modules.gestures.actions.test_wrap_selection_action
+
+=== wrap_selection gesture action ===
+  ok   wraps with the pair stored for the binding, under its parent
+  ok   refuses an invalid pair and wraps nothing without one
+RESULT 2 passed 0 failed

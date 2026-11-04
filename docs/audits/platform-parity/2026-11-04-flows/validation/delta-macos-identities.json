@@ -1,0 +1,102 @@
+{
+	"audit": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"reviewed": "89d477dcc06b85b71071e6d5f1fe8d701bf51649",
+	"identical_owners": [
+		{
+			"path": "static/ergopti_plus/macos/infra/i18n.lua",
+			"blob": "b4def084613831edf030b11b0ee346de4d63c5cb"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/apps.lua",
+			"blob": "921882f7e745dbe4c7eef4962f9c843ccc490d95"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/text.lua",
+			"blob": "1243fcb88160cd57495e10f127486a81be3b1879"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/text_continuation.lua",
+			"blob": "294c5322e4cc542c0c7bd64176d9787cf4c10620"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"blob": "3f4d1ca80532e0aaa1732a6dc07efc735e0c5bbf"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/synthetic_input.lua",
+			"blob": "d19211772c1afe9554778e2254cc57128310a56f"
+		},
+		{
+			"path": "static/ergopti_plus/macos/apps/Encryptor.app/Contents/Resources/Scripts/main.applescript",
+			"blob": "5ce896fae8afd61b97c08a6e2a3179f238f18c39"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keystats/text_cipher.lua",
+			"blob": "181518555194fc0aad82405a2b4e4060a4c76caa"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keystats/text_crypto.lua",
+			"blob": "9f5fec572146a01cd3468f56e8650e24d70d6ad3"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keystats/sqlite_writer.lua",
+			"blob": "2a8e7f10d94eb641b93dcc18d3085f487a4de69b"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_hf.lua",
+			"blob": "159c9ff7caeb1ee917a75175c386c27f814fac58"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/task_lifecycle.lua",
+			"blob": "0281a1f2bd659bcf2d6221e9886236b1b700c869"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_llm/local_server_panel.lua",
+			"blob": "c0420293aee52803b78efb64d1636f5ff7679562"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_llm/api_panel.lua",
+			"blob": "d31ccc298927996eb120963eaa0b3e94b94a2d75"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/llm/init.lua",
+			"blob": "024836d4ca4da05b93cba8a77ea4fd08a26593c5"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/llm/api_token_crypto.lua",
+			"blob": "6101dd54d06fc1fb9a7af3b05ae62a04019ebf8f"
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeychainTokenWorker.swift",
+			"blob": "2e169aa9017f2f43fb44784ddd95652cdc9ad16a"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keystats/text_migration_driver.lua",
+			"blob": "9152ae229cc20816e5cdf0e12b11263193a1a4fb"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keystats/text_migration_runner.lua",
+			"blob": "1b731aa059f0ab78c353d15402a5be1422df7cca"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keystats/text_migration.lua",
+			"blob": "45a7f64c7fd1d63193044e687aae4009b1f12010"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/timer_scheduler.lua",
+			"blob": "b231208ffcbc4643d42058f202c5532eddb2daf5"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_metrics.lua",
+			"blob": "4a0ff88b2ae6ad3ab57029096f31df5543011163"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/gestures/system_actions.lua",
+			"blob": "8252a53de5abf161b5357369d4fd6aff466fd57d"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/script_config_authority.lua",
+			"blob": "d82b97943dab3285908430ea12375273063e0e9d"
+		}
+	]
+}

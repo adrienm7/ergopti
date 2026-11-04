@@ -1,0 +1,14 @@
+MODULE tests.unit.modules.keymap.expansion.test_emit_tokens_multi_paste
+
+=== KU.emit_tokens: multi-segment paste is serialised ===
+  ok   writes only the first clipboard segment synchronously
+  ok   writes the second segment from one ordered settle owner
+  ok   keeps inline and deferred batches in one ordered generation
+  ok   returns the complete logical size before deferred delivery
+  ok   keeps a single paste in the callback batch without deferred payload
+  ok   fails the exact transaction and stops continuation when the second payload is rejected
+  ok   retains ownership and retries when the native restore is refused
+  ok   acquires trailing ordering timers before the first visible paste
+  ok   keeps committed Cmd+V and restores through the fallback when its post-handoff timer is refused
+  ok   rejects synchronous recovery dispatchers without recursive re-entry
+RESULT 10 passed 0 failed

@@ -1,0 +1,21 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_wrap_selection_atomic_transaction
+
+=== wrap_selection: atomic pre-commit contract ===
+  ok   returns true only after paste and restore are armed, and rejects re-entry
+  ok   snapshot throw returns false, emits nothing, logs only after deferral, and reopens
+  ok   clipboard write false rolls back exact data and emits no paste
+  ok   clipboard write nil rolls back exact data and emits no paste
+  ok   clipboard write throw rolls back exact data and emits no paste
+  ok   keeps ownership and retries when pre-paste rollback cannot restore
+  ok   restore timer allocation nil rolls back before paste
+  ok   restore timer allocation throw rolls back before paste
+  ok   synthetic paste false stops its timer, rolls back, and reopens
+  ok   synthetic paste throw stops its timer, rolls back, and reopens
+
+=== wrap_selection: restore recovery and generation ownership ===
+  ok   restore callback false stays owned and retries to exact data
+  ok   restore callback nil stays owned and retries to exact data
+  ok   restore callback throw stays owned and retries to exact data
+  ok   uses lifecycle fallback when restore fails and retry timer allocation fails
+  ok   a stale retained callback cannot clear a newer generation
+RESULT 15 passed 0 failed

@@ -1,0 +1,58 @@
+
+=== intrinsic saved-model source ownership ===
+  ok   admits plain nonempty custom identity 1
+  ok   admits plain nonempty custom identity 2
+  ok   rejects an intrinsically malformed record 1
+  ok   rejects an intrinsically malformed record 2
+  ok   rejects an intrinsically malformed record 3
+  ok   rejects an intrinsically malformed record 4
+  ok   rejects an intrinsically malformed record 5
+  ok   rejects an intrinsically malformed record 6
+  ok   rejects an intrinsically malformed record 7
+  ok   rejects an intrinsically malformed record 8
+  ok   rejects an intrinsically malformed record 9
+  ok   rejects TOML dates as names or backend strings without changing the source
+  ok   edits only an owned name token in canonical source form 1
+  ok   edits only an owned name token in canonical source form 2
+  ok   edits only an owned name token in canonical source form 3
+  ok   edits only an owned name token in canonical source form 4
+  ok   edits only an owned name token in canonical source form 5
+  ok   edits only an owned name token in canonical source form 6
+  ok   keeps the entire malformed block through clear, add and repeated rename
+  ok   restores exact removed records and refuses withdrawn or reordered inverses
+  ok   restores an acknowledged all-valid AOT removal without manufacturing new future fields
+  ok   withdraws retry permission when an external writer changes any physical model row
+  ok   refuses changed ordinary row authority copied
+  ok   refuses changed ordinary row authority token
+  ok   refuses changed ordinary row authority name
+  ok   refuses changed ordinary row authority field
+  ok   refuses changed ordinary row authority delete
+  ok   refuses changed ordinary row authority section
+  ok   refuses changed ordinary row authority future
+  ok   refuses changed ordinary row authority reordered
+  ok   refuses changed ordinary row authority duplicate
+  ok   refuses changed ordinary row authority stale
+  ok   refuses changed ordinary row authority source
+  ok   requires raw ordinary token identity without equality effects: substituted token
+  ok   requires raw ordinary token identity without equality effects: token metatable
+  ok   requires plain exact cleanup identity without equality effects: substituted token
+  ok   requires plain exact cleanup identity without equality effects: token metatable
+  ok   requires plain exact cleanup identity without equality effects: path metatable
+  ok   refuses a borrowed ordinary destination before reading its source
+  ok   refuses collisions from another candidate but permits unrelated byte changes
+  ok   ordinary empty list retains scalar invalid rows and empty-array identity
+  ok   preserves stream BOM while explicit cleanup removes its first invalid array record
+  ok   offers and cuts exactly the reported intrinsically invalid physical row
+  ok   keeps foreign unavailable feature cleanup with its existing reader instead of claiming native model ownership
+  ok   requires the actual reader report and preserves duplicate bad rows as distinct identities
+  ok   refuses cleanup selection copied
+  ok   refuses cleanup selection changed-kind
+  ok   refuses cleanup selection changed-path
+  ok   refuses cleanup selection changed-value
+  ok   refuses cleanup selection changed-token
+  ok   refuses cleanup selection duplicate
+  ok   refuses cleanup selection repaired
+  ok   refuses cleanup selection stale
+  ok   refuses cleanup selection ancestor
+  ok   refuses cleanup selection valid
+TOTAL 55 passed 0 failed

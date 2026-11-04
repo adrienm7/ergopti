@@ -1,0 +1,7 @@
+MODULE tests.unit.modules.gestures.actions.test_search_web_clipboard_restore_retry
+
+=== search_web: native clipboard refusal retains ownership ===
+  ok   retries writeAllData(false) with the original all-type snapshot
+  ok   timer refusal restores before posting Cmd+C
+  ok   Cmd+C refusal restores before any selection is read
+RESULT 3 passed 0 failed

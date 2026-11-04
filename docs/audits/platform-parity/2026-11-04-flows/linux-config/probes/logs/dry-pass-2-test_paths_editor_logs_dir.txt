@@ -1,0 +1,20 @@
+
+=== paths editor: logs folder (paths-editor-logs-dir) ===
+  ok   sends the current and the default logs folder
+  ok   answers a logs-folder browse on the logs field
+  ok   stores the logs folder with the configuration folder
+  ok   keeps the stored logs folder when the page sends none
+  ok   refuses a relative logs folder before saving the configuration folder
+  ok   moves the running sink to the saved logs folder
+  ok   creates the logs folder before storing it
+  ok   refuses a logs folder that cannot be created and stores nothing
+  ok   keeps the editor open when the sink cannot move to the saved folder
+  ok   leaves the sink alone when the page sends no logs folder
+  ok   refuses a relative logs folder and keeps the editor open
+
+=== paths-editor-atomic: related directory overrides ===
+  ok   paths-editor-atomic: refuses false batch without a partial first folder
+  ok   paths-editor-atomic: refuses throw batch without a partial first folder
+  ok   paths-editor-atomic: refuses missing batch without a partial first folder
+  ok   paths-editor-atomic: resets both overrides in one acknowledged batch
+TOTAL 15 passed 0 failed

@@ -1,0 +1,35 @@
+{
+	"schema_version": 1,
+	"scope": "windows-clipboard",
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-flows/windows-clipboard/report.md",
+	"findings": [
+		{
+			"id": "WCP-001",
+			"title": "Selection startup can clear and copy after an external foreground-window change",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G3"],
+			"reproduction": "Source-derived: original foreground is recorded before clipboard snapshot. Model an external HWND change across snapshot preparation through actual GetSelectionAsync ports; unexecuted probes/selection-startup-foreground-probe.ahk records the intended isolated AHK reproduction. Startup has no foreground comparison before clear/copy; later poll can only cancel after the wrong-context side effect. The older physical-generation-only probe is also unexecuted and does not establish real InputHook scheduling under Critical.",
+			"root_cause": "infra/hotstrings/hotstring_send.ahk:GetSelectionAsync captures physical generation and foreground before SaveFn.Call, but every startup recheck uses _SelectionCaptureStartCurrent, which checks only pause, active object and capture id. Physical generation and HWND comparisons occur only in _SelectionCapturePoll after clear/copy side effects. Ordinary physical input does not call GetSelectionCancel; lifecycle suspend does. Existing startup tests cover explicit cancellation/pause/new requests, not physical-generation-only change at snapshot.",
+			"silent_failure": "The later poll logs cancellation as if the capture was safely retired, but copying in a new context and clearing a newer user copy already happened. The canceled callback delivers nothing and cannot recover that newer clipboard value.",
+			"regression_test": "Call the real GetSelectionAsync with recording native boundaries and invalidate physical generation and foreground separately inside each startup boundary. Before the first mutation require refused startup and zero clear/copy; after mutation require exact-owner cleanup that preserves newest clipboard content. Retain initiating-key-release success. Repeat on an isolated native Windows clipboard with a controlled slow snapshot and physical focus change; compare Linux retained publication and macOS text transaction scopes.",
+			"integration_qualification": "Primary retained scenario is external HWND/focus change across snapshot preparation. Critical does not pin OS focus; native InputHook physical-generation timing under Critical is unexecuted. Another clipboard copy must occur after snapshot lock release and before subsequent clear, not while the snapshot holds its lock.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/windows-clipboard/report.md"
+		},
+		{
+			"id": "WCP-002",
+			"title": "Selection transformations can paste into a new window after clipboard preparation",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2", "G3"],
+			"reproduction": "Invoke a case transformation, explicit wrap or typed-symbol wrap on selected text. While SendInstant prepares its output clipboard snapshot, pause the driver or move focus/selection. The resumed stack writes prepared old text and emits Ctrl+V with no final destination/pause check, potentially replacing unrelated text. Plain paste has the sibling preparation-to-SendFinalResult boundary. Source-derived unexecuted AHK probe copies the actual SendInstant body, records native clipboard/send boundaries and pauses the private process inside its fake snapshot; baseline expected observation is one write and send while suspended. No native Windows output or timing was executed.",
+			"root_cause": "Capture completion/UIA selection consumption validates context before handing plain text to GestureTransformSelection/WrapTextIfSelected. SendInstant in infra/hotstrings/hotstring_send.ahk:486-580 then calls CB_SaveAll, CB_WriteTextWithReceipt and bare SendInput without a retained HWND/control/physical-generation or pause admission after potentially yielding preparation. The capture job has retired before its continuation; lifecycle GetSelectionCancel cannot revoke the executing sender. Typed wrapping explicitly releases Critical over the clipboard round trip. GesturePastePlain authenticates clipboard ownership but similarly omits target/pause admission before SendFinalResult.",
+			"silent_failure": "SendInstant returns successful primitive emission and schedules clipboard restoration. Clipboard custody is truthful but does not validate where or while paused the paste landed. Existing custody tests focus on clipboard sequence/external copies and use a private Edit under Critical, not target/pause invalidation during open-thread selection preparation.",
+			"regression_test": "Carry original selection HWND/control/physical generation and lifecycle admission through the final native output boundary. Inject pause/focus/input changes inside SaveAll, receipt and timer preparation for case transforms, explicit and typed wrap, plain paste and clipboard-free fallbacks. Assert no stale clipboard write/paste, correct bare-symbol fallback only in the original context, exactly-once synthetic cleanup and preserved newer clipboard. Keep actual native application consumption separate from primitive emission.",
+			"integration_qualification": "Retained on externally reachable HWND/focus change. A fake SaveAll directly calling Suspend does not prove ordinary native pause preemption under Critical; direct invocation of an already-paused helper is not an established user path. Native AHK remains unexecuted.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/windows-clipboard/report.md"
+		}
+	]
+}

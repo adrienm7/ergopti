@@ -1,0 +1,31 @@
+
+=== storage released regular-file link admission ===
+  ok   released-link: set replaces only the link and preserves foreign source tokens
+  ok   released-link: set_many replaces only the link and preserves foreign source tokens
+  ok   released-link: delete replaces only the link and preserves foreign source tokens
+  ok   released-link: clear replaces only the link and preserves foreign source tokens
+  ok   released-link: owned capture and foreign cohort publication retain strict source-kind refusal
+  ok   released-link: dangling source remains refused rather than treated as an absent regular file
+  ok   released-link: actual descriptor read refusal preserves the link and cache
+  ok   released-link: actual descriptor close refusal preserves the link and cache
+  ok   released-link: final source callback withdrawal refuses publication until exact capability repair
+  ok   released-link: source-read and native-rename reentry cannot mutate or acquire another alias
+  ok   released-link: acknowledged rename retries only failed physical readback
+  ok   released-link: a refused native rename retires no effect without replacing the link
+
+=== script storage retired journal roots ===
+  ok   script-storage-cohort successful forget releases a retained authentic journal owner
+
+=== storage-mixed-batch: atomic values and removals ===
+  ok   storage-mixed-batch: persists removal and value together with held=false
+  ok   storage-mixed-batch: persists removal and value together with held=true
+  ok   storage-mixed-batch: refused native publication keeps every original cell with held=false
+  ok   storage-mixed-batch: refused native publication keeps every original cell with held=true
+  ok   storage-mixed-batch: refuses malformed or overlapping removals false
+  ok   storage-mixed-batch: refuses malformed or overlapping removals {[1]="a" [2]="a"}
+  ok   storage-mixed-batch: refuses malformed or overlapping removals {[1]=""}
+  ok   storage-mixed-batch: refuses malformed or overlapping removals {[2]="a"}
+  ok   storage-mixed-batch: refuses malformed or overlapping removals {[1]="a"}
+  ok   storage-mixed-batch: refuses malformed or overlapping removals {[1]="a\0b"}
+  ok   storage-mixed-batch: a held removed alias rejects the entire batch
+TOTAL 24 passed 0 failed

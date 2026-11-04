@@ -1,0 +1,15 @@
+
+=== bounded clipboard backend writes ===
+  ok   preserves exact stdin and successful wl-copy acknowledgement
+  ok   refuses a stalled wl-copy setter without publishing success
+  ok   keeps wl-copy restoration debt until a later write succeeds
+  ok   retires a refused wl-copy preparation only after its restore succeeds
+  ok   preserves exact stdin and successful xclip acknowledgement
+  ok   refuses a stalled xclip setter without publishing success
+  ok   keeps xclip restoration debt until a later write succeeds
+  ok   retires a refused xclip preparation only after its restore succeeds
+  ok   preserves exact stdin and successful xsel acknowledgement
+  ok   refuses a stalled xsel setter without publishing success
+  ok   keeps xsel restoration debt until a later write succeeds
+  ok   retires a refused xsel preparation only after its restore succeeds
+AUDIT_RESULT	12	0

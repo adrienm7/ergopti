@@ -1,0 +1,17 @@
+
+=== toml codec scanners: cost is bounded by structure, not length ===
+  ok   decodes a long plain array element with a handful of slices
+  ok   strips a comment only outside strings, over long plain runs
+  ok   advances nesting depth over a long line in few steps
+
+=== toml reader and string decoding: cost is bounded by structure ===
+  ok   parses a long hotstring entry line with a handful of slices
+  ok   decodes a plain basic string without a pass over its bytes
+  ok   still rejects raw controls, a bare quote and a bad escape
+
+=== toml codec scanners: the shortcuts change no result ===
+  ok   keeps delimiters inside strings out of the split
+  ok   keeps hashes inside every string form and drops the real comment
+  ok   trims every kind of surrounding whitespace and nothing inside
+  ok   tracks multiline string state across lines
+TOTAL 10 passed 0 failed

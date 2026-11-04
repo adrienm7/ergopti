@@ -1,0 +1,14 @@
+
+=== macOS scoped preference table owner ===
+  ok   restores and clears the exact inline parameter table without dropping other domains or unknown data
+  ok   handles the equivalent nested parameter table without rewriting its unknown siblings
+  ok   removes an exhausted inline table instead of writing an empty placeholder
+  ok   refuses unreadable or malformed parameter tables before backup and native mutation
+  ok   compensates both runtime owners after a refused conditional publication
+  ok   refuses a stale preparation snapshot, unreadable source and unavailable runtime inventory
+  ok   the shared preparation port requires a terminal result and an exact valid candidate
+  ok   retains compensation debt and rejects another operation until terminal restoration
+  ok   preserves an external edit and refuses truthy nonterminal runtime acknowledgement
+  ok   refuses reentrancy without changing the selected domain and refuses preset scopes
+  ok   the live gesture facade exposes the exact parameter snapshot and replacement owner
+TOTAL 11 passed 0 failed

@@ -1,0 +1,68 @@
+Selecting exact test module: "tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour"
+Focused discovery: 1 of 2147 module(s) selected before require
+
+>>> Loading tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour
+
+=== TokenCrypto async task ownership ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"times out a hung read, terminates its exact task, and completes once","status":"pass","elapsed_ms":0.338425,"timing_error":""}
+  ok   times out a hung read, terminates its exact task, and completes once
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"reports start refusal exactly once and never waits for a callback","status":"pass","elapsed_ms":0.299046,"timing_error":""}
+  ok   reports start refusal exactly once and never waits for a callback
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"does not launch after a deadline fires synchronously during acquisition","status":"pass","elapsed_ms":0.200656,"timing_error":""}
+  ok   does not launch after a deadline fires synchronously during acquisition
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"retains a synchronously delivered deadline after false cleanup refusal","status":"pass","elapsed_ms":0.260327,"timing_error":""}
+  ok   retains a synchronously delivered deadline after false cleanup refusal
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"retains a synchronously delivered deadline after nil cleanup refusal","status":"pass","elapsed_ms":0.371806,"timing_error":""}
+  ok   retains a synchronously delivered deadline after nil cleanup refusal
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"retains a synchronously delivered deadline after throw cleanup refusal","status":"pass","elapsed_ms":0.498810,"timing_error":""}
+  ok   retains a synchronously delivered deadline after throw cleanup refusal
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"converts a constructor throw into one explicit launch failure","status":"pass","elapsed_ms":0.640005,"timing_error":""}
+  ok   converts a constructor throw into one explicit launch failure
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"never returns cleartext as the encryption failure value","status":"pass","elapsed_ms":0.211492,"timing_error":""}
+  ok   never returns cleartext as the encryption failure value
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"does not signal or settle a timed-out Keychain mutation before natural completion","status":"pass","elapsed_ms":0.205503,"timing_error":""}
+  ok   does not signal or settle a timed-out Keychain mutation before natural completion
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"keeps explicit Keychain-mutation cancellation pending until native completion","status":"pass","elapsed_ms":0.332547,"timing_error":""}
+  ok   keeps explicit Keychain-mutation cancellation pending until native completion
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"logs a client callback throw instead of swallowing it","status":"pass","elapsed_ms":1.184894,"timing_error":""}
+  ok   logs a client callback throw instead of swallowing it
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"retains the exact timeout handle after task completion and false","status":"pass","elapsed_ms":0.320979,"timing_error":""}
+  ok   retains the exact timeout handle after task completion and false
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"retains the exact timeout handle after task completion and nil","status":"pass","elapsed_ms":0.212304,"timing_error":""}
+  ok   retains the exact timeout handle after task completion and nil
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"retains the exact timeout handle after task completion and throw","status":"pass","elapsed_ms":1.108197,"timing_error":""}
+  ok   retains the exact timeout handle after task completion and throw
+
+=== ApiRemote asynchronous token resolver ===
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"finishes real Remote resolution after autonomous false timeout settlement","status":"pass","elapsed_ms":72.544042,"timing_error":""}
+  ok   finishes real Remote resolution after autonomous false timeout settlement
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"finishes real Remote resolution after autonomous nil timeout settlement","status":"pass","elapsed_ms":25.138805,"timing_error":""}
+  ok   finishes real Remote resolution after autonomous nil timeout settlement
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"finishes real Remote resolution after autonomous throw timeout settlement","status":"pass","elapsed_ms":24.498370,"timing_error":""}
+  ok   finishes real Remote resolution after autonomous throw timeout settlement
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"single-flights waiters, caches outside the entry, and ignores duplicates","status":"pass","elapsed_ms":17.178906,"timing_error":""}
+  ok   single-flights waiters, caches outside the entry, and ignores duplicates
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"terminates and fails waiters when identity changes, then discards the late result","status":"pass","elapsed_ms":12.105121,"timing_error":""}
+  ok   terminates and fails waiters when identity changes, then discards the late result
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"fences reentrant identity resolution over false cancellation debt","status":"pass","elapsed_ms":21.702523,"timing_error":""}
+  ok   fences reentrant identity resolution over false cancellation debt
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"fences reentrant identity resolution over nil cancellation debt","status":"pass","elapsed_ms":11.990806,"timing_error":""}
+  ok   fences reentrant identity resolution over nil cancellation debt
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"fences reentrant identity resolution over throw cancellation debt","status":"pass","elapsed_ms":14.665439,"timing_error":""}
+  ok   fences reentrant identity resolution over throw cancellation debt
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"does zero HTTP work until a cold token resolves","status":"pass","elapsed_ms":14.005053,"timing_error":""}
+  ok   does zero HTTP work until a cold token resolves
+
+=== API menu metadata path ===
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"builds before token resolution without starting any shell work","status":"pass","elapsed_ms":22.795848,"timing_error":""}
+  ok   builds before token resolution without starting any shell work
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","name":"tests.unit.modules.llm.remote.test_api_token_decrypt_async_behaviour","status":"pass","elapsed_ms":244.081825,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  24
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

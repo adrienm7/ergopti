@@ -1,0 +1,19 @@
+{
+  "modules": [
+    "tests.unit.infra.config.test_config_migrate",
+    "tests.unit.infra.config.test_config_cleanup_session",
+    "tests.unit.infra.config.test_config_scope_transaction",
+    "tests.unit.infra.config.test_config_scope_composition",
+    "tests.unit.infra.config.test_config_paths_write_transaction",
+    "tests.unit.infra.preferences.test_preferences_keeps_unowned_sections_save",
+    "tests.unit.infra.preferences.test_preferences_keeps_unowned_sections_actual_file",
+    "tests.unit.infra.preferences.test_preferences_existing_key_spellings",
+    "tests.unit.infra.config.test_config_outdated",
+    "tests.unit.ui.menu.configuration.test_unused_keys_cleanup",
+    "tests.unit.ui.menu.configuration.test_cleanup_adoption_receipts",
+    "tests.unit.ui.menu.scope.test_global_reset_transaction"
+  ],
+  "passed": 581,
+  "failed": 0,
+  "bad_modules": []
+}

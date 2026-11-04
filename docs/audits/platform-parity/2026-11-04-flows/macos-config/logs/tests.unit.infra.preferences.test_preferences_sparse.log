@@ -1,0 +1,6 @@
+
+=== sparse preference transactions ===
+  ok   saves a real neutral module snapshot without adding enabled overrides
+  ok   does not reinterpret unknown gesture fields as live action assignments
+  ok   deletes neutral leaves and preserves unknown nested data in one publication
+TOTAL 3 passed 0 failed

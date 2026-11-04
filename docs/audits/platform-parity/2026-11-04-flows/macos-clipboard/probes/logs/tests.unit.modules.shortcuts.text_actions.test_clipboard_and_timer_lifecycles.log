@@ -1,0 +1,9 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_clipboard_and_timer_lifecycles
+
+=== shortcuts: the clipboard wrap serialises like its sibling ===
+  ok   wrap_selection refuses re-entry while a wrap is outstanding
+  ok   and releases the guard only after the restore
+
+=== shortcuts: keep-awake cancels its pending cursor return ===
+  ok   toggle_awake stops the return timer, not only the tick timer
+RESULT 3 passed 0 failed

@@ -1,0 +1,40 @@
+{
+	"schema_version": 1,
+	"scope": "linux-crypto",
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-flows/linux-crypto/report.md",
+	"findings": [
+		{
+			"id": "LCR-001",
+			"title": "Raw marker-prefixed typed text bypasses encryption and can abort decryption migration",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Run ci-bin/luajit docs/audits/platform-parity/2026-11-04-flows/linux-crypto/probes/marker-collision.lua. Actual shared cipher+native EVP+original Linux SQL composer preserve clear raw ergopti-enc-v1:CANARY without AES. Valid-IV-looking literal also yields empty on decrypt; original shared decrypt migration runner aborts before apply. Synthetic key only; SQL-bound proof, no DB COMMIT claimed.",
+			"root_cause": "_shared/lua/keystats/text_crypto.lua:102–104 recognizes only marker prefix; shared text_cipher.lua:124 returns new raw plaintext untouched on that recognition. Linux sqlite_writer.lua:668–671 passes newly captured ev.text through the same already-stored idempotence API, losing raw/stored provenance.",
+			"silent_failure": "Normal write receives a non-nil accepted string and no encryption error, so SQL contains the clear canary under enabled encryption. Existing tests only test genuine-envelope rewrap; later migration refusal is not linked to literal raw input.",
+			"regression_test": "Separate trusted stored-envelope migration from raw capture; round-trip literal malformed markers, valid-IV-looking text and exact envelope-looking literals as literal plaintext without clear SQL exposure. Genuine stored envelope replay stays idempotent; decrypt migration must not stall on newly typed literals.",
+			"security_impact": {
+				"confidentiality": "Additional impact beyond G1–G5: literal protected text remains readable in SQL despite encryption enabled.",
+				"integrity": "Envelope-looking literal can be misinterpreted on decode; executed Linux migration refuses rather than applying empty text."
+			},
+			"counterparts": "macOS independent actual-writer probe confirms same shared core root; Windows source prefix recognition/skip at keystats_text_cipher.ahk170–173,221. Deduplicate common root, preserve per-OS evidence."
+		},
+		{
+			"id": "LCR-002",
+			"title": "Secret-tool stdin write refusal can still publish a successful API credential reference",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Run ci-bin/luajit docs/audits/platform-parity/2026-11-04-flows/linux-crypto/probes/secret-tool-short-write.lua. Public ApiEntries.add uses real token owner/private metadata writer and disposable executable. Recording real-pipe boundary writes SYN then returns nil controlled short write; helper exits0. Add succeeds and writes reference; reload reads SYN instead of complete27-byte synthetic key. All scratch content removed; no live keyring.",
+			"root_cause": "linux/modules/llm/api_token_store.lua:91 ignores pipe.write result; :92 ignores close result; :93–94 returns only helper status. SECRET_TOOL.store:127 treats status0 as complete key persistence. ApiEntries then publishes the reference without acknowledged complete stdin transport.",
+			"silent_failure": "Entry save succeeds and current RAM retains full key, hiding that only a truncated key was stored until reload or remote auth. Existing tests cover helper refusal/full successful stdin but not a refused partial transport receipt with child exit0.",
+			"regression_test": "Inject partial/full input write refusal/throw and native pipe completion refusal; require no saved-success/reference publication based on child status alone, keep previous source/key, own cleanup of newly created orphan item, and verify exact complete bytes after success+reload. Preserve no-plaintext-fallback and key-free argv.",
+			"security_impact": {
+				"integrity": "Saved credential can be truncated while metadata reports success. No real credential disclosure demonstrated."
+			},
+			"counterparts": "macOS signed-launcher Keychain async owner and Windows DPAPI protected blob avoid this exact secret-tool pipe; native counterpart fault coverage remains their scopes."
+		}
+	]
+}

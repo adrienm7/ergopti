@@ -1,0 +1,14 @@
+
+=== window toggle (macOS) ===
+  ok   opens a closed page, presents a covered one and closes a focused one
+2026-11-04 17:15:59:000 [ERROR] [window_toggle] Page 'layer_editor' has no registered opener yet; nothing was opened.
+[logger] unified log write refused: /tmp/lua_Slewre_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_Slewre_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   a context page opens only through its registered opener
+2026-11-04 17:15:59:000 [ERROR] [window_toggle] Toggle refused: unknown page 'no_such_page'.
+  ok   refuses an unknown page and an opener for one
+  ok   every page module exposes its window and close hooks
+
+=== window actions reach the toggle (macOS) ===
+  ok   each catalogue window action toggles its own page
+TOTAL 5 passed, 0 failed

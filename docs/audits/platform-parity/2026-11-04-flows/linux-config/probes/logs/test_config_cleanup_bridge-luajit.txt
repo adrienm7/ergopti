@@ -1,0 +1,8 @@
+
+=== configuration cleanup WebView (Linux) ===
+  ok   opens without scanning and pushes the current ready state to the shared receiver
+  ok   refuses headless native creation and closes the provisional session
+  ok   rejects missing and stale native epochs even for a ready message
+  ok   keeps the current session when the menu focuses its existing page
+  ok   closes only the displayed session and ignores its old close callback after reopen
+TOTAL 5 passed 0 failed

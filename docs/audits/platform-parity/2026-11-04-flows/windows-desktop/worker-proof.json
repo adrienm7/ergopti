@@ -1,0 +1,21 @@
+{
+	"source": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"worker_body": "Clear-RecycleBin -Force -ErrorAction Stop",
+	"engine": "PowerShell 7.4.6 Linux; fake native Clear-RecycleBin only",
+	"ahk_execution": false,
+	"results": [
+		{
+			"refuse": false,
+			"exit": 0,
+			"stdout": "recorded successful bin operation\n",
+			"stderr": ""
+		},
+		{
+			"refuse": true,
+			"exit": 1,
+			"stdout": "",
+			"stderr": "Exception: recorded native bin refusal\n"
+		}
+	],
+	"source_observation": "AHK asks SystemControl.Launch then logs Emptying; launch PID is not retained and no exit callback/monitor exists in handler."
+}

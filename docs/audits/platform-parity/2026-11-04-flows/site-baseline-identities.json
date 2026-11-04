@@ -1,0 +1,57 @@
+{
+	"baseline": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"audited": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"reviewed_dev": "1fa4c28f318258dd1af31920b1a55b8bb4c33de1",
+	"files": [
+		{
+			"path": "tools/test/fixtures/site-deploy-admission-controls.cjs",
+			"sha256": "063b34408b47dd87298d82c33a77f157a85e58bb84f91b065c0401e6df2e969f",
+			"baseline_equals_audited_and_reviewed_dev": true
+		},
+		{
+			"path": "tools/ci/site-deploy-admission.cjs",
+			"sha256": "28d65cb93dec81a4150638ca33450ec61d6b621de07029ad94d04c36bd5f3d29",
+			"baseline_equals_audited_and_reviewed_dev": true
+		},
+		{
+			"path": "tools/ci/site-artifact.cjs",
+			"sha256": "4e154f3569cbb8553c8a7dabf2aff43cba0a369a3db2b7b480b5dc3ad6f1f077",
+			"baseline_equals_audited_and_reviewed_dev": true
+		},
+		{
+			"path": "tools/ci/github-api-page.cjs",
+			"sha256": "8523250ad3fff108706af844631ef99cac1675878bd8d7a8e75b5773a8afad7d",
+			"baseline_equals_audited_and_reviewed_dev": true
+		},
+		{
+			"path": "tools/dev/site-context.cjs",
+			"sha256": "d5d587e73f30448926dbdcb24aa0ded482d240fb232121a2d68509bdffb634dd",
+			"baseline_equals_audited_and_reviewed_dev": true
+		},
+		{
+			"path": "tools/test/test-ci-pipeline-wiring.cjs",
+			"sha256": "ffce6b684d0504338e202967a996c0adfdaeea1b10ee763f0e4fc7e6877c9b09",
+			"baseline_equals_audited_and_reviewed_dev": true
+		},
+		{
+			"path": ".github/workflows/deploy-site.yml",
+			"sha256": "6395ce718dbffc1fda2bc4e636e958548584a79b2d14db2de1f212dd37e0ad47",
+			"baseline_equals_audited_and_reviewed_dev": true
+		},
+		{
+			"path": "package.json",
+			"sha256": "f79ce41d79d57d1d0568f4c2f81a2cd92f024ca674d99cf290af7f05b98e54ba",
+			"baseline_equals_audited_and_reviewed_dev": true
+		},
+		{
+			"path": "package-lock.json",
+			"sha256": "5220d38742602a9f947aa67f642b147962eccd56d1482e3978783f3aeec7cab5",
+			"baseline_equals_audited_and_reviewed_dev": true
+		},
+		{
+			"path": ".node-version",
+			"sha256": "4c42fb8d6334c5cdcac68b93f96c581fb83b1f58cda898cff115e5e941ef717d",
+			"baseline_equals_audited_and_reviewed_dev": true
+		}
+	]
+}

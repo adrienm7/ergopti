@@ -1,0 +1,5 @@
+timer_refused: public=false; current RAM=fr; canonical disk=de; next-start adoption=de; earlier accepted reloads=0; errors=1
+settings_refused: public=false; current RAM=fr; canonical disk=de; next-start adoption=de; earlier accepted reloads=0; errors=2
+persist_settings_refused: public=false; current RAM=fr; canonical disk=de; next-start adoption=de; earlier accepted reloads=0; errors=2
+cancel_refused: public=false; current RAM=de; canonical disk=en; next-start adoption=en; earlier accepted reloads=1; errors=1
+Real locale+script authority+native file writer+boot adoption; timer/settings refusals recorded; no user preference state touched.

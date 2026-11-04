@@ -1,0 +1,4 @@
+
+=== menu preference rollback: restore runtime-owned values ===
+  ok   restores backend labels, ChatGPT URL, and a disabled editor shortcut
+TOTAL 1 passed 0 failed

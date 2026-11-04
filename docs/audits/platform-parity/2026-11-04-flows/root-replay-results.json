@@ -1,0 +1,79 @@
+[
+	{
+		"scope": "linux-clipboard",
+		"probe": "clipboard-flows.lua",
+		"engine": "lua",
+		"exit": 0,
+		"tail": [
+			"RICH_FORMATS\twayland\tplain=saved\thtml=nil\twrites=3\tpasted=SELECTED",
+			"FOREIGN_COPY_TRANSFORM\twayland\tfinal=saved\twaits=3",
+			"FOREIGN_COPY_PASTE_CONTROL\twayland\tfinal=external-copy"
+		]
+	},
+	{
+		"scope": "linux-clipboard",
+		"probe": "range-owner.lua",
+		"engine": "lua",
+		"exit": 0,
+		"tail": ["SAME_FIELD_RANGE\tok=true\twrites=1\trange=other-range\ttext=SOURCE"]
+	},
+	{
+		"scope": "linux-clipboard",
+		"probe": "file-copy-focus.lua",
+		"engine": "lua",
+		"exit": 0,
+		"tail": [
+			"FILE_COPY_FOCUS\tresult=false\tchords=1\ttarget=terminal\tcombo=ctrl+c\tpublication=nil"
+		]
+	},
+	{
+		"scope": "linux-clipboard",
+		"probe": "atspi-range-control.lua",
+		"engine": "lua",
+		"exit": 0,
+		"tail": ["ATSPI_RANGE_CONTROL\tcommitted=false\temits=0\tpayload_written=false\tsettled=true"]
+	},
+	{
+		"scope": "macos-config",
+		"probe": "locale-partial-commit.lua",
+		"engine": "lua",
+		"exit": 0,
+		"tail": [
+			"persist_settings_refused: public=false; current RAM=fr; canonical disk=de; next-start adoption=de; earlier accepted reloads=0; errors=2",
+			"cancel_refused: public=false; current RAM=de; canonical disk=en; next-start adoption=en; earlier accepted reloads=1; errors=1",
+			"Real locale+script authority+native file writer+boot adoption; timer/settings refusals recorded; no user preference state touched."
+		]
+	},
+	{
+		"scope": "linux-config",
+		"probe": "legacy-neutral-real-storage.lua",
+		"engine": "luajit",
+		"exit": 0,
+		"tail": [
+			"REAL_STORAGE native_rename_refusals=1 first_import=false later_neutral_save=true next_import=true old_choice_resurrected=true alias_finally_deleted=true",
+			"BYTES # real storage failure audit fixture |  | [hotstrings] | preview_ai_enabled = false | repeat_key_enabled = true | "
+		]
+	},
+	{
+		"scope": "linux-config",
+		"probe": "locale-split-commit.lua",
+		"engine": "luajit",
+		"exit": 0,
+		"tail": [
+			"CASE existing_config_row=false setter=false active_and_native_alias_on_return=fr native_refusals=1 startup_locale=fr",
+			"BYTES # no explicit script locale | ",
+			"CONFIRMED existing config row changes despite rejected locale setter; absent-row control preserves fr"
+		]
+	},
+	{
+		"scope": "windows-config",
+		"probe": "source-evidence.py",
+		"engine": "python",
+		"exit": 0,
+		"tail": [
+			"Actual owner body sha256=182006c6db91caf583c900c45919b1aab25aa1a4a6b69739ebb348f6d27f47b6",
+			"Generated unexecuted probe: wpm-position-rollback-native.ahk",
+			"Audited SHA=213d65af24d2aa4845ba47743c9bab6787b61964"
+		]
+	}
+]

@@ -1,0 +1,16 @@
+
+=== file_watchers debounce clock source ===
+  ok   computes the debounce deadline from the monotonic clock, not os.clock
+
+=== file_watchers Linux directory identity ===
+  ok   (linux-watch-path-identity) native watches distinct Foo and foo siblings
+  ok   (linux-watch-path-identity) native preserves a literal trailing backslash in sibling names
+  ok   (linux-watch-path-identity) native preserves a literal trailing backslash in the configured root
+  ok   (linux-watch-path-identity) native accepts ordinary trailing directory slashes
+  ok   (linux-watch-path-identity) native retains the existing recursive depth boundary
+  ok   (linux-watch-path-identity) pump watches distinct Foo and foo siblings
+  ok   (linux-watch-path-identity) pump preserves a literal trailing backslash in sibling names
+  ok   (linux-watch-path-identity) pump preserves a literal trailing backslash in the configured root
+  ok   (linux-watch-path-identity) pump accepts ordinary trailing directory slashes
+  ok   (linux-watch-path-identity) pump retains the existing recursive depth boundary
+TOTAL 11 passed 0 failed

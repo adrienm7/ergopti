@@ -1,0 +1,8 @@
+{
+	"path": "static/ergopti_plus/_shared/data/__pycache__/identifiers.cpython-312.pyc",
+	"size": 1494,
+	"mtime_ns": 1793815577240621962,
+	"sha256": "2afe2c3cc2119478b2bcfec856d5cf38ba63db9ecc4317debe380c12c45b0af2",
+	"tracked": false,
+	"reason": "transient CPython bytecode generated during authorized checks; no importing test process remains; canonical identifiers.py preserved"
+}

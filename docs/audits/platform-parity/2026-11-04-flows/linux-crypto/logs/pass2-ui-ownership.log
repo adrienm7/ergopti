@@ -1,0 +1,48 @@
+
+=== API add exact runtime admission ===
+  ok   (api-add-admission) commits once without rewriting backend preferences and tests once
+  ok   (api-add-admission) refuses scope acquired while the last prompt was open
+  ok   (api-add-admission) refuses pause acquired while the last prompt was open
+  ok   (api-add-admission) refuses shutdown acquired while the last prompt was open
+  ok   (api-add-admission) refuses backend acquired while the last prompt was open
+  ok   (api-add-admission) guards RAM before a reentrant writer entry
+  ok   (api-add-admission) reserves private RAM before a reentrant publication admission
+  ok   (api-add-admission) rolls back tentative RAM after staging pause
+  ok   (api-add-admission) rolls back tentative RAM after staging preferences
+  ok   (api-add-admission) rolls back tentative RAM after staging throw
+  ok   (api-add-admission) preserves an actual API source conflict and releases rollback
+  ok   (api-add-admission) retains uncertain rename debt instead of declaring rollback
+  ok   (api-add-admission) refuses a forged receipt without exposing the private owner
+  ok   (api-add-admission) does not adopt a successor selected from the commit logger
+  ok   (api-add-admission) binds source validation inside the runtime admission bracket
+  ok   (api-add-admission) a throwing commit logger cannot lose a known publication ACK
+  ok   (api-add-admission) never posts after a successor at menu
+  ok   (api-add-admission) never posts after a successor at logger
+  ok   (api-add-admission) never posts after a successor at native
+  ok   (api-add-admission) refuses a changed API selection after menu rebuild
+  ok   (api-add-admission) refuses a changed API source after menu rebuild
+  ok   (api-add-admission) suppresses a late connectivity verdict after a scope successor
+
+=== API menu selection persistence errors ===
+  ok   (api-selection-errors) reports a physical source conflict and preserves the external winner
+  ok   (api-selection-errors) reports a native private-file staging refusal without changing either source
+  ok   (api-selection-errors) names the secret service's refusal instead of a generic failure (linux-api-key-secret-service)
+  ok   (api-selection-errors) publishes one successful real selection without an error dialog
+  ok   (api-selection-errors) recovers after a source conflict with a fresh authoritative menu
+
+=== Per-account address: the form fills the template ===
+  ok   asks the resource, the key and the model, and stores the filled address
+  ok   refuses a value that would change the host, and saves nothing
+  ok   saves nothing without a model, since none defaults
+
+=== Optional workspace domain: the form keeps or replaces the address ===
+  ok   a filled domain becomes the entry's address
+  ok   an empty domain keeps the catalogue's address
+  ok   another host is refused in words and saves nothing
+
+=== Per-account address: the catalogue row and its requests ===
+  ok   a template row without a default model is loaded
+  ok   a fixed address still needs its default model, and a stray brace is refused
+  ok   a malformed optional_address refuses the provider whole
+  ok   an entry without its filled address is refused before anything is sent
+TOTAL 37 passed 0 failed

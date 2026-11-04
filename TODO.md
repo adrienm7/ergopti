@@ -36,6 +36,51 @@ the field-run step or the hand action that proves it and the commits it confirms
 - [ ] **Windows and Linux:** evaluate equivalents of the macOS bundled App Cloner (isolated application copies and profiles) and Encryptor (file encryption/decryption by drag-and-drop). These are bundled apps, distinct from the shared text and metrics encryption features.
 - [ ] Triage each OS-specific configuration entry, action and greyed menu item in the generated [feature inventory](docs/feature-inventory.md). The recorded reason and equivalent distinguish OS-specific mechanisms from actual product gaps. Recheck runtime and hardware behavior before declaring parity.
 
+## Audit validation follow-up
+
+- [ ] **[CODE] macOS:** declare the existing `/usr/sbin/installer` child in the owned-runtime program inventory through its canonical owner and regenerate consumers. The unchanged inventory test rejects this pre-existing omission at all three reviewed source revisions. [Baseline proof](docs/audits/platform-parity/2026-11-04-flows/validation/installer-baseline/report.md). This metadata item is outside the 26 flow findings.
+
+## End-to-end parity follow-up
+
+Evidence: [12-scope flow review](docs/audits/platform-parity/2026-11-04-flows/report.md). These are OS/flow work items, not a claim of 26 unique causes or native acceptance. Preserve intentional policies and all current refusal guards.
+
+### Windows
+
+- [ ] **[CODE] WCP-001:** Selection startup can clear and copy after an external foreground-window change. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/windows-clipboard/report.md).
+- [ ] **[CODE] WCP-002:** Selection transformations can paste into a new window after clipboard preparation. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/windows-clipboard/report.md).
+- [ ] **[CODE] WCR-001:** Marker-prefixed raw typing bypasses the protected SQL text encryption path. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/windows-crypto/report.md). Shared root: typed-text envelope-prefix admission; implement and test all three ingress/migration paths together.
+- [ ] **[CODE] WCF-001:** Widget coordinates can persist a mixed pair after failed compensation or reentrant position writes. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/windows-config/report.md). Initial refusal is logged; preserve/recover the promised durable pair. Reentrant native timing remains conditional.
+- [ ] **[CODE] WDS-001:** Ordinary application quit discards failed window-close receipts. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/windows-desktop/report.md).
+- [ ] **[CODE] WDS-002:** Recycle Bin worker failure after successful launch has no completion observer. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/windows-desktop/report.md).
+
+### macOS
+
+- [ ] **[CODE] MCP-001:** Apps selection capture restores an obsolete clipboard over a newer copy. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/report.md).
+- [ ] **[CODE] MCP-002:** Independent macOS clipboard borrowers snapshot another family’s temporary payload. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/report.md).
+- [ ] **[CODE] MCP-003:** Ordinary delayed selection transforms paste captured text into another focused app. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/report.md).
+- [ ] **[CODE] MCR-001:** Encryptor source conversion can destroy an approved overwrite target on failure. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md). Approved overwrite is required; improve failure-safe replacement. No unconsented overwrite or explicit atomicity promise is asserted.
+- [ ] **[CODE] MCR-002:** Encryptor hidden password is embedded in shell command arguments. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md).
+- [ ] **[CODE] MCR-003:** Raw envelope-prefixed typed text bypasses macOS SQL payload encryption. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md). Shared root: typed-text envelope-prefix admission; implement and test all three ingress/migration paths together.
+- [ ] **[CODE] MCR-004:** HuggingFace login credential is embedded in native bash argv. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md).
+- [ ] **[CODE] MCR-005:** Failed API secret replacement restores old metadata pointing to overwritten Keychain value. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md).
+- [ ] **[CODE] MCR-006:** Refused migration slice timer leaves successful-start receipt and permanently running idle pass. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md).
+- [ ] **[CODE] MCF-001:** Rejected locale changes publish canonical config before reload or settings admission. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-config/report.md). Shared rejected-locale publication root; retain the macOS timer-race subtype and Linux startup control.
+
+### Linux
+
+- [ ] **[CODE] LCP-001:** Clipboard borrowers restore only text and silently discard other original formats. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-clipboard/report.md).
+- [ ] **[CODE] LCP-002:** Text transformations overwrite an intervening external clipboard copy. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-clipboard/report.md).
+- [ ] **[CODE] LCP-003:** Case and wrap transformations can replace a changed selection in the same text field. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-clipboard/report.md).
+- [ ] **[CODE] LCP-004:** URI clipboard probing can send Ctrl+C to an unvalidated terminal, including an unchanged terminal through make_executable_selection. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-clipboard/report.md).
+- [ ] **[CODE] LCR-001:** Raw marker-prefixed typed text bypasses encryption and can abort decryption migration. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-crypto/report.md). Shared root: typed-text envelope-prefix admission; implement and test all three ingress/migration paths together.
+- [ ] **[CODE] LCR-002:** Secret-tool stdin write refusal can still publish a successful API credential reference. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-crypto/report.md).
+- [ ] **[CODE] LCF-001:** Failed legacy alias cleanup resurrects a later accepted neutral preference. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-config/report.md).
+- [ ] **[CODE] LCF-002:** Rejected locale change remains canonical startup authority after native alias refusal. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-config/report.md). Shared rejected-locale publication root; retain the macOS timer-race subtype and Linux startup control.
+- [ ] **[CODE] LDS-001:** Desktop command producer hides both shell acquisition and background child failures. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-desktop/report.md).
+- [ ] **[CODE] LDS-002:** Serialize independently accepted Linux theme read-modify-write toggles; overlapping calls currently lose one transition. [Public-dispatch reproduction and controls](docs/audits/platform-parity/2026-11-04-flows/linux-desktop/report.md).
+
+- [ ] **[PHYS-W] / [PHYS-M] / [PHYS-L]:** execute only the receiving scenarios named by each flow report on isolated native hosts. Source/recording-port tests do not close native focus, selection, keyring, application or device qualification.
+
 ## Deep OS × module follow-up
 
 Audited source and immutable evidence: [18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md). These entries are implementation/validation work, not permission to remove deliberate safety checks or silently change explicit product contracts. Intentional differences and unresolved rationale are in the [provenance register](docs/audits/platform-parity/2026-11-04-deep/intentional-differences.md).

@@ -1,0 +1,14 @@
+0 RESULT 95 passed 0 failed tests.unit.adapters.system.test_apple_shortcuts
+0 RESULT 32 passed 0 failed tests.unit.adapters.system.test_apple_shortcuts_native
+0 RESULT 14 passed 0 failed tests.unit.modules.keymap.expansion.test_builtin_clipboard_restore_ownership
+0 RESULT 13 passed 0 failed tests.unit.modules.keymap.expansion.test_builtin_clipboard_snapshot_acquisition
+0 RESULT 10 passed 0 failed tests.unit.modules.keymap.expansion.test_emit_tokens_multi_paste
+0 RESULT 19 passed 0 failed tests.unit.modules.keymap.expansion.test_multi_paste_fifo_handoff
+0 RESULT 12 passed 0 failed tests.unit.modules.llm.features.test_selection_translation_end_to_end
+0 RESULT 10 passed 0 failed tests.unit.modules.llm.features.test_selection_translation_fifo
+0 RESULT 7 passed 0 failed tests.unit.modules.llm.features.test_selection_translation_focus_lifecycle
+0 RESULT 8 passed 0 failed tests.unit.modules.llm.features.test_selection_translation_gate_lifecycle
+0 RESULT 4 passed 0 failed tests.unit.modules.llm.features.test_selection_translation_scope_ownership
+0 RESULT 9 passed 0 failed tests.unit.modules.llm.features.test_tone_rewrite_end_to_end
+0 RESULT 17 passed 0 failed tests.unit.modules.llm.features.test_tone_rewrite_focus_lifecycle
+0 RESULT 22 passed 0 failed tests.unit.modules.shortcuts.system_actions.test_screenshot_save_capture_verdicts

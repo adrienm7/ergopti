@@ -1,0 +1,62 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_text_pause_ownership
+
+=== text composite owner: positive controls ===
+  ok   completes transform, plain, and wrap phases with exact restoration
+  ok   retains one surround transaction until the closing batch
+  ok   discards a partially built close before retry after false
+  ok   discards a partially built close before retry after throw
+  ok   duplicate RESUME leaves an active text transaction untouched
+  ok   restores an exactly empty clipboard on the native void boundary
+  ok   falls back to an immediate close when the post-opening timer fires synchronously
+  ok   bounds repeated synchronous closing recovery failures
+  ok   settles a real SyntheticInput admission refusal without a ghost slot
+
+=== text composite owner: exact timer cleanup ===
+  ok   transform retains the same timer after stop false
+  ok   transform retains the same timer after stop nil
+  ok   transform retains the same timer after stop throw
+  ok   plain retains the same timer after stop false
+  ok   plain retains the same timer after stop nil
+  ok   plain retains the same timer after stop throw
+  ok   wrap retains the same timer after stop false
+  ok   wrap retains the same timer after stop nil
+  ok   wrap retains the same timer after stop throw
+  ok   surround waits on its due closing timer after stop false
+  ok   surround waits on its due closing timer after stop nil
+  ok   surround waits on its due closing timer after stop throw
+
+=== text composite owner: pause around surround opening ===
+  ok   joins a re-entrant PAUSE while arming the post-opening close
+  ok   finishes the retained closing half after PAUSE follows the opening
+  ok   completes the opening and retains mutate-then-refused timer false
+  ok   completes the opening and retains mutate-then-refused timer nil
+  ok   completes the opening and retains mutate-then-refused timer throw
+
+=== text composite owner: mutate-then-refused timer acquisition ===
+  ok   transform retains the exact candidate after start false
+  ok   transform retains the exact candidate after start nil
+  ok   transform retains the exact candidate after start throw
+  ok   plain retains the exact candidate after start false
+  ok   plain retains the exact candidate after start nil
+  ok   plain retains the exact candidate after start throw
+  ok   wrap retains the exact candidate after start false
+  ok   wrap retains the exact candidate after start nil
+  ok   wrap retains the exact candidate after start throw
+
+=== text composite owner: clipboard restore debt ===
+  ok   transform retains its snapshot after restore false
+  ok   transform retains its snapshot after restore nil
+  ok   transform retains its snapshot after restore throw
+  ok   plain retains its snapshot after restore false
+  ok   plain retains its snapshot after restore nil
+  ok   plain retains its snapshot after restore throw
+  ok   wrap retains its snapshot after restore false
+  ok   wrap retains its snapshot after restore nil
+  ok   wrap retains its snapshot after restore throw
+
+=== text composite owner: parent isolation ===
+  ok   keeps gesture admission and ownership live while shortcuts pause
+  ok   serialises the shared clipboard without settling a sibling parent
+  ok   select_line revalidates PAUSE between its two emissions
+  ok   select_word revalidates PAUSE between its two emissions
+RESULT 48 passed 0 failed

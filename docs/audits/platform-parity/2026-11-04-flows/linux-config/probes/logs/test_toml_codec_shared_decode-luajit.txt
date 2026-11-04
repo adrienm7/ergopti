@@ -1,0 +1,421 @@
+
+=== shared toml_codec.decode is live in the managers ===
+  ok   validates multiline token boundaries without losing content quotes
+  ok   preserves whitespace on the first line of multiline values
+  ok   preserves escaped backslashes before multiline newlines
+  ok   (toml-token-boundary) rejects joined strings through the shared entry point
+  ok   recognizes the first section after a UTF-8 BOM
+  ok   rejects scalar-table collisions without raising
+  ok   preserves heterogeneous arrays with typed values
+  ok   decodes TOML numeric forms with their numeric type
+  ok   enforces Unicode scalar values while preserving escaped U+0000
+  ok   preserves array-of-table structure and rejects duplicate definitions
+  ok   round-trips escaped control bytes without publishing raw controls
+  ok   dynamic_hotstrings preserves a '#' inside a quoted value (decode, not bespoke strip)
+
+=== managers delegate TOML parsing to the shared codec ===
+  ok   the tap-hold loader and writer call .decode and keep no bespoke parser
+  ok   dynamic_hotstrings manager calls .decode and drops the bespoke parser
+
+=== toml_codec.decode parses multi-line arrays ===
+  ok   populates a multi-line string array spanning several lines
+  ok   keeps a '#' inside a quoted element of a multi-line array
+  ok   ignores blank lines and inline comments between elements
+  ok   still parses inline (single-line) arrays unchanged
+  ok   rejects an unterminated multi-line array as malformed
+  ok   rejects a key redeclared after a multi-line array
+
+=== shared TOML quoted headers ===
+  ok   updates deletes and inserts quoted literal dotted leaves without touching nested paths
+  ok   preserves sparse defaults under equivalent quoted owner paths
+  ok   keeps cleanup conservative while the batch deletes a quoted assignment key
+
+=== shared physical TOML equals boundary ===
+  ok   equals-boundary: authentic splitter keeps key and raw RHS "x=y" = true
+  ok   equals-boundary: authentic splitter keeps key and raw RHS 'x=y'=false
+  ok   equals-boundary: authentic splitter keeps key and raw RHS  "x\"=y".z  =  [1, 2]
+  ok   equals-boundary: authentic splitter keeps key and raw RHS "x\u003dy"=0.1
+  ok   equals-boundary: authentic splitter keeps key and raw RHS a = "right=side" # = comment
+  ok   equals-boundary: authentic splitter keeps key and raw RHS a	=	'literal=rhs'
+  ok   equals-boundary: an unclosed quoted key never invents a separator
+  ok   equals-boundary: actual quoted leaf batch uses its original physical owner
+  ok   equals-boundary: complete physical multiline span stays attached to the quoted owner
+
+=== shared hotstring reader header syntax ===
+  ok   (toml-raw-comment) keeps rejected-header substring work linear as markers double
+
+=== shared section-relative inline scalar ownership ===
+  ok   describes the complete eligible parent and retains fresh detached hints
+  ok   admits a new inline member next to existing ones 1
+  ok   admits a new inline member next to existing ones 2
+  ok   rejects malformed source, sparse and duplicate descriptions
+  ok   withholds hints when the canonical decoder does not publish shape evidence
+  ok   refuses a wrong scalar candidate even after a hint is forged
+  ok   checks the actual typed scalar candidate after an eligible encoder is interposed
+  ok   retains the strict actual source precondition after hint creation
+
+=== exact source integers above the double precision boundary ===
+  ok   refuses a malicious decoded-equal integer literal before a native publisher
+
+=== source-shaped scalar numeric intent remains independently exact ===
+  ok   refuses an authentic scalar row minted by a decoded-equal wrong encoder
+
+=== authentic inline parents admit absent scalar members ===
+  ok   refuses an inserted scalar emitted with the wrong exact native integer intent
+
+=== shared TOML inline scalar vectors ===
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-wrong-scalar-type
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-delete-of-an-array-member
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-delete-below-an-array-member
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-delete-below-a-scalar-member
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-parent-replaced-by-a-scalar
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-infinite-number
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-not-a-number
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-case-twin-of-the-parent
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-scalar-group-with-a-parent-replacement
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-delete-group-with-an-overlapping-parent-delete
+  ok   (inline-scalar-hints-withheld) whole-group-withheld-overlapping-new-scalar-and-parent
+  ok   (inline-scalar-hints-withheld) array-table-source-hint-withheld
+  ok   (inline-scalar-hints-withheld) literal-dot-key-source-hint-withheld
+  ok   (inline-scalar-hints-withheld) empty-literal-identity-stays-on-the-whole-parent-route
+  ok   (inline-scalar-insertion-refused) insertion-refused-through-scalar-parent
+  ok   (inline-scalar-insertion-refused) insertion-refused-through-array-parent
+  ok   (inline-scalar-insertion-refused) insertion-refused-through-missing-intermediate-parent
+  ok   (inline-scalar-insertion-refused) insertion-refused-through-existing-scalar-intermediate
+  ok   (inline-scalar-insertion-refused) insertion-refused-through-array-intermediate
+  ok   (inline-scalar-insertion-refused) insertion-refused-through-new-structured-value
+  ok   (inline-scalar-insertion-refused) insertion-refused-through-literal-dotted-key
+  ok   (inline-scalar-insertion-refused) insertion-refused-through-source-case-twin
+  ok   (inline-scalar-insertion-refused) insertion-refused-through-dotted-implicit-parent
+  ok   (inline-scalar-insertion-refused) insertion-refused-through-nonfinite-scalar
+  ok   (inline-scalar-insertion) insertion-root-nested-scalar
+  ok   (inline-scalar-insertion) insertion-relative-scalar
+  ok   (inline-scalar-insertion) insertion-empty-source-object
+  ok   (inline-scalar-insertion) insertion-precise-finite-number
+  ok   (inline-scalar-insertion) insertion-negative-zero
+  ok   (inline-scalar-insertion) insertion-quoted-key-and-string
+  ok   (inline-scalar-insertion) insertion-sorts-only-new-siblings-and-keeps-replacement-deletion-and-foreign-spans
+  ok   (inline-scalar-exact-integers) integer-above-double-precision-published-exactly-through-root-inline
+  ok   (inline-scalar-exact-integers) integer-above-double-precision-published-exactly-through-root-dotted
+  ok   (inline-scalar-exact-integers) integer-above-double-precision-published-exactly-through-section-dotted
+  ok   (inline-scalar-exact-integers) integer-above-double-precision-published-exactly-through-header-leaf
+  ok   (inline-scalar-exact-integers) integer-above-double-precision-published-exactly-through-section-inline
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-minus9007199254740993
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-9_007_199_254_740_993
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-0x20000000000001
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-0o400000000000000001
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-0b100000000000000000000000000000000000000000000000000001
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-9007199254740991
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-plus9_007_199_254_740_992
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-9007199254740994
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-minus9007199254740991
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-minus9_007_199_254_740_992
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-minus9007199254740994
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-1dot0000000000000001e16
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-0dot1
+  ok   (inline-scalar-exact-integers) canonical-numeric-token-minus0dot0
+
+=== shared TOML batch writer vectors ===
+  ok   (toml-batch-existing-key) empty-header-table-deleted-comments-kept
+  ok   (toml-batch-existing-key) header-table-descendants-and-interleaved-blocks-replaced-by-scalar
+  ok   (toml-batch-existing-key) header-table-without-parent-header-deleted
+  ok   (toml-batch-existing-key) header-table-without-parent-header-set-to-a-table
+  ok   (toml-batch-existing-key) equal-array-of-tables-left-byte-for-byte
+  ok   (toml-batch-existing-key) equal-empty-header-table-left-byte-for-byte
+  ok   (toml-batch-existing-key) equal-inline-parent-value-left-byte-for-byte
+  ok   (toml-batch-existing-key) changed-array-of-tables-rewritten-as-one-inline-list
+  ok   (toml-batch-existing-key) quoted-bare-key-updated-in-place-double-quoted
+  ok   (toml-batch-existing-key) quoted-bare-key-deleted-in-place-double-quoted
+  ok   (toml-batch-existing-key) quoted-bare-key-updated-in-place-single-quoted
+  ok   (toml-batch-existing-key) quoted-bare-key-deleted-in-place-single-quoted
+  ok   (toml-batch-existing-key) quoted-bare-key-in-dotted-section-updated
+  ok   (toml-batch-existing-key) inline-table-value-change-names-its-key
+  ok   (toml-batch-existing-key) section-inline-string-updated-without-owning-its-parent
+  ok   (toml-batch-existing-key) batch-replacing-a-header-table-and-writing-inside-it-refused
+  ok   (shared-section-relative-inline-scalar-ownership) inline-source-existing-boolean
+  ok   (shared-section-relative-inline-scalar-ownership) inline-source-existing-string
+  ok   (shared-section-relative-inline-scalar-ownership) inline-source-precise-number
+  ok   (shared-section-relative-inline-scalar-ownership) inline-source-negative-zero
+  ok   (shared-section-relative-inline-scalar-ownership) inline-source-first-deletion
+  ok   (shared-section-relative-inline-scalar-ownership) inline-source-middle-deletion
+  ok   (shared-section-relative-inline-scalar-ownership) inline-source-existing-no-op
+  ok   (shared-section-relative-inline-scalar-ownership) inline-source-authored-absent-deletion
+  ok   (shared-section-relative-inline-scalar-ownership) inline-source-scalar-and-absent-sibling-deletion
+  ok   (shared-section-relative-inline-scalar-ownership) nested-dotted-and-quoted-member-fragments-kept-under-a-quoted-header
+  ok   (shared-section-relative-inline-scalar-ownership) explicit-empty-inline-parent-kept-after-last-scalar-deletion
+  ok   (toml-quoted-headers) owned-extension-leaf-deleted-neighbour-bytes-kept
+  ok   (toml-quoted-headers) equivalent-section-spelling-literal-updated-and-extended
+  ok   (toml-quoted-headers) equivalent-section-spelling-basic-updated-and-extended
+  ok   (toml-quoted-headers) equivalent-section-spelling-escaped-updated-and-extended
+  ok   (toml-quoted-headers) canonical-colon-segments-rendered-quoted-on-first-insertion
+  ok   (toml-quoted-headers) duplicate-equivalent-rows-refused-before-reading
+  ok   (toml-quoted-headers) unrelated-case-variants-preserved-on-quoted-delete
+  ok   (toml-quoted-headers) quoted-dots-and-brackets-kept-distinct-from-nested-sections
+  ok   (toml-quoted-headers) malformed-table-path-1-refused-before-reading
+  ok   (toml-quoted-headers) malformed-table-path-2-refused-before-reading
+  ok   (toml-quoted-headers) malformed-table-path-3-refused-before-reading
+  ok   (toml-quoted-headers) malformed-table-path-4-refused-before-reading
+  ok   (toml-quoted-headers) malformed-table-path-5-refused-before-reading
+  ok   (toml-quoted-headers) malformed-table-path-6-refused-before-reading
+  ok   (toml-quoted-headers) malformed-table-path-7-refused-before-reading
+  ok   (toml-quoted-headers) malformed-table-path-8-refused-before-reading
+  ok   (toml-quoted-headers) malformed-source-or-duplicate-table-1-refused
+  ok   (toml-quoted-headers) malformed-source-or-duplicate-table-2-refused
+  ok   (toml-quoted-headers) malformed-source-or-duplicate-table-3-refused
+  ok   (toml-quoted-headers) ambiguous-case-folded-or-array-target-1-refused
+  ok   (toml-quoted-headers) ambiguous-case-folded-or-array-target-2-refused
+  ok   (toml-quoted-headers) ambiguous-case-folded-or-array-target-3-refused
+  ok   (toml-dotted-keys) dotted-section-unchanged-value-keeps-every-byte
+  ok   (toml-dotted-keys) dotted-section-unrelated-owned-update-keeps-dotted-unknown-records
+  ok   (toml-dotted-keys) dotted-section-scalar-replaced-with-an-exact-owned-image
+  ok   (toml-dotted-keys) dotted-section-scalar-deleted-with-an-exact-owned-image
+  ok   (toml-dotted-keys) duplicate-semantic-dotted-source-refuses-an-unrelated-update
+  ok   (toml-dotted-keys) root-dotted-bare-scalar-updated-alone
+  ok   (toml-dotted-keys) root-dotted-bare-scalar-removed-alone
+  ok   (toml-dotted-keys) root-dotted-bare-scalar-unchanged-keeps-every-byte
+  ok   (toml-dotted-keys) root-dotted-quoted-leaf-scalar-updated-alone
+  ok   (toml-dotted-keys) root-dotted-quoted-leaf-scalar-removed-alone
+  ok   (toml-dotted-keys) root-dotted-quoted-leaf-scalar-unchanged-keeps-every-byte
+  ok   (toml-dotted-keys) root-dotted-quoted-parent-scalar-updated-alone
+  ok   (toml-dotted-keys) root-dotted-quoted-parent-scalar-removed-alone
+  ok   (toml-dotted-keys) root-dotted-quoted-parent-scalar-unchanged-keeps-every-byte
+  ok   (toml-dotted-keys) root-dotted-literal-parent-scalar-updated-alone
+  ok   (toml-dotted-keys) root-dotted-literal-parent-scalar-removed-alone
+  ok   (toml-dotted-keys) root-dotted-literal-parent-scalar-unchanged-keeps-every-byte
+  ok   (toml-dotted-keys) root-dotted-unicode-escaped-parent-scalar-updated-alone
+  ok   (toml-dotted-keys) root-dotted-unicode-escaped-parent-scalar-removed-alone
+  ok   (toml-dotted-keys) root-dotted-unicode-escaped-parent-scalar-unchanged-keeps-every-byte
+  ok   (toml-dotted-keys) root-dotted-case-distinct-neighbours-kept-and-multiline-scalar-replaced-whole
+  ok   (toml-dotted-keys) root-dotted-bom-kept-when-updating-a-first-leaf
+  ok   (toml-dotted-keys) root-dotted-bom-kept-when-deleting-a-first-leaf
+  ok   (toml-dotted-keys) root-dotted-final-newline-ownership-kept-when-updating-the-last-leaf
+  ok   (toml-dotted-keys) root-inline-scalar-updated-without-claiming-its-parent
+  ok   (toml-dotted-keys) root-container-mutation-or-subtree-collision-1-refused
+  ok   (toml-dotted-keys) root-container-mutation-or-subtree-collision-2-refused
+  ok   (toml-dotted-keys) root-container-mutation-or-subtree-collision-3-refused
+  ok   (toml-dotted-keys) root-container-mutation-or-subtree-collision-4-refused
+  ok   (toml-dotted-keys) root-container-mutation-or-subtree-collision-5-refused
+  ok   (toml-dotted-keys) root-scalar-replaced-while-publishing-a-descendant-refused
+  ok   (toml-dotted-keys) root-scalar-nonfinite-infinity-refused
+  ok   (toml-dotted-keys) root-scalar-nonfinite-negative-infinity-refused
+  ok   (toml-dotted-keys) root-scalar-nonfinite-not-a-number-refused
+  ok   (toml-dotted-keys) root-duplicate-aliases-refused
+  ok   (toml-dotted-keys) root-scalar-changed-into-a-dictionary-refused
+  ok   (toml-dotted-keys) root-dotted-precise-precise-decimal-published-exactly
+  ok   (toml-dotted-keys) root-dotted-precise-representable-large-integer-published-exactly
+  ok   (toml-dotted-keys) root-dotted-precise-negative-zero-published-exactly
+  ok   (toml-dotted-keys) header-scalar-precise-decimal-published-exactly
+  ok   (toml-dotted-keys) header-scalar-representable-large-integer-published-exactly
+  ok   (toml-dotted-keys) header-scalar-negative-zero-published-exactly
+  ok   (toml-dotted-keys) header-scalar-new-key-gets-the-precise-numeric-literal
+  ok   (toml-root-inline-scalar) root-inline-nested-numeric
+  ok   (toml-root-inline-scalar) root-inline-first-removal
+  ok   (toml-root-inline-scalar) root-inline-middle-removal
+  ok   (toml-root-inline-scalar) root-inline-last-removal
+  ok   (toml-root-inline-scalar) root-inline-only-removal
+  ok   (toml-root-inline-scalar) root-inline-adjacent-removals
+  ok   (toml-root-inline-scalar) root-inline-all-removals
+  ok   (toml-root-inline-scalar) root-inline-nested-empty-parent-retained
+  ok   (toml-root-inline-scalar) root-inline-nested-dotted-inline-member
+  ok   (toml-root-inline-scalar) root-inline-disjoint-edits
+  ok   (toml-root-inline-scalar) root-inline-opaque-escaped-delimiters
+  ok   (toml-root-inline-scalar) root-inline-quoted-root-owner
+  ok   (toml-root-inline-scalar) root-inline-exact-no-op-keeps-every-byte-and-signed-zero
+  ok   (toml-root-inline-scalar) root-inline-signed-zero-changed-to-integer-zero
+  ok   (toml-root-inline-scalar) root-inline-bom-and-trailing-newline-ownership-kept
+  ok   (toml-root-inline-scalar) root-inline-refused-case-twin-member
+  ok   (toml-root-inline-scalar) root-inline-refused-case-twin-table
+  ok   (toml-root-inline-scalar) root-inline-refused-duplicate-member
+  ok   (toml-root-inline-scalar) root-inline-refused-table-header-beside-the-inline-table
+  ok   (toml-root-inline-scalar) root-inline-refused-closed-scalar-parent
+  ok   (toml-root-inline-scalar) root-inline-refused-closed-array-parent
+  ok   (toml-root-inline-scalar) root-inline-refused-literal-dot-key
+  ok   (toml-root-inline-scalar) root-inline-refused-parent-and-child-in-one-batch
+  ok   (toml-root-inline-scalar) root-inline-refused-changed-type
+  ok   (toml-root-inline-scalar) root-inline-new-member-appended
+  ok   (toml-section-dotted-scalar) section-dotted-boolean-leaf
+  ok   (toml-section-dotted-scalar) section-dotted-string-leaf
+  ok   (toml-section-dotted-scalar) section-dotted-nested-header
+  ok   (toml-section-dotted-scalar) section-dotted-quoted-header
+  ok   (toml-section-dotted-scalar) section-dotted-quoted-literal-header-segment
+  ok   (toml-section-dotted-scalar) section-dotted-precise-finite-number
+  ok   (toml-section-dotted-scalar) section-dotted-negative-zero
+  ok   (toml-section-dotted-scalar) section-dotted-explicit-leaf-deletion
+  ok   (toml-section-dotted-scalar) section-dotted-multiline-scalar-record
+  ok   (toml-section-dotted-scalar) section-dotted-two-separate-scalar-owners
+  ok   (toml-section-dotted-scalar) section-dotted-original-no-op-image-kept
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-1
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-2
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-3
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-4
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-5
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-6
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-7
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-8
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-9
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-10
+  ok   (toml-section-dotted-scalar) section-dotted-safety-refusal-11
+  ok   (toml-section-dotted-scalar) section-dotted-overlapping-scalar-and-ancestor-requests-refused
+  ok   (toml-dotted-keys) dotted-stale-snapshot-refused-without-publication
+  ok   (toml-dotted-keys) root-changed-source-snapshot-refused
+  ok   (toml-root-inline-scalar) root-inline-stale-source-refused-before-any-edit
+  ok   (toml-section-dotted-scalar) section-dotted-stale-source-refused-before-an-owned-scalar
+
+=== toml leaf rows ===
+  ok   sets, updates and removes a quoted key under an existing table header
+  ok   deletes nothing where the source holds a scalar instead of the leaf's table
+
+=== shared hotstring reader vectors ===
+  ok   (toml-hotstring-header) malformed-header-1-refused
+  ok   (toml-hotstring-header) malformed-header-2-refused
+  ok   (toml-hotstring-header) malformed-header-3-refused
+  ok   (toml-hotstring-header) malformed-header-4-refused
+  ok   (toml-hotstring-header) malformed-header-5-refused
+  ok   (toml-hotstring-header) malformed-header-6-refused
+  ok   (toml-hotstring-header) malformed-header-7-refused
+  ok   (toml-hotstring-header) malformed-header-8-refused
+  ok   (toml-hotstring-header) malformed-header-9-refused
+  ok   (toml-hotstring-header) malformed-header-10-refused
+  ok   (toml-hotstring-header) complete-unfamiliar-header-1-preserved
+  ok   (toml-hotstring-header) complete-unfamiliar-header-2-preserved
+  ok   (toml-hotstring-header) complete-unfamiliar-header-3-preserved
+  ok   (toml-hotstring-header) complete-unfamiliar-header-4-preserved
+  ok   (toml-hotstring-header) complete-unfamiliar-header-5-preserved
+  ok   (toml-hotstring-header) historical-literal-name-1-preserved
+  ok   (toml-hotstring-header) historical-literal-name-2-preserved
+  ok   (toml-hotstring-header) historical-literal-name-3-preserved
+  ok   (toml-hotstring-header) historical-literal-name-4-preserved
+  ok   (toml-hotstring-header) historical-literal-name-5-preserved
+  ok   (toml-hotstring-header) historical-literal-name-6-preserved
+  ok   (toml-hotstring-header) historical-literal-name-7-preserved
+  ok   (toml-hotstring-header) historical-literal-name-8-preserved
+  ok   (toml-hotstring-header) historical-literal-name-9-preserved
+  ok   (toml-hotstring-header) historical-literal-name-10-preserved
+  ok   (toml-hotstring-header) historical-literal-name-11-preserved
+  ok   (toml-hotstring-header) historical-literal-name-12-preserved
+  ok   (toml-raw-comment) exact-literal-name-1-before-a-comment
+  ok   (toml-raw-comment) exact-literal-name-2-before-a-comment
+  ok   (toml-raw-comment) exact-literal-name-3-before-a-comment
+  ok   (toml-raw-comment) exact-literal-name-4-before-a-comment
+  ok   (toml-raw-comment) exact-literal-name-5-before-a-comment
+  ok   (toml-raw-comment) exact-literal-name-6-before-a-comment
+  ok   (toml-raw-comment) exact-literal-name-7-before-a-comment
+  ok   (toml-raw-comment) exact-literal-name-8-before-a-comment
+  ok   (toml-raw-comment) exact-literal-name-9-before-a-comment
+  ok   (toml-raw-comment) accepted-identity-1-never-reinterpreted
+  ok   (toml-raw-comment) accepted-identity-2-never-reinterpreted
+  ok   (toml-raw-comment) existing-refusal-1-retained
+  ok   (toml-raw-comment) existing-refusal-2-retained
+  ok   (toml-raw-comment) existing-refusal-3-retained
+  ok   (toml-raw-comment) existing-refusal-4-retained
+  ok   (toml-hotstring-header) header-looking-value-continuation-1-preserved
+  ok   (toml-hotstring-header) header-looking-value-continuation-2-preserved
+  ok   (toml-hotstring-header) header-looking-value-continuation-3-preserved
+  ok   (toml-hotstring-header) header-looking-value-continuation-4-preserved
+  ok   (toml-hotstring-header) quoted-metadata-path-distinct-from-the-literal-rule-name
+  ok   (toml-hotstring-value-eof) unfinished-logical-value-1-refused
+  ok   (toml-hotstring-value-eof) completed-logical-value-1-admitted
+  ok   (toml-hotstring-value-eof) unfinished-logical-value-2-refused
+  ok   (toml-hotstring-value-eof) completed-logical-value-2-admitted
+  ok   (toml-hotstring-value-eof) unfinished-logical-value-3-refused
+  ok   (toml-hotstring-value-eof) completed-logical-value-3-admitted
+  ok   (toml-hotstring-value-eof) unfinished-logical-value-4-refused
+  ok   (toml-hotstring-value-eof) completed-logical-value-4-admitted
+
+=== shared TOML leaf rows vectors ===
+  ok   (toml-leaf-rows) bare-leaves-written-as-ordinary-table-rows-in-an-absent-file
+  ok   (toml-leaf-rows) runtime-identity-and-bare-siblings-in-one-quoted-inline-table
+  ok   (toml-leaf-rows) inline-table-rewritten-whole-keeping-unknown-entries
+  ok   (toml-leaf-rows) inline-table-left-empty-by-deletions-is-removed
+  ok   (toml-leaf-rows) sections-below-a-quoted-table-header-addressed
+  ok   (toml-leaf-rows) malformed-operation-1-refused
+  ok   (toml-leaf-rows) malformed-operation-2-refused
+  ok   (toml-leaf-rows) malformed-operation-3-refused
+  ok   (toml-leaf-rows) malformed-operation-4-refused
+  ok   (toml-leaf-rows) malformed-source-refused
+  ok   (toml-leaf-rows) source-shaped-scalar-request-exact-despite-decoded-integer-aliasing
+  ok   (toml-leaf-rows) unrelated-numeric-tokens-kept-inside-a-source-shaped-carried-model
+
+=== TOML no-op persistence parity ===
+  ok   toml-noop-parity same_boolean
+  ok   toml-noop-parity same_integer
+  ok   toml-noop-parity same_string
+  ok   toml-noop-parity same_array
+  ok   toml-noop-parity delete_missing_key
+  ok   toml-noop-parity delete_missing_section
+  ok   toml-noop-parity changed_integer
+  ok   toml-noop-parity case_sensitive_string
+  ok   toml-noop-parity integer_to_boolean
+  ok   toml-writer-case-twins a refused twin reports its setting once
+  ok   toml-noop-parity revalidates an unchanged source before acknowledgement
+  ok   toml-noop-parity refuses an unchanged source after the session fence
+
+=== shared TOML dotted assignment identities ===
+  ok   root bare dotted assignment (toml-dotted-keys)
+  ok   siblings share one semantic owner (toml-dotted-keys)
+  ok   root literal and nested dots coexist (toml-dotted-keys)
+  ok   section relative dotted assignment (toml-dotted-keys)
+  ok   array of table owner generations (toml-dotted-keys)
+  ok   multiline dotted array (toml-dotted-keys)
+  ok   multiline dotted string (toml-dotted-keys)
+  ok   quoted Unicode assignment (toml-dotted-keys)
+  ok   root quoted escaped path (toml-dotted-keys)
+  ok   inline dotted values inside array (toml-dotted-keys)
+  ok   dotted namespace child header (toml-dotted-keys)
+  ok   implicit header parent admits new dotted child (toml-dotted-keys)
+  ok   semantic duplicate assignment refuses (toml-dotted-keys)
+  ok   scalar assignment parent refuses (toml-dotted-keys)
+  ok   array assignment parent refuses (toml-dotted-keys)
+  ok   inline empty assignment parent refuses (toml-dotted-keys)
+  ok   dotted namespace replacement refuses (toml-dotted-keys)
+  ok   dotted namespace header redefinition refuses (toml-dotted-keys)
+  ok   explicit table namespace cannot be extended by dotted key (toml-dotted-keys)
+  ok   explicit nested header cannot be redefined through dotted key (toml-dotted-keys)
+  ok   duplicate dotted keys across multiline values refuses (toml-dotted-keys)
+  ok   malformed dotted key refuses (toml-dotted-keys)
+  ok   malformed quoted key suffix refuses (toml-dotted-keys)
+  ok   inline bare nested key (toml-dotted-keys)
+  ok   inline sibling dotted members preserve types (toml-dotted-keys)
+  ok   inline quoted dot stays literal (toml-dotted-keys)
+  ok   inline literal dot stays literal (toml-dotted-keys)
+  ok   inline mixed quoted path (toml-dotted-keys)
+  ok   inline quoted Unicode path (toml-dotted-keys)
+  ok   inline empty quoted segment (toml-dotted-keys)
+  ok   inline escaped dot segment (toml-dotted-keys)
+  ok   inline spaced dotted path (toml-dotted-keys)
+  ok   inline closed child value (toml-dotted-keys)
+  ok   inline duplicate dotted alias (toml-dotted-keys)
+  ok   inline scalar parent refuses (toml-dotted-keys)
+  ok   inline array parent refuses (toml-dotted-keys)
+  ok   inline closed empty inline parent refuses (toml-dotted-keys)
+  ok   inline dotted parent replacement refuses (toml-dotted-keys)
+  ok   inline empty bare path segment refuses (toml-dotted-keys)
+  ok   inline trailing dot refuses (toml-dotted-keys)
+  ok   script projection keeps exact paths and ignores every other table (toml-dotted-keys)
+  ok   script tables and arrays stay non-scalar (toml-dotted-keys)
+
+=== shared root dotted scalar publication ===
+  ok   refuses an encodable but wrong owned scalar before publication
+
+=== shared finite header scalar publication ===
+  ok   refuses a valid wrong numeric literal, keeps source and permits an explicit repaired retry
+  ok   refuses an optional numeric encoder exception before candidate admission
+
+=== shared authentic root inline scalar publication ===
+  ok   strict canonical span evidence refuses malformed and non-inline values
+  ok   rejects an authenticated but wrong string literal before candidate ACK
+  ok   refuses a wrong numeric token before publication and permits explicit repaired retry
+
+=== shared section-relative dotted scalar publication ===
+  ok   refuses an inexact section literal and permits an explicit repaired retry
+
+=== shared TOML foreign physical source ownership ===
+  ok   toml-foreign-source retired_metrics_records
+  ok   toml-foreign-source foreign_sibling_comments
+  ok   toml-foreign-source quoted_literal_owned_and_foreign_keys
+  ok   toml-foreign-source multiline_foreign_array
+  ok   toml-foreign-source absent_deletions_keep_foreign_source
+  ok   toml-foreign-source standalone_comment_with_all_scalars_owned
+  ok   toml-foreign-source header_comment_with_all_scalars_owned
+  ok   toml-foreign-source all_owned_scalar_canonical_boundary
+TOTAL 376 passed 0 failed

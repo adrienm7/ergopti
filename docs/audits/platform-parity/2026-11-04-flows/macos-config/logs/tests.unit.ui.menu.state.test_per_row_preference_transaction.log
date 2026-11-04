@@ -1,0 +1,27 @@
+
+=== menu_shortcuts: per-row toggles are preference transactions ===
+  ok   exposes row compensation debt until the real retry settles it
+  ok   rolls runtime back after save false
+  ok   rolls runtime back after save nil
+  ok   rolls runtime back after save throw
+  ok   rolls an ambiguous runtime false back before saving
+  ok   rolls an ambiguous runtime nil back before saving
+  ok   rolls an ambiguous runtime throw back before saving
+  ok   publishes only after runtime and persistence both commit
+
+=== menu_gestures: per-slot values are preference transactions ===
+  ok   rolls sensitivity back after save false
+  ok   rolls sensitivity back after save nil
+  ok   rolls sensitivity back after save throw
+  ok   rolls sensitivity back after runtime false
+  ok   rolls sensitivity back after runtime nil
+  ok   rolls sensitivity back after runtime throw
+  ok   publishes sensitivity only after both commitments
+  ok   rolls mode back after save false
+  ok   rolls mode back after save nil
+  ok   rolls mode back after save throw
+  ok   rolls mode back after runtime false
+  ok   rolls mode back after runtime nil
+  ok   rolls mode back after runtime throw
+  ok   publishes mode only after both commitments
+TOTAL 22 passed 0 failed

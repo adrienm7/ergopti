@@ -1,0 +1,65 @@
+
+=== storage ordinary native cleanup journal ===
+  ok   ordinary-native-debt: retains refuse cleanup and retries only its terminal
+  ok   ordinary-native-debt: retains raise cleanup and retries only its terminal
+  ok   ordinary-native-debt: settles an unrelated request without acknowledging or replaying it
+  ok   ordinary-native-debt: preserves a foreign successor and retires only the old settled intent
+  ok   ordinary-native-debt: retains cleanup after missing effect receipt and requires actual repair
+  ok   ordinary-native-debt: retains cleanup after string effect receipt and requires actual repair
+  ok   ordinary-native-debt: refuses candidate acknowledgement when the native effect flag is false
+  ok   ordinary-native-debt: starts a fresh explicit retry only after proven no-effect settlement
+  ok   ordinary-native-debt: does not infer publication from unacknowledged partial native effects
+  ok   ordinary-native-debt: keeps native terminal identity across actual method successors
+  ok   ordinary-native-debt: refuses source-read and native-cleanup owned reentry without effects
+  ok   ordinary-native-debt: blocks released ordinary effects until prior held cleanup settles
+
+=== storage final ordinary publication admission ===
+  ok   ordinary-native-debt: refuses a codec replacement during Writer final source read
+
+=== storage released ordinary source publication ===
+  ok   released-source: preserves full foreign precision and kinds across ordinary mutations and restart
+  ok   released-source: deletes a while retaining complete adjacent bytes
+  ok   released-source: deletes b while retaining complete adjacent bytes
+  ok   released-source: deletes c while retaining complete adjacent bytes
+  ok   released-source: keeps decoded case and escaped literal key identities
+  ok   released-source: samples a fresh external source rather than stale loaded cache
+  ok   released-source: clear owns all actual root members and keeps outside trivia
+  ok   released-source: actual final source change refuses publication and safely admits a later explicit request
+  ok   released-source: refuses codec changes during final read and permits exact capability repair
+  ok   released-source: retains an exclusive temporary inode claimed by another writer
+  ok   released-source: rejects decoded duplicate-key sources before ordinary effects
+  ok   released-source: native rename reentry cannot acquire or mutate another alias
+
+=== storage released ordinary native receipt recovery ===
+  ok   released-source: unknown partial rename acknowledgement cannot be replayed or inferred
+  ok   released-source: acknowledged native rename retries only failed readback
+
+=== storage lazy recovery permission under native ownership ===
+  ok   held-read: claim-only valid source refuses every lazy reader without effects
+  ok   held-read: claim-only malformed source refuses every lazy reader without effects
+  ok   held-read: claim-only absent source refuses every lazy reader without effects
+  ok   held-read: refused claim initialization permits later source repair and released ordinary initialization
+  ok   held-read: active ordinary cleanup preserves a malformed successor during all lazy reads
+  ok   held-read: ordinary boot initialization does not grant reentrant readers its private permission
+  ok   held-read: cached reads remain read-only while ownership is active
+
+=== storage ordinary initialization lifetime ===
+  ok   held-load: valid native read callbacks cannot acquire overlapping ownership
+  ok   held-load: malformed native read callbacks cannot acquire overlapping ownership
+  ok   held-load: throwing recovery logger releases initialization lifetime without hiding the exception
+
+=== first owned native storage publication ===
+  ok   owned-storage-parent: the created parent is private to the user (0700)
+  ok   owned-storage-parent: first native effect creates the real parent and restores exact absence
+  ok   owned-storage-parent: strict native preparation false leaves the receipt unspent
+  ok   owned-storage-parent: strict native preparation nil leaves the receipt unspent
+  ok   owned-storage-parent: strict native preparation truthy string leaves the receipt unspent
+  ok   owned-storage-parent: strict native preparation wrong object leaves the receipt unspent
+  ok   owned-storage-parent: strict native preparation exception leaves the receipt unspent
+  ok   owned-storage-parent: a claimed preparation success never fabricates a native file effect
+  ok   owned-storage-parent: a source successor during real preparation is never adopted before staging
+  ok   owned-storage-parent: native producer withdrawal during preparation refuses before backup
+  ok   owned-storage-parent: native file callback replacement during preparation refuses before staging
+  ok   owned-storage-parent: source reread withdrawal of write_if_unchanged refuses before staging
+  ok   owned-storage-parent: source reread withdrawal of delete refuses before staging
+TOTAL 50 passed 0 failed

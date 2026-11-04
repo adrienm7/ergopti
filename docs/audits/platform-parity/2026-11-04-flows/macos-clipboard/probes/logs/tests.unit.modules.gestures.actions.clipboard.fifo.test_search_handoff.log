@@ -1,0 +1,14 @@
+MODULE tests.unit.modules.gestures.actions.clipboard.fifo.test_search_handoff
+
+=== Search copy native FIFO handoff ===
+  ok   keeps an empty FIFO search healthy
+  ok   does not capture before a real paced predecessor hands off the copy
+  ok   preserves the full settle interval after a short queue
+  ok   cleanup cancels only the queued Search and retains the predecessor
+  ok   revokes a late capture after cleanup and leaves its successor intact
+  ok   keeps a later foreign generation during recovery: USER COPY
+  ok   keeps a later foreign generation during recovery: SELECTED WORDS
+  ok   keeps known-result recovery debt while changeCount is unavailable
+  ok   retries restoration without dispatching another copy
+  ok   does not copy when its native capture timer cannot be acquired
+RESULT 10 passed 0 failed

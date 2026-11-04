@@ -1,0 +1,12 @@
+MODULE tests.unit.modules.llm.features.test_selection_translation_gate_lifecycle
+
+=== selection translation retains its admitted engine revision ===
+  ok   retires pending copy across off (translation-gate-copy)
+  ok   retires pending copy across off-on (translation-gate-copy)
+  ok   retires pending copy across reset (translation-gate-copy)
+  ok   hands its own surface revision through acceptance (translation-gate-owned)
+  ok   admits fresh selection after off-on retirement (translation-gate-fresh)
+  ok   preserves a newer surface after pending copy (translation-gate-superseded)
+  ok   retires accepted clipboard work across off-on (translation-gate-replacement)
+  ok   rejects late answers after off-on (translation-gate-answer)
+RESULT 8 passed 0 failed

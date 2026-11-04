@@ -1,0 +1,31 @@
+
+=== native current-directory receipts ===
+  ok   linux-native-cwd: ignores stale PWD and checks cwd receipt 1
+  ok   linux-native-cwd: ignores stale PWD and checks cwd receipt 2
+  ok   linux-native-cwd: ignores stale PWD and checks cwd receipt 3
+  ok   linux-native-cwd: ignores stale PWD and checks cwd receipt 4
+  ok   linux-native-cwd: ignores stale PWD and checks cwd receipt 5
+
+=== native path separator policy ===
+  ok   linux-native-path-literal: source metadata separator case 1
+  ok   linux-native-path-literal: source metadata separator case 2
+  ok   linux-native-path-literal: source metadata separator case 3
+  ok   linux-native-path-literal: source metadata separator case 4
+  ok   linux-native-path-literal: source metadata separator case 5
+
+=== infra.paths: shared_root resolves both shipped layouts ===
+  ok   finds the tree beside the driver — the checkout and the tarball
+  ok   finds the tree inside the driver — the .deb, .rpm and PKGBUILD layout
+  ok   prefers the sibling when a tree sits in both places
+  ok   applies the same policy to an updater-staged driver root
+
+=== infra.paths: an unresolvable tree is named, not guessed ===
+  ok   returns nil and reports both candidates when neither carries the tree
+
+=== infra.paths: the resolved root is memoised ===
+  ok   resolves once and keeps the answer
+
+=== paths: the driver root is absolute ===
+  ok   even when the modules load through a relative package.path
+  ok   anchors to the working directory this process opens files in
+TOTAL 18 passed 0 failed

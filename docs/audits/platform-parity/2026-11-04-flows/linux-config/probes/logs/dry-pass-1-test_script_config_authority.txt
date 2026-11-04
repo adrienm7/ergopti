@@ -1,0 +1,7 @@
+
+=== config.toml [script] wins at start (linux) ===
+  ok   adopts every configured row over the saved value (script-config-wins-at-start)
+  ok   leaves the saved values alone without a [script] row: no migration (script-config-no-migration)
+  ok   refuses an undeclared value and a malformed file (script-config-refusals)
+  ok   rewrites only a row the file holds (script-config-change-rewrite)
+TOTAL 4 passed 0 failed

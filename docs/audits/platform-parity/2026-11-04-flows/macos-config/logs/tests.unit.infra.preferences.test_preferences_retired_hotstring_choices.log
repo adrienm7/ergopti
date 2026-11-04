@@ -1,0 +1,9 @@
+
+=== retired hotstring choices (hotstring-choice-retired-2026-10-23) ===
+  ok   accepts one catalogue owner and refuses a second or a non-function
+  ok   judges nothing before the catalogue is published
+  ok   reports and drops a category and a section the build no longer ships
+  ok   never judges a personal file or an extension pack
+  ok   keeps a retired choice in the file across a save
+  ok   keeps every retired choice when the state holds no category at all
+TOTAL 6 passed 0 failed

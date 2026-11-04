@@ -1,0 +1,3 @@
+REPRO: copy handoff then independent new clipboard write; Apps reads newer text as selection, opens it, restores ORIGINAL over newer clipboard; changeCount reads=0
+CONTROL: no independent writer; one copy, one restore, one URL and original all-type clipboard preserved
+REPRO RETRY: selection read completed and first restore refused; independent new clipboard write is overwritten by retained restore retry without generation check

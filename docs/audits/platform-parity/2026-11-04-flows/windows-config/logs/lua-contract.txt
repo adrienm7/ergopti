@@ -1,0 +1,64 @@
+FAIL backs up exact legacy data before publishing the represented chord handoff: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: native configuration initializer is unavailable
+FAIL migrates after a byte-exact backup, then leaves a current file alone: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: native configuration initializer is unavailable
+FAIL never writes a newer file and refuses every later write this session: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= newer
+FAIL refuses a stamp below the oldest version in words and leaves it byte for byte: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= unsupported
+FAIL treats a file with no stamp as current: no step, no backup, no refusal: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: native configuration initializer is unavailable
+FAIL still migrates a file stamped at the oldest version: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: native configuration initializer is unavailable
+FAIL has nothing to do when the file is absent: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= absent
+FAIL stamps the current version into a file a writer creates later: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= absent
+FAIL rejects copied or callback native ports before invoking them: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses copied adapter before whole-write reader invocation: create_only=false: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses withdrawn actual reader before whole-write reader invocation: create_only=false: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses copied adapter before whole-write reader invocation: create_only=true: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses withdrawn actual reader before whole-write reader invocation: create_only=true: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses replacement native removal identity remove_if_unchanged_admitted after boot: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses replacement native removal identity remove_exact after boot: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses replacement native removal identity delete after boot: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses raw native issuer withdrawal before publication without invoking its accessor: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses a withdrawn actual admitted native export even with accessor fallback: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses newly unsupported source before preparation, publication, read and removal: 4: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses newly unsupported source before preparation, publication, read and removal: true: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses newly unsupported source before preparation, publication, read and removal: "3": .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses newly unsupported source before preparation, publication, read and removal: 3.5: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses newly unsupported source before preparation, publication, read and removal: []: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL authenticates canonical current metadata: _meta = {schema_version = 3}: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL authenticates canonical current metadata: _meta.schema_version = 3: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL authenticates canonical current metadata: ["_meta"]
+"schema_version" = 3: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL admits actual absent/current creation but does not grant READY through public row/default setters: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= absent
+FAIL starts PREPARING before the real logger can reenter ordinary publication: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL keeps the issued registry copy private before callbacks mutate the public object: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL does not accept raw factory withdrawal through an __index fallback: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses ambiguous dot-segment spellings without rewriting the native route: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL refuses future whole-write/create-only exists acknowledgement before adapter effects: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL reacquires initial legacy source before backup when its first actual native read triggers drift: ...rgopti_plus/_shared/lua/test/config_migrate_contract.lua:1149: attempt to call a nil value (field 'route_source_through_stdio')
+FAIL retires an acquired publication epoch if actual final native read reenters boot: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= current
+FAIL reads initial invalid bytes without granting a write or scope effect: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= invalid
+FAIL reads initial invalid bytes without granting a write or scope effect: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= invalid
+FAIL reads initial newer bytes without granting a write or scope effect: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: failed ~= newer
+FAIL refuses a changed image or absence without lifting the initial write latch: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: nil ~= # retained read-only source
+[_meta]
+schema_version = 4
+[llm]
+enabled = false
+[future]
+value = "preserved"
+
+FAIL refuses a withdrawn raw native issuer without invoking its replacement: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: nil ~= # retained read-only source
+[_meta]
+schema_version = true
+[llm]
+enabled = false
+[future]
+value = "preserved"
+
+FAIL refuses a raw native owner replacement rather than lending its readable image: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: nil ~= # retained read-only source
+[_meta]
+schema_version = 4
+[llm]
+enabled = false
+[future]
+value = "preserved"
+
+FAIL retires a captured read closure when a new boot journal replaces its epoch: .../parity-flows/windows-config/probes/run-lua-contract.lua:21: values differ: boolean ~= function
+Shared Lua migration comparator driver=ahk passed=149 failed=41; NOT native Windows replay

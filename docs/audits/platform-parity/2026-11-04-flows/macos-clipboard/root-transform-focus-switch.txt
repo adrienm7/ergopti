@@ -1,0 +1,2 @@
+CONTROL: original APP_A selection read; native global Cmd+V delivered to APP_A with [selected words]; original clipboard restored
+REPRO: original APP_A selection read; native global Cmd+V delivered to APP_B with [selected words]; original clipboard restored

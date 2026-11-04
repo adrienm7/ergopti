@@ -1,0 +1,9 @@
+
+=== clipboard paste snapshot ===
+  ok   aborts before mutation when snapshot read fails (lnx-062)
+  ok   preserves a genuinely empty clipboard (lnx-062)
+  ok   keeps a copy another application made during the paste
+  ok   restores the clipboard and balances the chord when any emit fails (lnx-004)
+  ok   treats an emitter exception like a failed chord and still restores
+  ok   restores after a timing exception once replacement text was staged
+AUDIT_RESULT	6	0

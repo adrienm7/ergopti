@@ -1,0 +1,6 @@
+
+=== factory-reset journal survives process death ===
+  ok   restores a prepared move before boot reads the configuration
+  ok   finalizes an accepted reset instead of undoing it
+  ok   refuses a replaced recovery shadow without overwriting either path
+TOTAL 3 passed 0 failed

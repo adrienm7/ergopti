@@ -1,0 +1,21 @@
+MODULE tests.unit.modules.llm.features.test_tone_rewrite_focus_lifecycle
+
+=== tone rewrite retains its original native destination ===
+  ok   keeps a healthy tone rewrite working (tone-focus-positive)
+  ok   refuses unknown focus before selection copy (tone-focus-unknown)
+  ok   refuses AI off before selection copy (tone-focus-disabled)
+  ok   does not rebind an original copy to a new window (tone-focus-copy)
+  ok   refuses focus lost during replacement copy (tone-focus-answer-copy)
+  ok   revokes a queued paste when focus changes (tone-focus-queued)
+  ok   revokes a queued paste across tone reset (tone-focus-reset-queued)
+  ok   ignores an answer after tone reset (tone-focus-reset-answer)
+  ok   does not revive a queued paste after AI off and on (tone-focus-ai-cycle)
+  ok   revokes a queued paste when AI preview is disabled (tone-focus-preview-off)
+  ok   keeps a healthy delayed answer valid across the native TTL (tone-focus-late-positive)
+  ok   keeps tone copy behind an occupied native FIFO (tone-focus-busy-positive)
+  ok   drops an older tone when an automatic prediction supersedes its request (tone-focus-automatic)
+  ok   rechecks destination after native AI exclusion reads (tone-focus-request-callback)
+  ok   preserves the existing unguarded rewrite request facade (tone-focus-legacy-request)
+  ok   refuses a throwing final selection guard before HTTP (tone-focus-guard-error)
+  ok   does not revive an old response after text pause and engine reset (tone-focus-pause-resume)
+RESULT 17 passed 0 failed

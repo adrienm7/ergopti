@@ -1,0 +1,30 @@
+
+=== prepared clipboard exact lifetime ===
+  ok   constructs and closes an unused stage without desktop IO or admission
+  ok   prepares before paste and restores the exact saved bytes length 8
+  ok   prepares before paste and restores the exact saved bytes length 0
+  ok   defers close until the admission preparation frame unwinds
+  ok   defers close until the backend preparation frame unwinds
+  ok   defers close until the read preparation frame unwinds
+  ok   defers close until the build preparation frame unwinds
+  ok   defers close until the set preparation frame unwinds
+  ok   defers close until the settle preparation frame unwinds
+  ok   restores after a setter commits then refuses
+  ok   keeps restore debt after an acknowledgement refuses
+  ok   restores after the settle wait refuses
+  ok   restores after a setter commits then throws
+  ok   keeps restore debt after an acknowledgement throws
+  ok   restores after the settle wait throws
+  ok   keeps a copy another application made during the paste
+  ok   a late native setter cannot overwrite restoration after a close request
+  ok   rechecks revocation after preparation admission 2
+  ok   rechecks revocation after preparation admission 3
+  ok   rechecks revocation after preparation admission 4
+  ok   retains a restoration frame until its physical setter returns
+  ok   does not restore or acknowledge close during the emit paste frame
+  ok   does not restore or acknowledge close during the paste_wait paste frame
+  ok   refuses a nested preparation without a second native snapshot
+  ok   rechecks revocation after the admission callback following Ctrl DOWN
+  ok   refuses unavailable before replacing any clipboard bytes
+  ok   refuses read_refused before replacing any clipboard bytes
+AUDIT_RESULT	27	0

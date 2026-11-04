@@ -1,0 +1,124 @@
+Selecting exact test module: "tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership"
+Focused discovery: 1 of 2147 module(s) selected before require
+
+>>> Loading tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership
+
+=== HuggingFace prompt/webview/task exact requirement ownership ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"owns the missing-source notification across reentrant PAUSE","status":"pass","elapsed_ms":3.592205,"timing_error":""}
+  ok   owns the missing-source notification across reentrant PAUSE
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"keeps one provenance child through prompt, webview, and task terminal","status":"pass","elapsed_ms":2.460162,"timing_error":""}
+  ok   keeps one provenance child through prompt, webview, and task terminal
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"joins the prompt timer on PAUSE after false stop","status":"pass","elapsed_ms":2.544338,"timing_error":""}
+  ok   joins the prompt timer on PAUSE after false stop
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"joins the prompt timer on PAUSE after nil stop","status":"pass","elapsed_ms":2.444348,"timing_error":""}
+  ok   joins the prompt timer on PAUSE after nil stop
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"joins the prompt timer on PAUSE after throw stop","status":"pass","elapsed_ms":3.489391,"timing_error":""}
+  ok   joins the prompt timer on PAUSE after throw stop
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"withholds the prompt while one-shot self-stop returns false","status":"pass","elapsed_ms":2.479811,"timing_error":""}
+  ok   withholds the prompt while one-shot self-stop returns false
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"withholds the prompt while one-shot self-stop returns nil","status":"pass","elapsed_ms":2.622156,"timing_error":""}
+  ok   withholds the prompt while one-shot self-stop returns nil
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"withholds the prompt while one-shot self-stop returns throw","status":"pass","elapsed_ms":3.116610,"timing_error":""}
+  ok   withholds the prompt while one-shot self-stop returns throw
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"retains the exact webview after false delete","status":"pass","elapsed_ms":2.572852,"timing_error":""}
+  ok   retains the exact webview after false delete
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"retains the exact webview after nil delete","status":"pass","elapsed_ms":2.386180,"timing_error":""}
+  ok   retains the exact webview after nil delete
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"retains the exact webview after throw delete","status":"pass","elapsed_ms":2.742607,"timing_error":""}
+  ok   retains the exact webview after throw delete
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"suppresses task terminal after false PAUSE termination","status":"pass","elapsed_ms":2.523688,"timing_error":""}
+  ok   suppresses task terminal after false PAUSE termination
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"suppresses task terminal after nil PAUSE termination","status":"pass","elapsed_ms":2.411279,"timing_error":""}
+  ok   suppresses task terminal after nil PAUSE termination
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"suppresses task terminal after throw PAUSE termination","status":"pass","elapsed_ms":2.919473,"timing_error":""}
+  ok   suppresses task terminal after throw PAUSE termination
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"accepts synchronous task completion over a false terminate return","status":"pass","elapsed_ms":2.385891,"timing_error":""}
+  ok   accepts synchronous task completion over a false terminate return
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"accepts webview close settlement over a false delete return","status":"pass","elapsed_ms":2.497598,"timing_error":""}
+  ok   accepts webview close settlement over a false delete return
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"buffers a synchronous completion across task_sync_false","status":"pass","elapsed_ms":2.312680,"timing_error":""}
+  ok   buffers a synchronous completion across task_sync_false
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"buffers a synchronous completion across task_sync_nil","status":"pass","elapsed_ms":2.228063,"timing_error":""}
+  ok   buffers a synchronous completion across task_sync_nil
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"buffers a synchronous completion across task_sync_throw","status":"pass","elapsed_ms":3.261899,"timing_error":""}
+  ok   buffers a synchronous completion across task_sync_throw
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"commits one synchronous successful task terminal after start","status":"pass","elapsed_ms":2.436827,"timing_error":""}
+  ok   commits one synchronous successful task terminal after start
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"commits one asynchronous failed task terminal","status":"pass","elapsed_ms":2.563388,"timing_error":""}
+  ok   commits one asynchronous failed task terminal
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"retains a mutating task after task_false start refusal","status":"pass","elapsed_ms":2.546342,"timing_error":""}
+  ok   retains a mutating task after task_false start refusal
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"retains a mutating task after task_nil start refusal","status":"pass","elapsed_ms":2.170346,"timing_error":""}
+  ok   retains a mutating task after task_nil start refusal
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"retains a mutating task after task_throw start refusal","status":"pass","elapsed_ms":2.922767,"timing_error":""}
+  ok   retains a mutating task after task_throw start refusal
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles a start-refused task when terminate stop_false proves it stopped","status":"pass","elapsed_ms":2.695396,"timing_error":""}
+  ok   settles a start-refused task when terminate stop_false proves it stopped
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles a start-refused task when terminate stop_nil proves it stopped","status":"pass","elapsed_ms":2.685702,"timing_error":""}
+  ok   settles a start-refused task when terminate stop_nil proves it stopped
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles a start-refused task when terminate stop_throw proves it stopped","status":"pass","elapsed_ms":3.291022,"timing_error":""}
+  ok   settles a start-refused task when terminate stop_throw proves it stopped
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles prompt ownership when the application boundary raises","status":"pass","elapsed_ms":2.950740,"timing_error":""}
+  ok   settles prompt ownership when the application boundary raises
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles prompt ownership when the pasteboard boundary raises","status":"pass","elapsed_ms":3.067055,"timing_error":""}
+  ok   settles prompt ownership when the pasteboard boundary raises
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles prompt ownership when the screen boundary raises","status":"pass","elapsed_ms":3.052062,"timing_error":""}
+  ok   settles prompt ownership when the screen boundary raises
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles prompt ownership when the paths boundary raises","status":"pass","elapsed_ms":3.141417,"timing_error":""}
+  ok   settles prompt ownership when the paths boundary raises
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles the exact webview after a mutate_false factory refusal","status":"pass","elapsed_ms":2.319601,"timing_error":""}
+  ok   settles the exact webview after a mutate_false factory refusal
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles the exact webview after a mutate_nil factory refusal","status":"pass","elapsed_ms":2.366241,"timing_error":""}
+  ok   settles the exact webview after a mutate_nil factory refusal
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles the exact webview after a mutate_throw factory refusal","status":"pass","elapsed_ms":3.096069,"timing_error":""}
+  ok   settles the exact webview after a mutate_throw factory refusal
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles a task construction refusal exactly once","status":"pass","elapsed_ms":2.602627,"timing_error":""}
+  ok   settles a task construction refusal exactly once
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"suppresses a task created across reentrant PAUSE before start returns","status":"pass","elapsed_ms":2.318599,"timing_error":""}
+  ok   suppresses a task created across reentrant PAUSE before start returns
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"keeps a pre-activation start candidate owned across reentrant PAUSE","status":"pass","elapsed_ms":2.269605,"timing_error":""}
+  ok   keeps a pre-activation start candidate owned across reentrant PAUSE
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"waits for queued native success after an accepted stopped task","status":"pass","elapsed_ms":2.562476,"timing_error":""}
+  ok   waits for queued native success after an accepted stopped task
+# lua_timing {"schema":1,"driver":"macos","id":40,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"waits for queued native failure after an accepted stopped task","status":"pass","elapsed_ms":2.617078,"timing_error":""}
+  ok   waits for queued native failure after an accepted stopped task
+# lua_timing {"schema":1,"driver":"macos","id":41,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"waits for queued native paused after an accepted stopped task","status":"pass","elapsed_ms":2.996009,"timing_error":""}
+  ok   waits for queued native paused after an accepted stopped task
+# lua_timing {"schema":1,"driver":"macos","id":42,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"accepts a truthy terminate that proves the task stopped","status":"pass","elapsed_ms":2.229945,"timing_error":""}
+  ok   accepts a truthy terminate that proves the task stopped
+# lua_timing {"schema":1,"driver":"macos","id":43,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"holds task-terminal notification callbacks across nested PAUSE","status":"pass","elapsed_ms":2.467062,"timing_error":""}
+  ok   holds task-terminal notification callbacks across nested PAUSE
+# lua_timing {"schema":1,"driver":"macos","id":44,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"holds the final on_done callback across nested PAUSE","status":"pass","elapsed_ms":2.450818,"timing_error":""}
+  ok   holds the final on_done callback across nested PAUSE
+# lua_timing {"schema":1,"driver":"macos","id":45,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"joins an owned webview timer after false stop","status":"pass","elapsed_ms":2.491559,"timing_error":""}
+  ok   joins an owned webview timer after false stop
+# lua_timing {"schema":1,"driver":"macos","id":46,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"joins an owned webview timer after nil stop","status":"pass","elapsed_ms":3.336681,"timing_error":""}
+  ok   joins an owned webview timer after nil stop
+# lua_timing {"schema":1,"driver":"macos","id":47,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"joins an owned webview timer after throw stop","status":"pass","elapsed_ms":3.709081,"timing_error":""}
+  ok   joins an owned webview timer after throw stop
+# lua_timing {"schema":1,"driver":"macos","id":48,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"keeps direct source navigation on-stack visible to PAUSE","status":"pass","elapsed_ms":2.527984,"timing_error":""}
+  ok   keeps direct source navigation on-stack visible to PAUSE
+# lua_timing {"schema":1,"driver":"macos","id":49,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"rejects a direct selector prompt without maintenance provenance","status":"pass","elapsed_ms":2.781636,"timing_error":""}
+  ok   rejects a direct selector prompt without maintenance provenance
+# lua_timing {"schema":1,"driver":"macos","id":50,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"rejects passed provenance that is already paused","status":"pass","elapsed_ms":2.385110,"timing_error":""}
+  ok   rejects passed provenance that is already paused
+# lua_timing {"schema":1,"driver":"macos","id":51,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"uses the existing maintenance capability for a direct selector","status":"pass","elapsed_ms":2.265278,"timing_error":""}
+  ok   uses the existing maintenance capability for a direct selector
+# lua_timing {"schema":1,"driver":"macos","id":52,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"rejects synchronous prompt-timer delivery before commit","status":"pass","elapsed_ms":2.175073,"timing_error":""}
+  ok   rejects synchronous prompt-timer delivery before commit
+# lua_timing {"schema":1,"driver":"macos","id":53,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles a prompt-timer timer_false start refusal","status":"pass","elapsed_ms":2.270256,"timing_error":""}
+  ok   settles a prompt-timer timer_false start refusal
+# lua_timing {"schema":1,"driver":"macos","id":54,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles a prompt-timer timer_nil start refusal","status":"pass","elapsed_ms":2.163305,"timing_error":""}
+  ok   settles a prompt-timer timer_nil start refusal
+# lua_timing {"schema":1,"driver":"macos","id":55,"kind":"case","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"settles a prompt-timer timer_throw start refusal","status":"pass","elapsed_ms":2.921636,"timing_error":""}
+  ok   settles a prompt-timer timer_throw start refusal
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","name":"tests.unit.ui.menu.menu_llm.activation.test_hf_prompt_pause_ownership","status":"pass","elapsed_ms":146.234509,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  54
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

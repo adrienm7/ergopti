@@ -1,0 +1,5 @@
+
+=== preferences keep a shared nested table apart from its scalar (script-control-enabled) ===
+  ok   loads the enable flag as its own setting, never as a key slot
+  ok   saves both without writing the flag into the live key-slot table
+TOTAL 2 passed 0 failed

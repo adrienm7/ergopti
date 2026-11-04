@@ -1,0 +1,21 @@
+MODULE tests.unit.modules.shortcuts.text_actions.test_text_case_vectors
+
+=== selection case actions replay the shared text-case corpus ===
+  ok   the corpus holds vectors for this driver
+  ok   case vector 'french_accents_lowercase_input'
+  ok   case vector 'french_accents_uppercase_input'
+  ok   case vector 'french_title_toggles_back_to_lowercase'
+  ok   case vector 'ligatures_and_cedilla'
+  ok   case vector 'apostrophe_elision_stays_inside_the_word'
+  ok   case vector 'typographic_apostrophe'
+  ok   case vector 'english_contraction'
+  ok   case vector 'hyphenated_compounds'
+  ok   case vector 'opening_punctuation_keeps_the_capital'
+  ok   case vector 'digit_starts_a_word'
+  ok   case vector 'whitespace_is_preserved'
+  ok   case vector 'cyrillic'
+  ok   case vector 'no_cased_character'
+  ok   case vector 'german_sharp_s_expands'
+  ok   case vector 'greek_final_sigma'
+  ok   case vector 'title_case_digraph'
+RESULT 17 passed 0 failed

@@ -1,0 +1,53 @@
+{
+	"schema_version": 1,
+	"scope": "linux-clipboard",
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-flows/linux-clipboard/report.md",
+	"findings": [
+		{
+			"id": "LCP-001",
+			"title": "Clipboard borrowers restore only text and silently discard other original formats",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "Run probes/clipboard-flows.lua through either supplied Lua runtime. Real clipboard adapter on modeled X11/Wayland clipboard initially offering plain saved + HTML <b>saved</b>; successful Unicode transform ends with plain=saved, html=nil, pasted=SELECTED. Native text-writer boundary records only text publication; no real clipboard or tool used.",
+			"root_cause": "linux/adapters/clipboard.lua backend:99 uses one text reader/writer; read_restorable_snapshot:186 captures only a string. write_backend_checked:175 and transform_selection:629 restore only that text, losing other MIME formats. The same snapshot is used by read-selection, URI probe and paste stages. Windows ClipboardAll and macOS readAllData/writeAllData provide all-format comparators.",
+			"silent_failure": "Action reports success and the visible plain text matches the original, while HTML/RTF/file representations have vanished.",
+			"regression_test": "Drive every borrowing path with multiple clipboard targets and verify complete target/byte restoration, or refuse before mutation when a complete restorable snapshot is unavailable. Preserve existing empty/NUL/failure-atomic guarantees."
+		},
+		{
+			"id": "LCP-002",
+			"title": "Text transformations overwrite an intervening external clipboard copy",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G3"],
+			"reproduction": "Run probes/clipboard-flows.lua on Lua and LuaJIT. During final transform wait publish external-copy at the recorded native clipboard boundary. Real transform returns success but final clipboard=saved on X11 and Wayland. Positive control through real paste_text retains external-copy.",
+			"root_cause": "clipboard.lua transform_selection restore at :643/:676 unconditionally writes the original snapshot without current clipboard custody. read_selection and read_selection_uri_list have the same restore shape. Existing holds_pasted_text/paste_text and new_paste_stage already check whether another owner replaced the clipboard.",
+			"silent_failure": "The newer copy is destroyed with no foreign-owner refusal/log; the transformation otherwise succeeds.",
+			"regression_test": "Publish a new clipboard generation/content at every post-snapshot boundary and assert it survives successful/refused transformations, while still restoring damage from partial own writes and retaining genuine cleanup debt."
+		},
+		{
+			"id": "LCP-003",
+			"title": "Case and wrap transformations can replace a changed selection in the same text field",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1", "G3"],
+			"reproduction": "Run probes/range-owner.lua: real shortcuts manager.transform_to_uppercase, real clipboard and real focus guard via controlled resident fixture. Application changes selected range source to other-range during pre-paste settlement without changing field identity/privacy. Output: ok=true writes=1 range=other-range text=SOURCE. probes/atspi-range-control.lua independently proves existing exact-range owner refuses a changed range with zero payload. No native editor used.",
+			"root_cause": "shortcuts/manager.lua:590 captures only field destination, then clipboard.transform_selection:629 pastes the earlier copied value at :670 without retaining/revalidating selected offsets/text. focus_guard.capture_text_owner:425 retains bus/path/role/context rather than range. Resident focus worker watches focus/window/name, not selected-range identity. Existing selection_transaction.replace_staged has the missing exact-range comparator.",
+			"silent_failure": "A paste/restore ACK is reported as transformation success even though a different selected document range received the old replacement.",
+			"regression_test": "Drive actual case/wrap entries while only same-field selected offsets/text change between capture and paste. Require original-range revalidation before payload; include stable control, unavailable range, pause/cancel/scope changes and physical cleanup. Do not infer Windows/macOS immunity without separate proof."
+		},
+		{
+			"id": "LCP-004",
+			"title": "File-selection clipboard probing can send Ctrl+C to a newly focused terminal",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1", "G3"],
+			"reproduction": "Run probes/file-copy-focus.lua. Real OpenSelection and Clipboard.read_selection_uri_list begin with recorded active app nautilus; clipboard snapshot boundary switches it to terminal. Recorded actual emitter call is ctrl+c, target=terminal, publication=nil; action returns false afterward. No real terminal, job, clipboard or native key emission occurred.",
+			"root_cause": "open_selection.copy_selected_path:215 checks app only before entering copy_file_selection:143. Its default read_uri_list:71 supplies no retained publication. clipboard.read_selection_uri_list snapshots/stages sentinel before emitting Ctrl+C at :608 and never rechecks original application/window. This breaks its own header invariant that Ctrl+C is sent only to known file managers.",
+			"silent_failure": "The eventual no-selection/false outcome does not undo the unexpected control chord or explain its stale target; in a real terminal Ctrl+C normally interrupts the foreground job.",
+			"regression_test": "Switch active native application/window during URI-probe snapshot/write and just before Ctrl+C; assert no chord reaches a successor, including terminal. Retain a suitable original window/application owner for non-text file-manager surfaces and review other read_selection_uri_list callers."
+		}
+	]
+}

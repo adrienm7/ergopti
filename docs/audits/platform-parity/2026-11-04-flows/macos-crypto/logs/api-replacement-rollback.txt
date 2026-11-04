@@ -1,0 +1,3 @@
+result=settings_readback_failed; durable=false
+prior_metadata_restored=true; same_keychain_reference_retained=true; referenced_secret_is_NEW_not_OLD=true; native_write_count=1
+Actual coordinator+TokenCrypto; all settings/SecItem effects in memory; no live Keychain/network/clipboard.

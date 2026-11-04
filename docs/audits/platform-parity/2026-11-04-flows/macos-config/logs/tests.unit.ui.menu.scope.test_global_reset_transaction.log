@@ -1,0 +1,37 @@
+
+=== HS-022 factory reset owns settings, files, deployment, and reload ===
+  ok   refuses bulk mutation behind every live manual termination owner
+  ok   refuses a reentrant action while synchronous rollback is on-stack
+  ok   compensates settings and recoverable file move refusal shapes
+  ok   requires exact Karabiner deployment before requesting reload
+  ok   compensates a negative reset deployment terminal before reload
+  ok   compensates every reload handoff refusal without a success claim
+  ok   rolls back every durable journal boundary refusal
+  ok   retains compensation debt and lets one retry commit exactly once
+  ok   keeps reset fenced through a returning reload with no post-reload tail
+  ok   rolls back an accepted reload whose exact lease later aborts
+
+=== HS-022 recoverable config moves retain exact inverse evidence ===
+  ok   records a throw-after-move and restores the original bytes on retry
+  ok   recognizes every pre-mutation move refusal as already restored
+  ok   refuses an absent snapshot after a file appears
+  ok   never overwrites a destination created inside the forward move
+  ok   never overwrites a source recreated inside the inverse move
+  ok   rejects a split postcondition changed between its two reads
+
+=== gesture scope menu composition ===
+  ok   wires exact scope modes and the shared fence, with no question for either mode
+
+=== layout scope menu composition ===
+  ok   wires exact scope modes and the shared fence, with no question for either mode
+
+=== metrics scope menu composition ===
+  ok   wires exact scope modes and the shared fence, with no question for either mode
+
+=== hotstrings scope menu composition ===
+  ok   wires the running keymap, both files and the shared fence, with no question for either mode
+  ok   skips the hotstrings category of the global restore when its owner cannot serve it
+
+=== private program admission uses the actual global writer fence ===
+  ok   registers once and closes while another writer owns a mutation
+TOTAL 22 passed 0 failed

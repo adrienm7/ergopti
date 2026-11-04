@@ -1,0 +1,40 @@
+
+=== clipboard selection transaction ===
+  ok   transforms and restores through the X11 backend
+  ok   uses wl-clipboard under Wayland
+  ok   detects no selection without pasting the sentinel
+  ok   restores before reporting a timing failure
+  ok   reads the selection without pasting and restores the clipboard
+  ok   reports no selection from the read probe and restores the clipboard
+
+=== clipboard file-selection probe (text/uri-list) ===
+  ok   reads the copied files as text/uri-list and restores the clipboard (x11)
+  ok   reads the copied files as text/uri-list and restores the clipboard (wayland)
+  ok   reports no file selection when the copy published no uri-list
+  ok   (linux-uri-list-xclip-sentinel) reads the sentinel back as no file selection
+
+=== asynchronous native selected-range transactions ===
+  ok   ai-pass2-span commits the original range only once after the physical ACK
+  ok   ai-pass2-span refuses changed offset before any physical edit
+  ok   ai-pass2-span refuses changed text before any physical edit
+  ok   ai-pass2-span refuses changed focus before any physical edit
+  ok   ai-pass2-span refuses changed privacy before any physical edit
+  ok   ai-pass2-span refuses changed authorization before any physical edit
+  ok   ai-pass2-span rejects an absent or refused physical success receipt 1
+  ok   ai-pass2-span rejects an absent or refused physical success receipt 2
+  ok   ai-pass2-span rejects an absent or refused physical success receipt 3
+  ok   ai-pass2-span retains cancel cleanup until actual native ACK
+  ok   ai-pass2-span retains stop cleanup until actual native ACK
+  ok   ai-pass2-span retains timeout cleanup until actual native ACK
+  ok   ai-pass2-span retains authorization cleanup until actual native ACK
+  ok   ai-pass2-span retains privacy cleanup until actual native ACK
+  ok   ai-pass2-span retains focus cleanup until actual native ACK
+  ok   ai-pass2-span retains inconclusive acquired ownership after start-throw
+  ok   ai-pass2-span retains inconclusive acquired ownership after missing-cancel
+  ok   ai-pass2-span retains inconclusive acquired ownership after missing-settled
+  ok   ai-pass2-span retains inconclusive acquired ownership after missing-registration
+  ok   ai-pass2-span retains inconclusive acquired ownership after register-throw
+  ok   ai-pass2-span retains inconclusive acquired ownership after register-refuse
+  ok   ai-pass2-span handles inline native settlement after subscription ACK
+  ok   ai-pass2-span fences reentry before native dispatch and cannot pump libuv
+AUDIT_RESULT	33	0

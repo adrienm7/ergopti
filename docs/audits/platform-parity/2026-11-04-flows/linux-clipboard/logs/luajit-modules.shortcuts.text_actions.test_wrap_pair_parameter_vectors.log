@@ -1,0 +1,23 @@
+
+=== wrap_selection parameter replays the shared wrap-pair corpus ===
+  ok   the parameter is declared and the real catalogue is loaded
+  ok   wrap-pair vector 'catalogue_opening_parenthesis'
+  ok   wrap-pair vector 'catalogue_closing_parenthesis'
+  ok   wrap-pair vector 'catalogue_guillemet_without_its_space'
+  ok   wrap-pair vector 'catalogue_closing_guillemet'
+  ok   wrap-pair vector 'opening_symbol_wins_over_closing_symbol'
+  ok   wrap-pair vector 'catalogue_symmetric_symbol'
+  ok   wrap-pair vector 'catalogue_pipe_is_a_symbol_not_a_separator'
+  ok   wrap-pair vector 'surrounding_spaces_are_trimmed'
+  ok   wrap-pair vector 'custom_pair'
+  ok   wrap-pair vector 'custom_pair_keeps_its_inner_spaces'
+  ok   wrap-pair vector 'custom_markdown_bold'
+  ok   wrap-pair vector 'empty'
+  ok   wrap-pair vector 'blank'
+  ok   wrap-pair vector 'unknown_symbol'
+  ok   wrap-pair vector 'custom_pair_without_right'
+  ok   wrap-pair vector 'custom_pair_without_left'
+  ok   wrap-pair vector 'custom_pair_with_blank_side'
+  ok   wrap-pair vector 'two_separators'
+  ok   wrap-pair vector 'line_break'
+AUDIT_RESULT	20	0

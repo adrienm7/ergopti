@@ -1,0 +1,14 @@
+
+=== hotstring preferences: canonical leaves ===
+  ok   answers every owned leaf with its neutral default for an empty configuration
+  ok   persists a choice sparsely, keeps neighbours and reads it after a restart
+  ok   removes a leaf set back to its neutral value
+  ok   keeps a malformed configuration neutral and refuses to write over it
+  ok   reads an old-shape leaf as neutral and keeps every other leaf (config-outdated-preferences)
+  ok   reads the leaves under an old scalar parent as neutral (config-outdated-preferences)
+  ok   refuses a write raced by an external editor and keeps its cache
+  ok   answers the typing path from its cache
+  ok   refuses paths it does not own and values of the wrong type
+  ok   marks exactly the owned leaves a configuration sets
+  ok   lets only the acquiring scope adopt and restore a candidate
+TOTAL 11 passed 0 failed

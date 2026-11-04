@@ -1,0 +1,4 @@
+CALLER	terminal	clipboard_provider=true	emitter_refused=false	result=true	ctrlc=1	commands=0	writes=2	notices=1
+CALLER	nautilus	clipboard_provider=true	emitter_refused=false	result=true	ctrlc=1	commands=1	writes=2	notices=0
+CALLER	terminal	clipboard_provider=false	emitter_refused=false	result=true	ctrlc=0	commands=0	writes=0	notices=0
+CALLER	terminal	clipboard_provider=true	emitter_refused=true	result=true	ctrlc=1	commands=0	writes=2	notices=0

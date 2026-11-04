@@ -1,0 +1,13 @@
+
+=== personal file adoption parity ===
+  ok   (personal-file-adoption) flattened names remain distinct
+  ok   (personal-file-adoption) ambiguous stored legacy choice is not copied twice
+  ok   (personal-file-adoption) physical aliases both refuse
+  ok   (personal-file-adoption) normalized pathname aliases both refuse
+  ok   (personal-file-adoption) duplicate descriptor cannot select another path
+  ok   (personal-file-adoption) unique stored legacy owner can be admitted
+  ok   (personal-file-adoption) unavailable physical metadata does not manufacture alias
+  ok   (personal-file-adoption) policy does not expand the descriptor shape
+  ok   (personal-file-backups) writer backups are never personal sources
+  ok   (native-backslash-components) follows POSIX and Windows separator identity
+TOTAL 10 passed 0 failed

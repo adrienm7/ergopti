@@ -1,0 +1,48 @@
+{
+  "audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+  "passes": [
+    {
+      "pass_id": "P1",
+      "new": [
+        "MCR-001",
+        "MCR-002"
+      ],
+      "dry": false
+    },
+    {
+      "pass_id": "P2",
+      "new": [
+        "MCR-003",
+        "MCR-004"
+      ],
+      "dry": false
+    },
+    {
+      "pass_id": "P3",
+      "new": [
+        "MCR-005"
+      ],
+      "dry": false
+    },
+    {
+      "pass_id": "P4",
+      "new": [
+        "MCR-006"
+      ],
+      "dry": false
+    },
+    {
+      "pass_id": "P5",
+      "new": [],
+      "dry": true,
+      "coverage": "Entry/save rollback, cipher/migration failure, timer cancellation fence, API stale/native boundaries"
+    },
+    {
+      "pass_id": "P6",
+      "new": [],
+      "dry": true,
+      "coverage": "Signed helper byte/account bounds, HF lifecycle/store, Encryptor cancel/build boundaries, Windows/Linux comparisons"
+    }
+  ],
+  "consecutive_dry_passes": 2
+}

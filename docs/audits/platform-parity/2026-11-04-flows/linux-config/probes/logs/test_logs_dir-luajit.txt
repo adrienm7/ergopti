@@ -1,0 +1,25 @@
+
+=== logs folder resolution (logs-dir-resolver) ===
+  ok   defaults to $XDG_STATE_HOME/ergopti_plus/logs
+  ok   falls back to ~/.local/state when XDG_STATE_HOME is empty
+  ok   follows the override and appends the application folder to a foreign one
+  ok   keeps a folder already named after the application
+  ok   ignores a relative stored override
+  ok   stores a normalized override and clears the default
+[INFO] [logs_dir_test] marker-after-repoint
+  ok   names the folder the installed sink writes until it is moved there
+  ok   prepares a logs folder only when it can be created and written
+  ok   writes crash dumps into the logs folder
+
+=== absolute Linux user directories (xdg-absolute-bases) ===
+  ok   ignores relative XDG roots: relative folder
+  ok   ignores relative XDG roots: ~/folder
+  ok   ignores relative XDG roots: .
+  ok   ignores relative XDG roots: ../folder
+  ok   uses absolute temporary placement without treating a relative HOME as account identity
+  ok   cannot replace a missing HOME with a relative TMPDIR
+  ok   preserves absolute folder bytes while dropping only trailing separators
+  ok   retains the root account directory and joins its fallback children exactly
+  ok   retains absolute XDG filesystem roots without introducing a double separator
+  ok   keeps the existing temporary fallback when no absolute base is available
+TOTAL 19 passed 0 failed

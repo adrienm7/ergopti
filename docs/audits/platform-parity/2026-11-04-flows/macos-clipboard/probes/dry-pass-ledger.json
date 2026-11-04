@@ -1,0 +1,20 @@
+[
+	{
+		"pass_id": "D1",
+		"started_at": "2026-11-04T17:22:48.866277+00:00",
+		"finished_at": "2026-11-04T17:22:56.100979+00:00",
+		"fresh_modules": 33,
+		"results_path": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/test-results.json",
+		"new_confirmed_findings": 0,
+		"source_review": "See report pass ledger: source/entry/custody review completed; this execution is validation of the reviewed controls, not proof of no bugs."
+	},
+	{
+		"pass_id": "D2",
+		"started_at": "2026-11-04T17:22:56.101054+00:00",
+		"finished_at": "2026-11-04T17:23:04.898090+00:00",
+		"fresh_modules": 14,
+		"results_path": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/second-test-results.json",
+		"new_confirmed_findings": 0,
+		"source_review": "See report pass ledger: source/entry/custody review completed; this execution is validation of the reviewed controls, not proof of no bugs."
+	}
+]

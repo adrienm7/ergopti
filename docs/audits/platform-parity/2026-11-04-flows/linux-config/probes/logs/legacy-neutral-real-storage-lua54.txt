@@ -1,0 +1,2 @@
+REAL_STORAGE native_rename_refusals=1 first_import=false later_neutral_save=true next_import=true old_choice_resurrected=true alias_finally_deleted=true
+BYTES # real storage failure audit fixture |  | [hotstrings] | preview_ai_enabled = false | repeat_key_enabled = true |

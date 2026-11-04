@@ -1,0 +1,6 @@
+CONTROL actual manager: sequential accepted dispatches return default
+REPRO actual manager: two independently named accepted dispatches overlap and leave prefer-dark, losing one toggle
+get default
+get default
+set prefer-dark
+set prefer-dark

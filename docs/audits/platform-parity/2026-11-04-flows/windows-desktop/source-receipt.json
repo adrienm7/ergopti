@@ -1,0 +1,8 @@
+{
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"basis": "source-derived only; AHK/native desktop unexecuted",
+	"finding": "WDS-001",
+	"observation": "nonshared PostClose=false increments zero then only LoggerInfo; false is a native boolean contract, does not throw",
+	"test_blind_spot": "existing generic fake PostClose returns _Log success, not false receipt diagnostics",
+	"counterpart": "shared-host branch explicitly LoggerError on PostClose=false"
+}

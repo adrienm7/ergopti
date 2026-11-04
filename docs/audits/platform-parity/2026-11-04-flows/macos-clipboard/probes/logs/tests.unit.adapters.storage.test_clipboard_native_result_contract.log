@@ -1,0 +1,9 @@
+MODULE tests.unit.adapters.storage.test_clipboard_native_result_contract
+
+=== clipboard adapter: native boolean results are authoritative ===
+  ok   write returns false when setContents returns false
+  ok   restore returns false when writeAllData returns false
+  ok   write returns false when setContents returns nil
+  ok   restore returns false when writeAllData returns nil
+  ok   restore nil accepts clearContents' documented void result
+RESULT 5 passed 0 failed

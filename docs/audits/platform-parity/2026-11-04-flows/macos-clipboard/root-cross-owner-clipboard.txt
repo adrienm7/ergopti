@@ -1,0 +1,2 @@
+CONTROL: plain-paste owner alone restores original all-type snapshot including HTML
+REPRO: pending actual plain-paste owner and Apps copy capture both admit; Apps snapshots borrowed text-only payload and eventually restores it; original HTML type lost

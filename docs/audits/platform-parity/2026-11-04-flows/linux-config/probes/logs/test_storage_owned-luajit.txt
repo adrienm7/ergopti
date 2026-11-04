@@ -1,0 +1,16 @@
+
+=== shared storage owned-alias protocol (storage-owned-protocol) ===
+  ok   copies only finite, plain, dense values and compares their native kinds
+  ok   refuses an invalid adapter declaration
+  ok   acquires a dense, unique, logical alias set once per owner
+  ok   releases only after pending() settles and keeps its exact identity
+  ok   grants authority only to the receipt's owner, gate and sequence
+  ok   detaches update cells and refuses aliases outside the owner's gate
+  ok   refuses owned work while a backend hook declines
+  ok   pins the adapter's methods and refuses a replaced one or module
+  ok   finalizes a released journal once and keeps only a weak owner tombstone
+  ok   guards a native step against reentry and reports a throw as a refusal
+
+=== the Storage adapter uses the shared owned-alias protocol (storage-owned-protocol) ===
+  ok   adapters.storage installs the shared gates
+TOTAL 11 passed 0 failed

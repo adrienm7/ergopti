@@ -1,0 +1,8 @@
+
+=== shared [limits] byte caps: linux ===
+  ok   keeps the registry values unchanged
+  ok   publishes each cap from the registry
+
+=== Linux [limits] byte caps ===
+  ok   reads the network check body cap one byte over the shared PAC cap
+TOTAL 3 passed 0 failed

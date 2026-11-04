@@ -1,0 +1,91 @@
+
+=== ui.bridge_handlers ===
+
+=== paths_editor_bridge ===
+  ok   has correct bridge_name
+  ok   pushes the shared initData contract on ready
+  ok   returns the native picker result through applyBrowseResult
+  ok   persists configDir, closes, and reloads on save
+  ok   paths reload: keeps a saved editor open after false acknowledgement and permits retry
+  ok   paths reload: keeps a saved editor open after nil acknowledgement and permits retry
+  ok   paths reload: keeps a saved editor open after truthy acknowledgement and permits retry
+  ok   paths reload: keeps a saved editor open after throw acknowledgement and permits retry
+  ok   paths reload: keeps a saved editor open after missing acknowledgement and permits retry
+  ok   paths reload: closes only after the daemon acknowledges application
+  ok   closes without persistence on cancel
+
+=== ui.bridge_handlers ===
+
+=== personal_info_editor_bridge ===
+  ok   has correct bridge_name
+  ok   pushes the exact shared-page initData contract on ready
+  ok   commits the page's values, reloads, then closes its exact page
+  ok   keeps the editor open when persistence refuses the page values
+  ok   closes the exact page without persistence on cancel
+
+=== ui.bridge_handlers ===
+
+=== model_browser_bridge ===
+  ok   has correct bridge_name
+  ok   pushes the curated Ollama catalogue and routes exact page actions
+
+=== ui.bridge_handlers ===
+
+=== token_bridge ===
+  ok   has correct bridge_name
+  ok   'ready' returns token settings
+  ok   handles 'save_settings' action
+  ok   handles 'test_prompt' action
+
+=== personal editor: canonical reload acknowledgement ===
+  ok   admits a canonical successful reload count 0
+  ok   admits a canonical successful reload count 7
+  ok   retains a saved editor after reload acknowledgement false
+  ok   retains a saved editor after reload acknowledgement nil
+  ok   retains a saved editor after reload acknowledgement number
+  ok   retains a saved editor after reload acknowledgement text
+  ok   retains a saved editor after reload acknowledgement throw
+  ok   retains a saved editor after reload acknowledgement missing
+  ok   personal-source-receipt: preserves the displayed file through positive
+  ok   personal-source-receipt: preserves the displayed file through external
+  ok   personal-source-receipt: preserves the displayed file through recovery
+  ok   personal-source-receipt: preserves the displayed file through root
+  ok   personal-source-receipt: preserves the displayed file through page
+  ok   personal-source-receipt: preserves the displayed file through publication
+  ok   personal-source-receipt: preserves the displayed file through generation
+  ok   personal-source-receipt: preserves the displayed file through ready-refused
+  ok   personal-source-receipt: preserves the displayed file through retained
+  ok   personal-source-receipt: preserves the displayed file through retained-foreign
+  ok   personal-source-receipt: preserves the displayed file through forged
+  ok   personal-source-receipt: preserves the displayed file through push-reentry
+  ok   personal-source-receipt: preserves the displayed file through final-page
+  ok   personal-source-receipt: preserves the displayed file through postwrite-external
+  ok   personal-source-receipt: preserves the displayed file through state-refresh
+PERSONAL_RELOAD outcome=committed native_count=0 native_ack=true closes=1 refreshes=1
+  ok   consumes the actual canonical catalogue receipt after a real personal save committed
+PERSONAL_RELOAD outcome=uninitialized native_count=0 native_ack=false closes=0 refreshes=0
+  ok   consumes the actual canonical catalogue receipt after a real personal save uninitialized
+PERSONAL_RELOAD outcome=false native_count=0 native_ack=false closes=0 refreshes=0
+  ok   consumes the actual canonical catalogue receipt after a real personal save false
+PERSONAL_RELOAD outcome=nil native_count=0 native_ack=false closes=0 refreshes=0
+  ok   consumes the actual canonical catalogue receipt after a real personal save nil
+PERSONAL_RELOAD outcome=number native_count=0 native_ack=false closes=0 refreshes=0
+  ok   consumes the actual canonical catalogue receipt after a real personal save number
+PERSONAL_RELOAD outcome=throw native_count=0 native_ack=false closes=0 refreshes=0
+  ok   consumes the actual canonical catalogue receipt after a real personal save throw
+
+=== wizard explicit locale acknowledgment ===
+  ok   (wizard-locale-ack) keeps the wizard open after false publication of fr
+  ok   (wizard-locale-ack) keeps the wizard open after throw publication of fr
+  ok   (wizard-locale-ack) keeps the wizard open after false publication of en
+  ok   (wizard-locale-ack) keeps the wizard open after throw publication of en
+  ok   (wizard-locale-ack) completes only after actual locale and configuration readback for fr
+  ok   (wizard-locale-ack) completes only after actual locale and configuration readback for en
+  ok   (wizard-locale-ack) rejects a false explicit owner receipt
+  ok   (wizard-locale-ack) rejects a nil explicit owner receipt
+  ok   (wizard-locale-ack) rejects a truthy explicit owner receipt
+  ok   (wizard-locale-ack) rejects a throw explicit owner receipt
+  ok   (wizard-locale-ack) refuses a missing explicit owner
+  ok   (wizard-locale-ack) retains existing runtime rollback after later config refusal for fr
+  ok   (wizard-locale-ack) retains existing runtime rollback after later config refusal for en
+TOTAL 64 passed 0 failed

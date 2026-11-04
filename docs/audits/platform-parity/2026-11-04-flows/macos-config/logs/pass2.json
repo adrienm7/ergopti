@@ -1,0 +1,18 @@
+{
+  "modules": [
+    "tests.unit.ui.hotstring_windows.test_hotstrings_config_window_transaction",
+    "tests.unit.ui.hotstring_windows.test_hotstrings_config_window_pushes_delay",
+    "tests.unit.ui.hotstring_windows.test_hotstrings_config_window_refreshes_menu",
+    "tests.unit.ui.editors.test_layer_editor_cleanup_transaction",
+    "tests.unit.infra.preferences.test_preferences_scope",
+    "tests.unit.infra.preferences.test_preferences_keeps_unowned_sections_gesture_parameters",
+    "tests.unit.infra.preferences.test_preferences_shared_nested_table",
+    "tests.unit.infra.preferences.test_preferences_sparse",
+    "tests.unit.infra.preferences.test_preferences_manifest_round_trip",
+    "tests.unit.ui.menu.state.test_per_row_preference_transaction",
+    "tests.unit.ui.menu.state.test_session_demotions"
+  ],
+  "passed": 108,
+  "failed": 0,
+  "bad_modules": []
+}

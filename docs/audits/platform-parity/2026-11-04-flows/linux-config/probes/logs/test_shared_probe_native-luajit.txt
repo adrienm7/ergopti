@@ -1,0 +1,8 @@
+
+=== shared-probe-native ===
+  ok   (shared-probe-native) classifies a sibling fifo before selecting the shipped layout
+  ok   (shared-probe-native) classifies a sibling directory before selecting the shipped layout
+  ok   (shared-probe-native) classifies a sibling file before selecting the shipped layout
+  ok   (shared-probe-native) classifies a sibling symlink before selecting the shipped layout
+  ok   (shared-probe-native) refuses an unacknowledged probe close
+TOTAL 5 passed 0 failed

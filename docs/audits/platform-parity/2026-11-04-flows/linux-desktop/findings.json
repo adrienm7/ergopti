@@ -1,0 +1,35 @@
+{
+	"schema_version": 1,
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04",
+	"scope": "linux-desktop",
+	"report_path": "docs/audits/platform-parity/2026-11-04-flows/linux-desktop/report.md",
+	"findings": [
+		{
+			"id": "LDS-001",
+			"title": "Desktop command producer hides both shell acquisition and background child failures",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Run actual Gestures.execute_action(mic_mute_toggle,tap_3) with recording os.execute returning nil/exit126 or throwing: no warning/error. Then run its exact command through a real POSIX shell with only a scratch fake pactl that writes a reached marker and exits37: the child failure is discarded, and there is no error diagnostic. Healthy exit control also executes once. No actual audio device or user session is used.",
+			"root_cause": "linux/modules/gestures/manager.lua run_background wraps os.execute(cmd .. \" 2>/dev/null &\") in an ignored pcall, so acquisition failure is lost and successful shell background dispatch has no retained child status/error channel. SystemActions fixed commands and multiple direct/handler actions share this producer.",
+			"silent_failure": "stderr is redirected to /dev/null and no completion owner exists. execute_action=true only acknowledges a nonempty action name by its documented contract; it is not reinterpreted as a terminal success receipt.",
+			"regression_test": "Exercise the actual public dispatcher and native owned child boundary with construction/launch refusal, nonzero exit, stderr, healthy exit, cancellation and late callbacks. Require observable refusal without blocking the grabbed-keyboard daemon; do not replace asynchronous dispatch with synchronous waits.",
+			"basis": "real module+recording acquisition boundary, plus real POSIX shell and scratch fake native tool",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/linux-desktop/report.md"
+		},
+		{
+			"id": "LDS-002",
+			"title": "Overlapping accepted theme toggles lose one read-modify-write update",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G3"],
+			"reproduction": "Dispatch toggle_dark_mode twice through the real public manager with independently named bindings. Real POSIX background shells use a private fake gsettings with quoted GVariant output and a read barrier: both read default and write prefer-dark. Sequential control returns default after two toggles. No actual desktop preference is touched.",
+			"root_cause": "The fixed COMMANDS.toggle_dark_mode shell reads GNOME color-scheme then derives and writes its opposite. The manager admits separate gestures/keyboard actions and launches independent background shells without an operation owner or serialization across this read-modify-write interval.",
+			"silent_failure": "Both dispatches are accepted and both child commands complete, but one requested state transition is lost. The public true acknowledgment is not interpreted as completed native success.",
+			"regression_test": "Exercise two independent public bindings with a controlled native read barrier, assert two accepted toggles compose to the initial state, and retain sequential, read-refusal, write-refusal and cancellation controls without blocking the input daemon.",
+			"basis": "Real public manager, real POSIX shells and private native-tool fixture; actual GNOME and other OS atomicity remain unqualified.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/linux-desktop/report.md"
+		}
+	]
+}

@@ -1,0 +1,31 @@
+
+=== Linux global scope: pending writer ===
+  ok   reports no pending writer before any request
+
+=== Linux global scope: registry and composition ===
+  ok   registers only the owners the daemon runs
+  ok   skips the gestures of a machine without a touchpad instead of refusing the row
+  ok   applies the manifest order and reports every category without an owner
+  ok   retries a pending rollback before the next request and refuses while it stays
+
+=== Linux global scope: hotstrings ===
+  ok   registers the hotstrings scope owner with the daemon's runtimes
+  ok   leaves hotstrings out when the daemon runs none
+
+=== Linux global scope: the Configuration row ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   composes at once and asks nothing
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   refuses while paused without asking
+
+=== Linux global scope: the Configuration clear ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   clears the real tap-hold file to neutral after its backup, without a question
+  ok   puts the cleared tap-hold file back byte for byte when a later category refuses
+
+=== Linux global scope: a real owner is reverted ===
+  ok   puts the real tap-hold files and engine back when a later category refuses
+TOTAL 12 passed 0 failed

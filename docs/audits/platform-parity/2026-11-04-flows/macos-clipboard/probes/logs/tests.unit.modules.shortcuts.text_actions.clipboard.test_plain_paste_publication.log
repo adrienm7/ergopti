@@ -1,0 +1,15 @@
+MODULE tests.unit.modules.shortcuts.text_actions.clipboard.test_plain_paste_publication
+
+=== plain paste validates ownership immediately before native Down ===
+  ok   keeps healthy native pair and all-type restoration
+  ok   refuses a queued foreign generation, identical text=false
+  ok   refuses a queued foreign generation, identical text=true
+  ok   rejects a copy after any native trigger was posted but before its HID delivery
+  ok   starts restoration grace after a long real FIFO wait
+  ok   keeps the pair outside an ambient callback collector
+  ok   fails closed on unavailable generation before Down and settles exact debt later
+  ok   cancels before Down without handing off events or restoring over pending native work
+  ok   keeps grace after an uncertain Down, never replaying it
+  ok   retains mandatory Up and exact clipboard owner beyond ordinary retries
+  ok   retains native stop debt after Up until exact ACK and subsequent grace
+RESULT 11 passed 0 failed

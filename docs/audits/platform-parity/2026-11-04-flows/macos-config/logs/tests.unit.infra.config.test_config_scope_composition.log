@@ -1,0 +1,71 @@
+
+=== configuration scope composition ===
+  ok   applies registered participants in manifest order and reports the missing ones
+  ok   reverts committed participants newest first when a later one refuses
+  ok   treats a raising participant as a refusal and rolls back
+  ok   waits for an asynchronous terminal before the next participant
+  ok   retains a refused rollback and settles it in the same order on retry
+  ok   refuses before any change while a participant retains its own debt
+  ok   refuses a participant registered outside the composite scope
+  ok   reports a registry provider that raises instead of letting it escape
+  ok   refuses an incomplete participant and an unknown mode before any change
+  ok   adapts a synchronous owner so the composition reverts the owner that committed
+  ok   ignores a duplicate settlement instead of running the next participant twice
+
+=== scope participant retained cohort ===
+  ok   reverts the actual committed source and runtime after its provider is replaced
+  ok   preserves a same-path successor and retains the original inverse until exact repair
+  ok   releases only its committed inverse after a later owner replaced the provider
+  ok   keeps the failed apply owner's runtime debt when the provider advances
+  ok   refuses reentrant application without replacing the in-flight real-file owner
+  ok   retains a raising apply's actual compensation owner through provider replacement
+  ok   refuses a successful request whose retained owner is missing
+  ok   refuses a successful request whose retained owner is malformed
+  ok   refuses a successful request whose retained owner is raising
+  ok   admits no replacement while the latest provider retains pre-apply debt
+  ok   keeps an unmodified refusal without an owner retryable
+  ok   never forgets a committed transaction on its successful no-op retry
+  ok   keeps its actual inverse on explicit release refusal while void success stays supported
+
+=== fenced configuration transaction ===
+  ok   owns clear compensation until a nil release settles
+  ok   owns recommended compensation until a nil release settles
+  ok   retains no primary mutation when nil acquisition refuses
+  ok   owns clear compensation until a false release settles
+  ok   owns recommended compensation until a false release settles
+  ok   retains no primary mutation when false acquisition refuses
+  ok   owns clear compensation until a truthy release settles
+  ok   owns recommended compensation until a truthy release settles
+  ok   retains no primary mutation when truthy acquisition refuses
+  ok   owns clear compensation until a wrong type release settles
+  ok   owns recommended compensation until a wrong type release settles
+  ok   retains no primary mutation when wrong type acquisition refuses
+  ok   owns clear compensation until a exception release settles
+  ok   owns recommended compensation until a exception release settles
+  ok   retains no primary mutation when exception acquisition refuses
+  ok   retains an inverse until its released claim can be reacquired
+  ok   keeps all claims while runtime compensation refuses
+  ok   settles an acknowledged inverse release without repeating runtime restoration
+  ok   refuses reentrant mutation while a native claim is being acquired
+  ok   refuses nil admission before acquiring any native claim
+  ok   refuses false admission before acquiring any native claim
+  ok   refuses truthy admission before acquiring any native claim
+  ok   refuses wrong type admission before acquiring any native claim
+  ok   refuses exception admission before acquiring any native claim
+  ok   guards reentrant admission before the first native claim
+  ok   refuses sparse and named native claim lists instead of dropping an owner
+  ok   retains original native port identities after its caller mutates the descriptor list
+  ok   separates public pending from the exact private primary-compensation token
+  ok   refuses a malformed private native token before any acquisition
+  ok   reclaims acknowledged tail admission gates while forward release debt remains
+  ok   reclaims tail gates after an acknowledged explicit inverse without repeating that inverse
+  ok   retains refused tail reacquisition even after the primary inverse acknowledged
+  ok   reclaims only actually acquired gates during a partial acquisition cleanup refusal
+
+=== composed scope finalization receipts ===
+  ok   retains exact two-file finalization on false inverse release
+  ok   retains exact two-file finalization on truthy string inverse release
+  ok   retains exact two-file finalization on wrong object inverse release
+  ok   retains exact two-file finalization on exception inverse release
+  ok   refuses reentrant apply and retry while the exact finalization release runs
+TOTAL 62 passed 0 failed

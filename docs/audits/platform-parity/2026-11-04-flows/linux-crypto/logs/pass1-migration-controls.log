@@ -1,0 +1,95 @@
+
+=== text_migration plan — what may be rewritten ===
+  ok   names only the two columns that hold typed text
+  ok   refuses a column that is not one of the two
+  ok   scopes every statement to one device
+  ok   reads in bounded batches from an exclusive cursor
+  ok   derives the IV id exactly as the writers do
+  ok   escapes a quote instead of ending the literal
+
+=== text_migration plan — literal byte preservation ===
+  ok   linux-migration-literal: CRLF retains complete decrypted values in owned SQL
+  ok   linux-migration-literal: NUL retains complete decrypted values in owned SQL
+  ok   linux-migration-literal: mixed retains complete decrypted values in owned SQL
+
+=== text_migration plan — the idempotence rule ===
+  ok   converts only what is not already in the target state
+  ok   leaves an empty value alone in both directions
+  ok   round-trips a row through hex without touching the bytes
+
+=== text_migration — enabling encrypts the rows already stored ===
+  ok   wraps every pre-existing row and round-trips it byte for byte
+  ok   gives each row and each column its own IV
+  ok   derives the key once for the whole migration
+  ok   never asks the store to write anything but the two text columns
+
+=== text_migration — disabling decrypts the rows in place ===
+  ok   returns every row to the exact bytes it started from
+
+=== text_migration — an interrupted pass converges ===
+  ok   finishes a half-migrated table without double-wrapping
+  ok   re-running a finished pass converts nothing and loses nothing
+  ok   resumes nothing when no pass was ever started in that direction
+  ok   reads in bounded batches rather than the whole table
+
+=== text_migration — failure never leaves data behind ===
+  ok   leaves the rows in clear when encryption cannot run
+  ok   leaves the envelopes intact when decryption cannot run
+  ok   stops rather than advancing the cursor past a batch it could not write
+  ok   resumes an accepted request cancelled before its first slice (migration-durable-intent)
+  ok   rejects an initial resume receipt returning false (migration-durable-intent)
+  ok   retires work after a batch resume receipt returning false (migration-durable-intent)
+  ok   does not announce completion after a final resume receipt returning false (migration-durable-intent)
+  ok   rejects an initial resume receipt returning nil (migration-durable-intent)
+  ok   retires work after a batch resume receipt returning nil (migration-durable-intent)
+  ok   does not announce completion after a final resume receipt returning nil (migration-durable-intent)
+  ok   cancels and resumes after a committed partial pass (migration-durable-intent)
+
+=== saved encryption capability refusal ===
+  ok   keeps saved ON and refuses persistence instead of silently storing plaintext
+  ok   refuses unavailable activation without changing saved OFF or current posture
+
+=== collector configuration scope ===
+  ok   captures detached native posture and updates future capture without historical conversion
+  ok   refuses capture and mutation while a historical conversion is active
+  ok   rejects malformed or unavailable encryption before publishing capture flags
+  ok   requires terminal cipher acknowledgment and permits exact compensation
+
+=== retired API provider source ownership ===
+  ok   partitions stored rows after actual publication, remote-first=false (retired-provider-source-contract)
+  ok   partitions stored rows after actual publication, remote-first=true (retired-provider-source-contract)
+  ok   ordinary selection retains the independently handwritten complete ignored-row model (retired-provider-source-contract)
+  ok   an unrelated local update retains the obsolete active reference and source row (retired-provider-source-contract)
+  ok   ignored identities cannot be selected or deleted by ordinary entry operations (retired-provider-source-contract)
+  ok   a refused private publication retains rows and the dangling selection for retry (retired-provider-source-contract)
+  ok   cloud missing cannot prove retirement
+  ok   cloud malformed cannot prove retirement
+  ok   cloud empty cannot prove retirement
+  ok   cloud zero projected cannot prove retirement
+  ok   local missing cannot prove retirement
+  ok   local malformed cannot prove retirement
+  ok   local empty cannot prove retirement
+  ok   local zero projected cannot prove retirement
+  ok   cloud read nil cannot publish retirement authority
+  ok   cloud read false cannot publish retirement authority
+  ok   cloud read truthy string cannot publish retirement authority
+  ok   cloud read wrong object cannot publish retirement authority
+  ok   cloud read exception cannot publish retirement authority
+  ok   cloud close nil cannot publish retirement authority
+  ok   cloud close false cannot publish retirement authority
+  ok   cloud close truthy string cannot publish retirement authority
+  ok   cloud close wrong object cannot publish retirement authority
+  ok   cloud close exception cannot publish retirement authority
+  ok   local read nil cannot publish retirement authority
+  ok   local read false cannot publish retirement authority
+  ok   local read truthy string cannot publish retirement authority
+  ok   local read wrong object cannot publish retirement authority
+  ok   local read exception cannot publish retirement authority
+  ok   local close nil cannot publish retirement authority
+  ok   local close false cannot publish retirement authority
+  ok   local close truthy string cannot publish retirement authority
+  ok   local close wrong object cannot publish retirement authority
+  ok   local close exception cannot publish retirement authority
+  ok   explicit reload of both owners after a catalogue repair admits a fresh proof
+  ok   configuration snapshots cannot mutate the actual registered provider inventory
+TOTAL 74 passed 0 failed

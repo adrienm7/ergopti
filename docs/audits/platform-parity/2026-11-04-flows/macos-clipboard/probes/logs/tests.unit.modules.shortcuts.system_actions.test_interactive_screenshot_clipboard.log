@@ -1,0 +1,23 @@
+MODULE tests.unit.modules.shortcuts.system_actions.test_interactive_screenshot_clipboard
+
+=== Ctrl+H interactive screenshot: Screen Recording gate ===
+  ok   does not launch screencapture without the permission
+  ok   tells the user in a translated error notification
+  ok   opens System Settings on the Screen Recording pane
+  ok   asks macOS for its prompt once, not on every refused shortcut
+  ok   refuses the same way when the permission query itself fails
+  ok   the pixel color reader is gated the same way
+  ok   a granted runtime launches both captures (positive control)
+
+=== Ctrl+H interactive screenshot: verified clipboard result ===
+  ok   captures into an owned file, never with -c
+  ok   puts the captured image on the clipboard and announces success
+  ok   removes the temporary capture file after success
+  ok   stays silent when the user cancels with Escape
+  ok   notifies a failed capture and logs its exit code
+  ok   treats exit 0 without any image as an error, never as success
+  ok   reports an error when the clipboard does not hold the image after the write
+  ok   does not trust a file written by a capture that exited non-zero
+  ok   accepts a capture sent to the clipboard by a held Control key
+  ok   counts the clipboard change only when it happened during the capture
+RESULT 17 passed 0 failed

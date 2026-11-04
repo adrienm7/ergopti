@@ -1,0 +1,123 @@
+MODULE tests.unit.adapters.system.test_apple_shortcuts
+
+=== chosen Apple Shortcut ownership ===
+  ok   keeps duplicate Unicode/newline names separate and IDs private
+  ok   delivers no discovery before exact physical settlement
+  ok   resolves chosen ID to literal existing v1 argv after revalidation
+  ok   refuses equal-count chosen id substitution
+  ok   refuses equal-count chosen name substitution
+  ok   refuses equal-count chosen accepts_input substitution
+  ok   rejects arguments and stale keys without native allocation
+  ok   refuses native CLI replacement before and after query
+  ok   contains private nonce reply without success
+  ok   contains private duplicate reply without success
+  ok   contains private oversize reply without success
+  ok   contains private permission reply without success
+  ok   contains private stderr reply without success
+  ok   retains cancelled query debt and discards its late reply
+  ok   refuses invocation when runtime cancellation is unqualified
+  ok   uses identical chosen argv and acknowledged retirement for gesture
+  ok   uses identical chosen argv and acknowledged retirement for keyboard
+  ok   uses identical chosen argv and acknowledged retirement for other
+  ok   retains cancelled service debt after CLI closure across all consumers
+  ok   rechecks consumer admission after asynchronous ID revalidation
+  ok   refuses reentrant construction during capability observation
+  ok   retains start-refusal cleanup without admitting a successor
+  ok   captures nonce privately before a native transport mutates its request
+  ok   does not resurrect a session invalidated during native capability observation
+  ok   retains unknown constructor custody instead of opening a successor
+  ok   suppresses terminal success after consumer admission closes
+
+=== Independent terminal Apple Shortcut query currency ===
+TERMINAL_REVOCATION	identity	calls	0	choices	0
+  ok   terminal identity invalidation cannot resurrect discovery
+TERMINAL_REVOCATION	qualified	calls	0	choices	0
+  ok   terminal qualified invalidation cannot resurrect discovery
+
+=== Independent terminal Apple Shortcut invocation currency ===
+TERMINAL_INVOCATION_REVOCATION	identity	calls	0	success	nil
+  ok   terminal identity invalidation cannot complete an invocation
+TERMINAL_INVOCATION_REVOCATION	invocation	calls	0	success	nil
+  ok   terminal invocation invalidation cannot complete an invocation
+TERMINAL_INVOCATION_REVOCATION	cancellation	calls	0	success	nil
+  ok   terminal cancellation invalidation cannot complete an invocation
+TERMINAL_INVOCATION_REVOCATION	admitted	calls	0	success	nil
+  ok   terminal admitted invalidation cannot complete an invocation
+  ok   genuine current discovery and invocation retain terminal acknowledgements
+
+=== terminal Apple Shortcut refusal currency ===
+  ok   terminal refused identity invalidation suppresses discovery
+  ok   terminal refused qualified invalidation suppresses discovery
+  ok   terminal refused identity invalidation suppresses invocation
+  ok   terminal refused invocation invalidation suppresses invocation
+  ok   terminal refused cancellation invalidation suppresses invocation
+  ok   terminal refused admitted invalidation suppresses invocation
+  ok   ordinary current refusals retain exact terminal failure delivery
+  ok   native admission observes late identity invalidation
+  ok   native admission observes late invocation invalidation
+  ok   native admission observes late cancellation invalidation
+
+=== Apple Shortcut revalidation consumer currency ===
+  ok   revalidation identity invalidation with true suppresses acquisition delivery
+  ok   revalidation identity invalidation with false suppresses acquisition delivery
+  ok   revalidation invocation invalidation with true suppresses acquisition delivery
+  ok   revalidation invocation invalidation with false suppresses acquisition delivery
+  ok   revalidation cancellation invalidation with true suppresses acquisition delivery
+  ok   revalidation cancellation invalidation with false suppresses acquisition delivery
+  ok   revalidation admitted invalidation with true suppresses acquisition delivery
+  ok   revalidation admitted invalidation with false suppresses acquisition delivery
+
+=== Apple Shortcut acquisition refusal settlement ===
+  ok   current revalidation admission refusals deliver without invoking
+  ok   invalidated throw invocation construction retains unknown debt without delivery
+  ok   invalidated missing invocation construction retains unknown debt without delivery
+  ok   invalidated malformed invocation construction retains unknown debt without delivery
+  ok   current invalid invocation construction retains refusal and unknown debt
+
+=== Apple Shortcut invocation watcher and start refusals ===
+  ok   current invocation watcher false delivers refusal and retains debt
+  ok   current invocation watcher throw delivers refusal and retains debt
+  ok   current invocation watcher nonliteral delivers refusal and retains debt
+  ok   invocation watcher refusal terminate invalidation suppresses delivery
+  ok   invocation watcher refusal isSettled invalidation suppresses delivery
+  ok   invocation watcher refusal automationSettled invalidation suppresses delivery
+  ok   invocation watcher refusal synchronously settles cancellation once
+  ok   current invocation start false delivers refusal and retains debt
+  ok   current invocation start throw delivers refusal and retains debt
+  ok   current invocation start nonliteral delivers refusal and retains debt
+  ok   invocation start refusal terminate invalidation suppresses delivery
+  ok   invocation start refusal isSettled invalidation suppresses delivery
+  ok   invocation start refusal automationSettled invalidation suppresses delivery
+  ok   invocation start refusal synchronously settles cancellation once
+  ok   synchronous watcher completion with false ACK waits for start admission
+  ok   synchronous watcher completion with true ACK waits for start admission
+  ok   synchronous start completion with false ACK delivers once after acknowledgement
+  ok   synchronous start completion with throw ACK delivers once after acknowledgement
+  ok   synchronous start completion with true ACK delivers once after acknowledgement
+  ok   current post-watcher admission refusal delivers without starting
+  ok   post-watcher admission invalidation refuses start without stale delivery
+
+=== Apple Shortcut query start acknowledgement ===
+  ok   discover synchronous completion with false ACK waits for query admission
+  ok   discover synchronous completion with throw ACK waits for query admission
+  ok   discover synchronous completion with true ACK waits for query admission
+  ok   revalidate synchronous completion with false ACK waits for query admission
+  ok   revalidate synchronous completion with throw ACK waits for query admission
+  ok   revalidate synchronous completion with true ACK waits for query admission
+  ok   query false start refusal releases only after late exact settlement
+  ok   query throw start refusal releases only after late exact settlement
+  ok   query false watcher refusal releases only after late exact settlement
+  ok   query throw watcher refusal releases only after late exact settlement
+  ok   discover asynchronous accepted query preserves ordinary delivery
+  ok   revalidate asynchronous accepted query preserves ordinary delivery
+
+=== Apple Shortcut resolved start failure ownership ===
+  ok   query forged valid reply with false ACK delivers only closed failure
+  ok   query forged valid reply with throw ACK delivers only closed failure
+  ok   closed query start failure preserves a callback-created successor
+  ok   query settlement observer cannot erase an invalidation-created successor
+
+=== Independent invocation settlement successor custody ===
+  ok   invocation isSettled observer cannot erase an invalidation-created successor
+  ok   invocation automationSettled observer cannot erase an invalidation-created successor
+RESULT 95 passed 0 failed

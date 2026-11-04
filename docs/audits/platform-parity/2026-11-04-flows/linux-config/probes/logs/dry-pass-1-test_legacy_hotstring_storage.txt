@@ -1,0 +1,13 @@
+
+=== legacy hotstring storage import ===
+  ok   keeps an updated install's categories, sections and scalar settings
+  ok   never overwrites a leaf config.toml already sets
+  ok   leaves a fresh install neutral and unwritten
+  ok   keeps the legacy keys for the next start when config.toml refuses the write
+
+=== legacy hotstring storage import: word delimiters ===
+  ok   carries the delimiters over as sparse config.toml leaves the owner reads
+  ok   carries a custom delimiter's state to the shipped one that now owns its character
+  ok   imports the legacy delimiters over a config.toml list of another shape
+  ok   keeps the delimiter list config.toml already defines, with its states
+TOTAL 8 passed 0 failed

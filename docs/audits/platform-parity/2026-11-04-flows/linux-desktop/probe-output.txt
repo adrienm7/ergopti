@@ -1,0 +1,4 @@
+refuse: public result=true; command attempts=1; diagnostics=0
+throw: public result=true; command attempts=1; diagnostics=0
+healthy: public result=true; command attempts=1; diagnostics=0
+actual POSIX shell + fake pactl exit37: native command reached, asynchronous child refusal lost, public result=true, diagnostics=0

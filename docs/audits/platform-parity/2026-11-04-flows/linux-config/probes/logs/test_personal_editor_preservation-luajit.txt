@@ -1,0 +1,52 @@
+
+=== personal editor source preservation ===
+  ok   (personal-editor-preservation) retained rows preserve foreign metadata and comments
+  ok   (personal-editor-preservation) unchanged rows keep original spelling and comments
+  ok   (personal-editor-preservation) edited row keeps unknown inline fields
+  ok   (personal-editor-preservation) explicit row deletion remains authoritative
+  ok   (personal-editor-preservation) explicit section deletion preserves foreign metadata
+  ok   (personal-editor-preservation) hidden nonrow assignments survive visible row edits
+  ok   (personal-editor-preservation) section deletion cannot discard hidden assignments
+  ok   (personal-editor-preservation) reorder cannot cross hidden assignments
+  ok   (personal-editor-preservation) new row preserves hidden section assignments
+  ok   (personal-editor-preservation) new file retains requested projection
+  ok   (personal-editor-preservation) changed row retains trailing comment and literal hash
+  ok   (personal-editor-preservation) CRLF edits retain unowned physical lines
+  ok   (personal-editor-preservation) EOF without newline retains terminal comment
+  ok   (personal-editor-preservation) deleted row retains its unowned trailing comment
+  ok   (personal-editor-preservation) descendant metadata keeps latest array ownership
+  ok   (personal-editor-preservation) reorder cannot reattach descendant array metadata
+  ok   (personal-editor-preservation) deleted section cannot discard hidden descendants
+  ok   (personal-editor-preservation) deleted section retains its unowned header comment
+  ok   (personal-editor-preservation) changed output retains native token normalization
+  ok   (personal-editor-preservation) retained inline fields keep array and numeric source kinds
+  ok   (personal-editor-preservation) unprojected multilingual description survives unrelated edits
+  ok   (personal-editor-preservation) unprojected description cannot be silently replaced
+  ok   (personal-editor-preservation) metadata ancestor aliases cannot grant source ownership
+
+=== personal metadata stored types ===
+  ok   (personal-metadata-source-type) file delay wrong type
+  ok   (personal-metadata-source-type) file color wrong type
+  ok   (personal-metadata-source-type) file show_tooltip wrong type
+  ok   (personal-metadata-source-type) file priority wrong type
+  ok   (personal-metadata-source-type) section delay wrong type
+  ok   (personal-metadata-source-type) section color wrong type
+  ok   (personal-metadata-source-type) section show_tooltip wrong type
+  ok   (personal-metadata-source-type) section priority wrong type
+  ok   (personal-metadata-source-type) file delay ordinary valid edit and clear
+  ok   (personal-metadata-source-type) section delay ordinary valid edit and clear
+  ok   (personal-metadata-source-type) file color ordinary valid edit and clear
+  ok   (personal-metadata-source-type) section color ordinary valid edit and clear
+  ok   (personal-metadata-source-type) file show_tooltip ordinary valid edit and clear
+  ok   (personal-metadata-source-type) section show_tooltip ordinary valid edit and clear
+  ok   (personal-metadata-source-type) file priority ordinary valid edit and clear
+  ok   (personal-metadata-source-type) section priority ordinary valid edit and clear
+  ok   (personal-metadata-source-type) invalid legacy delay true
+  ok   (personal-metadata-source-type) invalid legacy delay "foreign"
+  ok   (personal-metadata-source-type) invalid legacy delay []
+  ok   (personal-metadata-source-type) invalid legacy delay { future = false }
+  ok   (personal-metadata-source-type) blocked metadata ancestor []
+  ok   (personal-metadata-source-type) blocked metadata ancestor "foreign"
+  ok   (personal-metadata-source-type) valid legacy section delay edit removes only its owned alias
+  ok   (personal-metadata-source-type) raw invalid leaf remains unavailable behind valid override
+TOTAL 47 passed 0 failed

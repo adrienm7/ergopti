@@ -1,0 +1,6 @@
+RICH_FORMATS	x11	plain=saved	html=nil	writes=3	pasted=SELECTED
+FOREIGN_COPY_TRANSFORM	x11	final=saved	waits=3
+FOREIGN_COPY_PASTE_CONTROL	x11	final=external-copy
+RICH_FORMATS	wayland	plain=saved	html=nil	writes=3	pasted=SELECTED
+FOREIGN_COPY_TRANSFORM	wayland	final=saved	waits=3
+FOREIGN_COPY_PASTE_CONTROL	wayland	final=external-copy

@@ -1,0 +1,30 @@
+Selecting exact test module: "tests.unit.modules.keystats.test_shared_text_cipher"
+Focused discovery: 1 of 2147 module(s) selected before require
+
+>>> Loading tests.unit.modules.keystats.test_shared_text_cipher
+
+=== shared typed-text cipher policy (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keystats.test_shared_text_cipher","name":"returns the plaintext untouched and starts nothing while disabled","status":"pass","elapsed_ms":0.009094,"timing_error":""}
+  ok   returns the plaintext untouched and starts nothing while disabled
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keystats.test_shared_text_cipher","name":"round-trips through the envelope once enabled","status":"pass","elapsed_ms":0.014581,"timing_error":""}
+  ok   round-trips through the envelope once enabled
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keystats.test_shared_text_cipher","name":"does not wrap an envelope twice and leaves empty or non-string values alone","status":"pass","elapsed_ms":0.009414,"timing_error":""}
+  ok   does not wrap an envelope twice and leaves empty or non-string values alone
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keystats.test_shared_text_cipher","name":"fails closed: no key means nil, never the plaintext, and the failure is latched","status":"pass","elapsed_ms":0.013350,"timing_error":""}
+  ok   fails closed: no key means nil, never the plaintext, and the failure is latched
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keystats.test_shared_text_cipher","name":"answers nil when the primitive refuses to encrypt or is not ready","status":"pass","elapsed_ms":0.010756,"timing_error":""}
+  ok   answers nil when the primitive refuses to encrypt or is not ready
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keystats.test_shared_text_cipher","name":"fails open on decryption: a plain value reads as itself, an unreadable envelope as empty","status":"pass","elapsed_ms":0.021933,"timing_error":""}
+  ok   fails open on decryption: a plain value reads as itself, an unreadable envelope as empty
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.keystats.test_shared_text_cipher","name":"refuses a cipher built without its ports","status":"pass","elapsed_ms":0.002824,"timing_error":""}
+  ok   refuses a cipher built without its ports
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keystats.test_shared_text_cipher","name":"tests.unit.modules.keystats.test_shared_text_cipher","status":"pass","elapsed_ms":0.521114,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  7
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

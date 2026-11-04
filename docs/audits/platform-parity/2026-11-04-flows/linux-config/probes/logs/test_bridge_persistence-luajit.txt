@@ -1,0 +1,37 @@
+
+=== bridge handler TOML persistence ===
+  ok   paths_editor_bridge makes the selected config directory authoritative
+  ok   hotstring_editor_bridge.save writes the personal file, named by its stem
+  ok   hotstring_editor_bridge.save preserves the file-level tuning the UI does not carry
+  ok   hotstring_editor_bridge.save enables exactly the sections it creates
+
+=== shared toml writer preserves file-level tuning (meta-tuning) ===
+  ok   meta-tuning: write then parse round-trips the tuning the loader consumes
+  ok   meta-tuning: callers without tuning get byte-identical output
+
+=== hotstring editor classified source admission ===
+  ok   personal source refusal retains native bytes: malformed
+  ok   personal source refusal retains native bytes: open_false
+  ok   personal source refusal retains native bytes: open_throw
+  ok   personal source refusal retains native bytes: read_nil
+  ok   personal source refusal retains native bytes: close_nil
+  ok   personal source refusal retains native bytes: close_false
+  ok   personal source refusal retains native bytes: parse_false
+  ok   personal source refusal retains native bytes: parse_nil
+  ok   personal source refusal retains native bytes: parse_truthy
+  ok   personal source refusal retains native bytes: parse_throw
+  ok   personal source refusal retains native bytes: missing_parse
+  ok   personal source refusal retains native bytes: missing_classified
+  ok   personal source refusal retains native bytes: stale
+  ok   personal source refusal retains native bytes: appeared
+  ok   personal source refusal retains native bytes: rename_false
+  ok   personal source refusal retains native bytes: rename_nil
+  ok   personal source refusal retains native bytes: rename_throw
+  ok   personal source refusal retains native bytes: write_truthy
+  ok   personal classified source preserves successful replacement: present
+  ok   personal classified source preserves successful replacement: absent
+
+=== configuration filesystem root persistence ===
+  ok   linux-config-root: selected root survives bootstrap storage: /
+  ok   linux-config-root: selected root survives bootstrap storage: ///
+TOTAL 28 passed 0 failed

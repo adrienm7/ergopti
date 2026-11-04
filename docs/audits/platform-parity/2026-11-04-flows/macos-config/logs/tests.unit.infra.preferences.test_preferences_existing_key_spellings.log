@@ -1,0 +1,7 @@
+
+=== the Hotstrings switch saves over existing key spellings (toml-batch-existing-key) ===
+  ok   saves over every config.toml shape an older build, the migration or a hand edit left
+  ok   keeps a hand-written [[hotstrings.terminators]] list untouched when it did not change
+  ok   preserves retired Metrics bindings as unknown source data through a full save
+  ok   keeps outdated entries when a table is reset, header or inline
+TOTAL 4 passed 0 failed

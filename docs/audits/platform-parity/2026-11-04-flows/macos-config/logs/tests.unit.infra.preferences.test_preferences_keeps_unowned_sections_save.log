@@ -1,0 +1,52 @@
+
+=== Preferences.save keeps what it does not own (preferences-unowned-sections) ===
+  ok   keeps [_meta], [script], [features] and every other foreign table
+  ok   updates owned leaves without discarding unknown siblings
+  ok   never replaces a file it can no longer decode with its own sections alone
+  ok   stamps a file it creates with the rows the boot migration registered
+  ok   refuses to save over a file this session must not write
+
+=== Intrinsic hotstring section-order preservation ===
+  ok   ignores obsolete false order and preserves its whole native source model
+  ok   ignores obsolete integer order and preserves its whole native source model
+  ok   ignores obsolete float order and preserves its whole native source model
+  ok   ignores obsolete string order and preserves its whole native source model
+  ok   ignores obsolete empty map order and preserves its whole native source model
+  ok   ignores obsolete mixed list order and preserves its whole native source model
+  ok   ignores obsolete record list order and preserves its whole native source model
+  ok   keeps an obsolete scalar order namespace during an empty carried save
+  ok   keeps an obsolete empty array order namespace during an empty carried save
+  ok   keeps an obsolete nonempty array order namespace during an empty carried save
+  ok   retains a valid empty array and unknown group without inferring retirement
+  ok   preserves obsolete literal identity "literal.dot" during a whole-order reset
+  ok   preserves obsolete literal identity "" during a whole-order reset
+  ok   refuses replacing obsolete false order with empty candidate
+  ok   refuses replacing obsolete false order with nonempty candidate
+  ok   acknowledges an explicit valid reorder and a later valid order clear
+  ok   retains a later external obsolete edit and refuses the stale first save
+  ok   never replaces a malformed whole document with neutral order defaults
+  ok   prepares owned deletes without deleting obsolete siblings
+  ok   refuses malformed declared candidates before any publication
+
+=== Explicit section-order namespace source-shape admission ===
+  ok   refuses a proven empty array namespace before native save can delete a valid order
+  ok   refuses a proven empty array namespace before the reset preparation shortcut
+  ok   admits a proven empty map namespace and verifies the actual whole reset model
+  ok   admits the existing plain-map and proven-map preparation contracts
+
+=== Obsolete scalar user-model list preservation ===
+  ok   preserves the complete file model for false during a default-carried unrelated save
+  ok   preserves the complete file model for true during a default-carried unrelated save
+  ok   preserves the complete file model for integer during a default-carried unrelated save
+  ok   preserves the complete file model for float during a default-carried unrelated save
+  ok   preserves the complete file model for text during a default-carried unrelated save
+  ok   preserves an admitted equivalent scalar source spelling through ordinary save and actual neutral scope
+  ok   preserves an admitted equivalent scalar source spelling through ordinary save and actual neutral scope
+  ok   preserves an admitted equivalent scalar source spelling through ordinary save and actual neutral scope
+  ok   preserves the obsolete leaf while the real neutral scope updates a valid sibling
+  ok   refuses nonneutral complete snapshots and scope replacements before publication
+  ok   admits a valid model edit only after explicit source repair and reload
+  ok   refuses a stale snapshot and preserves the newer obsolete generation on ordinary retry
+  ok   retains the valid empty-array and historical empty-header runtime contracts
+  ok   retains the valid empty-array and historical empty-header runtime contracts
+TOTAL 43 passed 0 failed

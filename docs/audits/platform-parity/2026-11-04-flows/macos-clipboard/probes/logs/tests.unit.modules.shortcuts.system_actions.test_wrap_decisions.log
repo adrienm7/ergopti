@@ -1,0 +1,10 @@
+MODULE tests.unit.modules.shortcuts.system_actions.test_wrap_decisions
+
+=== shortcuts.actions.system: wrap_event_decision ===
+  ok   wraps an AltGr-typed symbol when a selection exists (alt must not block)
+  ok   passes the symbol through when no selection is readable
+  ok   never treats Cmd/Ctrl combos as wrap input
+  ok   passes through characters that are not configured wrap symbols
+  ok   passes through empty / nil characters without crashing
+  ok   wraps a plain (no-modifier) wrap symbol with a selection
+RESULT 6 passed 0 failed

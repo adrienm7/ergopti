@@ -1,0 +1,7 @@
+
+=== hotstrings config window applies delay edits to the running engine ===
+  ok   pushes a file-level set_delay into keymap.set_delay
+  ok   pushes after a file-level clear_delay so the default takes effect
+  ok   pushes for every category on reset_all
+  ok   does NOT push for a per-section delay edit
+TOTAL 4 passed 0 failed

@@ -1,0 +1,35 @@
+{
+	"schema_version": 1,
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04",
+	"scope": "windows-desktop",
+	"report_path": "docs/audits/platform-parity/2026-11-04-flows/windows-desktop/report.md",
+	"findings": [
+		{
+			"id": "WDS-001",
+			"title": "Ordinary application quit discards failed window-close receipts",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Source-derived, native AHK unexecuted: dispatch quit_frontmost_app from an ordinary nonshared application with one or more live windows. Have native PostMessageW(WM_CLOSE) refuse every window (for example a lower-integrity caller targeting an elevated application). Shared-host control must emit LoggerError on the same false receipt; ordinary branch only logs Asked process ... close its 0 windows. No claim that its message says the app actually closed.",
+			"root_cause": "GestureSysQuitFrontmostApp in windows/modules/gestures/system_actions.ahk accumulates Sys.PostClose(Hwnd) booleans into Closed and unconditionally emits LoggerInfo, without tracking refused/nonempty candidate count. SystemControl.PostClose preserves a false Win32 return without throwing; outer try/catch cannot report this refusal.",
+			"silent_failure": "No warning/error is emitted for all-refused ordinary windows, so the errors-only diagnostic channel misses the user action failure. The zero count is INFO, not a positive completed-success assertion.",
+			"regression_test": "Invoke the actual handler with ordinary/shared process fixtures, all/partial/no refused PostClose receipts, zero eligible windows, and pause. Require explicit failure/partial-result diagnostics for refused live targets, while preserving shell/shared-host and exact target protection.",
+			"basis": "source-derived; independent countercheck; native Windows AHK scenario unexecuted",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/windows-desktop/report.md"
+		},
+		{
+			"id": "WDS-002",
+			"title": "Recycle Bin worker failure after successful launch has no completion observer",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "The exact production Clear-RecycleBin -Force -ErrorAction Stop body ran under real PowerShell 7.4.6 on Linux with a recording replacement native cmdlet: control exits0; refusing cmdlet exits1. Source-derived Windows integration: Sys.Launch starts the hidden worker successfully; the cmdlet later fails, with no handler polling or callback to report its failure. Windows5.1/AHK/Recycling APIs unexecuted.",
+			"root_cause": "GestureSysEmptyTrash discards the PID returned by SystemControl.Launch, which calls nonwaiting Run. It only logs Emptying the Recycle Bin. No completion monitor is connected to this worker; unrelated ShellRunner/touchpad trackers do not receive it.",
+			"silent_failure": "A hidden child can terminate with a native failure after launch admission; neither its stderr nor exit code reaches the action error channel. The progress log is not misrepresented as an explicit completed-success claim.",
+			"regression_test": "Exercise a genuine owned worker lifecycle: native start refusal, child exit0/nonzero, stderr, timeout/cancellation and late terminal delivery. Keep the action asynchronous and confirmation intact, and report worker refusal without claiming completed success from a launch PID.",
+			"basis": "real PowerShell worker-body controls with fake cmdlet; AHK integration source-derived",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/windows-desktop/report.md"
+		}
+	]
+}

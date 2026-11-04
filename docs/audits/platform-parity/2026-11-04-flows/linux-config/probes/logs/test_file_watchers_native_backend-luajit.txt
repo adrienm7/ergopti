@@ -1,0 +1,77 @@
+
+=== file watchers native backend ===
+  ok   native callbacks filter, debounce and close every watcher
+  ok   installed luv observes a real TOML creation through inotify
+
+=== file_watchers subsecond polling ===
+  [native posix integration unavailable; fixed-mtime receipt fixtures still run]
+  ok   file_watchers subsecond polling: detects same-second edits with scalar mtime
+  ok   file_watchers subsecond polling: detects same-second edits with scalar modification
+  ok   file_watchers subsecond polling: detects same-second edits with incomplete timespec
+  ok   file_watchers subsecond polling: detects same-second edits with complete timespec
+
+=== linux-watch-activation-receipts ===
+  ok   linux-watch-activation-receipts: retires EACCES before reporting ownership
+  ok   linux-watch-activation-receipts: retires ENOSPC before reporting ownership
+  ok   linux-watch-activation-receipts: retires ENOENT before reporting ownership
+  ok   linux-watch-activation-receipts: retires false before reporting ownership
+  ok   linux-watch-activation-receipts: retires throw before reporting ownership
+  ok   linux-watch-activation-receipts: owns native success 0
+  ok   linux-watch-activation-receipts: owns native success true
+
+=== file_watchers ===
+
+=== has_inotify ===
+  ok   returns a boolean
+  ok   is stable across calls
+
+=== lifecycle ===
+  ok   stop() before start() is safe (no-op)
+  ok   stop() is idempotent (second call no-op)
+  ok   start() then stop() then restart() works
+  ok   start() with empty opts is a no-op
+  ok   start() with nil opts is a no-op
+  ok   start() with no readable directories still finishes gracefully
+
+=== start (pump mode) ===
+  ok   pump() with no entries is a no-op (no crash)
+  ok   creates per-file entries for each .toml in the hotstrings dir
+  ok   skips directories with no .toml files
+
+=== file change detection ===
+  ok   fires on_reload after .toml mtime changes and deadline passes
+  ok   debounces — multiple rapid changes fire only once
+  ok   holds a many-file bulk burst until the bulk settle window
+  ok   detects .lua file changes in base_dir
+  ok   personal_dir with subdirectory .toml files is watched
+  ok   personal_dir empty (no .toml files) is a no-op
+
+=== on_reload errors ===
+  ok   pcall-guards the callback so a thrown error never reaches pump()
+
+=== stop cleanup ===
+  ok   clears all pump entries and the pending deadline
+  ok   stop() prevents old callback from firing after restart
+
+=== base_dir and personal_dir ===
+  ok   base_dir with no .lua files does not crash
+  ok   base_dir with .lua file does not crash on load
+  ok   personal_dir that does not exist is a no-op
+  ok   base_dir with temp files from /tmp is still safe
+
+=== file watcher fixture directories ===
+  ok   (fw-nontmp-outside-source-tree) the non-/tmp fixture is a private directory outside the driver tree
+
+=== legacy watcher native retirement ownership ===
+  ok   (legacy-watch-retirement) native/native/native
+  ok   (legacy-watch-retirement) native/native/throw
+  ok   (legacy-watch-retirement) native/throw/throw
+  ok   (legacy-watch-retirement) native/throw/native
+  ok   (legacy-watch-retirement) false/native/native
+  ok   (legacy-watch-retirement) false/native/throw
+  ok   (legacy-watch-retirement) throw/native/native
+  ok   (legacy-watch-retirement) throw/native/throw
+  ok   (legacy-watch-retirement) native/native/false
+  ok   (legacy-watch-retirement) native/native/refuse
+  ok   (legacy-watch-retirement) revoked active watcher cannot reload its successor session
+TOTAL 49 passed 0 failed

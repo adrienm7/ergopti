@@ -1,0 +1,200 @@
+[
+	{
+		"module": "tests.unit.adapters.storage.test_clipboard_all_types",
+		"exit_code": 0,
+		"summary": "RESULT 2 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.adapters.storage.test_clipboard_all_types.log"
+	},
+	{
+		"module": "tests.unit.adapters.storage.test_clipboard_native_result_contract",
+		"exit_code": 0,
+		"summary": "RESULT 5 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.adapters.storage.test_clipboard_native_result_contract.log"
+	},
+	{
+		"module": "tests.unit.adapters.storage.test_clipboard_save_type_count",
+		"exit_code": 0,
+		"summary": "RESULT 1 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.adapters.storage.test_clipboard_save_type_count.log"
+	},
+	{
+		"module": "tests.unit.adapters.synthetic_input.test_guarded_clipboard_pair",
+		"exit_code": 0,
+		"summary": "RESULT 15 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.adapters.synthetic_input.test_guarded_clipboard_pair.log"
+	},
+	{
+		"module": "tests.unit.adapters.synthetic_input.test_text_sender_clipboard_serial",
+		"exit_code": 0,
+		"summary": "RESULT 6 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.adapters.synthetic_input.test_text_sender_clipboard_serial.log"
+	},
+	{
+		"module": "tests.unit.modules.gestures.actions.clipboard.fifo.test_search_handoff",
+		"exit_code": 0,
+		"summary": "RESULT 10 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.gestures.actions.clipboard.fifo.test_search_handoff.log"
+	},
+	{
+		"module": "tests.unit.modules.gestures.actions.clipboard.test_search_clear_contract",
+		"exit_code": 0,
+		"summary": "RESULT 7 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.gestures.actions.clipboard.test_search_clear_contract.log"
+	},
+	{
+		"module": "tests.unit.modules.gestures.actions.clipboard.test_search_result_ownership",
+		"exit_code": 0,
+		"summary": "RESULT 15 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.gestures.actions.clipboard.test_search_result_ownership.log"
+	},
+	{
+		"module": "tests.unit.modules.gestures.actions.test_lookup_transaction",
+		"exit_code": 0,
+		"summary": "RESULT 30 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.gestures.actions.test_lookup_transaction.log"
+	},
+	{
+		"module": "tests.unit.modules.gestures.actions.test_search_acquisition",
+		"exit_code": 0,
+		"summary": "RESULT 16 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.gestures.actions.test_search_acquisition.log"
+	},
+	{
+		"module": "tests.unit.modules.gestures.actions.test_search_web_clipboard_restore_retry",
+		"exit_code": 0,
+		"summary": "RESULT 3 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.gestures.actions.test_search_web_clipboard_restore_retry.log"
+	},
+	{
+		"module": "tests.unit.modules.gestures.actions.test_wrap_selection_action",
+		"exit_code": 0,
+		"summary": "RESULT 2 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.gestures.actions.test_wrap_selection_action.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.system_actions.test_copy_pixel_color_clipboard_refusal",
+		"exit_code": 0,
+		"summary": "RESULT 2 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.system_actions.test_copy_pixel_color_clipboard_refusal.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.system_actions.test_interactive_screenshot_clipboard",
+		"exit_code": 0,
+		"summary": "RESULT 17 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.system_actions.test_interactive_screenshot_clipboard.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.system_actions.test_selection_cache",
+		"exit_code": 0,
+		"summary": "RESULT 12 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.system_actions.test_selection_cache.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.system_actions.test_wrap_decisions",
+		"exit_code": 0,
+		"summary": "RESULT 6 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.system_actions.test_wrap_decisions.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.clipboard.test_initial_clipboard_capture",
+		"exit_code": 0,
+		"summary": "RESULT 48 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.clipboard.test_initial_clipboard_capture.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.clipboard.test_payload_generation_ownership",
+		"exit_code": 0,
+		"summary": "RESULT 38 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.clipboard.test_payload_generation_ownership.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.clipboard.test_plain_paste_ownership",
+		"exit_code": 0,
+		"summary": "RESULT 12 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.clipboard.test_plain_paste_ownership.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.clipboard.test_plain_paste_publication",
+		"exit_code": 0,
+		"summary": "RESULT 11 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.clipboard.test_plain_paste_publication.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.fifo.test_copy_capture_handoff",
+		"exit_code": 0,
+		"summary": "RESULT 8 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.fifo.test_copy_capture_handoff.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_clipboard_and_timer_lifecycles",
+		"exit_code": 0,
+		"summary": "RESULT 3 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_clipboard_and_timer_lifecycles.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_clipboard_state_hygiene",
+		"exit_code": 0,
+		"summary": "RESULT 4 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_clipboard_state_hygiene.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_copy_or_open_clipboard_transaction",
+		"exit_code": 0,
+		"summary": "RESULT 4 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_copy_or_open_clipboard_transaction.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_open_target_vectors",
+		"exit_code": 0,
+		"summary": "RESULT 92 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_open_target_vectors.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_surround_with_parens_transaction",
+		"exit_code": 0,
+		"summary": "RESULT 16 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_surround_with_parens_transaction.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_text_case_vectors",
+		"exit_code": 0,
+		"summary": "RESULT 17 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_text_case_vectors.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_text_clipboard_native_refusals",
+		"exit_code": 0,
+		"summary": "RESULT 7 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_text_clipboard_native_refusals.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_text_pause_ownership",
+		"exit_code": 0,
+		"summary": "RESULT 48 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_text_pause_ownership.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_text_reselection_batch",
+		"exit_code": 0,
+		"summary": "RESULT 1 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_text_reselection_batch.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_wrap_selection_atomic_transaction",
+		"exit_code": 0,
+		"summary": "RESULT 15 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_wrap_selection_atomic_transaction.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_wrap_selection_broker_commit",
+		"exit_code": 0,
+		"summary": "RESULT 12 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_wrap_selection_broker_commit.log"
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.text_actions.test_wrap_symbols",
+		"exit_code": 0,
+		"summary": "RESULT 10 passed 0 failed",
+		"log": "docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/probes/logs/tests.unit.modules.shortcuts.text_actions.test_wrap_symbols.log"
+	}
+]

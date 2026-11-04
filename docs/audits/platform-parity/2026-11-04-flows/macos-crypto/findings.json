@@ -1,0 +1,141 @@
+{
+	"schema_version": 1,
+	"scope": "macos-crypto",
+	"audited_sha": "213d65af24d2aa4845ba47743c9bab6787b61964",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md",
+	"findings": [
+		{
+			"id": "MCR-001",
+			"title": "Encryptor source conversion can destroy an approved overwrite target on failure",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": [],
+			"reproduction": "Run probes/encryptor-openssl.py. Re-derive actual AppleScript OpenSSL templates; encrypt private synthetic input successfully; prepopulate destination sentinel; run wrong-password decrypt then exact source failure cleanup. OpenSSL exit1, original destination bytes replaced, destination removed. Correct-password control round-trips. AppleScript/packaged app itself not executed.",
+			"root_cause": "process_file directs OpenSSL -out at final destination and catch unconditionally rm -f that destination, without newly owned stage or previous-output restoration authority.",
+			"silent_failure": "Decryption failure alert is loud, but destruction of a formerly existing overwrite target is not disclosed; launcher tests do not cover conversion failure.",
+			"regression_test": "Actual conversion owner: pre-existing destination under wrong password/corruption/subprocess refusal remains byte-exact, successful control publishes complete stage only after ACK; cleanup owns only exact new stage.",
+			"evidence": [
+				"macos/apps/Encryptor.app/Contents/Resources/Scripts/main.applescript:305",
+				"macos/apps/Encryptor.app/Contents/Resources/Scripts/main.applescript:314",
+				"macos/apps/Encryptor.app/Contents/Resources/Scripts/main.applescript:324"
+			],
+			"probe": "probes/encryptor-openssl.py",
+			"native_execution": "Real OpenSSL/Linux shell on private disposable fixtures; no AppleScript/LaunchServices/Mac runtime",
+			"additional_property": "Data integrity and failure-safe replacement, beyond the five runtime/preview guarantees.",
+			"classification": "observed_data_loss_risk",
+			"integration_qualification": "Destination overwrite was explicitly approved. Conversion failure is visibly reported; preservation-on-failure atomicity was not found as an explicit product promise. Retained as reproducible collateral-data-loss hardening risk, not an unconsented overwrite or silent conversion failure. This is an audited AppleScript source-path risk; packaged compiled-script equivalence/LaunchServices execution remains unqualified and is already tracked separately.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md"
+		},
+		{
+			"id": "MCR-002",
+			"title": "Encryptor hidden password is embedded in shell command arguments",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"confidentiality": "Password leaves hidden-input/private-channel boundary through do shell script command text and -pass pass: argument; local process-inspection permissions bound observer access.",
+			"reproduction": "Run probes/encryptor-openssl.py. Exact source-built command contains synthetic password; sentinel observed in own Linux /bin/sh -c argv while real OpenSSL runs. Sentinel not observed in OpenSSL child argv in this run. No measured macOS process-table claim.",
+			"root_cause": "AppleScript concatenates quoted password after -pass pass: then executes whole command string; shell quoting is not argument confidentiality.",
+			"silent_failure": "Conversion succeeds and password UI is hidden, so user receives no indication credential traveled in process argument text.",
+			"regression_test": "Record actual native command argv and private input channel with sentinel: zero secret bytes in argv/logs, exact password delivery through bounded private pipe/fd; retain conversion failure controls.",
+			"evidence": [
+				"macos/apps/Encryptor.app/Contents/Resources/Scripts/main.applescript:308",
+				"macos/apps/Encryptor.app/Contents/Resources/Scripts/main.applescript:314",
+				"macos/apps/Encryptor.app/Contents/Resources/Scripts/main.applescript:318",
+				"_shared/lua/keystats/text_crypto.lua:derive_key_command"
+			],
+			"probe": "probes/encryptor-openssl.py",
+			"native_execution": "Own Linux shell argv observed; Mac visibility unmeasured",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md"
+		},
+		{
+			"id": "MCR-003",
+			"title": "Raw envelope-prefixed typed text bypasses macOS SQL payload encryption",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"confidentiality": "Enabled text-column protection is bypassed by raw user content colliding with persistence marker; event JSON remains independently encrypted.",
+			"shared_root": "typed-text-envelope-prefix-admission",
+			"reproduction": "Run probes/cipher-prefix.lua. Actual mac TextCipher + actual sqlite_writer.build_inserts: ordinary text absent from SQL and two primitive calls; raw ergopti-enc-v1:SENTINEL-PRIVATE-CONTENT literal retained in SQL with only event-JSON primitive call. Authentic-envelope-lookalike raw text retained then interpreted by decrypt. No DB or live crypto store.",
+			"root_cause": "Raw e.text reaches Cipher.encrypt which treats prefix-only TextCrypto.is_encrypted as proof of presealed provenance and returns it unchanged. Migration uses same marker classification.",
+			"silent_failure": "SQL writer receives a successful string; real-envelope idempotence tests pass without raw-content collision vectors, so enabled setting can coexist with clear text-column data.",
+			"regression_test": "At actual raw ingress encrypt and round-trip ordinary text, malformed marker and authentic-envelope-shaped literal; preserve stored-envelope migration idempotence using provenance/metadata rather than prefix-only user-content classification.",
+			"evidence": [
+				"macos/modules/keystats/sqlite_writer.lua:520",
+				"_shared/lua/keystats/text_cipher.lua:124",
+				"_shared/lua/keystats/text_crypto.lua:is_encrypted",
+				"_shared/lua/keystats/text_migration_runner.lua:plan_row"
+			],
+			"probe": "probes/cipher-prefix.lua",
+			"native_execution": "Production Lua modules executed with recording native primitive ports; Windows/Linux share root and require dedup",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md"
+		},
+		{
+			"id": "MCR-004",
+			"title": "HuggingFace login credential is embedded in native bash argv",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"confidentiality": "Synthetic HF credential observed in actual TaskLifecycle.native argument vector before start; native process visibility itself not measured on Mac.",
+			"reproduction": "Run probes/hf-secret-argv.lua. Actual HF mixin/direct flow acquires /bin/bash task with {-c,login_script}; recording native port sees synthetic hf credential inside argv[2]. Start refused, effects0; no HTTP/file/Keychain access.",
+			"root_cause": "_process_hf_token embeds escaped token in Python source inside login_script, then passes complete script as bash -c argument rather than private stdin.",
+			"silent_failure": "Auth can work normally and lifecycle tests verify cancellation/ownership rather than absence of credential bytes in native arguments.",
+			"regression_test": "Actual prompt/direct flow with recording native task args/stdin: no credential in argv/logs; bounded exact private delivery. Keep native SDK token file and optional git helper compatibility separate.",
+			"evidence": [
+				"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:1072",
+				"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:1085",
+				"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:1206",
+				"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:1213"
+			],
+			"probe": "probes/hf-secret-argv.lua",
+			"native_execution": "Actual Lua mixin executed; native acquisition recorded and start refused",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md"
+		},
+		{
+			"id": "MCR-005",
+			"title": "Failed API secret replacement restores old metadata pointing to overwritten Keychain value",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G3"],
+			"reproduction": "Run probes/api-replacement-rollback.lua. Existing local-omlx combined state references OLD in-memory keychain value. Same-id token edit invokes real coordinator+TokenCrypto; native helper port updates account to NEW. Inject final settings readback corruption: durable=false/settings_readback_failed, prior metadata/reference restored, but referenced account still NEW and OLD lost.",
+			"root_cause": "Stable entry id is also mutable Keychain account identity. SecItemUpdate overwrites secret before final metadata publication; rollback compensates settings/runtime references only and cannot restore original secret bytes.",
+			"silent_failure": "Metadata rollback/readback checks succeed while authentication silently changes after a reported refused edit. Referenced-account cleanup intentionally does not delete it and has no old secret revision to restore.",
+			"regression_test": "Existing persisted credential replacement with final publish/readback refusal, supersession, cancellation/timeout after native mutation: retained reference resolves prior secret or explicit truthful committed-new result. Prefer immutable secret revisions until metadata ACK, retire old afterward.",
+			"evidence": [
+				"macos/ui/menu/menu_llm/local_server_panel.lua:294",
+				"macos/ui/menu/menu_llm/api_panel.lua:1097",
+				"macos/ui/menu/menu_llm/api_panel.lua:1140",
+				"macos/modules/llm/init.lua:1015",
+				"macos/modules/llm/init.lua:1077",
+				"macos/modules/llm/init.lua:566",
+				"macos/launcher/Sources/ErgoptiPlus/KeychainTokenWorker.swift:SystemKeychainTokenStore.write"
+			],
+			"probe": "probes/api-replacement-rollback.lua",
+			"native_execution": "Real coordinator and TokenCrypto; in-memory signed-helper/settings ports; no live Keychain",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md"
+		},
+		{
+			"id": "MCR-006",
+			"title": "Refused migration slice timer leaves successful-start receipt and permanently running idle pass",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Run probes/migration-scheduler.lua. Actual mac migration wrapper/shared runner/cipher/SQL modules with actual TimerScheduler over safe hs.timer/data ports: native start returns false and adapter returns handle,committed=false; start_for_posture returns true, runningtrue, rewritten_rows0. Healthy committed-timer control rewrites1 and ends.",
+			"root_cause": "Shared migration arm retains only first Scheduler.after return and ignores explicit committed ACK; start/resume return true regardless, and rearm has same hole.",
+			"silent_failure": "Native scheduler can log acquisition error, but migration owner never rejects/settles pass or progress and historical rows remain in old posture indefinitely.",
+			"regression_test": "Actual wrapper over native timer false/nil/throw/rollback-debt and later rearm refusal: no successful-running pass without admitted slice; truthful failure/retry while preserving exact timer cleanup and cursor-after-apply.",
+			"evidence": [
+				"_shared/lua/keystats/text_migration_driver.lua:89",
+				"_shared/lua/keystats/text_migration_driver.lua:111",
+				"macos/modules/keystats/text_migration.lua:116",
+				"macos/adapters/timer_scheduler.lua:241",
+				"macos/ui/menu/menu_metrics.lua:499"
+			],
+			"probe": "probes/migration-scheduler.lua",
+			"native_execution": "Actual production TimerScheduler + migration/cipher/SQL modules executed; native hs.timer/data ports recording-only, no actual native timer/DB",
+			"integration_qualification": "Native timer acquisition error can be logged; the migration owner nevertheless acknowledges an in-flight pass with no committed slice. It is stranded until external recovery/pump/restart, not proven irreparable forever.",
+			"source_report": "docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md"
+		}
+	],
+	"recorded_at": "2026-11-04T17:27:27.678738+00:00"
+}

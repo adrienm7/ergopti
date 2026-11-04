@@ -1,0 +1,20 @@
+MODULE tests.unit.modules.gestures.actions.test_search_acquisition
+
+=== gesture Actions search acquisition epoch ===
+  ok   fences search when clear reenters cleanup
+  ok   fences search when timer reenters cleanup
+  ok   fences search when emit reenters cleanup
+  ok   keeps clipboard restore visible until its native boundary returns
+  ok   retains restore-boundary debt after inverse false
+  ok   retains restore-boundary debt after inverse nil
+  ok   retains restore-boundary debt after inverse throw
+  ok   retains exact clear clipboard debt when restore false
+  ok   retains exact clear clipboard debt when restore nil
+  ok   retains exact clear clipboard debt when restore throw
+  ok   retains exact emit clipboard debt when restore false
+  ok   retains exact emit clipboard debt when restore nil
+  ok   retains exact emit clipboard debt when restore throw
+  ok   arms clipboard recovery after cleanup after clear
+  ok   arms clipboard recovery after admission close after timer acquisition
+  ok   does not let a shortcut sibling consume gesture clipboard recovery debt
+RESULT 16 passed 0 failed
