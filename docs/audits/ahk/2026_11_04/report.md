@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **55 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **56 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1011,3 +1011,21 @@ The ongoing register now contains **55 distinct new findings**. The requested ta
 ## Native fixture discovery checkpoint: 41918560789
 
 At `c177720`, the 85-case replay never began: discovery exited2 at the wrap fixture’s single-quoted inline semicolon. This is a test-source parse failure, not a behavioral verdict. The production graph compiled and hotstring E2E still passed **90/90**; HTTP E2E was outside selection. The fixture now constructs the same semicolon character with Chr(59), without changing its source or semantic oracle. The next replay reuses those unchanged production-source E2E results and selects only the 85 affected cases. No new finding is counted for the fixture.
+
+## AHK-056: Sorting the native personal-entry list targets a different stored entry
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+The native personal editor permits automatic header sorting but its form, Save and Delete handlers use the visible row number directly as the TOML entry-array index. Header ordering therefore separates displayed identity from the record mutated. This differs from AHK-031’s initial active-model insertion ordering.
+
+Reproduction: Native run41919871873 at2298478 uses the real native constructor, header click, selection and original Save/Delete buttons. Both cases report displayed alpha/form zeta/header_clicks1. Save changes the other stored entry while alpha remains unchanged; Delete leaves alpha present after a different entry was removed. The same failures repeat in reverse.
+
+Consequence: Editing or deleting the selected visible row can mutate another persistent personal expansion. The form and confirmation may also describe the wrong record, rather than the row the user selected.
+
+Regression: Two personal-native-sort-owner probes use the production public native fallback, a real header HWND click, actual selection and BM_CLICK on the original buttons. Independent durable TOML checks follow the displayed trigger identity and inspect the result before the form assertion. No copied ListView style or fake writer is used. Adding NoSort retains TOML row order; the native editor does not advertise a separate sorting feature. Native fail-before measured; post-fix qualification pending.
+
+The ongoing register now contains **56 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native partial qualification checkpoint: 41919871873
+
+At `2298478`, discovery succeeded and all **85 cases executed: 76 passed and nine failed**, identically in individual and reversed runs. The nine rollover recovery cases plus nine adjacent metadata/EOF cases qualify AHK-052; all three native sticky cases qualify AHK-053; all35 wrap loader/transaction cases qualify AHK-055. All five genuine layer-ready/source cases and ten host cases pass, but two old layer-save fixtures lack the newly required public page receipt and never reach their logger cutpoint; those fixtures remain to adapt and replay. The already-paused layer-save control passes. Native sort failures establish AHK-056. Both default-section cases fail an incorrect fixture control-type lookup (DropDownList instead of DDL), so that hypothesis remains unconfirmed. The two incomplete-journal drains need their bounded lifecycle escape; the advancing empty-batch control passes. Raw gesture logs separately establish acquisition and Max termination followed by the final held-debt failure; they are not an acquisition failure despite the last generic observation label. Production compile passed; E2E was outside this replay and the unchanged production-source90/90 hotstring evidence remains the previous checkpoint.
