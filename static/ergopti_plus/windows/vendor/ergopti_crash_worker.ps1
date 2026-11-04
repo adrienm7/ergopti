@@ -130,7 +130,9 @@ try {
 
 try {
 	if (Test-CrashFault "architecture") { throw "Injected architecture fault" }
-	Set-CrashField $snapshot "os_arch" $env:PROCESSOR_ARCHITECTURE
+	# Process environment describes the worker under WOW64, not the host OS.
+	$osArchitecture = if ([Environment]::Is64BitOperatingSystem) { "64 bits" } else { "32 bits" }
+	Set-CrashField $snapshot "os_arch" $osArchitecture
 } catch { $enrichmentErrors.Add("architecture: " + $_.Exception.Message) }
 
 try {
