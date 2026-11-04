@@ -492,3 +492,22 @@ helpers.describe("network field check window (Linux)", function()
 		end)
 	end)
 end)
+
+helpers.describe("native data FIFO admission", function()
+	for _, mode in ipairs({ "layout", "locale", "network" }) do
+		helpers.it("native data readers do not block on a FIFO: " .. mode, function()
+			if not pcall(require, "luv") or package.config:sub(1, 1) ~= "/" then return end
+			local Shell = require("adapters.shell_runner")
+			local dir = assert(os.tmpname()); os.remove(dir)
+			assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
+			local path = dir .. (mode == "locale" and "/locale_order.json" or "/source")
+			assert(Shell.run("mkfifo " .. Shell.quote(path)))
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_data_fifo_admission.lua"
+			local command = "timeout 4 " .. Shell.quote(assert(arg and arg[-1])) .. " " .. Shell.quote(fixture)
+				.. " " .. Shell.quote(dir) .. " " .. Shell.quote(mode)
+			local result = os.execute(command)
+			assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+			helpers.assert_true(result == true or result == 0, "a data FIFO must not block the driver")
+		end)
+	end
+end)
