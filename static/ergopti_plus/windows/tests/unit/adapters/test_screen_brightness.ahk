@@ -603,3 +603,58 @@ _SBT_DiagnosticMarkerControls() {
 Test("screen brightness: optional phase marker reads closed bounded facts without exposing paths", _SBT_DiagnosticMarkerControls)
 
 #Include test_screen_brightness_completion_deadline.ahk
+
+
+_SBT_AcquisitionSpawn(Fake, Cancel, Executable, Args, Done, OnChunk?, BeforeAdopt?, MaxOutput := 0) {
+	Fake.nested := ScreenBrightnessRequest("brightness_down")
+	if Cancel
+		Fake.pending_cancel := ScreenBrightnessCancel("fixture-acquiring")
+	return Fake.spawn(Executable, Args, Done, , , MaxOutput)
+}
+
+_SBT_ConfigureAcquisition(Cancel, Fake) {
+	ScreenBrightnessOwner.spawn_fn := _SBT_AcquisitionSpawn.Bind(Fake, Cancel)
+}
+
+_SBT_ObserveAcquisition(Cancel, Fake, Observed, Notices) {
+	AssertFalse(Fake.nested, "a reentrant spawn cannot acquire a second worker")
+	AssertEqual(Cancel ? 0 : 1, Fake.starts, "cancellation during acquisition must prevent start")
+	if Cancel {
+		AssertFalse(Fake.pending_cancel, "a pending acquisition retains cleanup ownership")
+		AssertEqual(1, Fake.retirements, "the acquired handle must be retired exactly once")
+		AssertFalse(IsObject(ScreenBrightnessOwner.job), "retirement releases the reservation")
+	} else {
+		AssertTrue(ScreenBrightnessOwner.job["handle"] == Fake, "the first request retains its exact handle")
+	}
+}
+
+_SBT_AcquisitionReservation(Cancel) {
+	_SBT_Owned("brightness_up", _SBT_ObserveAcquisition.Bind(Cancel),
+		_SBT_ConfigureAcquisition.Bind(Cancel), !Cancel)
+}
+Test("screen brightness: spawn reentry preserves the first worker (brightness-acquisition-owner)",
+	_SBT_AcquisitionReservation.Bind(false))
+Test("screen brightness: acquisition cancellation retires without start (brightness-acquisition-owner)",
+	_SBT_AcquisitionReservation.Bind(true))
+
+
+_SBT_ThrowAcquisition(Args*) {
+	throw Error("fixture acquisition refusal")
+}
+_SBT_ConfigureAcquisitionRefusal(Throws, Fake) {
+	ScreenBrightnessOwner.spawn_fn := Throws ? _SBT_ThrowAcquisition : (*) => 0
+}
+_SBT_ObserveAcquisitionRefusal(Fake, Observed, Notices) {
+	AssertFalse(IsObject(ScreenBrightnessOwner.job), "a failed acquisition releases its reservation")
+	AssertEqual(0, Observed.Length, "refused acquisition does not report worker completion")
+	ScreenBrightnessOwner.spawn_fn := ObjBindMethod(Fake, "spawn")
+	AssertTrue(ScreenBrightnessRequest("brightness_down"), "a later acquisition is admitted")
+}
+_SBT_AcquisitionRefusal(Throws) {
+	_SBT_Owned("brightness_up", _SBT_ObserveAcquisitionRefusal,
+		_SBT_ConfigureAcquisitionRefusal.Bind(Throws), false)
+}
+Test("screen brightness: rejected spawn releases reservation (brightness-acquisition-refusal)",
+	_SBT_AcquisitionRefusal.Bind(false))
+Test("screen brightness: throwing spawn releases reservation (brightness-acquisition-refusal)",
+	_SBT_AcquisitionRefusal.Bind(true))
