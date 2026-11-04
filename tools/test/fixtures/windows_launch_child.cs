@@ -224,7 +224,7 @@ public static class WindowsLaunchChild
         }
         File.WriteAllText(Path.Combine(root, "ready.json"), new JavaScriptSerializer().Serialize(receipt), new UTF8Encoding(false));
         if (scenario != "missing-logs") {
-            var logs = Path.Combine(root, "ergopti_plus", "logs");
+            var logs = Path.Combine(root, "Ergopti", "logs");
             Directory.CreateDirectory(logs);
             File.WriteAllText(Path.Combine(logs, "startup.log"),
                 scenario == "logged-error" ? "[ERROR] deliberate startup failure\n" : "[INFO] ready\n");

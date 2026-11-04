@@ -22,7 +22,7 @@ for (const dependency of [
 	'OllamaInstallFilesPort',
 	'OllamaRuntimeOwner',
 	'OllamaRuntime_HostArchitecture',
-	'AppDirsWindowsManagedOllamaFolderName'
+	'AppFoldersManagedOllamaRoot'
 ]) {
 	assert.ok(flow.includes(dependency), `Production composition must consume ${dependency}.`);
 }

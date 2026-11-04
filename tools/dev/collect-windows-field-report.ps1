@@ -32,8 +32,10 @@
 # The branch, the report folder and the base config key are the field_report
 # names of static/ergopti_plus/_shared/data/identifiers.json; the git steps are
 # the ones tools/dev/field-report-git.sh runs for the two shell collectors. The
-# logs folder and file names come from _shared/modules/paths/app_dirs.toml
-# ([logs.windows]: %LOCALAPPDATA%\ergopti_plus\logs).
+# logs folder and file names, the installed paths.toml and the default
+# configuration folder come from _shared/modules/paths/app_dirs.toml
+# ([logs.windows]: %LOCALAPPDATA%\Ergopti\logs, [config.windows]:
+# %LOCALAPPDATA%\Ergopti\paths.toml and %LOCALAPPDATA%\Ergopti\config).
 #
 # NOT COVERED, AND WHY:
 # - The field run needs a developer driver of this clone already running
@@ -202,6 +204,7 @@ $App = Read-TomlSection 'app'
 $Logs = Read-TomlSection 'logs'
 $Files = Read-TomlSection 'logs.files'
 $Windows = Read-TomlSection 'logs.windows'
+$ConfigWindows = Read-TomlSection 'config.windows'
 $FolderName = Get-AppDir $App 'app' 'folder_name'
 $MainPrefix = Get-AppDir $Files 'logs.files' 'unified_prefix'
 $ErrorsPrefix = Get-AppDir $Files 'logs.files' 'errors_prefix'
@@ -210,6 +213,9 @@ $BootstrapLog = Get-AppDir $Files 'logs.files' 'bootstrap_log'
 $CrashReports = Get-AppDir $Logs 'logs' 'crash_reports_dir'
 $LogsBase = Get-AppDir $Windows 'logs.windows' 'base'
 $LogsSegments = @(Get-AppDir $Windows 'logs.windows' 'segments')
+$ConfigBase = Get-AppDir $ConfigWindows 'config.windows' 'base'
+$ConfigSegments = @(Get-AppDir $ConfigWindows 'config.windows' 'segments')
+$PathsFileSegments = @(Get-AppDir $ConfigWindows 'config.windows' 'paths_file')
 
 # ===========================================
 # ======= 2/ Field branch and base ==========
@@ -304,14 +310,19 @@ Write-Text (Join-Path $script:Out 'base.txt') "field_branch: $Branch`nbase: $Bas
 # ======= 3/ Logs, commit and push ==========
 # ===========================================
 
+# An app_dirs.toml folder: its base variable followed by its segments, "" when
+# the variable is unset.
+function Join-AppDir([string]$Base, [string[]]$Segments) {
+	$Folder = [Environment]::GetEnvironmentVariable($Base)
+	if (-not $Folder) { return '' }
+	foreach ($Segment in $Segments) { $Folder = Join-Path $Folder ($Segment -replace '\{app\}', $FolderName) }
+	return $Folder
+}
+
 # The logs folder: -LogsDir, else the app_dirs.toml default.
 function Resolve-LogsDir {
 	if ($LogsDir) { return $LogsDir }
-	$Root = [Environment]::GetEnvironmentVariable($LogsBase)
-	if (-not $Root) { return '' }
-	$Folder = $Root
-	foreach ($Segment in $LogsSegments) { $Folder = Join-Path $Folder ($Segment -replace '\{app\}', $FolderName) }
-	return $Folder
+	return Join-AppDir $LogsBase $LogsSegments
 }
 
 # The configuration folder, resolved like infra/boot.ahk: -ConfigDir, else the
@@ -319,12 +330,14 @@ function Resolve-LogsDir {
 function Resolve-ConfigDir {
 	if ($ConfigDir) { return $ConfigDir }
 	$Driver = [IO.Path]::Combine($SharedRoot, '..', 'windows', '_generated', 'paths.toml')
-	foreach ($Candidate in (Join-Path $env:APPDATA 'Ergopti\paths.toml'), $Driver) {
-		if (-not (Test-Path -LiteralPath $Candidate -PathType Leaf)) { continue }
+	foreach ($Candidate in (Join-AppDir $ConfigBase $PathsFileSegments), $Driver) {
+		if (-not $Candidate -or -not (Test-Path -LiteralPath $Candidate -PathType Leaf)) { continue }
 		$Text = Get-Content -Raw -Encoding UTF8 -LiteralPath $Candidate
 		if ($Text -match '(?m)^\s*ConfigDirPath\s*=\s*"([^"]+)"') { return $Matches[1] }
 	}
-	return Join-Path $env:USERPROFILE ('.config\' + $FolderName)
+	$Default = Join-AppDir $ConfigBase $ConfigSegments
+	if (-not $Default) { Fail "%$ConfigBase% is unset: pass -ConfigDir." }
+	return $Default
 }
 
 # How long a ready developer driver may take to accept the request (it looks

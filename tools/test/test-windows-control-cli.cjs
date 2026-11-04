@@ -84,12 +84,9 @@ if (phase === 'result') {
 	});
 	process.exit(0);
 }
-const folders = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml'),
-	'utf8'
-);
-const folderNames = [...folders.matchAll(/^folder_name = "([^"]+)"$/gm)];
-assert.equal(folderNames.length, 1, 'the actual application folder declaration must be unique');
+// The [app] folder name the script reads; [owned_runtime.macos] declares a
+// second folder_name, so a first-match reader must stop at the [app] table.
+const appFolder = require('./lib/app-dirs.cjs').folderName('windows');
 const sourceHash = () => createHash('sha256').update(fs.readFileSync(SOURCE)).digest('hex');
 const originalHash = sourceHash();
 const token = 'a'.repeat(spec.token_hex_length);
@@ -138,7 +135,7 @@ try {
 	for (const fixture of cases) {
 		const base = path.join(scratch, fixture.name + " O'Brien é [1]");
 		const folder = spec.folders.windows.segments.reduce(
-			(parent, segment) => path.join(parent, segment === '{app}' ? folderNames[0][1] : segment),
+			(parent, segment) => path.join(parent, segment === '{app}' ? appFolder : segment),
 			base
 		);
 		fs.mkdirSync(folder, { recursive: true });

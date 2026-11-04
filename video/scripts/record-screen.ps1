@@ -37,7 +37,22 @@ $ReadPredictionMs = 900
 # delay is not enough, because the backend's latency varies. The first one is
 # acceptable at once; alternatives keep arriving after it (final_visible).
 $PredictionTimeoutMs = 30000
-$DriverLog = Join-Path $env:LOCALAPPDATA ("ergopti_plus\logs\ErgoptiPlus_{0}.log" -f (Get-Date -Format 'yyyy-MM-dd'))
+# Today's driver log in the default logs folder, both named by the one
+# declaration of the Ergopti folders (_shared/modules/paths/app_dirs.toml).
+function Get-AppDirsValue([string]$Toml, [string]$Section, [string]$Key) {
+	$Pattern = '(?m)^\[' + [regex]::Escape($Section) + '\]\r?\n(?:(?!\[)[^\n]*\n)*?' + $Key + ' = ("[^"]*"|\[[^\]]*\])'
+	if ($Toml -notmatch $Pattern) { throw "app_dirs.toml names no $Section.$Key" }
+	# The comma keeps a one-element list a list: [0] then names the value, not its first character.
+	return ,@([regex]::Matches($Matches[1], '"([^"]*)"') | ForEach-Object { $_.Groups[1].Value })
+}
+$AppDirs = Get-Content -Raw -Encoding utf8 (Join-Path $VideoRoot '../static/ergopti_plus/_shared/modules/paths/app_dirs.toml')
+$AppFolder = (Get-AppDirsValue $AppDirs 'app' 'folder_name')[0]
+$DriverLog = [Environment]::GetEnvironmentVariable((Get-AppDirsValue $AppDirs 'logs.windows' 'base')[0])
+foreach ($Segment in (Get-AppDirsValue $AppDirs 'logs.windows' 'segments')) {
+	$DriverLog = Join-Path $DriverLog ($Segment -replace '\{app\}', $AppFolder)
+}
+$DriverLog = Join-Path $DriverLog ('{0}{1}{2}' -f (Get-AppDirsValue $AppDirs 'logs.files' 'unified_prefix')[0],
+	(Get-Date -Format 'yyyy-MM-dd'), (Get-AppDirsValue $AppDirs 'logs.files' 'extension')[0])
 
 function Wait-DemoPrediction([datetime]$Since) {
 	$deadline = (Get-Date).AddMilliseconds($PredictionTimeoutMs)

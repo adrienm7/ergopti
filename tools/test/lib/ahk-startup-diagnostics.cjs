@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const AppDirs = require('./app-dirs.cjs');
 
 // These are capture policy limits, not a claim about the driver's log capacity.
 const MAX_MEMBER_BYTES = 16 * 1024 * 1024;
@@ -181,9 +182,10 @@ function createStartupDiagnostics(parent, context, sources, execution = null) {
 				const root = fs.realpathSync(configRoot);
 				assert.equal(root, path.resolve(configRoot), 'startup fixture redirection refused');
 				const files = RECEIPTS.map((name) => ({ name, file: path.join(root, name) }));
-				const logs = path.join(root, 'ergopti_plus/logs');
+				const logsSegments = AppDirs.segments('logs.windows', 'windows');
+				const logs = path.join(root, ...logsSegments);
 				if (fs.existsSync(logs)) {
-					assert.equal(fs.lstatSync(path.join(root, 'ergopti_plus')).isSymbolicLink(), false);
+					assert.equal(fs.lstatSync(path.join(root, logsSegments[0])).isSymbolicLink(), false);
 					assert.equal(fs.lstatSync(logs).isSymbolicLink(), false);
 					assert.ok(fs.lstatSync(logs).isDirectory(), 'startup logs require their owned directory');
 					assert.equal(fs.realpathSync(logs), path.resolve(logs));
