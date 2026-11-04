@@ -1,5 +1,6 @@
 """Exercise the real launcher and daemon bootstrap with live flock ownership."""
 
+import fcntl
 import os
 import pathlib
 import shlex
@@ -85,6 +86,49 @@ class SessionLockTests(unittest.TestCase):
                         self.assertEqual(result.returncode, 78, result.stderr)
                         self.assertIn(b"absolute", result.stderr)
             self.assertFalse((root / "relative-runtime").exists(), "refusal precedes lock creation")
+
+    def test_inherited_marker_rejects_unrelated_descriptor(self):
+        driver = pathlib.Path(__file__).resolve().parents[2]
+        runtime = shutil.which("luajit")
+        self.assertIsNotNone(runtime, "This native regression requires Linux LuaJIT")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            folder = root / "runtime" / "ergopti"
+            folder.mkdir(parents=True)
+            lock = folder / "ergopti.lock"
+            other = root / "unrelated"
+            other.write_text("unrelated", encoding="utf-8")
+            environment = dict(
+                os.environ, XDG_RUNTIME_DIR=str(root / "runtime"), ERGOPTI_SESSION_LOCK_FD="9"
+            )
+            code = (
+                "package.path = "
+                + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/lua/?.lua"))
+                + "; local lock = require('infra.session_lock'); "
+                + "local protected = lock.protect(); local acquired = protected and lock.acquire(); "
+                + "os.exit(acquired and 0 or 78)"
+            )
+            with lock.open("w+") as held:
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                for candidate in (other, lock):
+                    with self.subTest(candidate=candidate.name):
+                        result = subprocess.run(
+                            [
+                                "bash",
+                                "-c",
+                                'exec 9<>"$1"; exec "$2" -e "$3"',
+                                "test",
+                                str(candidate),
+                                runtime,
+                                code,
+                            ],
+                            env=environment,
+                            capture_output=True,
+                            timeout=5,
+                        )
+                        self.assertEqual(
+                            result.returncode, 78, "fd 9 cannot bypass the held singleton lock"
+                        )
 
     def test_nonregular_lock_never_blocks_or_admits_startup(self):
         driver = pathlib.Path(__file__).resolve().parents[2]
