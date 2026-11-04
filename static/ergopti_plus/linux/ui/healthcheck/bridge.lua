@@ -645,10 +645,12 @@ end
 --- Cancels the probes of a session.
 --- @param session table|nil
 local function cancel_probes(session)
-	if session and session.probes then
-		session.probes.cancel()
-		session.probes = nil
-	end
+	if not session then return nil end
+	session.probe_revision = (session.probe_revision or 0) + 1
+	local revision, previous = session.probe_revision, session.probes
+	session.probes = nil
+	if previous then previous.cancel() end
+	return revision
 end
 
 --- Archives only reported cleanup metadata; no native owner is adopted or released.
@@ -675,18 +677,24 @@ end
 --- @param session table
 --- @param state table Daemon state.
 local function start_probes(session, state)
-	cancel_probes(session)
+	local revision = cancel_probes(session)
+	local snapshot = session.snapshot
+	local function current()
+		return _session == session and session.probe_revision == revision and session.snapshot == snapshot
+	end
+	if not current() then return end
 	-- Without the extensive opt-in only the local probes run (the configuration)
-	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot.sections.paths, state,
+	local probes = require("ui.healthcheck.probes").start(M.config().schema, snapshot.sections.paths, state,
 		function(id, result, sections)
-			if _session ~= session then return end
-			session.snapshot.probes[id] = result
+			if not current() then return end
+			snapshot.probes[id] = result
 			for section_id, values in pairs(sections or {}) do
-				local target = session.snapshot.sections[section_id]
+				local target = snapshot.sections[section_id]
 				for key, value in pairs(values) do target[key] = value end
 			end
 			push(session, { type = "probe", id = id, result = result, sections = sections })
-		end, { local_only = session.snapshot.extensive ~= true })
+		end, { local_only = snapshot.extensive ~= true })
+	if current() then session.probes = probes else probes.cancel() end
 end
 
 --- The first message of a page: its configuration and the first snapshot.
