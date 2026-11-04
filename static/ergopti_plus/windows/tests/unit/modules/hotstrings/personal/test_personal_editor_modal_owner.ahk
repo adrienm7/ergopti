@@ -157,12 +157,14 @@ _PEMO_Case(Boundary, Mode) {
 	global ScriptInformation, ConfigurationFile, Features, _ReadPersonalTomlCache
 	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	global _PersonalEditorGui, _PersonalEditorSessionEpoch, _PersonalEditorPrioCtrl
+	global _PersonalEditorEntryCohort, _PersonalEditorEntryBusy
 	global _HS_GrandTotalCache, _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
 	HadTotal := IsSet(_HS_GrandTotalCache)
 	SavedTotal := HadTotal ? _HS_GrandTotalCache : unset
 	Saved := { Path: ScriptInformation["PersonalTomlPath"], Config: ConfigurationFile, Features: Features,
 		Cache: _ReadPersonalTomlCache, Data: _PersonalEditorData, Section: _PersonalEditorSection,
 		Source: _PersonalEditorOpeningSource, Window: _PersonalEditorGui, Epoch: _PersonalEditorSessionEpoch,
+		EntryCohort: _PersonalEditorEntryCohort, EntryBusy: _PersonalEditorEntryBusy,
 		Priority: _PersonalEditorPrioCtrl, Critical: A_IsCritical, Suspended: A_IsSuspended,
 		Desired: MasterGateState()["features"] }
 	Fixture := _ScopeOwnerFixture(), Timer := 0
@@ -179,6 +181,7 @@ _PEMO_Case(Boundary, Mode) {
 			WindowTitle(t("editor.hotstrings.title_confirm")), "delete"))
 	try {
 		Critical("Off"), Suspend(false)
+		_PersonalEditorEntryCohort := 0, _PersonalEditorEntryBusy := false
 		ConfigurationFile := Fixture.path
 		ScriptInformation["PersonalTomlPath"] := State["path"]
 		Features := _PersonalTomlCloneDetached(Saved.Features)
@@ -237,6 +240,7 @@ _PEMO_Case(Boundary, Mode) {
 		_PersonalEditorData := Saved.Data, _PersonalEditorSection := Saved.Section
 		_PersonalEditorOpeningSource := Saved.Source, _PersonalEditorGui := Saved.Window
 		_PersonalEditorSessionEpoch := Saved.Epoch, _PersonalEditorPrioCtrl := Saved.Priority
+		_PersonalEditorEntryCohort := Saved.EntryCohort, _PersonalEditorEntryBusy := Saved.EntryBusy
 		ScriptInformation["PersonalTomlPath"] := Saved.Path, ConfigurationFile := Saved.Config
 		Features := Saved.Features, MasterGateState()["features"] := Saved.Desired
 		_PersonalTomlInvalidateCaches(State["path"])
