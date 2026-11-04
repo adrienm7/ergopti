@@ -298,6 +298,182 @@ helpers.describe("AI overlay: one window shared with the hotstring preview", fun
 end)
 
 helpers.describe("Hotstring preview: its own rows, not the shared window", function()
+	helpers.it("(preview-partial-draw) retains a draw across replacement of its module", function()
+		local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview" }
+		local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
+		local replacement, preview, nested, hides = nil, nil, nil, 0
+		local config = { resolve = function() return { delay = 0.25, show_tooltip = true } end }
+		local candidate = { { replacement = "text", group = "rolls", fires = true } }
+		local renderer = { is_available = function() return true end,
+			show = function()
+				package.loaded["ui.tooltip.preview"] = nil
+				replacement = require("ui.tooltip.preview")
+				replacement.init({ style = { positioning = { window_bottom_inset = 0 } }, config = config })
+				nested = replacement.show(candidate, "autocorrect")
+				return true
+			end,
+			hide = function() hides = hides + 1; return true end }
+		package.loaded["adapters.graphics_renderer"] = renderer
+		package.loaded["adapters.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
+		package.loaded["ui.tooltip.preview"] = nil
+		preview = require("ui.tooltip.preview")
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } }, config = config })
+		local accepted = preview.show(candidate, "autocorrect")
+		local blocked = replacement.show(candidate, "autocorrect")
+		package.loaded["ui.tooltip.preview"] = preview
+		local settled = preview.retry_render_cleanup()
+		for _, name in ipairs(names) do package.loaded[name] = saved[name].value end
+		helpers.assert_eq({ accepted = accepted, nested = nested, blocked = blocked, settled = settled, hides = hides },
+			{ accepted = false, nested = false, blocked = false, settled = true, hides = 1 })
+	end)
+
+	helpers.it("(preview-partial-draw) revokes an old LLM offer covered by a failed preview", function()
+		local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
+		local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
+		local draws, hides, allow_hide = 0, 0, false
+		local renderer = { is_available = function() return true end,
+			show = function() draws = draws + 1; return draws ~= 2 end,
+			hide = function() hides = hides + 1; return allow_hide end }
+		package.loaded["adapters.graphics_renderer"] = renderer
+		package.loaded["adapters.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
+		package.loaded["ui.tooltip.preview"], package.loaded["ui.tooltip.llm"] = nil, nil
+		local preview, overlay = require("ui.tooltip.preview"), require("ui.tooltip.llm")
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function() return { delay = 0.25, show_tooltip = true } end },
+			on_render_failed = function() overlay.revoke_presentation() end })
+		overlay.init({ style = {}, renderer = renderer, companion = {
+			showing = preview.is_showing, rows = preview.showing_rows, covered = preview.note_covered,
+			redraw = preview.redraw, prepare = preview.retry_render_cleanup, ready = preview.render_ready,
+			revision = preview.render_revision,
+		} })
+		assert(overlay.show({ { to_type = "old offer" } }, {}))
+		local accepted = preview.show({ { replacement = "text", group = "rolls", fires = true } }, "autocorrect")
+		local blocked = overlay.is_showing()
+		allow_hide = true
+		local settled, still_showing = preview.retry_render_cleanup(), overlay.is_showing()
+		for _, name in ipairs(names) do package.loaded[name] = saved[name].value end
+		helpers.assert_eq({ accepted = accepted, blocked = blocked, settled = settled, showing = still_showing },
+			{ accepted = false, blocked = false, settled = true, showing = false })
+	end)
+
+	helpers.it("(preview-partial-draw) fences reentrant owners during the native draw", function()
+		local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
+		local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
+		local preview, overlay, hide_result, offer_result, hidden = nil, nil, nil, nil, 0
+		local renderer = {
+			is_available = function() return true end,
+			show = function()
+				hide_result = preview.hide()
+				offer_result = overlay.show({ { to_type = "reentrant" } }, {})
+				return true
+			end,
+			hide = function() hidden = hidden + 1; return true end,
+		}
+		package.loaded["adapters.graphics_renderer"] = renderer
+		package.loaded["adapters.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
+		package.loaded["ui.tooltip.preview"], package.loaded["ui.tooltip.llm"] = nil, nil
+		preview, overlay = require("ui.tooltip.preview"), require("ui.tooltip.llm")
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function() return { delay = 0.25, show_tooltip = true } end } })
+		overlay.init({ style = {}, renderer = renderer, companion = {
+			showing = preview.is_showing, rows = preview.showing_rows, covered = preview.note_covered,
+			redraw = preview.redraw, prepare = preview.retry_render_cleanup, revision = preview.render_revision,
+		} })
+		local accepted = preview.show({ { replacement = "text", group = "rolls", fires = true } }, "autocorrect")
+		local observed = { accepted = accepted, showing = preview.is_showing(), hide = hide_result, offer = offer_result, hidden = hidden }
+		for _, name in ipairs(names) do package.loaded[name] = saved[name].value end
+		helpers.assert_eq(observed, { accepted = true, showing = true, hide = false, offer = false, hidden = 0 })
+	end)
+
+	helpers.it("(preview-partial-draw) restores a preview published inside an older LLM draw", function()
+		local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
+		local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
+		local preview, draws, owner = nil, 0, nil
+		local renderer = {
+			is_available = function() return true end,
+			show = function()
+				draws = draws + 1
+				if draws == 1 then
+					assert(preview.show({ { replacement = "new", group = "rolls", fires = true } }, "autocorrect"))
+					owner = "stale LLM"; return true
+				end
+				owner = "preview"; return true
+			end,
+			hide = function() owner = nil; return true end,
+		}
+		package.loaded["adapters.graphics_renderer"] = renderer
+		package.loaded["adapters.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
+		package.loaded["ui.tooltip.preview"], package.loaded["ui.tooltip.llm"] = nil, nil
+		preview = require("ui.tooltip.preview")
+		local overlay = require("ui.tooltip.llm")
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function() return { delay = 0.25, show_tooltip = true } end } })
+		overlay.init({ style = {}, renderer = renderer, companion = {
+			showing = preview.is_showing, rows = preview.showing_rows, covered = preview.note_covered,
+			redraw = preview.redraw, prepare = preview.retry_render_cleanup, revision = preview.render_revision,
+		} })
+		local accepted = overlay.show({ { to_type = "old" } }, {})
+		local observed = { accepted = accepted, showing = overlay.is_showing(), preview = preview.is_showing(), owner = owner }
+		for _, name in ipairs(names) do package.loaded[name] = saved[name].value end
+		helpers.assert_eq(observed, { accepted = false, showing = false, preview = true, owner = "preview" })
+	end)
+
+	for _, mode in ipairs({ "false", "throw" }) do
+		helpers.it("(preview-partial-draw) fences the shared surface after " .. mode, function()
+			local names = { "adapters.graphics_renderer", "adapters.timer_scheduler", "ui.tooltip.preview", "ui.tooltip.llm" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
+			local draws, hides, visible, allow_hide = 0, 0, false, false
+			local preview, overlay, nested_offer = nil, nil, nil
+			local renderer = {
+				is_available = function() return true end,
+				show = function()
+					draws = draws + 1; visible = true
+					if draws == 1 then if mode == "throw" then error("partial") end; return false end
+					return true
+				end,
+				hide = function()
+					hides = hides + 1
+					if not allow_hide then return false end
+					nested_offer = overlay.show({ { to_type = "during cleanup" } }, {})
+					visible = false; return true
+				end,
+			}
+			package.loaded["adapters.graphics_renderer"] = renderer
+			package.loaded["adapters.timer_scheduler"] = helpers.load_module("tests.fakes").timer_scheduler()
+			package.loaded["ui.tooltip.preview"], package.loaded["ui.tooltip.llm"] = nil, nil
+			preview, overlay = require("ui.tooltip.preview"), require("ui.tooltip.llm")
+			preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+				config = { resolve = function() return { delay = 0.25, show_tooltip = true } end } })
+			overlay.init({ style = {}, renderer = renderer, companion = {
+				showing = preview.is_showing, rows = preview.showing_rows, covered = preview.note_covered,
+				redraw = preview.redraw, prepare = preview.retry_render_cleanup, revision = preview.render_revision,
+			} })
+			local ok, accepted = pcall(preview.show, { { replacement = "text", group = "rolls", fires = true } }, "autocorrect")
+			local offered = overlay.show({ { to_type = "suggestion" } }, {})
+			local before = { ok = ok, accepted = accepted, offered = offered, draws = draws, visible = visible }
+			allow_hide = true
+			local original_hide, replacement_calls = renderer.hide, 0
+			renderer.hide = function() replacement_calls = replacement_calls + 1; return true end
+			local replaced_method = preview.retry_render_cleanup()
+			renderer.hide = original_hide
+			local before_stale = hides
+			package.loaded["ui.tooltip.preview"] = nil
+			local replacement = require("ui.tooltip.preview")
+			replacement.init({ style = { positioning = { window_bottom_inset = 0 } },
+				config = { resolve = function() return { delay = 0.25, show_tooltip = true } end } })
+			local replacement_allowed = replacement.show({ { replacement = "new", group = "rolls", fires = true } }, "autocorrect")
+			local stale = preview.retry_render_cleanup()
+			local stale_hides = hides - before_stale
+			package.loaded["ui.tooltip.preview"] = preview
+			local recovered = overlay.show({ { to_type = "suggestion" } }, {})
+			local after = { recovered = recovered, draws = draws, visible = visible, stale = stale, stale_hides = stale_hides, nested_offer = nested_offer, replacement_allowed = replacement_allowed,
+				replaced_method = replaced_method, replacement_calls = replacement_calls }
+			for _, name in ipairs(names) do package.loaded[name] = saved[name].value end
+			helpers.assert_eq(before, { ok = true, accepted = false, offered = false, draws = 1, visible = true })
+			helpers.assert_eq(after, { recovered = true, draws = 2, visible = true, stale = false, stale_hides = 0, nested_offer = false, replacement_allowed = false, replaced_method = false, replacement_calls = 0 })
+		end)
+	end
+
 
 	--- The preview module over a fake renderer and scheduler.
 	--- @return table preview

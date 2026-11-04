@@ -2632,6 +2632,13 @@ local function main()
 			tooltip_preview.init({
 				style = style,
 				config = hotstrings_config,
+				on_render_failed = function()
+					if rawequal(package.loaded["ui.tooltip.preview"], tooltip_preview)
+						and rawequal(package.loaded["ui.tooltip.llm"], llm_overlay)
+						and llm_overlay and type(llm_overlay.revoke_presentation) == "function" then
+						llm_overlay.revoke_presentation()
+					end
+				end,
 				on_expire = function()
 					if prediction_engine and type(prediction_engine.on_hotstring_expired) == "function" then
 						prediction_engine.on_hotstring_expired(engine:ai_context():text(), {
@@ -2665,6 +2672,9 @@ local function main()
 						return tooltip_preview.showing_rows()
 					end,
 					showing = tooltip_preview.is_showing,
+					prepare = tooltip_preview.retry_render_cleanup,
+					ready = tooltip_preview.render_ready,
+					revision = tooltip_preview.render_revision,
 					covered = tooltip_preview.note_covered,
 					redraw = tooltip_preview.redraw,
 				},

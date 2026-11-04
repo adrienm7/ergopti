@@ -184,7 +184,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 		replace("adapters.graphics_renderer", {
 			is_available = function() return true end,
 			show = function() return true end,
-			hide = function() hidden = hidden + 1 end,
+			hide = function() hidden = hidden + 1; return true end,
 			is_visible = function() return hidden == 0 end,
 			destroy = function() end,
 		})
@@ -211,7 +211,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 		replace("adapters.graphics_renderer", {
 			is_available = function() return true end,
 			show = function() return true end,
-			hide = function() end,
+			hide = function() return true end,
 			is_visible = function() return true end,
 			destroy = function() end,
 		})
@@ -281,11 +281,13 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 			on_expire = function() expired = expired + 1 end })
 		local candidate = { { replacement = "text", group = "rolls", fires = true } }
 		assert(preview.show(candidate, "autocorrect")); preview.note_covered(); callbacks[1]()
+		local after_cover = hidden
 		assert(preview.show(candidate, "autocorrect")); assert(preview.show(candidate, "autocorrect") == false)
 		callbacks[2]()
 		package.loaded["ui.tooltip.preview"] = nil
 		restore()
-		helpers.assert_eq({ hidden = hidden, expired = expired }, { hidden = 0, expired = 0 })
+		helpers.assert_eq({ after_cover = after_cover, hidden = hidden, expired = expired },
+			{ after_cover = 0, hidden = 1, expired = 0 })
 	end)
 
 	helpers.it("(preview-expiry-stale) does not retain a timer that fires before after returns", function()
@@ -363,6 +365,33 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 	end)
 	end
 
+	helpers.it("(preview-hide-debt) delays expiry until a refused hide is acknowledged", function()
+		local callback, expired, allowed, hides = nil, 0, false, 0
+		replace("adapters.timer_scheduler", {
+			after = function(_, fn) callback = fn; return { armed = true } end,
+			cancel = function() return true end,
+		})
+		replace("adapters.graphics_renderer", {
+			is_available = function() return true end, show = function() return true end,
+			hide = function() hides = hides + 1; return allowed end,
+		})
+		package.loaded["ui.tooltip.preview"] = nil
+		local preview = require("ui.tooltip.preview")
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function() return { delay = 0.25, show_tooltip = true } end },
+			on_expire = function() expired = expired + 1 end })
+		assert(preview.show({ { replacement = "text", group = "rolls", fires = true } }, "autocorrect"))
+		callback()
+		local before = { expired = expired, ready = preview.render_ready(), showing = preview.is_showing() }
+		allowed = true
+		local settled = preview.retry_render_cleanup()
+		local after = { expired = expired, ready = preview.render_ready(), settled = settled, hides = hides }
+		package.loaded["ui.tooltip.preview"] = nil
+		restore()
+		helpers.assert_eq(before, { expired = 0, ready = false, showing = false })
+		helpers.assert_eq(after, { expired = 1, ready = true, settled = true, hides = 2 })
+	end)
+
 	helpers.it("(preview-destroy-expiry) retires its timer and rows before a new owner draws", function()
 		local scheduler = Fakes.timer_scheduler()
 		local hidden, expired = 0, 0
@@ -370,7 +399,7 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 		replace("adapters.graphics_renderer", {
 			is_available = function() return true end,
 			show = function() return true end,
-			hide = function() hidden = hidden + 1 end,
+			hide = function() hidden = hidden + 1; return true end,
 			is_visible = function() return true end,
 			destroy = function() end,
 		})

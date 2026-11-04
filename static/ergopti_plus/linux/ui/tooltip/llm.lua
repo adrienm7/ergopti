@@ -164,6 +164,24 @@ local function companion_showing()
 	return ok and showing == true
 end
 
+--- The companion's partial draw must be settled before this owner touches the surface.
+local function prepare_companion(companion)
+	if not companion or type(companion.prepare) ~= "function" then return true end
+	if type(companion.ready) == "function" then
+		local ok, ready = pcall(companion.ready)
+		if (not ok or ready ~= true) and #_candidates > 0 then
+			_generation = _generation + 1
+			_candidates, _active_index, _meta = {}, 1, {}
+		end
+	end
+	local ok, ready = pcall(function()
+		local revision = type(companion.revision) == "function" and companion.revision() or nil
+		if companion.prepare() ~= true then return false end
+		return revision == nil or (type(companion.revision) == "function" and companion.revision() == revision)
+	end)
+	return ok and ready == true
+end
+
 --- Settles a possibly partial draw through the surface owner captured with it.
 --- A visible companion must redraw itself; it must never be hidden for us.
 settle_cleanup = function()
@@ -171,6 +189,10 @@ settle_cleanup = function()
 	if not pending then return true end
 	if _cleanup_busy then return false end
 	_cleanup_busy = true
+	if not prepare_companion(pending.companion) or _cleanup_pending ~= pending then
+		_cleanup_busy = false
+		return false
+	end
 	local called, settled = pcall(function()
 		local companion, renderer = pending.companion, pending.renderer
 		local showing = false
@@ -189,6 +211,13 @@ end
 local function draw(generation)
 	_presenting = generation
 	if type(_renderer) ~= "table" or type(_renderer.show) ~= "function" then error("suggestion renderer unavailable") end
+	local renderer, companion = _renderer, _companion
+	local companion_revision
+	if companion and type(companion.revision) == "function" then
+		local ok, value = pcall(companion.revision)
+		if not ok then _candidates, _active_index, _meta, _presenting = {}, 1, {}, nil; return false end
+		companion_revision = value
+	end
 	local rows = M.build_rows(_candidates, _active_index, _meta)
 	if #rows == 0 then
 		if _presenting == generation then _presenting = nil end
@@ -206,9 +235,16 @@ local function draw(generation)
 		if _presenting == generation then _presenting = nil end
 		return false
 	end
-	local renderer, companion = _renderer, _companion
+	if companion_revision ~= nil then
+		local ok, current = pcall(companion.revision)
+		if not ok or current ~= companion_revision then
+			_candidates, _active_index, _meta, _presenting = {}, 1, {}, nil
+			return false
+		end
+	end
 	local called, drawn = pcall(renderer.show, rows, { style = _style, accent = nil, anchor = anchor, screen = screen })
 	if _presenting == generation then _presenting = nil end
+	if not rawequal(package.loaded["ui.tooltip.llm"], M) then return false end
 	if generation ~= _generation then
 		-- An older native call can finish after a reentrant replacement. Repair
 		-- the current owner rather than allowing that stale call to cover it.
@@ -219,6 +255,15 @@ local function draw(generation)
 			settle_cleanup()
 		end
 		return false
+	end
+	if companion_revision ~= nil and companion and type(companion.revision) == "function" then
+		local ok, current = pcall(companion.revision)
+		if not ok or current ~= companion_revision then
+			_candidates, _active_index, _meta = {}, 1, {}
+			_cleanup_pending = { renderer = renderer, companion = companion }
+			settle_cleanup()
+			return false
+		end
 	end
 	if not called or drawn ~= true then
 		_candidates, _active_index, _meta = {}, 1, {}
@@ -248,7 +293,9 @@ end
 --- @param meta table|nil
 --- @return boolean
 function M.show(candidates, meta)
-	if type(candidates) ~= "table" or not settle_cleanup() then return false end
+	local before = _generation
+	if type(candidates) ~= "table" or not prepare_companion(_companion) or not settle_cleanup()
+		or before ~= _generation then return false end
 	-- A fresh owner without a draw method has touched no surface to clean up.
 	-- An existing offer still needs the usual cleanup if its renderer changed.
 	if #_candidates == 0 and (type(_renderer) ~= "table" or type(_renderer.show) ~= "function") then return false end
@@ -263,6 +310,8 @@ end
 --- @param index integer
 --- @return boolean
 function M.select(index)
+	local before = _generation
+	if not prepare_companion(_companion) or before ~= _generation then return false end
 	if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #_candidates then return false end
 	_generation = _generation + 1
 	_active_index = index
@@ -273,6 +322,8 @@ end
 --- @param delta integer
 --- @return boolean
 function M.move(delta)
+	local before = _generation
+	if not prepare_companion(_companion) or before ~= _generation then return false end
 	if #_candidates < 2 or type(delta) ~= "number" then return false end
 	_generation = _generation + 1
 	_active_index = ((_active_index - 1 + delta) % #_candidates) + 1
@@ -289,7 +340,9 @@ end
 --- they stand now. Does nothing while no candidate is shown.
 --- @return boolean drawn
 function M.redraw()
-	if #_candidates == 0 or not settle_cleanup() then return false end
+	local before = _generation
+	if #_candidates == 0 or not prepare_companion(_companion) or not settle_cleanup()
+		or before ~= _generation then return false end
 	_generation = _generation + 1
 	return attempt_draw(_generation)
 end
@@ -305,9 +358,16 @@ function M.redraw_if_preview_hidden()
 	return M.redraw()
 end
 
+--- Revokes an offer covered by a failed companion draw, without touching its surface.
+function M.revoke_presentation()
+	_generation = _generation + 1
+	_candidates, _active_index, _meta = {}, 1, {}
+end
+
 --- Hides and forgets every candidate.
 function M.hide()
-	if not settle_cleanup() then return false end
+	local before = _generation
+	if not prepare_companion(_companion) or not settle_cleanup() or before ~= _generation then return false end
 	_generation = _generation + 1
 	-- The preview drawn over the suggestions keeps the window; it hides itself.
 	if not companion_showing() and _renderer and type(_renderer.hide) == "function"
@@ -321,6 +381,12 @@ function M.hide()
 	return true
 end
 
+local function companion_ready()
+	if not _companion or type(_companion.ready) ~= "function" then return true end
+	local ok, ready = pcall(_companion.ready)
+	return ok and ready == true
+end
+
 --- Whether candidates are presented: set by show(), cleared by hide().
 ---
 --- The logical state, not the window's. The GTK surface maps asynchronously
@@ -328,12 +394,12 @@ end
 --- answered by "is the window up" would type the digit meant to accept.
 --- @return boolean
 function M.is_showing()
-	return _presenting == nil and #_candidates > 0
+	return _presenting == nil and companion_ready() and #_candidates > 0
 end
 
 --- @return boolean
 function M.is_visible()
-	return _presenting == nil and #_candidates > 0
+	return _presenting == nil and companion_ready() and #_candidates > 0
 		and _renderer ~= nil and type(_renderer.is_visible) == "function"
 		and _renderer.is_visible() == true
 end

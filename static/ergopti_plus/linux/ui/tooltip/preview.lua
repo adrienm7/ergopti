@@ -82,6 +82,7 @@ local _config = nil
 local _expiry = nil
 local _expiry_token = nil
 local _revision = 0
+local _surface_guard = require("ui.tooltip.surface_guard")
 local _on_expire = nil
 -- The rows this preview drew while it holds the shared window, nil once it is
 -- hidden or covered. The window itself cannot say whose rows it shows: the AI
@@ -91,6 +92,7 @@ local _showing_opts = nil
 -- Told once the preview has hidden itself, so a suggestion shown together with
 -- it can be drawn again alone.
 local _on_hidden = nil
+local _on_render_failed = nil
 local _enabled = {
 	star = true,
 	autocorrect = true,
@@ -101,11 +103,13 @@ local _enabled = {
 --- Initialises the preview.
 --- @param opts table { style = table, config = table }
 function M.init(opts)
+	if _surface_guard.debt or _surface_guard.cleanup_busy or _surface_guard.render_busy then return false end
 	opts = opts or {}
 	_style = opts.style
 	_config = opts.config
 	_on_expire = type(opts.on_expire) == "function" and opts.on_expire or nil
 	_on_hidden = type(opts.on_hidden) == "function" and opts.on_hidden or nil
+	_on_render_failed = type(opts.on_render_failed) == "function" and opts.on_render_failed or nil
 	if not _style then
 		Logger.error(LOG, "init() without a style — the preview cannot draw.")
 	end
@@ -357,8 +361,14 @@ local function arm_expiry(group, section, revision)
 		if _expiry_token ~= token then return end
 		_expiry, _expiry_token = nil, nil
 		local hidden_revision = _revision + 1
-		M.hide()
+		local hidden = M.hide()
 		if _revision ~= hidden_revision then return end
+		if hidden ~= true then
+			if _surface_guard.debt and rawequal(_surface_guard.debt.owner, M) then
+				_surface_guard.debt.expiry = { revision = hidden_revision, callback = _on_expire }
+			end
+			return
+		end
 		if _on_expire then
 			local ok_callback, callback_err = pcall(_on_expire)
 			if not ok_callback then
@@ -439,11 +449,57 @@ end
 -- =============================================
 -- =============================================
 
+--- Settles a native draw which may have shown partial content.
+--- @return boolean settled
+function M.retry_render_cleanup()
+	if not rawequal(package.loaded["ui.tooltip.preview"], M) or _surface_guard.render_busy then return false end
+	local debt = _surface_guard.debt
+	if not debt then return not _surface_guard.cleanup_busy end
+	if _surface_guard.cleanup_busy or not rawequal(debt.owner, M)
+		or not rawequal(package.loaded["adapters.graphics_renderer"], debt.renderer)
+		or type(debt.hide) ~= "function" or debt.renderer.hide ~= debt.hide then return false end
+	_surface_guard.cleanup_busy = true
+	local called, hidden = pcall(debt.hide)
+	_surface_guard.cleanup_busy = false
+	if not called or hidden ~= true or _surface_guard.debt ~= debt then return false end
+	_surface_guard.debt = nil
+	if _on_hidden then pcall(_on_hidden) end
+	local expiry = debt.expiry
+	if expiry and expiry.revision == _revision and expiry.callback == _on_expire and _on_expire then
+		pcall(_on_expire)
+	end
+	return true
+end
+
+--- Current preview ownership generation, for the other surface participant.
+--- @return integer revision
+function M.render_revision() return _revision end
+
+--- Reports ownership without performing cleanup or a native call.
+--- @return boolean ready
+function M.render_ready()
+	return rawequal(package.loaded["ui.tooltip.preview"], M)
+		and not _surface_guard.debt and not _surface_guard.cleanup_busy and not _surface_guard.render_busy
+end
+
+local function failed_render(hide)
+	local revision = _revision
+	_showing_rows, _showing_opts = nil, nil
+	_surface_guard.debt = { renderer = Renderer, hide = hide, owner = M }
+	if _on_render_failed then pcall(_on_render_failed) end
+	if revision ~= _revision then return end
+	cancel_expiry()
+	if revision ~= _revision then return end
+	M.retry_render_cleanup()
+end
+
 --- Shows a preview for a set of candidates.
 --- @param candidates table Array of { trigger, replacement, group, fires }.
 --- @param kind string "star" | "autocorrect" | "ai" — which toggle gates it.
 --- @return boolean True when something was drawn.
 function M.show(candidates, kind)
+	local before = _revision
+	if not M.retry_render_cleanup() or before ~= _revision then return false end
 	if not _style then return false end
 	if kind and _enabled[kind] == false then return false end
 	if not Renderer.is_available() then return false end
@@ -483,18 +539,25 @@ function M.show(candidates, kind)
 		screen = M.screen_frame(),
 	}
 	if revision ~= _revision then return false end
-	local drawn = Renderer.show(rows, draw_opts)
+	local hide = Renderer.hide
+	_surface_guard.render_busy = true
+	local called, drawn = pcall(Renderer.show, rows, draw_opts)
+	_surface_guard.render_busy = false
+	if not rawequal(package.loaded["ui.tooltip.preview"], M) then
+		_surface_guard.debt = _surface_guard.debt or { renderer = Renderer, hide = hide, owner = M }
+		return false
+	end
 	if revision ~= _revision then return false end
+	if not called or drawn ~= true then failed_render(hide); return false end
 
-	_showing_rows = drawn and rows or nil
-	_showing_opts = drawn and draw_opts or nil
-	if not drawn then cancel_expiry(); return false end
+	_showing_rows, _showing_opts = rows, draw_opts
 	if not arm_expiry(group, section, revision) then return false end
 	return drawn
 end
 
 --- Hides the preview.
 function M.hide()
+	if _surface_guard.debt or _surface_guard.cleanup_busy or _surface_guard.render_busy then return M.retry_render_cleanup() end
 	_revision = _revision + 1
 	local revision = _revision
 	-- The pending expiry goes with it, so a bubble hidden by the next keystroke
@@ -504,18 +567,16 @@ function M.hide()
 	local was_showing = _showing_rows ~= nil
 	_showing_rows = nil
 	_showing_opts = nil
-	if not was_showing then return end
-	Renderer.hide()
-	if revision ~= _revision then return end
-	if was_showing and _on_hidden then
-		local ok, err = pcall(_on_hidden)
-		if not ok then Logger.warn(LOG, "Preview hide observer failed: %s", tostring(err)) end
-	end
+	if not was_showing then return true end
+	_surface_guard.debt = { renderer = Renderer, hide = Renderer.hide, owner = M }
+	return M.retry_render_cleanup()
 end
 
 --- Forgets the rows another owner drew over: the preview is gone from the
 --- window, so neither its expiry nor its hide may withdraw what replaced it.
 function M.note_covered()
+	local before = _revision
+	if not M.retry_render_cleanup() or before ~= _revision then return false end
 	_revision = _revision + 1
 	local revision = _revision
 	cancel_expiry()
@@ -528,8 +589,20 @@ end
 --- them is withdrawn. Its expiry stays armed as it was.
 --- @return boolean drawn
 function M.redraw()
-	if not _showing_rows or not _showing_opts then return false end
-	return Renderer.show(_showing_rows, _showing_opts) == true
+	local before = _revision
+	if not M.retry_render_cleanup() or before ~= _revision or not _showing_rows or not _showing_opts then return false end
+	local revision = _revision
+	local hide = Renderer.hide
+	_surface_guard.render_busy = true
+	local called, drawn = pcall(Renderer.show, _showing_rows, _showing_opts)
+	_surface_guard.render_busy = false
+	if not rawequal(package.loaded["ui.tooltip.preview"], M) then
+		_surface_guard.debt = _surface_guard.debt or { renderer = Renderer, hide = hide, owner = M }
+		return false
+	end
+	if revision ~= _revision then return false end
+	if not called or drawn ~= true then failed_render(hide); return false end
+	return true
 end
 
 --- @return boolean
@@ -555,6 +628,8 @@ end
 
 --- Tears the window down.
 function M.destroy()
+	local before = _revision
+	if not M.retry_render_cleanup() or before ~= _revision then return false end
 	local revision = _revision + 1
 	M.note_covered()
 	if revision ~= _revision then return false end
@@ -562,6 +637,7 @@ function M.destroy()
 	if revision ~= _revision then return false end
 	_on_expire = nil
 	_on_hidden = nil
+	_on_render_failed = nil
 end
 
 return M
