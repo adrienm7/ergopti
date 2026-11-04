@@ -544,3 +544,17 @@ copy checks, the native paths pause case and two retirement controls, plus twelv
 explicit boot locator cases and two existing boot-selection controls. No native
 verdict for those later changes is claimed here. The two additional validation
 site fixes do not increase the register beyond **34 distinct new findings**.
+
+## AHK-035: Managed GET redirects can forward a caller body to another origin
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+ergopti_managed_http_worker.ps1 in static/ergopti_plus/windows/vendor checks only whether a cross-origin method differs from GET. It does not inspect the current SendBody state and actual body length, while the genuine WinHTTP transport sends bodies independently of the method.
+
+Reproduction: Send a nonempty body through the exposed managed GET adapter to an owned origin returning HTTP 301, 302, 307 or 308 to a different origin. The redirect loop strips headers but forwards the staged body.
+
+Consequence: The adapter violates its explicit cross-origin payload policy by contacting the second origin with the original GET body. No current production caller sending a nonempty GET body was found; this is an exposed adapter-contract defect, not an observed end-user disclosure.
+
+Regression: A reachable managed-redirect-body-owner AHK case launches the genuine worker with its real admission handshake and WinHTTP engine against two owned loopback peers. Twelve native controls require denial before target contact, empty-GET and 303 controls, same-origin body preservation, and existing POST denial. Native peers record only body lengths and SHA256 digests. The original raw transport controls remain. Native Windows execution is pending.
+
+The ongoing register now contains **35 distinct new findings**. The requested target of 1,000 remains unmet.

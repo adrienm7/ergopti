@@ -59,6 +59,8 @@ public sealed class ErgoptiWinHttpTestServer : IDisposable
     public int HugeBodyBytes = 1048576;
     public byte[] BinaryBody = new byte[0];
     public readonly List<string> Requests = new List<string>();
+    public readonly List<int> BodyLengths = new List<int>();
+    public readonly List<string> BodyDigests = new List<string>();
     public int Connections, Type1, Type3, SpnegoLegs, Authenticated, ProxyAuthorizations, BasicAttempts, OriginAuthorizations;
     public bool IdentityMatched;
     public string Failure = "";
@@ -144,11 +146,14 @@ public sealed class ErgoptiWinHttpTestServer : IDisposable
         return text.ToString();
     }
 
-    void Record(string head)
+    void Record(string head, byte[] body)
     {
         lock (gate)
         {
             Requests.Add(Sanitize(head));
+            BodyLengths.Add(body.Length);
+            using (SHA256 hash = SHA256.Create())
+                BodyDigests.Add(BitConverter.ToString(hash.ComputeHash(body)).Replace("-", ""));
             if (Header(head, "Proxy-Authorization") != null) ProxyAuthorizations++;
             string proxyAuth = Header(head, "Proxy-Authorization");
             if (proxyAuth != null && proxyAuth.StartsWith("Basic", StringComparison.OrdinalIgnoreCase)) BasicAttempts++;
@@ -194,8 +199,14 @@ public sealed class ErgoptiWinHttpTestServer : IDisposable
                 string head = ReadHead(stream);
                 if (head == null) return;
                 int length = ContentLength(head);
-                for (int index = 0; index < length; index++) if (stream.ReadByte() < 0) return;
-                Record(head);
+                byte[] body = new byte[length];
+                for (int index = 0; index < length; index++)
+                {
+                    int value = stream.ReadByte();
+                    if (value < 0) return;
+                    body[index] = (byte)value;
+                }
+                Record(head, body);
                 if (PacScript != null && head.StartsWith("GET /ordered.pac ", StringComparison.Ordinal))
                 {
                     // The proxy auto-configuration file is served to anyone, unauthenticated.
