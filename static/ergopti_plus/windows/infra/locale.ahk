@@ -148,13 +148,12 @@ _I18nParseTSV(Content, MagicKey, Status := unset) {
 	return m
 }
 
-; True when the .tsv cache is at least as new as its .json source — i.e. it is
-; not stale after a .json edit or pull. FileGetTime's "M" form is YYYYMMDDHH24MISS,
-; which orders chronologically as a plain integer, so a direct >= comparison is
-; correct. Any stat failure returns false so the caller regenerates defensively.
+; FileGetTime exposes seconds only. Equality cannot prove that a cache follows
+; its source: an edit later in the same second must regenerate on a cold boot.
+; Any stat failure also returns false so JSON remains authoritative.
 _I18nTsvIsFresh(TsvPath, JsonPath) {
 	try {
-		return FileGetTime(TsvPath, "M") >= FileGetTime(JsonPath, "M")
+		return FileGetTime(TsvPath, "M") > FileGetTime(JsonPath, "M")
 	} catch {
 		return false
 	}
@@ -203,7 +202,7 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 }
 
 ; Load one locale's flat key→value Map using the self-healing .tsv cache: parse
-; the fast .tsv when it exists AND is at least as new as the .json; otherwise
+; the fast .tsv when it exists AND is strictly newer than the .json; otherwise
 ; parse the .json (the single source of truth), build the Map, and regenerate the
 ; .tsv beside it so the NEXT boot is fast. ★ is substituted with MagicKey on both
 ; paths. This is the ONLY site that reads or writes a locale .tsv, so the cache
