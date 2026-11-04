@@ -820,6 +820,26 @@ end)
 
 
 helpers.describe("LLM trigger settings: applications the trigger never runs in", function()
+	helpers.it("keeps trigger exclusions when a caller mutates a returned list (trigger-apps-alias)", function()
+		local settings, storage = load_settings()
+		assert(settings.set_disabled_apps({ "bank" }))
+		local exposed = settings.get("disabled_apps")
+		exposed[1] = nil
+		local disabled, stored = settings.is_app_disabled("bank"), storage.get("llm.trigger.disabled_apps")
+		restore()
+		helpers.assert_true(disabled, "mutating a returned list cannot turn predictions back on")
+		helpers.assert_eq(stored, { "bank" })
+	end)
+
+	helpers.it("owns direct trigger exclusion input independently after persistence (trigger-apps-alias)", function()
+		local settings = load_settings()
+		local candidate = { "bank" }
+		assert(settings.set("disabled_apps", candidate))
+		candidate[1] = nil
+		local disabled = settings.is_app_disabled("bank")
+		restore()
+		helpers.assert_true(disabled, "caller-owned edits cannot change the committed runtime list")
+	end)
 	helpers.it("refuses sparse exclusion edits without erasing protected applications (trigger-apps-sparse)", function()
 		local settings, storage = load_settings()
 		assert(settings.set_disabled_apps({ "firefox", "bank" }))

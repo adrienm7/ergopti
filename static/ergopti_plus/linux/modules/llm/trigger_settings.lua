@@ -79,6 +79,13 @@ local MAX_APPS = 200
 local _defaults = {}
 local _values = {}
 
+local function detached(name, value)
+	if name ~= LEAF.DISABLED_APPS or type(value) ~= "table" then return value end
+	local copy = {}
+	for index, app in ipairs(value) do copy[index] = app end
+	return copy
+end
+
 local function definition(name)
 	local def = DEFINITIONS[name]
 	if not def then Logger.error(LOG, "Unknown trigger setting '%s'.", tostring(name)) end
@@ -156,22 +163,22 @@ end
 --- @param name string
 --- @return number|boolean|nil
 function M.get(name)
-	if _values[name] ~= nil then return _values[name] end
+	if _values[name] ~= nil then return detached(name, _values[name]) end
 	local shipped = default_for(name)
 	if shipped == nil then return nil end
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if ok and Storage then
 		local stored = Storage.get(PREF_PREFIX .. name, nil)
 		if valid(name, stored) then
-			_values[name] = stored
-			return stored
+			_values[name] = detached(name, stored)
+			return detached(name, _values[name])
 		elseif stored ~= nil then
 			-- Outdated configuration: named once, offered by the cleanup.
 			ConfigOutdated.report(PREF_PREFIX .. name, ConfigOutdated.REFUSED, Logger)
 		end
 	end
-	_values[name] = shipped
-	return shipped
+	_values[name] = detached(name, shipped)
+	return detached(name, _values[name])
 end
 
 --- The applications the trigger never runs in, as a detached list.
@@ -225,6 +232,7 @@ function M.set(name, value, expected_source, admission)
 		Logger.error(LOG, "Refused invalid trigger setting %s=%s.", tostring(name), tostring(value))
 		return false
 	end
+	value = detached(name, value)
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then
 		Logger.error(LOG, "No storage; trigger setting '%s' was not changed.", name)
@@ -242,7 +250,7 @@ function M.set(name, value, expected_source, admission)
 		Logger.error(LOG, "Trigger setting '%s' could not be persisted; live state is unchanged.", name)
 		return false
 	end
-	_values[name] = value
+	_values[name] = detached(name, value)
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
 	return true
 end
