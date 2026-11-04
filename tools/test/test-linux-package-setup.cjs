@@ -201,7 +201,7 @@ try {
 	stub('id', 'if [ "$1" = -u ]; then echo 0; else exit 1; fi');
 	stub(
 		'getent',
-		'if [ "$1" = passwd ]; then echo "desktop:x:1000:1000::/home/desktop:/bin/bash"; else exit 2; fi'
+		'if [ "$1" = passwd ]; then echo "desktop:x:1000:1000::/home/desktop:/bin/bash"; elif [ "$2" = "${FAIL_GROUP:-}" ]; then exit "${FAIL_STATUS:-1}"; else exit 2; fi'
 	);
 	stub(
 		'loginctl',
@@ -234,6 +234,31 @@ show-session) case "$2" in
 			.replace('[ -S /run/udev/control ]', 'true')
 			.replace('set -euo pipefail', 'set -euo pipefail\nexport PATH="$TEST_STUBS:/usr/bin:/bin"')
 	);
+	for (const [group, status] of ['input', 'uinput'].flatMap((name) => [
+		[name, 1],
+		[name, 3]
+	])) {
+		const failed = spawnSync(bashExecutable(), [bashPath(script), '--user', '1000'], {
+			encoding: 'utf8',
+			timeout: 15000,
+			env: {
+				HOME: bashPath(sandbox),
+				PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
+				TEST_STUBS: bashPath(stubs),
+				CALL_LOG: bashPath(callLog),
+				FAIL_GROUP: group,
+				FAIL_STATUS: String(status)
+			}
+		});
+		assert.equal(failed.status, status, `failed ${group} lookup must preserve its status`);
+		assert.match(failed.stderr, /code=group-lookup-failed/);
+		assert.equal(
+			fs.existsSync(callLog),
+			false,
+			'no group or device mutation before complete lookup'
+		);
+		assert.equal(fs.existsSync(path.join(sandbox, 'etc')), false);
+	}
 	const result = spawnSync(bashExecutable(), [bashPath(script), '--active-sessions'], {
 		encoding: 'utf8',
 		timeout: 15000,
