@@ -56,6 +56,7 @@ end
 local function compare_prerelease_id(a, b)
 	local a_num = a:match("^%d+$") ~= nil
 	local b_num = b:match("^%d+$") ~= nil
+	if a_num ~= b_num then return a_num and -1 or 1 end
 	if a_num and b_num then
 		local ai, bi = tonumber(a), tonumber(b)
 		if ai > bi then return 1 end
