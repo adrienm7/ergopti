@@ -127,7 +127,7 @@ end
 --- Runs a SQL statement against the database via the sqlite3 CLI.
 --- @param sql string Complete SQL statement(s) to execute.
 --- @return boolean True on success.
-local function _exec(sql, media_owned)
+local function _exec(sql, media_owned, strict_terminal)
 	if _flush_owner and not _flush_owner:is_settled() then return false end
 	if not _db_path or not _available then return false end
 
@@ -149,13 +149,17 @@ local function _exec(sql, media_owned)
 		return false
 	end
 	local output
-	if media_owned then
+	if media_owned or strict_terminal then
 		local read_ok, body = pcall(pipe.read, pipe, "*a")
 		local close_ok, closed = pcall(pipe.close, pipe)
 		if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
-			_media_terminal_debt = { pipe = pipe, close_acknowledged = close_ok and closed == true }
-			_db_path = nil
-			Logger.error(LOG, "Semantic media terminal observation failed; exact owner and pending events remain unresolved.")
+			if media_owned then
+				_media_terminal_debt = { pipe = pipe, close_acknowledged = close_ok and closed == true }
+				_db_path = nil
+				Logger.error(LOG, "Semantic media terminal observation failed; exact owner and pending events remain unresolved.")
+			else
+				Logger.error(LOG, "SQLite backup process was not completely observed and closed.")
+			end
 			return false
 		end
 		output = body
@@ -366,6 +370,42 @@ function M.flush_transport_available()
 	return require("infra.sqlite_batch_process").is_available() == true
 end
 
+--- Reserves a private, unique folder for this attempt. Earlier backups are
+--- retained: their existence does not prove they describe the current store.
+local function reserve_migration_backup()
+	local loaded, uv = pcall(require, "luv")
+	if not loaded or type(uv.fs_mkdtemp) ~= "function" or type(uv.fs_lstat) ~= "function"
+		or type(uv.getuid) ~= "function" then return nil end
+	local uid_ok, uid = pcall(uv.getuid)
+	if not uid_ok or type(uid) ~= "number" then return nil end
+	local prefix = _db_path .. TokenEncoding.BACKUP_SUFFIX .. "."
+	local made, dir = pcall(uv.fs_mkdtemp, prefix .. "XXXXXX")
+	if not made or type(dir) ~= "string" or dir:sub(1, #prefix) ~= prefix or #dir ~= #prefix + 6
+		or dir:sub(#prefix + 1):find("[/%z]") then return nil end
+	local checked, stat = pcall(uv.fs_lstat, dir)
+	if not checked or type(stat) ~= "table" or stat.type ~= "directory" or stat.uid ~= uid
+		or type(stat.mode) ~= "number" or stat.mode % 512 ~= 448
+		or type(stat.dev) ~= "number" or stat.dev < 0 or stat.dev % 1 ~= 0 or stat.dev >= 2 ^ 53
+		or type(stat.ino) ~= "number" or stat.ino < 0 or stat.ino % 1 ~= 0 or stat.ino >= 2 ^ 53 then return nil end
+	return { path = dir .. "/snapshot.sqlite", dir = dir, dev = stat.dev, ino = stat.ino, uid = uid, uv = uv }
+end
+
+--- Rechecks the reserved directory and the completed private snapshot before
+--- changing the original. Metadata checks fence observed replacement; they do
+--- not claim an atomic compare-and-swap against same-user concurrent changes.
+local function migration_backup_current(backup)
+	local uv = backup.uv
+	local checked, directory, file = pcall(function()
+		return uv.fs_lstat(backup.dir), uv.fs_lstat(backup.path)
+	end)
+	return checked and type(directory) == "table" and directory.type == "directory"
+		and directory.dev == backup.dev and directory.ino == backup.ino and directory.uid == backup.uid
+		and type(directory.mode) == "number" and directory.mode % 512 == 448
+		and type(file) == "table" and file.type == "file" and file.uid == backup.uid
+		and type(file.mode) == "number" and file.mode % 512 == 384
+		and file.nlink == 1 and type(file.size) == "number" and file.size > 0
+end
+
 --- Moves a store to the current n-gram token encoding, once. This database is
 --- the only copy of its derived keys: unlike Windows and macOS there is no ledger
 --- replay, so the keys are rewritten in place. VACUUM INTO first leaves a
@@ -402,18 +442,13 @@ function M.ensure_token_encoding()
 	end
 	local statements = TokenEncoding.migration_statements(keys)
 	if #statements > 0 then
-		local backup = _db_path .. TokenEncoding.BACKUP_SUFFIX
-		local fh, detail, code = RegularFileReader.open(backup)
-		if fh then
-			local close_ok, closed = pcall(fh.close, fh)
-			if not close_ok or closed ~= true then
-				Logger.error(LOG, "Cannot close the metrics migration backup.")
-				return false
-			end
-		elseif code ~= RegularFileReader.ENOENT then
-			Logger.error(LOG, "Cannot inspect the metrics migration backup: %s.", ErrorDescription.describe(detail))
+		local backup = reserve_migration_backup()
+		if not backup then
+			Logger.error(LOG, "Cannot reserve a private metrics migration backup.")
 			return false
-		elseif not _exec("VACUUM INTO '" .. backup:gsub("'", "''") .. "';") then
+		end
+		if not _exec("VACUUM INTO '" .. backup.path:gsub("'", "''") .. "';", false, true)
+			or not migration_backup_current(backup) then
 			Logger.error(LOG, "Cannot back the metrics store up before migrating its n-gram keys.")
 			return false
 		end
