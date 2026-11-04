@@ -39,6 +39,8 @@ on:
       - 'tools/diagnostics/hs274*'
       - 'tools/diagnostics/fixtures/hs274*'
       - 'tools/build/remap_runtime*'
+      - 'tools/build/owned_runtime*'
+      - 'tools/build/owned-runtime-installer/**'
 
 concurrency:
   group: remap-runtime-build-${{ github.ref }}
@@ -73,6 +75,16 @@ jobs:
           set -euo pipefail
           python3 tools/build/remap_runtime_hosted_build_test.py
           python3 tools/build/remap_runtime_build_test.py
+
+      # The live installer helper's roster (the idle Core service owners of
+      # the first install) compiles unsigned with the builder's own commands,
+      # so a roster change is proven without the signed runtime-artifact job.
+      - name: Compile the live installer helper roster unsigned
+        working-directory: ergopti
+        run: |
+          set -euo pipefail
+          python3 tools/build/owned_runtime_product_build_test.py
+          python3 tools/build/owned_runtime_helper_compile_check.py
 
       - name: Compile and run each vendor-header test
         working-directory: ergopti

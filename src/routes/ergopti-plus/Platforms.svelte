@@ -20,6 +20,7 @@ under another configuration path.
 	import { t, i18n } from './i18n.svelte.js';
 	import matrix from './feature-inventory.json';
 	import actions from './action-inventory.json';
+	import menuGaps from './menu-gaps.json';
 
 	/** @type {{macosApps: Array<{id: string, name: string, description: string}>}} */
 	let { macosApps } = $props();
@@ -106,6 +107,50 @@ under another configuration path.
 				</thead>
 				<tbody>
 					{#each actions as row, i}
+						<tr style="--row: {i};">
+							<td class="feat-col"
+								>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
+							>
+							{#each ['windows', 'macos', 'linux'] as os}
+								{@const available = row.platforms[os]}
+								<td
+									class:ok={available}
+									class:off={!available}
+									class="cell"
+									title={row.reasons[os]?.[i18n.lang]}>{available ? '✓' : '—'}</td
+								>
+							{/each}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</details>
+
+		<details class="table-wrap" use:reveal>
+			<summary>{t('Options de menu propres à certains systèmes')} ({actions.length})</summary>
+			<table class="matrix">
+				<thead>
+					<tr>
+						<th class="feat-col">{t('Option')}</th>
+						<th>
+							<i class="icon-windows"></i>
+							<span class="os-name">Windows</span>
+							<span class="os-driver">AutoHotkey v2</span>
+						</th>
+						<th>
+							<i class="icon-appleinc"></i>
+							<span class="os-name">macOS</span>
+							<span class="os-driver">Hammerspoon</span>
+						</th>
+						<th>
+							<i class="icon-linux"></i>
+							<span class="os-name">Linux</span>
+							<span class="os-driver">Lua · alpha</span>
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each menuGaps as row, i}
 						<tr style="--row: {i};">
 							<td class="feat-col"
 								>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td

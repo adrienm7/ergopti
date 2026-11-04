@@ -134,6 +134,24 @@ local function announce_closed()
 	require("infra.notifications").notify(i18n.get("notify.karabiner.user_closed"), nil, "info")
 end
 
+--- Builds the owner's state observer: the first block of a launch the user can
+--- act on (runtime_owner.lua USER_BLOCKS) raises one notice; the Tap-Holds menu
+--- says which one. Without it an owned boot with the runtime missing
+--- or a user Karabiner left running had the tap-holds off silently, since the
+--- official-application wizard no longer runs and the explanation sits in a submenu.
+--- @param notify function fn(text) showing a notice.
+--- @return function observer fn(state, reason).
+function M.block_notice(notify)
+	assert(type(notify) == "function", "Missing notifier")
+	local shown = false
+	local blocks = require("platform.remap.runtime_owner").USER_BLOCKS
+	return function(state, reason)
+		if shown or (state ~= "unavailable" and state ~= "failed") or not blocks[reason] then return end
+		shown = true
+		notify(require("infra.i18n").get("notify.karabiner.owned_blocked"))
+	end
+end
+
 --- The ports of the activation rule (platform/remap/runtime_activation.lua).
 --- @param owner table The bound runtime owner module.
 --- @param close_other_instances function fn() -> boolean, the user's consent.
@@ -186,6 +204,9 @@ function M.new()
 		},
 		capture = require("adapters.runtime_capture_port").new(),
 		timer = require("adapters.timer_scheduler"),
+		observer = M.block_notice(function(text)
+			require("infra.notifications").notify(text, nil, "warning")
+		end),
 	}
 end
 

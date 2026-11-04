@@ -172,6 +172,26 @@ class PublishTests(unittest.TestCase):
         with self.assertRaisesRegex(SUBJECT.PublishRefusal, "exactly"):
             SUBJECT.apply_pin(copy, dict(pin, extra=1))
 
+    def test_written_json_is_lf_on_every_os(self):
+        # Text mode on Windows turned each newline into CRLF in the tracked manifest.
+        # The pin is literal so this runs where the fake tree cannot carry POSIX modes.
+        copy = self.base / "manifest.json"
+        copy.write_bytes(MANIFEST.read_bytes())
+        pin = {
+            "version": "1.0.0",
+            "file_name": SUBJECT.file_name("1.0.0"),
+            "source_url": SUBJECT.source_url(version="1.0.0"),
+            "sha256": "0" * 64,
+            "size": 1,
+        }
+        SUBJECT.apply_pin(copy, pin)
+        written_pin = self.base / "runtime-pin.json"
+        SUBJECT.write_json(written_pin, pin)
+        for written in (copy, written_pin):
+            data = written.read_bytes()
+            self.assertNotIn(b"\r", data, written.name)
+            self.assertTrue(data.endswith(b"}\n"), written.name)
+
     def test_version_has_the_shape_the_driver_accepts(self):
         self.assertRegex(SUBJECT.RUNTIME_VERSION, r"^\d+\.\d+\.\d+[\w.\-+]*$")
         self.assertRegex(SUBJECT.file_name(), r"^[A-Za-z0-9][A-Za-z0-9._-]*$")

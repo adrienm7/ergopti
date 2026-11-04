@@ -48,6 +48,9 @@ local USER_KARABINER_KEYS = {
 	["menu.tapholds.vhid_incompatible"] = true,
 	["menu.tapholds.vhid_not_active"] = true,
 	["menu.tapholds.vhid_update"] = true,
+	-- A running user Karabiner blocks ours, or refused Karabiner's own quit.
+	["menu.tapholds.owned_other_running"] = true,
+	["menu.tapholds.owned_close_failed"] = true,
 }
 
 -- The Debug menu's field checks exist so the maintainer can test the remap
