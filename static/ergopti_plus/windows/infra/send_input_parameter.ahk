@@ -388,13 +388,22 @@ SendInputParse(Kind, Value) {
 ; ==================================
 ; ==================================
 
-; The AutoHotkey name of a parsed key: the vocabulary's name for a named key,
-; the character itself otherwise (TextPressKey braces it, so { and } are safe).
+; The AutoHotkey name of a parsed key: the vocabulary's name, a BMP
+; character, or U+codepoint for a supplementary scalar. Braced AHK key names
+; accept a single UTF-16 unit, not a literal surrogate pair. TextPressKey adds
+; the braces, keeping literal braces and explicit Unicode keys safe.
 ; @param {Map} Parsed A key or shortcut parse.
 ; @returns {String}
 _SendInputAhkKey(Parsed) {
-	if Parsed.Has("char")
-		return Parsed["char"]
+	if Parsed.Has("char") {
+		Char := Parsed["char"]
+		if StrLen(Char) == 2 {
+			High := Ord(SubStr(Char, 1, 1)), Low := Ord(SubStr(Char, 2, 1))
+			if High >= 0xD800 && High <= 0xDBFF && Low >= 0xDC00 && Low <= 0xDFFF
+				return Format("U+{:X}", 0x10000 + ((High - 0xD800) << 10) + Low - 0xDC00)
+		}
+		return Char
+	}
 	return _SendInputFindEntry(SendKeysVocabulary()["keys"], Parsed["named"])["ahk"]
 }
 

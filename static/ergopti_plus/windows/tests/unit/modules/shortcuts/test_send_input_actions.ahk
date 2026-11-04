@@ -100,6 +100,10 @@ _SIA_KeysAndShortcuts() {
 	AssertEqual("{PgDn}|critical", _SIA_FireKey("send_key", "pgdn"), "alias")
 	AssertEqual("{{}|critical", _SIA_FireKey("send_key", "{"), "a brace is braced, not read as a key name")
 	AssertEqual("{é}|critical", _SIA_FireKey("send_key", "é"), "a character key")
+	AssertEqual("{U+10000}|critical", _SIA_FireKey("send_key", Chr(0x10000)), "the first supplementary scalar uses AHK's explicit Unicode syntax")
+	AssertEqual("{U+1F44B}|critical", _SIA_FireKey("send_key", Chr(0x1F44B)), "an accepted emoji cannot become an unknown two-unit braced key name")
+	AssertEqual("{U+10FFFF}|critical", _SIA_FireKey("send_key", Chr(0x10FFFF)), "the final Unicode scalar retains every surrogate-pair bit")
+	AssertEqual("^{U+1F44B}|critical", _SIA_FireKey("send_shortcut", "ctrl+" . Chr(0x1F44B)), "shortcut character keys share the same scalar adapter")
 	AssertEqual("", _SIA_FireKey("send_shortcut", "a"), "an invalid stored value presses nothing")
 	AssertEqual("", _SIA_FireKey("send_key", ""), "an empty stored value presses nothing")
 }
