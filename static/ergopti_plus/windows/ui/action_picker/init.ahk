@@ -217,6 +217,8 @@ FilePathsEditor(*) {
 		DirEdit := W.Add("Edit", "xm w400", StrReplace(_ConfigDir, "\", "/"))
 		W.Add("Button", "xm y+6 w80", t("common.browse")).OnEvent("Click", (*) => _PathsEdNative_Browse(W, DirEdit))
 		ConfirmPath(*) {
+				if A_IsSuspended
+						return
 				N := StrReplace(Trim(DirEdit.Value), "/", "\")
 				if (N == "")
 						N := _DefaultConfigDir

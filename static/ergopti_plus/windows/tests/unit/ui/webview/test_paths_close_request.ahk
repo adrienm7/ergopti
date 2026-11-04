@@ -20,14 +20,16 @@ _PCRT_Quote(Text) {
 	return Chr(34) . StrReplace(StrReplace(Text, Chr(96), Chr(96) . Chr(96)), Chr(34), Chr(96) . Chr(34)) . Chr(34)
 }
 
-; All lifecycle/public/window-manager declarations remain their whole owners.
-; The child observes native event registration instead of copying or renaming a
-; production Close handler or providing a second public request producer.
-_PCRT_ChildSource() {
+; Retirement cases retain whole lifecycle/public/window-manager owners.
+; The native admission case extracts the genuine public editor and instruments
+; its callback boundary; both variants use the original native registrations.
+_PCRT_ChildSource(NativePause := false) {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Owners := Map()
 	for Symbol in ["JsonStringLiteral", "FilePathsEditor", "_PathsEdWeb_TryOpen", "WMPresentWindow", "TickElapsed"] {
+		if NativePause && Symbol == "FilePathsEditor"
+			continue
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The paths retirement child requires its whole genuine owner: " . Symbol)
 		if !Owners.Has(Owner) {
@@ -35,13 +37,37 @@ _PCRT_ChildSource() {
 			Code .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(5, Owners.Count, "The codec/public/host/native presentation/clock owners must be present")
-	Fixture := _DriverDir . "\tests\fixtures\paths_close_request_body.ahk"
+	AssertEqual(NativePause ? 4 : 5, Owners.Count, "The codec/public/host/native presentation/clock owners must be present")
+	if NativePause {
+		Body := _DriverFuncBody("FilePathsEditor")
+		AssertTrue(Body != "", "The native admission test requires the actual public editor")
+		Masked := _DriverMaskNonCode(&Body)
+		Pattern := "(?<![A-Za-z0-9_.])_PathsFile_Write(?![A-Za-z0-9_])"
+		AssertTrue(RegExMatch(Masked, Pattern, &Write) > 0, "The actual native writer admission must exist")
+		AssertEqual(0, RegExMatch(Masked, Pattern, , Write.Pos + Write.Len), "The native editor has exactly one writer admission")
+		Body := SubStr(Body, 1, Write.Pos - 1) . "_NPPA_Write" . SubStr(Body, Write.Pos + Write.Len)
+		Definition := _DriverFindFunctionDefinition(&Body, "ConfirmPath")
+		AssertTrue(IsObject(Definition), "The actual nested native callback must resolve")
+		Nested := RTrim(_DriverExtractDefinedBody(&Body, Definition), "`r`n")
+		AssertTrue(Nested != "", "The nested callback body must be nonempty")
+		AssertEqual(Nested, SubStr(Body, Definition.Idx, StrLen(Nested)),
+			"Boundary instrumentation must preserve the exact already comment-stripped callback bytes")
+		CloseAt := Definition.Idx + StrLen(Nested) - 1
+		AssertEqual("}", SubStr(Body, CloseAt, 1))
+		; Entry/return instrumentation delegates the actual closure through its
+		; genuine native OnEvent registration; only the writer is an admission port.
+		Body := SubStr(Body, 1, Definition.OpenPos) . "`n_NPPA.Entered += 1`ntry {"
+			. SubStr(Body, Definition.OpenPos + 1, CloseAt - Definition.OpenPos - 1)
+			. "`n} finally _NPPA.Returned += 1`n" . SubStr(Body, CloseAt)
+		Code .= Body . "`n"
+	}
+	Fixture := _DriverDir . "\tests\fixtures\"
+		. (NativePause ? "native_paths_pause_owner_body.ahk" : "paths_close_request_body.ahk")
 	AssertTrue(FileExist(Fixture))
 	return Code . "#Include " . Fixture . "`n"
 }
 
-_PCRT_Case(Mode) {
+_PCRT_Case(Mode, NativePause := false) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unsettled earlier paths editor child must retire first")
 	Directory := A_Temp . "\ergopti_paths_close_request_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
@@ -54,8 +80,9 @@ _PCRT_Case(Mode) {
 		FSCreateDirectoryExclusiveStrict(Directory . "\64bit")
 		; Availability must take its genuine filesystem branch. This inert marker
 		; is never loaded: the browser factory is explicitly passive in the child.
-		AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "private availability marker") != 0)
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _PCRT_ChildSource()) != 0)
+		if !NativePause
+			AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "private availability marker") != 0)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _PCRT_ChildSource(NativePause)) != 0)
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _PCRT_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The genuine public paths editor child must start")
@@ -114,7 +141,7 @@ _PCRT_Case(Mode) {
 	AssertEqual(1, AtDeadline.Calls, "The exact paths editor child must settle once: " . State.ErrorText . State.Output)
 	AssertEqual("", AtDeadline.ErrorText, "Parser/runtime diagnostics cannot qualify as cancellation: " . State.Output)
 	AssertEqual(0, AtDeadline.Code, "The real paths editor violated startup ownership: " . State.Output)
-	AssertContains(AtDeadline.Output, "PASS paths-close-request " . Mode)
+	AssertContains(AtDeadline.Output, (NativePause ? "PASS native-paths-pause " : "PASS paths-close-request ") . Mode)
 	; A capture-export refusal cannot hide an earlier timeout/business failure,
 	; nor can a successful child silently turn that refusal into a passing test.
 	if IsObject(ExportFailure)
@@ -124,3 +151,6 @@ _PCRT_Case(Mode) {
 for _PCRT_Mode in ["after-close", "during-close"]
 	Test("Paths retirement request: " . _PCRT_Mode . " is retained after the actual Close returns (paths-close-request-owner)",
 		_PCRT_Case.Bind(_PCRT_Mode))
+
+Test("Native paths editor: a real OK callback refuses mutation while paused (native-paths-pause-owner)",
+	_PCRT_Case.Bind("native-paused", true))
