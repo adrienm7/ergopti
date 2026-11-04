@@ -72,7 +72,11 @@ under another configuration path.
 								>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
 							>
 							{#each [row.platforms.windows, row.platforms.macos, row.platforms.linux] as available}
-								<td class:ok={available} class:off={!available} class="cell"
+								<td
+									class:ok={available}
+									class:off={!available}
+									class="cell"
+									title={!available ? row.reason?.[i18n.lang] : undefined}
 									>{available ? '✓' : '—'}</td
 								>
 							{/each}

@@ -21,7 +21,24 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const inventory = require('../codegen/codegen-feature-inventory.cjs');
 inventory.check();
 // Both projections must react to a change in a platform declaration.
-const inventoryModel = require('../build/build-features-manifest.js').loadFeatureModel().features;
+const featureModel = require('../build/build-features-manifest.js').loadFeatureModel();
+const inventoryModel = inventory.withSectionReasons(
+	featureModel.features,
+	featureModel.manifest.sections
+);
+assert.strictEqual(
+	inventoryModel.find((row) => row.path === 'gestures.modes.swipe_2_left').reason_key,
+	'platform_reason.gesture_modes_and_steps_are_macos'
+);
+const inheritedFixture = inventory.withSectionReasons(
+	[{ section: 'one', platforms: ['hs', 'linux'] }],
+	{ one: { platforms: ['hs'], reason_key: 'wrong' } }
+);
+assert.strictEqual(
+	inheritedFixture[0].reason_key,
+	undefined,
+	'section reasons must not cross platform sets'
+);
 const inventoryLocales = Object.fromEntries(
 	['fr', 'en'].map((lang) => [
 		lang,
@@ -51,8 +68,16 @@ const beforeInventory = inventory.render(
 	inventoryActions,
 	inventoryMenu
 );
+const unexplainedModel = structuredClone(inventoryModel);
+const unexplained = unexplainedModel.find((row) => row.platforms.length < 3);
+delete unexplained.reason_key;
+assert.throws(
+	() => inventory.render(unexplainedModel, inventoryLocales, inventoryActions, inventoryMenu),
+	/Missing translated platform reason/
+);
 const changedModel = structuredClone(inventoryModel);
 changedModel[0].platforms = ['ahk'];
+changedModel[0].reason_key = 'platform_reason.alt_gr_is_kana_remap';
 const afterInventory = inventory.render(
 	changedModel,
 	inventoryLocales,
