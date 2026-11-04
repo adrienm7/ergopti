@@ -383,8 +383,8 @@ function M.build(ctx)
 	local legacy_active     = {}
 	for _, r in ipairs(records) do
 		local kl_name = r.id or ""
-		if kl_name:lower():find("ergopti", 1, true) then
-			local stable_id = kl_name_to_tis[kl_name]
+		local stable_id = kl_name_to_tis[kl_name]
+		if stable_id or is_legacy_ergopti_id(kl_name) then
 			if stable_id then
 				-- Matches an installed variant → genuinely active
 				active_id_set_pre[stable_id] = true

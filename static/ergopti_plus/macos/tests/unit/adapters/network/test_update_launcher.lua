@@ -78,6 +78,26 @@ helpers.describe("update_launcher: exact native updater command", function()
 		helpers.assert_true(#errors >= 6)
 	end)
 
+	helpers.it("refuses a syntactically valid channel absent from the registry", function()
+		local sent = {}
+		local subject, _, dialogs = load_subject(function(url) sent[#sent + 1] = url; return true end)
+		helpers.assert_eq(subject.select_channel("unknown_channel"), false)
+		helpers.assert_eq(subject.request_check("unknown_channel"), false)
+		helpers.assert_eq(#sent, 0)
+		helpers.assert_eq(#dialogs, 1)
+	end)
+
+	helpers.it("does not send a command when the channel registry is unavailable", function()
+		helpers.with_stub_scope({ "modules.updater" }, function()
+			package.loaded["modules.updater"] = { channels = function() error("registry unavailable") end }
+			local sent = {}
+			local subject, _, dialogs = load_subject(function(url) sent[#sent + 1] = url; return true end)
+			helpers.assert_eq(subject.request_check("dev"), false)
+			helpers.assert_eq(#sent, 0)
+			helpers.assert_eq(#dialogs, 1)
+		end)
+	end)
+
 	helpers.it("fails visibly when Hammerspoon refuses the URL", function()
 		local subject, errors, dialogs = load_subject(function() return false end)
 
@@ -94,6 +114,18 @@ helpers.describe("update_launcher: exact native updater command", function()
 		helpers.assert_eq(result, false)
 		helpers.assert_eq(#errors, 1)
 		helpers.assert_eq(#dialogs, 1)
+	end)
+
+	helpers.it("surfaces an opaque native URL error without formatting it", function()
+		local failure = setmetatable({}, { __tostring = function() error("cannot format") end })
+		local subject, _, dialogs = load_subject(function() error(failure) end)
+		local ok, result = pcall(subject.request_check, "dev")
+		helpers.assert_true(ok)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(#dialogs, 1)
+		local channel_ok, changed = pcall(subject.select_channel, "dev")
+		helpers.assert_true(channel_ok)
+		helpers.assert_eq(changed, false)
 	end)
 
 	helpers.it("falls back when the modal returns no button", function()

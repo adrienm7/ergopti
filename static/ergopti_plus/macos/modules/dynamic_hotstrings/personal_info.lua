@@ -53,6 +53,7 @@ local _enabled   = false
 local _replacing = false
 local _state     = STATE_IDLE
 local _combo     = ""
+local _action_revision = {}
 
 local _trigger         = "★"
 local _info            = {}
@@ -426,6 +427,7 @@ end
 --- @param new_info table The updated fields to save.
 --- @return boolean committed True only after disk and live memory commit.
 function M.save_info(new_info)
+	_action_revision = {}
 	if type(new_info) ~= "table" then
 		Logger.error(LOG, "save_info(): expected a table, got %s — save refused.", type(new_info))
 		return false
@@ -724,6 +726,7 @@ local function interceptor(event, _km_buffer, ctx)
 
 	if _state == STATE_IDLE then
 		if char == "@" then
+			local revision, token, owner = _action_revision, _active_start_token, _keymap
 			local full_trigger = (_km_buffer or "") .. "@"
 			if _keymap then
 				-- Single-pass and memoised: classify_trigger returns all three flags
@@ -753,6 +756,9 @@ local function interceptor(event, _km_buffer, ctx)
 				if exact or pref or suff then
 					return nil
 				end
+			end
+			if not _enabled or revision ~= _action_revision or token ~= _active_start_token or owner ~= _keymap then
+				return nil
 			end
 
 			_state = STATE_COLLECTING
@@ -786,6 +792,7 @@ local function interceptor(event, _km_buffer, ctx)
 				local combo = _combo
 				
 				local full_trigger = "@" .. combo .. _trigger
+				local revision, token, owner = _action_revision, _active_start_token, _keymap
 				-- Through the memoised classifier, like the @-entry check above.
 				-- has_exact_trigger walks the whole mapping corpus and caches nothing,
 				-- and this runs on the keystroke that completes a combo - so the same
@@ -793,6 +800,9 @@ local function interceptor(event, _km_buffer, ctx)
 				-- classify_trigger returns all three flags; only `exact` matters at this
 				-- point, because a prefix or suffix match does not claim the trigger.
 				local claimed = static_claims_full_trigger(full_trigger)
+				if not _enabled or revision ~= _action_revision or token ~= _active_start_token or owner ~= _keymap then
+					return nil
+				end
 				if claimed and full_trigger:sub(1, 1) == "@" then
 					_state = STATE_IDLE
 					_combo = ""
@@ -875,6 +885,7 @@ function M.set_trigger_char(char)
 		Logger.error(LOG, "set_trigger_char(): expected a non-empty string, got %s — trigger unchanged.", type(char))
 		return false
 	end
+	_action_revision = {}
 	_trigger = char
 	-- A pending combo was accumulated against the OLD trigger; keeping it would
 	-- let the next keystroke fire a combo the user started under different rules.
@@ -1037,6 +1048,7 @@ end
 --- Enables the engine tracking.
 function M.enable()
 	Logger.debug(LOG, "Enabling personal info tracking…")
+	_action_revision = {}
 	_enabled = true; _state = STATE_IDLE; _combo = ""
 	Logger.info(LOG, "Personal info tracking enabled.")
 	return true
@@ -1045,6 +1057,7 @@ end
 --- Disables the engine tracking.
 function M.disable()
 	Logger.debug(LOG, "Disabling personal info tracking…")
+	_action_revision = {}
 	_enabled = false; _state = STATE_IDLE; _combo = ""
 	Logger.info(LOG, "Personal info tracking disabled.")
 	return true

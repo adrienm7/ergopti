@@ -59,7 +59,7 @@ function parseToNodes(text) {
 			tokenName === 'max_words' || // config-key-literal-ok: prompt template token, not a configuration key
 			tokenName === 'language'
 		) {
-			nodes.push(makeChip(tokenName));
+			nodes.push(makeChip(match[1]));
 		} else {
 			nodes.push(document.createTextNode(match[0]));
 		}
@@ -210,8 +210,7 @@ function tryConvertToken(editorElement) {
 	replaceRange.setEnd(node, offset);
 	replaceRange.deleteContents();
 
-	var tokenName = match[1].toLowerCase();
-	var chip = makeChip(tokenName);
+	var chip = makeChip(match[1]);
 	var anchorRange = selection.getRangeAt(0);
 	anchorRange.insertNode(chip);
 

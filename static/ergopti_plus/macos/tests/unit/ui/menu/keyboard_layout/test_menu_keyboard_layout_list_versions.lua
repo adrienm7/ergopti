@@ -129,6 +129,12 @@ end
 local INSTALLED = { name = "Ergopti_v2.2.2.bundle", version = { 2, 2, 2 } }
 
 helpers.describe("menu_keyboard_layout: active-list upgrade label versions", function()
+	helpers.it("does not offer migration for a third-party source containing Ergopti (layout-legacy-ownership)", function()
+		local labels = bundle_labels({ legacy = "OtherErgopti_v2_2_0", latest = "Ergopti_v2.2.2.bundle", installed = INSTALLED })
+		for _, label in ipairs(labels) do
+			helpers.assert_true(not label:find("list ->", 1, true), "a foreign source must not offer an upgrade")
+		end
+	end)
 	helpers.it("drops an unknown legacy version instead of printing v?", function()
 		local labels = bundle_labels({
 			legacy = "Ergopti_plus", legacy_version = nil,

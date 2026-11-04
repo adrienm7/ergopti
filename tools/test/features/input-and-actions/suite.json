@@ -738,6 +738,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-editor-preference-update.cjs"],
 			"repro": "node tools/test/test-hotstring-editor-preference-update.cjs"
+		},
+		{
+			"id": "js-personal-editor-initialization",
+			"ordinal": 576,
+			"name": "personal information editor preserves edits across delayed initialization",
+			"cmd": "node",
+			"args": ["tools/test/test-personal-editor-initialization.cjs"],
+			"repro": "node tools/test/test-personal-editor-initialization.cjs"
 		}
 	]
 }

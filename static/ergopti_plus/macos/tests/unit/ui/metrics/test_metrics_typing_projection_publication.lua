@@ -33,7 +33,7 @@ local function fake_reader(per_day, failing)
 			error(ABANDONED)
 		end
 	end
-	local reader = { next_day = Real.next_day }
+	local reader = { next_day = Real.next_day, history_fingerprint_exact = true }
 	function reader.split_bounds(_start, _end, today)
 		local y, m, d = today:match("^(%d+)%-(%d+)%-(%d+)$")
 		local yesterday = os.date("%Y-%m-%d", os.time({ year = y, month = m, day = d - 1, hour = 12 }))

@@ -1290,11 +1290,29 @@ end
 local function is_legacy_ergopti_id(name)
 	if type(name) ~= "string" then return false end
 	local lower = name:lower()
-	-- Versioned IDs (any namespace)
-	if lower:find("ergopti[._]v%d", 1) ~= nil then return true end
-	-- Short reserved namespace, only for Ergopti
-	if lower:find("^com%.apple%.keylayout%.ergopti", 1) ~= nil then return true end
-	return false
+	local raw_suffixes = { [""] = true, ["_plus"] = true, ["_ansi"] = true,
+		["_plus_ansi"] = true, ["_plus_plus"] = true, ["_plus_plus_ansi"] = true }
+	local id_suffixes = { [""] = true, [".plus"] = true, [".ansi"] = true,
+		[".plus.ansi"] = true, [".plus_plus"] = true, [".plus_plus.ansi"] = true }
+	local raw = lower:match("^ergopti(.*)$")
+	local versioned_id = lower:match("^com%.apple%.keyboardlayout%.ergopti(.*)$")
+	local short_id = lower:match("^com%.apple%.keylayout%.ergopti(.*)$")
+	if short_id ~= nil and id_suffixes[short_id] then return true end
+	local tail, suffixes = raw or versioned_id or short_id, raw and raw_suffixes or id_suffixes
+	if tail == nil then return false end
+	if raw and raw_suffixes[tail] then return true end
+	-- Version numbers consist of digits separated by dots or underscores. Only
+	-- known variant suffixes may follow, so a third-party name cannot claim a
+	-- source merely by beginning with an Ergopti-looking version.
+	local remainder = tail:match("^[._]v%d+(.*)$")
+	if remainder == nil then return false end
+	while true do
+		local after = remainder:match("^[._]%d+(.*)$")
+		if after == nil then break end
+		remainder = after
+	end
+	-- The old prefix-free ID spelling (ergopti.v2_2_0.plus) uses ID suffixes.
+	return suffixes[remainder] == true or (raw and id_suffixes[remainder] == true) or false
 end
 
 --- Maps a legacy Ergopti identifier to its v2.2.2+ stable equivalent.
@@ -1332,6 +1350,10 @@ local function upgrade_active_list_async(legacy_active, on_done)
 	local entry_count = 0
 	for index, old in pairs(legacy_active) do
 		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > requested_upgrades then
+			invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
+			return false
+		end
+		if not is_legacy_ergopti_id(old) then
 			invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
 			return false
 		end

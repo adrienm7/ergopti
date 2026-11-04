@@ -839,7 +839,8 @@ _CLW_PollFetch(Req, Context, Polls) {
 	; The text crosses into the page as a JS string literal and is parsed there
 	; (JSON.parse or the Atom reader); a response is never evaluated as script.
 	; injectReleases* keeps what the channel's view lists (shared registry).
-	global _CLW_LastList := Map("kind", Context.Stage == "feed" ? "feed" : "json", "json", Json)
+	global _CLW_LastList := Map("kind", Context.Stage == "feed" ? "feed" : "json", "json", Json,
+		"request_epoch", Context.RequestEpoch)
 	if (Context.Stage == "feed") {
 		try LoggerDone("Changelog", "Injecting releases from the Atom feed (channel={1}; API failed: {2})…",
 			Channel, Context.ApiFailure)
@@ -916,9 +917,10 @@ _CLW_InstallDeps(Request) {
 ; This native owner is never serialized. A refreshed list or replaced window
 ; cannot lend an older staging intent its action authority.
 _CLW_ManagedFailureCurrent(Current) {
-	global _CLW_LastList
+	global _CLW_LastList, _CLW_RequestEpoch
 	Owner := Current["native_owner"]
-	return Owner is Map && IsObject(Owner["list"]) && IsObject(_CLW_LastList)
+	return Owner is Map && IsObject(Owner["list"]) && (_CLW_LastList is Map)
+		&& _CLW_LastList.Get("request_epoch", 0) == _CLW_RequestEpoch
 		&& ObjPtr(Owner["list"]) == ObjPtr(_CLW_LastList)
 		&& _CLW_BridgeSessionIsCurrent(Owner["window_epoch"], Owner["session"])
 		&& _Updater_ManagedFailureOwnerIsCurrent(Current["stage_owner"])
@@ -934,8 +936,8 @@ _CLW_RetryUpdatePath(Owner, Observer) {
  * @returns {Map} Map("release", Release) or Map("reason", page locale key).
  */
 _CLW_FindRelease(Tag) {
-	global _CLW_LastList, RELEASE_INSTALL_REASONS
-	if !IsObject(_CLW_LastList)
+	global _CLW_LastList, _CLW_RequestEpoch, RELEASE_INSTALL_REASONS
+	if !(_CLW_LastList is Map) || _CLW_LastList.Get("request_epoch", 0) != _CLW_RequestEpoch
 		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
 	; The Atom feed carries no asset list and no digest.
 	if (_CLW_LastList["kind"] != "json")

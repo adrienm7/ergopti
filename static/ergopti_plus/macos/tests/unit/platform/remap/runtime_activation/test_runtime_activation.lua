@@ -48,7 +48,7 @@ local function fake(initial_state)
 		owner = owner,
 		restore = function(callback)
 			world.restores = world.restores + 1
-			callback(world.restore_result)
+			if world.defer_restore then world.restore_callback = callback else callback(world.restore_result) end
 		end,
 		marker = {
 			get = function() return world.marker end,
@@ -197,6 +197,41 @@ end)
 -- =============================================
 
 helpers.describe("owned runtime activation: Ergopti resumes", function()
+	helpers.it("waits for an in-flight restore before resuming (owned-resume-during-restore)", function()
+		local activation, world = fake()
+		world.marker, world.defer_restore = true, true
+		activation.reconcile(true)
+		activation.reconcile(false)
+		helpers.assert_eq(world.restores, 1)
+		activation.reconcile(true)
+		helpers.assert_eq(world.reloads, 0, "restore must settle before a new capture can start")
+		world.restore_callback(true)
+		helpers.assert_eq(world.reloads, 1)
+	end)
+
+	helpers.it("honors a new pause before the restore settles (owned-resume-during-restore)", function()
+		local activation, world = fake()
+		world.marker, world.defer_restore = true, true
+		activation.reconcile(true)
+		activation.reconcile(false)
+		activation.reconcile(true)
+		activation.reconcile(false)
+		world.restore_callback(true)
+		helpers.assert_eq(world.reloads, 0)
+		helpers.assert_eq(world.marker, false)
+	end)
+
+	helpers.it("does not reload twice if restore completion reenters reconciliation (owned-resume-during-restore)", function()
+		local activation, world = fake()
+		world.marker, world.defer_restore = true, true
+		activation.reconcile(true)
+		world.state = "stopped"
+		activation.restore_if_closed(function() activation.reconcile(true) end)
+		activation.reconcile(true)
+		world.restore_callback(true)
+		world.restore_callback(true)
+		helpers.assert_eq(world.reloads, 1)
+	end)
 	helpers.it("reloads instead of starting a second capture in the same Lua VM", function()
 		local activation, world = fake()
 		activation.reconcile(true)

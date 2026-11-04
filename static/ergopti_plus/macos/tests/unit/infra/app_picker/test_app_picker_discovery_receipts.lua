@@ -20,6 +20,18 @@ local function fail_scan(state, mode)
 end
 
 helpers.describe("app_picker: discovery receipts", function()
+	helpers.it("rescans after the wall clock moves behind its cached result", function()
+		with_picker(function(picker, state)
+			local received = {}
+			picker.discover_apps(function(rows, ok) received[#received + 1] = { rows, ok } end)
+			state.pending[1].callback(0, "/Applications/Old.app\0")
+			state.now = state.now - 120
+			picker.discover_apps(function(rows, ok) received[#received + 1] = { rows, ok } end)
+			helpers.assert_eq(#state.pending, 2, "clock rollback must invalidate the cached application list")
+			state.pending[2].callback(0, "/Applications/New.app\0")
+			helpers.assert_eq(received[2][1][1].text, "New")
+		end)
+	end)
 	for _, accepted in ipairs({ false, true }) do
 		helpers.it("settles an inline completion only after the start receipt=" .. tostring(accepted), function()
 			with_picker(function(picker, state)

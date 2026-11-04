@@ -514,6 +514,11 @@ local function _manifest_windows(db, start_date, end_date)
 	if end_date and end_date ~= "" and (not hi or end_date < hi) then hi = end_date end
 	local windows = {}
 	if not lo or not hi or lo > hi then return windows, complete end
+	-- Validate even a single-day window before the iterator accepts it.
+	if not pcall(shift_day, lo, 0) or not pcall(shift_day, hi, 0) then
+		Logger.error(LOG, "Cannot read manifest history: invalid date bound.")
+		return windows, false
+	end
 	local window_lo = lo
 	while window_lo <= hi do
 		local window_hi = window_lo
@@ -664,7 +669,15 @@ local function _ngram_days(db, start_date, end_date)
 	if start_date and start_date ~= "" and (not lo or start_date > lo) then lo = start_date end
 	if end_date and end_date ~= "" and (not hi or end_date < hi) then hi = end_date end
 	local days = {}
-	if not lo or not hi then return days, complete end
+	if not lo or not hi or lo > hi then return days, complete end
+	-- Stored dates are untrusted: a malformed bound must not escape this read
+	-- before its SQLite handle is closed, or certify a partial projection.
+	local valid_lo = pcall(shift_day, lo, 0)
+	local valid_hi = pcall(shift_day, hi, 0)
+	if not valid_lo or not valid_hi then
+		Logger.error(LOG, "Cannot read n-gram history: invalid date bound.")
+		return days, false
+	end
 	local day = lo
 	while day <= hi do
 		days[#days + 1] = day

@@ -37,6 +37,9 @@ local Logger = require("infra.logger")
 local LOG = "remap.runtime_activation"
 
 local ACTIVE = { starting = true, admitted = true, peers_starting = true, ready = true, stopping = true }
+-- A failed owner can still retain a capture while its stop settles.
+local MUST_STOP = { starting = true, admitted = true, peers_starting = true, ready = true,
+	stopping = true, failed = true, unavailable = true }
 
 --- Whether the owned runtime should run.
 --- @param lifecycle table|nil { running = boolean, paused = boolean }.
@@ -94,26 +97,42 @@ function M.new(ports)
 	local activation = {}
 	local restoring = false
 	local started_once = false
+	local desired = false
+	local pending_admitted = nil
+	local reconcile_epoch = 0
 
 	--- Gives the user's Karabiner back when Ergopti closed it.
 	--- @param callback function|nil fn(restored|nil): true restored, false refused, nil nothing to do.
 	function activation.restore_if_closed(callback)
 		local done = callback or function() end
 		if ports.marker.get() ~= true or restoring then return done(nil) end
-		restoring = true
+		local owner = {}
+		restoring = owner
 		Logger.start(LOG, "Restoring the user's Karabiner, which Ergopti closed…")
 		ports.restore(function(ok)
+			if restoring ~= owner then return end
 			restoring = false
 			if ok ~= true then
 				Logger.error(LOG, "The user's Karabiner could not be restored; it stays closed until opened.")
-				return done(false)
+			else
+				if ports.marker.clear() ~= true then
+					Logger.error(LOG, "The user's Karabiner was restored but the marker could not be cleared.")
+				end
+				Logger.success(LOG, "Restored the user's Karabiner.")
 			end
-			if ports.marker.clear() ~= true then
-				Logger.error(LOG, "The user's Karabiner was restored but the marker could not be cleared.")
-			end
-			Logger.success(LOG, "Restored the user's Karabiner.")
-			done(true)
+			local epoch = reconcile_epoch
+			done(ok == true)
+			if desired and epoch == reconcile_epoch then activation.reconcile(true, pending_admitted) end
 		end)
+	end
+
+	-- The owner retains one observer identity across retries of a pending stop.
+	local function on_stopped()
+		if desired then
+			activation.reconcile(true, pending_admitted)
+		else
+			activation.restore_if_closed()
+		end
 	end
 
 	--- Brings the runtime in line with the lifecycle.
@@ -121,8 +140,16 @@ function M.new(ports)
 	--- @param on_admitted function|nil fn() called once when a start is admitted.
 	--- @return string action `start`, `starting`, `reload`, `stop` or `idle`.
 	function activation.reconcile(wanted, on_admitted)
+		reconcile_epoch = reconcile_epoch + 1
+		desired = wanted == true
+		if on_admitted ~= nil then pending_admitted = on_admitted end
 		local state = ports.owner.status().state
 		if wanted then
+			if restoring then return "restoring" end
+			if state == "stopping" or (state == "failed" and started_once) then
+				ports.owner.stop(on_stopped)
+				return "stopping"
+			end
 			if ACTIVE[state] and state ~= "stopping" then return "starting" end
 			if started_once then
 				-- This VM already ran a capture: only a reloaded driver can start one.
@@ -141,10 +168,10 @@ function M.new(ports)
 			if accepted ~= true then Logger.error(LOG, "The owned runtime refused to start in state %s.", state) end
 			return "start"
 		end
-		if ACTIVE[state] then
+		if MUST_STOP[state] then
 			Logger.info(LOG, "Ergopti pauses: stopping its own Karabiner runtime.")
 			-- The owner calls this once its capture is observed retired, even when that is at once.
-			ports.owner.stop(function() activation.restore_if_closed() end)
+			ports.owner.stop(on_stopped)
 			return "stop"
 		end
 		activation.restore_if_closed()

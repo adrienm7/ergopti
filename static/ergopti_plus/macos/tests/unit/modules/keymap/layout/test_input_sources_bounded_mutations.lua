@@ -313,6 +313,41 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		reset_fixture_modules()
 	end)
 
+	status_test("(tis-legacy-ownership) refuses foreign source IDs before native mutation", function()
+		for _, foreign in ipairs({ "org.example.otherergopti.v1.2.3", "com.apple.keylayout.ergoptiExtra", "French",
+			"Ergopti_v2_2_0_Custom", "com.apple.keyboardlayout.ergopti.v2_2_0.foreign" }) do
+			local f = load_fixture()
+			local terminal
+			helpers.assert_eq(f.IS.upgrade_active_list_async({ "com.apple.keylayout.ergopti.plus", foreign },
+				function(ok, _, reason) terminal = { ok = ok, reason = reason } end), false)
+			helpers.assert_eq(#f.tasks, 0, "an unrelated keyboard must never enter a migration transaction")
+			helpers.assert_eq(terminal.reason, "invalid_entries")
+			reset_fixture_modules()
+		end
+	end)
+
+	status_test("(tis-legacy-ownership) retains recognized unversioned legacy names", function()
+		local f = load_fixture()
+		helpers.assert_eq(f.IS.upgrade_active_list_async({ "Ergopti_plus" }, function() end), true)
+		helpers.assert_eq(#f.tasks, 1)
+		f.tasks[1]:complete(0, "1/1\n", "")
+		reset_fixture_modules()
+	end)
+
+	status_test("(tis-legacy-ownership) recognizes the shipped legacy bundle roster", function()
+		local f = load_fixture()
+		for _, version in ipairs({ "2_2_0", "2_2_1" }) do
+			for _, pair in ipairs({ { "", "" }, { "_ansi", ".ansi" }, { "_plus", ".plus" },
+				{ "_plus_ansi", ".plus.ansi" }, { "_plus_plus", ".plus_plus" },
+				{ "_plus_plus_ansi", ".plus_plus.ansi" } }) do
+				helpers.assert_true(f.IS.is_legacy_ergopti_id("Ergopti_v" .. version .. pair[1]))
+				helpers.assert_true(f.IS.is_legacy_ergopti_id("com.apple.keyboardlayout.ergopti.v" .. version .. pair[2]))
+				helpers.assert_true(f.IS.is_legacy_ergopti_id("com.apple.keylayout.ergopti.v" .. version .. pair[2]))
+			end
+		end
+		reset_fixture_modules()
+	end)
+
 	status_test("(tis-native-upgrade) refuses an unavailable helper before any native transaction", function()
 		local f = load_fixture({ helper_unavailable = true })
 		local terminal

@@ -260,6 +260,7 @@ function M.start_fetch(channel)
 		return M._push(payload, document)
 	end
 	if not fetch_current() then return generation end
+	_last_list = nil
 	if not registry_channel(channel) then
 		Logger.error(LOG, "Refused a release fetch for a channel outside the registry.")
 		push({ action = "releases_error", error_key = "changelog_window.error_network" })
@@ -705,6 +706,12 @@ function M.on_message(payload, state, context)
 
 	-- Only this click installs a chosen release: nothing else calls the session.
 	if action == "install_release" then
+		if _last_list == nil then
+			local reason = _install_session and _install_session.busy() and ReleaseInstall.REASON.busy
+				or ReleaseInstall.REASON.unknown_release
+			return { action = "install_progress", tag = payload.tag, phase = "failed",
+				reason_key = reason }
+		end
 		install_session().install(payload.tag, payload.channel)
 		return nil
 	end

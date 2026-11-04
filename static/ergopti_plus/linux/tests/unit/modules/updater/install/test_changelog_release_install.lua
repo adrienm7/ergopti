@@ -364,6 +364,16 @@ local function index_of(list, prefix)
 end
 
 helpers.describe("changelog_bridge: one-click release install", function()
+	helpers.it("does not install the previous list during a release refresh", function()
+		local ctx = harness()
+		ctx.bridge._http_get = function() return true end
+		ctx.bridge.on_message({ action = "fetch", channel = "dev" }, ctx.state)
+		local answer = ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" }, ctx.state)
+		local events = #ctx.events
+		ctx.restore_modules()
+		helpers.assert_eq(events, 0, "a pending fetch must not authorize the old release")
+		helpers.assert_eq(answer.reason_key, "changelog_window.install_error_unknown_release")
+	end)
 	helpers.it("announces the installed build and the restorable backup when the page is ready", function()
 		local ctx = harness({ latest = { id = "pre-install-b", created_at = "2026-09-30T10:00:00Z", tag = "v1" } })
 		ctx.restore_modules()
