@@ -1455,6 +1455,7 @@
 	"menu.hotstrings.no_group_loaded": "(no group loaded)",
 	"menu.llm.ollama_start_hint": "(start Ollama on port 11434)",
 	"menu.metrics.migration_progress": "Migration: %d/%d row(s) — click to stop",
+	"dialog.metrics.storage_unavailable": "Metrics collection is paused because SQLite storage is unavailable or failed validation. Your preference has not changed.",
 	"menu.metrics.unavailable": "(metrics unavailable)",
 	"menu.hotstrings.unavailable": "(hotstrings configuration unavailable)",
 	"menu.llm.unavailable": "AI unavailable",
