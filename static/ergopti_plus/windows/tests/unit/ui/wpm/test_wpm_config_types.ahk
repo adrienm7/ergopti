@@ -134,6 +134,23 @@ TestWPMAutoPositionRequiresBothCoordinates() {
 	AssertFalse(_WPMWidget_IsAutoPosition(-1, 100), "a left-edge position must survive")
 	AssertFalse(_WPMWidget_IsAutoPosition(100, -1), "a top-edge position must survive")
 	AssertFalse(_WPMWidget_IsAutoPosition(100, 100), "a saved position must survive")
+	SavedX := WPMWidget.pos_x, SavedY := WPMWidget.pos_y
+	SavedVisible := WPMWidget.visible, SavedColors := WPMWidget.use_colors, SavedGraph := WPMWidget.show_graph
+	SavedStoreX := WPMWidgetConst.STORE_X, SavedStoreY := WPMWidgetConst.STORE_Y
+	try {
+		WPMWidgetConst.STORE_X := "test.pos_x", WPMWidgetConst.STORE_Y := "test.pos_y"
+		for Pair in [[-1, 100], [100, -1]] {
+			WPMWidget_LoadConfig(Map("metrics", Map(WPMWidgetConst.CFG_GRAPH, false)),
+				_TWCT_Areas, _TWCT_StoredPosition.Bind(Pair[1], Pair[2]))
+			AssertEqual(Pair[1], WPMWidget.pos_x, "the saved X reaches the surface anchor")
+			AssertEqual(Pair[2], WPMWidget.pos_y, "the saved Y reaches the surface anchor")
+			AssertFalse(_WPMWidget_IsAutoPosition(WPMWidget.pos_x, WPMWidget.pos_y))
+		}
+	} finally {
+		WPMWidget.pos_x := SavedX, WPMWidget.pos_y := SavedY
+		WPMWidget.visible := SavedVisible, WPMWidget.use_colors := SavedColors, WPMWidget.show_graph := SavedGraph
+		WPMWidgetConst.STORE_X := SavedStoreX, WPMWidgetConst.STORE_Y := SavedStoreY
+	}
 }
 Test("WPM config: one negative-one coordinate is a position (wpm-anchor-sentinel)",
 	TestWPMAutoPositionRequiresBothCoordinates)
