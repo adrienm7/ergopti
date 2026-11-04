@@ -34,6 +34,7 @@ const fs = require('fs');
 const { StringDecoder } = require('node:string_decoder');
 const { TextDecoder } = require('node:util');
 const { NOT_EXECUTED_MARKER } = require('./validate-ahk-suite-manifest.cjs');
+const { escapeTableCell } = require('../lib/text-escape.cjs');
 
 // =====================================
 // ======= 1/ Argument parsing =========
@@ -348,7 +349,7 @@ function emit(opts, res, code, signal = null) {
 					: '') +
 				(res.slowest.length
 					? `\n<details><summary>Slowest ${res.slowest.length} test(s)</summary>\n\n| ms | test |\n| ---: | --- |\n${res.slowest
-							.map((row) => `| ${row.elapsed_ms.toFixed(1)} | ${row.name.replace(/\|/g, '\\|')} |`)
+							.map((row) => `| ${row.elapsed_ms.toFixed(1)} | ${escapeTableCell(row.name)} |`)
 							.join('\n')}\n</details>\n`
 					: '') +
 				(timingDetails ? `\n${timingDetails}\n` : '');

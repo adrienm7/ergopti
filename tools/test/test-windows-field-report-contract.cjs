@@ -32,6 +32,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { reportNotExecuted } = require('./lib/host-capabilities.cjs');
+const { escapeRegExp } = require('../lib/text-escape.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SCRIPT = 'tools/dev/collect-windows-field-report.ps1';
@@ -445,10 +446,7 @@ try {
 			for (const name of ['versions', 'toolchain', 'processes', 'proxy'])
 				assert.match(steps, new RegExp(`^${name}\\s+exit=\\d+$`, 'm'));
 			const dayLog = `${LOG.main}${today()}${LOG.extension}`;
-			assert.match(
-				steps,
-				new RegExp(`^${dayLog.replace(/\./g, '\\.')}\\s+copied \\(scrubbed\\)$`, 'm')
-			);
+			assert.match(steps, new RegExp(`^${escapeRegExp(dayLog)}\\s+copied \\(scrubbed\\)$`, 'm'));
 			assert.match(steps, /^hotstring_collisions\s+exit=0$/m);
 			assert.match(steps, /^proxy_winhttp\s+exit=0$/m);
 			assert.match(

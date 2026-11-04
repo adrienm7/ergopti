@@ -34,6 +34,7 @@
 'use strict';
 
 const { execFileSync } = require('node:child_process');
+const { escapeTableCell: cell } = require('../lib/text-escape.cjs');
 
 const REPOSITORY = 'adrienm7/ergopti';
 const PAGE_SIZE = 30;
@@ -150,15 +151,6 @@ function render(summary) {
 	for (const row of summary.steps)
 		lines.push(`  ${clock(row.elapsed_ms).padStart(8)}  ${row.step}  [${row.job}]`);
 	return lines.join('\n') + '\n';
-}
-
-/**
- * Escapes a value for one Markdown table cell.
- * @param {string} text Cell text.
- * @returns {string}
- */
-function cell(text) {
-	return String(text).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }
 
 /**

@@ -385,6 +385,7 @@
 		"test:no-pinned-source-reads-linux": "node ./tools/test/test-no-pinned-source-reads-linux.cjs",
 		"test:owned-runtimes-inventory": "node ./tools/test/test-owned-runtimes-inventory.cjs",
 		"test:owned-runtimes-doc": "node ./tools/test/test-owned-runtimes-doc.cjs",
+		"test:text-escape": "node ./tools/test/test-text-escape.cjs",
 		"test:no-pinned-source-reads-lua": "node ./tools/test/test-no-pinned-source-reads-lua.cjs",
 		"test:ahk-test-coverage": "node ./tools/test/test-ahk-test-coverage.cjs",
 		"test:e2e-gate-symmetry": "node ./tools/test/test-e2e-gate-symmetry.cjs",

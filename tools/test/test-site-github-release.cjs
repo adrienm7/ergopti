@@ -15,6 +15,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { prependObjectMember } = require('./lib/json-text-mutations.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const source = fs.readFileSync(path.join(ROOT, 'src/lib/js/getGitHubRelease.js'), 'utf8');
@@ -1087,7 +1088,7 @@ async function main() {
 			{ SITE_METADATA: JSON.stringify({ 'Stable site': expected.metadata['Stable site'] }) },
 			{ SITE_METADATA: env.SITE_METADATA.replace('"main"', '"dev"') },
 			{ SITE_METADATA: env.SITE_METADATA.replace('"base_path":""', '"base_path":"/dev"') },
-			{ SITE_METADATA: env.SITE_METADATA.replace('{', '{"Stable site":{},') },
+			{ SITE_METADATA: prependObjectMember(env.SITE_METADATA, '"Stable site":{}') },
 			{
 				SITE_METADATA: JSON.stringify({
 					...expected.metadata,

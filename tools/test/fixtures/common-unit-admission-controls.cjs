@@ -6,6 +6,7 @@
 const assert = require('node:assert/strict');
 const { createPlan, admitPlan, selectPlannedLot } = require('../../ci/js-feature-matrix.cjs');
 const { selectUnitJobs, receiveUnit } = require('../../ci/validate-js-feature-results.cjs');
+const { prependObjectMember } = require('../lib/json-text-mutations.cjs');
 
 /** Exercise the real admission functions without a Git, network or child-process actor. */
 async function run() {
@@ -68,7 +69,7 @@ async function run() {
 		);
 		controls++;
 	}
-	for (const missing of [undefined, '', '{}', encoded.replace('{', '{"schema_version":0,')]) {
+	for (const missing of [undefined, '', '{}', prependObjectMember(encoded, '"schema_version":0')]) {
 		assert.throws(() => admitPlan(inventory, context, missing), /complete authored inventory/);
 		controls++;
 	}
