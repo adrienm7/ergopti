@@ -4,17 +4,11 @@
 ==============================================================================
 MODULE: Ergopti+ Page — Platforms & Download
 DESCRIPTION:
-The three-driver story with an HONEST feature matrix (verified against the
-source tree), the Linux alpha disclaimer with a call for testers, and the
-final download call-to-action.
+The three-driver story, a configuration inventory projected from the shared
+manifest, the Linux alpha disclaimer, and the download call-to-action.
 
-FEATURES & RATIONALE:
-1. Verified Matrix: every cell was checked against the driver sources —
-   Windows and macOS are at effective parity (the page previously claimed
-   Windows lacked the LLM bridge and metrics, which is false today).
-2. Honest Alpha: the Linux driver is presented as what it is — complete on
-   paper, never run on real hardware — which builds more trust than a fake
-   checkmark ever could.
+A declaration does not prove runtime behavior or the absence of an equivalent
+under another configuration path.
 ==============================================================================
 -->
 
@@ -23,41 +17,12 @@ FEATURES & RATIONALE:
 	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '#lib/js/getGitHubRelease.js';
 	import { ui } from './state.svelte.js';
 	import { reveal } from './reveal.js';
-	import { t } from './i18n.svelte.js';
+	import { t, i18n } from './i18n.svelte.js';
+	import matrix from './feature-inventory.json';
+	import actions from './action-inventory.json';
 
 	/** @type {{macosApps: Array<{id: string, name: string, description: string}>}} */
 	let { macosApps } = $props();
-
-	// Verified against the source tree — see the per-row nuance labels.
-	// status: 'yes' | 'no' | text label rendered as-is.
-	const matrix = [
-		{ label: 'Hotstrings + autocorrection (2 994 livrés)', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'Touche magique ★ (2 121 expansions)', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'Hotstrings personnels + dynamiques', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'Tap-holds (7 touches) + layer navigation', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'Tooltips colorés en temps réel', win: 'yes', mac: 'yes', linux: 'X11' },
-		{ label: 'IA locale via Ollama (110 modèles)', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'IA distante (9 fournisseurs d’API)', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'Backend MLX (Apple Silicon)', win: 'no', mac: 'yes', linux: 'no' },
-		{ label: 'Gestes trackpad', win: '10 slots', mac: '36 + 3 axes', linux: 'no' },
-		{ label: 'Métriques de frappe + tableaux de bord', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'Widget WPM flottant', win: 'yes', mac: 'yes', linux: 'no' },
-		{ label: 'Menu complet (335 réglages, 21 langues)', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'Mises à jour automatiques', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'Spotlight curseur (présentations)', win: 'yes', mac: 'yes', linux: 'no' }
-	];
-
-	/**
-	 * Map a matrix status to its display cell.
-	 * @param {string} status
-	 * @returns {{cls: string, text: string}}
-	 */
-	function cell(status) {
-		if (status === 'yes') return { cls: 'ok', text: '✓' };
-		if (status === 'no') return { cls: 'off', text: '—' };
-		if (status === 'alpha') return { cls: 'warn', text: 'α' };
-		return { cls: 'note', text: status };
-	}
 
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
@@ -68,21 +33,20 @@ FEATURES & RATIONALE:
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Trois systèmes</p>
-			<h2>Windows et macOS à parité. Linux en alpha.</h2>
+			<h2>{t('Trois systèmes, un projet.')}</h2>
 			<p class="lead">
-				Le même fichier de hotstrings, les mêmes raccourcis, le même tooltip, le même menu — sur
-				AutoHotkey v2 (Windows) et Hammerspoon (macOS). Le driver Linux (un daemon Lua qui gère
-				aussi les tap-holds) est complet sur le papier mais <strong
-					>cherche encore ses premiers testeurs</strong
-				>.
+				{t(
+					'Les entrées ci-dessous proviennent du manifeste partagé. Une entrée absente peut avoir un équivalent sous un autre nom ; sa présence ne garantit pas son fonctionnement en conditions réelles.'
+				)}
 			</p>
 		</header>
 
-		<div class="table-wrap" use:reveal>
+		<details class="table-wrap" use:reveal>
+			<summary>{t('Inventaire des réglages et fonctionnalités')} ({matrix.length})</summary>
 			<table class="matrix">
 				<thead>
 					<tr>
-						<th class="feat-col">Fonctionnalité</th>
+						<th class="feat-col">{t('Fonctionnalité ou réglage')}</th>
 						<th>
 							<i class="icon-windows"></i>
 							<span class="os-name">Windows</span>
@@ -103,22 +67,67 @@ FEATURES & RATIONALE:
 				<tbody>
 					{#each matrix as row, i}
 						<tr style="--row: {i};">
-							<td class="feat-col">{row.label}</td>
-							{#each [row.win, row.mac, row.linux] as status}
-								{@const c = cell(status)}
-								<td class="cell {c.cls}">{c.text}</td>
+							<td class="feat-col"
+								>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
+							>
+							{#each [row.platforms.windows, row.platforms.macos, row.platforms.linux] as available}
+								<td class:ok={available} class:off={!available} class="cell"
+									>{available ? '✓' : '—'}</td
+								>
 							{/each}
 						</tr>
 					{/each}
 				</tbody>
 			</table>
-		</div>
+		</details>
+
+		<details class="table-wrap" use:reveal>
+			<summary>{t('Inventaire des actions configurables')} ({actions.length})</summary>
+			<table class="matrix">
+				<thead>
+					<tr>
+						<th class="feat-col">{t('Action')}</th>
+						<th>
+							<i class="icon-windows"></i>
+							<span class="os-name">Windows</span>
+							<span class="os-driver">AutoHotkey v2</span>
+						</th>
+						<th>
+							<i class="icon-appleinc"></i>
+							<span class="os-name">macOS</span>
+							<span class="os-driver">Hammerspoon</span>
+						</th>
+						<th>
+							<i class="icon-linux"></i>
+							<span class="os-name">Linux</span>
+							<span class="os-driver">Lua · alpha</span>
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each actions as row, i}
+						<tr style="--row: {i};">
+							<td class="feat-col"
+								>{row.labels[i18n.lang]} <small><code>{row.path}</code></small></td
+							>
+							{#each ['windows', 'macos', 'linux'] as os}
+								{@const available = row.platforms[os]}
+								<td
+									class:ok={available}
+									class:off={!available}
+									class="cell"
+									title={row.reasons[os]?.[i18n.lang]}>{available ? '✓' : '—'}</td
+								>
+							{/each}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</details>
 
 		<p class="legend" use:reveal>
-			<span class="lg ok">✓ fonctionnel</span>
-			<span class="lg note">texte = nuance</span>
-			<span class="lg warn">α = implémenté, jamais testé en conditions réelles</span>
-			<span class="lg off">— = absent</span>
+			<span class="lg ok">{t('✓ déclaré pour ce système')}</span>
+			<span class="lg off">{t('— entrée non déclarée pour ce système')}</span>
 		</p>
 
 		<!-- Per-OS bonuses (exclusive features that are not bundled apps) -->
@@ -256,6 +265,16 @@ FEATURES & RATIONALE:
 <style>
 	/* ─── Matrix ────────────────────────────────────────────── */
 
+	.table-wrap summary {
+		cursor: pointer;
+		padding: 16px;
+	}
+
+	.feat-col small {
+		display: block;
+		font-size: 0.75em;
+	}
+
 	.table-wrap {
 		background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
 		border: 1px solid var(--border);
@@ -341,37 +360,6 @@ FEATURES & RATIONALE:
 		color: rgba(255, 255, 255, 0.25);
 	}
 
-	.cell.warn {
-		color: #ffc107;
-		font-weight: 700;
-	}
-
-	.cell.note {
-		color: var(--ink-soft);
-		font-size: 0.8rem;
-	}
-
-	/* The matrix "checks itself": status cells pop in row-by-row when the table
-	 * scrolls into view. Guarded so cells stay visible without JS or with
-	 * reduced motion (the enclosing .reveal already handles the safe fade). */
-	@media (prefers-reduced-motion: no-preference) {
-		.table-wrap.is-visible .cell {
-			animation: cell-in 0.5s var(--ease-out) both;
-			animation-delay: calc(var(--row, 0) * 55ms + 120ms);
-		}
-	}
-
-	@keyframes cell-in {
-		from {
-			opacity: 0;
-			transform: scale(0.55);
-		}
-		to {
-			opacity: 1;
-			transform: none;
-		}
-	}
-
 	.legend {
 		color: var(--ink-faint);
 		display: flex;
@@ -385,9 +373,6 @@ FEATURES & RATIONALE:
 
 	.lg.ok {
 		color: #4ade80;
-	}
-	.lg.warn {
-		color: #ffc107;
 	}
 	.lg.off {
 		color: rgba(255, 255, 255, 0.35);

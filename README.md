@@ -538,3 +538,7 @@ and nothing is uploaded. See the
 ## License
 
 [MIT](LICENSE) © Adrien MOYAUX
+
+## Ergopti+ platform inventory
+
+The [generated configuration inventory and parity review](docs/feature-inventory.md) lists every shared configuration entry and bindable action not declared on each OS, with action reasons and equivalents. A missing entry can have an equivalent under a different name; declarations are not runtime proof. Regenerate the inventory and website data with `node tools/codegen/codegen-feature-inventory.cjs`.

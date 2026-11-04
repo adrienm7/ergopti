@@ -8,6 +8,16 @@ the field-run step or the hand action that proves it and the commits it confirms
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
+## Cross-platform feature inventory
+
+- [ ] **macOS:** review parity for resetting a word on tap-holds and automatically switching the prompt profile with the selected model (`hotstrings.tap_hold_resets_word`, `llm.profiles.auto_profile_for_model`). The manifest reason describes the current alternatives and constraints.
+- [ ] **macOS and Linux:** evaluate direct streaming insertion of AI predictions (`platform_reason.inline_autotype_is_windows`); both currently show a bubble and insert on acceptance.
+- [ ] **Windows and Linux:** evaluate incremental touchpad gesture modes and step sizes; macOS tracks finger movement, whereas the other drivers receive or execute discrete gestures (`platform_reason.gesture_modes_and_steps_are_macos`).
+- [ ] **Windows:** evaluate a notification-area WPM readout; the manifest documents the floating widget as the current alternative (`platform_reason.wpm_readout_needs_a_menubar`).
+- [ ] **Linux:** evaluate remapping shortcut chords on accented keys for layouts where those keys are not shortcut letters; the manifest records a Windows implementation and no Linux equivalent (`platform_reason.accented_shortcuts_are_windows`).
+- [ ] Triage every OS-specific manifest entry in the generated [feature inventory](docs/feature-inventory.md): confirm equivalent behavior, intentional platform differences, or a real missing capability before implementing a parity change. The queue covers configuration entries, not unregistered product features; audit those separately.
+- [ ] Triage every OS-specific bindable action in the generated inventory using its recorded reason and equivalent. Audit capabilities outside the configuration and action catalogues (including macOS bundled App Cloner and Encryptor and their possible equivalents on Windows and Linux, as well as platform-specific implementations) and add independently evidenced gaps to this TODO. A declaration or an existing source file alone does not prove runtime behavior.
+
 ## Handoff, 2026-11-03 late evening (read first if the session was lost)
 
 - **Release 1.0.9 is pending on CI only.** dev `ed2618c2fe` holds every 1.0.9 change; full CI run 41730677937 is the
