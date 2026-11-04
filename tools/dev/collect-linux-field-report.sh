@@ -35,7 +35,7 @@
 #
 # The logs folder is the one the driver itself resolves
 # (infra/config_paths.lua get_logs_dir: the paths.logs_dir override, else
-# ${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/logs), asked through luajit.
+# ${XDG_STATE_HOME:-~/.local/state}/ergopti/logs), asked through luajit.
 #
 # NOT COVERED, AND WHY:
 # - A daemon that is not running gets no field run: the collector says so and

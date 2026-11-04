@@ -23,6 +23,9 @@
 
 local helpers = require("tests.helpers")
 
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
+
 --- Runs `body` with an in-memory bootstrap store behind the real resolver.
 --- @param stored table Initial storage values.
 --- @param body function Receives (handler, state, values, pushed).
@@ -86,19 +89,19 @@ end
 
 helpers.describe("paths editor: logs folder (paths-editor-logs-dir)", function()
 	helpers.it("sends the current and the default logs folder", function()
-		with_bridge({ ["paths.logs_dir"] = "/sync/ergopti_plus" }, function(handler, state)
+		with_bridge({ ["paths.logs_dir"] = "/sync/" .. FOLDER }, function(handler, state)
 			local result = handler.on_message({ action = "ready" }, state)
 			local ConfigPaths = require("infra.config_paths")
-			helpers.assert_eq(result.data.logsDir, "/sync/ergopti_plus")
+			helpers.assert_eq(result.data.logsDir, "/sync/" .. FOLDER)
 			helpers.assert_eq(result.data.defaultLogsDir, ConfigPaths.default_logs_dir())
 		end)
 	end)
 
 	helpers.it("answers a logs-folder browse on the logs field", function()
-		with_bridge({ ["paths.logs_dir"] = "/sync/ergopti_plus" }, function(handler, state, _, pushed)
+		with_bridge({ ["paths.logs_dir"] = "/sync/" .. FOLDER }, function(handler, state, _, pushed)
 			local result = handler.on_message({ action = "browse", target = "logs" }, state)
 			helpers.assert_true(result.picked == true)
-			helpers.assert_eq(result.path, "/picked/from//sync/ergopti_plus")
+			helpers.assert_eq(result.path, "/picked/from//sync/" .. FOLDER)
 			helpers.assert_contains(pushed[#pushed], "\"logs\")")
 		end)
 	end)
@@ -109,16 +112,16 @@ helpers.describe("paths editor: logs folder (paths-editor-logs-dir)", function()
 				action = "save", configDir = "/tmp/ergopti-custom/", logsDir = "/sync/logs",
 			}, state)
 			helpers.assert_true(result.saved == true)
-			helpers.assert_eq(values["paths.logs_dir"], "/sync/logs/ergopti_plus")
+			helpers.assert_eq(values["paths.logs_dir"], "/sync/logs/" .. FOLDER)
 			helpers.assert_eq(values["paths.config_dir"], "/tmp/ergopti-custom")
 		end)
 	end)
 
 	helpers.it("keeps the stored logs folder when the page sends none", function()
-		with_bridge({ ["paths.logs_dir"] = "/sync/ergopti_plus" }, function(handler, state, values)
+		with_bridge({ ["paths.logs_dir"] = "/sync/" .. FOLDER }, function(handler, state, values)
 			local result = handler.on_message({ action = "save", configDir = "" }, state)
 			helpers.assert_true(result.saved == true)
-			helpers.assert_eq(values["paths.logs_dir"], "/sync/ergopti_plus")
+			helpers.assert_eq(values["paths.logs_dir"], "/sync/" .. FOLDER)
 		end)
 	end)
 
@@ -138,7 +141,7 @@ helpers.describe("paths editor: logs folder (paths-editor-logs-dir)", function()
 		with_bridge({}, function(handler, state, values)
 			local result = handler.on_message({ action = "save", configDir = "", logsDir = "/sync/logs" }, state)
 			helpers.assert_true(result.saved == true)
-			helpers.assert_eq(values["paths.logs_dir"], "/sync/logs/ergopti_plus")
+			helpers.assert_eq(values["paths.logs_dir"], "/sync/logs/" .. FOLDER)
 			helpers.assert_eq(state.logger_sink.moves, 1, "the sink must follow the saved folder")
 		end)
 	end)
@@ -147,7 +150,7 @@ helpers.describe("paths editor: logs folder (paths-editor-logs-dir)", function()
 		with_bridge({}, function(handler, state)
 			local result = handler.on_message({ action = "save", configDir = "", logsDir = "/sync/logs" }, state)
 			helpers.assert_true(result.saved == true)
-			helpers.assert_eq(state.logger_sink.prepared, { "/sync/logs/ergopti_plus" })
+			helpers.assert_eq(state.logger_sink.prepared, { "/sync/logs/" .. FOLDER })
 		end)
 	end)
 
@@ -174,7 +177,7 @@ helpers.describe("paths editor: logs folder (paths-editor-logs-dir)", function()
 	end)
 
 	helpers.it("leaves the sink alone when the page sends no logs folder", function()
-		with_bridge({ ["paths.logs_dir"] = "/sync/ergopti_plus" }, function(handler, state)
+		with_bridge({ ["paths.logs_dir"] = "/sync/" .. FOLDER }, function(handler, state)
 			local result = handler.on_message({ action = "save", configDir = "" }, state)
 			helpers.assert_true(result.saved == true)
 			helpers.assert_eq(state.logger_sink.moves, 0)
@@ -193,7 +196,7 @@ end)
 helpers.describe("paths-editor-atomic: related directory overrides", function()
 	for _, refusal in ipairs({ "false", "throw", "missing" }) do
 		helpers.it("paths-editor-atomic: refuses " .. refusal .. " batch without a partial first folder", function()
-			with_bridge({ ["paths.config_dir"] = "/original/config", ["paths.logs_dir"] = "/original/logs/ergopti_plus" }, function(handler, state, values)
+			with_bridge({ ["paths.config_dir"] = "/original/config", ["paths.logs_dir"] = "/original/logs/" .. FOLDER }, function(handler, state, values)
 				local storage = package.loaded["adapters.storage"]
 				local set, writes = storage.set, 0
 				storage.set = function(key, value)
@@ -206,14 +209,14 @@ helpers.describe("paths-editor-atomic: related directory overrides", function()
 				local result = handler.on_message({ action = "save", configDir = "/new/config", logsDir = "/new/logs" }, state)
 				helpers.assert_eq(result.saved, false)
 				helpers.assert_eq(values["paths.config_dir"], "/original/config", "Refusal cannot relocate the daemon to a different configuration")
-				helpers.assert_eq(values["paths.logs_dir"], "/original/logs/ergopti_plus")
+				helpers.assert_eq(values["paths.logs_dir"], "/original/logs/" .. FOLDER)
 				helpers.assert_eq(writes, 0, "The editor cannot split related overrides into independent writes")
 				helpers.assert_eq(state.logger_sink.moves, 0)
 			end)
 		end)
 	end
 	helpers.it("paths-editor-atomic: resets both overrides in one acknowledged batch", function()
-		with_bridge({ ["paths.config_dir"] = "/original/config", ["paths.logs_dir"] = "/original/logs/ergopti_plus" }, function(handler, state, values)
+		with_bridge({ ["paths.config_dir"] = "/original/config", ["paths.logs_dir"] = "/original/logs/" .. FOLDER }, function(handler, state, values)
 			local storage = package.loaded["adapters.storage"]
 			local many, calls = storage.set_many, 0
 			storage.set_many = function(...) calls = calls + 1; return many(...) end

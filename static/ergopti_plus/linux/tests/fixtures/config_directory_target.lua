@@ -12,6 +12,9 @@ package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
 	.. driver .. "/../_shared/lua/?.lua;" .. driver .. "/../_shared/lua/?/init.lua;" .. package.path
 require("compat.utf8").install()
 local Shell, Json = require("adapters.shell_runner"), require("json")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 local Paths, Writer = require("infra.config_paths"), require("toml_codec.writer")
 
 --- Writes and closes the exact native fixture bytes.
@@ -24,7 +27,7 @@ end
 --- Reads the real durable locator, independently of the storage cache.
 --- @return string bytes
 local function locator()
-	local file = assert(io.open(Paths.config_home() .. "/ergopti_plus/storage.json", "rb"))
+	local file = assert(io.open(Paths.config_home() .. "/" .. FOLDER .. "/storage.json", "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close()); return bytes
 end
 

@@ -29,6 +29,7 @@ const { findRuntime, run: runLinux } = require('./run-linux-lua.cjs');
 const { verifyAggregate } = require('./linux-ci-evidence.cjs');
 const pipeline = require('./ci-full-default.cjs');
 const installMatrix = require('../ci/linux-install-matrix.cjs');
+const AppDirs = require('./lib/app-dirs.cjs');
 const LINUX_E2E_SHARDS = require('./fixtures/linux-e2e-shards.json');
 const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 /** The unit-matrix step that is not part of the Lua suite runs in the meta row only. */
@@ -1114,6 +1115,9 @@ end
 
 	// Execute the actual Bash owner with controlled build/install/interpreter
 	// ports. This checks diagnostics and cleanup, never claims a real update.
+	// The logs folder under XDG_STATE_HOME, as the installed app_dirs names it:
+	// the stand-in luajit answers the runner's registry query with it.
+	const logsRelative = AppDirs.segments('logs.linux', 'linux').join('/');
 	const runnerFixture = path.join(updaterScratch, 'runner');
 	const runnerRelative = 'static/ergopti_plus/linux/tests/hardware/run_updater_live.sh';
 	const runner = path.join(runnerFixture, runnerRelative);
@@ -1131,16 +1135,19 @@ end
 	fs.writeFileSync(
 		path.join(runnerFixture, 'build/linux/install.sh'),
 		`#!/usr/bin/env bash
-mkdir -p "$HOME/.local/lib/ergopti/_shared" "$XDG_STATE_HOME/ergopti_plus/logs"
+mkdir -p "$HOME/.local/lib/ergopti/_shared" "$XDG_STATE_HOME/${logsRelative}"
 printf 'version=0.0.0-dev.2\\n' > "$HOME/.local/lib/ergopti/_shared/build_stamp.txt"
-printf 'daemon starting (version 0.0.0-dev.2, fixture)\\n' > "$XDG_STATE_HOME/ergopti_plus/logs/daemon.log"
+printf 'daemon starting (version 0.0.0-dev.2, fixture)\\n' > "$XDG_STATE_HOME/${logsRelative}/daemon.log"
 exit "${'${UPDATER_TEST_INSTALL_STATUS:-0}'}"
 `
 	);
 	fs.writeFileSync(
 		path.join(runnerFixture, 'bin/luajit'),
 		`#!/usr/bin/env bash
-if [ "$1" = -e ]; then exit "${'${UPDATER_TEST_ENV_STATUS:-0}'}"; fi
+if [ "$1" = -e ]; then
+	case "$2" in *app_dirs*) printf '%s' '${logsRelative}' ;; esac
+	exit "${'${UPDATER_TEST_ENV_STATUS:-0}'}"
+fi
 printf '%s' "$UPDATER_TEST_STDOUT"
 printf '%s' "$UPDATER_TEST_STDERR" >&2
 printf '%s' "${'${HOME%/home}'}" > "$UPDATER_TEST_WORK_REPORT"

@@ -20,6 +20,10 @@ const { createHash } = require('crypto');
 const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const { pythonExecutable } = require('../lib/python.cjs');
 const { provideShellMessages } = require('./lib/shell-messages-fixture.cjs');
+const AppDirs = require('./lib/app-dirs.cjs');
+
+// The application folder under XDG_CONFIG_HOME, where the user's data stays.
+const FOLDER = AppDirs.folderName('linux');
 
 const ROOT = path.resolve(__dirname, '../..');
 const script = path.join(ROOT, 'static/ergopti_plus/linux/uninstall.sh');
@@ -31,7 +35,7 @@ try {
 	const prefix = path.join(home, 'prefix with spaces');
 	const library = path.join(prefix, 'lib/ergopti');
 	const wrapper = path.join(prefix, 'bin/ergopti-hotstrings');
-	const config = path.join(home, '.config/ergopti_plus/personal.toml');
+	const config = path.join(home, '.config', FOLDER, 'personal.toml');
 	const neighbour = path.join(prefix, 'lib/another-app/keep');
 	for (const file of [
 		config,
@@ -262,7 +266,7 @@ try {
 	// otherwise leaves an enabled service pointing to the deleted launcher.
 	configHome = path.join(home, 'config with spaces');
 	const customUnit = path.join(configHome, 'systemd/user/ergopti-hotstrings.service');
-	const customPersonal = path.join(configHome, 'ergopti/personal.toml');
+	const customPersonal = path.join(configHome, FOLDER, 'personal.toml');
 	const ownedFiles = [
 		['linux/ergopti_hotstrings.lua', path.join(library, 'linux/ergopti_hotstrings.lua'), 'runtime'],
 		[
