@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **65 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **67 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1149,3 +1149,29 @@ Run41924556519 discovered and executed92 selected cases individually and reverse
 Run41925176895 at81d5aae executes17 new probes in both orders:6 pass and11 fail, including real override data loss, cancelled callback revival and false peer contention. The override correction is being completed with legacy preservation before integration.
 
 The register contains65 distinct findings; the requested1,000 target remains unmet.
+
+## AHK-066: Remote usage casts and inferred totals overflow the signed native integer domain
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before; source fix integrated; native post-fix pending.
+
+\_LLMRemoteExtractUsageRoot treats every nonnegative finite Number as safely castable to signed64 Integer and adds two valid counters without a representation check. JSON validity alone does not establish the native consumer domain.
+
+Reproduction: Native run41924556519 at9a8ebad: the real classifier and managed Poll both accept a finite1e30 usage count as MININT, publish a negative inferred total and negative estimated cost. Individually valid MAXINT prompt plus1 completion also wraps the inferred total to MININT. Both normal controls pass, and actual callbacks and exact handle/registry retirement still complete in all modes.
+
+Consequence: A successful response can publish negative usage totals and estimated costs even though its provider supplied nonnegative values.
+
+Regression: Six genuine classifier/managed-completion probes plus an eight-row boundary test preserve valid response text, exact callback count and retirement. The fix admits only representable counts and infers a total only when subtraction proves the addition safe; otherwise total remains unknown0. No product token cap is introduced. Native post-fix pending.
+
+## AHK-067: Sticky replay drops modifier flags released before the captured key is replayed
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before; source fix integrated; native post-fix pending.
+
+StickyModifier sends Hook.EndKey with only the selected sticky modifiers and discards Hook.EndMods. A native captured modifier may already be released when Wait unwinds, so current key state or Blind cannot restore the captured shortcut.
+
+Reproduction: Native run41924556519 at9a8ebad: sticky-native-modifier-flags plain passes, shift fails after native capture reports EndMods=<+, Shift is released, and replay reaches the receiving F6 handler with Ctrl1/Shift0. Actual synthetic transaction is Critical, finalization is not Critical, and both canonical buffers remain unchanged. Same inverse result; input injection is confined to a verified owned Edit, not a claim about physical keys.
+
+Consequence: For example sticky Ctrl followed by Shift+F6 becomes Ctrl+F6, changing the requested application action.
+
+Regression: The two real-hook/native-receiver probes include the production HS_RunSyntheticInputTransaction and TextPressKey pipeline. The fix unions captured Ctrl/Alt/Shift/Win groups with the sticky modifier without duplicates; it does not claim preservation of left/right modifier identity. Post-fix qualification pending.
+
+The ongoing register now contains67 distinct findings. The requested1,000 target remains unmet.
