@@ -404,7 +404,7 @@ _ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal
 	}
 }
 
-_BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StrictCase := false) {
+_BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal) {
 	global _PersonalEditorPrioCtrl
 	TriggerVal := Trim(TriggerEdit.Value)
 	O := NormaliseOutput(OutputEdit.Value)
@@ -429,7 +429,7 @@ _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFina
 		"auto_expand", ChkAutoExp.Value == 1,
 		"is_case_sensitive", ChkCaseSens.Value == 1,
 		"final_result", ChkFinal.Value == 1,
-		"strict_case", StrictCase == true,
+		"strict_case", ChkCaseSens.Value == 1,
 		"priority", PrioVal,
 		"line_index", 0,
 	)
@@ -647,8 +647,7 @@ _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, C
 	if Row > Entries.Length {
 		return
 	}
-	Entry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal,
-		Entries[Row].Get("strict_case", false))
+	Entry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal)
 	Entry["line_index"] := Entries[Row]["line_index"]
 	Candidate := _PersonalTomlCloneDetached(Data)
 	Candidate["sections"][SectionName]["entries"][Row] := Entry
