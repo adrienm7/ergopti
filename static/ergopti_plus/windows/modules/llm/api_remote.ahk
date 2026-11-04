@@ -1366,7 +1366,7 @@ _LLMRemoteEstimateCost(model, in_tokens, out_tokens) {
     if (model == "" or !LLM_REMOTE_MODEL_PRICES.Has(model))
         return 0.0
     p := LLM_REMOTE_MODEL_PRICES[model]
-    return (in_tokens * p["in"] + out_tokens * p["out"]) / 1000000.0
+    return (Float(in_tokens) * p["in"] + Float(out_tokens) * p["out"]) / 1000000.0
 }
 
 _LLMRemote_TrimAsyncRegistry() {
