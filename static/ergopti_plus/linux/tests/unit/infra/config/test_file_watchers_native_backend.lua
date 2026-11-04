@@ -65,6 +65,33 @@ helpers.describe("file watchers native backend", function()
 		helpers.assert_eq(closed, #armed, "stop must close every native watcher once")
 	end)
 
+	for _, flag in ipairs({ "change", "rename" }) do
+		helpers.it("native nil-filename " .. flag .. " flag triggers file reload", function()
+			local dir = make_temp_dir()
+			local path = dir .. "/watched.toml"
+			helpers.assert_true(write_file(path))
+			local armed = {}
+			local uv = {
+				new_fs_event = function() return {} end,
+				fs_event_start = function(_, watched, _, callback) armed[watched] = callback; return 0 end,
+				fs_event_stop = function() return 0 end,
+				close = function(_, callback) if callback then callback() end end,
+			}
+			local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", uv)
+			local now, fired = 0, 0
+			local ok, detail = pcall(function()
+				fw.start({ hotstrings_dir = dir, now_ms = function() return now end,
+					on_reload = function() fired = fired + 1 end })
+				helpers.assert_type(armed[path], "function", "the file itself must have a watcher")
+				armed[path](nil, nil, { [flag] = true })
+				now = 10000; fw.pump()
+				helpers.assert_eq(fired, 1, "luv's keyed event must not be discarded")
+			end)
+			fw.stop(); rm_dir(dir)
+			if not ok then error(detail, 0) end
+		end)
+	end
+
 	if native_ok then
 		helpers.it("installed luv observes a real TOML creation through inotify", function()
 			local dir = make_temp_dir()

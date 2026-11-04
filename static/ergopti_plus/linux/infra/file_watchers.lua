@@ -419,15 +419,19 @@ local function _arm_luv_watcher(path, accept_fn)
 				return
 			end
 			-- fname is the basename of the changed file (nil for file watchers).
-			-- events is a table like {"change"} or {"rename"}.
+			-- luv supplies keyed flags; some backends supply an array of names.
 			if type(fname) == "string" and fname ~= "" then
 				-- Directory watcher: filter by filename.
 				if accept_fn(fname) then
 					_schedule_reload(string.format("inotify: %s/%s", NativePath.basename(path), fname), { path .. "/" .. fname })
 				end
-			elseif events and #events > 0 then
+			elseif type(events) == "table" and (events.change or events.rename or #events > 0) then
 				-- File watcher: fire on any event.
-				_schedule_reload(string.format("inotify: %s (%s)", NativePath.basename(path), table.concat(events, ",")), { path })
+				local names = {}
+				if events.change then names[#names + 1] = "change" end
+				if events.rename then names[#names + 1] = "rename" end
+				if #names == 0 then names = events end
+				_schedule_reload(string.format("inotify: %s (%s)", NativePath.basename(path), table.concat(names, ",")), { path })
 			end
 		end)
 	end)
