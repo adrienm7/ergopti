@@ -637,22 +637,31 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then return false, snapshot_error or "clipboard_snapshot_failed" end
 
+	local owned, previous_owned
 	local function restore()
 		return write_backend_checked(b, saved)
 	end
 	local function fail(reason)
+		if owned ~= nil then
+			local ok, content = read_backend_checked(b)
+			if ok and content ~= owned and content ~= previous_owned then return false, reason end
+		end
 		if not restore() then return false, "clipboard_restore_failed" end
 		return false, reason
 	end
 	if not current() then return fail("destination_changed") end
 	local copied, selected = copy_selection(b, emit_combo, sleep_ms, publication)
 	if not copied then return fail(selected) end
+	owned = selected
 
 	local transformed_ok, replacement = pcall(transform, selected)
 	if not transformed_ok or type(replacement) ~= "string" then
 		return fail("selection_transform_failed")
 	end
 	if not current() then return fail("destination_changed") end
+	local still_owned, contents = read_backend_checked(b)
+	if not still_owned or contents ~= owned then return fail("clipboard_changed") end
+	previous_owned, owned = owned, replacement
 	if not write_backend_checked(b, replacement) then
 		return fail("replacement_write_failed")
 	end
@@ -660,6 +669,9 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 
 	local paste_ok, pasted = pcall(function()
 		if not wait_checked(sleep_ms, SETTLE_MS) then return false end
+		if not current() then return false end
+		local read_ok, contents = read_backend_checked(b)
+		if not read_ok or contents ~= replacement then return false end
 		if not current() then return false end
 		if emit_combo("ctrl+v", publication) ~= true then return false end
 		if not current() then return false end

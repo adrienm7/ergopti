@@ -100,6 +100,63 @@ helpers.describe("clipboard selection transaction", function()
 		end)
 	end
 
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("does not paste an external copy made before the paste chord (" .. kind .. ")", function()
+			with_session(kind, "selected", function(clipboard, shell, combos, _, emit)
+				local waits = 0
+				local ok = clipboard.transform_selection(string.upper, emit, function()
+					waits = waits + 1
+					if waits == 2 then shell.current = "new user copy" end
+					return true
+				end)
+				helpers.assert_eq(ok, false)
+				helpers.assert_eq(combos, { "ctrl+c" })
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+		helpers.it("keeps an external copy when the transformation fails (" .. kind .. ")", function()
+			with_session(kind, "selected", function(clipboard, shell, combos, _, emit, sleep_ms)
+				local ok = clipboard.transform_selection(function()
+					shell.current = "new user copy"
+					error("transform refused")
+				end, emit, sleep_ms)
+				helpers.assert_eq(ok, false)
+				helpers.assert_eq(combos, { "ctrl+c" })
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+	end
+
+	helpers.it("does not overwrite a copy made during a successful transform", function()
+		with_session("x11", "selected", function(clipboard, shell, combos, _, emit, sleep_ms)
+			local ok = clipboard.transform_selection(function()
+				shell.current = "new user copy"
+				return "SELECTED"
+			end, emit, sleep_ms)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(combos, { "ctrl+c" })
+			helpers.assert_eq(shell.current, "new user copy")
+		end)
+	end)
+
+	helpers.it("does not paste when the replacement cannot be read back", function()
+		with_session("x11", "selected", function(clipboard, shell, combos, _, emit)
+			local original_read, waits, refuse = shell.exec_checked, 0, false
+			shell.exec_checked = function(command)
+				if refuse then refuse = false; return false, "", "unreadable" end
+				return original_read(command)
+			end
+			local ok = clipboard.transform_selection(string.upper, emit, function()
+				waits = waits + 1
+				if waits == 2 then refuse = true end
+				return true
+			end)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(combos, { "ctrl+c" })
+			helpers.assert_eq(shell.current, "saved")
+		end)
+	end)
+
 	helpers.it("uses wl-clipboard under Wayland", function()
 		with_session("wayland", "selected", function(clipboard, shell, _, _, emit, sleep_ms)
 			local ok = clipboard.transform_selection(string.upper, emit, sleep_ms)
