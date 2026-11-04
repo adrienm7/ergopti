@@ -35,6 +35,19 @@ local function load_adapter()
 end
 
 helpers.describe("task_lifecycle: only a real native start commits", function()
+	helpers.it("contains errors whose formatter itself raises (task-lifecycle-error-object)", function()
+		local adapter, errors = load_adapter()
+		local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+		local function fail() error(hostile) end
+		local callback = adapter.guard_callback(fail, "callback")
+		helpers.assert_eq(callback(), false)
+		helpers.assert_nil(adapter.create(fail, "factory"))
+		helpers.assert_eq(adapter.start({ start = fail }, "start"), false)
+		helpers.assert_eq(adapter.terminate({ terminate = fail }, "terminate"), false)
+		helpers.assert_eq(#errors, 4)
+		for _, line in ipairs(errors) do helpers.assert_contains(line, "error object (table)") end
+	end)
+
 	helpers.it("refuses an invalid completion callback before constructing a task (task-invalid-completion)", function()
 		local original_new = hs.task.new
 		local constructed = 0

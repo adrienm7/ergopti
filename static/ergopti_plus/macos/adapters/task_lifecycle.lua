@@ -21,6 +21,7 @@ local M = {}
 
 local hs = hs
 local Logger = require("infra.logger")
+local ErrorDescription = require("error_description")
 local TaskEnvironment = require("adapters.task_environment")
 
 local LOG = "adapters.task_lifecycle"
@@ -54,7 +55,7 @@ function M.guard_callback(callback, label)
 		end, debug.traceback))
 		if not results[1] then
 			Logger.error(LOG, "%s task callback raised: %s.", tostring(label),
-				tostring(results[2]))
+				ErrorDescription.describe(results[2]))
 			return false
 		end
 		return table.unpack(results, 2, results.n)
@@ -73,7 +74,7 @@ function M.create(factory, label)
 	local ok, task_or_err = xpcall(factory, debug.traceback)
 	if not ok then
 		Logger.error(LOG, "%s task creation raised: %s.", tostring(label),
-			tostring(task_or_err))
+			ErrorDescription.describe(task_or_err))
 		return nil
 	end
 	if not task_or_err then
@@ -133,7 +134,7 @@ function M.start(task, label)
 		debug.traceback)
 	if not ok then
 		Logger.error(LOG, "%s task start raised: %s.", tostring(label),
-			tostring(started_or_err))
+			ErrorDescription.describe(started_or_err))
 		return false
 	end
 	if not started_or_err then
@@ -166,7 +167,7 @@ function M.terminate(task, label)
 	end, debug.traceback)
 	if not ok then
 		Logger.error(LOG, "%s task termination raised: %s.", tostring(label),
-			tostring(accepted_or_err))
+			ErrorDescription.describe(accepted_or_err))
 		return false
 	end
 	if accepted_or_err == false or accepted_or_err == nil then
