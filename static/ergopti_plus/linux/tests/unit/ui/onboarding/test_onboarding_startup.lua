@@ -68,6 +68,43 @@ helpers.describe("first-use startup", function()
 		helpers.assert_eq(record.failed, 1)
 	end)
 
+	helpers.it("(first-use-regular-file) refuses a directory in place of the configuration", function()
+		if package.config:sub(1, 1) == "\\" then return end
+		local path = os.tmpname()
+		os.remove(path)
+		local created = os.execute("mkdir " .. require("text_utils").shell_quote(path))
+		assert(created == true or created == 0)
+		local absent, detail = Startup.config_absent(path)
+		assert(os.remove(path))
+		helpers.assert_nil(absent)
+		helpers.assert_true(type(detail) == "string" and detail ~= "")
+	end)
+
+	helpers.it("(first-use-regular-file) refuses a FIFO without blocking startup", function()
+		if package.config:sub(1, 1) == "\\" then return end
+		local path = os.tmpname()
+		os.remove(path)
+		local quote = require("text_utils").shell_quote
+		local created = os.execute("mkfifo " .. quote(path))
+		assert(created == true or created == 0)
+		local root = helpers.driver_root()
+		local script = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/../_shared/lua/?.lua;")
+			.. "..package.path; local absent = require('ui.onboarding.startup').config_absent("
+			.. string.format("%q", path) .. "); assert(absent == nil)"
+		local interpreter = assert(require("luv").exepath())
+		local status = os.execute("timeout 3 " .. quote(interpreter) .. " -e " .. quote(script))
+		assert(os.remove(path))
+		helpers.assert_true(status == true or status == 0, "special-file admission must complete and refuse")
+	end)
+
+	helpers.it("(first-use-regular-file) refuses an unacknowledged configuration close", function()
+		local absent, detail = Startup.config_absent("/fixture/config.toml", function()
+			return { close = function() return nil, "close failed" end }
+		end)
+		helpers.assert_nil(absent)
+		helpers.assert_eq(detail, "close failed")
+	end)
+
 	helpers.it("a dismissed wizard opens again while nothing was written (linux-first-use)", function()
 		local opts, record = fixture()
 		helpers.assert_true(Startup.run(opts))
