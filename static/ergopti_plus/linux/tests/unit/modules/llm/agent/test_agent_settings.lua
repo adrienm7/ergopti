@@ -221,6 +221,16 @@ end
 -- ======================================
 
 helpers.describe("AI agent settings: stored like every llm.* setting", function()
+	helpers.it("preserves excluded applications when an agent list has a hole (agent-apps-sparse)", function()
+		Scenario.run({}, function(world)
+			local settings = require("modules.llm.agent_settings")
+			assert(settings.set_disabled_apps({ "firefox", "bank" }))
+			local accepted = settings.set_disabled_apps({ [1] = "firefox", [3] = "bank" })
+			helpers.assert_eq(accepted, false)
+			helpers.assert_true(settings.is_app_disabled("bank"), "a hole cannot erase a protected app")
+			helpers.assert_eq(world.preferences.get("llm.agent_disabled_apps"), { "firefox", "bank" })
+		end)
+	end)
 
 	helpers.it("round-trips both systems, the mode and the excluded apps through the preferences", function()
 		Scenario.run({ stored = { ["llm.agent_system2"] = "" } }, function(world)
