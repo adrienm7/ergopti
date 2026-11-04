@@ -45,11 +45,24 @@ enroll_user() {
 
 if [ "$MODE" = --user ]; then resolve_user "$2" >/dev/null; fi
 
+missing_groups=()
 for group in input uinput; do
-	if ! getent group "$group" >/dev/null; then
-		if command -v groupadd >/dev/null 2>&1; then groupadd --system "$group"
-		else addgroup -S "$group"; fi
+	if getent group "$group" >/dev/null; then
+		:
+	else
+		lookup_status=$?
+		# getent reports an absent key as 2. Other errors cannot authorize
+		# creating a local group, which could shadow an unavailable NSS entry.
+		if [ "$lookup_status" -ne 2 ]; then
+			printf '[permissions] code=group-lookup-failed group=%s status=%s\n' "$group" "$lookup_status" >&2
+			exit "$lookup_status"
+		fi
+		missing_groups+=("$group")
 	fi
+done
+for group in "${missing_groups[@]}"; do
+	if command -v groupadd >/dev/null 2>&1; then groupadd --system "$group"
+	else addgroup -S "$group"; fi
 done
 install -d /etc/udev/rules.d /etc/modules-load.d
 if [ ! -e /etc/udev/rules.d/99-ergopti-uinput.rules ]; then
