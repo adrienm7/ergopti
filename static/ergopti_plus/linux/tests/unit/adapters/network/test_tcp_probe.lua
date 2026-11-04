@@ -69,6 +69,29 @@ it("tries the next resolved address when the first connection is refused", funct
 	helpers.assert_eq(answers[1][1], true, "a later reachable address must keep the proxy usable")
 end)
 
+it("does not publish during a reentrant close callback", function()
+	local resolve, connect, closed = nil, nil, 0
+	local function handle()
+		return {
+			is_closing = function() return false end,
+			close = function(_, callback) closed = closed + 1; callback() end,
+			connect = function(_, _, _, callback) connect = callback; return true end,
+		}
+	end
+	local backend = {
+		new_timer = handle, new_tcp = handle,
+		update_time = function() end,
+		timer_start = function() return true end,
+		getaddrinfo = function(_, _, _, callback) resolve = callback; return {} end,
+	}
+	local observed
+	local child = assert(Probe.probe("example", 80, 1000, function() observed = closed end, backend))
+	resolve(nil, { { addr = "127.0.0.1", port = 80 } })
+	connect(nil)
+	helpers.assert_true(child.is_settled())
+	helpers.assert_eq(observed, 2, "both exact handles must finish before publication")
+end)
+
 it("publishes the answer only after its native timer and socket retire", function()
 	local server, port = listener()
 	local owned = {}
