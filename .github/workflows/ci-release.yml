@@ -593,7 +593,7 @@ jobs:
           **Installation — app:**
           1. Download \`ErgoptiPlus.exe\`.
           2. Double-click to run. On first launch, resources are extracted to \`%LOCALAPPDATA%\Ergopti\`.
-          3. Your personal configuration is stored in \`%USERPROFILE%\.config\ergopti_plus\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
+          3. Your personal configuration is stored in \`%LOCALAPPDATA%\Ergopti\config\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
 
           ---
 
@@ -617,7 +617,7 @@ jobs:
           xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
           \`\`\`
           3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
-          4. Your personal configuration is stored in \`~/.config/ergopti_plus/\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
+          4. Your personal configuration is stored in \`~/Library/Application Support/Ergopti/config/\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
 
           ---
 
@@ -645,6 +645,7 @@ jobs:
           2. Open **Ergopti Plus** from the applications menu. Input permissions are prepared by the package; if additional authorization is needed, Ergopti opens a graphical administrator prompt.
           3. Follow the first-use window. If group membership changed, sign out and back in when prompted.
           4. Choose **Global actions → Start at login** to enable or disable automatic startup.
+          5. Your personal configuration is stored in \`~/.config/ergopti/\` (\`\$XDG_CONFIG_HOME/ergopti/\` when it is set).
 
           **Removal:** choose **Global actions → Uninstall Ergopti**, or remove the package through your software manager. The standalone archive also includes an ownership-checked uninstall script. Personal settings are preserved.
 

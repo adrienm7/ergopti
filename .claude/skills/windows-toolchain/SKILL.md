@@ -107,9 +107,10 @@ explicitly. See `ship-fix` for the full regression-proof contract.
 ## Where the driver actually lives at runtime
 
 `<ConfigDir>` is **not** the default folder: it is redirected by
-`%APPDATA%\Ergopti\paths.toml`. On the maintainer's box that resolves to
-`D:\Documents\GitHub\config\ergopti_plus\`. The logs are not there: they are in
-`%LOCALAPPDATA%\ergopti_plus\logs\`, unless `LogsDirPath` in the same
+`%LOCALAPPDATA%\Ergopti\paths.toml`. On the maintainer's box that resolves to
+`D:\Documents\GitHub\config\ergopti_plus\` (a folder the maintainer picked, not
+a default). The logs are not there: they are in
+`%LOCALAPPDATA%\Ergopti\logs\`, unless `LogsDirPath` in the same
 paths.toml moves them (logs from before 2026-09 stay in the old
 `…\config\ergopti_plus\autohotkey\logs\`). Looking in the repo for them finds
 nothing and invites the wrong conclusion. Always read the timestamp on the line

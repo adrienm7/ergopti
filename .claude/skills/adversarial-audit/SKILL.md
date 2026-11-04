@@ -71,7 +71,7 @@ pass re-derived the disputed figures independently and got them _exactly_:
 across 10 days. The debunker had searched `<ConfigDir>/ahk/logs/` — a directory
 that never existed — instead of `<ConfigDir>/autohotkey/logs/`
 (`_AhkSubDir := "autohotkey\"`), and `<ConfigDir>` is itself redirected by
-`%APPDATA%\Ergopti\paths.toml`. A real 2.5-second stall on the typing path was
+`%LOCALAPPDATA%\Ergopti\paths.toml`. A real 2.5-second stall on the typing path was
 dismissed as unmeasured and stayed open an extra cycle.
 
 Consequences to internalise:
@@ -91,9 +91,9 @@ Consequences to internalise:
   perfectly respectable basis for a finding. Dressing it up as a measurement is
   not. G4 in particular is unmeasured on this driver unless you have a log line
   to quote.
-- Where logs live: `%LOCALAPPDATA%\ergopti_plus\logs\` on Windows,
-  `~/Library/Logs/ergopti_plus/` on macOS, unless `LogsDirPath` in
-  `%APPDATA%\Ergopti\paths.toml` (macOS: the launcher-managed paths.toml) moves
+- Where logs live: `%LOCALAPPDATA%\Ergopti\logs\` on Windows,
+  `~/Library/Logs/Ergopti/` on macOS, unless `LogsDirPath` in
+  `%LOCALAPPDATA%\Ergopti\paths.toml` (macOS: the launcher-managed paths.toml) moves
   them; logs written before 2026-09 are in the old `<ConfigDir>/autohotkey/logs/`
   and `<ConfigDir>/hammerspoon/logs/`. There is a dedicated errors-only sink and
   14-day retention. Getting this path wrong is precisely what produced the false

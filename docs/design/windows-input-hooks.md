@@ -175,7 +175,7 @@ that every named case still exists, so a rename cannot orphan a claim.
 1. Reload the driver from the working tree, open the tray, Debug.
 2. Click "Record keyboard hook order". Confirm. Do not touch the keyboard for
    about 5 seconds. Paste the `InputProbe` lines of today's log
-   (`%LOCALAPPDATA%\ergopti_plus\logs`, Debug > Open today's log file).
+   (`%LOCALAPPDATA%\Ergopti\logs`, Debug > Open today's log file).
 3. Click "Measure SendEvent vs SendInput", confirm, keep hands off for about 10
    seconds, paste the `InputProbe` lines.
 4. Terminal capture rows (AltGr+letter, Shift+letter, digit, Tab with a

@@ -6,7 +6,7 @@
 
 The launcher alert `Embedded Hammerspoon stopped unexpectedly with exit code 0`
 can hide a Lua startup failure; inspect the managed Lua error log as well as
-`~/Library/Logs/ergopti_plus/launcher.log`. The published v0.0.0-dev.126 archive
+`~/Library/Logs/Ergopti/launcher.log`. The published v0.0.0-dev.126 archive
 reproduced this on macOS in run `34865561172`: `log_transport` required LuaSocket,
 but Hammerspoon 1.1.1 does not ship it. Injecting `bootstrap_socket_factory` in
 unit fixtures cannot verify that distribution dependency. Test the extracted
@@ -35,7 +35,7 @@ refuses a macOS 26 lot holding `clean` or `karabiner_config`, whose deferrable
 AppleEvent receipts name only the two macOS 15 runners. Either
 way a failed launch fails the macOS lane, and `Release` needs that lane.
 The launcher XCTest appends to the real
-`~/Library/Logs/ergopti_plus/launcher.log`, while `macos-release-launch.py`
+`~/Library/Logs/Ergopti/launcher.log`, while `macos-release-launch.py`
 refuses to judge a launch over an existing launcher log. It therefore runs in
 the E2E cell `Launcher XCTest and native probes (macOS 26)` (role
 `launcher-native` of `tools/ci/macos-stage-roles.cjs`) on a runner of its own,
@@ -63,7 +63,7 @@ a modal alert. `configured_symlink` now requires that named refusal, and
 stay untouched, `symlink_logs_dir` points LogsDirPath through a link and checks
 the picked folder keeps its permissions, and `dangling_logs` is a LogsDirPath
 link to nothing that must be refused by name. To see where a boot stopped, read
-`~/Library/Logs/ergopti_plus/ErgoptiPlus_boot.log` (the default logs folder, beside
+`~/Library/Logs/Ergopti/ErgoptiPlus_boot.log` (the default logs folder, beside
 launcher.log; it was the shared `/tmp` root until 2026-09): every `Boot.stage`/`Boot.mark` pair is appended
 there synchronously by `adapters/boot_journal.lua` (and to launcher.log until
 the native logger commits); the last START without SUCCESS is the stage. Log folders are resolved once with
@@ -242,7 +242,7 @@ Symantec, Trellix on the maintainer's work Mac) kill fileless script execution:
 started, before any output, while the same script ran from a path (field report
 2026-10-27 23:55, `fileless_bash_probe.txt`). The native PTY guardian
 (`ManagedPTYWorker.swift`) therefore runs its installer from a linked copy:
-`~/Library/Application Support/ErgoptiPlus/pty-sources/op.<guardian pid>.XXXXXX/<name>`,
+`~/Library/Application Support/Ergopti/pty-sources/op.<guardian pid>.XXXXXX/<name>`,
 folders 0700 and owned by the user, file created O_EXCL at 0400, its identity
 (inode, size, mode, mtime, ctime) and SHA-256 proved through the retained
 read-only descriptor after the copy and again right before bash is activated, and
@@ -499,7 +499,7 @@ both returns instead of treating nil as proof of a directory.
 `adapters/file_system.lua` takes a stable advisory-lock inode for every
 publication and conditional removal. It cannot unlink that inode after use (a
 waiter would lock the orphan while a newcomer locks a new file), so the lock
-lives in `~/Library/Application Support/ErgoptiPlus/write-locks/` under an
+lives in `~/Library/Application Support/Ergopti/write-locks/` under an
 FNV-1a digest of the canonical destination (`adapters/write_lock_path.lua`).
 Beside its destination it stayed next to every field-run result and inside
 private folders whose exact census then refused retirement (the Ollama pull
@@ -962,7 +962,9 @@ launcher's `--installed-physical-source` role (ADR 011 decision 8), never by a
 Lua-spawned process: the Lua owner spawns nothing and is READY only when the
 capture admits its first stream, and a managed capture session is single-use
 per Lua VM (a restart takes a reload); root binaries run only from a root-owned
-`/Library/Application Support/ErgoptiPlus/…` copy, never from the
+`/Library/Application Support/ErgoptiPlus/…` copy (the one folder that keeps
+the old name, `[owned_runtime.macos]` of `app_dirs.toml`, until the runtime is
+rebuilt), never from the
 user-writable app bundle; upstream `same_team_id` trusts every peer of an
 unsigned daemon, so the fork must pin the Ergopti certificate leaf before it is
 distributed. A selected stream never falls back to Quartz or the ledger when it
@@ -990,7 +992,7 @@ resume with `FieldRun.after_run`. Action: never tie the owned runtime to a menu
 switch, route pause and resume through `M._owned.reconcile`, and never call the
 closer's `restore` without the marker. The pinned artifact is fetched
 by `platform/remap/runtime_artifact_fetch.lua` into
-`~/Library/Application Support/ErgoptiPlus/RemapRuntime/<version>/` (size, then
+`~/Library/Application Support/Ergopti/RemapRuntime/<version>/` (size, then
 SHA-256, then a closed member list, receipt last); the privileged installer
 still reads only the payload sealed in its own signed bundle, so a downloaded
 `Runtime/` tree cannot be installed without changing the artifact to the
@@ -1092,7 +1094,7 @@ native poller and the one path that deploys the retained regeneration on
 ### project-macos-launcher-log-stays-in-the-default-folder
 
 `launcher.log` and `hammerspoon-fatal.txt` are written by the native launcher
-before any configuration is read, so they stay in `~/Library/Logs/ergopti_plus`
+before any configuration is read, so they stay in `~/Library/Logs/Ergopti`
 whatever `LogsDirPath` says; only the daily and topical logs move. The macOS
 field-report collector looked for them in the moved folder and skipped them
 without a trace, so no 2026-10-30 report carried `launcher.log` and the reload
@@ -1918,7 +1920,7 @@ without the launcher's environment, beside the launcher's own child: issue
 #99 (09:40:03, 1.0.4 update relaunch) and #100 (10:28:12, launcher PID 1051,
 right after a reboot) both show two "session opened" banners in the same
 millisecond, one with no `ERGOPTI_*` key and a config dir from the default
-`~/.config/ergopti_plus`. No Ergopti code launches that bundle without the
+configuration folder. No Ergopti code launches that bundle without the
 environment, so treat session restore (loginwindow reopening every running
 app, the nested one included) as the trigger until a launcher.log proves
 otherwise. `infra/instance_admission.lua` therefore runs before any settings
@@ -1992,7 +1994,7 @@ pins and needs Go, the Xcode Command Line Tools and python3 3.11.4 or newer.
   files are `config.toml`, `config_karabiner.toml`, personal hotstrings and
   personal info, with the driver's TOML reader. The logs probe file is removed
   at once. `keystats_cache_place` is `caches`, `legacy_left` or
-  `outside_caches` (cache under `~/Library/Caches/ergopti_plus/metrics`, no
+  `outside_caches` (cache under `~/Library/Caches/Ergopti/metrics`, no
   `<TMPDIR>/ergopti_metrics/<device>/db.sqlite` left).
 - `field_launcher_roles`: any exit other than 64 to malformed
   `--managed-http-worker` arguments, or a timeout, means the role did not

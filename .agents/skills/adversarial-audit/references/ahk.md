@@ -26,7 +26,7 @@ Audit `static/ergopti_plus/windows/`. Read `ahk-driver`, `windows-toolchain`,
   tree-wide.
 
 For G4 evidence, use `perf-profiling`'s AHK reference. Resolve `LogsDirPath` in
-`%APPDATA%\Ergopti\paths.toml` (empty: `%LOCALAPPDATA%\ergopti_plus\logs\`)
+`%LOCALAPPDATA%\Ergopti\paths.toml` (empty: `%LOCALAPPDATA%\Ergopti\logs\`)
 before inspecting the logs; never infer an event date from the process-start
 date in the filename or count the errors-only mirror twice.
 
