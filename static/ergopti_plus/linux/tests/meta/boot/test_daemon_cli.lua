@@ -267,6 +267,34 @@ helpers.describe("ergopti_hotstrings CLI", function()
   -- ==========================================================================
 
   helpers.describe("edge cases", function()
+    helpers.it("rejects missing option values without swallowing the next flag (cli-missing-value)", function()
+      local file = assert(io.open(daemon_path(), "rb"))
+      local source = file:read("*a"); assert(file:close())
+      local first = assert(source:find("local function parse_args()", 1, true))
+      local last = assert(source:find("======= 6/ Config Resolution", first, true))
+      for _, option in ipairs({ "--config", "--device", "--layout", "--keymap" }) do
+        for _, arguments in ipairs({ { option }, { option, "--no-grab" } }) do
+          local env = setmetatable({ arg = arguments, Logger = helpers.make_logger_stub() }, { __index = _G })
+          local code = source:sub(first, last - 1) .. "\nreturn parse_args()"
+          local chunk
+          if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+          else chunk = assert(load(code, "daemon argument parser", "t", env)) end
+          local ok, reason = pcall(chunk)
+          helpers.assert_eq(ok, false, option .. " must reject a missing value")
+          helpers.assert_true(tostring(reason):find(option, 1, true) ~= nil, "the refusal names the option")
+        end
+      end
+      local env = setmetatable({ arg = { "--config", "./--definitions", "--no-grab" },
+        Logger = helpers.make_logger_stub() }, { __index = _G })
+      local code = source:sub(first, last - 1) .. "\nreturn parse_args()"
+      local chunk
+      if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+      else chunk = assert(load(code, "daemon argument parser", "t", env)) end
+      local opts = chunk()
+      helpers.assert_eq(opts.config, "./--definitions")
+      helpers.assert_eq(opts.grab, false)
+    end)
+
     helpers.it("bogus flag does not crash", function()
       local out, _ = run_daemon("--bogus-flag-xyz 2>&1")
       -- Accept: Unknown/ignored warning, Erreur/device (crash, not flag-crash), or any output.
