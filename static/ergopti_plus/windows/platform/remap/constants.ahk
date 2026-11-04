@@ -1252,12 +1252,14 @@ TapHoldRestoreLiftedKey(Name, UserHeld := false) {
 		if (Ok and !Owned and !_TapHoldKeyIsDown.Call(Name, "P")) {
 			RacedRelease := true
 			Ok := TextPressKey(Name, "Up", false)
+			if !Ok
+				_TH_MarkSyntheticKeyReleasePending(Name)
 		}
 	} finally {
 		Critical(PreviousCritical)
 	}
 	if (!Ok and RacedRelease) {
-		try LoggerError("TapHoldDispatch", "Could not release '{1}' after the user let go of it during its re-press; it stays down until the key is pressed again.", Name)
+		try LoggerError("TapHoldDispatch", "Could not release '{1}' after the user let go of it during its re-press; the balancing release remains pending for retry.", Name)
 	} else if !Ok {
 		try LoggerError("TapHoldDispatch", "Could not give '{1}' back to its holder after an output; it stays up until the key is pressed again.", Name)
 	}
