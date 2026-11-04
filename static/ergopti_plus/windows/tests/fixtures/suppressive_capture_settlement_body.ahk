@@ -6,6 +6,7 @@
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0
 global ScriptInformation := Map("MagicKey", "★")
 global OneShotShiftEnabled := false, InDeadKeySequence := false
+global _TH_SyntheticEpoch := 0
 global _SIC_Mode := A_Args[2], _SIC_Emits := [], _SIC_Activations := 0, _SIC_Warnings := 0
 global _SIC_Hook := 0, _SIC_Successor := 0, _SIC_SuccessorToken := 0
 

@@ -18,6 +18,9 @@
 
 OneShotShift() {
 		global OneShotShiftEnabled
+		; Capture ownership ends before activation/output; the gesture epoch must
+		; remain current through those later effects as well.
+		GestureOwner := TapHoldNewOwner()
 		; Skip entirely when the script is suspended — an in-flight InputHook would
 		; intercept keystrokes that belong to other applications while AHK is paused
 		if A_IsSuspended
@@ -27,6 +30,8 @@ OneShotShift() {
 		; Full scalar membership must not append an astral magic key's high unit.
 		MagicKey := ScriptInformation["MagicKey"]
 		_TapHoldOneShotTable()
+		if !TapHoldOwnerCurrent(GestureOwner) || A_IsSuspended
+				return
 		NamedKeys := "{BackSpace}{Enter}{Delete}"
 		ihvText := InputHook("L2 T" . TimeoutSec . " E C", _SIHO_ScalarEndKeys())
 		ihvText.KeyOpt(NamedKeys, "E") ; End keys to not swallow
@@ -39,7 +44,7 @@ OneShotShift() {
 		; token/hook still owns capture, atomically with the suspension check.
 		PreviousCritical := Critical("On")
 		try {
-				Admitted := SIHO_IsOwned(OwnerToken, ihvText) && !A_IsSuspended
+				Admitted := SIHO_IsOwned(OwnerToken, ihvText) && TapHoldOwnerCurrent(GestureOwner) && !A_IsSuspended
 				if Admitted
 						OneShotShiftEnabled := True
 		} finally Critical(PreviousCritical)
@@ -54,17 +59,15 @@ OneShotShift() {
 		}
 		; Pause can finish and resume before this older Wait unwinds. Its exact
 		; owner acknowledgement remains revoked even when Suspend is false again.
-		if !CaptureSettled
+		if !CaptureSettled || !TapHoldOwnerCurrent(GestureOwner) || A_IsSuspended
 				return
-		; Guard against a suspend that arrived while Wait() was blocking — discard
-		; the captured input and leave the shift state clean for the next resume
-		if A_IsSuspended {
-				global OneShotShiftEnabled := False
-				return
-		}
+		; Lifecycle owns clearing the latch. This retired frame must never clear
+		; a successor which may already be armed after pause and resume.
 		Capture := _SIHO_ReadScalar(ihvText, NamedKeys)
 		if Capture.Reason != ""
 				LoggerWarn("OneShotShift", "Discarded invalid scalar capture ({1}).", Capture.Reason)
+		if !TapHoldOwnerCurrent(GestureOwner) || A_IsSuspended
+				return
 		if Capture.Kind == "timeout" || Capture.Kind == "invalid"
 				return
 		if Capture.Kind == "control" {
@@ -73,9 +76,13 @@ OneShotShift() {
 		}
 		Scalar := Capture.Text
 		SpecialCharacter := TapHoldOneShotResult(Scalar, MagicKey)
+		if !TapHoldOwnerCurrent(GestureOwner) || A_IsSuspended
+				return
 		if SpecialCharacter != "" {
 				if OneShotShiftEnabled {
 						ActivateHotstrings()
+						if !TapHoldOwnerCurrent(GestureOwner) || A_IsSuspended
+								return
 						SendNewResult(SpecialCharacter)
 				} else {
 						SendNewResult(Scalar)
