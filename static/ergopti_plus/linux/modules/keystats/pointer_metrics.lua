@@ -60,6 +60,11 @@ function M.new()
 	local tracker = {}
 	local frames, dropping, default_source = {}, {}, {}
 
+	--- Forgets uncommitted movement without admitting a dropped packet.
+	function tracker.discard_frames()
+		frames = {}
+	end
+
 	--- Observes one pointer report and returns what it adds to the metrics.
 	--- @param kind string "press", "motion", "frame", "dropped" or "reset".
 	--- @param code integer evdev code of the report.
