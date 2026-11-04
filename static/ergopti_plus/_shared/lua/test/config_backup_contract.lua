@@ -137,7 +137,7 @@ function M.register(helpers, env)
 			},
 			io = fs.io,
 			json = json,
-			clock = function()
+			clock = opts.clock or function()
 				tick = math.min(tick + 1, #times)
 				local stamp = times[tick]
 				return { stamp = stamp, iso = stamp:gsub("^(%d%d%d%d)(%d%d)(%d%d)%-(%d%d)(%d%d)(%d%d)$",
@@ -232,6 +232,33 @@ function M.register(helpers, env)
 			helpers.assert_eq(latest and latest.tag, "v2")
 		end)
 
+		helpers.it("never offers or restores a backup with a corrupt creation timestamp", function()
+			for _, case in ipairs({ {}, { value = false }, { value = {} }, { value = "not-a-date" },
+				{ value = "9999-99-99T99:99:99Z" }, { value = "2026-02-29T12:00:00Z" } }) do
+				local owner, fs, _, json = fixture({ times = { "20260930-101500", "20260930-111500" } })
+				local valid = assert(owner.create("pre_install", { tag = "valid" }))
+				local broken = assert(owner.create("pre_install", { tag = "broken" }))
+				fs.files[broken.path .. "/backup.json"] = json.encode({ schema_version = 1, id = broken.id,
+					kind = "pre_install", created_at = case.value, files = broken.files })
+				local latest = owner.latest("pre_install")
+				helpers.assert_eq(latest and latest.id, valid.id)
+				local writes = #fs.writes
+				helpers.assert_eq(owner.restore(broken.id), false)
+				helpers.assert_eq(#fs.writes, writes)
+			end
+		end)
+
+		helpers.it("does not publish a backup when its clock returns an invalid creation time", function()
+			local owner, fs = fixture({ clock = function()
+				return { stamp = "20260930-101500", iso = "2026-02-29T10:15:00Z" }
+			end })
+			local writes = #fs.writes
+			local record, reason = owner.create("pre_install")
+			helpers.assert_nil(record)
+			helpers.assert_eq(reason, "clock")
+			helpers.assert_eq(#fs.writes, writes)
+		end)
+
 		helpers.it("restores after backing the replaced configuration up", function()
 			local owner, fs = fixture({ times = { "20260930-101500", "20260930-111500" } })
 			local record = assert(owner.create("pre_install", { tag = "v0.0.0-dev.139" }))
@@ -280,7 +307,7 @@ function M.register(helpers, env)
 			local owner, fs, _, json = fixture()
 			local record = assert(owner.create("pre_install", {}))
 			local manifest = record.path .. "/backup.json"
-			fs.files[manifest] = json.encode({ schema_version = 1, id = record.id, kind = "pre_install",
+			fs.files[manifest] = json.encode({ schema_version = 1, id = record.id, kind = "pre_install", created_at = record.created_at,
 				files = { { root = "config", path = "../../etc/passwd" } } })
 			local writes = #fs.writes
 			local restored, reason = owner.restore(record.id)
@@ -299,7 +326,7 @@ function M.register(helpers, env)
 				local owner, fs, _, json = fixture()
 				local record = assert(owner.create("pre_install", {}))
 				fs.files[record.path .. "/backup.json"] = json.encode({ schema_version = 1, id = record.id,
-					kind = "pre_install", files = files })
+					kind = "pre_install", created_at = record.created_at, files = files })
 				local writes = #fs.writes
 				local restored, reason = owner.restore(record.id)
 				helpers.assert_eq(restored, false)
