@@ -495,6 +495,12 @@ _LLM_TokenExchange_Begin(Slot, ProviderId, Auth, Key) {
 ; Reads the token service's answer into the slot.
 ; @param {Map} Answer "status", "body"[, "network_report"].
 _LLM_TokenExchange_OnAnswer(Slot, ProviderId, Auth, Answer) {
+	if Answer.Get("pause_revoked", false) is Integer && Answer.Get("pause_revoked", false) == true {
+		LoggerInfo("LLM.remote", "Access token of provider '{1}' cancelled because the driver was paused.", ProviderId)
+		_LLM_TokenExchange_Settle(Slot,
+			Map("refusal", "the driver is paused", "status", 0, "key_refused", false), false)
+		return
+	}
 	Status := Answer.Get("status", 0)
 	Decoded := 0
 	try Decoded := JsonParse(Answer.Get("body", ""))
@@ -568,6 +574,8 @@ _LLM_TokenExchange_Poll(Http, OnAnswer) {
 		return
 	}
 	Answer := Map("status", Http.Status, "body", Http.ResponseEncodingValid ? Http.ResponseText : "")
+	if Http.ManagedPauseRevoked
+		Answer["pause_revoked"] := true
 	NetworkReport := ManagedNetworkFailureWindows_FromTransport(Http, () => true)
 	if NetworkReport is Map
 		Answer["network_report"] := NetworkReport

@@ -344,6 +344,8 @@ class CurlAsyncRequest {
 		this.ManagedAdmissionFn := 0
 		this.ManagedTransportImage := ""
 		this.ManagedPayloadPublished := false
+		; A consumer polling after resume still needs the actual revocation cause.
+		this.ManagedPauseRevoked := false
 		this.NativeReceipt := Map()
 		this.RevocationBestEffort := true
 		this.SendStarted := false
@@ -414,9 +416,19 @@ class CurlAsyncRequest {
 		this.ManagedOwnerCurrent := OwnerCurrent
 	}
 
+	_RetainManagedPauseRevocation(Paused) {
+		; A completed request or spent deadline is not reclassified by a later
+		; pause. This is called only after actual admission refused this facade.
+		if Paused && !this.Completed && !this.Aborted && this._Remaining() > 0
+			this.ManagedPauseRevoked := true
+	}
+
 	_ManagedIsLive() {
-		if this.Completed || this.Aborted || A_IsSuspended || this._Remaining() <= 0
+		Paused := A_IsSuspended
+		if this.Completed || this.Aborted || Paused || this._Remaining() <= 0 {
+			this._RetainManagedPauseRevocation(Paused)
 			return false
+		}
 		Current := true
 		try {
 			if IsObject(this.ManagedOwnerCurrent)
@@ -426,7 +438,11 @@ class CurlAsyncRequest {
 		}
 		; A captured owner check may itself reenter cancellation. Recheck the
 		; facade and the original clock after it returns, before any effect.
-		return Current && !this.Completed && !this.Aborted && !A_IsSuspended && this._Remaining() > 0
+		Paused := A_IsSuspended
+		Admitted := Current && !this.Completed && !this.Aborted && !Paused && this._Remaining() > 0
+		if !Admitted
+			this._RetainManagedPauseRevocation(Paused)
+		return Admitted
 	}
 
 	_SendManaged(Body) {

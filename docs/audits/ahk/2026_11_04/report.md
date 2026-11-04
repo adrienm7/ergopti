@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **50 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **51 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -933,3 +933,17 @@ The ongoing register now contains **50 distinct new findings**. The requested ta
 ## Native partial qualification checkpoint: 41910772341
 
 At `f7e7b2f`, **52 selected cases passed and seven probes failed**, identically in individual and reversed execution. All 21 chord engine/lifecycle cases and 21 roll cases passed, qualifying AHK-045 with its adjacent admission callers. All three clipboard clock cases and both readiness deadline cases passed, qualifying AHK-046/AHK-047. The seven failures are the independently measured AHK-048/AHK-049/AHK-050. The full production graph compiled; hotstring and HTTP E2E were outside selection and no full-suite qualification is claimed.
+
+## AHK-051: A token exchange revoked by pause imposes a provider-failure cooldown after resume
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+The managed facade loses the cause of its refusal when it represents pause revocation as an aborted status0 response. The later token polling consumer treats that result as a provider/transport failure and installs the normal60-second backoff. Checking current suspension only cannot distinguish a consumer delivered after resume.
+
+Reproduction: Run41910983878 atc93908c passes success, HTTP403 and original-deadline controls. Pause after actual managed admission and deliver a late valid token response through the genuine facade. The facade correctly aborts with status0, but after resume the token slot retains retry_at and serves a cached failure: posts remain1 instead of2 and verdicts become2. The same failure reproduces individually and reversed.
+
+Consequence: An explicit driver pause creates an artificial provider refusal for subsequent legitimate token requests, delaying normal operation after resume despite no provider authentication failure.
+
+Regression: Five token-managed-pause cases use genuine Prepare/Begin/Post, managed facade admission and original deadlines, actual token polling timers and native Suspend. Only Job/HTTP process I/O is controlled, not a wire/process-native proof. Success,403 and timeout retain their intended policies; pause and resume-before-Poll require a fresh exchange without cooldown. A narrow facade latch records only an actual pause refusal on a still-active unexpired request, and the internal Answer conveys that fact to token settlement. Secondary cleanup failures remain visible. Native four-case fail-before measured; post-fix qualification pending. Prompt cancellation of a silent server is outside this finding.
+
+The ongoing register now contains **51 distinct new findings**. The requested target of 1,000 remains unmet.
