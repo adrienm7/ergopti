@@ -478,4 +478,17 @@ helpers.describe("network field check window (Linux)", function()
 			helpers.assert_true(not Window.is_running())
 		end)
 	end)
+
+	helpers.it("(field-check-env-error) settles and allows retry when environment construction raises", function()
+		with_window(nil, function(Window, world)
+			world.services.env = function() error("environment unavailable") end
+			local result
+			helpers.assert_true(Window.run_headless(function(value) result = value end, world.services))
+			helpers.assert_true(not Window.is_running())
+			helpers.assert_eq(result.passed, false)
+			helpers.assert_contains(world.evidence[1], "proxy_settings=fail:unusable")
+			helpers.assert_true(Window.run_headless(function() end, world.services), "a later check can retry")
+			helpers.assert_eq(#world.evidence, 2)
+		end)
+	end)
 end)
