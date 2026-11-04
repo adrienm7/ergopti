@@ -99,6 +99,27 @@ end
 -- ===========================================================
 
 helpers.describe("native task environment: launcher authority never reaches children", function()
+	helpers.it("refuses opaque native environment errors without throwing (task-env-error-object)", function()
+		local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+		for _, boundary in ipairs({ "read", "write", "readback" }) do
+			local reads = 0
+			local task = {
+				environment = function()
+					reads = reads + 1
+					if boundary == "read" or (boundary == "readback" and reads == 2) then error(hostile) end
+					return { HOME = "/Users/tester" }
+				end,
+				setEnvironment = function(self)
+					if boundary == "write" then error(hostile) end
+					return self
+				end,
+			}
+			local sanitized, detail = require("adapters.task_environment").sanitize(task)
+			helpers.assert_eq(sanitized, false, boundary .. " must fail closed")
+			helpers.assert_contains(detail, "error object (table)")
+		end
+	end)
+
 	helpers.it("owns one exact launcher-only key list and preserves ordinary variables", function()
 		package.loaded["infra.launcher_environment"] = nil
 		local policy = require("infra.launcher_environment")

@@ -32,6 +32,7 @@ local shortcut_ui = require("ui.menu.shortcut_utils")
 local TableUtil = require("table_util")
 
 local LOG = "menu_llm.trigger_orchestrator"
+local VALID_MODIFIERS = {cmd = true, alt = true, ctrl = true, shift = true, option = true, control = true}
 
 --- Refuses malformed persisted modifier arrays before logging or normalization.
 --- @param mods any Candidate array, or nil for a removed shortcut.
@@ -43,6 +44,8 @@ local function valid_modifiers(mods)
 	for index, value in pairs(mods) do
 		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length
 			or type(value) ~= "string" then return false end
+		local modifier = value:match("^%s*(.-)%s*$"):lower()
+		if not VALID_MODIFIERS[modifier] then return false end
 		count = count + 1
 	end
 	return count == length
