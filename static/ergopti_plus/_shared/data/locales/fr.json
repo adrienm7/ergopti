@@ -2193,7 +2193,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds en pause : autorisez le pilote de clavier virtuel Karabiner dans Réglages Système",
 	"menu.tapholds.vhid_update": "Mettre à jour le pilote Karabiner pour Ergopti…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-holds en pause : le moteur de remappage d’Ergopti n’est pas encore installé sur ce Mac",
-	"menu.tapholds.owned_install": "Installer le moteur de remappage d’Ergopti…",
+	"menu.tapholds.owned_install": "Réessayer l’installation du moteur de remappage d’Ergopti…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holds en pause : un autre Karabiner tourne ; cochez la ligne ci-dessous ou quittez-le",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holds en pause : votre Karabiner-Elements n’a pas pu être fermé ; quittez-le depuis son icône de la barre des menus",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holds en pause : le moteur de remappage d’Ergopti n’a pas pu être téléchargé ; vérifiez la connexion, puis rechargez Ergopti",

@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Tap-holds रुके हैं: System Settings में Karabiner वर्चुअल कीबोर्ड ड्राइवर को अनुमति दें",
 	"menu.tapholds.vhid_update": "Ergopti के लिए Karabiner ड्राइवर अपडेट करें…",
 	"menu.tapholds.owned_not_installed": "⚠️ टैप-होल्ड बंद हैं: Ergopti का की-रीमैपिंग इंजन इस Mac पर अभी इंस्टॉल नहीं है",
-	"menu.tapholds.owned_install": "Ergopti का रीमैपिंग इंजन इंस्टॉल करें…",
+	"menu.tapholds.owned_install": "Ergopti का रीमैपिंग इंजन फिर से इंस्टॉल करने का प्रयास करें…",
 	"menu.tapholds.owned_other_running": "⚠️ टैप-होल्ड बंद हैं: कोई दूसरा Karabiner चल रहा है; नीचे की पंक्ति चुनें या उसे बंद करें",
 	"menu.tapholds.owned_close_failed": "⚠️ टैप-होल्ड बंद हैं: आपका Karabiner-Elements बंद नहीं हो सका; मेनू बार में उसके आइकन से उसे बंद करें",
 	"menu.tapholds.owned_fetch_failed": "⚠️ टैप-होल्ड बंद हैं: Ergopti का की-रीमैपिंग इंजन डाउनलोड नहीं हो सका; कनेक्शन जाँचें, फिर Ergopti को फिर से लोड करें",

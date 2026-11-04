@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Касание-удержание приостановлено: разрешите драйвер виртуальной клавиатуры Karabiner в Системных настройках",
 	"menu.tapholds.vhid_update": "Обновить драйвер Karabiner для Ergopti…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-hold отключены: движок переназначения клавиш Ergopti ещё не установлен на этом Mac",
-	"menu.tapholds.owned_install": "Установить движок переназначения Ergopti…",
+	"menu.tapholds.owned_install": "Повторить установку движка переназначения Ergopti…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-hold отключены: запущен другой Karabiner; отметьте строку ниже или закройте его",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-hold отключены: не удалось закрыть ваш Karabiner-Elements; закройте его через значок в строке меню",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-hold отключены: не удалось загрузить движок переназначения клавиш Ergopti; проверьте подключение и перезагрузите Ergopti",

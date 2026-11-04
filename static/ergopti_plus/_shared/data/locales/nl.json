@@ -2133,7 +2133,7 @@
 	"menu.tapholds.vhid_not_active": "⚠️ Tik-vasthouden gepauzeerd: sta het virtuele Karabiner-toetsenbordstuurprogramma toe in Systeeminstellingen",
 	"menu.tapholds.vhid_update": "Karabiner-stuurprogramma voor Ergopti bijwerken…",
 	"menu.tapholds.owned_not_installed": "⚠️ Tap-holds staan uit: de remapping-engine van Ergopti is nog niet op deze Mac geïnstalleerd",
-	"menu.tapholds.owned_install": "Ergopti’s remapping-engine installeren…",
+	"menu.tapholds.owned_install": "Installatie van Ergopti’s remapping-engine opnieuw proberen…",
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holds staan uit: er draait een andere Karabiner; vink de regel hieronder aan of sluit hem af",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holds staan uit: je Karabiner-Elements kon niet worden gesloten; sluit hem via zijn menubalksymbool",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holds staan uit: de remapping-engine van Ergopti kon niet worden gedownload; controleer de verbinding en herlaad Ergopti",
