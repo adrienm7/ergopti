@@ -443,10 +443,10 @@ between workers) green alone. All live checks pass, typed by the harness.
     row « Install Ergopti's remapping engine… »; the field run reports both jobs, the verified download and whether
     the launcher can install; `RUNTIME_VERSION` `16.3.0-ergopti.3`; the hosted `sudo` install acceptance job.
     Status of the `.3` build, publication and pin: see the handoff.
-  - Blocked, needs the maintainer: the developer app is signed ad hoc (field report 2026-11-04: `signing_identity`
-    `adhoc`), and the install role and the installed-source capture both require the launcher's stable certificate
-    leaf. The flip stays on `next/owned-karabiner-flip` until the developer app is signed with the stable
-    certificate (handoff, WP9).
+  - Decided 4 November: the owned runtime is field-tested on the CI-signed dev build (`--installed` collector mode),
+    never on the ad hoc developer app; no Developer ID for now. The `.3` artifact's Core lacked its idle admission
+    key (every hosted install stopped after the files); fixed in the producer, rebuilt, then published and pinned
+    once the hosted install acceptance passes (handoff).
   - Then: WP9 (handoff checklist), the flip, the shared-mode deletion.
     Done on 1 November: the per-OS feature requirements table
     (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).

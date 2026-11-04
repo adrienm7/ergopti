@@ -71,16 +71,19 @@ Decisions to know:
   (`org.pqrs.service.daemon.Karabiner-VirtualHIDDevice-Daemon`) keeps running beside ours: both run the same pqrs
   program. WP9 must show whether that is harmless (a field report lists both jobs).
 
-### Why the flip is not on `dev`
+### Which app field-tests the owned runtime
 
-The maintainer's developer app is signed ad hoc (field report `mac-2026-11-04_093844`: `signing_identity=adhoc`,
-`developer_adhoc_legacy_only`). The install role takes the helper only when it carries the launcher's own certificate
-leaf, and the installed-source capture (`OwnedRuntimeInstalledPeerOwner`) needs the same leaf, so an ad hoc developer
-app can neither install nor run the owned runtime: it answers `refused|launcher_unsigned`
-(`install_launcher=refused:adhoc` in the field run). With the flip, that Mac's tap-holds would be off with an install
-row that cannot succeed, so the flip stays on `next/owned-karabiner-flip` (rebased on this work). It lands once the
-developer app is signed with the stable certificate (`MACOS_SIGNING_CERTIFICATE_BASE64` and `_PASSWORD` set when
-`tools/dev/run-macos-dev-app.sh` builds, the identity of `tools/build/create_macos_signing_identity.sh`) and WP9 holds.
+The owned runtime trusts only the stable certificate the CI signs with: the install role takes the helper only when
+it carries the launcher's own certificate leaf, the installed-source capture (`OwnedRuntimeInstalledPeerOwner`) needs
+the same leaf, and the manifest pins it in `capture.requirement`. An ad hoc developer app answers
+`refused|launcher_unsigned` (`install_launcher=refused:adhoc`). Maintainer decision (2026-11-04): the Mac runs the
+signed dev build CI publishes (same certificate as main), and the collector's `--installed` mode reports from it.
+No Developer ID for now: one administrator prompt and separate Login Items rows stay (TODO « Owned runtime with a
+Developer ID »).
+
+The install is as automatic as this certificate allows: a launch whose runtime is missing offers it once by itself
+(one confirmation, one macOS administrator prompt), pqrs' manager activates the driver without a password, the
+Extensions pane opens and the approval is detected, then the driver reloads. The Tap-Holds row is the retry.
 
 ### Publishing the runtime artifact (done 2026-11-03)
 
@@ -122,26 +125,20 @@ branch for `.2`), and the downloaded-back asset must match the pin's digest and 
 
 ### WP9: the real-Mac acceptance (maintainer checklist)
 
-No copy-paste on the Mac: each pass is this one command, typed in the clone. The collector rebuilds and opens the
-developer app when needed, runs every Debug field check, then pushes the evidence to a `field/mac-…` branch.
+No copy-paste on the Mac. Install the signed dev build CI publishes (once the maintainer authorizes that dev CI run),
+then, in the clone, one command per pass:
 
 ```sh
-git switch dev && git pull && bash tools/dev/collect-macos-field-report.sh
+git switch dev && git pull && bash tools/dev/collect-macos-field-report.sh --installed
 ```
 
-Pass 1, now (shared default, nothing to click): `field_owned_runtime` shows `artifact_receipt`, `job_loaded`,
-`vhid_job_loaded`, `driver_state` (the DriverKit approval) and `install_launcher`. With the ad hoc developer app it
-reads `refused:adhoc`: that is the blocker above, not a failure.
-
-Once the developer app is signed with the stable certificate and the flip is on `dev`, the same command, then:
-
-1. Tap-Holds shows « not installed » and « Install Ergopti's remapping engine… ». Click it, confirm, type the
-   administrator password once. Ergopti restarts.
-2. If macOS asks, allow the driver in System Settings > General > Login Items & Extensions, and Input Monitoring for
-   the owned Console.
-3. Run the command again: `field_owned_runtime` reads `artifact_receipt=fetched:16.3.0-ergopti.3`, both jobs
-   `loaded`, `driver_state=activated_enabled`; `field_owned_start` and `field_owned_pause` pass (a running
-   Karabiner-Elements is closed with the notice and reopens on pause).
+1. Open the installed ErgoptiPlus. It offers « Install Ergopti's remapping engine » once by itself: confirm, type the
+   administrator password once.
+2. macOS opens Login Items & Extensions > Extensions: allow the Karabiner driver. Ergopti reloads by itself once it is
+   allowed. If macOS asks, allow Input Monitoring for ErgoptiPlus.
+3. Click Debug > the owned runtime field check, then run the command: the report's `owned_runtime` step lists both
+   jobs loaded, the driver `[activated enabled]`, the verified `16.3.0-ergopti.3` download, the app's signing
+   authority and `console parent: ErgoptiPlus`.
 4. By hand: tap-holds, chords and the navigation layer on the internal keyboard with fn/globe, autorepeat, sleep and
    wake; a reload returns the keyboard to native input.
 
