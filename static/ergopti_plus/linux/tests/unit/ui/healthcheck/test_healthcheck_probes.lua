@@ -29,21 +29,6 @@ local PROC_AFTER = {
 	["/proc/self/stat"] = "4242 (lua (ergopti) d) S 1 4242 4242 0 -1 4194304 1000 0 0 0 150 75 0 0 20 0 3 0 12345\n",
 }
 
---- An io.open answering the /proc paths of world.proc from memory.
---- @param world table
---- @param real function The real io.open.
---- @return function
-local function proc_open(world, real)
-	return function(path, mode)
-		local content = world.proc and world.proc[path]
-		if content == nil then return real(path, mode) end
-		return {
-			read = function() return content end,
-			close = function() return true end,
-		}
-	end
-end
-
 --- Runs body with the real probes over recorded adapters.
 --- @param async boolean Whether libuv is available.
 --- @param body function(Probes, world)
@@ -67,8 +52,13 @@ local function with_probes(async, body, absent)
 			world.cancelled_timers = world.cancelled_timers + 1
 		end,
 	}
-	local real_open = io.open
-	io.open = proc_open(world, real_open)
+	local reader = require("infra.regular_file_reader")
+	local real_read = reader.read_source
+	reader.read_source = function(path)
+		local content = world.proc and world.proc[path]
+		if content ~= nil then return content end
+		return real_read(path)
+	end
 	package.loaded["adapters.http_client"] = {
 		HAS_ASYNC = async,
 		get = function(url, headers, options, callback)
@@ -92,7 +82,7 @@ local function with_probes(async, body, absent)
 	}
 	package.loaded["ui.healthcheck.probes"] = nil
 	local ok, err = pcall(body, require("ui.healthcheck.probes"), world)
-	io.open = real_open
+	reader.read_source = real_read
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
 end
@@ -287,5 +277,42 @@ helpers.describe("diagnostics probes (linux)", function()
 			helpers.assert_eq(answers.proxy_pac.result.state, "ok")
 			helpers.assert_eq(answers.proxy_pac.sections.network.proxy_pac, "No PAC configured")
 		end)
+	end)
+end)
+
+helpers.describe("healthcheck native source admission", function()
+	for _, mode in ipairs({ "stat_refused", "stat_throw", "access_nil", "access_throw" }) do
+		helpers.it("(healthcheck-device-owner) refuses " .. mode .. " without opening a descriptor", function()
+			local previous, accesses = package.loaded["luv"], 0
+			package.loaded["luv"] = {
+				fs_open = function() error("a diagnostic must not open the device") end,
+				fs_stat = function()
+					if mode == "stat_throw" then error("stat failed") end
+					if mode == "stat_refused" then return nil end
+					return { type = "char" }
+				end,
+				fs_access = function()
+					accesses = accesses + 1
+					if mode == "access_throw" then error("access failed") end
+					return nil
+				end,
+			}
+			local called, result = pcall(require("ui.healthcheck.bridge")._device_access_for_test, "/synthetic")
+			package.loaded["luv"] = previous
+			helpers.assert_true(called)
+			helpers.assert_eq(result, "unknown")
+			helpers.assert_eq(accesses, (mode == "stat_refused" or mode == "stat_throw") and 0 or 1)
+		end)
+	end
+
+	helpers.it("(healthcheck-source-fifo) reads regular sources and rejects special files without blocking", function()
+		local shell = require("adapters.shell_runner")
+		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"))
+		local quote = require("text_utils").shell_quote
+		local runtime = assert(shell.exec_line("command -v luajit"))
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_healthcheck_sources.py"
+		local result = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime) .. " --driver " .. quote(root))
+		helpers.assert_true(result == true or result == 0, "native healthcheck reads must not wait on special files")
 	end)
 end)

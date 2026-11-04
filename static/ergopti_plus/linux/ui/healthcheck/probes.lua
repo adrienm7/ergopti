@@ -101,11 +101,7 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local fh = io.open(path, "rb")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	return content
+	return require("infra.regular_file_reader").read_source(path)
 end
 
 --- The answer of a failed HTTP request.

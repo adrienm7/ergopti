@@ -146,16 +146,16 @@ helpers.describe("healthcheck (linux): the daemon's own load", function()
 	-- The resident memory of the daemon, which a report of a slow or leaking
 	-- driver is read for (system-load)
 	helpers.it("reports the daemon's resident memory from /proc/self/status (system-load)", function()
-		local real_open = io.open
-		io.open = function(path, mode)
-			if path ~= "/proc/self/status" then return real_open(path, mode) end
-			local content = "Name:\tluajit\nUid:\t1000\t1000\t1000\t1000\nVmRSS:\t   51200 kB\nThreads:\t3\n"
-			return { read = function() return content end, close = function() return true end }
+		local reader = require("infra.regular_file_reader")
+		local real_read = reader.read_source
+		reader.read_source = function(path)
+			if path ~= "/proc/self/status" then return real_read(path) end
+			return "Name:\tluajit\nUid:\t1000\t1000\t1000\t1000\nVmRSS:\t   51200 kB\nThreads:\t3\n"
 		end
 		local ok, result = pcall(function()
 			return helpers.load_module("ui.healthcheck.bridge").build_snapshot({}, false)
 		end)
-		io.open = real_open
+		reader.read_source = real_read
 		helpers.assert_true(ok, tostring(result))
 		helpers.assert_eq(result.sections.system.process_memory, 51200 * 1024)
 		helpers.assert_eq(result.sections.system.elevated, false, "the same file answers the elevation")
