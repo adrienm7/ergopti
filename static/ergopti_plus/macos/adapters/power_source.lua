@@ -28,9 +28,9 @@ local _reported_failure = nil
 --- @return boolean on_battery
 function M.on_battery()
 	local ok, source = pcall(function() return hs.battery.powerSource() end)
-	if ok and (type(source) == "string" or source == nil) then
+	if ok and (source == BATTERY_SOURCE or source == "AC Power" or source == "UPS Power") then
 		_reported_failure = nil
-		return source == BATTERY_SOURCE
+		return source ~= "AC Power"
 	end
 	local failure = tostring(source)
 	if _reported_failure ~= failure then
