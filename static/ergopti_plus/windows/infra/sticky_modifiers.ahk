@@ -27,8 +27,8 @@ StickyModifierNames(ActionId) {
 }
 
 ; Presses the next key with the sticky action's modifiers, once. The key itself is
-; withheld until then; a modifier pressed in between is left alone, and the timeout
-; of the one-shot Shift ends the wait.
+; withheld until then; intervening modifiers pass through and their captured
+; flags accompany the replay. The one-shot Shift timeout ends the wait.
 ; @param {String} ActionId A sticky_* action id other than sticky_shift.
 ; @returns {Boolean} True when a key was pressed with them.
 StickyModifier(ActionId) {
@@ -47,5 +47,17 @@ StickyModifier(ActionId) {
 	finally CaptureSettled := SIHO_StopOwned(OwnerToken, Hook)
 	if !CaptureSettled || A_IsSuspended || Hook.EndReason != "EndKey"
 		return false
+	; Native input can release a modifier before Wait unwinds. EndMods owns the
+	; flags of the captured key; current keyboard state or Blind would lose them.
+	CapturedMods := Hook.EndMods
+	Seen := Map()
+	for Name in Held
+		Seen[Name] := true
+	for Symbol, Name in Map("^", "Ctrl", "!", "Alt", "+", "Shift", "#", "Win") {
+		if InStr(CapturedMods, Symbol) && !Seen.Has(Name) {
+			Held.Push(Name)
+			Seen[Name] := true
+		}
+	}
 	return TextPressKey(Hook.EndKey, Held) ? true : false
 }
