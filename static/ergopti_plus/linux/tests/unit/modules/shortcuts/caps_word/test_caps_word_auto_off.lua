@@ -601,7 +601,7 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		local hook = assert(helpers.read_driver_unit("local function hold_owner("))
 		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value, slot)')
 		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)')
-		helpers.assert_contains(hook, "_on_pointer_event = options.onPointerEvent")
+		helpers.assert_contains(hook, '_on_pointer_event = type(options.onPointerEvent) == "function" and options.onPointerEvent or nil')
 		-- The frame a report closes is for the metrics; it is neither a press nor a motion.
 		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot)')
 		helpers.assert_contains(source("ergopti_hotstrings.lua"), 'if kind_of_event == "frame" or kind_of_event == "reset" or kind_of_event == "dropped" then return end')
