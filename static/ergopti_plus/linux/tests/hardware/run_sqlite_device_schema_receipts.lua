@@ -130,6 +130,42 @@ COMMIT;
 	assert(assert(Writer.query_rows("PRAGMA schema_version;"))[1] == before, "legacy migration repeated after succeeding")
 end)
 
+check("shipped legacy DDL migrates with a real SQLite database", function()
+	Writer.close_db()
+	local schema_file = assert(io.open("../_shared/data/db/schema.sql", "rb"))
+	local schema = assert(schema_file:read("*a")); assert(schema_file:close())
+	local ddl = assert(schema:match("(CREATE TABLE IF NOT EXISTS devices%s*%b())%s*;"))
+	local legacy, replacements = ddl:gsub(",%s*'linux'", "", 1)
+	assert(replacements == 1, "canonical legacy transform must remove one Linux value")
+	local path = root .. "/historical.sqlite"
+	local handle = ffi.new("sqlite3 *[1]")
+	assert(sqlite.sqlite3_open_v2(path, handle, 6, nil) == 0)
+	assert(sqlite.sqlite3_exec(handle[0], legacy .. ";", nil, nil, nil) == 0)
+	assert(sqlite.sqlite3_close(handle[0]) == 0)
+	assert(Writer.open_db(path), "the actual shipped legacy DDL must migrate")
+	Writer.close_db()
+end)
+
+check("unknown legacy CHECK is refused and retained", function()
+	local path = root .. "/extra-check.sqlite"
+	local handle = ffi.new("sqlite3 *[1]")
+	assert(sqlite.sqlite3_open_v2(path, handle, 6, nil) == 0)
+	local ddl = [[CREATE TABLE devices (
+ device_id TEXT PRIMARY KEY, name TEXT NOT NULL CHECK(length(name)>0),
+ os TEXT NOT NULL CHECK(os IN ('darwin','windows')), os_version TEXT,
+ host_signature TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
+);]]
+	assert(sqlite.sqlite3_exec(handle[0], ddl, nil, nil, nil) == 0)
+	assert(sqlite.sqlite3_close(handle[0]) == 0)
+	assert(Writer.open_db(path) == false, "unrecognized CHECK cannot be dropped")
+	assert(sqlite.sqlite3_open_v2(path, handle, 2, nil) == 0)
+	local inserted = sqlite.sqlite3_exec(handle[0], [[INSERT INTO devices VALUES
+ ('id','','darwin','','host','created','updated',0,'');]], nil, nil, nil)
+	assert(inserted ~= 0, "the original CHECK remains enforced")
+	assert(sqlite.sqlite3_close(handle[0]) == 0)
+end)
+
 Writer.close_db()
 for name in uv.fs_scandir_next, assert(uv.fs_scandir(root)) do assert(uv.fs_unlink(root .. "/" .. name)) end
 assert(uv.fs_rmdir(root))

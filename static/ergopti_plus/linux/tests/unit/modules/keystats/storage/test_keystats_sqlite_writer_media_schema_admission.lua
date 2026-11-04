@@ -784,7 +784,7 @@ for _, fault in ipairs({ "seek_throw", "close_throw" }) do
 	end)
 end
 
-for _, receipt in ipairs({ "0", "1", "error" }) do
+for _, receipt in ipairs({ "0", "1", "error", "extra_check" }) do
 	it("SQLite legacy device migration preserves dependent schema " .. receipt, function()
 		local command = require("modules.keystats.sqlite_command")
 		local build, execute, popen = command.build, os.execute, io.popen
@@ -799,9 +799,16 @@ for _, receipt in ipairs({ "0", "1", "error" }) do
 		io.popen = function()
 			local body, status = "", 0
 			if current:find("SELECT sql FROM sqlite_master", 1, true) then
-				body = "CREATE TABLE devices (os CHECK (os IN ('darwin','windows')));\n"
+				body = [[CREATE TABLE devices (
+ device_id TEXT PRIMARY KEY, name TEXT NOT NULL,
+ os TEXT NOT NULL CHECK(os IN ('darwin','windows')), os_version TEXT,
+ host_signature TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
+)]] .. "\n"
+				if receipt == "extra_check" then body = body:gsub("name TEXT NOT NULL", "name TEXT NOT NULL CHECK(length(name)>0)") end
 			elseif current:find("pragma_foreign_key_list", 1, true) then
-				if receipt == "error" then status = 7 else body = receipt .. "\n" end
+				if receipt == "error" then status = 7
+				elseif receipt == "1" then body = "1\n" else body = "0\n" end
 			end
 			return { read = function() return body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,
 				close = function() return true end }
@@ -811,7 +818,7 @@ for _, receipt in ipairs({ "0", "1", "error" }) do
 		command.build, os.execute, io.popen = build, execute, popen
 		Writer.close_db(); os.remove(path)
 		helpers.assert_true(called)
-		helpers.assert_eq(opened, receipt == "0", "only a proven dependency-free schema may be migrated")
+		helpers.assert_eq(opened, receipt == "0", "only a proven known schema may be migrated")
 		local observed_guard, observed_migration = false, false
 		for _, sql in ipairs(statements) do
 			if sql:find("pragma_foreign_key_list", 1, true) then
@@ -821,7 +828,7 @@ for _, receipt in ipairs({ "0", "1", "error" }) do
 			end
 			if sql:find("ALTER TABLE devices RENAME", 1, true) then observed_migration = true end
 		end
-		helpers.assert_true(observed_guard)
+		if receipt == "0" or receipt == "1" or receipt == "error" then helpers.assert_true(observed_guard) end
 		helpers.assert_eq(observed_migration, receipt == "0", "unsafe device migration cannot start")
 	end)
 end
