@@ -504,13 +504,15 @@ _required_dependency_package() {
 _install_required_package() {
 	local pkg_mgr="$1"
 	local package_name="$2"
+	local -a privilege=()
+	if [ "$(id -u)" != 0 ]; then privilege=(sudo); fi
 	case "${pkg_mgr}" in
-		apt)     sudo apt-get install -y "${package_name}" ;;
-		dnf)     sudo dnf install -y "${package_name}" ;;
-		zypper)  sudo zypper --non-interactive install "${package_name}" ;;
-		pacman)  sudo pacman -Sy --noconfirm "${package_name}" ;;
-		xbps)    sudo xbps-install -Sy "${package_name}" ;;
-		apk)     sudo apk add "${package_name}" ;;
+		apt)     "${privilege[@]}" apt-get install -y "${package_name}" ;;
+		dnf)     "${privilege[@]}" dnf install -y "${package_name}" ;;
+		zypper)  "${privilege[@]}" zypper --non-interactive install "${package_name}" ;;
+		pacman)  "${privilege[@]}" pacman -Sy --noconfirm "${package_name}" ;;
+		xbps)    "${privilege[@]}" xbps-install -Sy "${package_name}" ;;
+		apk)     "${privilege[@]}" apk add "${package_name}" ;;
 		*) return 1 ;;
 	esac
 }

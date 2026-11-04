@@ -25,6 +25,77 @@ assert.ok(fs.existsSync(sourcePath), 'native packages need an automatic permissi
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-setup-'));
 const shellQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 try {
+	// A root shell need not have sudo installed: execute the detected package
+	// manager directly, while retaining its actual failure as a failure.
+	{
+		const tools = path.join(sandbox, 'root-package-tools');
+		const receipt = path.join(sandbox, 'root-package-receipt');
+		const shellEnv = path.join(sandbox, 'root-package-env');
+		fs.mkdirSync(tools);
+		fs.writeFileSync(
+			path.join(tools, 'id'),
+			'#!/bin/bash\n[ "$1" = -u ] && echo "${TEST_UID:-0}"\n',
+			{ mode: 0o755 }
+		);
+		fs.writeFileSync(
+			path.join(tools, 'apt-get'),
+			`#!/bin/bash\nprintf 'apt-get\\n' > ${shellQuote(receipt)}\nexit 42\n`,
+			{ mode: 0o755 }
+		);
+		fs.writeFileSync(
+			path.join(tools, 'sudo'),
+			`#!/bin/bash\nprintf 'sudo\\n' > ${shellQuote(receipt)}\nexit 42\n`,
+			{ mode: 0o755 }
+		);
+		fs.writeFileSync(
+			shellEnv,
+			'command() { if [ "$1" = -v ] && [ "$2" = luajit ]; then return 1; fi; builtin command "$@"; }\n'
+		);
+		const result = spawnSync(
+			'/bin/bash',
+			[
+				bashPath(path.join(ROOT, 'static/ergopti_plus/linux/install.sh')),
+				'--prefix',
+				bashPath(path.join(sandbox, 'root-prefix')),
+				'--no-service'
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: {
+					...process.env,
+					HOME: sandbox,
+					SUDO_UID: '1001',
+					PATH: `${tools}:/usr/bin:/bin`,
+					BASH_ENV: shellEnv
+				}
+			}
+		);
+		assert.equal(result.status, 42, result.stderr);
+		assert.equal(fs.readFileSync(receipt, 'utf8'), 'apt-get\n');
+		const unprivileged = spawnSync(
+			'/bin/bash',
+			[
+				bashPath(path.join(ROOT, 'static/ergopti_plus/linux/install.sh')),
+				'--prefix',
+				bashPath(path.join(sandbox, 'user-prefix')),
+				'--no-service'
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: {
+					...process.env,
+					HOME: sandbox,
+					TEST_UID: '1001',
+					PATH: `${tools}:/usr/bin:/bin`,
+					BASH_ENV: shellEnv
+				}
+			}
+		);
+		assert.equal(unprivileged.status, 42, unprivileged.stderr);
+		assert.equal(fs.readFileSync(receipt, 'utf8'), 'sudo\n');
+	}
 	// An unprivileged invocation must enroll its own UID, even when it inherited
 	// SUDO_UID from an earlier `sudo -u` context.
 	{
