@@ -113,12 +113,15 @@ helpers.describe("system gesture snapshots (gesture-conflicts)", function()
 				subject.refresh()
 				for _, task in ipairs(pending) do task.done(0, output, "") end
 				helpers.assert_type(subject.on_action_changed("swipe_3_left", "word_prev"), "table")
+				helpers.assert_eq(subject.slot_system_state("swipe_3_left"), "unverified")
+				helpers.assert_eq(subject.slot_held_by_system("swipe_3_left"), true)
 			end)
 		end
 		fixture(function(subject, pending)
 			subject.refresh()
 			for _, task in ipairs(pending) do task.done(0, "TrackpadThreeFingerDrag = 0; TrackpadThreeFingerHorizSwipeGesture = 0;", "") end
 			helpers.assert_nil(subject.on_action_changed("swipe_3_left", "word_prev"))
+			helpers.assert_eq(subject.slot_system_state("swipe_3_left"), "free")
 		end)
 	end)
 	helpers.it("keeps failed probes unknown rather than calling them disabled", function()

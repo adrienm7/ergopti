@@ -387,6 +387,14 @@ local function preference_is_disabled(keys, preferences)
 	return found
 end
 
+--- Tells whether at least one alias was actually present in the snapshot.
+local function preference_is_observed(keys, preferences)
+	for _, key in ipairs(keys) do
+		if type(preferences[key]) == "table" and #preferences[key] > 0 then return true end
+	end
+	return false
+end
+
 --- Whether one macOS policy is on: any observed non-zero value, all observed
 --- values zero means off, and no value at all means the macOS default.
 --- @param keys table Native aliases for one policy.
@@ -533,6 +541,14 @@ function M.slot_system_state(slot)
 	if not grp or grp.blocks ~= true then return "free" end
 	if next(cached_preferences) == nil and not snapshot_all_absent then return "unverified" end
 	if system_gesture_on(grp, cached_preferences) then return "taken" end
+	if grp.drag_preferences then
+		local swipe_known = preference_is_observed(grp.preferences, cached_preferences)
+		local drag_known = preference_is_observed(grp.drag_preferences, cached_preferences)
+		-- The warning policy requires both independent settings before it calls
+		-- either explicitly disabled setting conflict-free. Keep the engine held
+		-- under the same uncertainty; when both are absent their defaults apply.
+		if swipe_known ~= drag_known then return "unverified" end
+	end
 	return snapshot_incomplete and "unverified" or "free"
 end
 
