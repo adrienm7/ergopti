@@ -64,6 +64,7 @@ M.REASON = {
 	MEMBERS = "artifact_members_refused",
 	EXTRACT = "artifact_extract_failed",
 	STORE = "artifact_store_failed",
+	BUSY = "artifact_busy",
 }
 local REASON = M.REASON
 
@@ -77,7 +78,7 @@ local function complete_pin(pin)
 	for _, key in ipairs(PIN_KEYS) do
 		if pin[key] == nil then return false end
 	end
-	return type(pin.version) == "string" and pin.version:match("^[%w%.%-+]+$") ~= nil
+	return require("platform.remap.runtime_manifest").valid_version(pin.version)
 		and type(pin.file_name) == "string" and pin.file_name:match("^[%w][%w%._%-]*$") ~= nil
 		and type(pin.source_url) == "string" and pin.source_url:match("^https://[^%s]+/" .. pin.file_name:gsub("%p", "%%%0") .. "$") ~= nil
 		and type(pin.sha256) == "string" and #pin.sha256 == 64 and pin.sha256:match("^%x+$") ~= nil
@@ -132,11 +133,13 @@ function M.new(ports)
 	end
 	local fetcher = {}
 	local waiters
+	local active_pin
 
 	--- Settles every waiter of the running fetch once.
 	local function settle(ok, value, detail)
 		local pending = waiters
 		waiters = nil
+		active_pin = nil
 		if ok then
 			Logger.success(LOG, "Owned runtime artifact ready at %s.", tostring(value))
 		elseif value == REASON.DOWNLOAD then
@@ -197,9 +200,18 @@ function M.new(ports)
 			return callback(false, REASON.UNPINNED, "the runtime artifact is not pinned in the manifest")
 		end
 		if waiters then
+			for _, key in ipairs(PIN_KEYS) do
+				if pin[key] ~= active_pin[key] then
+					return callback(false, REASON.BUSY, "another runtime artifact pin is being fetched")
+				end
+			end
 			waiters[#waiters + 1] = callback
 			return
 		end
+		local admitted_pin = {}
+		for _, key in ipairs(PIN_KEYS) do admitted_pin[key] = pin[key] end
+		pin = admitted_pin
+		active_pin = pin
 		waiters = { callback }
 		local home = ports.expand(M.home_for(pin.version))
 		if kept(home, pin) then

@@ -191,6 +191,17 @@ end
 local function settle_private_output()
 	local receipt = _private_stdin_cleanup
 	if receipt == nil then return true end
+	if receipt.file ~= nil then
+		local closed, result = pcall(function() return receipt.file:close() end)
+		if not closed or result ~= true then
+			if receipt.reported ~= true then
+				receipt.reported = true
+				Logger.error(LOG, "exec_private_stdin() private output close refused; the handle is retained for retry.")
+			end
+			return false
+		end
+		receipt.file = nil
+	end
 	local call_ok, removed = pcall(receipt.native.remove, receipt.path)
 	local absent = false
 	if not call_ok or removed ~= true then
@@ -235,9 +246,9 @@ local function run_private_stdin(cmd, input)
 	local read_ok, output = pcall(function()
 		local handle = native.open(out_path, "rb")
 		if not handle then return nil end
-		local data = handle:read("a")
-		handle:close()
-		return data
+		-- Record ownership before reading, which may raise or return an error.
+		_private_stdin_cleanup.file = handle
+		return handle:read("a")
 	end)
 	if not written_ok or not written then return nil, "standard input was not fully delivered" end
 	if not closed_ok or exit_type ~= "exit" or rc ~= 0 or status ~= true then

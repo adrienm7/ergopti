@@ -25,15 +25,14 @@ function doValidate() {
 window.addEventListener('load', function () {
 	const input = document.getElementById('token-input');
 	if (input) {
-		// Multi-step focus to ensure visibility
-		input.focus();
-		setTimeout(() => {
-			input.focus();
-			input.select();
-		}, 50);
-		setTimeout(() => {
-			input.focus();
-		}, 150);
+		// Retry focus only while no control has been chosen. Selecting the input
+		// later would replace a token the user has already started typing.
+		const focusIfUnclaimed = () => {
+			if (document.activeElement === document.body) input.focus();
+		};
+		focusIfUnclaimed();
+		setTimeout(focusIfUnclaimed, 50);
+		setTimeout(focusIfUnclaimed, 150);
 
 		input.addEventListener('keypress', function (e) {
 			if (e.key === 'Enter') {
@@ -46,7 +45,7 @@ window.addEventListener('load', function () {
 // Also try to focus immediately
 document.addEventListener('DOMContentLoaded', function () {
 	const input = document.getElementById('token-input');
-	if (input) {
+	if (input && document.activeElement === document.body) {
 		input.focus();
 	}
 });

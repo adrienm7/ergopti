@@ -751,14 +751,14 @@ local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, 
 	-- Shortcuts (counts only).
 	query("ngram_shortcuts", function()
 		for r in _rows(db, string.format([[
-			SELECT token, SUM(c) AS c FROM ngram_shortcuts %s GROUP BY token
+			SELECT token, TOTAL(c) AS c FROM ngram_shortcuts %s GROUP BY token
 		]], where), pacer) do
 			add_count(out.sc, r.token, r.c)
 		end
 	end, pacer)
 	query("ngram_shortcut_bigrams", function()
 		for r in _rows(db, string.format([[
-			SELECT token, SUM(c) AS c FROM ngram_shortcut_bigrams %s GROUP BY token
+			SELECT token, TOTAL(c) AS c FROM ngram_shortcut_bigrams %s GROUP BY token
 		]], where), pacer) do
 			add_count(out.sc_bg, r.token, r.c)
 		end
@@ -766,7 +766,7 @@ local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, 
 	-- Keycodes.
 	query("ngram_keycodes", function()
 		for r in _rows(db, string.format([[
-			SELECT keycode, SUM(c) AS c FROM ngram_keycodes %s GROUP BY keycode
+			SELECT keycode, TOTAL(c) AS c FROM ngram_keycodes %s GROUP BY keycode
 		]], where), pacer) do
 			add_count(out.kc, tostring(r.keycode), r.c)
 		end
@@ -930,31 +930,31 @@ function M.read_today_split(sqlite_path, start_date, end_date, selected_apps, pa
 
 		_safe_query("ngram_keycodes(today)", function()
 			for r in _rows(db, string.format([[
-				SELECT app, keycode, SUM(c) AS c FROM ngram_keycodes
+				SELECT app, keycode, TOTAL(c) AS c FROM ngram_keycodes
 				WHERE date = %s %s GROUP BY app, keycode
 			]], _q(today_str), app_clause), pacer) do
 				_today_bucket(r.app).kc[tostring(r.keycode)] =
-					{ c = r.c or 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					{ c = finite_number(r.c, 0), t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 			end
 		end, pacer)
 
 		_safe_query("ngram_shortcuts(today)", function()
 			for r in _rows(db, string.format([[
-				SELECT app, token, SUM(c) AS c FROM ngram_shortcuts
+				SELECT app, token, TOTAL(c) AS c FROM ngram_shortcuts
 				WHERE date = %s %s GROUP BY app, token
 			]], _q(today_str), app_clause), pacer) do
 				_today_bucket(r.app).sc[r.token] =
-					{ c = r.c or 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					{ c = finite_number(r.c, 0), t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 			end
 		end, pacer)
 
 		_safe_query("ngram_shortcut_bigrams(today)", function()
 			for r in _rows(db, string.format([[
-				SELECT app, token, SUM(c) AS c FROM ngram_shortcut_bigrams
+				SELECT app, token, TOTAL(c) AS c FROM ngram_shortcut_bigrams
 				WHERE date = %s %s GROUP BY app, token
 			]], _q(today_str), app_clause), pacer) do
 				_today_bucket(r.app).sc_bg[r.token] =
-					{ c = r.c or 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					{ c = finite_number(r.c, 0), t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 			end
 		end, pacer)
 
