@@ -22,6 +22,34 @@ helpers.describe("hotstrings_config", function()
     if not ok then error(err, 0) end
   end
 
+  for _, mode in ipairs({ "index", "override", "default", "denied", "missing", "retained" }) do
+    helpers.it("hotstring source admission is bounded: " .. mode, function()
+      local uv_ok = pcall(require, "luv")
+      if not uv_ok or package.config:sub(1, 1) ~= "/" then return end
+      with_owned_dir(function(dir)
+        local target
+        if mode == "index" then target = dir .. "/index.toml"
+        elseif mode == "override" or mode == "denied" or mode == "missing" or mode == "retained" then
+          target = dir .. "/french/autocorrection.toml"
+        else target = dir .. "/.config/ergopti/hotstrings" end
+        local parent = target:match("^(.*)/[^/]+$")
+        helpers.assert_true(Shell.run("mkdir -p " .. Shell.quote(parent)))
+        if mode == "denied" then
+          local file = assert(io.open(target, "w")); file:write("x"); file:close()
+          helpers.assert_true(Shell.run("chmod 000 " .. Shell.quote(target)))
+        elseif mode ~= "missing" and mode ~= "retained" then
+          helpers.assert_true(Shell.run("mkfifo " .. Shell.quote(target)))
+        end
+        local executable = assert(arg and arg[-1], "running Lua interpreter required")
+        local fixture = helpers.driver_root() .. "/tests/fixtures/native_hotstring_path_admission.lua"
+        local command = "timeout 4 " .. Shell.quote(executable) .. " " .. Shell.quote(fixture)
+          .. " " .. Shell.quote(dir) .. " " .. Shell.quote(mode)
+        local result = os.execute(command)
+        helpers.assert_true(result == true or result == 0, "FIFO admission must refuse before the deadline")
+      end)
+    end)
+  end
+
   -- Create a minimal engine stub for testing.
   local function make_engine()
     local e = engine_mod.new()
