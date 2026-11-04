@@ -62,6 +62,7 @@ local function load_bridge(controls)
 				return { redaction = context.redaction, templates = document("issue_templates"), repository = document("../updater/defaults").github, schema = sharing_schema }
 			end,
 			build_snapshot = function()
+				if context.on_snapshot then context.on_snapshot() end
 				return {
 					driver = "linux",
 					generated_at = "2026-09-24T08:15:02Z",
@@ -200,6 +201,42 @@ local function reported(bridge, record)
 end
 
 helpers.describe("error window bridge (linux): policy and deferral (error-dialog-linux)", function()
+	helpers.it("(error-dialog-ready-owner) discards a report when its page closes during collection", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			local owner = page(context)
+			context.on_snapshot = function()
+				context.on_snapshot = nil
+				context.epoch = nil
+				bridge.on_window_closed(owner.epoch)
+			end
+			helpers.assert_nil(bridge.on_message("ready", {}, owner))
+			helpers.assert_nil(bridge.on_message({ action = "copy" }, {}, owner))
+		end)
+	end)
+
+	helpers.it("(error-dialog-ready-owner) preserves a replacement report during collection", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			local owner = page(context)
+			context.on_snapshot = function()
+				context.on_snapshot = nil
+				context.epoch = nil
+				bridge.on_window_closed(owner.epoch)
+				bridge.on_error("second", "second failure", "second failure")
+				run_deferred(context)
+				helpers.assert_eq(bridge.on_message("ready", {}, page(context)).module, "second")
+			end
+			helpers.assert_nil(bridge.on_message("ready", {}, owner))
+			local answer = bridge.on_message({ action = "copy" }, {}, page(context))
+			helpers.assert_true(answer and answer.ok)
+		end)
+	end)
+
 	helpers.it("(error-dialog-close-refusal) retains the report until its window closes", function()
 		with_bridge(nil, function(bridge, context)
 			bridge.init()
