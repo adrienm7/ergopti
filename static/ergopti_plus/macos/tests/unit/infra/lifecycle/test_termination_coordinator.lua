@@ -1087,6 +1087,24 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_eq(raising_calls.fatal_exits, 1)
 	end)
 
+	helpers.it("rejects nonfinite and oversized termination deadlines (termination-deadline-range)", function()
+		for _, name in ipairs({ "user_exit_deadline_seconds", "reload_deadline_seconds" }) do
+			for _, value in ipairs({ 0 / 0, math.huge, math.maxinteger }) do
+				package.loaded["infra.termination_coordinator"] = nil
+				local coordinator = require("infra.termination_coordinator")
+				local noop = function() return true end
+				local deps = {
+					request_lease = noop, drain_input = noop, teardown = noop, begin_drain = noop,
+					finalize_teardown = noop, reload = noop, exit = noop, fatal_exit = noop,
+					mark_reload = noop, clear_reload = noop, schedule = noop, fatal_exit_code = 70,
+					user_exit_deadline_seconds = 12, reload_deadline_seconds = 30,
+				}
+				deps[name] = value
+				helpers.assert_eq(coordinator.init(deps), false, name .. " must be a bounded positive duration")
+			end
+		end
+	end)
+
 	helpers.it("refuses initialization without a positive reload deadline (reload-deadline)", function()
 		package.loaded["infra.termination_coordinator"] = nil
 		local coordinator = require("infra.termination_coordinator")

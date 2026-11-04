@@ -54,6 +54,18 @@ local function harness(request_exit, schedule_result, timer_stop_result)
 end
 
 helpers.describe("bounded emergency exit", function()
+	helpers.it("refuses nonfinite or oversized deadlines before starting work (emergency-deadline-range)", function()
+		for _, value in ipairs({ 0 / 0, math.huge, math.maxinteger }) do
+			local emergency = load_emergency()
+			local requests = 0
+			local options, calls = harness(function() requests = requests + 1; return true end)
+			options.deadline_seconds = value
+			helpers.assert_eq(emergency.request(options), false)
+			helpers.assert_eq(requests, 0)
+			helpers.assert_eq(calls.delay, nil)
+		end
+	end)
+
 	helpers.it("forces exit even when deadline diagnostics contain opaque errors (emergency-opaque-error)", function()
 		local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
 		for _, scenario in ipairs({

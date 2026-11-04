@@ -401,9 +401,9 @@ function M.new(opts)
 	end
 
 	--- The headers of one list request, conditional on the stored copy.
-	local function list_headers()
+	local function list_headers(copy)
 		local headers = { Accept = "application/vnd.github+json", ["User-Agent"] = USER_AGENT }
-		if list_cache then headers["If-None-Match"] = list_cache.etag end
+		if copy then headers["If-None-Match"] = copy.etag end
 		return headers
 	end
 
@@ -413,11 +413,11 @@ function M.new(opts)
 	--- @return string|nil body
 	--- @return string|nil reason
 	--- @return string|nil detail
-	local function read_response(result)
+	local function read_response(result, request_copy)
 		local status = type(result) == "table" and tonumber(result.status) or 0
-		if status == 304 and list_cache then
+		if status == 304 and request_copy then
 			Logger.debug(LOG, "Release list unchanged (304); reusing the stored copy.")
-			return list_cache.body
+			return request_copy.body
 		end
 		if type(result) == "table" and result.ok == true and type(result.body) == "string"
 			and result.body:match("^%s*%[") then
@@ -472,7 +472,8 @@ function M.new(opts)
 		in_flight = true
 		local request_generation = generation
 		local completed = false
-		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(result)
+		local request_copy = list_cache
+		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(request_copy), function(result)
 			if completed or not active or request_generation ~= generation then return end
 			completed = true
 			if channel ~= opts.channel() then
@@ -480,7 +481,7 @@ function M.new(opts)
 				Logger.info(LOG, "Discarded a completed check for the previous channel '%s'.", channel)
 				return
 			end
-			local body, reason, detail = read_response(result)
+			local body, reason, detail = read_response(result, request_copy)
 			if not body and reason == "no_connection" then
 				Logger.info(LOG, "Background check: the GitHub API gave no list (%s); reading the Atom feed.", detail)
 				read_feed(opts.http, detail, function(feed_body, feed_detail)
@@ -604,10 +605,11 @@ function M.new(opts)
 			answer(result)
 		end
 		local api_completed = false
-		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(), function(response)
+		local request_copy = list_cache
+		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(request_copy), function(response)
 			if api_completed or answered or request_generation ~= manual_generation then return end
 			api_completed = true
-			local body, reason, detail = read_response(response)
+			local body, reason, detail = read_response(response, request_copy)
 			if body then return answer_from(body) end
 			if reason ~= "no_connection" then return fail(reason, detail) end
 			Logger.info(LOG, "Manual update check on channel '%s': the GitHub API gave no list (%s); reading the Atom feed.",
