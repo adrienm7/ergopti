@@ -354,3 +354,19 @@ _MFS_StopAlwaysRemovesTheHooks() {
 }
 Test("metrics: the lifecycle installs the hooks before choosing the interval and removes them on stop (metrics-focus-events)",
 	_MFS_StopAlwaysRemovesTheHooks)
+
+
+_MFRSG_PartialHookCleanup() {
+	Freed := []
+	Removed := []
+	Free := (Address) => Freed.Push(Address)
+	AssertFalse(_MF_ReleaseFocusHooks([101], 202, (*) => false, Free))
+	AssertEqual(0, Freed.Length, "a hook that survived partial installation keeps its callback")
+	AssertTrue(_MF_ReleaseFocusHooks([101, 102], 202,
+		(Handle) => (Removed.Push(Handle), true), Free))
+	AssertEqual(2, Removed.Length, "every installed hook is removed")
+	AssertEqual(1, Freed.Length, "only successful removal permits callback release")
+	AssertEqual(202, Freed[1], "the callback released belongs to these hooks")
+}
+Test("metrics focus: partial hook cleanup retains live callbacks (focus-hook-partial-cleanup)",
+	_MFRSG_PartialHookCleanup)
