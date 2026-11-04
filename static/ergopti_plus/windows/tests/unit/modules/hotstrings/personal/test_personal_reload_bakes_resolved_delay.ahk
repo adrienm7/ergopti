@@ -56,7 +56,7 @@ _PRBD_ReloadBakesTheResolvedDelay() {
 		HotstringsSetOverride("personal", Section, "delay", 1.5)
 		Data := Map("sections", Map(Section, Map("entries", [
 			Map("trigger", "zzq", "output", "AVANT", "is_word", true, "auto_expand", false,
-				"is_case_sensitive", false, "final_result", false, "strict_case", false, "priority", "")
+				"is_case_sensitive", false, "final_result", false, "is_case_sensitive_strict", false, "priority", "")
 		])))
 
 		ReloadPersonalSection(Data, Section, {})

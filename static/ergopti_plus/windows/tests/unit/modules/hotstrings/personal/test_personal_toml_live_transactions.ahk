@@ -61,7 +61,7 @@ _PTIOCR_Model(Label) {
 				"auto_expand", true,
 				"is_case_sensitive", true,
 				"final_result", false,
-				"strict_case", false,
+				"is_case_sensitive_strict", false,
 				"priority", "",
 			)]
 		)
