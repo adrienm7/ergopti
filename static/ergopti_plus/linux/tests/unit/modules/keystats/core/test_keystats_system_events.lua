@@ -136,7 +136,7 @@ for _, failure in ipairs({ "migration", "registration", "migration_throw", "regi
 	it("metrics do not use SQLite after failed " .. failure, function()
 		local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system_metrics", "modules.keystats.text_migration" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-		local starts, closes, registers, resumes, conversions = 0, 0, 0, 0, 0
+		local starts, closes, registers, migrations, resumes, conversions = 0, 0, 0, 0, 0, 0
 		local writer = setmetatable({
 			open_db = function()
 				if failure == "open_throw" then error("injected open failure") end
@@ -145,6 +145,7 @@ for _, failure in ipairs({ "migration", "registration", "migration_throw", "regi
 				return true
 			end,
 			ensure_token_encoding = function()
+				migrations = migrations + 1
 				if failure == "migration_throw" then error("injected migration failure") end
 				return failure ~= "migration"
 			end,
@@ -182,7 +183,10 @@ for _, failure in ipairs({ "migration", "registration", "migration_throw", "regi
 			helpers.assert_eq(starts, 0, "unadmitted SQLite must never accept a flush")
 			helpers.assert_eq(closes, (failure == "open_refused" or failure == "open_throw" or failure == "open_unavailable") and 0 or 1,
 				"only a successfully opened store is closed")
-			helpers.assert_eq(registers, (failure == "registration" or failure == "registration_throw") and 1 or 0)
+			local opened = failure ~= "open_refused" and failure ~= "open_throw" and failure ~= "open_unavailable"
+			helpers.assert_eq(registers, opened and 1 or 0, "registration must precede migration")
+			helpers.assert_eq(migrations, (failure == "migration" or failure == "migration_throw") and 1 or 0,
+				"failed device registration cannot mutate n-gram encoding")
 			failure = "none"
 			helpers.assert_true(keystats.init(Home.options()), "healthy retry must restore admission")
 			require("tests.support.metrics_consent_fixture").enable(keystats)
