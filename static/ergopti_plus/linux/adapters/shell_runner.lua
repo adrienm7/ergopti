@@ -493,7 +493,7 @@ local ASYNC_MAX_OUTPUT_BYTES = require("llm.process_limits").defaults().max_outp
 ---   output is the result (run_command) passes its own.
 --- @param callback function Receives { ok, code, stdout, stderr, error,
 ---   timed_out, overflow } once.
---- @return table|nil handle { cancel = function() } — nil when admission failed.
+--- @return table|nil handle { cancel, on_settled } — nil when admission failed.
 --- @return string|nil error Why admission failed; the completion callback stays silent.
 function M.run_async(executable, args, options, callback)
 	if not luv then return nil, "asynchronous execution needs libuv" end
@@ -553,7 +553,8 @@ function M.run_async(executable, args, options, callback)
 	end
 	request.admitted = true
 	if pending then publish(pending) end
-	return { cancel = function() return operation:cancel() end }
+	return { cancel = function() return operation:cancel() end,
+		on_settled = function(listener) return operation:on_settled(listener) end }
 
 end
 

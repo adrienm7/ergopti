@@ -83,6 +83,9 @@ local function with_world(body)
 			run = function(command) world.shell[#world.shell + 1] = command; return true end,
 			run_async = function(executable, args, options, callback)
 				local handle = { executable = executable, args = args, options = options, callback = callback }
+				local listeners = {}
+				function handle.on_settled(callback) listeners[#listeners + 1] = callback; return true end
+				function handle.settle() for _, callback in ipairs(listeners) do callback() end end
 				function handle.cancel() handle.cancelled = true; return true end
 				world.async[#world.async + 1] = handle
 				return handle
@@ -155,6 +158,24 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 			helpers.assert_eq(#world.async, 1)
 			User.set_paused(false)
 			helpers.assert_eq(User.run_command({ command = "true", mode = "hidden", output = "none" }, 500), true)
+		end)
+	end)
+
+	helpers.it("retains a cancelled child until native settlement", function()
+		with_world(function(User, world)
+			User.run_command({ command = "sleep 99", mode = "hidden", output = "none" }, 500)
+			local handle = world.async[1]
+			handle.cancel = function() return false end
+			local notifications = 0
+			helpers.assert_true(User.when_settled(function() notifications = notifications + 1 end))
+			helpers.assert_eq(User.stop(), false)
+			helpers.assert_eq(notifications, 0)
+			helpers.assert_eq(User.busy(), true)
+			helpers.assert_eq(User.stop(), false)
+			handle.settle()
+			helpers.assert_eq(notifications, 1)
+			helpers.assert_eq(User.busy(), false)
+			helpers.assert_eq(User.stop(), true)
 		end)
 	end)
 
