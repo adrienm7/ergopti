@@ -432,6 +432,58 @@ helpers.describe("timer_scheduler armed ownership", function()
     end)
   end)
 
+  for _, refusal in ipairs({ "stop", "close" }) do
+    for _, operation in ipairs({ "cancel", "cancelAll", "fire" }) do
+      helpers.it("retains timer ownership on returned " .. refusal .. " refusal during " .. operation, function()
+        local callback, allow, closes = nil, false, 0
+        local fired = 0
+        with_luv({
+          update_time = function() end,
+          new_timer = function() return {} end,
+          timer_start = function(_, _, _, fn) callback = fn; return true end,
+          timer_stop = function()
+            if refusal == "stop" and not allow then return nil, "stop refused" end
+            return true
+          end,
+          close = function()
+            closes = closes + 1
+            if refusal == "close" and not allow then return false, "close refused" end
+          end,
+        }, function(scheduler)
+          local handle = scheduler.after(1, function() fired = fired + 1 end)
+          if operation == "fire" then callback()
+          elseif operation == "cancel" then helpers.assert_eq(scheduler.cancel(handle), false)
+          else helpers.assert_eq(scheduler.cancelAll(), false) end
+          helpers.assert_true(handle.timer ~= nil, "refused native cleanup must retain its owner")
+          helpers.assert_eq(fired, operation == "fire" and 1 or 0)
+          if refusal == "stop" then helpers.assert_eq(closes, 0, "do not close after refused stop") end
+          allow = true
+          helpers.assert_true(scheduler.cancel(handle), "the same timer must be retryable")
+          helpers.assert_eq(handle.timer, nil)
+          helpers.assert_eq(scheduler.activeCount(), 0)
+        end)
+      end)
+    end
+  end
+
+  helpers.it("retains an unstarted timer when rollback returns a refusal", function()
+    local allow = false
+    with_luv({
+      update_time = function() end,
+      new_timer = function() return {} end,
+      timer_start = function() return nil, "start refused" end,
+      timer_stop = function() return true end,
+      close = function() if not allow then return false, "close refused" end end,
+    }, function(scheduler)
+      local handle = scheduler.every(1, function() end)
+      helpers.assert_true(handle.fired and not handle.armed and handle.timer ~= nil)
+      helpers.assert_eq(scheduler.cancelAll(), false)
+      allow = true
+      helpers.assert_true(scheduler.cancelAll())
+      helpers.assert_eq(handle.timer, nil)
+    end)
+  end)
+
   helpers.it("still invokes a fired callback when handle cleanup fails", function()
     local callback = nil
     local close_fails = true
