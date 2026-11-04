@@ -441,3 +441,131 @@ for Index, Budget in [0, -1, "30000", 0x80000000, "unset"]
 #Include %A_LineFile%/../test_llm_api_remote_abort_retirement.ahk
 
 #Include %A_LineFile%/../test_llm_api_remote_completion_reads.ahk
+
+; Uses the existing RawPost transport port and actual managed facade/registry.
+_NUI_Body(Mode) {
+    Prefix := '{"choices":[{"message":{"content":"owned-usage-ok"}}],"usage":'
+    if Mode == "normal"
+        return Prefix . '{"prompt_tokens":2,"completion_tokens":3}}'
+    if Mode == "float_outside_int64"
+        return Prefix . '{"prompt_tokens":1e30,"completion_tokens":1}}'
+    ; Each input is accepted by the strict signed integer JSON domain. Their
+    ; inferred total cannot be represented in that domain without validation.
+    return Prefix . '{"prompt_tokens":9223372036854775807,"completion_tokens":1}}'
+}
+
+_NUI_UsageValid(Usage) {
+    if !(Usage is Map)
+        return false
+    for Name in ["prompt_tokens", "completion_tokens", "total_tokens"] {
+        if !Usage.Has(Name) || !(Usage[Name] is Integer) || Usage[Name] < 0
+            return false
+    }
+    return Usage.Has("est_cost_usd") && Usage["est_cost_usd"] is Number && Usage["est_cost_usd"] >= 0
+}
+
+_NUI_Check(Mode, ViaPoll) {
+    global _LLM_Remote_Async
+    Body := _NUI_Body(Mode)
+    ; Actual parser must first accept the exact synthetic finite JSON source.
+    Root := JsonParse(Body)
+    AssertTrue(Root is Map)
+    if Mode == "float_outside_int64"
+        AssertTrue(Root["usage"]["prompt_tokens"] is Float && Root["usage"]["prompt_tokens"] > 9223372036854775807)
+    if !ViaPoll {
+        Result := 0, Failure := 0
+        try Result := _LLMRemoteClassifyResponse("openai", Body, "gpt-4.1")
+        catch Any as ErrorObject
+            Failure := ErrorObject
+        _TestPrint("# USAGE_INTEGER_CLASSIFIER " . KL_JsonEncode(Map("case", Mode,
+            "threw", IsObject(Failure), "error", IsObject(Failure) ? Type(Failure) : "",
+            "usage", Result is Map ? Result["usage"] : 0)))
+        AssertFalse(IsObject(Failure), "finite JSON usage must not tear down completion classification")
+        AssertTrue(Result["ok"] && Result["text"] == "owned-usage-ok")
+        AssertTrue(_NUI_UsageValid(Result["usage"]), "usage counters and estimated cost must remain nonnegative in the consumer integer domain")
+        if Mode == "normal"
+            AssertEqual(5, Result["usage"]["total_tokens"])
+        return
+    }
+    AssertEqual(0, _LLM_Remote_Async.Count, "do not borrow foreign live requests")
+    Control := _ManagedCurlControlState()
+    Port := Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+        "create_http", _NUI_Create.Bind(Control))
+    Heard := [], Id := 0, Entry := 0, Failure := 0, Primary := 0
+    try {
+        Resolved := _LLMRemoteResolveEntry(Map("Provider", "openai_compat", "BaseUrl", "https://usage-fixture.invalid/v1",
+            "Token", "owned-fixture-secret", "Model", "gpt-4.1"))
+        Id := LLM_RemotePostBody_Async(Resolved, "https://usage-fixture.invalid/v1/chat/completions", '{"messages":[]}',
+            (Text, Usage := "") => Heard.Push(Map("ok", true, "text", Text, "usage", Usage)),
+            (Info := "") => Heard.Push(Map("ok", false, "info", Info)), 20000, "usage_integer_control", 0, 0, Port)
+        AssertTrue(_LLM_Remote_Async.Has(Id))
+        Entry := _LLM_Remote_Async[Id]
+        Http := Control["request"]
+        AssertTrue(Entry["http"] == Http)
+        AssertEqual(1, Control["spawns"])
+        _ManagedCurlControlAck(Control)
+        Http._PollManagedAdmission()
+        AssertTrue(Http.ManagedPayloadPublished)
+        AssertTrue(FSWrite(Http.BodyPath, Body))
+        AssertTrue(FSWrite(Http.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+        ; Hold only the controlled terminal -> consumer handoff so the existing
+        ; background poll timer cannot consume this same terminal first.
+        TerminalCritical := Critical("On")
+        try {
+            Control["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+            AssertTrue(Http.Completed && Http.ResponseEncodingValid)
+            AssertEqual(200, Http.Status)
+            AssertFalse(IsObject(Http.Handle), "the genuine facade must retain no controlled Job after terminal acknowledgement")
+            try _LLMRemote_PollRequest(Id)
+            catch Any as ErrorObject
+                Failure := ErrorObject
+        } finally Critical(TerminalCritical)
+        Observed := Heard.Length ? Heard[1] : 0
+        _TestPrint("# USAGE_INTEGER_POLL " . KL_JsonEncode(Map("case", Mode, "threw", IsObject(Failure),
+            "error", IsObject(Failure) ? Type(Failure) : "", "callbacks", Heard.Length,
+            "reservation_present", _LLM_Remote_Async.Has(Id), "http_completed", Http.Completed,
+            "http_handle_retired", !IsObject(Http.Handle), "status", Http.Status,
+            "usage", Observed is Map && Observed.Get("ok", false) ? Observed["usage"] : 0)))
+        AssertFalse(IsObject(Failure), "actual polling must not throw before retiring its reservation")
+        AssertFalse(_LLM_Remote_Async.Has(Id), "a terminal response must retire the exact reservation")
+        AssertEqual(1, Heard.Length, "the real terminal must publish exactly one callback")
+        AssertTrue(Heard[1]["ok"] && Heard[1]["text"] == "owned-usage-ok")
+        AssertTrue(_NUI_UsageValid(Heard[1]["usage"]), "actual completion callback must carry valid integer-domain usage")
+    } catch Any as ErrorObject {
+        Primary := ErrorObject
+    } finally {
+        if Entry is Map && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Entry {
+            LLM_RemoteCancelAsync(Id)
+            _LLMRemote_PollRequest(Id)
+        }
+        if Control.Has("request") {
+            Http := Control["request"]
+            try {
+                AssertTrue(Http.Abort())
+                AssertFalse(IsObject(Http.Handle))
+                AssertFalse(_LLM_Remote_Async.Has(Id))
+                _ManagedCurlControlRelease(Control)
+            } catch Any as CleanupFailure {
+                _TestPrint("# USAGE_INTEGER_CLEANUP " . KL_JsonEncode(Map("case", Mode,
+                    "error", Type(CleanupFailure), "message", SubStr(CleanupFailure.Message, 1, 300))))
+                if !IsObject(Primary)
+                    Primary := CleanupFailure
+            }
+        }
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+
+_NUI_Create(Control) {
+    Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(Control)))
+    Control["request"] := Request
+    return Request
+}
+_NUI_Run(Mode, ViaPoll) {
+    _ManagedRemoteFixtureWithLlmTimings(_NUI_Check.Bind(Mode, ViaPoll))
+}
+for _NUI_Mode in ["normal", "float_outside_int64", "sum_outside_int64"] {
+    Test("Remote usage integer domain: classifier " . _NUI_Mode . " (usage-integer-domain)", _NUI_Run.Bind(_NUI_Mode, false))
+    Test("Remote usage integer domain: managed poll " . _NUI_Mode . " (usage-integer-domain)", _NUI_Run.Bind(_NUI_Mode, true))
+}

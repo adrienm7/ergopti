@@ -138,3 +138,52 @@ _HTBS_RecordsOwnTheirScalarOverTheLeaves() {
 Test("terminator-leaves: records add their scalar after the shipped delimiters",
 	_HTBS_Run.Bind("records-after", '[[hotstrings.terminators]]`nkey = "currency"`nchar = "¤"`nlabel = "C"`nconsume = true`n',
 		_HTBS_RecordsOwnTheirScalarOverTheLeaves))
+
+_HTMK_Migration(Mode) {
+	global ConfigurationFile, _HotstringsTerminatorRecords
+	Snow := Chr(0x2603), Preferred := "custom_2603"
+	Before := FSReadUtf8Exact(ConfigurationFile)
+	Word := HSE_TerminatorDefaultWordDelimiters() . Snow
+	Consumed := HSE_TerminatorDefaultConsumedDelimiters() . Snow
+	AssertEqual(1, HotstringsTerminatorMigrateStrings(Word, Consumed),
+		"the actual configuration writer must acknowledge the legacy migration")
+	AssertTrue(InStr(HotstringsGetWordDelimiters(), Snow, true) > 0,
+		"a successfully migrated legacy delimiter must reach the actual engine string")
+	AssertTrue(InStr(HotstringsGetConsumedDelimiters(), Snow, true) > 0,
+		"the migrated consumed choice must reach the actual engine string")
+	Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+	Resolved := HotstringsTerminatorRecordsResolve(Document)
+	AssertEqual(0, Resolved.Rejected.Length, "key allocation cannot create a rejected duplicate record")
+	Found := 0
+	for Entry in Resolved.Records
+		if Entry.Char == Snow {
+			Found += 1
+			AssertTrue(Entry.Enabled)
+			AssertTrue(Entry.Consume)
+			if Mode == "record" || Mode == "state"
+				AssertTrue(Entry.Key != Preferred, "a new logical delimiter cannot borrow an existing record or future state key")
+		}
+	AssertEqual(1, Found)
+	if Mode == "record" {
+		AssertTrue(InStr(HotstringsGetWordDelimiters(), "¤", true) > 0,
+			"the existing independent currency delimiter must remain admitted")
+		AssertEqual("¤", Document["hotstrings"]["terminators"][1]["char"])
+		AssertEqual(Preferred, Document["hotstrings"]["terminators"][1]["key"])
+	} else if Mode == "state"
+		AssertEqual(false, Document["hotstrings"]["terminator_states"][Preferred].Value,
+			"the unrelated future false leaf must stay unchanged")
+	if Mode == "existing-character-control"
+		AssertEqual(Before, FSReadUtf8Exact(ConfigurationFile), "an already owned delimiter needs no migration rewrite")
+	After := FSReadUtf8Exact(ConfigurationFile)
+	AssertEqual(1, HotstringsTerminatorMigrateStrings(Word, Consumed))
+	AssertEqual(After, FSReadUtf8Exact(ConfigurationFile), "the actual successful move must remain idempotent")
+	AssertEqual(After, _HotstringsTerminatorRecords.Source)
+}
+Test("terminator-move key allocation: existing record cannot hide the legacy character",
+	_HTBS_Run.Bind("key-move-record", '[[hotstrings.terminators]]`nkey="custom_2603"`nchar="¤"`nlabel="Existing currency"`nconsume=false`n', _HTMK_Migration.Bind("record")))
+Test("terminator-move key allocation: future false state cannot disable the legacy character",
+	_HTBS_Run.Bind("key-move-state", '[hotstrings.terminator_states]`ncustom_2603=false`n', _HTMK_Migration.Bind("state")))
+Test("terminator-move key allocation: ordinary fresh allocation remains admitted",
+	_HTBS_Run.Bind("key-move-fresh", "", _HTMK_Migration.Bind("fresh-control")))
+Test("terminator-move key allocation: an existing character is not duplicated",
+	_HTBS_Run.Bind("key-move-existing-char", '[[hotstrings.terminators]]`nkey="already_snow"`nchar="☃"`nlabel="Owned snow"`nconsume=true`n', _HTMK_Migration.Bind("existing-character-control")))
