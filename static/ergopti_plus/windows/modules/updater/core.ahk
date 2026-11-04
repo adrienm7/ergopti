@@ -2479,7 +2479,14 @@ _Updater_IsAllowedManualUrl(Url) {
 	if Suffix == ""
 		return true
 	Boundary := SubStr(Suffix, 1, 1)
-	return Boundary == "/" || Boundary == "?" || Boundary == "#"
+	if !(Boundary == "/" || Boundary == "?" || Boundary == "#")
+		return false
+	; Browsers normalize backslashes and dot segments before navigating. Check
+	; the path separately so a query or fragment cannot disguise a traversal.
+	Path := RegExReplace(Suffix, "[?#].*", "")
+	if InStr(Path, "\") || RegExMatch(Path, "i)(?:^|/)(?:\.|%2e){1,2}(?:/|$)")
+		return false
+	return true
 }
 
 _Updater_OpenManualUrl(ResolveUrlFn, Request := unset, IsSuspended := unset, NotifyFn := 0, RunFn := 0) {

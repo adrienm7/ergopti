@@ -197,6 +197,9 @@ _UpdaterTest_ManualUrlAllowlistPrecedesRunner() {
 		"audit-canary://noop",
 		"https://example.invalid/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO,
 		RepoRoot . ".invalid/releases",
+		RepoRoot . "/../../attacker/repo",
+		RepoRoot . "/%2e%2e/%2E%2e/attacker/repo",
+		RepoRoot . "\..\..\attacker\repo",
 		"https://github.com/" . UPDATER_GH_OWNER . "/other/releases"
 	] {
 		AssertFalse(_Updater_IsAllowedManualUrl(Url),
