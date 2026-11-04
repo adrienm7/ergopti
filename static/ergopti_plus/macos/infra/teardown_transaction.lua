@@ -41,6 +41,20 @@ local function validate_steps(steps)
 		Logger.error(LOG, "Teardown steps must be a table.")
 		return false
 	end
+	local count = 0
+	for key in pairs(steps) do
+		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then
+			Logger.error(LOG, "Teardown steps must be a dense array.")
+			return false
+		end
+		count = count + 1
+	end
+	for index = 1, count do
+		if rawget(steps, index) == nil then
+			Logger.error(LOG, "Teardown steps must be a dense array.")
+			return false
+		end
+	end
 	local names = {}
 	for index, step in ipairs(steps) do
 		if type(step) ~= "table" or type(step.name) ~= "string" or step.name == ""
@@ -116,6 +130,7 @@ function M.run_with_finalizer(state, steps, finalizer)
 		Logger.error(LOG, "Teardown finalizer must be a descriptor table.")
 		return false
 	end
+	if not validate_steps(steps) then return false end
 	local complete_transaction = {}
 	for index, step in ipairs(steps) do
 		complete_transaction[index] = step
