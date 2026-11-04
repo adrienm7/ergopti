@@ -1738,6 +1738,8 @@
 	"menu.keyboard_layout.open_system_prefs": "Otwórz Preferencje systemowe → Klawiatura",
 	"menu.layout.install_failed": "Nie udało się zainstalować układu klawiatury. Sprawdź dzienniki i zachowane kopie zapasowe.",
 	"menu.layout.install_launcher_required": "Otwórz ErgoptiPlus i ponów instalację układu klawiatury.",
+	"menu.layout.install_other_scope": "W drugim folderze Keyboard Layouts znajduje się układ. Usuń go ręcznie i spróbuj ponownie.",
+	"menu.layout.install_other_scope_unverified": "Nie można sprawdzić drugiego folderu Keyboard Layouts. Sprawdź go ręcznie przed ponowną próbą.",
 	"menu.layout.active_layouts": "Źródła wprowadzania",
 	"menu.layout.header_any": "Wszystkie układy",
 	"menu.layout.header_custom": "Układ niestandardowy",

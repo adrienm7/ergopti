@@ -1738,6 +1738,8 @@
 	"menu.keyboard_layout.open_system_prefs": "Apri Preferenze di sistema → Tastiera",
 	"menu.layout.install_failed": "Impossibile installare il layout della tastiera. Controlla i registri e le copie conservate.",
 	"menu.layout.install_launcher_required": "Apri ErgoptiPlus e riprova a installare il layout della tastiera.",
+	"menu.layout.install_other_scope": "Un layout è presente nell’altra cartella Keyboard Layouts. Rimuovilo manualmente e riprova.",
+	"menu.layout.install_other_scope_unverified": "Impossibile verificare l’altra cartella Keyboard Layouts. Controllala manualmente prima di riprovare.",
 	"menu.layout.active_layouts": "Sorgenti di input",
 	"menu.layout.header_any": "Tutti i layout",
 	"menu.layout.header_custom": "Layout personalizzato",

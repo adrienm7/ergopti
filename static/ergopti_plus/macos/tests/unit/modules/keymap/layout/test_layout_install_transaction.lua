@@ -20,12 +20,24 @@ end
 --- `in_system` says the same bundle is there too.
 local function with_fake_bundle_listing(initial_name, callback, in_system)
 	local original_popen = io.popen
+	local original_dir = package.loaded["infra.fs_dir"]
+	local original_fs = package.loaded["adapters.file_system"]
+	package.loaded["adapters.file_system"] = setmetatable({
+		classify_no_follow = function() return { mode = "directory" }, "ok" end,
+	}, { __index = original_fs or {} })
 	local listing = initial_name
+	local system_present = in_system == true
 	local scans = 0
+	package.loaded["infra.fs_dir"] = { try_entries = function(dir)
+		local system_scan = dir:sub(1, 1) == "/" and dir:find("/Library/Keyboard Layouts", 1, true) == 1
+		if system_scan and not system_present then return {}, true end
+		if not system_scan then scans = scans + 1 end
+		return listing and { listing } or {}, true
+	end }
 	io.popen = function(command)
 		local system_scan = tostring(command):find("'/Library/Keyboard Layouts", 1, true) ~= nil
 		if not system_scan then scans = scans + 1 end
-		local delivered = system_scan and in_system ~= true
+		local delivered = system_scan and not system_present
 		return {
 			lines = function()
 				return function()
@@ -41,10 +53,13 @@ local function with_fake_bundle_listing(initial_name, callback, in_system)
 	local ok, err = xpcall(function()
 		callback({
 			set_listing = function(name) listing = name end,
+			set_system = function(value) system_present = value end,
 			scan_count = function() return scans end,
 		})
 	end, debug.traceback)
 	io.popen = original_popen
+	package.loaded["infra.fs_dir"] = original_dir
+	package.loaded["adapters.file_system"] = original_fs
 	if not ok then error(err, 0) end
 end
 
@@ -74,6 +89,44 @@ end
 
 
 helpers.describe("layout_install: transactional replacement", function()
+	helpers.it("refuses an unreadable other scope before mutation (layout-other-scope-unverified)", function()
+		local old_dir, old_fs = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"]
+		package.loaded["infra.fs_dir"] = { try_entries = function() return {}, false end }
+		package.loaded["adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
+		local ok, err = xpcall(function()
+			local calls = 0
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				execute = function() calls = calls + 1; return "", true end,
+				osascript = { applescript = function() calls = calls + 1; return true end },
+			})
+			local committed, reason = install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle")
+			helpers.assert_eq(committed, false); helpers.assert_eq(reason, "other_scope_unverified")
+			helpers.assert_eq(calls, 0, "unverified scope cannot authorize mutation")
+		end, debug.traceback)
+		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"] = old_dir, old_fs
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("warns when the post-install other-scope check becomes unreadable", function()
+		local old_dir, old_fs, old_notify = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"],
+			package.loaded["infra.notifications"]
+		local reads, notices = 0, {}
+		package.loaded["infra.fs_dir"] = { try_entries = function()
+			reads = reads + 1; return {}, reads == 1
+		end }
+		package.loaded["adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
+		package.loaded["infra.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
+		local ok, err = xpcall(function()
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				osascript = { applescript = function() return true end },
+			})
+			helpers.assert_eq(install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle"), true)
+			helpers.assert_eq(notices[1], require("infra.i18n").get("menu.layout.install_other_scope_unverified"))
+		end, debug.traceback)
+		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"], package.loaded["infra.notifications"] =
+			old_dir, old_fs, old_notify
+		if not ok then error(err, 0) end
+	end)
 	helpers.it("refuses standalone installation before authorization (layout-install-native-role)", function()
 		local getenv = os.getenv
 		os.getenv = function(name) if name == "ERGOPTI_LAUNCHER_EXECUTABLE" then return nil end; return getenv(name) end
@@ -227,7 +280,20 @@ helpers.describe("layout_install: transactional replacement", function()
 		assert_copy_precedes_replacement(scripts[1], "system install")
 	end)
 
-	helpers.it("removes the other scope only after the new user bundle commits", function()
+	helpers.it("refuses an existing other-scope bundle before asking for authorization", function()
+		with_fake_bundle_listing("Ergopti_v1.0.0.bundle", function()
+			local prompts = 0
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				osascript = { applescript = function() prompts = prompts + 1; return true end },
+			})
+			local committed, reason = install.install_system("/tmp/layout source/", "Ergopti_v2.0.0.bundle")
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(reason, "other_scope_occupied")
+			helpers.assert_eq(prompts, 0)
+		end)
+	end)
+
+	helpers.it("does not remove the other scope after the new user bundle commits", function()
 		local commands = {}
 		local install = helpers.load_with_stubs("modules.keymap.layout_install", {
 			execute = function(command)
@@ -239,13 +305,11 @@ helpers.describe("layout_install: transactional replacement", function()
 		helpers.assert_eq(
 			install.install_user("/tmp/layout source/", "Ergopti_v2.0.0.bundle"),
 			true)
-		helpers.assert_eq(#commands, 2)
+		helpers.assert_eq(#commands, 1)
 		assert_copy_precedes_replacement(commands[1], "user install")
-		helpers.assert_true(commands[2]:find("/Library/Keyboard Layouts", 1, true) ~= nil,
-			"system-scope cleanup must run only after the user transaction commits")
 	end)
 
-	helpers.it("removes the user scope only after the system transaction commits", function()
+	helpers.it("does not remove the user scope after the system transaction commits", function()
 		local events = {}
 		local install = helpers.load_with_stubs("modules.keymap.layout_install", {
 			execute = function(command)
@@ -263,11 +327,33 @@ helpers.describe("layout_install: transactional replacement", function()
 		helpers.assert_eq(
 			install.install_system("/tmp/layout source/", "Ergopti_v2.0.0.bundle"),
 			true)
-		helpers.assert_eq(#events, 2)
+		helpers.assert_eq(#events, 1)
 		helpers.assert_eq(events[1].kind, "privileged",
 			"the privileged copy transaction must commit before user cleanup")
 		assert_copy_precedes_replacement(events[1].payload, "system install")
-		helpers.assert_eq(events[2].kind, "cleanup")
+	end)
+
+	helpers.it("preserves and reports an other-scope bundle that appears during installation", function()
+		with_fake_bundle_listing("Ergopti_v1.0.0.bundle", function(listing)
+			local notices, commands = {}, {}
+			local saved = package.loaded["infra.notifications"]
+			package.loaded["infra.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
+			local ok, err = xpcall(function()
+				local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+					execute = function(command)
+						commands[#commands + 1] = command
+						listing.set_system(true)
+						return "", true, "exit", 0
+					end,
+				})
+				helpers.assert_eq(install.install_user("/tmp/layout source/", "Ergopti_v2.0.0.bundle"), true)
+				helpers.assert_eq(#commands, 1, "no second command may delete the concurrent bundle")
+				helpers.assert_eq(notices[1], require("infra.i18n").get("menu.layout.install_other_scope"),
+					"the duplicate must be reported")
+			end, debug.traceback)
+			package.loaded["infra.notifications"] = saved
+			if not ok then error(err, 0) end
+		end)
 	end)
 
 	helpers.it("refuses reentrant installs across both bundle scopes", function()
@@ -309,8 +395,8 @@ helpers.describe("layout_install: transactional replacement", function()
 			install.install_user("/tmp/layout source/", "Ergopti_v2.0.0.bundle"),
 			true,
 			"the install owner must be released after the first attempt returns")
-		helpers.assert_eq(execute_calls, 2,
-			"the admitted user install must run one replacement and one cleanup")
+		helpers.assert_eq(execute_calls, 1,
+			"the admitted user install must run one replacement")
 	end)
 end)
 
@@ -392,8 +478,8 @@ helpers.describe("layout_install: fresh bundle resources", function()
 			end
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
 				fs = {
-					symlinkAttributes = function()
-						if fail_stat then error("attribute read refused") end
+					symlinkAttributes = function(path)
+						if fail_stat and path:find("Custom.bundle", 1, true) then error("attribute read refused") end
 						return { mode = "directory" }
 					end,
 					dir = function(path)
@@ -422,6 +508,9 @@ end)
 helpers.describe("layout_install: failed listings are not cached", function()
 	helpers.it("retries an incomplete listing without reusing its partial result", function()
 		local original_popen = io.popen
+		local original_dir, original_fs = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"]
+		package.loaded["infra.fs_dir"] = { try_entries = function() return {}, false end }
+		package.loaded["adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
 		local scans = 0
 		local ok, err = xpcall(function()
 			io.popen = function()
@@ -440,11 +529,35 @@ helpers.describe("layout_install: failed listings are not cached", function()
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
 				fs = { attributes = function() return { mode = "directory", size = 1, modification = 1 } end },
 			})
-			helpers.assert_nil(install.highest_installed("/layouts"))
-			helpers.assert_eq(install.highest_installed("/layouts").name, "Ergopti_v1.0.0.bundle")
+			local first, listed = install.highest_installed("/layouts")
+			helpers.assert_nil(first)
+			helpers.assert_eq(listed, false)
+			local second, retried = install.highest_installed("/layouts")
+			helpers.assert_eq(second.name, "Ergopti_v1.0.0.bundle")
+			helpers.assert_eq(retried, true)
 			helpers.assert_eq(scans, 2)
 		end, debug.traceback)
 		io.popen = original_popen
+		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"] = original_dir, original_fs
+		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("layout_install: missing optional directories", function()
+	helpers.it("proves absence before requesting a directory listing", function()
+		local old_dir, old_fs = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"]
+		local listings = 0
+		package.loaded["infra.fs_dir"] = { try_entries = function() listings = listings + 1; return {}, false end }
+		package.loaded["adapters.file_system"] = { classify_no_follow = function() return nil, "absent" end }
+		local ok, err = xpcall(function()
+			local install = helpers.load_with_stubs("modules.keymap.layout_install")
+			local result, listed = install.highest_installed("/missing")
+			helpers.assert_nil(result)
+			helpers.assert_true(listed)
+			helpers.assert_eq(install.bundle_keylayout_names(), {})
+			helpers.assert_eq(listings, 0, "a proven missing scope needs no error-producing listing")
+		end, debug.traceback)
+		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"] = old_dir, old_fs
 		if not ok then error(err, 0) end
 	end)
 end)

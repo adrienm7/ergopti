@@ -1738,6 +1738,8 @@
 	"menu.keyboard_layout.open_system_prefs": "Öppna Systeminställningar → Tangentbord",
 	"menu.layout.install_failed": "Tangentbordslayouten kunde inte installeras. Se loggarna och de sparade säkerhetskopiorna.",
 	"menu.layout.install_launcher_required": "Öppna ErgoptiPlus och försök installera tangentbordslayouten igen.",
+	"menu.layout.install_other_scope": "En layout finns i den andra mappen Keyboard Layouts. Ta bort den manuellt och försök igen.",
+	"menu.layout.install_other_scope_unverified": "Den andra mappen Keyboard Layouts kunde inte kontrolleras. Kontrollera den manuellt innan du försöker igen.",
 	"menu.layout.active_layouts": "Inmatningskällor",
 	"menu.layout.header_any": "Alla layouter",
 	"menu.layout.header_custom": "Anpassad layout",

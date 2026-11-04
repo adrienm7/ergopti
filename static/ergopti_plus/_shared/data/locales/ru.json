@@ -1738,6 +1738,8 @@
 	"menu.keyboard_layout.open_system_prefs": "Открыть Системные настройки → Клавиатура",
 	"menu.layout.install_failed": "Не удалось установить раскладку клавиатуры. Подробности и сохранённые резервные копии указаны в журнале.",
 	"menu.layout.install_launcher_required": "Откройте ErgoptiPlus и повторите установку раскладки клавиатуры.",
+	"menu.layout.install_other_scope": "В другой папке Keyboard Layouts осталась раскладка. Удалите её вручную и повторите попытку.",
+	"menu.layout.install_other_scope_unverified": "Не удалось проверить другую папку Keyboard Layouts. Проверьте её вручную перед повторной попыткой.",
 	"menu.layout.active_layouts": "Источники ввода",
 	"menu.layout.header_any": "Все раскладки",
 	"menu.layout.header_custom": "Пользовательская раскладка",

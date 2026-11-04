@@ -28,6 +28,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({
 				"modules.keymap.layout_install",
+				"infra.fs_dir",
 				"modules.keymap.input_sources",
 				"ui.menu.menu_keyboard_layout",
 				"infra.logger",
@@ -101,6 +102,16 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 						end
 					end
 					return nil
+				end
+
+				hs_stub.fs.dir = function(path)
+					local rows
+					if path == bundles_dir then rows = available
+					elseif path == user_dir then rows = installed_user
+					elseif path == system_dir then rows = {}
+					else error("unexpected directory") end
+					local index = 0
+					return function() index = index + 1; return rows[index] end
 				end
 
 				local function pipe_for(rows)
@@ -202,8 +213,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				helpers.assert_eq(row.label, "user update v2.2.2 to v2.2.3")
 				helpers.assert_true(row.disabled ~= true)
 
-				-- Positive cache control: unchanged directories keep the same discoveries
-				-- without paying for another directory listing.
+				-- Repeated native listings do not spawn directory-listing processes.
 				local scans_before = {
 					bundles = scans.bundles,
 					user = scans.user,
@@ -213,6 +223,14 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				helpers.assert_eq(row.label, "user update v2.2.2 to v2.2.3")
 				helpers.assert_eq(scans, scans_before)
 				helpers.assert_eq(install.pick_latest_bundle(bundles_dir), "Ergopti_v2.2.3.bundle")
+
+				-- A same-length replacement in the same second keeps the same root
+				-- metadata, but the next native listing must see the new name.
+				installed_user = { "Ergopti_v2.2.3.bundle" }
+				helpers.assert_eq(install.highest_installed(user_dir).name, "Ergopti_v2.2.3.bundle")
+				installed_user = { "Ergopti_v2.2.2.bundle" }
+				available = { "Ergopti_v2.2.4.bundle" }
+				helpers.assert_eq(install.pick_latest_bundle(bundles_dir), "Ergopti_v2.2.4.bundle")
 
 				-- Mutating a bundle's contents does not change its parent's revision.
 				-- The cached names must still be checked against the current plist.

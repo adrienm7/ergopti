@@ -109,7 +109,6 @@ local highest_installed    = install.highest_installed
 local install_user         = install.install_user
 local install_system       = install.install_system
 local pick_latest_bundle   = install.pick_latest_bundle
-local invalidate_bundle_caches = install.invalidate_bundle_caches
 local USER_LAYOUTS_DIR     = install.USER_LAYOUTS_DIR
 local SYSTEM_LAYOUTS_DIR   = install.SYSTEM_LAYOUTS_DIR
 
@@ -184,7 +183,8 @@ local function run_install_and_chain(install_fn, legacy_active, update_menu)
 	local called, ok, reason = pcall(install_fn)
 	if not called or ok ~= true then
 		local key = reason == "launcher_unavailable" and "menu.layout.install_launcher_required"
-			or "menu.layout.install_failed"
+			or reason == "other_scope_occupied" and "menu.layout.install_other_scope"
+			or reason == "other_scope_unverified" and "menu.layout.install_other_scope_unverified" or "menu.layout.install_failed"
 		pcall(notifications.notify, i18n.get(key), nil, "error")
 	end
 	if called and ok == true and type(legacy_active) == "table" and #legacy_active > 0 then
@@ -418,8 +418,8 @@ function M.build(ctx)
 
 		-- System scope is listed first: it is the preferred install target
 		-- because it makes the layout available for all users and avoids
-		-- duplication between ~/Library and /Library. A system install also
-		-- removes the user copy automatically, keeping a single canonical bundle.
+		-- duplication between ~/Library and /Library. An existing other-scope
+		-- bundle requires manual removal so a concurrent writer stays untouched.
 		bundle_rows[#bundle_rows + 1] = build_install_item(
 			i18n.get("menu.layout.scope_system"), "🔐", system_best, latest, latest_ver,
 			function()
@@ -879,18 +879,10 @@ M._parse_active_layouts         = parse_active_layouts
 M._compute_active_layouts_fast  = compute_active_layouts_fast
 M._list_active_keyboard_layouts = list_active_keyboard_layouts
 M._refresh_active_layouts_async = refresh_active_layouts_async
-M._invalidate_bundle_caches     = invalidate_bundle_caches
 M._set_active_layouts_cache     = input_sources.set_active_layouts_cache
 
---- Warms the discovery caches off the menu-open path so the first user click
---- renders instantly. Safe to call repeatedly. Invoked from ui.menu.init once
---- boot settles. See the discovery-cache notes near the top of this module.
---- @param ctx table|nil Menu context; ctx.base_dir locates the bundles directory.
-function M.prime(ctx)
-	local base_dir = (type(ctx) == "table" and type(ctx.base_dir) == "string") and ctx.base_dir or ""
-	pcall(function() M.pick_latest_bundle(base_dir .. BUNDLES_RELDIR) end)
-	pcall(highest_installed, USER_LAYOUTS_DIR)
-	pcall(highest_installed, SYSTEM_LAYOUTS_DIR)
+--- Starts the asynchronous active-layout refresh after boot settles.
+function M.prime()
 	refresh_active_layouts_async(nil)
 end
 

@@ -191,7 +191,9 @@ local function with_layout_fixture(listing, plists, callback)
 		helpers.with_fresh_modules({
 			"modules.keymap.layout_install",
 			"adapters.file_system",
+			"infra.fs_dir",
 		}, function()
+			package.loaded["infra.fs_dir"] = { try_entries = function() return {}, false end }
 			local reads = {}
 			package.loaded["adapters.file_system"] = {
 				read_with_status = function(path)

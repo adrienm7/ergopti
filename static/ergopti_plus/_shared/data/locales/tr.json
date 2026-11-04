@@ -1738,6 +1738,8 @@
 	"menu.keyboard_layout.open_system_prefs": "Sistem Tercihleri → Klavye'yi aç",
 	"menu.layout.install_failed": "Klavye düzeni yüklenemedi. Ayrıntılar ve korunan yedekler için günlükleri kontrol edin.",
 	"menu.layout.install_launcher_required": "ErgoptiPlus uygulamasını açıp klavye düzenini yeniden yüklemeyi deneyin.",
+	"menu.layout.install_other_scope": "Diğer Keyboard Layouts klasöründe bir düzen var. Elle kaldırıp yeniden deneyin.",
+	"menu.layout.install_other_scope_unverified": "Diğer Keyboard Layouts klasörü kontrol edilemedi. Yeniden denemeden önce elle kontrol edin.",
 	"menu.layout.active_layouts": "Giriş kaynakları",
 	"menu.layout.header_any": "Tüm düzenler",
 	"menu.layout.header_custom": "Özel klavye düzeni",

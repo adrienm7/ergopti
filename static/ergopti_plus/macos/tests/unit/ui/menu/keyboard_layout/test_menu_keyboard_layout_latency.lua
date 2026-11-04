@@ -9,7 +9,7 @@
 --- SYNCHRONOUSLY, plus several redundant bundle directory scans. A python3 cold
 --- start alone is 300 ms–1 s.
 ---
---- THE FIX: bundle discovery is memoised for the session, and the active-layout
+--- THE FIX: bundle discovery uses native enumeration, and the active-layout
 --- list is served from a cache that is refreshed ASYNCHRONOUSLY (hs.task,
 --- `defaults read`, no Python since hardening-h-no-rosetta) off the click path. These tests assert that the warm open path
 --- spawns no blocking subprocess and that the async probe output is parsed
@@ -133,23 +133,21 @@ end)
 
 
 -- =================================================
--- ===== 4) Bundle discovery memoisation ===========
+-- ===== 4) Bundle discovery ========================
 -- =================================================
 
-helpers.describe("menu_keyboard_layout.pick_latest_bundle (memoised)", function()
-	helpers.it("returns a stable result across repeated calls and honours invalidation", function()
-		local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
-		local bundles_dir = helpers.fixtures_dir() .. "bundles/"
-		local first  = kbd.pick_latest_bundle(bundles_dir)
-		local second = kbd.pick_latest_bundle(bundles_dir)
-		helpers.assert_eq(second, first, "memoised lookup must be stable")
-		helpers.assert_true(type(first) == "string" and first:match("^Ergopti_v[%d%.]+%.bundle$") ~= nil,
-			"expected a bundle name, got " .. tostring(first))
-		-- The invalidation hook exists and a fresh scan still yields the same bundle.
-		helpers.assert_true(type(kbd._invalidate_bundle_caches) == "function",
-			"invalidation hook must be exposed for install-time cache refresh")
-		kbd._invalidate_bundle_caches()
-		helpers.assert_eq(kbd.pick_latest_bundle(bundles_dir), first, "post-invalidation scan must agree")
+helpers.describe("menu_keyboard_layout.pick_latest_bundle", function()
+	helpers.it("returns a stable result across repeated calls", function()
+		helpers.with_fresh_modules({ "infra.fs_dir", "modules.keymap.layout_install", "ui.menu.menu_keyboard_layout" }, function()
+			local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+			local bundles_dir = helpers.fixtures_dir() .. "bundles/"
+			_G.hs.fs.__set_entries(bundles_dir, { "Ergopti_v2.2.2.bundle" })
+			local first  = kbd.pick_latest_bundle(bundles_dir)
+			local second = kbd.pick_latest_bundle(bundles_dir)
+			helpers.assert_eq(second, first, "repeated lookups must agree")
+			helpers.assert_true(type(first) == "string" and first:match("^Ergopti_v[%d%.]+%.bundle$") ~= nil,
+				"expected a bundle name, got " .. tostring(first))
+		end)
 	end)
 end)
 

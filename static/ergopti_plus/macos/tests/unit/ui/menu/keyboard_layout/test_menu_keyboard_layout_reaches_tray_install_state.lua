@@ -30,6 +30,8 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 		local file = assert(io.open(require("infra.paths").shared("data/locales/en.json"), "rb"))
 		local labels = assert(require("json").decode(assert(file:read("*a")))); assert(file:close())
 		for _, case in ipairs({ { "launcher_unavailable", "menu.layout.install_launcher_required" },
+			{ "other_scope_occupied", "menu.layout.install_other_scope" },
+			{ "other_scope_unverified", "menu.layout.install_other_scope_unverified" },
 			{ "other", "menu.layout.install_failed" }, { "throw", "menu.layout.install_failed" } }) do
 			local notices = {}
 			with_switch_frame(function(build, fixture)
