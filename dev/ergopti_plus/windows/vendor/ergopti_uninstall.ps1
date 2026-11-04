@@ -54,8 +54,15 @@ function Invoke-ErgoptiRemoval {
 	Assert-ErgoptiRemovalTarget $Path $Hash
 	if (-not (& $Authorize)) { return $false }
 	if (-not (& $WaitOwner)) { throw 'The application did not finish shutting down.' }
-	Assert-ErgoptiRemovalTarget $Path $Hash
-	& $Unregister $Path
+	# The last check and the unregistration run under a handle that denies write,
+	# rename and delete: a pathname hash alone left the shortcut work, which takes
+	# COM calls, free to swap the image that the recycle then selected. Windows
+	# cannot recycle a pinned file, so the pin ends on the statement before it.
+	$pin = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+	try {
+		Assert-ErgoptiRemovalTarget $Path $Hash
+		& $Unregister $Path
+	} finally { $pin.Dispose() }
 	& $Recycle $Path
 	return $true
 }
@@ -74,8 +81,10 @@ function Remove-ErgoptiStartupShortcut {
 		$link = $shell.CreateShortcut($ShortcutPath)
 		$actualTarget = $link.TargetPath
 		# Normalize both paths through the Shell, including 8.3 directory names.
-		# This object is never saved: the on-disk shortcut remains untouched.
-		$link.TargetPath = $ExecutablePath
+		# The Shell setter keeps "." and ".." segments verbatim, so the path is
+		# made canonical first. This object is never saved: the on-disk shortcut
+		# remains untouched.
+		$link.TargetPath = [IO.Path]::GetFullPath($ExecutablePath)
 		if ($actualTarget -ne $link.TargetPath -or $link.Arguments -ne '') {
 			Write-Warning 'Foreign startup entry retained.'
 			return
@@ -85,6 +94,16 @@ function Remove-ErgoptiStartupShortcut {
 		[void][Runtime.InteropServices.Marshal]::ReleaseComObject($shell)
 	}
 	Remove-Item -LiteralPath $ShortcutPath
+}
+
+# The login owner accepts exact manual shortcut names as well as the canonical
+# filename. Removal must inspect the complete folder before retiring the image.
+function Remove-ErgoptiStartupShortcuts {
+	param([string]$ExecutablePath, [string]$StartupFolder)
+	foreach ($entry in Get-ChildItem -LiteralPath $StartupFolder -Force) {
+		if ($entry.PSIsContainer -or $entry.Extension -ne '.lnk') { continue }
+		Remove-ErgoptiStartupShortcut $ExecutablePath $entry.FullName
+	}
 }
 
 if ($LibraryOnly) { return }
@@ -116,7 +135,7 @@ try {
 	}
 	$unregister = {
 		param($Path)
-		Remove-ErgoptiStartupShortcut $Path (Join-Path ([Environment]::GetFolderPath('Startup')) 'ErgoptiPlus.lnk')
+		Remove-ErgoptiStartupShortcuts $Path ([Environment]::GetFolderPath('Startup'))
 	}
 	[void](Invoke-ErgoptiRemoval $Executable $ExpectedHash $authorize $waitOwner $recycle $unregister)
 } catch {

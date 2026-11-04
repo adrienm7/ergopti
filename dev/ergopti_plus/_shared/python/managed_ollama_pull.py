@@ -35,6 +35,8 @@ class PullOwner:
         self.operation = secrets.token_hex(16)
         self.admitted = self.submitted = self.request_finished = self.retired = False
         self.success = False
+        # Why the last pull did not succeed, in a closed vocabulary.
+        self.outcome = "not_started"
 
     @property
     def pending(self):
@@ -131,6 +133,8 @@ class PullOwner:
                 if response.status != 200:
                     raise POLICY.RuntimeRefusal("pull")
                 pending = bytearray()
+                # Ollama 0.40.4 PullModel ends with a "success" row, or the
+                # handler sends one {"error": ...} row and closes the stream.
                 success, failure = False, False
                 while chunk := response.read():
                     pending.extend(chunk)
@@ -140,7 +144,7 @@ class PullOwner:
                         if not row or len(row) > self.maximum_bytes:
                             raise POLICY.RuntimeRefusal("protocol")
                         progress = self._progress(bytes(row))
-                        success = progress.get("status") == "success"
+                        success = success or progress.get("status") == "success"
                         failure = failure or "error" in progress
                         emit(progress)
                     if len(pending) > self.maximum_bytes:
@@ -148,6 +152,13 @@ class PullOwner:
                 if pending or response.listener != self.listener:
                     raise POLICY.RuntimeRefusal("protocol")
                 self.success = success and not failure
+                self.outcome = (
+                    "error_row"
+                    if failure
+                    else "success"
+                    if success
+                    else "stream_ended_without_success"
+                )
         finally:
             # The native port contract physically joins on every constructor or
             # context failure. This flag is local request closure, never proof

@@ -241,6 +241,17 @@ function M.new(native, report)
 			or executable:find("[%z\r\n]") then self._sealed = true; settle(); return nil end
 		return observe(nil, executable)
 	end
+	--- Observes a regular file under the same exact native descriptor ledger.
+	--- Relative paths and literal CR/LF filename bytes retain filesystem semantics.
+	--- @param path string
+	--- @return table|nil, string|nil
+	function token:observe_regular(path)
+		if self._sealed or self._constructing then return nil end
+		if type(path) ~= "string" or path == "" or #path > 4096 or path:find("%z") then
+			self._sealed = true; settle(); return nil
+		end
+		return observe(nil, path)
+	end
 	--- Captures bounded regular-file bytes under this existing descriptor ledger.
 	--- Missing conditional files match curl's explicit empty-validator behavior.
 	function token:read_regular(path, maximum, missing_allowed)

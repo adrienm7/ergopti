@@ -23,9 +23,13 @@ local CHANNEL = require("modules.updater.manager").installed_channel()
 local INDEX_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/index.json"
 local ERGOL_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANNEL .. "/static/layouts/registry/ergol/ergol.keylayout"
 local PYTHON_MESSAGE = "translated: layouts.linux_needs_python"
+-- The interpreter the managed Python dependency answers with.
+local MANAGED_PYTHON = "/data/ergopti/runtime/python/cpython-3.11.16+20260929-x86_64-gnu/python/bin/python3"
 local LOCAL_DIR = "/cfg/layouts/"
 local SHIPPED_DIR = "/pkg/linux/static/layouts/registry/"
-local CONVERTER = "/pkg/linux/xkb_generation/keylayout_to_xkb.py"
+local CONVERTER_DATA = "/pkg/linux/xkb_generation/data"
+local DATA_SOURCE = helpers.driver_root() .. "/../../ergopti/linux/xkb_generation/data/"
+local KEYCODES_PATH = "/pkg/_shared/modules/layouts/mac_keycodes.json"
 local INSTALLER = "/pkg/linux/xkb_installation/user_layout_installer.py"
 
 --- Reads a file of the repository registry byte for byte.
@@ -68,6 +72,17 @@ local function manager(options)
 		for _, file in ipairs(entry.extension.files) do digests[registry_file(file.file)] = file.sha256 end
 	end
 	local state = { requests = {}, files = {}, runs = {}, deleted = {} }
+	-- The conversion data the package ships: the real files, read once per manager.
+	for _, name in ipairs({ "key_sym.json", "xkb_symbols.txt", "xkb_types.txt" }) do
+		local handle = assert(io.open(DATA_SOURCE .. name, "rb"))
+		state.files[CONVERTER_DATA .. "/" .. name] = handle:read("*a")
+		handle:close()
+	end
+	do
+		local handle = assert(io.open(require("infra.paths").shared("modules/layouts/mac_keycodes.json"), "rb"))
+		state.files[KEYCODES_PATH] = handle:read("*a")
+		handle:close()
+	end
 	for path, text in pairs(options.files or {}) do state.files[path] = text end
 	local runs = options.runs or {}
 	local served = options.served or {}
@@ -96,6 +111,12 @@ local function manager(options)
 		delete = function(path) state.files[path] = nil; state.deleted[#state.deleted + 1] = path; return true end,
 		exists = function(path) return state.files[path] ~= nil end,
 		ensure_dir = function() return true end,
+		-- Ergopti's own Python, as modules/keymap/managed_python.lua answers once installed.
+		python = function(callback)
+			state.python_asked = (state.python_asked or 0) + 1
+			if options.python_refusal then callback(false, options.python_refusal, "fixture refusal") return end
+			callback(true, MANAGED_PYTHON)
+		end,
 		run = function(program, args, run_options, callback)
 			state.runs[#state.runs + 1] = { program = program, args = args, timeout_ms = run_options.timeout_ms }
 			callback(assert(table.remove(runs, 1), "unexpected process run"))
@@ -103,9 +124,9 @@ local function manager(options)
 		end,
 		local_dir = LOCAL_DIR,
 		bundled_dir = options.no_shipped and nil or SHIPPED_DIR,
-		converter = CONVERTER,
+		converter_data = CONVERTER_DATA,
 		installer = INSTALLER,
-		keycodes = "/pkg/_shared/modules/layouts/mac_keycodes.json",
+		keycodes = KEYCODES_PATH,
 		translate = function(key) return "translated: " .. key end,
 	}
 	return LayoutRegistry, deps, state
@@ -203,9 +224,10 @@ helpers.describe("layout manager (Linux): installing", function()
 		helpers.assert_true(errors[1]:find("not valid JSON", 1, true) ~= nil, errors[1])
 	end)
 
-	helpers.it("rereads the checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
+	helpers.it("rereads a modified checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
 		local registry, deps, state = manager({ files = shipped_files() })
 		deps.local_source = true
+		deps.registry_changes = function(_, callback) callback(" M index.json\n", nil) end
 		local outcomes = {}
 		local function refreshed(outcome) outcomes[#outcomes + 1] = outcome end
 		registry.refresh(refreshed, deps)
@@ -249,7 +271,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local layout = registry_file("ergol/ergol.keylayout")
 		local LayoutRegistry, deps, state = manager({
 			served = { [INDEX_URL] = INDEX_TEXT, [ERGOL_URL] = layout },
-			runs = { OK_RUN, OK_RUN, OK_RUN, INSTALLED_RUN },
+			runs = { OK_RUN, INSTALLED_RUN },
 		})
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
 		helpers.assert_true(result.ok, "the installation must succeed: " .. tostring(result.extra))
@@ -259,14 +281,15 @@ helpers.describe("layout manager (Linux): installing", function()
 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.json"], INDEX_TEXT, "the refreshed index is cached")
 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.etag"], '"e1"')
 		helpers.assert_true(state.files[LOCAL_DIR .. "ergol.keylayout"] == layout, "the verified bytes are converted")
-		helpers.assert_eq(#state.runs, 4, "a version probe and the conversion, then a probe and the installer")
-		local convert = state.runs[2]
-		helpers.assert_eq(convert.args[1], CONVERTER)
-		helpers.assert_eq(arg_value(convert.args, "--keylayout"), LOCAL_DIR .. "ergol.keylayout")
-		helpers.assert_eq(arg_value(convert.args, "--convention"), "ansi", "Ergo-L numbers its keys the ANSI way")
-		helpers.assert_eq(arg_value(convert.args, "--index"), LOCAL_DIR .. "index.json")
-		helpers.assert_eq(arg_value(convert.args, "--out"), LOCAL_DIR .. "ergol")
-		local install = state.runs[4]
+		helpers.assert_eq(#state.runs, 2, "the conversion runs in Lua: only the installer's probe and the installer are children")
+		helpers.assert_nil(state.files[LOCAL_DIR .. "ergol.canonical.json"], "no intermediate file is handed to a child")
+		for _, name in ipairs({ "ergol.xkb", "ergol.XCompose", "xkb_types.txt" }) do
+			helpers.assert_type(state.files[LOCAL_DIR .. "ergol/" .. name], "string", name .. " is written for the installer")
+		end
+		helpers.assert_contains(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], 'xkb_symbols "ergol"')
+		helpers.assert_contains(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], 'name[Group1] = "' .. entry_of("ergol").name .. '";')
+		helpers.assert_contains(state.files[LOCAL_DIR .. "ergol/ergol.XCompose"], 'include "%L"')
+		local install = state.runs[2]
 		helpers.assert_eq(install.args[1], INSTALLER)
 		helpers.assert_eq(install.args[2], "install")
 		helpers.assert_eq(arg_value(install.args, "--layout-id"), "ergol")
@@ -287,7 +310,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local LayoutRegistry, deps, state = manager({
 			served = "offline",
 			files = shipped_files(),
-			runs = { OK_RUN, OK_RUN, OK_RUN, INSTALLED_RUN },
+			runs = { OK_RUN, INSTALLED_RUN },
 		})
 		local directories = {}
 		deps.ensure_dir = function(path) directories[path] = true return true end
@@ -300,8 +323,8 @@ helpers.describe("layout manager (Linux): installing", function()
 		helpers.assert_true(result.ok, "the shipped Ergopti must install offline: " .. tostring(result.extra))
 		helpers.assert_eq(result.detail.source, "bundled")
 		helpers.assert_eq(#state.requests, 1, "only the index refresh is attempted")
-		helpers.assert_eq(arg_value(state.runs[2].args, "--index"), SHIPPED_DIR .. "index.json",
-			"the XKB hints come from the index the entry was taken from")
+		helpers.assert_contains(state.files[LOCAL_DIR .. "ergopti/ergopti.XCompose"], "<guillemotleft>",
+			"the XKB hints come from the entry the shipped index describes")
 		local snapshot = LayoutRegistry.snapshot(deps)
 		helpers.assert_eq(snapshot.source, "bundled")
 		helpers.assert_eq(snapshot.error.code, "offline")
@@ -316,7 +339,7 @@ helpers.describe("layout manager (Linux): installing", function()
 				[LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1, layouts = { ergol = old } }),
 				[LOCAL_DIR .. "ergol.keylayout"] = "old bytes",
 			},
-			runs = { OK_RUN, OK_RUN, OK_RUN, INSTALLED_RUN },
+			runs = { OK_RUN, INSTALLED_RUN },
 		})
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
 		helpers.assert_true(result.ok, tostring(result.extra))
@@ -360,6 +383,79 @@ helpers.describe("layout manager (Linux): installing", function()
 		end
 	end)
 
+	helpers.it("runs the installer on Ergopti's own Python, never the host's python3 (layout-registry-managed-python)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files(),
+			runs = { OK_RUN, INSTALLED_RUN } })
+		run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(#state.runs >= 1, "the interpreter probe runs")
+		for _, child in ipairs(state.runs) do
+			helpers.assert_eq(child.program, MANAGED_PYTHON, "every Python child runs the managed interpreter")
+		end
+	end)
+
+	helpers.it("asks once before downloading Ergopti's own Python, naming its size (layout-registry-managed-python)", function()
+		local saved = { registry = package.loaded["modules.keymap.layout_registry"],
+			managed = package.loaded["modules.keymap.managed_python"], dialogs = package.loaded["ui.menu.menu_dialogs"],
+			i18n = package.loaded["infra.i18n"] }
+		local asked, answer = {}, nil
+		package.loaded["infra.i18n"] = { get = function(key)
+			return key == "layouts.managed_python_offer" and "Download {1} MB <now>?" or key
+		end }
+		package.loaded["ui.menu.menu_dialogs"] = {
+			plain_markup = function(text) return (text:gsub("<", "&lt;"):gsub(">", "&gt;")) end,
+			ask_yes_no = function(title, text, ok_label, cancel_label)
+				asked[#asked + 1] = { title = title, text = text, ok = ok_label, cancel = cancel_label }
+				return answer
+			end,
+		}
+		package.loaded["modules.keymap.managed_python"] = { ensure = function(deps, done)
+			done(deps.confirm(31 * 1048576 - 1), "fixture")
+		end }
+		package.loaded["modules.keymap.layout_registry"] = nil
+		local ok, err = pcall(function()
+			local python = require("modules.keymap.layout_registry")._managed_python_for_probe()
+			local outcomes = {}
+			-- nil is the question that could not be shown (no display): a decline.
+			for _, reply in ipairs({ { true }, { false }, {} }) do
+				answer = reply[1]
+				python(function(accepted) outcomes[#outcomes + 1] = accepted end)
+			end
+			helpers.assert_eq(outcomes, { true, false, false }, "only Download accepts; Cancel and no answer decline")
+		end)
+		package.loaded["modules.keymap.layout_registry"] = saved.registry
+		package.loaded["modules.keymap.managed_python"] = saved.managed
+		package.loaded["ui.menu.menu_dialogs"] = saved.dialogs
+		package.loaded["infra.i18n"] = saved.i18n
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(asked[1], { title = "layouts.managed_python_title", text = "Download 31 MB &lt;now&gt;?",
+			ok = "menu.llm.btn_download", cancel = "common.cancel" })
+	end)
+
+	helpers.it("reports a declined or failed managed Python and runs nothing (layout-registry-managed-python)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files(),
+			python_refusal = "python_declined" })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok == false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_PYTHON)
+		helpers.assert_eq(result.user_message, PYTHON_MESSAGE)
+		helpers.assert_contains(result.extra, "python_declined")
+		helpers.assert_eq(#state.runs, 0, "no child runs without Ergopti's Python")
+		helpers.assert_eq(state.python_asked, 1)
+	end)
+
+	helpers.it("tells the user why a pure Xorg session cannot install a layout (layout-registry-convert)", function()
+		local LayoutRegistry, deps, state = manager({
+			served = "offline",
+			files = shipped_files(),
+			runs = { OK_RUN, { exit_code = 3, error = "exit 3", stderr = "",
+				stdout = '{"ok": false, "verified": null, "detail": "this is an Xorg session", "code": "xorg_session"}\n' } },
+		})
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_XORG_SESSION)
+		helpers.assert_eq(result.user_message, "translated: layouts.linux_xorg_session")
+		helpers.assert_nil(state.files[LOCAL_DIR .. "installed.json"], "a refused installation is not recorded")
+	end)
+
 	helpers.it("writes and runs nothing while the installed record is unreadable (layout-install-record-first)", function()
 		-- A layout installed before the record fails is in the user XKB tree
 		-- with no record: the layout manager then neither lists nor removes it.
@@ -379,7 +475,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local LayoutRegistry, deps, state = manager({
 			served = "offline",
 			files = shipped_files(),
-			runs = { OK_RUN, OK_RUN, OK_RUN, { exit_code = 3, error = "exit 3", stderr = "",
+			runs = { OK_RUN, { exit_code = 3, error = "exit 3", stderr = "",
 				stdout = '{"ok": false, "verified": null, "detail": "rules/evdev is your own file", "code": "conflict"}\n' } },
 		})
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
@@ -468,17 +564,144 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 	end)
 end)
 
+helpers.describe("layout manager (Linux): number-row options, live", function()
+	local APPLIED_RUN = { exit_code = 0, stdout = '{"ok": true, "verified": true, "detail": "loaded into the running X server"}\n', stderr = "" }
+	local NOT_LOADED_RUN = { exit_code = 1, stdout = '{"ok": false, "verified": false, "detail": "not loaded: not_loaded", "code": "not_loaded"}\n', stderr = "" }
+
+	--- An installed Ergo-L and a session of the given type and desktop.
+	local function with_ergol(session, runs, desktop)
+		local LayoutRegistry, deps, state = manager({
+			files = {
+				[LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1, layouts = { ergol = entry_of("ergol") } }),
+				[LOCAL_DIR .. "ergol.keylayout"] = registry_file("ergol/ergol.keylayout"),
+			},
+			runs = runs,
+		})
+		deps.session_type = function() return session end
+		deps.desktop_is = function(token) return (desktop or ""):find(token, 1, true) ~= nil end
+		return LayoutRegistry, deps, state
+	end
+
+	--- The keysyms of one key in a symbols file, in level order.
+	local function levels_of(symbols, key)
+		local list = symbols:match("key <" .. key .. "> { type%[group1%] = \"[^\"]*\", %[([^%]]*)%]")
+		local out = {}
+		for item in (list or ""):gmatch("[^,%s]+") do out[#out + 1] = item end
+		return out
+	end
+
+	local ROWS = { order = "symbols", edges = true }
+
+	helpers.it("converts with the options, installs for Xorg and loads the layout into the running server (layout-rows-live)", function()
+		local LayoutRegistry, deps, state = with_ergol("x11", { OK_RUN, INSTALLED_RUN, OK_RUN, APPLIED_RUN })
+		local result = run(function(done) LayoutRegistry.apply_rows(nil, ROWS, done, deps) end)
+		helpers.assert_true(result.ok, tostring(result.detail) .. " " .. tostring(result.extra))
+		helpers.assert_eq(result.detail.id, "ergol")
+		helpers.assert_eq(result.detail.rows.order, "symbols")
+		helpers.assert_true(result.detail.rows.edges.applies)
+		helpers.assert_eq(state.runs[2].args[2], "install")
+		helpers.assert_eq(state.runs[2].args[#state.runs[2].args], "--allow-xorg", "Xorg is only allowed because the layout is loaded here")
+		helpers.assert_eq(state.runs[4].args[2], "apply-x11")
+		helpers.assert_eq(arg_value(state.runs[4].args, "--layout-id"), "ergol")
+		-- Ergo-L types its digits unshifted; with the options the symbol is the unshifted level.
+		local plain = levels_of(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], "AE01")
+		helpers.assert_eq(plain[1], "EuroSign", "symbols first: Ergo-L's Shift symbol of the 1 key is now unshifted")
+		helpers.assert_eq(plain[3], "1", "symbols first: the digit is on Shift")
+		helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
+	end)
+
+	helpers.it("refuses a session that cannot load a user layout live before anything is written (layout-rows-live)", function()
+		for _, case in ipairs({ { "wayland", "sway" }, { "wayland", "hyprland" }, { "wayland", "" }, { "tty", "gnome" },
+			{ "", "kde" } }) do
+			local session = case[1]
+			local LayoutRegistry, deps, state = with_ergol(session, {}, case[2])
+			local before = {}
+			for path, text in pairs(state.files) do before[path] = text end
+			local result = run(function(done) LayoutRegistry.apply_rows("ergol", ROWS, done, deps) end)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_SESSION, session)
+			helpers.assert_eq(#state.runs, 0, "no child runs")
+			helpers.assert_eq(state.files, before, "nothing is written")
+		end
+	end)
+
+	helpers.it("selects the new build through the GNOME or KDE setting on Wayland (layout-rows-live)", function()
+		for _, desktop in ipairs({ "ubuntu:gnome", "kde" }) do
+			local WAYLAND_RUN = { exit_code = 0, stdout = '{"ok": true, "verified": true, "slot": "ergol_live", "detail": "loaded"}\n', stderr = "" }
+			local LayoutRegistry, deps, state = with_ergol("wayland", { OK_RUN, WAYLAND_RUN }, desktop)
+			local result = run(function(done) LayoutRegistry.apply_rows(nil, ROWS, done, deps) end)
+			helpers.assert_true(result.ok, tostring(result.detail) .. " " .. tostring(result.extra))
+			helpers.assert_eq(result.detail.slot, "ergol_live")
+			helpers.assert_eq(result.detail.rows.order, "symbols")
+			helpers.assert_eq(#state.runs, 2, "one installer call converts nothing: the conversion is Lua")
+			helpers.assert_eq(state.runs[2].args[2], "apply-wayland")
+			helpers.assert_eq(arg_value(state.runs[2].args, "--layout-id"), "ergol")
+			helpers.assert_eq(arg_value(state.runs[2].args, "--source-dir"), LOCAL_DIR .. "ergol")
+			helpers.assert_eq(levels_of(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], "AE01")[1], "EuroSign")
+			helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
+		end
+	end)
+
+	helpers.it("reports the Wayland installer's closed code and keeps the session's own refusal (layout-rows-live)", function()
+		for _, case in ipairs({ { "stale_keymap", "live_apply_failed" }, { "select_refused", "live_apply_failed" },
+			{ "session_unsupported", "session_unsupported" } }) do
+			local refused = { exit_code = 1, stderr = "",
+				stdout = '{"ok": false, "verified": false, "detail": "not loaded", "code": "' .. case[1] .. '"}\n' }
+			local LayoutRegistry, deps = with_ergol("wayland", { OK_RUN, refused }, "gnome")
+			local failed, code
+			LayoutRegistry.apply_rows("ergol", ROWS, function(ok, detail, _, _, live)
+				failed, code = { ok = ok, detail = detail }, live
+			end, deps)
+			helpers.assert_eq(failed.ok, false)
+			helpers.assert_eq(failed.detail, case[2], case[1])
+			helpers.assert_eq(code, case[1])
+		end
+	end)
+
+	helpers.it("names a missing source layout and an uninstalled one (layout-rows-live)", function()
+		local LayoutRegistry, deps = manager({ files = { [LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1, layouts = {} }) } })
+		deps.session_type = function() return "x11" end
+		local none = run(function(done) LayoutRegistry.apply_rows(nil, ROWS, done, deps) end)
+		helpers.assert_eq(none.detail, LayoutRegistry.FAILURE_NO_SOURCE)
+		local missing = run(function(done) LayoutRegistry.apply_rows("ergol", ROWS, done, deps) end)
+		helpers.assert_eq(missing.detail, LayoutRegistry.FAILURE_NOT_INSTALLED)
+	end)
+
+	helpers.it("reports the closed code of a load the server did not keep, and frees the slot (layout-rows-live)", function()
+		local LayoutRegistry, deps = with_ergol("x11", { OK_RUN, INSTALLED_RUN, OK_RUN, NOT_LOADED_RUN,
+			OK_RUN, INSTALLED_RUN, OK_RUN, APPLIED_RUN })
+		local failed, code
+		LayoutRegistry.apply_rows("ergol", ROWS, function(ok, detail, _, _, live)
+			failed, code = { ok = ok, detail = detail }, live
+		end, deps)
+		helpers.assert_eq(failed.ok, false)
+		helpers.assert_eq(failed.detail, LayoutRegistry.FAILURE_LIVE)
+		helpers.assert_eq(code, "not_loaded")
+		local again = run(function(done) LayoutRegistry.apply_rows("ergol", ROWS, done, deps) end)
+		helpers.assert_true(again.ok, "the operation slot is free after a failure")
+	end)
+
+	helpers.it("keeps an inert choice and says why (layout-rows-live)", function()
+		local LayoutRegistry, deps, state = with_ergol("x11", { OK_RUN, INSTALLED_RUN, OK_RUN, APPLIED_RUN })
+		local result = run(function(done) LayoutRegistry.apply_rows("ergol", { order = "digits", edges = false }, done, deps) end)
+		helpers.assert_true(result.ok)
+		helpers.assert_eq(result.detail.rows.order, "native")
+		helpers.assert_eq(result.detail.rows.reason, "already_digits_first")
+		helpers.assert_eq(levels_of(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], "AE01")[1], "1")
+	end)
+end)
+
 helpers.describe("layout manager (Linux): what the package ships", function()
-	helpers.it("finds the converter, the installer and the registry where package and checkout put them (layout-registry-convert)", function()
+	helpers.it("finds the conversion data, the installer and the registry where package and checkout put them (layout-registry-convert)", function()
 		local LayoutRegistry = helpers.load_module("modules.keymap.layout_registry")
 		local settings = assert(LayoutRegistry.settings())
 		local present = {
-			["/pkg/linux/xkb_generation/keylayout_to_xkb.py"] = true,
+			["/pkg/linux/xkb_generation/data/key_sym.json"] = true,
 			["/pkg/linux/xkb_installation/user_layout_installer.py"] = true,
 			["/pkg/linux/static/layouts/registry/index.json"] = true,
 		}
 		local function exists(path) return present[path] == true end
-		helpers.assert_eq(LayoutRegistry.converter_path("/pkg/linux", exists), CONVERTER)
+		helpers.assert_eq(LayoutRegistry.converter_data_path("/pkg/linux", exists), CONVERTER_DATA)
 		helpers.assert_eq(LayoutRegistry.installer_path("/pkg/linux", exists), INSTALLER)
 		helpers.assert_eq(LayoutRegistry.bundled_dir("/pkg/linux", settings, exists), SHIPPED_DIR)
 		local checkout = {
@@ -486,11 +709,15 @@ helpers.describe("layout manager (Linux): what the package ships", function()
 			["/repo/static/ergopti_plus/linux/../../../static/layouts/registry/index.json"] = true,
 		}
 		local function in_checkout(path) return checkout[path] == true end
+		checkout["/repo/static/ergopti_plus/linux/../../ergopti/linux/xkb_generation/data/key_sym.json"] = true
+		helpers.assert_contains(LayoutRegistry.converter_data_path("/repo/static/ergopti_plus/linux", in_checkout),
+			"/ergopti/linux/xkb_generation/data")
 		helpers.assert_contains(LayoutRegistry.installer_path("/repo/static/ergopti_plus/linux", in_checkout),
 			"/ergopti/linux/xkb_installation/user_layout_installer.py")
 		helpers.assert_contains(LayoutRegistry.bundled_dir("/repo/static/ergopti_plus/linux", settings, in_checkout),
 			"/static/layouts/registry/")
 		helpers.assert_nil(LayoutRegistry.installer_path("/nowhere", function() return false end))
+		helpers.assert_nil(LayoutRegistry.converter_data_path("/nowhere", function() return false end))
 	end)
 end)
 
@@ -523,3 +750,238 @@ require("test.layout_installed_extension_manager_contract")(helpers, Json, {
 	probe_receipt = OK_RUN,
 	install_receipt = INSTALLED_RUN,
 })
+
+--- Isolates terminal registry shutdown from every other module's runner lifetime.
+--- @param options table Existing registry filesystem/transport fixture options.
+--- @param body function Receives the real registry and controlled physical helper ACK.
+local function with_shutdown_owner(options, body)
+	local modules = { "modules.keymap.layout_registry", "adapters.process_runner", "adapters.http_client", "adapters.file_digest" }
+	local previous = {}
+	for _, name in ipairs(modules) do previous[name] = package.loaded[name] end
+	local physical = { settled = true, stops = 0, http_cancels = 0, digest_cancels = 0 }
+	package.loaded["adapters.process_runner"] = {
+		shutdown = function() physical.stops = physical.stops + 1; return physical.settled end,
+		is_settled = function() return physical.settled end,
+	}
+	package.loaded["adapters.http_client"] = { cancel = function(owner)
+		helpers.assert_eq(owner, "layout_registry")
+		physical.http_cancels = physical.http_cancels + 1
+		if physical.on_cancel then physical.on_cancel() end
+		return true -- Logical cancellation deliberately does not acknowledge helpers.
+	end }
+	package.loaded["adapters.file_digest"] = { cancel = function(owner)
+		helpers.assert_eq(owner, "layout_registry"); physical.digest_cancels = physical.digest_cancels + 1; return true
+	end }
+	local ok, err = xpcall(function()
+		local registry, deps, state = manager(options)
+		body(registry, deps, state, physical)
+	end, debug.traceback)
+	for _, name in ipairs(modules) do package.loaded[name] = previous[name] end
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("registry workflows lose publication authority at terminal shutdown", function()
+	for _, phase in ipairs({ "probe", "installer" }) do
+		helpers.it("(layout-helper-shutdown) fences a select callback during " .. phase, function()
+			with_shutdown_owner({ files = { [LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1,
+				layouts = { ergol = entry_of("ergol") } }) } }, function(registry, deps, state, physical)
+				local pending, stages, callbacks = nil, 0, 0
+				deps.run = function(_, args, _, done)
+					stages = stages + 1
+					if args[1] == "-c" and phase == "installer" then done(OK_RUN) else pending = done end
+					return true
+				end
+				helpers.assert_true(registry.select("ergol", function() callbacks = callbacks + 1 end, deps))
+				local busy = registry.snapshot(deps).busy
+				helpers.assert_type(busy, "table")
+				physical.settled = false
+				physical.on_cancel = function() pending(phase == "probe" and OK_RUN or INSTALLED_RUN) end
+				helpers.assert_eq(registry.shutdown(), false)
+				pending(phase == "probe" and OK_RUN or INSTALLED_RUN)
+				helpers.assert_eq(stages, phase == "probe" and 1 or 2, "cancelled probe cannot start an installer")
+				helpers.assert_eq(callbacks, 0)
+				helpers.assert_eq(registry.snapshot(deps).active, "")
+				helpers.assert_eq(registry.snapshot(deps).busy, busy, "logical cancellation cannot clear physical debt")
+				local reset_ok = pcall(registry._reset)
+				helpers.assert_eq(reset_ok, false, "test reset cannot erase terminal ownership")
+				physical.settled = true
+				helpers.assert_true(registry.shutdown())
+				helpers.assert_nil(registry.snapshot(deps).busy)
+				helpers.assert_eq(callbacks, 0)
+				helpers.assert_eq(physical.http_cancels, 1); helpers.assert_eq(physical.digest_cancels, 1)
+			end)
+		end)
+	end
+
+	helpers.it("(layout-helper-shutdown) retired uninstall cannot delete files or publish a new record", function()
+		local record = Json.encode({ schema_version = 1, layouts = { ergol = entry_of("ergol") } })
+		with_shutdown_owner({ files = { [LOCAL_DIR .. "installed.json"] = record,
+			[LOCAL_DIR .. "ergol.keylayout"] = "original layout" } }, function(registry, deps, state, physical)
+			local pending, callbacks = nil, 0
+			deps.run = function(_, args, _, done) if args[1] == "-c" then done(OK_RUN) else pending = done end; return true end
+			helpers.assert_true(registry.uninstall("ergol", function() callbacks = callbacks + 1 end, deps))
+			physical.settled = false
+			helpers.assert_eq(registry.shutdown(), false)
+			pending(INSTALLED_RUN)
+			helpers.assert_eq(state.files[LOCAL_DIR .. "installed.json"], record)
+			helpers.assert_eq(state.files[LOCAL_DIR .. "ergol.keylayout"], "original layout")
+			helpers.assert_eq(#state.deleted, 0); helpers.assert_eq(callbacks, 0)
+			physical.settled = true; helpers.assert_true(registry.shutdown())
+		end)
+	end)
+
+	helpers.it("(layout-helper-shutdown) cancelled catalogue reply cannot cache or restart installation", function()
+		with_shutdown_owner({}, function(registry, deps, state, physical)
+			local pending, requests, callbacks, writes = nil, 0, 0, 0
+			deps.transport.get = function(_, _, _, done) requests = requests + 1; pending = done end
+			deps.write = function() writes = writes + 1; return true end
+			helpers.assert_true(registry.install("ergol", function() callbacks = callbacks + 1 end, deps))
+			helpers.assert_eq(requests, 1)
+			physical.on_cancel = function() pending(200, INDEX_TEXT, nil, { etag = '"late"' }) end
+			helpers.assert_true(registry.shutdown())
+			pending(200, INDEX_TEXT, nil, { etag = '"late"' })
+			helpers.assert_eq(writes, 0); helpers.assert_eq(requests, 1)
+			helpers.assert_eq(#state.runs, 0); helpers.assert_eq(callbacks, 0)
+			for _, method in ipairs({ "install", "select", "uninstall" }) do
+				helpers.assert_eq(registry[method]("ergol", function() callbacks = callbacks + 1 end, deps), false)
+			end
+			helpers.assert_eq(registry.refresh(function() callbacks = callbacks + 1 end, deps), false)
+			helpers.assert_eq(callbacks, 0, "closed admission cannot publish a late business callback")
+		end)
+	end)
+
+	helpers.it("(layout-helper-shutdown) cancelled digest cannot advance acquisition or start conversion", function()
+		with_shutdown_owner({ served = { [INDEX_URL] = INDEX_TEXT, [ERGOL_URL] = registry_file("ergol/ergol.keylayout") } }, function(registry, deps, state)
+			local pending, callbacks, writes = nil, 0, 0
+			local write = deps.write
+			deps.write = function(...) writes = writes + 1; return write(...) end
+			deps.transport.sha256 = function(_, done) pending = done end
+			helpers.assert_true(registry.install("ergol", function() callbacks = callbacks + 1 end, deps))
+			helpers.assert_type(pending, "function")
+			local before = writes
+			helpers.assert_true(registry.shutdown())
+			pending(entry_of("ergol").sha256, nil)
+			helpers.assert_eq(writes, before)
+			helpers.assert_eq(#state.runs, 0); helpers.assert_eq(callbacks, 0)
+		end)
+	end)
+
+	helpers.it("(layout-helper-shutdown) source read reentry cannot acquire an operation after shutdown", function()
+		with_shutdown_owner({ files = { [LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1,
+			layouts = { ergol = entry_of("ergol") } }) } }, function(registry, deps, state)
+			local read, stopped, callbacks = deps.read, false, 0
+			deps.read = function(path)
+				if not stopped then stopped = true; helpers.assert_true(registry.shutdown()) end
+				return read(path)
+			end
+			helpers.assert_eq(registry.select("ergol", function() callbacks = callbacks + 1 end, deps), false)
+			helpers.assert_eq(#state.runs, 0); helpers.assert_eq(callbacks, 0)
+			helpers.assert_nil(registry.snapshot(deps).busy)
+		end)
+	end)
+end)
+
+require("test.layout_composer_contract")(helpers, Json, {
+	name = "Linux",
+	platform = "linux",
+	shortcuts = "single",
+	manager = manager,
+	files = shipped_files,
+	config_dir = "/cfg/",
+	local_dir = LOCAL_DIR,
+	installed_copy = LOCAL_DIR .. "composed.keylayout",
+	registry_text = registry_file,
+	-- The Python children are controlled: every one succeeds and is recorded.
+	prepare = function(deps, state)
+		deps.run = function(program, args, run_options, callback)
+			state.runs[#state.runs + 1] = { program = program, args = args, timeout_ms = run_options.timeout_ms }
+			callback(INSTALLED_RUN)
+			return true
+		end
+	end,
+	selections = function(state)
+		local count = 0
+		for _, item in ipairs(state.runs) do
+			for _, value in ipairs(item.args) do
+				if value == "activate" then count = count + 1 end
+			end
+		end
+		return count
+	end,
+})
+
+require("test.composer_check_contract")(helpers, Json, {
+	name = "Linux",
+	manager = manager,
+	files = shipped_files,
+	config_dir = "/cfg/",
+	local_dir = LOCAL_DIR,
+	installed_copy = LOCAL_DIR .. "composed.keylayout",
+	-- The Python children are controlled: every one succeeds and is recorded.
+	prepare = function(deps, state)
+		deps.run = function(program, args, run_options, callback)
+			state.runs[#state.runs + 1] = { program = program, args = args, timeout_ms = run_options.timeout_ms }
+			callback(INSTALLED_RUN)
+			return true
+		end
+	end,
+	env = function(overrides)
+		return helpers.load_module("modules.keymap.composer_check").env(overrides)
+	end,
+	selections = function(state)
+		local count = 0
+		for _, item in ipairs(state.runs) do
+			for _, value in ipairs(item.args) do
+				if value == "activate" then count = count + 1 end
+			end
+		end
+		return count
+	end,
+	ready_step = "composer_ready=pass:verified",
+	-- The installer runs on Ergopti's own Python: without it the check skips.
+	prerequisite_code = "python_missing",
+	-- The installer is not run again for a composition that already exists.
+	existing_ready_step = "composer_ready=info:not_reprobed",
+	-- The installer installs the layout but could not verify it.
+	readiness_failure = function(fresh)
+		local registry, deps, state = fresh()
+		deps.run = function(program, args, run_options, callback)
+			state.runs[#state.runs + 1] = { program = program, args = args, timeout_ms = run_options.timeout_ms }
+			callback({ exit_code = 0, stdout = '{"ok": true, "verified": false, "detail": "installed"}\n', stderr = "" })
+			return true
+		end
+		return registry, deps, state
+	end,
+	readiness_failure_step = "composer_ready=fail:unverified",
+})
+
+helpers.describe("native installed-layout record publication", function()
+	local cases = { "healthy", "stage_fifo", "stage_symlink", "stage_hardlink", "stage_regular", "stage_directory" }
+	for _, boundary in ipairs({ "write", "close", "read", "read_close", "rename" }) do
+		for _, refusal in ipairs({ "nil", "false", "throw" }) do cases[#cases + 1] = boundary .. "_" .. refusal end
+	end
+	for _, kind in ipairs(cases) do
+		helpers.it("(layout-record-publication) preserves the production registry on " .. kind, function()
+			local Shell = require("adapters.shell_runner")
+			local folder = os.tmpname()
+			assert(os.remove(folder)); assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
+			local okay, detail = xpcall(function()
+				local environment, directories = { "env" }, {}
+				for _, pair in ipairs({ { "XDG_CONFIG_HOME", "config" }, { "XDG_DATA_HOME", "data" },
+					{ "XDG_CACHE_HOME", "cache" }, { "XDG_STATE_HOME", "state" }, { "XDG_RUNTIME_DIR", "runtime" } }) do
+					directories[#directories + 1] = Shell.quote(folder .. "/" .. pair[2])
+					environment[#environment + 1] = pair[1] .. "=" .. Shell.quote(folder .. "/" .. pair[2])
+				end
+				assert(Shell.run("mkdir -m 700 -- " .. table.concat(directories, " ")))
+				local fixture = helpers.driver_root() .. "/tests/fixtures/native_layout_registry_record.lua"
+				helpers.assert_true(Shell.run(table.concat(environment, " ") .. " timeout --kill-after=2 10 "
+					.. Shell.quote(assert(arg[-1])) .. " " .. Shell.quote(fixture) .. " " .. Shell.quote(folder) .. " " .. Shell.quote(kind)),
+					"the actual public uninstall must retain other installed layouts across native failures")
+				local file = assert(io.open(folder .. "/complete", "rb"))
+				helpers.assert_eq(file:read("*a"), "complete"); assert(file:close())
+			end, debug.traceback)
+			assert(Shell.run("rm -rf -- " .. Shell.quote(folder)))
+			if not okay then error(detail, 0) end
+		end)
+	end
+end)

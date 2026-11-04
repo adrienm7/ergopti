@@ -4,8 +4,8 @@
 --- MODULE: Hotstring Scalar Preferences (Linux)
 --- DESCRIPTION:
 --- Owns the hotstring settings that are single canonical config.toml leaves:
---- the magic key and its physical key, the four preview toggles, the dynamic
---- master and each dynamic family. Absence resolves through the manifest's
+--- the magic key and its physical key, the four preview toggles, the base
+--- expansion delay, the dynamic master and each dynamic family. Absence resolves through the manifest's
 --- neutral default, so an empty configuration switches every one of them off.
 ---
 --- FEATURES & RATIONALE:
@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local Manifest = require("infra.manifest_reader")
 local ConfigPaths = require("infra.config_paths")
 local Writer = require("toml_codec.writer")
@@ -30,6 +31,8 @@ local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Terminators = require("keymap.terminators")
+local KEY = require("config_keys").KEY
+local NativePath = require("native_path")
 
 local LOG = "infra.hotstring_preferences"
 
@@ -37,17 +40,18 @@ local LOG = "infra.hotstring_preferences"
 --- `hotstrings.dynamic` feature rows, appended below, so a family declared there
 --- is owned here without a second list.
 local OWNED = {
-	"hotstrings.trigger_char",
-	"hotstrings.magic_key_source",
-	"hotstrings.preview_star_enabled",
-	"hotstrings.preview_autocorrect_enabled",
-	"hotstrings.preview_ai_enabled",
-	"hotstrings.preview_colored_tooltips",
-	"hotstrings.dynamic.enabled",
-	"hotstrings.dynamic.user_code.time_activation_seconds",
+	KEY.HOTSTRINGS_TRIGGER_CHAR,
+	KEY.HOTSTRINGS_MAGIC_KEY_SOURCE,
+	KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED,
+	KEY.HOTSTRINGS_PREVIEW_AUTOCORRECT_ENABLED,
+	KEY.HOTSTRINGS_PREVIEW_AI_ENABLED,
+	KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS,
+	KEY.HOTSTRINGS_DYNAMIC_ENABLED,
+	KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS,
+	KEY.HOTSTRINGS_EXPANSION_DELAY,
 }
 for _, entry in ipairs(Manifest.features()) do
-	if entry.section == "hotstrings.dynamic" and entry.type == "feature" then
+	if entry.section == KEY.HOTSTRINGS_DYNAMIC and entry.type == "feature" then
 		OWNED[#OWNED + 1] = entry.path .. ".enabled"
 	end
 end
@@ -63,8 +67,12 @@ end
 -- (a magic key today's shared policy rejects) is outdated for the cleanup
 -- exactly as it is for the owner's reader, which warns with the same words.
 local VALUE_RULES = {
-	["hotstrings.trigger_char"] = function(value) return Terminators.validate_magic_key(value) == true end,
-	["hotstrings.dynamic.user_code.time_activation_seconds"] = function(value)
+	[KEY.HOTSTRINGS_TRIGGER_CHAR] = function(value) return Terminators.validate_magic_key(value) == true end,
+	[KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS] = function(value)
+		return type(value) == "number" and value == value and value >= 0 and value < math.huge
+	end,
+	-- The base expansion delay: seconds, finite, never negative. 0 means unlimited.
+	[KEY.HOTSTRINGS_EXPANSION_DELAY] = function(value)
 		return type(value) == "number" and value == value and value >= 0 and value < math.huge
 	end,
 }
@@ -96,12 +104,7 @@ local function publish(document)
 	_generation = _generation + 1
 end
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone(child) end
-	return copy
-end
+local clone = TableUtil.deep_copy
 
 local function segments(path)
 	local parts = {}
@@ -147,7 +150,7 @@ end
 --- @return any value
 local function lookup(document, path)
 	local value, outdated, detail = inspect(document, path)
-	if value ~= nil and path == "hotstrings.dynamic.user_code.time_activation_seconds" and not VALUE_RULES[path](value) then
+	if value ~= nil and path == KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS and not VALUE_RULES[path](value) then
 		outdated, detail, value = path, "the activation interval is not a finite non-negative number", nil
 	end
 	if outdated then ConfigOutdated.report(outdated, detail, Logger) end
@@ -284,7 +287,7 @@ function M.set_many(values)
 		for path, value in pairs(values) do
 			owned(path)
 			assert(type(value) == _owned[path], "hotstring preference has the wrong type: " .. path)
-			if path == "hotstrings.dynamic.user_code.time_activation_seconds" then
+			if path == KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS then
 				assert(VALUE_RULES[path](value), "programmable hotstring activation interval is invalid")
 			end
 			if value == Manifest.default_for(path) then
@@ -294,7 +297,7 @@ function M.set_many(values)
 			end
 		end
 		local rows = LeafRows.prepare(source.content or "", operations)
-		local directory = file():match("^(.*)/[^/]+$")
+		local directory = NativePath.dirname(file())
 		if source.status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then
 			return false, "the configuration folder cannot be created"
 		end

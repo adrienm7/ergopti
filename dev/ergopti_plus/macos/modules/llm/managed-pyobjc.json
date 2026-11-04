@@ -1,0 +1,24 @@
+{
+	"schema_version": 1,
+	"purpose": "PyObjC for the App Cloner helpers and the launchers it writes, installed into the managed Python (owned_runtimes.json, the macOS /usr/bin/python3 row).",
+	"python_tag": "cp311",
+	"import_check": ["objc", "AppKit", "Foundation"],
+	"wheels": [
+		{
+			"name": "pyobjc-core",
+			"version": "12.1",
+			"file_name": "pyobjc_core-12.1-cp311-cp311-macosx_10_9_universal2.whl",
+			"url": "https://files.pythonhosted.org/packages/95/df/d2b290708e9da86d6e7a9a2a2022b91915cf2e712a5a82e306cb6ee99792/pyobjc_core-12.1-cp311-cp311-macosx_10_9_universal2.whl",
+			"sha256": "c918ebca280925e7fcb14c5c43ce12dcb9574a33cccb889be7c8c17f3bcce8b6",
+			"size": 671263
+		},
+		{
+			"name": "pyobjc-framework-Cocoa",
+			"version": "12.1",
+			"file_name": "pyobjc_framework_cocoa-12.1-cp311-cp311-macosx_10_9_universal2.whl",
+			"url": "https://files.pythonhosted.org/packages/3f/07/5760735c0fffc65107e648eaf7e0991f46da442ac4493501be5380e6d9d4/pyobjc_framework_cocoa-12.1-cp311-cp311-macosx_10_9_universal2.whl",
+			"sha256": "f52228bcf38da64b77328787967d464e28b981492b33a7675585141e1b0a01e6",
+			"size": 383812
+		}
+	]
+}

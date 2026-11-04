@@ -16,10 +16,10 @@ helpers.describe("gesture Actions feature isolation", function()
 		helpers.assert_eq(actions.force_cleanup("gestures"), true)
 		helpers.assert_eq(actions.execute_single("open_config"), false)
 		helpers.assert_eq(
-			actions.execute_single("open_config", "keyboard__cmd_1"), true)
+			actions.execute_single("open_config", "keyboard__primary_1"), true)
 		helpers.assert_eq(calls.open[1].parent, "shortcut_bindings")
 		helpers.assert_eq(actions.execute_single(
-			"screenshot_region_clipboard", "keyboard__cmd_1"), true)
+			"screenshot_region_clipboard", "keyboard__primary_1"), true)
 		helpers.assert_eq(calls.action_parents[#calls.action_parents],
 			"shortcut_bindings")
 
@@ -28,16 +28,16 @@ helpers.describe("gesture Actions feature isolation", function()
 		helpers.assert_eq(actions.execute_single("open_config"), true)
 		helpers.assert_eq(calls.open[#calls.open].parent, "gestures")
 		helpers.assert_eq(
-			actions.execute_single("open_config", "keyboard__cmd_1"), false)
+			actions.execute_single("open_config", "keyboard__primary_1"), false)
 	end)
 
 	it("keeps a sibling search timer authorized and published in both directions", function(fresh_actions, with_feature_lifecycles)
 		local actions, calls = fresh_actions()
 		actions.init({ action_params = {} })
 		helpers.assert_eq(actions.set_action_parameter(
-			"keyboard__cmd_1", "search_web", "https://example.test/?q=%s"), true)
+			"keyboard__primary_1", "search_web", "https://example.test/?q=%s"), true)
 		helpers.assert_eq(actions.execute_single(
-			"search_web", "keyboard__cmd_1"), true)
+			"search_web", "keyboard__primary_1"), true)
 		local shortcut_timer = calls.hs.timer.__timers[#calls.hs.timer.__timers]
 		helpers.assert_not_nil(shortcut_timer)
 		helpers.assert_eq(actions.force_cleanup("gestures"), true)

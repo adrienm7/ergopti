@@ -177,6 +177,7 @@ function derive_modifier_usage(sc_dict) {
 				count: 0,
 				time: 0,
 				errors: 0,
+				accuracy_errors: 0,
 				synth_hs: 0,
 				synth_llm: 0,
 				synth_other: 0
@@ -189,7 +190,15 @@ function derive_modifier_usage(sc_dict) {
 	const shift_count = count_uppercase_shift();
 	if (shift_count > 0) {
 		if (!result['shift']) {
-			result['shift'] = { count: 0, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+			result['shift'] = {
+				count: 0,
+				time: 0,
+				errors: 0,
+				accuracy_errors: 0,
+				synth_hs: 0,
+				synth_llm: 0,
+				synth_other: 0
+			};
 		}
 		// Add inferred shift presses on top of direct flagsChanged counts to get
 		// the total number of shift activations (direct key tap + held for uppercase).
@@ -211,11 +220,20 @@ function derive_modifier_usage(sc_dict) {
 		const mod_key = mods.join('+');
 
 		if (!result[mod_key]) {
-			result[mod_key] = { count: 0, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+			result[mod_key] = {
+				count: 0,
+				time: 0,
+				errors: 0,
+				accuracy_errors: 0,
+				synth_hs: 0,
+				synth_llm: 0,
+				synth_other: 0
+			};
 		}
 		result[mod_key].count += item.count || 0;
 		result[mod_key].time += item.time || 0;
 		result[mod_key].errors += item.errors || 0;
+		result[mod_key].accuracy_errors += item.accuracy_errors;
 		result[mod_key].synth_hs += item.synth_hs || 0;
 		result[mod_key].synth_llm += item.synth_llm || 0;
 		result[mod_key].synth_other += item.synth_other || 0;
@@ -231,9 +249,8 @@ function derive_modifier_usage(sc_dict) {
  * @returns {boolean} Whether all characters in the sequence are the same.
  */
 function is_repetition(key) {
-	// Normalize [BS] markers before the grapheme check
-	const clean = key.replace(/\[BS\]/gi, '');
-	const chars = Array.from(clean);
+	// A [BS] marker takes no part in the repetition check
+	const chars = key_tokens(key).filter((token) => token.toUpperCase() !== '[BS]');
 	if (chars.length <= 1) return false;
 	return chars.every((c) => c === chars[0]);
 }
@@ -248,15 +265,8 @@ function is_repetition(key) {
  * @returns {number} The number of effective tokens.
  */
 function count_key_tokens(key) {
-	const parts = key.split(/(\[[^\]]+\])/i).filter((p) => p.length > 0);
-	return parts.reduce((sum, part) => {
-		if (/^\[[^\]]+\]$/i.test(part)) return sum + 1;
-		return sum + Array.from(part).length;
-	}, 0);
+	return key_tokens(key).length;
 }
-
-// Expected token count for each fixed-length n-gram tab
-const NGRAM_EXPECTED_LEN = { bg: 2, tg: 3, qg: 4, pg: 5, hx: 6, hp: 7 };
 
 // ===========================================
 // ===========================================
@@ -405,10 +415,7 @@ function compute_key_km_per_stroke(key, char_km_map, is_kc_tab, is_sc_tab) {
 				.split('+')
 				.map((p) => p.trim().toLowerCase())
 				.filter((p) => p.length > 0)
-		: key
-				.split(/(\[[^\]]+\])/i)
-				.filter((p) => p.length > 0)
-				.flatMap((part) => (/^\[[^\]]+\]$/i.test(part) ? [part.toLowerCase()] : Array.from(part)));
+		: key_tokens(key);
 
 	return tokens.reduce((sum, t) => sum + (char_km_map[t.toLowerCase()] ?? char_km_map[t] ?? 0), 0);
 }
@@ -442,7 +449,7 @@ function render_current_tab() {
 	const is_text_tab = ![...SC_TABS, 'kc'].includes(app_state.current_tab);
 
 	// ── Characters tab: expand multi-token keys into individual entries ───────
-	// The keylogger sometimes records multi-char sequences (e.g. NBSP+?) in the
+	// The keystats sometimes records multi-char sequences (e.g. NBSP+?) in the
 	// character dict. We decompose each multi-token key so that NBSP, NNBSP, and
 	// every other char that only appeared in a combination is surfaced individually.
 	// Bracket markers such as [TAB], [F1] count as one token and are kept as-is.
@@ -478,7 +485,8 @@ function render_current_tab() {
 					synth_llm: 0,
 					synth_other: 0,
 					time: 0,
-					errors: 0
+					errors: 0,
+					accuracy_errors: 0
 				};
 			}
 			char_accum[token].count += item.count || 0;
@@ -488,6 +496,7 @@ function render_current_tab() {
 			if (keep_timing) {
 				char_accum[token].time += item.time || 0;
 				char_accum[token].errors += item.errors || 0;
+				char_accum[token].accuracy_errors += item.accuracy_errors;
 			}
 		};
 
@@ -499,15 +508,11 @@ function render_current_tab() {
 			});
 			if (has_ctrl) return;
 
-			// Tokenize: [BRACKET] markers → one token; everything else → per grapheme
-			const tokens = k
-				.split(/(\[[^\]]+\])/i)
-				.filter((p) => p.length > 0)
-				.flatMap((part) => (/^\[[^\]]+\]$/i.test(part) ? [part] : Array.from(part)));
+			const tokens = key_tokens(k);
 
 			if (tokens.length === 1) {
 				// Single token: preserve full stats including timing
-				accum_token(k, item, true);
+				accum_token(tokens[0], item, true);
 			} else {
 				// Multi-token: propagate counts only; timing is not per-char here
 				tokens.forEach((t) => accum_token(t, item, false));
@@ -537,7 +542,7 @@ function render_current_tab() {
 		});
 
 		// Fallback pull from the kc (keycode) dict for control keys missing from sc.
-		// Some keylogger versions only populate kc for bare navigation/function keys,
+		// Some keystats versions only populate kc for bare navigation/function keys,
 		// never sc. Checking after sc ensures no double-counting.
 		const kc_for_chars = app_state.data.kc || {};
 		const kc_name_map =
@@ -591,19 +596,11 @@ function render_current_tab() {
 		);
 		const avg = manual_count > 0 ? item.time / manual_count : 0;
 
-		// Precision: [BS]-containing sequences are always 100%; others are 1 - error_rate
-		const acc =
-			k.includes('[BS]') || k.toLowerCase() === 'backspace'
-				? 100
-				: item.count > 0
-					? ((item.count - item.errors) / item.count) * 100
-					: 0;
+		// The projection retains correction policy from original native keys before folding.
+		const acc = item.count > 0 ? ((item.count - item.accuracy_errors) / item.count) * 100 : 0;
 
-		// Normalize any [BRACKET] marker to a single char before grapheme length computation.
 		// Keycode tab keys are numeric strings ("49") representing a single physical key.
-		const norm_key = k.replace(/\[[^\]]+\]/gi, 'B');
-		const display_len =
-			app_state.current_tab === 'kc' ? 1 : Math.max(1, Array.from(norm_key).length);
+		const display_len = app_state.current_tab === 'kc' ? 1 : Math.max(1, count_key_tokens(k));
 
 		total_occ += item.count;
 
@@ -655,7 +652,9 @@ function render_current_tab() {
 	if (rep_source_tab) {
 		const rep_dict = app_state.data[rep_source_tab] || {};
 		data_arr.forEach((item) => {
-			const rep_key = item.key + item.key;
+			// The characters tab unescapes a typed bracket; the source dict does not.
+			const stem = item.key === '[' ? KEYSTATS_LITERAL_BRACKET : item.key;
+			const rep_key = stem + stem;
 			// Lowercase fallback handles bracket markers stored with mixed case
 			// (e.g. "[BS][BS]" vs "[bs][bs]" depending on raw data source path).
 			const rep_entry = rep_dict[rep_key] ?? rep_dict[rep_key.toLowerCase()];
@@ -803,6 +802,7 @@ function render_current_tab() {
 		? Object.entries(app_state.data.kc).map(([key, item]) => ({ key, count: item.count || 0 }))
 		: [];
 	render_kc_heatmap(kc_data_for_heatmap);
+	render_media_keys();
 
 	render_table();
 }
@@ -966,7 +966,7 @@ function render_kc_heatmap(kc_data_arr) {
 
 	// Heat colour: dark blue (cold) → orange (mid) → bright red (hot)
 	const heat_color = (count) => {
-		if (count === 0) return '#1e1e2e';
+		if (count === 0) return ThemeTokens.color('hue-1e1e2e');
 		const t = Math.pow(count / max_count, 0.4);
 		if (t < 0.5) {
 			const tt = t * 2;
@@ -1071,7 +1071,7 @@ function render_kc_heatmap(kc_data_arr) {
 		const cx = sx + key_w / 2;
 		const cy = sy + key_h / 2;
 
-		const text_color = count === 0 ? '#555' : '#fff';
+		const text_color = count === 0 ? ThemeTokens.color('grey-555') : ThemeTokens.color('white');
 
 		// Label: user's layout label, uppercase. Force a few well-known wide-key
 		// short forms so they render clearly (Esc, Ret, Tab, Bksp, Caps, Shft).
@@ -1122,10 +1122,10 @@ function render_kc_heatmap(kc_data_arr) {
 			126: '↑',
 			76: '↵'
 		};
-		const SHORT_LABELS =
-			window.driver_meta && (window.driver_meta.os === 'win' || window.driver_meta.os === 'linux')
-				? SHORT_LABELS_WIN
-				: SHORT_LABELS_MAC;
+		// heatmap_win.js owns which recording OSes use PC scan codes.
+		const SHORT_LABELS = is_pc_scancode_driver(window.driver_meta)
+			? SHORT_LABELS_WIN
+			: SHORT_LABELS_MAC;
 		// Truncate only when truly too long for the cell. Most names ≤ 6 chars fit
 		// at font_size 9; longer ones get the ellipsis fallback.
 		let label_disp;
@@ -1180,7 +1180,7 @@ function render_kc_heatmap(kc_data_arr) {
 				.sort((a, b) => b[1] - a[1])
 				.slice(0, 4);
 			if (mod_sorted.length > 0) {
-				tip_lines.push(`<hr style="border-color:#444;margin:3px 0">`);
+				tip_lines.push(`<hr style="border-color:${ThemeTokens.color('grey-444')};margin:3px 0">`);
 				tip_lines.push(`Combos modificateurs :`);
 				mod_sorted.forEach(([mod, mc]) => {
 					tip_lines.push(`&nbsp;&nbsp;${escape_html(mod)} : <b>${format_number(mc)}</b>`);
@@ -1196,7 +1196,7 @@ function render_kc_heatmap(kc_data_arr) {
 					.sort((a, b) => b[1] - a[1])
 					.slice(0, 3);
 				if (top3.length > 0) {
-					tip_lines.push(`<hr style="border-color:#444;margin:3px 0">`);
+					tip_lines.push(`<hr style="border-color:${ThemeTokens.color('grey-444')};margin:3px 0">`);
 					tip_lines.push(`Top lettres suivantes :`);
 					top3.forEach(([ch, n]) => {
 						const disp =
@@ -1250,7 +1250,7 @@ function render_kc_heatmap(kc_data_arr) {
 				`L ${wing_lx} ${top_y + R}`,
 				'Z'
 			].join(' ');
-			rects += `<path d="${d}" fill="${fill}" stroke="#0d0d1a" stroke-width="1.5" paint-order="stroke fill"
+			rects += `<path d="${d}" fill="${fill}" stroke="${ThemeTokens.color('hue-0d0d1a')}" stroke-width="1.5" paint-order="stroke fill"
 				data-tip="${tip_id}" class="hm-key"
 				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
 			// Label centred in the wing portion (wider area, more legible than the narrow stem)
@@ -1264,7 +1264,7 @@ function render_kc_heatmap(kc_data_arr) {
 		} else {
 			// Standard or half-height rounded rect
 			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${key_h}" rx="${R}"
-				fill="${fill}" stroke="#0d0d1a" stroke-width="1.5" paint-order="stroke fill"
+				fill="${fill}" stroke="${ThemeTokens.color('hue-0d0d1a')}" stroke-width="1.5" paint-order="stroke fill"
 				data-tip="${tip_id}" class="hm-key"
 				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
 		}
@@ -1280,18 +1280,18 @@ function render_kc_heatmap(kc_data_arr) {
 		// Tooltip div — absolutely positioned, hidden by default
 		tooltips +=
 			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
-			`background:#1a1a2e;border:1px solid #444;border-radius:6px;padding:7px 10px;` +
-			`font-size:12px;line-height:1.5;color:#ddd;pointer-events:none;max-width:220px;white-space:nowrap;text-align:left;">` +
+			`background:${ThemeTokens.color('hue-1a1a2e')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
+			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:220px;white-space:nowrap;text-align:left;">` +
 			tip_html +
 			`</div>`;
 	});
 
 	container.innerHTML =
 		`<div style="display:inline-block;position:relative;">` +
-		`<div style="font-size:17px;font-weight:bold;color:#1e96ff;margin-bottom:6px;text-align:left;">` +
+		`<div style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-1e96ff')};margin-bottom:6px;text-align:left;">` +
 		`Heatmap de l'utilisation physique des touches</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
-		`style="background:#12121e;border-radius:10px;display:block;"` +
+		`style="background:${ThemeTokens.color('hue-12121e')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
 		labels +
@@ -1457,7 +1457,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 	// Green (cold, 0 SFBs) → red (hot, many SFBs)
 	const heat_color = (count) => {
-		if (count === 0) return '#1e2e1e';
+		if (count === 0) return ThemeTokens.color('hue-1e2e1e');
 		const t = Math.pow(count / max_count, 0.4);
 		if (t < 0.5) {
 			const tt = t * 2;
@@ -1520,10 +1520,10 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		126: '↑',
 		76: '⏎'
 	};
-	const SHORT_LABELS =
-		window.driver_meta && (window.driver_meta.os === 'win' || window.driver_meta.os === 'linux')
-			? SHORT_LABELS_WIN
-			: SHORT_LABELS_MAC;
+	// heatmap_win.js owns which recording OSes use PC scan codes.
+	const SHORT_LABELS = is_pc_scancode_driver(window.driver_meta)
+		? SHORT_LABELS_WIN
+		: SHORT_LABELS_MAC;
 
 	let rects = '';
 	let labels = '';
@@ -1541,7 +1541,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 			half_slot === 'bottom' ? base_sy + Math.round(KH / 2) + Math.round(GAP / 2) : base_sy;
 		const cx = sx + key_w / 2;
 		const cy = sy + key_h / 2;
-		const text_color = count === 0 ? '#555' : '#fff';
+		const text_color = count === 0 ? ThemeTokens.color('grey-555') : ThemeTokens.color('white');
 		const label_raw = kc_name_map[kc_str] ?? KEYCODE_NAMES[kc_str] ?? '';
 		let label_disp;
 		if (SHORT_LABELS[kc_str] !== undefined) {
@@ -1565,13 +1565,13 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 			key_occurrences > 0 ? ((sfb_key_count / key_occurrences) * 100).toFixed(1) : '0.0';
 
 		const tip_lines = [
-			`<b>${escape_html(label_raw || kc_str)}</b> <span style="color:#888;font-size:10px;">(kc ${kc_str})</span><br>`,
+			`<b>${escape_html(label_raw || kc_str)}</b> <span style="color:${ThemeTokens.color('grey-888')};font-size:10px;">(kc ${kc_str})</span><br>`,
 			`Occurrences : <b>${format_number(key_occurrences)}</b>`
 		];
 
 		if (sfb_key_count > 0) {
 			tip_lines.push(
-				`<br>SFBs : ${format_number(sfb_key_count)} — taux : <b style="color:#f87171;">${sfb_key_rate}%</b>`
+				`<br>SFBs : ${format_number(sfb_key_count)} — taux : <b style="color:${ThemeTokens.color('hue-f87171')};">${sfb_key_rate}%</b>`
 			);
 		}
 
@@ -1606,16 +1606,16 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		const sfb_total_all = grand_total;
 
 		if (all_rows.length > 0) {
-			tip_lines.push(`<hr style="border-color:#555;margin:4px 0">`);
+			tip_lines.push(`<hr style="border-color:${ThemeTokens.color('grey-555')};margin:4px 0">`);
 			// Table header
 			tip_lines.push(
 				`<table style="border-collapse:collapse;width:100%;font-size:11px;">` +
-					`<tr style="color:#888;">` +
+					`<tr style="color:${ThemeTokens.color('grey-888')};">` +
 					`<td style="padding:1px 6px 1px 0;">Paire</td>` +
 					`<td style="padding:1px 4px;text-align:right;">nb</td>` +
-					`<td style="padding:1px 4px;text-align:right;" title="Part de ce SFB parmi les SFBs de la touche">% /SFBs touche</td>` +
+					`<td style="padding:1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_key_tooltip'))}">% /SFBs touche</td>` +
 					`<td style="padding:1px 4px;text-align:right;" title="${_t('ui_typing.tooltip_sfb_rate')}">taux</td>` +
-					`<td style="padding:1px 0 1px 4px;text-align:right;" title="Part de ce SFB parmi tous les SFBs">% SFBs tot.</td>` +
+					`<td style="padding:1px 0 1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_total_tooltip'))}">% SFBs tot.</td>` +
 					`</tr>`
 			);
 
@@ -1632,15 +1632,21 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 					key_occurrences > 0 ? ((p_count / key_occurrences) * 100).toFixed(1) : '0.0';
 				const pct_sfb_total =
 					sfb_total_all > 0 ? ((p_count / sfb_total_all) * 100).toFixed(2) : '0.00';
-				const row_color = p_count === 0 ? 'color:#555;' : 'color:#ddd;';
-				const val_color = p_count === 0 ? 'color:#555;' : 'color:#ddd;';
+				const row_color =
+					p_count === 0
+						? 'color:' + ThemeTokens.color('grey-555') + ';'
+						: 'color:' + ThemeTokens.color('grey-ddd') + ';';
+				const val_color =
+					p_count === 0
+						? 'color:' + ThemeTokens.color('grey-555') + ';'
+						: 'color:' + ThemeTokens.color('grey-ddd') + ';';
 				tip_lines.push(
 					`<tr>` +
 						`<td style="padding:1px 6px 1px 0;${row_color}">${pair_str}</td>` +
 						`<td style="padding:1px 4px;text-align:right;${val_color}"><b>${p_count > 0 ? format_number(p_count) : '—'}</b></td>` +
-						`<td style="padding:1px 4px;text-align:right;color:#aaa;">${p_count > 0 ? pct_of_key_sfb + '%' : '—'}</td>` +
-						`<td style="padding:1px 4px;text-align:right;color:#aaa;">${p_count > 0 ? pct_key_use + '%' : '—'}</td>` +
-						`<td style="padding:1px 0 1px 4px;text-align:right;color:#aaa;">${p_count > 0 ? pct_sfb_total + '%' : '—'}</td>` +
+						`<td style="padding:1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_of_key_sfb + '%' : '—'}</td>` +
+						`<td style="padding:1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_key_use + '%' : '—'}</td>` +
+						`<td style="padding:1px 0 1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_sfb_total + '%' : '—'}</td>` +
 						`</tr>`
 				);
 			});
@@ -1682,7 +1688,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 				`L ${wing_lx} ${top_y + R}`,
 				'Z'
 			].join(' ');
-			rects += `<path d="${d}" fill="${fill}" stroke="#0d1a0d" stroke-width="1.5" paint-order="stroke fill"
+			rects += `<path d="${d}" fill="${fill}" stroke="${ThemeTokens.color('hue-0d1a0d')}" stroke-width="1.5" paint-order="stroke fill"
 				data-tip="${tip_id}" class="hm-key"
 				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
 			const ret_font = 15;
@@ -1694,7 +1700,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 				pointer-events="none">${escape_html(label_disp)}</text>`;
 		} else {
 			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${key_h}" rx="${R}"
-				fill="${fill}" stroke="#0d1a0d" stroke-width="1.5" paint-order="stroke fill"
+				fill="${fill}" stroke="${ThemeTokens.color('hue-0d1a0d')}" stroke-width="1.5" paint-order="stroke fill"
 				data-tip="${tip_id}" class="hm-key"
 				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
 		}
@@ -1708,19 +1714,19 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 		tooltips +=
 			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
-			`background:#1a2e1a;border:1px solid #444;border-radius:6px;padding:7px 10px;` +
-			`font-size:12px;line-height:1.5;color:#ddd;pointer-events:none;max-width:280px;white-space:nowrap;text-align:left;">` +
-			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:#555;}</style>` +
+			`background:${ThemeTokens.color('hue-1a2e1a')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
+			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:280px;white-space:nowrap;text-align:left;">` +
+			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:${ThemeTokens.color('grey-555')};}</style>` +
 			tip_html +
 			`</div>`;
 	});
 
 	container.innerHTML =
 		`<div style="display:inline-block;position:relative;">` +
-		`<div style="font-size:17px;font-weight:bold;color:#22c55e;margin-bottom:6px;text-align:left;">` +
+		`<div style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-22c55e')};margin-bottom:6px;text-align:left;">` +
 		`Heatmap des SFBs par touche</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
-		`style="background:#1e1608;border-radius:10px;display:block;"` +
+		`style="background:${ThemeTokens.color('hue-1e1608')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
 		labels +
@@ -1744,12 +1750,14 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
  * @returns {string} Lowercase composite string including all aliases.
  */
 function build_searchable_key(raw_key, case_sensitive) {
-	let s = case_sensitive ? raw_key : raw_key.toLowerCase();
+	const tokens = key_tokens(raw_key);
+	const text = tokens.join('');
+	let s = case_sensitive ? text : text.toLowerCase();
 	// Space character variants
 	if (raw_key.includes('\u00A0')) s += ' nbsp';
 	if (raw_key.includes('\u202F')) s += ' nnbsp';
 	// [BS] marker → backspace alias
-	if (/\[bs\]/i.test(raw_key)) s += ' backspace';
+	if (tokens.some((token) => token.toUpperCase() === '[BS]')) s += ' backspace';
 	// Single ASCII control characters → add their CONTROL_CHAR_NAMES abbreviation
 	if (raw_key.length === 1) {
 		const code = raw_key.charCodeAt(0);
@@ -1766,14 +1774,16 @@ function build_searchable_key(raw_key, case_sensitive) {
 	}
 	// Add the text label for the exact key (lowercased for case-insensitive search)
 	// so that typing "backspace", "left", "space", etc. finds the matching entries.
-	const exact_sym = CONTROL_KEY_SYMBOLS[raw_key.toLowerCase()];
+	const exact_sym =
+		app_state.current_tab !== 'w' && Object.hasOwn(CONTROL_KEY_SYMBOLS, raw_key.toLowerCase())
+			? CONTROL_KEY_SYMBOLS[raw_key.toLowerCase()]
+			: null;
 	if (exact_sym) {
 		const candidate = case_sensitive ? exact_sym : exact_sym.toLowerCase();
 		if (!s.includes(candidate)) s += ' ' + candidate;
 	}
 	// For sequences: also add labels for each embedded bracket marker (e.g. in bigrams)
-	const bracket_matches = raw_key.match(/\[[^\]]+\]/gi) || [];
-	bracket_matches.forEach((m) => {
+	tokens.filter(is_key_marker).forEach((m) => {
 		const m_sym = CONTROL_KEY_SYMBOLS[m.toLowerCase()];
 		if (m_sym) {
 			const candidate = case_sensitive ? m_sym : m_sym.toLowerCase();
@@ -1802,7 +1812,9 @@ function render_table() {
 			?.classList.contains('active');
 		const match_positions = new Map();
 		if (app_state.search_query) {
-			const q = app_state.search_query;
+			const q = case_sensitive_search
+				? app_state.search_query
+				: app_state.search_query.toLowerCase();
 			arr = arr.filter((i) => {
 				const haystack = build_searchable_key(i.key, case_sensitive_search);
 				const idx = haystack.indexOf(q);
@@ -1868,13 +1880,14 @@ function render_table() {
 			.map((item, row_idx) => {
 				const raw_lower = item.key.toLowerCase();
 
-				// Detect standalone non-printable ASCII characters (e.g. RS = 0x1E logged by the keylogger)
+				// Detect standalone non-printable ASCII characters (e.g. RS = 0x1E logged by the keystats)
 				const single_code = item.key.length === 1 ? item.key.charCodeAt(0) : -1;
 				const is_nonprint = single_code >= 0 && (single_code < 32 || single_code === 127);
 
 				// Regular space (code 32) is printable but must still render as a "Space" chip so
 				// the cell is not blank. CONTROL_KEY_LABELS includes " " for this reason.
 				const is_ctrl_display =
+					app_state.current_tab !== 'w' &&
 					!is_shortcut_tab &&
 					!is_kc_tab &&
 					(CONTROL_KEY_LABELS.has(raw_lower) || CONTROL_KEY_LABELS.has(item.key) || is_nonprint);
@@ -1919,6 +1932,7 @@ function render_table() {
 							)
 							.join('') +
 						`</span>`;
+				} else if (is_shortcut_tab) {
 					key_html = `<span class="shortcut-seq">${format_shortcut_key(item.key)}</span>`;
 				} else if (is_ctrl_display) {
 					// Resolve the best label: pretty symbol > ASCII abbreviation > uppercase name
@@ -1968,7 +1982,11 @@ function render_table() {
 					rep_html = `0`;
 				} else {
 					const rep_color =
-						item.rep_rate >= 20 ? '#ff3b30' : item.rep_rate >= 10 ? '#ffcc00' : 'inherit';
+						item.rep_rate >= 20
+							? ThemeTokens.color('red')
+							: item.rep_rate >= 10
+								? ThemeTokens.color('yellow')
+								: 'inherit';
 					const rate_str = format_number(item.rep_rate.toFixed(1)) + ' %';
 					rep_html = `<span style="color:${rep_color}">${format_number(item.rep)} (${rate_str})</span>`;
 				}
@@ -2004,4 +2022,108 @@ function render_table() {
 		tbody.innerHTML =
 			html || `<tr><td colspan="8" style="text-align:center;">${_t('ui_typing.no_data')}</td></tr>`;
 	});
+}
+
+/**
+ * Renders admitted semantic media as labelled rows from the daily manifest.
+ * Live ngrams are intentionally absent: the manifest already owns today's
+ * media aggregates. These identities change no keyboard geometry/text metrics.
+ */
+function render_media_keys() {
+	const container = document.getElementById('media_keys_container');
+	if (!container) return;
+	const catalogue = typeof METRICS_MEDIA_KEYS === 'undefined' ? [] : METRICS_MEDIA_KEYS;
+	const object = (value) =>
+		value !== null &&
+		typeof value === 'object' &&
+		!Array.isArray(value) &&
+		Object.prototype.toString.call(value) === '[object Object]';
+	const integer = (value, min = 0, max = Number.MAX_SAFE_INTEGER) =>
+		Number.isSafeInteger(value) && value >= min && value <= max;
+	const rows = new Map(
+		catalogue.map(({ id, label_key }) => [
+			id,
+			{
+				id,
+				label_key,
+				count: 0,
+				s: 0,
+				n: 0,
+				m: 0,
+				tap: 0,
+				hold: 0,
+				valid: true
+			}
+		])
+	);
+	const start = document.getElementById('date_start')?.value || '';
+	const end = document.getElementById('date_end')?.value || '';
+	const manifest = object(window.metrics_manifest) ? window.metrics_manifest : {};
+	Object.entries(manifest).forEach(([date, apps]) => {
+		if (
+			!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+			(start && date < start) ||
+			(end && date > end) ||
+			!object(apps)
+		)
+			return;
+		Object.entries(apps).forEach(([app_name, app]) => {
+			if (!matches_typing_app_selection(app_name) || !object(app)) return;
+			rows.forEach((row, id) => {
+				if (object(app.media_keys) && Object.hasOwn(app.media_keys, id)) {
+					const count = app.media_keys[id];
+					if (!integer(count) || !integer(row.count + count)) row.valid = false;
+					else row.count += count;
+				}
+				if (!object(app.media_hold) || !Object.hasOwn(app.media_hold, id)) return;
+				const hold = app.media_hold[id];
+				if (
+					!object(hold) ||
+					!['s', 'n', 'm', 'tap', 'hold'].every((key) => Object.hasOwn(hold, key)) ||
+					Object.keys(hold).some((key) => !['s', 'n', 'm', 'tap', 'hold'].includes(key)) ||
+					!integer(hold.s) ||
+					!integer(hold.n, 1) ||
+					!integer(hold.m, 0, 9223372036854) ||
+					!integer(hold.tap) ||
+					!integer(hold.hold) ||
+					hold.tap + hold.hold !== hold.n ||
+					hold.s < hold.m ||
+					['s', 'n', 'tap', 'hold'].some((key) => !integer(row[key] + hold[key]))
+				) {
+					row.valid = false;
+					return;
+				}
+				for (const key of ['s', 'n', 'tap', 'hold']) row[key] += hold[key];
+				row.m = Math.max(row.m, hold.m);
+			});
+		});
+	});
+	const visible = [...rows.values()].filter((row) => row.valid && (row.count > 0 || row.n > 0));
+	container.hidden = visible.length === 0;
+	if (visible.length === 0) {
+		container.innerHTML = '';
+		return;
+	}
+	const number = (value) => escape_html(format_number_plain(value));
+	const list = visible
+		.map((row) => {
+			let details = `${number(row.count)} ${escape_html(_t('ui_typing.unit_keyspressed'))}`;
+			if (row.n > 0) {
+				const breakdown = _t('onboarding.checklist.tap_hold')
+					.replace('{1}', String(row.tap))
+					.replace('{2}', String(row.hold));
+				const labelled = (label, value) =>
+					escape_html(_t('common.label_value'))
+						.replace('{1}', () => escape_html(label))
+						.replace('{2}', () => value);
+				const durations =
+					`${escape_html(_t('ui_typing.lbl_total'))} ${number(row.s)} ms · ` +
+					`${escape_html(_t('ui_typing.key_tip_avg_dur'))} ${number(Number((row.s / row.n).toFixed(1)))} ms · ` +
+					labelled(_t('ui_typing.lbl_longest_time'), `${number(row.m)} ms`);
+				details += ` · ${escape_html(breakdown)} · ${labelled(_t('ui_apps.col_duration'), durations)}`;
+			}
+			return `<li data-media-id="${row.id}"><strong>${escape_html(_t(row.label_key))}</strong><br>${details}</li>`;
+		})
+		.join('');
+	container.innerHTML = `<h3>${escape_html(_t('sg_actions.sg_order.header.grp_media'))}</h3><ul>${list}</ul>`;
 }

@@ -95,7 +95,7 @@
 			"shown_key": "menu.layout.magic_key_source.auto"
 		}
 	],
-	"caption_separator": " : ",
+	"caption_separator": { "en": ": ", "fr": " : " },
 	"conflict_separator": " — ",
 	"reason_key": "menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment"
 }

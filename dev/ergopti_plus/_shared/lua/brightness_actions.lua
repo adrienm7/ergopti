@@ -9,19 +9,13 @@
 
 local M = {}
 local Canonical = require("brightness_actions_data")
-
---- Copies data-only generated metadata so each native owner retains its own tree.
-local function copy(value)
-	if type(value) ~= "table" then return value end
-	local result = {}
-	for key, item in pairs(value) do result[key] = copy(item) end
-	return result
-end
+local TableUtil = require("table_util")
 
 --- Loads canonical native encodings without filesystem work in an input callback.
+--- Each native owner receives its own copy of the data-only generated tree.
 --- @return table
 function M.load()
-	return copy(Canonical)
+	return TableUtil.deep_copy(Canonical)
 end
 
 --- Builds the existing screen-only tool request from the same percentage policy.

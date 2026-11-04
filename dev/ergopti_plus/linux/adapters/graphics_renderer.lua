@@ -36,6 +36,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Tint = require("tooltip.tint")
 local Layout = require("tooltip.layout")
+local LlmLine = require("tooltip.llm_line")
 
 local LOG = "adapters.graphics_renderer"
 
@@ -155,8 +156,10 @@ local function segment_font(segment, style)
 end
 
 --- Measures a segmented row: a prefix, then pieces that each have their own
---- colour, weight and size, laid out one after the other on a single line.
---- @param row table { prefix?, segments }
+--- colour, weight and size, laid out one after the other on a single line,
+--- and an optional label right-aligned on the same line (the AI tooltip's
+--- shortcut column).
+--- @param row table { prefix?, segments, label? }
 --- @param style table
 --- @param pango_layout userdata
 --- @return table { text_w, text_h, label_w, height, prefix_w, segments }
@@ -174,10 +177,41 @@ local function measure_segmented_row(row, style, pango_layout)
 		width = width + w
 		height = math.max(height, h)
 	end
+	local label_w, label_h = 0, 0
+	if row.label and row.label ~= "" then
+		label_w, label_h = measure(pango_layout, row.label, style.fonts.main, style.sizes.hint)
+	end
 	return {
-		text_w = width, text_h = height, label_w = 0, height = height,
-		prefix_w = prefix_w, segments = sizes,
+		text_w = width, text_h = height, label_w = label_w, label_h = label_h,
+		height = math.max(height, label_h), prefix_w = prefix_w, segments = sizes,
 	}
+end
+
+--- Sets the prediction rows' width and each one's line limit.
+---
+--- Only the prediction rows of the AI tooltip are segmented, so they alone stop
+--- at [layout].llm_max_content_width and give the rest to the shortcut column.
+--- @param metrics table Per-row metrics; segmented ones have a `segments` field.
+--- @param widest_other number Widest row that is not segmented.
+--- @param layout table style.layout.
+--- @return number The panel's width between the paddings.
+function M.fit_prediction_rows(metrics, widest_other, layout)
+	local widest_line, widest_label = 0, 0
+	for _, m in ipairs(metrics) do
+		if m.segments then
+			widest_line = math.max(widest_line, m.text_w)
+			widest_label = math.max(widest_label, m.label_w)
+		end
+	end
+	local column = LlmLine.shortcut_column(widest_line, widest_label,
+		layout.label_gap, layout.llm_max_content_width)
+	local content_w = math.max(column.preds_w, widest_other)
+	for _, m in ipairs(metrics) do
+		if m.segments then
+			m.line_limit = LlmLine.column_placement(content_w, column.zone_w, m.label_w, m.text_w).line_limit
+		end
+	end
+	return content_w
 end
 
 --- Computes the panel size for a set of rows.
@@ -197,7 +231,8 @@ function M.measure_rows(rows, style, pango_layout)
 		local row_w, row_h
 		if type(row.segments) == "table" then
 			metrics[i] = measure_segmented_row(row, style, pango_layout)
-			row_w, row_h = metrics[i].text_w, metrics[i].height
+			row_w = 0
+			row_h = metrics[i].height
 		else
 			local text_w, text_h = measure(pango_layout, row.text or "", style.fonts.main, style.sizes.main)
 			local label_w, label_h = 0, 0
@@ -218,7 +253,7 @@ function M.measure_rows(rows, style, pango_layout)
 	end
 
 	return {
-		w = widest + style.layout.pad_x * 2,
+		w = M.fit_prediction_rows(metrics, widest, style.layout) + style.layout.pad_x * 2,
 		h = total_height + style.layout.pad_y * 2,
 	}, metrics
 end
@@ -253,22 +288,34 @@ end
 --- text beside it instead of hanging from the top.
 --- @param cr userdata Cairo context.
 --- @param pango_layout userdata
---- @param row table { prefix?, prefix_color?, segments }
+--- @param row table { prefix?, prefix_color?, segments, label?, label_color? }
 --- @param m table The row's metrics from measure_segmented_row.
 --- @param style table
 --- @param y number Top of the row.
-local function paint_segmented_row(cr, pango_layout, row, m, style, y)
+--- @param panel_w number Width of the panel, for the right-aligned label.
+local function paint_segmented_row(cr, pango_layout, row, m, style, y, panel_w)
 	local g = bind()
 	local x = style.layout.pad_x
+	local line_end = x + m.line_limit
 
-	local function draw(text, font, size, color, height)
+	-- A piece that passes max_w ends in an ellipsis; the layout is reused, so its
+	-- width comes back off before the next piece is measured or drawn.
+	local function draw(text, font, size, color, height, max_w)
 		local description = g.Pango.FontDescription.from_string(font)
 		description:set_size(size * PANGO_SCALE)
 		pango_layout:set_font_description(description)
 		pango_layout:set_text(text, -1)
+		if max_w then
+			pango_layout:set_width(math.floor(max_w * PANGO_SCALE))
+			pango_layout:set_ellipsize("END")
+		end
 		cr:set_source_rgba(color.red, color.green, color.blue, 1)
 		cr:move_to(x, y + (m.height - height))
 		g.PangoCairo.show_layout(cr, pango_layout)
+		if max_w then
+			pango_layout:set_ellipsize("NONE")
+			pango_layout:set_width(-1)
+		end
 	end
 
 	if row.prefix_color and m.prefix_w > 0 then
@@ -277,9 +324,20 @@ local function paint_segmented_row(cr, pango_layout, row, m, style, y)
 	x = x + m.prefix_w
 
 	for index, segment in ipairs(row.segments) do
+		local room = line_end - x
+		if room <= 0 then break end
 		local font, size = segment_font(segment, style)
-		draw(segment.text or "", font, size, segment.color, m.segments[index].h)
-		x = x + m.segments[index].w
+		local width = m.segments[index].w
+		draw(segment.text or "", font, size, segment.color, m.segments[index].h,
+			width > room and room or nil)
+		x = x + width
+	end
+
+	if m.label_w > 0 then
+		-- Right-aligned against the panel's inner edge, like the trigger column
+		-- of the hotstring rows, on the row's bottom edge at the hint size.
+		x = panel_w - style.layout.pad_x - m.label_w
+		draw(row.label, style.fonts.main, style.sizes.hint, row.label_color, m.label_h)
 	end
 end
 
@@ -316,7 +374,7 @@ local function paint(cr, rows, metrics, style, size, background)
 	for i, row in ipairs(rows) do
 		local m = metrics[i]
 		if type(row.segments) == "table" then
-			paint_segmented_row(cr, pango_layout, row, m, style, y)
+			paint_segmented_row(cr, pango_layout, row, m, style, y, size.w)
 			y = y + m.height + style.layout.line_spacing
 			goto continue
 		end

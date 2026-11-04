@@ -66,7 +66,19 @@ LLM_Menu_LocalServersInit(RequestBuild := true) {
 LLM_Menu_LocalServersRows() {
 	global _LLM_LocalServerPanel
 	if !IsSet(_LLM_LocalServerPanel) || !(_LLM_LocalServerPanel is LLM_LocalServerPanel)
-		return MenuRenderer_StatusRows("llm_menu", "llm_backend", "unavailable")
+		return MenuRenderer_StatusRows("llm_menu", "llm_model", "unavailable")
+	return _LLM_LocalServerPanel.Rows()
+}
+
+/**
+ * Returns the live panel's rows for the model selector page, or none before the
+ * panel exists: the page lists only servers that answer, and the tray's status
+ * rows (LLM_Menu_LocalServersRows) carry no server for it to list.
+ */
+LLM_Menu_LocalServersLiveRows() {
+	global _LLM_LocalServerPanel
+	if !IsSet(_LLM_LocalServerPanel) || !(_LLM_LocalServerPanel is LLM_LocalServerPanel)
+		return []
 	return _LLM_LocalServerPanel.Rows()
 }
 
@@ -127,7 +139,7 @@ LLM_Menu_LocalServersPrepareShutdown() {
 
 class LLM_LocalServerPanel {
 	__New(Options := unset) {
-		global LLM_LOCAL_API_SERVERS, LLM_API_PROVIDER_ORDER
+		global LLM_LOCAL_API_SERVERS, LLM_API_PROVIDER_ORDER, LLM_LOCAL_SERVER_DISCOVERY, LLM_LOCAL_SERVER_IDENTITIES
 		if !(LLM_LOCAL_API_SERVERS is Map) || LLM_LOCAL_API_SERVERS.Count == 0
 				|| !(LLM_API_PROVIDER_ORDER is Array)
 			throw Error("The local AI server catalogue is unavailable.")
@@ -144,6 +156,8 @@ class LLM_LocalServerPanel {
 		for Name in ["format", "notify", "build", "timer"]
 			if this.Options.Has(Name) && !HasMethod(this.Options[Name], "Call")
 				throw TypeError("Local server panel observer port must be callable.", -1, Name)
+		if this.Options.Has("port_scan") && !(this.Options["port_scan"] is LocalServerPortScan)
+			throw TypeError("Local server panel port scan must be a LocalServerPortScan.")
 		this.Source := this.Options.Get("source_owner", 0)
 		if (this.Source is Integer) && this.Source == 0
 			this.Source := LLM_Menu_ApiPrivateSourceOwner()
@@ -151,6 +165,12 @@ class LLM_LocalServerPanel {
 			throw TypeError("Local server panel requires the native private source owner.")
 		this.ResumeIntent := 0
 		this.Repair := 0
+		this.Discovery := 0
+		this.Preparation := 0
+		this.PreparedRows := 0
+		this.PreparedOwner := 0
+		this.PreparedRecord := 0
+		this.DiscoveryGeneration := 0
 		this.RepairRecords := Map()
 		this.RepairGeneration := 0
 		this.Generation := 0
@@ -172,6 +192,11 @@ class LLM_LocalServerPanel {
 		Ports["max_age"] := (*) => TimingsGet("llm", "local_server_detection_max_age_ms")
 		Ports["on_publish"] := ObjBindMethod(this, "_Published")
 		Ports["on_error"] := ObjBindMethod(this, "_Error")
+		; A sweep first finds where each catalogue server runs (no process, no
+		; probe; its configured or listening port before the catalogue default)
+		Ports["scan_ports"] := ObjBindMethod(this.Options.Get("port_scan", LocalServerPortScan()), "Scan")
+		Ports["discovery"] := LLM_LOCAL_SERVER_DISCOVERY
+		Ports["identities"] := LLM_LOCAL_SERVER_IDENTITIES
 		if !(this.Models is LocalServerModelsOwner)
 			throw TypeError("Local server panel requires the owned native models transport.")
 		this.Native := this.Options.Get("native_owner", 0)
@@ -209,68 +234,102 @@ class LLM_LocalServerPanel {
 		this._Build("local_servers_published")
 	}
 
-	/** Retains display-only data under pause; native actions require a live view. */
+	/** Menu builds consume detached prepared rows without source or transport I/O. */
 	Rows() {
+		PreviousCritical := Critical("Off")
+		try {
+			ClaimCritical := Critical("On")
+			try {
+				if this.PreparedRows is Array && this.PreparedOwner is Map && this.PreparedRecord is Map
+						&& this._PreparationFence(this.PreparedRecord) && this._HeldCurrent(this.PreparedOwner) {
+					Rows := this.PreparedRows
+					this.PreparedRows := 0
+					this.PreparedOwner := 0
+					this.PreparedRecord := 0
+					return Rows
+				}
+				this.PreparedRows := 0
+				this.PreparedOwner := 0
+				this.PreparedRecord := 0
+			} finally Critical(ClaimCritical)
+			; With the AI off the rows stay inert: no source capture and no
+			; discovery sweep may start behind a disabled feature (issue #97).
+			if !A_IsSuspended && !this.Writing && !this.Native.Closed && LLM_Menu_AiEnabled()
+				this._QueuePreparation()
+			return this.LastSnapshot is Map ? this._Render(this.LastSnapshot, true, 0) : this._UnavailableRows()
+		} catch as Err {
+			this._Error("view", Err)
+			return this._UnavailableRows()
+		} finally Critical(PreviousCritical)
+	}
+
+	/** Full admission and fresh source/view preparation run only on the owned timer. */
+	_PrepareRows(Record) {
 		global _LLM_Menu_ApiPrivateAuthorityGeneration
 		PreviousCritical := Critical("Off")
 		try {
+			if !this._PreparationCurrent(Record)
+				return this._UnavailableRows()
 			if A_IsSuspended || this.Writing
 				return this.LastSnapshot is Map ? this._Render(this.LastSnapshot, true, 0) : this._UnavailableRows()
 			if !this.Source.Admit()
 				return this._UnavailableRows()
-			if this.Native.IsStale()
-				this.Native.Rescan()
 			Source := this.Source.Capture()
 			if !IsObject(Source)
 				return this._UnavailableRows()
-			Owner := Map("source", Source, "receipts", Map())
+			Projection := this.Native.CaptureView(Source)
+			if !(Projection is Map)
+				return this._UnavailableRows()
+			this.Order := Projection["order"].Clone()
+			this.Servers := Projection["servers"]
+			if Projection["stale"] {
+				; A freshly checked source cannot display the old source's model list.
+				this.LastSnapshot := 0
+				; Discovery is optional work: a menu build must not enter managed
+				; HTTP acquisition or hold the driver's startup readiness stack.
+				this._QueueDiscovery(Source)
+				return this._UnavailableRows()
+			}
+			Entries := Projection["entries"]
+			Owner := Map("source", Source, "receipts", Projection["receipts"],
+				"native_view", Projection["view"], "native_models", Projection["models"],
+				"native_configuration", Projection["configuration"], "native_cache", Projection["cache"],
+				"native_rescan", Projection["rescan"], "native_controller", Projection["controller"],
+				"authority", Entries["authority"])
+			Snapshot := Map("results", Projection["results"], "detected", Projection["detected"],
+				"active", 0, "entry_ids", Map(), "backend", Entries["backend"], "sweeping", Projection["sweeping"],
+				"authority", Entries["authority"],
+				"menu_owner", Entries["menu_owner"], "active_id", Entries["active_id"])
+			for Id in this.Order {
+				Entry := Entries["entries"][Id]
+				Snapshot["entry_ids"][Id] := Entry is Map ? Entry["Id"] : ""
+				if Entry is Map && Entry["Id"] == Snapshot["active_id"] {
+					Snapshot["active"] := Map("provider", Entry["Provider"], "id", Entry["Id"], "model", Entry["Model"])
+				}
+			}
 			ClaimCritical := Critical("On")
 			try {
-				Ready := !A_IsSuspended && !this.Writing
+				Ready := this._PreparationCurrent(Record)
 				if Ready {
 					Owner["generation"] := ++this.Generation
-					this.Native.BeginView()
-					Owner["native_view"] := this.Native.ViewGeneration
-					Owner["native_models"] := this.Native.ModelGeneration
-					Owner["native_configuration"] := this.Native.ConfigurationGeneration
-					Owner["native_cache"] := this.Native.Cache
-					Owner["native_rescan"] := this.Native.RescanGeneration
-					Owner["native_controller"] := this.Native.Controller.Generation
-					Owner["authority"] := _LLM_Menu_ApiPrivateAuthorityGeneration
 					this.View := Owner
+					Record["generation"] := this.Generation
 				}
 			} finally Critical(ClaimCritical)
 			if !Ready
 				return this._UnavailableRows()
-			Snapshot := Map("results", Map(), "detected", [], "active", 0,
-				"backend", "", "sweeping", this.Native.Controller.IsSweeping())
-			for Id in this.Order {
-				Receipt := this.Native.Capture(Id)
-				if !IsObject(Receipt)
-					return this._UnavailableRows()
-				Owner["receipts"][Id] := Receipt
-				Verdict := this.Native.Result(Id)
-				if Verdict is Map {
-					Snapshot["results"][Id] := Verdict
-					if !(Verdict["status"] == "down")
-						Snapshot["detected"].Push(Id)
-				}
-			}
-			if !this._ActiveSnapshot(Snapshot) || !this._Current(Owner)
+			Rows := this._Render(Snapshot, false, Owner)
+			if !this.Source.Current(Source)
 				return this._UnavailableRows()
-			for Id, Receipt in Owner["receipts"]
-				if !this.Native.IsCurrent(Receipt)
-					return this._UnavailableRows()
-			if !this._Current(Owner)
-				return this._UnavailableRows()
-			Snapshot["authority"] := Owner["authority"]
 			ClaimCritical := Critical("On")
 			try {
-				Ready := this._HeldCurrent(Owner)
-				if Ready
+				Ready := this._HeldCurrent(Owner) && this._PreparationCurrent(Record)
+				if Ready {
 					this.LastSnapshot := Snapshot
+					Record["owner"] := Owner
+				}
 			} finally Critical(ClaimCritical)
-			return Ready ? this._Render(Snapshot, false, Owner) : this._UnavailableRows()
+			return Ready ? Rows : this._UnavailableRows()
 		} catch as Err {
 			this._Error("view", Err)
 			return this._UnavailableRows()
@@ -279,17 +338,19 @@ class LLM_LocalServerPanel {
 
 	_ActiveSnapshot(Snapshot) {
 		global _LLM_Menu
-		Menu := _LLM_Menu
-		if !(Menu is Map)
+		LlmMenu := _LLM_Menu
+		if !(LlmMenu is Map)
 			return false
-		Snapshot["backend"] := Menu.Get("backend", "")
-		Snapshot["menu_owner"] := Menu
-		EntryId := Menu.Get("api_entry_id", "")
+		Snapshot["backend"] := LlmMenu.Get("backend", "")
+		Snapshot["menu_owner"] := LlmMenu
+		EntryId := LlmMenu.Get("api_entry_id", "")
 		Snapshot["active_id"] := EntryId
+		Snapshot["entry_ids"] := Map()
 		for Id in this.Order {
 			Entry := this.Source.Entry(Id)
+			Snapshot["entry_ids"][Id] := Entry is Map ? Entry["Id"] : ""
 			if Entry is Map && Entry["Id"] == EntryId {
-				Snapshot["active"] := Map("provider", Id, "model", Entry["Model"])
+				Snapshot["active"] := Map("provider", Entry["Provider"], "id", Entry["Id"], "model", Entry["Model"])
 				break
 			}
 		}
@@ -300,10 +361,16 @@ class LLM_LocalServerPanel {
 		return Snapshot["results"].Get(Id, 0)
 	}
 
+	_SnapshotEntryId(Snapshot, Id) {
+		Entries := Snapshot["entry_ids"]
+		return Entries.Get(Id, "")
+	}
+
 	_Render(Snapshot, Paused, Owner) {
 		return LocalServerMenuRows(Map("order", this.Order, "servers", this.Servers,
 			"detected", Snapshot["detected"], "result", ObjBindMethod(this, "_SnapshotResult", Snapshot),
 			"backend", Snapshot["backend"], "active", Snapshot["active"],
+			"entry_id", ObjBindMethod(this, "_SnapshotEntryId", Snapshot),
 			"sweeping", Snapshot["sweeping"], "paused", Paused, "tr", t,
 			"format", ObjBindMethod(this, "_Format"), "actions", Map(
 				"select", ObjBindMethod(this, "_Select", Owner),
@@ -313,7 +380,7 @@ class LLM_LocalServerPanel {
 	}
 
 	_UnavailableRows() {
-		return MenuRenderer_StatusRows("llm_menu", "llm_backend", "unavailable")
+		return MenuRenderer_StatusRows("llm_menu", "llm_model", "unavailable")
 	}
 
 	/** Does not mint a receipt or produce HTTP work while resolving the row title. */
@@ -497,11 +564,11 @@ class LLM_LocalServerPanel {
 		Verdict := this.Native.Result(Id)
 		if !(Verdict is Map) || !this._ReportCurrent(Stamp)
 			return false
-		Server := this.Servers[Id]
+		Label := LocalServerMenuLabelOf(this.Servers, Id, Verdict)
 		if Verdict["status"] == "up"
 			Body := this._Format("llm.local_servers.found_body", Verdict["models"].Length)
 		else if Verdict["status"] == "needs_key"
-			Body := this._Format("menu.llm.local_servers.needs_key", Server["label"])
+			Body := this._Format("menu.llm.local_servers.needs_key", Label)
 		else
 			Body := this._Format("menu.llm.local_servers.none", LocalServerMenuHost(Verdict["base_url"]))
 		if !(Body is String)
@@ -516,11 +583,11 @@ class LLM_LocalServerPanel {
 			; Production publication is the bounded native effect. Observer ports
 			; run outside Critical and only observe current-at-claim authority.
 			if !this.Options.Has("notify") {
-				TrayTip(Body, Server["label"], Icon)
+				TrayTip(Body, Label, Icon)
 				return true
 			}
 		} finally Critical(ClaimCritical)
-		this.Options["notify"].Call(Body, Server["label"], Icon)
+		this.Options["notify"].Call(Body, Label, Icon)
 		return true
 	}
 
@@ -542,6 +609,195 @@ class LLM_LocalServerPanel {
 			&& Stamp["rescan"] == this.Native.RescanGeneration && Stamp["controller"] == this.Native.Controller.Generation
 			&& Stamp["authority"] == _LLM_Menu_ApiPrivateAuthorityGeneration
 			&& Stamp["epoch"] == State["generation"] && State["attempt"] == 0 && !this.Native.Closed
+	}
+
+
+	/** Coalesces only the same exact pending preparation in the existing ledger. */
+	_QueuePreparation() {
+		Prior := this.Preparation
+		if Prior is Map && !this._PreparationCurrent(Prior)
+			this._DropRepair(Prior)
+		ClaimCritical := Critical("On")
+		try {
+			if this.Preparation is Map {
+				if this.Preparation != Prior || !this._PreparationCurrent(Prior)
+					return false
+				; The existing one-shot owns the pending work. Repeated menu builds
+				; must not reset its schedule or borrow a reentrant successor.
+				return true
+			}
+			global _LifecycleLatestTransition, _LLM_Menu_ApiPrivateAuthorityGeneration
+			State := _LLM_Menu_ApiPrivateLifecycleState()
+			if A_IsSuspended || this.Writing || this.Native.Closed || State["attempt"] != 0
+				return false
+			Record := Map("kind", "view", "generation", this.Generation, "epoch", State["generation"],
+				"transition", _LifecycleLatestTransition, "authority", _LLM_Menu_ApiPrivateAuthorityGeneration,
+				"configuration", this.Native.ConfigurationGeneration, "rescan", this.Native.RescanGeneration,
+				"cache", this.Native.Cache, "models", this.Native.ModelGeneration,
+				"controller", this.Native.Controller.Generation, "built", false, "busy", false, "resume", 0)
+			Record["timer"] := ObjBindMethod(this, "_RepairTick", Record)
+			this.Preparation := Record
+			this.RepairRecords[ObjPtr(Record)] := Record
+		} finally Critical(ClaimCritical)
+		return this._ArmRepair(Record)
+	}
+
+	_PreparationFence(Record) {
+		global _LifecycleLatestTransition, _LLM_Menu_ApiPrivateAuthorityGeneration
+		State := _LLM_Menu_ApiPrivateLifecycleState()
+		return !A_IsSuspended && !this.Writing && !this.Native.Closed
+			&& Record["generation"] == this.Generation && Record["epoch"] == State["generation"]
+			&& State["attempt"] == 0 && Record["transition"] == _LifecycleLatestTransition
+			&& Record["authority"] == _LLM_Menu_ApiPrivateAuthorityGeneration
+			&& Record["configuration"] == this.Native.ConfigurationGeneration
+			&& Record["rescan"] == this.Native.RescanGeneration && Record["cache"] == this.Native.Cache
+			&& Record["models"] == this.Native.ModelGeneration
+			&& Record["controller"] == this.Native.Controller.Generation
+	}
+
+	_PreparationCurrent(Record) {
+		return this.Preparation is Map && this.Preparation == Record
+			&& this.RepairRecords.Get(ObjPtr(Record), 0) == Record && this._PreparationFence(Record)
+	}
+
+	_PreparationTick(Record) {
+		PreviousCritical := Critical("Off")
+		try {
+			ClaimCritical := Critical("On")
+			try {
+				if Record["busy"] || this.RepairRecords.Get(ObjPtr(Record), 0) != Record
+					return
+				Record["busy"] := true
+			} finally Critical(ClaimCritical)
+			try {
+				if !this._PreparationCurrent(Record)
+					return this._DropRepair(Record)
+				if !this._DiscoveryReady()
+					return this._ArmRepair(Record)
+				Rows := this._PrepareRows(Record)
+				Ready := Record.Has("owner") && this._PreparationCurrent(Record) && this._DiscoveryReady()
+				this._DropRepair(Record)
+				ClaimCritical := Critical("On")
+				try {
+					Ready := Ready && this._PreparationFence(Record) && this._HeldCurrent(Record["owner"])
+						&& this._DiscoveryReady()
+					if Ready {
+						this.PreparedRows := Rows
+						this.PreparedOwner := Record["owner"]
+						this.PreparedRecord := Record
+					}
+				} finally Critical(ClaimCritical)
+				if Ready
+					this._Build("local_servers_view_prepared")
+			} catch as Err {
+				this._DropRepair(Record)
+				this._Error("view", Err)
+			} finally Record["busy"] := false
+		} finally Critical(PreviousCritical)
+	}
+
+	/** Retains automatic discovery in the existing exact panel timer ledger. */
+	_QueueDiscovery(Source) {
+		if !this.Source.Current(Source)
+			return false
+		Prior := this.Discovery
+		; Coalescence must retain a source that is still admitted, not only
+		; the matching RAM epochs. Source checks may yield to a successor.
+		PriorCurrent := Prior is Map && this._DiscoveryCurrent(Prior)
+			&& this.Source.Current(Prior["source"]) && this._DiscoveryCurrent(Prior)
+		if Prior is Map && !PriorCurrent {
+			this._DropRepair(Prior)
+			if !this.Source.Current(Source)
+				return false
+		}
+		PreviousCritical := Critical("On")
+		try {
+			if this.Discovery is Map {
+				if this.Discovery != Prior || !PriorCurrent || !this._DiscoveryCurrent(Prior)
+					return false
+				Record := Prior
+			} else {
+			global _LifecycleLatestTransition, _LLM_Menu_ApiPrivateAuthorityGeneration
+			State := _LLM_Menu_ApiPrivateLifecycleState()
+			if A_IsSuspended || this.Writing || this.Native.Closed || State["attempt"] != 0
+					|| !LLM_Menu_AiEnabled()
+				return false
+			Record := Map("kind", "discovery", "source", Source, "generation", this.Generation,
+				"epoch", State["generation"], "intent", ++this.DiscoveryGeneration,
+				"transition", _LifecycleLatestTransition, "authority", _LLM_Menu_ApiPrivateAuthorityGeneration,
+				"configuration", this.Native.ConfigurationGeneration, "rescan", this.Native.RescanGeneration,
+				"built", false, "busy", false, "resume", 0)
+			Record["timer"] := ObjBindMethod(this, "_RepairTick", Record)
+			this.Discovery := Record
+			this.RepairRecords[ObjPtr(Record)] := Record
+			}
+		} finally Critical(PreviousCritical)
+		return this._ArmRepair(Record)
+	}
+
+	_DiscoveryCurrent(Record) {
+		global _LifecycleLatestTransition, _LLM_Menu_ApiPrivateAuthorityGeneration
+		State := _LLM_Menu_ApiPrivateLifecycleState()
+		return this.Discovery is Map && this.Discovery == Record
+			&& this.RepairRecords.Get(ObjPtr(Record), 0) == Record
+			&& !A_IsSuspended && !this.Writing && !this.Native.Closed && LLM_Menu_AiEnabled()
+			&& Record["generation"] == this.Generation && Record["epoch"] == State["generation"]
+			&& Record["intent"] == this.DiscoveryGeneration && State["attempt"] == 0
+			&& Record["transition"] == _LifecycleLatestTransition
+			&& Record["authority"] == _LLM_Menu_ApiPrivateAuthorityGeneration
+			&& Record["configuration"] == this.Native.ConfigurationGeneration
+			&& Record["rescan"] == this.Native.RescanGeneration
+	}
+
+	_DiscoveryReady() {
+		global _DriverReady, _LLM_MenuBuildCoordinator
+		return IsSet(_DriverReady) && (_DriverReady is Integer) && _DriverReady == 1
+			&& IsSet(_LLM_MenuBuildCoordinator) && _LLM_MenuBuildCoordinator is LLMMenuBuildCoordinator
+			&& !_LLM_MenuBuildCoordinator.Active
+	}
+
+	_DiscoveryTick(Record) {
+		PreviousCritical := Critical("Off")
+		try {
+			ClaimCritical := Critical("On")
+			try {
+				if Record["busy"] || this.RepairRecords.Get(ObjPtr(Record), 0) != Record
+					return
+				Record["busy"] := true
+			} finally Critical(ClaimCritical)
+			try {
+				if !this._DiscoveryCurrent(Record) {
+					this._DropRepair(Record)
+					return
+				}
+				if !this._DiscoveryReady() {
+					this._ArmRepair(Record)
+					return
+				}
+				if !this.Source.Current(Record["source"]) {
+					this._DropRepair(Record)
+					return
+				}
+				if !this._DiscoveryCurrent(Record)
+					return this._DropRepair(Record)
+				if !this._DiscoveryReady()
+					return this._ArmRepair(Record)
+				this._RepairTimer(Record["timer"], 0)
+				if !this._DiscoveryCurrent(Record)
+					return this._DropRepair(Record)
+				if !this._DiscoveryReady()
+					return this._ArmRepair(Record)
+				Accepted := this.Native.Rescan()
+				this._DropRepair(Record)
+				if (Accepted is Integer) && Accepted == 1
+					this._Build("local_servers_deferred_discovery")
+				else this._Error("rescan", Error("Deferred local discovery was refused."))
+			} catch as Err {
+				; A refused timer0 keeps the exact record in the ledger as debt.
+				this._DropRepair(Record)
+				this._Error("rescan", Err)
+			} finally Record["busy"] := false
+		} finally Critical(PreviousCritical)
 	}
 
 	/** Retains exact transition intent without publishing before Finish. */
@@ -625,6 +881,10 @@ class LLM_LocalServerPanel {
 	}
 
 	_RepairCurrent(Record) {
+		if Record.Get("kind", "") == "view"
+			return this._PreparationCurrent(Record)
+		if Record.Get("kind", "") == "discovery"
+			return this._DiscoveryCurrent(Record)
 		global _LifecycleLatestTransition
 		State := _LLM_Menu_ApiPrivateLifecycleState()
 		return this.Repair is Map && this.Repair == Record && !A_IsSuspended && !this.Native.Closed
@@ -634,6 +894,10 @@ class LLM_LocalServerPanel {
 	}
 
 	_RepairTick(Record) {
+		if Record.Get("kind", "") == "view"
+			return this._PreparationTick(Record)
+		if Record.Get("kind", "") == "discovery"
+			return this._DiscoveryTick(Record)
 		PreviousCritical := Critical("Off")
 		try {
 			ClaimCritical := Critical("On")
@@ -675,13 +939,22 @@ class LLM_LocalServerPanel {
 	}
 
 	_ArmRepair(Record) {
-		if !this._RepairCurrent(Record)
+		ClaimCritical := Critical("On")
+		try {
+			Held := this.RepairRecords.Get(ObjPtr(Record), 0) == Record
+			Callback := Held ? Record["timer"] : 0
+		} finally Critical(ClaimCritical)
+		if !Held || !this._RepairCurrent(Record)
 			return this._DropRepair(Record)
-		this._RepairTimer(Record["timer"], -TimingsGet("llm", "poll_interval_ms"))
+		this._RepairTimer(Callback, -TimingsGet("llm", "poll_interval_ms"))
 		if !this._RepairCurrent(Record) {
-			; A yielding timer port may arm after reentrant cancellation. The
-			; exact old callback remains cleanup debt, never a successor's timer.
-			this.RepairRecords[ObjPtr(Record)] := Record
+			; A yielding timer port may arm after reentrant cancellation cleared
+			; the field. Restore only this old capability as its cleanup debt.
+			ClaimCritical := Critical("On")
+			try {
+				Record["timer"] := Callback
+				this.RepairRecords[ObjPtr(Record)] := Record
+			} finally Critical(ClaimCritical)
 			return this._DropRepair(Record)
 		}
 		return true
@@ -696,15 +969,26 @@ class LLM_LocalServerPanel {
 	}
 
 	_DropRepair(Record) {
-		if !this.RepairRecords.Has(ObjPtr(Record))
-			return true
-		this._RepairTimer(Record["timer"], 0)
 		ClaimCritical := Critical("On")
 		try {
-			if this.RepairRecords.Has(ObjPtr(Record))
+			if this.RepairRecords.Get(ObjPtr(Record), 0) != Record
+				return true
+			Callback := Record["timer"]
+		} finally Critical(ClaimCritical)
+		this._RepairTimer(Callback, 0)
+		ClaimCritical := Critical("On")
+		try {
+			if this.RepairRecords.Get(ObjPtr(Record), 0) == Record {
 				this.RepairRecords.Delete(ObjPtr(Record))
+				; A running frame or prepared view may still legitimately hold Record.
+				Record["timer"] := 0
+			}
 			if this.Repair is Map && this.Repair == Record
 				this.Repair := 0
+			if this.Discovery is Map && this.Discovery == Record
+				this.Discovery := 0
+			if this.Preparation is Map && this.Preparation == Record
+				this.Preparation := 0
 			if Record["built"] && this.ResumeIntent is Map && this.ResumeIntent == Record["resume"]
 				this.ResumeIntent := 0
 		} finally Critical(ClaimCritical)
@@ -735,15 +1019,21 @@ class LLM_LocalServerPanel {
 			try {
 				this.Generation += 1
 				this.View := 0
+				this.PreparedRows := 0
+				this.PreparedOwner := 0
+				this.PreparedRecord := 0
 				this.ResumeIntent := 0
 				this.RepairGeneration += 1
+				this.DiscoveryGeneration += 1
 			} finally Critical(ClaimCritical)
 			try RepairSettled := this._DropRepairs()
 			finally {
-				Cancelled := this.Native.Cancel(Shutdown)
+				this.Native.Cancel(Shutdown)
 				Settled := this.Native.RetryPending()
 			}
-			return RepairSettled && Cancelled && Settled
+			; The final retry can settle a request whose earlier cancellation was pending.
+			; Its exact native ownership census decides retirement at this boundary.
+			return RepairSettled && Settled
 		} finally Critical(PreviousCritical)
 	}
 }

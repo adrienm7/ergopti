@@ -7,6 +7,7 @@
 		<!-- Bump the ?v= on style.css/script.js whenever either changes: the host
 		     loads index.html fresh each launch (cache-busted) but WebView2 caches
 		     these sub-resources by URL, so the version query forces a refresh. -->
+		<link rel="stylesheet" href="../theme.css" />
 		<link rel="stylesheet" href="style.css?v=6" />
 		<script src="../host_bridge.js"></script>
 		<!-- The pages, their questions and checklists, generated from the
@@ -58,6 +59,9 @@
 							</label>
 						</div>
 					</div>
+					<!-- Persistent controls a page declares (the keyboard layout's emulated
+					     layout, number-row emulation and ordering), redrawn on their own. -->
+					<div class="controls hidden" id="page-controls"></div>
 					<!-- Windows touchpad gestures must also be registered in Windows
 					     Settings: "Auto" writes the precision-touchpad values, "Manual"
 					     opens the tutorial. Shown on the gestures page when enabled. -->
@@ -88,6 +92,6 @@
 			</footer>
 		</div>
 
-		<script src="script.js?v=7"></script>
+		<script src="script.js?v=10"></script>
 	</body>
 </html>

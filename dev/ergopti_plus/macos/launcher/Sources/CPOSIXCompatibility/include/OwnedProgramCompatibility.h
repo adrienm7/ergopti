@@ -5,6 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <spawn.h>
 #include <sys/types.h>
 
 // Establishes a new private native session before any child or secret exists.
@@ -73,10 +74,27 @@ int ergopti_owned_query_prepare(
 	int error_descriptor,
 	ergopti_owned_program **owner
 );
+// The native image lease supplies its own action without exposing a lock descriptor.
+typedef int (*ergopti_owned_stream_inheritance)(void *image_lease, posix_spawn_file_actions_t *actions);
+// Borrows three distinct pipe ends; original group/birth cleanup authority is retained.
+int ergopti_owned_stream_prepare(
+	const char *executable,
+	char *const arguments[],
+	char *const environment[],
+	int input_descriptor,
+	int output_descriptor,
+	int error_descriptor,
+	ergopti_owned_stream_inheritance install_inheritance,
+	void *image_lease,
+	ergopti_owned_program **owner
+);
 ergopti_owned_program_receipt ergopti_owned_program_activate(ergopti_owned_program *owner);
+// Fixed cooperative TERM to the retained active child; never a retirement ACK.
+int ergopti_owned_program_request_stream_stop(ergopti_owned_program *owner);
 ergopti_owned_program_receipt ergopti_owned_program_cancel(ergopti_owned_program *owner);
 ergopti_owned_program_receipt ergopti_owned_program_poll(ergopti_owned_program *owner);
 // A failed destruction leaves the pointer and cleanup capability intact.
 bool ergopti_owned_program_destroy(ergopti_owned_program **owner);
 
+ergopti_owned_program_observation ergopti_owned_program_active_identity(ergopti_owned_program *owner);
 #endif

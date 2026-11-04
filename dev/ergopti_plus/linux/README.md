@@ -10,7 +10,7 @@ desktop environments.
 │  Ergopti Linux — architecture overview                           │
 │                                                                  │
 │  Key remapping + tap-hold  →  platform/remap/ (in the daemon)    │
-│  Hotstrings + keylogger    →  ergopti_hotstrings.lua (LuaJIT)    │
+│  Hotstrings + keystats    →  ergopti_hotstrings.lua (LuaJIT)    │
 │    ├─ input_reader.lua     →  /dev/input/eventN (raw evdev)      │
 │    ├─ engine.lua           →  trigger matching (pure Lua)        │
 │    ├─ injector.lua         →  ydotool / uinput injection         │
@@ -68,9 +68,17 @@ linux/
   _generated/                 Codegen output
   tests/
     helpers.lua               Assertion + describe/it harness
-    run.lua                   Auto-discovers test_*.lua under tests/unit
-    unit/                     unit + meta tests
+    run.lua                   Runs tests/meta and tests/unit against test_manifest.lua
+    test_manifest.lua         Every test module, checked against discovery
+    meta/<topic>/             Source checks and harness self-tests: architecture,
+                              boot, corpus (shared vector replays), harness
+    unit/<area>/<part>/       Behaviour tests, filed like the driver: adapters/,
+                              infra/, modules/<module>/, platform/remap/, ui/
+    support/                  Fixtures and harness modules tests require;
+                              support/<area>/<name>_fixture.lua for split files
+    fakes/ fixtures/          Port fakes and static inputs
     e2e/run_e2e.lua           corpus-driven end-to-end harness
+    hardware/ distro/         Native probes, never run by the unit suite
   vendor/                     Bundled third-party Lua libs (not in git)
 ```
 
@@ -80,7 +88,7 @@ linux/
 > `app_launcher`, `crypto`. They are implemented and unit-tested but no Linux feature
 > calls them, so there is currently no tooltip surface, no notification, no clipboard
 > action and no window management on Linux. The `secure_field_detector` case is
-> **deliberate** — see the comment at `modules/keylogger/keylogger.lua:90-98`:
+> **deliberate** — see the comment at `modules/keystats/keystats.lua:90-98`:
 > delegating to it would _narrow_ password-app coverage and leak keystrokes.
 
 ## Running the daemon
@@ -98,14 +106,46 @@ luajit ergopti_hotstrings.lua --device /dev/input/event3 \
 luajit ergopti_hotstrings.lua --dry-run --verbose
 ```
 
+## Developer mode
+
+`bash tools/dev/run-linux-dev.sh` (from the clone root, or `npm run dev:linux`)
+runs this tree through `install/launch.sh`, the packages' entry point, with the
+tray, the same config folder and the native archive backend built into `bin/`.
+It stops an installed `ergopti-hotstrings` user unit first. A saved `.lua` of
+the driver or of `_shared/lua` restarts the daemon, and so does the tray's
+Reload; the updater stays off. See `docs/design/developer-mode.md`.
+
 ## Running the tests
 
 ```bash
 cd static/ergopti_plus/linux
 luajit tests/run.lua
+luajit tests/run.lua --only "case name substring"
+luajit tests/run.lua --module=infra
 ```
 
+`--module` runs one group of `tests/support/module_groups.lua` (meta, core,
+infra, input, modules, ui); CI runs each group as its own job, and together
+they are exactly the whole suite (`tests/meta/harness/test_module_groups.lua`).
+Put a new test in the folder of the code it exercises and add it to
+`tests/test_manifest.lua`; split a test file along its describes before it
+passes about 800 lines.
+
 Requires LuaJIT 2.x. Plain Lua 5.4 works for the meta tests (no luv dependency).
+
+Typed-text encryption additionally requires LuaJIT FFI and OpenSSL 3's native
+AES-256-CBC API. Without that capability, activation is refused and a saved ON
+preference keeps persistence closed; encrypted rows cannot be decrypted. There
+is no CLI encryption fallback exposing the key in process arguments. The
+existing key derivation runs synchronously once per session and is cached;
+subsequent encryption and decryption use native byte buffers. Plain Lua 5.4
+tests exercise this capability refusal and the provider contract explicitly.
+
+The installed driver requires `lua-luv` for owned asynchronous SQLite flushes.
+A manually started minimal daemon without it retains collected metrics in RAM;
+`flush()` returns false, merged views remain readable, and shutdown acknowledges
+only that no native write is acquired. It warns once and never claims those
+metrics were saved. Install the required package to restore durable flushes.
 
 ## Installation
 
@@ -180,9 +220,34 @@ keyboard layout. Reinstalling the application can reuse the retained settings.
 | Secure field detection   | ✅ AT-SPI    | ✅ AT-SPI              | Secure applications, private windows and focused password fields suppress capture and prediction; an inconclusive focus probe fails closed                                                                |
 | Config UI                | ✅ WebKitGTK | ✅ WebKitGTK           | Shared configuration, diagnostics, onboarding, metrics and editor pages are routed through page-scoped bridges                                                                                            |
 
+AI predictions, tone rewrites and translations require a fresh AT-SPI identity
+for the active text field before sending or inserting text. A window ID alone
+cannot distinguish two fields in the same application. Password fields and
+applications that do not expose an active accessible text destination refuse AI
+typing, including when the general privacy filters are disabled.
+
 ## Distribution support
 
 Target distributions: **Ubuntu 22.04+, Fedora 38+, Arch Linux, Debian 12+**.
+
+The AppImage brings its own LuaJIT, curl and tray library but uses the
+system's GNU C library (glibc) and GTK 3: it needs **glibc 2.35 or newer**
+(Ubuntu 22.04, Debian 12, Fedora 36, openSUSE Leap 16 or newer, Arch Linux).
+On an older glibc (Ubuntu 20.04, Debian 11) it refuses to start and says
+which version it found. Distributions built on **musl** instead of glibc
+(Alpine Linux, the musl editions of Void Linux) cannot run programs built for
+glibc at all, so neither the AppImage nor the `.deb`/`.rpm` packages run there;
+the AppImage refuses with a message saying so.
+
+The image is self-contained except for the C library, its loader, GLib, the
+C++ runtime and GTK 3, which a program that draws a tray icon and web views
+must share with the desktop it runs on: bundling a second glibc or GTK next to
+the host's graphics and NSS modules breaks them. Instead the image is built and
+launched on the oldest supported glibc (Ubuntu 22.04), a symbol-version check
+refuses anything newer, and a closure check refuses any other library an ELF
+file needs that the image does not carry. The list of what the recipient
+supplies, with the reason for each group, is
+`_shared/data/linux_appimage_recipient_libraries.json`.
 
 Requirements:
 

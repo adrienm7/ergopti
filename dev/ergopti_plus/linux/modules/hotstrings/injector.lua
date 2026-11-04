@@ -34,13 +34,18 @@ local M = {}
 -- =========================================
 -- =========================================
 
+local Errors = require("adapter_errors")
 local Logger = require("logger.shim")
+local Perf = require("infra.perf_counters")
 local EvdevCodes = require("infra.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
 local layout_plan, layout_plan_current, layout_plan_view = KeyboardLayout.plan, KeyboardLayout.plan_current, KeyboardLayout.plan_view
 local XkbCapture = require("adapters.xkb_capture")
 local Clipboard = require("adapters.clipboard")
 local OutputTransaction = require("modules.hotstrings.output_transaction")
+local ModifierBroker = require("adapters.modifier_broker")
+local broker_for_channel = ModifierBroker.for_channel
+local NumberPolicy = require("number_policy")
 
 local LOG = "modules.hotstrings.injector"
 
@@ -70,6 +75,12 @@ local EVDEV_VALUE_DOWN   = 1
 -- the injector cannot disagree about which level means which key.
 local MODIFIER_CODES = EvdevCodes.LEVEL_MODIFIER_CODE
 
+-- Told of the text every successful injection typed (an expansion, the magic
+-- key's result, a send_text, a consumed key typed in its place): such text
+-- never reaches the keyboard hook's character callback, yet CapsWord must end
+-- on a delimiter it contains. One owner, set by the daemon.
+local _output_observer = nil
+
 
 -- =========================================
 -- =========================================
@@ -81,6 +92,17 @@ local MODIFIER_CODES = EvdevCodes.LEVEL_MODIFIER_CODE
 --- means the daemon cannot put a key back, cannot erase a trigger and cannot
 --- type a replacement, which is why the daemon refuses to grab without it.
 local _uinput = nil
+local _clipboard_cleanup = nil
+
+--- Retires the original clipboard owner independently of output admission.
+--- @return boolean acknowledged Saved bytes were physically restored.
+local function retire_clipboard()
+	local close = _clipboard_cleanup
+	if not close then return true end
+	local checked, closed = pcall(close)
+	if checked and closed == true and _clipboard_cleanup == close then _clipboard_cleanup = nil end
+	return _clipboard_cleanup == nil
+end
 
 --- Exact layout-level modifier keycodes the user is physically holding.
 --- @return table Ordered evdev keycodes.
@@ -124,26 +146,14 @@ local _nanosleep = nil
 --- CI and is optional on a user's machine, so the fallback below is what actually
 --- ran everywhere — and it forks /bin/sleep on the injection path, once per
 --- expansion. LuaJIT is a hard requirement of this driver, so FFI is not.
+--- The shared binding resumes after a child's SIGCHLD: discarding the remainder
+--- typed the next phase before the application had settled.
 --- @return function|nil sleep(seconds)
 local function nanosleep()
 	if _nanosleep ~= nil then return _nanosleep or nil end
-	_nanosleep = false
-
 	local ok_ffi, ffi = pcall(require, "ffi")
-	if not ok_ffi or type(ffi) ~= "table" then return nil end
-	local ok_cdef, cdef_err = pcall(ffi.cdef, [[
-		struct timespec { long tv_sec; long tv_nsec; };
-		int nanosleep(const struct timespec *req, struct timespec *rem);
-	]])
-	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then return nil end
-
-	local req = ffi.new("struct timespec[1]")
-	_nanosleep = function(seconds)
-		req[0].tv_sec = math.floor(seconds)
-		req[0].tv_nsec = math.floor((seconds % 1) * 1e9)
-		ffi.C.nanosleep(req, nil)
-	end
-	return _nanosleep
+	_nanosleep = require("infra.native_sleep").bind(ok_ffi and ffi or nil) or false
+	return _nanosleep or nil
 end
 
 --- Sleeps for the given number of milliseconds without forking or spinning.
@@ -151,9 +161,15 @@ end
 --- Never busy-waits on the standard CPU clock: on Linux it reports process CPU
 --- time, so spinning on it would burn a full core for the delay rather than
 --- yield it.
+--- Every fallback refuses a wait above the shared timer ceiling, as the FFI
+--- binding does: luv and the sleep command would otherwise take a wait that
+--- never ends (or a NaN) as an ordinary pause.
 --- @param ms integer Milliseconds to sleep.
 local function sleep_ms(ms)
-	if ms <= 0 then return end
+	if type(ms) == "number" and ms <= 0 then return end
+	if not NumberPolicy.within_timer_ceiling(ms) then
+		error("injector sleep refused: " .. tostring(ms) .. " ms is not finite or exceeds the timer ceiling", 0)
+	end
 	local nap = nanosleep()
 	if nap then
 		nap(ms / 1000)
@@ -206,16 +222,19 @@ end
 --- which is worse than not typing it: the user loses text they had.
 --- @param tx table Output transaction.
 --- @param text string
+--- @param prepared table|nil Exact ordinary replacement plan retained before erasure.
 --- @return boolean True when the whole string was typed.
-local function send_text_native(tx, text)
+local function send_text_native(tx, text, prepared)
 	if not (_uinput and _uinput.is_open()) then return false end
-	if not KeyboardLayout.is_ready() then return false end
+	if not prepared and not KeyboardLayout.is_ready() then return false end
 
 	if KeyboardLayout.plan ~= layout_plan or KeyboardLayout.plan_current ~= layout_plan_current
 		or KeyboardLayout.plan_view ~= layout_plan_view then return false end
-	local offered, blocker, receipt = layout_plan(text)
+	local offered, blocker, receipt
+	if prepared then offered, receipt = prepared.plan, prepared.receipt
+	else offered, blocker, receipt = layout_plan(text) end
 	local check, view = layout_plan_current, layout_plan_view
-	local plan = offered and type(view) == "function" and view(receipt) or nil
+	local plan = prepared and prepared.plan or offered and type(view) == "function" and view(receipt) or nil
 	if not plan then
 		Logger.debug(LOG, "Layout cannot type %s — falling back.", tostring(blocker))
 		return false
@@ -225,6 +244,7 @@ local function send_text_native(tx, text)
 		if KeyboardLayout.plan ~= layout_plan or KeyboardLayout.plan_current ~= check or KeyboardLayout.plan_view ~= view or not ok or current ~= true then
 			error("layout plan is no longer current", 0)
 		end
+		if prepared then prepared.seal() end
 	end
 	local function admission()
 		current_plan(false)
@@ -253,7 +273,7 @@ local function send_text_native(tx, text)
 			for _, mod in ipairs(step.mods) do
 				press(MODIFIER_CODES[mod], "layout modifier down")
 			end
-			press(step.keycode, "replacement key down")
+			press(step.keycode, Errors.REPLACEMENT_KEY_DOWN)
 			must_emit(tx, step.keycode, EVDEV_VALUE_UP, "replacement key up")
 			-- Released in reverse, and always: a modifier left held after an
 			-- interrupted injection turns every subsequent keystroke into a shortcut.
@@ -263,7 +283,7 @@ local function send_text_native(tx, text)
 		end
 	end)
 	if caps then
-		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, "capslock restore down")
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, Errors.CAPSLOCK_RESTORE_DOWN)
 		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_UP, "capslock restore up")
 	end
 	if not ok_typed then error(typed_err, 0) end
@@ -286,20 +306,51 @@ end
 --- @param tx table Output transaction.
 --- @param text string
 --- @param is_private boolean|nil True when `text` is PII and must not be logged.
+--- @param prepared table|nil Admitted ordinary replacement route; nil for other text phases.
 --- @return boolean True when the whole payload was delivered.
-local function send_text(tx, text, is_private)
-	if send_text_native(tx, text) then return true end
+local function send_text(tx, text, is_private, prepared)
+	if prepared and prepared.clipboard_paste then
+		if not prepared.clipboard_paste(tx.channel()) then error("prepared clipboard paste refused", 0) end
+		return true
+	end
+	if not prepared or prepared.native then
+		if send_text_native(tx, text, prepared) then return true end
+		if prepared then error("prepared native replacement is no longer available", 0) end
+	end
 
+	-- Clipboard restores its saved bytes even when admission fails. Retain the
+	-- original refusal across its protected cleanup so healthy input is not
+	-- emergency-stopped merely because a destination changed during an I/O.
+	local admission_error
+	local function admission()
+		local checked, reason = pcall(require_publication, tx.publication, false)
+		if not checked then admission_error = reason; return false end
+		return true
+	end
 	local pause = sleep_ms
 	if tx.publication then
 		pause = function(ms)
-			require_publication(tx.publication, false)
+			if not admission() then error(admission_error, 0) end
 			sleep_ms(ms)
-			require_publication(tx.publication, false)
+			if not admission() then error(admission_error, 0) end
 		end
 	end
 	require_publication(tx.publication, false)
-	if Clipboard.paste_text(text, tx.channel(), pause) then
+	if prepared then prepared.cached() end
+	local channel = tx.channel()
+	local emit = channel.emit
+	channel.emit = function(...)
+		local checked, result = pcall(emit, ...)
+		if not checked then admission_error = result; error(result, 0) end
+		return result
+	end
+	local pasted, restore_failure = Clipboard.paste_text(text, channel, pause, admission)
+	if restore_failure then
+		tx.fail(restore_failure, "clipboard restoration")
+		error(tx.error(), 0)
+	end
+	if admission_error ~= nil then error(admission_error, 0) end
+	if pasted then
 		Logger.debug(LOG, "Replacement delivered by clipboard (untypable on this layout).")
 		return true
 	end
@@ -360,35 +411,238 @@ require_publication = function(publication, cached)
 	if publication == nil then return end
 	local check = cached and publication.cached or publication.current
 	local ok, current = pcall(check)
-	if not ok or current ~= true then error("programmable publication is no longer current", 0) end
+	if not ok or current ~= true then error(Errors.PROGRAMMABLE_PUBLICATION_STALE, 0) end
+end
+
+--- Captures one original output and API set before any planning callback.
+--- @return table owner Private original channel, broker and observation ports.
+local function capture_replacement_owner()
+	local channel = _uinput
+	local broker, binding = broker_for_channel(channel)
+	return { channel = channel, open = channel and channel.is_open, emit = channel and channel.emit,
+		ready = KeyboardLayout.is_ready, available = Clipboard.is_available, paste = Clipboard.paste_text,
+		stage = Clipboard.new_paste_stage, paste_key = Clipboard.paste_keycode, shortcut = KeyboardLayout.shortcut_keycode,
+		broker = broker, binding = binding, output_current = broker and broker.output_current }
+end
+
+--- Prepares the complete replacement without reserving output or erasing text.
+--- Clipboard availability proves a tool exists; snapshot or paste can still fail.
+--- @param text string Whole replacement payload.
+--- @param publication table|nil Retained programmable publication owner.
+--- @param owner table|nil Shared original owner for a complete field set.
+--- @return table prepared Exact route and original channel ownership.
+local function prepare_replacement(text, publication, owner)
+	owner = owner or capture_replacement_owner()
+	local channel, open, emit, ready = owner.channel, owner.open, owner.emit, owner.ready
+	local available, paste = owner.available, owner.paste
+	local broker, binding, output_current = owner.broker, owner.binding, owner.output_current
+	local stage_factory, paste_key, shortcut = owner.stage, owner.paste_key, owner.shortcut
+	local prepared = { channel = channel }
+	local clip, clip_prepare, clip_paste, clip_close, owned_close, clip_closed, admission_error
+	local function seal()
+		local current_broker, current_binding = broker_for_channel(channel)
+		if _uinput ~= channel or not channel or channel.is_open ~= open or channel.emit ~= emit
+			or KeyboardLayout.is_ready ~= ready or KeyboardLayout.plan ~= layout_plan
+			or KeyboardLayout.plan_current ~= layout_plan_current or KeyboardLayout.plan_view ~= layout_plan_view
+			or ModifierBroker.for_channel ~= broker_for_channel or current_broker ~= broker or current_binding ~= binding then
+			error("replacement preparation is no longer current", 0)
+		end
+		if broker and (broker.output_current ~= output_current or type(binding) ~= "function" or binding(broker) ~= true) then
+			error("replacement output owner is no longer current", 0)
+		end
+		if prepared.native == false and (Clipboard.is_available ~= available or Clipboard.paste_text ~= paste) then
+			error("clipboard preparation is no longer current", 0)
+		end
+		if clip and (Clipboard.new_paste_stage ~= stage_factory or Clipboard.paste_keycode ~= paste_key
+			or KeyboardLayout.shortcut_keycode ~= shortcut or clip.prepare ~= clip_prepare
+			or clip.paste ~= clip_paste or clip.close ~= clip_close) then
+			error("clipboard stage is no longer current", 0)
+		end
+	end
+	prepared.seal = seal
+	seal()
+	if type(open) ~= "function" or open() ~= true then error("uinput channel is not open", 0) end
+	seal()
+	local offered, blocker
+	if ready() then
+		seal()
+		offered, blocker, prepared.receipt = layout_plan(text)
+		seal()
+		prepared.plan = offered and layout_plan_view(prepared.receipt) or nil
+		seal()
+		if offered and not prepared.plan then error("layout plan is no longer current", 0) end
+	end
+	seal()
+	prepared.native = prepared.plan ~= nil
+	if not prepared.native then
+		if type(available) ~= "function" or available() ~= true then error("replacement could not be delivered", 0) end
+		seal()
+	end
+	function prepared.cached()
+		seal()
+		require_publication(publication, true)
+		seal()
+		if prepared.native and not prepared.delivered then
+			local checked, current = pcall(layout_plan_current, prepared.receipt, true)
+			seal()
+			if not checked or current ~= true then error("layout plan is no longer current", 0) end
+		end
+	end
+	function prepared.source_current()
+		require_publication(publication, false)
+		seal()
+		if prepared.native then
+			local checked, current = pcall(layout_plan_current, prepared.receipt, false)
+			seal()
+			if not checked or current ~= true then error("layout plan is no longer current", 0) end
+		end
+		require_publication(publication, true)
+		prepared.cached()
+	end
+	function prepared.current()
+		prepared.source_current()
+		-- An idle broker's original output epoch must be current before reservation.
+		-- While reserved, its native transaction owns that epoch and the RAM seal
+		-- checks only the binding, since output_current deliberately refuses busy.
+		if broker then
+			local checked, current = pcall(output_current)
+			seal()
+			if not checked or current ~= true then error("replacement output owner is no longer current", 0) end
+		end
+	end
+	--- Prepares only the ordinary single-payload route before destructive keys.
+	function prepared.prepare_clipboard()
+		if prepared.native then return true end
+		if clip or _clipboard_cleanup then error("clipboard preparation already owned", 0) end
+		prepared.current()
+		if type(stage_factory) ~= "function" or type(paste_key) ~= "function" then
+			error("clipboard preparation unavailable", 0)
+		end
+		local key = paste_key()
+		prepared.current()
+		local function admission()
+			local checked, why = pcall(prepared.source_current)
+			if not checked then admission_error = why end
+			return checked
+		end
+		clip = stage_factory(text, sleep_ms, key, admission)
+		clip_prepare, clip_paste, clip_close = clip.prepare, clip.paste, clip.close
+		assert(type(clip_prepare) == "function" and type(clip_paste) == "function" and type(clip_close) == "function",
+			"invalid clipboard stage")
+		owned_close = function()
+			if clip_close() ~= true then return false end
+			clip_closed = true
+			return true
+		end
+		_clipboard_cleanup = owned_close
+		seal()
+		if clip_prepare() ~= true then error(admission_error or "clipboard preparation failed", 0) end
+		prepared.current()
+		prepared.clipboard_paste = function(output)
+			prepared.source_current()
+			local pasted = clip_paste(output)
+			if admission_error then error(admission_error, 0) end
+			prepared.source_current()
+			return pasted == true
+		end
+		return true
+	end
+	--- Cleanup uses the captured owner even after its public APIs are replaced.
+	function prepared.close_clipboard()
+		if not clip or clip_closed then return true end
+		return _clipboard_cleanup == owned_close and retire_clipboard()
+	end
+	return prepared
+end
+
+--- Copies a dense plain string array without invoking caller-owned metamethods.
+--- @param values table Caller-provided field values.
+--- @return table|nil snapshot Private immutable-by-ownership string sequence.
+local function snapshot_fields(values)
+	if getmetatable(values) ~= nil then return nil end
+	local count, snapshot = 0, {}
+	for index, value in pairs(values) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or type(value) ~= "string" then return nil end
+		count = count + 1
+	end
+	for index = 1, count do
+		local value = rawget(values, index)
+		if type(value) ~= "string" then return nil end
+		snapshot[index] = value
+	end
+	return snapshot
+end
+
+--- Prepares all field routes once; per-key checks only inspect the active field.
+--- @param values table Private string snapshot.
+--- @param owner table Common original output captured before diagnostic callbacks.
+--- @return table batch Common output guard and active-field admission.
+--- @return table fields Exact retained route for each original value.
+local function prepare_fields(values, owner, publication)
+	local fields = {}
+	for index, value in ipairs(values) do fields[index] = prepare_replacement(value, publication, owner) end
+	local active = 1
+	local batch = { channel = owner.channel }
+	function batch.current()
+		for _, field in ipairs(fields) do field.current() end
+		-- Later observations may retire an earlier plan. One final RAM pass joins
+		-- every receipt before output is reserved, rather than accepting each alone.
+		for _, field in ipairs(fields) do field.cached() end
+	end
+	-- An output of keys alone has no text field to check.
+	function batch.cached() if fields[active] then fields[active].cached() end end
+	function batch.activate(index)
+		-- The genuine transaction now owns the busy output epoch. Source checking
+		-- must not query the broker's idle-only output_current observer here.
+		fields[index].source_current()
+		active = index
+	end
+	return batch, fields
 end
 
 --- Runs one complete output transaction with unconditional cleanup.
 --- @param label string Diagnostic operation name.
 --- @param body function Called as body(transaction).
+--- @param publication table|nil Retained programmable publication owner.
+--- @param prepared table|nil Ordinary replacement guards checked before any output reservation.
+--- @param data_attempt function|nil Private mutation latch after admission, before native ACK.
 --- @return table Commit result.
-local function run_transaction(label, body, publication)
-	local native_tx = OutputTransaction.new(_uinput)
+local function run_transaction(label, body, publication, prepared, data_attempt)
+	if prepared then
+		local checked, reason = pcall(prepared.current)
+		if not checked then return { ok = false, error = tostring(reason), failed_phase = "replacement preflight", cleanup_ok = true } end
+	end
+	local native_tx = OutputTransaction.new(prepared and prepared.channel or _uinput)
+	Perf.count("hotstring.expansions")
+	local transaction_started = Perf.clock()
 	local tx
 	-- Cleanup remains on the original transaction wire, so a refused late
 	-- publication never prevents owned key-ups or physical modifier restore.
 	tx = setmetatable({ publication = publication,
 		emit = function(code, value, phase, admission)
-			if value == EVDEV_VALUE_DOWN and phase ~= "capslock restore down" then
+			if value == EVDEV_VALUE_DOWN and phase ~= Errors.CAPSLOCK_RESTORE_DOWN then
 				require_publication(publication, true)
+				if prepared then prepared.cached() end
 			end
 			if value == EVDEV_VALUE_DOWN and admission then admission() end
-			return native_tx.emit(code, value, phase)
+			if value == EVDEV_VALUE_DOWN and data_attempt then data_attempt(code, phase) end
+			Perf.count("output.uinput_events")
+			local write_started = Perf.clock()
+			local accepted = native_tx.emit(code, value, phase)
+			Perf.span("output.uinput_write", write_started)
+			return accepted
 		end,
 	}, { __index = native_tx })
 	tx.channel = function()
 		local channel = native_tx.channel()
 		return { is_open = channel.is_open,
-			emit = function(code, value) return tx.emit(code, value, "clipboard paste chord") end }
+			emit = function(code, value) return tx.emit(code, value, Errors.CLIPBOARD_PASTE_CHORD) end }
 	end
 	local ok, err = pcall(function()
-		require_publication(publication, false)
-		if not tx.neutralize(held_text_modifier_codes()) then error(tx.error(), 0) end
+		if prepared then prepared.cached() else require_publication(publication, false) end
+		local text_modifiers = held_text_modifier_codes()
+		if prepared then prepared.cached() end
+		if not tx.neutralize(text_modifiers) then error(tx.error(), 0) end
 		-- Ctrl, Alt and Super are released for good: the chord that asked for
 		-- this text (Alt+1 on a prediction) is spent, and text typed under them
 		-- would be shortcuts. A masking tap comes first, so the release is not a
@@ -411,8 +665,9 @@ local function run_transaction(label, body, publication)
 	end)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end
 	local result = tx.finish()
+	Perf.span("hotstring.expand", transaction_started)
 	if not result.ok and not (publication ~= nil and result.cleanup_ok == true
-		and result.error == "programmable publication is no longer current") then stop_after_failure(result, label) end
+		and result.error == Errors.PROGRAMMABLE_PUBLICATION_STALE) then stop_after_failure(result, label) end
 	return result
 end
 
@@ -502,6 +757,20 @@ function M.emit_key(code, value)
 	return _uinput.emit(code, value)
 end
 
+--- Writes one relative report (pointer motion or a wheel notch) on the virtual
+--- device, for a mouse the navigation layer holds while it binds the wheel.
+--- @param axis integer evdev REL_* code.
+--- @param value integer Signed delta.
+--- @return boolean True when the report and its SYN were written.
+function M.emit_relative(axis, value)
+	if not _uinput or not _uinput.is_open() or type(_uinput.emit_relative) ~= "function" then
+		Logger.error(LOG, "emit_relative(%s:%s): no uinput channel — the report cannot be put back.",
+			tostring(axis), tostring(value))
+		return false
+	end
+	return _uinput.emit_relative(axis, value)
+end
+
 --- Opens the non-forking uinput channel, if this system can provide one.
 ---
 --- Called by the daemon before taking a grab. Returns false rather than raising
@@ -541,8 +810,10 @@ function M.output_broker()
 end
 
 --- Closes the non-forking channel, if one is open.
+--- @return boolean acknowledged True when absent or strictly retired; false retains cleanup debt.
 function M.close_fast_channel()
-	if not _uinput then return end
+	local clipboard_closed = retire_clipboard()
+	if not _uinput then return clipboard_closed end
 	local Broker = require("adapters.modifier_broker")
 	if Broker.for_channel(_uinput) then
 		local acknowledged = _uinput.close() == true
@@ -555,13 +826,40 @@ function M.close_fast_channel()
 	else _uinput.close() end
 	_uinput = nil
 	Logger.done(LOG, "Non-forking uinput channel closed.")
-	return true
+	return clipboard_closed
 end
 
 --- Test seam: injects (or clears) the uinput channel without touching /dev.
 --- @param mod table|nil A module exposing is_open() and emit(code, value).
 function M._set_uinput(mod)
 	_uinput = mod
+end
+
+--- Sets the one observer told of each successful injection's typed text.
+--- A second observer is refused: two owners would each believe they see all
+--- output. Pass nil to clear it (tests, a stopped daemon).
+--- @param fn function|nil fn(text) called after the text was typed.
+--- @return boolean accepted
+function M.set_output_observer(fn)
+	if fn ~= nil and type(fn) ~= "function" then
+		Logger.error(LOG, "set_output_observer(): a function or nil is required, got %s.", type(fn))
+		return false
+	end
+	if fn ~= nil and _output_observer ~= nil and _output_observer ~= fn then
+		Logger.error(LOG, "set_output_observer(): an output observer is already installed.")
+		return false
+	end
+	_output_observer = fn
+	return true
+end
+
+--- Tells the observer of typed text; its failure is logged, never raised into
+--- an injection that already succeeded.
+--- @param text string Exactly what was typed.
+local function notify_output(text)
+	if not _output_observer or text == "" then return end
+	local ok, err = pcall(_output_observer, text)
+	if not ok then Logger.error(LOG, "The output observer failed: %s.", tostring(err)) end
 end
 
 --- Performs a hotstring injection: erases the trigger then types the replacement.
@@ -592,13 +890,32 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 		return { ok = false, error = "invalid arguments", cleanup_ok = true }
 	end
 
+	local owner = capture_replacement_owner()
 	if is_private then
 		Logger.trace(LOG, "inject(): bc=%d, private text (content withheld)…", backspace_count)
 	else
 		Logger.trace(LOG, "inject(): bc=%d text='%s'…", backspace_count, replacement_text)
 	end
+	if not retire_clipboard() then
+		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
+	end
+	local checked, prepared = pcall(prepare_replacement, replacement_text, publication, owner)
+	if not checked then
+		if is_private then Logger.error(LOG, "Cannot prepare a private replacement before erasure: %s.", tostring(prepared))
+		else Logger.error(LOG, "Cannot deliver '%s' before erasing its trigger: %s.", replacement_text, tostring(prepared)) end
+		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
+	end
+	local ready, preparation_error = pcall(prepared.prepare_clipboard)
+	if not ready then
+		local closed = prepared.close_clipboard()
+		local failure = { ok = false, error = closed and tostring(preparation_error) or "clipboard restoration failed",
+			failed_phase = "replacement preflight", cleanup_ok = closed }
+		if not closed then failure.native_cleanup_ok = true end
+		if not closed then stop_after_failure(failure, "inject()") end
+		return failure
+	end
 
-	local result = run_transaction("inject()", function(tx)
+	local ran, result = pcall(run_transaction, "inject()", function(tx)
 		-- Phase 1: erase the trigger (and terminator if consumed).
 		if backspace_count > 0 then
 			send_backspaces(tx, backspace_count)
@@ -608,14 +925,30 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 
 		require_publication(publication, false)
 		-- Phase 2: type the replacement.
-		if not send_text(tx, replacement_text, is_private) then error(tx.error(), 0) end
+		if not send_text(tx, replacement_text, is_private, prepared) then error(tx.error(), 0) end
+		-- The terminator owns its own plan. The replacement's completed receipt
+		-- no longer fences that later phase; channel/publication seals still do.
+		prepared.delivered = true
 		if replay_terminator and replay_terminator ~= "" then
 			require_publication(publication, false)
 			send_terminator(tx, replay_terminator)
 		end
-	end, publication)
+	end, publication, prepared)
+	local clipboard_closed = prepared.close_clipboard()
+	if not ran then
+		result = { ok = false, error = "output transaction raised before its cleanup receipt", failed_phase = "output transaction",
+			cleanup_ok = false, native_cleanup_ok = false }
+	end
+	if not clipboard_closed then
+		result.native_cleanup_ok = result.cleanup_ok
+		result.ok, result.cleanup_ok, result.error, result.failed_phase = false, false, "clipboard restoration failed", "clipboard restoration"
+	end
+	if not ran or not clipboard_closed then stop_after_failure(result, "inject()") end
 
-	if result.ok then Logger.done(LOG, "inject(): done (bc=%d).", backspace_count) end
+	if result.ok then
+		Logger.done(LOG, "inject(): done (bc=%d).", backspace_count)
+		notify_output(replacement_text .. (replay_terminator or ""))
+	end
 	return result
 end
 
@@ -646,9 +979,11 @@ function M.type_directly(text)
 	if not (_uinput and _uinput.is_open()) then
 		return { ok = false, error = "no uinput channel", cleanup_ok = true }
 	end
-	return run_transaction("type_directly()", function(tx)
+	local result = run_transaction("type_directly()", function(tx)
 		if not send_text_native(tx, text) then error(tx.error() or "the key presses were refused", 0) end
 	end)
+	if result.ok then notify_output(text) end
+	return result
 end
 
 --- Types several values separated by a real Tab KEYSTROKE.
@@ -673,6 +1008,12 @@ function M.inject_fields(backspace_count, values, is_private)
 			type(backspace_count), type(values))
 		return { ok = false, error = "invalid arguments", cleanup_ok = true }
 	end
+	local snapshot = snapshot_fields(values)
+	if not snapshot then
+		Logger.error(LOG, "inject_fields(): expected a dense plain array of strings.")
+		return { ok = false, error = "invalid field values", cleanup_ok = true }
+	end
+	values = snapshot
 	if #values == 0 then
 		Logger.error(LOG, "inject_fields(): no values — the trigger would be erased for nothing.")
 		return { ok = false, error = "no values", cleanup_ok = true }
@@ -684,12 +1025,21 @@ function M.inject_fields(backspace_count, values, is_private)
 	if #values == 1 then
 		return M.inject(backspace_count, values[1], is_private)
 	end
+	local owner = capture_replacement_owner()
+	if not retire_clipboard() then
+		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
+	end
 
 	if is_private then
 		Logger.trace(LOG, "inject_fields(): bc=%d, %d private field(s) (content withheld)…",
 			backspace_count, #values)
 	else
 		Logger.trace(LOG, "inject_fields(): bc=%d, %d field(s)…", backspace_count, #values)
+	end
+	local checked, prepared, fields = pcall(prepare_fields, values, owner)
+	if not checked then
+		Logger.error(LOG, "Cannot prepare %d replacement field(s) before erasure (content withheld).", #values)
+		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
 	end
 
 	local result = run_transaction("inject_fields()", function(tx)
@@ -699,8 +1049,10 @@ function M.inject_fields(backspace_count, values, is_private)
 		end
 
 		for index, value in ipairs(values) do
-			if not send_text(tx, value, is_private) then error(tx.error(), 0) end
+			if not send_text(tx, value, is_private, fields[index]) then error(tx.error(), 0) end
+			fields[index].delivered = true
 			if index < #values then
+				prepared.activate(index + 1)
 				must_emit(tx, EvdevCodes.KEY_TAB, EVDEV_VALUE_DOWN, "field Tab down")
 				must_emit(tx, EvdevCodes.KEY_TAB, EVDEV_VALUE_UP, "field Tab up")
 				-- The focus change a Tab causes is asynchronous in most toolkits;
@@ -710,10 +1062,79 @@ function M.inject_fields(backspace_count, values, is_private)
 				sleep_ms(INTER_PHASE_DELAY_MS)
 			end
 		end
-	end)
+	end, nil, prepared)
 
 	if result.ok then
 		Logger.done(LOG, "inject_fields(): done (bc=%d, %d field(s)).", backspace_count, #values)
+		notify_output(table.concat(values, "\t"))
+	end
+	return result
+end
+
+--- Performs a hotstring injection whose output presses keys ({Left}, {Enter}...):
+--- erases the trigger, then plays the parsed tokens in order as one transaction.
+--- inject() stays text-only, because a prediction or a selection holding the
+--- characters "{Left}" must type them.
+--- @param backspace_count integer Characters to erase before the output.
+--- @param tokens table Ordered tokens of send_input.parse_output.
+--- @param is_private boolean|nil True when the text is PII and must not be logged.
+--- @param replay_terminator string|nil Exact non-consumed carrier to type last.
+--- @param publication table|nil Retained full-phase and cached-key admission guards.
+--- @return table result { ok, error, cleanup_ok }.
+function M.inject_tokens(backspace_count, tokens, is_private, replay_terminator, publication)
+	if type(backspace_count) ~= "number" or type(tokens) ~= "table" then
+		Logger.error(LOG, "inject_tokens(): invalid arguments — bc is %s, tokens is %s.",
+			type(backspace_count), type(tokens))
+		return { ok = false, error = "invalid arguments", cleanup_ok = true }
+	end
+	local values = {}
+	for _, token in ipairs(tokens) do
+		if token.kind == "text" then values[#values + 1] = token.value end
+	end
+	local owner = capture_replacement_owner()
+	if not retire_clipboard() then
+		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
+	end
+	-- A count only: this log is kept for 14 days and the text may be a secret.
+	Logger.trace(LOG, "inject_tokens(): bc=%d, %d token(s)…", backspace_count, #tokens)
+	local checked, prepared, fields = pcall(prepare_fields, values, owner, publication)
+	if not checked then
+		Logger.error(LOG, "Cannot prepare a replacement with keys before erasure (content withheld).")
+		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
+	end
+
+	local result = run_transaction("inject_tokens()", function(tx)
+		if backspace_count > 0 then
+			send_backspaces(tx, backspace_count)
+			sleep_ms(INTER_PHASE_DELAY_MS)
+		end
+		require_publication(publication, false)
+		local field = 0
+		for _, token in ipairs(tokens) do
+			if token.kind == "text" then
+				field = field + 1
+				prepared.activate(field)
+				if not send_text(tx, token.value, is_private, fields[field]) then error(tx.error(), 0) end
+				fields[field].delivered = true
+			else
+				for _ = 1, token.count do
+					must_emit(tx, token.entry.linux, EVDEV_VALUE_DOWN, "output key down")
+					must_emit(tx, token.entry.linux, EVDEV_VALUE_UP, "output key up")
+				end
+				-- What the key does is asynchronous in most toolkits (the same reason
+				-- as a field Tab): text sent at once could land before the caret moved.
+				sleep_ms(INTER_PHASE_DELAY_MS)
+			end
+		end
+		if replay_terminator and replay_terminator ~= "" then
+			require_publication(publication, false)
+			send_terminator(tx, replay_terminator)
+		end
+	end, publication, prepared)
+
+	if result.ok then
+		Logger.done(LOG, "inject_tokens(): done (bc=%d).", backspace_count)
+		notify_output(table.concat(values) .. (replay_terminator or ""))
 	end
 	return result
 end
@@ -784,34 +1205,25 @@ function M.caret_steps(text)
 	return steps
 end
 
---- Types a text over the focused selection, then selects exactly what it typed.
----
---- Shift+Left per caret step, in the same transaction and on the same channel
---- as the text, so a keystroke from elsewhere cannot land between them. The
---- tone actions keep their rewrite selected this way, so the next step applies
---- to it.
---- @param text string Non-empty text to type.
---- @param is_private boolean|nil True when `text` must not be logged.
---- @return table Commit result { ok, error?, cleanup_ok }.
-function M.inject_selected(text, is_private)
-	if type(text) ~= "string" or text == "" then
-		Logger.error(LOG, "inject_selected(): text is %s, expected a non-empty string.", type(text))
-		return { ok = false, error = "invalid arguments", cleanup_ok = true }
-	end
+--- Reserves a selected rewrite route before preparation and native range checks.
+--- @param text string Non-empty private replacement.
+--- @param publication table Original action and exact field authority.
+--- @return table stage Explicit preparation, payload and reselection lifetime.
+function M.prepare_selected(text, publication)
 	local steps = M.caret_steps(text)
-	local result = run_transaction("inject_selected()", function(tx)
-		if not send_text(tx, text, is_private) then error(tx.error(), 0) end
-		-- The typed text must reach the application before it is selected back.
-		sleep_ms(INTER_PHASE_DELAY_MS)
-		must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_DOWN, "selection shift down")
-		for _ = 1, steps do
-			must_emit(tx, KEY_LEFT, EVDEV_VALUE_DOWN, "selection left down")
-			must_emit(tx, KEY_LEFT, EVDEV_VALUE_UP, "selection left up")
-		end
-		must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_UP, "selection shift up")
-	end)
-	if result.ok then Logger.done(LOG, "inject_selected(): done (%d step(s) selected).", steps) end
-	return result
+	return require("modules.hotstrings.selected_output").new(text, publication, {
+		channel = _uinput, current_channel = function() return _uinput end,
+		run = run_transaction, native = send_text_native, sleep = sleep_ms,
+		reselect = function(tx)
+			must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_DOWN, "selection shift down")
+			for _ = 1, steps do
+				must_emit(tx, KEY_LEFT, EVDEV_VALUE_DOWN, "selection left down")
+				must_emit(tx, KEY_LEFT, EVDEV_VALUE_UP, "selection left up")
+			end
+			must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_UP, "selection shift up")
+		end,
+		settle = function() sleep_ms(INTER_PHASE_DELAY_MS) end,
+	})
 end
 
 return M

@@ -6,13 +6,22 @@ local PhysicalAvailability = require("shortcuts.physical_availability")
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.preferences")
 local Scope = require("infra.preferences_scope")
+local MOD_COMBOS = require("config_keys").KEY.MOD_COMBOS
 
-local STATE_FIELDS = { "shortcuts", "chatgpt_url", "shortcut_keys", "script_control_enabled", "script_control_shortcuts" }
+local STATE_FIELDS = { "shortcuts", require("config_keys").LEAF.CHATGPT_URL, "shortcut_keys", "script_control_enabled", "script_control_shortcuts" }
+
+-- [shortcuts.caps_word] and its pointer kinds belong to their settings owner,
+-- which names their state keys; the scope applies them through it.
+local CapsWordAutoOff = require("infra.capsword_auto_off")
+local TableUtil = require("table_util")
+for _, key in ipairs({ CapsWordAutoOff.IDLE_KEY, CapsWordAutoOff.TERMINATORS_KEY, CapsWordAutoOff.POINTER_KEY }) do
+	STATE_FIELDS[#STATE_FIELDS + 1] = key
+end
 
 -- The rows of the script chords' submenu: their section, and the parameters
 -- of the bindings they dispatch under (modules/shortcuts/script_control.lua
 -- BINDING_PREFIX).
-local SCRIPT_CHORD_SECTION = "shortcuts.script_control"
+local SCRIPT_CHORD_SECTION = require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL
 local SCRIPT_CHORD_PARAMETERS = "gestures.action_parameters." .. require("modules.shortcuts.script_control").BINDING_PREFIX
 
 --- Whether a Shortcuts scope row belongs to the script chords' submenu, whose
@@ -24,12 +33,31 @@ function M.script_chord_rows(path)
 		or path:sub(1, #SCRIPT_CHORD_PARAMETERS) == SCRIPT_CHORD_PARAMETERS
 end
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local result = {}
-	for key, item in pairs(value) do result[key] = clone(item) end
-	return result
+--- The rows of one modifier group of the keyboard slots (Option, Ctrl,
+--- Ctrl+Shift, Cmd, Cmd+Shift), whose restore and clear narrow the scope to
+--- the group's slots and the parameters of the bindings they dispatch under.
+--- @param slot_ids table Array of the group's slot ids, as its submenu lists them.
+--- @param binding_id function Slot id -> binding id (keyboard_shortcuts.binding_id).
+--- @return function select Configuration path -> boolean.
+function M.keyboard_group_rows(slot_ids, binding_id)
+	assert(type(slot_ids) == "table" and #slot_ids > 0 and type(binding_id) == "function",
+		"a keyboard group scope needs its slots and their binding identity")
+	local paths, parameter_prefixes = {}, {}
+	for _, slot in ipairs(slot_ids) do
+		assert(type(slot) == "string" and slot ~= "", "keyboard group slot ids must be strings")
+		paths["shortcuts.keyboard." .. slot] = true
+		parameter_prefixes[#parameter_prefixes + 1] = "gestures.action_parameters." .. binding_id(slot) .. "__"
+	end
+	return function(path)
+		if paths[path] then return true end
+		for _, prefix in ipairs(parameter_prefixes) do
+			if path:sub(1, #prefix) == prefix then return true end
+		end
+		return false
+	end
 end
+
+local clone = TableUtil.deep_copy
 
 --- Creates an atomic scope without publishing a menu command or acquiring a second store.
 --- ScriptControl's boot-owned eventtap posture is preserved independently of its action gate.
@@ -94,6 +122,16 @@ function M.new(options)
 		-- cleanup. Physical edits retain their source-bound leaf validation;
 		-- the script chords' submenu writes only its own leaves.
 		local containers = config.select == nil and not config.editing and Preferences.SHORTCUT_CONTAINERS or nil
+		-- [mod_combos] lives in config_karabiner.toml: the remap engine applies
+		-- the Shortcuts scope's combination section itself (platform/remap
+		-- REMAP_SCOPE_SECTIONS), so this config.toml transaction leaves it.
+		if not config.editing then
+			local narrowed = config.select
+			config.select = function(path)
+				if path == MOD_COMBOS or path:sub(1, #MOD_COMBOS + 1) == MOD_COMBOS .. "." then return false end
+				return narrowed == nil or narrowed(path) == true
+			end
+		end
 		config.parameter_name_owned = function(domain, name)
 			if domain == "keyboard" and require("shortcuts.physical_slots").is_namespace(name) then
 				return keyboard.physical_slot_descriptor(name) ~= nil
@@ -102,11 +140,11 @@ function M.new(options)
 		end
 		config.validate_edit_row = function(scope, row)
 			if scope ~= "shortcuts" then return false end
-			if row.section == "shortcuts.keyboard" then
+			if row.section == require("config_keys").KEY.SHORTCUTS_KEYBOARD then
 				return keyboard.physical_slot_descriptor(row.key) ~= nil
 					and (row.delete == true or gestures.is_assignable(row.value) == true)
 			end
-			if row.section == "gestures.action_parameters" then
+			if row.section == require("config_keys").KEY.GESTURES_ACTION_PARAMETERS then
 				local binding, action = gestures.split_action_parameter_key(row.key)
 				local slot = type(binding) == "string" and binding:match("^keyboard__(.+)$") or nil
 				return slot ~= nil and keyboard.physical_slot_descriptor(slot) ~= nil
@@ -142,6 +180,8 @@ function M.new(options)
 			end
 			local desired = {}
 			for _, key in ipairs(STATE_FIELDS) do desired[key] = clone(state[key]) end
+			-- What CapsWord runs is its owner's, as each native posture above is.
+			for key, value in pairs(CapsWordAutoOff.current_values()) do desired[key] = value end
 			captured = { native = native, state = desired }
 			return captured
 		end,
@@ -150,28 +190,34 @@ function M.new(options)
 			desired.shortcut_keys = desired.shortcut_keys or {}
 			desired.script_control_shortcuts = desired.script_control_shortcuts or {}
 			for _, row in ipairs(updates) do
-				if row.section ~= "gestures.action_parameters" then
+				if row.section ~= require("config_keys").KEY.GESTURES_ACTION_PARAMETERS then
 					local value = row.value
 					if row.delete then
-						if row.section == "shortcuts.keyboard" and keyboard.physical_slot_descriptor(row.key) ~= nil then value = "none"
+						if row.section == require("config_keys").KEY.SHORTCUTS_KEYBOARD and keyboard.physical_slot_descriptor(row.key) ~= nil then value = "none"
 						else value = Manifest.default_for(row.section .. "." .. row.key) end
 					end
-					if row.section == "shortcuts.keyboard" then
+					if row.section == require("config_keys").KEY.SHORTCUTS_KEYBOARD then
 						native.keyboard_expected[row.key] = value
 						if row.delete then
 							native.keyboard[row.key], native.keyboard_claims[row.key] = nil, nil
 						else
 							native.keyboard[row.key], native.keyboard_claims[row.key] = value, true
 						end
-					elseif row.section == "shortcuts.tap_keys" then native.tap_keys[row.key] = value
-					elseif row.section == "shortcuts.keys" then
+					elseif row.section == require("config_keys").KEY.SHORTCUTS_TAP_KEYS then native.tap_keys[row.key] = value
+					elseif row.section == require("config_keys").KEY.SHORTCUTS_KEYS then
 						assert(native.keys[row.key] ~= nil, "scope key has no native binding owner: " .. row.key)
 						native.keys[row.key], desired.shortcut_keys[row.key] = value, value
-					elseif row.section == "shortcuts.script_control" then
+					elseif row.section == require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL then
 						if row.key == "chords_enabled" then desired.script_control_enabled = value
 						else desired.script_control_shortcuts[row.key] = value end
 					elseif row.section == "shortcuts" and row.key == "enabled" then native.master, desired.shortcuts = value, value
-					elseif row.section == "shortcuts" and row.key == "chatgpt_url" then native.url, desired.chatgpt_url = value, value
+					elseif row.section == "shortcuts" and row.key == require("config_keys").LEAF.CHATGPT_URL then native.url, desired.chatgpt_url = value, value
+					elseif row.section == "shortcuts.caps_word.pointer" then
+						desired[CapsWordAutoOff.POINTER_KEY][row.key] = value
+					elseif row.section == require("config_keys").KEY.SHORTCUTS_CAPS_WORD then
+						local flat = Preferences.flat_key_for(row.section .. "." .. row.key)
+						assert(flat ~= nil, "CapsWord scope row has no settings owner: " .. row.key)
+						desired[flat] = value
 					else error("shortcut scope has no runtime owner: " .. row.section .. "." .. row.key) end
 				end
 			end
@@ -187,11 +233,18 @@ function M.new(options)
 			end
 			assert(type(desired.script_control_enabled) == "boolean", "invalid script chords switch in scope candidate")
 			native.script_chords_on = desired.script_control_enabled
-			if apply_native(native) ~= true then return false end
+			-- The CapsWord settings compile before any native publication; a
+			-- refused native step puts the previous ones back.
+			if CapsWordAutoOff.apply_state(desired) ~= true then return false end
+			if apply_native(native) ~= true then
+				CapsWordAutoOff.apply_state(captured.state)
+				return false
+			end
 			set_state(desired)
 			return true
 		end,
 		restore = function(snapshot)
+			if CapsWordAutoOff.apply_state(snapshot.state) ~= true then return false end
 			if apply_native(snapshot.native) ~= true then return false end
 			set_state(snapshot.state)
 			return true
@@ -232,7 +285,7 @@ function M.new(options)
 		rows = PhysicalAvailability.capture_updates(rows)
 		if rows == nil then return false, "save_failed" end
 		if not owner.physical_delivery_available()
-			and PhysicalAvailability.requires_delivery(rows, "gestures.action_parameters", options.gestures.split_action_parameter_key) then
+			and PhysicalAvailability.requires_delivery(rows, require("config_keys").KEY.GESTURES_ACTION_PARAMETERS, options.gestures.split_action_parameter_key) then
 			return false, "unavailable"
 		end
 		if receipt ~= nil then

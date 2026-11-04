@@ -29,20 +29,10 @@
 -- ---------------------------------------------------------------------------
 -- Bootstrap: resolve driver root from this file's own path, mirror run.lua.
 -- ---------------------------------------------------------------------------
-local self_path   = debug.getinfo(1, "S").source:gsub("^@", "")
-local driver_root = self_path:match("^(.*)[/\\]tests[/\\]e2e[/\\]run_e2e%.lua$") or "."
-driver_root = driver_root:gsub("\\", "/")
-
-if driver_root == "." then
-	local sep      = package.config:sub(1, 1)
-	local cwd_cmd  = (sep == "\\") and "cd" or "pwd"
-	local h        = io.popen(cwd_cmd)
-	if h then
-		local cwd = h:read("*l") or "."
-		h:close()
-		driver_root = cwd:gsub("\\", "/"):gsub("/$", "")
-	end
-end
+local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+local tests_dir = assert(self_path:match("^(.*)[/\\]e2e[/\\]run_e2e%.lua$"),
+	"the E2E runner needs its tests directory")
+local driver_root = assert(loadfile(tests_dir .. "/runner_root.lua"))()
 
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
 local shared_root  = drivers_root .. "/_shared"
@@ -65,6 +55,7 @@ package.path = table.concat({
 -- wrong against a correct vector.
 local terminators = require("keymap.terminators")
 local Contract = require("tests.e2e.contract")
+local ChildCapture = require("tests.support.e2e.child_capture")
 
 
 -- ============================================================================
@@ -388,6 +379,94 @@ local corpus_assertions = pass_count + fail_count - corpus_before
 assert_true("corpus vector floor", vectors ~= nil and #vectors >= Contract.MIN_VECTOR_COUNT)
 assert_true("corpus assertion floor", corpus_assertions >= Contract.MIN_CORPUS_ASSERTIONS)
 
+-- The shipped data, which the corpus above does not pin: two or three
+-- expansions per hotstring family of the menu manifest, each read from the pack
+-- this driver ships and replayed exactly as a corpus vector.
+print("\n--- Shipped hotstring family samples ---")
+local static_root = drivers_root:match("^(.*)/[^/]+$")
+local ok_samples, samples = pcall(require("test.hotstring_family_samples").load, static_root)
+if not ok_samples then
+	fail("mandatory family samples", "resolved samples", tostring(samples))
+else
+	for _, v in ipairs(samples) do
+		run_corpus_vector(v)
+	end
+	print(string.format("Family samples processed: %d", #samples))
+end
+
+-- What a typed sequence leaves on screen: chaining, synthetic output and erase
+-- accounting, which one trigger per vector cannot show. The engine is fed as the
+-- daemon feeds it (ergopti_hotstrings.lua on_char): the hook has already
+-- forwarded the key to the application, an expansion erases backspace_count
+-- codepoints, types its replacement and the unconsumed terminator back, and the
+-- buffer keeps the output unless the mapping is final_result.
+print("\n--- Shared sequence vectors ---")
+local SEQUENCE_FLAGS = { "is_word", "auto_expand", "is_case_sensitive", "is_case_sensitive_strict", "final_result" }
+
+--- The codepoints of a UTF-8 string, in order.
+--- @param text string
+--- @return table
+local function codepoints(text)
+	local out = {}
+	for cp in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do out[#out + 1] = cp end
+	return out
+end
+
+--- Types `text` into a fresh engine holding `mappings`.
+--- @param mappings table Corpus mappings.
+--- @param text string Typed characters.
+--- @return string screen What the application shows.
+--- @return number fired Expansions that fired.
+local function type_sequence(mappings, text)
+	local engine = require("modules.hotstrings.engine").new()
+	local list = {}
+	for _, m in ipairs(mappings) do
+		local mapping = { trigger = m.trigger, replacement = m.replacement }
+		for _, flag in ipairs(SEQUENCE_FLAGS) do mapping[flag] = m[flag] == true end
+		list[#list + 1] = mapping
+	end
+	engine:load_mappings(list)
+	local screen, fired = {}, 0
+	for _, ch in ipairs(codepoints(text)) do
+		screen[#screen + 1] = ch
+		local is_terminator = terminators.is_terminator(ch)
+		local result = engine:on_char(ch, {
+			is_terminator       = is_terminator,
+			terminator_consumed = is_terminator and terminators.terminator_is_consumed(ch),
+		})
+		if result then
+			fired = fired + 1
+			for _ = 1, result.backspace_count do table.remove(screen) end
+			for _, cp in ipairs(codepoints(result.replacement)) do screen[#screen + 1] = cp end
+			if result.end_char and not result.consume_terminator then screen[#screen + 1] = result.terminator end
+			if result.final_result then engine:reset() else engine:apply_expansion(result) end
+		end
+	end
+	return table.concat(screen), fired
+end
+
+local ok_sequences, sequences = pcall(function()
+	local handle = assert(io.open(shared_root .. "/tests/corpus/hotstrings/sequence_vectors.json", "r"))
+	local decoded = require("json").decode(handle:read("*a"))
+	handle:close()
+	assert(type(decoded.vectors) == "table" and #decoded.vectors > 0, "sequence_vectors.json has no vectors")
+	return decoded.vectors
+end)
+if not ok_sequences then
+	fail("mandatory sequence vectors", "decoded vectors", tostring(sequences))
+else
+	for _, v in ipairs(sequences) do
+		local ok_typed, screen, fired = pcall(type_sequence, v.mappings, v.typed)
+		if not ok_typed then
+			fail("sequence[" .. v.id .. "] — replay", "ok", tostring(screen))
+		else
+			assert_eq("sequence[" .. v.id .. "] — screen", v.expected.screen, screen)
+			assert_eq("sequence[" .. v.id .. "] — expansions", v.expected.expansions, fired)
+		end
+	end
+	print(string.format("Sequence vectors processed: %d", #sequences))
+end
+
 -- The real daemon main(), one process per scenario (it runs once per
 -- process), against a scripted keyboard and a model of the focused field.
 -- These pin what no engine-level vector can: the injector's erase arithmetic,
@@ -403,10 +482,18 @@ local DAEMON_SCENARIOS = {
 	-- count it, or the first character of the replacement stays ("Aadn").
 	{ name = "Backspace after an end-char expansion restores the trigger", keys = " adn {BS}", screen = " adn" },
 	{ name = "Backspace after an auto expansion restores the trigger", keys = "pk★{BS}", screen = "pk★" },
+	-- The restored trigger ends the line without being buffered: the next word-only
+	-- trigger continues that word (unknown-context-resets).
+	{ name = "a word-only trigger does not fire inside a restored trigger", keys = " adn {BS}adn ", screen = " adnadn " },
 	-- Backspace edits the buffer instead of wiping it and declaring a word start.
 	{ name = "a corrected typo still expands", keys = " adx{BS}n ", screen = " ADN " },
 	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },
-	{ name = "a word-only trigger does not fire after an arrow key", keys = "x{LEFT}adn ", screen = "xadn " },
+	-- hotstrings.arrow_resets_word defaults to true: an arrow starts a new word.
+	{ name = "a word-only trigger fires after an arrow key (arrow_resets_word)", keys = "x{LEFT}adn ", screen = "xADN " },
+	{ name = "an arrow preserves a mid-word prefix when resets are disabled",
+		keys = "{ARROWRESETOFF}x{LEFT}adn {ARROWRESETON}", screen = "xadn " },
+	{ name = "an arrow preserves a partial trigger when resets are disabled",
+		keys = "{ARROWRESETOFF} ad{LEFT}n {ARROWRESETON}", screen = " ADN " },
 	-- Ctrl+Backspace deletes a word, not one character: it neither undoes the
 	-- expansion over text that is already gone nor leaves the rest of the word
 	-- in the buffer to complete a trigger (modified-backspace-2026-09-25).
@@ -423,12 +510,14 @@ local DAEMON_SCENARIOS = {
 	-- together read a second apart whenever that second turns over between
 	-- them: the 0.75 s expansion delay then dropped the trigger. This is the
 	-- stubbed CI step's clock, where the AI twin above once failed that way.
-	{ name = "a trigger typed across a clock second still expands", keys = " ad{TICK}n ", screen = " ADN ",
+	-- The delay runs from the last letter to the expander, so the second turns
+	-- over between those two keys.
+	{ name = "a trigger typed across a clock second still expands", keys = " adn{TICK} ", screen = " ADN ",
 		clock = "seconds" },
 	{ name = "with AI loaded, a corrected typo typed across a clock second still expands",
-		keys = " adx{BS}{TICK}n ", screen = " ADN ", llm = true, clock = "seconds" },
+		keys = " adx{BS}n{TICK} ", screen = " ADN ", llm = true, clock = "seconds" },
 	-- Two seconds on that clock is more than one of real pause: the delay holds.
-	{ name = "a pause the whole-second clock can prove still expires the trigger", keys = " ad{TICK}{TICK}n ",
+	{ name = "a pause the whole-second clock can prove still expires the trigger", keys = " adn{TICK}{TICK} ",
 		screen = " adn ", clock = "seconds" },
 	-- A touchpad reader that fails stops the reader alone: the same module
 	-- still runs the tap actions (gesture-pump-keeps-actions).
@@ -459,6 +548,19 @@ local TAP_WRAP_SCENARIOS = {
 	{ name = "a refused tap queue keeps the ordinary selection wrap", tap_wrap = "refused",
 		keys = "{SELECT}{TAPKEY}{WRAP}", screen = "(selected)(",
 		receipt = "attempts=1 queued=0 executed=0 reads=2 action=none binding=none" },
+}
+
+-- Built-in dynamic hotstrings fire only at a word start (item 129): with the
+-- date rules on, "td★" after a space expands, which proves they are live, and
+-- the same suffix ending a longer word stays as typed. The date is read
+-- before and after the child, so a run across midnight still has its answer.
+local DYNAMIC_SCENARIOS = {
+	{ name = "a built-in date rule expands at a word start", dynamic = "dates", keys = " td★",
+		screen = function() return " " .. os.date("%Y_%m_%d") end },
+	{ name = "a built-in date rule does not fire at the end of a longer word", dynamic = "dates", keys = " uptd★",
+		screen = " uptd★" },
+	{ name = "\"update\" never proposes \"date\" (dynamic-word-start)", dynamic = "dates", keys = " update★",
+		screen = " update★" },
 }
 
 -- A real consumed down owns repeats only while its native epochs and owners
@@ -558,6 +660,27 @@ local function daemon_child_command(interpreter, env, device, keys, quiet)
 	return table.concat(parts, " ")
 end
 
+
+do
+	local child = os.tmpname()
+	local file = assert(io.open(child, "wb"))
+	assert(file:write([[print('SCREEN "misleading"'); print("E2E_CLEAN_EXIT"); os.exit(23)]]))
+	assert(file:close())
+	local quote = ON_WINDOWS and cmd_quoted or sh_quoted
+	local output, status = ChildCapture.run(quote(arg and arg[-1] or "luajit") .. " " .. quote(child))
+	os.remove(child)
+	assert_true("a child error after a forged clean screen is rejected", status == 23
+		and not ChildCapture.accepted(output, status, false))
+	child = os.tmpname()
+	file = assert(io.open(child, "wb"))
+	assert(file:write([[print('SCREEN "misleading"'); print("E2E_EXPECTED_FAILURE injection output_debt=false signals_settled=true"); os.exit(1)]]))
+	assert(file:close())
+	output, status = ChildCapture.run(quote(arg and arg[-1] or "luajit") .. " " .. quote(child))
+	os.remove(child)
+	assert_true("exit one without the injected Writer debt is rejected", status == 1
+		and not ChildCapture.accepted(output, status, true))
+end
+
 do
 	print("\n--- Daemon key scenarios (real main(), scripted keyboard) ---")
 	local interpreter = arg and arg[-1] or "luajit"
@@ -589,10 +712,12 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_CLOCK", scenario.clock or "system" }
 			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_DYNAMIC", scenario.dynamic or "none" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
-			local pipe = io.popen(command, "r")
-			local output = pipe and pipe:read("*a") or ""
-			if pipe then pipe:close() end
+			local expected_before = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
+			local output, status = ChildCapture.run(command)
+			local expected_after = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
+			local completed = ChildCapture.accepted(output, status, scenario.magic_repeat == "injection")
 			if scenario.tap_collision_receipt then
 				local receipt = output:match("TAP_COLLISION ([^\r\n]+)")
 				if receipt == scenario.tap_collision_receipt then
@@ -619,17 +744,18 @@ do
 			end
 			local quoted = output:match("SCREEN (%b\"\")")
 			local screen = quoted and (loadstring or load)("return " .. quoted)() or nil
-			if screen == scenario.screen then
+			if (screen == expected_before or screen == expected_after) and completed then
 				pass(prefix .. scenario.name)
 			else
-				fail(prefix .. scenario.name, string.format("%q", scenario.screen),
-					screen and string.format("%q", screen) or ("no SCREEN line: " .. output:sub(-300)))
+				fail(prefix .. scenario.name, string.format("%q", expected_after),
+					screen and string.format("%q (exit %s, receipt %s)", screen, tostring(status), tostring(completed)) or ("no SCREEN line: " .. output:sub(-300)))
 			end
 		end
 	end
 	run_key_scenarios(home_env, "")
 	run_key_scenarios(home_env, "", TAP_WRAP_SCENARIOS)
 	run_key_scenarios(home_env, "", MAGIC_REPEAT_SCENARIOS)
+	run_key_scenarios(home_env, "", DYNAMIC_SCENARIOS)
 
 	-- hardening-e-presets: the same keys over the recommended preset, committed
 	-- by a start-up child through the menu's own composition in a folder tree
@@ -652,10 +778,9 @@ do
 		parts[#parts + 1] = sh_quoted(interpreter) .. " tests/e2e/startup_child.lua"
 		parts[#parts + 1] = sh_quoted(device) .. " restore_recommended " .. sh_quoted(driver_root)
 		parts[#parts + 1] = sh_quoted(driver_root .. "/_generated/config_template.toml") .. " 2>&1"
-		local pipe = io.popen(table.concat(parts, " "), "r")
-		local output = pipe and pipe:read("*a") or ""
-		if pipe then pipe:close() end
-		if output:find("E2E_FACT restore_committed=true", 1, true) then
+		local output, status = ChildCapture.run(table.concat(parts, " "))
+		if status == 0 and output:find("E2E_DONE restore_recommended", 1, true)
+			and output:find("E2E_FACT restore_committed=true", 1, true) then
 			run_key_scenarios(preset_env, "recommended preset: ")
 		else
 			fail("hardening-e-presets: the recommended preset is committed for the key scenarios",
@@ -673,16 +798,31 @@ do
 	local rows_env = {}
 	for _, pair in ipairs(home_env) do rows_env[#rows_env + 1] = pair end
 	rows_env[#rows_env + 1] = { "ERGOPTI_E2E_MENU_ROWS", rows_file }
-	os.execute(daemon_child_command(interpreter, rows_env, device, "a", true))
+	local rows_output, rows_status = ChildCapture.run(daemon_child_command(interpreter, rows_env, device, "a", false))
 	local rows_fh = io.open(rows_file, "r")
 	local rows = rows_fh and tonumber(rows_fh:read("*l")) or nil
+	local agent = rows_fh and rows_fh:read("*l") or nil
 	if rows_fh then rows_fh:close() end
 	os.remove(rows_file)
-	if rows and rows > 100 and rows <= MENU_ROW_CEILING then
+	local rows_child_accepted = ChildCapture.accepted(rows_output, rows_status, false)
+	if rows_child_accepted and rows and rows > 100 and rows <= MENU_ROW_CEILING then
 		pass(string.format("the real tray menu has %d rows (ceiling %d)", rows, MENU_ROW_CEILING))
 	else
-		fail("the real tray menu stays navigable", string.format("100 < rows <= %d", MENU_ROW_CEILING),
-			tostring(rows))
+		-- A count inside the bounds still fails when the child itself failed, so
+		-- the receipt names the child's verdict rather than the count alone.
+		fail("the real tray menu stays navigable", string.format("100 < rows <= %d and an accepted child", MENU_ROW_CEILING),
+			string.format("rows=%s child=%s%s", tostring(rows), rows_child_accepted and "accepted" or "failed",
+				rows_child_accepted and "" or ": " .. rows_output:sub(-300)))
+	end
+	-- Item 121: the unfinished agent is declared unavailable once, in the shared
+	-- manifest; in the composed tray its row says why and runs nothing, while
+	-- the AI submenu beside it keeps its controls.
+	local AGENT_RECEIPT = "agent disabled=true reason=true actions=0 ai_actions=some"
+	if rows_child_accepted and agent == AGENT_RECEIPT then
+		pass("the real tray shows the AI agent unavailable beside a working AI submenu (agent-disabled-root)")
+	else
+		fail("the real tray shows the AI agent unavailable beside a working AI submenu (agent-disabled-root)",
+			AGENT_RECEIPT, tostring(agent))
 	end
 
 	os.remove(device)
@@ -695,7 +835,7 @@ do
 		pass = pass,
 		fail = fail,
 		skip = function(label) print(string.format("  SKIP  %s", label)) end,
-	}, { driver = driver_root, interpreter = arg and arg[-1] or "luajit" })
+	}, { driver = driver_root, interpreter = arg and arg[-1] or "luajit", capture_child = ChildCapture.run })
 end
 
 do
@@ -708,6 +848,17 @@ do
 		assert_true("linux-digest-owner: updater cancellation preserves a real unrelated digest", result == true or result == 0)
 	else
 		print("  SKIP  native digest owner isolation requires libuv and LuaJIT FFI")
+	end
+end
+
+do
+	if not ON_WINDOWS then
+		local fixture = driver_root .. "/tests/e2e/clipboard_deadline_child.lua"
+		local output, status = ChildCapture.run(sh_quoted(assert(arg[-1])) .. " " .. sh_quoted(fixture))
+		assert_true("clipboard-deadline: refused preparation emits no paste and retains restoration",
+			status == 0 and output == "E2E_CLIPBOARD_DEADLINE_CLEAN\n")
+	else
+		print("  SKIP  clipboard process deadlines require the native POSIX target")
 	end
 end
 

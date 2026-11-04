@@ -12,6 +12,10 @@
 
 global _ConfigRegistryCachePending := false
 
+/** A well-formed cache built for another parser or registry: an expected miss. */
+class ConfigRegistryCacheStale extends Error {
+}
+
 /** Encodes the closed typed TOML model without evaluating cached source code. */
 class ConfigRegistryCodec {
 	static MAX_BYTES := 4194304
@@ -168,7 +172,7 @@ ConfigRegistryCacheCodeIdentity() {
 	if A_IsCompiled
 		return CryptoSha256Bytes(FSReadBytesStrict(A_ScriptFullPath))
 	SplitPath(A_LineFile, , &Directory)
-	Files := [Directory . "\config_migrate.ahk", A_LineFile]
+	Files := [Directory . "\config_migrate.ahk", Directory . "\..\_generated\config_migration_ops.ahk", A_LineFile]
 	loop files Directory . "\toml\*.ahk", "F"
 		Files.Push(A_LoopFileFullPath)
 	Identity := "typed-registry-cache-v1`n" . A_AhkVersion . "`n"
@@ -186,15 +190,42 @@ ConfigRegistryCacheCodeIdentity() {
 /** Strict envelope parsing is separate from typed model/schema validation. */
 ConfigRegistryCacheDecode(Text, Identity) {
 	Lines := StrSplit(Text, "`n")
-	if Lines.Length != 5 || Lines[1] != "ERGOPTI_REGISTRY_CACHE_V1"
-			|| Lines[2] != Identity || Lines[5] != ""
-		throw Error("Registry cache identity or envelope does not match")
+	if Lines.Length != 5 || Lines[1] != "ERGOPTI_REGISTRY_CACHE_V1" || Lines[5] != ""
+		throw Error("Registry cache envelope is malformed")
+	if Lines[2] != Identity
+		throw ConfigRegistryCacheStale("Registry cache was built from another parser or registry")
 	if !RegExMatch(Lines[3], "^[0-9a-f]{64}$") || !RegExMatch(Lines[4], "^[A-Za-z0-9+/]*={0,2}$")
 		throw Error("Registry cache checksum or payload encoding is invalid")
 	Bytes := CryptoBase64Decode(Lines[4])
 	if CryptoSha256Bytes(Bytes) != Lines[3]
 		throw Error("Registry cache payload checksum does not match")
 	return ConfigRegistryCodec.Decode(Bytes)
+}
+
+/** Owns the pristine validated registry per source path, keyed by the source content hash. */
+_ConfigRegistryPristineStore() {
+	static Store := Map()
+	return Store
+}
+
+/**
+ * Remembers an independent copy of a registry that was just validated from the
+ * source with this content hash, before anything else can hold or mutate it.
+ */
+_ConfigRegistryRememberPristine(Path, SourceHash, Registry) {
+	_ConfigRegistryPristineStore()[Path] := { Hash: SourceHash, Registry: ManifestCloneValue(Registry) }
+}
+
+/**
+ * Returns a fresh independent copy of the registry validated from exactly this
+ * source content, or false when the content differs from every validated load.
+ * A changed, removed or invalid source never matches: the caller parses it.
+ */
+ConfigRegistryPristineFor(Path, SourceHash) {
+	Store := _ConfigRegistryPristineStore()
+	if !Store.Has(Path) || Store[Path].Hash != SourceHash
+		return false
+	return ManifestCloneValue(Store[Path].Registry)
 }
 
 /** Reads the authoritative file on every load and always validates cached models. */
@@ -218,14 +249,21 @@ ConfigRegistryCacheLoad(Path, CachePath, CodeIdentity := unset, ParseFn := 0, Va
 				throw Error("Registry cache envelope could not be read")
 			Model := ConfigRegistryCacheDecode(Text, Identity)
 			Registry := Validate.Call(Model)
+			_ConfigRegistryRememberPristine(Path, SourceHash, Registry)
 			try LoggerInfo("ConfigMigration", "Registry parse cache hit, validated in {1} ms.", TickElapsed(Started))
 			return Registry
 		}
+	} catch ConfigRegistryCacheStale as Err {
+		; Every driver update or registry edit changes the identity: an expected
+		; miss, not a fault. A malformed or tampered cache below still warns.
+		try LoggerInfo("ConfigMigration", "Registry parse cache is stale: {1}; parsing the authoritative source.", Err.Message)
 	} catch as Err {
 		try LoggerWarn("ConfigMigration", "Registry parse cache refused: {1}; parsing the authoritative source.", Err.Message)
 	}
 	Model := Parse.Call(Source, "the shipped migration registry")
 	Registry := Validate.Call(Model)
+	if IsSet(SourceHash) && StrLen(SourceHash) == 64
+		_ConfigRegistryRememberPristine(Path, SourceHash, Registry)
 	if IsSet(Identity)
 		_ConfigRegistryCachePending := {Path: CachePath, Identity: Identity, Model: Model}
 	try LoggerInfo("ConfigMigration", "Registry parse cache miss, authoritative parse validated in {1} ms.", TickElapsed(Started))

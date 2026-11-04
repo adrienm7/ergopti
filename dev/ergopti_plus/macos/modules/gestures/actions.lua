@@ -18,10 +18,13 @@ local Logger        = require("infra.logger")
 local Paths         = require("infra.paths")
 local Timings       = require("infra.timings")
 local i18n          = require("infra.i18n")
+local KeyNames      = require("keycodes.key_names")
+local StickyLabel   = require("actions.sticky_label")
 local text_utils    = require("infra.text_utils")
 local FileSystem    = require("adapters.file_system")
 local KeyState      = require("adapters.key_state")
 local SyntheticInput = require("adapters.synthetic_input")
+local Clipboard     = require("adapters.clipboard")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
@@ -32,6 +35,7 @@ local DesktopNavigation = require("desktop_navigation")
 local SendInput     = require("send_input")
 local AppParameter  = require("app_parameter")
 local ProgramParameter = require("program_parameter")
+local UserActionParameter = require("user_action_parameter")
 local _program_revision = 0
 local _program_parameters_owned = false
 local PromptAction  = require("llm.prompt_action")
@@ -42,6 +46,7 @@ local JsonCodec     = require("adapters.json_codec")
 local ChordCatalogue = require("infra.script_chord_catalogue")
 local LOG           = "gestures.actions"
 local Brightness = require("brightness_actions").load()
+local ConfigKeys = require("config_keys")
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
 -- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on the
@@ -158,7 +163,7 @@ end
 
 --- Sends a system-level media or hardware key event.
 --- NX system-defined events are deliberately outside SyntheticInput: they are
---- not keyDown/keyUp events and never enter keymap/keylogger keyboard callbacks.
+--- not keyDown/keyUp events and never enter keymap/keystats keyboard callbacks.
 --- @param key string The hardware key name (e.g. "SOUND_UP").
 local function sysKey(key)
 	local function post_phase(is_down)
@@ -227,10 +232,7 @@ local function defer_key(label, mods, key, delay)
 end
 
 local function url_encode_query(value)
-	value = tostring(value or "")
-	return (value:gsub("[^%w%-%._~]", function(char)
-		return string.format("%%%02X", string.byte(char))
-	end))
+	return text_utils.percent_encode(tostring(value or ""))
 end
 
 local function open_url(url)
@@ -389,30 +391,6 @@ end
 local function sg(name, label_or_fn, fn_arg)
 	local fn = type(fn_arg) == "function" and fn_arg or label_or_fn
 	SG[name] = { fn = fn }
-end
-
---- Calls `method` on a lazily required UI module, logging loudly on a miss.
---- The plain `pcall(function() require(mod).method() end)` shape this replaces
---- collapsed three distinct failures — module absent, method absent, method
---- raised — into the same silent no-op, so four actions stayed dead through a
---- module rename with nothing in the logs to say so.
---- @param mod string Module name to require.
---- @param method string Method to invoke on it.
---- @param ... any Arguments forwarded to the method.
-local function invoke_ui(mod, method, ...)
-	local ok_mod, m = pcall(require, mod)
-	if not ok_mod or type(m) ~= "table" then
-		Logger.error(LOG, "Action target '%s' could not be required — gesture is a no-op.", mod)
-		return
-	end
-	if type(m[method]) ~= "function" then
-		Logger.error(LOG, "Action target '%s' has no '%s' function — gesture is a no-op.", mod, method)
-		return
-	end
-	local ok_call, err = pcall(m[method], ...)
-	if not ok_call then
-		Logger.error(LOG, "Action '%s.%s' raised: %s", mod, method, tostring(err))
-	end
 end
 
 --- Activates the most recently used other application directly.
@@ -1020,6 +998,14 @@ sg("capsword", function()
 			return
 		end
 		Logger.pcall(LOG, KeyState.set_capslock, true)
+		-- This write raises no Karabiner control signal: start the inactivity
+		-- delay that the watcher otherwise starts from the signal.
+		local watchers_ok, watchers = pcall(require, "platform.remap.watchers")
+		if not watchers_ok then
+			Logger.error(LOG, "CapsWord gesture cannot start the inactivity delay: %s.", tostring(watchers))
+			return
+		end
+		Logger.pcall(LOG, watchers.note_capsword_activated)
 	end
 	if not ke.set(KE_CAPSWORD_VARIABLE, KE_CAPSWORD_ACTIVE, finish_activation) then return end
 	-- A keystroke cannot toggle CapsLock: macOS delivers it as a flagsChanged
@@ -1164,10 +1150,10 @@ sg("select_word", text_action("select_word"))
 sg("paste_plain", text_action("paste_as_plain_text"))
 -- The case actions: the two toggles and the three explicit conversions, all
 -- through the shared Unicode table (unicode_case), pinned by the shared corpus.
-sg("uppercase_selection", text_action("toggle_uppercase"))
-sg("titlecase_selection", text_action("toggle_titlecase"))
+sg(ConfigKeys.COMMAND.UPPERCASE_SELECTION, text_action("toggle_uppercase"))
+sg(ConfigKeys.COMMAND.TITLECASE_SELECTION, text_action("toggle_titlecase"))
 sg("selection_uppercase", text_action("selection_uppercase"))
-sg("selection_lowercase", text_action("selection_lowercase"))
+sg(ConfigKeys.COMMAND.SELECTION_LOWERCASE, text_action(ConfigKeys.COMMAND.SELECTION_LOWERCASE))
 sg("selection_titlecase", text_action("selection_titlecase"))
 -- Wraps the current LINE (Cmd+Left, "(", Cmd+Right, ")"), like Windows.
 sg("surround_parens", text_action("surround_with_parens"))
@@ -1425,6 +1411,22 @@ sg("display_mirror_toggle", mouse_action("toggle_display_mirror"))
 -- The frontmost window saved to the screenshots folder, under the dispatching
 -- parent's screenshot owner: what the key left of 1 ran before it became a tap key.
 sg("screen_capture_instant", owner_action("modules.shortcuts.actions.system", "capture_frontmost_window"))
+-- Formerly the fixed Ctrl+G hotkey (schema v20 made it the secondary_g slot).
+-- The URL is read from its owner at each run, so a changed
+-- shortcuts.chatgpt_url applies at once to every binding.
+sg("open_chatgpt", function()
+	local ok_bindings, Bindings = pcall(require, "modules.shortcuts.bindings")
+	if not ok_bindings or type(Bindings) ~= "table" or type(Bindings.get_chatgpt_url) ~= "function" then
+		Logger.error(LOG, "open_chatgpt: the ChatGPT URL owner is unavailable: %s.", tostring(Bindings))
+		return false
+	end
+	local ok_apps, Apps = pcall(require, "modules.shortcuts.actions.apps")
+	if not ok_apps or type(Apps) ~= "table" or type(Apps.open_chatgpt) ~= "function" then
+		Logger.error(LOG, "open_chatgpt: the application owner is unavailable: %s.", tostring(Apps))
+		return false
+	end
+	return Apps.open_chatgpt(Bindings.get_chatgpt_url(), current_action_parent())
+end)
 sg("open_downloads", owner_action("modules.shortcuts.actions.apps", "open_downloads"))
 sg("open_file_manager", owner_action("modules.shortcuts.actions.apps", "open_finder"))
 sg("open_system_settings", owner_action("modules.shortcuts.actions.apps", "open_settings"))
@@ -1484,16 +1486,55 @@ sg("open_app", function(binding)
 	end
 	return System.open_app(value, current_action_parent())
 end)
+-- The user's own command line, file or folder, and Apple shortcut: each value
+-- is decoded by _shared/lua/user_action_parameter and never logged.
+local USER_ACTIONS = {
+	run_command = function(fields, parent)
+		return require("modules.gestures.user_actions").run_command(fields, parent,
+			M.send_vocabulary().text_max_code_points)
+	end,
+	open_path = function(fields, parent)
+		return require("modules.gestures.user_actions").open_path(fields, parent)
+	end,
+	run_apple_shortcut = function(fields, parent)
+		return require("modules.gestures.apple_shortcut_action").run(fields, parent,
+			M.send_vocabulary().text_max_code_points)
+	end,
+}
+for user_action, run_user_action in pairs(USER_ACTIONS) do
+	sg(user_action, function(binding)
+		local fields = UserActionParameter.parse(M.get_action_parameter_spec(user_action),
+			M.get_action_parameter(binding, user_action))
+		if not fields then
+			Logger.warn(LOG, "%s ignored for binding '%s': no valid value is stored.", user_action, tostring(binding))
+			return false
+		end
+		return run_user_action(fields, current_action_parent())
+	end)
+end
 
 -- Applications and Stats
--- These four target the same modules the menu dispatches to (ui/menu/init.lua),
--- which is the reference for the real module names: the metrics overlays were
--- never one "ui.metrics_overlay" module, the hotstring editor is singular, and
--- the paths editor lives behind the menu_paths module rather than a UI module.
-sg("open_metrics_typing",            function() invoke_ui("ui.metrics_typing", "show") end)
-sg("open_metrics_apps",        function() invoke_ui("ui.metrics_apps", "show") end)
-sg("open_hotstrings_editor",    function() invoke_ui("ui.hotstring_editor", "open") end)
-sg("open_paths_editor",            function() invoke_ui("ui.menu.menu_paths", "open_editor") end)
+-- Each window action toggles one page through ui/window_toggle: closed opens
+-- it, covered brings it to the front, focused closes it. The page ids name
+-- the modules the menu dispatches to (ui/menu/init.lua): the metrics overlays
+-- were never one "ui.metrics_overlay" module, the hotstring editor is
+-- singular, and the paths editor lives behind the menu_paths module.
+local WINDOW_ACTIONS = {
+	open_metrics_typing      = "metrics_typing",
+	open_metrics_apps        = "metrics_apps",
+	open_hotstrings_editor   = "hotstring_editor",
+	open_paths_editor        = "paths_editor",
+	open_hotstrings_settings = ConfigKeys.COMMAND.HOTSTRINGS_CONFIG_WINDOW,
+	open_layout_manager      = ConfigKeys.COMMAND.LAYOUT_MANAGER,
+	open_layer_editor        = "layer_editor",
+	open_model_browser       = "model_browser",
+	open_changelog           = "changelog",
+	open_healthcheck         = ConfigKeys.COMMAND.HEALTHCHECK,
+}
+M.WINDOW_ACTIONS = WINDOW_ACTIONS
+for action_id, page in pairs(WINDOW_ACTIONS) do
+	sg(action_id, function() return require("ui.window_toggle").toggle(page) end)
+end
 sg("open_script_source",               function()
 	return AuxOwner.open(hs.configdir, "open script source", nil, current_action_parent())
 end)
@@ -1538,10 +1579,10 @@ end
 sg("open_logs_folder",                function()
 	return require("ui.log_openers").open_logs_folder(gesture_opener("open logs folder"))
 end)
-sg("open_today_log",                   function()
+sg(ConfigKeys.COMMAND.OPEN_TODAY_LOG,                   function()
 	return require("ui.log_openers").open_today_log(gesture_opener("open today's log"))
 end)
-sg("open_error_log",                   function()
+sg(ConfigKeys.COMMAND.OPEN_ERROR_LOG,                   function()
 	return require("ui.log_openers").open_today_errors(gesture_opener("open error log"))
 end)
 
@@ -1558,6 +1599,7 @@ end)
 local _search_capture_in_flight = false
 local _search_parent = nil
 local _search_saved_clipboard = nil
+local _search_result_receipt = nil
 local _search_capture_generation = 0
 local _search_recovery_only = false
 local _search_capture_authorized = false
@@ -1568,6 +1610,7 @@ local _search_restore_retry_timer_parent = nil
 local _search_deferred_retry_armed = false
 local _search_mutation_depth = 0
 local _search_cleanup_requested = false
+local _search_dispatch = nil
 
 local function search_capture_is_current(parent, generation)
 	return _search_capture_in_flight == true
@@ -1628,6 +1671,7 @@ end
 
 local function release_search_clipboard(generation)
 	if generation ~= _search_capture_generation then return end
+	if _search_dispatch and _search_dispatch.pending then return false, "search transaction retirement pending" end
 	local parent = _search_parent
 	local capture_stopped = stop_search_timer("capture", parent)
 	local restore_stopped = stop_search_timer("restore", parent)
@@ -1635,8 +1679,10 @@ local function release_search_clipboard(generation)
 		return false, "search timer cleanup pending"
 	end
 	_search_capture_in_flight = false
+	_search_dispatch = nil
 	_search_parent = nil
 	_search_saved_clipboard = nil
+	_search_result_receipt = nil
 	_search_recovery_only = false
 	_search_capture_authorized = false
 	_search_deferred_retry_armed = false
@@ -1649,22 +1695,61 @@ local function restore_search_clipboard(generation)
 	if generation ~= _search_capture_generation or not _search_capture_in_flight then
 		return false, "stale search generation"
 	end
-	local saved = _search_saved_clipboard
-	local ok_restore, restore_result
+	local dispatch = _search_dispatch
+	if dispatch and dispatch.pending then
+		dispatch.cancel_requested = true
+		pcall(SyntheticInput.cancel, dispatch.tx)
+		if dispatch.pending then return false, "search transaction retirement pending" end
+		if generation ~= _search_capture_generation then return true, nil end
+	end
+	if _search_mutation_depth > 0 then return false, "search clipboard boundary is active" end
 	_search_mutation_depth = _search_mutation_depth + 1
-	if type(saved) == "table" and next(saved) ~= nil then
-		ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
-	else
-		ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
-	end
+	local called, settled, detail, outcome = xpcall(function()
+		local saved = _search_saved_clipboard
+		local ok_restore, restore_result
+		local receipt = _search_result_receipt
+		if receipt ~= nil then
+			-- A missing initial observation cannot be replaced with a later count:
+			-- that would adopt an unrelated user's clipboard generation.
+			if receipt.expected_count == nil then return false, "search result ownership count is unavailable" end
+			local expected = receipt.expected_count
+			local function revoke_snapshot()
+				Logger.info(LOG, "search_web clipboard ownership changed; revoking old snapshot without restoration.")
+				local released, release_error = release_search_clipboard(generation)
+				if released ~= true then return false, release_error end
+				return true, nil, "revoked"
+			end
+			local current_count, count_error = Clipboard._change_count()
+			if current_count == nil then return false, count_error end
+			if current_count ~= expected then return revoke_snapshot() end
+			-- The adapter rechecks immediately before mutation and captures the
+			-- resulting count before any Logger callback can change the clipboard.
+			ok_restore, restore_result = Clipboard.restore(next(saved or {}) ~= nil and saved or nil, receipt)
+			if receipt.count_ok == true and receipt.attempted == false and receipt.count ~= expected then
+				return revoke_snapshot()
+			end
+			if receipt.attempted == true and receipt.count_ok == true then receipt.expected_count = receipt.count end
+			if not ok_restore then return false, receipt.detail or "search clipboard restoration refused" end
+		else
+			-- Before the first result, retain the existing capture/cleanup contract;
+			-- native changeCount does not identify the author of asynchronous Cmd+C.
+			if type(saved) == "table" and next(saved) ~= nil then
+				ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
+			else
+				ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
+				if ok_restore then restore_result = true end
+			end
+			if not ok_restore or restore_result ~= true then
+				return false, ok_restore and "clipboard restore returned " .. tostring(restore_result) or restore_result
+			end
+		end
+		local released, release_error = release_search_clipboard(generation)
+		if released ~= true then return false, release_error end
+		return true, nil, "restored"
+	end, debug.traceback)
 	_search_mutation_depth = _search_mutation_depth - 1
-	if not ok_restore or restore_result ~= true then
-		return false, ok_restore and "clipboard restore returned " .. tostring(restore_result)
-			or restore_result
-	end
-	local released, release_error = release_search_clipboard(generation)
-	if released ~= true then return false, release_error end
-	return true, nil
+	if not called then return false, settled end
+	return settled, detail, outcome
 end
 
 local function arm_search_timer(slot, delay, label, generation, parent, callback)
@@ -1756,6 +1841,73 @@ local function retain_search_restore_failure(generation, context, restore_error)
 		context, tostring(restore_error))
 end
 
+--- Joins the exact queued copy before reading or restoring its clipboard owner.
+local function start_search_dispatch(generation, parent, callback)
+	local dispatch = { pending = true, timer_elapsed = false }
+	_search_dispatch = dispatch
+	local function owns_dispatch()
+		return _search_dispatch == dispatch and generation == _search_capture_generation
+	end
+	local capture
+	local function failed(detail)
+		if not owns_dispatch() then return end
+		_search_capture_authorized = false
+		stop_search_timer("capture", parent)
+		local restored, restore_error = restore_search_clipboard(generation)
+		if not restored then _search_recovery_only = true; queue_search_restore_retry(generation) end
+		Logger.error(LOG, "search_web copy transaction failed: %s (restore=%s).", tostring(detail), tostring(restore_error))
+	end
+	local function arm(delay)
+		dispatch.timer_elapsed = false
+		local armed, detail = arm_search_timer("capture", delay, "capture", generation, parent, capture)
+		if not armed then failed(detail) end
+		return armed
+	end
+	capture = function()
+		if not owns_dispatch() or not search_capture_is_current(parent, generation) then return end
+		if dispatch.deadline == nil then dispatch.timer_elapsed = true; return end
+		local remaining = dispatch.deadline - hs.timer.absoluteTime()
+		if remaining > 0 then arm(remaining / 1e9); return end
+		if dispatch.pending then dispatch.timer_elapsed = true; return end
+		_search_dispatch = nil
+		callback()
+	end
+	local ok, accepted = xpcall(function()
+		dispatch.tx = SyntheticInput.begin("gestures.search.copy", "action", {
+			current = function() return owns_dispatch() and search_capture_is_current(parent, generation) end,
+			cached = function() return owns_dispatch() and search_capture_is_current(parent, generation) end,
+		})
+		SyntheticInput.on_complete(dispatch.tx, function(_, status)
+			dispatch.pending = false
+			if not owns_dispatch() then return end
+			if dispatch.cancel_requested then
+				local restored = restore_search_clipboard(generation)
+				if not restored and generation == _search_capture_generation then queue_search_restore_retry(generation) end
+			elseif status ~= "complete" then failed(status)
+			elseif dispatch.timer_elapsed and dispatch.deadline ~= nil then capture() end
+		end)
+		SyntheticInput.on_dispatched(dispatch.tx, function(_, _, status)
+			if not owns_dispatch() or status ~= "dispatched" then return end
+			dispatch.deadline = hs.timer.absoluteTime() + math.ceil(CLIPBOARD_COPY_SETTLE_SEC * 1e9)
+			if dispatch.timer_elapsed and search_capture_is_current(parent, generation) then arm(CLIPBOARD_COPY_SETTLE_SEC) end
+		end)
+		if not arm(CLIPBOARD_COPY_SETTLE_SEC) then return false end
+		_search_mutation_depth = _search_mutation_depth + 1
+		local emitted, copied = pcall(SyntheticInput.emit_key_stroke,
+			{ "cmd" }, "c", KEYSTROKE_NO_DELAY_US, dispatch.tx)
+		_search_mutation_depth = _search_mutation_depth - 1
+		assert(emitted and copied == true, "search copy shortcut admission refused: " .. tostring(copied))
+		assert(SyntheticInput.seal(dispatch.tx) == true, "search copy transaction seal refused")
+		return true
+	end, debug.traceback)
+	if not ok then
+		if dispatch.tx == nil then dispatch.pending = false end
+		failed(accepted)
+		return false, accepted
+	end
+	return accepted == true
+end
+
 local function cleanup_search_capture(parent)
 	local scope_id = type(parent) == "string" and parent ~= ""
 		and parent or GESTURE_ACTION_PARENT
@@ -1785,6 +1937,7 @@ local function cleanup_search_capture(parent)
 end
 
 sg("search_web", function(binding)
+	if _search_mutation_depth > 0 then return false end
 	local template = M.get_action_parameter(binding, "search_web")
 	if not M.validate_action_parameter("search_web", template) then return end
 	local parent = current_action_parent()
@@ -1820,6 +1973,7 @@ sg("search_web", function(binding)
 	end
 	if not aux_admission_open(parent) then return false end
 	_search_saved_clipboard = snapshot_or_error
+	_search_result_receipt = nil
 	_search_capture_in_flight = true
 	_search_parent = parent
 	_search_capture_authorized = true
@@ -1829,7 +1983,8 @@ sg("search_web", function(binding)
 	_search_mutation_depth = _search_mutation_depth + 1
 	local ok_clear, clear_error = pcall(hs.pasteboard.clearContents)
 	_search_mutation_depth = _search_mutation_depth - 1
-	if not ok_clear or clear_error ~= true then
+	-- clearContents returns no values; only a raised boundary refuses it.
+	if not ok_clear then
 		local restored, restore_error = restore_search_clipboard(my_generation)
 		if not restored then
 			_search_recovery_only = true
@@ -1850,16 +2005,26 @@ sg("search_web", function(binding)
 		end
 		return false
 	end
-	local timer_armed, timer_error = arm_search_timer(
-		"capture", CLIPBOARD_COPY_SETTLE_SEC, "capture", my_generation, parent, function()
+	local timer_armed, timer_error = start_search_dispatch(my_generation, parent, function()
 		if not search_capture_is_current(parent, my_generation) then return end
+		local count_before, count_error = Clipboard._change_count()
 		local ok_selected, selected = pcall(hs.pasteboard.getContents)
-		local restored, restore_error = restore_search_clipboard(my_generation)
+		local count_after, after_error = Clipboard._change_count()
+		if not search_capture_is_current(parent, my_generation) then return end
+		_search_result_receipt = { expected_count = count_before }
+		if count_before == nil or count_after == nil then
+			retain_search_restore_failure(my_generation, "result ownership observation refused", count_error or after_error)
+			return
+		end
+		local restored, restore_error, restore_outcome = restore_search_clipboard(my_generation)
+		if restore_outcome == "revoked" then return end
 		if not restored then
 			_search_recovery_only = true
 			Logger.error(LOG, "search_web clipboard restore refused; ownership retained: %s.",
 				tostring(restore_error))
+			if not search_capture_is_current(parent, my_generation) then return end
 			queue_search_restore_retry(my_generation)
+			if not search_capture_is_current(parent, my_generation) then return end
 		end
 		if not ok_selected or type(selected) ~= "string" or selected == "" then
 			Logger.error(LOG, "search_web selection copy produced no text: %s.", tostring(selected))
@@ -1902,24 +2067,6 @@ sg("search_web", function(binding)
 					"superseded after capture timer acquisition", restore_error)
 			end
 		end
-		return false
-	end
-	_search_mutation_depth = _search_mutation_depth + 1
-	local ok_copy, copied = pcall(
-		SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
-	_search_mutation_depth = _search_mutation_depth - 1
-	if not ok_copy or copied ~= true
-		or _search_cleanup_requested
-		or not search_capture_is_current(parent, my_generation) then
-		_search_capture_authorized = false
-		stop_search_timer("capture", parent)
-		local restored, restore_error = restore_search_clipboard(my_generation)
-		if not restored then
-			_search_recovery_only = true
-			queue_search_restore_retry(my_generation)
-		end
-		Logger.error(LOG, "search_web copy shortcut was refused: %s (restore=%s).",
-			tostring(copied), tostring(restore_error))
 		return false
 	end
 	return true
@@ -2150,7 +2297,7 @@ sg("script_quit",                         function()
 	pcall(function() hs.closeConsole() end)
 	-- Leave the gesture/eventtap stack before starting the lifecycle transaction.
 	-- The coordinator keeps every F17 consumer and classifier live until the exact
-	-- token reports STOPPED, then the root teardown owns keylogger/MLX/helpers and
+	-- token reports STOPPED, then the root teardown owns keystats/MLX/helpers and
 	-- finally calls os.exit. Shared stock/personal Karabiner remains untouched.
 	local exit_requested = false
 	local function request_controlled_exit()
@@ -2339,7 +2486,9 @@ function M.validate_action_parameter(action, value)
 	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
 	-- Syntax only: whether the application is installed is checked when it opens
 	if spec == "app" then return AppParameter.is_valid(value) end
-	if spec == "program" then return ProgramParameter.parse(value, "hs") ~= nil end
+	if spec == "program" then return ProgramParameter.parse(value, "posix") ~= nil end
+	-- Syntax only: whether the path or the shortcut still exists is checked when it runs
+	if UserActionParameter.KINDS[spec] then return UserActionParameter.parse(spec, value) ~= nil end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -2362,6 +2511,7 @@ function M.parameter_prompt(action)
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
 	if spec == "program" then return i18n.get("dialog.gestures.param_program") end
+	if UserActionParameter.KINDS[spec] then return i18n.get(UserActionParameter.PROMPT_KEYS[spec]) end
 	if spec == "text" then
 		return fill_placeholder(i18n.get("dialog.gestures.param_text"),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2409,6 +2559,11 @@ function M.parameter_error(action)
 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
 	if spec == "program" then return i18n.get("dialog.gestures.param_err_program") end
+	if spec == "command" then
+		return fill_placeholder(i18n.get(UserActionParameter.ERROR_KEYS.command),
+			tostring(UserActionParameter.MAX_COMMAND_BYTES))
+	end
+	if UserActionParameter.KINDS[spec] then return i18n.get(UserActionParameter.ERROR_KEYS[spec]) end
 	if SendInput.KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(M.send_vocabulary().text_max_code_points))
@@ -2548,7 +2703,7 @@ function M.run_program(binding)
 		local Toml = require("infra.toml.codec")
 		local path = ConfigPaths.get("ConfigTomlPath")
 		local scalar = M.get_action_parameter(binding, "run_program")
-		local parsed = ProgramParameter.parse(scalar, "hs")
+		local parsed = ProgramParameter.parse(scalar, "posix")
 		if not parsed then return false end
 		local function binding_action()
 			if type(_state.ga) == "table" and _state.ga[binding] ~= nil then
@@ -2556,7 +2711,7 @@ function M.run_program(binding)
 			end
 			if binding:match("^script__") then
 				local id = binding:sub(9)
-				return require("modules.shortcuts.script_control").get_shortcut_actions()[id], "script_control", id
+				return require("modules.shortcuts.script_control").get_shortcut_actions()[id], ConfigKeys.LEAF.SCRIPT_CONTROL, id
 			end
 			local descriptors = {
 				{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
@@ -2688,10 +2843,11 @@ function M.get_all_action_parameters()
 	return out
 end
 
--- Labels for modifier-key actions are intentionally kept outside i18n: the
--- shared catalogue defines their exact, language-neutral display form (for
--- example "Ctrl + A") for every driver.
-local MODIFIER_ACTION_LABELS = {}
+-- The modifier-key actions are named at each read from the shared key name
+-- table, in the active language (« Cmd + Maj + Entrée »): they used to keep the
+-- catalogue's English names in every locale. Each entry holds the modifier ids
+-- and the catalogue key the label is built from.
+local MODIFIER_ACTION_PARTS = {}
 local MODIFIER_ACTION_GROUPS = {}
 
 local function load_modifier_chords(path)
@@ -2720,29 +2876,26 @@ local function register_modifier_chords(catalogue)
 
 	local max_mask = (2 ^ #modifiers) - 1
 	for mask = 1, max_mask do
-		local ids, labels, native_mods = {}, {}, {}
+		local ids, native_mods = {}, {}
 		for index, modifier in ipairs(modifiers) do
 			if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
 				ids[#ids + 1] = modifier.id
-				labels[#labels + 1] = modifier.label
 				native_mods[#native_mods + 1] = modifier.hammerspoon
 			end
 		end
 		local id_prefix = join(ids, "_")
-		local label_prefix = join(labels, " + ")
 		local action_ids = {}
 		for _, key_def in ipairs(keys) do
 			local action_id = id_prefix .. "_" .. key_def.id
-			local action_label = label_prefix .. " + " .. key_def.label
 			local key = key_def.macos_key or key_def.id
 			local mods = {}
 			for index, modifier in ipairs(native_mods) do mods[index] = modifier end
-			MODIFIER_ACTION_LABELS[action_id] = action_label
+			MODIFIER_ACTION_PARTS[action_id] = { modifiers = ids, key = key_def }
 			action_ids[#action_ids + 1] = action_id
 			sg(action_id, function() postKeyStroke(mods, key) end)
 		end
 		MODIFIER_ACTION_GROUPS[#MODIFIER_ACTION_GROUPS + 1] = {
-			label = label_prefix,
+			modifiers = ids,
 			actions = action_ids,
 		}
 	end
@@ -2773,8 +2926,8 @@ M.SG_NAMES = nil  -- populated below after get_sg_names() is defined
 --- Returns the ordered SG names with translated section headers: action ids,
 --- and headings as "#" (level 1) or "##" (level 2) followed by their text. The
 --- modifier-chord block expands into one sub-heading per modifier combination,
---- built from the localized group key and the language-neutral combination
---- label; it used to be a hardcoded French heading in every locale.
+--- built from the localized group key and the combination's names from the key
+--- name table; it used to be a hardcoded French heading in every locale.
 --- Called at menu-build time so headers always reflect the active locale.
 function M.get_sg_names()
 	local out = {}
@@ -2785,7 +2938,8 @@ function M.get_sg_names()
 			out[#out + 1] = string.rep("#", item.level) .. heading_text(item.key)
 		elseif item.kind == "modifier_chords" then
 			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
-				out[#out + 1] = string.rep("#", item.level) .. i18n.format(item.group_key, group.label)
+				out[#out + 1] = string.rep("#", item.level)
+					.. i18n.format(item.group_key, KeyNames.modifiers_label(group.modifiers, "macos", i18n.get))
 				for _, action_id in ipairs(group.actions) do out[#out + 1] = action_id end
 			end
 		else
@@ -2825,7 +2979,8 @@ function M.get_label(name)
 	if not name or name == "none" then
 		return i18n.get("sg_actions.none")
 	end
-	if MODIFIER_ACTION_LABELS[name] then return MODIFIER_ACTION_LABELS[name] end
+	local chord = MODIFIER_ACTION_PARTS[name]
+	if chord then return KeyNames.chord_label(chord.modifiers, chord.key, "macos", i18n.get) end
 	-- The label key the generated catalogue declares. An id this platform does
 	-- not offer (a binding written on another OS) still resolves through the
 	-- conventional keys. No hardcoded fallback: an action without a label key is
@@ -2835,7 +2990,11 @@ function M.get_label(name)
 	local keys = meta and { meta.label_key } or { "sg_actions." .. name, "ax_actions." .. name }
 	for _, key in ipairs(keys) do
 		local s = i18n.get(key)
-		if s ~= key then return s end
+		if s ~= key then
+			-- A sticky label is a template its modifiers fill (« 📌 {1} rémanents »).
+			if StickyLabel.is_sticky(name) then return StickyLabel.label(name, key, "macos", i18n.get) end
+			return s
+		end
 	end
 	return name
 end
@@ -2914,8 +3073,12 @@ function M.execute_single(name, binding)
 		end
 		-- The action owns the dispatch whether or not its question could be shown
 		-- (ask logs why not): a fallback provider must never run it unasked.
+		local confirmation_scope = action_scope_lifecycle(parent)
+		local confirmation_epoch = confirmation_scope.epoch
 		ActionConfirm.ask(M.get_label(name), function(acted_from)
-			if not aux_admission_open(parent) then
+			if not aux_admission_open(parent)
+				or action_scope_lifecycle(parent) ~= confirmation_scope
+				or confirmation_scope.epoch ~= confirmation_epoch then
 				Logger.info(LOG, "'%s' was confirmed after its scope was paused — not run.", name)
 				return
 			end

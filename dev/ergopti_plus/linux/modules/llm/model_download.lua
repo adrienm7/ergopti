@@ -22,6 +22,10 @@ local OWNER = "ollama_model_pull"
 local MODEL_PULL_TIMEOUT_MS = 24 * 60 * 60 * 1000
 
 local _active = nil
+-- The one observer of pull percentages (the model selector page) and the
+-- last whole percentage told, by "<attempt>|<percent>".
+local _progress_listener = nil
+local _told = nil
 -- Retain the exact creator/transport after logical progress has completed.
 local _retained = nil
 local _retry_request = nil
@@ -32,9 +36,39 @@ local function translated(key)
 	return ok and type(i18n.get) == "function" and i18n.get(key) or key
 end
 
-local function valid_tag(tag)
-	return type(tag) == "string" and tag ~= ""
-		and tag:match("^[%w%._%-%/:]+$") ~= nil
+local valid_tag = HttpBridge.valid_ollama_tag
+
+-- An answer the registry itself gave: the route reached it.
+local REGISTRY_ANSWERS = { "file does not exist" }
+
+--- The failure the window shows. A pull the managed daemon fetched direct,
+--- because its PAC route was unusable, names both causes as macOS does.
+--- @param request table
+--- @return string message
+local function failure_message(request)
+	local remote = request.remote_error
+	local stage = require("modules.llm.ollama_install_state").direct_fallback(request.base_url)
+	if stage == nil or type(remote) ~= "string" then return translated("menu.llm.download_failed") end
+	for _, answer in ipairs(REGISTRY_ANSWERS) do
+		if remote:find(answer, 1, true) then return translated("menu.llm.download_failed") end
+	end
+	Logger.error(LOG, "The automatic network configuration was unusable (%s) and the direct connection failed: %s.",
+		stage, remote)
+	return translated("network.failure.pac_unreachable_direct_failed")
+end
+
+--- Tells the percentage observer a new whole percentage of one pull, or nil
+--- once the pull ended.
+--- @param request table
+--- @param percent number|nil
+local function tell(request, percent)
+	if type(_progress_listener) ~= "function" then return end
+	local whole = percent ~= nil and math.floor(percent) or nil
+	local signature = tostring(request.attempt) .. "|" .. tostring(whole)
+	if signature == _told then return end
+	_told = signature
+	local ok, err = pcall(_progress_listener, request.tag, whole)
+	if not ok then Logger.error(LOG, "Model-download percentage observer raised: %s", tostring(err)) end
 end
 
 --- Observes actual physical retirement, never a legacy cancellation signal.
@@ -74,6 +108,7 @@ local function finish(request, attempt, succeeded, message, failure_receipt)
 	request.terminal = true
 	_active = nil
 	_retry_request = not succeeded and request or nil
+	tell(request, nil)
 	DownloadWindow.complete(request.session_id, succeeded, message, failure_receipt)
 	if current(request, attempt) and type(request.on_done) == "function" then
 		local ok, err = pcall(request.on_done, succeeded, request.tag)
@@ -98,6 +133,7 @@ local function consume_line(request, line)
 	local percentage = nil
 	if completed and total and total > 0 then percentage = completed * 100 / total end
 	if not current(request, request.attempt) or _active ~= request then return end
+	if percentage then tell(request, percentage) end
 	DownloadWindow.update(request.session_id, percentage,
 		translated("ollama.downloading"), type(message.status) == "string" and message.status or nil)
 end
@@ -125,6 +161,17 @@ local function dispatch(request)
 	local attempt = _attempt_serial
 	request.attempt = attempt
 	_active, _retained = request, request
+	-- The daemon started without its proxy after a refused sign-in: it serves the
+	-- models on disk, and a pull is refused here with the relay's own message.
+	local InstallState = require("modules.llm.ollama_install_state")
+	local refusal_key = InstallState.pull_refusal_key(request.base_url)
+	if refusal_key then
+		Logger.error(LOG, "Ollama model pull refused: the proxy sign-in relay refused (%s).",
+			tostring(InstallState.relay_refusal(request.base_url)))
+		request.acquiring = false
+		finish(request, attempt, false, translated(refusal_key))
+		return false
+	end
 	local url = HttpBridge.ollama_endpoint(request.base_url, "pull")
 	local ok_body, body = pcall(Json.encode, { name = request.tag, stream = true })
 	if not url or not ok_body or type(body) ~= "string" then
@@ -153,7 +200,7 @@ local function dispatch(request)
 			local succeeded = type(result) == "table" and result.ok == true
 				and request.saw_success == true and request.remote_error == nil
 			finish(request, attempt, succeeded, succeeded and translated("download_window.done_success")
-				or translated("menu.llm.download_failed"),
+				or failure_message(request),
 				type(result) == "table" and result.ok ~= true and result.failure_receipt or nil)
 		end)
 	request.acquiring = false
@@ -185,29 +232,43 @@ local function dispatch(request)
 	return true
 end
 
+--- Sets the one observer of pull percentages: it receives (tag, percent)
+--- at each new whole percentage of a pull, then (tag, nil) once it ended.
+--- nil removes it.
+--- @param listener function|nil
+function M.set_progress_listener(listener)
+	if listener ~= nil and type(listener) ~= "function" then
+		error("model_download.set_progress_listener requires a function or nil", 2)
+	end
+	_progress_listener = listener
+end
+
 --- Starts one model pull and its progress window.
 --- @param base_url string
 --- @param tag string Ollama-native model identity.
 --- @param label string Human-readable catalogue name.
 --- @param on_done function|nil
 --- @param admission function|nil Current consent, rechecked after native UI creation and on every retry.
---- @return boolean
-function M.start(base_url, tag, label, on_done, admission)
+--- @param on_retired function|nil Exact cleanup notification after retained transport and UI retirement.
+--- @return boolean handled Existing menu focus remains a handled action.
+--- @return boolean|nil acquired True only for a newly dispatched owned pull.
+function M.start(base_url, tag, label, on_done, admission, on_retired)
 	if _active then
 		if _active.creating or _active.acquiring or _active.cancelled then return false end
-		if _active.tag == tag then return DownloadWindow.focus(_active.session_id) end
+		if _active.tag == tag then return DownloadWindow.focus(_active.session_id), false end
 		return false
 	end
 	if _retained and not settled(_retained) then return false end
 	if type(base_url) ~= "string" or base_url == "" or not valid_tag(tag)
-			or type(label) ~= "string" or label == "" then
+			or type(label) ~= "string" or label == ""
+			or (on_retired ~= nil and type(on_retired) ~= "function") then
 		return false
 	end
 	local request = {
 		base_url = base_url,
 		tag = tag,
 		label = label,
-		on_done = on_done,
+		on_done = on_done, on_retired = on_retired,
 		admission = admission,
 		pending = "",
 		remote_error = nil,
@@ -241,7 +302,8 @@ function M.start(base_url, tag, label, on_done, admission)
 		if _retained == request then _retained = nil end
 		return false
 	end
-	return dispatch(request)
+	local dispatched = dispatch(request)
+	return dispatched, dispatched == true
 end
 
 --- Cancels the exact owned curl process group.
@@ -301,6 +363,11 @@ function M.cancel(expected)
 	if _retry_request == request then _retry_request = nil end
 	if _retained == request then _retained = nil end
 	Logger.info(LOG, "Ollama model pull cancelled for '%s'.", request.tag)
+	if type(request.on_retired) == "function" and not request.retirement_notified then
+		request.retirement_notified = true
+		local called, err = pcall(request.on_retired)
+		if not called then Logger.error(LOG, "Model-download retirement callback raised: %s", tostring(err)) end
+	end
 	return _active == nil and _retained == nil and _retry_request == nil
 end
 

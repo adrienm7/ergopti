@@ -458,9 +458,9 @@ local function handle_message(msg, owner)
 		
 		if ok_write and written == true and type(committed_content) == "string" then
 			_source_snapshot = { status = "ok", content = committed_content }
-			local reload_ok, reloaded = xpcall(function()
+			local reload_ok, reloaded, reload_cause = xpcall(function()
 				if type(_keymap) ~= "table" or type(_keymap.reload_toml) ~= "function" then
-					return false
+					return false, "the keymap reload API is unavailable"
 				end
 				-- The registry owns disable + load as one transaction. If parsing or
 				-- indexing fails, the exact old mappings remain live instead of leaving
@@ -469,7 +469,10 @@ local function handle_message(msg, owner)
 			end, debug.traceback)
 			if not owner_is_current(owner) then return end
 			if not reload_ok or reloaded ~= true then
-				Logger.error(LOG, "Personal hotstrings were saved but the live group reload rolled back.")
+				local cause = reload_cause or "the registry refused; its own line names the step"
+				-- A raised error may quote personal mappings; only its kind is logged.
+				if not reload_ok then cause = "the reload raised (details withheld)" end
+				Logger.error(LOG, "Personal hotstrings were saved but the live group reload rolled back (%s).", cause)
 				pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), nil, "error")
 				return
 			end
@@ -486,8 +489,8 @@ local function handle_message(msg, owner)
 				end
 			end
 		else
-			pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"),
-				tostring(ok_write and write_err or written), "error")
+			Logger.error(LOG, "Personal hotstring publication was refused: %s.", tostring(ok_write and write_err or written))
+			pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), nil, "error")
 		end
 		return
 	end
@@ -584,6 +587,7 @@ function M.open(open_mode)
 	local closed = false
 	local show_ok, candidate = xpcall(function()
 		return ui_builder.show_webview({
+			delete_on_close = true,
 			frame       = ui_builder.get_centered_frame(geo.width, geo.height),
 			title       = i18n.get("editor.hotstrings.window_title"),
 			style_masks = window_style,
@@ -625,6 +629,13 @@ end
 --- @return boolean
 function M.is_open()
 	return _webview ~= nil and owner_is_current(_owner)
+end
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window()
+	if _webview ~= nil and owner_is_current(_owner) then return _webview end
+	return nil
 end
 
 --- Closes the Hotstring Editor window and cleans up resources.

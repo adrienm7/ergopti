@@ -16,7 +16,7 @@
 ;    navigation keys (arrows, F-keys) are ignored to keep context clean.
 ; 4. PrefixWatcher integration: keystrokes are fed from the prefix watcher's
 ;    pass-through InputHook (``hotstring_prefix_watcher.ahk``). On Windows,
-;    HookDispatcher + Keylogger + PrefixWatcher each create an InputHook;
+;    HookDispatcher + Keystats + PrefixWatcher each create an InputHook;
 ;    the LLM bridge no longer registers with HookDispatcher because keystrokes
 ;    were not reaching it on some machines while the prefix hook was reliable.
 ; 5. Agent-only feed: while the bridge is inactive (the AI menu switched off,
@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -130,6 +131,57 @@ _LLM_Bridge_ApplyBufferEdit(DeleteFromEnd := unset, InsertedText := "") {
 _LLM_Bridge_ClearBuffer() {
 	LLM_Bridge_CancelPrefixObserver()
 	return _LLM_Bridge_ApplyBufferEdit()
+}
+
+/** Reports incomplete text retained by either bridge-owned context. */
+LLM_Bridge_HasIncompleteInput() {
+	global _LLM_Bridge_Buffer, _LLM_Bridge_AgentBuffer
+	return (_LLM_Bridge_Buffer != "" && _TextCompleteTailScalar(_LLM_Bridge_Buffer) == "")
+		|| (_LLM_Bridge_AgentBuffer != "" && _TextCompleteTailScalar(_LLM_Bridge_AgentBuffer) == "")
+}
+
+; Retire derived work without notifying an observer with invalid UTF-16.
+_LLM_Bridge_InvalidateIncompleteTyping(InvalidatePrediction := true) {
+	global _LLM_Bridge_Active, _LLM_Engine
+	LLM_Bridge_CancelPrefixObserver()
+	if InvalidatePrediction && _LLM_Bridge_Active {
+		LLM_Engine_CancelTimer()
+		_LLM_Engine["request_id"] := _LLM_Engine.Get("request_id", 0) + 1
+		_LLM_Engine["active_request_signature"] := ""
+	}
+	if IsSet(LLM_Agent_InvalidateTyping)
+		LLM_Agent_InvalidateTyping()
+}
+
+; A new unrelated character cannot make an abandoned half valid retroactively.
+_LLM_Bridge_PrepareInput(Char) {
+	if !LLM_Bridge_HasIncompleteInput() || Char == ""
+		return
+	First := NumGet(StrPtr(Char), 0, "UShort")
+	if !(First >= 0xDC00 && First <= 0xDFFF)
+		LLM_Bridge_DiscardIncompleteInput()
+}
+
+/** Discards only incomplete contexts when their input owner is revoked. */
+LLM_Bridge_DiscardIncompleteInput() {
+	global _LLM_Bridge_Buffer, _LLM_Bridge_AgentBuffer
+	PreviousCritical := Critical("On")
+	try {
+		IncompletePrediction := _LLM_Bridge_Buffer != ""
+			&& _TextCompleteTailScalar(_LLM_Bridge_Buffer) == ""
+		IncompleteAgent := _LLM_Bridge_AgentBuffer != ""
+			&& _TextCompleteTailScalar(_LLM_Bridge_AgentBuffer) == ""
+		if !IncompletePrediction && !IncompleteAgent
+			return false
+		if IncompletePrediction
+			_LLM_Bridge_ClearBuffer()
+		if IncompleteAgent
+			_LLM_Bridge_AgentBuffer := ""
+		_LLM_Bridge_InvalidateIncompleteTyping()
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 ; Pure admission policy for a deferred LLM output. Maps keep the test seam
@@ -671,7 +723,7 @@ _LLM_Accept_ClaimAndDispatch(Presented, AcceptFn := unset, AutomationGeneration 
  * Second canonical acceptance primitive: inserts slot SlotIdx of the exact
  * prediction whose validation chord (val_modifiers + digit) the native owner
  * consumed. It runs after the chord's modifiers were released, so it demands
- * the same record and surface, the chosen slot still active and painted, no
+ * the same offer, the chosen slot still active and painted, no
  * modifier held (it would alter the injected text), and verified focus in the
  * control that owns the render (llm-val-chord-inserts).
  * @param {Object} ExpectedRecord - Record named by the consumed jump receipt.
@@ -706,8 +758,12 @@ _LLM_Accept_SlotRefusal(Presented, ExpectedRecord, ExpectedSurface, SlotIdx,
 	if !IsObject(Presented) || !IsObject(ExpectedRecord)
 			|| !IsObject(ExpectedSurface)
 		return "no prediction offers an acceptable snapshot"
-	if ObjPtr(Presented.Record) != ObjPtr(ExpectedRecord)
-			|| ObjPtr(Presented.Surface) != ObjPtr(ExpectedSurface)
+	; The chord's own jump repaints the tooltip before its modifiers are
+	; released, and a repaint publishes a successor record and surface for the
+	; same offer, sharing its lifecycle: comparing the exact record refused every
+	; chord, so it only moved the highlight (val-chord-survives-own-repaint).
+	; Another offer always carries another lifecycle.
+	if !_LLM_Accept_SameOffer(Presented, ExpectedRecord)
 		return "another prediction replaced the one the chord named"
 	if !(SlotIdx is Integer) || SlotIdx < 1
 			|| !(Presented.Slots is Array) || SlotIdx > Presented.Slots.Length
@@ -724,6 +780,15 @@ _LLM_Accept_SlotRefusal(Presented, ExpectedRecord, ExpectedSurface, SlotIdx,
 	if !_LLM_Accept_FocusMatchesSource(InputSnapshot, Presented.AcceptSource)
 		return "the focus is not the control the prediction was rendered for"
 	return ""
+}
+
+; Whether the presented snapshot belongs to the offer whose record a receipt
+; named: the same lifecycle object, which every repaint of that offer keeps.
+_LLM_Accept_SameOffer(Presented, ExpectedRecord) {
+	if !Presented.HasOwnProp("Lifecycle") || !ExpectedRecord.HasOwnProp("Lifecycle")
+		return false
+	return IsObject(Presented.Lifecycle) && IsObject(ExpectedRecord.Lifecycle)
+		&& ObjPtr(Presented.Lifecycle) == ObjPtr(ExpectedRecord.Lifecycle)
 }
 
 ; Only the newest chord may insert: a second Alt+N while Alt is still held
@@ -998,7 +1063,12 @@ _LLM_Bridge_UnregisterDispatcherFallback() {
 ; which left this path as the only unattributed candidate. Two QPC reads, and the
 ; line is gated by the profiler floor so ordinary typing logs nothing.
 _LLM_Bridge_OnDispatcherChar(ih, ch) {
-	if (IsSet(_PrefixInputHook) && _PrefixInputHook)
+	if A_IsSuspended || (IsSet(_PrefixInputHook) && _PrefixInputHook)
+		return
+	if !IsObject(ih) || !IsObject(HookDispatcher._ih)
+		|| ObjPtr(ih) != ObjPtr(HookDispatcher._ih)
+		return
+	if _PrefixPrepareScalarContext(ch) < 0
 		return
 	_hpLlmChar := HotPath_Now()
 	LLM_Bridge_OnChar(ch)
@@ -1006,8 +1076,14 @@ _LLM_Bridge_OnDispatcherChar(ih, ch) {
 }
 
 _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
-	if (IsSet(_PrefixInputHook) && _PrefixInputHook)
+	if A_IsSuspended || (IsSet(_PrefixInputHook) && _PrefixInputHook)
 		return
+	if !IsObject(ih) || !IsObject(HookDispatcher._ih)
+		|| ObjPtr(ih) != ObjPtr(HookDispatcher._ih)
+		return
+	if (KS_IsContextResetKey(vk) && vk != 0x20)
+		|| (!_PrefixIsModifierVK(vk) && _PrefixShortcutModifierHeld())
+		_PrefixRevokeIncompleteFragments()
 	LLM_Bridge_FeedKeyDownIfActive(vk)
 }
 
@@ -1065,6 +1141,8 @@ LLM_Bridge_OnPrefixWatcherReady() {
  * @param {string} ch - Character from the prefix InputHook.
  */
 LLM_Bridge_FeedCharIfActive(ch) {
+	if A_IsSuspended
+		return false
 	if (IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
 		LLM_Bridge_OnChar(ch)
 	else
@@ -1081,9 +1159,10 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 		AgentWantedFn := unset) {
 	global _LLM_Bridge_Active, _LLM_Bridge_AgentFeeding, _LLM_Bridge_AgentBuffer
 	global _LLM_Bridge_PrefixObserver, _LLM_Engine, _LLM_Bridge_ReadLiveFocus
-	global _PrefixDeferredGeneration
+	global _PrefixDeferredGeneration, _LLM_Bridge_Buffer
 	if !A_IsCritical
 		throw Error("Prefix character mirroring requires a serialized input transaction.")
+	_LLM_Bridge_PrepareInput(ch)
 	Active := _LLM_Bridge_Active
 	if Active {
 		_LLM_Bridge_ApplyBufferEdit(0, ch)
@@ -1102,7 +1181,15 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 		}
 		LLM_Bridge_MirrorAgentEdit(0, ch)
 	}
-	return _LLM_Bridge_SchedulePrefixObserver(ch,
+	BridgeBuffer := Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
+	if BridgeBuffer != "" && _TextCompleteTailScalar(BridgeBuffer) == "" {
+		_LLM_Bridge_InvalidateIncompleteTyping(false)
+		return false
+	}
+	ObservedChar := ch
+	if StrLen(ch) == 1 && StrLen(_TextCompleteTailScalar(BridgeBuffer)) == 2
+		ObservedChar := _TextCompleteTailScalar(BridgeBuffer)
+	return _LLM_Bridge_SchedulePrefixObserver(ObservedChar,
 		ScheduleFn, IsSet(FocusFn) ? FocusFn : _LLM_Bridge_ReadLiveFocus)
 }
 
@@ -1163,6 +1250,9 @@ _LLM_Bridge_RunPrefixObserver(Owner) {
 		; Read the canonical buffer after any expansion, never the original trigger.
 		ContentGeneration := _LLM_Bridge_ContentGeneration
 		CurrentFn := _LLM_Bridge_PrefixObserverStillCurrent.Bind(Owner, ContentGeneration)
+		BridgeBuffer := Owner.Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
+		if BridgeBuffer != "" && _TextCompleteTailScalar(BridgeBuffer) == ""
+			return false
 		if Owner.Active {
 			LLM_Engine_CancelInflight(CurrentFn)
 			if !CurrentFn.Call()
@@ -1200,7 +1290,7 @@ LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
 		; Predictions are off: only the AI agent's typing observer listens
 		if (vk = 0x08)
 			_LLM_Bridge_ObserveAgentTyping(_TextTailCodeUnits(_LLM_Bridge_AgentBuffer, 1), "")
-		else if (vk = 0x09 or vk = 0x0D or vk = 0x1B)
+		else if (KS_IsContextResetKey(vk) && vk != 0x20)
 			LLM_Bridge_MirrorAgentEdit(0, "", true)
 		return
 	}
@@ -1214,8 +1304,13 @@ LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
 			return
 		}
 		LLM_Bridge_OnFlush()
-	} else if (vk = 0x0D or vk = 0x1B)
+	} else if (vk = 0x0D or vk = 0x1B) {
 		LLM_Bridge_OnFlush()
+	} else if (KS_IsContextResetKey(vk) && vk != 0x20) {
+		; The I1 hook forwards only keys not consumed by the prediction-cycle
+		; hotkeys. Cursor/editing input must retire both requests and offers.
+		LLM_Bridge_ResetPredictions()
+	}
 }
 
 
@@ -1236,7 +1331,7 @@ LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
  * @param {Object} SurfaceToken - Optional immutable owner from the pixel commit.
  */
 LLM_Bridge_ScheduleAfterHotstring(items, SurfaceToken := 0) {
-	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Engine
+	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Engine, LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
 	global _LLM_HOTSTRING_CHAIN_OFFSET_SEC, _LLM_INFINITE_TOOLTIP_SEC
 	global _LLM_MIN_TOOLTIP_DURATION_SEC
 
@@ -1245,8 +1340,13 @@ LLM_Bridge_ScheduleAfterHotstring(items, SurfaceToken := 0) {
 	; Live mode waits for the hotstring tooltip to close whatever after_hotstring
 	; says: its tooltip follows every keystroke, so it must come back after it.
 	if !(IsSet(_LLM_Engine) && _LLM_Engine["enabled"]
-			&& (_LLM_Engine["after_hotstring"] || LLM_Engine_LiveIsActive()))
+			&& (_LLM_Engine[ConfigLeaf.AFTER_HOTSTRING] || LLM_Engine_LiveIsActive()))
 		return
+	; Shown together, the prediction keeps the keystroke's own debounce: pushing
+	; it past the tooltip would show the two one after the other.
+	if !LLM_Engine_LiveIsActive()
+			&& LLM_Engine_WhileHotstringTooltip() == LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
+		return false
 	if !(IsObject(items) && items.Length > 0)
 		return false
 	if (IsObject(SurfaceToken)
@@ -1293,7 +1393,7 @@ _LLM_Bridge_IsBoundaryChar(c) {
 ; appended) is a word character. Mirrors macOS engine.start_timer_word_end gating.
 _LLM_Bridge_IsWordEndTrigger(ch) {
 	global _LLM_Engine, _LLM_Bridge_Buffer
-	if !(_LLM_Engine.Has("instant_on_word_end") and _LLM_Engine["instant_on_word_end"])
+	if !(_LLM_Engine.Has(ConfigLeaf.INSTANT_ON_WORD_END) and _LLM_Engine[ConfigLeaf.INSTANT_ON_WORD_END])
 		return false
 	if !_LLM_Bridge_IsBoundaryChar(ch)
 		return false
@@ -1307,6 +1407,9 @@ _LLM_Bridge_IsWordEndTrigger(ch) {
 LLM_Bridge_DeferTooltipHide(accepted := false, ExpectedRecord := 0) {
 	Record := IsObject(ExpectedRecord)
 		? ExpectedRecord : LLM_Tooltip_GetPresentedToken()
+	if !IsObject(Record)
+		return false
+	Record := LLM_Tooltip_WithdrawExact(Record, accepted)
 	if !IsObject(Record)
 		return false
 	SetTimer(_LLM_Bridge_DeferredTooltipHide.Bind(Record, accepted), -1)
@@ -1324,16 +1427,33 @@ _LLM_Bridge_DeferredTooltipHide(ExpectedRecord, accepted) {
  */
 LLM_Bridge_OnChar(ch) {
 	global _LLM_Bridge_Buffer, _LLM_Bridge_Active
-	if !_LLM_Bridge_Active
+	if !_LLM_Bridge_Active || A_IsSuspended
 		return
 
-	_LLM_Bridge_ApplyBufferEdit(0, ch)
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_Bridge_PrepareInput(ch)
+		_LLM_Bridge_ApplyBufferEdit(0, ch)
+		if _TextCompleteTailScalar(_LLM_Bridge_Buffer) == "" && _LLM_Bridge_Buffer != "" {
+			_LLM_Bridge_InvalidateIncompleteTyping()
+			return false
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
 	return _LLM_Bridge_NotifyChar(ch, _LLM_Bridge_Buffer)
 }
 
 _LLM_Bridge_NotifyChar(ch, Buffer, PublishGuard := unset) {
 	if IsSet(PublishGuard) && !PublishGuard.Call()
 		return false
+	if Buffer != "" {
+		CompletedScalar := _TextCompleteTailScalar(Buffer)
+		if CompletedScalar == ""
+			return false
+		if StrLen(ch) == 1 && StrLen(CompletedScalar) == 2
+			ch := CompletedScalar
+	}
 	; The AI agent's automatic mode waits for a pause in the same typing, and
 	; every keystroke retires its flow in flight, hotstring tooltip or not
 	if IsSet(LLM_Agent_OnTyping)
@@ -1343,8 +1463,9 @@ _LLM_Bridge_NotifyChar(ch, Buffer, PublishGuard := unset) {
 	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
 	; update the buffer but do NOT arm the LLM timer — LLM_Bridge_ScheduleAfterHotstring
 	; (fired from _LookupAndRender) owns the chain delay until
-	; the overlay closes, mirroring HS update_preview().
-	if TooltipIsVisible()
+	; the overlay closes, mirroring HS update_preview(). With
+	; llm.trigger.while_hotstring_tooltip = "both" the keystroke arms as usual.
+	if _LLM_Engine_HotstringTooltipHolds(LLM_Engine_LiveOverride())
 		return
 	; Only hide OUR tooltip — never dismiss a hotstring overlay. The canonical
 	; lifecycle emits dismissal for the exact offer this keystroke supersedes.
@@ -1422,7 +1543,7 @@ LLM_Bridge_OnBackspace() {
 		LLM_Agent_OnTyping(_LLM_Bridge_Buffer)
 
 	; Same hotstring-priority guard as OnChar.
-	if TooltipIsVisible()
+	if _LLM_Engine_HotstringTooltipHolds(LLM_Engine_LiveOverride())
 		return
 	if LLM_Tooltip_IsVisible()
 		LLM_Bridge_DeferTooltipHide()
@@ -1455,7 +1576,12 @@ _LLM_Bridge_ObserveAgentTyping(DeleteFromEnd, InsertedText) {
 	global _LLM_BRIDGE_AGENT_FEED_ERROR_THROTTLE_MS
 	if !_LLM_Bridge_AgentFeedIsWanted()
 		return false
+	_LLM_Bridge_PrepareInput(InsertedText)
 	LLM_Bridge_MirrorAgentEdit(DeleteFromEnd, InsertedText)
+	if _LLM_Bridge_AgentBuffer != "" && _TextCompleteTailScalar(_LLM_Bridge_AgentBuffer) == "" {
+		_LLM_Bridge_InvalidateIncompleteTyping(false)
+		return false
+	}
 	try {
 		LLM_Agent_OnTyping(_LLM_Bridge_AgentBuffer)
 	} catch as Err {
@@ -1473,7 +1599,7 @@ _LLM_Bridge_ObserveAgentTyping(DeleteFromEnd, InsertedText) {
 }
 
 ; Tells whether the inactive bridge feeds the AI agent: its automatic mode
-; watches the typing (LLM_Agent_WatchesTyping: mode "auto", not paused). The
+; watches the typing (LLM_Agent_WatchesTyping: mode "auto", AI on, not paused). The
 ; answer is read on every keystroke from the agent's own settings, so a mode
 ; change, a pause or a restored config starts or stops the feed at the next
 ; keystroke with no second copy of that state; the transitions are logged.
@@ -1563,11 +1689,13 @@ LLM_Bridge_ResetPredictions() {
 	global _LLM_Bridge_Buffer, _LLM_Engine, _LLM_Bridge_Active
 	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
 		return
+	; Context retention applies even between requests, while work cancellation
+	; and visual disposal remain conditional on actual active work.
+	if (IsSet(_LLM_Engine) and _LLM_Engine.Has(ConfigLeaf.RESET_ON_NAV) and _LLM_Engine[ConfigLeaf.RESET_ON_NAV])
+		_LLM_Bridge_ClearBuffer()
 	if !LLM_Bridge_HasActivePredictionWork()
 		return
 	try LoggerDebug("LLM.tt", "ResetPredictions: cancelling generation + hiding any tooltip.")
-	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("reset_on_nav") and _LLM_Engine["reset_on_nav"])
-		_LLM_Bridge_ClearBuffer()
 	; Timings only: the surface is about to be hidden, so the full re-render the
 	; old call performed here was painted and thrown away in the same breath.
 	try LLM_Tooltip_MarkChainTimingOnly(A_TickCount)

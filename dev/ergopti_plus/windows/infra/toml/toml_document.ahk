@@ -11,6 +11,15 @@
 
 #Requires AutoHotkey v2.0
 
+; Monotonic count of complete semantic parses. A configuration transaction's
+; cost is mostly its parses, so tests pin how many one transaction spends.
+global _TOML_DocumentParses := 0
+
+; Monotonic count of characters the lexer classified one at a time. That is the
+; slow path, so the boot record publishes it per parse and the startup smoke
+; bounds it: a native run that stops matching shows up here, not in a wall clock.
+global _TOML_DocumentSlowSteps := 0
+
 /** Returns a case-sensitive semantic table without native configuration effects. */
 _TOML_DocumentTable() {
 	Table := Map()
@@ -18,13 +27,61 @@ _TOML_DocumentTable() {
 	return Table
 }
 
+; Search pattern for the first character that needs full classification. The
+; separator is matched by code point so no separator can alter the pattern.
+_TOML_DocumentRunNeedle(Separator) {
+	static Cache := Map()
+	if !Cache.Has(Separator)
+		Cache[Separator] := "[#" . Chr(34) . Chr(39) . "\[\]{}\x{" . Format("{:X}", Ord(Separator)) . "}]"
+	return Cache[Separator]
+}
+
 ; One lexical owner serves physical records and nested value containers. Only
 ; an unquoted top-level separator ends a token; comments never acquire ownership.
 _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0, &SpanEnd := 0, StopAfterContainer := false) {
+	global _TOML_DocumentSlowSteps
 	Separated := false
 	SpanStart := 0, SpanEnd := 0
 	Result := "", Quote := "", Closers := [], Length := StrLen(Text)
+	; Outside a string, every character that is not a quote, comment, container
+	; or separator only extends the token: take the whole run in one native
+	; search instead of classifying it character by character (measured 2x on a
+	; 6 KB configuration). Anything the needle matches goes through the full
+	; classification below, so the lexical contract is unchanged.
+	Needle := StrLen(Separator) == 1 ? _TOML_DocumentRunNeedle(Separator) : ""
 	while Position <= Length {
+		if Needle != "" && Quote == "" && Type(Position) == "Integer" && Position > 0 {
+			Stop := RegExMatch(Text, Needle, , Position)
+			Stop := Stop ? Stop : Length + 1
+			if Stop > Position {
+				UnquotedRun := SubStr(Text, Position, Stop - Position)
+				Solid := RTrim(UnquotedRun, " `t`r`n")
+				if Solid != "" {
+					if !SpanStart
+						SpanStart := Position + RegExMatch(UnquotedRun, "[^ `t`r`n]") - 1
+					SpanEnd := Position + StrLen(Solid) - 1
+				}
+				Result .= UnquotedRun
+				Position := Stop
+				continue
+			}
+		}
+		; Inside a one-line string, every character except its closing quote, a
+		; basic-string escape or a line break only extends the token: take the run
+		; in one native search too. Character-by-character classification of quoted
+		; text made a 33 KB personal hotstrings file cost about 460 ms per parse.
+		if StrLen(Quote) == 1 && Type(Position) == "Integer" && Position > 0 {
+			Stop := RegExMatch(Text, Quote == Chr(34) ? '["\\\r\n]' : "['\r\n]", , Position)
+			if Stop > Position {
+				if !SpanStart
+					SpanStart := Position
+				SpanEnd := Stop - 1
+				Result .= SubStr(Text, Position, Stop - Position)
+				Position := Stop
+				continue
+			}
+		}
+		_TOML_DocumentSlowSteps += 1
 		Char := SubStr(Text, Position, 1)
 		Triple := SubStr(Text, Position, 3)
 		; Report original token offsets without changing the decoded token. Quote
@@ -37,14 +94,14 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0
 		}
 		if Quote != "" {
 			if StrLen(Quote) == 3 && Triple == Quote {
-				Run := 3
-				while SubStr(Text, Position + Run, 1) == Char
-					Run += 1
-				if Run > 5
+				QuoteRun := 3
+				while SubStr(Text, Position + QuoteRun, 1) == Char
+					QuoteRun += 1
+				if QuoteRun > 5
 					throw ValueError("Invalid TOML multiline string closure")
-				SpanEnd := Position + Run - 1
-				Result .= SubStr(Text, Position, Run)
-				Position += Run
+				SpanEnd := Position + QuoteRun - 1
+				Result .= SubStr(Text, Position, QuoteRun)
+				Position += QuoteRun
 				Quote := ""
 				continue
 			}
@@ -59,8 +116,16 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0
 			else if StrLen(Quote) == 1 && (Char == Chr(10) || Char == Chr(13))
 				throw ValueError("A single-line TOML string contains a newline")
 		} else if Char == "#" {
-			while Position <= Length && SubStr(Text, Position, 1) != Chr(10)
-				Position += 1
+			; Leave the LF to the original separator/container processing. Native
+			; search is forward only for an integer cursor and stops at NUL, so
+			; keep the original loop when there is no match or another cursor type.
+			if Type(Position) == "Integer" && Position > 0
+					&& (CommentNewline := InStr(Text, Chr(10), true, Position))
+				Position := CommentNewline
+			else {
+				while Position <= Length && SubStr(Text, Position, 1) != Chr(10)
+					Position += 1
+			}
 			continue
 		} else if (Triple == Chr(34) . Chr(34) . Chr(34))
 				|| (Triple == Chr(39) . Chr(39) . Chr(39)) {
@@ -171,7 +236,26 @@ _TOML_DocumentValue(Raw) {
 		}
 		return Result
 	}
-	return TOML_CoerceValue(Raw, true)
+	Spelled := _TOML_DocumentSpelledInteger(Raw)
+	return Spelled != "" ? Spelled : TOML_CoerceValue(Raw, true)
+}
+
+; TOML spells an integer with a sign, digit separators or a radix prefix too: read
+; as text, a same-value write would rewrite the token and a number could not replace
+; it. A value that may not fit 63 bits stays what it was. "" when Raw is none of these.
+_TOML_DocumentSpelledInteger(Raw) {
+	if RegExMatch(Raw, "^[+-]?\d+(_\d+)*$") && RegExMatch(Raw, "[+_]") && StrLen(RegExReplace(Raw, "\D")) <= 18
+		return Integer(StrReplace(StrReplace(Raw, "_"), "+"))
+	if !RegExMatch(Raw, "^0([xob])([0-9A-Fa-f]+(?:_[0-9A-Fa-f]+)*)$", &Match)
+		return ""
+	Digits := StrReplace(Match[2], "_")
+	Bits := Match[1] == "x" ? 4 : (Match[1] == "o" ? 3 : 1)
+	if StrLen(Digits) * Bits > 62 || (Bits < 4 && RegExMatch(Digits, Bits == 3 ? "[^0-7]" : "[^01]"))
+		return ""
+	Value := 0
+	loop parse Digits
+		Value := (Value << Bits) | Integer("0x" . A_LoopField)
+	return Value
 }
 
 _TOML_DocumentSealed(Value, Sealed) {
@@ -211,8 +295,18 @@ _TOML_DocumentContainer(Root, Parts, Limit, Arrays, Sealed) {
  * @returns {Map} Case-sensitive semantic document; malformed namespaces throw.
  */
 TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
+	global _TOML_DocumentParses, _TOML_DocumentSlowSteps
 	if !(Source is String)
 		throw TypeError("TOML document source must be a String")
+	_TOML_DocumentParses += 1
+	PerfCount("toml.document_parse")
+	PerfCount("toml.document_chars", StrLen(Source))
+	SlowStepsBefore := _TOML_DocumentSlowSteps
+	try return _TOML_ParseDocumentRecords(Source, &Records, &Physical)
+	finally PerfCount("toml.document_slow_steps", _TOML_DocumentSlowSteps - SlowStepsBefore)
+}
+
+_TOML_ParseDocumentRecords(Source, &Records, &Physical) {
 	if SubStr(Source, 1, 1) == Chr(0xFEFF)
 		Source := SubStr(Source, 2)
 	Root := _TOML_DocumentTable(), Current := Root, CurrentPath := [], NativeSection := ""
@@ -220,6 +314,13 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 	Records := [], Physical := [], Position := 1
 	while Position <= StrLen(Source) {
 		Start := Position
+		; A bare line feed is an empty record: skip the tokenizer for the long
+		; blank runs the writers render between sections.
+		if SubStr(Source, Position, 1) == Chr(10) {
+			Position += 1
+			Physical.Push({ Kind: "trivia", Section: NativeSection, Text: Chr(10) })
+			continue
+		}
 		Record := _TOML_DocumentToken(Source, &Position, Chr(10))
 		RawRecord := SubStr(Source, Start, Position - Start)
 		if Record == "" {
@@ -296,6 +397,40 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 	return Root
 }
 
+/**
+ * Parses an exact source once for READ-ONLY consumers. The memo is keyed by the
+ * whole source text, so a changed file can never be served a stale document; the
+ * returned Document, Records and Physical are shared and must not be mutated.
+ * Boot and every tray rebuild used to parse the same config.toml text more than
+ * twenty times (about 35 ms each) for lookups that only read it.
+ * @param {String} Source - Exact source text.
+ * @param {Array} Records - Receives the shared typed assignment records.
+ * @param {Array} Physical - Receives the shared physical record spans.
+ * @returns {Map} The shared, read-only semantic document; malformed input throws.
+ */
+TOML_ParseDocumentShared(Source, &Records := 0, &Physical := 0) {
+	static Entries := []
+	static MAX_ENTRIES := 4
+	static MAX_SOURCE_CHARS := 262144
+	if !(Source is String)
+		throw TypeError("TOML document source must be a String")
+	for Entry in Entries {
+		if Entry.Source == Source {
+			PerfCount("toml.document_shared_hit")
+			Records := Entry.Records, Physical := Entry.Physical
+			return Entry.Document
+		}
+	}
+	PerfCount("toml.document_shared_miss")
+	Document := TOML_ParseDocument(Source, &Records, &Physical)
+	if StrLen(Source) <= MAX_SOURCE_CHARS {
+		Entries.Push({ Source: Source, Document: Document, Records: Records, Physical: Physical })
+		while Entries.Length > MAX_ENTRIES
+			Entries.RemoveAt(1)
+	}
+	return Document
+}
+
 
 ; The semantic reader and migration share one typed value owner. Native Boolean
 ; sentinels retain their intent, while integers and floats compare by value.
@@ -313,6 +448,11 @@ _TOML_ValueKind(Value) {
 	return "unknown"
 }
 
+; Numeric equality cannot see the sign of a zero, and a division would throw.
+_TOML_IsNegativeZero(Value) {
+	return Value is Float && Value == 0 && SubStr(Format("{:g}", Value), 1, 1) == "-"
+}
+
 /** Compares native typed TOML values without coercing strings or Booleans. */
 TOML_SameValue(Left, Right) {
 	Kind := _TOML_ValueKind(Left)
@@ -321,7 +461,7 @@ TOML_SameValue(Left, Right) {
 	switch Kind {
 		case "boolean": return !!Left.Value == !!Right.Value
 		case "string": return StrCompare(Left, Right, true) == 0
-		case "number": return Left = Right
+		case "number": return Left = Right && _TOML_IsNegativeZero(Left) == _TOML_IsNegativeZero(Right)
 		case "array":
 			if Left.Length != Right.Length
 				return false
@@ -412,12 +552,12 @@ TOML_AdmitWriterCandidate(Source, Before, After, Candidate, Updates, Prefixes) {
 	Document := TOML_ParseDocument(Source, &Records, &Physical)
 	Roots := _TOML_ForeignArrayRoots(Physical)
 	Projection := _TOML_FlatDocument(_TOML_ArrayProjectionSections(Before, Roots))
-	TOML_ParseDocument(Candidate)
+	TOML_ParseDocument(Candidate, , &CandidatePhysical)
 	InlineAdmitted := _TOML_AdmitInlineTerminatorParent(Source, Document, Physical, Before, After, Candidate, Updates, Prefixes)
 	if InlineAdmitted is Map
 		return InlineAdmitted
 	if TOML_SameValue(Document, Projection) {
-		Content := _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes)
+		Content := _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes, Physical, CandidatePhysical)
 		if !TOML_SameValue(TOML_ParseDocument(Content), _TOML_FlatDocument(After))
 			throw ValueError("The physical TOML candidate differs from the requested model")
 		return Map("content", Content, "preserve_source", false)
@@ -454,9 +594,13 @@ _TOML_RecordOwned(Record, Owners, Prefixes) {
 ; Unmatched physical records are user data. Keep their complete lexical spans,
 ; including comments inside multiline arrays, instead of re-encoding values.
 ; Explicitly owned rows still come from the existing canonical serializer.
-_TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes) {
-	TOML_ParseDocument(Source, , &Physical)
-	TOML_ParseDocument(Candidate, , &Canonical)
+_TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes, Physical := 0, Canonical := 0) {
+	; A caller that already parsed one side hands over its lexical records, so a
+	; transaction does not tokenize the same text twice. Both lists are only read.
+	if !(Physical is Array)
+		TOML_ParseDocument(Source, , &Physical)
+	if !(Canonical is Array)
+		TOML_ParseDocument(Candidate, , &Canonical)
 	Owners := Map(), Rows := Map(), Headers := Map(), Order := []
 	Spacing := "", Separator := ""
 	for Update in Updates {
@@ -497,7 +641,7 @@ _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes) {
 	}
 	Content := "", Seen := Map(), Current := ""
 	Append(Text) {
-		if Content != "" && !RegExMatch(Content, "[\r\n]$")
+		if Content != "" && !TOML_EndsWithLineBreak(Content)
 			Content .= "`n"
 		Content .= Text
 	}
@@ -544,6 +688,18 @@ _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes) {
 		Flush(Section)
 	}
 	return Chr(0xFEFF) . Content
+}
+
+/**
+ * Tells whether a growing source buffer already ends its last physical line.
+ * An end-anchored regex rescans the whole buffer on every append, which made
+ * rendering a long config quadratic; this reads only the final character.
+ * @param {String} Text Source image assembled so far.
+ * @returns {Boolean} True when the final character is CR or LF.
+ */
+TOML_EndsWithLineBreak(Text) {
+	Last := SubStr(Text, -1)
+	return Last == "`n" || Last == "`r"
 }
 
 
@@ -610,11 +766,7 @@ _TOML_ConfigSet(Document, Parts, Update) {
 			Node.Delete(Key)
 		return
 	}
-	Value := _TOML_DocumentValue(TOML_RenderValue(Update.Value))
-	if Node.Has(Key) && ((Node[Key] is Map) != (Value is Map)
-			|| (Node[Key] is Array) != (Value is Array))
-		throw ValueError("Configuration update cannot replace a retained value container")
-	Node[Key] := Value
+	Node[Key] := _TOML_DocumentValue(TOML_RenderValue(Update.Value))
 }
 
 ; A changed descendant does not own a containing inline assignment. Its source
@@ -654,7 +806,7 @@ _TOML_ConfigInlineValue(Raw, Before, After, Path, Owned) {
 	if SubStr(Raw, SpanStart, 1) != "{" || SubStr(Raw, SpanEnd, 1) != "}"
 		throw ValueError("An inline container lost its physical braces")
 	Body := SubStr(Raw, SpanStart + 1, SpanEnd - SpanStart - 1)
-	Rows := [], Covered := [], Carry := "", ClosingTrivia := "", Position := 1
+	Rows := [], Covered := [], Carry := "", ClosingTrivia := "", Position := 1, RemovedLast := false
 	while Position <= StrLen(Body) {
 		Start := Position
 		Member := _TOML_DocumentToken(Body, &Position, ",", &Separated, , &MemberEnd)
@@ -683,7 +835,10 @@ _TOML_ConfigInlineValue(Raw, Before, After, Path, Owned) {
 		if !Desired["found"] {
 			TailPosition := 1
 			_TOML_DocumentToken(ValueRaw, &TailPosition, "", , , &ValueEnd)
-			Carry .= SubStr(Text, 1, KeyStart - 1) . SubStr(ValueRaw, ValueEnd + 1)
+			RemovedTrivia := SubStr(Text, 1, KeyStart - 1) . SubStr(ValueRaw, ValueEnd + 1)
+			if Trim(RemovedTrivia, " " . Chr(9) . Chr(13) . Chr(10)) != ""
+				Carry .= RemovedTrivia
+			RemovedLast := !Separated
 			continue
 		}
 		ChildPath := Path.Clone()
@@ -695,11 +850,19 @@ _TOML_ConfigInlineValue(Raw, Before, After, Path, Owned) {
 	}
 	NewRows := []
 	_TOML_ConfigInlineNewRows(After, [], Covered, NewRows)
+	; The separator space before a removed last member goes with it, and an empty
+	; container's own trivia stays at its opening brace.
+	if RemovedLast && Rows.Length
+		Rows[Rows.Length] := RTrim(Rows[Rows.Length], " " . Chr(9))
 	Content := ""
 	for Index, Row in Rows
 		Content .= (Index == 1 ? "" : ",") . Row
-	for Row in NewRows {
-		Content .= (Content == "" ? "" : ", ") . Carry . Row
+	if !Rows.Length && NewRows.Length {
+		Content := ClosingTrivia
+		ClosingTrivia := ""
+	}
+	for Index, Row in NewRows {
+		Content .= (Rows.Length || Index > 1 ? "," : "") . Carry . Row
 		Carry := ""
 	}
 	Content .= Carry . ClosingTrivia
@@ -768,20 +931,246 @@ _TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped,
 	}
 }
 
+; The expected model starts as the parsed source and is then mutated. Only the
+; semantic setter mutates it, and it changes Maps alone (arrays are never
+; traversed, values are replaced whole), so every table is copied and every
+; array or scalar is shared. A second parse of the same source was the cost.
+_TOML_DocumentCloneTables(Value) {
+	if !(Value is Map)
+		return Value
+	Copy := Value.Clone()
+	for Key, Child in Value {
+		if Child is Map
+			Copy[Key] := _TOML_DocumentCloneTables(Child)
+	}
+	return Copy
+}
+
+; Two rows on one path, or on a path and its descendant, have no single meaning:
+; the last one would silently win. Each path is already resolved to its source
+; spelling, so two rows reaching one member collide here whatever they spelled.
+_TOML_ConfigRefuseOverlappingRows(RowPaths) {
+	Seen := Map()
+	Seen.CaseSense := "On"
+	for Parts in RowPaths {
+		Name := _TOML_ConfigPathName(Parts)
+		if Seen.Has(Name)
+			throw ValueError("Two configuration rows address " . Name)
+		Seen[Name] := true
+	}
+	for Parts in RowPaths {
+		Ancestor := []
+		loop Parts.Length - 1 {
+			Ancestor.Push(Parts[A_Index])
+			if Seen.Has(_TOML_ConfigPathName(Ancestor))
+				throw ValueError("A configuration row replaces the parent of " . _TOML_ConfigPathName(Parts))
+		}
+	}
+}
+
+; True when a table or array generation below this path has its own source header:
+; the assignment replacing that value has to take those headers away with it.
+_TOML_ConfigPathHasHeader(Physical, Parts) {
+	for PhysicalRecord in Physical {
+		if PhysicalRecord.Kind == "header" && _TOML_ConfigPathUnder(_TOML_ConfigPath(PhysicalRecord.Section), Parts)
+			return true
+	}
+	return false
+}
+
+; Follows a row through the source without regard to case. A single member in
+; another spelling names the row's destination; two are a case twin.
+_TOML_ConfigResolveSpelling(Document, Parts) {
+	Node := Document, Canonical := [], Differs := false
+	for Segment in Parts {
+		Spelling := Segment, Matches := 0
+		if Node is Map {
+			for Key in Node {
+				if StrCompare(Key, Segment, false) != 0
+					continue
+				Matches += 1
+				if Matches == 1 || Key == Segment
+					Spelling := Key
+			}
+		}
+		LeafMatches := Matches
+		Differs := Differs || !(Spelling == Segment)
+		Canonical.Push(Spelling)
+		Node := Node is Map && Node.Has(Spelling) ? Node[Spelling] : ""
+	}
+	; Twins count where they reach the row's own table or its own member: a foreign
+	; [Tap_hold.other] says nothing about a row in [tap_hold.keys].
+	Twin := LeafMatches > 1 || _TOML_ConfigFoldedTables(Document, Canonical, 1) > 1
+	return Map("parts", Canonical, "twin", Twin, "differs", Differs)
+}
+
+; How many tables the path of a row's parent reaches, compared without regard to case.
+_TOML_ConfigFoldedTables(Node, Parts, Depth) {
+	if !(Node is Map)
+		return 0
+	if Depth >= Parts.Length
+		return 1
+	Count := 0
+	for Key, Child in Node {
+		if StrCompare(Key, Parts[Depth], false) == 0
+			Count += _TOML_ConfigFoldedTables(Child, Parts, Depth + 1)
+	}
+	return Count
+}
+
+; "" for a table or an array, else what the shared writer compares: one number kind.
+_TOML_ConfigScalarKind(Value) {
+	if Value is Map || Value is Array
+		return ""
+	if Value is TOML_Bool
+		return "boolean"
+	return Value is Number ? "number" : "string"
+}
+
+; Whether an inline source has a real parent for this absent member. A dotted
+; member implies its parent, so it owns no brace a new member could join.
+_TOML_ConfigInlineCanInsert(Raw, Path) {
+	Raw := Trim(Raw, " " . Chr(9) . Chr(13) . Chr(10))
+	if SubStr(Raw, 1, 1) != "{"
+		return false
+	for Member in _TOML_DocumentSplit(SubStr(Raw, 2, StrLen(Raw) - 2)) {
+		Position := 1
+		Segments := TOML_ParseKeyPath(_TOML_DocumentToken(Member, &Position, "="), true)
+		if !_TOML_ConfigPathUnder(Path, Segments) && !_TOML_ConfigPathUnder(Segments, Path)
+			continue
+		if Path.Length <= Segments.Length
+			return false
+		Remaining := []
+		for Index, Segment in Path {
+			if Index > Segments.Length
+				Remaining.Push(Segment)
+			else if !(Segment == Segments[Index])
+				return false
+		}
+		return _TOML_ConfigInlineCanInsert(SubStr(Member, Position), Remaining)
+	}
+	return Path.Length == 1
+}
+
+; An inline or a dotted owner is one physical line holding other values: the
+; shared writer changes a scalar there only for one of its own type, and never a
+; container, a literal-dot key or a spelling that is not exact.
+_TOML_ConfigAdmitOwnedEdit(Owner, Parts, Existing, Key, Differs, Desired := unset, WholeValue := false) {
+	Name := _TOML_ConfigPathName(Parts)
+	Inline := Owner.Path.Length < Parts.Length
+	Holder := Inline ? "An inline table" : "A dotted key"
+	if Key == "" || InStr(Key, ".")
+		throw ValueError(Holder . " cannot hold the literal key of " . Name)
+	if Differs
+		throw ValueError(Holder . " holds " . Name . " in another spelling")
+	Wanted := IsSet(Desired) ? _TOML_ConfigScalarKind(Desired) : ""
+	if !Existing["found"] {
+		if !IsSet(Desired) || Wanted == ""
+			throw ValueError(Holder . " takes no new container at " . Name)
+		Remaining := []
+		loop Parts.Length - Owner.Path.Length
+			Remaining.Push(Parts[Owner.Path.Length + A_Index])
+		if !_TOML_ConfigInlineCanInsert(Owner.Raw, Remaining)
+			throw ValueError("An inline table has no exact parent for " . Name)
+		return
+	}
+	Held := _TOML_ConfigScalarKind(Existing["value"])
+	if Held == "" {
+		; A batch save refuses this as the shared writer does; only the explicit
+		; cleanup removes one offered value whole, as the Lua cleanup's own cut does.
+		if WholeValue && !IsSet(Desired)
+			return
+		throw ValueError(Holder . " keeps the container at " . Name . " whole")
+	}
+	if !IsSet(Desired)
+		return
+	; Only a root dotted key may change type: it is alone on its line, with no header.
+	Rooted := !Inline && Owner.NativeSection == ""
+	if Wanted == "" || (!Rooted && Wanted != Held)
+		throw ValueError(Holder . " takes only a " . Held . " at " . Name)
+}
+
+; Applies the shared writer's refusals to one row and answers its destination.
+; A row that changes nothing is never refused: a save carries every setting, so
+; refusing those would make a whole file unwritable for one untouched twin.
+_TOML_ConfigAdmitRow(Document, Records, Physical, Parts, Update) {
+	Resolved := _TOML_ConfigResolveSpelling(Document, Parts)
+	Canonical := Resolved["parts"]
+	Existing := _TOML_DocumentLookup(Document, Canonical)
+	if Existing["blocked"]
+		return Canonical
+	Deleting := Update.HasOwnProp("Delete") && Update.Delete == 1
+	WholeValue := Deleting && Update.HasOwnProp("WholeValue") && Update.WholeValue == 1
+	if Deleting {
+		; Deleting what this spelling does not name never reaches a sibling in another
+		; spelling: a save deletes every neutral setting, and that sibling is the user's.
+		if !_TOML_DocumentLookup(Document, Parts)["found"]
+			return Parts
+	} else {
+		Desired := _TOML_DocumentValue(TOML_RenderValue(Update.Value))
+		if Existing["found"] && TOML_SameValue(Existing["value"], Desired)
+			return Canonical
+	}
+	Name := _TOML_ConfigPathName(Parts)
+	Twin := Resolved["twin"]
+	for Record in Records {
+		if !_TOML_ConfigPathUnder(Canonical, Record.Path)
+			continue
+		; A root dotted key is one line naming its whole exact path: its twin is
+		; another line, and the shared writer leaves that neighbour alone.
+		if Twin && !(Record.NativeSection == "" && Record.Path.Length == Canonical.Length
+				&& Canonical.Length > 1 && !Resolved["differs"])
+			break
+		if Record.Path.Length < Canonical.Length {
+			if Record.Value is Map
+				_TOML_ConfigAdmitOwnedEdit(Record, Canonical, Existing, Update.Key, Resolved["differs"], Desired?, WholeValue)
+		} else if Record.Path.Length - _TOML_ConfigPath(Record.NativeSection).Length > 1 {
+			_TOML_ConfigAdmitOwnedEdit(Record, Canonical, Existing, Update.Key, Resolved["differs"], Desired?, WholeValue)
+		}
+		return Canonical
+	}
+	; The explicit cleanup names one exact offered line, as the Lua cleanup's own cut
+	; does: refusing it would leave the user no way out of the twin refused here.
+	if Twin && !WholeValue {
+		; The named setting travels with the refusal: only it tells the user what
+		; to clean up, where any other refused write reads as a held file.
+		Refused := ValueError("Case twins in the source leave " . Name . " without one destination")
+		Refused.CaseTwinSetting := Name
+		throw Refused
+	}
+	if Existing["found"] && !IsSet(Desired) && _TOML_ConfigScalarKind(Existing["value"]) == ""
+		return Canonical
+	if Existing["found"] && _TOML_ConfigScalarKind(Existing["value"]) == ""
+			&& !_TOML_ConfigPathHasHeader(Physical, Canonical)
+		throw ValueError("No header owns the table at " . Name . ", so no row can replace it")
+	return Canonical
+}
+
 /**
  * Renders explicit configuration effects against the complete semantic source.
  * @param {String} Source Exact source image captured by the existing I/O owner.
  * @param {Array} Updates Section paths and literal leaf keys, never flat aliases.
  * @param {Array} Prefixes Explicitly replaced semantic namespaces.
- * @returns {Map} Qualified complete content and unchanged-source acknowledgement.
+ * @param {String} ExpectedSnapshot The image an earlier read of this source saw:
+ *   a source that moved since is refused before any row is applied.
+ * @returns {Map} Qualified complete content, unchanged-source acknowledgement,
+ *   and the number of source parses spent admitting new section headers. The
+ *   content holds a byte order mark only when the source did.
  */
-TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
+TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes, ExpectedSnapshot := unset) {
+	if IsSet(ExpectedSnapshot) && !(Source == ExpectedSnapshot)
+		throw ValueError("source changed before preparing the batch")
 	Document := TOML_ParseDocument(Source, &Records, &Physical)
-	Expected := TOML_ParseDocument(Source)
+	Expected := _TOML_DocumentCloneTables(Document)
 	for PhysicalRecord in Physical {
 		if PhysicalRecord.Kind == "opaque"
 			throw ValueError("Cannot retain an unclassified configuration source record")
 	}
+	RowPaths := []
+	for Update in Updates
+		RowPaths.Push(_TOML_ConfigAdmitRow(Document, Records, Physical,
+			_TOML_ConfigPath(Update.Section, Update.Key), Update))
+	_TOML_ConfigRefuseOverlappingRows(RowPaths)
 	Dropped := [], Deleted := []
 	for Prefix in Prefixes {
 		Parts := _TOML_ConfigPath(Prefix)
@@ -793,16 +1182,29 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	}
 	Owned := Map()
 	Owned.CaseSense := "On"
-	for Update in Updates {
-		Parts := _TOML_ConfigPath(Update.Section, Update.Key)
+	for RowIndex, Update in Updates {
+		Parts := RowPaths[RowIndex]
 		_TOML_ConfigSet(Expected, Parts, Update)
-		if Update.HasOwnProp("Delete") && Update.Delete == 1
+		if Update.HasOwnProp("Delete") && Update.Delete == 1 {
 			Deleted.Push(Parts)
+			; A deleted table or array owns every header and record beneath it;
+			; keeping a header would recreate an empty table or generation.
+			Original := _TOML_DocumentLookup(Document, Parts)
+			if Original["found"] && (Original["value"] is Array || Original["value"] is Map)
+				Dropped.Push(Parts)
+		} else {
+			; A changed value replacing header-owned bytes becomes one assignment.
+			Original := _TOML_DocumentLookup(Document, Parts)
+			if Original["found"] && (Original["value"] is Array || Original["value"] is Map)
+					&& !TOML_SameValue(Original["value"], _TOML_DocumentLookup(Expected, Parts)["value"])
+					&& _TOML_ConfigPathHasHeader(Physical, Parts)
+				Dropped.Push(Parts)
+		}
 		Owned[_TOML_ConfigPathName(Parts)] := Parts
 	}
 	_TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped, Owned)
 	if TOML_SameValue(Document, Expected)
-		return Map("content", Source, "preserve_source", true)
+		return Map("content", Source, "preserve_source", true, "header_admission_parses", 0)
 
 	; Find the deepest surviving explicit table for each newly introduced leaf.
 	; Appending a root dotted row after a header would silently change its owner.
@@ -822,7 +1224,7 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 			if _TOML_ConfigPathDropped(Records[RecordIndex].Path, Dropped)
 				continue
 		}
-		if HeaderSource != "" && !RegExMatch(HeaderSource, "[\r\n]$")
+		if HeaderSource != "" && !TOML_EndsWithLineBreak(HeaderSource)
 			HeaderSource .= "`n"
 		HeaderSource .= PhysicalRecord.Text
 	}
@@ -832,6 +1234,7 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	NewTables.CaseSense := "On"
 	HeaderAdmission := Map()
 	HeaderAdmission.CaseSense := "On"
+	NewLeaves := []
 	for Name, Parts in Owned {
 		Desired := _TOML_DocumentLookup(Expected, Parts)
 		if !Desired["found"]
@@ -850,19 +1253,42 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		loop Parts.Length - 1
 			SectionParts.Push(Parts[A_Index])
 		Identity := _TOML_ConfigPathName(SectionParts)
-		; New sections need explicit headers for the still-live native flat reader.
-		; The semantic parser decides whether that declaration is legal: existing
-		; dotted or inline namespaces may already have closed the requested table.
-		; Explicit replacements first release only their classified physical owners.
-		if SectionParts.Length && !HeaderAdmission.Has(Identity) {
+		if SectionParts.Length
 			HeaderAdmission[Identity] := false
-			try {
-				TOML_ParseDocument(HeaderSource . "`n[" . Identity . "]`n")
+		NewLeaves.Push({ Parts: Parts, Desired: Desired, SectionParts: SectionParts, Identity: Identity })
+	}
+	; New sections need explicit headers for the still-live native flat reader.
+	; The semantic parser decides whether that declaration is legal: existing
+	; dotted or inline namespaces may already have closed the requested table.
+	; Explicit replacements first release only their classified physical owners.
+	; One parse admits every header at once: parsing only adds declarations, so
+	; headers legal together are each legal alone. A refusal falls back to one
+	; parse per header, which a bulk change of 20 new sections paid every time.
+	AdmissionParses := 0
+	if HeaderAdmission.Count {
+		Batch := ""
+		for Identity in HeaderAdmission
+			Batch .= "`n[" . Identity . "]`n"
+		try {
+			AdmissionParses += 1
+			TOML_ParseDocument(HeaderSource . Batch)
+			for Identity in HeaderAdmission
 				HeaderAdmission[Identity] := true
-			} catch ValueError {
-				; Existing physical ownership remains the only legal insertion route.
+		} catch ValueError {
+			for Identity in HeaderAdmission {
+				try {
+					AdmissionParses += 1
+					TOML_ParseDocument(HeaderSource . "`n[" . Identity . "]`n")
+					HeaderAdmission[Identity] := true
+				} catch ValueError {
+					; Existing physical ownership remains the only legal insertion route.
+				}
 			}
 		}
+	}
+	for Leaf in NewLeaves {
+		Parts := Leaf.Parts, Desired := Leaf.Desired
+		SectionParts := Leaf.SectionParts, Identity := Leaf.Identity
 		if SectionParts.Length && HeaderAdmission[Identity] {
 			if !NewTables.Has(Identity)
 				NewTables[Identity] := []
@@ -887,7 +1313,7 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	}
 	Content := "", Current := "", RecordIndex := 0
 	Append(Text) {
-		if Content != "" && !RegExMatch(Content, "[\r\n]$")
+		if Content != "" && !TOML_EndsWithLineBreak(Content)
 			Content .= "`n"
 		Content .= Text
 	}
@@ -904,8 +1330,10 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 				Flush(Current)
 				Parts := _TOML_ConfigPath(PhysicalRecord.Section)
 				Current := _TOML_ConfigPathName(Parts)
-				if !_TOML_ConfigPathDropped(Parts, Dropped)
+				if !_TOML_ConfigPathDropped(Parts, Dropped) {
 					Append(PhysicalRecord.Text)
+					Flush(Current)
+				}
 			case "assignment":
 				RecordIndex += 1
 				Record := Records[RecordIndex]
@@ -928,7 +1356,10 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 				else {
 					Position := 1
 					KeyText := _TOML_DocumentToken(PhysicalRecord.Text, &Position, "=")
-					Append(KeyText . " = " . TOML_RenderValue(Desired["value"]) . "`n")
+					KeyParts := TOML_ParseKeyPath(KeyText, true)
+					Append((KeyParts.Length == 1 ? TOML_RenderKey(KeyParts[1]) : KeyText) . " = "
+						. TOML_RenderValue(Desired["value"])
+						. (TOML_EndsWithLineBreak(PhysicalRecord.Text) ? "`n" : ""))
 				}
 			default:
 				Append(PhysicalRecord.Text)
@@ -942,10 +1373,13 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	}
 	if Pending.Count
 		throw ValueError("A configuration update lost its physical table owner")
-	Candidate := Chr(0xFEFF) . Content
+	; The shared writer keeps the source's byte order mark and never adds one; every
+	; reader of these files decodes UTF-8 explicitly, so nothing depends on it.
+	Candidate := (SubStr(Source, 1, 1) == Chr(0xFEFF) ? Chr(0xFEFF) : "") . Content
 	if !TOML_SameValue(TOML_ParseDocument(Candidate), Expected)
 		throw ValueError("The physical configuration candidate differs from its requested semantic model")
-	return Map("content", Candidate, "preserve_source", false)
+	return Map("content", Candidate, "preserve_source", false,
+		"header_admission_parses", AdmissionParses)
 }
 
 ; Foreign table arrays cannot lend their collapsed flat row to the writer.
@@ -1158,7 +1592,8 @@ _TOML_InlineTableRewriteRecord(RecordText, Changes) {
 ; assignments and literal dotted root names still lack native write authority.
 _TOML_InlineTerminatorParent(Physical, Document) {
 	ParentTable := Document.Get("hotstrings", 0)
-	if !(ParentTable is Map) || (!ParentTable.Has("terminators") && !ParentTable.Has("terminator_states"))
+	if !(ParentTable is Map) || (!ParentTable.Has("terminators") && !ParentTable.Has("terminator_states")
+			&& !ParentTable.Has("terminator_consume"))
 		return false
 	for ParentRow in Physical {
 		if ParentRow.Kind != "assignment" || ParentRow.Section != ""
@@ -1204,6 +1639,7 @@ _TOML_AdmitInlineTerminatorParent(Source, Document, Physical, Before, After, Can
 		if UpdateParts.Length != 2 || StrCompare(UpdateParts[1], "hotstrings", true) != 0
 				|| StrCompare(ParentUpdate.Key, "terminators", false) == 0
 				|| StrCompare(ParentUpdate.Key, "terminator_states", false) == 0
+				|| StrCompare(ParentUpdate.Key, "terminator_consume", false) == 0
 			throw ValueError("The record owner requires its dedicated typed editor")
 		ParentDelete := ParentUpdate.HasOwnProp("Delete") && ParentUpdate.Delete == 1
 		ParentChanges[ParentUpdate.Key] := Map("delete", ParentDelete)

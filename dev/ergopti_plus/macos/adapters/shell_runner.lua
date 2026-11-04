@@ -11,6 +11,8 @@
 --- 1. exec(): synchronous shell execution via hs.execute. Returns the stdout
 ---    string. Best-effort — failures return "" rather than raising. Used for
 ---    fire-and-forget operations (mkdir, pkill, nohup daemon starts, stat calls).
+---    exec_checked() returns stdout only after a zero exit. Both refuse a
+---    command containing NUL, which popen(3) would silently cut short.
 --- 2. spawn(): async subprocess via hs.task. Returns an opaque handle with
 ---    lifecycle and streaming-input methods. Supports both the 3-arg form (no
 ---    streaming callback) and the 4-arg form (streaming chunk callback). Used
@@ -27,9 +29,11 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local PhaseStats = require("infra.phase_stats")
 local DeferredWork = require("infra.deferred_work")
 local TaskEnvironment = require("adapters.task_environment")
 local RuntimeLog = require("diagnostics.runtime_log")
+local TableUtil = require("table_util")
 
 local LOG = "adapters.shell_runner"
 
@@ -48,8 +52,22 @@ end
 -- Every exit is reported by program name, status and duration through one
 -- throttled recorder; the command line is never logged because it can carry
 -- user text. Successful spawns and their exit codes used to leave no trace.
-local _record_exit = RuntimeLog.new_process_log(Logger, LOG, now_ms)
-local CAPTURED_OUTPUT_MAX_BYTES = 4 * 1024 * 1024
+local _log_exit = RuntimeLog.new_process_log(Logger, LOG, now_ms)
+
+--- Times the child as the phase process.<program> (the Linux driver records the
+--- same phase on every spawn path), then reports its exit as above. The
+--- synchronous run/capture paths used to leave no phase: only the task path did.
+--- @param program string Sanitised program basename from RuntimeLog.program_name.
+--- @param status any Exit status.
+--- @param duration_ms number Wall milliseconds.
+--- @return boolean logged Whether the throttled recorder wrote a line.
+local function _record_exit(program, status, duration_ms)
+	PhaseStats.add_ms("process." .. tostring(program), duration_ms)
+	return _log_exit(program, status, duration_ms)
+end
+-- Read through the registry's generated table, as the logger transport does,
+-- so this early boot module takes no infra.timings dependency.
+local CAPTURED_OUTPUT_MAX_BYTES = require("_generated.registry_limits").count("limits", "shell_captured_output_bytes")
 local CAPTURED_OUTPUT_LIMIT_EXIT_CODE = -1
 local CAPTURED_OUTPUT_LIMIT_DETAIL = "ShellRunner output limit exceeded."
 
@@ -66,21 +84,200 @@ M._active_tasks = {}
 -- =========================================
 -- =========================================
 
+--- Returns the C-string refusal for a synchronous command, or nil when admissible.
+--- hs.execute hands the command to popen(3) as a char *, so /bin/sh would run
+--- only the prefix before an embedded NUL: a different command than composed.
+--- @param cmd any Candidate command.
+--- @return string|nil reason
+local function sync_command_refusal(cmd)
+	if type(cmd) ~= "string" or cmd == "" then return "command must be a non-empty string" end
+	if cmd:find("\0", 1, true) then return "command contains NUL, which /bin/sh cannot receive" end
+	return nil
+end
+
+--- Runs one admitted command through hs.execute and records its exit.
+--- @param cmd string Admitted command.
+--- @return boolean ok, any output, any status, any exit_type, any code
+local function run_sync(cmd)
+	local started_ms = now_ms()
+	local ok, output, status, exit_type, rc = pcall(hs.execute, cmd)
+	if ok then _record_exit(RuntimeLog.program_name(cmd), rc, now_ms() - started_ms) end
+	return ok, output, status, exit_type, rc
+end
+
 --- Executes a shell command synchronously and returns its stdout.
 --- Wraps hs.execute(). The command is run via /bin/sh -c.
 --- Failures return an empty string — the adapter never raises.
 --- @param cmd string Shell command string.
 --- @return string stdout output, or "" on any error.
 function M.exec(cmd)
-	if type(cmd) ~= "string" or cmd == "" then return "" end
-	local started_ms = now_ms()
-	local ok, result, _, _, rc = pcall(hs.execute, cmd)
+	local refusal = sync_command_refusal(cmd)
+	if refusal then
+		if type(cmd) == "string" and cmd ~= "" then
+			Logger.error(LOG, "exec() refused for '%s': %s.",
+				RuntimeLog.program_name(cmd:match("^[^%z]*")), refusal)
+		end
+		return ""
+	end
+	local ok, result = run_sync(cmd)
 	if not ok then
 		Logger.error(LOG, "exec() failed for '%s': %s", RuntimeLog.program_name(cmd), tostring(result))
 		return ""
 	end
-	_record_exit(RuntimeLog.program_name(cmd), rc, now_ms() - started_ms)
 	return type(result) == "string" and result or ""
+end
+
+--- Executes a shell command synchronously and admits stdout only after exit 0.
+--- Useful output alone is not success: a failed openssl prints the blocks it
+--- decrypted before its padding check, and that prefix is not the plaintext.
+--- @param cmd string Shell command string.
+--- @return string|nil stdout Exact output after a verified zero exit.
+--- @return string|nil reason Fixed refusal text; it never quotes the command.
+function M.exec_checked(cmd)
+	local refusal = sync_command_refusal(cmd)
+	if refusal then return nil, refusal end
+	local ok, output, status, exit_type, rc = run_sync(cmd)
+	if not ok then return nil, "the native shell call raised" end
+	if exit_type ~= "exit" or rc ~= 0 or status ~= true then
+		return nil, string.format("the shell ended by %s with status %s",
+			tostring(exit_type), tostring(rc))
+	end
+	if type(output) ~= "string" then return nil, "the shell returned no output string" end
+	return output
+end
+
+--- Composes `cmd` so that it receives EXACTLY `input` on standard input.
+--- The bytes travel as one printf %b operand: every backslash is doubled and
+--- every NUL becomes backslash-0000, so the command stays a valid C string while
+--- the pipe still carries NUL. Unlike a heredoc, nothing is appended, nothing
+--- is staged in a temporary file, and a leading "-" is an operand, not an
+--- option. pipefail makes a failed producer the pipeline's status; a shell
+--- without pipefail refuses the whole command rather than trusting the last
+--- stage.
+--- @param cmd string Composed consumer command without NUL.
+--- @param input string Exact standard-input bytes.
+--- @return string|nil command
+--- @return string|nil reason
+function M.exact_stdin_pipeline(cmd, input)
+	local refusal = sync_command_refusal(cmd)
+	if refusal then return nil, refusal end
+	if type(input) ~= "string" then return nil, "input must be a string" end
+	local operand = input:gsub("\\", "\\\\"):gsub("\0", "\\0000"):gsub("'", "'\\''")
+	return "set -o pipefail; printf '%b' '" .. operand .. "' | " .. cmd
+end
+
+-- Native boundary of exec_private_stdin(); each pending cleanup retains its
+-- original provider even when a test installs another one for the next call.
+local DEFAULT_PRIVATE_STDIN_NATIVE = {
+	popen = io.popen, tmpname = os.tmpname, open = io.open, remove = os.remove,
+	classify_no_follow = function(path) return require("adapters.file_system").classify_no_follow(path) end,
+}
+local _private_stdin_native = DEFAULT_PRIVATE_STDIN_NATIVE
+local _private_stdin_cleanup = nil
+local _private_stdin_busy = false
+local PRIVATE_OUTPUT_CLEANUP_PENDING = "private output cleanup remains pending"
+
+--- Replaces the native boundary of exec_private_stdin(); nil restores it.
+--- @param native table|nil Table with popen, tmpname, open, remove and classify_no_follow.
+function M._set_private_stdin_native(native)
+	_private_stdin_native = type(native) == "table" and native or DEFAULT_PRIVATE_STDIN_NATIVE
+end
+
+--- Settles only the private output pathname retained by the current transaction.
+--- @return boolean settled
+local function settle_private_output()
+	local receipt = _private_stdin_cleanup
+	if receipt == nil then return true end
+	local call_ok, removed = pcall(receipt.native.remove, receipt.path)
+	local absent = false
+	if not call_ok or removed ~= true then
+		local inspected, _, status = pcall(receipt.native.classify_no_follow, receipt.path)
+		absent = inspected and status == "absent"
+	end
+	if (call_ok and removed == true) or absent then
+		_private_stdin_cleanup = nil
+		if receipt.reported then Logger.debug(LOG, "Retained private output cleanup settled.") end
+		return true
+	end
+	-- Native errors may quote private paths. Keep diagnostics closed, and report
+	-- this exact debt once instead of flooding a per-keystroke cipher caller.
+	if receipt.reported ~= true then
+		receipt.reported = true
+		Logger.error(LOG, "exec_private_stdin() private output unlink refused; the pathname is retained for retry.")
+	end
+	return false
+end
+
+--- Runs one admitted private command while its caller owns the synchronous frame.
+--- @param cmd string Validated command.
+--- @param input string Exact input bytes.
+--- @return string|nil stdout
+--- @return string|nil reason
+local function run_private_stdin(cmd, input)
+	local native = _private_stdin_native
+	local made, out_path = pcall(native.tmpname)
+	if made and type(out_path) == "string" and out_path ~= "" and not out_path:find("\0", 1, true) then
+		_private_stdin_cleanup = { path = out_path, native = native, reported = false }
+	end
+	-- The path is spliced unquoted into the command, so only a plain path is admitted.
+	if not made or type(out_path) ~= "string" or not out_path:match("^/[%w/._-]+$") then
+		return nil, "no private output file could be created"
+	end
+	local started_ms = now_ms()
+	local opened, pipe = pcall(native.popen, cmd .. " > " .. out_path, "w")
+	if not opened or not pipe then return nil, "the native shell pipe could not be opened" end
+	local written_ok, written = pcall(function() return pipe:write(input) end)
+	local closed_ok, status, exit_type, rc = pcall(function() return pipe:close() end)
+	if closed_ok then _record_exit(RuntimeLog.program_name(cmd), rc, now_ms() - started_ms) end
+	local read_ok, output = pcall(function()
+		local handle = native.open(out_path, "rb")
+		if not handle then return nil end
+		local data = handle:read("a")
+		handle:close()
+		return data
+	end)
+	if not written_ok or not written then return nil, "standard input was not fully delivered" end
+	if not closed_ok or exit_type ~= "exit" or rc ~= 0 or status ~= true then
+		return nil, string.format("the shell ended by %s with status %s", tostring(exit_type), tostring(rc))
+	end
+	if not read_ok or type(output) ~= "string" then return nil, "the command output could not be read" end
+	return output
+end
+
+--- Runs `cmd` with exact private standard input and publishes output only after
+--- its mkstemp(3) output file is removed. Secrets never enter command arguments.
+--- An unlink refusal retains one exact cleanup receipt; later calls retry that
+--- receipt before any new allocation. Process-exit diagnostics cannot reenter
+--- the synchronous transaction and replace its owner.
+--- @param cmd string Composed consumer command without NUL.
+--- @param input string Exact standard-input bytes, NUL included.
+--- @return string|nil stdout Exact output after zero exit and committed cleanup.
+--- @return string|nil reason Fixed refusal text; never the command, path or input.
+function M.exec_private_stdin(cmd, input)
+	local refusal = sync_command_refusal(cmd)
+	if refusal then return nil, refusal end
+	if type(input) ~= "string" then return nil, "input must be a string" end
+	if _private_stdin_busy then return nil, "a private shell operation is already active" end
+	_private_stdin_busy = true
+	local failure_trace
+	local ok, output, reason = xpcall(function()
+		if not settle_private_output() then return nil, PRIVATE_OUTPUT_CLEANUP_PENDING end
+		local candidate, failure = run_private_stdin(cmd, input)
+		if not settle_private_output() then return nil, PRIVATE_OUTPUT_CLEANUP_PENDING end
+		return candidate, failure
+	end, function()
+		failure_trace = debug.traceback("", 2)
+	end)
+	if not ok then
+		-- Keep any original cleanup owner even if an unexpected diagnostic throws.
+		pcall(settle_private_output)
+	end
+	_private_stdin_busy = false
+	if not ok then
+		Logger.error(LOG, "exec_private_stdin() failed without publishing private output.%s", failure_trace)
+		return nil, "the private shell transaction failed"
+	end
+	return output, reason
 end
 
 
@@ -98,7 +295,7 @@ end
 --- loses its whole subprocess behind a generic "returned no task" line. Refuse by
 --- INDEX instead. On the Windows driver the identical defect killed the metrics
 --- worker for sixteen days, and the argument index was the only diagnostic that
---- located it (keylogger-worker-timings-must-be-strings).
+--- located it (keystats-worker-timings-must-be-strings).
 ---
 --- @param executable any Expected: a non-empty string path.
 --- @param args any Expected: a pure array of strings; nil means "no arguments".
@@ -107,19 +304,23 @@ function M.validate_spawn_args(executable, args)
 	if type(executable) ~= "string" or executable == "" then
 		return "executable must be a non-empty string"
 	end
+	-- NSTask passes every argv element to execve(2) as a C string: an embedded
+	-- NUL would launch a shorter word than composed. Name the slot, never bytes.
+	if executable:find("\0", 1, true) then return "executable must not contain NUL" end
 	if args == nil then return "" end
 	if type(args) ~= "table" then
 		return "args must be a table, got " .. type(args)
 	end
-	local keys = 0
-	for _ in pairs(args) do keys = keys + 1 end
-	if keys ~= #args then
+	if TableUtil.count(args) ~= #args then
 		return "args must be a pure array, not a keyed or sparse table"
 	end
 	for index = 1, #args do
 		if type(args[index]) ~= "string" then
 			return string.format("argument %d must be a string, got %s",
 				index, type(args[index]))
+		end
+		if args[index]:find("\0", 1, true) then
+			return string.format("argument %d must not contain NUL", index)
 		end
 	end
 	return ""
@@ -144,6 +345,7 @@ local function refused_handle(private)
 	function handle.close_input() return false end
 	function handle.terminate() return true, "settled" end
 	function handle.isSettled() return true end
+	function handle.wasStartAttempted() return false end
 	function handle.onSettled(observer)
 		if type(observer) ~= "function" then return false end
 		local ok, err = xpcall(observer, debug.traceback)
@@ -184,6 +386,11 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 			tostring(executable), refusal)
 		return refused_handle(private)
 	end
+	-- The system curl is checked at its point of use; the gate logs and tells.
+	local SystemCurl = require("adapters.system_curl")
+	if executable == SystemCurl.PATH and not SystemCurl.check("a spawned transfer") then
+		return refused_handle(private)
+	end
 	local handle = {}
 	local _task  = nil
 	local _protocol_task = nil
@@ -191,6 +398,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	local _lifecycle = "constructing"
 	local _start_dispatching = false
 	local _start_committed = false
+	local _start_attempted = false
 	local _pending_completion = nil
 	local _pending_chunks = {}
 	local _pending_protocol_bytes = 0
@@ -228,7 +436,8 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		_business_stream_closed = owned_protocol ~= true
 		local task = _task
 		if _lifecycle == "prepared"
-			or (_lifecycle == "start_failed" and _task_proven_not_running(task)) then
+			or (owned_protocol ~= true and _lifecycle == "start_failed"
+				and _task_proven_not_running(task)) then
 			-- No process was launched, so releasing the prepared object is exact
 			-- settlement and requires no signal or completion callback.
 			_task = nil
@@ -290,6 +499,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		local task = _task
 		_lifecycle = "starting"
 		_start_dispatching = true
+		_start_attempted = true
 		local ok, started = pcall(function() return task:start() end)
 		_start_dispatching = false
 		if ok and started and (private ~= true or started == true or started == task) then
@@ -467,8 +677,9 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		_input_closed = true
 		_lifecycle = "completed"
 		if private ~= true then
-			_record_exit(RuntimeLog.program_name(executable), exit_code,
-				_started_ms and (now_ms() - _started_ms) or 0)
+			local program = RuntimeLog.program_name(executable)
+			local duration_ms = _started_ms and (now_ms() - _started_ms) or 0
+			_record_exit(program, exit_code, duration_ms)
 		end
 		if _start_dispatching then
 			if _pending_completion == nil then
@@ -592,6 +803,10 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	--- @return string state `settled`, `pending`, or `refused`.
 	handle.terminate = _safe_terminate
 
+	--- Reports whether this exact handle attempted native start, including refusal.
+	--- @return boolean attempted
+	function handle.wasStartAttempted() return _start_attempted end
+
 	--- Returns literal true only when no exact native task remains retained.
 	function handle.isSettled()
 		return _task == nil and _start_dispatching ~= true
@@ -643,7 +858,7 @@ local OSASCRIPT_BIN = "/usr/bin/osascript"
 ---
 --- `pcall` is deliberately not used: it returns the error and discards it, which
 --- is the swallowing pattern `wrapped_on_done` was fixed for and that
---- `tests/unit/adapters/test_shell_runner_on_done_visible.lua` pins against. These
+--- `tests/unit/adapters/processes/test_shell_runner_on_done_visible.lua` pins against. These
 --- callbacks run from an hs.task completion, where a bare throw is invisible.
 --- @param label string Identifies the call site in the log line.
 --- @param fn function|nil The callback. Nothing happens when it is absent.

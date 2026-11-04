@@ -30,9 +30,10 @@
 --- FEATURES & RATIONALE:
 --- 1. Single renderer: every submenu is built by the same loop — structure lives
 ---    in the manifest, not in per-submenu Lua code.
---- 2. Dynamic escape hatch: items whose ``type`` is ``"dynamic"`` are routed to a
----    caller-supplied table of handler functions so platform-specific UI stays in
----    the caller.
+--- 2. No escape hatch: the retired ``dynamic`` type handed a row back to the
+---    caller, and the menu compiler refuses it now. A row whose contents are
+---    runtime data is a ``list``, whose provider returns DATA drawn here; only the
+---    legacy ``action`` type still hands its id to a caller handler.
 --- 3. A FACTORY, not a singleton. Each driver builds one instance at require
 ---    time. An ``M.init``-style singleton would have to warn-and-ignore a second
 ---    call per the module-init convention, and the test harness legitimately
@@ -41,6 +42,8 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
+local Separators = require("menu.separators")
 
 --- Captures plain source records and callback maps before a reasoned group calls native owners.
 local function reasoned_group_snapshot(value, seen)
@@ -78,6 +81,7 @@ local function reasoned_group_current(receipt, seen)
 end
 
 local utf8_length = require("compat.utf8").len
+local LabelValue = require("locale.label_value")
 
 -- Literal command decoration does not interpret percent bytes or native data.
 local function command_literal_prefix(item)
@@ -190,6 +194,56 @@ local function read_caption_values(item, getters, i18n)
 		values[index] = value
 	end
 	return caption_values(i18n.get(item.i18n), values)
+end
+
+-- Count decoration is declared around a translated caption, never supplied as a native label.
+local function translated_count_policy(item)
+	local policy = item.caption_count_policy
+	if item.type ~= "group" or type(item.id) ~= "string" or item.id == ""
+		or type(item.i18n) ~= "string" or item.i18n == "" or type(policy) ~= "table" or getmetatable(policy) ~= nil
+		or item.caption_source ~= nil or item.caption_format ~= nil or item.caption_getter ~= nil
+		or item.caption_getters ~= nil or item.caption_layout ~= nil or item.caption_joiner ~= nil
+		or item.caption_count_getter ~= nil or item.caption_count_format ~= nil or item.label_prefix ~= nil then return nil end
+	local fields = { value_getter = true, present_getter = true, visibility = true, style = true, format = true, maximum = true }
+	local count = 0
+	for key in next, policy do if not fields[key] then return nil end; count = count + 1 end
+	if count ~= 6 or type(policy.value_getter) ~= "string" or policy.value_getter == ""
+		or type(policy.present_getter) ~= "string" or policy.present_getter == ""
+		or type(policy.maximum) ~= "number" or policy.maximum ~= policy.maximum
+		or policy.maximum < 0 or policy.maximum > 2^53 - 1 or policy.maximum % 1 ~= 0
+		or type(policy.format) ~= "string" or policy.format:find("[%z\1-\31\127]")
+		or utf8_length(policy.format) == nil or caption_values(policy.format, { "", "" }) == nil then return nil end
+	for _, field in ipairs({ "visibility", "style" }) do
+		local map = policy[field]
+		if type(map) ~= "table" or getmetatable(map) ~= nil then return nil end
+		local size = 0
+		for key, value in next, map do
+			if key ~= "ahk" and key ~= "hs" and key ~= "linux" then return nil end
+			if field == "visibility" and value ~= "always" and value ~= "available" and value ~= "positive" then return nil end
+			if field == "style" and value ~= "space" and value ~= "decimal" then return nil end
+			size = size + 1
+		end
+		if size ~= 3 then return nil end
+	end
+	return policy
+end
+
+local function read_translated_count_caption(item, getters, i18n, platform)
+	local policy = translated_count_policy(item)
+	if not policy or type(getters) ~= "table" or type(getters[policy.value_getter]) ~= "function"
+		or type(getters[policy.present_getter]) ~= "function" or policy.style[platform] == nil then return nil end
+	local title = i18n.get(item.i18n)
+	if type(title) ~= "string" or title == "" or title == item.i18n
+		or title:find("[%z\1-\31\127]") or utf8_length(title) == nil then return nil end
+	local value_ok, total = pcall(getters[policy.value_getter])
+	local present_ok, present = pcall(getters[policy.present_getter])
+	if not value_ok or not present_ok or type(present) ~= "boolean" or type(total) ~= "number"
+		or total ~= total or total < 0 or total > policy.maximum or total % 1 ~= 0 then return nil end
+	local visible = policy.visibility[platform]
+	if visible ~= "always" and (not present or (visible == "positive" and total == 0)) then return title end
+	local text = total == 0 and "0" or string.format("%.0f", total)
+	if policy.style[platform] == "space" then text = text:reverse():gsub("(%d%d%d)", "%1 "):reverse():gsub("^ ", "") end
+	return caption_values(policy.format, { title, text })
 end
 
 -- Used only to report a malformed `new()` call, which by definition happens
@@ -392,7 +446,37 @@ function M.new(deps)
 			if at and (cut == nil or at < cut) then cut = at end
 		end
 		local head = cut and text:sub(1, cut - 1) or text
-		return (head:gsub("^%s+", ""):gsub("%s+$", ""))
+		return TextUtils.trim(head)
+	end
+
+	--- The reason a greyed row names: the first `disabled_reasons` entry whose
+	--- state getter answers true (a configuration saved by a newer version),
+	--- otherwise its `disabled_reason_key`. A malformed entry or a missing getter
+	--- refuses the row, as the manifest generator refuses the declaration.
+	--- @param manifest_key string Menu definition key, for the report.
+	--- @param item table Manifest entry.
+	--- @param getters table Native state readers.
+	--- @return string|nil reason_key The key, or nil when the row is refused.
+	local function disabled_reason(manifest_key, item, getters)
+		local reason = item.disabled_reason_key
+		local cases = item.disabled_reasons
+		if cases == nil then return reason end
+		if type(cases) ~= "table" or #cases == 0 or type(reason) ~= "string" or reason == "" then
+			Logger.error(LOG, "Invalid disabled reasons on '%s.%s' — row refused.", manifest_key, tostring(item.id))
+			return nil
+		end
+		for _, case in ipairs(cases) do
+			local when = type(case) == "table" and case.when or nil
+			local key = type(case) == "table" and case.reason_key or nil
+			if type(when) ~= "string" or type(key) ~= "string" or key == ""
+				or type(getters) ~= "table" or type(getters[when]) ~= "function" then
+				Logger.error(LOG, "No getter or reason for disabled reason '%s' on '%s.%s' — row refused.",
+					tostring(when), manifest_key, tostring(item.id))
+				return nil
+			end
+			if getters[when]() == true then return key end
+		end
+		return reason
 	end
 
 	--- The disabled stand-in of a row this platform has not yet ported: its
@@ -409,6 +493,55 @@ function M.new(deps)
 			return nil
 		end
 		return { title = i18n.get(item.i18n) .. " — " .. reason_head(i18n.get(item.reason_key)), disabled = true }
+	end
+
+	--- Whether a menu's enable row reads off. An unanswered state is not "off":
+	--- the row reports its drift where it is drawn, and the menu stays as built.
+	--- @param manifest_key string Menu definition key.
+	--- @param item table The enable row: a `toggle`, or a `choice` with its off value.
+	--- @param getters table Native state readers.
+	--- @return boolean
+	local function enable_row_reads_off(manifest_key, item, getters)
+		if item.type == "toggle" then
+			for _, key in ipairs(item.checked_when or {}) do
+				if type(getters[key]) ~= "function" then return false end
+			end
+			return R.resolve_checked_when(manifest_key, item.id, getters) ~= true
+		end
+		return type(getters[item.path]) == "function" and getters[item.path]() == item.submenu_off_value
+	end
+
+	--- What the category-off rule does to the rows one manifest entry draws.
+	--- @param item table Manifest entry.
+	--- @return string role "live" stays clickable; "unreasoned" may already be
+	---   grey for another cause and still owes the reason; "plain" owes it unless
+	---   already grey, as a caption or a row naming its own reason is.
+	local function off_rule_role(item)
+		if item.submenu_off_reason_key ~= nil or item.readable_when_off == true then return "live" end
+		if item.disabled_when ~= nil and item.disabled_reason_key == nil and is_for_platform(item) then
+			return "unreasoned"
+		end
+		return "plain"
+	end
+
+	--- Greys a finished category submenu whose enable row reads off: one rule,
+	--- declared on that row in the manifest, so no driver restates it.
+	--- @param rows table Finished rows.
+	--- @param roles table Finished row -> off_rule_role.
+	--- @param reason_key string Locale key of the shared reason.
+	local function apply_category_off(rows, roles, reason_key)
+		local suffix = " — " .. reason_head(i18n.get(reason_key))
+		for _, row in ipairs(rows) do
+			local role = roles[row]
+			if row.title ~= "-" and role ~= "live" then
+				if (not row.disabled or role == "unreasoned") and type(row.title) == "string" then
+					row.title = row.title .. suffix
+				end
+				row.disabled = true
+				row.fn = nil
+				row.menu = nil
+			end
+		end
 	end
 
 
@@ -480,37 +613,7 @@ function M.new(deps)
 		end
 	end
 
-	--- Returns true when a menu item table is a separator.
-	--- @param entry any
-	--- @return boolean
-	local function is_separator(entry)
-		return type(entry) == "table" and entry.title == "-"
-	end
-
-	--- Drops every separator that would not sit between two real rows, in place.
-	---
-	--- The deferred `---` in R.build only sees the manifest's own separators. A
-	--- list provider or a dynamic handler brings separators of its own, and one
-	--- landing next to a manifest `---`, or at either end of a menu, drew two lines
-	--- in a row. Submenus are normalised too, since a provider nests rows freely.
-	--- @param items table Array of menu item tables; `{ title = "-" }` is a separator.
-	--- @return table The same array.
-	local function normalize_separators(items)
-		local kept = {}
-		for _, entry in ipairs(items) do
-			if is_separator(entry) then
-				if #kept > 0 and not is_separator(kept[#kept]) then kept[#kept + 1] = entry end
-			else
-				if type(entry) == "table" and type(entry.menu) == "table" then
-					normalize_separators(entry.menu)
-				end
-				kept[#kept + 1] = entry
-			end
-		end
-		while is_separator(kept[#kept]) do kept[#kept] = nil end
-		for i = 1, math.max(#items, #kept) do items[i] = kept[i] end
-		return items
-	end
+	local normalize_separators = Separators.normalize
 
 	--- Turns a list provider's row DATA into menu item tables.
 	---
@@ -555,6 +658,10 @@ function M.new(deps)
 				-- adapter that carried label, tick and greying and silently left the
 				-- app icons behind, so every row in that menu rendered blank-faced.
 				if row.image ~= nil then entry.image = row.image end
+				-- Read by the tray click owners: a click on this row during a reload
+				-- joins the reload in flight (menu/click_intent.lua).
+				if row.joins_reload == true then entry.joins_reload = true end
+				if row.bypasses_reload == true then entry.bypasses_reload = true end
 				if type(row.items) == "table" then
 					entry.menu = render_rows(row.items, list_id, depth + 1)
 				elseif type(row.submenu) == "table" then
@@ -620,10 +727,15 @@ function M.new(deps)
 				if type(child) ~= "table" or getmetatable(child) ~= nil then return nil end
 				for field in next, child do
 					if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "checked"
-						and field ~= "disabled" and field ~= "image" then return nil end
+						and field ~= "disabled" and field ~= "image" and field ~= "joins_reload"
+						and field ~= "bypasses_reload" then return nil end
 				end
 				local title, action, subtree = rawget(child, "title"), rawget(child, "fn"), rawget(child, "menu")
 				local checked, disabled, image = rawget(child, "checked"), rawget(child, "disabled"), rawget(child, "image")
+				local joins_reload = rawget(child, "joins_reload")
+				if joins_reload ~= nil and joins_reload ~= true then return nil end
+				local bypasses_reload = rawget(child, "bypasses_reload")
+				if bypasses_reload ~= nil and bypasses_reload ~= true then return nil end
 				if type(title) ~= "string" or title == "" or (action ~= nil and type(action) ~= "function")
 					or (subtree ~= nil and type(subtree) ~= "table") or (action ~= nil and subtree ~= nil)
 					or (checked ~= nil and type(checked) ~= "boolean")
@@ -634,7 +746,8 @@ function M.new(deps)
 					if action ~= nil or subtree ~= nil or checked ~= nil or disabled ~= nil or image ~= nil then return nil end
 					row = { separator = true }
 				else
-					row = { label = title, action = action, checked = checked, disabled = disabled, image = image }
+					row = { label = title, action = action, checked = checked, disabled = disabled, image = image,
+						joins_reload = joins_reload, bypasses_reload = bypasses_reload }
 					if subtree ~= nil then
 						row.items = convert(subtree, depth + 1)
 						if row.items == nil then return nil end
@@ -752,8 +865,11 @@ function M.new(deps)
 					if type(row) ~= "table" or getmetatable(row) ~= nil then return false end
 					for field in next, row do
 						if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "image"
-							and field ~= "checked" and field ~= "disabled" then return false end
+							and field ~= "checked" and field ~= "disabled" and field ~= "joins_reload"
+							and field ~= "bypasses_reload" then return false end
 					end
+					if rawget(row, "joins_reload") ~= nil and rawget(row, "joins_reload") ~= true then return false end
+					if rawget(row, "bypasses_reload") ~= nil and rawget(row, "bypasses_reload") ~= true then return false end
 					local title, action, menu = rawget(row, "title"), rawget(row, "fn"), rawget(row, "menu")
 					local image, checked, disabled = rawget(row, "image"), rawget(row, "checked"), rawget(row, "disabled")
 					if type(title) ~= "string" or (title == "" and image == nil)
@@ -854,16 +970,51 @@ function M.new(deps)
 				action  = function() return fn(value) end,
 			}
 		end
-		local title = i18n.get(i18n_key) .. (item.current_choice_suffix or "")
+		-- An open catalogue closes its presets with a free-entry row whose command
+		-- prompts natively; it carries the tick when the stored value is no preset.
+		local custom_id = item.custom_command
+		if custom_id ~= nil then
+			local custom_fn = commands[custom_id]
+			if type(custom_id) ~= "string" or type(custom_fn) ~= "function"
+				or type(item.custom_i18n) ~= "string" then
+				Logger.error(LOG, "No command '%s' registered for the '%s.%s' free entry — choice skipped.",
+					tostring(custom_id), manifest_key, row_id)
+				return nil
+			end
+			local custom_current = current ~= nil and current_label == nil
+			sub[#sub + 1] = { separator = true }
+			sub[#sub + 1] = {
+				label   = i18n.get(item.custom_i18n),
+				checked = custom_current,
+				action  = function() return custom_fn() end,
+			}
+			if custom_current and type(current) == "number" then
+				-- The caption names a free value with its declared unit.
+				current_label = string.format("%g", current)
+				if type(item.custom_unit_i18n) == "string" then
+					current_label = current_label .. " " .. i18n.get(item.custom_unit_i18n)
+				end
+			end
+		end
+		local title = i18n.get(i18n_key)
 		-- Caption interpolation is declared alongside the shared choice, so
 		-- native consumers provide no competing mode-label policy.
 		if item.show_current_choice == true then
-			title = title:gsub(item.current_choice_placeholder or "{1}", function() return current_label or tostring(current or "") end)
+			local shown = current_label or tostring(current or "")
+			if item.current_choice_label_value == true then
+				title = LabelValue.compose(i18n.get, title, shown)
+			else
+				title = title:gsub(item.current_choice_placeholder or "{1}", function() return shown end)
+			end
 		end
-		return {
-			label = title, items = sub,
-			disabled = R.resolve_disabled_when(manifest_key, row_id, getters) or nil,
-		}
+		local disabled = R.resolve_disabled_when(manifest_key, row_id, getters)
+		-- A greyed choice that declares why (`disabled_reason_key`) opens nothing
+		-- and names its reason: no driver repeats that policy. Without a reason
+		-- it stays navigable, as before.
+		if disabled and type(item.disabled_reason_key) == "string" then
+			return { label = title, disabled = true, disabled_reason_key = item.disabled_reason_key }
+		end
+		return { label = title, items = sub, disabled = disabled or nil }
 	end
 
 	--- Supplies one declared choice as provider data, without a private row policy.
@@ -963,10 +1114,12 @@ function M.new(deps)
 		-- ported, « label — head of the reason », with nothing to run: the
 		-- two differ only in how the condition is evaluated.
 		if disabled and type(item.disabled_reason_key) == "string" then
+			local reason_key = disabled_reason(manifest_key, item, getters)
+			if reason_key == nil then return nil end
 			local stand_in = greyed_stand_in(manifest_key,
-				{ id = row_id, i18n = i18n_key, reason_key = item.disabled_reason_key })
+				{ id = row_id, i18n = i18n_key, reason_key = reason_key })
 			if stand_in and (has_caption_layout(item) or item.caption_getters ~= nil) then
-				stand_in.title = title .. " — " .. reason_head(i18n.get(item.disabled_reason_key))
+				stand_in.title = title .. " — " .. reason_head(i18n.get(reason_key))
 			end
 			if stand_in and rawget(item, "label_prefix") ~= nil then
 				stand_in.title = prefix .. stand_in.title
@@ -1013,6 +1166,60 @@ function M.new(deps)
 		end
 		Logger.error(LOG, "Missing declared command '%s.%s' — provider row refused.", manifest_key, row_id)
 		return nil
+	end
+
+	--- Captures a simple translated command caption without constructing a row.
+	--- Translation stays at the caller's delivery boundary; admission allocates no native row.
+	--- @param manifest_key string Owning shared declaration.
+	--- @param row_id string Unique native-visible command identity.
+	--- @return function|nil receive Late translated caption reader.
+	--- @return function|nil current Pure captured-owner admission.
+	function R.command_caption_receiver(manifest_key, row_id)
+		if type(manifest_key) ~= "string" or manifest_key == "" or type(row_id) ~= "string" or row_id == "" then return nil end
+		local root = get_manifest_root()
+		if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+		local rows = rawget(root, manifest_key)
+		if type(rows) ~= "table" or getmetatable(rows) ~= nil then return nil end
+		local source = reasoned_group_snapshot(rows)
+		if not source then return nil end
+		local count, maximum = 0, 0
+		for index, item in next, rows do
+			if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or type(item) ~= "table" then return nil end
+			count, maximum = count + 1, math.max(maximum, index)
+			local platforms = rawget(item, "platforms")
+			if platforms ~= nil then
+				if type(platforms) ~= "table" then return nil end
+				local tokens, last = 0, 0
+				for position, token in next, platforms do
+					if type(position) ~= "number" or position % 1 ~= 0 or position < 1 or type(token) ~= "string" then return nil end
+					tokens, last = tokens + 1, math.max(last, position)
+				end
+				if tokens ~= last then return nil end
+			end
+		end
+		if count == 0 or count ~= maximum then return nil end
+		local item = find_item_by_id(manifest_key, row_id)
+		if not item or rawget(item, "type") ~= "command" then return nil end
+		local key = rawget(item, "i18n")
+		if type(key) ~= "string" or key == "" then return nil end
+		-- Decorated, formatted and native captions need their own existing receiver.
+		local fields = { type = true, id = true, i18n = true, disabled_when = true,
+			disabled_reason_key = true, platforms = true, unavailable = true, reason_key = true }
+		for field in next, item do if not fields[field] then return nil end end
+		local owner, translate = rawget(R, "command_caption_receiver"), rawget(i18n, "get")
+		if getmetatable(R) ~= nil or getmetatable(i18n) ~= nil or type(owner) ~= "function" or type(translate) ~= "function" then return nil end
+		local function current()
+			return getmetatable(R) == nil and rawget(R, "command_caption_receiver") == owner
+				and getmetatable(i18n) == nil and rawget(i18n, "get") == translate
+				and _cache == root and getmetatable(root) == nil and rawget(root, manifest_key) == rows
+				and reasoned_group_current(source) and find_item_by_id(manifest_key, row_id) == item
+		end
+		return function()
+			if not current() then return nil end
+			local caption = translate(key)
+			if not current() or type(caption) ~= "string" or caption == "" or caption == key then return nil end
+			return caption
+		end, current
 	end
 
 	--- Supplies an ordered declared child template as provider data.
@@ -1147,6 +1354,7 @@ function M.new(deps)
 					Logger.error(LOG, "Invalid inert caption layout in '%s' — rows refused.", key)
 					return nil
 				end
+				if item.caption_count_policy ~= nil and not translated_count_policy(item) then return nil end
 				if item.caption_format ~= nil and is_for_platform(item) and read_numbered_caption(item, getters, i18n) == nil then return nil end
 				if item.caption_source ~= nil and is_for_platform(item) and read_native_caption(item, getters) == nil then return nil end
 				if item.caption_getters ~= nil then
@@ -1272,6 +1480,10 @@ function M.new(deps)
 						if not row then return nil end
 					elseif item.type == "group" and (type(children[item.id]) == "table" or type(children[item.id]) == "function") then
 						local title
+						if item.caption_count_policy ~= nil then
+							title = read_translated_count_caption(item, getters, i18n, platform)
+							if title == nil then return nil end
+						end
 						if item.caption_format ~= nil then
 							title = read_numbered_caption(item, getters, i18n)
 							if title == nil then return nil end
@@ -1374,7 +1586,8 @@ function M.new(deps)
 		end
 		for _, item in ipairs(declaration) do
 			if type(item) ~= "table" then return nil end
-			local label = item.type == "label" and type(item.i18n) == "string" and item.i18n ~= ""
+			local label = (item.type == "label" or item.type == "section_header")
+				and type(item.i18n) == "string" and item.i18n ~= ""
 			if item.type ~= "---" and not label then return nil end
 			for field in pairs(item) do
 				if field ~= "type" and not (label and field == "i18n") then return nil end
@@ -1413,8 +1626,8 @@ function M.new(deps)
 	---
 	--- ``manifest_key``      — key in menu_manifest.json (e.g. ``"shortcuts_menu"``)
 	--- ``category``          — human-readable category name for debug logs
-	--- ``dynamic_handlers``  — table of id → function(items, ctx) for ``action`` and
-	---   ``dynamic`` entries. Each handler appends its items to the list in place.
+	--- ``action_handlers``   — table of id → function(items, ctx) for ``action``
+	---   entries. Each handler appends its items to the list in place.
 	--- ``group_builders``    — optional table of group_id → function(ctx) → table|nil
 	---   for ``group`` entries. Returns ``{title, menu}``, a raw items list, or nil.
 	--- ``list_providers``    — optional table of list_id → function(ctx) → rows for
@@ -1426,13 +1639,13 @@ function M.new(deps)
 	--- ``ctx``               — menu context passed through to handlers.
 	--- @param manifest_key string
 	--- @param category string
-	--- @param dynamic_handlers table
+	--- @param action_handlers table|nil
 	--- @param group_builders table|nil
 	--- @param ctx table
 	--- @param list_providers table|nil
 	--- @return table
-	function R.build(manifest_key, category, dynamic_handlers, group_builders, ctx, list_providers)  -- luacheck: ignore 212
-		dynamic_handlers = dynamic_handlers or {}
+	function R.build(manifest_key, category, action_handlers, group_builders, ctx, list_providers)  -- luacheck: ignore 212
+		action_handlers  = action_handlers or {}
 		group_builders   = group_builders or {}
 		list_providers   = list_providers or {}
 		local menu_def    = get_menu_def(manifest_key)
@@ -1454,7 +1667,24 @@ function M.new(deps)
 		local commands = (type(ctx) == "table" and type(ctx.commands) == "table") and ctx.commands or {}
 		local getters  = (type(ctx) == "table" and type(ctx.state_getters) == "table") and ctx.state_getters or {}
 
+		-- The rows each entry draws are read off `result` when the next entry
+		-- starts: the branches below leave through `goto continue`, whose label
+		-- must stay last in its block.
+		local roles, settled, previous, off_reason_key = {}, 0, nil, nil
+		local function settle_previous_item()
+			if previous == nil then return end
+			if #result > settled and previous.submenu_off_reason_key ~= nil
+				and enable_row_reads_off(manifest_key, previous, getters) then
+				off_reason_key = previous.submenu_off_reason_key
+			end
+			local role = off_rule_role(previous)
+			for index = settled + 1, #result do roles[result[index]] = role end
+			settled = #result
+		end
+
 		for _, item in ipairs(menu_def) do
+			settle_previous_item()
+			previous = item
 			local prefix = command_literal_prefix(item)
 			if prefix == nil then
 				Logger.error(LOG, "Invalid literal command prefix in '%s' — row refused.", manifest_key)
@@ -1478,6 +1708,7 @@ function M.new(deps)
 				goto continue
 			end
 
+			if item.caption_count_policy ~= nil and not translated_count_policy(item) then goto continue end
 			local t = item.type
 
 			if t == "---" then
@@ -1508,12 +1739,25 @@ function M.new(deps)
 					Logger.error(LOG, "No command '%s' for the '%s' category switch — its submenu has no way to "
 						.. "turn it on or off.", tostring(cmd_id), manifest_key)
 				else
+					local reason = item.disabled_reason_key
+					if reason ~= nil and (type(reason) ~= "string" or reason == "") then
+						Logger.error(LOG, "Invalid disabled reason for toggle '%s' — skipped.", toggle_id)
+						goto continue
+					end
+					local disabled = R.resolve_disabled_when(manifest_key, toggle_id, getters)
+					local title = i18n.get(i18n_key)
+					if disabled and reason ~= nil then
+						reason = disabled_reason(manifest_key, item, getters)
+						if reason == nil then goto continue end
+						title = title .. " — " .. reason_head(i18n.get(reason))
+						fn = nil
+					end
 					flush_sep()
 					table.insert(result, {
-						title    = i18n.get(i18n_key),
+						title    = title,
 						fn       = fn,
 						checked  = R.resolve_checked_when(manifest_key, toggle_id, getters),
-						disabled = R.resolve_disabled_when(manifest_key, toggle_id, getters) or nil,
+						disabled = disabled or nil,
 					})
 					item_count = item_count + 1
 				end
@@ -1545,9 +1789,9 @@ function M.new(deps)
 
 			elseif t == "action" then
 				local action_id = type(item.id) == "string" and item.id or ""
-				if action_id ~= "" and type(dynamic_handlers[action_id]) == "function" then
+				if action_id ~= "" and type(action_handlers[action_id]) == "function" then
 					flush_sep()
-					local ok = call_isolated(manifest_key, action_id, dynamic_handlers[action_id], result, ctx)
+					local ok = call_isolated(manifest_key, action_id, action_handlers[action_id], result, ctx)
 					if ok then item_count = item_count + 1 end
 				else
 					-- A manifest entry with an id but no matching handler renders one
@@ -1646,6 +1890,10 @@ function M.new(deps)
 					goto continue
 				end
 				local label = i18n.get(i18n_key)
+				if item.caption_count_policy ~= nil then
+					label = read_translated_count_caption(item, getters, i18n, platform)
+					if label == nil then goto continue end
+				end
 				if item.caption_format ~= nil then
 					label = read_numbered_caption(item, getters, i18n)
 					if label == nil then goto continue end
@@ -1698,7 +1946,7 @@ function M.new(deps)
 			elseif t == "list" then
 				local list_id = type(item.id) == "string" and item.id or ""
 				if list_id == "" or type(list_providers[list_id]) ~= "function" then
-					-- Same class of bug as the "action" and "dynamic" branches: an entry
+					-- Same class of bug as the "action" branch: an entry
 					-- whose provider is missing either belongs on this platform (and the
 					-- caller's list_providers table has a hole) or needs a `platforms`
 					-- restriction. Silence here is a menu section that vanishes.
@@ -1723,9 +1971,9 @@ function M.new(deps)
 				-- The declarative row: everything about it is in the manifest, and
 				-- the driver supplies only a NAMED behaviour.
 				--
-				-- WHY THIS TYPE EXISTS. Every other type that carries behaviour —
-				-- "action", "dynamic" — hands the manifest key to a driver function
-				-- that builds the row itself. That is why 639 rows lived outside this
+				-- WHY THIS TYPE EXISTS. The other types that carried behaviour —
+				-- "action", and "dynamic" until it was retired — hand the manifest key
+				-- to a driver function that builds the row itself. That is why 639 rows lived outside this
 				-- file: the manifest described the SLOT and three drivers each wrote
 				-- the row. And they wrote it differently — Linux appended " ✓" to the
 				-- title while its own tray adapter has supported a native GTK check
@@ -1754,27 +2002,17 @@ function M.new(deps)
 					item_count = item_count + 1
 				end
 
-			elseif t == "dynamic" then
-				local dyn_id = type(item.id) == "string" and item.id or ""
-				if dyn_id ~= "" and type(dynamic_handlers[dyn_id]) == "function" then
-					flush_sep()
-					local ok = call_isolated(manifest_key, dyn_id, dynamic_handlers[dyn_id], result, ctx)
-					if ok then item_count = item_count + 1 end
-				else
-					-- Same class of bug as the "action" branch above: a misclassified or
-					-- drifted id-bearing entry with no handler must never fail silently.
-					Logger.warn(LOG, "No 'dynamic' handler registered for id '%s' in '%s' — item skipped.",
-						tostring(dyn_id), manifest_key)
-				end
-
 			else
 				Logger.warn(LOG, "Unknown item type '%s' in '%s' — skipped.", tostring(t), manifest_key)
 			end
 
 			::continue::
 		end
+		settle_previous_item()
 
-		return normalize_separators(result)
+		local finished = normalize_separators(result)
+		if off_reason_key ~= nil then apply_category_off(finished, roles, off_reason_key) end
+		return finished
 	end
 
 
@@ -1923,6 +2161,106 @@ function M.new(deps)
 	end
 
 
+	--- Captures only the existing top-level declaration's inert boundaries.
+	--- The second return is the exact source array: native loops must not infer
+	--- ownership from a separately decoded or cached copy of that declaration.
+	--- @return function|nil receive, table|nil declared
+	function R.top_level_separator_receiver()
+		local root = get_manifest_root()
+		local declared = type(root) == "table" and rawget(root, "top_level")
+		if type(root) ~= "table" or getmetatable(root) ~= nil or type(declared) ~= "table"
+			or getmetatable(declared) ~= nil or #declared == 0 or getmetatable(R) ~= nil then return nil end
+		for index in next, declared do
+			if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #declared then return nil end
+		end
+		-- Admit every nested source before platform iteration can observe it.
+		local source = reasoned_group_snapshot(declared)
+		if not source then return nil end
+		local quit, tail_boundary, record_owners = nil, nil, {}
+		for index = 1, #declared do
+			local row = rawget(declared, index)
+			if type(row) ~= "table" or getmetatable(row) ~= nil or type(rawget(row, "id")) ~= "string" then return nil end
+			if record_owners[row] then return nil end
+			record_owners[row] = true
+			if row.id == "---" then
+				for field in next, row do
+					if field ~= "id" and field ~= "type" and field ~= "platforms" and field ~= "reason_key"
+						and field ~= "unavailable" then return nil end
+				end
+				if (row.type ~= nil and row.type ~= "---") or (row.unavailable ~= nil and row.unavailable ~= "hide")
+					or (row.reason_key ~= nil and (type(row.reason_key) ~= "string" or row.reason_key == "")) then return nil end
+				local allowed = rawget(row, "platforms")
+				if allowed ~= nil then
+					if type(allowed) ~= "table" or getmetatable(allowed) ~= nil or #allowed == 0 then return nil end
+					local seen, count = {}, 0
+					for key, token in next, allowed do
+						if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #allowed
+							or (token ~= "ahk" and token ~= "hs" and token ~= "linux") or seen[token] then return nil end
+						seen[token], count = true, count + 1
+					end
+					if count ~= #allowed then return nil end
+				end
+				if is_for_platform(row) then tail_boundary = index end
+			elseif row.id == "quit" and is_for_platform(row) then
+				if quit ~= nil or row.type ~= "command" or type(row.i18n) ~= "string" or row.i18n == "" then return nil end
+				quit = { row = row, boundary = tail_boundary }
+			end
+		end
+		local owner = rawget(R, "top_level_separator_receiver")
+		local render_owner = rawget(R, "render_rows")
+		if not source or type(owner) ~= "function" or type(render_owner) ~= "function" then return nil end
+		local function current()
+			return getmetatable(R) == nil and rawget(R, "top_level_separator_receiver") == owner
+				and rawget(R, "render_rows") == render_owner
+				and get_manifest_root() == root and rawget(root, "top_level") == declared and reasoned_group_current(source)
+		end
+		if not current() then return nil end
+		return function(row)
+			if not current() then return nil end
+			if row == "current" then return true end
+			if row == "linux_quit_last" then
+				if platform ~= "linux" or not quit or quit.boundary == nil then return nil end
+				row = rawget(declared, quit.boundary)
+			end
+			if type(row) ~= "table" or getmetatable(row) ~= nil then return nil end
+			local matches = 0
+			for _, entry in ipairs(declared) do if rawequal(row, entry) then matches = matches + 1 end end
+			if matches ~= 1 or rawget(row, "id") ~= "---" or not is_for_platform(row) then return nil end
+			-- Shared inert projection; normalization remains the existing renderer's.
+			return { separator = true }
+		end, declared
+	end
+
+	--- Captures one canonical parent before its actual native child producer runs.
+	--- @param manifest_key string Existing canonical menu section.
+	--- @param row_id string Identified group to receive the completed child.
+	--- @return function|nil receiver No native state is read during admission.
+	function R.group_receiver(manifest_key, row_id)
+		local root, rows = get_manifest_root(), get_menu_def(manifest_key)
+		local selected, matches = nil, 0
+		for _, item in ipairs(rows) do
+			if type(item) ~= "table" or getmetatable(item) ~= nil then return nil end
+			if item.id == row_id then selected, matches = item, matches + 1 end
+		end
+		if type(row_id) ~= "string" or row_id == "" or matches ~= 1 or selected.type ~= "group"
+			or not is_for_platform(selected) or type(selected.i18n) ~= "string" or selected.i18n == ""
+			or (selected.caption_count_policy ~= nil and not translated_count_policy(selected)) then return nil end
+		local source = reasoned_group_snapshot(rows)
+		local owner = rawget(R, "group_row")
+		if not source or type(owner) ~= "function" or getmetatable(R) ~= nil then return nil end
+		return function(child, getters)
+			if type(child) ~= "table" or type(getters) ~= "table" then return nil end
+			local state, child_source = reasoned_group_snapshot(getters), reasoned_group_snapshot(child)
+			if not state or not child_source or getmetatable(R) ~= nil or rawget(R, "group_row") ~= owner
+				or get_manifest_root() ~= root or get_menu_def(manifest_key) ~= rows or not reasoned_group_current(source) then return nil end
+			local row = owner(manifest_key, row_id, child, getters)
+			if not row or get_manifest_root() ~= root or get_menu_def(manifest_key) ~= rows
+				or not reasoned_group_current(source) or not reasoned_group_current(state) or not reasoned_group_current(child_source)
+				or rawget(R, "group_row") ~= owner then return nil end
+			return row
+		end
+	end
+
 	--- Supplies one declared parent around an already completed native subtree.
 	--- @param manifest_key string Owning shared menu declaration.
 	--- @param row_id string Unique declared group identity.
@@ -1948,7 +2286,10 @@ function M.new(deps)
 		getters = getters or {}
 		local label = i18n.get(selected.i18n)
 		local caption_key = rawget(selected, "caption_getter")
-		if selected.caption_format ~= nil then
+		if selected.caption_count_policy ~= nil then
+			label = read_translated_count_caption(selected, getters, i18n, platform)
+			if label == nil then return nil end
+		elseif selected.caption_format ~= nil then
 			label = read_numbered_caption(selected, getters, i18n)
 			if label == nil then return nil end
 		elseif selected.caption_source ~= nil then

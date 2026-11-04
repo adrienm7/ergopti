@@ -9,8 +9,9 @@
 # (company) Mac: the system relay of `scutil --proxy` as HTTPS_PROXY,
 # HTTP_PROXY and NO_PROXY (loopback always excluded), and the system trust
 # store, where a company installs its inspection certificate. No CA file is
-# ever handed to a child: uv loads the keychain's roots (UV_SYSTEM_CERTS),
-# Apple's curl and Python's truststore read it already. Callers provide
+# ever handed to a child, and an inherited SSL_CERT_FILE or SSL_CERT_DIR is
+# dropped: uv loads the keychain's roots (UV_SYSTEM_CERTS), Apple's curl and
+# Python's truststore read it already. Callers provide
 # log_info() and log_error() before invoking retry_network() or
 # apply_system_network().
 # ============================================================================
@@ -18,6 +19,42 @@
 # EX_CONFIG: the client cannot apply the configured native route. It does not
 # identify a PAC evaluation failure, and callers must not infer one from it.
 OPAQUE_NETWORK_REFUSAL_EXIT_CODE=78
+# The user's proxy override (Issue #101 point 2; the Lua prelude validates it
+# with network/proxy_override.lua and exports ERGOPTI_PROXY_OVERRIDE). It is
+# applied before the inherited route is captured, so a relay becomes the
+# explicit route every activation below keeps, and no PAC, WPAD or system lookup
+# runs; "direct" drops every relay and the activations never read the system
+# settings. Empty means automatic: nothing below changes. A set override is
+# exported so an installer script sourcing this file again sees the same one.
+OPAQUE_NETWORK_ROUTE_OVERRIDE=""
+
+# Leaves no relay for this shell's children: every relay variable goes and every
+# host is excluded, so nothing inherited applies. The direct override and a
+# refused sign-in both need exactly this; the names are the shared policy's.
+clear_proxy_environment() {
+	unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY all_proxy ALL_PROXY
+	export NO_PROXY="*" no_proxy="*"
+}
+
+case "${ERGOPTI_PROXY_OVERRIDE:-}" in
+	"") ;;
+	direct)
+		OPAQUE_NETWORK_ROUTE_OVERRIDE=direct
+		export ERGOPTI_PROXY_OVERRIDE
+		clear_proxy_environment
+		;;
+	http://*|https://*|socks5://*|socks5h://*)
+		OPAQUE_NETWORK_ROUTE_OVERRIDE=relay
+		export ERGOPTI_PROXY_OVERRIDE
+		unset all_proxy ALL_PROXY
+		export https_proxy="$ERGOPTI_PROXY_OVERRIDE" HTTPS_PROXY="$ERGOPTI_PROXY_OVERRIDE"
+		export http_proxy="$ERGOPTI_PROXY_OVERRIDE" HTTP_PROXY="$ERGOPTI_PROXY_OVERRIDE"
+		;;
+	*)
+		# The prelude never exports another value; refuse rather than guess.
+		OPAQUE_NETWORK_ROUTE_OVERRIDE=invalid
+		;;
+esac
 # Capture the caller's route before the default/native-curl activation exports
 # system static values. Those exports cannot later become an explicit override.
 OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE="${https_proxy:-${HTTPS_PROXY:-${all_proxy:-${ALL_PROXY:-}}}}"
@@ -30,6 +67,59 @@ CURL_RETRY_COUNT=5
 CURL_RETRY_DELAY_SEC=5
 CURL_RETRY_MAX_TIME_SEC=300
 
+# The stages of the native route lookup after which a download goes direct
+# instead of refusing: the automatic configuration (PAC, WPAD) could not be
+# fetched or evaluated, which is not a route decision. Projected from
+# proxy_policy.json "pac_unavailable_fallback" (test-managed-proxy-route-contract.cjs
+# pins the copy). An explicit inherited relay never reaches the lookup, and a
+# relay the PAC names that then fails is never retried direct.
+PAC_UNAVAILABLE_FALLBACK_STAGES="native_proxy_lookup native_proxy_budget native_proxy_candidates native_pac_download native_pac_evaluation native_proxy_routes native_wpad_discovery native_route_empty"
+# Read by the Lua callers before the admission line, to name both causes when
+# the direct attempt fails too (modules/llm/opaque_network_admission.lua).
+PAC_DIRECT_FALLBACK_MARKER="__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:"
+# Set to the stage once this script went direct after an unusable PAC.
+OPAQUE_NETWORK_PAC_FALLBACK_STAGE=""
+PAC_FALLBACK_OUTCOME_REPORTED=""
+
+# Whether a failed lookup stage lets the download go direct.
+pac_unavailable_fallback_applies() {
+	local stage="$1" candidate
+	[ -n "$stage" ] || return 1
+	for candidate in $PAC_UNAVAILABLE_FALLBACK_STAGES; do
+		[ "$candidate" = "$stage" ] && return 0
+	done
+	return 1
+}
+
+# Sends this script's downloads direct after an unusable automatic configuration,
+# with one warning naming the stage that gave up. Nothing the system named is
+# exported, so no relay variable survives; loopback stays excluded by the caller.
+apply_pac_direct_fallback() {
+	local stage="$1"
+	unset HTTPS_PROXY https_proxy
+	export OPAQUE_NETWORK_PAC_FALLBACK_STAGE="$stage"
+	printf '%s%s\n' "$PAC_DIRECT_FALLBACK_MARKER" "$stage" >&2
+	# A caller without log_warn gets the level spelled in the line itself.
+	if declare -F log_warn >/dev/null; then
+		log_warn "The automatic network configuration could not be used ($stage). Trying a direct connection."
+	else
+		log_info "WARNING: The automatic network configuration could not be used ($stage). Trying a direct connection."
+	fi
+}
+
+# Reports, once, whether the direct attempt that replaced an unusable automatic
+# configuration worked. A no-op when no fallback happened.
+report_pac_fallback_outcome() {
+	local outcome="$1" cause="${2:-}"
+	[ -n "$OPAQUE_NETWORK_PAC_FALLBACK_STAGE" ] && [ -z "$PAC_FALLBACK_OUTCOME_REPORTED" ] || return 0
+	PAC_FALLBACK_OUTCOME_REPORTED=1
+	if [ "$outcome" = success ]; then
+		log_info "The direct connection worked after the automatic network configuration failed ($OPAQUE_NETWORK_PAC_FALLBACK_STAGE)."
+	else
+		log_error "The automatic network configuration was unreachable ($OPAQUE_NETWORK_PAC_FALLBACK_STAGE) and the direct connection failed ($cause)."
+	fi
+}
+
 # Runs an exact command with bounded exponential backoff.
 retry_network() {
 	local attempt=1
@@ -37,12 +127,20 @@ retry_network() {
 	local rc=1
 	while [ "$attempt" -le "$NETWORK_MAX_RETRIES" ]; do
 		if "$@"; then
+			report_pac_fallback_outcome success
 			return 0
 		else
 			rc=$?
 		fi
+		if [ "$rc" -eq "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE" ]; then
+			# The same settings would be refused again: retrying only delays the error.
+			log_error "Network attempt $attempt/$NETWORK_MAX_RETRIES refused by the configured network route (code $rc) -- not retrying."
+			report_pac_fallback_outcome failure "code $rc"
+			return "$rc"
+		fi
 		if [ "$attempt" -ge "$NETWORK_MAX_RETRIES" ]; then
 			log_error "Network attempt $attempt/$NETWORK_MAX_RETRIES failed (code $rc) -- giving up."
+			report_pac_fallback_outcome failure "code $rc"
 			return "$rc"
 		fi
 		log_info "Network attempt $attempt/$NETWORK_MAX_RETRIES failed (code $rc) -- retrying in ${backoff}s."
@@ -127,10 +225,260 @@ managed_bootstrap_launcher_available() {
 	[ "$identity" = "${ERGOPTI_LAUNCHER_DEVICE:-}:${ERGOPTI_LAUNCHER_INODE:-}" ]
 }
 
+# Seconds the launcher may spend naming the route of one origin (a PAC
+# download and its evaluation included).
+PAC_ROUTE_BUDGET_SEC=20
+
+# The shared origin inventory, beside this file in the bundle and the checkout
+# (macos/modules/llm -> _shared/modules/network). A caller may override it.
+# The folder is resolved inside an if: a failing command substitution in a
+# plain assignment ended every `set -e` caller that sourced this file, with no
+# line saying why, whenever the folder was missing. The unresolved path then
+# stays the default, and route_origins_for_client refuses it when it is used.
+if [ -z "${ROUTE_ORIGINS_FILE:-}" ]; then
+	if ROUTE_ORIGINS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network" 2>/dev/null && pwd)"; then
+		ROUTE_ORIGINS_FILE="$ROUTE_ORIGINS_DIR/route_origins.json"
+	else
+		ROUTE_ORIGINS_FILE="$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network/route_origins.json"
+	fi
+	unset ROUTE_ORIGINS_DIR
+fi
+
+# The origins one download client contacts, redirect targets included, as the
+# shared inventory (_shared/modules/network/route_origins.json) lists them.
+# Prints one origin per line; fails for an unknown client or a missing file.
+route_origins_for_client() {
+	local client="$1" file="${2:-${ROUTE_ORIGINS_FILE:-}}"
+	[ -n "$client" ] && [ -f "$file" ] || return 1
+	awk -v client="$client" '
+		$0 ~ "\"" client "\"[ \t]*:[ \t]*\\[" { active = 1 }
+		active {
+			line = $0
+			while (match(line, /"https:\/\/[^"]+"/)) {
+				print substr(line, RSTART + 1, RLENGTH - 2)
+				line = substr(line, RSTART + RLENGTH)
+				found = 1
+			}
+			if (line ~ /\]/) exit
+		}
+		END { exit found ? 0 : 1 }
+	' "$file"
+}
+
+# Twin of _shared/lua/network/route_plan.lua and _shared/go/route_plan: both
+# answer _shared/tests/corpus/network/route_plan_vectors.json. Reads
+# "<https origin><TAB><route>" lines on stdin, one per looked-up origin, where a
+# route is "direct" or an http, https, socks5 or socks5h relay with a port and
+# an optional userinfo (an apostrophe in it must be percent-encoded). Prints
+# "PLAN|<relay or direct>|<comma list of origins the lookup sent direct>" or
+# "REFUSED|<closed reason>". A client holding one environment relay cannot serve
+# two different relays, so that is refused rather than guessed.
+route_plan_from_entries() {
+	awk -F '\t' '
+		function refuse(reason) { print "REFUSED|" reason; refused = 1; exit 0 }
+		{ count++; origin[count] = $1; route[count] = $2; fields[count] = NF }
+		END {
+			if (count == 0) refuse("route-plan-empty")
+			for (i = 1; i <= count; i++) {
+				host = tolower(origin[i])
+				if (fields[i] != 2 || host !~ /^https:\/\/[A-Za-z0-9.-]+$/) refuse("route-plan-invalid")
+				sub(/^https:\/\//, "", host)
+				sub(/\.$/, "", host)
+				if (host == "" || length(host) > 253 || index(host, "..") > 0) refuse("route-plan-invalid")
+				hostname[i] = host
+				if (route[i] != "direct") {
+					if (route[i] !~ /^(https?|socks5h?):\/\/([A-Za-z0-9._~%!$&()*+,;=:-]+@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9._-]+):[0-9]+$/) refuse("route-plan-invalid")
+					parts = split(route[i], pieces, ":")
+					if (length(pieces[parts]) > 5 || pieces[parts] + 0 < 1 || pieces[parts] + 0 > 65535) refuse("route-plan-invalid")
+				}
+			}
+			relay = ""
+			for (i = 1; i <= count; i++) {
+				if (hostname[i] in known) {
+					if (known[hostname[i]] != route[i]) refuse("route-plan-conflict")
+					continue
+				}
+				known[hostname[i]] = route[i]
+				if (route[i] == "direct") {
+					direct = direct (direct == "" ? "" : ",") hostname[i]
+				} else if (relay != "" && relay != route[i]) {
+					refuse("route-plan-conflict")
+				} else {
+					relay = route[i]
+				}
+			}
+			print "PLAN|" (relay == "" ? "direct" : relay) "|" (relay == "" ? "" : direct)
+		}
+	'
+}
+
+# Seconds are bounded by PAC_ROUTE_BUDGET_SEC per origin; the origins are looked
+# up one after the other, so a download with N origins waits at most N times it.
+# A client that reads only environment relay variables (the Ollama daemon, uv)
+# cannot evaluate a PAC. When the caller names the origins it downloads from,
+# redirect targets included, in OPAQUE_NETWORK_PAC_PROBE_URLS (or the single
+# OPAQUE_NETWORK_PAC_PROBE_URL), the launcher resolves each one through the
+# system (PAC, WPAD) and the plan above turns the answers into HTTPS_PROXY plus
+# a NO_PROXY entry for each origin the PAC sends direct, or no relay at all when
+# every answer is DIRECT. A host the lookups did not name still follows
+# HTTPS_PROXY: the plan cannot see a redirect that leaves the inventory.
+# Neither a route nor a PAC is ever logged: only the step that gave up by its
+# closed stage code, or the closed reason of a refused plan.
+# Returns 0 when a route was settled, 1 otherwise (nothing is exported then);
+# OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE then names the launcher stage that gave up,
+# empty when no lookup ran or the plan refused the answers.
+resolve_system_route_for_probe() {
+	local origins="${OPAQUE_NETWORK_PAC_PROBE_URLS:-${OPAQUE_NETWORK_PAC_PROBE_URL:-}}"
+	local origin output status stage route entries="" plan kind first second existing
+	local tab=$'\t' newline=$'\n'
+	OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE=""
+	[ -n "$origins" ] || return 1
+	managed_bootstrap_launcher_available || return 1
+	for origin in $origins; do
+		case "$origin" in https://*) ;; *) return 1 ;; esac
+		output="$("$ERGOPTI_LAUNCHER_EXECUTABLE" --managed-proxy-route "$origin" "$PAC_ROUTE_BUDGET_SEC" 2>&1 </dev/null)"
+		status=$?
+		if [ "$status" -ne 0 ]; then
+			stage="$(printf '%s\n' "$output" | sed -n 's/^STAGE \(native_[a-z_]*\)$/\1/p' | head -n 1)"
+			OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE="${stage:-}"
+			log_info "The automatic network settings named no route (${stage:-unknown step})."
+			return 1
+		fi
+		route="$(printf '%s\n' "$output" | sed -n 's/^ROUTE \(.*\)$/\1/p' | head -n 1)"
+		entries="${entries}${origin}${tab}${route}${newline}"
+	done
+	plan="$(printf '%s' "$entries" | route_plan_from_entries)"
+	IFS='|' read -r kind first second <<EOF_ROUTE_PLAN
+$plan
+EOF_ROUTE_PLAN
+	case "$kind" in
+		PLAN) ;;
+		REFUSED)
+			log_info "The automatic network settings cannot be applied to every host of this download (${first})."
+			return 1
+			;;
+		*) return 1 ;;
+	esac
+	if [ "$first" = direct ]; then
+		log_info "The automatic network settings send model downloads directly."
+		return 0
+	fi
+	export HTTPS_PROXY="$first" https_proxy="$first"
+	if [ -n "$second" ]; then
+		existing="${NO_PROXY:-${no_proxy:-}}"
+		export NO_PROXY="${existing:+$existing,}$second" no_proxy="${existing:+$existing,}$second"
+	fi
+	log_info "Model downloads use the relay the automatic network settings name."
+	return 0
+}
+
+# Runs "$@" (the stock Ollama daemon) under Ergopti's local sign-in relay when
+# the relay HTTPS_PROXY names answers 407 with NTLM or Negotiate
+# (docs/design/proxy-auth-relay.md); the daemon cannot answer that sign-in
+# itself. Only a plain http relay without credentials is probed: userinfo is
+# Basic, which the daemon sends, and socks or https relays are not signed in.
+# The relay is the one bundled beside the admitted launcher; the probe signs in
+# once, so "required" proves the user's Kerberos ticket before the daemon
+# depends on it. The probe line is read as network/proxy_auth_relay.lua reads it
+# (the shared proxy_auth_relay_probe_vectors.json pins both). A relay that is
+# not bundled starts the daemon under the proxy as named. A refused sign-in
+# starts the daemon without the proxy, as Windows and Linux do, so the models
+# already on disk keep working: the closed reason goes to the log and to
+# ERGOPTI_PROXY_RELAY_REFUSAL_FILE, which refuses the pull with its message
+# (modules/llm/proxy_relay_receipt.lua). Never logs the proxy.
+# Deadlines come from the caller (constants.toml [adapters] proxy_relay_*_ms):
+# ERGOPTI_PROXY_RELAY_DIAL_MS, ERGOPTI_PROXY_RELAY_HANDSHAKE_MS and
+# ERGOPTI_PROXY_RELAY_IDLE_MS; the registry is the first OPAQUE_NETWORK_PAC_PROBE_URLS origin.
+run_with_proxy_sign_in_relay() {
+	local upstream="${HTTPS_PROXY:-}" relay origin authority output status reason
+	local dial="${ERGOPTI_PROXY_RELAY_DIAL_MS:-}" handshake="${ERGOPTI_PROXY_RELAY_HANDSHAKE_MS:-}"
+	local idle="${ERGOPTI_PROXY_RELAY_IDLE_MS:-}" receipt="${ERGOPTI_PROXY_RELAY_REFUSAL_FILE:-}"
+	[ "$#" -gt 0 ] || return 2
+	# A receipt names the daemon of its own start, never a later one.
+	[ -z "$receipt" ] || rm -f "$receipt"
+	if ! printf '%s' "$upstream" | grep -Eq '^http://[A-Za-z0-9.-]+:[0-9]{1,5}/?$'; then
+		"$@"
+		return
+	fi
+	upstream="${upstream%/}"
+	origin="${OPAQUE_NETWORK_PAC_PROBE_URLS:-${OPAQUE_NETWORK_PAC_PROBE_URL:-}}"
+	origin="${origin%% *}"
+	case "$origin" in https://*) authority="${origin#https://}:443" ;; *) authority="" ;; esac
+	case "$dial:$handshake:$idle" in
+		*[!0-9:]*|:*|*::*|*:) authority="" ;;
+	esac
+	if [ -z "$authority" ] || ! printf '%s' "$authority" | grep -Eq '^[A-Za-z0-9.-]+:443$'; then
+		log_error "The proxy sign-in relay was not probed: its inputs are incomplete (relay_unavailable)."
+		start_without_proxy_after_refusal relay_unavailable "$receipt" "$@"
+		return
+	fi
+	relay=""
+	if managed_bootstrap_launcher_available; then
+		relay="${ERGOPTI_LAUNCHER_EXECUTABLE%/*}/ergopti-proxy-relay"
+	fi
+	if [ -z "$relay" ] || [ ! -f "$relay" ] || [ ! -x "$relay" ] || [ -L "$relay" ]; then
+		log_info "The proxy sign-in relay is not installed: a proxy that demands NTLM or Negotiate will refuse model downloads (not_installed)."
+		"$@"
+		return
+	fi
+	output="$("$relay" probe --upstream "$upstream" --authority "$authority" \
+		--dial-timeout-ms "$dial" --handshake-timeout-ms "$handshake" 2>/dev/null </dev/null)"
+	status=$?
+	case "$status:$output" in
+		'0:{"schema":1,"status":"not_needed"}')
+			"$@"
+			return
+			;;
+		'0:{"schema":1,"status":"required","scheme":"negotiate"}'|'0:{"schema":1,"status":"required","scheme":"ntlm"}')
+			log_info "The proxy demands a network sign-in: model downloads go through the local relay."
+			"$relay" run --upstream "$upstream" --variable HTTPS_PROXY --variable https_proxy \
+				--dial-timeout-ms "$dial" --handshake-timeout-ms "$handshake" --idle-timeout-ms "$idle" -- "$@"
+			return
+			;;
+		[23]':{"schema":1,"status":"refused","reason":"'*'"}')
+			reason="${output#*\"reason\":\"}"
+			reason="${reason%\"\}}"
+			printf '%s' "$reason" | grep -Eq '^[a-z_]{1,40}$' || reason=relay_unavailable
+			;;
+		*) reason=relay_unavailable ;;
+	esac
+	log_error "The proxy sign-in relay refused (${reason}): the daemon starts without the proxy."
+	start_without_proxy_after_refusal "$reason" "$receipt" "$@"
+}
+
+# Records a closed refusal for the pull, then runs the daemon with no proxy at
+# all. The subshell keeps the caller's own route for whatever it does next.
+start_without_proxy_after_refusal() {
+	local reason="$1" receipt="$2"
+	shift 2
+	if [ -n "$receipt" ]; then
+		if ! mkdir -p "${receipt%/*}" || ! printf '%s\n' "$reason" > "$receipt"; then
+			log_error "The proxy sign-in refusal could not be recorded for the model pull (${reason})."
+		fi
+	fi
+	(
+		clear_proxy_environment
+		exec "$@"
+	)
+}
+
+# Prints the SHA-256 hex digest of one file. shasum marks a line whose name
+# holds a backslash or a newline with a leading backslash before the digest,
+# so the first field alone was "\<digest>" for such a path and never matched.
+sha256_file_digest() {
+	local line
+	line="$(shasum -a 256 "$1")" || return 1
+	line="${line%% *}"
+	printf '%s\n' "${line#\\}"
+}
+
 managed_bootstrap_download() {
 	local url="$1" output="$2" digest="$3" size="${4:-}" transfer="${5:-resumable}" replace_owner="${6:-}"
 	case "$transfer" in resilient|resumable) ;; *) return 64 ;; esac
-	if [ -n "${ERGOPTI_LAUNCHER_EXECUTABLE:-}" ] && [ -z "$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE" ]; then
+	# The signed native worker reads the system routes itself: a proxy override
+	# (relay or direct) takes the environment-driven path below instead.
+	if [ -n "${ERGOPTI_LAUNCHER_EXECUTABLE:-}" ] && [ -z "$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE" ] \
+		&& [ -z "$OPAQUE_NETWORK_ROUTE_OVERRIDE" ]; then
 		if [ ! -x "${ERGOPTI_BOOTSTRAP_PYTHON:-}" ]; then
 			if ! managed_bootstrap_launcher_available; then
 				log_error "The native download input owner is unavailable. No download was started."
@@ -177,9 +525,29 @@ managed_bootstrap_download() {
 # sends the local Ollama and MLX servers to the company's.
 LOOPBACK_NO_PROXY="localhost,127.0.0.1,::1"
 
+# Names of the CA-file variables a download child never inherits: they override
+# uv's and Python's system trust, and the signed native worker ignores them.
+INHERITED_TRUST_VARIABLES="SSL_CERT_FILE SSL_CERT_DIR"
+
+# Drops an inherited CA file or folder so every child uses the system and
+# keychain trust only, where the policy puts a company root. Ergopti never sets
+# either; the field run of 2026-10-27 19:47 inherited one the worker could not
+# read, and every download stopped. One INFO line per dropped name: once unset,
+# a later activation in the same child has nothing left to report.
+drop_inherited_trust_variables() {
+	local name
+	for name in $INHERITED_TRUST_VARIABLES; do
+		if [ -n "${!name:-}" ]; then
+			log_info "Inherited $name ignored: downloads use the system and keychain trust."
+		fi
+		unset "$name"
+	done
+}
+
 # Repeated admission checks keep the same child environment. Never append a CA
 # file: uv's native trust selection is the same Boolean activation every time.
 apply_client_network_environment() {
+	drop_inherited_trust_variables
 	local exclusions="${NO_PROXY:-${no_proxy:-}}" host
 	local IFS=,
 	for host in $LOOPBACK_NO_PROXY; do
@@ -361,14 +729,39 @@ opaque_automatic_mode_from_scutil() {
 	'
 }
 
+# Names the proxy override in the child log once per activation and refuses
+# an override value the prelude cannot have exported. A direct override also
+# completes the activation: the system settings are never read. The lines name
+# the kind of route only, never the relay.
+apply_route_override_activation() {
+	case "$OPAQUE_NETWORK_ROUTE_OVERRIDE" in
+		"") return 0 ;;
+		direct)
+			log_info "Downloads go direct: the proxy override in the Ergopti settings says so."
+			apply_client_network_environment
+			export NO_PROXY="*" no_proxy="*"
+			return 0 ;;
+		relay)
+			log_info "Downloads use the relay the proxy override in the Ergopti settings names."
+			return 0 ;;
+		*)
+			OPAQUE_NETWORK_FAILURE_PROVENANCE=verified
+			OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=unavailable
+			log_error "The proxy override in the Ergopti settings is not valid. No download was started."
+			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE" ;;
+	esac
+}
+
 # uv, HTTPX/HuggingFace and the owned Ollama Go daemon have no native,
 # per-request full-URL PAC adapter. An explicit HTTPS environment route remains
 # supported; a system automatic route must be refused before any child starts.
 # These facts belong to this admission only, not to unstructured child stderr.
 apply_opaque_system_network() {
-	local relay snapshot mode settings line
+	local relay snapshot mode mode_name settings line
 	OPAQUE_NETWORK_FAILURE_PROVENANCE=""
 	OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=""
+	apply_route_override_activation || return $?
+	if [ "$OPAQUE_NETWORK_ROUTE_OVERRIDE" = direct ]; then return 0; fi
 	relay="$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE"
 	if [ -n "$relay" ]; then
 		# Go does not consume ALL_PROXY. Materialize the selected environment
@@ -387,10 +780,31 @@ apply_opaque_system_network() {
 			log_error "The system network configuration could not be read. No download was started."
 			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
 		fi
+		if [ "$mode" = pac ] || [ "$mode" = wpad ]; then
+			if resolve_system_route_for_probe; then
+				# The launcher evaluated the automatic configuration for the origin the
+				# caller downloads from; its route is exported, so the client is admitted.
+				apply_client_network_environment
+				return 0
+			fi
+			if pac_unavailable_fallback_applies "${OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE:-}"; then
+				# The configuration could not be fetched or evaluated: a terminal goes
+				# direct and works, so the download tries the same (issue #101).
+				apply_pac_direct_fallback "$OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE"
+				apply_client_network_environment
+				return 0
+			fi
+		fi
 		if [ "$mode" != none ]; then
 			OPAQUE_NETWORK_FAILURE_PROVENANCE=verified
 			OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=unavailable
-			log_error "The system proxy configuration cannot be used by this client. No download was started."
+			# Name the setting: the log is all a maintainer gets from a user's Mac (#99)
+			case "$mode" in
+				pac) mode_name="an automatic proxy configuration file (PAC)" ;;
+				wpad) mode_name="automatic proxy discovery (WPAD)" ;;
+				*) mode_name="a SOCKS proxy without an HTTPS proxy" ;;
+			esac
+			log_error "The system proxy configuration ($mode_name) cannot be used by this client. No download was started."
 			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
 		fi
 		settings="$(printf '%s\n' "$snapshot" | system_network_from_scutil)" || return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
@@ -420,7 +834,9 @@ apply_system_network() {
 		return $?
 	fi
 	local settings line
-	if [ -z "${HTTPS_PROXY:-}${https_proxy:-}${HTTP_PROXY:-}${http_proxy:-}${ALL_PROXY:-}${all_proxy:-}" ]; then
+	apply_route_override_activation || return $?
+	if [ "$OPAQUE_NETWORK_ROUTE_OVERRIDE" = direct ]; then return 0; fi
+	if [ -z "${http_proxy:-}${HTTP_PROXY:-}${https_proxy:-}${HTTPS_PROXY:-}${all_proxy:-}${ALL_PROXY:-}" ]; then
 		# Reuse the native getter; explicit inherited routes never trigger it.
 		settings="$(opaque_system_proxy_snapshot 2>/dev/null | system_network_from_scutil)" || settings=""
 		while IFS= read -r line; do
@@ -429,7 +845,12 @@ apply_system_network() {
 				HTTP_PROXY=*) export HTTP_PROXY="${line#HTTP_PROXY=}" http_proxy="${line#HTTP_PROXY=}" ;;
 				NO_PROXY=*) export NO_PROXY="${line#NO_PROXY=}" ;;
 				PAC_URL=*)
-					if managed_bootstrap_launcher_available; then
+					if [ -n "${OPAQUE_NETWORK_PAC_PROBE_URL:-}${OPAQUE_NETWORK_PAC_PROBE_URLS:-}" ] && resolve_system_route_for_probe; then
+						:
+					elif pac_unavailable_fallback_applies "${OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE:-}"; then
+						# The daemon starts either way; say that its downloads go direct.
+						apply_pac_direct_fallback "$OPAQUE_NETWORK_ROUTE_LOOKUP_STAGE"
+					elif managed_bootstrap_launcher_available; then
 						log_info "Automatic network settings will be evaluated by the native download helper."
 					else
 						log_info "Automatic network settings require the native download helper or an explicit relay."

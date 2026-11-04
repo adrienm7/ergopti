@@ -4,20 +4,27 @@
 ; MODULE: Gesture Screenshot Capture (AHK)
 ; DESCRIPTION:
 ; Owns every asynchronous screenshot worker from launch through cancellation,
-; private staging, publication, and cleanup. PowerShell children may capture only
-; into per-generation staging files; the current AHK owner alone may publish a
-; final file or clipboard image after revalidating its epoch and lifecycle state.
+; private staging, publication, and cleanup. Workers capture in process with
+; GDI and GDI+ and write only per-generation staging files; the current AHK owner
+; alone may publish a final file or clipboard image after revalidating its epoch
+; and lifecycle state.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One worker registry - direct, instant, window, fullscreen, and region-save
-;    paths share one cancellable ShellRunner lifecycle.
+;    paths share one cancellable worker lifecycle.
 ; 2. Side-effect fencing - a worker which survives suspend, timeout, supersession,
 ;    or shutdown can finish only a private stage and cannot touch user state.
-; 3. Exact ownership - terminal callbacks, process termination, and stage cleanup
-;    are each claimed once even when cancellation and completion are re-entrant.
+; 3. Exact ownership - terminal callbacks and worker termination are claimed
+;    once; staging cleanup retains its native identity until deletion is acknowledged.
+; 4. No child process - the capture never starts a hidden script host: a hidden
+;    process compiling clipboard P/Invoke code is the shape of a stealer stage,
+;    and corporate antivirus engines flagged the release that carried one.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+
+#Include ../../adapters/file_publication.ahk
+#Include ../../adapters/screen_capture.ahk
 
 global _GestureRegionCapture := false
 global _GestureRegionCaptureEpoch := 0
@@ -34,6 +41,8 @@ global GESTURE_SM_XVIRTUALSCREEN := 76
 global GESTURE_SM_YVIRTUALSCREEN := 77
 global GESTURE_SM_CXVIRTUALSCREEN := 78
 global GESTURE_SM_CYVIRTUALSCREEN := 79
+global GESTURE_SCREENSHOT_PNG_ENCODER := "{557CF406-1A04-11D3-9A73-0000F81EF32E}"
+global GESTURE_SCREENSHOT_BMP_ENCODER := "{557CF400-1A04-11D3-9A73-0000F81EF32E}"
 
 ; Test seams stay at zero in production. Tests replace only the OS boundaries,
 ; while the same ownership state machine and terminal paths execute unchanged.
@@ -50,6 +59,9 @@ class GestureScreenshotWorkerState {
 	static clipboard_has_image_fn := 0
 	static clipboard_save_fn := 0
 	static clipboard_restore_fn := 0
+	; Called as (Phase, Bitmap) at "acquired" (clipboard lock held, borrowed
+	; bitmap) and "detached" (lock released, private image retained).
+	static native_probe_fn := 0
 }
 
 
@@ -85,30 +97,57 @@ _GestureScreenshotDefaultFileExists(Path) {
 }
 
 _GestureScreenshotDefaultPublishFile(Stage, Destination) {
+	return FSPublishCreateOwned(Stage, Destination)
+}
+
+_GestureScreenshotFileSnapshot(Path) {
+	Reader := 0
 	try {
-		if !FileExist(Stage) || FileExist(Destination)
+		Reader := FSOpenStrict(Path, "r-wd", "UTF-8-RAW")
+		return IsObject(Reader) ? FSHandleSnapshot(Reader.Handle) : 0
+	} catch {
+		return 0
+	} finally {
+		if IsObject(Reader)
+			Reader.Close()
+	}
+}
+
+_GestureScreenshotSnapshotMatches(Expected, Path) {
+	Observed := _GestureScreenshotFileSnapshot(Path)
+	if !(Expected is Map) || !Expected.Get("ok", false)
+			|| !(Observed is Map) || !Observed.Get("ok", false)
+		return false
+	for Key in ["volume", "index_high", "index_low", "size", "write_high", "write_low"]
+		if Expected[Key] != Observed[Key]
 			return false
-		FileMove(Stage, Destination)
-		return FileExist(Destination) != ""
-	} catch as Err {
-		LoggerError("gestures", "Screenshot file publication failed for '{1}': {2}.", Destination, Err.Message)
-		return false
-	}
+	return true
 }
 
-_GestureScreenshotDefaultPublishClipboard(Stage) {
-	return CB_WriteBitmapFile(Stage)
+_GestureScreenshotDefaultRollbackFile(Destination, Snapshot) {
+	return FSDeleteVerified(Destination, _GestureScreenshotSnapshotMatches.Bind(Snapshot))
 }
 
-_GestureScreenshotDefaultDeleteFile(Path) {
-	try {
-		if FileExist(Path)
-			FileDelete(Path)
-		return FileExist(Path) = ""
-	} catch as Err {
-		LoggerError("gestures", "Screenshot staging cleanup failed for '{1}': {2}.", Path, Err.Message)
+_GestureScreenshotDefaultPublishClipboard(Stage, AdmissionFn := 0) {
+	Published := CB_WriteBitmapFile(Stage, &MutationSequence, AdmissionFn)
+	return Map("published", Published, "sequence", MutationSequence)
+}
+
+_GestureScreenshotDefaultDeleteFile(Path, Snapshot) {
+	; Absence captured before delivery owns nothing created by a later callback.
+	if Snapshot is Map && Snapshot.Get("absent", false)
+		return true
+	if !(Snapshot is Map) || !Snapshot.Get("ok", false)
 		return false
-	}
+	if !FSStrictExists(Path)
+		return true
+	Observed := _GestureScreenshotFileSnapshot(Path)
+	if !(Observed is Map) || !Observed.Get("ok", false)
+		return false
+	for Key in ["volume", "index_high", "index_low", "size", "write_high", "write_low"]
+		if Snapshot[Key] != Observed[Key]
+			return true
+	return FSDeleteVerified(Path, _GestureScreenshotSnapshotMatches.Bind(Snapshot))
 }
 
 _GestureScreenshotDefaultClipboardSequence() {
@@ -140,34 +179,98 @@ _GestureScreenshotPublishFile(Stage, Destination) {
 	return Fn.Call(Stage, Destination)
 }
 
-_GestureScreenshotPublishClipboard(Stage) {
+_GestureScreenshotPublishClipboard(Stage, AdmissionFn) {
 	Fn := IsObject(GestureScreenshotWorkerState.publish_clipboard_fn)
 		? GestureScreenshotWorkerState.publish_clipboard_fn : _GestureScreenshotDefaultPublishClipboard
-	return Fn.Call(Stage)
+	return Fn.Call(Stage, AdmissionFn)
+}
+
+_GestureScreenshotCaptureStage(Job) {
+	PreviousCritical := Critical("On")
+	try {
+		if Job.Get("stage_captured", false)
+			return
+		Job["stage_captured"] := true
+		Job["stage_snapshot"] := 0
+	} finally Critical(PreviousCritical)
+	; Never re-adopt a path after a callback, failed probe, or cleanup retry.
+	if IsObject(GestureScreenshotWorkerState.cleanup_stage_fn)
+		return
+	try Job["stage_snapshot"] := FSStrictExists(Job["stage"])
+		? _GestureScreenshotFileSnapshot(Job["stage"]) : Map("absent", true)
 }
 
 _GestureScreenshotCleanupStage(Job) {
 	PreviousCritical := Critical("On")
 	try {
-		if Job.Get("cleanup_claimed", false)
+		if !GestureScreenshotWorkerState.jobs.Has(Job["id"])
+				|| GestureScreenshotWorkerState.jobs[Job["id"]] != Job
+				|| !Job.Get("quiescent", false) || Job.Get("delivery_active", false)
+				|| Job.Get("cleanup_claimed", false)
 			return false
 		Job["cleanup_claimed"] := true
+		Job["cleanup_attempts"] := Job.Get("cleanup_attempts", 0) + 1
+	} finally Critical(PreviousCritical)
+	Acknowledged := false
+	try {
+		_GestureScreenshotCaptureStage(Job)
+		Fn := GestureScreenshotWorkerState.cleanup_stage_fn
+		Result := IsObject(Fn) ? Fn.Call(Job["stage"])
+			: _GestureScreenshotDefaultDeleteFile(Job["stage"], Job["stage_snapshot"])
+		Acknowledged := Result is Integer && Result == 1
+	} catch as Err {
+		; The retained job, not a new pathname sample, owns the next attempt.
+		Job["cleanup_error"] := Err.Message
 	} finally {
-		Critical(PreviousCritical)
+		PreviousCritical := Critical("On")
+		try {
+			Job["cleanup_claimed"] := false
+			if Acknowledged && GestureScreenshotWorkerState.jobs.Has(Job["id"])
+					&& GestureScreenshotWorkerState.jobs[Job["id"]] == Job {
+				Job["cleanup_done"] := true
+				GestureScreenshotWorkerState.jobs.Delete(Job["id"])
+			}
+		} finally Critical(PreviousCritical)
+		_GestureScreenshotScheduleCleanup()
 	}
-	Fn := IsObject(GestureScreenshotWorkerState.cleanup_stage_fn)
-		? GestureScreenshotWorkerState.cleanup_stage_fn : _GestureScreenshotDefaultDeleteFile
-	try return Fn.Call(Job["stage"])
-	catch as Err {
-		LoggerError("gestures", "Screenshot staging cleanup threw for '{1}': {2}.", Job["stage"], Err.Message)
-		return false
-	}
+	if !Acknowledged && (Job["cleanup_attempts"] == 1 || Mod(Job["cleanup_attempts"], 20) == 0)
+		LoggerError("gestures", "Screenshot staging cleanup remains pending for '{1}' after attempt {2}: {3}.",
+			Job["stage"], Job["cleanup_attempts"], Job.Get("cleanup_error", "native deletion was not acknowledged"))
+	return Acknowledged
 }
 
-_GestureScreenshotRollbackFile(Destination) {
+_GestureScreenshotScheduleCleanup() {
+	global GESTURE_REGION_CAPTURE_POLL_MS
+	PreviousCritical := Critical("On")
+	try {
+		Pending := false
+		for _, Job in GestureScreenshotWorkerState.jobs
+			if Job.Get("quiescent", false) && !Job.Get("delivery_active", false)
+					&& !Job.Get("cleanup_shutdown", false) {
+				Pending := true
+				break
+			}
+		if Pending
+			TimerArmOneShotMs(_GestureScreenshotRetryCleanup, GESTURE_REGION_CAPTURE_POLL_MS)
+		else
+			TimerSetCallback(_GestureScreenshotRetryCleanup, 0)
+	} finally Critical(PreviousCritical)
+}
+
+_GestureScreenshotRetryCleanup() {
+	PreviousCritical := Critical("On")
+	try Snapshot := GestureScreenshotWorkerState.jobs.Clone()
+	finally Critical(PreviousCritical)
+	for _, Job in Snapshot
+		if Job.Get("quiescent", false) && !Job.Get("cleanup_shutdown", false)
+			_GestureScreenshotCleanupStage(Job)
+	_GestureScreenshotScheduleCleanup()
+}
+
+_GestureScreenshotRollbackFile(Destination, Snapshot) {
 	Fn := IsObject(GestureScreenshotWorkerState.rollback_file_fn)
-		? GestureScreenshotWorkerState.rollback_file_fn : _GestureScreenshotDefaultDeleteFile
-	try return Fn.Call(Destination)
+		? GestureScreenshotWorkerState.rollback_file_fn : _GestureScreenshotDefaultRollbackFile
+	try return Fn.Call(Destination, Snapshot)
 	catch as Err {
 		LoggerError("gestures", "Canceled screenshot file rollback threw for '{1}': {2}.", Destination, Err.Message)
 		return false
@@ -220,21 +323,63 @@ _GestureScreenshotRollbackClipboard(Snapshot, PublishedSequence, OwnerToken) {
 ; ==========================================
 ; ==========================================
 
-_GestureScreenshotPowerShellArgs(Script, NeedsSta := false) {
-	Args := ["-NoProfile", "-NonInteractive"]
-	if NeedsSta
-		Args.Push("-Sta")
-	Args.Push("-WindowStyle", "Hidden", "-Command", Script)
-	return Args
+; An in-process capture task with the start/requestTerminate/completion contract
+; of a process handle. start() defers the capture to its own timer thread, so a
+; hotkey returns at once and the owner is registered before any pixel is read.
+; @param {Func} Capture Writes the private stage; throws on any failure.
+; @param {Func} Done Called once with (ExitCode, Stdout, Stderr).
+; @returns {Object} The handle with start() and requestTerminate().
+_GestureScreenshotSpawnNative(Capture, Done) {
+	Task := Map("capture", Capture, "done", Done, "started", false, "running", false,
+		"terminated", false)
+	Handle := {}
+	Handle.start := _GestureScreenshotNativeStart.Bind(Task)
+	Handle.requestTerminate := _GestureScreenshotNativeRequestTerminate.Bind(Task)
+	return Handle
 }
 
-_GestureScreenshotCreateWorker(Kind, OwnerEpoch, Stage, Args, OwnerDone) {
+_GestureScreenshotNativeStart(Task, *) {
+	if Task["started"] || Task["terminated"]
+		return false
+	Task["started"] := true
+	SetTimer(_GestureScreenshotNativeRun.Bind(Task), -1)
+	return true
+}
+
+; A terminated task still reports once, so the registry reaps its job and stage.
+; The quiescence receipt (1) is exact: a capture interrupted mid-run by another
+; AHK thread can still write its stage, so it reports 0 and its completion,
+; which follows, fences publication and owns the cleanup.
+_GestureScreenshotNativeRequestTerminate(Task, *) {
+	Task["terminated"] := true
+	return Task["running"] ? 0 : 1
+}
+
+_GestureScreenshotNativeRun(Task) {
+	ExitCode := 1
+	ErrorText := "terminated before capture"
+	if !Task["terminated"] {
+		Task["running"] := true
+		try {
+			Task["capture"].Call()
+			ExitCode := 0
+			ErrorText := ""
+		} catch as Err {
+			ErrorText := Err.Message
+		} finally {
+			Task["running"] := false
+		}
+	}
+	Task["done"].Call(ExitCode, "", ErrorText)
+}
+
+_GestureScreenshotCreateWorker(Kind, OwnerEpoch, Stage, Capture, OwnerDone) {
 	PreviousCritical := Critical("On")
 	try WorkerId := ++GestureScreenshotWorkerState.generation
 	finally Critical(PreviousCritical)
 	Spawn := IsObject(GestureScreenshotWorkerState.spawn_fn)
-		? GestureScreenshotWorkerState.spawn_fn : ShellRunner_SpawnTreeOwned
-	try Handle := Spawn.Call("powershell.exe", Args, GestureScreenshotWorkerDone.Bind(WorkerId))
+		? GestureScreenshotWorkerState.spawn_fn : _GestureScreenshotSpawnNative
+	try Handle := Spawn.Call(Capture, GestureScreenshotWorkerDone.Bind(WorkerId))
 	catch as Err {
 		LoggerError("gestures", "Screenshot worker construction failed ({1}): {2}.", Kind, Err.Message)
 		return 0
@@ -251,6 +396,8 @@ _GestureScreenshotCreateWorker(Kind, OwnerEpoch, Stage, Args, OwnerDone) {
 		"handle", Handle,
 		"on_done", OwnerDone,
 		"worker_done", false,
+		"start_attempted", false,
+		"quiescent", false,
 		"cancel_requested", false,
 		"terminate_requested", false,
 		"cleanup_claimed", false)
@@ -268,6 +415,7 @@ _GestureScreenshotStartWorker(WorkerId) {
 		Job := GestureScreenshotWorkerState.jobs[WorkerId]
 		if Job["cancel_requested"]
 			return false
+		Job["start_attempted"] := true
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -277,9 +425,9 @@ _GestureScreenshotStartWorker(WorkerId) {
 		return false
 	}
 	; A test seam or a very short process may complete synchronously from start().
-	; The vanished registry entry proves that terminal already won ownership.
+	; A terminal remains successful even while its private file cleanup is pending.
 	PreviousCritical := Critical("On")
-	try return !GestureScreenshotWorkerState.jobs.Has(WorkerId) ? true : (Started ? true : false)
+	try return Job["worker_done"] || !GestureScreenshotWorkerState.jobs.Has(WorkerId) || Started ? true : false
 	finally Critical(PreviousCritical)
 }
 
@@ -289,11 +437,15 @@ _GestureScreenshotDiscardUnstartedWorker(WorkerId) {
 		if !GestureScreenshotWorkerState.jobs.Has(WorkerId)
 			return false
 		Job := GestureScreenshotWorkerState.jobs[WorkerId]
-		GestureScreenshotWorkerState.jobs.Delete(WorkerId)
-	} finally {
-		Critical(PreviousCritical)
-	}
-	_GestureScreenshotCleanupStage(Job)
+		Job["cancel_requested"] := true
+		Job["on_done"] := 0
+		if !Job["start_attempted"]
+			Job["quiescent"] := true
+	} finally Critical(PreviousCritical)
+	if !Job["quiescent"]
+		GestureScreenshotCancelWorker(WorkerId, "start failed")
+	if Job["quiescent"]
+		_GestureScreenshotCleanupStage(Job)
 	return true
 }
 
@@ -303,39 +455,38 @@ GestureScreenshotCancelWorker(WorkerId, Reason) {
 		if !GestureScreenshotWorkerState.jobs.Has(WorkerId)
 			return false
 		Job := GestureScreenshotWorkerState.jobs[WorkerId]
-		if Job["cancel_requested"]
-			return false
+		if Reason == "shutdown"
+			Job["cleanup_shutdown"] := true
 		Job["cancel_requested"] := true
 		Job["cancel_reason"] := Reason
-		if Job["worker_done"]
-			return true
-		; Claim before calling the handle: a fake or future handle may report done
-		; synchronously while it processes the termination request.
-		Job["terminate_requested"] := true
+		; A terminal or an earlier exact termination receipt already proves quiet.
+		Request := !Job["quiescent"] && !Job["terminate_requested"]
+		if Request
+			Job["terminate_requested"] := true
 		Handle := Job["handle"]
-	} finally {
-		Critical(PreviousCritical)
-	}
+	} finally Critical(PreviousCritical)
 	Requested := false
-	try Requested := Handle.requestTerminate()
-	catch as Err
-		LoggerError("gestures", "Screenshot worker termination threw ({1}, {2}): {3}.", Job["kind"], Reason, Err.Message)
-	if !Requested {
-		PreviousCritical := Critical("On")
-		try {
-			if GestureScreenshotWorkerState.jobs.Has(WorkerId)
-				GestureScreenshotWorkerState.jobs[WorkerId]["termination_failed"] := true
-		} finally {
-			Critical(PreviousCritical)
+	if Request {
+		try Requested := Handle.requestTerminate()
+		catch as Err
+			LoggerError("gestures", "Screenshot worker termination threw ({1}, {2}): {3}.", Job["kind"], Reason, Err.Message)
+		if Requested is Integer && Requested == 1
+			Job["quiescent"] := true
+		else {
+			Job["termination_failed"] := true
+			LoggerError("gestures", "Screenshot worker termination request failed ({1}, {2}); publication remains fenced.", Job["kind"], Reason)
 		}
-		LoggerError("gestures", "Screenshot worker termination request failed ({1}, {2}); publication remains fenced.", Job["kind"], Reason)
 	}
-	; On shutdown no AHK completion callback can run. Delete an already-written
-	; stage now; a worker still inside Save performs the matching parent-death
-	; cleanup in its final PowerShell statement.
-	if Reason == "shutdown"
+	; Normal termination retains its completion callback. Shutdown has no such
+	; guarantee: attempt once only after a strict native quiescence receipt.
+	if Job["worker_done"] || (Reason == "shutdown" && Job["quiescent"])
 		_GestureScreenshotCleanupStage(Job)
-	return Requested
+	if Reason == "shutdown" {
+		_GestureScreenshotScheduleCleanup()
+		if GestureScreenshotWorkerState.jobs.Has(WorkerId)
+			LoggerError("gestures", "Screenshot staging debt remains at shutdown for '{1}'; forced exit or a native blocker can prevent cleanup.", Job["stage"])
+	}
+	return Job["quiescent"]
 }
 
 GestureScreenshotWorkerDone(WorkerId, ExitCode, Stdout, Stderr) {
@@ -344,33 +495,37 @@ GestureScreenshotWorkerDone(WorkerId, ExitCode, Stdout, Stderr) {
 		if !GestureScreenshotWorkerState.jobs.Has(WorkerId)
 			return
 		Job := GestureScreenshotWorkerState.jobs[WorkerId]
+		FirstTerminal := !Job["worker_done"]
 		Job["worker_done"] := true
-		Canceled := Job["cancel_requested"]
-	} finally {
-		Critical(PreviousCritical)
+		Job["quiescent"] := true
+		if FirstTerminal {
+			Job["delivery_active"] := true
+			Completion := Job["on_done"]
+			Job["on_done"] := 0
+		}
+	} finally Critical(PreviousCritical)
+	if !FirstTerminal {
+		_GestureScreenshotCleanupStage(Job)
+		return
 	}
 	try {
-		if !Canceled {
-			try Job["on_done"].Call(WorkerId, Job, ExitCode, Stdout, Stderr)
+		_GestureScreenshotCaptureStage(Job)
+		if !Job["cancel_requested"] && IsObject(Completion) {
+			try Completion.Call(WorkerId, Job, ExitCode, Stdout, Stderr)
 			catch as Err
 				LoggerError("gestures", "Screenshot owner completion failed ({1}): {2}.", Job["kind"], Err.Message)
 		}
 	} finally {
+		Job["delivery_active"] := false
 		_GestureScreenshotCleanupStage(Job)
-		PreviousCritical := Critical("On")
-		try {
-			if GestureScreenshotWorkerState.jobs.Has(WorkerId)
-				GestureScreenshotWorkerState.jobs.Delete(WorkerId)
-		} finally {
-			Critical(PreviousCritical)
-		}
 	}
 }
 
 GestureScreenshotCancelAll(Reason := "canceled") {
-	global _GestureDirectCaptures, _GestureRegionCapture
+	global _GestureDirectCaptures, _GestureRegionCapture, _GestureRegionCaptureEpoch
 	PreviousCritical := Critical("On")
 	try {
+		RegionGeneration := ++_GestureRegionCaptureEpoch
 		DirectSnapshot := _GestureDirectCaptures.Clone()
 		RegionEpoch := (_GestureRegionCapture is Map) ? _GestureRegionCapture["epoch"] : 0
 	} finally {
@@ -387,6 +542,7 @@ GestureScreenshotCancelAll(Reason := "canceled") {
 	finally Critical(PreviousCritical)
 	for WorkerId, _ in WorkerSnapshot
 		GestureScreenshotCancelWorker(WorkerId, Reason)
+	return RegionGeneration
 }
 
 
@@ -399,51 +555,26 @@ GestureScreenshotCancelAll(Reason := "canceled") {
 ; ========================================
 ; ========================================
 
-; PowerShell statements that shrink the bitmap held by Var (e.g. "$bmp") so its
-; longest edge is at most MaxEdge, with GDI+ (System.Drawing) bicubic
-; resampling. "" when MaxEdge is 0: the capture keeps its size.
-; @param {String} Var The PowerShell variable holding a System.Drawing image.
 ; @param {Integer} MaxEdge The longest edge allowed, 0 for no limit.
-; @returns {String}
-_GestureScreenshotDownscaleScript(Var, MaxEdge) {
+_GestureScreenshotRequireMaxEdge(MaxEdge) {
 	if !(MaxEdge is Integer) || MaxEdge < 0
 		throw ValueError("A screenshot's longest edge must be a non-negative integer.")
-	if (MaxEdge == 0)
-		return ""
-	Longest := "[Math]::Max(" . Var . ".Width, " . Var . ".Height)"
-	return "if (" . Longest . " -gt " . MaxEdge . ") {"
-		. "$dsScale = " . MaxEdge . " / " . Longest . ";"
-		. "$dsW = [Math]::Max(1, [int][Math]::Round(" . Var . ".Width * $dsScale));"
-		. "$dsH = [Math]::Max(1, [int][Math]::Round(" . Var . ".Height * $dsScale));"
-		. "$dsImg = New-Object System.Drawing.Bitmap $dsW,$dsH;"
-		. "$dsG = [System.Drawing.Graphics]::FromImage($dsImg);"
-		. "$dsG.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic;"
-		. "$dsG.DrawImage(" . Var . ", 0, 0, $dsW, $dsH);"
-		. "$dsG.Dispose(); " . Var . ".Dispose(); " . Var . " = $dsImg };"
 }
 
-_GestureScreenshotDirectScript(X, Y, W, H, Mode, Stage, MaxEdge := 0) {
-	global DriverPid
-	EscapedStage := StrReplace(Stage, "'", "''")
-	FormatName := (Mode == "clipboard") ? "Bmp" : "Png"
-	return "Add-Type -AssemblyName System.Drawing;"
-		. "$bmp = New-Object System.Drawing.Bitmap " . W . "," . H . ";"
-		. "$g = [System.Drawing.Graphics]::FromImage($bmp);"
-		. "$g.CopyFromScreen(" . X . "," . Y . ",0,0,(New-Object System.Drawing.Size " . W . "," . H . "));"
-		. "$g.Dispose();"
-		. _GestureScreenshotDownscaleScript("$bmp", MaxEdge)
-		. "$bmp.Save('" . EscapedStage . "', [System.Drawing.Imaging.ImageFormat]::" . FormatName . ");"
-		. "$bmp.Dispose();"
-		. "$parentAlive = Get-Process -Id " . DriverPid . " -ErrorAction SilentlyContinue;"
-		. "if (-not $parentAlive) { Remove-Item -LiteralPath '" . EscapedStage . "' -Force -ErrorAction SilentlyContinue }"
+; Copies a screen rectangle (virtual-screen coordinates, in the driver's own
+; DPI context) into a private DIB section and saves it to Stage.
+_GestureScreenshotCaptureScreen(X, Y, W, H, Encoder, Stage, MaxEdge) {
+	_GestureScreenshotWithGdiplus(_GestureScreenshotCaptureScreenGdip.Bind(
+		X, Y, W, H, Encoder, Stage, MaxEdge))
 }
 
 ; @param {Integer} MaxEdge Longest edge of the saved image, 0 to keep the
 ;     captured size (the screen reading shrinks what it sends to a model).
 GestureCaptureRegion(X, Y, W, H, Mode, Path := "", OnComplete := "", MaxEdge := 0) {
 	global _GestureDirectCaptures, _GestureDirectCaptureEpoch, GESTURE_DIRECT_CAPTURE_TIMEOUT_MS
-	global DriverPid
+	global DriverPid, GESTURE_SCREENSHOT_PNG_ENCODER, GESTURE_SCREENSHOT_BMP_ENCODER
 	Completion := IsObject(OnComplete) ? OnComplete : 0
+	_GestureScreenshotRequireMaxEdge(MaxEdge)
 	if (Mode != "save" && Mode != "clipboard") || W <= 0 || H <= 0
 		return _GestureScreenshotRejectDirect(Completion, "invalid capture request")
 	if (Mode == "save" && Path == "")
@@ -459,9 +590,11 @@ GestureCaptureRegion(X, Y, W, H, Mode, Path := "", OnComplete := "", MaxEdge := 
 		Epoch := ++_GestureDirectCaptureEpoch
 		Extension := (Mode == "clipboard") ? "bmp" : "png"
 		Stage := A_Temp . "\ergopti_screenshot_direct_" . DriverPid . "_" . Epoch . "." . Extension
-		Script := _GestureScreenshotDirectScript(X, Y, W, H, Mode, Stage, MaxEdge)
+		; The clipboard publisher loads a BMP stage; a saved capture is a PNG.
+		Encoder := (Mode == "clipboard") ? GESTURE_SCREENSHOT_BMP_ENCODER : GESTURE_SCREENSHOT_PNG_ENCODER
+		Capture := _GestureScreenshotCaptureScreen.Bind(X, Y, W, H, Encoder, Stage, MaxEdge)
 		WorkerId := _GestureScreenshotCreateWorker("direct_" . Mode, Epoch, Stage,
-			_GestureScreenshotPowerShellArgs(Script), GestureDirectCaptureWorkerDone.Bind(Epoch))
+			Capture, GestureDirectCaptureWorkerDone.Bind(Epoch))
 		if WorkerId {
 			_GestureDirectCaptures[Epoch] := Map(
 				"epoch", Epoch,
@@ -536,6 +669,14 @@ GestureDirectCapturePoll(Epoch) {
 	SetTimer(GestureDirectCapturePoll.Bind(Epoch), -GESTURE_REGION_CAPTURE_POLL_MS)
 }
 
+; Called only by the native bitmap publisher inside its short Critical claim.
+; Retain the exact completed job even after its worker registry slot is retired.
+_GestureDirectClipboardAdmission(State, Epoch, WorkerId, Job) {
+	return !A_IsSuspended && !Job["cancel_requested"]
+		&& _GestureDirectCaptureState(Epoch, WorkerId) == State
+		&& !TickExpired(State["started_tick"], State["timeout_ms"])
+}
+
 GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 	State := _GestureDirectCaptureState(Epoch, WorkerId)
 	if !IsObject(State) || Job["cancel_requested"]
@@ -546,24 +687,27 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		return
 	}
 	if ExitCode != 0 || !_GestureScreenshotFileExists(Job["stage"]) {
-		GestureDirectCaptureFinish(Epoch, false, "worker exited without staged output")
+		GestureDirectCaptureFinish(Epoch, false, (Stderr != "")
+			? "worker exited without staged output: " . RTrim(Stderr, ".")
+			: "worker exited without staged output")
 		return
 	}
 
 	if State["mode"] == "save" {
-		DestinationExistedBefore := _GestureScreenshotFileExists(State["path"])
-		Published := _GestureScreenshotPublishFile(Job["stage"], State["path"])
+		Publication := _GestureScreenshotPublishFile(Job["stage"], State["path"])
+		Published := Publication["published"]
+		DestinationSnapshot := Publication["snapshot"]
 		DestinationExistsAfter := _GestureScreenshotFileExists(State["path"])
-		OwnsDestination := !DestinationExistedBefore && DestinationExistsAfter
+		OwnsDestination := DestinationSnapshot is Map
 		if !IsObject(_GestureDirectCaptureState(Epoch, WorkerId))
 				|| A_IsSuspended || Job["cancel_requested"] {
 			if OwnsDestination
-				_GestureScreenshotRollbackFile(State["path"])
+				_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 			return
 		}
 		Ok := Published && DestinationExistsAfter
 		if !Ok && OwnsDestination
-			_GestureScreenshotRollbackFile(State["path"])
+			_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 	} else {
 		OwnerToken := CB_TryBeginOwnedTransaction("gesture_direct_screenshot")
 		if !OwnerToken {
@@ -578,10 +722,11 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 				"clipboard snapshot failed before publication")
 			return
 		}
-		BeforeSequence := _GestureScreenshotClipboardSequence()
-		Published := _GestureScreenshotPublishClipboard(Job["stage"])
-		PublishedSequence := _GestureScreenshotClipboardSequence()
-		ClipboardChanged := PublishedSequence != BeforeSequence
+		AdmissionFn := _GestureDirectClipboardAdmission.Bind(State, Epoch, WorkerId, Job)
+		Publication := _GestureScreenshotPublishClipboard(Job["stage"], AdmissionFn)
+		Published := Publication["published"]
+		PublishedSequence := Publication["sequence"]
+		ClipboardChanged := PublishedSequence > 0
 		if !IsObject(_GestureDirectCaptureState(Epoch, WorkerId))
 				|| A_IsSuspended || Job["cancel_requested"] {
 			if ClipboardChanged
@@ -592,6 +737,7 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 			return
 		}
 		Ok := Published && ClipboardChanged
+			&& _GestureScreenshotClipboardSequence() == PublishedSequence
 			&& _GestureScreenshotClipboardHasImage()
 		if !Ok && ClipboardChanged
 			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence,
@@ -605,7 +751,7 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 	if !GestureDirectCaptureFinish(Epoch, Ok,
 			Ok ? "" : "worker output could not be published") && Ok {
 		if State["mode"] == "save" && OwnsDestination
-			_GestureScreenshotRollbackFile(State["path"])
+			_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 		else if State["mode"] != "save" && ClipboardChanged
 			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence,
 				OwnerToken)
@@ -709,53 +855,80 @@ GestureScreenshotFullscreen(Mode) {
 ;     the screenshots folder.
 ; @param {Integer} MaxEdge Save mode only: longest edge of the saved image, 0
 ;     to keep the selection's size.
-GestureScreenshotRegion(Mode, OnComplete := 0, Path := "", MaxEdge := 0) {
+GestureScreenshotRegion(Mode, OnComplete := 0, Path := "", MaxEdge := 0, Ports := 0) {
 	global _GestureRegionCapture, _GestureRegionCaptureEpoch
 	if A_IsSuspended {
 		_GestureRegionNotify(OnComplete, false, "suspended")
-		return
+		return false
 	}
-	GestureScreenshotCancelAll("superseded")
+	if !(Ports is Map)
+		Ports := Map()
+	Epoch := GestureScreenshotCancelAll("superseded")
 	if Mode == "clipboard" {
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
 		LoggerStart("gestures", "Region screenshot to clipboard — opening Snip & Sketch…")
-		TextPressKey("s", ["Shift", "Win"])
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
+		ClipboardSendFn := Ports.Get("send", TextPressKey.Bind("s", ["Shift", "Win"]))
+		ClipboardSendFn.Call()
 		LoggerSuccess("gestures", "Snip & Sketch invoked (clipboard mode).")
-		return
+		return true
 	}
 	if Mode != "save" {
 		LoggerError("gestures", "Region screenshot rejected invalid mode '{1}'.", Mode)
-		return
+		return false
 	}
 
-	if (Path == "")
-		Path := GestureScreenshotPath()
-	LoggerStart("gestures", "Region screenshot to disk — opening Snip & Sketch…")
-	PreviousCritical := Critical("On")
-	try Epoch := ++_GestureRegionCaptureEpoch
-	finally Critical(PreviousCritical)
+	SaveFn := Ports.Get("save", CB_SaveAll)
+	ClearFn := Ports.Get("clear", CB_ClearWithReceipt)
+	SequenceFn := Ports.Get("sequence", CB_GetSequenceNumber)
+	SendFn := Ports.Get("send", SendEvent.Bind("#+s"))
+	RestoreFn := Ports.Get("restore", CB_RestoreAll)
 	OldClip := ""
+	SnapshotValid := false
+	Mutated := false
+	OwnedSequence := 0
 	OwnerToken := 0
 	ExpectedChange := 0
 	StatePublished := false
 	try {
+		if (Path == "")
+			Path := GestureScreenshotPath()
+		LoggerStart("gestures", "Region screenshot to disk — opening Snip & Sketch…")
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
 		OwnerToken := CB_TryBeginOwnedTransaction("gesture_region_capture")
 		if !OwnerToken
 			throw Error("clipboard transaction busy")
-		OldClip := CB_SaveAll()
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
+		OldClip := SaveFn.Call()
 		if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__")
 			throw Error("clipboard snapshot failed")
-		if !CB_Write("")
+		SnapshotValid := true
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
+		Cleared := ClearFn.Call()
+		if !Cleared
 			throw Error("clipboard clear failed")
+		; An empty A_Clipboard assignment fails before EmptyClipboard succeeds.
+		; Record a successful clear once; retirement must not adopt a later copy.
+		; The default clear authenticates its own generation: sampling it here
+		; could adopt a copy another program made right after the clear.
+		Mutated := true
+		OwnedSequence := Cleared is Map ? Cleared["sequence"] : SequenceFn.Call()
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
 		ExpectedChange := CB_ExpectOwnedChange()
-		if A_IsSuspended
-			throw Error("driver suspended before Snipping Tool launch")
 		State := Map(
 			"epoch", Epoch,
 			"path", Path,
 			"original_clipboard", OldClip,
-			"clipboard_sequence", CB_GetSequenceNumber(),
+			"clipboard_sequence", OwnedSequence,
 			"owner_token", OwnerToken,
 			"expected_change", ExpectedChange,
+			"poll_timer", 0,
 			"selection_started_tick", A_TickCount,
 			"selection_timeout_ms", GESTURE_REGION_CAPTURE_TIMEOUT_MS,
 			"save_started_tick", 0,
@@ -766,45 +939,70 @@ GestureScreenshotRegion(Mode, OnComplete := 0, Path := "", MaxEdge := 0) {
 			"callback", OnComplete)
 		PreviousCritical := Critical("On")
 		try {
+			if !_GestureRegionCaptureStartCurrent(Epoch)
+				return false
 			_GestureRegionCapture := State
 			StatePublished := true
 		} finally {
 			Critical(PreviousCritical)
 		}
-		SendEvent("#+s")
+		if A_IsSuspended || _GestureRegionCaptureEpoch != Epoch
+				|| !IsObject(_GestureRegionCaptureState(Epoch)) {
+			GestureRegionCaptureFinish(Epoch, "suspended", true)
+			return false
+		}
+		SendFn.Call()
 		if A_IsSuspended {
 			GestureRegionCaptureFinish(Epoch, "suspended", true)
-			return
+			return false
 		}
-		if IsObject(_GestureRegionCaptureState(Epoch))
-			SetTimer(GestureRegionCapturePoll.Bind(Epoch), -GESTURE_REGION_CAPTURE_POLL_MS)
+		if !IsObject(_GestureRegionCaptureState(Epoch))
+			return false
+		State["poll_timer"] := GestureRegionCapturePoll.Bind(Epoch)
+		SetTimer(State["poll_timer"], -GESTURE_REGION_CAPTURE_POLL_MS)
+		return true
 	} catch as Err {
-		if StatePublished {
+		if StatePublished
 			GestureRegionCaptureFinish(Epoch, "start failure", true)
-		} else {
+		LoggerError("gestures", "Region screenshot could not start: {1}.", Err.Message)
+		return false
+	} finally {
+		if !StatePublished {
 			if ExpectedChange
 				CB_CancelExpectedChange(ExpectedChange)
 			if OwnerToken {
-				try CB_RestoreOwnedAllEventually(OldClip, CB_GetSequenceNumber(),
-					OwnerToken, "gesture_region_capture_rollback", true, true)
+				if SnapshotValid && Mutated
+					CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken,
+						"gesture_region_capture_rollback", true, true, RestoreFn, SequenceFn)
+				else
+					CB_EndOwnedTransaction(OwnerToken)
 			}
-			; A published capture reports through its finish; this one never began
+			; A published capture reports through its finish; this one never began.
 			_GestureRegionNotify(OnComplete, false, "start failure")
 		}
-		LoggerError("gestures", "Region screenshot could not start: {1}.", Err.Message)
 	}
 }
 
-_GestureScreenshotRegionSaveScript(Stage, MaxEdge := 0) {
-	global DriverPid
-	EscapedStage := StrReplace(Stage, "'", "''")
-	return "Add-Type -AssemblyName System.Windows.Forms;"
-		. "Add-Type -AssemblyName System.Drawing;"
-		. "$img = [System.Windows.Forms.Clipboard]::GetImage();"
-		. "if ($img) { " . _GestureScreenshotDownscaleScript("$img", MaxEdge)
-		. "$img.Save('" . EscapedStage . "', [System.Drawing.Imaging.ImageFormat]::Png) };"
-		. "$parentAlive = Get-Process -Id " . DriverPid . " -ErrorAction SilentlyContinue;"
-		. "if (-not $parentAlive) { Remove-Item -LiteralPath '" . EscapedStage . "' -Force -ErrorAction SilentlyContinue }"
+_GestureRegionCaptureStartCurrent(Epoch) {
+	global _GestureRegionCapture, _GestureRegionCaptureEpoch
+	return !A_IsSuspended && _GestureRegionCaptureEpoch == Epoch
+		&& !IsObject(_GestureRegionCapture)
+}
+
+; Builds the region-save capture. Validation runs here, in the owner, so a bad
+; sequence or edge fails before any worker is registered.
+; @returns {Func} The capture that writes Stage from the admitted clipboard image.
+_GestureScreenshotRegionCapture(Stage, ExpectedSequence, MaxEdge := 0) {
+	if !(ExpectedSequence is Integer) || ExpectedSequence < 0 || ExpectedSequence > 0xFFFFFFFF
+		throw ValueError("A region image requires its captured clipboard sequence.")
+	_GestureScreenshotRequireMaxEdge(MaxEdge)
+	return _GestureScreenshotWithGdiplus.Bind(
+		_GestureScreenshotCaptureClipboardImage.Bind(Stage, ExpectedSequence, MaxEdge))
+}
+
+_GestureScreenshotNativeProbe(Phase, Bitmap) {
+	if IsObject(GestureScreenshotWorkerState.native_probe_fn)
+		GestureScreenshotWorkerState.native_probe_fn.Call(Phase, Bitmap)
 }
 
 _GestureRegionCaptureState(Epoch, WorkerId := 0) {
@@ -831,8 +1029,7 @@ GestureRegionCaptureStartSaveWorker(Epoch) {
 		State := _GestureRegionCapture
 		Stage := A_Temp . "\ergopti_screenshot_region_" . DriverPid . "_" . Epoch . ".png"
 		WorkerId := _GestureScreenshotCreateWorker("region_save", Epoch, Stage,
-			_GestureScreenshotPowerShellArgs(
-				_GestureScreenshotRegionSaveScript(Stage, State.Get("max_edge", 0)), true),
+			_GestureScreenshotRegionCapture(Stage, State["clipboard_sequence"], State.Get("max_edge", 0)),
 			GestureRegionSaveWorkerDone.Bind(Epoch))
 		if WorkerId {
 			State["worker_id"] := WorkerId
@@ -919,30 +1116,32 @@ GestureRegionSaveWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		return
 	}
 	if ExitCode != 0 || !_GestureScreenshotFileExists(Job["stage"]) {
-		LoggerError("gestures", "Region screenshot save worker produced no staged image.")
+		LoggerError("gestures", "Region screenshot save worker produced no staged image: {1}.",
+			(Stderr != "") ? RTrim(Stderr, ".") : "exit code " . ExitCode)
 		GestureRegionCaptureFinish(Epoch, "save worker failed")
 		return
 	}
 
-	DestinationExistedBefore := _GestureScreenshotFileExists(State["path"])
-	Published := _GestureScreenshotPublishFile(Job["stage"], State["path"])
+	Publication := _GestureScreenshotPublishFile(Job["stage"], State["path"])
+	Published := Publication["published"]
+	DestinationSnapshot := Publication["snapshot"]
 	DestinationExistsAfter := _GestureScreenshotFileExists(State["path"])
-	OwnsDestination := !DestinationExistedBefore && DestinationExistsAfter
+	OwnsDestination := DestinationSnapshot is Map
 	if !IsObject(_GestureRegionCaptureState(Epoch, WorkerId))
 			|| A_IsSuspended || Job["cancel_requested"] {
 		if OwnsDestination
-			_GestureScreenshotRollbackFile(State["path"])
+			_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 		return
 	}
 	if !Published || !DestinationExistsAfter {
 		if OwnsDestination
-			_GestureScreenshotRollbackFile(State["path"])
+			_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 		LoggerError("gestures", "Region screenshot staging file could not be published.")
 		GestureRegionCaptureFinish(Epoch, "save publication failed")
 		return
 	}
 	if !GestureRegionCaptureFinish(Epoch, "saved") {
-		_GestureScreenshotRollbackFile(State["path"])
+		_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 		return
 	}
 	LoggerSuccess("gestures", "Region screenshot saved: '{1}'.", State["path"])

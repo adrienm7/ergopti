@@ -2,11 +2,11 @@
 
 ## Entry fields
 
-| Field         | Type            | Required | Default | Description                                                           |
-| ------------- | --------------- | -------- | ------- | --------------------------------------------------------------------- |
-| `trigger`     | string          | yes      | —       | The typed abbreviation to expand. UTF-8.                              |
-| `replacement` | string          | yes      | —       | The replacement text. May contain `{date}`, `{time}` template tokens. |
-| `flags`       | array\<string\> | no       | `[]`    | See flag table below.                                                 |
+| Field         | Type            | Required | Default | Description                                                |
+| ------------- | --------------- | -------- | ------- | ---------------------------------------------------------- |
+| `trigger`     | string          | yes      | —       | The typed abbreviation to expand. UTF-8.                   |
+| `replacement` | string          | yes      | —       | The replacement text. May contain the output tokens below. |
+| `flags`       | array\<string\> | no       | `[]`    | See flag table below.                                      |
 
 ## Flag values
 
@@ -17,12 +17,23 @@
 | `auto`           | Fires without a terminator keystroke (the trigger itself is the terminator).                           |
 | `final`          | Skips further substitution passes after expansion.                                                     |
 
-## Template tokens in replacements
+## Output tokens in replacements
 
-| Token    | Replaced with                                 |
-| -------- | --------------------------------------------- |
-| `{date}` | Today's date in ISO-8601 format (YYYY-MM-DD). |
-| `{time}` | Current time in HH:MM format.                 |
+All three drivers read one grammar, pinned by
+`_shared/tests/corpus/hotstrings/output_token_vectors.json`.
+
+| Token                                | Effect                                                                                  |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
+| `{Left}`, `{enter}`, `{F5}`...       | Presses a key of `_shared/modules/actions/send_keys.json`, by id or alias, in any case. |
+| `{Left 2}`                           | Presses it that many times, up to `output_key_max_repeat`.                              |
+| `{U+27C3}`                           | Types that code point.                                                                  |
+| `{{}`, `{}}`                         | Types a brace. `{{}Left}` types the six characters `{Left}`.                            |
+| A line break or a tab                | The Enter key or the Tab key.                                                           |
+| Anything else in braces, `+ ^ ! # ~` | Literal text.                                                                           |
+
+An output with a key token leaves the caret where the engine cannot read it, so the
+driver forgets its typing buffer and the AI context, and the output takes no part in
+a cascade. Dates and times come from the dynamic hotstrings, not from a token.
 
 ## Category metadata (category.toml)
 

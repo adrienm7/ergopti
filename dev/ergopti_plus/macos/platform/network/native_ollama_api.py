@@ -103,6 +103,10 @@ class NativeOllamaResponse(ENGINE.NativeHTTPResponse):
         body="",
         *,
         source_alias=None,
+        register=None,
+        absolute_deadline=None,
+        progress=None,
+        pre_acquire=None,
     ):
         if (
             type(port) is not int
@@ -214,7 +218,20 @@ class NativeOllamaResponse(ENGINE.NativeHTTPResponse):
         )
         if not hasattr(self, "_open_wire"):
             raise ENGINE.NativeHTTPError("unavailable")
-        tag, payload = self._open_wire(encoded, arguments, timeout, idle_timeout)
+        options = {}
+        if (
+            register is not None
+            or absolute_deadline is not None
+            or progress is not None
+            or pre_acquire is not None
+        ):
+            options = dict(
+                register=register,
+                absolute_deadline=absolute_deadline,
+                progress=progress,
+                pre_acquire=pre_acquire,
+            )
+        tag, payload = self._open_wire(encoded, arguments, timeout, idle_timeout, **options)
         try:
             if expected is None:
                 if tag != b"C":
@@ -255,7 +272,20 @@ class NativeOllamaResponse(ENGINE.NativeHTTPResponse):
         return dict(self._terminal_value["listener"])
 
 
-def discover(executable, device, inode, port, timeout, idle_timeout, *, source_alias=None):
+def discover(
+    executable,
+    device,
+    inode,
+    port,
+    timeout,
+    idle_timeout,
+    *,
+    source_alias=None,
+    register=None,
+    absolute_deadline=None,
+    progress=None,
+    pre_acquire=None,
+):
     with NativeOllamaResponse(
         executable,
         device,
@@ -264,6 +294,10 @@ def discover(executable, device, inode, port, timeout, idle_timeout, *, source_a
         timeout,
         idle_timeout,
         source_alias=source_alias,
+        register=register,
+        absolute_deadline=absolute_deadline,
+        progress=progress,
+        pre_acquire=pre_acquire,
     ) as response:
         return response.listener
 
@@ -282,6 +316,10 @@ def open_request(
     idle_timeout,
     *,
     source_alias=None,
+    register=None,
+    absolute_deadline=None,
+    progress=None,
+    pre_acquire=None,
 ):
     return NativeOllamaResponse(
         executable,
@@ -296,4 +334,8 @@ def open_request(
         headers,
         body,
         source_alias=source_alias,
+        register=register,
+        absolute_deadline=absolute_deadline,
+        progress=progress,
+        pre_acquire=pre_acquire,
     )

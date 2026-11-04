@@ -20,8 +20,8 @@ local hs = hs
 local ok_utils, km_utils = pcall(require, "modules.keymap.utils")
 if not ok_utils then km_utils = nil end
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 
 local SharedEngine = require("dynamic_hotstrings")
 local Terminators = require("keymap.terminators")
@@ -46,6 +46,7 @@ if not ok_locale then locale = nil end
 -- ====================================
 
 local GROUP_NAME = "dynamichotstrings"
+local ResolutionOwner = require("modules.dynamic_hotstrings.resolution_owner").new(GROUP_NAME)
 
 local _km             = nil
 local _trigger        = "\u{2605}"
@@ -166,6 +167,7 @@ end
 --- @return boolean committed True only when mutation may proceed.
 local function invalidate_preview_snapshot(reason)
 	if not _km then
+		ResolutionOwner.invalidate()
 		_preview_snapshot = nil
 		return true
 	end
@@ -178,6 +180,7 @@ local function invalidate_preview_snapshot(reason)
 		Logger.error(LOG, "%s could not revoke the dynamic preview (details withheld).", reason)
 		return false
 	end
+	ResolutionOwner.invalidate()
 	_preview_snapshot = nil
 	return true
 end
@@ -216,6 +219,7 @@ local function interceptor(event, km_buffer, ctx)
 		_preview_snapshot = nil
 		return nil
 	end
+	local resolution = ResolutionOwner.capture(_active_start_token, _km, _trigger)
 
 	-- Gate on the group master toggle so that disabling the dynamichotstrings group
 	-- (or "Disable all hotstrings") stops date expansion even though date rules are
@@ -252,6 +256,8 @@ local function interceptor(event, km_buffer, ctx)
 	end
 	if not match then match = SharedEngine.match_buffer(buffer, GROUP_NAME, guard,
 		ctx and ctx.start_is_word_boundary) end
+	if not ResolutionOwner.current(resolution, _active_start_token, _km, _trigger,
+		match and match.rule.section) then return nil end
 	if not match then
 		return require("modules.dynamic_hotstrings.user_code").request(buffer) and "consume" or nil
 	end
@@ -265,10 +271,11 @@ local function interceptor(event, km_buffer, ctx)
 	end
 
 	Logger.debug(LOG, "Injecting dynamic rule for suffix '%s'…", rule.suffix)
+	if not ResolutionOwner.current(resolution, _active_start_token, _km, _trigger, rule.section) then return nil end
 
 	-- inject_dynamic routes the whole replacement through one immutable-tagged
 	-- keymap transaction; the fallback below must preserve that same ownership.
-	-- We do NOT call keylogger.log_hotstring here: the result may contain private
+	-- We do NOT call keystats.log_hotstring here: the result may contain private
 	-- data (phone number, SSN, IBAN) whose plaintext must never reach the log.
 	_is_injecting = true
 
@@ -303,10 +310,10 @@ local function interceptor(event, km_buffer, ctx)
 			end
 			if type(_km.suppress_rescan) == "function" then _km.suppress_rescan() end
 			local transaction = _km.arm_synthetic(n_back, result)
-			if keylogger and type(keylogger.notify_synthetic) == "function" then
+			if keystats and type(keystats.notify_synthetic) == "function" then
 				-- Same privacy contract as the primary path above — this branch
 				-- reaches the identical sink, so it needs the identical flag.
-				pcall(keylogger.notify_synthetic, result, "hotstring", n_back, "dynamic", nil, true)
+				pcall(keystats.notify_synthetic, result, "hotstring", n_back, "dynamic", nil, true)
 			end
 			local ok_emit, emit_err = pcall(_km.with_synthetic_transaction, transaction, function()
 				for _ = 1, n_back do
@@ -354,6 +361,7 @@ end
 --- @return string|nil result
 --- @return table|nil token
 local function preview_provider(buf, start_is_boundary)
+	local resolution = ResolutionOwner.capture(_active_start_token, _km, _trigger)
 	_preview_snapshot = nil
 	if type(_km.is_group_enabled) == "function" and not _km.is_group_enabled(GROUP_NAME) then
 		return nil
@@ -363,6 +371,8 @@ local function preview_provider(buf, start_is_boundary)
 		and function(grp, sec) return is_sec_enabled(grp, sec) end
 		or nil
 	local match = SharedEngine.match_buffer(buf, GROUP_NAME, guard, start_is_boundary)
+	if not ResolutionOwner.current(resolution, _active_start_token, _km, _trigger,
+		match and match.rule.section) then return nil end
 	if not match then return require("modules.dynamic_hotstrings.user_code").preview(buf) end
 	local token = {}
 	_preview_snapshot = {
@@ -818,6 +828,7 @@ end
 
 --- Stops the engine and cleans up shared state.
 function M.stop()
+	ResolutionOwner.invalidate()
 	-- Clear the date rules registered at start time; without this, a subsequent
 	-- start() call would call register_date_rules() again and duplicate all three
 	-- rules in the shared engine (dynhotstrings-5).

@@ -17,6 +17,9 @@
 ---    reattach hotkeys without holding stale refs.
 --- 5. Profile shortcuts only: a prediction on demand is the
 ---    llm_generate_prediction action in a keyboard slot, not a hotkey of its own.
+--- 6. Inert with the AI off: a shortcut is then a saved preference that holds no
+---    native hotkey; arm_shortcuts binds them at the switch-on and
+---    disarm_shortcuts releases them at the switch-off.
 --- ==============================================================================
 
 local M = {}
@@ -26,6 +29,7 @@ local llm_mod   = require("modules.llm")
 local Chord     = require("chord")
 local Hotkeys   = require("adapters.hotkey_registrar")
 local shortcut_ui = require("ui.menu.shortcut_utils")
+local TableUtil = require("table_util")
 
 local LOG = "menu_llm.trigger_orchestrator"
 
@@ -45,7 +49,8 @@ local LOG = "menu_llm.trigger_orchestrator"
 ---   init.lua's locals so the orchestrator never holds stale references to the
 ---   hotkey objects.
 --- @return table Instance with: bind_hotkey, activate_hotkey,
----   trigger_prediction_with_profile, apply_llm_profile_shortcut.
+---   trigger_prediction_with_profile, apply_llm_profile_shortcut, arm_shortcuts,
+---   disarm_shortcuts.
 function M.new(ctx)
 	if type(ctx) ~= "table" then
 		Logger.error(LOG, "M.new(): ctx must be a table — module non-functional.")
@@ -70,12 +75,7 @@ function M.new(ctx)
 	--- Creates a detached shortcut snapshot for comparison and rollback.
 	--- @param value any Shortcut value.
 	--- @return any clone
-	local function clone_value(value)
-		if type(value) ~= "table" then return value end
-		local clone = {}
-		for key_name, child in pairs(value) do clone[clone_value(key_name)] = clone_value(child) end
-		return clone
-	end
+	local clone_value = TableUtil.deep_copy_with_keys
 
 	--- Compares two normalized shortcut values without relying on table identity.
 	--- @param left table|boolean|nil First shortcut.
@@ -174,8 +174,11 @@ function M.new(ctx)
 		-- A failed disable is not terminal if unbind can still release the owner
 		set_record_enabled(record, false, label .. " disable")
 		if not invoke_hotkey_boundary(label .. " delete", Hotkeys.unbind, record.handle) then
+			-- Native deletion ACK is irreversible even while restoration remains.
+			record.release_pending = Hotkeys.release_pending(record.handle) == true
 			return false
 		end
+		record.release_pending = nil
 		handle_records[record.handle] = nil
 		record.handle = nil
 		return true
@@ -260,6 +263,7 @@ function M.new(ctx)
 	--- @return boolean settled
 	local function restore_record(record, should_deliver)
 		if not record then return true end
+		if record.release_pending == true then return false end
 		if should_deliver ~= true then
 			record.committed = false
 			return set_record_enabled(record, false, "LLM shortcut rollback disable")
@@ -329,6 +333,11 @@ function M.new(ctx)
 	--- @return boolean settled
 	local function settle_recovery_debt()
 		if not recovery_debt then return true end
+		if recovery_debt.finish_release then
+			if not recovery_debt.finish_release() then return false end
+			recovery_debt = nil
+			return true
+		end
 		Logger.warn(LOG, "Retrying retained LLM shortcut rollback before a new action.")
 		return restore_transition(recovery_debt)
 	end
@@ -504,11 +513,13 @@ function M.new(ctx)
 			key = normalized.key,
 		} or spec.disabled_value
 		local should_deliver = opts.activate ~= false
+		-- With the AI off a shortcut is a preference only: it holds no native owner
+		local bind = opts.bind ~= false
 
 		-- A disable request must still release any live native owner even when a
 		-- stale/malformed preference already says "disabled". Equality is a no-op
 		-- only when both the desired action and its exact owner exist.
-		if old_record and normalized
+		if old_record and normalized and bind
 			and shortcuts_equal(old_preference, desired_preference) then
 			if should_deliver then
 				if old_record.committed ~= true then
@@ -523,13 +534,13 @@ function M.new(ctx)
 			return set_record_enabled(old_record, false,
 				spec.label .. " existing-owner suspension")
 		end
-		if not old_record and not normalized
+		if not old_record and (not normalized or not bind)
 			and shortcuts_equal(old_preference, desired_preference) then
 			return true
 		end
 
 		local candidate = nil
-		if normalized then
+		if normalized and bind then
 			candidate = acquire_record(normalized.mods, normalized.key, callback)
 			if not candidate then return false end
 			if should_deliver
@@ -582,23 +593,34 @@ function M.new(ctx)
 			end
 		end
 
-		if old_record and not release_record(old_record, spec.label .. " prior-owner release") then
+		local function finish_release()
+			if old_record and not release_record(old_record, spec.label .. " prior-owner release") then
+				return false
+			end
+			debt.old_restore = false
+			if candidate then
+				spec.set_handle(candidate.handle)
+				candidate.committed = should_deliver
+				debt.candidate = nil
+			else
+				spec.set_handle(nil)
+			end
+			close_restore_fence()
+			Logger.debug(LOG, "%s committed.", spec.label)
+			return true
+		end
+		if not finish_release() then
 			recovery_debt = debt
-			restore_transition(debt)
+			if old_record.release_pending == true then
+				-- Persistence and menu already acknowledged this candidate. The old
+				-- native owner is gone, so retain completion rather than re-enable it.
+				debt.old_restore = false
+				debt.finish_release = finish_release
+			else
+				restore_transition(debt)
+			end
 			return false
 		end
-		debt.old_restore = false
-
-		if candidate then
-			spec.set_handle(candidate.handle)
-			candidate.committed = should_deliver
-			debt.candidate = nil
-		else
-			spec.set_handle(nil)
-		end
-		close_restore_fence()
-
-		Logger.debug(LOG, "%s committed.", spec.label)
 		return true
 	end
 
@@ -684,6 +706,7 @@ function M.new(ctx)
 		local active = true
 		local published = false
 		local restored = false
+		local replacement_required = false
 		local lease = {}
 
 		--- Publishes only the in-memory shortcut preference into the parent snapshot.
@@ -719,6 +742,22 @@ function M.new(ctx)
 			state.llm_profile_shortcuts = old_shortcuts
 			if type(old_shortcuts) == "table" then
 				old_shortcuts[profile_id] = old_preference
+			end
+			if old_record and old_record.release_pending == true then
+				if not release_record(old_record, "Profile shortcut rollback release settlement") then
+					return false
+				end
+				replacement_required = true
+			end
+			if replacement_required then
+				-- The parent requires rollback after an irreversible delete. Rebuild
+				-- one owner only after its exact release and staging debts settle.
+				if not settle_cleanup_debts() then return false end
+				local replacement = acquire_record(old_record.mods, old_record.key, old_record.callback)
+				if not replacement then return false end
+				old_record = replacement
+				replacement_required = false
+				set_profile_hk(profile_id, old_record.handle)
 			end
 			restored = restore_record(old_record, old_should_deliver)
 			return restored
@@ -757,6 +796,9 @@ function M.new(ctx)
 		end
 
 		local persist = opts.persist ~= false and opts.silent ~= true
+		-- With the AI off the choice is saved and nothing is bound: the switch-on
+		-- binds it (arm_shortcuts), as Windows and Linux wait for it
+		local bind = opts.bind ~= false and type(state) == "table" and state.llm_enabled == true
 		return apply_shortcut_transition({
 			label = "Profile LLM shortcut '" .. profile_id .. "'",
 			disabled_value = nil,
@@ -787,7 +829,75 @@ function M.new(ctx)
 		end, {
 			activate = opts.activate ~= false and opts.silent ~= true,
 			persist = persist,
+			bind = bind,
 		})
+	end
+
+	--- Ids of the profiles a shortcut may target: the built-in and user profiles.
+	--- @return table valid Set of profile ids.
+	local function valid_profile_ids()
+		local valid = {}
+		for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
+			if type(profile) == "table" and type(profile.id) == "string" then valid[profile.id] = true end
+		end
+		for _, profile in ipairs(type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}) do
+			if type(profile) == "table" and type(profile.id) == "string" then valid[profile.id] = true end
+		end
+		return valid
+	end
+
+	--- Binds and delivers every saved profile shortcut once the AI is switched on.
+	--- A boot with the AI off bound none of them.
+	--- @return boolean settled True when every saved shortcut is bound.
+	function inst.arm_shortcuts()
+		if state.llm_enabled ~= true then
+			Logger.error(LOG, "AI profile shortcuts cannot be armed while the AI is off.")
+			return false
+		end
+		local shortcuts = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts or {}
+		local valid = valid_profile_ids()
+		local ids = {}
+		for profile_id, shortcut in pairs(shortcuts) do
+			if valid[profile_id] and type(shortcut) == "table" then ids[#ids + 1] = profile_id end
+		end
+		table.sort(ids)
+		local settled = true
+		local armed = 0
+		for _, profile_id in ipairs(ids) do
+			local shortcut = shortcuts[profile_id]
+			if inst.apply_llm_profile_shortcut(profile_id, shortcut.mods, shortcut.key,
+				{ persist = false }) ~= true then
+				settled = false
+			elseif get_profile_hks()[profile_id] ~= nil then
+				armed = armed + 1
+			end
+		end
+		Logger.info(LOG, "AI profile shortcuts armed: %d bound.", armed)
+		return settled
+	end
+
+	--- Releases every profile hotkey when the AI is switched off, keeping the
+	--- saved shortcuts for the next switch-on.
+	--- @return boolean settled True when no profile hotkey remains bound.
+	function inst.disarm_shortcuts()
+		local ids = TableUtil.sorted_keys(get_profile_hks())
+		local settled = true
+		local released = 0
+		for _, profile_id in ipairs(ids) do
+			local shortcut = type(state.llm_profile_shortcuts) == "table"
+				and state.llm_profile_shortcuts[profile_id] or nil
+			local mods = type(shortcut) == "table" and shortcut.mods or nil
+			local key = type(shortcut) == "table" and shortcut.key or nil
+			if inst.apply_llm_profile_shortcut(profile_id, mods, key,
+				{ persist = false, bind = false }) ~= true
+				or get_profile_hks()[profile_id] ~= nil then
+				settled = false
+			else
+				released = released + 1
+			end
+		end
+		Logger.info(LOG, "AI profile shortcuts disarmed: %d released.", released)
+		return settled
 	end
 
 	--- Captures actual owned hotkeys, including their acknowledged delivery posture.

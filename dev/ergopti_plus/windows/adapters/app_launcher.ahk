@@ -40,7 +40,8 @@
 AL_Launch(AppPath) {
 	try {
 		Pid := 0
-		Run(AppPath, , , &Pid)
+		; Run first tries CreateProcess, so a literal path must stay one token.
+		Run(AL_QuoteArgument(AppPath), , , &Pid)
 		try LoggerInfo("AppLauncher", "Launched '{1}' (pid {2}).", AL_ProgramName(AppPath), Pid)
 	} catch as Err {
 		; The launch used to fail in silence: a shortcut that "does nothing" had no
@@ -70,7 +71,7 @@ AL_ProgramName(AppPath) {
 AL_LaunchWithArgs(AppPath, Args) {
 	try {
 		Pid := 0
-		Run(AppPath . " " . Args, , , &Pid)
+		Run(AL_QuoteArgument(AppPath) . " " . Args, , , &Pid)
 		; Arguments can carry user text (a search, a path), so they are never logged.
 		try LoggerInfo("AppLauncher", "Launched '{1}' with arguments (pid {2}).", AL_ProgramName(AppPath), Pid)
 	} catch as Err {
@@ -88,7 +89,7 @@ AL_LaunchWithArgs(AppPath, Args) {
 AL_OpenStrict(Target) {
 	; Err.Message quotes the target, which can carry a mail body: only its
 	; program name and the Win32 code go on
-	try Run(Target)
+	try Run(AL_QuoteArgument(Target))
 	catch
 		throw Error("Opening '" . AL_ProgramName(Target) . "' failed (Win32 error " . A_LastError . ").", -1)
 	try LoggerInfo("AppLauncher", "Opened '{1}' with its default handler.", AL_ProgramName(Target))
@@ -176,7 +177,7 @@ AL_IsRunning(ProcessName) {
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
-; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_APP_LAUNCHER := Map(
     "launch",         AL_Launch,

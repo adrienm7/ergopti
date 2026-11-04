@@ -11,9 +11,28 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
 	"compat.utf8",
-	"program_parameter",
+	-- The real logger and timer scheduler describe failures through this pure owner.
+	"error_description",
+	-- The real logger's shared core and the phase counters it records into.
+	"logger",
+	"infra.phase_stats",
+	-- The phase counters' bookkeeping, shared with the Linux driver.
+	"phase_stats_core",
+	-- The real paths, logger and configuration owners split paths through this pure owner,
+	-- and the timer scheduler admits delays through the number policy.
+	"native_path",
+	"number_policy",
+	-- The real notifications owner focuses the clicked application through this adapter.
+	"adapters.running_application",
+	"program_parameter", "user_action_parameter",
 	"actions.assignable",
+	-- The chord and sticky labels name their keys through the key name table,
+	-- which loads with its data.
+	"actions.sticky_label", "keycodes.key_names", "keycodes.key_names_data",
 	"_generated.action_catalogue",
+	-- The generated catalogue filters the shared data through this owner.
+	"actions.catalogue",
+	"actions.catalogue_data",
 	-- The shared script chords' paused actions, read by the control-plane
 	-- admission of a script chord's action.
 	"infra.script_chord_catalogue",
@@ -22,10 +41,15 @@ local OWNERS = {
 	"brightness_actions",
 	"brightness_actions_data",
 	"config_binding_identity",
+	-- Shared binding admission captures this real ordered-pair dependency.
+	"tap_hold.key_combinations",
 	"config_binding_publication",
 	"config_keyboard_publication",
+	-- infra.notifications names the launcher bundle id through this shared table.
+	"identifiers",
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",
+	"adapters.clipboard",
 	"adapters.hotkey_registrar",
 	"adapters.json_codec",
 	"adapters.key_state",
@@ -42,6 +66,9 @@ local OWNERS = {
 	"infra.termination_coordinator",
 	"infra.text_utils",
 	"infra.timings",
+	-- The driver bindings of the manifest reader and the timings registry build on these.
+	"manifest_reader",
+	"timings",
 	"infra.toml.reader",
 	"json",
 	"llm.profile_selector",
@@ -49,6 +76,8 @@ local OWNERS = {
 	"llm.tone",
 	"llm.translate",
 	"llm.vision",
+	-- The shared vision request reads the API dialects from this pure owner.
+	"llm.remote_formats",
 	"modules.gestures",
 	"modules.gestures.actions",
 	"modules.gestures.native_app_switcher_action",
@@ -61,6 +90,7 @@ local OWNERS = {
 	"modules.gestures.actions_click",
 	"modules.gestures.conflicts",
 	"modules.gestures.engine",
+	"infra.gesture_frame_evidence",
 	"modules.gestures.sticky_modifiers",
 	"modules.shortcuts",
 	"modules.shortcuts.actions.apps",
@@ -77,6 +107,13 @@ local OWNERS = {
 	"toml_codec.bom",
 	"toml_codec.key_path",
 	"toml_codec.reader",
+	"toml_codec.record_scanner",
+	-- The record scanner memoizes one text's scans through this owner.
+	"toml_codec.source_memo",
+	-- The real TOML reader opens its source through this shared owner.
+	"toml_codec.source_open",
+	-- The shared ordered-pair policy copies tables through this owner.
+	"table_util",
 	"wrap_pair",
 }
 
@@ -101,6 +138,7 @@ local function fresh_actions(options)
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system_pixel",
 		"adapters.file_system",
+		"adapters.clipboard",
 		"adapters.key_state",
 		"adapters.synthetic_input",
 		"infra.termination_coordinator",
@@ -155,6 +193,7 @@ local function fresh_actions(options)
 	}
 	calls.controls = controls
 	local clipboard_data = { ["public.utf8-plain-text"] = "original" }
+	local clipboard_count = 0
 	local function clone_clipboard(data)
 		local copy = {}
 		for key, value in pairs(data or {}) do copy[key] = value end
@@ -190,7 +229,7 @@ local function fresh_actions(options)
 	local function reenter_during_resume(kind, parent)
 		if controls.reenter_during_resume ~= kind then return end
 		local binding = parent == "shortcut_bindings"
-			and "keyboard__cmd_1" or "tap_3"
+			and "keyboard__primary_1" or "tap_3"
 		calls.reentrant_results[#calls.reentrant_results + 1] =
 			actions.execute_single("open_config", binding)
 	end
@@ -570,7 +609,36 @@ local function fresh_actions(options)
 	package.loaded["adapters.key_state"] = setmetatable({}, {
 		__index = function() return function() return false end end,
 	})
+	local function finish_transaction(tx, status)
+		if tx.completed or tx.completing then return end
+		tx.completing = true
+		if tx.batch then
+			for _, callback in ipairs(tx.dispatched) do callback(tx, tx.batch, "dispatched") end
+		end
+		tx.completed, tx.status = true, tx.cancelled and "cancelled" or status
+		for _, callback in ipairs(tx.complete) do callback(tx, tx.status) end
+	end
 	package.loaded["adapters.synthetic_input"] = setmetatable({
+		begin = function(owner, effect, publication)
+			return { owner = owner, effect = effect, publication = publication, complete = {}, dispatched = {} }
+		end,
+		on_complete = function(tx, callback)
+			if tx.completed then callback(tx, tx.status)
+			else tx.complete[#tx.complete + 1] = callback end
+		end,
+		on_dispatched = function(tx, callback) tx.dispatched[#tx.dispatched + 1] = callback end,
+		seal = function(tx)
+			if tx.sealed then return false end
+			tx.sealed = true
+			finish_transaction(tx, "complete")
+			return true
+		end,
+		cancel = function(tx)
+			if tx.cancelled or tx.completed then return false end
+			tx.cancelled, tx.sealed = true, true
+			if not tx.emitting then finish_transaction(tx, "cancelled") end
+			return true
+		end,
 		prepare_mouse_event = function(_, event_type, position)
 			local event = _G.hs.eventtap.event.newMouseEvent(event_type, position)
 			if event == nil or event == false then return nil, "constructor refused" end
@@ -613,26 +681,37 @@ local function fresh_actions(options)
 			calls.typed[#calls.typed + 1] = value
 			return true
 		end,
-		emit_key_stroke = function(mods, key)
-			if controls.search_reenter == "emit" and key == "c" then
-				controls.search_reenter = nil
-				calls.search_cleanup_results[#calls.search_cleanup_results + 1] =
-					actions.force_cleanup(controls.search_parent or "gestures")
-			end
-			local accepted = controlled_result(
-				controls.key_post_mode, "synthetic key post exploded")
-			if accepted == true then
-				if key == "c" then
-					-- Model the native copy mutation after the re-entrant lifecycle
-					-- callback returns, which is the hostile ordering production must own.
-					clipboard_data = {
-						["public.utf8-plain-text"] = "selected words",
-					}
+		emit_key_stroke = function(mods, key, _, tx)
+			if tx then tx.emitting = true end
+			local ok, result = pcall(function()
+				if controls.search_reenter == "emit" and key == "c" then
+					controls.search_reenter = nil
+					calls.search_cleanup_results[#calls.search_cleanup_results + 1] =
+						actions.force_cleanup(controls.search_parent or "gestures")
 				end
-				calls.keys[#calls.keys + 1] = { mods = mods, key = key }
+				local accepted = controlled_result(
+					controls.key_post_mode, "synthetic key post exploded")
+				if accepted == true then
+					if key == "c" then
+						-- Model the native copy mutation after the re-entrant lifecycle
+						-- callback returns, which is the hostile ordering production must own.
+						clipboard_data = {
+							["public.utf8-plain-text"] = "selected words",
+						}
+						clipboard_count = clipboard_count + 1
+					end
+					calls.keys[#calls.keys + 1] = { mods = mods, key = key }
+					if tx then tx.batch = { mods = mods, key = key } end
+				end
+				if controls.pause_on_key == true then aux_paused.gestures = true end
+				return accepted
+			end)
+			if tx then
+				tx.emitting = false
+				if tx.cancelled then finish_transaction(tx, "cancelled") end
 			end
-			if controls.pause_on_key == true then aux_paused.gestures = true end
-			return accepted
+			if not ok then error(result, 0) end
+			return result
 		end,
 	}, { __index = function() return function() return true end end })
 	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
@@ -735,6 +814,7 @@ local function fresh_actions(options)
 			focusedWindow = function() return focused_window end,
 		},
 		pasteboard = {
+			changeCount = function() return clipboard_count end,
 			readAllData = function()
 				return clone_clipboard(clipboard_data)
 			end,
@@ -746,6 +826,7 @@ local function fresh_actions(options)
 				end
 				-- The native mutation occurs after the re-entrant cleanup returns.
 				clipboard_data = {}
+				clipboard_count = clipboard_count + 1
 				return true
 			end,
 			getContents = function()
@@ -760,7 +841,10 @@ local function fresh_actions(options)
 				end
 				local accepted = controlled_result(
 					controls.search_restore_mode, "clipboard restore exploded")
-				if accepted == true then clipboard_data = clone_clipboard(data) end
+				if accepted == true then
+					clipboard_data = clone_clipboard(data)
+					clipboard_count = clipboard_count + 1
+				end
 				return accepted
 			end,
 		},
@@ -772,6 +856,18 @@ local function fresh_actions(options)
 		},
 	})
 	calls.hs = _G.hs
+	local clock_ns = 0
+	local native_after = calls.hs.timer.doAfter
+	calls.hs.timer.absoluteTime = function() return clock_ns end
+	calls.hs.timer.doAfter = function(delay, callback)
+		local timer = native_after(delay, callback)
+		local deadline, fire = clock_ns + math.ceil(delay * 1e9), timer.fire
+		function timer:fire()
+			clock_ns = math.max(clock_ns, deadline)
+			return fire(self)
+		end
+		return timer
+	end
 	if controls.search_reenter == "timer" then
 		local original_do_after = calls.hs.timer.doAfter
 		calls.hs.timer.doAfter = function(delay, callback)
@@ -896,7 +992,7 @@ local function with_feature_lifecycles(actions, calls, body)
 
 	feature.keyboard_execute = function(action)
 		if feature.keyboard_started ~= true then return false end
-		return actions.execute_single(action, "keyboard__cmd_1")
+		return actions.execute_single(action, "keyboard__primary_1")
 	end
 	feature.static_screenshot = function()
 		if feature.bindings_started ~= true then return false end

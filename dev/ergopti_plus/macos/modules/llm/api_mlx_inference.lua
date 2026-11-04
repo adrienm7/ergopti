@@ -23,20 +23,23 @@
 local M = {}
 
 local Logger         = require("infra.logger")
+local Ports          = require("llm.request_plan.ports")
 local text_utils = require("infra.text_utils")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local Rewrite        = require("llm.rewrite")
 local JsonCodec      = require("adapters.json_codec")
+local FileSystem     = require("adapters.file_system")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("infra.timings")
+local StreamRetirement = require("modules.llm.mlx_stream_retirement")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 
 -- Dedicated client for non-streaming inference POSTs; isolated so it never shares
 -- state with the warmup/probe/check clients that live in api_mlx.lua.
@@ -67,6 +70,7 @@ local STREAM_TMPFILE_CLEANUP_SEC = STREAM_HARD_TIMEOUT_SEC + 10
 -- model identifiers, the active-model-arg reader, and the shared streaming-task
 -- table (mutated here and by api_mlx's cancel_streaming). nil until init().
 local _ctx = nil
+local _payload_cleanup = nil
 
 -- Exact native timer capabilities whose cancellation was refused. The scheduler
 -- also keeps a strong registry, but this request layer must retain its own debt so
@@ -429,8 +433,8 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
                 if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end return
             end
             Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s)", model_name, req_id, #results)
-            if keylogger and type(keylogger.log_llm) == "function" then
-                pcall(keylogger.log_llm, full_text, results, nil, {
+            if keystats and type(keystats.log_llm) == "function" then
+                pcall(keystats.log_llm, full_text, results, nil, {
                     backend       = "mlx",
                     model         = tostring(model_name),
                     system_prompt = system_prompt,
@@ -468,6 +472,15 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- Supersede any previous stream: always terminate to free the MLX server connection
 	if (_ctx.stream.task or _ctx.stream.timeout) and _ctx.cancel_streaming() ~= true then
 		Logger.error(LOG, "Cannot start MLX stream while the previous task remains owned.")
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
+	if not _payload_cleanup then
+		_payload_cleanup = require("modules.llm.stream_payload_cleanup").new(Logger, LOG)
+	end
+	if _payload_cleanup.settle_pending() ~= true then
+		Logger.error(LOG, "Cannot start MLX stream while earlier payload cleanup remains owned.")
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
@@ -572,40 +585,60 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		return
 	end
 
-	-- Write payload to a temp file so curl reads it directly — avoids the
-	-- stdin-pipe/streaming-callback conflict in hs.task.
-	-- os.tmpname() creates an empty file at the base path; remove it immediately
-	-- so only the suffixed path (which we own) exists in /tmp.
-	-- Declared BEFORE on_done so the closure captures the real `tmp_path` upvalue
-	-- (Lua lexical scoping: a local declared after the closure resolves to the
-	-- nil global inside that closure, making os.remove(tmp_path) throw and abort
-	-- the whole callback — mirrors the exact gotcha already fixed in
-	-- api_ollama.lua's streaming twin).
-	local _tmp_base = os.tmpname()
-	local tmp_path = _tmp_base .. "_mlx_stream.json"
-	os.remove(_tmp_base)
-	local fh = io.open(tmp_path, "w")
-	if not fh then
-		Logger.error(LOG, "Failed to open temp file '%s' for MLX streaming payload.", tmp_path)
+	-- Retain the private file created by the allocator. Removing it and opening
+	-- a suffixed pathname would lose its owner-only mode under a normal umask.
+	-- Declare the path before callbacks so they capture this exact request file.
+	local tmp_path, allocation_error = FileSystem.create_secure_temp_file()
+	if type(tmp_path) ~= "string" or tmp_path == "" then
+		Logger.error(LOG, "Failed to allocate a private MLX streaming payload: %s.", tostring(allocation_error))
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
-	fh:write(encoded)
-	fh:close()
+	local written, write_error = ApiCommon.write_stream_payload(tmp_path, encoded)
+	if not written then
+		Logger.error(LOG, "Failed to write temp file '%s' for MLX streaming payload: %s.", tmp_path, tostring(write_error))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
+	local task = nil
+	local retire_payload = _payload_cleanup.capture(tmp_path, function() return task end)
 
 	local accumulated   = ""
 	local line_buf      = ""
 	local event_data_lines = {}
+	local stream_complete = false
 	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
 	local t0_req        = TimerScheduler.now()
-	local task = nil
 	local task_completed = false
+	local failure_requested = false
+	local terminal_notified = false
+	local failure_observed = false
+	local function report_failure()
+		if terminal_notified or my_generation ~= _ctx.stream.generation then return end
+		terminal_notified = true
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+	end
+	local function retire_failed_task(owned_task)
+		failure_requested = true
+		if not failure_observed and type(owned_task.onSettled) == "function" then
+			failure_observed = true
+			local ok, registered = pcall(owned_task.onSettled, function()
+				retire_payload()
+				report_failure()
+			end)
+			if not ok or registered ~= true then failure_observed = false end
+		end
+		local settled, state = StreamRetirement.cancel(_ctx.stream, owned_task)
+		if settled then report_failure() end
+		return settled, state
+	end
 
 	-- Decode one complete SSE event payload and append its token to accumulated.
 	-- Framing is handled separately so multi-line data fields reach the JSON
 	-- boundary as one value instead of being mistaken for split TCP chunks.
 	local function process_sse_payload(json_str)
-		if json_str == "[DONE]" then return end
+		if json_str == "[DONE]" then stream_complete = true; return end
 		if json_str == "" then return end
 		local ok_json, obj, decode_err = pcall(JsonCodec.decode, json_str)
 		if not ok_json or decode_err ~= nil then
@@ -760,18 +793,13 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 					if not task then return end
 					Logger.warn(LOG, "[%s] #%d STREAM idle timeout (%gs) — terminating hung task.",
 						model_name, req_id, STREAM_HARD_TIMEOUT_SEC)
-					local terminate_ok, terminate_result = xpcall(task.terminate, debug.traceback)
-					if not terminate_ok or terminate_result ~= true then
+					local _, state = retire_failed_task(task)
+					if state == "refused" then
 						Logger.error(LOG, "[%s] #%d STREAM timeout termination did not commit (result: %s).",
-							tostring(model_name), req_id, tostring(terminate_result))
+							tostring(model_name), req_id, state)
 						if _ctx.stream.task == task then arm_stream_idle_watchdog() end
 						return
 					end
-					if _ctx.stream.task == task then
-						_ctx.stream.task       = nil
-						_ctx.stream.has_chunks = false
-					end
-					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				end, debug.traceback)
 				if not callback_ok then
 					Logger.error(LOG, "[%s] #%d STREAM watchdog callback raised: %s",
@@ -792,6 +820,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- Streaming callback: fired each time curl writes a chunk to stdout
 	local function on_chunk(_, chunk, stderr_chunk)
 		if not chunk or chunk == "" then return true end
+		if failure_requested then return false end
 		-- Generation check: if a newer request superseded us, discard chunks silently
 		if my_generation ~= _ctx.stream.generation then return false end
 		-- First chunk received — server is alive (logged once for diagnostics).
@@ -804,18 +833,15 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			-- The old deadline was already revoked and its replacement never became
 			-- native ownership. Keep no unbounded stream behind a successful chunk.
 			local owned_task = _ctx.stream.task
-			_ctx.stream.generation = _ctx.stream.generation + 1
 			if owned_task then
-				local stop_ok, stop_result = xpcall(function() return owned_task.terminate() end, debug.traceback)
-				if stop_ok and stop_result == true and _ctx.stream.task == owned_task then
-					_ctx.stream.task = nil
-				elseif not stop_ok or stop_result ~= true then
+				local _, state = retire_failed_task(owned_task)
+				if state == "refused" then
 					Logger.error(LOG, "[%s] #%d STREAM task retained after watchdog loss: %s",
-						tostring(model_name), req_id, tostring(stop_result))
+						tostring(model_name), req_id, state)
 				end
+			else
+				report_failure()
 			end
-			_ctx.stream.has_chunks = false
-			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			return false
 		end
 		Logger.debug(LOG, "[%s] #%d STREAM chunk (%d bytes): '%s'",
@@ -838,7 +864,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		-- Remove the payload temp file as soon as curl exits so it doesn't linger
 		-- for the full STREAM_TMPFILE_CLEANUP_SEC fallback window (mirrors the
 		-- Ollama backend's streaming twin; F-MED-3).
-		os.remove(tmp_path)
+		retire_payload()
 
 		Logger.debug(LOG, "[%s] #%d STREAM on_done: exit=%s remaining_len=%d stderr='%s'",
 			model_name, req_id, tostring(exit_code),
@@ -870,6 +896,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			end
 		end
 
+		if failure_requested then report_failure(); return end
 		-- SIGTERM (15) means this stream was explicitly terminated (mid-flight cancel)
 		if exit_code == 15 then
 			Logger.debug(LOG, "[%s] #%d STREAM: terminated mid-flight — no callbacks.", model_name, req_id)
@@ -885,6 +912,14 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()
+		end
+		-- HTTP/1.0 closes a streamed body at EOF even when the model generator
+		-- raised. curl exit zero proves transport closure, not provider completion.
+		if not stream_complete then
+			Logger.warn(LOG, "[%s] #%d STREAM ended without its completion marker — discarding partial output.",
+				tostring(model_name), req_id)
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			return
 		end
 
 		-- Close any unterminated reasoning segment so Parser.strip_thinking
@@ -924,8 +959,8 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			return
 		end
 		Logger.debug(LOG, "[%s] #%d STREAM: %d result(s).", model_name, req_id, #results)
-		if keylogger and type(keylogger.log_llm) == "function" then
-			pcall(keylogger.log_llm, full_text, results, nil, {
+		if keystats and type(keystats.log_llm) == "function" then
+			pcall(keystats.log_llm, full_text, results, nil, {
 				backend       = "mlx",
 				model         = tostring(model_name),
 				system_prompt = system_prompt,
@@ -955,7 +990,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		}, on_done, on_chunk)
 	end, debug.traceback)
 	if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
-		pcall(os.remove, tmp_path)
+		retire_payload()
 		Logger.error(LOG, "[%s] #%d STREAM task creation did not commit (result: %s).",
 			tostring(model_name), req_id, tostring(spawned))
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
@@ -965,25 +1000,10 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	_ctx.stream.task = task
 	local start_ok, start_result = xpcall(function() return task.start() end, debug.traceback)
 	if not start_ok or start_result ~= true then
-		if not start_ok then
-			local stop_ok, stop_result = xpcall(function() return task.terminate() end, debug.traceback)
-			if stop_ok and stop_result == true then
-				if _ctx.stream.task == task then _ctx.stream.task = nil end
-			else
-				Logger.error(LOG, "[%s] #%d STREAM ambiguous task retained for cancellation retry: %s",
-					tostring(model_name), req_id, tostring(stop_result))
-			end
-		elseif _ctx.stream.task == task then
-			_ctx.stream.task = nil
-		end
-		local removed, remove_err = pcall(os.remove, tmp_path)
-		if not removed then
-			Logger.error(LOG, "[%s] #%d STREAM payload cleanup failed: %s",
-				tostring(model_name), req_id, tostring(remove_err))
-		end
+		local settled = retire_failed_task(task)
+		if settled then retire_payload() end
 		Logger.error(LOG, "[%s] #%d STREAM task start did not commit (result: %s).",
 			tostring(model_name), req_id, tostring(start_result))
-		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 	if task_completed then return end
@@ -995,7 +1015,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- this later deadline remains the only safe cleanup owner.
 	local cleanup_ok, cleanup_handle, cleanup_committed = xpcall(function()
 		return TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
-			os.remove(tmp_path)
+			retire_payload()
 		end)
 	end, debug.traceback)
 	if not cleanup_ok or cleanup_committed ~= true then
@@ -1008,19 +1028,22 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- server — connection accepted but no further tokens — is terminated and
 	-- surfaced via on_fail instead of freezing the UI on a stuck spinner.
 	if arm_stream_idle_watchdog() ~= true then
-		_ctx.stream.generation = _ctx.stream.generation + 1
-		local stop_ok, stop_result = xpcall(function() return task.terminate() end, debug.traceback)
-		if stop_ok and stop_result == true and _ctx.stream.task == task then
-			_ctx.stream.task = nil
-			pcall(os.remove, tmp_path)
-		elseif not stop_ok or stop_result ~= true then
+		local settled, state = retire_failed_task(task)
+		if settled then
+			retire_payload()
+		elseif state == "refused" then
 			Logger.error(LOG, "[%s] #%d STREAM task retained after initial watchdog failure: %s",
-				tostring(model_name), req_id, tostring(stop_result))
+				tostring(model_name), req_id, state)
 		end
-		_ctx.stream.has_chunks = false
-		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
+end
+
+--- Hands in the HttpClient that sends inference requests (engine init, the
+--- HttpClient port of the shared request plan). The default stays this module's own client.
+--- @param client table Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	_infer_client = Ports.check("HttpClient", client)
 end
 
 return M

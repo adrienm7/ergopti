@@ -21,7 +21,7 @@
 ---    reload afterwards is the caller's business, which is the actual
 ---    difference between those two.
 --- 3. Resolution works BEFORE init(). Modules requiring this during their own
----    load — keylogger's init IIFE among them — must still get the
+---    load — keystats's init IIFE among them — must still get the
 ---    user-configured directory, so the default is computed at module load and
 ---    paths.toml is lazy-read on first use. A packaged launch exports its stable
 ---    user-writable bootstrap path; source-tree launches retain the adjacent
@@ -31,7 +31,7 @@
 ---    path resolves to a directory that EXISTS and holds nothing, the write
 ---    succeeds against the wrong place, and nothing is logged. Five separate
 ---    bugs of that shape are recorded in this repo, which is why
----    tests/unit/ui/test_menu_paths_resolution_matrix.lua stats every answer
+---    tests/unit/ui/menu/paths/test_menu_paths_resolution_matrix.lua stats every answer
 ---    rather than comparing strings.
 --- 5. User overrides are validated at this owner boundary, on both load and
 ---    save. Native pickers and typed webview fields therefore cannot disagree:
@@ -47,8 +47,10 @@
 local M = {}
 local hs         = hs
 local Logger     = require("infra.logger")
+local NativePath = require("native_path")
 local text_utils = require("infra.text_utils")
 local FileSystem = require("adapters.file_system")
+local TomlCodec  = require("infra.toml.codec")
 local AppDirs    = require("app_dirs")
 local LogFolders = require("infra.log_folders")
 local LOG        = "config_paths"
@@ -89,22 +91,22 @@ end
 
 -- The two keys stored in paths.toml: the configuration folder, and the logs
 -- folder named by the shared application-folders registry.
-local CONFIG_DIR_KEY = "ConfigDirPath"
+local CONFIG_DIR_KEY = AppDirs.config.override_key
 local LOGS_DIR_KEY   = AppDirs.override_key
 
 -- Driver root — derived at module-load time so standalone source-tree launches
 -- can read their adjacent paths.toml before M.init(). M.init() may override it.
 local _src      = debug.getinfo(1, "S").source:sub(2)
-local _base_dir = (_src:match("^(.*[/\\])") or "./"):gsub("infra[/\\]$", "")
+local _base_dir = NativePath.directory_prefix(NativePath.dirname(_src) or "") or "./"
 
 -- Computed at module load, not in init(), for the same reason: anything written
 -- under the config dir must land outside the source tree by construction, even
 -- for a consumer that required this module before init() ran.
 local _home = os.getenv("HOME")
 local _default_config_dir = (function()
-	local home = _home
+	local home = os.getenv(AppDirs.config.macos_base_env)
 	if type(home) == "string" and home ~= "" then
-		return home .. "/.config/ergopti_plus/"
+		return home .. "/" .. AppDirs.config.macos_relative .. "/"
 	end
 	return nil
 end)()
@@ -189,15 +191,10 @@ local function normalize_config_dir_override(value, key)
 	if type(value) ~= "string" then
 		return nil, key .. " must be a string or empty"
 	end
-	local is_absolute = value:sub(1, 1) == "/"
-	if package.config:sub(1, 1) == "\\" then
-		is_absolute = is_absolute or value:match("^%a:[/\\]") ~= nil
-	end
-	if not is_absolute then
+	if not NativePath.is_absolute(value) then
 		return nil, key .. " must be an absolute path"
 	end
-	if not value:match("[/\\]$") then value = value .. "/" end
-	return value
+	return NativePath.with_trailing_separator(value)
 end
 
 --- Validates one logs-folder override and makes it a folder the application
@@ -210,26 +207,11 @@ end
 local function normalize_logs_dir_override(value)
 	local normalized, err = normalize_config_dir_override(value, LOGS_DIR_KEY)
 	if normalized == nil or normalized == "" then return normalized, err end
-	local leaf = normalized:match("([^/\\]+)[/\\]$")
+	local leaf = NativePath.basename(NativePath.without_trailing_separators(normalized))
 	if leaf ~= AppDirs.folder_name then
 		normalized = normalized .. AppDirs.folder_name .. "/"
 	end
 	return normalized
-end
-
---- Parses a simple flat TOML file (key = "value" pairs, ignoring comments).
---- @param content string Raw file content.
---- @return table Parsed key-value map.
-local function parse_toml(content)
-	local result = {}
-	for line in content:gmatch("[^\r\n]+") do
-		local trimmed = line:match("^%s*(.-)%s*$")
-		if trimmed ~= "" and trimmed:sub(1, 1) ~= "#" then
-			local key, val = trimmed:match('^(%S+)%s*=%s*"(.*)"$')
-			if key then result[key] = val end
-		end
-	end
-	return result
 end
 
 --- Reads and parses one bootstrap file.
@@ -253,7 +235,8 @@ local function read_bootstrap(path)
 			path, tostring(failed_step), tostring(detail))
 	end
 	if status ~= "ok" then return nil, status, detail end
-	local parsed = parse_toml(raw)
+	local parsed = TomlCodec.decode(raw)
+	if not parsed then return nil, "error", "invalid paths.toml syntax" end
 	if parsed[CONFIG_DIR_KEY] ~= nil then
 		local expanded, expand_error = expand_legacy_home(parsed[CONFIG_DIR_KEY])
 		if expanded == nil then return nil, "error", expand_error end
@@ -312,6 +295,12 @@ local function config_dir()
 	return _default_config_dir or _base_dir or ""
 end
 
+--- Hands the resolved configuration directory to the log redactor, which masks
+--- the names under it at write time; called whenever the resolution can move.
+local function follow_config_dir_in_logs()
+	Logger.follow_config_dir(config_dir())
+end
+
 --- Returns the resolved logs folder (with trailing slash): the LogsDirPath
 --- override, or ~/Library/Logs/ergopti_plus/. Lazy-loads paths.toml like
 --- config_dir(). Without a home folder the logger's early-boot fallback is the
@@ -337,10 +326,8 @@ local function ensure_dir(path)
 	local made = false
 	if hs.fs and type(hs.fs.mkdir) == "function" then
 		made = true
-		local prefix = path:match("^[/\\]") and path:sub(1, 1) or ""
-		local rest   = path:sub(#prefix + 1)
-		local current = prefix
-		for segment in rest:gmatch("[^/\\]+") do
+		local current = NativePath.is_rooted(path) and path:sub(1, 1) or ""
+		for _, segment in ipairs(NativePath.components(path)) do
 			current = current .. segment .. "/"
 			local ok_attr, attr = pcall(hs.fs.attributes, current)
 			if not (ok_attr and attr) then
@@ -384,7 +371,7 @@ end
 --- @return string
 local function serialize_toml()
 	local default_dir = _default_config_dir ~= "" and _default_config_dir
-		or "~/.config/ergopti_plus/"
+		or ("~/" .. AppDirs.config.macos_relative .. "/")
 	local lines = { "# Custom paths — auto-generated by ErgoptiPlus." }
 	lines[#lines + 1] = "# Edit this file to point to your personal configuration folder."
 	lines[#lines + 1] = string.format(
@@ -394,7 +381,7 @@ local function serialize_toml()
 	lines[#lines + 1] = ""
 	local v = _bootstrap[CONFIG_DIR_KEY]
 	if type(v) == "string" and v ~= "" then
-		lines[#lines + 1] = string.format('%s = "%s"', CONFIG_DIR_KEY, v)
+		lines[#lines + 1] = string.format('%s = %s', CONFIG_DIR_KEY, TomlCodec.encode_value(v))
 	else
 		lines[#lines + 1] = string.format('# %s = "%s"', CONFIG_DIR_KEY, default_dir)
 	end
@@ -404,7 +391,7 @@ local function serialize_toml()
 		"# Logs folder. If absent or commented out, logs are written to: %s", default_logs)
 	local logs = _bootstrap[LOGS_DIR_KEY]
 	if type(logs) == "string" and logs ~= "" then
-		lines[#lines + 1] = string.format('%s = "%s"', LOGS_DIR_KEY, logs)
+		lines[#lines + 1] = string.format('%s = %s', LOGS_DIR_KEY, TomlCodec.encode_value(logs))
 	else
 		lines[#lines + 1] = string.format('# %s = "%s"', LOGS_DIR_KEY, default_logs)
 	end
@@ -497,6 +484,7 @@ local function adopt_changed_bootstrap_target()
 		_bootstrap_status = "absent"
 		_bootstrap_snapshot = { status = "absent" }
 	end
+	follow_config_dir_in_logs()
 	return true
 end
 
@@ -518,9 +506,7 @@ end
 --- @param filename string Bare filename (e.g. "personal_hotstrings.toml").
 --- @return string
 local function file_in_config(filename)
-	local d = config_dir()
-	if not d:match("[/\\]$") then d = d .. "/" end
-	return d .. filename
+	return NativePath.with_trailing_separator(config_dir()) .. filename
 end
 
 --- Absolute path for a HS-specific file under the ``hammerspoon/`` subfolder of
@@ -530,9 +516,7 @@ end
 --- @param filename string Bare filename inside the hammerspoon/ folder.
 --- @return string
 local function file_in_driver_subdir(filename)
-	local d = config_dir()
-	if not d:match("[/\\]$") then d = d .. "/" end
-	local sub = d .. "hammerspoon/"
+	local sub = NativePath.with_trailing_separator(config_dir()) .. "hammerspoon/"
 	ensure_dir(sub)
 	return sub .. filename
 end
@@ -541,13 +525,11 @@ end
 --- access so callers need not guard ENOENT.
 --- @return string Absolute path with trailing slash.
 local function personal_hotstrings_dir()
-	local d = config_dir()
-	if not d:match("[/\\]$") then d = d .. "/" end
-	local p = d .. "hotstrings/"
+	local p = NativePath.with_trailing_separator(config_dir()) .. AppDirs.config.hotstrings_dir .. "/"
 	ensure_dir(p)
 	-- Bootstrap an empty personal_hotstrings.toml on first use so the user always
 	-- has a file to open rather than a confusing ENOENT.
-	local toml_path = p .. "personal_hotstrings.toml"
+	local toml_path = p .. AppDirs.config.personal_hotstrings_file
 	local _, read_status = FileSystem.read_with_status(toml_path)
 	if read_status == "absent" then
 		local _, create_status = FileSystem.create_if_absent(toml_path, "")
@@ -591,7 +573,7 @@ function M.init(base_dir)
 	_base_dir = base_dir
 	ensure_dir(_base_dir)
 	if _managed_paths_file then
-		ensure_dir(paths_file():match("^(.*[/\\])") or "")
+		ensure_dir(NativePath.directory_prefix(paths_file()) or "")
 	end
 
 	-- Read paths.toml, migrating an adjacent legacy override when present, or
@@ -652,7 +634,7 @@ function M.init(base_dir)
 			else
 				_bootstrap_snapshot = { status = "ok", content = migrated_content }
 			end
-		elseif is_home_relative(parse_toml(source_snapshot.content)[CONFIG_DIR_KEY]) then
+		elseif is_home_relative(TomlCodec.decode(source_snapshot.content)[CONFIG_DIR_KEY]) then
 			-- Persist the expansion once so the file shows the folder actually used.
 			local saved, save_err = save_bootstrap()
 			if saved then
@@ -672,6 +654,7 @@ function M.init(base_dir)
 	local resolved = config_dir()
 	if resolved == _default_config_dir then ensure_dir(_default_config_dir) end
 	_initialized = true
+	follow_config_dir_in_logs()
 	Logger.success(LOG, "Config paths initialized (base: '%s', config: '%s').", base_dir, resolved)
 	return true
 end
@@ -689,7 +672,7 @@ end
 --- @return string The resolved absolute path, or "" for an unknown key.
 function M.get(key)
 	-- Shared at the root of config_dir (both drivers may read these):
-	if key == "PersonalTomlPath"      then return personal_hotstrings_dir() .. "personal_hotstrings.toml" end
+	if key == "PersonalTomlPath"      then return personal_hotstrings_dir() .. AppDirs.config.personal_hotstrings_file end
 	if key == "PersonalInfoTomlPath"  then return file_in_config("personal_info.toml")                    end
 	if key == "HotstringsDirPath"     then return config_dir()                                            end
 	if key == "PersonalHotstringsDir" then return personal_hotstrings_dir()                               end
@@ -797,6 +780,7 @@ function M.set_paths(new_config_dir, new_logs_dir)
 		adopt_changed_bootstrap_target()
 		return false, save_err
 	end
+	follow_config_dir_in_logs()
 	if logs_dir() ~= old_logs then
 		Logger.info(LOG, "Logs folder set to '%s'; it takes effect at the next reload.", logs_dir())
 	end
@@ -813,7 +797,7 @@ function M.set_config_dir(new_dir)
 end
 
 --- Metrics store directory of a configuration directory. The single rule shared
---- by the keylogger (where keystrokes are written) and the onboarding consent
+--- by the keystats (where keystrokes are written) and the onboarding consent
 --- text (where the user is told they will be written).
 --- @param dir string|nil Configuration directory; nil means the current one.
 --- @return string <dir>/metrics, without trailing slash.
@@ -822,8 +806,21 @@ function M.metrics_dir(dir)
 	if type(dir) ~= "string" or dir == "" then
 		error("config_paths.metrics_dir: a configuration directory is required", 2)
 	end
-	if not dir:match("[/\\]$") then dir = dir .. "/" end
-	return dir .. "metrics"
+	return NativePath.with_trailing_separator(dir) .. "metrics"
+end
+
+--- Persistent cache folder of the keystats SQLite mirror. The mirror lived in
+--- TMPDIR, which macOS empties at every reboot, so each reboot rebuilt it from
+--- the whole durable ledger (field ledger L64); the user's Caches folder
+--- survives a reboot and, like TMPDIR, is never synced nor shown in the
+--- metrics folder. HOME is read at each call so an owned test home applies.
+--- @return string ~/Library/Caches/<app folder>/metrics, without trailing slash.
+function M.metrics_cache_dir()
+	local home = os.getenv("HOME")
+	if type(home) ~= "string" or home:sub(1, 1) ~= "/" then
+		error("config_paths.metrics_cache_dir: an absolute HOME is required", 2)
+	end
+	return NativePath.with_trailing_separator(home) .. "Library/Caches/" .. AppDirs.folder_name .. "/metrics"
 end
 
 --- Ensures a directory exists. Exposed because the path editor creates the

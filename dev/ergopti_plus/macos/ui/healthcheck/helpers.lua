@@ -265,9 +265,31 @@ function H.collect_input()
 		end),
 	}
 	local phase = read("the remapping lease", function()
-		return (require("platform.remap.lease_controller").status())
+		-- A boot that stopped before the lease init still collects diagnostics:
+		-- asking status() then logged an ERROR for an answer already known.
+		local LeaseController = require("platform.remap.lease_controller")
+		if LeaseController.is_initialized() ~= true then return "uninitialized" end
+		return (LeaseController.status())
 	end)
 	input.remap_phase = phase and tostring(phase) or nil
+	-- The session's key-event counters: how the taps saw the keys pair up, how
+	-- late they came and how often the lease failed. Counts only, never a key.
+	local health = read("the key event counters", function()
+		return require("infra.key_event_health").counts()
+	end)
+	if health then
+		local lease_failures = 0
+		for _, count in pairs(health.lease) do lease_failures = lease_failures + count end
+		input.key_downs = health.downs
+		input.key_ups = health.ups
+		input.key_ups_orphaned = health.ups_without_down
+		input.key_ups_lost = health.downs_without_up
+		input.key_stuck = health.stuck
+		input.key_long_holds = health.long_holds
+		input.key_late = health.late_downs + health.late_ups
+		input.key_late_passed = health.stale_passed
+		input.key_lease_failures = lease_failures
+	end
 	return input
 end
 
@@ -298,12 +320,43 @@ function H.collect_features(state)
 		add("layout", state.keymap)
 		add("shortcuts", state.shortcuts)
 		add("gestures", state.gestures)
-		add("metrics", state.keylogger_enabled)
+		add("metrics", state.keystats_enabled)
 	end
 	add("llm", read("the AI switch", function()
 		return require("modules.llm").get_runtime_llm_enabled() == true
 	end))
 	return { items = items }
+end
+
+--- What the configuration probe works with: where the files live, the
+--- manifest, the decoder and a clock. The sections are filled by the probe
+--- (ui.healthcheck.probes), never by phase A.
+--- @param schema table The diagnostics schema.
+--- @param overrides table|nil Replacements for tests: features, path_of, open_fn, clock.
+--- @return table
+function H.configuration_context(schema, overrides)
+	overrides = overrides or {}
+	local names = schema.configuration.file_names
+	--- Where one configuration file lives on macOS: config.toml under the
+	--- driver's hammerspoon/ folder, the shared files (layers.toml) at the root
+	--- of the configuration folder. macOS config_paths has no config(rel) like
+	--- Linux; calling it made every configuration probe answer "error" (#99).
+	--- @param id string Schema file id.
+	--- @return string path
+	local function path_of(id)
+		local ConfigPaths = require("infra.config_paths")
+		if id == "config" then return ConfigPaths.get("ConfigTomlPath") end
+		return ConfigPaths.get_config_dir() .. names[id]
+	end
+	return {
+		schema   = schema,
+		driver   = "macos",
+		features = overrides.features or function() return require("infra.manifest_reader").features() end,
+		path_of  = overrides.path_of or path_of,
+		decode   = require("toml_codec").decode,
+		open_fn  = overrides.open_fn,
+		clock    = overrides.clock or function() return hs.timer.absoluteTime() / 1e6 end,
+	}
 end
 
 --- The network facts phase A can read: the Wi-Fi signal only. The network's

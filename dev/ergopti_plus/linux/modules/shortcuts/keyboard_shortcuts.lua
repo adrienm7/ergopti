@@ -4,7 +4,7 @@
 --- MODULE: Configurable Keyboard Shortcuts (Linux)
 --- DESCRIPTION:
 --- The user's own modifier chords, bound to the same action catalogue the
---- gestures use. A slot is a modifier prefix plus a key — `ctrl_shift_p` — and
+--- gestures use. A slot is a modifier prefix plus a key — `primary_shift_p` — and
 --- the user assigns an action to it from the tray menu.
 ---
 --- WHY THIS DRIVER HAD NONE:
@@ -13,7 +13,7 @@
 --- nowhere to store an assignment. The hook reported every modified keystroke as
 --- the bare string "shortcut" — enough to tell the engine the caret had moved,
 --- and not enough to say WHICH shortcut, so there was nothing to match and
---- nothing to record. `keylogger.record_shortcut` existed and had no caller for
+--- nothing to record. `keystats.record_shortcut` existed and had no caller for
 --- the same reason.
 ---
 --- FEATURES & RATIONALE:
@@ -36,11 +36,15 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
+local ShortcutCatalogue = require("shortcuts.catalogue")
 local ConfigOutdated = require("config_outdated")
+local SlotRoles = require("shortcuts.slot_roles")
 local Paths = require("infra.paths")
 local ScriptActions = require("modules.shortcuts.script_actions")
+local AiActions = require("modules.shortcuts.ai_actions")
 local Manifest = require("infra.manifest_reader")
 local Codec = require("toml_codec")
 local Writer = require("toml_codec.writer")
@@ -51,26 +55,28 @@ local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
 local PhysicalSlots = require("shortcuts.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
+local ConfigKeys = require("config_keys")
+local KeyNames = require("keycodes.key_names")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
 -- The modifier prefixes a slot id can start with, longest first.
 --
--- Ordered, and iterated with ipairs: "ctrl_shift_x" also starts with "ctrl_",
--- so a shorter prefix reached first would resolve the wrong chord. macOS keeps
--- the same list in the same order for the same reason.
+-- They come from the role-named families of the shared table
+-- (shortcuts.slot_roles): "primary_g" is Ctrl+G, "meta_space" Super+Space.
+-- Ordered, and iterated with ipairs: "primary_shift_x" also starts with
+-- "primary_", so a shorter prefix reached first would resolve the wrong chord.
 --
--- No `cmd`: there is no command key on a PC keyboard. `super` is what the key
--- between Ctrl and Alt is called on Linux, and calling it cmd here would put a
--- label on screen that names a key the user does not have.
-local SLOT_MODS = {
-	{ "ctrl_shift_", { "ctrl", "shift" } },
-	{ "super_shift_", { "meta", "shift" } },
-	{ "alt_shift_", { "alt", "shift" } },
-	{ "ctrl_", { "ctrl" } },
-	{ "super_", { "meta" } },
-	{ "alt_", { "alt" } },
-}
+-- No `cmd`: there is no command key on a PC keyboard. `meta` is what the key
+-- between Ctrl and Alt is called here, and calling it cmd would put a label on
+-- screen that names a key the user does not have.
+local SLOT_MODS = {}
+for _, family in ipairs(SlotRoles.families("linux")) do
+	local mods = {}
+	for index, native in ipairs(family.native) do mods[index] = native == "super" and "meta" or native end
+	SLOT_MODS[#SLOT_MODS + 1] = { family.prefix, mods }
+end
+table.sort(SLOT_MODS, function(a, b) return #a[1] > #b[1] end)
 
 -- What each modifier is drawn as in a menu label. Words rather than symbols:
 -- Linux desktops have no single convention for modifier glyphs, and a symbol
@@ -82,6 +88,16 @@ local MOD_LABELS = {
 	meta = "Super",
 }
 
+--- The text a menu row uses for one modifier or named key, in the active
+--- language: the shared key name table's (`meta` reads Super, as the desktops
+--- name that key). MOD_LABELS above is the chord's recorded identity
+--- (chord_name), not a label.
+--- @param name string "ctrl", "shift", "alt", "meta", "space"…
+--- @return string
+local function key_name(name)
+	return KeyNames.label(name, "linux", require("infra.i18n").get)
+end
+
 -- The slot suffix of a key the hook reports by the character it types.
 local SUFFIX_OF_IDENTITY = {
 	[" "] = "space",
@@ -90,10 +106,9 @@ local SUFFIX_OF_IDENTITY = {
 	["\r"] = "enter",
 }
 
--- Suffixes that name a key rather than spelling it.
-local SPECIAL_KEYS = {
-	space = "Espace",
-	enter = "Entrée",
+-- Suffixes that spell a sign rather than a letter; a named key (Space, Enter)
+-- reads as the key name table names it.
+local SIGN_KEYS = {
 	period = ".",
 	comma = ",",
 }
@@ -102,16 +117,28 @@ local SPECIAL_KEYS = {
 -- catalogue prefixes; contextual slots retain their stable logical identity.
 M.SLOT_GROUPS = {
 	{ prefix = "contextual", group_key = "menu.shortcuts.group_contextual" },
-	{ prefix = "ctrl_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" },
-	{ prefix = "ctrl_shift_", group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
+	{ prefix = "primary_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" },
+	{ prefix = "primary_shift_", group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
 	{ prefix = "alt_", group_key = "menu.shortcuts.alt_group", add_key = "menu.shortcuts.alt_add" },
-	{ prefix = "super_", group_key = "menu.shortcuts.super_group", add_key = "menu.shortcuts.super_add" },
+	{ prefix = "meta_", group_key = "menu.shortcuts.super_group", add_key = "menu.shortcuts.super_add" },
 }
+
+--- The heading of one group's submenu: the contextual group's own title, a
+--- modifier group's template filled with its modifiers by the shared key name
+--- table (« Raccourcis Ctrl + Maj »), never the template's own spelling.
+--- @param group table An entry of M.SLOT_GROUPS.
+--- @return string
+function M.get_group_label(group)
+	local translate = require("infra.i18n").get
+	if group.add_key == nil then return translate(group.group_key) end
+	local modifiers = KeyNames.modifiers_label(SlotRoles.family_modifiers("linux", group.prefix), "linux", translate)
+	return KeyNames.fill(group.group_key, modifiers, translate)
+end
 
 -- The manifest section whose entries are this driver's shipped slot bindings
 -- (Super+Space generates an AI prediction).
 -- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.
-local KEYBOARD_SECTION = "shortcuts.keyboard"
+local KEYBOARD_SECTION = ConfigKeys.KEY.SHORTCUTS_KEYBOARD
 
 -- The shared key catalogue.
 local CATALOGUE_REL_PATH = "modules/actions/modifier_chords.json"
@@ -275,12 +302,13 @@ local function split_slot(slot_id)
 	return nil, nil
 end
 
---- The label a menu row shows for a slot, e.g. "Ctrl Maj P".
+--- The label a menu row shows for a slot, e.g. "Ctrl + Maj + P", the way the
+--- Windows menu names it.
 --- @param slot_id string
 --- @return string
 function M.get_slot_label(slot_id, reason)
 	if slot_id == MagicEditor.SLOT_ID then
-		local label = MOD_LABELS.meta .. " + " .. require("modules.hotstrings.magic_key").get()
+		local label = key_name("meta") .. " + " .. require("modules.hotstrings.magic_key").get()
 		if reason then label = label .. " (" .. require("infra.i18n").get("menu.shortcuts.keyboard.magic_editor_reason." .. reason) .. ")" end
 		return label
 	end
@@ -288,23 +316,24 @@ function M.get_slot_label(slot_id, reason)
 	if physical then
 		local parts = {}
 		for _, name in ipairs(PhysicalSlots.modifiers()) do
-			if physical.mods[name] then parts[#parts + 1] = name == "super" and MOD_LABELS.meta or MOD_LABELS[name] end
+			if physical.mods[name] then parts[#parts + 1] = key_name(name) end
 		end
-		parts[#parts + 1] = physical.code
+		parts[#parts + 1] = KeyNames.physical_label(physical.code, "linux", require("infra.i18n").get)
 		return table.concat(parts, " + ")
 	end
 	local mods, suffix = split_slot(slot_id)
 	if not mods then return tostring(slot_id) end
 	local parts = {}
-	for _, mod in ipairs(mods) do parts[#parts + 1] = MOD_LABELS[mod] or mod end
-	local key_label = SPECIAL_KEYS[suffix]
+	for _, mod in ipairs(mods) do parts[#parts + 1] = key_name(mod) end
+	local key_label = SIGN_KEYS[suffix]
+	if not key_label and KeyNames.canonical(suffix) then key_label = key_name(suffix) end
 	if not key_label then
 		for _, entry in ipairs(catalogue_keys() or {}) do
 			if entry.id == suffix then key_label = entry.label end
 		end
 	end
 	parts[#parts + 1] = key_label or (suffix:sub(1, 1):upper() .. suffix:sub(2))
-	return table.concat(parts, " ")
+	return table.concat(parts, " + ")
 end
 
 --- The modifier set a chord must hold EXACTLY for a slot to match.
@@ -348,14 +377,7 @@ end
 --- The gestures manager, whose catalogue decides which action ids a slot may
 --- hold. Required lazily: the daemon loads it after this module.
 --- @return table|nil The manager, or nil (logged) when its catalogue is unavailable.
-local function action_catalogue()
-	local ok, Gestures = pcall(require, "modules.gestures.manager")
-	if not ok or type(Gestures) ~= "table" or type(Gestures.is_assignable) ~= "function" then
-		Logger.error(LOG, "The action catalogue is unavailable: %s", tostring(Gestures))
-		return nil
-	end
-	return Gestures
-end
+local function action_catalogue() return ShortcutCatalogue.action_catalogue(Logger, LOG) end
 
 --- The shipped bindings: every manifest shortcuts.keyboard entry for Linux.
 --- @return table slot_id → action_id
@@ -383,6 +405,10 @@ local function walk_assignments(decoded, consume, written)
 		elseif PhysicalSlots.is_namespace(slot) then
 			assert(not written, "physical keyboard candidate contains an invalid slot")
 			ConfigOutdated.report({ "shortcuts", "keyboard", slot }, "invalid physical shortcut identity", Logger)
+		else
+			-- A key no slot owns (an id a past build used, a typo) used to vanish
+			-- without a word. It is named once and offered by the cleanup.
+			ConfigOutdated.report({ "shortcuts", "keyboard", slot }, ConfigOutdated.UNKNOWN_SLOT, Logger)
 		end
 	end
 end
@@ -463,9 +489,7 @@ local function load_assignments()
 	_assignments = loaded
 	_explicit_assignments = explicit
 	_loaded = true
-	local count = 0
-	for _ in pairs(_assignments) do count = count + 1 end
-	Logger.info(LOG, "Keyboard shortcut assignments loaded (%d bound).", count)
+	Logger.info(LOG, "Keyboard shortcut assignments loaded (%d bound).", TableUtil.count(_assignments))
 end
 
 --- Every assignment the user has made.
@@ -599,7 +623,7 @@ function M.magic_editor_decision(admission)
 	for _, candidate in ipairs(source.candidates) do
 		if candidate.direct and not candidate.dead then
 			local suffix = suffix_of(candidate.native_text or candidate.text)
-			local slot = suffix and ("super_" .. suffix) or nil
+			local slot = suffix and ("meta_" .. suffix) or nil
 			local action = slot and _explicit_assignments[slot] or nil
 			if action ~= nil then claims[candidate.identity] = { action = action, binding_id = M.binding_id(slot) } end
 			local physical_slot = physical_slots().encode(candidate.code, { super = true })
@@ -659,7 +683,8 @@ local function match(detail, only_script)
 				return {
 					slot = slot,
 					action = action,
-					held_back = only_script and not ScriptActions.is_script_action(action),
+					held_back = (only_script and not ScriptActions.is_script_action(action))
+						or AiActions.blocked(action),
 				}
 			end
 		end
@@ -747,6 +772,8 @@ local function physical_match(detail, opts, epoch)
 		end
 	end
 	if explicit == "none" then return nil, slot end
+	-- An AI action is unarmed while the AI is off: the key keeps its own meaning.
+	if AiActions.blocked(explicit) then return nil end
 	if not PhysicalAvailability.ready(M.physical_delivery_available) then return nil end
 	hit.slot, hit.action, hit.physical = slot, explicit, true
 	if not guarded or not physical_current(hit) then return nil end
@@ -824,27 +851,75 @@ function M.consume(detail, opts)
 	local hit = physical_hit or contextual_match(detail, opts) or match(detail, opts.only_script == true)
 	if not hit or hit.held_back or _configuration_owner ~= nil or entry_generation ~= _dispatch_generation then return false, nil end
 	local generation = _dispatch_generation
-	if opts.defer(function()
-		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
+	local admission_reader, decision_reader = opts.admission, M.magic_editor_decision
+	-- Ordinary chords have the same live gates as contextual bindings. A pause
+	-- or a modal capture can begin after the key was claimed but before delivery.
+	local function delivery_current()
+		if hit.physical or hit.decision then
+			return _configuration_owner == nil and generation == _dispatch_generation
+		end
+		local function owner_current()
+			return _configuration_owner == nil and generation == _dispatch_generation
+				and opts.admission == admission_reader
+		end
+		if not owner_current() then return false end
+		if AiActions.blocked(hit.action) then return false end
+		if admission_reader == nil then return true end
+		if type(admission_reader) ~= "function" then return false end
+		local called, admission = pcall(admission_reader)
+		if not called or type(admission) ~= "table" or not owner_current() then return false end
+		if type(admission.master) ~= "boolean" or type(admission.paused) ~= "boolean"
+			or admission.inhibited ~= false then return false end
+		return ScriptActions.is_script_action(hit.action)
+			or (admission.master == true and admission.paused == false)
+	end
+	if not delivery_current() then return false, nil end
+	-- A scheduled callback has no delivery rights until its original queue ACK.
+	local deferring, accepted, early, dispatched = true, false, false, false
+	local deferred, queued = pcall(opts.defer, function()
+		if deferring then early = true; return end
+		if not accepted or dispatched then return end
+		dispatched = true
+		if not delivery_current() then return end
 		if hit.physical then
 			if not physical_admitted(opts, hit) then return end
 			local source = physical_source_generation()
 			if source ~= hit.source_generation or not physical_current(hit) then return end
 		end
-		if hit.decision then
-			local admission = opts.admission()
-			local current = M.magic_editor_decision(admission)
-			if not MagicEditor.can_deliver(hit.decision, { source_generation = current.source_generation,
-				configuration_generation = _dispatch_generation, action = current.action,
-				master = admission.master, paused = admission.paused, inhibited = admission.inhibited }) then return end
+		local function contextual_current()
+			local function owner_current()
+				return _configuration_owner == nil and generation == _dispatch_generation
+					and opts.admission == admission_reader and M.magic_editor_decision == decision_reader
+			end
+			if not owner_current() then return false end
+			local called, admission = pcall(admission_reader)
+			if not called or type(admission) ~= "table" or not owner_current() then return false end
+			local resolved, current = pcall(decision_reader, admission)
+			if not resolved or type(current) ~= "table" or not owner_current() then return false end
+			-- Source resolution invokes native collaborators after the first gate read.
+			local reread, live = pcall(admission_reader)
+			if not reread or type(live) ~= "table" then return false end
+			return owner_current() and current.active == true
+				and MagicEditor.can_deliver(hit.decision, { source_generation = current.source_generation,
+					configuration_generation = _dispatch_generation, action = current.action,
+					master = live.master, paused = live.paused, inhibited = live.inhibited })
 		end
+		if hit.decision and not contextual_current() then return end
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
-		fire(hit, hit.physical and function() return physical_current(hit) end or nil)
-	end) ~= true then
+		-- Logging and lazy executor loading can reenter after the first live check.
+		fire(hit, function()
+			if hit.physical and not physical_current(hit) then return false end
+			if hit.decision and not contextual_current() then return false end
+			return delivery_current()
+		end)
+	end)
+	deferring = false
+	if not deferred or queued ~= true or early then
 		Logger.error(LOG, "Keyboard shortcut %s could not be queued — the key is typed instead.", hit.slot)
 		return false, nil
 	end
-	if _configuration_owner ~= nil or generation ~= _dispatch_generation then return false, nil end
+	if not delivery_current() then return false, nil end
+	accepted = true
 	return true, hit.slot
 end
 
@@ -977,5 +1052,65 @@ function M.published_binding_catalogue()
 end
 
 KeyboardPublication.register(M, M.published_binding_catalogue)
+
+
+--- Captures all effective keyboard claims without acquiring a configuration lease.
+--- @return table|nil frame Detached claims and an exact source/runtime guard.
+function M.capture_collision_inventory()
+	load_assignments()
+	if _configuration_owner ~= nil then return nil end
+	local Routes = require("infra.config_paths")
+	local route, read, factory = Routes.config, Writer.read_classified, M.capture_collision_inventory
+	local path = route("config.toml")
+	local bytes, status = read(path)
+	if status ~= "ok" and status ~= "absent" then return nil end
+	local expected = M.configuration_candidate(Codec.decode(bytes or ""))
+	local actual, explicit, epoch = _assignments, _explicit_assignments, _dispatch_generation
+	local function same(left, right)
+		for key, value in pairs(left) do if right[key] ~= value then return false end end
+		for key, value in pairs(right) do if left[key] ~= value then return false end end
+		return true
+	end
+	local function runtime()
+		return rawequal(package.loaded["modules.shortcuts.keyboard_shortcuts"], M)
+			and _configuration_owner == nil and _dispatch_generation == epoch
+			and rawequal(_assignments, actual) and rawequal(_explicit_assignments, explicit)
+			and same(actual, expected.assignments) and same(explicit, expected.explicit_assignments)
+			and rawequal(package.loaded["infra.config_paths"], Routes) and Routes.config == route
+			and Writer.read_classified == read and M.capture_collision_inventory == factory
+	end
+	local function current()
+		if not runtime() or route("config.toml") ~= path then return false end
+		local content, classification = read(path)
+		if content ~= bytes or classification ~= status or route("config.toml") ~= path or not runtime() then return false end
+		return runtime()
+	end
+	if not current() then return nil end
+	local claims, configured = {}, {}
+	for slot, action in pairs(actual) do configured[slot] = action end
+	for slot, action in pairs(explicit) do configured[slot] = action end
+	for slot in pairs(configured) do
+		local descriptor = M.physical_slot_descriptor(slot)
+		if descriptor then
+			claims[#claims + 1] = { kind = "chord", binding = M.binding_id(slot),
+				code = physical_slots().stable_native_code(slot, "evdev"), mods = descriptor.mods }
+		elseif slot ~= MagicEditor.SLOT_ID then
+			local mods, key = required_modifiers(slot), suffix_of(select(2, split_slot(slot)))
+			if not mods or not key then return nil end
+			claims[#claims + 1] = { kind = "logical", binding = M.binding_id(slot), key = key,
+				mods = { ctrl = mods.ctrl == true, alt = mods.alt == true, shift = mods.shift == true, super = mods.meta == true } }
+		end
+	end
+	-- Magic Editor yields to explicit personal claims in the existing shared
+	-- policy; its conditional recommendation is not an occupied reservation.
+	if not current() then return nil end
+	return { claims = claims, path = path, content = bytes, status = status, current = current, sealed = runtime }
+end
+
+--- Translates only the original registry's stable Linux physical identity.
+function M.physical_native_code(slot) return physical_slots().stable_native_code(slot, "evdev") end
+
+--- Uses the same logical identity normalization as ordinary dispatch.
+function M.collision_identity(identity) return suffix_of(identity) end
 
 return M

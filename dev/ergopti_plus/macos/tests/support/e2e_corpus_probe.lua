@@ -46,10 +46,26 @@ io.open = function(path, access)
 		end,
 	}
 end
+-- The installed-application boot scenarios boot the real init.lua in child
+-- processes for minutes and judge nothing about the corpus. The E2E job runs
+-- them through the same runner; here they report one explicit SKIP so the
+-- verdict stays the runner's own. The count proves the runner still reaches
+-- them through this exact boundary, so a moved entry point fails loudly.
+local boot_scenarios = root .. "/tests/e2e/boot/boot_scenarios.lua"
+local boot_runs = 0
+local real_dofile = dofile
+dofile = function(path, ...)
+	if path ~= boot_scenarios then return real_dofile(path, ...) end
+	return { run = function(check)
+		boot_runs = boot_runs + 1
+		check.skip("installed-application boot scenarios run in the E2E job, not in this corpus probe")
+	end }
+end
 local marker, code = {}, nil
 os.exit = function(value) code = value; error(marker, 0) end
-local ok, reason = pcall(dofile, root .. "/tests/e2e/run_e2e.lua")
-io.open, os.exit = open, exit
+local ok, reason = pcall(real_dofile, root .. "/tests/e2e/run_e2e.lua")
+io.open, os.exit, dofile = open, exit, real_dofile
 assert(not ok and reason == marker, "the E2E runner must reach its terminal boundary: " .. tostring(reason))
-print(string.format("PROBE opens=%d reads=%d closes=%d vector=%s", opens, reads, closes, selected.id))
+print(string.format("PROBE opens=%d reads=%d closes=%d boot_runs=%d vector=%s",
+	opens, reads, closes, boot_runs, selected.id))
 exit(code)

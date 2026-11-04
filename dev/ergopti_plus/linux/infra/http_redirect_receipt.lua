@@ -89,4 +89,31 @@ function M.response_etag(bytes, status, validate)
 	return final and final.status == status and final or nil
 end
 
+--- Returns the final response frame's raw GitHub rate-limit values.
+--- Interim and CONNECT frames never lend their fields to the final response.
+--- @param bytes string Every response header frame curl wrote, in order.
+--- @param status integer The final status the transfer reported.
+--- @return table|nil { remaining, reset } as strings, or nil when the final frame
+--- is incomplete, has another status or carries no X-RateLimit-Remaining.
+function M.response_rate_limit(bytes, status)
+	if type(bytes) ~= "string" then return nil end
+	local position, final = 1, nil
+	while position <= #bytes do
+		local boundary = bytes:find("\r\n\r\n", position, true)
+		if not boundary then return nil end
+		local block = bytes:sub(position, boundary - 1)
+		local code = block:match("^HTTP/%d[%.%d]* (%d%d%d)")
+		if not code then return nil end
+		local observed = { status = tonumber(code) }
+		for line in (block .. "\r\n"):gmatch("([^\r\n]*)\r\n") do
+			local name, value = line:match("^([^: \t]+):[ \t]*(.-)[ \t]*$")
+			if name and name:lower() == "x-ratelimit-remaining" then observed.remaining = value end
+			if name and name:lower() == "x-ratelimit-reset" then observed.reset = value end
+		end
+		final, position = observed, boundary + 4
+	end
+	if not final or final.status ~= status or final.remaining == nil then return nil end
+	return { remaining = final.remaining, reset = final.reset }
+end
+
 return M

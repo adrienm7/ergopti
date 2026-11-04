@@ -9,12 +9,14 @@
 #Requires AutoHotkey v2.0
 
 ; Legacy bare values may contain apostrophes (O'Brien). A literal string opens
-; only at a token boundary, never in the middle of such a value.
+; only at a token boundary, never in the middle of such a value. A physical
+; newline is itself a boundary: scanning beyond it would inspect a skipped
+; comment from the previous line as though that text owned the next token.
 _TOML_IsLiteralStart(Text, Position) {
 	Index := Position - 1
-	while Index > 0 && InStr(" `t`r`n", SubStr(Text, Index, 1))
+	while Index > 0 && InStr(" `t", SubStr(Text, Index, 1))
 		Index -= 1
-	return Index == 0 || InStr("[{,=.", SubStr(Text, Index, 1)) > 0
+	return Index == 0 || InStr("`r`n[{,=.", SubStr(Text, Index, 1)) > 0
 }
 
 /**
@@ -24,6 +26,12 @@ _TOML_IsLiteralStart(Text, Position) {
  * @returns {Array} Exact semantic segments; malformed paths throw.
  */
 TOML_ParseKeyPath(Text, Strict := false) {
+	; Bare dotted segments are nearly every key of a real configuration: one
+	; anchored match replaces the element scan and the per-segment matches
+	; (measured: about 0.055 ms per key before, see the commit message).
+	Trimmed := Trim(Text, " " . Chr(9))
+	if RegExMatch(Trimmed, "^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\z")
+		return StrSplit(Trimmed, ".")
 	Keys := TOML_SplitArrayElements(Text, ".", true)
 	if !Keys.Length
 		throw ValueError("A TOML key path requires a segment")

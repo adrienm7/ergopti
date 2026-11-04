@@ -14,7 +14,8 @@
 ---   5. the remote-API backend and its "Test" probe, pointed at Ollama's own
 ---      OpenAI-compatible endpoint, which speaks the dialect Cerebras does.
 ---
---- Usage (from the driver root, with lua-luv installed and Ollama serving):
+--- Usage (from the driver root, with lua-luv installed and Ergopti's own Ollama
+--- serving on llm_ollama_owned_port; a user's Ollama on the stock port is never used):
 ---   luajit tests/hardware/run_ollama_live.lua <model-tag>
 --- Exit 0 = all five verified; 1 = a failure; 2 = no environment.
 --- ==============================================================================
@@ -76,7 +77,13 @@ require("tests.support.live_preferences").ensure_directory()
 local Profiles = require("modules.llm.profiles")
 Profiles.init({})
 assert(Profiles.enable() == true, "the live prediction fixture must explicitly grant AI consent")
-local models = Profiles.refresh_models() or Profiles.get_models() or {}
+-- The inventory is acquired off the event loop: a refresh only reserves the
+-- request, so the listing is read once that owned request has settled.
+Profiles.refresh_models()
+check(Profiles.model_inventory_pending(), "the inventory request is dispatched")
+check(run_until(10, function() return not Profiles.model_inventory_pending() end),
+	"the inventory request settles asynchronously")
+local models = Profiles.get_cached_models()
 local listed = false
 for _, name in ipairs(models) do if name == MODEL then listed = true end end
 check(listed, string.format("the model list holds %s (%d model(s))", MODEL, #models))
@@ -166,7 +173,7 @@ Http.postStream = native_post
 print("=== 4/ predictions from the engine ===")
 local offered, final = {}, nil
 local Engine = require("modules.llm.prediction_engine")
-Engine.init({
+Engine.init({ focus_id = function() return "owned-ollama-target" end,
 	overlay = {
 		show = function(candidates, meta)
 			offered = candidates
@@ -199,7 +206,7 @@ print("=== 5/ the remote-API backend on Ollama's OpenAI endpoint ===")
 local Remote = require("modules.llm.api_remote")
 local entry = {
 	id = "ollama-openai", provider = "openai_compat", label = "Ollama (OpenAI)",
-	token = "ollama", model = MODEL, base_url = "http://127.0.0.1:11434/v1",
+	token = "ollama", model = MODEL, base_url = Profiles.get_base_url() .. "/v1",
 }
 local tested = nil
 Remote.test(entry, function(succeeded, detail, elapsed_ms)

@@ -13,6 +13,8 @@
 
 #Include config_write_lease.ahk
 #Include config_unused_keys.ahk
+#Include %A_LineFile%\..\slot_roles.ahk
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 ; Reports one user-visible error for a configuration mutation that did not
 ; reach disk. The TOML writer already logs its low-level failure; this adds the
@@ -20,6 +22,12 @@
 ; loses. NotifyFn is injectable so behavioural tests can count the signal
 ; without displaying a real TrayTip.
 ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchanged := true) {
+	NewerSchema := ConfigNewerSchemaReadOnly()
+	if NewerSchema
+		Detail := "the startup configuration uses a newer schema; update ErgoptiPlus and reload before changing settings"
+	OlderSchema := ConfigOlderSchemaReadOnly()
+	if OlderSchema
+		Detail := "the startup configuration is too old for this build to migrate; it was left untouched"
 	if (Detail != "") {
 		try LoggerError("Config", "Could not persist {1}: {2}.", Context, Detail)
 	} else if StateUnchanged {
@@ -27,13 +35,20 @@ ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchan
 	} else {
 		try LoggerError("Config", "Could not fully persist {1}.", Context)
 	}
-	MessageKey := StateUnchanged ? "dialog.bulk_toggle.save_failed" : "onboarding.error.write_failed"
+	CaseTwin := TOML_TakeCaseTwinRefusal()
+	MessageKey := NewerSchema ? "config.read_only.newer_schema"
+		: OlderSchema ? "config.read_only.older_schema"
+		: (CaseTwin != "" ? "dialog.config_save.case_twin"
+		: (StateUnchanged ? "dialog.bulk_toggle.save_failed" : "onboarding.error.write_failed"))
 	; Failure reporting is a backstop, never a second failure source. Translation,
 	; an injected UI seam, or the native notifier can each throw while the driver
 	; is already handling a refused write. Preserve the false status and the
 	; file-log evidence instead of escaping the menu/timer callback.
 	try {
 		Message := t(MessageKey)
+		if MessageKey == "dialog.config_save.case_twin"
+			Message := StrReplace(StrReplace(Message, "{1}", CaseTwin),
+				"{2}", t("menu.global.clean_unused_keys"))
 		Options := Map("title", t("paths_editor.save_failed_title"), "level", "error")
 		if HasMethod(NotifyFn, "Call")
 			NotifyFn.Call(Message, Options)
@@ -43,6 +58,47 @@ ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchan
 		try LoggerError("Config", "Could not present the persistence failure notification: {1}.", Err.Message)
 	}
 	return false
+}
+
+; True when the startup configuration was saved by a newer schema: the boot
+; migration preserved it and every write is refused for the session. The
+; refused-save notice and the menus' greyed persistence rows name this cause.
+ConfigNewerSchemaReadOnly() {
+	global ConfigurationFile
+	return IsSet(ConfigurationFile) && (ConfigurationFile is String)
+		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "newer"
+}
+
+; True when the startup configuration predates the registry's oldest supported
+; version: the boot migration refused it, the file stays byte for byte, and the
+; same notice and greyed rows name this cause.
+ConfigOlderSchemaReadOnly() {
+	global ConfigurationFile
+	return IsSet(ConfigurationFile) && (ConfigurationFile is String)
+		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "unsupported"
+}
+
+; Tells the user once at boot why nothing they change will stick, as macOS and
+; Linux do from read_only_notice_key: the refusal's ERROR line is for the logs.
+; NotifyFn is injectable so a test can read the words without a real TrayTip.
+ConfigNotifyOlderSchemaAtBoot(NotifyFn := 0) {
+	if !ConfigOlderSchemaReadOnly()
+		return false
+	; The migration's own ERROR can fall out of the pre-logger ring on a busy boot.
+	try LoggerWarn("Config", "The startup configuration is too old for this build to migrate: "
+		. "it is left untouched and this session is read-only.")
+	try {
+		Message := t("config.read_only.older_schema")
+		Options := Map("title", t("paths_editor.save_failed_title"), "level", "warning")
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(Message, Options)
+		else
+			NotifierSend(Message, Options)
+	} catch as Err {
+		try LoggerError("Config", "Could not present the older-configuration notice: {1}.", Err.Message)
+		return false
+	}
+	return true
 }
 
 ; SaveFullConfig has three explicit outcomes. Callers must compare against the
@@ -61,6 +117,25 @@ global CONFIG_FULL_SAVE_BOOT_DELAY_MS := -500
 ; A one-shot timer is only a wake-up mechanism: Reload terminates it. Keep the
 ; actual full-save obligation in a generation counter so a terminal transition
 ; can synchronously prove that every accepted request reached disk first.
+; A final native acknowledgement may inspect only the original nine native
+; data fields. Named methods/getters cannot execute from that short Critical.
+_ConfigFullSaveCoordinatorDataAdmitted(State) {
+	static DataOwner := _ConfigWriteLeaseDataObject
+	if DataOwner != _ConfigWriteLeaseDataObject || !DataOwner.Call(State,
+		["requested_generation", "committed_generation", "settled_generation",
+		"terminal_required_generation", "bound_path", "bound_path_key",
+		"reload_required", "timer_armed", "reported_failure_generation"])
+		return false
+	for Name in ["requested_generation", "committed_generation", "settled_generation",
+			"terminal_required_generation", "reported_failure_generation"] {
+		if !(State.%Name% is Integer) || State.%Name% < 0
+			return false
+	}
+	return (State.bound_path is String) && (State.bound_path_key is String)
+		&& (State.reload_required is Integer) && (State.reload_required == 0 || State.reload_required == 1)
+		&& (State.timer_armed is Integer) && (State.timer_armed == 0 || State.timer_armed == 1)
+}
+
 _ConfigFullSaveCoordinator(Replacement := unset) {
 	static State := {
 		requested_generation: 0,
@@ -73,13 +148,52 @@ _ConfigFullSaveCoordinator(Replacement := unset) {
 		timer_armed: false,
 		reported_failure_generation: 0
 	}
-	if IsSet(Replacement)
+	if IsSet(Replacement) {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(Replacement)
+			throw ValueError("Full-save replacement requires the original native data fields")
 		State := Replacement
+	}
 	return State
 }
 
-_ConfigFullSaveRequest(TerminalRequired := true, Path := unset) {
+_ConfigFullSaveRequest(TerminalRequired := true, Path := unset, InspectState := unset, RetireIntent := false) {
+	static MandatoryIntents := Map()
 	global ConfigurationFile
+	if IsSet(InspectState) {
+		PreviousCritical := Critical("On")
+		try {
+			if (InspectState is Integer) && InspectState == 0 {
+				for ActualState, ActualIntent in MandatoryIntents {
+					if ActualIntent.required > 0 && _ConfigSchemaEntrySelected(ActualIntent.path)
+							&& _ConfigPublicationHasRecoveryDebt(ActualIntent.path)
+						return true
+				}
+				return false
+			}
+			if !MandatoryIntents.Has(InspectState)
+				return false
+			Intent := MandatoryIntents[InspectState]
+			if (RetireIntent is Integer) && RetireIntent == 2 {
+				return _ConfigFullSaveCoordinatorDataAdmitted(InspectState)
+					&& InspectState.requested_generation == Intent.generation
+					&& InspectState.settled_generation < Intent.generation
+					&& _ConfigSchemaEntrySelected(Intent.path)
+					&& _ConfigPublicationHasRecoveryDebt(Intent.path)
+			}
+			if RetireIntent {
+				if !_ConfigFullSaveCoordinatorDataAdmitted(InspectState)
+						|| InspectState.settled_generation < Intent.generation
+					return false
+				MandatoryIntents.Delete(InspectState)
+				return true
+			}
+			; Malformed public metadata cannot erase an actual accepted request.
+			; No descriptor is read here; both facts came from native owner stores.
+			return Intent.required > 0 && IsSet(ConfigurationFile) && (ConfigurationFile is String)
+				&& _ConfigSchemaEntrySelected(Intent.path)
+				&& _ConfigPublicationHasRecoveryDebt(Intent.path)
+		} finally Critical(PreviousCritical)
+	}
 	RequestPath := IsSet(Path) ? String(Path)
 		: (IsSet(ConfigurationFile) ? String(ConfigurationFile) : "")
 	RequestKey := _ConfigWriteLeaseKey(RequestPath)
@@ -88,8 +202,12 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset) {
 		return 0
 	}
 	State := _ConfigFullSaveCoordinator()
+	if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+		return 0
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State) || State != _ConfigFullSaveCoordinator()
+			return 0
 		if State.reload_required || _ConfigWriteTerminalIsActive()
 			return 0
 		if State.requested_generation > State.settled_generation {
@@ -100,8 +218,12 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset) {
 			State.bound_path_key := RequestKey
 		}
 		State.requested_generation += 1
-		if TerminalRequired
+		Required := MandatoryIntents.Has(State) ? MandatoryIntents[State].required : 0
+		if TerminalRequired {
 			State.terminal_required_generation := State.requested_generation
+			Required := State.requested_generation
+		}
+		MandatoryIntents[State] := { generation: State.requested_generation, required: Required, path: RequestPath }
 		return State.requested_generation
 	} finally {
 		Critical(PreviousCritical)
@@ -111,7 +233,7 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset) {
 _ConfigFullSaveBoundPath() {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
-	try return State.bound_path
+	try return _ConfigFullSaveCoordinatorDataAdmitted(State) ? State.bound_path : ""
 	finally Critical(PreviousCritical)
 }
 
@@ -119,7 +241,8 @@ _ConfigFullSavePathMatches(Path) {
 	State := _ConfigFullSaveCoordinator()
 	Key := _ConfigWriteLeaseKey(Path)
 	PreviousCritical := Critical("On")
-	try return State.bound_path_key != "" && State.bound_path_key == Key
+	try return _ConfigFullSaveCoordinatorDataAdmitted(State)
+		&& State.bound_path_key != "" && State.bound_path_key == Key
 	finally Critical(PreviousCritical)
 }
 
@@ -134,14 +257,15 @@ _ConfigFullSaveReleaseBindingIfSettled(State) {
 _ConfigFullSaveHasPending() {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
-	try return State.requested_generation > State.settled_generation
+	try return !_ConfigFullSaveCoordinatorDataAdmitted(State)
+		|| State.requested_generation > State.settled_generation
 	finally Critical(PreviousCritical)
 }
 
 _ConfigFullSaveCapture() {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
-	try return State.requested_generation
+	try return _ConfigFullSaveCoordinatorDataAdmitted(State) ? State.requested_generation : 0
 	finally Critical(PreviousCritical)
 }
 
@@ -149,12 +273,16 @@ _ConfigFullSaveAcknowledge(TargetGeneration) {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+			return false
 		TargetGeneration := Min(TargetGeneration, State.requested_generation)
 		if (TargetGeneration > State.committed_generation)
 			State.committed_generation := TargetGeneration
 		if (TargetGeneration > State.settled_generation)
 			State.settled_generation := TargetGeneration
 		_ConfigFullSaveReleaseBindingIfSettled(State)
+		_ConfigFullSaveRequest(true, , State, true)
+		return true
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -169,6 +297,8 @@ _ConfigFullSaveRejectExact(Generation) {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State) || _ConfigFullSaveRequest(true, , 0)
+			return false
 		if Generation != State.requested_generation
 				|| Generation != State.settled_generation + 1
 			return false
@@ -223,6 +353,9 @@ _ConfigFullSaveAbandonThrough(TargetGeneration) {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+				|| _ConfigFullSaveRequest(true, , 0)
+			return false
 		TargetGeneration := Min(TargetGeneration, State.requested_generation)
 		if (TargetGeneration > State.settled_generation)
 			State.settled_generation := TargetGeneration
@@ -235,8 +368,12 @@ _ConfigFullSaveAbandonThrough(TargetGeneration) {
 _ConfigFullSaveTimerStarted() {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
-	try State.timer_armed := false
-	finally Critical(PreviousCritical)
+	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+			return false
+		State.timer_armed := false
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 ; Coalesces wake-ups but never erases the generation when SetTimer itself
@@ -254,6 +391,8 @@ _ConfigArmFullSaveRetry(DelayMs, TimerFn := 0) {
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+			return false
 		if (State.requested_generation <= State.settled_generation)
 			return true
 		if State.timer_armed
@@ -292,14 +431,14 @@ _ConfigQueueFullSave(DelayMs, TimerFn := 0, TerminalRequired := true) {
 ; Critical window and must contain memory swaps only. A throw from either is a
 ; PARTIAL failure because the durable write has already succeeded.
 ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0,
-		PublishFn := 0, FinalizeFn := 0, CompensateFn := 0) {
+		PublishFn := 0, FinalizeFn := 0, CompensateFn := 0, AdmissionFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		; The global path owner supplies isolation. Never inherit a caller's
 		; Critical span into durable I/O, finalization, recovery or feedback.
 		Critical("Off")
 		try return ConfigCommitUpdates(Path, Updates, Context, WriterFn,
-			NotifyFn, PublishFn, FinalizeFn, CompensateFn)
+			NotifyFn, PublishFn, FinalizeFn, CompensateFn, AdmissionFn)
 		finally Critical(InheritedCritical)
 	}
 	OwnerToken := _ConfigWriteLeaseTryAcquire(Path, "targeted")
@@ -311,7 +450,7 @@ ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0,
 				FailureDetail, StateUnchanged)
 	}
 	return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
-			NotifyFn, PublishFn, FinalizeFn, CompensateFn, false)
+			NotifyFn, PublishFn, FinalizeFn, CompensateFn, false, 0, 0, 0, true, AdmissionFn)
 }
 
 ; Executes one strict update batch while the caller retains its transition
@@ -368,7 +507,13 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 	CompensateFn := 0
 	RetainFn := 0
 	StateUnchanged := true
+	PlanAdmission := 0
+	NoOpSourceAdmission := 0
 	try {
+		if _ConfigSchemaEntrySelected(Path)
+			NoOpSourceAdmission := ConfigMigrateBoot(Path, "capture_noop")
+		if !_ConfigSchemaEntryAdmitted(Path)
+			throw Error("The native configuration source/schema refused candidate construction")
 		try Plan := BuildFn.Call()
 		catch as Err
 			FailureDetail := "candidate construction failed: " . Err.Message
@@ -379,6 +524,7 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 			; contract. Even a malformed/noop getter may follow a prepared side effect.
 			CompensateFn := _ConfigPlanGet(Plan, "compensate", 0)
 			RetainFn := _ConfigPlanGet(Plan, "retain", 0)
+			PlanAdmission := _ConfigPlanGet(Plan, "admission", 0)
 			NoOp := !!_ConfigPlanGet(Plan, "noop", false)
 		}
 		if (FailureDetail == "" && !NoOp) {
@@ -400,7 +546,17 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 			Transferred := true
 			return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
 					NotifyFn, PublishFn, FinalizeFn, CompensateFn,
-					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn, !Borrowed)
+					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn, !Borrowed, PlanAdmission)
+		}
+		NativePlanAdmission := () => _ConfigWriteLeaseOwns(OwnerToken, Path) && _FSNativeAdmissionAccepted(PlanAdmission)
+		if FailureDetail == "" && NoOp {
+			Acknowledged := HasMethod(NoOpSourceAdmission, "Call")
+				? ConfigSchemaAcknowledgeNoop(Path, NoOpSourceAdmission, NativePlanAdmission)
+				: (!_ConfigSchemaEntrySelected(Path) && FSNativeAcknowledge(NativePlanAdmission))
+			if !Acknowledged {
+				NoOp := false
+				FailureDetail := "the native source or logical owner refused the built-plan noop acknowledgement"
+			}
 		}
 	} catch as Err {
 		FailureDetail := "candidate plan inspection failed: " . Err.Message
@@ -431,12 +587,113 @@ _ConfigPlanGet(Plan, Key, Default := 0) {
 
 _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		PublishFn, FinalizeFn, CompensateFn, PublishOnFinalizeFailure := false,
-		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0, ReleaseOwner := true) {
+		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0, ReleaseOwner := true, AdmissionFn := 0, Request := "commit") {
+	static PublicationDebt := Map()
+	; Only these retained genuine producers may prove an already durable full-save
+	; obligation. No supplied collector, writer, snapshot or registration token
+	; can settle the private debt while RAM and disk disagree.
+	static ReconcileOwners := { collect: _ConfigCollectFullSaveUpdates,
+		build: TOML_BuildConfigUpdatedContent, prepare: _ConfigPrepareTypedUpdates,
+		obsolete: ConfigFullSnapshotCaptureObsoleteSource,
+		preserve: ConfigFullSnapshotPreserveObsoleteSource,
+		capture: ConfigMigrateBoot, acknowledge: ConfigSchemaAcknowledgeNoop,
+		coordinator: _ConfigFullSaveCoordinator, coordinator_data: _ConfigFullSaveCoordinatorDataAdmitted,
+		generation_ack: _ConfigFullSaveAcknowledge, generation_capture: _ConfigFullSaveCapture,
+		path_match: _ConfigFullSavePathMatches, request_owner: _ConfigFullSaveRequest }
+	ReconcileOwnersLive() {
+		return ReconcileOwners.collect == _ConfigCollectFullSaveUpdates
+			&& ReconcileOwners.build == TOML_BuildConfigUpdatedContent
+			&& ReconcileOwners.prepare == _ConfigPrepareTypedUpdates
+			&& ReconcileOwners.obsolete == ConfigFullSnapshotCaptureObsoleteSource
+			&& ReconcileOwners.preserve == ConfigFullSnapshotPreserveObsoleteSource
+			&& ReconcileOwners.capture == ConfigMigrateBoot
+			&& ReconcileOwners.acknowledge == ConfigSchemaAcknowledgeNoop
+			&& ReconcileOwners.coordinator == _ConfigFullSaveCoordinator
+			&& ReconcileOwners.coordinator_data == _ConfigFullSaveCoordinatorDataAdmitted
+			&& ReconcileOwners.generation_ack == _ConfigFullSaveAcknowledge
+			&& ReconcileOwners.generation_capture == _ConfigFullSaveCapture
+			&& ReconcileOwners.path_match == _ConfigFullSavePathMatches
+			&& ReconcileOwners.request_owner == _ConfigFullSaveRequest
+	}
+	if Request == "reconcile_full_save" {
+		global ConfigurationFile, _DriverReady, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+		if !IsSet(ConfigurationFile) || !_ConfigSchemaEntrySelected(Path)
+				|| !IsSet(_DriverReady) || !_DriverReady
+				|| (IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed)
+				|| (IsSet(_ConfigBootRejectedOverrides) && _ConfigBootRejectedOverrides)
+				|| !ReconcileOwnersLive() || !_ConfigWriteLeaseOwns(OwnerToken, Path)
+			return false
+		CoordinatorState := ReconcileOwners.coordinator.Call()
+		if !ReconcileOwners.coordinator_data.Call(CoordinatorState)
+				|| !ReconcileOwners.request_owner.Call(true, , CoordinatorState, 2)
+				|| !ReconcileOwners.path_match.Call(Path) || !_ConfigFullSaveHasPending()
+			return false
+		DebtKey := _ConfigWriteLeaseKey(Path)
+		PreviousCritical := Critical("On")
+		try {
+			if !PublicationDebt.Has(DebtKey)
+				return false
+			DebtRow := PublicationDebt[DebtKey]
+			TargetGeneration := ReconcileOwners.generation_capture.Call()
+		} finally Critical(PreviousCritical)
+		try {
+			SourceAdmission := ReconcileOwners.capture.Call(Path, "capture_reconcile_noop")
+			if !HasMethod(SourceAdmission, "Call")
+				return false
+			SourceImage := ReconcileOwners.build.Call(Path, [])
+			if !(SourceImage is Map) || SourceImage.Get("status", "") != "ok"
+					|| SourceImage.Get("kind", "") != "rendered"
+				return false
+			ObsoleteSource := ReconcileOwners.obsolete.Call(SourceImage["source_content"])
+			Updates := ReconcileOwners.collect.Call()
+			if !(Updates is Array)
+				return false
+			Updates := ReconcileOwners.prepare.Call(ReconcileOwners.preserve.Call(ObsoleteSource, Updates))
+			Candidate := ReconcileOwners.build.Call(Path, Updates)
+			; Byte equality alone is insufficient: use the actual semantic renderer's
+			; preserve-source decision and require the same genuine source generation.
+			if !(Candidate is Map) || Candidate.Get("status", "") != "ok"
+					|| Candidate.Get("kind", "") != "rendered"
+					|| Candidate.Get("preserve_source", 0) != 1
+					|| Candidate["source_present"] != SourceImage["source_present"]
+					|| StrCompare(Candidate["source_content"], SourceImage["source_content"], true) != 0
+				return false
+			FinalReconcileSource(Source, Present) {
+				if !ReconcileOwnersLive()
+						|| ReconcileOwners.coordinator.Call() != CoordinatorState
+						|| !ReconcileOwners.coordinator_data.Call(CoordinatorState)
+						|| !ReconcileOwners.request_owner.Call(true, , CoordinatorState, 2)
+						|| !_ConfigWriteLeaseOwns(OwnerToken, Path)
+						|| !ReconcileOwners.path_match.Call(Path)
+						|| !PublicationDebt.Has(DebtKey) || PublicationDebt[DebtKey] != DebtRow
+						|| !SourceAdmission.Call(Source, Present)
+					return false
+				; Called by the actual native acknowledgement inside its short restored
+				; Critical span. Newer accepted requests remain pending, never over-acked.
+				PublicationDebt.Delete(DebtKey)
+				ReconcileOwners.generation_ack.Call(TargetGeneration)
+				return true
+			}
+			return ReconcileOwners.acknowledge.Call(Path, FinalReconcileSource)
+		} catch {
+			return false
+		}
+	}
+	if Request == "query_debt" {
+		PreviousCritical := Critical("On")
+		try return PublicationDebt.Has(_ConfigWriteLeaseKey(Path))
+		finally Critical(PreviousCritical)
+	}
+	if Request != "commit"
+		throw ValueError("Unknown native publication request")
 	Failed := false
 	FailureDetail := ""
 	StateUnchanged := true
 	DurableCommitted := false
 	PrimaryFinalized := false
+	LogicalOwnershipLost := false
+	OwnerAdmission := () => _ConfigWriteLeaseOwns(OwnerToken, Path)
+	PublicationAdmission := () => OwnerAdmission.Call() && _FSNativeAdmissionAccepted(AdmissionFn)
 	try {
 		; A misspelled plan callback used to be treated as "not supplied": the
 		; writer committed, publication was skipped, and the gateway returned true.
@@ -447,11 +704,24 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 				&FailureDetail, &StateUnchanged)
 			Failed := true
 		if !Failed && !_ConfigInvokeCommitWriter(Path, Updates, WriterFn,
-				"the configuration writer", &FailureDetail) {
+				"the configuration writer", &FailureDetail, AdmissionFn, OwnerAdmission) {
 			Failed := true
 		}
-		if !Failed
+		if !Failed {
 			DurableCommitted := true
+			PreviousCritical := Critical("On")
+			try {
+				if !PublicationAdmission.Call() {
+					Failed := true
+					StateUnchanged := false
+					LogicalOwnershipLost := true
+					FailureDetail := "the durable write succeeded but logical publication ownership was withdrawn"
+					PublicationDebt[_ConfigWriteLeaseKey(Path)] := { detail: FailureDetail }
+				}
+			} finally Critical(PreviousCritical)
+			if LogicalOwnershipLost
+				_ConfigRunRecoveryRetention(RetainFn, "publication_admission_withdrawn", &FailureDetail, &StateUnchanged)
+		}
 		if Failed && !DurableCommitted {
 			Compensated := _ConfigRunPrecommitCompensation(CompensateFn,
 					&FailureDetail, &StateUnchanged)
@@ -476,7 +746,7 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		}
 		if DurableCommitted && !Failed
 			PrimaryFinalized := true
-		if DurableCommitted && Failed && (RollbackUpdates is Array) {
+		if DurableCommitted && Failed && !LogicalOwnershipLost && (RollbackUpdates is Array) {
 			; Activation is exception-atomic, so compensation can discard the inert
 			; candidate before restoring the previous durable value. Both operations
 			; remain under this owner; no full-save or sibling writer can interleave.
@@ -520,10 +790,18 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		ShouldPublish := PrimaryFinalized
 			|| (DurableCommitted && PublishOnFinalizeFailure
 				&& !(RollbackUpdates is Array))
-		if ShouldPublish && HasMethod(PublishFn, "Call") {
+		if ShouldPublish {
 			PublishingAfterFailure := Failed
 			PreviousCritical := Critical("On")
-			try PublishFn.Call()
+			try {
+				if !PublicationAdmission.Call() {
+					LogicalOwnershipLost := true
+					PublicationDebt[_ConfigWriteLeaseKey(Path)] := { detail: "logical ownership was withdrawn after durable acknowledgement" }
+					throw Error("logical publication ownership was withdrawn after durable acknowledgement")
+				}
+				if HasMethod(PublishFn, "Call")
+					PublishFn.Call()
+			}
 			catch as Err {
 				Failed := true
 				StateUnchanged := false
@@ -535,6 +813,8 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 			} finally {
 				Critical(PreviousCritical)
 			}
+			if LogicalOwnershipLost
+				_ConfigRunRecoveryRetention(RetainFn, "publication_admission_withdrawn", &FailureDetail, &StateUnchanged)
 		}
 	} finally {
 		if ReleaseOwner
@@ -545,21 +825,37 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 	return true
 }
 
-_ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail) {
+_ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail, AdmissionFn := 0, OwnerAdmission := 0) {
 	global ConfigurationFile
 	if FileReadActivityBusy(Path) {
 		FailureDetail .= (FailureDetail != "" ? "; " : "") . "an exact configuration read is still in progress"
 		return false
 	}
 	try {
+		NativeAdmission := () => _FSNativeAdmissionAccepted(OwnerAdmission) && _FSNativeAdmissionAccepted(AdmissionFn)
+		Guarded := !((AdmissionFn is Integer) && AdmissionFn == 0)
+		; Typed ownership lookup can touch public binding metadata. Refuse a
+		; withdrawn genuine issuer/lease before that lookup, and retain the same
+		; predicate at the actual native noop or target replacement below.
+		if !NativeAdmission.Call()
+			throw Error("logical publication admission refused before writer invocation")
+		if !_ConfigSchemaEntryAdmitted(Path)
+			throw Error("The native configuration source/schema refused the writer entry")
 		IsConfiguration := IsSet(ConfigurationFile) && ConfigurationFile != ""
 			&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
 		if IsConfiguration
 			Updates := _ConfigPrepareTypedUpdates(Updates)
-		if HasMethod(WriterFn, "Call")
-			Written := WriterFn.Call(Path, Updates)
-		else
-			Written := IsConfiguration ? TOML_ConfigBatchWrite(Path, Updates) : TOML_BatchWrite(Path, Updates)
+		if HasMethod(WriterFn, "Call") {
+			if Guarded {
+				if WriterFn != TOML_ConfigBatchWrite && WriterFn != TOML_BatchWrite
+					throw Error("a guarded publication cannot invoke an unqualified custom writer")
+				Written := IsConfiguration ? TOML_ConfigBatchWrite(Path, Updates, [], NativeAdmission)
+					: TOML_BatchWrite(Path, Updates, [], NativeAdmission)
+			} else
+				Written := WriterFn.Call(Path, Updates)
+		} else
+			Written := IsConfiguration ? TOML_ConfigBatchWrite(Path, Updates, [], NativeAdmission)
+				: TOML_BatchWrite(Path, Updates, [], NativeAdmission)
 	} catch as Err {
 		FailureDetail .= (FailureDetail != "" ? "; " : "")
 			. Stage . " failed: " . Err.Message
@@ -773,14 +1069,9 @@ _ConfigSeedPersonalHotstring(FeaturesTarget, SectionName) {
 		Path := "hotstrings.personal." . SectionName
 		FeaturesTarget["hotstrings"]["personal"][SectionName] := Map(
 			"enabled", ManifestDefaultFor(Path . ".enabled"),
-			"time_activation_seconds", ManifestDefaultFor(Path . ".time_activation_seconds"))
+			ConfigLeaf.TIME_ACTIVATION_SECONDS, ManifestDefaultFor(Path . ".time_activation_seconds"))
 	}
 	return true
-}
-
-; Section selection persists independently of every category's runtime master.
-ToggleAllHotstrings(Value) {
-	return _ConfigCommitHotstringIntent("all", "", Value, "the bulk hotstring toggle")
 }
 
 IsCategoryAllEnabled(Categories) {
@@ -889,7 +1180,7 @@ _ConfigBuildCategoryIntentPlan(Category, Bool) {
 				throw Error("Unknown hotstring category state: " . Category)
 			RuntimePatches.Push({ target: Features["hotstrings"], key: Root, value: Projected["hotstrings"][Root] })
 	}
-	Updates := [_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Category), Bool)]
+	Updates := [_ConfigSparseOperation(ConfigLeaf.CATEGORY_ENABLED, _CategoryEnabledKey(Category), Bool)]
 	return { updates: Updates, publish: _ConfigPublishDesiredState.Bind(Desired,
 		RuntimePatches, CandidateCategories, CandidateTapHold) }
 }
@@ -910,51 +1201,148 @@ _ConfigPublishDesiredState(Desired, RuntimePatches, CandidateCategories := 0, Ca
 	} finally Critical(PreviousCritical)
 }
 
-; Select every section of one category while retaining its independent master.
-ToggleCategoryAllSections(V1Cat, Enable) {
+/**
+ * « Check all » / « uncheck all » of one category submenu: the sections that
+ * submenu draws, never a section an extension draws in its own submenu, and
+ * the category gate with them, as the shared category scope plans it.
+ * @param {String} V1Cat Native category id.
+ * @param {Integer} Enable Explicit Boolean posture.
+ * @param {Map} Options Optional "live" and "reload" ports for isolated tests.
+ * @returns {Integer} True once written and applied (live) or reloading.
+ */
+ToggleCategoryAllSections(V1Cat, Enable, Options := unset) {
 	return _ConfigCommitHotstringIntent("category", V1Cat, Enable,
-		"the '" . V1Cat . "' section toggle")
+		"the '" . V1Cat . "' section toggle", IsSet(Options) ? Options : Map())
 }
 
 /**
- * Publishes the dynamic families through the conditional reload journal.
- * This category follows the Hotstrings master and owns no additional gate.
- * @param {Integer} Enabled Explicit Boolean posture for every dynamic family.
- * @param {Map} Options Existing journal/lifecycle ports for isolated tests.
- * @returns {Map} Pending or terminal receipt; native refusal restores exact bytes.
+ * « Check all » / « uncheck all » of the dynamic hotstrings submenu. The
+ * programmable hotstrings run the user's own code through their own start and
+ * cancellation owner, so only their dedicated row switches them.
+ * @param {Integer} Enable Explicit Boolean posture for every dynamic family.
+ * @param {Map} Options Optional "live" and "reload" ports for isolated tests.
+ * @returns {Integer} True once written and applied (live) or reloading.
  */
-HotstringsDynamicScopeApply(Enabled, Options := unset) {
-	if !IsSet(Options)
-		Options := Map()
-	Operations() {
-		if !(Enabled is Integer) || (Enabled != 0 && Enabled != 1)
-			throw TypeError("A dynamic hotstring scope requires an explicit Boolean target.")
-		return _ConfigBuildHotstringIntentPlan("dynamic", "", Enabled).updates
-	}
-	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
+ToggleDynamicAllSections(Enable, Options := unset) {
+	return _ConfigCommitHotstringIntent("dynamic", "", Enable,
+		"the dynamic-hotstring section toggle", IsSet(Options) ? Options : Map())
 }
 
 ; Select one language pack in a single transaction without changing its masters.
-ToggleLanguageAllSections(Pack, Enable) {
+ToggleLanguageAllSections(Pack, Enable, Options := unset) {
 	return _ConfigCommitHotstringIntent("language", Pack, Enable,
-		"the '" . Pack["id"] . "' language toggle")
+		"the '" . Pack["id"] . "' language toggle", IsSet(Options) ? Options : Map())
 }
 
 ; Personal section paths come from discovered TOML names; selection remains
 ; editable while the Hotstrings or Personal master is disabled.
-HS_TogglePersonalAllSections(Enable) {
+HS_TogglePersonalAllSections(Enable, Options := unset) {
 	return _ConfigCommitHotstringIntent("personal", "", Enable,
-		"the personal-hotstring section toggle")
+		"the personal-hotstring section toggle", IsSet(Options) ? Options : Map())
 }
 
-; Section selection never changes a master checkbox. Users may prepare every
-; desired section while all native activation remains disabled.
-_ConfigCommitHotstringIntent(Kind, Selector, Enable, Context) {
-	global ConfigurationFile
-	if !ConfigCommitBuilt(ConfigurationFile, Context,
-			_ConfigBuildHotstringIntentPlan.Bind(Kind, Selector, !!Enable))
+/**
+ * Switches on the personal sections the user has just created. Undeclared
+ * personal sections are neutral-off like every absent setting, so a category
+ * created in an editor never loaded its hotstrings and a bundled trigger kept
+ * firing over them (issue #96). Creating one is the user's choice to use it.
+ * @param {Array} Sections Section names already committed to the personal file.
+ * @param {Map} Options Optional "live" / "reload" continuations.
+ * @returns {Integer} True when the selection was written and applied.
+ */
+HS_EnableNewPersonalSections(Sections, Options := unset) {
+	if !(Sections is Array) || !Sections.Length
+		throw ValueError("New personal sections are required.")
+	return _ConfigCommitHotstringIntent("personal", Sections, true,
+		"the new personal-hotstring section", IsSet(Options) ? Options : Map())
+}
+
+/**
+ * The sections a save adds to the personal file, in their new order.
+ * @param {Array} Before Section names on disk before the save.
+ * @param {Array} After Section names the save commits.
+ * @returns {Array} Names in After absent from Before (case-insensitive).
+ */
+HS_PersonalSectionsAdded(Before, After) {
+	Known := Map()
+	Known.CaseSense := false
+	for Name in Before
+		Known[Name] := true
+	Added := []
+	for Name in After {
+		if Name is String && Name != "-" && !Known.Has(Name) {
+			Known[Name] := true
+			Added.Push(Name)
+		}
+	}
+	return Added
+}
+
+/**
+ * The manifest paths of the sections a bundled category's own submenu draws:
+ * every declared section except those a layout extension binds, which its
+ * « Hotstrings <extension> » submenu draws instead (InitSubMenus).
+ * @param {String} V1Cat Native category id.
+ * @returns {Array} Canonical v2 section paths, in manifest order.
+ */
+_HS_CategoryOwnSectionPaths(V1Cat) {
+	global _LegacyTopCategoryMap
+	if !_LegacyTopCategoryMap.Has(V1Cat)
+		throw Error("Unknown hotstring category: " . V1Cat)
+	Bound := HotstringsBoundSections(V1Cat)
+	Paths := []
+	for Entry in ManifestFeaturesForSection(_LegacyTopCategoryMap[V1Cat]) {
+		Parts := StrSplit(Entry["path"], ".")
+		if !Bound.Has(StrLower(Parts[Parts.Length]))
+			Paths.Push(Entry["path"])
+	}
+	return Paths
+}
+
+/**
+ * Whether the in-process rebuild applies every switched path, as it does for
+ * one section's checkbox; a gate flip follows ToggleCategoryAllFeatures' rule.
+ * @param {Array} Paths Switched v2 section paths.
+ * @param {String} FlippedGate Category whose gate changes, or "".
+ * @returns {Integer} True when no path needs a reload.
+ */
+_HS_SelectionAppliesLive(Paths, FlippedGate := "") {
+	if FlippedGate != "" && !_IsLiveHotstringCategory(FlippedGate)
 		return false
-	return ReloadPreservingSuspend()
+	for Path in Paths {
+		Parts := StrSplit(Path, ".")
+		if Parts.Length != 3 || Parts[1] != "hotstrings" || Path == ConfigKey.HOTSTRINGS_DYNAMIC_USER_CODE
+			return false
+		if Parts[2] == "personal"
+			continue
+		if _HS_IsReloadOnlyGroup(_HS_DeriveLiveToggleGroup(Parts[2], Parts[3]))
+			return false
+	}
+	return true
+}
+
+; Section selection never changes the Hotstrings master. A selection the live
+; rebuild covers applies in-process, like one section's checkbox: a reload
+; restarted the whole driver for every bulk click (2026-10-17: one click took
+; the driver away for minutes and every click queued behind it was refused).
+_ConfigCommitHotstringIntent(Kind, Selector, Enable, Context, Options := unset) {
+	global ConfigurationFile
+	if !IsSet(Options)
+		Options := Map()
+	if !(Enable is Integer) || (Enable != 0 && Enable != 1)
+		throw TypeError("A hotstring selection requires an explicit Boolean posture.")
+	Plan := 0
+	Build() {
+		Plan := _ConfigBuildHotstringIntentPlan(Kind, Selector, Enable)
+		return Plan
+	}
+	if !ConfigCommitBuilt(ConfigurationFile, Context, Build)
+		return false
+	if !Plan.live
+		return Options.Get("reload", ReloadPreservingSuspend).Call()
+	try LoggerInfo("Menu", "Hotstring selection ({1}) of {2} section(s) applied in-process.",
+		Context, Plan.paths.Length)
+	return Options.Get("live", RebuildHotstringsLive).Call()
 }
 
 ; Scope enumeration and personal discovery occur under the same owner as write
@@ -963,36 +1351,53 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 	global Features, TapHold, CategoryEnabled, _LegacyTopCategoryMap, ScriptInformation
 	Desired := _HSDeepCloneMap(MasterGateDesiredFeatures(Features))
 	Entries := []
+	Gate := ""
 	switch Kind {
-		case "all":
-			for Path in _CollectAllHotstringsV2Paths(Desired)
-				Entries.Push(Map("path", Path, "value", Bool))
 		case "category":
-			if !_LegacyTopCategoryMap.Has(Selector)
-				throw Error("Unknown hotstring category: " . Selector)
-			for Entry in ManifestFeaturesForSection(_LegacyTopCategoryMap[Selector])
-				Entries.Push(Map("path", Entry["path"], "value", Bool))
+			; The submenu's own sections and its gate, which the shared category
+			; scope switches with them: that gate is drawn only as the parent row's
+			; tick, which no tray can click.
+			for Path in _HS_CategoryOwnSectionPaths(Selector)
+				Entries.Push(Map("path", Path, "value", Bool))
+			Gate := Selector
 		case "dynamic":
 			; Discover the canonical families inside the admitted lease, independent
 			; of a menu preview or the mixed legacy tray map. There is no extra gate.
-			for Entry in ManifestFeaturesForSection("hotstrings.dynamic")
-				Entries.Push(Map("path", Entry["path"], "value", Bool))
-		case "language":
-			for Category in Selector["categories"] {
-				for Entry in ManifestFeaturesForSection("hotstrings." . Category["v2"])
+			; The programmable hotstrings keep their own start/cancel owner.
+			for Entry in ManifestFeaturesForSection(ConfigKey.HOTSTRINGS_DYNAMIC)
+				if Entry["path"] != ConfigKey.HOTSTRINGS_DYNAMIC_USER_CODE
 					Entries.Push(Map("path", Entry["path"], "value", Bool))
+		case "language":
+			; Each category's own sections, as its submenu draws them.
+			for Category in Selector["categories"] {
+				for Path in _HS_CategoryOwnSectionPaths(Category["v1"])
+					Entries.Push(Map("path", Path, "value", Bool))
 			}
 		case "personal":
 			PersonalPath := ScriptInformation.Get("PersonalTomlPath", "")
 			if PersonalPath == "" || !FSExists(PersonalPath)
 				throw Error("Personal hotstring configuration is unavailable.")
 			; A menu preview must not freeze a later admitted scope inventory.
-			for Section in ReadPersonalToml(true)["sections_order"] {
-				if Section == "-"
+			; An Array selector names the only sections to switch; each must
+			; still be in the file read under this lease.
+			OnDisk := ReadPersonalToml(true)["sections_order"]
+			Wanted := 0
+			if Selector is Array {
+				Wanted := Map()
+				Wanted.CaseSense := false
+				for Name in Selector
+					Wanted[Name] := true
+			}
+			for Section in OnDisk {
+				if Section == "-" || (Wanted is Map && !Wanted.Has(Section))
 					continue
+				if Wanted is Map
+					Wanted.Delete(Section)
 				_ConfigSeedPersonalHotstring(Desired, Section)
 				Entries.Push(Map("path", "hotstrings.personal." . StrLower(Section), "value", Bool))
 			}
+			if Wanted is Map && Wanted.Count
+				throw Error("A selected personal section is not in the personal file.")
 		default:
 			throw Error("Unknown hotstring scope: " . Kind)
 	}
@@ -1001,8 +1406,20 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 	Updates := []
 	if _ConfigStageFeatureEntries(Desired, Entries, Updates) != Entries.Length
 		throw Error("A hotstring scope feature could not be resolved.")
+	CandidateCategories := 0, FlippedGate := ""
+	if Gate != "" {
+		if !CategoryEnabled.Has(Gate)
+			throw Error("Unknown category gate: " . Gate)
+		if CategoryEnabled[Gate] != Bool {
+			CandidateCategories := CategoryEnabled.Clone()
+			CandidateCategories[Gate] := Bool
+			FlippedGate := Gate
+			Updates.Push(_ConfigSparseOperation(ConfigLeaf.CATEGORY_ENABLED, _CategoryEnabledKey(Gate), Bool))
+		}
+	}
 	Projected := _HSDeepCloneMap(Desired)
-	ApplyMasterGatesToFeatures(Projected, Map(), IsCategoryGated)
+	ApplyMasterGatesToFeatures(Projected, Map(), CandidateCategories is Map
+		? (Name) => _ConfigCandidateCategoryEnabled(CandidateCategories, Name) : IsCategoryGated)
 	CandidateFeatures := _HSDeepCloneMap(Features)
 	RuntimePatches := []
 	NewPersonalRoot := false
@@ -1028,7 +1445,19 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 	}
 	if NewPersonalRoot
 		RuntimePatches.Push({ target: Features["hotstrings"], key: "personal", value: CandidateFeatures["hotstrings"]["personal"] })
-	return { updates: Updates, publish: _ConfigPublishDesiredState.Bind(Desired, RuntimePatches) }
+	if FlippedGate != "" {
+		; A gate zeroes or restores every section of its category, the ones an
+		; extension draws included, exactly as ToggleCategoryAllFeatures projects.
+		Root := SubStr(_LegacyTopCategoryMap[FlippedGate], StrLen("hotstrings.") + 1)
+		if !Projected["hotstrings"].Has(Root) || !Features["hotstrings"].Has(Root)
+			throw Error("Unknown hotstring category state: " . FlippedGate)
+		RuntimePatches.Push({ target: Features["hotstrings"], key: Root, value: Projected["hotstrings"][Root] })
+	}
+	Paths := []
+	for Entry in Entries
+		Paths.Push(Entry["path"])
+	return { updates: Updates, paths: Paths, live: _HS_SelectionAppliesLive(Paths, FlippedGate),
+		publish: _ConfigPublishDesiredState.Bind(Desired, RuntimePatches, CandidateCategories) }
 }
 
 _CategoryEnabledKey(Category) {
@@ -1036,12 +1465,12 @@ _CategoryEnabledKey(Category) {
 				case "Layout":     return "layout"
 				case "Shortcuts":  return "shortcuts"
 				case "Hotstrings": return "hotstrings"
-				case "TapHolds":   return "tap_holds"
+				case "TapHolds":   return ConfigLeaf.TAP_HOLDS
 				case "KeyCombinations": return "key_combinations"
 				; Hotstring sub-category gates — snake_case to match the v2 schema.
-				case "DistancesReduction": return "distances_reduction"
-				case "SFBsReduction":      return "sfbs_reduction"
-				case "MagicKey":           return "magic_key"
+				case "DistancesReduction": return ConfigLeaf.DISTANCES_REDUCTION
+				case "SFBsReduction":      return ConfigLeaf.SFBS_REDUCTION
+				case "MagicKey":           return ConfigLeaf.MAGIC_KEY
 		}
 		; Language-pack gates are keyed by their group id ("french_autocorrection");
 		; the table is filled when the boot seeds those gates.
@@ -1074,26 +1503,26 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 				; state that only existed in the failed serialization candidate.
 				FeatureSnapshot := _HSDeepCloneMap(MasterGateDesiredFeatures(FeatureState))
 				; The dedicated category owner below is authoritative for master gates.
-				if FeatureSnapshot.Has("category_enabled")
-						FeatureSnapshot.Delete("category_enabled")
+				if FeatureSnapshot.Has(ConfigLeaf.CATEGORY_ENABLED)
+						FeatureSnapshot.Delete(ConfigLeaf.CATEGORY_ENABLED)
 				if IsSet(_LLM_Menu_SyncToFeatures)
 						&& MenuReady && (MenuState is Map)
 						&& !_LLM_Menu_SyncToFeatures(FeatureSnapshot, MenuState)
 						throw Error("LLM menu state could not be reconciled into the full-save candidate")
 				_CollectFeatureUpdates(Updates, "", FeatureSnapshot)
 				; The version the boot migration reads (infra/config_migrate.ahk).
-				Updates.Push({ Section: "_meta", Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
+				Updates.Push({ Section: ConfigLeaf._META, Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
 		}
 		Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
-		Updates.Push({ Section: "script", Key: "log_level", Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
-		Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
+		Updates.Push({ Section: "script", Key: ConfigLeaf.LOG_LEVEL, Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
+		Updates.Push({ Section: "hotstrings", Key: ConfigLeaf.TRIGGER_CHAR, Value: ScriptInformation["MagicKey"] })
 		if IsSet(ScriptShortcutAssignments) {
 				for Slot, Action in ScriptShortcutAssignments
-						Updates.Push({ Section: "shortcuts.script_control", Key: Slot, Value: Action })
+						Updates.Push({ Section: ConfigKey.SHORTCUTS_SCRIPT_CONTROL, Key: Slot, Value: Action })
 		}
 		if IsSet(KeyboardShortcutAssignments)
 				CollectKeyboardShortcutUpdates(Updates, KeyboardShortcutAssignments,
-						_IniCache.Get("shortcuts.keyboard", Map()), KEYBOARD_SHORTCUT_DEFAULTS)
+						_IniCache.Get(ConfigKey.SHORTCUTS_KEYBOARD, Map()), KEYBOARD_SHORTCUT_DEFAULTS)
 		if IsSet(GestureAssignments) {
 				for Slot, Action in GestureAssignments
 						Updates.Push({ Section: "gestures", Key: Slot, Value: Action })
@@ -1101,16 +1530,13 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		apps := []
 		for proc, _ in MetricsFilters.disabled_apps
 				apps.Push(proc)
-		Updates.Push({ Section: "metrics", Key: "metrics_enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
-		Updates.Push({ Section: "metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
-		Updates.Push({ Section: "metrics", Key: "private_filter_enabled", Value: TOML_Bool(MetricsFilters.private_browsing) })
-		Updates.Push({ Section: "metrics", Key: "secure_filter_enabled", Value: TOML_Bool(MetricsFilters.secure_field) })
-		Updates.Push({ Section: "metrics", Key: "system_auth_filter_enabled", Value: TOML_Bool(MetricsFilters.system_auth) })
+		Updates.Push({ Section: "metrics", Key: "enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.PRIVATE_FILTER_ENABLED, Value: TOML_Bool(MetricsFilters.private_browsing) })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.SECURE_FILTER_ENABLED, Value: TOML_Bool(MetricsFilters.secure_field) })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED, Value: TOML_Bool(MetricsFilters.system_auth) })
 		Updates.Push({ Section: "metrics", Key: "encrypt", Value: TOML_Bool(MetricsFilters.encrypt) })
-		Updates.Push({ Section: "metrics", Key: "metrics_disabled_apps", Value: apps })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.DISABLED_APPS, Value: apps })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_X,       Value: WPMWidget.pos_x })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_Y,       Value: WPMWidget.pos_y })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: WPMWidget.show_graph })
 		; The flat [llm] keys below round-trip through _LLM_Menu DIRECTLY (not via
@@ -1122,29 +1548,44 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		; over the user's saved values. Skipping is safe: TOML_BatchWrite preserves keys
 		; it does not re-collect, so the on-disk values survive until the menu has loaded.
 		if (MenuReady && (MenuState is Map)) {
-				if !MenuState.Has("onboarding_seen")
-						|| !LLM_Option_TryNormalize("onboarding_seen",
-							MenuState["onboarding_seen"], &OnboardingSeen)
+				if !MenuState.Has(ConfigLeaf.ONBOARDING_SEEN)
+						|| !LLM_Option_TryNormalize(ConfigLeaf.ONBOARDING_SEEN,
+							MenuState[ConfigLeaf.ONBOARDING_SEEN], &OnboardingSeen)
 					throw Error("LLM onboarding state could not be serialized into the full-save candidate")
-				Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: OnboardingSeen })
+				Updates.Push({ Section: "llm", Key: ConfigLeaf.ONBOARDING_SEEN, Value: OnboardingSeen })
 				_AppOverridesPayload := _LLM_Menu_SerializeAppProfileOverrides(
-						MenuState["app_profile_overrides"])
+						MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES])
 				if !(_AppOverridesPayload is String)
 						throw Error("Could not serialize LLM app-profile overrides")
-				Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesPayload })
+				Updates.Push({ Section: "llm", Key: ConfigLeaf.APP_PROFILE_OVERRIDES, Value: _AppOverridesPayload })
 				if IsSet(_LLM_Menu_AppendPersistedUpdates)
 						&& !_LLM_Menu_AppendPersistedUpdates(Updates, MenuState)
 					throw Error("LLM menu persistence fields could not be serialized into the full-save candidate")
 		}
 		if IsSet(CategoryEnabled) {
 				for _CatName, _CatBool in CategoryEnabled
-						Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(_CatName), Value: TOML_Bool(_CatBool) })
+						Updates.Push({ Section: ConfigLeaf.CATEGORY_ENABLED, Key: _CategoryEnabledKey(_CatName), Value: TOML_Bool(_CatBool) })
 		}
 		if IsSet(UPDATER_CHECK_INTERVAL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
 		if IsSet(UPDATER_CHANNEL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
-		return _ConfigKeepOutdatedEntries(_ConfigSparseUpdates(Updates))
+		return _ConfigKeepOutdatedEntries(_ConfigLastRowWins(_ConfigSparseUpdates(Updates)))
+}
+
+; The feature walk collects rows a dedicated owner below it overrules (the magic
+; key, the personal file controls). The writer refuses two rows on one path, so the
+; overruling is settled here, where the order means something.
+_ConfigLastRowWins(Updates) {
+	Last := Map()
+	Last.CaseSense := "On"
+	for Index, Update in Updates
+		Last[_TOML_ConfigPathName(_TOML_ConfigPath(Update.Section, Update.Key))] := Index
+	Kept := []
+	for Index, Update in Updates
+		if Last[_TOML_ConfigPathName(_TOML_ConfigPath(Update.Section, Update.Key))] == Index
+			Kept.Push(Update)
+	return Kept
 }
 
 ; Manifest comparison uses native values; Boolean serialization sentinels belong
@@ -1209,9 +1650,14 @@ _ConfigUpdateIsNeutral(Update) {
 ; Every full-state producer, including detached candidates, shares this gate.
 ConfigFullStateCanPersist() {
 	global _ConfigBootReadFailed, _ConfigBootRejectedOverrides, ConfigurationFile
+	PerfCount("config_io.full_state_can_persist")
 	; The boot migration refused the file (a newer schema, a failed migration):
 	; the loaded tree does not describe it, so it must never be serialized over it.
 	if IsSet(ConfigurationFile) {
+		if !ConfigSchemaCanPrepareWrite(ConfigurationFile) {
+			try LoggerError("ConfigIO", "Refusing full-state persistence before a genuine current source/schema handoff.")
+			return false
+		}
 		Refusal := TOML_WriteRefusal(ConfigurationFile)
 		if (Refusal != "") {
 			try LoggerError("ConfigIO", "Refusing full-state persistence: config.toml is read-only for this session ({1}).",
@@ -1249,7 +1695,7 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		; a partial config flush triggered by the -500 ms boot timer from clobbering the
 		; user's file with uninitialised defaults (e.g. before Features or GestureAssignments
 		; have been populated by ApplyConfigToml and the deferred tray-menu build).
-		global _DriverReady
+		global _DriverReady, _DriverBootTailPending
 		; Guard: refuse to serialize the feature tree when boot could not READ an
 		; existing config.toml. In that case ApplyConfigToml applied nothing and the
 		; tree below is ManifestBuildFeaturesMap() DEFAULTS — writing it out replaces
@@ -1259,6 +1705,11 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		; so the write looks perfectly safe while the payload is already wrong.
 		; Returns false — not a bare return — so a caller (and the regression test)
 		; can tell "refused" from "deferred until ready" and from a completed save.
+		PublicationDebt := IsSet(ConfigurationFile) && _ConfigPublicationHasRecoveryDebt(ConfigurationFile)
+		if PublicationDebt && (RegisterRequest || HasMethod(WriterFn, "Call") || HasMethod(CollectFn, "Call")) {
+			try LoggerError("ConfigIO", "A retained durable publication debt permits only a genuine default full-save reconciliation of existing requests.")
+			return CONFIG_SAVE_FAILED
+		}
 		RequestedGeneration := 0
 		if RegisterRequest {
 			RequestedGeneration := _ConfigFullSaveRequest(true)
@@ -1267,20 +1718,65 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				return CONFIG_SAVE_FAILED
 			}
 		}
-		; Accepted explicit intent survives refusal; it grants no serializer authority.
-		if !ConfigFullStateCanPersist() {
+		; The exact requested intent survives a fresh source/schema refusal.
+		; Admission still precedes every runtime collection and physical write.
+		; A timer retry that finds the driver not ready yet can write nothing, so it does not
+		; pay the admission (a registry deep compare of about 21 ms): the 100 ms retry ran it
+		; 27 times per boot. A new request and every attempt once the driver is ready are
+		; still admitted before anything is collected or written.
+		; The request stays recorded early, but the write waits for the ready line: on
+		; the boot's last message pump it stalled the tail of the boot by 860 ms.
+		if !RegisterRequest && IsSet(_DriverBootTailPending) && _DriverBootTailPending && !PublicationDebt {
+			PerfCount("config_io.save_retry_deferred_boot_tail")
+			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+				? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+		}
+		if !RegisterRequest && !_DriverReady && !PublicationDebt {
+			PerfCount("config_io.save_retry_deferred_before_admission")
+			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+				? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+		}
+		if !PublicationDebt && !ConfigFullStateCanPersist() {
 			return CONFIG_SAVE_FAILED
 		}
-		if !_ConfigFullSaveHasPending()
-			return CONFIG_SAVE_OK
-		BoundPath := _ConfigFullSaveBoundPath()
+		State := _ConfigFullSaveCoordinator()
+		PreviousCritical := Critical("On")
+		try {
+			; Genuine accepted intent/debt cannot be abandoned by a public scalar
+			; edit or valid replacement that merely looks already settled.
+			if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+					|| (_ConfigFullSaveRequest(true, , 0)
+						&& !_ConfigFullSaveRequest(true, , State, 2))
+				return CONFIG_SAVE_FAILED
+			if State.requested_generation <= State.settled_generation
+				return CONFIG_SAVE_OK
+			; A timer may acknowledge and clear the binding as soon as Critical
+			; ends. Capture the path admission with the pending observation.
+			; Both helpers inspect native data and lexical path keys only.
+			BoundPath := _ConfigFullSaveBoundPath()
+			BoundPathKey := State.bound_path_key
+			SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+			BoundPathMatches := BoundPath != "" && (SelectedPath is String)
+				&& _ConfigFullSavePathMatches(SelectedPath)
+		} finally Critical(PreviousCritical)
 		; A deferred generation belongs to the path that accepted it. Re-reading
 		; ConfigurationFile here used to silently rebase old-path work onto a newly
 		; selected config directory. Refuse before collecting live state: that state
 		; may already describe the new path and must never overwrite the old file.
-		if (BoundPath = "" || !_ConfigFullSavePathMatches(ConfigurationFile)) {
+		if (BoundPath = "" || !BoundPathMatches) {
 			try LoggerError("ConfigIO", "Refusing to rebase a pending full save from '{1}' onto '{2}'. Settle the original path before publishing a config relocation.",
-				BoundPath, ConfigurationFile)
+				BoundPath, (SelectedPath is String) ? SelectedPath : "<invalid configuration path>")
+			return CONFIG_SAVE_FAILED
+		}
+		; Preserve live relocation refusal before any readiness or lease retry.
+		PreviousCritical := Critical("On")
+		try {
+			SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+			SelectedPathMatches := (SelectedPath is String)
+				&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+		} finally Critical(PreviousCritical)
+		if !SelectedPathMatches {
+			try LoggerError("ConfigIO", "Refusing a full save after the selected configuration path changed.")
 			return CONFIG_SAVE_FAILED
 		}
 		if !_DriverReady {
@@ -1309,9 +1805,27 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				? CONFIG_SAVE_DEFERRED
 				: CONFIG_SAVE_FAILED
 		}
-		TargetGeneration := _ConfigFullSaveCapture()
 		Result := CONFIG_SAVE_FAILED
 		try {
+				; The binding may have settled while this caller acquired its lease.
+				; Compare the selected path independently of that cleared binding.
+				PreviousCritical := Critical("On")
+				try {
+					SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+					SelectedPathMatches := (SelectedPath is String)
+						&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+				} finally Critical(PreviousCritical)
+				if !SelectedPathMatches {
+					try LoggerError("ConfigIO", "Refusing a full save after the selected configuration path changed.")
+					return CONFIG_SAVE_FAILED
+				}
+				TargetGeneration := _ConfigFullSaveCapture()
+				if PublicationDebt {
+					Reconciled := _ConfigPublicationReconcileFullSave(BoundPath, OwnerToken)
+					if !Reconciled
+						try LoggerError("ConfigIO", "The accepted full-save request conflicts with retained durable publication state; both remain pending until explicit reconciliation.")
+					Result := Reconciled ? CONFIG_SAVE_OK : CONFIG_SAVE_FAILED
+				} else {
 				Phase := "source"
 				try {
 				SourceImage := 0
@@ -1364,8 +1878,9 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 					Result := CONFIG_SAVE_OK
 				else
 					Result := CONFIG_SAVE_FAILED
-				if (Result = CONFIG_SAVE_OK)
-						_ConfigFullSaveAcknowledge(TargetGeneration)
+				if (Result = CONFIG_SAVE_OK) && !_ConfigFullSaveAcknowledge(TargetGeneration)
+						Result := CONFIG_SAVE_FAILED
+				}
 		} finally {
 			if !BorrowedOwner
 				_ConfigWriteLeaseRelease(OwnerToken)
@@ -1407,10 +1922,24 @@ _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
 	State := _ConfigFullSaveCoordinator()
 	PreviousCritical := Critical("On")
 	try {
+		if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+			return false
+		ActualMandatoryDebt := _ConfigFullSaveRequest(true, , 0)
+		if ActualMandatoryDebt && !_ConfigFullSaveRequest(true, , State, 2)
+			return false
 		Requested := State.requested_generation
 		Settled := State.settled_generation
 		Required := State.terminal_required_generation
 		BoundPath := State.bound_path
+		BoundPathKey := State.bound_path_key
+		SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+		; The live binding may clear when this native-data snapshot ends.
+		; Optional or settled work must not inspect an unused selected path.
+		BoundPathMatches := Requested > Settled && Required > Settled
+			&& BoundPath != "" && (SelectedPath is String)
+			&& _ConfigFullSavePathMatches(SelectedPath)
+		if ActualMandatoryDebt && (Requested <= Settled || Required <= Settled)
+			return false
 	} finally Critical(PreviousCritical)
 	if Requested <= Settled
 		return true
@@ -1421,13 +1950,34 @@ _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
 	; required generation pending, which correctly refuses process death.
 	if Required <= Settled
 		return _ConfigFullSaveAbandonThrough(Requested)
-	if (BoundPath = "" || !_ConfigFullSavePathMatches(ConfigurationFile)) {
+	if (BoundPath = "" || !BoundPathMatches) {
 		try LoggerError("ConfigIO", "Terminal full-save drain refused because the active configuration path no longer matches the accepted generation path.")
+		return false
+	}
+	PreviousCritical := Critical("On")
+	try {
+		SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+		SelectedPathMatches := (SelectedPath is String)
+			&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+	} finally Critical(PreviousCritical)
+	if !SelectedPathMatches {
+		try LoggerError("ConfigIO", "Refusing mandatory terminal full save after the selected configuration path changed.")
 		return false
 	}
 	OwnerToken := _ConfigWriteLeaseSelectOwner(OwnerBundle, BoundPath)
 	if !(OwnerToken is Object) {
 		try LoggerError("ConfigIO", "Terminal full-save drain refused a bundle that did not own config.toml.")
+		return false
+	}
+	; The admitted terminal owner prevents a subsequent real relocation.
+	PreviousCritical := Critical("On")
+	try {
+		SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+		SelectedPathMatches := (SelectedPath is String)
+			&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+	} finally Critical(PreviousCritical)
+	if !SelectedPathMatches {
+		try LoggerError("ConfigIO", "Refusing mandatory terminal full save after the selected configuration path changed.")
 		return false
 	}
 	Result := _ConfigDrainFullSave(WriterFn, TimerFn, OwnerToken, CollectFn)
@@ -1549,13 +2099,14 @@ _ConfigResetRollbackRefusedReload(OwnerBundle) {
 ReadScriptShortcutsConfig() {
 		global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, _IniCache, GESTURE_ACTIONS
 		global ScriptShortcutChordsOn
-		; The switch of the chords: absent keeps the manifest default, anything but
-		; a TOML boolean stops the boot like a malformed category gate.
-		Raw := IniCacheGet(_IniCache, "shortcuts.script_control", "chords_enabled")
+		; Authored preferences retain the canonical manifest/source-kind decision;
+		; detached runtime candidates keep their strict Boolean contract.
+		if !ConfigTomlTryReadBootValue(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, "chords_enabled", &Raw)
+				Raw := IniCacheGet(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, "chords_enabled")
 		if (Raw != "_")
 				ScriptShortcutChordsOn := _FeatureStateValidateBoolean(Raw, "shortcuts.script_control.chords_enabled")
 		for Slot in SCRIPT_SHORTCUT_SLOTS {
-				Value := IniCacheGet(_IniCache, "shortcuts.script_control", Slot)
+				Value := IniCacheGet(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
 						ScriptShortcutAssignments[Slot] := Value
 				else if (Value != "_")
@@ -1591,8 +2142,8 @@ ResetScriptComboKeys(SuffixSC, ReleaseFn := 0) {
 		global _ALTGR_KANA_FIXUP
 		if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
 				return
-		KeyWait(SuffixSC, "T2")
-		if GetKeyState(SuffixSC, "P")
+		KS_WaitReleased(SuffixSC, 2)
+		if KS_IsHeld(SuffixSC)
 				return
 		_ScriptComboClearAltGr(KS_AltGrKeyName(), A_SendLevel,
 				HasMethod(ReleaseFn, "Call") ? ReleaseFn : _ScriptComboReleaseThroughHook, false)
@@ -1606,7 +2157,8 @@ ResetScriptComboKeys(SuffixSC, ReleaseFn := 0) {
 ; hotkey's SendLevel, kept for the Up sent from a timer thread.
 _ScriptComboClearAltGr(Name, Level, ReleaseFn, Waited) {
 		global _TapHoldKeyIsDown, _ScriptComboArmFn, SCRIPT_COMBO_ALTGR_RELEASE_POLL_MS
-		if _TapHoldKeyIsDown.Call(Name, "P") {
+		; A press replayed after a terminal expansion is held in the ledger alone.
+		if (_TapHoldKeyIsDown.Call(Name, "P") || KS_IsHeld(Name)) {
 				_ScriptComboArmFn.Call(_ScriptComboClearAltGr.Bind(Name, Level, ReleaseFn, true),
 						SCRIPT_COMBO_ALTGR_RELEASE_POLL_MS)
 				return
@@ -1655,11 +2207,18 @@ ScriptShortcutSlotRunsAction(Slot, Suspended := A_IsSuspended) {
 		global ScriptShortcutAssignments, GESTURE_ACTIONS, SCRIPT_SHORTCUT_SUSPEND_ALLOWED
 		if !ScriptShortcutAssignments.Has(Slot)
 				throw ValueError("Unknown script shortcut slot.", -1, Slot)
+		; These chords are exempt from Suspend, so a quarantined smoke closes them
+		; here: the resident driver keeps its pause, reload and quit.
+		if Suspended && IsSet(_DriverSmokeInputQuarantined) && _DriverSmokeInputQuarantined
+				return false
 		; The submenu's switch: off leaves every chord native and keeps the actions.
 		if !ScriptShortcutChordsAreOn()
 				return false
 		Action := ScriptShortcutAssignments[Slot]
 		if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
+				return false
+		; An AI action is unarmed while the AI is off: the chord stays the system's.
+		if AiActionBlocked(Action)
 				return false
 		; While suspended these chords stay armed ONLY for script management. Without this
 		; scope check the exemption silently widened to whatever the user assigned, so a
@@ -1671,9 +2230,9 @@ RunScriptShortcutAction(Slot) {
 		global ScriptShortcutAssignments, SCRIPT_SHORTCUT_FALLBACKS
 		if !ScriptShortcutSlotRunsAction(Slot) {
 				; The chord's #HotIf admitted this slot at the press, so only a pause
-				; that began before this thread ran gets here: the chord was already
-				; taken, and its key is the one thing left to give back.
-				LoggerWarn("Shortcuts", "Script slot '{1}' no longer runs '{2}' (paused since the press); sending its key instead.",
+				; or an AI switch-off that began before this thread ran gets here: the chord
+				; was already taken, and its key is the one thing left to give back.
+				LoggerWarn("Shortcuts", "Script slot '{1}' no longer runs '{2}' (paused or AI off since the press); sending its key instead.",
 						Slot, ScriptShortcutAssignments[Slot])
 				SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
 				return
@@ -1684,7 +2243,7 @@ RunScriptShortcutAction(Slot) {
 SetScriptShortcutAction(Slot, ActionName) {
 		global ScriptShortcutAssignments
 		if !GestureAssignConfiguredAction(&ScriptShortcutAssignments,
-				"script", "shortcuts.script_control", Slot, ActionName)
+				"script", ConfigKey.SHORTCUTS_SCRIPT_CONTROL, Slot, ActionName)
 				return false
 		return ReloadPreservingSuspend()
 }
@@ -1707,6 +2266,7 @@ SetScriptShortcutChordsOn(On, Path := "", ReloadFn := 0) {
 		Row := ManifestSparseOperation("shortcuts.script_control.chords_enabled", On ? true : false)
 		if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, [Row], "the script chords switch")
 				return false
+		NotifyFeature(t("notify.script_control"), On ? true : false)
 		return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 
@@ -1758,7 +2318,7 @@ ScriptShortcutRows() {
 				CurrentLabel := GESTURE_ACTIONS.Has(Current) ? GestureActionDisplayLabel(Current, GestureBindingId("script", Slot)) : t("dialog.action_picker.disabled")
 				SlotLabel := t(SCRIPT_SHORTCUT_LABELS[Slot])
 				Rows.Push(Map(
-					"label",  SlotLabel . " : " . CurrentLabel,
+					"label",  LabelValue(SlotLabel, CurrentLabel),
 					"action", ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id), false, GestureBindingId("script", _s)))(Slot, SlotLabel)))
 		}
 		return Rows
@@ -1767,36 +2327,114 @@ ScriptShortcutRows() {
 /**
  * Resolves a keyboard-shortcut slot id to a canonical chord string.
  *
- * The slot id is our own vocabulary ("ctrl_shift_v", "win_sc029"); the chord is
- * the cross-driver one. Everything AutoHotkey-specific — that Ctrl is "^", that
- * Space is "{Space}" — now lives in the HotkeyRegistrar adapter, which is the
- * only layer allowed to know it. This function previously emitted a native
- * AutoHotkey spec directly, which is why the macOS driver had to reimplement the
- * same slot grammar from scratch.
- * @param {String} SlotId e.g. "ctrl_shift_v", "win_e", "alt_space".
+ * The slot id is the neutral vocabulary of every driver ("primary_shift_v",
+ * "meta_sc029"); the chord is the cross-driver one. Everything
+ * AutoHotkey-specific — that Ctrl is "^", that Space is "{Space}" — lives in the
+ * HotkeyRegistrar adapter, the only layer allowed to know it.
+ * @param {String} SlotId e.g. "primary_shift_v", "meta_e", "alt_space".
  * @returns {String} The canonical chord, or "" when the slot names no modifier.
  */
 _KeyboardSlotChord(SlotId) {
-		if SubStr(SlotId, 1, 10) = "ctrl_shift"
-				Mods := ["ctrl", "shift"]
-		else if SubStr(SlotId, 1, 4) = "ctrl"
-				Mods := ["ctrl"]
-		else if SubStr(SlotId, 1, 3) = "win"
-				Mods := ["cmd"]
-		else if SubStr(SlotId, 1, 3) = "alt"
-				Mods := ["alt"]
-		else
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("modifiers")
 				return ""
-		if SubStr(SlotId, 1, 10) = "ctrl_shift"
-				Suffix := SubStr(SlotId, 12)
-		else
-				Suffix := SubStr(SlotId, InStr(SlotId, "_") + 1)
-		; Slot-id spellings for keys whose canonical name is a character. The
-		; brace-wrapped AutoHotkey forms that used to live here moved to the adapter
-		static _SlotKeyNames := Map("period", ".", "comma", ",", "enter", "return")
-		Key := _SlotKeyNames.Has(Suffix) ? _SlotKeyNames[Suffix] : Suffix
-		Formatted := ChordFormat(Mods, Key)
+		Mods := []
+		; The chord vocabulary calls the Windows key "cmd" on every driver.
+		for Modifier in Native["modifiers"]
+				Mods.Push(Modifier == "win" ? "cmd" : Modifier)
+		Formatted := ChordFormat(Mods, SlotRoleChordKey(Native["key"]))
 		return Formatted["ok"] ? Formatted["label"] : ""
+}
+
+/**
+ * The keyboard slot domain of this build's input owner: the chord groups the
+ * tray offers (KEYBOARD_SLOT_GROUPS), the keys each group binds and the
+ * shipped manifest slots. A function, not a global, because the boot loader
+ * judges slots before this file's include position has run.
+ * @returns {Map} "groups" (slot prefixes) and "keys" (slot suffixes), in order.
+ */
+KeyboardSlotDeclaration() {
+		static Declaration := _KeyboardSlotBuildDeclaration()
+		return Declaration
+}
+
+_KeyboardSlotBuildDeclaration() {
+		Keys := []
+		for Entry in SlotRolesData()["keys"]
+				Keys.Push(Entry["id"])
+		return Map("groups", SlotRoleFamilyPrefixes(), "keys", Keys)
+}
+
+/**
+ * Resolves a physical Win slot (meta_SC03A, any letter case) to its canonical
+ * scan when the shipped physical key registry has that key.
+ * @param {String} Slot Persisted slot id.
+ * @returns {String} Canonical "SCnnn", or "" when Slot is no physical slot.
+ */
+KeyboardSlotPhysicalScan(Slot) {
+		if !(Slot is String) || !RegExMatch(Slot, "i)^meta_(SC[0-9a-f]{3})$", &Match)
+				return ""
+		Scan := StrUpper(Match[1])
+		for Key in MagicEditorPhysicalCatalogue()["keys"] {
+				if StrUpper(Key["ahk"]) == Scan
+						return Scan
+		}
+		return ""
+}
+
+; The exact ordinary slot ids, or 0 while the manifest is unavailable: without
+; its slots the set is incomplete and must judge nothing.
+_KeyboardSlotOrdinarySet() {
+		Manifest := ManifestFeaturesForSection(ConfigKey.SHORTCUTS_KEYBOARD)
+		if !(Manifest is Array) || Manifest.Length == 0
+				return 0
+		Slots := Map()
+		Slots.CaseSense := "On"
+		for Entry in Manifest
+				Slots[Entry["id"]] := true
+		Declaration := KeyboardSlotDeclaration()
+		for Prefix in Declaration["groups"] {
+				for Key in Declaration["keys"]
+						Slots[Prefix . Key] := true
+		}
+		return Slots
+}
+
+/**
+ * Whether the keyboard input owner binds this persisted slot. The boot loader,
+ * the unused-key cleanup and ReadKeyboardShortcutsConfig all ask this one
+ * rule, so a slot is either live and owned or unused and offered for cleanup.
+ * @param {String} Slot Persisted slot id (case-exact, physical slots aside).
+ * @returns {Boolean}
+ */
+KeyboardSlotIsCatalogued(Slot) {
+		if !(Slot is String) || Slot == ""
+				return false
+		if KeyboardSlotPhysicalScan(Slot) != ""
+				return true
+		Slots := _KeyboardSlotOrdinarySet()
+		return (Slots is Map) && Slots.Has(Slot)
+}
+
+/**
+ * The complete published slot inventory for parameter-binding judgment: the
+ * ordinary slots plus the canonical and lowercase spelling of every physical
+ * Win slot. Returns 0 while the manifest is unavailable (nothing is judged).
+ * @returns {Array|Integer}
+ */
+KeyboardSlotCatalogueIds() {
+		Slots := _KeyboardSlotOrdinarySet()
+		if !(Slots is Map)
+				return 0
+		for Key in MagicEditorPhysicalCatalogue()["keys"] {
+				Scan := StrUpper(Key["ahk"])
+				Slots["meta_" . Scan] := true
+				Slots["meta_" . StrLower(Scan)] := true
+		}
+		Ids := []
+		for Slot in Slots
+				Ids.Push(Slot)
+		return Ids
 }
 
 /**
@@ -1810,7 +2448,7 @@ CollectKeyboardShortcutUpdates(Updates, Assignments, Stored, Defaults) {
 	for Slot, Action in Assignments {
 		if Action == "none" && Defaults.Get(Slot, "none") == "none" && !Stored.Has(Slot)
 			continue
-		Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: Action })
+		Updates.Push({ Section: ConfigKey.SHORTCUTS_KEYBOARD, Key: Slot, Value: Action })
 	}
 }
 
@@ -1822,7 +2460,7 @@ ReadKeyboardShortcutsConfig() {
 		;
 		; The slot picker offers every modifier chord in GESTURE_ACTIONS — roughly
 		; 600 of them — while KEYBOARD_SHORTCUT_DEFAULTS holds 15. Iterating only
-		; the defaults meant a slot the user added (say win_b) was written to
+		; the defaults meant a slot the user added (say meta_b) was written to
 		; config.toml by SetKeyboardShortcutAction, and then never read back on the
 		; Reload that same function triggers: absent from KeyboardShortcutAssignments,
 		; so no hotkey is registered and the entry vanishes from the menu too. The
@@ -1831,13 +2469,21 @@ ReadKeyboardShortcutsConfig() {
 		SlotsToRead := Map()
 		for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS
 				SlotsToRead[Slot] := true
-		if IsSet(_IniCache) and _IniCache.Has("shortcuts.keyboard") {
-				for Slot, _ in _IniCache["shortcuts.keyboard"]
+		if IsSet(_IniCache) and _IniCache.Has(ConfigKey.SHORTCUTS_KEYBOARD) {
+				for Slot, _ in _IniCache[ConfigKey.SHORTCUTS_KEYBOARD]
 						SlotsToRead[Slot] := true
 		}
 
 		for Slot, _ in SlotsToRead {
-				Value := IniCacheGet(_IniCache, "shortcuts.keyboard", Slot)
+				; A slot this build's owner does not bind (a hand-written primary_f1, a
+				; case variant, an unknown physical key) is the unused key the boot
+				; loader already warned about: it stays on disk for the cleanup and
+				; must never become a live hotkey.
+				if !KEYBOARD_SHORTCUT_DEFAULTS.Has(Slot) && !KeyboardSlotIsCatalogued(Slot) {
+						try LoggerInfo("Shortcuts", "Keyboard slot '{1}' is not a slot of this build; it is left for the configuration cleanup.", Slot)
+						continue
+				}
+				Value := IniCacheGet(_IniCache, ConfigKey.SHORTCUTS_KEYBOARD, Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
 						KeyboardShortcutAssignments[Slot] := Value
 				else if (Value != "_")
@@ -1850,18 +2496,224 @@ ReadKeyboardShortcutsConfig() {
 		}
 }
 
+/**
+ * The physical key a slot's letter lives on when the layout owner decides it: a
+ * letter the Ergopti emulation remapped (the slot follows the letter, not the key
+ * the host layout prints on it), and the apostrophe, which a host layout may type
+ * with Shift while the chord means the key alone.
+ * @param {String} SlotId Neutral slot id.
+ * @returns {String} Canonical "SCnnn", or "" when the host layout answers.
+ */
+KeyboardSlotLayoutScan(SlotId) {
+		global RemappedList
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("key")
+				return ""
+		Char := SlotRoleChordKey(Native["key"])
+		if StrLen(Char) != 1 || !(RemappedList.Has(Char) || Char == "'")
+				return ""
+		return MagicEditorNormalizeScan(RetrieveScancode(Char))
+}
+
+/**
+ * The physical key a Win slot binds. A textual Win chord cannot be relied on:
+ * AutoHotkey registers it with RegisterHotKey when the chord is free, and when
+ * Windows holds it (Win+S, Win+E, Win+1, Win+Tab) falls back to its hook, which
+ * reads a key carrying any scan-code hotkey from the scan-code table. The layout
+ * tables give almost every key one, inert or not, so the textual variant never
+ * fired and Windows kept the chord. An exact #SCnnn variant is found in that table.
+ * A key already spelled by its scan (sc029, sc03a) or one the host layout does not
+ * have stays with its chord.
+ * @param {String} SlotId A meta_ slot id.
+ * @returns {String} Canonical "SCnnn", or "" when the chord itself must be bound.
+ */
+KeyboardSlotWinScan(SlotId) {
+		LayoutScan := KeyboardSlotLayoutScan(SlotId)
+		if LayoutScan != ""
+				return LayoutScan
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("key")
+				return ""
+		Key := SlotRoleChordKey(Native["key"])
+		if RegExMatch(Key, "i)^(?:sc|vk)[0-9a-f]")
+				return ""
+		Code := GetKeySC(Key)
+		return Code > 0 ? Format("SC{:03X}", Code) : ""
+}
+
+/**
+ * The canonical chord a slot binds: its key is the physical one where the layout
+ * owner decides it (KeyboardSlotLayoutScan).
+ * @param {String} SlotId Neutral slot id.
+ * @param {String} Scan The slot's layout scan, "" for none.
+ * @returns {String} The chord, or "" when the slot names no modifier.
+ */
+_KeyboardSlotBoundChord(SlotId, Scan) {
+		Chord := _KeyboardSlotChord(SlotId)
+		if Scan == "" || Chord == ""
+				return Chord
+		Parsed := ChordParse(Chord)
+		Formatted := ChordFormat(Parsed["mods"], StrLower(Scan))
+		return Formatted["ok"] ? Formatted["label"] : ""
+}
+
+/**
+ * Registers every configured slot. A Win slot binds its physical key
+ * (KeyboardSlotWinScan) and, on a key of the physical registry, joins the broker,
+ * which holds that Win variant for the remap of the same key too. A Ctrl or Alt slot
+ * on a remapped key shares the layout's own variant, which asks at each press; the
+ * others take their own hotkey through the registrar, which reports refusal by
+ * returning "".
+ * @returns {Integer} The slots bound.
+ */
+KeyboardShortcutsBindAll() {
+		global KeyboardShortcutAssignments
+		LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
+		Bound := 0
+		for Slot, Action in KeyboardShortcutAssignments {
+				if Slot == MagicEditorSlot()["id"]
+						continue
+				if MagicEditorRecordOrdinaryPhysical(Slot, Action)
+						continue
+				if Action == "none"
+						continue
+				IsWinSlot := SubStr(Slot, 1, 5) == "meta_"
+				Scan := IsWinSlot ? KeyboardSlotWinScan(Slot) : KeyboardSlotLayoutScan(Slot)
+				if Scan != "" && IsWinSlot && KeyboardSlotPhysicalScan("meta_" . Scan) != "" {
+						MagicEditorRecordOrdinaryScan(Scan, Slot, Action)
+						Bound++
+						continue
+				}
+				; The broker asks at each press; a native hotkey would swallow the chord
+				; with the Shortcuts category off, and turning it on reloads the driver.
+				if !IsCategoryGated("Shortcuts")
+						continue
+				Chord := _KeyboardSlotBoundChord(Slot, Scan)
+				if Chord == "" {
+						LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — chord not resolvable.", Slot)
+						continue
+				}
+				Variant := _KeyboardSlotLayoutVariant(Slot, Scan, Chord)
+				if Variant != "" {
+						_KeyboardShortcutLayoutChords()[Variant] := Slot
+						LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' shares the layout's {3}.", Slot, Action, Variant)
+						Bound++
+						continue
+				}
+				Handle := HotkeyRegistrarBind(Chord, ((_s) => (*) => RunKeyboardShortcutAction(_s))(Slot))
+				if Handle == "" {
+						LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}' ({2}).", Slot, Chord)
+						continue
+				}
+				LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", Slot, Action)
+				MagicEditorRecordOrdinaryHandle(Slot, Handle)
+				KeyboardShortcutRecordHandle(Slot, Action, Handle)
+				Bound++
+		}
+		LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", Bound)
+		return Bound
+}
+
+; The slots set on a Ctrl or Alt variant the layout owns, by native spec. A function,
+; not a global: the boot binds the slots before this file's include.
+; @returns {Map}
+_KeyboardShortcutLayoutChords() {
+		static Chords := Map()
+		return Chords
+}
+
+; The native variant of a slot's chord when RemapKey already registered it: the
+; registrar would refuse it as another producer's, and the slot would never fire.
+; @param Slot {String} The slot.
+; @param Scan {String} Its layout scan, "" when the host layout answers.
+; @param Chord {String} Its bound chord.
+; @returns {String} "^SCnnn" or "!SCnnn", or "" when the slot takes its own hotkey.
+_KeyboardSlotLayoutVariant(Slot, Scan, Chord) {
+		global RemappedList
+		if Scan == "" || !RemappedList.Has(SlotRoleChordKey(SlotRoleNative(Slot)["key"]))
+				return ""
+		Parsed := ChordParse(Chord)
+		Spec := HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"])
+		return RegExMatch(Spec, "^[\^!]SC[0-9A-F]{3}$") ? Spec : ""
+}
+
+; Runs the slot set on a layout variant. An unassigned slot and an AI action held
+; back leave the chord to the layout, as a released native hotkey would.
+; @param Variant {String} The native spec.
+; @returns {Boolean} True when a slot took the press.
+KeyboardShortcutRunLayoutChord(Variant) {
+		global KeyboardShortcutAssignments
+		Slot := _KeyboardShortcutLayoutChords().Get(Variant, "")
+		if Slot == ""
+				return false
+		Action := KeyboardShortcutAssignments.Get(Slot, "none")
+		if Action == "none" || AiActionBlocked(Action)
+				return false
+		RunKeyboardShortcutAction(Slot)
+		return true
+}
+
 RunKeyboardShortcutAction(SlotId) {
 		global KeyboardShortcutAssignments, GESTURE_ACTIONS
 		Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
 		if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
 				return
+		; Re-read at delivery: the switch may have turned off since the press.
+		if AiActionBlocked(Action) {
+				LoggerDebug("KeyboardShortcuts", "Slot '{1}' -> '{2}' held back: the AI is off.", SlotId, Action)
+				return
+		}
 		GestureInvokeAction(Action, GestureBindingId("keyboard", SlotId))
+}
+
+; The registrar handles of the keyboard slots bound to an AI action, by slot. A
+; function, not a global: the boot binds the slots before this file's include.
+; @returns {Map}
+_KeyboardShortcutAiHandles() {
+		static Handles := Map()
+		return Handles
+}
+
+; Retains the handle of a slot bound to an AI action, which follows the AI switch.
+; @param SlotId {String} The keyboard slot.
+; @param Action {String} Its action.
+; @param Handle {String} Its registrar handle.
+KeyboardShortcutRecordHandle(SlotId, Action, Handle) {
+		if AiActionIsAi(Action)
+				_KeyboardShortcutAiHandles()[SlotId] := Handle
+}
+
+; Follows the AI switch: the hotkeys bound to an AI action are released while the
+; AI is off, so the chord reaches the application, and armed again by the
+; switch-on with no reload. A native hotkey cannot ask at each press, unlike every
+; other key layer. A slot the physical Win broker took stays with it: the broker's
+; criterion asks at each press. A refusal is logged and the others still follow.
+; @param SetEnabledFn {Func} Test seam; HotkeyRegistrarSetEnabled by default.
+; @returns {Boolean} True when every handle holds the wanted state.
+KeyboardShortcutsFollowAiSwitch(SetEnabledFn := 0) {
+		global KeyboardShortcutAssignments
+		SetEnabled := HasMethod(SetEnabledFn, "Call") ? SetEnabledFn : HotkeyRegistrarSetEnabled
+		Settled := true
+		for SlotId, Handle in _KeyboardShortcutAiHandles() {
+				if MagicEditorOwnsOrdinarySlot(SlotId)
+						continue
+				Wanted := !AiActionBlocked(KeyboardShortcutAssignments.Get(SlotId, "none"))
+				Accepted := false
+				try Accepted := SetEnabled.Call(Handle, Wanted)
+				catch as Err
+						LoggerError("KeyboardShortcuts", "Slot '{1}' raised while following the AI switch: {2}.", SlotId, Err.Message)
+				if (Accepted == true)
+						continue
+				Settled := false
+				LoggerError("KeyboardShortcuts", "Slot '{1}' could not follow the AI switch (enabled={2}).", SlotId, Wanted ? "true" : "false")
+		}
+		return Settled
 }
 
 SetKeyboardShortcutAction(SlotId, ActionName) {
 		global KeyboardShortcutAssignments
 		if !GestureAssignConfiguredAction(&KeyboardShortcutAssignments,
-				"keyboard", "shortcuts.keyboard", SlotId, ActionName)
+				"keyboard", ConfigKey.SHORTCUTS_KEYBOARD, SlotId, ActionName)
 				return false
 		MagicEditorConfigurationChanged()
 		return ReloadPreservingSuspend()
@@ -1874,26 +2726,53 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
 _FormatSlotLabel(SlotId) {
 		if SlotId == MagicEditorSlot()["id"]
 				return MagicEditorSlotLabel()
-		static _ModLabels := Map("ctrl_shift_", "Ctrl + Shift + ", "ctrl_", "Ctrl + ", "win_", "Win + ", "alt_", "Alt + ")
-		; Only the two NAMED keys are translatable — ".", "," and "²" are the glyphs
-		; themselves. The map holds i18n KEYS, never labels: a static initialised with
-		; t() would freeze the language at first call, and the menu is rebuilt on a
-		; language switch expecting the new one.
-		static _KeyNameKeys := Map("space", "common.key_space", "enter", "common.key_enter")
-		static _KeyGlyphs := Map("period", ".", "comma", ",", "sc029", "²")
-		for Prefix, ModLabel in _ModLabels {
-				if (SubStr(SlotId, 1, StrLen(Prefix)) = Prefix) {
-						Suffix := SubStr(SlotId, StrLen(Prefix) + 1)
-						if _KeyNameKeys.Has(Suffix)
-								Key := t(_KeyNameKeys[Suffix])
-						else if _KeyGlyphs.Has(Suffix)
-								Key := _KeyGlyphs[Suffix]
-						else
-								Key := StrUpper(Suffix)
-						return ModLabel . Key
+		Native := SlotRoleNative(SlotId)
+		if !Native.Has("modifiers")
+				return SlotId
+		; A named key (Space, Caps Lock) and every modifier read as the shared key
+		; name table names them in the user's language (« Ctrl + Maj + V »); a
+		; letter, digit or sign prints the catalogue's own legend.
+		Suffix := Native["key"]
+		if (KeyNameCanonical(Suffix) != "") {
+				Key := KeyNameLabel(Suffix)
+		} else {
+				Key := StrUpper(Suffix)
+				for Entry in SlotRolesData()["keys"] {
+						if Entry["id"] == Suffix
+								Key := Entry["label"]
 				}
 		}
-		return SlotId
+		Label := ""
+		for Modifier in Native["modifiers"]
+				Label .= KeyNameLabel(Modifier) . " + "
+		return Label . Key
+}
+
+; The modifiers of one keyboard-slot group, named as its rows name them
+; (« Ctrl + Maj »), for the picker that adds a slot to the group.
+; @param Prefix {String} A group prefix of KEYBOARD_SLOT_GROUPS, e.g. "primary_shift_".
+; @returns {String}
+_KeyboardSlotFamilyLabel(Prefix) {
+		; Any key of the family carries its modifiers; "a" is in every slot domain.
+		Native := SlotRoleNative(Prefix . "a")
+		if !Native.Has("modifiers") || Native["modifiers"].Length == 0
+				throw ValueError("The keyboard-slot group names no modifier.", -1, Prefix)
+		Label := ""
+		for Modifier in Native["modifiers"]
+				Label .= (Label == "" ? "" : " + ") . KeyNameLabel(Modifier)
+		return Label
+}
+
+; The heading or the Add row of one keyboard-slot group: the contextual
+; group's own title, a modifier group's template filled with its modifiers
+; (« Raccourcis Ctrl + Maj », « [+ Ajouter un raccourci Win + …] »).
+; @param GroupInfo {Map} An entry of KEYBOARD_SLOT_GROUPS.
+; @param Field {String} "group_key" or "add_key".
+; @returns {String}
+_KeyboardSlotGroupText(GroupInfo, Field) {
+		if GroupInfo["prefix"] == "magic_"
+				return t(GroupInfo[Field])
+		return KeyNameFill(GroupInfo[Field], _KeyboardSlotFamilyLabel(GroupInfo["prefix"]))
 }
 
 ; The keyboard-shortcut groups, in display order. The i18n KEYS are stored, never
@@ -1902,9 +2781,9 @@ _FormatSlotLabel(SlotId) {
 global KEYBOARD_SLOT_GROUPS := [
 		Map("prefix", "magic_", "group_key", "menu.shortcuts.group_contextual", "add_key", "menu.shortcuts.add_contextual"),
 		Map("prefix", "alt_", "group_key", "menu.shortcuts.alt_group", "add_key", "menu.shortcuts.alt_add"),
-		Map("prefix", "ctrl_", "group_key", "menu.shortcuts.ctrl_group", "add_key", "menu.shortcuts.ctrl_add"),
-		Map("prefix", "ctrl_shift_", "group_key", "menu.shortcuts.ctrl_shift_group", "add_key", "menu.shortcuts.ctrl_shift_add"),
-		Map("prefix", "win_", "group_key", "menu.shortcuts.win_group", "add_key", "menu.shortcuts.win_add"),
+		Map("prefix", "primary_", "group_key", "menu.shortcuts.ctrl_group", "add_key", "menu.shortcuts.ctrl_add"),
+		Map("prefix", "primary_shift_", "group_key", "menu.shortcuts.ctrl_shift_group", "add_key", "menu.shortcuts.ctrl_shift_add"),
+		Map("prefix", "meta_", "group_key", "menu.shortcuts.win_group", "add_key", "menu.shortcuts.win_add"),
 ]
 
 /**
@@ -1923,39 +2802,114 @@ KeyboardSlotRows() {
 		Rows := []
 		for GroupInfo in KEYBOARD_SLOT_GROUPS {
 				Prefix := GroupInfo["prefix"]
-				Items := []
 				if Prefix == "magic_" {
 						Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", MagicEditorSlotRows()))
 						continue
 				}
+				; The group opens with its restore and clear, declared by
+				; keyboard_group_scope_controls like on the two other drivers.
+				Items := MenuRenderer_TemplateRows("keyboard_group_scope_controls", Map(
+						MenuCommand.SCOPE_RESTORE, _KeyboardSlotGroupScopeCommand.Bind(Prefix, "recommended"),
+						MenuCommand.SCOPE_CLEAR, _KeyboardSlotGroupScopeCommand.Bind(Prefix, "clear")),
+						Map("keyboard_group_ready", (*) => true), Map())
+				if !(Items is Array) || Items.Length != 3
+						throw Error("The keyboard group scope rows are not declared.")
 				for Slot, Action in KeyboardShortcutAssignments {
-						if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix)
-								continue
-						; A slot only belongs to the LONGEST prefix that matches it, or
-						; "ctrl_shift_v" would appear in the Ctrl group as well
-						IsExactPrefix := true
-						for OtherGroup in KEYBOARD_SLOT_GROUPS {
-								OtherPrefix := OtherGroup["prefix"]
-								if (OtherPrefix != Prefix and StrLen(OtherPrefix) > StrLen(Prefix) and SubStr(Slot, 1, StrLen(OtherPrefix)) == OtherPrefix) {
-										IsExactPrefix := false
-										break
-								}
-						}
-						if !IsExactPrefix or (Action == "none")
+						if KeyboardSlotGroupOf(Slot) != Prefix or (Action == "none")
 								continue
 						ActionLabel := GESTURE_ACTIONS.Has(Action) ? GestureActionDisplayLabel(Action, GestureBindingId("keyboard", Slot)) : Action
 						Items.Push(Map(
-								"label", _FormatSlotLabel(Slot) . " : " . ActionLabel,
+								"label", LabelValue(_FormatSlotLabel(Slot), ActionLabel),
 								"action", ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot)
 						))
 				}
 				Items.Push(Map(
-						"label", t(GroupInfo["add_key"]),
+						"label", _KeyboardSlotGroupText(GroupInfo, "add_key"),
 						"action", ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix)
 				))
-				Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", Items))
+				Rows.Push(Map("label", _KeyboardSlotGroupText(GroupInfo, "group_key"), "items", Items))
 		}
 		return Rows
+}
+
+/**
+ * The keyboard-slot group a slot is listed in: the LONGEST group prefix that
+ * matches it, or "primary_shift_v" would also belong to the Ctrl group. The tray
+ * and the group's restore and clear ask this one rule.
+ * @param {String} Slot Persisted slot id.
+ * @returns {String} The group prefix, or "" when no group lists the slot.
+ */
+KeyboardSlotGroupOf(Slot) {
+		global KEYBOARD_SLOT_GROUPS
+		Found := ""
+		for GroupInfo in KEYBOARD_SLOT_GROUPS {
+				Prefix := GroupInfo["prefix"]
+				if SubStr(Slot, 1, StrLen(Prefix)) == Prefix && StrLen(Prefix) > StrLen(Found)
+						Found := Prefix
+		}
+		return Found
+}
+
+; Whether one configuration row belongs to a modifier group: its slot, or an
+; action parameter of the binding that slot dispatches under.
+_KeyboardSlotGroupOwnsRow(Prefix, Row) {
+		if Row.Section == ConfigKey.SHORTCUTS_KEYBOARD
+				return KeyboardSlotGroupOf(Row.Key) == Prefix
+		BindingPrefix := GestureBindingId("keyboard", "")
+		if Row.Section != "action_parameters" || SubStr(Row.Key, 1, StrLen(BindingPrefix)) != BindingPrefix
+				return false
+		Rest := SubStr(Row.Key, StrLen(BindingPrefix) + 1)
+		Separator := InStr(Rest, "__")
+		return Separator > 1 && KeyboardSlotGroupOf(SubStr(Rest, 1, Separator - 1)) == Prefix
+}
+
+/**
+ * The rows that put one modifier group of the keyboard slots back to its
+ * preset ("recommended": each shipped slot of the group takes its recommended
+ * action and the slots the user added are removed) or empty it ("clear").
+ * They are the Shortcuts scope's own rows narrowed to the group, so the group
+ * restores exactly what the whole Shortcuts restore would.
+ * @param {String} Prefix A bindable group prefix of KEYBOARD_SLOT_GROUPS.
+ * @param {String} Mode "recommended" or "clear".
+ * @returns {Array} Sparse configuration rows.
+ */
+KeyboardSlotGroupScopeRows(Prefix, Mode) {
+		global KEYBOARD_SLOT_GROUPS
+		if !(Mode == "recommended" or Mode == "clear")
+				throw ValueError("Unknown keyboard group scope mode.", -1, Mode)
+		Bindable := false
+		for GroupInfo in KEYBOARD_SLOT_GROUPS
+				Bindable := Bindable || (GroupInfo["prefix"] == Prefix && Prefix != "magic_")
+		if !Bindable
+				throw ValueError("Unknown keyboard slot group.", -1, Prefix)
+		Owners := Map("action_parameter_domain", ConfigScopeActionParameterDomain)
+		Inventory := ManifestScopeInventory("shortcuts", Map("parameters", ConfigScopeActionParameterPaths), Owners)
+		Rows := []
+		for Row in ManifestScopePlan("shortcuts", Mode, Inventory, Owners).operations {
+				if _KeyboardSlotGroupOwnsRow(Prefix, Row)
+						Rows.Push(Row)
+		}
+		for Row in ConfigIOShortcutScopeOperations("shortcuts", Mode) {
+				if _KeyboardSlotGroupOwnsRow(Prefix, Row)
+						Rows.Push(Row)
+		}
+		return Rows
+}
+
+; Restores or clears one modifier group the way every scope row does: a
+; backup, one conditional write, then the reload that reads it (no question).
+; @param Prefix {String} The group prefix.
+; @param Mode {String} "recommended" or "clear".
+; @param Options {Map} Scope ports (path, reload...) for tests.
+; @return {Map} The scope receipt.
+KeyboardSlotGroupApplyScope(Prefix, Mode, Options := unset) {
+		return ConfigScopeCommitOperations("shortcuts", Mode, KeyboardSlotGroupScopeRows.Bind(Prefix, Mode),
+				IsSet(Options) ? Options : Map())
+}
+
+; Menu callback: the native menu arguments never reach the scope options.
+_KeyboardSlotGroupScopeCommand(Prefix, Mode, *) {
+		return KeyboardSlotGroupApplyScope(Prefix, Mode)
 }
 
 /**
@@ -1970,13 +2924,61 @@ ConfigIOShortcutScopeOperations(ScopeId, Mode) {
 		throw Error("Keyboard shortcut inventory is unavailable.")
 	Rows := []
 	for Slot in KeyboardShortcutAssignments {
-		if TomlConfigForeignOwner("shortcuts.keyboard", Slot) != "ConfigIO"
+		if TomlConfigForeignOwner(ConfigKey.SHORTCUTS_KEYBOARD, Slot) != "ConfigIO"
 			continue
 		if ManifestFindEntryByPath("shortcuts.keyboard." . Slot)
 			continue
-		Rows.Push({ Section: "shortcuts.keyboard", Key: Slot, Delete: true })
+		Rows.Push({ Section: ConfigKey.SHORTCUTS_KEYBOARD, Key: Slot, Delete: true })
 	}
 	for Row in KeyCombinationScopeRows()
 		Rows.Push(Row)
 	return Rows
+}
+
+
+; Generic data-file gateway paths do not claim configuration journal authority.
+; The selected configuration path has no permissive unconstructed-state fallback.
+_ConfigSchemaEntrySelected(Path) {
+	global ConfigurationFile
+	return IsSet(ConfigurationFile) && ConfigurationFile != ""
+		&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
+}
+
+_ConfigSchemaEntryAdmitted(Path) {
+	PerfCount("config_io.schema_entry_admitted")
+	return !_ConfigSchemaEntrySelected(Path) || ConfigSchemaCanPrepareWrite(Path)
+}
+
+
+; This query exposes only a Boolean. Durable-withdrawal rows stay private and
+; cannot be cleared by replacing a public cache/result/phase. A genuine fresh
+; driver process reconciles the persisted source during its ordinary boot. A
+; same-process mandatory request can settle only through the genuine default
+; full-save collector and strict native source-preserving acknowledgement.
+_ConfigPublicationHasRecoveryDebt(Path) {
+	return _ConfigCommitOwned(0, Path, 0, "", 0, 0, 0, 0, 0, false,
+		0, 0, 0, false, 0, "query_debt")
+}
+
+/** Settles only an actual source-preserving default full-save obligation. */
+_ConfigPublicationReconcileFullSave(Path, OwnerToken) {
+	return _ConfigCommitOwned(OwnerToken, Path, 0, "", 0, 0, 0, 0, 0, false,
+		0, 0, 0, false, 0, "reconcile_full_save")
+}
+
+/** Retains only genuine unresolved mandatory intent with private durable debt. */
+_ConfigFullSavePublicationDebtNeedsRetention() {
+	State := _ConfigFullSaveCoordinator()
+	ActualMandatoryDebt := _ConfigFullSaveRequest(true, , 0)
+	if !_ConfigFullSaveCoordinatorDataAdmitted(State)
+		return ActualMandatoryDebt
+	if ActualMandatoryDebt
+		return true
+	PreviousCritical := Critical("On")
+	try {
+		return State.terminal_required_generation > State.settled_generation
+			&& State.requested_generation > State.settled_generation
+			&& State.bound_path != "" && _ConfigSchemaEntrySelected(State.bound_path)
+			&& _ConfigPublicationHasRecoveryDebt(State.bound_path)
+	} finally Critical(PreviousCritical)
 }

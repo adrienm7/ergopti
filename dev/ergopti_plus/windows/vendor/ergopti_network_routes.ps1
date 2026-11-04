@@ -25,6 +25,27 @@ function New-ErgoptiRouteRefusal {
     return @{ Ok = $false; Routes = @(); Receipt = $Receipt }
 }
 
+# Closed lookup stage of a PAC or WPAD that could not be used; never route text.
+function Get-ErgoptiPacFailureStage {
+    param($Native)
+    if ($Native.Backend -ceq 'winhttp') { return 'native_wpad_discovery' }
+    if ($Native.FailureOrigin -ceq 'pac_download') { return 'native_pac_download' }
+    if ($Native.FailureOrigin -ceq 'application_budget') { return 'native_proxy_budget' }
+    if ($Native.Backend -ceq 'native_socket') { return 'native_pac_evaluation' }
+    return 'native_proxy_lookup'
+}
+
+# proxy_policy.json pac_unavailable_fallback owns which stages go direct. A PAC
+# that answered is a route decision and never reaches this: its list is followed,
+# and a relay it names that then fails is not retried direct.
+function New-ErgoptiPacDirectFallback {
+    param($Policy, [string]$Stage)
+    if ($Policy.pac_unavailable_fallback.route -cne 'direct' -or
+        $Policy.pac_unavailable_fallback.stages -cnotcontains $Stage) { return $null }
+    return @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops; PacFallbackStage = $Stage;
+        Routes = @(@{ Kind = 'direct'; Endpoint = ''; Source = 'pac_unavailable_direct'; Authentication = 'none' }) }
+}
+
 function Get-ErgoptiNetworkPolicy {
     param([Parameter(Mandatory=$true)][string]$Path)
     $Policy = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -37,7 +58,7 @@ function Get-ErgoptiNetworkPolicy {
     }
     foreach ($Inventory in @($Policy.allowed_proxy_schemes,
         $Policy.environment_precedence.http, $Policy.environment_precedence.https,
-        $Policy.environment_bypass_precedence,
+        $Policy.environment_bypass_precedence, $Policy.pac_unavailable_fallback.stages,
         $Policy.loopback.dns_hosts, $Policy.loopback.dns_suffixes,
         $Policy.loopback.ipv4_cidrs, $Policy.loopback.ipv6_addresses)) {
         if ($Inventory -isnot [array] -or $Inventory.Count -eq 0) { throw 'Invalid canonical proxy inventory.' }
@@ -120,6 +141,293 @@ function Get-ErgoptiHttpRelay {
         $Proxy.Port -lt 1 -or $Proxy.Port -gt 65535 -or $Proxy.Query -ne '' -or
         $Proxy.Fragment -ne '' -or $Proxy.AbsolutePath -ne '/') { throw 'Private relay capability was refused.' }
     return $Proxy.AbsoluteUri
+}
+
+# The owned loopback hop: what lets WinHTTP and HttpWebRequest, which reach a plain
+# http relay only, use an https relay, a socks5 relay or credentials in the address.
+# The client talks plain CONNECT to 127.0.0.1 in this same process; the hop speaks
+# the real relay's protocol, so the client's TLS to the origin stays end to end.
+# 1. It lives in this process and dies with it: a worker's request, nothing else.
+# 2. It answers only this process (the peer's owner is read from the TCP table): a
+#    credentialed relay must not become an open door for the machine.
+# 3. Credentials stay in this process's memory. No exception text, receipt or
+#    argument carries them; a refusal is one closed status line.
+# 4. An https relay is checked like any TLS peer, by the Windows trust store, and
+#    nothing in this file can widen that: a test's self-signed relay is trusted by
+#    a patched copy of this file in the test's own folder, never by a shipped input.
+$script:ErgoptiRelayHopTimeoutMs = 10000
+$script:ErgoptiRelayHops = @{}
+$script:ErgoptiRelayHopSource = @'
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Net;
+using System.Net.Security;
+using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Security.Authentication;
+using System.Text;
+using System.Threading;
+
+public sealed class ErgoptiRelayHop {
+    private const int HeadLimit = 16384;
+    private const int BufferBytes = 65536;
+    private const int TcpTableOwnerPidAll = 5;
+    private const int AddressFamilyIpv4 = 2;
+    private const uint LoopbackAddress = 0x0100007F;
+    private const string Refused = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    private const string NotAllowed = "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    private const string Established = "HTTP/1.1 200 Connection established\r\n\r\n";
+
+    private readonly string scheme, relayHost, user, password;
+    private readonly int relayPort, timeoutMs;
+    private TcpListener listener;
+
+    public int Port { get; private set; }
+
+    public ErgoptiRelayHop(string scheme, string relayHost, int relayPort, string user, string password, int timeoutMs) {
+        this.scheme = scheme; this.relayHost = relayHost; this.relayPort = relayPort;
+        this.user = user; this.password = password; this.timeoutMs = timeoutMs;
+    }
+
+    public void Start() {
+        listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        Thread accept = new Thread(AcceptLoop);
+        accept.IsBackground = true;
+        accept.Start();
+    }
+
+    private void AcceptLoop() {
+        while (true) {
+            TcpClient client;
+            try { client = listener.AcceptTcpClient(); } catch (SocketException) { return; } catch (ObjectDisposedException) { return; }
+            Thread serve = new Thread(() => Serve(client));
+            serve.IsBackground = true;
+            serve.Start();
+        }
+    }
+
+    [DllImport("iphlpapi.dll")]
+    private static extern uint GetExtendedTcpTable(IntPtr table, ref int size, bool sorted, int family, int tableClass, int reserved);
+
+    private static int NetworkPort(int value) { return ((value & 0xFF) << 8) | ((value >> 8) & 0xFF); }
+
+    // The row of the peer's own socket names the process that connected.
+    private bool PeerIsThisProcess(int peerPort) {
+        int size = 0;
+        GetExtendedTcpTable(IntPtr.Zero, ref size, false, AddressFamilyIpv4, TcpTableOwnerPidAll, 0);
+        IntPtr table = Marshal.AllocHGlobal(size);
+        try {
+            if (GetExtendedTcpTable(table, ref size, false, AddressFamilyIpv4, TcpTableOwnerPidAll, 0) != 0) return false;
+            int rows = Marshal.ReadInt32(table);
+            int self = Process.GetCurrentProcess().Id;
+            for (int row = 0; row < rows; row++) {
+                int offset = 4 + row * 24;
+                if ((uint)Marshal.ReadInt32(table, offset + 4) != LoopbackAddress) continue;
+                if (NetworkPort(Marshal.ReadInt32(table, offset + 8)) != peerPort) continue;
+                if (NetworkPort(Marshal.ReadInt32(table, offset + 16)) != Port) continue;
+                return Marshal.ReadInt32(table, offset + 20) == self;
+            }
+            return false;
+        } finally { Marshal.FreeHGlobal(table); }
+    }
+
+    private static void Write(Stream stream, string text) {
+        byte[] bytes = Encoding.ASCII.GetBytes(text);
+        stream.Write(bytes, 0, bytes.Length);
+    }
+
+    // One byte at a time: nothing after the head may be consumed.
+    private static string ReadHead(Stream stream) {
+        StringBuilder head = new StringBuilder();
+        while (head.Length < HeadLimit) {
+            int value = stream.ReadByte();
+            if (value < 0) return null;
+            head.Append((char)value);
+            int length = head.Length;
+            if (length >= 4 && head[length - 4] == '\r' && head[length - 3] == '\n' && head[length - 2] == '\r' && head[length - 1] == '\n')
+                return head.ToString();
+        }
+        return null;
+    }
+
+    private static void SplitAuthority(string authority, out string host, out int port) {
+        int colon = authority.LastIndexOf(':');
+        host = authority.Substring(0, colon).Trim('[', ']');
+        port = int.Parse(authority.Substring(colon + 1));
+    }
+
+    private bool ConnectThroughHttp(Stream stream, string authority) {
+        StringBuilder request = new StringBuilder("CONNECT " + authority + " HTTP/1.1\r\nHost: " + authority + "\r\n");
+        if (user != null) {
+            string token = Convert.ToBase64String(Encoding.UTF8.GetBytes(user + ":" + password));
+            request.Append("Proxy-Authorization: Basic " + token + "\r\n");
+        }
+        request.Append("\r\n");
+        Write(stream, request.ToString());
+        string head = ReadHead(stream);
+        return head != null && (head.StartsWith("HTTP/1.1 200") || head.StartsWith("HTTP/1.0 200"));
+    }
+
+    private static byte[] ReadExact(Stream stream, int count) {
+        byte[] data = new byte[count];
+        int done = 0;
+        while (done < count) {
+            int read = stream.Read(data, done, count - done);
+            if (read <= 0) throw new IOException("closed");
+            done += read;
+        }
+        return data;
+    }
+
+    private static void Send(Stream stream, byte[] data) { stream.Write(data, 0, data.Length); }
+
+    // RFC 1928 with the username method of RFC 1929.
+    private bool ConnectThroughSocks(Stream stream, string authority) {
+        Send(stream, user != null ? new byte[] { 5, 2, 0, 2 } : new byte[] { 5, 1, 0 });
+        byte[] chosen = ReadExact(stream, 2);
+        if (chosen[0] != 5) return false;
+        if (chosen[1] == 2) {
+            if (user == null) return false;
+            byte[] name = Encoding.UTF8.GetBytes(user), secret = Encoding.UTF8.GetBytes(password);
+            if (name.Length > 255 || secret.Length > 255) return false;
+            MemoryStream login = new MemoryStream();
+            login.WriteByte(1); login.WriteByte((byte)name.Length); login.Write(name, 0, name.Length);
+            login.WriteByte((byte)secret.Length); login.Write(secret, 0, secret.Length);
+            Send(stream, login.ToArray());
+            if (ReadExact(stream, 2)[1] != 0) return false;
+        } else if (chosen[1] != 0) return false;
+        string host; int port;
+        SplitAuthority(authority, out host, out port);
+        MemoryStream request = new MemoryStream();
+        request.WriteByte(5); request.WriteByte(1); request.WriteByte(0);
+        IPAddress address;
+        if (!IPAddress.TryParse(host, out address) && scheme != "socks5h") address = Dns.GetHostAddresses(host)[0];
+        if (address != null) {
+            byte[] raw = address.GetAddressBytes();
+            request.WriteByte(raw.Length == 4 ? (byte)1 : (byte)4);
+            request.Write(raw, 0, raw.Length);
+        } else {
+            byte[] name = Encoding.ASCII.GetBytes(host);
+            if (name.Length > 255) return false;
+            request.WriteByte(3); request.WriteByte((byte)name.Length); request.Write(name, 0, name.Length);
+        }
+        request.WriteByte((byte)(port >> 8)); request.WriteByte((byte)(port & 0xFF));
+        Send(stream, request.ToArray());
+        byte[] reply = ReadExact(stream, 4);
+        if (reply[0] != 5 || reply[1] != 0) return false;
+        if (reply[3] == 1) ReadExact(stream, 6);
+        else if (reply[3] == 4) ReadExact(stream, 18);
+        else if (reply[3] == 3) ReadExact(stream, ReadExact(stream, 1)[0] + 2);
+        else return false;
+        return true;
+    }
+
+    private Stream Dial(TcpClient relay, string authority) {
+        IAsyncResult connect = relay.BeginConnect(relayHost, relayPort, null, null);
+        if (!connect.AsyncWaitHandle.WaitOne(timeoutMs)) return null;
+        relay.EndConnect(connect);
+        relay.ReceiveTimeout = timeoutMs;
+        relay.SendTimeout = timeoutMs;
+        Stream stream = relay.GetStream();
+        if (scheme == "https") {
+            SslStream secure = new SslStream(stream, false);
+            secure.AuthenticateAsClient(relayHost, null, SslProtocols.Tls12, false);
+            stream = secure;
+        }
+        bool open = scheme.StartsWith("socks") ? ConnectThroughSocks(stream, authority) : ConnectThroughHttp(stream, authority);
+        if (!open) return null;
+        relay.ReceiveTimeout = 0;
+        relay.SendTimeout = 0;
+        return stream;
+    }
+
+    private static void Copy(Stream from, Stream to, TcpClient first, TcpClient second) {
+        byte[] buffer = new byte[BufferBytes];
+        try {
+            int read;
+            while ((read = from.Read(buffer, 0, buffer.Length)) > 0) { to.Write(buffer, 0, read); to.Flush(); }
+        } catch (IOException) { } catch (ObjectDisposedException) { }
+        first.Close();
+        second.Close();
+    }
+
+    private void Serve(TcpClient client) {
+        TcpClient relay = new TcpClient();
+        try {
+            if (!PeerIsThisProcess(((IPEndPoint)client.Client.RemoteEndPoint).Port)) return;
+            client.ReceiveTimeout = timeoutMs;
+            client.SendTimeout = timeoutMs;
+            NetworkStream local = client.GetStream();
+            string head = ReadHead(local);
+            if (head == null) return;
+            string[] line = head.Substring(0, head.IndexOf("\r\n", StringComparison.Ordinal)).Split(' ');
+            if (line.Length != 3) { Write(local, NotAllowed); return; }
+            string authority, replay = null;
+            if (line[0] == "CONNECT") {
+                authority = line[1];
+            } else if (line[1].StartsWith("http://", StringComparison.OrdinalIgnoreCase)) {
+                // A plain http destination: the tunnel carries the request in origin form.
+                Uri target = new Uri(line[1]);
+                authority = target.Authority.Contains(":") ? target.Authority : target.Authority + ":80";
+                replay = line[0] + " " + target.PathAndQuery + " " + line[2] + head.Substring(head.IndexOf("\r\n", StringComparison.Ordinal));
+            } else { Write(local, NotAllowed); return; }
+            if (authority.LastIndexOf(':') < 1) { Write(local, Refused); return; }
+            Stream remote = Dial(relay, authority);
+            if (remote == null) { Write(local, Refused); return; }
+            if (replay == null) Write(local, Established); else Write(remote, replay);
+            client.ReceiveTimeout = 0;
+            client.SendTimeout = 0;
+            Thread upstream = new Thread(() => Copy(local, remote, client, relay));
+            upstream.IsBackground = true;
+            upstream.Start();
+            Copy(remote, local, client, relay);
+        } catch (Exception) {
+            // The client sees a closed connection. Exception text may name the relay.
+            try { Write(client.GetStream(), Refused); } catch (Exception) { }
+        } finally {
+            client.Close();
+            relay.Close();
+        }
+    }
+}
+'@
+
+# Reads one override relay: the grammar of route_plan.lua. Returns $null for
+# anything else; never an exception, whose text could quote a credential.
+function Get-ErgoptiRelayParts {
+    param([string]$Relay)
+    if ($Relay -cnotmatch '^(https?|socks5h?)://(?:([^@/\s]+)@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9._\-]+):([0-9]{1,5})\z') { return $null }
+    $Parts = @{ Scheme = $Matches[1]; Host = $Matches[3].Trim('[', ']'); Port = [int]$Matches[4]; User = $null; Password = '' }
+    $UserInfo = $Matches[2]
+    if ($Parts.Port -lt 1 -or $Parts.Port -gt 65535) { return $null }
+    if ($null -ne $UserInfo) {
+        $Colon = $UserInfo.IndexOf(':')
+        $Name = if ($Colon -lt 0) { $UserInfo } else { $UserInfo.Substring(0, $Colon) }
+        $Parts.User = [Uri]::UnescapeDataString($Name)
+        if ($Colon -ge 0) { $Parts.Password = [Uri]::UnescapeDataString($UserInfo.Substring($Colon + 1)) }
+    }
+    return $Parts
+}
+
+# The address the clients of this process use for one relay: the relay itself when
+# they can reach it, else the loopback hop, started once. Returns the normalized
+# relay URI, or throws a text that quotes nothing.
+function Resolve-ErgoptiRelayEndpoint {
+    param([string]$Relay, $Policy)
+    $Parts = Get-ErgoptiRelayParts $Relay
+    if ($null -eq $Parts) { throw 'The relay was refused.' }
+    if ($Parts.Scheme -ceq 'http' -and $null -eq $Parts.User) { return (Get-ErgoptiHttpRelay $Relay $Policy) }
+    if (-not $script:ErgoptiRelayHops.ContainsKey($Relay)) {
+        if (-not ('ErgoptiRelayHop' -as [type])) { Add-Type -TypeDefinition $script:ErgoptiRelayHopSource -ErrorAction Stop }
+        $Hop = [ErgoptiRelayHop]::new($Parts.Scheme, $Parts.Host, $Parts.Port, $Parts.User, $Parts.Password,
+            $script:ErgoptiRelayHopTimeoutMs)
+        $Hop.Start()
+        $script:ErgoptiRelayHops[$Relay] = $Hop
+    }
+    return ('http://127.0.0.1:' + $script:ErgoptiRelayHops[$Relay].Port + '/')
 }
 
 function Test-ErgoptiEnvironmentBypass {
@@ -228,6 +536,22 @@ function Resolve-ErgoptiNativeNetworkRoutes {
             return @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops; Routes = @(@{ Kind = 'direct'; Endpoint = ''; Source = 'loopback'; Authentication = 'none' }) }
         }
         if ($null -eq $ReadEnvironment) { $ReadEnvironment = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') } }
+        # The user's proxy override: the driver sets it on this worker's own environment
+        # (adapters/proxy_override.ahk). It wins over an exported relay and the PAC or
+        # WPAD lookup never runs.
+        $Override = & $ReadEnvironment 'ERGOPTI_PROXY_OVERRIDE'
+        if ($Override -is [string] -and $Override -ne '') {
+            if ($Override -ceq 'direct') {
+                return @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops; Routes = @(@{ Kind = 'direct'; Endpoint = ''; Source = 'override'; Authentication = 'none' }) }
+            }
+            # Anything but a relay, the refused token included, refuses the download
+            # and is never read as automatic. Relay names the real relay for a client
+            # that reads it from its environment (the daemon); Endpoint is what this
+            # process's own WinHTTP and HttpWebRequest clients can reach.
+            if ($null -eq (Get-ErgoptiRelayParts $Override)) { return New-ErgoptiRouteRefusal 'dotnet' 'invalid_configuration' 0 $true }
+            return @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops; Routes = @(@{ Kind = 'proxy';
+                Endpoint = (Resolve-ErgoptiRelayEndpoint $Override $Policy); Relay = $Override; Source = 'override'; Authentication = 'current_user_proxy_only' }) }
+        }
         foreach ($Name in $Policy.environment_precedence.($Destination.Scheme)) {
             $Value = & $ReadEnvironment $Name
             if ($null -ne $Value -and $Value -isnot [string]) { return New-ErgoptiRouteRefusal 'dotnet' 'invalid_configuration' }
@@ -263,7 +587,10 @@ function Resolve-ErgoptiNativeNetworkRoutes {
             } else {
                 if ($Config.PacUrl -ne '') { $null = Get-ErgoptiDestination $Config.PacUrl }
                 $Remaining = [int][Math]::Min($LookupBudget, $BudgetMs - $Clock.ElapsedMilliseconds)
-                if ($Remaining -lt 1500) { return New-ErgoptiRouteRefusal }
+                if ($Remaining -lt 1500) {
+                    $Fallback = New-ErgoptiPacDirectFallback $Policy 'native_proxy_budget'
+                    return $(if ($null -ne $Fallback) { $Fallback } else { New-ErgoptiRouteRefusal })
+                }
                 $Native = Resolve-ErgoptiFullUrlPac -DestinationUrl $DestinationUrl -PacUrl $Config.PacUrl -AutoDetect $Config.AutoDetect `
                     -Deadline ([ErgoptiNetworkPac]::CurrentTick() + $Remaining) -Policy $Policy
                 if (-not $Native.OwnersRetired) {
@@ -276,6 +603,8 @@ function Resolve-ErgoptiNativeNetworkRoutes {
                     $Config.PacUrl -eq '' -and $Config.AutoDetect) {
                     $Routes = Get-ErgoptiStaticRoutes $Destination $Config $Policy 'wpad_absent'
                 } elseif (-not $Native.Ok -or $Native.Kind -cne 'pac_routes') {
+                    $Fallback = New-ErgoptiPacDirectFallback $Policy (Get-ErgoptiPacFailureStage $Native)
+                    if ($null -ne $Fallback) { return $Fallback }
                     $Status = if ($Config.PacUrl -ne '') { 'pac_failed' } else { 'wpad_failed' }
                     return New-ErgoptiRouteRefusal $Native.Backend $Status $Native.NativeError ($Native.FailureOrigin -ceq 'native') $(if($Native.NativeErrorDomain -cin @('win32','winsock','posix')){$Native.NativeErrorDomain}else{'win32'})
                 } else {

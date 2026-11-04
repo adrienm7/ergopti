@@ -24,6 +24,10 @@ local Paths      = require("infra.paths")
 local Timings    = require("infra.timings")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TextContinuation = require("modules.shortcuts.actions.text_continuation")
+local TextDispatch = require("modules.shortcuts.actions.text_dispatch")
+local TransformGrace = require("modules.shortcuts.actions.text_transform_grace")
+local TableUtil = require("table_util")
 
 local LOG = "shortcuts.actions.text"
 
@@ -257,6 +261,57 @@ local function schedule_text_timer(owner, delay, label, callback, completion)
 	return true, nil, entry
 end
 
+--- Reads native pasteboard generation without entering a diagnostic boundary.
+--- @return integer|nil count
+local function text_clipboard_count()
+	local ok, count = pcall(function() return pasteboard.changeCount() end)
+	if not ok or math.type(count) ~= "integer" or count < 0 then return nil end
+	return count
+end
+
+--- Mutates and captures generation before any diagnostic or owner continuation.
+--- @param owner table Exact clipboard mutation owner.
+--- @param mutation function Native write or restore primitive.
+--- @param ... any Native arguments, preserving the void clear arity.
+--- @return boolean ok
+--- @return any result
+local function mutate_owned_clipboard(owner, mutation, ...)
+	local ok, result = pcall(mutation, ...)
+	owner.clipboard_count = text_clipboard_count()
+	if not ok then return false, result end
+	if owner.clipboard_count == nil then return false, "native clipboard generation unavailable after mutation" end
+	return true, result
+end
+
+--- Joins a clipboard generation with an existing business publication receipt.
+--- The native count is the last full probe; cached validation remains RAM-only.
+--- @param owner table Exact Text owner.
+--- @param current function|nil Existing full business authority.
+--- @param cached function|nil Existing RAM-only business authority.
+--- @return table publication
+local function clipboard_publication(owner, current, cached)
+	local expected_count = owner.clipboard_count
+	local function retained()
+		return text_owner_authorized(owner) and owner.clipboard_owned == true
+			and owner.clipboard_count == expected_count and (cached == nil or cached() == true)
+	end
+	return {
+		cached = retained,
+		current = function()
+			if not retained() then return false end
+			owner.mutations = owner.mutations + 1
+			local ok, allowed = pcall(function()
+				if current and current() ~= true then return false end
+				if not retained() then return false end
+				local count = text_clipboard_count()
+				return count ~= nil and count == expected_count and retained()
+			end)
+			owner.mutations = owner.mutations - 1
+			return ok and allowed == true
+		end,
+	}
+end
+
 --- Restores an exact all-type snapshot. clearContents has no success return in
 --- Hammerspoon; a non-throw is its complete contract.
 --- @param owner table Text owner.
@@ -264,13 +319,40 @@ end
 --- @return any detail
 local function restore_text_clipboard(owner)
 	if owner.clipboard_owned ~= true then return true, nil end
+	if (owner.kind == "transform" or owner.kind == "plain") and (owner.synthetic_pending == true
+		or (owner.transform_restore_after or 0) > TimerScheduler.awake_time()) then
+		return false, "native transform paste grace is pending"
+	end
 	owner.mutations = owner.mutations + 1
+	if owner.kind == "plain" or owner.clipboard_guarded == true then
+		local count = text_clipboard_count()
+		if owner.clipboard_count == nil or count == nil then
+			owner.mutations = owner.mutations - 1
+			return false, "native clipboard generation unavailable; snapshot retained"
+		end
+		if count ~= owner.clipboard_count then
+			owner.clipboard_owned = false
+			-- A new native generation revokes this snapshot, including identical text.
+			-- Keep the mutation fence through diagnostics so no successor can be adopted.
+			pcall(Logger.info, LOG, "Text clipboard ownership changed for %s; snapshot revoked.", owner.kind)
+			owner.mutations = owner.mutations - 1
+			return true, "clipboard ownership revoked"
+		end
+	end
 	local restore_ok, restore_result
 	if type(owner.clipboard_prior) == "table" and next(owner.clipboard_prior) ~= nil then
-		restore_ok, restore_result = pcall(pasteboard.writeAllData, owner.clipboard_prior)
+		if owner.kind == "plain" or owner.clipboard_guarded == true then
+			restore_ok, restore_result = mutate_owned_clipboard(owner, pasteboard.writeAllData, owner.clipboard_prior)
+		else
+			restore_ok, restore_result = pcall(pasteboard.writeAllData, owner.clipboard_prior)
+		end
 		restore_ok = restore_ok and restore_result == true
 	else
-		restore_ok, restore_result = pcall(pasteboard.clearContents)
+		if owner.kind == "plain" or owner.clipboard_guarded == true then
+			restore_ok, restore_result = mutate_owned_clipboard(owner, pasteboard.clearContents)
+		else
+			restore_ok, restore_result = pcall(pasteboard.clearContents)
+		end
 	end
 	owner.mutations = owner.mutations - 1
 	if restore_ok then
@@ -388,6 +470,47 @@ local function call_text_boundary(owner, fn, ...)
 	owner.mutations = owner.mutations - 1
 	if not text_owner_authorized(owner) then return false, "text admission was revoked" end
 	return table.unpack(results, 1, results.n)
+end
+
+--- Captures one native clipboard generation across every snapshot read.
+--- @param owner table Text owner.
+--- @param include_plain boolean Also capture the plain text representation.
+--- @return boolean accepted
+--- @return table|string|nil snapshot Saved types, or refusal detail.
+--- @return string|nil plain Plain text when requested.
+--- @return integer|nil count Exact captured native generation.
+local function capture_text_clipboard(owner, include_plain)
+	local before_ok, before = call_text_boundary(owner, text_clipboard_count)
+	if not before_ok or before == nil then
+		return false, "native clipboard generation unavailable before snapshot"
+	end
+	local snapshot_ok, snapshot = call_text_boundary(owner, pasteboard.readAllData)
+	if not snapshot_ok or (snapshot ~= nil and type(snapshot) ~= "table") then
+		return false, snapshot_ok and "readAllData returned " .. type(snapshot) or snapshot
+	end
+	local plain = nil
+	if include_plain then
+		local plain_ok
+		plain_ok, plain = call_text_boundary(owner, pasteboard.getContents)
+		if not plain_ok then return false, plain end
+	end
+	local after_ok, after = call_text_boundary(owner, text_clipboard_count)
+	if not after_ok or after == nil then
+		return false, "native clipboard generation unavailable after snapshot"
+	end
+	if after ~= before then return false, "clipboard changed during snapshot capture" end
+	return true, snapshot, plain, before
+end
+
+--- Refuses a first mutation after the captured native clipboard changed owner.
+--- The enclosing boundary retains cleanup authority if a count read reenters PAUSE.
+--- @param owner table Text owner.
+--- @param expected_count integer Captured native generation.
+local function admit_initial_clipboard_mutation(owner, expected_count)
+	local count = text_clipboard_count()
+	assert(text_owner_authorized(owner), "text admission was revoked before clipboard mutation")
+	assert(count ~= nil, "native clipboard generation unavailable before clipboard mutation")
+	assert(count == expected_count, "clipboard changed before its first owned mutation")
 end
 
 --- Fences and joins every text owner for the Bindings lifecycle.
@@ -557,8 +680,7 @@ end
 -- from. Kept permanently — cheap (fires once) and invaluable when wrapping
 -- mysteriously stops in a given deployment.
 do
-	local key_count = 0
-	for _ in pairs(WRAP_PAIRS) do key_count = key_count + 1 end
+	local key_count = TableUtil.count(WRAP_PAIRS)
 	if key_count == 0 then
 		Logger.error(LOG, "Wrap catalogue is EMPTY — selection wrapping is disabled. Catalogue path/parse failed.")
 	else
@@ -672,34 +794,20 @@ local _transform_generation = 0
 --- @param count integer Number of preceding characters to select.
 --- @param owner table Transform owner.
 --- @return boolean dispatched
-local function reselect_previous_text(count, owner)
+local function reselect_previous_text(count, owner, tx)
 	if type(count) ~= "number" or count < 1 then return true end
 	if not text_owner_authorized(owner) then return false end
-	local tx = nil
-	owner.mutations = owner.mutations + 1
-	local ok, err = xpcall(function()
-		tx = SyntheticInput.begin("shortcuts.text.reselect", "action")
-		local batch = SyntheticInput.begin_batch(tx)
-		for _ = 1, count do
-			assert(SyntheticInput.keyStroke(batch, {}, "left") == true,
-				"synthetic left reselection stroke was refused")
-		end
-		for _ = 1, count do
-			assert(SyntheticInput.keyStroke(batch, { "shift" }, "right") == true,
-				"synthetic right reselection stroke was refused")
-		end
-		assert(text_owner_authorized(owner),
-			"text admission was revoked during reselection build")
-		assert(SyntheticInput.dispatch(batch) == true,
-			"synthetic reselection batch could not be dispatched")
-		assert(SyntheticInput.seal(tx) == true,
-			"synthetic reselection transaction could not be sealed")
-	end, debug.traceback)
-	owner.mutations = owner.mutations - 1
-	if ok and text_owner_authorized(owner) then return true end
-	if tx then pcall(SyntheticInput.cancel, tx) end
-	Logger.error(LOG, "Text reselection could not be dispatched - %s.", tostring(err))
-	return false
+	local batch = SyntheticInput.begin_batch(tx)
+	for _ = 1, count do
+		assert(SyntheticInput.keyStroke(batch, {}, "left") == true,
+			"synthetic left reselection stroke was refused")
+	end
+	for _ = 1, count do
+		assert(SyntheticInput.keyStroke(batch, { "shift" }, "right") == true,
+			"synthetic right reselection stroke was refused")
+	end
+	assert(text_owner_authorized(owner), "text admission was revoked during reselection build")
+	return SyntheticInput.dispatch(batch) == true
 end
 
 --- The transform callback may return false to decline: nothing is pasted, the
@@ -709,8 +817,11 @@ end
 --- @param parent string|nil Stable action parent.
 --- @param on_declined function|nil Runs after a decline released the clipboard.
 --- @param on_empty function|nil Runs after an empty selection released the clipboard.
+--- @param continuation_check function|table|nil Refuses delayed business work when it no longer returns true.
 --- @return boolean started
-local function do_transform(transform_func, parent, on_declined, on_empty)
+local function do_transform(transform_func, parent, on_declined, on_empty, continuation_check)
+	local continuation_current, continuation_cached = TextContinuation.new(continuation_check)
+	if not continuation_current() then return false end
 	local scope = text_scope(parent)
 	if scope.paused == true then return false end
 	if _transform_in_flight then
@@ -751,20 +862,25 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 	end
 
 	Logger.trace(LOG, "Text transformation started…")
-	local ok_snapshot, prior = call_text_boundary(owner, pasteboard.readAllData)
-	if not ok_snapshot or (prior ~= nil and type(prior) ~= "table") then
+	local ok_snapshot, prior, _, initial_count = capture_text_clipboard(owner, false)
+	if not ok_snapshot then
 		release()
 		Logger.error(LOG, "Text transform clipboard snapshot failed: %s.", tostring(prior))
 		return false
 	end
-	owns_clipboard = true
 	owner.clipboard_prior = prior or {}
-	owner.clipboard_owned = true
 
 	local restore_prior
 	local queue_restore_retry
 	local abort_transform
-	owner.on_timer_settled = function()
+	local continue_transform
+	owner.on_timer_settled = function(_, entry)
+		local was_grace = owner.transform_grace_entry == entry
+		if was_grace then owner.transform_grace_entry = nil end
+		if owner.business_open ~= true then
+			if was_grace or owner.transform_restore_after ~= nil then settle_text_owner(owner) end
+			return
+		end
 		if owner.cleanup_waiting == true and owner.cleanup_settling ~= true
 			and owner.cleanup_only == true and owns_clipboard
 			and scope.paused ~= true and scope.slots.transform == owner then
@@ -787,6 +903,7 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 		return schedule_text_timer(owner, delay, "Text transform " .. label, function()
 			if not active or my_generation ~= _transform_generation then return end
 			if owner.cleanup_only == true and cleanup ~= true then return end
+			if cleanup ~= true and not continue_transform() then return end
 			local ok_callback, callback_error = xpcall(callback, debug.traceback)
 			if not ok_callback then
 				Logger.error(LOG, "Text transform %s callback failed: %s.",
@@ -855,13 +972,78 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 		return false
 	end
 
+	-- Refusal ends business work, while clipboard retries keep their exact owner.
+	continue_transform = function()
+		if continuation_current() then return true end
+		local restored = restore_prior()
+		if restored then release() else queue_restore_retry() end
+		Logger.info(LOG, "Text transform stopped: its continuation is no longer current.")
+		return false
+	end
+
+	local function guarded_boundary(fn, ...)
+		if not continue_transform() then return false, "text continuation was revoked" end
+		local result = table.pack(call_text_boundary(owner, fn, ...))
+		if not continue_transform() then return false, "text continuation was revoked" end
+		return table.unpack(result, 1, result.n)
+	end
+
 	abort_transform = function(reason, detail)
-		if not active or my_generation ~= _transform_generation then return false end
+		if not active or my_generation ~= _transform_generation or owner.cleanup_only == true then return false end
 		local restored, restore_error = restore_prior()
 		if restored then release() else queue_restore_retry() end
 		Logger.error(LOG, "Text transform aborted at %s: %s (restore=%s).",
 			reason, tostring(detail), tostring(restore_error))
 		return false
+	end
+
+	local publication = {
+		current = function() return text_owner_authorized(owner) and continuation_current() end,
+		cached = function()
+			return text_owner_authorized(owner) and (continuation_cached == nil or continuation_cached())
+		end,
+	}
+	TransformGrace.install(owner, {
+		cancel = function(entry) return cancel_text_timer(owner, entry) end,
+		cancel_native = SyntheticInput.cancel,
+		now = TimerScheduler.awake_time,
+		schedule = function(delay, callback)
+			return schedule_text_timer(owner, delay, "Transform paste grace cleanup", callback, true)
+		end,
+		settle = function() return settle_text_owner(owner) end,
+	})
+	local function dispatch_stage(build, delay, label, next_stage, paste)
+		if not continue_transform() then return false end
+		local stage_publication = paste
+			and clipboard_publication(owner, publication.current, publication.cached) or publication
+		local started, detail = TextDispatch.start(SyntheticInput, owner, stage_publication, function(tx)
+			if paste then
+				SyntheticInput.on_dispatched(tx, function(finished, batch)
+					if owner.synthetic_tx == finished and batch.native_down_attempted == true then
+						owner.transform_down_attempted = true
+					end
+				end)
+			end
+			return build(tx)
+		end, function(status, handed_off)
+			if paste and (status == "complete" or handed_off == true or owner.transform_down_attempted) then
+				owner.transform_restore_after = TimerScheduler.awake_time() + RESTORE_DELAY_SEC
+			end
+			if not active or my_generation ~= _transform_generation or not text_owner_authorized(owner) then
+				settle_text_owner(owner)
+				return
+			end
+			if not continue_transform() then return end
+			if status ~= "complete" then
+				abort_transform(label .. " dispatch", status)
+				return
+			end
+			local armed, timer_error = schedule_transform_timer(delay, label, next_stage)
+			if not armed then abort_transform(label .. " timer", timer_error) end
+		end, paste)
+		if not started then abort_transform(label .. " dispatch", detail) end
+		if not text_owner_authorized(owner) then settle_text_owner(owner) end
+		return started
 	end
 
 	local copy_stage
@@ -880,7 +1062,7 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 			Logger.info(LOG, "%s", message)
 			return true
 		end
-		local ok_selection, selection = call_text_boundary(owner, pasteboard.getContents)
+		local ok_selection, selection = guarded_boundary(pasteboard.getContents)
 		if not ok_selection or (selection ~= nil and type(selection) ~= "string") then
 			abort_transform("selection copy", selection)
 			return
@@ -897,7 +1079,7 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 			end
 			return
 		end
-		local ok_transform, transformed = call_text_boundary(owner, transform_func, selection)
+		local ok_transform, transformed = guarded_boundary(transform_func, selection)
 		if ok_transform and transformed == false then
 			if end_without_paste("Text transform declined by its action: nothing pasted.")
 				and type(on_declined) == "function" then
@@ -913,44 +1095,27 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 			return
 		end
 
-		local paste_stage
-		paste_stage = function()
-			local reselect_stage
-			reselect_stage = function()
-				local restore_armed, restore_timer_error = schedule_transform_timer(
-					RESTORE_DELAY_SEC, "clipboard restore", function()
-						local restored, restore_error = restore_prior()
-						if restored then
-							release()
-							Logger.done(LOG, "Text transformation completed.")
-						else
-							Logger.error(LOG, "Text transform clipboard restore refused: %s.",
-								tostring(restore_error))
-							queue_restore_retry()
-						end
-					end)
-				if not restore_armed then
-					abort_transform("restore timer", restore_timer_error)
-					return
-				end
-				local steps_ok, steps = pcall(cursor_steps, transformed)
-				local count = (steps_ok and steps > 0) and steps or #transformed
-				if count > MAX_RESELECT_CHARS then count = MAX_RESELECT_CHARS end
-				if count > 0 and not reselect_previous_text(count, owner) then
-					abort_transform("text reselection", "synthetic dispatch refused")
-				end
+		local function restore_stage()
+			local restored, restore_error = restore_prior()
+			if restored then
+				release()
+				Logger.done(LOG, "Text transformation completed.")
+			else
+				Logger.error(LOG, "Text transform clipboard restore refused: %s.", tostring(restore_error))
+				queue_restore_retry()
 			end
-			local reselect_armed, reselect_timer_error = schedule_transform_timer(
-				RESELECT_DELAY_SEC, "reselection", reselect_stage)
-			if not reselect_armed then
-				abort_transform("reselection timer", reselect_timer_error)
-				return
-			end
-			local ok_paste, pasted = call_text_boundary(owner,
-				SyntheticInput.emit_key_stroke, { "cmd" }, "v", 0.02)
-			if not ok_paste or pasted ~= true then
-				abort_transform("paste shortcut", pasted)
-			end
+		end
+		local function reselect_stage()
+			local steps_ok, steps = pcall(cursor_steps, transformed)
+			local count = (steps_ok and steps > 0) and steps or #transformed
+			if count > MAX_RESELECT_CHARS then count = MAX_RESELECT_CHARS end
+			dispatch_stage(function(tx) return reselect_previous_text(count, owner, tx) end,
+				RESTORE_DELAY_SEC, "clipboard restore", restore_stage)
+		end
+		local function paste_stage()
+			dispatch_stage(function(tx)
+				return SyntheticInput.emit_guarded_key_stroke({ "cmd" }, "v", tx)
+			end, RESELECT_DELAY_SEC, "reselection", reselect_stage, true)
 		end
 
 		local paste_armed, paste_timer_error = schedule_transform_timer(
@@ -959,8 +1124,14 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 			abort_transform("paste timer", paste_timer_error)
 			return
 		end
-		local ok_write, write_result = call_text_boundary(
-			owner, pasteboard.setContents, transformed)
+		local ok_write, write_result = guarded_boundary(function()
+			-- The earlier asynchronous Cmd+C has no observable writer identity.
+			-- This receipt starts only with the payload mutation made by this owner.
+			owner.clipboard_guarded = true
+			local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, transformed)
+			if not ok then error(result, 0) end
+			return result
+		end)
 		if not ok_write or write_result ~= true then
 			abort_transform("clipboard write", write_result)
 		end
@@ -975,25 +1146,19 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 		Logger.error(LOG, "Text transform failsafe timer was refused: %s.", tostring(failsafe_error))
 		return false
 	end
-	local copy_armed, copy_timer_error = schedule_transform_timer(
-		COPY_SETTLE_SEC, "selection copy", copy_stage)
-	if not copy_armed then
-		abort_transform("copy timer", copy_timer_error)
-		return false
-	end
-
-	local ok_clear, clear_error = call_text_boundary(owner, pasteboard.clearContents)
+	local ok_clear, clear_error = guarded_boundary(function()
+		admit_initial_clipboard_mutation(owner, initial_count)
+		owns_clipboard = true
+		owner.clipboard_owned = true
+		return pasteboard.clearContents()
+	end)
 	if not ok_clear then
 		abort_transform("clipboard clear", clear_error)
 		return false
 	end
-	local ok_copy, copied = call_text_boundary(owner,
-		SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
-	if not ok_copy or copied ~= true then
-		abort_transform("copy shortcut", copied)
-		return false
-	end
-	return true
+	return dispatch_stage(function(tx)
+		return SyntheticInput.emit_key_stroke({ "cmd" }, "c", KEYSTROKE_NO_DELAY_US, tx)
+	end, COPY_SETTLE_SEC, "selection copy", copy_stage)
 end
 
 
@@ -1016,18 +1181,11 @@ function M.paste_as_plain_text(parent)
 	end
 	local owner = acquire_text_owner("plain", scope.id)
 	if not owner then return false end
-	local ok_snapshot, prior = call_text_boundary(owner, pasteboard.readAllData)
-	if not ok_snapshot or (prior ~= nil and type(prior) ~= "table") then
+	local ok_snapshot, prior, plain, initial_count = capture_text_clipboard(owner, true)
+	if not ok_snapshot then
 		owner.business_open = false
 		maybe_release_text_owner(owner)
-		Logger.error(LOG, "Plain-text paste clipboard snapshot failed.")
-		return false
-	end
-	local ok_plain, plain = call_text_boundary(owner, pasteboard.getContents)
-	if not ok_plain then
-		owner.business_open = false
-		maybe_release_text_owner(owner)
-		Logger.error(LOG, "Plain-text paste clipboard snapshot failed.")
+		Logger.error(LOG, "Plain-text paste clipboard snapshot failed: %s.", tostring(prior))
 		return false
 	end
 	_plain_paste_in_flight = true
@@ -1041,7 +1199,7 @@ function M.paste_as_plain_text(parent)
 	local queue_restore_retry
 	local abort_plain_paste
 	owner.clipboard_prior = prior or {}
-	owner.clipboard_owned = true
+	owner.clipboard_owned = false
 	owner.on_timer_settled = function()
 		if owner.cleanup_waiting == true and owner.cleanup_settling ~= true
 			and owner.cleanup_only == true and owns_clipboard
@@ -1155,27 +1313,52 @@ function M.paste_as_plain_text(parent)
 		return false
 	end
 
+	-- Reuse the exact pending-paste/grace owner used by transformations. Its
+	-- private deadline fields also keep plain-paste cleanup behind native Up/ACK.
+	TransformGrace.install(owner, {
+		cancel = function(entry) return cancel_text_timer(owner, entry) end,
+		cancel_native = SyntheticInput.cancel,
+		now = TimerScheduler.awake_time,
+		schedule = function(delay, callback)
+			return schedule_text_timer(owner, delay, "Plain paste grace cleanup", callback, true)
+		end,
+		settle = function() return settle_text_owner(owner) end,
+	})
+
 	local paste_armed, paste_timer_error = schedule_plain_timer(
 		PASTE_SETTLE_SEC, "paste", function()
-			local restore_armed, restore_timer_error = schedule_plain_timer(
-				RESTORE_DELAY_SEC, "clipboard restore", function()
-					local restored, restore_error = restore_prior()
-					if restored then release()
-					else
-						Logger.error(LOG, "Plain-text paste clipboard restore refused: %s.",
-							tostring(restore_error))
-						queue_restore_retry()
+			local expected_count = owner.clipboard_count
+			local function cached()
+				return active and generation == _plain_paste_generation
+					and text_owner_authorized(owner) and owner.cleanup_only ~= true
+					and owner.clipboard_owned == true and owner.clipboard_count == expected_count
+			end
+			local publication = clipboard_publication(owner, nil, cached)
+			local started, detail = TextDispatch.start(SyntheticInput, owner, publication, function(tx)
+				SyntheticInput.on_dispatched(tx, function(finished, batch)
+					if owner.synthetic_tx == finished and batch.native_down_attempted == true then
+						owner.plain_down_attempted = true
 					end
 				end)
-			if not restore_armed then
-				abort_plain_paste("restore timer", restore_timer_error)
-				return
-			end
-			local ok_emit, emitted = call_text_boundary(owner,
-				SyntheticInput.emit_key_stroke, { "cmd" }, "v", 0.02)
-			if not ok_emit or emitted ~= true then
-				abort_plain_paste("paste shortcut", emitted)
-			end
+				return SyntheticInput.emit_guarded_key_stroke({ "cmd" }, "v", tx)
+			end, function(status, handed_off)
+				if status == "complete" or handed_off or owner.plain_down_attempted then
+					owner.transform_restore_after = TimerScheduler.awake_time() + RESTORE_DELAY_SEC
+				end
+				if not text_owner_authorized(owner) then settle_text_owner(owner); return end
+				if status ~= "complete" then abort_plain_paste("paste shortcut", status); return end
+				local armed, timer_error = schedule_plain_timer(
+					RESTORE_DELAY_SEC, "clipboard restore", function()
+						local restored, restore_error = restore_prior()
+						if restored then release()
+						else
+							Logger.error(LOG, "Plain-text paste clipboard restore refused: %s.", tostring(restore_error))
+							queue_restore_retry()
+						end
+					end)
+				if not armed then abort_plain_paste("restore timer", timer_error) end
+			end, true)
+			if not started then abort_plain_paste("paste shortcut", detail) end
 		end)
 	if not paste_armed then
 		release()
@@ -1183,8 +1366,14 @@ function M.paste_as_plain_text(parent)
 		return false
 	end
 
-	local ok_write, write_result = call_text_boundary(
-		owner, pasteboard.setContents, plain or "")
+	local ok_write, write_result = call_text_boundary(owner, function()
+		-- Snapshot or timer acquisition alone does not own a clipboard mutation.
+		admit_initial_clipboard_mutation(owner, initial_count)
+		owner.clipboard_owned = true
+		local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, plain or "")
+		if not ok then error(result, 0) end
+		return result
+	end)
 	if not ok_write or write_result ~= true then
 		abort_plain_paste("clipboard write", write_result)
 		return false
@@ -1639,8 +1828,9 @@ end
 --- @param parent string|nil Stable action parent.
 --- @param on_selection function Receives the selected text.
 --- @param on_empty function|nil Runs when nothing is selected.
+--- @param continuation_check function|table|nil Optional receipt checked before delayed copy work.
 --- @return boolean started
-function M.read_copied_selection(parent, on_selection, on_empty)
+function M.read_copied_selection(parent, on_selection, on_empty, continuation_check)
 	if type(on_selection) ~= "function" then
 		error("read_copied_selection: on_selection must be a function")
 	end
@@ -1651,7 +1841,7 @@ function M.read_copied_selection(parent, on_selection, on_empty)
 	return do_transform(function(sel)
 		selection = sel
 		return false
-	end, parent, function() on_selection(selection) end, on_empty)
+	end, parent, function() on_selection(selection) end, on_empty, continuation_check)
 end
 
 --- Replaces the current selection with `text` and leaves `text` selected, like
@@ -1662,8 +1852,9 @@ end
 --- @param parent string|nil Stable action parent.
 --- @param on_checked function Receives true when the selection matched and the
 ---        paste follows, false once a changed selection was left alone.
+--- @param continuation_check function|table|nil Optional receipt checked before delayed copy, paste and reselection.
 --- @return boolean started
-function M.replace_copied_selection(expected, text, parent, on_checked)
+function M.replace_copied_selection(expected, text, parent, on_checked, continuation_check)
 	if type(expected) ~= "string" or expected == "" or type(text) ~= "string" or text == "" then
 		error("replace_copied_selection: expected and text must be non-empty strings")
 	end
@@ -1674,7 +1865,7 @@ function M.replace_copied_selection(expected, text, parent, on_checked)
 		if sel ~= expected then return false end
 		on_checked(true)
 		return text
-	end, parent, function() on_checked(false) end)
+	end, parent, function() on_checked(false) end, nil, continuation_check)
 end
 
 --- Selects the current word under the cursor (Alt+Right, then Alt+Shift+Left).
@@ -1843,11 +2034,62 @@ function M.wrap_selection(sel, left, right, parent)
 			_wrap_generation = _wrap_generation + 1
 		end
 	end
+	owner.on_quiesce = function()
+		local snapshot = {}
+		local cleanup_pending = false
+		for _, entry in pairs(owner.timers) do
+			if entry.completion == true then cleanup_pending = true
+			else snapshot[#snapshot + 1] = entry end
+		end
+		local timers_settled = true
+		owner.mutations = owner.mutations + 1
+		for _, entry in ipairs(snapshot) do
+			if cancel_text_timer(owner, entry) ~= true then timers_settled = false end
+		end
+		if owner.synthetic_pending == true then
+			pcall(SyntheticInput.cancel, owner.synthetic_tx)
+		end
+		owner.mutations = owner.mutations - 1
+		if owner.synthetic_pending == true then
+			-- Accepted cancellation does not retract a native handoff. Keep the
+			-- pasteboard until the exact producer reports its terminal receipt.
+			return true, false
+		end
+		local remaining = transaction.restore_after ~= nil
+			and transaction.restore_after - TimerScheduler.awake_time() or 0
+		if remaining > 0 and owner.clipboard_owned == true then
+			-- PAUSE revokes document work, but cannot revoke a paste that Quartz
+			-- already returned. One cleanup-only timer retains its fixed grace
+			-- deadline; repeated PAUSE/RESUME never restarts that interval.
+			owner.completion_only = true
+			if not cleanup_pending and timers_settled then
+				local armed, cleanup_error = schedule_text_timer(owner, remaining,
+					"Wrap paste grace cleanup", function() settle_text_owner(owner) end, true)
+				if armed ~= true then
+					defer_wrap_diagnostic("error", "Paste grace cleanup timer was refused: %s.",
+						tostring(cleanup_error))
+				end
+			end
+			return true, false
+		end
+		if cleanup_pending then return true, false end
+		local restored, restore_error = restore_text_clipboard(owner)
+		if restored ~= true then
+			defer_wrap_diagnostic("error", "Paused wrap clipboard restore remains pending: %s.",
+				tostring(restore_error))
+		end
+		local released = maybe_release_text_owner(owner)
+		return true, timers_settled == true and restored == true and released == true
+	end
 	owner.on_timer_settled = function(_, entry)
 		if transaction.timer_entry == entry then
 			transaction.timer_entry = nil
 			transaction.timer = nil
 			if _wrap_restore_timer == entry.handle then _wrap_restore_timer = nil end
+		end
+		if owner.business_open ~= true then
+			settle_text_owner(owner)
+			return
 		end
 		if transaction.restore_waiting == true
 			and transaction.restore_scheduling ~= true
@@ -1866,6 +2108,23 @@ function M.wrap_selection(sel, left, right, parent)
 	end
 
 	local function rollback(reason, detail)
+		transaction.aborting = true
+		if owner.synthetic_pending == true then
+			local cancelled_ok, cancelled = pcall(SyntheticInput.cancel, owner.synthetic_tx)
+			if cancelled_ok and cancelled == true
+				and owner.synthetic_completion_registered ~= true then
+				owner.synthetic_pending = false
+			end
+		end
+		if owner.synthetic_pending == true or transaction.paste_accepted == true
+			or transaction.restore_after ~= nil then
+			-- Refused admission cannot retract accepted native output. Reuse the
+			-- fenced owner to join its exact producer and retain host paste grace.
+			defer_wrap_diagnostic("error", "Wrap transaction aborted at %s: %s.",
+				reason, tostring(detail or "operation failed"))
+			settle_text_owner(owner)
+			return false
+		end
 		detach_timer(true)
 		local restored, restore_error = true, nil
 		if transaction.mutated then
@@ -1931,6 +2190,25 @@ function M.wrap_selection(sel, left, right, parent)
 			or transaction.generation ~= _wrap_generation then
 			return false
 		end
+		if owner.synthetic_pending == true then
+			transaction.restore_waiting = true
+			return false
+		end
+		if transaction.restore_after ~= nil then
+			local remaining = transaction.restore_after - TimerScheduler.awake_time()
+			if remaining > 0 then
+				local scheduled, settling_error = schedule_restore(remaining)
+				if scheduled ~= true then
+					defer_wrap_diagnostic("error", "Paste settling timer was refused: %s.",
+						tostring(settling_error))
+				end
+				if scheduled ~= true and allow_lifecycle_fallback then
+					pcall(SyntheticInput.defer_after_callback,
+						"wrap post-paste settling retry", function() attempt_restore(false) end)
+				end
+				return false
+			end
+		end
 		local restored, restore_error = restore_prior()
 		if restored then
 			finish_restore()
@@ -1962,7 +2240,7 @@ function M.wrap_selection(sel, left, right, parent)
 		return false
 	end
 
-	local snapshot_ok, prior_or_error = call_text_boundary(owner, pasteboard.readAllData)
+	local snapshot_ok, prior_or_error, _, initial_count = capture_text_clipboard(owner, false)
 	if not snapshot_ok then
 		return rollback("clipboard snapshot", prior_or_error)
 	end
@@ -1972,13 +2250,17 @@ function M.wrap_selection(sel, left, right, parent)
 	transaction.prior = prior_or_error
 	transaction.prior_empty = prior_or_error == nil or next(prior_or_error) == nil
 	owner.clipboard_prior = prior_or_error or {}
-	owner.clipboard_owned = true
 
-	-- Mark the clipboard conservatively before the call: a throwing pasteboard
-	-- implementation may have changed its contents before reporting the error.
-	transaction.mutated = true
-	local write_ok, write_result = call_text_boundary(
-		owner, pasteboard.setContents, left .. sel .. right)
+	local write_ok, write_result = call_text_boundary(owner, function()
+		admit_initial_clipboard_mutation(owner, initial_count)
+		-- A throwing native write may already have changed the clipboard.
+		transaction.mutated = true
+		owner.clipboard_owned = true
+		owner.clipboard_guarded = true
+		local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, left .. sel .. right)
+		if not ok then error(result, 0) end
+		return result
+	end)
 	if not write_ok or write_result ~= true then
 		return rollback("clipboard write", write_result)
 	end
@@ -1990,10 +2272,63 @@ function M.wrap_selection(sel, left, right, parent)
 		return rollback("restore timer", timer_error)
 	end
 
+	local publication = clipboard_publication(owner, nil, function()
+		return transaction.active and transaction.generation == _wrap_generation
+	end)
+	local producer_ok, producer_or_error = call_text_boundary(owner,
+		SyntheticInput.begin, "shortcuts.text.wrap", "action", publication)
+	if not producer_ok then return rollback("paste producer", producer_or_error) end
+	owner.synthetic_tx = producer_or_error
+	owner.synthetic_pending = true
+	local dispatch_observe_ok, dispatch_observe_error = call_text_boundary(owner,
+		SyntheticInput.on_dispatched, owner.synthetic_tx, function(finished, batch, status)
+			if owner.synthetic_tx == finished and (status == "dispatched" or batch.native_down_attempted == true) then
+				transaction.paste_accepted = true
+			end
+		end)
+	if not dispatch_observe_ok then
+		return rollback("paste dispatch observer", dispatch_observe_error)
+	end
+	local observe_ok, observe_error = call_text_boundary(owner,
+		SyntheticInput.on_complete, owner.synthetic_tx, function(_, status)
+			owner.synthetic_pending = false
+			if status == "complete" or transaction.paste_accepted == true then
+				-- Queue admission is not native delivery. The full clipboard grace
+				-- interval starts only after the exact paste producer completes.
+				transaction.restore_after = TimerScheduler.awake_time() + RESTORE_DELAY_SEC
+			end
+			if transaction.aborting == true then
+				settle_text_owner(owner)
+			elseif owner.business_open ~= true or scope.paused == true then
+				settle_text_owner(owner)
+			elseif status ~= "complete" then
+				if transaction.paste_accepted == true then settle_text_owner(owner)
+				else rollback("paste completion", status) end
+			elseif transaction.restore_waiting == true and transaction.timer_entry == nil then
+				-- A broker can remain queued longer than the original restore timer.
+				-- Start a fresh paste-settling delay after its actual completion.
+				transaction.restore_waiting = false
+				local restored_timer, restore_error = schedule_restore(RESTORE_DELAY_SEC)
+				if restored_timer ~= true then
+					defer_wrap_diagnostic("error", "Post-paste restore timer was refused: %s.",
+						tostring(restore_error))
+					attempt_restore(true)
+				end
+			end
+			maybe_release_text_owner(owner)
+		end)
+	if not observe_ok then return rollback("paste completion observer", observe_error) end
+	owner.synthetic_completion_registered = true
 	local emit_ok, emitted_or_error = call_text_boundary(owner,
-		SyntheticInput.emit_key_stroke, { "cmd" }, "v", KEYSTROKE_NO_DELAY_US)
+		SyntheticInput.emit_guarded_key_stroke, { "cmd" }, "v", owner.synthetic_tx)
 	if not emit_ok or emitted_or_error ~= true then
+		pcall(SyntheticInput.cancel, owner.synthetic_tx)
 		return rollback("paste dispatch", emitted_or_error)
+	end
+	local seal_ok, sealed = call_text_boundary(owner, SyntheticInput.seal, owner.synthetic_tx)
+	if not seal_ok or sealed ~= true then
+		pcall(SyntheticInput.cancel, owner.synthetic_tx)
+		return rollback("paste seal", sealed)
 	end
 
 	transaction.paste_dispatched = true

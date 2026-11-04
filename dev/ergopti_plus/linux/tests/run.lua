@@ -11,29 +11,16 @@
 --- USAGE:
 ---     luajit tests/run.lua          # Run from the linux driver root
 ---     lua    tests/run.lua          # Works with plain Lua 5.4 as well
+---     luajit tests/run.lua --module=infra   # One CI shard (tests/support/module_groups.lua)
 ---
 --- The runner exits non-zero when at least one assertion fails so it can be
 --- wired into CI without further glue.
 --- ==============================================================================
 
 -- Resolve our own directory so the runner works no matter the cwd.
-local self_path  = debug.getinfo(1, "S").source:gsub("^@", "")
-local driver_root = self_path:match("^(.*)[/\\]tests[/\\]run%.lua$") or "."
-driver_root = driver_root:gsub("\\", "/")
-
--- When launched as "luajit tests/run.lua" from the linux root, self_path may
--- be a relative path and driver_root resolves to ".". Canonicalise it to an
--- absolute path so downstream path arithmetic is reliable.
-if driver_root == "." then
-	local sep      = package.config:sub(1, 1)
-	local cwd_cmd  = (sep == "\\") and "cd" or "pwd"
-	local cwd_pipe = io.popen(cwd_cmd)
-	if cwd_pipe then
-		local cwd = cwd_pipe:read("*l") or "."
-		cwd_pipe:close()
-		driver_root = cwd:gsub("\\", "/"):gsub("/$", "")
-	end
-end
+local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+local tests_dir = assert(self_path:match("^(.*)[/\\]run%.lua$"), "the unit runner needs its tests directory")
+local driver_root = assert(loadfile(tests_dir .. "/runner_root.lua"))()
 
 -- The _shared/ Lua libraries live one level above the linux driver root
 -- (i.e. in static/ergopti_plus/_shared/lua/).
@@ -68,26 +55,58 @@ do
 	end
 end
 
+-- Never let a suite touch the developer's own config.toml, logs or caches: a
+-- real HOME is replaced by a scratch directory for this process (see
+-- _shared/lua/test/runner_home.lua). Done before any module resolves a path.
+require("test.runner_home").isolate()
+-- Nor the developer's keyring: the API key store gets an in-memory secret
+-- service on every load (tests/support/secret_service_fake.lua).
+require("tests.support.secret_service_fake").isolate()
+-- A reloaded tray root reloads its section modules with it
+-- (tests/support/menu_part_reload.lua).
+require("tests.support.menu_part_reload").install()
+
 -- Install the pure-Lua UTF-8 compatibility shim BEFORE any test module is
 -- loaded. LuaJIT 2.x does not bundle Lua 5.3's built-in utf8 library, and
--- several shared modules (keylogger/utils.lua, toml_codec, terminators) use
+-- several shared modules (keystats/utils.lua, toml_codec, terminators) use
 -- utf8.len / utf8.offset / utf8.codes as globals. Without this early install,
--- require("keylogger.utils") crashes with "attempt to index global 'utf8' (a
+-- require("keystats.utils") crashes with "attempt to index global 'utf8' (a
 -- nil value)" and every dependent test (pop_utf8, compat.utf8, device_finder)
 -- fails before the daemon_smoke test even reaches its compat.utf8 check.
 local ok_utf8, compat_utf8 = pcall(require, "compat.utf8")
 if ok_utf8 and compat_utf8 and compat_utf8.install then compat_utf8.install() end
 
 local helpers = require("tests.helpers")
+-- Shipped TOML is read through the native descriptor admission, which looks luv
+-- up when it opens a file. Load the timings registry while the genuine backend
+-- is installed: fixtures swap package.loaded.luv for a double while requiring
+-- the HTTP engine, and a first registry read inside that window read nothing.
+require("infra.timings")
+local shell_quote = require("text_utils").shell_quote
+helpers.initialize_timing()
 local RunnerContract = require("tests.runner_contract")
 local TEST_MANIFEST = require("tests.test_manifest")
+local ModuleGroups = require("tests.support.module_groups")
 
 -- --only <substr> / --only=<substr>: run only test cases whose name contains the
 -- substring, so a single behaviour can be re-run in isolation.
+-- --module <group> / --module=<group>: run one domain group of the manifest, so
+-- CI can shard the suite. The groups partition the manifest exactly.
 local only_filter = nil
+local module_group = nil
 if arg then
 	for i = 1, #arg do
-		if arg[i] == "--only" then
+		if arg[i] == "--module" or (type(arg[i]) == "string" and arg[i]:match("^%-%-module=")) then
+			if arg[i] == "--module" then
+				module_group = arg[i + 1]
+			else
+				module_group = arg[i]:gsub("^%-%-module=", "")
+			end
+			if type(module_group) ~= "string" or module_group == "" then
+				io.stderr:write("tests/run.lua: --module requires a group name\n")
+				os.exit(2)
+			end
+		elseif arg[i] == "--only" then
 			if type(arg[i + 1]) ~= "string" or arg[i + 1] == "" then
 				io.stderr:write("tests/run.lua: --only requires a nonempty substring\n")
 				os.exit(2)
@@ -115,67 +134,26 @@ end
 -- ===================================
 
 local TEST_DIRS = {
+	"tests/meta",
 	"tests/unit",
 }
 
---- Recursively collects test files under a directory.
---- Uses lfs if available, otherwise shells out to dir/ls.
+--- Recursively collects test files through the canonical native directory owner.
+--- Discovery preserves native filename bytes independently of optional lfs.
 --- @param dir string Directory relative to the driver root.
 --- @return table|nil List of dotted module names ready for require.
 --- @return string|nil Discovery error.
 local function discover_tests(dir)
 	local results = {}
-	local abs     = driver_root .. "/" .. dir
-
-	local ok_lfs, lfs = pcall(require, "lfs")
-	if ok_lfs then
-		local function walk(path, mod_prefix)
-			for entry in lfs.dir(path) do
-				if entry ~= "." and entry ~= ".." then
-					local full = path .. "/" .. entry
-					local attr = lfs.attributes(full)
-					if attr and attr.mode == "directory" then
-						walk(full, mod_prefix .. "." .. entry)
-					elseif entry:match("^test_.+%.lua$") then
-						local name = entry:gsub("%.lua$", "")
-						results[#results + 1] = mod_prefix .. "." .. name
-					end
-				end
-			end
-		end
-		local ok_walk, walk_error = pcall(walk, abs, dir:gsub("/", "."))
-		if not ok_walk then return nil, tostring(walk_error) end
-		return results, nil
-	end
-
-	-- Fallback: shell out using io.popen.
-	local cmd
-	if package.config:sub(1, 1) == "\\" then
-		cmd = string.format('cmd /c dir /b /s /a-d "%s"', abs:gsub("/", "\\"))
-	else
-		cmd = string.format("find '%s' -type f -name 'test_*.lua'", abs)
-	end
-	local pipe, open_error = io.popen(cmd)
-	if not pipe then return nil, tostring(open_error or "could not start discovery command") end
-
-	local strip_prefix = driver_root
-	for line in pipe:lines() do
-		line = line:gsub("\\", "/")
-		local rel
-		if strip_prefix ~= "" and line:sub(1, #strip_prefix):lower() == strip_prefix:lower() then
-			rel = line:sub(#strip_prefix + 2):gsub("%.lua$", "")
-		else
-			rel = line:match("([^/]+/test_[^/]+)%.lua$")
-		end
-		if rel and rel:match("/test_[^/]+$") then
-			results[#results + 1] = rel:gsub("/", ".")
-		end
-	end
-	local close_ok, close_reason, close_code = pipe:close()
-	if close_ok ~= true then
-		return nil, string.format("discovery command failed (%s %s)",
-			tostring(close_reason), tostring(close_code))
-	end
+	local Directory = require("infra.native_directory")
+	local ok, failure = pcall(Directory.walk, driver_root .. "/" .. dir, nil, function(path, kind)
+		if kind ~= "file" or not path:match("/test_[^/]+%.lua$") then return end
+		local relative = path:sub(#driver_root + 2):gsub("%.lua$", "")
+		results[#results + 1] = relative:gsub("/", ".")
+	end, function(path, message, code)
+		error(string.format("cannot discover %s (%s %s)", path, tostring(message), tostring(code)), 0)
+	end)
+	if not ok then return nil, tostring(failure) end
 	return results, nil
 end
 
@@ -212,13 +190,31 @@ if not manifest_ok then
 	os.exit(1)
 end
 
-local total_modules, load_errors = RunnerContract.load_modules(TEST_MANIFEST, function(mod_name)
+-- The whole tree is audited against the whole manifest above, so a shard can
+-- never hide an undiscovered or unlisted file; only then is the run narrowed.
+local modules_to_run = TEST_MANIFEST
+if module_group then
+	local ok_group, selected = pcall(ModuleGroups.select, TEST_MANIFEST, module_group)
+	if not ok_group then
+		io.stderr:write("tests/run.lua: " .. tostring(selected) .. "\n")
+		os.exit(2)
+	end
+	modules_to_run = selected
+	print(string.format("Module group %q: %d of %d module(s)", module_group, #modules_to_run, #TEST_MANIFEST))
+end
+
+local total_modules, load_errors = RunnerContract.load_modules(modules_to_run, function(mod_name)
 	print(string.format("\n>>> Loading %s", mod_name))
-	require(mod_name)
+	local ok, load_error = helpers.measure_module(mod_name, function() require(mod_name) end)
+	if not ok then error(load_error, 0) end
 end)
 for _, failure in ipairs(load_errors) do
 	print(string.format("  ! load error in %s: %s", failure.module, failure.error))
 	helpers.get_results().failed = helpers.get_results().failed + 1
+	local failures = helpers.get_results().failures
+	failures[#failures + 1] = {
+		name = failure.module, err = failure.error, kind = "module", module = failure.module,
+	}
 end
 
 local r = helpers.get_results()
@@ -240,8 +236,16 @@ end
 
 if r.failed > 0 then
 	for _, f in ipairs(r.failures) do
-		print(string.format("  - %s : %s\n    replay: luajit tests/run.lua --only %q", f.name, f.err, f.name))
+		local replay = "luajit tests/run.lua"
+		if module_group then replay = replay .. " --module=" .. module_group end
+		if f.kind == "case" then replay = replay .. " --only " .. shell_quote(f.name) end
+		if f.kind ~= "case" then print("  FAIL " .. f.name .. " — " .. f.err) end
+		print(string.format("  - %s : %s\n    replay: %s", f.name, f.err, replay))
 	end
+	os.exit(1)
+end
+if helpers.timing_failed() then
+	io.stderr:write("tests/run.lua: Lua wall timing diagnostics failed\n")
 	os.exit(1)
 end
 os.exit(0)

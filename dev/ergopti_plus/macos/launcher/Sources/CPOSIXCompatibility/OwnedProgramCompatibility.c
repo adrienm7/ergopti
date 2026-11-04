@@ -56,6 +56,7 @@ struct ergopti_owned_program {
 	bool kill_sent;
 	bool leader_exited;
 	bool retired;
+	bool monitor_close_refused;
 	bool status_valid;
 	int exit_status;
 	int error_code;
@@ -148,6 +149,28 @@ ergopti_owned_program_observation ergopti_owned_program_prepared_identity(ergopt
 	};
 }
 
+// Observation remains derived from the original opaque native owner.
+ergopti_owned_program_observation ergopti_owned_program_active_identity(ergopti_owned_program *owner) {
+	if (owner == NULL || !owner->active || owner->cancelled || owner->retired
+		|| owner->leader_exited || owner->error_code != 0 || owner->monitor < 0
+		|| !owner->identity_valid || owner->leader <= 0) {
+		return (ergopti_owned_program_observation) { .error_code = EINVAL };
+	}
+	struct proc_bsdinfo info;
+	int error = program_bsd_info(owner->leader, &info);
+	if (error == 0 && (!program_identity_equal(owner->identity, program_identity_from_info(&info))
+		|| (info.pbi_status == SSTOP || info.pbi_status == SZOMB) || info.pbi_ppid != (uint32_t)getpid()
+		|| info.pbi_pgid != (uint32_t)owner->leader || getsid(owner->leader) != getpid()
+		|| info.pbi_uid != geteuid() || info.pbi_ruid != getuid()
+		|| info.pbi_start_tvusec >= 1000000)) { error = ESTALE; }
+	if (error != 0) { return (ergopti_owned_program_observation) { .error_code = error }; }
+	return (ergopti_owned_program_observation) {
+		.process_id = owner->leader, .process_group_id = (pid_t)info.pbi_pgid,
+		.start_seconds = info.pbi_start_tvsec, .start_microseconds = info.pbi_start_tvusec,
+		.nonlive = false
+	};
+}
+
 static int program_pid_compare(const void *first, const void *second) {
 	pid_t left = *(const pid_t *)first;
 	pid_t right = *(const pid_t *)second;
@@ -219,13 +242,24 @@ static bool program_term_grace_elapsed(ergopti_owned_program *owner) {
 	return elapsed >= program_term_grace_nanoseconds;
 }
 
-static void program_release_storage(ergopti_owned_program *owner) {
-	if (owner->monitor >= 0) { close(owner->monitor); }
+static bool program_release_storage(ergopti_owned_program *owner) {
+	if (owner->monitor_close_refused) { return false; }
+	if (owner->monitor >= 0) {
+		const int descriptor = owner->monitor;
+		owner->monitor = -1;
+		if (close(descriptor) != 0) {
+			// Never retry an ambiguous close or free the retained debt owner.
+			owner->monitor_close_refused = true;
+			owner->error_code = errno == 0 ? EIO : errno;
+			return false;
+		}
+	}
 	free(owner->executable);
 	free(owner->first_pids);
 	free(owner->second_pids);
 	free(owner->first_identities);
 	free(owner);
+	return true;
 }
 
 static int program_prepare(
@@ -451,6 +485,130 @@ int ergopti_owned_query_prepare(
 	return error;
 }
 
+// Streaming roles retain the original exact suspended leader and retirement owner.
+// The native image lease installs only its own fixed lifecycle inheritance action.
+int ergopti_owned_stream_prepare(
+	const char *executable,
+	char *const arguments[],
+	char *const environment[],
+	int input_descriptor,
+	int output_descriptor,
+	int error_descriptor,
+	ergopti_owned_stream_inheritance install_inheritance,
+	void *inheritance_owner,
+	ergopti_owned_program **owner_out
+) {
+	if (owner_out == NULL || *owner_out != NULL || executable == NULL
+		|| executable[0] != '/' || arguments == NULL || arguments[0] == NULL || environment == NULL) {
+		return EINVAL;
+	}
+	struct stat input_stat;
+	struct stat output_stat;
+	struct stat error_stat;
+	if (input_descriptor <= STDERR_FILENO || output_descriptor <= STDERR_FILENO
+		|| error_descriptor <= STDERR_FILENO || input_descriptor == output_descriptor
+		|| input_descriptor == error_descriptor || output_descriptor == error_descriptor
+		|| install_inheritance == NULL || inheritance_owner == NULL
+		|| fstat(input_descriptor, &input_stat) != 0 || fstat(output_descriptor, &output_stat) != 0
+		|| fstat(error_descriptor, &error_stat) != 0 || !S_ISFIFO(input_stat.st_mode)
+		|| !S_ISFIFO(output_stat.st_mode) || !S_ISFIFO(error_stat.st_mode)) { return EINVAL; }
+	int input_flags = fcntl(input_descriptor, F_GETFL);
+	int output_flags = fcntl(output_descriptor, F_GETFL);
+	int error_flags = fcntl(error_descriptor, F_GETFL);
+	if (input_flags < 0 || output_flags < 0 || error_flags < 0) { return errno; }
+	if ((input_flags & O_ACCMODE) != O_RDONLY || (output_flags & O_ACCMODE) != O_WRONLY
+		|| (error_flags & O_ACCMODE) != O_WRONLY) { return EINVAL; }
+	if ((input_stat.st_dev == output_stat.st_dev && input_stat.st_ino == output_stat.st_ino)
+		|| (input_stat.st_dev == error_stat.st_dev && input_stat.st_ino == error_stat.st_ino)
+		|| (output_stat.st_dev == error_stat.st_dev && output_stat.st_ino == error_stat.st_ino)) { return EINVAL; }
+	// The signed query supervisor owns a separate session outside the query group.
+	if (getsid(0) != getpid()) { return EPERM; }
+	ergopti_owned_program *owner = calloc(1, sizeof(*owner));
+	if (owner == NULL) { return ENOMEM; }
+	owner->monitor = -1;
+	owner->executable = strdup(executable);
+	int max_processes = 0;
+	size_t limit_size = sizeof(max_processes);
+	int error = 0;
+	if (owner->executable == NULL) { error = ENOMEM; }
+	else if (stat(executable, &owner->executable_identity) != 0) { error = errno; }
+	else if (!S_ISREG(owner->executable_identity.st_mode)) { error = EINVAL; }
+	else if (sysctlbyname("kern.maxproc", &max_processes, &limit_size, NULL, 0) != 0) { error = errno; }
+	else if (limit_size != sizeof(max_processes) || max_processes <= 0
+		|| (size_t)max_processes > (INT_MAX / sizeof(pid_t)) - 20) { error = EOVERFLOW; }
+	if (error == 0) {
+		owner->census_capacity = (size_t)max_processes + 20;
+		owner->first_pids = calloc(owner->census_capacity, sizeof(pid_t));
+		owner->second_pids = calloc(owner->census_capacity, sizeof(pid_t));
+		owner->first_identities = calloc(owner->census_capacity, sizeof(program_identity));
+		if (owner->first_pids == NULL || owner->second_pids == NULL || owner->first_identities == NULL) {
+			error = ENOMEM;
+		}
+	}
+	if (error != 0) { program_release_storage(owner); return error; }
+
+	posix_spawnattr_t attributes;
+	posix_spawn_file_actions_t actions;
+	error = posix_spawnattr_init(&attributes);
+	if (error != 0) { program_release_storage(owner); return error; }
+	error = posix_spawn_file_actions_init(&actions);
+	if (error != 0) {
+		posix_spawnattr_destroy(&attributes);
+		program_release_storage(owner);
+		return error;
+	}
+	sigset_t default_signals;
+	sigset_t empty_mask;
+	sigfillset(&default_signals);
+	sigdelset(&default_signals, SIGKILL);
+	sigdelset(&default_signals, SIGSTOP);
+	sigemptyset(&empty_mask);
+	short flags = POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_START_SUSPENDED
+		| POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK;
+	if ((error = posix_spawnattr_setflags(&attributes, flags)) == 0
+		&& (error = posix_spawnattr_setpgroup(&attributes, 0)) == 0
+		&& (error = posix_spawnattr_setsigdefault(&attributes, &default_signals)) == 0
+		&& (error = posix_spawnattr_setsigmask(&attributes, &empty_mask)) == 0) {
+		error = posix_spawn_file_actions_adddup2(&actions, input_descriptor, STDIN_FILENO);
+		if (error == 0) { error = posix_spawn_file_actions_adddup2(&actions, output_descriptor, STDOUT_FILENO); }
+		if (error == 0) { error = posix_spawn_file_actions_adddup2(&actions, error_descriptor, STDERR_FILENO); }
+	}
+	if (error == 0) { error = install_inheritance(inheritance_owner, &actions); }
+	// A callback cannot exchange the borrowed streams after their native validation.
+	if (error == 0) {
+		struct stat input_current, output_current, error_current;
+		if (fstat(input_descriptor, &input_current) != 0 || fstat(output_descriptor, &output_current) != 0
+			|| fstat(error_descriptor, &error_current) != 0) { error = errno; }
+		else if (input_current.st_dev != input_stat.st_dev || input_current.st_ino != input_stat.st_ino
+			|| output_current.st_dev != output_stat.st_dev || output_current.st_ino != output_stat.st_ino
+			|| error_current.st_dev != error_stat.st_dev || error_current.st_ino != error_stat.st_ino
+			|| fcntl(input_descriptor, F_GETFL) != input_flags
+			|| fcntl(output_descriptor, F_GETFL) != output_flags
+			|| fcntl(error_descriptor, F_GETFL) != error_flags) { error = ESTALE; }
+	}
+	if (error == 0) {
+		error = posix_spawn(&owner->leader, executable, &actions, &attributes, arguments, environment);
+	}
+	posix_spawn_file_actions_destroy(&actions);
+	posix_spawnattr_destroy(&attributes);
+	if (error != 0) { program_release_storage(owner); return error; }
+	// Publication precedes every post-spawn check: failures retain real cleanup debt.
+	*owner_out = owner;
+	struct proc_bsdinfo info;
+	error = program_bsd_info(owner->leader, &info);
+	if (error == 0) {
+		owner->identity = program_identity_from_info(&info);
+		owner->identity_valid = true;
+		if (info.pbi_ppid != (uint32_t)getpid() || info.pbi_pgid != (uint32_t)owner->leader
+			|| getsid(owner->leader) != getpid()) { error = EPROTO; }
+	}
+	if (error == 0) { owner->monitor = ergopti_process_exit_monitor_open(owner->leader, &error); }
+	owner->error_code = error;
+	if (error != 0) { ergopti_owned_program_cancel(owner); }
+	return error;
+}
+
+
 ergopti_owned_program_receipt ergopti_owned_program_activate(ergopti_owned_program *owner) {
 	if (owner == NULL) { return program_receipt(owner); }
 	if (owner->retired || owner->cancelled || owner->active || owner->error_code != 0
@@ -477,6 +635,16 @@ ergopti_owned_program_receipt ergopti_owned_program_activate(ergopti_owned_progr
 		owner->active = true;
 	}
 	return program_receipt(owner);
+}
+
+// A cooperative protocol stop does not arm the original forced-cancel grace.
+// The caller still owns the native process/group and must poll its real retirement.
+int ergopti_owned_program_request_stream_stop(ergopti_owned_program *owner) {
+	ergopti_owned_program_observation observed = ergopti_owned_program_active_identity(owner);
+	if (observed.error_code != 0) { return observed.error_code; }
+	// The unreaped direct child reserves this exact PID through the signal call.
+	if (kill(owner->leader, SIGTERM) != 0) { return errno; }
+	return 0;
 }
 
 ergopti_owned_program_receipt ergopti_owned_program_cancel(ergopti_owned_program *owner) {
@@ -557,7 +725,7 @@ ergopti_owned_program_receipt ergopti_owned_program_poll(ergopti_owned_program *
 bool ergopti_owned_program_destroy(ergopti_owned_program **owner) {
 	if (owner == NULL || *owner == NULL) { return false; }
 	if (!(*owner)->retired) { return false; }
-	program_release_storage(*owner);
+	if (!program_release_storage(*owner)) { return false; }
 	*owner = NULL;
 	return true;
 }

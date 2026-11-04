@@ -29,9 +29,10 @@ end
 
 
 --- Loads and drives one prediction acceptance inside a real callback collector.
---- @param options table { text, buffer?, expander_failure?, real_overlap?, prediction? };
+--- @param options table { text, buffer?, llm_private_mark?, expander_failure?, expander?, real_overlap?, prediction? };
 ---   prediction is a complete parser record the engine hands over instead of
----   one built from text and deletes.
+---   one built from text and deletes; expander replaces the real choke point
+---   with a double, so a test can see what reaches it and what goes around it.
 --- @return table result Captured call, event, state, and side-effect data.
 function M.run(options)
 	options = options or {}
@@ -42,25 +43,32 @@ function M.run(options)
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
+	local elapsed = 0
+	hs_stub.timer.absoluteTime = function() return math.floor(elapsed * 1e9) end
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 
+	local clipboard_generation = 0
+	hs_stub.pasteboard.changeCount = function() return clipboard_generation end
 	local clipboard_writes = {}
 	local clipboard_value = "original"
 	local clipboard_restores = 0
 	hs_stub.pasteboard.getContents = function() return clipboard_value end
 	hs_stub.pasteboard.readAllData = function() return { text = clipboard_value } end
 	hs_stub.pasteboard.setContents = function(value)
+		clipboard_generation = clipboard_generation + 1
 		clipboard_writes[#clipboard_writes + 1] = value
 		clipboard_value = value
 		return true
 	end
 	hs_stub.pasteboard.writeAllData = function(data)
+		clipboard_generation = clipboard_generation + 1
 		clipboard_restores = clipboard_restores + 1
 		clipboard_value = type(data) == "table" and data.text or nil
 		return true
 	end
 	hs_stub.pasteboard.clearContents = function()
+		clipboard_generation = clipboard_generation + 1
 		clipboard_restores = clipboard_restores + 1
 		clipboard_value = nil
 	end
@@ -111,14 +119,14 @@ function M.run(options)
 
 	local accepted_count = 0
 	local notified_count = 0
-	local keylogger_buffers = {}
-	package.loaded["modules.keylogger"] = {
+	local keystats_buffers = {}
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = noop,
 		log_hotstring_dismissed = noop,
 		notify_synthetic = function() notified_count = notified_count + 1 end,
 		log_llm_accepted = function() accepted_count = accepted_count + 1 end,
 		set_buffer = function(value)
-			keylogger_buffers[#keylogger_buffers + 1] = value
+			keystats_buffers[#keystats_buffers + 1] = value
 		end,
 	}
 
@@ -225,7 +233,10 @@ function M.run(options)
 	end
 
 	local expander
-	if options.expander_failure then
+	if options.expander then
+		expander = options.expander
+		package.loaded["modules.keymap.expander"] = expander
+	elseif options.expander_failure then
 		expander = {
 			init = function() return true end,
 			perform_text_replacement = function() return false end,
@@ -240,6 +251,7 @@ function M.run(options)
 	local state = {
 		buffer = options.buffer or "prefix ",
 		llm_buffer = options.llm_buffer or options.buffer or "prefix ",
+		llm_private_mark = options.llm_private_mark or "",
 		magic_key = "\u{2605}",
 		lifecycle_generation = 0,
 		mappings = {},
@@ -255,7 +267,7 @@ function M.run(options)
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,
 	})
-	if not options.expander_failure then
+	if not options.expander_failure and not options.expander then
 		expander.init(state, package.loaded["modules.keymap.registry"], bridge)
 	end
 
@@ -301,6 +313,8 @@ function M.run(options)
 			end
 		end
 		if selected == nil then return nil end
+		-- A fired native timer spends its interval even when the test uses no CPU.
+		elapsed = elapsed + selected.delay
 		selected:fire()
 		return selected.delay
 	end
@@ -313,7 +327,7 @@ function M.run(options)
 		buffer_before = buffer_before,
 		accepted_count = accepted_count,
 		notified_count = notified_count,
-		keylogger_buffers = keylogger_buffers,
+		keystats_buffers = keystats_buffers,
 		reset_count = reset_count,
 		arm_chain_count = arm_chain_count,
 		arm_chain_before_completion = arm_chain_before_completion,

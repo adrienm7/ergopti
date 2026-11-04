@@ -104,7 +104,7 @@ private final class NetworkBootstrapNativeGuardian {
 	}
 	func wait(_ predicate: () -> Bool) throws {
 		let deadline = ProcessInfo.processInfo.systemUptime + 15
-		repeat { try poll(); if predicate() { return }; usleep(1000) } while ProcessInfo.processInfo.systemUptime < deadline
+		repeat { try poll(); if predicate() { return }; usleep(LauncherTimings.testFastPoll.microseconds) } while ProcessInfo.processInfo.systemUptime < deadline
 		throw NSError(domain: "BootstrapNativeDeadline", code: 1)
 	}
 	func send(_ line: String) throws { try input.fileHandleForWriting.write(contentsOf: Data((line + "\n").utf8)) }
@@ -189,7 +189,7 @@ private final class BootstrapNativeTLSFixture {
 			let count = Darwin.read(output.fileHandleForReading.fileDescriptor, &byte, 1)
 			if count == 1 { if byte == 10 { terminated = true; break }; line.append(byte) }
 			else if count == 0 || (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) { break }
-			else { usleep(1000) }
+			else { usleep(LauncherTimings.testFastPoll.microseconds) }
 		}
 		guard terminated else { process.terminate(); process.waitUntilExit(); throw NSError(domain: "BootstrapNativeTLSPeer", code: 1) }
 		guard let port = UInt16(String(decoding: line, as: UTF8.self)), port > 0 else { throw NSError(domain: "BootstrapNativeTLSPort", code: 1) }
@@ -313,5 +313,17 @@ final class ManagedNetworkBootstrapTests: XCTestCase {
 			XCTAssertThrowsError(try ManagedCertificateAuthorities.load(environment: ["SSL_CERT_FILE": fixture.certificate.path]))
 		}
 		XCTAssertThrowsError(try ManagedCertificateAuthorities.load(environment: ["SSL_CERT_FILE": fixture.root.appendingPathComponent("missing.pem").path]))
+	}
+	/// Field run 2026-10-27 19:47 (ledger L41): an inherited CA bundle the loader
+	/// refused stopped every download. A release role drops both names first.
+	func testReleaseRolesDropInheritedTrustVariables() throws {
+		let names = ManagedNetworkBootstrapPolicy.trustEnvironment
+		let saved = names.map { ($0, ProcessInfo.processInfo.environment[$0]) }
+		defer { for (name, value) in saved { if let value { setenv(name, value, 1) } else { unsetenv(name) } } }
+		for name in names { XCTAssertEqual(setenv(name, "/nonexistent/inherited-ca.pem", 1), 0) }
+		XCTAssertThrowsError(try ManagedCertificateAuthorities.load(environment: ProcessInfo.processInfo.environment))
+		XCTAssertTrue(ManagedCertificateAuthorities.dropInheritedTrustVariables())
+		for name in names { XCTAssertNil(ProcessInfo.processInfo.environment[name]) }
+		XCTAssertTrue(try ManagedCertificateAuthorities.load(environment: ProcessInfo.processInfo.environment).isEmpty)
 	}
 }

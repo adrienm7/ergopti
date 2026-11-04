@@ -1,0 +1,70 @@
+{
+	"origin": "Manually reviewed immutable original _HS_TomlFileRow caption expression; frozen before successor authoring. No native execution claim.",
+	"original_expression": "TF.stem . \" (\" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . \")\"",
+	"source_sha256": "f8ebc9037e6e4e4f1e4c93465a68f1b3c0e46c852bb335f85c5825e93a868317",
+	"receipts": [
+		{
+			"name": "zero_empty_stem",
+			"stem": "",
+			"formatted_count": "0",
+			"expected": " (0)"
+		},
+		{
+			"name": "ordinary",
+			"stem": "late_label",
+			"formatted_count": "2",
+			"expected": "late_label (2)"
+		},
+		{
+			"name": "grouped_count",
+			"stem": "many",
+			"formatted_count": "1 234",
+			"expected": "many (1 234)"
+		},
+		{
+			"name": "literal_tokens",
+			"stem": "%s {1} 100%",
+			"formatted_count": "%s",
+			"expected": "%s {1} 100% (%s)"
+		},
+		{
+			"name": "literal_ampersand",
+			"stem": "a&b",
+			"formatted_count": "2",
+			"expected": "a&b (2)"
+		},
+		{
+			"name": "del_code_unit",
+			"stem": "a\u007fb",
+			"formatted_count": "2",
+			"expected": "a\u007fb (2)"
+		},
+		{
+			"name": "control_code_units",
+			"stem": "a\t\r\nb",
+			"formatted_count": "2",
+			"expected": "a\t\r\nb (2)"
+		},
+		{
+			"name": "unpaired_utf16_unit",
+			"formatted_count": "2",
+			"stem_units": [97, 55296, 98],
+			"expected_units": [97, 55296, 98, 32, 40, 50, 41]
+		},
+		{
+			"name": "empty_cached_count",
+			"stem": "x",
+			"formatted_count": "",
+			"expected": "x ()"
+		}
+	],
+	"native_coercion_obligations": [
+		"Use the original AHK concatenation operator on the stem before native count evaluation.",
+		"Use that same concatenation operator on the original FmtCount return before projection.",
+		"No String(), Unicode normalization, sanitization, control filtering, native-caption validators or numerical reformatting.",
+		"Keep exact raw thrown identity; stem/coercion failure prevents any later ActiveCount/FmtCount read.",
+		"Genuine stem/ActiveCount/FmtCount/cleanup registered controls and all their old assertions stay unchanged."
+	],
+	"native_runtime": "UNRUN; synthetic raw-unit cases preserve Source domain and are not claimed genuine filesystem acceptance.",
+	"transport_note": "Explicit original UTF-16 unit vector for isolated surrogate; original donor corpus/freeze remain unchanged."
+}

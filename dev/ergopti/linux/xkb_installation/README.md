@@ -142,8 +142,9 @@ package or invalid keymap, `4` installation aborted.
 
 ## Registry layouts installed by ErgoptiPlus (no sudo)
 
-The ErgoptiPlus layout manager converts a registry `.keylayout` on the device
-(`../xkb_generation/keylayout_to_xkb.py`) and installs the result with
+The ErgoptiPlus layout manager converts a registry `.keylayout` on the device, in
+Lua (`_shared/lua/layouts/xkb_converter.lua`, which writes the bytes
+`../xkb_generation/keylayout_to_xkb.py` writes) and installs the result with
 `user_layout_installer.py` in the user XKB tree that libxkbcommon reads first,
 `${XDG_CONFIG_HOME:-~/.config}/xkb`: `symbols/<id>`, `types/<id>`,
 `compose/<id>.XCompose`, a `rules/evdev` that starts with `! include %S/evdev`
@@ -156,10 +157,29 @@ for the desktop pickers, and an owned block of includes in `~/.XCompose`.
   owner marker; any other existing file is a conflict (exit 3, `"code":
 "conflict"` in the JSON report) and nothing is written.
 - Only libxkbcommon reads this tree, so it serves Wayland sessions; an X11
-  session needs the system installer above.
+  session needs the system installer above. `install` and `activate` therefore
+  refuse in a pure Xorg session (`XDG_SESSION_TYPE=x11`): exit 3, `"code":
+"xorg_session"` in the JSON report, nothing written. The daemon turns that code
+  into the `layouts.linux_xorg_session` message. `uninstall` still works.
 - `install` compiles the layout with `xkbcli` when it is installed and reports
   `verified`; `activate` and `uninstall` add or remove the layout in the
   GNOME/KDE input sources through `desktop_activation.py`.
+- Two commands replace a layout live, for the daemon's number-row options. Both
+  succeed only once the session's keymap, read back with `xkbcomp -xkb
+$DISPLAY -`, holds the installed cells on the thirteen number-row keys, not
+  only the layout's name (`stale_keymap` otherwise).
+  - `apply-x11` (after `install --allow-xorg`) compiles the layout from the tree
+    straight into the running X server.
+  - `apply-wayland` serves GNOME and KDE on Wayland. A compositor recompiles only
+    when the selected id changes, so each build alternates between the layout's
+    id and `<id>_live`: the build is installed under the slot not in use, the
+    GNOME `sources`/`mru-sources` or Plasma `LayoutList` move to it with a
+    read-back, and XWayland, which receives the compositor's keymap, must hold
+    it. Every refusal (`no_display`, `select_refused`, `not_loaded`,
+    `stale_keymap`, ...) writes the previous setting back. Both slots then hold
+    the same build; `install` mirrors updates into `<id>_live`, `activate`
+    drops it from the desktop list and `uninstall` removes both. Other sessions
+    get `session_unsupported` before anything is written.
 - `ERGOPTI_XKB_USER_ROOT` and `ERGOPTI_XKB_USER_HOME` override the tree and the
   home folder for sandboxed tests.
 

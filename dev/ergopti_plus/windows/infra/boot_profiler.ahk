@@ -17,6 +17,7 @@
 ; ==============================================================================
 
 #Include ../adapters/boot_clock.ahk
+#Include phase_stats.ahk
 
 global _BOOT_PROFILE_LAST  := 0  ; A_TickCount captured at the previous mark
 global _BOOT_PROFILE_START  := 0  ; A_TickCount captured at BootProfile_Begin
@@ -169,9 +170,17 @@ BootProfile_StageEnd(Name, Detail := "") {
 		return
 	}
 	Started := Open.Delete(Name)
+	DurationMs := TickElapsed(Started.Tick, A_TickCount)
+	_BootStageDurations().Push({ Name: Name, Ms: DurationMs })
 	try LoggerSuccess("BootProfile", "Boot stage '{1}' done in {2} ms{3}.",
-		Name, TickElapsed(Started.Tick, A_TickCount), Detail != "" ? ": " . Detail : "")
+		Name, DurationMs, Detail != "" ? ": " . Detail : "")
 	_BootProfileStageResources(Name, Started)
+	; The phases macOS and Linux record for a boot stage: a process CPU of -1 means
+	; the clock could not be read, which is no duration.
+	PhaseStats_AddMs("boot.stage", BootClockWallMs() - Started.WallMs)
+	CpuMs := BootClockCpuMs()
+	if (CpuMs >= 0 && Started.CpuMs >= 0)
+		PhaseStats_AddMs("boot.stage_cpu", CpuMs - Started.CpuMs)
 }
 
 ; Closes a stage that did not complete, as a WARNING rather than a SUCCESS.
@@ -191,6 +200,39 @@ BootProfile_TotalBootMs() {
 	global _BOOT_PROFILE_START
 	Uptime := BootProfile_ProcessUptimeMs()
 	return (Uptime >= 0) ? Uptime : TickElapsed(_BOOT_PROFILE_START, A_TickCount)
+}
+
+; The boot total frozen when the boot ended: TotalBootMs keeps growing with the
+; process, so a check run later must read this one. -1 until the boot ended.
+; @param {Integer} Completed The total to record, or -1 to only read it.
+; @returns {Integer}
+BootProfile_CompletedBootMs(Completed := -1) {
+	static Recorded := -1
+	if Completed >= 0
+		Recorded := Completed
+	return Recorded
+}
+
+; Durations of the closed stages in completion order, for the boot summary.
+; A function static for the same include-order reason as the registry above.
+; @returns {Array} Entries { Name, Ms }.
+_BootStageDurations() {
+	static Closed := []
+	return Closed
+}
+
+; Compact one-line table of the closed top-level stages, e.g. "i18n=47 tray_menu=2781".
+; Nested "menu row" stages overlap the tray menu stage and are left out so the
+; figures can be read against the total. Names are code literals, never content.
+; @returns {String}
+BootProfile_StageSummary() {
+	Text := ""
+	for Stage in _BootStageDurations() {
+		if SubStr(Stage.Name, 1, 9) == "menu row "
+			continue
+		Text .= (Text == "" ? "" : " ") . StrReplace(Stage.Name, " ", "_") . "=" . Stage.Ms
+	}
+	return Text
 }
 
 ; Names of the stages still open, for the boot-complete line.

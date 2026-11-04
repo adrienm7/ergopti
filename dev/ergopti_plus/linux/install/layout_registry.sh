@@ -15,6 +15,9 @@
 LAYOUT_REGISTRY_FOLDER="static/layouts/registry"
 LAYOUT_REGISTRY_INDEX="index.json"
 
+# The sentences this script prints, in the user's language (install/messages.sh).
+source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
+
 # Prints the registry folder the installer copies beside the driver, or nothing
 # when the driver source already carries it. Fails when neither layout has one:
 # an installation without the registry would silently drop the Ergopti hotstrings.
@@ -32,7 +35,7 @@ layout_registry_source() {
 		(cd -- "${checkout_registry}" && pwd -P)
 		return 0
 	fi
-	echo "Layout registry not found beside ${driver_source} nor at ${checkout_registry}." >&2
+	ergopti_msg layout_registry.not_found "${driver_source}" "${checkout_registry}" >&2
 	return 1
 }
 

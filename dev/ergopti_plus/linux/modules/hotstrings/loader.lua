@@ -41,12 +41,15 @@ local M = {}
 -- =========================================
 
 local Logger = require("logger.shim")
-local Reader = require("toml_codec.reader")
+local Reader = require("infra.toml.reader")
 local Priority = require("hotstring_priority")
 local Paths  = require("infra.paths")
-local Shell  = require("adapters.shell_runner")
+local NativeDirectory = require("infra.native_directory")
 local CatalogueFiles = require("hotstrings.catalogue_files")
 local PersonalFiles = require("hotstrings.personal_files")
+local TableUtil = require("table_util")
+local NativePath = require("native_path")
+local OutputTokens = require("modules.hotstrings.output_tokens")
 
 local LOG = "modules.hotstrings.loader"
 
@@ -99,7 +102,7 @@ end
 --- @param path string Absolute path to a .toml file.
 --- @return string
 local function category_of(path)
-	local stem = path:match("([^/\\]+)%.toml$")
+	local stem = path:match("([^/]+)%.toml$")
 	return stem or "unknown"
 end
 
@@ -107,9 +110,7 @@ end
 --- @param t table
 --- @return integer
 local function count_categories(t)
-	local n = 0
-	for _ in pairs(t) do n = n + 1 end
-	return n
+	return TableUtil.count(t)
 end
 
 --- A set of section names from an optional source list.
@@ -289,9 +290,13 @@ function M.load_catalogue(paths, options, prepared_sources)
 					for index, entry in ipairs(section.entries) do
 						if type(entry.trigger) == "string" and type(entry.output) == "string" then
 							entry_count = entry_count + 1
+							local replacement, has_key_tokens = OutputTokens.resolve(entry.output)
 							registrations[sec_name][index] = {
 								trigger           = configured_magic_trigger(entry.trigger, options),
-								replacement       = entry.output,
+								replacement       = replacement,
+								-- {Left} and friends: the daemon presses them, and the buffer
+								-- cannot follow the caret afterwards.
+								has_key_tokens    = has_key_tokens,
 								is_word           = entry.is_word           or false,
 								is_case_sensitive = entry.is_case_sensitive or false,
 								-- The three flags the loader used to drop on the floor. Without
@@ -384,25 +389,35 @@ function M.is_pack_file(path)
 	return CatalogueFiles.is_category_file(path)
 end
 
+--- Reports a directory the discovery could not inspect or list. Absence is
+--- the ordinary case (no personal folder yet) and stays silent; any other
+--- refusal is logged, where `find ... 2>/dev/null` used to drop it.
+--- @param path string Refused path.
+--- @param message string|nil Native refusal.
+--- @param code string|nil Native error code.
+local function report_unlistable(path, message, code)
+	if code == "ENOENT" then return end
+	Logger.warn(LOG, "Hotstring discovery could not read '%s' (%s); its packs are left out.", path, tostring(message))
+end
+
 --- Scans a directory tree and returns every hotstring pack in it.
 --- Useful for pointing the loader at ~/.config/ergopti/hotstrings/.
+---
+--- The walk is `find <dir> [-maxdepth N] -type f -name '*.toml'`, kept to the
+--- byte and the order (infra/native_directory.lua), run in this process: a
+--- start used to fork find five times. Filenames keep every byte, newlines
+--- included, since no text framing sits between the kernel and the paths.
 --- @param dir string Absolute path to the root directory to scan.
+--- @param max_directory_depth number|nil Deepest level scanned (find -maxdepth).
 --- @return table  Array of absolute .toml file paths.
 function M.find_toml_files(dir, max_directory_depth)
 	if type(dir) ~= "string" or dir == "" then return {} end
 	Logger.trace(LOG, "Scanning '%s' for hotstring packs…", dir)
 
-	-- Through the shell adapter rather than a hand-quoted io.popen: this is a
-	-- path that can come from a config file, and quoting re-derived at a call
-	-- site is quoting that is eventually wrong.
 	local result = {}
-	local limit = max_directory_depth and (" -maxdepth " .. tostring(max_directory_depth)) or ""
-	local out = Shell.exec(string.format(
-		"find %s%s -type f -name '*.toml' 2>/dev/null", Shell.quote(dir), limit))
-	for line in out:gmatch("[^\r\n]+") do
-		local path = line:match("^%s*(.-)%s*$")
-		if M.is_pack_file(path) then result[#result + 1] = path end
-	end
+	NativeDirectory.walk(dir, max_directory_depth, function(path, kind)
+		if kind == "file" and path:sub(-5) == ".toml" and M.is_pack_file(path) then result[#result + 1] = path end
+	end, report_unlistable)
 
 	Logger.done(LOG, "Found %d pack(s) under '%s'.", #result, dir)
 	return result
@@ -415,34 +430,22 @@ end
 --- @return table directories Blocked relative labels and exact paths.
 function M.unavailable_directories(dir, max_directory_depth)
 	if type(dir) ~= "string" or dir == "" or type(max_directory_depth) ~= "number" then return {} end
-	local available, native = pcall(require, "lfs")
-	local stat = available and native.symlinkattributes or nil
-	if type(stat) ~= "function" then
-		available, native = pcall(require, "luv")
-		stat = available and native.fs_lstat or nil
-	end
-	if type(stat) ~= "function" then return {} end
-	local observed, root_attributes = pcall(stat, dir)
-	local root_mode = observed and type(root_attributes) == "table" and (root_attributes.mode or root_attributes.type)
-	if root_mode == "link" then
-		return { { path = dir, label = dir:gsub("/+$", ""):match("([^/]+)$"), reason = "linked-directory" } }
+	if NativeDirectory.kind(dir) == "link" then
+		return { { path = dir, label = NativePath.basename(NativePath.without_trailing_separators(dir)), reason = "linked-directory" } }
 	end
 	local prefix = dir:gsub("/+$", "") .. "/"
 	local rows = {}
-	local out = Shell.exec(string.format("find %s -maxdepth %d \\( -type l -o -type d \\) -print 2>/dev/null",
-		Shell.quote(dir), max_directory_depth))
-	for path in out:gmatch("[^\r\n]+") do
-		if path:sub(1, #prefix) == prefix then
+	-- `find <dir> -maxdepth N \( -type l -o -type d \)`, in process.
+	NativeDirectory.walk(dir, max_directory_depth, function(path, mode)
+		if (mode == "link" or mode == "directory") and path:sub(1, #prefix) == prefix then
 			local relative = path:sub(#prefix + 1)
 			local depth = 0; for _ in relative:gmatch("[^/]+") do depth = depth + 1 end
-			local called, attributes = pcall(stat, path)
-			local mode = called and type(attributes) == "table" and (attributes.mode or attributes.type)
 			if (mode == "link" and not relative:match("%.toml$")) or mode == "directory" and depth == max_directory_depth then
 				rows[#rows + 1] = { path = path, label = relative,
 					reason = mode == "link" and "linked-directory" or "scan-depth" }
 			end
 		end
-	end
+	end, report_unlistable)
 	table.sort(rows, function(left, right) return left.label < right.label end)
 	return rows
 end
@@ -450,24 +453,66 @@ end
 --- Lists the immediate subdirectories of a directory.
 ---
 --- Extensions are one directory each, so discovery is a listing at depth 1 —
---- `-maxdepth 1 -mindepth 1` rather than a recursive walk, which would descend
---- into every `hotstrings/` and `shortcuts/` folder and report those as
---- extensions too.
+--- `find <dir> -mindepth 1 -maxdepth 1 -type d`, in process — rather than a
+--- recursive walk, which would descend into every `hotstrings/` and
+--- `shortcuts/` folder and report those as extensions too.
 --- @param dir string Absolute path.
 --- @return table Array of absolute directory paths.
 function M.list_subdirs(dir)
 	if type(dir) ~= "string" or dir == "" then return {} end
 	local result = {}
-	local out = Shell.exec(string.format(
-		"find %s -mindepth 1 -maxdepth 1 -type d 2>/dev/null", Shell.quote(dir)))
-	for line in out:gmatch("[^\r\n]+") do
-		local path = line:match("^%s*(.-)%s*$")
-		if path ~= "" then result[#result + 1] = path end
-	end
+	NativeDirectory.walk(dir, 1, function(path, kind, depth)
+		if depth == 1 and kind == "directory" then result[#result + 1] = path end
+	end, report_unlistable)
 	return result
 end
 
 --- Proves two routes still name the same regular native source file.
+-- Exact identity acquisition remains unavailable after ambiguous native closure.
+-- Keep the original descriptor owner; it confers no retry/destructive authority.
+local _same_file_exact_owners = {}
+local _same_file_exact_acquiring = false
+local SAME_FILE_SAFE_INTEGER = 9007199254740991
+
+local function same_file_exact(left, right)
+	if _same_file_exact_acquiring or next(_same_file_exact_owners) ~= nil then return false end
+	_same_file_exact_acquiring = true
+	local called, result = pcall(function()
+		local available, native = pcall(require, "luv")
+		local admitted, Identity = pcall(require, "infra.curl_identity")
+		if not available or type(native) ~= "table" or not admitted or type(Identity) ~= "table"
+			or type(Identity.new) ~= "function" or type(Identity.copy) ~= "function"
+			or type(Identity.equal) ~= "function" then return false end
+		local function observe(path)
+			local owner = Identity.new(native)
+			_same_file_exact_owners[owner] = true
+			local observed, identity
+			if type(owner.observe_regular) == "function" then
+				observed, identity = pcall(owner.observe_regular, owner, path)
+			else
+				-- The unchanged constructor acquires no FD; seal an unavailable entry.
+				pcall(owner.cancel, owner)
+				observed = false
+			end
+			local readback, settled = pcall(owner.is_settled, owner)
+			if readback and settled == true then _same_file_exact_owners[owner] = nil end
+			if not observed or not readback or settled ~= true then return nil end
+			local copy = Identity.copy(identity)
+			return copy and copy.inode_decimal ~= "0" and copy or nil
+		end
+		local first = observe(left)
+		if not first then return false end
+		local second = observe(right)
+		if not second or not Identity.equal(first, second) then return false end
+		local final_left = observe(left)
+		if not final_left or not Identity.equal(first, final_left) then return false end
+		local final_right = observe(right)
+		return final_right ~= nil and Identity.equal(second, final_right)
+	end)
+	_same_file_exact_acquiring = false
+	return called and result == true and next(_same_file_exact_owners) == nil
+end
+
 --- Logical shipped categories can use a relative path or physical alias; a
 --- same-named user copy has a different identity and grants no shipped binding.
 --- Missing or unstable native identity support refuses this distinction.
@@ -477,6 +522,7 @@ end
 function M.same_file(left, right)
 	if type(left) ~= "string" or left == "" or left:find("\0", 1, true)
 		or type(right) ~= "string" or right == "" or right:find("\0", 1, true) then return false end
+	if _same_file_exact_acquiring or next(_same_file_exact_owners) ~= nil then return false end
 	local available, native = pcall(require, "lfs")
 	local stat = available and type(native) == "table" and native.attributes or nil
 	if type(stat) ~= "function" then
@@ -484,18 +530,31 @@ function M.same_file(left, right)
 		stat = available and type(native) == "table" and native.fs_stat or nil
 	end
 	if type(stat) ~= "function" then return false end
-	local function identity(path)
-		local ok, attrs = pcall(stat, path)
-		if not ok or type(attrs) ~= "table" or (attrs.mode ~= "file" and attrs.type ~= "file") then return nil end
-		local device, inode = attrs.dev, attrs.ino
-		if type(device) ~= "number" or type(inode) ~= "number"
-			or device ~= device or inode ~= inode or device < 0 or inode <= 0
-			or device == math.huge or inode == math.huge
-			or device % 1 ~= 0 or inode % 1 ~= 0 then return nil end
-		return tostring(device) .. ":" .. tostring(inode)
+	local function exact_ready()
+		return not _same_file_exact_acquiring and next(_same_file_exact_owners) == nil
 	end
-	local first, second = identity(left), identity(right)
-	return first ~= nil and first == second and identity(left) == first and identity(right) == second
+	local function identity(path)
+		if not exact_ready() then return nil end
+		local ok, attrs = pcall(stat, path)
+		if not exact_ready() then return nil end
+		if not ok or type(attrs) ~= "table" or (attrs.mode ~= "file" and attrs.type ~= "file") then return nil end
+		if not exact_ready() then return nil end
+		local device, inode = attrs.dev, attrs.ino
+		if not exact_ready() then return nil end
+		if type(device) ~= "number" or type(inode) ~= "number"
+			or device ~= device or inode ~= inode or device < 0 or inode == 0
+			or device == math.huge or inode == math.huge or inode == -math.huge
+			or device % 1 ~= 0 or inode % 1 ~= 0 then return nil end
+		if device > SAME_FILE_SAFE_INTEGER or inode < 0 or inode > SAME_FILE_SAFE_INTEGER then
+			return nil, "exact-native-observation-required"
+		end
+		return string.format("%.0f:%.0f", device, inode)
+	end
+	local first, first_reason = identity(left)
+	local second, second_reason = identity(right)
+	if (first == nil and first_reason == nil) or (second == nil and second_reason == nil) then return false end
+	if first_reason ~= nil or second_reason ~= nil then return same_file_exact(left, right) end
+	return first == second and identity(left) == first and identity(right) == second and exact_ready()
 end
 
 --- Reads a whole file, or nil when it is absent.

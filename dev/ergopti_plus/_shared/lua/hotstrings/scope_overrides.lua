@@ -8,14 +8,14 @@
 --- per-category and per-section delays, colours, previews and priorities.
 ---
 --- WHY DELETION IS NOT ENOUGH FOR « RESTORE RECOMMENDED »:
---- Removing a user's delay makes the section inherit its corpus value
---- ([_meta.section_delays], then [_meta].delay, then the shared default). The
---- manifest's recommended delay is a separate declaration and the two differ:
---- autocorrection.toml ships `delay = 1.0` while the manifest recommends 0.5 s
---- for its caps section. Each driver therefore supplies its own runtime
---- inheritance, and this planner writes an explicit value wherever deletion
---- would not produce the recommendation. « Clear » only deletes, which leaves
---- every section on its corpus inheritance.
+--- Removing a user's delay makes the section inherit the delay it declares
+--- (its manifest default), else its corpus value ([_meta.section_delays], then
+--- [_meta].delay), else the shared default. The manifest's recommended delay
+--- is a separate declaration that may differ from that inheritance. Each
+--- driver therefore supplies its own runtime inheritance, and this planner
+--- writes an explicit value wherever deletion would not produce the
+--- recommendation. « Clear » only deletes, which leaves every section on its
+--- inheritance.
 ---
 --- WHAT IS NEVER TOUCHED:
 --- Categories, sections and fields this planner is not told about stay in the
@@ -25,6 +25,7 @@
 
 local M = {}
 local Languages = require("hotstrings.languages")
+local DelayResolver = require("hotstrings.delay_resolver")
 local KeyPath = require("toml_codec.key_path")
 
 --- Override fields owned by the scope, in the order every driver writes them.
@@ -58,7 +59,8 @@ end
 ---   features table The generated manifest's `features` array.
 ---   groups table Dense array of runtime-owned groups: { id = string,
 ---     override = segments (the group's override table path),
----     sections = { section names }, bundled = boolean }.
+---     sections = { section names }, bundled = boolean, personal = boolean|nil }
+---     where personal marks the user's own files, which a restore leaves alone.
 ---   inherited function (group_id, section) -> seconds the runtime resolves
 ---     for that section once every user override is removed.
 ---   extra table|nil Dense array of { override = segments, fields = names }
@@ -89,9 +91,16 @@ function M.plan(request)
 			and valid_segments(group.override) and type(group.sections) == "table"
 			and type(group.bundled) == "boolean", "override scope group is malformed at " .. position)
 		assert(not seen[group.id], "override scope group is duplicated: " .. group.id)
+		assert(group.personal == nil or type(group.personal) == "boolean",
+			"override scope personal flag is malformed in " .. group.id)
 		seen[group.id] = true
-		for _, field in ipairs(M.FIELDS) do emit(group.override, nil, field) end
-		for _, section in ipairs(group.sections) do
+		-- A restore leaves the user's own hotstrings as they are: only a clear
+		-- resets a personal group's delay, colour, priority and tooltip.
+		local untouched = request.mode == "recommended" and group.personal == true
+		if not untouched then
+			for _, field in ipairs(M.FIELDS) do emit(group.override, nil, field) end
+		end
+		for _, section in ipairs(untouched and {} or group.sections) do
 			assert(type(section) == "string" and section ~= "", "override scope section is malformed in " .. group.id)
 			local delay_change
 			for _, field in ipairs(M.FIELDS) do
@@ -126,9 +135,16 @@ function M.plan(request)
 end
 
 --- Renders planned changes as shared TOML writer rows.
+---
+--- The planner reasons in effective seconds; the override file stores a delay as
+--- an offset of the base expansion delay (`delay_offset`, or `delay_unlimited`
+--- for 0), so a `delay` change renders as the whole set of delay leaves: the
+--- one that holds the value, and a deletion of each spelling that must not
+--- survive it, the absolute one of earlier builds included.
 --- @param changes table Result of M.plan().
+--- @param base number|nil Base expansion delay in seconds; required when a change writes a delay.
 --- @return table rows `{ section, key, delete = true }` or `{ section, key, value }`.
-function M.writer_rows(changes)
+function M.writer_rows(changes, base)
 	assert(type(changes) == "table", "override scope rows require planned changes")
 	local rows = {}
 	for index, change in ipairs(changes) do
@@ -137,10 +153,25 @@ function M.writer_rows(changes)
 		local segments = copy_segments(change.override)
 		if change.section ~= nil then segments[#segments + 1] = change.section end
 		local section = KeyPath.render(segments)
-		if change.value == nil then
-			rows[index] = { section = section, key = change.field, delete = true }
+		if change.field == "delay" then
+			local kept
+			if change.value == 0 then
+				kept = { key = "delay_unlimited", value = true }
+			elseif change.value ~= nil then
+				assert(type(base) == "number", "writing a delay needs the base expansion delay")
+				kept = { key = "delay_offset", value = DelayResolver.offset_for(change.value, base) }
+			end
+			for _, leaf in ipairs(DelayResolver.DELAY_LEAVES) do
+				if kept and kept.key == leaf then
+					rows[#rows + 1] = { section = section, key = leaf, value = kept.value }
+				else
+					rows[#rows + 1] = { section = section, key = leaf, delete = true }
+				end
+			end
+		elseif change.value == nil then
+			rows[#rows + 1] = { section = section, key = change.field, delete = true }
 		else
-			rows[index] = { section = section, key = change.field, value = change.value }
+			rows[#rows + 1] = { section = section, key = change.field, value = change.value }
 		end
 	end
 	return rows

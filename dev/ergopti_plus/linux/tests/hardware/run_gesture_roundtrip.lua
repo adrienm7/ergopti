@@ -33,6 +33,7 @@
 local Decoder = require("modules.gestures.mt_decoder")
 local Finder = require("modules.gestures.touchpad_finder")
 local Reader = require("adapters.evdev_reader")
+local Record = require("tests.support.touchpad_record")
 
 local UINPUT_PATH = "/dev/uinput"
 local DEVICE_NAME = "Ergopti Roundtrip Touchpad"
@@ -46,6 +47,10 @@ local SETTLE_SECONDS  = 0.1
 local _origin_nudge = 0
 
 local _failures, _checks = 0, 0
+
+-- Every event the reader delivered to a decoder, and the gestures it gave, kept
+-- as a libinput record capture of this run.
+local _captured, _decoded = {}, {}
 
 --- @param condition boolean
 --- @param what string
@@ -109,23 +114,28 @@ ffi.cdef([[
 local UI_SET_EVBIT   = 0x40045564
 local UI_SET_KEYBIT  = 0x40045565
 local UI_SET_ABSBIT  = 0x40045567
+local UI_SET_MSCBIT  = 0x40045568
 local UI_SET_PROPBIT = 0x4004556e
 local UI_ABS_SETUP   = 0x401c5504
 local UI_DEV_SETUP   = 0x405c5503
 local UI_DEV_CREATE  = 0x5501
 local UI_DEV_DESTROY = 0x5502
 
-local EV_SYN, EV_KEY, EV_ABS = 0x00, 0x01, 0x03
+local EV_SYN, EV_KEY, EV_ABS, EV_MSC = 0x00, 0x01, 0x03, 0x04
 local SYN_REPORT = 0
+local MSC_TIMESTAMP = 0x05
+-- Microseconds between two reports, as a touchpad scanning at about 140 Hz.
+local SCAN_INTERVAL_US = 7000
 local BTN_TOUCH = 0x14a
 local INPUT_PROP_POINTER, INPUT_PROP_BUTTONPAD = 0x00, 0x02
 
 local fd = ffi.C.open(UINPUT_PATH, 1 + 2048) -- O_WRONLY | O_NONBLOCK
 if fd < 0 then abort("could not open " .. UINPUT_PATH) end
 
-for _, bit in ipairs({ EV_KEY, EV_ABS, EV_SYN }) do
+for _, bit in ipairs({ EV_KEY, EV_ABS, EV_MSC, EV_SYN }) do
 	ffi.C.ioctl(fd, UI_SET_EVBIT, ffi.cast("int", bit))
 end
+ffi.C.ioctl(fd, UI_SET_MSCBIT, ffi.cast("int", MSC_TIMESTAMP))
 for _, prop in ipairs({ INPUT_PROP_POINTER, INPUT_PROP_BUTTONPAD }) do
 	ffi.C.ioctl(fd, UI_SET_PROPBIT, ffi.cast("int", prop))
 end
@@ -173,6 +183,19 @@ local function emit(etype, code, value)
 	ev.tv_sec, ev.tv_usec = 0, 0
 	ev.type, ev.code, ev.value = etype, code, value
 	ffi.C.write(fd, ev, ffi.sizeof("struct rt_input_event"))
+end
+
+local _scan_time_us = 0
+
+--- Ends one report the way a precision touchpad does: hid-multitouch stamps
+--- every report with MSC_TIMESTAMP. The input core drops a report in which no
+--- value changed, so without the stamp fingers held still produce no frame at
+--- all, and a five-finger tap reached the decoder as one frame at five, which
+--- the finger_join_frames gate rightly refuses as a graze.
+local function sync()
+	_scan_time_us = _scan_time_us + SCAN_INTERVAL_US
+	emit(EV_MSC, MSC_TIMESTAMP, _scan_time_us)
+	emit(EV_SYN, SYN_REPORT, 0)
 end
 
 
@@ -260,7 +283,7 @@ local function play(fingers, dx, dy)
 		if index > 0 then emit(EV_KEY, tool[index], 0) end
 		emit(EV_KEY, tool[index + 1], 1)
 		if index == 0 then emit(EV_KEY, BTN_TOUCH, 1) end
-		emit(EV_SYN, SYN_REPORT, 0)
+		sync()
 	end
 
 	for step = 1, 4 do
@@ -269,7 +292,7 @@ local function play(fingers, dx, dy)
 			emit(EV_ABS, Decoder.ABS_MT_POSITION_X, base_x + index * 200 + math.floor(dx * step / 4))
 			emit(EV_ABS, Decoder.ABS_MT_POSITION_Y, base_y + math.floor(dy * step / 4))
 		end
-		emit(EV_SYN, SYN_REPORT, 0)
+		sync()
 	end
 
 	for index = fingers - 1, 0, -1 do
@@ -277,18 +300,20 @@ local function play(fingers, dx, dy)
 		emit(EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1)
 		emit(EV_KEY, tool[index + 1], 0)
 		if index > 0 then emit(EV_KEY, tool[index], 1) end
-		emit(EV_SYN, SYN_REPORT, 0)
+		sync()
 	end
 	emit(EV_KEY, BTN_TOUCH, 0)
-	emit(EV_SYN, SYN_REPORT, 0)
+	sync()
 
 	-- Drain through the driver's own reader. Several passes because the kernel
 	-- delivers asynchronously and one drain is bounded.
 	local out = nil
 	for _ = 1, SETTLE_ATTEMPTS do
 		local drained = Reader.drain(function(event)
+			_captured[#_captured + 1] = { type = event.type, code = event.code, value = event.value,
+				timestamp_us = event.timestamp_us }
 			local gesture = decoder:feed(event)
-			if gesture then out = gesture end
+			if gesture then out = gesture; _decoded[#_decoded + 1] = gesture end
 		end, Reader.TOUCHPAD)
 		if out then break end
 		if drained == 0 then os.execute("sleep " .. tostring(SETTLE_SECONDS)) end
@@ -322,6 +347,31 @@ check(left ~= nil and left.direction == "left", string.format(
 	left and tostring(left.direction) or "nothing"))
 
 Reader.close(Reader.TOUCHPAD)
+
+-- The capture, written in libinput record format and read back, must decode
+-- into the same gestures: the reader of that format is then checked against
+-- what a kernel delivered rather than against a hand-written table.
+local record_text = Record.encode(DEVICE_NAME, _captured)
+local trace, record_error = Record.decode(record_text)
+check(trace ~= nil, "the capture reads back as a libinput record" .. (record_error and ": " .. record_error or ""))
+if trace then
+	local replayed = Record.replay(Decoder.new(), trace)
+	local same = #replayed == #_decoded
+	for index, gesture in ipairs(_decoded) do
+		local other = replayed[index]
+		same = same and other ~= nil and other.fingers == gesture.fingers
+			and other.direction == gesture.direction and (other.tap == true) == (gesture.tap == true)
+	end
+	check(same, string.format("the recorded capture replays into the same %d gesture(s); got %d",
+		#_decoded, #replayed))
+end
+local record_path = os.getenv("ERGOPTI_TOUCHPAD_RECORD")
+if record_path and record_path ~= "" then
+	local file = assert(io.open(record_path, "wb"))
+	assert(file:write(record_text))
+	assert(file:close())
+	print("  capture written to " .. record_path)
+end
 destroy()
 
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))

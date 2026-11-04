@@ -27,6 +27,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -88,8 +89,13 @@ LLM_ToneActions() {
  */
 LLM_Tone_Trigger(Direction, Cycle) {
 	global _LLM_Tone_Generation
-	_LLM_Tone_Generation += 1
-	if !LLM_SelectionReader().Call(_LLM_Tone_OnSelection.Bind(_LLM_Tone_Generation, Direction, Cycle)) {
+	AuxGeneration := LLM_AuxGeneration()
+	Generation := ++_LLM_Tone_Generation
+	PhysicalGeneration := KS_GetPhysicalInputGeneration()
+	; The destination belongs to the original selection, before any planning
+	; or readiness getter can pump a focus change after the copy completes.
+	Focus := _LLM_Tone_CurrentFocus()
+	if !LLM_SelectionReader().Call(_LLM_Tone_OnSelection.Bind(Generation, AuxGeneration, PhysicalGeneration, Direction, Cycle, Focus)) {
 		LoggerInfo("LLM", "Tone step skipped: the selection could not be read (paused or clipboard busy).")
 		return false
 	}
@@ -118,16 +124,23 @@ LLM_SelectionReader() {
 
 ; The selection arrived: plan the step, apply the refusals, send the request.
 ; @param {Integer} Generation The step's generation.
+; @param {Integer} AuxGeneration The backend lifecycle at the original trigger.
+; @param {Integer} PhysicalGeneration The input ticket retained before capture.
 ; @param {Integer} Direction The ladder direction.
 ; @param {Boolean} Cycle Whether to wrap around.
+; @param {String} Focus The original selected control.
 ; @param {String} Text The selected text ("" when nothing is selected).
-_LLM_Tone_OnSelection(Generation, Direction, Cycle, Text) {
+_LLM_Tone_OnSelection(Generation, AuxGeneration, PhysicalGeneration, Direction, Cycle, Focus, Text) {
 	global _LLM_Tone_Generation, _LLM_Tone_Memory, _LLM_Menu, LLM_TONE_MORE_FORMAL
-	if (Generation != _LLM_Tone_Generation) {
-		LoggerDebug("LLM", "Tone step dropped: a newer step superseded it before the selection arrived.")
+	if !_LLM_Tone_GenerationCurrent(Generation, AuxGeneration, PhysicalGeneration) {
+		LoggerDebug("LLM", "Tone step dropped: its request lifecycle ended before the selection arrived.")
 		return
 	}
 	Plan := LLM_Tone_Plan(Text, _LLM_Tone_Memory, Direction, Cycle, &Reason)
+	if !_LLM_Tone_GenerationCurrent(Generation, AuxGeneration, PhysicalGeneration) {
+		LoggerDebug("LLM", "Tone step dropped: its selected input changed while planning.")
+		return
+	}
 	if !(Plan is Map) {
 		if (Reason == "empty_selection") {
 			LoggerDebug("LLM", "Tone step skipped: nothing is selected.")
@@ -149,7 +162,9 @@ _LLM_Tone_OnSelection(Generation, Direction, Cycle, Text) {
 	; The selection would leave an app the user excluded from the AI
 	if _LLM_Engine_ShouldSuppressForDisabledApps()
 		return
-	_LLM_Tone_Dispatch(Generation, Plan, _LLM_Tone_CurrentFocus())
+	Plan["aux_generation"] := AuxGeneration
+	Plan["physical_generation"] := PhysicalGeneration
+	_LLM_Tone_Dispatch(Generation, Plan, Focus)
 }
 
 ; Sends the one request of a step to the current backend.
@@ -159,8 +174,12 @@ _LLM_Tone_OnSelection(Generation, Direction, Cycle, Text) {
 ; @returns {Boolean} True when the request was sent.
 _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 	global _LLM_Engine
+	AuxGeneration := Plan["aux_generation"]
+	PhysicalGeneration := Plan["physical_generation"]
+	if !_LLM_Tone_OutputCurrent(Generation, Focus, AuxGeneration, PhysicalGeneration)
+		return false
 	ProfileId := Plan["profile_id"]
-	Profile := LLM_FindProfile(ProfileId, _LLM_Engine.Get("user_profiles", []))
+	Profile := LLM_FindProfile(ProfileId, _LLM_Engine.Get(ConfigLeaf.USER_PROFILES, []))
 	if !(Profile is Map) {
 		LoggerError("LLM", "Tone step dropped: the built-in prompt '{1}' is missing.", ProfileId)
 		return false
@@ -170,12 +189,12 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 		return false
 	}
 	Source := Plan["source"]
-	SystemPrompt := LLM_ResolveSystemPrompt(Profile, 1, _LLM_Engine["min_words"],
-		_LLM_Engine["max_words"], _LLM_Engine["language"])
+	SystemPrompt := LLM_ResolveSystemPrompt(Profile, 1, _LLM_Engine[ConfigLeaf.MIN_WORDS],
+		_LLM_Engine[ConfigLeaf.MAX_WORDS], _LLM_Engine["language"])
 	MaxTokens := LLM_Rewrite_MaxTokens(Source)
 	Temperature := _LLM_Engine["temperature"] + 0.0
 	OnSuccess := _LLM_Tone_OnAnswer.Bind(Generation, Plan, Focus)
-	OnFail := _LLM_Tone_OnFail.Bind(Generation, ProfileId)
+	OnFail := _LLM_Tone_OnFail.Bind(Generation, AuxGeneration, PhysicalGeneration, ProfileId)
 	Backend := _LLM_Engine.Get("backend", "ollama")
 	Entry := ""
 	if (Backend == "api") {
@@ -189,16 +208,20 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 	; single slot and delay the rewrite behind it; so would an older step.
 	LLM_Engine_CancelTimer()
 	LLM_Engine_CancelInflight()
-	_LLM_Engine["last_request_tick"] := A_TickCount
+	_LLM_Engine_Plan().OnSent(A_TickCount)
 	; The size of the selection, never its content: it is the user's own text
 	LoggerInfo("LLM", "Tone step requested with '{1}' ({2} character(s)).", ProfileId, StrLen(Source))
+	; Profile/entry readers, cancellation and logging can withdraw this request.
+	if !_LLM_Tone_OutputCurrent(Generation, Focus, AuxGeneration, PhysicalGeneration)
+		return false
 	; PREFIX and TAIL are both the text to rewrite: a selection has no context
 	if (Backend == "api")
 		_LLM_Engine_ResolveRemoteTransport().Call(Entry, SystemPrompt, Source, Temperature,
-			OnSuccess, OnFail, Source, MaxTokens)
+			OnSuccess, OnFail, Source, MaxTokens, "", 0, _LLM_Tone_OutputCurrent.Bind(Generation, Focus, AuxGeneration, PhysicalGeneration))
 	else
 		LLM_OllamaGenerate_Async(LLM_ResolveOllamaTag(_LLM_Engine["model"]), SystemPrompt, Source,
-			Temperature, OnSuccess, OnFail, "", MaxTokens, false, Source)
+			Temperature, OnSuccess, OnFail, "", MaxTokens, false, Source, "",
+			_LLM_Tone_OutputCurrent.Bind(Generation, Focus, AuxGeneration, PhysicalGeneration))
 	return true
 }
 
@@ -211,12 +234,8 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 ; @param {Func} SendFn Optional sender; resolved at call time.
 _LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "", SendFn := unset) {
 	global _LLM_Tone_Generation
-	if (Generation != _LLM_Tone_Generation) {
-		LoggerInfo("LLM", "Tone answer ignored: a newer step superseded it.")
-		return
-	}
-	if A_IsSuspended {
-		LoggerInfo("LLM", "Tone answer dropped: the driver is paused.")
+	if !_LLM_Tone_RequestCurrent(Generation, Plan["aux_generation"], Plan["physical_generation"]) {
+		LoggerInfo("LLM", "Tone answer ignored: a newer step superseded it, its selection changed, or its backend lifecycle ended.")
 		return
 	}
 	Text := LLM_Tone_Extract(Raw)
@@ -225,8 +244,8 @@ _LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "", SendFn := unset) {
 			(Raw is String) ? StrLen(Raw) : 0)
 		return
 	}
-	if !_LLM_Tone_OutputCurrent(Generation, Focus) {
-		LoggerInfo("LLM", "Tone answer dropped: its step was superseded or the focus moved to another window.")
+	if !_LLM_Tone_OutputCurrent(Generation, Focus, Plan["aux_generation"], Plan["physical_generation"]) {
+		LoggerInfo("LLM", "Tone answer dropped: its original step or input changed, or the focus moved.")
 		return
 	}
 	Opts := Map(
@@ -234,7 +253,7 @@ _LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "", SendFn := unset) {
 		"mode", "auto",
 		"atomic_input", true,
 		; Checked again at the instant the keys are sent
-		"admission", _LLM_Tone_OutputCurrent.Bind(Generation, Focus)
+		"admission", _LLM_Tone_OutputCurrent.Bind(Generation, Focus, Plan["aux_generation"], Plan["physical_generation"])
 	)
 	if !IsSet(SendFn)
 		SendFn := TextSend
@@ -257,7 +276,7 @@ _LLM_Tone_OnTyped(Generation, Plan, Focus, Text, Ok, ErrorMessage := "", SelectF
 		LoggerInfo("LLM", "Tone rewrite not typed: {1}.", ErrorMessage)
 		return
 	}
-	if !_LLM_Tone_OutputCurrent(Generation, Focus) or A_IsSuspended {
+	if !_LLM_Tone_OutputCurrent(Generation, Focus, Plan["aux_generation"], Plan["physical_generation"]) or A_IsSuspended {
 		LoggerInfo("LLM", "Tone completion dropped: its step or focused control is no longer current, or the driver is paused.")
 		return
 	}
@@ -269,7 +288,7 @@ _LLM_Tone_OnTyped(Generation, Plan, Focus, Text, Ok, ErrorMessage := "", SelectF
 		LoggerWarn("LLM", "Tone rewrite typed but not selected again.")
 	; The selection sender may finish yielding effects before it returns. A
 	; newer step owns the memory even when the old selection was admitted.
-	if !_LLM_Tone_OutputCurrent(Generation, Focus) or A_IsSuspended {
+	if !_LLM_Tone_OutputCurrent(Generation, Focus, Plan["aux_generation"], Plan["physical_generation"]) or A_IsSuspended {
 		LoggerInfo("LLM", "Tone completion memory dropped: its output owner was retired during selection.")
 		return
 	}
@@ -280,11 +299,12 @@ _LLM_Tone_OnTyped(Generation, Plan, Focus, Text, Ok, ErrorMessage := "", SelectF
 
 ; The request failed: nothing is typed.
 ; @param {Integer} Generation The step's generation.
+; @param {Integer} AuxGeneration The backend lifecycle at the original trigger.
+; @param {Integer} PhysicalGeneration The original selected-input ticket.
 ; @param {String} ProfileId The ladder profile it ran.
 ; @param {Map} Failure Remote failure details, when the backend gives them.
-_LLM_Tone_OnFail(Generation, ProfileId, Failure := "") {
-	global _LLM_Tone_Generation
-	if (Generation != _LLM_Tone_Generation)
+_LLM_Tone_OnFail(Generation, AuxGeneration, PhysicalGeneration, ProfileId, Failure := "") {
+	if !_LLM_Tone_RequestCurrent(Generation, AuxGeneration, PhysicalGeneration)
 		return
 	Reason := (Failure is Map) ? Failure.Get("reason", "") : ""
 	LoggerWarn("LLM", "Tone step with '{1}' failed{2}.", ProfileId,
@@ -325,11 +345,25 @@ _LLM_Tone_FocusUnchanged(Focus) {
 ; Recheck after the focus probe: the probe can finish a newer callback.
 ; @param {Integer} Generation The step which produced the rewrite.
 ; @param {String} Focus The focused window and control captured at dispatch.
-; @returns {Integer} True only while the same step and focus remain current.
-_LLM_Tone_OutputCurrent(Generation, Focus) {
-	global _LLM_Tone_Generation
-	if Generation != _LLM_Tone_Generation
+; @param {Integer} AuxGeneration The backend lifecycle at the original trigger.
+; @param {Integer} PhysicalGeneration The original selected-input ticket.
+; @returns {Integer} True while the same step, backend, input and focus remain current.
+_LLM_Tone_OutputCurrent(Generation, Focus, AuxGeneration, PhysicalGeneration) {
+	if !_LLM_Tone_RequestCurrent(Generation, AuxGeneration, PhysicalGeneration)
 		return false
 	FocusCurrent := _LLM_Tone_FocusUnchanged(Focus)
-	return FocusCurrent and Generation == _LLM_Tone_Generation
+	return FocusCurrent && _LLM_Tone_RequestCurrent(Generation, AuxGeneration, PhysicalGeneration)
+}
+
+; A step cannot borrow authority from a later backend or physical input.
+_LLM_Tone_GenerationCurrent(Generation, AuxGeneration, PhysicalGeneration) {
+	global _LLM_Tone_Generation
+	return Generation == _LLM_Tone_Generation && AuxGeneration == LLM_AuxGeneration()
+		&& PhysicalGeneration is Integer && PhysicalGeneration == KS_GetPhysicalInputGeneration()
+}
+
+_LLM_Tone_RequestCurrent(Generation, AuxGeneration, PhysicalGeneration) {
+	global _LLM_Menu
+	return _LLM_Tone_GenerationCurrent(Generation, AuxGeneration, PhysicalGeneration) && !A_IsSuspended
+		&& _LLM_Menu is Map && _LLM_Menu.Get("enabled", false) == true
 }

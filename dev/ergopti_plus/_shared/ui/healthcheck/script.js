@@ -23,6 +23,11 @@
  *    against its allowlist and opens nothing it did not collect itself.
  * 4. "Include details" asks the host to collect the opt-in facts; unticking it
  *    drops them from the page at once, before any export.
+ * 5. "Also save a redacted copy of today's complete log" is a second opt-in,
+ *    unticked at every snapshot. Ticking asks the host to read and redact the
+ *    log; the page shows the host's size and preview, and only Save and Report
+ *    a bug carry the choice back (Copy never does). The text of the log never
+ *    reaches this page, only its first and last redacted lines.
  * ==============================================================================
  */
 
@@ -33,7 +38,7 @@
 	var Redact = window.ErgoptiRedact;
 	var post = makeHostBridge('healthcheck');
 
-	// The host's configuration (schema, redaction rules and context, mode) and
+	// The host's configuration (schema, redaction rules and context) and
 	// the snapshot on screen; both null until the host's init message
 	var state = { config: null, snapshot: null };
 	var Checks = window.ErgoptiDiagnosticChecks;
@@ -41,36 +46,201 @@
 	var exportSequence = 0;
 	var pendingExport = null;
 	var sharedText = null;
+	var collection = { phase: 'idle' };
+	// The opt-in day log: off, preparing, or the host's verdict (ready,
+	// too_large, empty, missing, failed)
+	var dayLog = { phase: 'off' };
+	var lastExportDayLog = false;
+
+	/** Collection controls expose exact host state without accepting a page-supplied path. */
+	function renderCollection() {
+		var supported = state.config !== null && state.config.capabilities.diagnostic_collection;
+		var active =
+			isTrue(collection.owner_pending) ||
+			(collection.phase !== 'idle' &&
+				collection.phase !== 'completed' &&
+				collection.phase !== 'failed');
+		var button = document.getElementById('btn-collect-windows');
+		button.disabled = !supported || active;
+		button.title = supported ? '' : t('healthcheck.collection.unavailable');
+		document.getElementById('btn-collection-cancel').hidden = !active;
+		document.getElementById('btn-collection-guided').hidden = collection.phase !== 'guided';
+		document.getElementById('btn-collection-skip').hidden = collection.phase !== 'guided';
+		document.getElementById('btn-collection-open').hidden =
+			!isTrue(collection.archive_created) && !isTrue(collection.folder_available);
+		document.getElementById('collection-progress').textContent = !supported
+			? t('healthcheck.collection.unavailable')
+			: collection.phase === 'idle'
+				? ''
+				: collection.phase === 'completed'
+					? t('healthcheck.collection.complete')
+					: collection.phase === 'failed'
+						? t('healthcheck.collection.failed')
+						: t(
+								'healthcheck.deep_tests.progress',
+								collection.completed || 0,
+								collection.total || 0
+							);
+	}
+
+	/** Invalid observations refuse sharing without disabling cleanup or local display. */
+	function pageObservations() {
+		try {
+			return Model.pageCheckObservations(state.snapshot.diagnostic_checks, state.config.schema);
+		} catch (_) {
+			setStatus(t('healthcheck.probe.error', 'invalid_page_observations'), 'fail');
+			return null;
+		}
+	}
+
+	/** True when the user ticked the day log and the host holds it ready. */
+	function dayLogReady() {
+		return document.getElementById('chk-day-log').checked && dayLog.phase === 'ready';
+	}
+
+	/** Formats a byte count for the day log line. */
+	function formatBytes(bytes) {
+		if (bytes < 1024) return bytes + ' B';
+		if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KiB';
+		return (bytes / 1048576).toFixed(1) + ' MiB';
+	}
+
+	/** Shows the day log verdict and, when ready, the host's preview of it. */
+	function renderDayLog() {
+		var status = document.getElementById('day-log-status');
+		var preview = document.getElementById('day-log-preview');
+		preview.hidden = true;
+		switch (dayLog.phase) {
+			case 'preparing':
+				status.textContent = t('healthcheck.day_log.preparing');
+				break;
+			case 'ready':
+				status.textContent = t(
+					'healthcheck.day_log.summary',
+					dayLog.lines,
+					formatBytes(dayLog.bytes),
+					formatBytes(dayLog.cap_bytes),
+					dayLog.first_time || '-',
+					dayLog.last_time || '-'
+				);
+				var head = Array.isArray(dayLog.head) ? dayLog.head : [];
+				var tail = Array.isArray(dayLog.tail) ? dayLog.tail : [];
+				document.getElementById('day-log-preview-text').textContent = head
+					.concat(tail.length > 0 ? [t('healthcheck.day_log.omitted')] : [], tail)
+					.join('\n');
+				preview.hidden = false;
+				break;
+			case 'too_large':
+				status.textContent = t(
+					'healthcheck.day_log.too_large',
+					formatBytes(dayLog.bytes),
+					formatBytes(dayLog.cap_bytes)
+				);
+				break;
+			case 'empty':
+			case 'missing':
+				status.textContent = t('healthcheck.day_log.' + dayLog.phase);
+				break;
+			case 'failed':
+				status.textContent = t('healthcheck.day_log.failed');
+				break;
+			default:
+				status.textContent = '';
+		}
+	}
+
+	/** Back to unticked: every new snapshot starts without the day log. */
+	function resetDayLog() {
+		dayLog = { phase: 'off' };
+		document.getElementById('chk-day-log').checked = false;
+		renderDayLog();
+	}
 
 	function requestExport(action) {
 		if (pendingExport) return;
 		if (exportSequence >= state.config.schema.report.export_sequence_max)
 			throw new Error('The export sequence is exhausted');
-		pendingExport = { action: action, sequence: ++exportSequence, snapshot: state.snapshot };
-		post({ action: 'export_snapshot', export_sequence: exportSequence });
+		var observations = pageObservations();
+		if (!observations) return;
+		// Copy never carries the day log: it is a file, saved with the report
+		var withDayLog = action !== 'copy' && dayLogReady();
+		pendingExport = {
+			action: action,
+			dayLog: withDayLog,
+			sequence: ++exportSequence,
+			snapshot: state.snapshot,
+			checks: JSON.stringify(observations)
+		};
+		var message = {
+			action: 'export_snapshot',
+			export_sequence: exportSequence,
+			generated_at: state.snapshot.generated_at,
+			snapshot_revision: state.snapshot.export_revision,
+			page_checks: observations.results
+		};
+		if (withDayLog) message.day_log = true;
+		post(message);
+	}
+
+	/** Host encoders may reorder keys; normalize only the exact closed envelope. */
+	function hostPageObservations(value) {
+		if (
+			!value ||
+			typeof value !== 'object' ||
+			Array.isArray(value) ||
+			value.source !== 'installed_page_reported' ||
+			value.qualification !== 'unqualified' ||
+			Object.keys(value).sort().join(',') !== 'qualification,results,source'
+		)
+			return null;
+		try {
+			return Model.pageCheckObservations(value.results, state.config.schema);
+		} catch (_) {
+			return null;
+		}
 	}
 
 	function completeExport(message) {
 		var request = pendingExport;
 		if (!request || message.export_sequence !== request.sequence) return;
 		pendingExport = null;
+		var currentChecks = pageObservations();
+		var hostChecks = hostPageObservations(
+			message.snapshot && message.snapshot.page_check_observations
+		);
+		if (!currentChecks || !hostChecks) return;
 		if (
 			!isTrue(message.ok) ||
 			!message.snapshot ||
 			typeof message.share_text !== 'string' ||
 			state.snapshot !== request.snapshot ||
 			message.snapshot.driver !== request.snapshot.driver ||
-			message.snapshot.generated_at !== request.snapshot.generated_at
+			message.snapshot.generated_at !== request.snapshot.generated_at ||
+			message.snapshot.export_revision !== request.snapshot.export_revision ||
+			JSON.stringify(currentChecks) !== request.checks ||
+			JSON.stringify(hostChecks) !== request.checks
 		)
 			return;
-		message.snapshot.diagnostic_checks = state.snapshot.diagnostic_checks;
-		state.snapshot = message.snapshot;
+		// Keep the actual check owner alive; replacing it would abandon pending callbacks.
+		var checks = state.snapshot.diagnostic_checks;
+		Object.keys(state.snapshot).forEach(function (key) {
+			if (
+				key !== 'diagnostic_checks' &&
+				!Object.prototype.hasOwnProperty.call(message.snapshot, key)
+			)
+				delete state.snapshot[key];
+		});
+		Object.assign(state.snapshot, message.snapshot, { diagnostic_checks: checks });
 		sharedText = message.share_text;
 		render();
-		if (request.action === 'copy') post({ action: 'copy', text: exportText() });
+		lastExportDayLog = request.dayLog;
+		var sent;
+		if (request.action === 'copy') sent = { action: 'copy', text: exportText() };
 		else if (request.action === 'save')
-			post({ action: 'save', text: exportText(), name: reportName() });
-		else post({ action: 'report', text: exportText(), fields: issueFields() });
+			sent = { action: 'save', text: exportText(), name: reportName() };
+		else sent = { action: 'report', text: exportText(), fields: issueFields() };
+		if (request.dayLog) sent.day_log = true;
+		post(sent);
 	}
 
 	function cancelChecks() {
@@ -193,9 +363,13 @@
 	 * @returns {string}
 	 */
 	function exportText() {
-		return sharedText !== null
-			? sharedText
-			: Model.formatShareable(state.snapshot, state.config.schema, t);
+		if (sharedText !== null) return sharedText;
+		var observations = pageObservations();
+		if (!observations) return '# Export refused\n\ninvalid_page_observations';
+		var preview = Object.assign({}, state.snapshot, {
+			page_check_observations: observations
+		});
+		return Model.formatShareable(preview, state.config.schema, t);
 	}
 
 	/**
@@ -207,6 +381,7 @@
 			button.disabled = !enabled;
 		});
 		document.getElementById('chk-details').disabled = !enabled;
+		document.getElementById('chk-day-log').disabled = !enabled;
 		document.getElementById('chk-extensive').disabled = !enabled;
 	}
 
@@ -235,6 +410,8 @@
 		document.getElementById('chk-details').checked = isTrue(state.snapshot.detailed);
 		setToolbarEnabled(true);
 		showCheckProgress();
+		renderCollection();
+		renderDayLog();
 	}
 
 	// ===============================
@@ -270,6 +447,17 @@
 			completeExport(message);
 			return;
 		}
+		if (message.action === 'day_log') {
+			// A late answer for a box the user has since unticked is dropped
+			if (!document.getElementById('chk-day-log').checked || dayLog.phase !== 'preparing') return;
+			dayLog = isTrue(message.ok)
+				? Object.assign({ phase: message.state }, message)
+				: { phase: 'failed' };
+			if (['ready', 'too_large', 'empty', 'missing'].indexOf(dayLog.phase) < 0)
+				dayLog = { phase: 'failed' };
+			renderDayLog();
+			return;
+		}
 		if (message.action === 'cancel' && message.snapshot && state.snapshot) {
 			message.snapshot.diagnostic_checks = state.snapshot.diagnostic_checks;
 			state.snapshot = message.snapshot;
@@ -290,22 +478,22 @@
 				setStatus(t('healthcheck.status.copied'), 'ok');
 				break;
 			case 'save':
-				setStatus(t('healthcheck.status.saved', message.path || ''), 'ok');
+				setStatus(
+					lastExportDayLog
+						? t('healthcheck.day_log.saved')
+						: t('healthcheck.status.saved', message.path || ''),
+					'ok'
+				);
 				break;
 			case 'report':
-				setStatus(t('notify.report_bug_body'), 'ok');
+				setStatus(
+					lastExportDayLog ? t('healthcheck.day_log.saved') : t('notify.report_bug_body'),
+					'ok'
+				);
 				break;
 			default:
 				setStatus('', 'info');
 		}
-	}
-
-	/** In report mode, the user starts from the preview and the report button. */
-	function applyMode() {
-		if (state.config.mode !== 'report') return;
-		document.getElementById('preview').open = true;
-		setStatus(t('healthcheck.status.report_mode'), 'info');
-		document.getElementById('btn-report').focus();
 	}
 
 	/**
@@ -314,18 +502,28 @@
 	 */
 	window.receiveDiagnostics = function (message) {
 		if (!message || typeof message !== 'object') return;
-		if (message.type !== 'action' || message.action === 'cancel') sharedText = null;
+		if (message.type !== 'action' || message.action === 'cancel' || message.action === 'day_log')
+			sharedText = null;
 		switch (message.type) {
 			case 'init':
+				// The host states what it can do; the page never infers it from the driver name.
+				if (
+					!message.config ||
+					!message.config.capabilities ||
+					typeof message.config.capabilities.diagnostic_collection !== 'boolean'
+				)
+					throw new Error('health check host must state its diagnostic_collection capability');
+				collection = message.collection || { phase: 'idle' };
 				state.config = message.config;
 				state.snapshot = message.snapshot;
+				resetDayLog();
 				startChecks();
 				render();
-				applyMode();
 				break;
 			case 'snapshot':
 				if (!state.config) return;
 				state.snapshot = message.snapshot;
+				resetDayLog();
 				startChecks();
 				setStatus('', 'info');
 				render();
@@ -339,6 +537,11 @@
 				break;
 			case 'action':
 				onActionResult(message);
+				break;
+			case 'collection':
+				if (!message.collection || typeof message.collection.phase !== 'string') return;
+				collection = message.collection;
+				renderCollection();
 				break;
 		}
 	};
@@ -404,6 +607,17 @@
 	Object.keys(TOOLBAR).forEach(function (id) {
 		document.getElementById(id).addEventListener('click', TOOLBAR[id]);
 	});
+	[
+		'collect-windows',
+		'collection-cancel',
+		'collection-guided',
+		'collection-skip',
+		'collection-open'
+	].forEach(function (id) {
+		document.getElementById('btn-' + id).addEventListener('click', function () {
+			post({ action: id.replace(/-/g, '_') });
+		});
+	});
 
 	document.getElementById('chk-extensive').addEventListener('change', function (event) {
 		if (!event.target.checked && state.snapshot) {
@@ -411,6 +625,20 @@
 			state.snapshot.extensive = false;
 		}
 		refreshRequest();
+	});
+
+	document.getElementById('chk-day-log').addEventListener('change', function (event) {
+		if (event.target.checked) {
+			dayLog = { phase: 'preparing' };
+			sharedText = null;
+			renderDayLog();
+			post({ action: 'day_log', enabled: true });
+		} else {
+			dayLog = { phase: 'off' };
+			sharedText = null;
+			renderDayLog();
+			post({ action: 'day_log', enabled: false });
+		}
 	});
 
 	document.getElementById('chk-details').addEventListener('change', function (event) {

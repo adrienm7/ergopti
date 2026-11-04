@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local M = {}
+local NativePath = require("native_path")
 
 M.SCHEMA_VERSION = 1
 
@@ -106,7 +107,7 @@ end
 --- @param path string
 --- @return string
 local function parent(path)
-	return path:match("^(.*)/[^/]+$") or path
+	return NativePath.dirname(path) or path
 end
 
 --- Whether a relative path stays inside its root: no absolute path, no empty,
@@ -254,7 +255,7 @@ function M.new(options)
 			elseif not inside_config(root.file) then
 				local content, status = io_port.read(root.file)
 				if content ~= nil then
-					local name = root.file:match("([^/]+)$")
+					local name = NativePath.basename(root.file)
 					entries[#entries + 1] = { root = root.id, path = name, source = root.file, content = content }
 				elseif status ~= "absent" then
 					return nil, "cannot read " .. root.file .. ": " .. tostring(status), skipped
@@ -272,7 +273,7 @@ function M.new(options)
 		local root = by_id[root_id]
 		if not root or not contained(path) then return nil end
 		if root.dir then return join(root.dir, path) end
-		return root.file:match("([^/]+)$") == path and root.file or nil
+		return NativePath.basename(root.file) == path and root.file or nil
 	end
 
 	--- Makes one backup of the current configuration.
@@ -436,6 +437,12 @@ function M.new(options)
 			local dir_ok, dir_err = io_port.make_dir(parent(destination))
 			local written, write_err = false, dir_err
 			if dir_ok then written, write_err = io_port.replace(destination, copies[index]) end
+			-- POSIX renames by name and neither OS denies a same-user process the
+			-- staging name, so a swap before the rename cannot be refused. Reading
+			-- the file back is what keeps a substituted file from reporting success.
+			if written and io_port.read(destination) ~= copies[index] then
+				written, write_err = false, "the published file does not hold the restored bytes"
+			end
 			if not written then
 				Logger.error(LOG, "Restore failed writing %s: %s; the replaced configuration is in %s.",
 					destination, tostring(write_err), pre.path)

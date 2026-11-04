@@ -36,7 +36,7 @@ global ACCENTED_SHORTCUT_LETTERS := Map(
 ; Every modifier chord remapped, AltGr (^!) deliberately excluded.
 global ACCENTED_SHORTCUT_PREFIXES := ["^", "^+", "!", "!+", "#", "#+"]
 
-; Layout handle (HKL) → Map(scancode → feature id). Filled lazily per layout.
+; Layout handle and effective digit-access policy → Map(scancode → feature id).
 global _AccentedShortcutLayoutCache := Map()
 global _AccentedShortcutRegistered := false
 
@@ -62,13 +62,16 @@ AccentedShortcutDirectScanCode(Char, Hkl) {
 ; Maps each directly-typed accented letter of one layout to its scancode.
 ; @param Hkl {Integer} Keyboard layout handle.
 ; @param ScanCodeFn {Func} (Char, Hkl) → scancode; injectable for tests.
+; @param DigitAccess {Boolean|unset} Effective digit override; live by default.
 ; @returns {Map} Scancode → feature id.
-AccentedShortcutKeysForLayout(Hkl, ScanCodeFn := AccentedShortcutDirectScanCode) {
+AccentedShortcutKeysForLayout(Hkl, ScanCodeFn := AccentedShortcutDirectScanCode, DigitAccess := unset) {
 	global ACCENTED_SHORTCUT_LETTERS
 	; « Chiffres en accès direct » swaps the top row of a layout whose digits sit
 	; behind Shift (AZERTY, BÉPO): its accents then need Shift, so they are no
 	; longer direct and Ctrl+that key must stay Ctrl+digit.
-	DigitRowSwapped := _AccentedShortcutDigitAccessEnabled()
+	if !IsSet(DigitAccess)
+		DigitAccess := _AccentedShortcutDigitAccessEnabled(Hkl)
+	DigitRowSwapped := DigitAccess
 		&& ScanCodeFn.Call("1", Hkl) == 0
 	Keys := Map()
 	for Id, Char in ACCENTED_SHORTCUT_LETTERS {
@@ -82,17 +85,30 @@ AccentedShortcutKeysForLayout(Hkl, ScanCodeFn := AccentedShortcutDirectScanCode)
 	return Keys
 }
 
-_AccentedShortcutDigitAccessEnabled() {
+; Whether « digits first » is in effect on layout Hkl (it is inert where it
+; cannot reorder that layout's row).
+_AccentedShortcutDigitAccessEnabled(Hkl) {
 	global Features
 	return IsSet(Features) && Features.Has("layout")
-		&& NumberRowEffectiveMode() == "digits"
+		&& NumberRowEffectiveMode(Hkl) == "digits"
 }
 
-_AccentedShortcutKeysCached(Hkl) {
+_AccentedShortcutKeysCached(Hkl, ScanCodeFn := AccentedShortcutDirectScanCode, DigitAccess := unset) {
 	global _AccentedShortcutLayoutCache
-	if !_AccentedShortcutLayoutCache.Has(Hkl)
-		_AccentedShortcutLayoutCache[Hkl] := AccentedShortcutKeysForLayout(Hkl)
-	return _AccentedShortcutLayoutCache[Hkl]
+	if !IsSet(DigitAccess)
+		DigitAccess := _AccentedShortcutDigitAccessEnabled(Hkl)
+	; The policy changes live, including when the Layout master switches off.
+	; One HKL can therefore own two different effective shortcut maps.
+	CacheKey := Hkl . "|" . (DigitAccess ? "digits" : "native")
+	if !_AccentedShortcutLayoutCache.Has(CacheKey)
+		_AccentedShortcutLayoutCache[CacheKey] := AccentedShortcutKeysForLayout(Hkl, ScanCodeFn, DigitAccess)
+	return _AccentedShortcutLayoutCache[CacheKey]
+}
+
+; Registration covers native accents even when digits currently hide them.
+; The live criterion decides each press, so switching back needs no reload.
+_AccentedShortcutRegistrationKeys(Hkl) {
+	return _AccentedShortcutKeysCached(Hkl, AccentedShortcutDirectScanCode, false)
 }
 
 _AccentedShortcutForegroundLayout() {
@@ -164,7 +180,7 @@ _AccentedShortcutEmit(HotkeyName) {
 ; @param KeysFn {Func} Hkl → Map(scancode → feature id); injectable for tests.
 ; @returns {Integer} Number of hotkeys registered.
 AccentedShortcuts_Register(Layouts := unset, HotkeyFn := Hotkey, HotIfFn := HotIf,
-		KeysFn := _AccentedShortcutKeysCached) {
+		KeysFn := _AccentedShortcutRegistrationKeys) {
 	global ACCENTED_SHORTCUT_PREFIXES, _AccentedShortcutRegistered
 	if _AccentedShortcutRegistered
 		throw Error("Accented-letter shortcuts are already registered.")

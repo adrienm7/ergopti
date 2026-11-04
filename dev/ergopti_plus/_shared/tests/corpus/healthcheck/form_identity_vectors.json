@@ -1,0 +1,125 @@
+{
+	"description": "Golden vectors for the version and operating system the Debug > Report a bug issue form shows (healthcheck share document, fields.version and fields.os). A source run reports the version \"local\" and a commit tagged (git): the form says \"dev source <commit>\", never \"unknown\". The system is the name and version the driver reported, then (desktop, session, architecture) for what is known; a name outside the closed grammar of the platform_name rule (a path, an address) is dropped and the driver name stands in. Replayed by the macOS and Linux Lua suites and the AHK suite through the share document.",
+	"vectors": [
+		{
+			"id": "macos_release",
+			"snapshot": {
+				"driver": "macos",
+				"sections": {
+					"versions": { "ergopti_version": "2.1.0", "commit": "abc1234 (build)" },
+					"system": { "os": "macOS 15.1" },
+					"hardware": { "arch": "arm64" }
+				}
+			},
+			"version": "2.1.0",
+			"os": "macOS 15.1 (arm64)"
+		},
+		{
+			"id": "macos_source_run_names_its_commit",
+			"snapshot": {
+				"driver": "macos",
+				"sections": {
+					"versions": { "ergopti_version": "local", "commit": "9f02a05ef (git)" },
+					"system": { "os": "macOS 15.1" },
+					"hardware": { "arch": "arm64" }
+				}
+			},
+			"version": "dev source 9f02a05ef",
+			"os": "macOS 15.1 (arm64)"
+		},
+		{
+			"id": "source_run_without_a_readable_commit",
+			"snapshot": {
+				"driver": "macos",
+				"sections": {
+					"versions": { "ergopti_version": "local", "commit": "unknown (unknown)" }
+				}
+			},
+			"version": "dev source",
+			"os": "macOS (version unknown)"
+		},
+		{
+			"id": "no_version_no_source_marker_stays_unknown",
+			"snapshot": {
+				"driver": "windows",
+				"sections": {
+					"versions": { "commit": "abc1234 (build)" }
+				}
+			},
+			"version": "unknown",
+			"os": "Windows (version unknown)"
+		},
+		{
+			"id": "windows_build",
+			"snapshot": {
+				"driver": "windows",
+				"sections": {
+					"versions": { "ergopti_version": "2.1.0-dev.130", "commit": "abc1234 (build)" },
+					"system": { "os": "Windows 11 Pro 26100.9457" },
+					"hardware": { "arch": "x64" }
+				}
+			},
+			"version": "2.1.0-dev.130",
+			"os": "Windows 11 Pro 26100.9457 (x64)"
+		},
+		{
+			"id": "linux_distro_desktop_and_session",
+			"snapshot": {
+				"driver": "linux",
+				"sections": {
+					"versions": { "ergopti_version": "2.1.0" },
+					"system": {
+						"os": "Fedora Linux 41 (Workstation Edition)",
+						"desktop": "gnome",
+						"display_server": "wayland"
+					},
+					"hardware": { "arch": "x86_64" }
+				}
+			},
+			"version": "2.1.0",
+			"os": "Fedora Linux 41 (Workstation Edition) (gnome, Wayland, x86_64)"
+		},
+		{
+			"id": "linux_x11_session",
+			"snapshot": {
+				"driver": "linux",
+				"sections": {
+					"versions": { "ergopti_version": "2.1.0" },
+					"system": {
+						"os": "Ubuntu 24.04.1 LTS",
+						"desktop": "ubuntu:GNOME",
+						"display_server": "x11"
+					},
+					"hardware": { "arch": "aarch64" }
+				}
+			},
+			"version": "2.1.0",
+			"os": "Ubuntu 24.04.1 LTS (ubuntu:GNOME, X11, aarch64)"
+		},
+		{
+			"id": "unknown_session_and_arch_are_left_out",
+			"snapshot": {
+				"driver": "linux",
+				"sections": {
+					"versions": { "ergopti_version": "2.1.0" },
+					"system": { "os": "Arch Linux", "display_server": "unknown" },
+					"hardware": { "arch": "unknown" }
+				}
+			},
+			"version": "2.1.0",
+			"os": "Arch Linux"
+		},
+		{
+			"id": "a_path_is_not_a_system_name",
+			"snapshot": {
+				"driver": "linux",
+				"sections": {
+					"versions": { "ergopti_version": "2.1.0" },
+					"system": { "os": "/home/jdoe/fedora", "desktop": "C:\\Users\\jdoe" }
+				}
+			},
+			"version": "2.1.0",
+			"os": "Linux (version unknown)"
+		}
+	]
+}

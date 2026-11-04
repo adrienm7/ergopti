@@ -79,6 +79,14 @@ local function write_report(kind, stage, detail, message, log_paths, deps)
 	local exact_stage = single_line(stage ~= nil and stage or "unknown")
 	local exact_detail = single_line(detail ~= nil and detail or "no detail")
 	local exact_message = single_line(message or "")
+	-- Privacy admission itself can fail before the redactor exists. Only this
+	-- exact closed bootstrap report is safe without an admitted text policy.
+	local closed_privacy_failure = kind == M.KIND_BOOT and stage == "logger_privacy"
+		and detail == "Canonical log privacy admission refused." and message == nil and log_paths == nil
+	if not closed_privacy_failure then
+		exact_detail = Logger.redact_message(exact_detail)
+		exact_message = Logger.redact_message(exact_message)
+	end
 	-- The boot wording is matched by the packaged launch gate; the runtime
 	-- wording must never contain it (tools/diagnostics/macos_launch_gate.py).
 	local where = kind == M.KIND_RUNTIME

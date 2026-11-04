@@ -7,6 +7,17 @@
 --- claim evdev injection or hardware observation. No database/process stubs.
 --- ==============================================================================
 
+--- Returns a typing time on the driver's own clock (ergopti_hotstrings passes
+--- Monotonic.now_ms()). A fixed 1000 ms made the session tracker's verdict
+--- depend on the host's uptime; one origin keeps the scripted gaps exact.
+--- @param offset_ms number Scripted time of the keystroke.
+--- @return number typed_ms
+local typing_origin_ms
+local function typed_at(offset_ms)
+	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	return typing_origin_ms + offset_ms
+end
+
 local uv = require("luv")
 require("compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-sqlite-wpm-XXXXXX"))
@@ -18,9 +29,9 @@ assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
 
-local Keylogger = require("modules.keylogger.keylogger")
-local Writer = require("modules.keylogger.sqlite_writer")
-local Metrics = require("keylogger.metrics")
+local Keystats = require("modules.keystats.keystats")
+local Writer = require("modules.keystats.sqlite_writer")
+local Metrics = require("keystats.metrics")
 local Json = require("json")
 local path = root .. "/metrics.sqlite"
 local checks, failures = 0, 0
@@ -42,11 +53,11 @@ local function row_count()
 	return tonumber(assert(Writer.query_rows("SELECT COUNT(*) FROM events_typing;"))[1])
 end
 
-Keylogger.init({ sqlite_path = path, log_dir = root .. "/logs" })
-assert(Keylogger.is_enabled() and Writer.is_available())
-Keylogger.on_keydown("a", 1000, "owned-wpm")
-Keylogger.on_keydown("b", 2300, "owned-wpm")
-Keylogger.flush()
+Keystats.init({ sqlite_path = path, log_dir = root .. "/logs" })
+assert(Keystats.is_enabled() and Writer.is_available())
+Keystats.on_keydown("a", typed_at(1000), "owned-wpm")
+Keystats.on_keydown("b", typed_at(2300), "owned-wpm")
+require("tests.support.sqlite_flush_native").flush(Keystats)
 local original = assert(Writer.query_rows("SELECT wpm,hex(text),hex(events_json) FROM events_typing;"))[1]
 
 check("public collector flush preserves fractional event-derived WPM and raw bytes", function()
@@ -61,7 +72,7 @@ check("public collector flush preserves fractional event-derived WPM and raw byt
 end)
 
 check("second collector flush cannot duplicate the accepted raw batch", function()
-	Keylogger.flush()
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	assert(row_count() == 1)
 	assert(Writer.query_rows("SELECT wpm,hex(text),hex(events_json) FROM events_typing;")[1] == original)
 end)
@@ -89,6 +100,25 @@ for _, nonfinite in ipairs({ math.huge, -math.huge, 0 / 0 }) do
 		assert(table.concat(assert(Writer.query_rows("SELECT id,wpm,hex(text),hex(events_json) FROM events_typing ORDER BY id;")), "\n") == before)
 	end)
 end
+
+-- The other raw families render through the same catalogue: a row it cannot
+-- render must come back as a false receipt, never as a raised Lua error.
+local function count_of(table_name)
+	return tonumber(assert(Writer.query_rows("SELECT COUNT(*) FROM " .. table_name .. ";"))[1])
+end
+check("(raw-batch-render-refusal) an unrenderable app switch is a false receipt", function()
+	local before = count_of("events_app_switch")
+	local accepted = Writer.insert_app_switch_events("owned", {
+		{ ts = "2026-10-30 10:00:00", date = "2026-10-30", prev_app = "a", next_app = "b", duration_ms = math.huge },
+	})
+	assert(accepted == false, "a non-finite duration was acknowledged")
+	assert(count_of("events_app_switch") == before)
+end)
+check("(raw-batch-render-refusal) the writer stays usable after a refused batch", function()
+	local before = row_count()
+	assert(Writer.insert_typing_events("owned", { { app = "owned-after", text = "owned", events_json = "[]", wpm = 3.5 } }))
+	assert(row_count() == before + 1)
+end)
 
 check("actual native trigger refusal preserves accepted rows and healthy retry", function()
 	local before = row_count()

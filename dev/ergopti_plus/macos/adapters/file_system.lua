@@ -28,6 +28,9 @@ local Logger = require("infra.logger")
 local OperationReporter = require("diagnostics.operation_reporter")
 local FsDir  = require("infra.fs_dir")
 local TextUtils = require("infra.text_utils")
+local NativePath = require("native_path")
+local MetadataCommandStats = require("adapters.metadata_command_stats")
+local WriteLockPath = require("adapters.write_lock_path")
 
 local LOG = "adapters.file_system"
 
@@ -36,7 +39,6 @@ local _temp_sequence = 0
 
 local STAGING_LOCK_SUFFIX = ".ergoptiplus-stage-lock"
 local STAGING_PAYLOAD_NAME = "payload"
-local WRITE_LOCK_SUFFIX = ".ergoptiplus-write-lock-v1"
 local ENOENT_ERROR_CODE = 2
 local MAX_SYMLINK_HOPS = 32
 local MAX_STAGING_RESERVATION_ATTEMPTS = 64
@@ -46,7 +48,8 @@ local LS_BIN = "/bin/ls"
 -- Native advisory locks may permit same-process re-entry depending on the
 -- primitive Hammerspoon exposes. This registry is therefore authoritative for
 -- in-process ownership regardless of kernel re-entry semantics. The handle is
--- retained until explicit release; the stable empty lock file remains.
+-- retained until explicit release; the stable empty lock file remains in the
+-- per-user lock directory.
 local _held_write_locks = {}
 -- A staging owner whose exact release did not commit remains authoritative
 -- across later writes. No successor may reserve another sidecar until this
@@ -109,10 +112,13 @@ end
 --- Derives the one lexical identity used for both the native lock pathname and
 --- the authoritative same-process registry. Destination operations retain their
 --- resolved spelling; only ownership collapses equivalent `.`/`..` spellings.
+--- The pathname sits in the per-user lock directory (adapters/write_lock_path),
+--- so every cooperating writer derives the same inode.
 --- @param resolved_path string Symlink-resolved destination spelling.
---- @return string lock_path Canonical cooperative lock pathname.
+--- @return string|nil lock_path Canonical cooperative lock pathname.
+--- @return string|nil error_message Why no lock pathname can be derived.
 local function cooperative_write_lock_path(resolved_path)
-	return normalize_path(resolved_path) .. WRITE_LOCK_SUFFIX
+	return WriteLockPath.for_canonical(normalize_path(resolved_path), os.getenv("HOME"))
 end
 
 --- Runs one fixed local metadata command and preserves the complete native
@@ -126,7 +132,9 @@ local function run_metadata_command(command, operation)
 	if not hs or type(hs.execute) ~= "function" then
 		return nil, "hs.execute is unavailable for " .. operation
 	end
+	local started = MetadataCommandStats.clock()
 	local call_ok, output, status, exit_type, rc = pcall(hs.execute, command, false)
+	MetadataCommandStats.record(started)
 	if not call_ok then return nil, tostring(output) end
 	if status ~= true or exit_type ~= "exit" or rc ~= 0 then
 		return nil, string.format(
@@ -143,18 +151,31 @@ local function run_metadata_command(command, operation)
 	return output
 end
 
---- Captures the extended ACL entries without including the pathname-bearing
---- first ls line. LC_ALL=C keeps the representation stable across locales.
+--- Builds the listing whose lines after the pathname-bearing first one are the
+--- extended ACL entries. LC_ALL=C keeps the representation stable across locales.
+--- @param path string Regular-file pathname.
+--- @return string command
+local function acl_inspection_command(path)
+	return "LC_ALL=C " .. LS_BIN .. " -led " .. TextUtils.shell_quote(path)
+end
+
+--- Keeps the ACL entries of one `ls -led` listing, dropping its first line.
+--- @param output string Listing of one file.
+--- @return string fingerprint
+local function acl_from_listing(output)
+	local newline = output:find("\n", 1, true)
+	if newline == nil then return "" end
+	return output:sub(newline + 1)
+end
+
+--- Captures the extended ACL entries of one file in its own command.
 --- @param path string Regular-file pathname.
 --- @return string|nil fingerprint
 --- @return string|nil error_message
 local function read_acl_fingerprint(path)
-	local command = "LC_ALL=C " .. LS_BIN .. " -led " .. TextUtils.shell_quote(path)
-	local output, command_err = run_metadata_command(command, "ACL inspection")
+	local output, command_err = run_metadata_command(acl_inspection_command(path), "ACL inspection")
 	if output == nil then return nil, command_err end
-	local newline = output:find("\n", 1, true)
-	if newline == nil then return "" end
-	return output:sub(newline + 1)
+	return acl_from_listing(output)
 end
 
 --- Captures every extended attribute as raw bytes through Hammerspoon's
@@ -206,9 +227,11 @@ end
 --- used only while rechecking the source; a staged replacement necessarily has
 --- a different inode.
 --- @param path string Regular-file pathname.
+--- @param acl string|nil ACL fingerprint already listed by the caller's own
+---   command; nil lists it here.
 --- @return table|nil snapshot
 --- @return string|nil error_message
-local function capture_security_metadata(path)
+local function capture_security_metadata(path, acl)
 	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
 		return nil, "hs.fs.attributes is unavailable"
 	end
@@ -218,8 +241,11 @@ local function capture_security_metadata(path)
 		return nil, tostring(attributes_err or "metadata source is not a regular file")
 	end
 
-	local acl, acl_err = read_acl_fingerprint(path)
-	if acl == nil then return nil, acl_err end
+	if acl == nil then
+		local acl_err
+		acl, acl_err = read_acl_fingerprint(path)
+		if acl == nil then return nil, acl_err end
+	end
 	local xattrs, xattr_err = read_xattr_snapshot(path)
 	if xattrs == nil then return nil, xattr_err end
 	return {
@@ -284,20 +310,35 @@ end
 --- metadata before its content is replaced. cp -p preserves mode, ownership,
 --- flags, ACLs, and xattrs; explicit snapshots catch its documented best-effort
 --- ownership behavior and any partial metadata copy before publication.
+---
+--- The source's ACL listing before the copy, the copy and the listing after it
+--- run in ONE command: each command is a fork the main thread waits for, and the
+--- Mac field log showed a preferences save spending 600 to 800 ms in four of
+--- them (ledger L17). The in-process attribute and xattr reads still bracket
+--- the command, so every "before" read precedes the copy and every "after" read
+--- follows it. A NUL, which no listing can contain, separates the two listings.
 --- @param source_path string Existing resolved destination.
 --- @param staging_path string Absent private payload pathname.
 --- @return table|nil expected_metadata
 --- @return string|nil error_message
 local function seed_staging_metadata(source_path, staging_path)
-	local expected, capture_err = capture_security_metadata(source_path)
-	if expected == nil then return nil, capture_err end
-	local command = COPY_BIN .. " -p "
+	local command = acl_inspection_command(source_path)
+		.. " && printf '\\000' && " .. COPY_BIN .. " -p "
 		.. TextUtils.shell_quote(source_path) .. " "
 		.. TextUtils.shell_quote(staging_path)
-	local _, copy_err = run_metadata_command(command, "metadata-preserving copy")
-	if copy_err ~= nil then return nil, copy_err end
+		.. " && " .. acl_inspection_command(source_path)
+	local before, before_err = capture_security_metadata(source_path, "")
+	if before == nil then return nil, before_err end
+	local output, copy_err = run_metadata_command(command, "metadata-preserving copy")
+	if output == nil then return nil, copy_err end
+	local separator = output:find("\0", 1, true)
+	if separator == nil or output:find("\0", separator + 1, true) ~= nil then
+		return nil, "metadata-preserving copy returned malformed ACL listings"
+	end
+	local expected = before
+	expected.acl = acl_from_listing(output:sub(1, separator - 1))
 
-	local current, current_err = capture_security_metadata(source_path)
+	local current, current_err = capture_security_metadata(source_path, acl_from_listing(output:sub(separator + 1)))
 	if current == nil then return nil, current_err end
 	local unchanged, compare_err = security_metadata_equal(expected, current, true)
 	if not unchanged then return nil, "metadata source changed during copy: " .. tostring(compare_err) end
@@ -344,7 +385,7 @@ local function parent_listing_proves_absence(path, known_parent, known_basename)
 	if type(FsDir) ~= "table" or type(FsDir.try_entries) ~= "function" then
 		return false, "infra.fs_dir.try_entries is unavailable"
 	end
-	local basename = known_basename or path:match("([^/]+)$")
+	local basename = known_basename or NativePath.basename(path)
 	if type(basename) ~= "string" or basename == "" then
 		return false, "pathname has no basename"
 	end
@@ -429,6 +470,27 @@ function M.directory_status(path)
 	end
 	if attributes.mode ~= "directory" then return "error", "input root is not a directory" end
 	return "present", attributes
+end
+
+--- Mode of what a path leads to, a symbolic link followed, without opening it
+--- (a FIFO or a device node would block an open).
+--- @param path string Absolute pathname to inspect.
+--- @return string status `present`, `absent` (nothing at the end of a dangling
+---   link) or `error`.
+--- @return string|nil detail The followed mode ("file", "directory", "named pipe",
+---   "socket", "char device", "block device", ...) on present, a diagnostic otherwise.
+function M.followed_mode(path)
+	if type(path) ~= "string" or path:sub(1, 1) ~= "/" then
+		return "error", "path must be an absolute pathname"
+	end
+	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
+		return "error", "hs.fs.attributes is unavailable"
+	end
+	local ok, followed, follow_err, errno = pcall(hs.fs.attributes, path)
+	if not ok then return "error", tostring(followed) end
+	if type(followed) == "table" then return "present", followed.mode end
+	if errno == 2 or tostring(follow_err):find("No such file", 1, true) then return "absent" end
+	return "error", tostring(follow_err or "cannot inspect the link target")
 end
 
 --- Splits a slash-separated path into its root and ordered components.
@@ -1310,7 +1372,7 @@ function M.create_if_absent(path, content)
 	return created, status, result_detail
 end
 
---- Acquires the stable adjacent native advisory mutex used by all cooperating writers.
+--- Acquires the stable native advisory mutex used by all cooperating writers.
 --- The lock pathname is never removed: unlink/recreate would split contenders
 --- across different inodes. The same-process registry remains authoritative
 --- even if the current native primitive would re-grant an existing owner.
@@ -1325,11 +1387,20 @@ acquire_cooperative_write_lock = function(resolved_path)
 		return nil, "hs.fs.lock/unlock are unavailable; cooperative publication is unsupported"
 	end
 
-	local lock_path = cooperative_write_lock_path(resolved_path)
+	local lock_path, path_err = cooperative_write_lock_path(resolved_path)
+	if lock_path == nil then return nil, path_err end
 	if _held_write_locks[lock_path] ~= nil then
 		return nil, "cooperative write lock is already held by this Hammerspoon process"
 	end
 
+	-- prepare_parent_for_create() resolves a symlinked home or Application
+	-- Support before it creates the missing lock directory components.
+	if M.directory_status(parent_dir(lock_path)) ~= "present" then
+		local directory_ready, directory_err = M.prepare_parent_for_create(lock_path)
+		if directory_ready ~= true then
+			return nil, "cooperative write-lock directory unavailable: " .. tostring(directory_err)
+		end
+	end
 	local before, inspect_err = inspect_path(lock_path)
 	if inspect_err ~= nil then return nil, inspect_err end
 	if before ~= nil and before.mode ~= "file" then
@@ -1457,7 +1528,8 @@ function M.acquire_write_locks(paths)
 		if type(resolved_path) ~= "string" or resolved_path == "" then
 			return nil, false, tostring(resolve_err or "path resolution failed")
 		end
-		local lock_path = cooperative_write_lock_path(resolved_path)
+		local lock_path, lock_path_err = cooperative_write_lock_path(resolved_path)
+		if lock_path == nil then return nil, false, tostring(lock_path_err) end
 		if lock_seen[lock_path] then
 			return nil, false,
 				"multiple requested paths share cooperative write lock '" .. lock_path .. "'"
@@ -1705,13 +1777,14 @@ end
 --- Ownership derives from this invocation's acquired mutex/rename, never from
 --- finding equal bytes later. No native lock handle or mutable owner is exposed.
 local function private_publication_receipt(path, resolved, chain, expected, candidate,
-		published, lock, staging_owner, on_error, source_identity)
+		published, lock, staging_owner, on_error, source_identity, unchanged, prior_identity, prior_verified)
 	local source = published and { status = "ok", content = candidate }
 		or { status = expected.status, content = expected.content }
 	local owner = { path = path, resolved = resolved, chain = chain,
 		expected = { status = expected.status, content = expected.content },
-		candidate = candidate, source = source, published = published,
-		lock = lock, staging = staging_owner, on_error = on_error }
+		candidate = candidate, source = source, published = published, unchanged = unchanged == true,
+		lock = lock, staging = staging_owner, on_error = on_error,
+		source_identity = source_identity, prior_identity = prior_identity, prior_verified = prior_verified == true }
 	local methods = {}
 	local receipt = setmetatable({}, {
 		__index = methods,
@@ -1721,10 +1794,10 @@ local function private_publication_receipt(path, resolved, chain, expected, cand
 	local report = OperationReporter.new(on_error, Logger, LOG)
 	function methods.matches_source()
 		if revalidate_write_path(path, resolved, chain) ~= true then return false end
-		if source.status == "ok" and revalidate_read_identity(source_identity, source.content) ~= true then return false end
+		if source.status == "ok" and revalidate_read_identity(owner.source_identity, source.content) ~= true then return false end
 		local content, status = M.read_with_status(path, on_error)
 		return status == source.status and (status ~= "ok" or content == source.content)
-			and (status ~= "ok" or revalidate_read_identity(source_identity, source.content) == true)
+			and (status ~= "ok" or revalidate_read_identity(owner.source_identity, source.content) == true)
 			and revalidate_write_path(path, resolved, chain) == true
 	end
 	function methods.is_settled()
@@ -1753,6 +1826,7 @@ local function private_publication_receipt(path, resolved, chain, expected, cand
 		end
 		return cleanup and released and receipt.is_settled()
 	end
+	owner.matches_source = methods.matches_source
 	_publication_receipt_owners[receipt] = owner
 	return receipt
 end
@@ -1771,8 +1845,64 @@ function M.publication_receipt_view(receipt, path, expected, candidate, on_error
 		or owner.path ~= path or owner.candidate ~= candidate or type(expected) ~= "table"
 		or owner.expected.status ~= expected.status
 		or (expected.status == "ok" and owner.expected.content ~= expected.content) then return nil end
-	return { published = owner.published,
+	local view = { published = owner.published,
 		source = { status = owner.source.status, content = owner.source.content } }
+	if owner.unchanged == true then view.unchanged = true end
+	return view
+end
+
+--- Continues an original receipt only through this issuer's exact rename inverse.
+--- Equal bytes or a newly inspected inode can never substitute for the native chain.
+--- @param previous table Original private publication capability.
+--- @param forward table Genuine successor whose locked preimage was previous's inode.
+--- @param inverse table Genuine inverse whose locked preimage was forward's inode.
+--- @return boolean linked Actual issuer lineage and current inverse remain verified.
+function M.publication_receipt_chain_restore(previous, forward, inverse)
+	local first = type(previous) == "table" and _publication_receipt_owners[previous]
+	local next_owner = type(forward) == "table" and _publication_receipt_owners[forward]
+	local restored = type(inverse) == "table" and _publication_receipt_owners[inverse]
+	if not first or not next_owner or not restored or first == next_owner
+		or first == restored or next_owner == restored or restored.chain_consumed
+		or first.chaining or next_owner.chaining or restored.chaining then return false end
+	local function identity(left, right)
+		return type(left) == "table" and type(right) == "table"
+			and left.path == right.path and left.dev == right.dev and left.ino == right.ino
+	end
+	local function settled(owner)
+		return owner.lock == nil and (owner.staging == nil or owner.staging.released == true)
+	end
+	local function verified()
+		return first.path == next_owner.path and first.path == restored.path
+			and first.resolved == next_owner.resolved and first.resolved == restored.resolved
+			and first.source.status == "ok" and next_owner.source.status == "ok"
+			and restored.source.status == "ok"
+			and next_owner.expected.status == "ok" and restored.expected.status == "ok"
+			and next_owner.expected.content == first.source.content
+			and restored.expected.content == next_owner.source.content
+			and restored.source.content == first.source.content
+			and (next_owner.published == true or next_owner.unchanged == true)
+			and (restored.published == true or restored.unchanged == true)
+			and next_owner.prior_verified == true and restored.prior_verified == true
+			and identity(next_owner.prior_identity, first.source_identity)
+			and identity(restored.prior_identity, next_owner.source_identity)
+			and settled(first) and settled(next_owner) and settled(restored)
+	end
+	if not verified() then return false end
+	first.chaining, next_owner.chaining, restored.chaining = true, true, true
+	local old_identity = first.source_identity
+	local called, linked = pcall(function()
+		if restored.matches_source() ~= true or not verified() then return false end
+		-- This identity was minted by the actual inverse writer under its lock.
+		-- No post-mutation lstat/caller metadata is used to renew the old owner.
+		first.source_identity = restored.source_identity
+		if first.matches_source() ~= true or restored.matches_source() ~= true
+			or not settled(first) or not settled(next_owner) or not settled(restored) then return false end
+		return true
+	end)
+	if not called or linked ~= true then first.source_identity = old_identity end
+	if called and linked == true then restored.chain_consumed = true end
+	first.chaining, next_owner.chaining, restored.chaining = nil, nil, nil
+	return called and linked == true
 end
 
 --- Writes content to a file atomically (temp file + rename), overwriting any
@@ -1792,7 +1922,7 @@ end
 --- @param content string UTF-8 content to write.
 --- @return boolean true on success, false on any error.
 --- @return string|nil error_message Concrete failure reason when available.
-local function write_atomic(path, content, expected_source, on_error, admission)
+local function write_atomic(path, content, expected_source, on_error, admission, carry_metadata)
 	local report = OperationReporter.new(on_error, Logger, LOG)
 	if admission ~= nil and type(admission) ~= "function" then
 		return false, "publication admission must be a function"
@@ -1816,7 +1946,8 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 	local payload_published = false
 	local write_lock = nil
 	local expected_metadata = nil
-	local source_identity = nil
+	local source_identity, prior_identity, prior_verified = nil, nil, false
+	local unchanged_acknowledged = false
 	local private = type(on_error) == "function" and type(expected_source) == "table"
 	local function capture_identity(attributes, source_path)
 		if type(attributes) ~= "table" or attributes.mode ~= "file"
@@ -1917,6 +2048,7 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 		end
 		if private and destination_attributes ~= nil then
 			source_identity = capture_identity(destination_attributes, resolved_path)
+			prior_identity = source_identity -- Original locked preimage, never reacquired after mutation.
 			if source_identity == nil then
 				report("publication", "error", "write(): private source identity is unavailable.")
 				return false, "private source identity is unavailable"
@@ -1943,6 +2075,13 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 				report("publication", "error", "write(): publication admission refused.")
 				return false, "publication admission refused"
 			end
+			if private and prior_identity ~= nil then
+				if revalidate_read_identity(prior_identity, expected_source.content) ~= true then
+					return false, "private unchanged preimage identity changed"
+				end
+				prior_verified = true
+			end
+			unchanged_acknowledged = private
 			return true
 		end
 
@@ -1961,7 +2100,7 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 		if not staging_directory_matches(staging_area) then
 			return fail_after_cleanup("staging identity failure", "staging directory identity changed")
 		end
-		if destination_attributes ~= nil then
+		if destination_attributes ~= nil and carry_metadata ~= false then
 			expected_metadata, resolve_err = seed_staging_metadata(resolved_path, tmp_path)
 			-- The copy may leave a partial regular file even when metadata checks fail.
 			local seeded = symlink_attributes(tmp_path)
@@ -2074,6 +2213,13 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 			report("publication", "error", "write(): publication admission refused.")
 			return fail_after_cleanup("publication admission refusal", "publication admission refused")
 		end
+		if private and prior_identity ~= nil then
+			if expected_source.status ~= "ok"
+				or revalidate_read_identity(prior_identity, expected_source.content) ~= true then
+				return fail_after_cleanup("private preimage identity failure", "private preimage identity changed")
+			end
+			prior_verified = true
+		end
 		local rename_ok, rename_err = os.rename(tmp_path, resolved_path)
 		if not rename_ok then
 			local reason = tostring(rename_err or "rename failed")
@@ -2155,9 +2301,9 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 	if lock_released then write_lock = nil end
 	local receipt, retry_cleanup
 	if private then
-		if native_lock and (payload_published or not lock_released or native_staging ~= nil) then
+		if native_lock and (payload_published or unchanged_acknowledged or not lock_released or native_staging ~= nil) then
 			receipt = private_publication_receipt(path, resolved_path, symlink_chain, expected_source, content,
-				payload_published, not lock_released and native_lock or nil, native_staging, on_error, source_identity)
+				payload_published, not lock_released and native_lock or nil, native_staging, on_error, source_identity, unchanged_acknowledged, prior_identity, prior_verified)
 			-- The opaque receipt becomes the sole retry owner of this operation.
 			write_lock = nil
 		end
@@ -2225,7 +2371,19 @@ end
 --- @return boolean written
 --- @return string|nil error_message
 function M.write(path, content)
-	local written, detail = write_atomic(path, content, nil)
+	local written, detail = write_atomic(path, content, nil, nil)
+	return written, detail
+end
+
+--- Same as M.write, for a caller that provokes the refusal: on_error receives
+--- the fixed failure category instead of the log. Kept apart so the FileSystem
+--- port keeps its two-argument write.
+--- @param path string Destination path.
+--- @param content string UTF-8 content.
+--- @param on_error function Receives the failure category.
+--- @return boolean written, string|nil detail
+function M.write_reporting(path, content, on_error)
+	local written, detail = write_atomic(path, content, nil, on_error)
 	return written, detail
 end
 
@@ -2249,6 +2407,27 @@ function M.write_if_unchanged(path, content, expected_source, on_error)
 	return write_atomic(path, content, expected_source, on_error)
 end
 
+--- Publishes a driver-owned private file under the same lock, route, staging
+--- and compare-before-write rules, without carrying the destination's ACL and
+--- extended attributes. Carrying them forks four shell commands per write from
+--- the Hammerspoon process (about 40 ms each on the Mac), which made every
+--- keystats ledger journal flush hold the main thread 0.3 to 0.7 s (ledger L16).
+--- Only for files the driver creates itself in its private data folders: their
+--- metadata is the driver's own default, so there is nothing a user set to keep.
+--- @param path string Absolute destination path.
+--- @param content string UTF-8 content.
+--- @param expected_source table `{ status = "ok"|"absent", content = string|nil }`.
+--- @param on_error function|nil Receives only fixed failure categories.
+--- @return boolean written
+--- @return string|nil error_message
+--- @return function|table|nil receipt Ordinary cleanup callback.
+function M.write_private_if_unchanged(path, content, expected_source, on_error)
+	if type(expected_source) ~= "table" then
+		return false, "expected_source must be a table"
+	end
+	return write_atomic(path, content, expected_source, on_error, nil, false)
+end
+
 --- Publishes an exact source only while the captured logical owner still admits it.
 --- @param path string Absolute destination path.
 --- @param content string Candidate UTF-8 content.
@@ -2270,21 +2449,42 @@ function M.write_if_unchanged_admitted(path, content, expected_source, on_error,
 	return write_atomic(path, content, captured, on_error, admission)
 end
 
---- Appends content to a file, creating it if it does not exist.
+--- Appends content to a file, creating it if it does not exist, for a caller
+--- that provokes the refusal: on_error receives the fixed failure category
+--- instead of the log (M.append is the port's two-argument form).
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to append.
+--- @param on_error function|nil Receives the failure category; nil logs it.
 --- @return boolean true on success, false on any error.
-function M.append(path, content)
+function M.append_reporting(path, content, on_error)
+	local report = OperationReporter.new(on_error, Logger, LOG)
 	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "append(): path must be a non-empty string.")
+		report("append", "error", "append(): path must be a non-empty string.")
 		return false
 	end
 	content = type(content) == "string" and content or ""
 
+	-- Admit only a regular file or an absent path, as write_atomic does: opening
+	-- a FIFO without a reader blocks the main thread, and with a reader the bytes
+	-- leave for another process. The metadata follows a symlink to its target.
+	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
+		report("append", "error", "append(): destination metadata is unavailable; refusing to open it.")
+		return false
+	end
+	local probe_ok, attributes = pcall(hs.fs.attributes, path)
+	if not probe_ok then
+		report("append", "error", "append(): cannot inspect the destination — %s", tostring(attributes))
+		return false
+	end
+	if type(attributes) == "table" and attributes.mode ~= "file" then
+		report("append", "error", "append(): destination is not a regular file (%s).", tostring(attributes.mode))
+		return false
+	end
+
 	local ok, result = pcall(function()
 		local fh, err = io.open(path, "a")
 		if not fh then
-			Logger.error(LOG, "append(): cannot open '%s' for appending — %s", path, tostring(err))
+			report("append", "error", "append(): cannot open '%s' for appending — %s", path, tostring(err))
 			return false
 		end
 		local write_ok, written = pcall(function() return fh:write(content) end)
@@ -2293,19 +2493,27 @@ function M.append(path, content)
 		local write_failed = not write_ok or written ~= fh
 		local close_failed = not close_ok or closed ~= true
 		if write_failed then
-			Logger.error(LOG, "append(): native write failed.")
+			report("append", "error", "append(): native write failed.")
 		end
 		if close_failed then
-			Logger.error(LOG, "append(): native close failed.")
+			report("append", "error", "append(): native close failed.")
 		end
 		return not write_failed and not close_failed
 	end)
 
 	if not ok then
-		Logger.error(LOG, "append(): unexpected error on '%s' — %s", path, tostring(result))
+		report("append", "error", "append(): unexpected error on '%s' — %s", path, tostring(result))
 		return false
 	end
 	return result == true
+end
+
+--- Appends content to a file, creating it if it does not exist.
+--- @param path    string Absolute path to the file.
+--- @param content string UTF-8 content to append.
+--- @return boolean true on success, false on any error.
+function M.append(path, content)
+	return M.append_reporting(path, content, nil)
 end
 
 --- Returns true if a file or directory exists at the given path.
@@ -2320,12 +2528,16 @@ function M.exists(path)
 		return ok and attrs ~= nil
 	end
 
-	-- Fallback: try to open as a file
-	local ok, fh = pcall(io.open, path, "r")
-	if ok and fh then
-		fh:close()
-		return true
+	-- Fallback: stat through test(1). Opening the path instead reported an
+	-- unreadable file as absent and blocked on a FIFO without a writer.
+	if path:find("\0", 1, true) or not hs or type(hs.execute) ~= "function" then
+		Logger.error(LOG, "exists(): no metadata probe can classify the path.")
+		return false
 	end
+	local call_ok, _, _, exit_type, rc = pcall(hs.execute, "/bin/test -e " .. TextUtils.shell_quote(path), false)
+	if call_ok and exit_type == "exit" and (rc == 0 or rc == 1) then return rc == 0 end
+	Logger.error(LOG, "exists(): the test(1) probe failed (type=%s, rc=%s).",
+		tostring(call_ok and exit_type), tostring(call_ok and rc))
 	return false
 end
 
@@ -2369,8 +2581,8 @@ function M.delete(path)
 		return false
 	end
 
-	-- Already absent — contract says this is a no-op success
-	if not M.exists(path) then return true end
+	-- Stat follows links and can fail while the pathname still exists. Only
+	-- remove itself can certify deletion or authoritative ENOENT absence.
 
 	local removed, remove_err = remove_path_or_absent(path)
 	if not removed then
@@ -2387,6 +2599,8 @@ local configuration_reader, configuration_writer, configuration_publisher =
 	rawget(M, "read_with_status"), rawget(M, "write_if_unchanged"), rawget(M, "write_if_unchanged_admitted")
 local configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete =
 	rawget(M, "remove_if_unchanged"), rawget(M, "remove_if_unchanged_admitted"), rawget(M, "remove_exact"), rawget(M, "delete")
+local configuration_receipt_view = rawget(M, "publication_receipt_view")
+local configuration_chain_restore = rawget(M, "publication_receipt_chain_restore")
 
 --- Returns this initializer's actual native method identities without IO.
 --- Public export replacement cannot change these captured values. Consumers
@@ -2399,9 +2613,16 @@ local configuration_remover, configuration_admitted_remover, configuration_exact
 --- @return function|nil admitted_remover
 --- @return function|nil exact_remover
 --- @return function delete
+--- @return function receipt_view Original opaque native issuer viewer.
+--- @return function chain_restore Original exact rename-inverse lineage issuer.
 function M.configuration_ports()
 	return M, configuration_reader, configuration_writer, configuration_publisher,
-		configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete
+		configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete,
+		configuration_receipt_view, configuration_chain_restore
 end
+
+-- The owner is checked against the shared spec when it loads: a missing method
+-- or a half-offered capability would otherwise fail late, inside a publication.
+require("file_system.ports").check_owner(M)
 
 return M

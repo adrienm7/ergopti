@@ -1,0 +1,12 @@
+{
+	"original_sha": "98572fe1a57dde86c6e8591e79112fc5400ec819",
+	"original_manifest_sha256": "fe948041332bf62f862ee84a38e0e2ba11ee4b7c0a3a8c9a593580e067b8c745",
+	"separator_positions": [4, 8, 11, 13, 17],
+	"visible_positions": {
+		"hs": [4, 8, 11, 13, 17],
+		"linux": [4, 8, 11, 17]
+	},
+	"linux_quit_boundary_position": 17,
+	"normalization_titles": ["First", "-", "Second", "-", "Third"],
+	"policy": "Original declared top_level boundaries; existing normalize_separators removes leading/trailing/adjacent separators, callbacks unchanged; Linux moves Quit last and projects its actual preceding boundary."
+}

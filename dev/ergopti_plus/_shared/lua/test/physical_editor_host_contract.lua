@@ -5,7 +5,9 @@ return function(helpers, Json, shared_path, load_host, platform)
 	local checks=0
 	local function eq(a,b,label)checks=checks+1;helpers.assert_eq(a,b,label)end
 	local noop=function()end
-	local logger={error=noop,info=noop,debug=noop,warn=noop}
+	-- Every level the real shim has: a module first loaded here (the manifest reader
+	-- logs done) must not depend on another test file having loaded it before.
+	local logger={error=noop,info=noop,debug=noop,warn=noop,trace=noop,done=noop,start=noop,success=noop}
 	package.loaded['infra.paths']={shared=function(path)return shared_path(path) end}
 	package.loaded['infra.i18n']={get=function(key)return key end}
 	package.loaded['logger.shim']=logger;package.loaded['infra.logger']=logger
@@ -30,7 +32,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 		local old=epoch;eq(backend.on_message({action='close'},{},{app_name='physical_shortcuts',epoch=old}),true,'Linux exact epoch closes')
 		eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'Linux successor opens after native close')
 		backend.on_window_closed(old);eq(backend.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=epoch}),true,'Old native close cannot clear successor')
-		old=epoch;backend.on_window_closed(old);epoch=0;eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'GTK close also retires session')
+		old=epoch;epoch=0;backend.on_window_closed(old);eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'GTK close also retires session')
 	else
 		-- Macro host controlled ports. These are tables, not native userdata qualification.
 		local callback,picker,lastjs,backend
@@ -49,8 +51,10 @@ return function(helpers, Json, shared_path, load_host, platform)
 		backend=load_host()
 		local s=scope();eq(backend.open({scope=s,gestures=catalogue}),true,'Mac actual host opens');callback({body={action='ready'}});eq(lastjs:find('"entries":[]',1,true)~=nil,true,'Mac empty JSON array preserved')
 		callback({body={action='choose',request={code='KeyJ',mods={},request_id=1}}});eq(picker('send_text','★'),true,'Mac native picker returns owned Unicode draft');eq(s.count(),0,'Mac selection never writes');callback({body={action='save',token=1}});eq(s.count(),1,'Mac source receipt reaches joint publication')
-		delete_refuse=true;eq(backend.close(),false,'Refused native delete retains exact owner');eq(backend.open({scope=scope(),gestures=catalogue}),false,'Refused delete blocks successor');delete_refuse=false;clear_refuse=true;eq(backend.close(),false,'Refused bridge detach retains debt');clear_refuse=false;eq(backend.close(),true,'Bridge debt retries without resurrecting deleted native view')
+		-- A failed public delete can already own a native fade. Observe its distinct
+		-- SDK retirement before testing bridge debt; never infer no effect and retry.
+		delete_refuse=true;eq(backend.close(),false,'Refused native delete retains exact owner');eq(backend.open({scope=scope(),gestures=catalogue}),false,'Refused delete blocks successor');delete_refuse=false;setmetatable(view,nil);clear_refuse=true;eq(backend.close(),false,'Refused bridge detach retains debt');clear_refuse=false;eq(backend.close(),true,'Bridge debt retries without resurrecting deleted native view')
 		early_ready=true;eq(backend.open({scope=scope(),gestures=catalogue}),true,'Synchronous ready during construction retained');eq(lastjs:sub(1,5),'init(','Owned view receives deferred constructor ready');backend.close();early_ready=false;early_close=true;eq(backend.open({scope=scope(),gestures=catalogue}),false,'Close during constructor refuses admission');early_close=false;eq(backend.open({scope=scope(),gestures=catalogue}),true,'Constructor cancellation retires exact candidate');backend.close()
-		delete_false=true;eq(backend.open({scope=scope(),gestures=catalogue}),true,'Mac false-delete candidate opens');eq(backend.close(),false,'Explicit native delete refusal retains debt');delete_false=false;clear_false=true;eq(backend.close(),false,'Explicit bridge release refusal retains debt');clear_false=false;eq(backend.close(),true,'Exact native release debt retries')
+		delete_false=true;eq(backend.open({scope=scope(),gestures=catalogue}),true,'Mac false-delete candidate opens');eq(backend.close(),false,'Explicit native delete refusal retains debt');delete_false=false;setmetatable(view,nil);clear_false=true;eq(backend.close(),false,'Explicit bridge release refusal retains debt');clear_false=false;eq(backend.close(),true,'Exact native release debt retries')
 	end
 end

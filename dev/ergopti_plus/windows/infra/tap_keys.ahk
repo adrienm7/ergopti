@@ -25,6 +25,8 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\ai_action_gate.ahk
 
 
 
@@ -68,7 +70,7 @@ TapKeysReadConfig(Cache) {
 	global TapKeyAssignments, TAP_KEY_ORDER, GESTURE_ACTIONS
 	Assignments := Map()
 	for _, Id in TAP_KEY_ORDER {
-		Value := IniCacheGet(Cache, "shortcuts.tap_keys", Id)
+		Value := IniCacheGet(Cache, ConfigKey.SHORTCUTS_TAP_KEYS, Id)
 		if (Value == "_") {
 			Entry := ManifestFindEntryByPath("shortcuts.tap_keys." . Id)
 			if !(Entry is Map)
@@ -99,7 +101,7 @@ SetTapKeyAction(Id, ActionName) {
 	global TapKeyAssignments, TAP_KEY_SCANCODES
 	if !TAP_KEY_SCANCODES.Has(Id)
 		throw ValueError("Unknown tap key '" . Id . "'.")
-	if !GestureAssignConfiguredAction(&TapKeyAssignments, "tap_key", "shortcuts.tap_keys", Id, ActionName)
+	if !GestureAssignConfiguredAction(&TapKeyAssignments, "tap_key", ConfigKey.SHORTCUTS_TAP_KEYS, Id, ActionName)
 		return false
 	LoggerInfo("TapKeys", "Tap key '{1}' → '{2}'.", Id, ActionName)
 	return ReloadPreservingSuspend()
@@ -124,8 +126,9 @@ _TapKeysCategoryEnabled() {
 	return !IsSet(CategoryEnabled) || !(CategoryEnabled is Map) || CategoryEnabled.Get("Shortcuts", true)
 }
 
-; The #HotIf predicate of one tap key: assigned to a known action, and the
-; Shortcuts category on. Evaluated by the keyboard hook on every press, so it
+; The #HotIf predicate of one tap key: assigned to a known action that is armed
+; (an AI action is not while the AI is off), and the Shortcuts category on.
+; Evaluated by the keyboard hook on every press, so it
 ; only reads memory.
 ; @param {String} Id A tap key id.
 ; @returns {Boolean}
@@ -134,7 +137,7 @@ TapKeyShouldFire(Id) {
 	if !IsSet(TapKeyAssignments) || !IsSet(GESTURE_ACTIONS)
 		return false
 	Action := TapKeyAssignments.Get(Id, "none")
-	return Action != "none" && GESTURE_ACTIONS.Has(Action) && _TapKeysCategoryEnabled()
+	return Action != "none" && GESTURE_ACTIONS.Has(Action) && !AiActionBlocked(Action) && _TapKeysCategoryEnabled()
 }
 
 ; Runs a tap key's action, then holds the hotkey thread until the key is up so
@@ -171,18 +174,20 @@ global _TapKeyOsProbe := {
 	ToUnicode: KS_KeyTextNoStateChange,
 }
 
-; The character the Ergopti emulation gives this scancode on its base layer
-; while it remaps the digit row, or "" when the key is the OS layout's.
+; The character the layout emulation gives this scancode on its base layer
+; (a registry layout or the built-in Ergopti row), or "" when the key is the
+; OS layout's. The number-row ordering never moves these edge keys.
 ; @param {Integer} Scancode
 ; @returns {String}
 _TapKeyEmulatedCharacter(Scancode) {
 	global Features
 	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout")
 		return ""
-	if NumberRowEffectiveMode() != "digits"
-		return ""
-	Table := ErgoptiNumberRowEdgeMapping()
-	return Table.Has(Scancode) ? Table[Scancode] : ""
+	; « Also reorder the three edge keys » types the other level.
+	Reordered := NumberRowEdgeText(Scancode, false, NumberRowForegroundLayout(), KS_CapsLockToggleState())
+	if Reordered != ""
+		return Reordered
+	return NumberRowEmulatedBase(Format("SC{:03X}", Scancode))
 }
 
 ; The character a plain tap on the key produces right now.
@@ -243,7 +248,7 @@ TapKeyRows(Probe := "") {
 			? GestureActionDisplayLabel(Action, TapKeyBindingId(Id))
 			: t("menu.shortcuts.tap_keys.unassigned")
 		Name := TapKeyDisplayName(Id, Probe)
-		Rows.Push(Map("label", Name . " : " . ActionLabel, "action", _TapKeyPickerOpener(Id, Name)))
+		Rows.Push(Map("label", LabelValue(Name, ActionLabel), "action", _TapKeyPickerOpener(Id, Name)))
 	}
 	return Rows
 }

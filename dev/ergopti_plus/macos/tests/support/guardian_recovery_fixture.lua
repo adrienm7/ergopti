@@ -36,8 +36,10 @@ local STUB_MODULES = {
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
 	"adapters.timer_scheduler",
+	"adapters.system_info",
+	"platform.remap.deploy_pacing",
 	"infra.notifications",
-	"modules.keylogger.kc_bridge",
+	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
 	"hs.caffeinate.watcher",
@@ -190,11 +192,17 @@ local function with_remap(options, body)
 		get = function() return "tests/unit/platform/remap/guardian-recovery.toml" end,
 		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}
+	-- The two timings platform/remap/init.lua reads; any other read is a new
+	-- dependency this fixture must learn about, so it fails loudly.
+	local timings_sec = {
+		["debounce.layout_tis_settle_ms"] = 0.5,
+		["ui.onboarding_startup_delay_ms"] = 2,
+	}
 	package.loaded["infra.timings"] = {
 		sec = function(category, key)
-			helpers.assert_eq(category, "debounce")
-			helpers.assert_eq(key, "layout_tis_settle_ms")
-			return 0.5
+			local value = timings_sec[category .. "." .. key]
+			helpers.assert_true(value ~= nil, "unexpected timing read: " .. category .. "." .. key)
+			return value
 		end,
 	}
 	package.loaded["platform.remap.defaults"] = {
@@ -273,7 +281,7 @@ local function with_remap(options, body)
 			end
 			calls.resolved_revision = calls.layout_revision
 			append("resolve:" .. calls.layout_revision)
-			return 1
+			return 1, "ansi"
 		end,
 	}
 	package.loaded["platform.remap.generator"] = {
@@ -584,7 +592,7 @@ local function with_remap(options, body)
 			return true
 		end,
 	}
-	package.loaded["modules.keylogger.kc_bridge"] = {
+	package.loaded["modules.keystats.kc_bridge"] = {
 		clear_managed_set = function() return true end,
 		refresh_managed_set = function()
 			calls.classifier_refreshes = calls.classifier_refreshes + 1
@@ -679,6 +687,13 @@ local function with_remap(options, body)
 		return true
 	end
 	package.loaded["adapters.timer_scheduler"] = timer_scheduler
+	-- Unknown input idle never delays a deploy; a case sets calls.input_idle_seconds.
+	calls.input_idle_seconds = options.input_idle_seconds
+	package.loaded["adapters.system_info"] = {
+		input_idle_seconds = function() return calls.input_idle_seconds end,
+	}
+	-- The pacing owner captures its probe at require time.
+	package.loaded["platform.remap.deploy_pacing"] = nil
 	-- Recorded, never sent: a real notice would arm its own retention timer on
 	-- the scheduler above and read as a recovery delay.
 	package.loaded["infra.notifications"] = {

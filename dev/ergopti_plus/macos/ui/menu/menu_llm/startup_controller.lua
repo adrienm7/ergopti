@@ -22,12 +22,18 @@ local M = {}
 local hs      = hs
 local llm_mod = require("modules.llm")
 local Logger  = require("infra.logger")
+local Errors  = require("adapter_errors")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
+local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
+local TableUtil = require("table_util")
 
 local LOG = "startup_ctrl"
+-- The lifecycle line Windows writes for the same boot (menu_llm/init.ahk)
+local AI_OFF_STARTUP_MESSAGE =
+	"Restored AI menu state activated with the AI off: its hotkeys and probes wait for the switch-on."
 
 
 
@@ -59,7 +65,10 @@ local LOG = "startup_ctrl"
 ---   get_startup_silence       function Returns the current _startup_silence flag.
 ---   set_startup_silence       function Sets the _startup_silence flag.
 ---   get_profile_hks           function Returns the current _llm_profile_hks map.
+---   disarm_shortcuts          function Releases the profile hotkeys once the AI is off.
 --- @return function check_startup The startup function to call once.
+--- @return function scope_idle Whether no startup work remains owned.
+--- @return table runtime_switch arm()/disarm() for the AI switch-on and switch-off.
 function M.new(ctx)
 	local state                      = ctx.state
 	local keymap                     = ctx.keymap
@@ -76,6 +85,7 @@ function M.new(ctx)
 	local get_startup_silence        = ctx.get_startup_silence
 	local set_startup_silence        = ctx.set_startup_silence
 	local get_profile_hks            = ctx.get_profile_hks
+	local disarm_shortcuts           = ctx.disarm_shortcuts
 	local prediction_locks = type(ctx.prediction_locks) == "table"
 		and ctx.prediction_locks or PredictionLockRegistry.new({
 			state = state,
@@ -118,6 +128,12 @@ function M.new(ctx)
 	local _startup_sync_in_progress = false
 	local _restart_requirements_cycle = nil
 	local _reattach_callback = nil
+	-- Set by a startup with the AI off: the switch-on arms the reattachment
+	local _reattach_awaits_enable = false
+	-- The AI switch's share of this startup: arm()/disarm() of the download
+	-- reattachment an off boot left waiting, defined below the startup sequence.
+	-- The trigger orchestrator owns the profile hotkeys.
+	local runtime_switch = {}
 	local _reattach_callback_in_progress = false
 	local _reattach_active = false
 	local _reattach_dispatch_in_progress = false
@@ -148,6 +164,7 @@ function M.new(ctx)
 		end
 	end
 	local pause_owner_registered = script_control == nil
+	local _startup_settlement_observer = nil
 	local _timer_slots = {
 		reattach = nil,
 		primary = nil,
@@ -185,7 +202,7 @@ function M.new(ctx)
 	--- @return boolean settled
 	local function cancel_startup_timers()
 		local settled = true
-		for _, slot in ipairs({ "reattach", "primary", "backup" }) do
+		for _, slot in ipairs({ "reattach", "primary", "backup", "settlement" }) do
 			if cancel_startup_timer(slot) ~= true then settled = false end
 		end
 		return settled
@@ -358,20 +375,88 @@ function M.new(ctx)
 		return ok == true and result == true
 	end
 
+	--- Unregisters an exact passive listener without consuming native custody.
+	--- @return boolean settled
+	local function cancel_settlement_observer()
+		local owner = _startup_settlement_observer
+		if owner == nil then return true end
+		owner.authorized = false
+		if owner.installing == true then return false end
+		local ok, result = Logger.callback(LOG, "Startup settlement unregistration", owner.lease.cancel)
+		if ok ~= true or result ~= true then
+			Logger.error(LOG, "Startup settlement unregistration remains unsettled.")
+			return false
+		end
+		if _startup_settlement_observer == owner then _startup_settlement_observer = nil end
+		return true
+	end
+
+	local settle_startup_abort
+
+	--- Waits for the original snapshot to retire; this never polls native tasks.
+	--- The owned one-shot leaves the native terminal stack before durable writes.
+	local function observe_requirement_settlement()
+		if _startup_settlement_observer ~= nil or _startup_paused == true then return end
+		if type(models_mgr.when_requirements_settled) ~= "function" then
+			Logger.error(LOG, "Startup requirement settlement observation is unavailable.")
+			return
+		end
+		local generation = _startup_check_generation
+		local owner = { installing = true, authorized = true, lease = nil, ready = false }
+		_startup_settlement_observer = owner
+		local function retired()
+			if owner.installing == true then owner.ready = true; return end
+			if _startup_settlement_observer ~= owner then return end
+			if cancel_settlement_observer() ~= true then return end
+			if generation ~= _startup_check_generation or _startup_paused == true
+				or _startup_abort_pending ~= true then return end
+			if arm_startup_timer("settlement", 0, function()
+				if generation == _startup_check_generation and _startup_abort_pending == true then
+					settle_startup_abort()
+				end
+			end) ~= true then
+				Logger.error(LOG, "Startup original settlement handoff was refused.")
+			end
+		end
+		local ok, lease, committed = Logger.callback(LOG, "Startup requirement settlement observation",
+			models_mgr.when_requirements_settled, requirement_owner, retired)
+		owner.installing = false
+		if type(lease) == "table" and type(lease.cancel) == "function" then owner.lease = lease end
+		if ok ~= true or committed ~= true or owner.lease == nil then
+			owner.authorized = false
+			if owner.lease ~= nil then cancel_settlement_observer()
+			elseif _startup_settlement_observer == owner then _startup_settlement_observer = nil end
+			Logger.error(LOG, "Startup requirement settlement observation was refused.")
+			return
+		end
+		if owner.ready == true or owner.authorized ~= true then
+			-- An already-idle snapshot cannot pay a different refused cleanup gate.
+			-- Retain that gate for its existing retry rather than loop zero timers.
+			cancel_settlement_observer()
+		end
+	end
+
 	--- Retries every exact capability retained by an aborted startup cycle. The
 	--- prediction lock is intentionally released last: a still-live requirement
 	--- task must never run below an unlocked engine after its dispatch refused.
 	--- @return boolean settled
-	local function settle_startup_abort()
+	settle_startup_abort = function()
 		if _startup_abort_pending ~= true then return true end
 		local timers_settled = cancel_startup_timers()
 		local requirements_settled = pause_requirement_tasks()
+		local observation_settled = true
+		if requirements_settled == true then
+			observation_settled = cancel_settlement_observer()
+		else
+			observe_requirement_settlement()
+		end
 		local prediction_settled = false
 		if requirements_settled == true then
 			prediction_settled = restore_startup_prediction_lock() == true
 		end
 		local native_settled = timers_settled == true
 			and requirements_settled == true and prediction_settled == true
+			and observation_settled == true
 		local finalize_settled = _startup_settlement_finalize == nil
 		if native_settled and type(_startup_settlement_finalize) == "function" then
 			_startup_callback_depth = _startup_callback_depth + 1
@@ -410,6 +495,15 @@ function M.new(ctx)
 		_startup_timer_generation = _startup_timer_generation + 1
 		_startup_abort_pending = true
 		if settle_startup_abort() ~= true then
+			if _startup_settlement_observer ~= nil then
+				-- A terminal delivered from inside its own requirement task cannot
+				-- join that task yet: the armed observer finishes the settlement
+				-- once it retires. Expected, so no error window opens (#99).
+				Logger.info(LOG,
+					"Startup-cycle settlement after '%s' waits for its requirement tasks to retire.",
+					tostring(reason))
+				return false
+			end
 			Logger.error(LOG,
 				"Startup-cycle settlement remains unsettled after '%s'.",
 				tostring(reason))
@@ -603,6 +697,15 @@ function M.new(ctx)
 			end
 			return callback_result == true
 		end
+		-- With the AI off nothing of it runs: no download reattachment, no profile
+		-- hotkey, no requirement probe. The switch-on arms them (runtime_switch and
+		-- the trigger orchestrator), as Windows and Linux do (ai-off-inert-macos).
+		if state.llm_enabled ~= true then
+			_reattach_awaits_enable = true
+			Logger.info(LOG, AI_OFF_STARTUP_MESSAGE)
+			return true
+		end
+		_reattach_awaits_enable = false
 		if arm_startup_timer("reattach", 0.5, _reattach_callback) ~= true then
 			Logger.error(LOG, "Download reattachment timer could not be armed.")
 		end
@@ -643,8 +746,7 @@ function M.new(ctx)
 			Logger.debug(LOG, string.format("User profiles loaded: %d.", user_count))
 
 			local profile_shortcuts = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts or {}
-			local sc_count = 0
-			for _ in pairs(profile_shortcuts) do sc_count = sc_count + 1 end
+			local sc_count = TableUtil.count(profile_shortcuts)
 			Logger.info(LOG, string.format("Profile shortcuts loaded: %d entries.", sc_count))
 
 			for profile_id, sc in pairs(profile_shortcuts) do
@@ -691,20 +793,23 @@ function M.new(ctx)
 		Logger.info(LOG, string.format("LLM enabled at startup, model: %s.", state.llm_model or "nil"))
 
 		--- Turns the AI off for this failed startup check.
-		--- @param cause table|nil { backend, reason, offer } when the user is told
-		---   what is wrong and how to fix it: a warning, and `offer` (the
-		---   unreachable-backend error) once the AI is off. Nil for an unexplained
-		---   failure, which stays an error.
+		--- @param cause table|string|nil { backend, reason, offer } when the user
+		---   is told what is wrong and how to fix it: a warning, and `offer` (the
+		---   unreachable-backend error) once the AI is off. A string or nil is the
+		---   manager's reason for an unexplained failure, which stays an error.
 		local function disable_llm(cause)
 			if type(cause) == "table" then
-				Logger.warn(LOG, "Disabling LLM: the %s backend %s.", tostring(cause.backend),
-					tostring(cause.reason))
+				Logger.warn(LOG, "Disabling LLM: the %s backend (%s%s).", tostring(cause.backend),
+					tostring(cause.reason), cause.detail ~= nil and ": " .. tostring(cause.detail) or "")
 			else
-				Logger.error(LOG, "Disabling LLM (requirements check failed).")
+				Logger.error(LOG, "Disabling LLM (requirements check failed: %s).",
+					tostring(cause or "no reason given"))
+				cause = nil
 			end
 			state.llm_enabled = false
 			local preference_applied = false
 			local prefs_saved = false
+			local shortcuts_released = false
 			local menu_updated = false
 			local offered = false
 			local function finalize_disable()
@@ -720,6 +825,18 @@ function M.new(ctx)
 				if not prefs_saved then
 					if save_prefs() ~= true then return false end
 					prefs_saved = true
+					if _startup_paused == true then return false end
+				end
+				if not shortcuts_released then
+					-- The AI is off now: its profile hotkeys must not stay bound
+					if type(disarm_shortcuts) ~= "function" then
+						Logger.error(LOG, "Profile hotkeys cannot be released: no shortcut owner.")
+						return false
+					end
+					local ok, released = Logger.callback(LOG,
+						"Disabled startup shortcut release", disarm_shortcuts)
+					if ok ~= true or released ~= true then return false end
+					shortcuts_released = true
 					if _startup_paused == true then return false end
 				end
 				if not menu_updated then
@@ -760,9 +877,11 @@ function M.new(ctx)
 		end
 
 		if keymap and type(keymap.set_llm_backend_name) == "function" then
+			-- The shared brand table names local backends; the API's label is its own.
 			local backend_label = ""
-			if state.llm_backend == "mlx"    then backend_label = "MLX 🚀"    end
-			if state.llm_backend == "ollama" then backend_label = "Ollama 🦙" end
+			if state.llm_backend == "mlx" or state.llm_backend == "ollama" then
+				backend_label = require("ui.menu.menu_llm.backend_labels").brand(state.llm_backend)
+			end
 			pcall(keymap.set_llm_backend_name, backend_label)
 		end
 
@@ -806,7 +925,7 @@ function M.new(ctx)
 			if presence_ok ~= true or runtime_present ~= true then
 				return disable_llm({
 					backend = state.llm_backend,
-					reason = "runtime is not installed",
+					reason = Errors.STARTUP_RUNTIME_NOT_INSTALLED,
 					offer = state.llm_backend == "ollama",
 				})
 			end
@@ -814,7 +933,7 @@ function M.new(ctx)
 			if _startup_paused == true or not runtime_current(my_pause_epoch) then
 				return false
 			end
-			local count = 0; for _ in pairs(installed) do count = count + 1 end
+			local count = TableUtil.count(installed)
 			Logger.debug(LOG, string.format("Startup installed-models cache count: %d.", count))
 			if count == 0 then
 				if not _check_startup_attempts then _check_startup_attempts = 0 end
@@ -892,11 +1011,28 @@ function M.new(ctx)
 				if reason == OllamaEndpoint.UNREACHABLE then
 					return disable_llm({
 						backend = state.llm_backend,
-						reason = "does not answer at " .. OllamaEndpoint.get_base_url(),
+						reason = Errors.STARTUP_OLLAMA_UNREACHABLE,
+						detail = OllamaEndpoint.get_base_url(),
 						offer = true,
 					})
 				end
-				return disable_llm()
+				-- The user closed the download prompt, the dialog said the disk
+				-- cannot hold the model, or the pull asked for a newer Ollama:
+				-- they know, so no error window
+				if reason == RequirementRegistry.CANCEL_DOWNLOAD_DECLINED then
+					return disable_llm({ backend = state.llm_backend,
+						reason = Errors.STARTUP_MODEL_DOWNLOAD_DECLINED, detail = tostring(state.llm_model) })
+				end
+				if reason == RequirementRegistry.CANCEL_DISK_INSUFFICIENT then
+					return disable_llm({ backend = state.llm_backend,
+						reason = Errors.STARTUP_MODEL_DISK_INSUFFICIENT, detail = tostring(state.llm_model) })
+				end
+				-- The pull's notice asked the user to upgrade Ollama (#101)
+				if reason == RequirementRegistry.CANCEL_RUNTIME_UPGRADE_REQUIRED then
+					return disable_llm({ backend = state.llm_backend,
+						reason = Errors.STARTUP_OLLAMA_UPGRADE_REQUIRED, detail = tostring(state.llm_model) })
+				end
+				return disable_llm(reason)
 			end)
 			if dispatch_result ~= true then
 				abort_startup_cycle("requirements dispatch")
@@ -1060,6 +1196,7 @@ function M.new(ctx)
 			_startup_timer_generation = _startup_timer_generation + 1
 			_startup_check_generation = _startup_check_generation + 1
 			local timers_settled = cancel_startup_timers()
+			local observation_settled = cancel_settlement_observer()
 			local requirements_settled = pause_requirement_tasks()
 			local callbacks_settled = _startup_callback_depth == 0
 			local reattach_settled = _reattach_dispatch_in_progress ~= true
@@ -1081,6 +1218,7 @@ function M.new(ctx)
 				prediction_settled = reassert_startup_prediction_lock()
 			end
 			return timers_settled == true and requirements_settled == true
+				and observation_settled == true
 				and reattach_settled == true
 				and callbacks_settled == true
 				and prediction_settled == true
@@ -1195,8 +1333,37 @@ function M.new(ctx)
 			and not _startup_sync_in_progress and not _reattach_active
 			and not _reattach_dispatch_in_progress and not _reattach_callback_in_progress
 			and _startup_prediction_lock == nil and next(_timer_slots) == nil
+			and _startup_settlement_observer == nil
 	end
-	return check_startup, scope_idle
+
+	--- Arms the reattachment a startup with the AI off left waiting.
+	--- @return boolean settled True when nothing waits or the timer is armed.
+	function runtime_switch.arm()
+		if state.llm_enabled ~= true then
+			Logger.error(LOG, "AI startup runtime cannot be armed while the AI is off.")
+			return false
+		end
+		if _reattach_awaits_enable ~= true or type(_reattach_callback) ~= "function" then return true end
+		if arm_startup_timer("reattach", 0.5, _reattach_callback) ~= true then
+			Logger.error(LOG, "Download reattachment timer could not be armed at the AI switch-on.")
+			return false
+		end
+		_reattach_awaits_enable = false
+		Logger.info(LOG, "AI switched on: the interrupted download reattachment is armed.")
+		return true
+	end
+
+	--- Cancels a reattachment that has not fired yet when the AI is switched off.
+	--- @return boolean settled True when no reattachment timer remains armed.
+	function runtime_switch.disarm()
+		if _timer_slots.reattach == nil then return true end
+		if cancel_startup_timer("reattach") ~= true then return false end
+		_reattach_awaits_enable = true
+		Logger.info(LOG, "AI switched off: the pending download reattachment is disarmed.")
+		return true
+	end
+
+	return check_startup, scope_idle, runtime_switch
 end
 
 return M

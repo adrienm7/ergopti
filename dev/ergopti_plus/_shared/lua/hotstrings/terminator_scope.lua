@@ -21,22 +21,41 @@ function M.defaults()
 	return states
 end
 
---- Lists only stored built-in state leaves. Deleting them restores inheritance;
---- personal definitions, their states, and unknown entries remain user-owned.
+--- Returns a detached map of shipped delimiter consume defaults, excluding
+--- custom rows. Only the magic-key slot ships consumed.
+--- @return table consume Map of built-in key to exact boolean default.
+function M.consume_defaults()
+	local consume = {}
+	for _, def in ipairs(Catalogue) do
+		if def.key and def.custom ~= true then consume[def.key] = def.consume == true end
+	end
+	return consume
+end
+
+--- The leaf tables that hold one choice per shipped delimiter, in the order the
+--- leaves are listed: enabled state, then consumption.
+M.BUILTIN_LEAF_TABLES = { "terminator_states", "terminator_consume" }
+
+--- Lists only stored built-in state and consume leaves. Deleting them restores
+--- inheritance; personal definitions, their states, and unknown entries remain
+--- user-owned.
 --- @param document table Decoded config.toml.
---- @return table paths Sorted array of path segments.
+--- @return table paths Array of path segments, each table sorted by key.
 function M.builtin_state_leaves(document)
 	assert(type(document) == "table", "word-delimiter leaves need a decoded configuration")
 	local hotstrings = type(document.hotstrings) == "table" and document.hotstrings or {}
-	local states = hotstrings.terminator_states
-	if type(states) ~= "table" or (next(states) ~= nil and #states > 0) then return {} end
-	local defaults, keys = M.defaults(), {}
-	for key in pairs(states) do
-		if type(key) == "string" and defaults[key] ~= nil then keys[#keys + 1] = key end
+	local defaults, paths = M.defaults(), {}
+	for _, name in ipairs(M.BUILTIN_LEAF_TABLES) do
+		local stored = hotstrings[name]
+		if type(stored) == "table" and not (next(stored) ~= nil and #stored > 0) then
+			local keys = {}
+			for key in pairs(stored) do
+				if type(key) == "string" and defaults[key] ~= nil then keys[#keys + 1] = key end
+			end
+			table.sort(keys)
+			for _, key in ipairs(keys) do paths[#paths + 1] = { "hotstrings", name, key } end
+		end
 	end
-	table.sort(keys)
-	local paths = {}
-	for _, key in ipairs(keys) do paths[#paths + 1] = { "hotstrings", "terminator_states", key } end
 	return paths
 end
 

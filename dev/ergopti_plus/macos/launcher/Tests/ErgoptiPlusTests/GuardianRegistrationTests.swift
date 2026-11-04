@@ -6,7 +6,7 @@ import XCTest
 @testable import ErgoptiPlus
 
 final class GuardianRegistrationTests: XCTestCase {
-	private let executable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+	private let executable = "/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus"
 	private let environment = ["ERGOPTI_LAUNCHER_DEVICE": "11", "ERGOPTI_LAUNCHER_INODE": "22"]
 	private let identity = LeaseExecutableIdentity(device: "11", inode: "22")
 
@@ -24,13 +24,34 @@ final class GuardianRegistrationTests: XCTestCase {
 				arguments: [executable, kRegisterRemapGuardianFlag],
 				executablePath: executable, environment: environment,
 				identityReader: { _ in self.identity },
-				register: { paths.append($0); return status },
+				register: {
+					paths.append($0)
+					return RemapGuardianRegistrationOutcome(status: status, note: nil)
+				},
 				writeResult: { output.append($0); return true }
 			)
 			XCTAssertEqual(code, 0)
 			XCTAssertEqual(paths, [executable])
 			XCTAssertEqual(String(data: output, encoding: .utf8), status.rawValue + "\n")
 		}
+	}
+
+	/// The ad hoc note follows the status on its own line, which the
+	/// driver logs and the field run reports; a Developer ID answer has none.
+	func testRegistrationPrintsTheAdhocNoteAfterTheStatus() {
+		for note in [RemapGuardianRegistrationNote.adhocLegacyOnly, .adhocResetDeferred, .adhocResetRefused] {
+			var output = Data()
+			let code = runGuardianRegistration(
+				arguments: [executable, kRegisterRemapGuardianFlag],
+				executablePath: executable, environment: environment,
+				identityReader: { _ in self.identity },
+				register: { _ in RemapGuardianRegistrationOutcome(status: .ready, note: note) },
+				writeResult: { output.append($0); return true }
+			)
+			XCTAssertEqual(code, 0)
+			XCTAssertEqual(String(data: output, encoding: .utf8), "ready\n" + note.rawValue + "\n")
+		}
+		XCTAssertEqual(RemapGuardianRegistrationNote.adhocLegacyOnly.rawValue, "developer_adhoc_legacy_only")
 	}
 
 	/// Invalid commands must neither register a service nor publish a status.
@@ -51,7 +72,10 @@ final class GuardianRegistrationTests: XCTestCase {
 			let code = runGuardianRegistration(
 				arguments: arguments, executablePath: path, environment: values,
 				identityReader: { _ in observed },
-				register: { _ in effects += 1; return .ready },
+				register: { _ in
+					effects += 1
+					return RemapGuardianRegistrationOutcome(status: .ready, note: nil)
+				},
 				writeResult: { _ in effects += 1; return true }
 			)
 			XCTAssertEqual(code, 64)
@@ -64,7 +88,8 @@ final class GuardianRegistrationTests: XCTestCase {
 		let code = runGuardianRegistration(
 			arguments: [executable, kRegisterRemapGuardianFlag],
 			executablePath: executable, environment: environment,
-			identityReader: { _ in self.identity }, register: { _ in .ready },
+			identityReader: { _ in self.identity },
+			register: { _ in RemapGuardianRegistrationOutcome(status: .ready, note: nil) },
 			writeResult: { _ in false }
 		)
 		XCTAssertEqual(code, LeaseWorkerExit.innerFailed.rawValue)

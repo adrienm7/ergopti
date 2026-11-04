@@ -8,15 +8,21 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
+local TableUtil = require("table_util")
 local LOG = "infra.llm_preferences"
 local _scope_owner = nil
 local _detached = nil
 local _generation = 0
 local _observed_source = nil
+-- The document decoded from _observed_source's bytes. Only lookup() reads it and
+-- every table value leaves as a copy, so identical bytes share one decode.
+local _observed_document = nil
 
---- Admits ordinary writes only outside the retained terminal transaction.
+--- Admits ordinary actions only outside a retained scope and source write refusal.
 --- @return boolean admitted
-function M.admit() return _scope_owner == nil end
+function M.admit()
+	return _scope_owner == nil and Writer.write_refusal(Paths.config("config.toml")) == nil
+end
 
 --- Rechecks only the originating acknowledged revision and ordinary owner.
 --- No IO or user callback occurs after this check in final write admission.
@@ -106,15 +112,19 @@ end
 
 local function read()
 	if _detached then return _detached.document, _detached.source end
+	-- Fresh bytes on every call: an external edit is seen at once. Only their
+	-- decode is reused, which the managed download's per-chunk source fence
+	-- otherwise repeated about 80 times for each 64 KiB chunk.
 	local bytes, status, detail = Writer.read_classified(Paths.config("config.toml"))
 	assert(status == "ok" or status == "absent", "AI configuration is unreadable: " .. tostring(detail))
+	local source = { status = status, content = bytes }
+	if _observed_source and _observed_source.status == status and _observed_source.content == bytes then
+		return _observed_document, source
+	end
 	local document = Codec.decode(bytes or "")
 	assert(type(document) == "table", "AI configuration contains malformed TOML")
-	local source = { status = status, content = bytes }
-	if not _observed_source or _observed_source.status ~= status or _observed_source.content ~= bytes then
-		_generation = _generation + 1
-		_observed_source = source
-	end
+	_generation = _generation + 1
+	_observed_source, _observed_document = source, document
 	return document, source
 end
 
@@ -133,6 +143,7 @@ function M.get(path, absent)
 	entry(path)
 	local value = lookup(read(), path)
 	if value == nil then return absent end
+	if type(value) == "table" then return TableUtil.deep_copy(value) end
 	return value
 end
 
@@ -140,16 +151,19 @@ end
 --- @param paths table Declared canonical paths.
 --- @return table values Effective values keyed by path.
 --- @return table source Exact bytes used to resolve the values.
+--- @return integer revision Source revision captured before lookup callbacks.
 function M.get_many(paths)
 	for _, path in ipairs(paths) do entry(path) end
 	local document, source = read()
+	local revision = _generation
 	local values = {}
 	for _, path in ipairs(paths) do
 		local value = lookup(document, path)
 		if value == nil then value = Manifest.default_for(path) end
+		if type(value) == "table" then value = TableUtil.deep_copy(value) end
 		values[path] = value
 	end
-	return values, source
+	return values, source, revision
 end
 
 --- Marks exactly one declared leaf through the same lookup as its reader. A

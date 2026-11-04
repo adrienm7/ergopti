@@ -36,6 +36,8 @@
 ; no counterpart in _shared/core/ports/ — it wraps Windows-only process spawning.
 ; ==============================================================================
 
+#Include ../infra/phase_stats.ahk
+
 #Include ../infra/tick_count.ahk
 
 
@@ -183,6 +185,17 @@ _SR_ProgramName(Cmd) {
 	return (Name != "" && RegExMatch(Name, "^[\w.+-]+$")) ? Name : "unknown"
 }
 
+; Names the program of a spawned executable, never its arguments: unlike a composed
+; command, the executable is a whole path, spaces included.
+; @param Executable {String}
+; @returns {String}
+_SR_ExecutableName(Executable) {
+	if !(Executable is String)
+		return "unknown"
+	SplitPath(Executable, &Name)
+	return (Name != "" && RegExMatch(Name, "^[\w.+-]+$")) ? Name : "unknown"
+}
+
 ; Reports a process exit with its status and duration. The first exit of each
 ; program is logged, then at most one line per program per window (carrying the
 ; number of runs it summarises), unless a run is slow — a slow child is exactly
@@ -198,6 +211,7 @@ _SR_RecordExit(Program, Status, DurationMs) {
 	static LastLogged := Map()
 	static Suppressed := Map()
 	Now := A_TickCount
+	PhaseStats_AddMs("process." . Program, DurationMs)
 	if (LastLogged.Has(Program) && (Now - LastLogged[Program]) < WINDOW_MS && DurationMs < SLOW_MS) {
 		Suppressed[Program] := Suppressed.Get(Program, 0) + 1
 		return false
@@ -247,6 +261,13 @@ _SR_DeferLogError(FormatString, Args*) {
  */
 ShellRunner_Exec(Cmd) {
 	if (Type(Cmd) != "String" or Cmd = "") {
+		return ""
+	}
+	; Run passes a NUL-terminated command line: the prefix would run without
+	; the capture redirection that follows it.
+	if _SR_HasNul(Cmd) {
+		_SR_LogError("exec() refused for '{1}': the command contains NUL, which a native command line cannot carry.",
+			_SR_ProgramName(Cmd))
 		return ""
 	}
 
@@ -309,6 +330,81 @@ ShellRunner_Exec(Cmd) {
 ; ===================================
 
 /**
+ * Windows PowerShell's executable: the one spelling a PowerShell stage shares,
+ * since the antivirus surface of the compiled script counts every copy.
+ * @returns {String} Absolute path under the Windows directory.
+ */
+ShellRunner_WinPsPath() {
+	return A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
+}
+
+/**
+ * The module folder of that executable. A driver started from PowerShell 7 inherits
+ * its PSModulePath, whose folders hold modules built for another engine.
+ * @returns {String} Absolute path under the Windows directory.
+ */
+ShellRunner_WinPsModulePath() {
+	SplitPath(ShellRunner_WinPsPath(), , &Directory)
+	return Directory . "\Modules"
+}
+
+; The version the workers' script text is written for.
+global SHELL_RUNNER_MIN_WIN_PS_VERSION := "5.1"
+
+; The program's name, from its one spelling: the compiled script's antivirus
+; surface counts every other copy.
+_ShellRunner_WinPsStem() {
+	SplitPath(ShellRunner_WinPsPath(), , , , &Stem)
+	return Stem
+}
+
+/**
+ * The installed version, from the registry, whose names ignore case: starting
+ * the program would cost a process at every start of the driver.
+ * @returns {String} "" when it is not installed.
+ */
+ShellRunner_WinPsVersion() {
+	Stem := _ShellRunner_WinPsStem()
+	return RegRead("HKLM\SOFTWARE\Microsoft\" . Stem . "\3\" . Stem . "Engine", Stem . "Version", "")
+}
+
+/**
+ * Says at start, in words, that the workers cannot run. Scheduled after the boot
+ * is ready, since a modal dialog freezes the auto-execute thread under it.
+ * @param {Func} VersionFn Test seam, ShellRunner_WinPsVersion by default.
+ * @param {Func} NoticeFn Test seam taking the text, a dialog by default.
+ * @returns {Boolean} True when the version is supported.
+ */
+ShellRunner_CheckWinPsAtStart(VersionFn := 0, NoticeFn := 0) {
+	global SHELL_RUNNER_MIN_WIN_PS_VERSION
+	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : ShellRunner_WinPsVersion()
+	if (Version != "" && VerCompare(Version, SHELL_RUNNER_MIN_WIN_PS_VERSION) >= 0)
+		return true
+	Name := "Windows " . StrReplace(StrTitle(_ShellRunner_WinPsStem()), "shell", "Shell")
+	LoggerError("ShellRunner", "{1} {2} is required, found '{3}'.", Name, SHELL_RUNNER_MIN_WIN_PS_VERSION, Version)
+	Text := StrReplace(t(Version == "" ? "startup.winps_missing" : "startup.winps_too_old"),
+		"{1}", SHELL_RUNNER_MIN_WIN_PS_VERSION)
+	Text := StrReplace(StrReplace(Text, "{2}", Version), "{3}", Name)
+	if HasMethod(NoticeFn, "Call")
+		NoticeFn.Call(Text)
+	else
+		Ui_MsgBox(Text, Name, "Icon!")
+	return false
+}
+
+/**
+ * The arguments a PowerShell stage starts with: no profile, no prompt, and
+ * the execution policy its scripts and modules need, followed by Args.
+ * @param {String} Args The stage's own arguments (-File or -Command first).
+ * @returns {Array}
+ */
+ShellRunner_WinPsArgs(Args*) {
+	Out := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass"]
+	Out.Push(Args*)
+	return Out
+}
+
+/**
  * Spawns an async subprocess and returns an opaque handle.
  * The handle exposes start(), terminate(), and the optional Windows-only
  * processId()/detach()/terminateAsync(); all are safe on a not-yet-started or
@@ -339,14 +435,20 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 	finally Critical(previous_critical)
 	; Index of the first Arg carrying a newline, or 0 when every Arg is single-line.
 	local bad_arg_index := 0
+	; Index of the first NUL-bearing value (0 = the executable), or -1 when none.
+	local nul_arg_index := _SR_HasNul(Executable) ? 0 : -1
 	for Arg in Args {
 		if (bad_arg_index = 0 and (InStr(Arg, "`n") or InStr(Arg, "`r")))
 			bad_arg_index := A_Index
+		if (nul_arg_index < 0 and _SR_HasNul(Arg))
+			nul_arg_index := A_Index
 	}
-	local command_line := _SR_BuildDirectCommandLine(Executable, Args)
+	local command_line := nul_arg_index < 0 ? _SR_BuildDirectCommandLine(Executable, Args) : ""
 
 	local state := _SR_LegacyNewState(task_id, "",
 		IsSet(OnDone) && IsObject(OnDone) ? OnDone : 0)
+	state["PhaseProgram"] := _SR_ExecutableName(Executable)
+	state["PhaseStartedTick"] := A_TickCount
 	local handle := {}
 
 	; AHK v2 fat-arrow bodies must be a single expression — a multi-statement
@@ -356,6 +458,12 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 	; terminate() are defined as ordinary nested functions instead.
 	_SR_HandleStart(*) {
 		; Refuse before allocating a capture owner or spawning anything.
+		if nul_arg_index >= 0 {
+			_SR_LogError("spawn() refused for '{1}': {2} contains NUL, which a native command line cannot carry.",
+				_SR_ProgramName(nul_arg_index = 0 ? "" : Executable),
+				nul_arg_index = 0 ? "the executable path" : "argument " . nul_arg_index)
+			return false
+		}
 		if bad_arg_index {
 			_SR_LogError("spawn() refused for '{1}': argument {2} contains a newline. Native process arguments must be single-line; stage a multi-line payload to a file and pass the path instead.",
 				Executable, bad_arg_index)
@@ -545,7 +653,9 @@ _SR_LegacyBuildClaimLocked(State, Pid, FireDone, Owner) {
 		"UseDirectFallback", false,
 		"TreeKillFn", 0,
 		"DirectKillFn", 0,
-		"CleanupDiagnostics", Map())
+		"CleanupDiagnostics", Map(),
+		"PhaseProgram", State.Get("PhaseProgram", ""),
+		"PhaseStartedTick", State.Get("PhaseStartedTick", 0))
 	_SR_CompletionInitClaim(claim, callback_token)
 	State["Native"] := 0
 	State["TerminalClaim"] := claim
@@ -728,7 +838,12 @@ _SR_LegacyClaimAsyncTerminate(State) {
 		local outcome := Map("Accepted", false, "Pid", 0)
 		local phase := State["Phase"]
 		if phase = SR_LEGACY_PHASE_READY {
-			outcome["Accepted"] := true
+			; The controller may retire a published handle before start reaches
+			; BeginStart. Preserve cancellation after its watchdog is removed so
+			; the interrupted start cannot resume into an untracked process.
+			State["TerminationRequested"] := true
+			State["AsyncTerminationRequested"] := true
+			outcome["Accepted"] := _SR_LegacyDetachCallbackLocked(State)
 			return outcome
 		}
 		if phase = SR_LEGACY_PHASE_STARTING {
@@ -808,6 +923,9 @@ _SR_CompletionBegin(Claim) {
 			return false
 		Claim["Finished"] := true
 		Claim["CompletionBusy"] := true
+		; One claim per process, one-shot: the phase is counted exactly once.
+		if (Claim.Get("PhaseProgram", "") != "")
+			PhaseStats_AddMs("process." . Claim["PhaseProgram"], A_TickCount - Claim["PhaseStartedTick"])
 		return true
 	} finally {
 		Critical(previous_critical)
@@ -966,7 +1084,7 @@ _SR_LegacyFinishCompletion(Claim, ExitCode, ReadFn := 0) {
 		try {
 			try {
 				local tmp_file := Claim["TmpFile"]
-				if FileExist(tmp_file) {
+				if tmp_file != "" {
 					local output := IsObject(ReadFn) ? ReadFn.Call(tmp_file) : FileRead(tmp_file)
 					stdout := Trim(output, "`r`n")
 				}
@@ -1096,8 +1214,16 @@ _SR_LegacyCreateDirect(Executable, CommandLine, CapturePath, State, ResumeFn := 
 ; ====== 3.1) Native process-tree ownership ======
 ; ================================================
 
+; A command line is NUL-terminated and Loop Parse stops at the first NUL code
+; unit, so such a value would reach the child silently shortened.
+_SR_HasNul(Text) {
+	return RegExMatch(Text, "\x00") != 0
+}
+
 _SR_QuoteCreateProcessArgument(Value) {
 	Text := Value . ""
+	if _SR_HasNul(Text)
+		throw ValueError("A native process argument cannot contain NUL.")
 	Result := '"'
 	BackslashCount := 0
 	Loop Parse Text {
@@ -1177,7 +1303,7 @@ _SR_QuoteArgument(Arg) {
  * the exact refusal the spawn boundary applies. Every argument must already be
  * a String: a command line has no other type, and a caller that hands over an
  * Integer (a timing constant, a byte budget) is refused before any process is
- * created (keylogger-worker-timings-must-be-strings).
+ * created (keystats-worker-timings-must-be-strings).
  *
  * @param Executable {String} Absolute path to the child executable.
  * @param Args {Array} Argument vector; every element must be a String.
@@ -1190,6 +1316,8 @@ ShellRunner_ValidateSpawnArgs(Executable, Args) {
 	local validation_error := ""
 	if Type(Executable) != "String" or Executable = "" {
 		validation_error := "Executable must be a non-empty string."
+	} else if _SR_HasNul(Executable) {
+		validation_error := "Executable must not contain NUL."
 	} else if !(Args is Array) {
 		validation_error := "Args must be an Array."
 	} else {
@@ -1197,6 +1325,11 @@ ShellRunner_ValidateSpawnArgs(Executable, Args) {
 		for Arg in Args {
 			if Type(Arg) != "String" {
 				validation_error := "Argument " . A_Index . " must be a string."
+				break
+			}
+			; Only the index is reported: the refused bytes can carry user text.
+			if _SR_HasNul(Arg) {
+				validation_error := "Argument " . A_Index . " must not contain NUL."
 				break
 			}
 			if (bad_arg_index = 0 and (InStr(Arg, "`n") or InStr(Arg, "`r")))
@@ -1231,6 +1364,127 @@ ShellRunner_ValidateSpawnArgs(Executable, Args) {
  */
 ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 		BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false) {
+	return _SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
+		MaxOutputBytes, CaptureOutput, PrivateDiagnostics)
+}
+
+; The absolute path of an executable on the search path, "" when there is none.
+ShellRunner_FindOnPath(Name) {
+	Found := Buffer(2 * 32768)
+	return DllCall("Kernel32\SearchPathW", "Ptr", 0, "Str", Name, "Ptr", 0, "UInt", 32768, "Ptr", Found, "Ptr", 0, "UInt")
+		? StrGet(Found, "UTF-16") : ""
+}
+
+/**
+ * Owns a trusted complete command line with a private Unicode environment.
+ * Unlike the argv entry, this preserves shell syntax already composed by its
+ * caller. Both entries share native construction, Job custody and retirement.
+ */
+ShellRunner_SpawnTreeOwnedCommand(ApplicationPath, CommandLine, Environment, WorkingDir := "", OnDone?,
+		OnChunk?, BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false) {
+	if !(ApplicationPath is String) || !RegExMatch(ApplicationPath, "^[A-Za-z]:\\")
+			|| !(CommandLine is String) || CommandLine == "" || !(WorkingDir is String)
+		throw TypeError("A raw tree launch requires an absolute application and command strings.")
+	for Text in [ApplicationPath, CommandLine, WorkingDir] {
+		Loop StrLen(Text)
+			if NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort") == 0
+				throw ValueError("Raw tree launch strings cannot contain NUL.")
+	}
+	Launch := Map("command", CommandLine, "environment", _SR_CaptureEnvironment(Environment), "directory", WorkingDir)
+	return _SR_NewTreeOwnedTask(ApplicationPath, [], OnDone?, OnChunk?, BeforeNativeAdoptFn?,
+		MaxOutputBytes, CaptureOutput, PrivateDiagnostics, Launch)
+}
+
+/**
+ * The argv entry of ShellRunner_SpawnTreeOwned with a private Unicode environment:
+ * what the child alone must see stays out of this process's own environment, so
+ * nothing else this driver starts can inherit it.
+ */
+ShellRunner_SpawnTreeOwnedPrivate(Environment, Executable, Args, OnDone?, OnChunk?,
+		BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false) {
+	Launch := Map("environment", _SR_CaptureEnvironment(Environment), "directory", "")
+	return _SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
+		MaxOutputBytes, CaptureOutput, PrivateDiagnostics, Launch)
+}
+
+_SR_CaptureEnvironment(Environment) {
+	if !(Environment is Buffer) || Environment.Size < 4 || Mod(Environment.Size, 2)
+			|| NumGet(Environment, Environment.Size - 4, "UInt") != 0
+		throw TypeError("A raw tree launch requires a terminated Unicode environment block.")
+	Captured := Buffer(Environment.Size, 0)
+	DllCall("RtlMoveMemory", "Ptr", Captured, "Ptr", Environment, "UPtr", Environment.Size)
+	return Captured
+}
+
+/**
+ * A copy of this process's environment with some variables replaced, for a child.
+ * @param {Map} Overrides Names and string values, added or replacing what is there.
+ * @returns {Buffer} A sorted, doubly terminated Unicode environment block.
+ */
+ShellRunner_BuildEnvironment(Overrides) {
+	if !(Overrides is Map)
+		throw TypeError("Environment overrides must be a Map.")
+	Values := Map()
+	Values.CaseSense := "Off"
+	EnvironmentPtr := DllCall("Kernel32\GetEnvironmentStringsW", "Ptr")
+	if !EnvironmentPtr
+		throw OSError(A_LastError)
+	try {
+		Cursor := EnvironmentPtr
+		while NumGet(Cursor, 0, "UShort") {
+			Entry := StrGet(Cursor, "UTF-16")
+			Cursor += (StrLen(Entry) + 1) * 2
+			; Hidden drive-current-directory entries start with '=' and must survive.
+			Separator := InStr(Entry, "=", true, 2)
+			if !Separator
+				throw Error("The inherited environment contains an invalid entry.")
+			Name := SubStr(Entry, 1, Separator - 1)
+			; An inherited ERRORLEVEL masks cmd's dynamic process status.
+			if StrLower(Name) != "errorlevel"
+				Values[Name] := SubStr(Entry, Separator + 1)
+		}
+	} finally DllCall("Kernel32\FreeEnvironmentStringsW", "Ptr", EnvironmentPtr)
+	for Name, Value in Overrides {
+		if !(Name is String) or Name == "" or InStr(Name, "=") or !(Value is String)
+			throw TypeError("Environment entries require valid names and string values.")
+		if StrLower(Name) == "errorlevel"
+			throw ValueError("Environment overrides must not shadow the process exit status.")
+		Values[Name] := Value
+	}
+	; Native environment blocks use case-insensitive ordinal ordering. Sort keys
+	; without a text delimiter, since inherited names and values may contain one.
+	Names := []
+	CharacterCount := 1
+	for Name, Value in Values {
+		Low := 1
+		High := Names.Length
+		while Low <= High {
+			Middle := (Low + High) // 2
+			Comparison := DllCall("Kernel32\CompareStringOrdinal", "Str", Name, "Int", -1,
+				"Str", Names[Middle], "Int", -1, "Int", true, "Int")
+			if !Comparison
+				throw OSError(A_LastError)
+			if Comparison == 1
+				High := Middle - 1
+			else
+				Low := Middle + 1
+		}
+		Names.InsertAt(Low, Name)
+		CharacterCount += StrLen(Name) + StrLen(Value) + 2
+	}
+	; Each entry includes its own NUL; the zero-filled tail supplies the second.
+	Result := Buffer(Max(2, CharacterCount) * 2, 0)
+	Offset := 0
+	for Name in Names {
+		Entry := Name . "=" . Values[Name]
+		StrPut(Entry, Result.Ptr + Offset, StrLen(Entry) + 1, "UTF-16")
+		Offset += (StrLen(Entry) + 1) * 2
+	}
+	return Result
+}
+
+_SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
+		MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false, NativeLaunch := 0) {
 	global _SR_TaskCounter
 	local previous_critical := Critical("On")
 	local task_id := 0
@@ -1242,14 +1496,18 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 	local bad_arg_index := PrivateDiagnostics == true ? 0 : validation["bad_arg_index"]
 	local validation_error := validation["error"]
 
-	; This API receives an executable and argv, never shell syntax. Launch it
-	; directly: cmd.exe expands %VAR% before the child can parse argv, even when
-	; the argument is quoted. stdout/stderr capture is attached natively below.
-	local cmd := _SR_BuildDirectCommandLine(Executable, Args)
+	; The argv entry quotes once; the trusted command entry keeps its exact
+	; caller-composed shell text. Both attach stdout/stderr natively below.
+	; A refused vector is never quoted: start() reports its validation error.
+	local cmd := NativeLaunch is Map && NativeLaunch.Has("command") ? NativeLaunch["command"]
+		: validation_error == "" ? _SR_BuildDirectCommandLine(Executable, Args) : ""
 	local state := Map(
 		"TaskId", task_id,
 		"Executable", Executable,
+		"PhaseProgram", _SR_ExecutableName(Executable),
+		"PhaseStartedTick", A_TickCount,
 		"Command", cmd,
+		"NativeLaunch", NativeLaunch,
 		"TmpFile", "",
 		"CaptureDir", "",
 		"CaptureOutput", capture_output,
@@ -1295,17 +1553,47 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 	_SR_TreeOwnedDetach(*) {
 		return _SR_TreeHandleDetach(state)
 	}
+	_SR_TreeOwnedOutputTail(Self, MaxBytes) {
+		return _SR_TreeHandleOutputTail(state, MaxBytes)
+	}
 
 	handle.start := _SR_TreeOwnedStart
 	handle.terminate := _SR_TreeOwnedTerminate
 	handle.processId := _SR_TreeOwnedProcessId
 	handle.detach := _SR_TreeOwnedDetach
 	handle.requestTerminate := _SR_TreeOwnedRequestTerminate
+	handle.outputTail := _SR_TreeOwnedOutputTail
 	; A tree-owned termination cannot honestly be fire-and-forget: its defining
 	; contract is that no descendant exists on return. Keep the optional method
 	; for handle-shape compatibility, but route it through the same hard fence.
 	handle.terminateAsync := _SR_TreeOwnedTerminate
 	return handle
+}
+
+/**
+ * Reads the last bytes a running tree-owned child wrote to its capture, for a
+ * progress display (an Ollama pull's percentage). The capture is opened
+ * read-only and shared, as the child's own handle shares it; nothing is read
+ * once the task stopped capturing, and a refused read is no progress, not an
+ * error.
+ * @param {Map} State The task.
+ * @param {Integer} MaxBytes Most bytes read from the end.
+ * @returns {String} The tail, "" when unavailable.
+ */
+_SR_TreeHandleOutputTail(State, MaxBytes) {
+	if !(MaxBytes is Integer) || MaxBytes <= 0 || !State["CaptureOutput"] || !State["Started"]
+			|| State["TreeQuiesced"] || !(State["TmpFile"] is String) || State["TmpFile"] == ""
+		return ""
+	try {
+		Capture := FileOpen(State["TmpFile"], "r", "UTF-8-RAW")
+		Capture.Pos := Max(0, Capture.Length - MaxBytes)
+		Tail := Capture.Read()
+		Capture.Close()
+		return Tail
+	} catch as Err {
+		_SR_LogAt("Debug", "tree-owned capture tail unavailable for '{1}': {2}", State["Executable"], Err.Message)
+		return ""
+	}
 }
 
 _SR_TreeLogError(Owner, Message, Arguments*) {
@@ -2153,6 +2441,8 @@ _SR_TreeNewTerminalClaim(State, Callback, AccountingConfirmedZero) {
 		"NativeExitObserved", State["RootReaped"],
 		"TaskId", task_id,
 		"Executable", State["Executable"],
+		"PhaseProgram", State.Get("PhaseProgram", ""),
+		"PhaseStartedTick", State.Get("PhaseStartedTick", 0),
 		"TmpFile", State["TmpFile"],
 		"CaptureDir", State.Get("CaptureDir", ""),
 		"MaxOutputBytes", State.Get("MaxOutputBytes", 0),
@@ -2170,8 +2460,15 @@ _SR_TreeNewTerminalClaim(State, Callback, AccountingConfirmedZero) {
 
 ; This private seam receives the per-call capsule, never a global debt fence.
 _SR_TreeCreateSuspendedForState(Executable, CommandLine, CapturePath, Carrier) {
+	Launch := Carrier["State"].Get("NativeLaunch", 0)
+	Create := Launch is Map ? _SR_TreeCreatePrivateEnvironment.Bind(Launch) : PLC_CreateProcessWithInheritedHandles
 	return _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, true,
-		PLC_CreateProcessWithInheritedHandles, _SR_TreeCloseLaunchStream, Carrier)
+		Create, _SR_TreeCloseLaunchStream, Carrier)
+}
+
+_SR_TreeCreatePrivateEnvironment(Launch, ApplicationPath, CommandBuffer, CreationFlags, StartupInfo, ProcessInfo) {
+	return PLC_CreateProcessWithInheritedHandles(ApplicationPath, CommandBuffer, CreationFlags, StartupInfo,
+		ProcessInfo, Launch["environment"], Launch["directory"])
 }
 
 _SR_TreeCreationFailureCarrier(State, AdoptFn := _SR_TreeAttachCreationFailure) {
@@ -2251,10 +2548,10 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 		return false
 	try {
 		_SR_TreeLogNativeDebt(Claim)
-		local stdout := ""
+		local stdout := "", stderr := ""
 		local tmp_file := Claim["TmpFile"]
 		try {
-			if tmp_file != "" && FileExist(tmp_file) {
+			if tmp_file != "" {
 				local max_output_bytes := Claim.Get("MaxOutputBytes", 0)
 				local output_bytes := FileGetSize(tmp_file)
 				if max_output_bytes > 0 && output_bytes > max_output_bytes {
@@ -2267,6 +2564,7 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 				}
 			}
 		} catch as Err {
+			stderr := Err.Message
 			if (Claim is Map) && Claim.Get("PrivateDiagnostics", false) == true
 				_SR_TreeLogError(Claim, "tree-owned task {1} output cleanup failed: {2}",
 					Claim["TaskId"], Err.Message)
@@ -2276,7 +2574,7 @@ _SR_TreeFinishClaim(Claim, ReadFn := 0, DeleteFn := 0) {
 		} finally {
 			_SR_TreeCleanupCapture(Claim, DeleteFn)
 		}
-		_SR_CompletionQueue(Claim, Claim["ExitCode"], stdout, "")
+		_SR_CompletionQueue(Claim, Claim["ExitCode"], stdout, stderr)
 	} finally {
 		Claim["CompletionBusy"] := false
 	}
@@ -2802,8 +3100,12 @@ _SR_CaptureSweepStale(Directory, CurrentPid) {
 			local capture := Map("TmpFile", A_LoopFileFullPath . "\output.tmp",
 				"CaptureDir", A_LoopFileFullPath . "\")
 			local refusal := 0, diagnostic := ""
-			try refusal := _SR_CaptureRemove(capture)
-			catch as Err
+			try {
+				; A folder reached through a link is not this adapter's to empty.
+				if !InStr(A_LoopFileAttrib, "L")
+					_SR_CaptureSweepMembers(A_LoopFileFullPath)
+				refusal := _SR_CaptureRemove(capture)
+			} catch as Err
 				diagnostic := Err.Message
 			if !refusal && diagnostic = "" {
 				removed += 1
@@ -2825,4 +3127,15 @@ _SR_CaptureSweepStale(Directory, CurrentPid) {
 		_SR_LogAt("Warn", "{1} stale capture folder(s) could not be removed ({2}); the next start retries.",
 			kept, first_refusal)
 	return Map("removed", removed, "kept", kept)
+}
+
+; Deletes the files an exited owner left in its capture folder. A managed HTTP
+; request stages more than the capture file there, and its transport.json holds
+; the request's headers and body in clear: left alone, they outlive the crash and
+; the folder refuses removal at every later start. A file another process still
+; holds stays; the folder's own removal then reports the refusal.
+; @param Folder {String} The capture folder of an exited owner.
+_SR_CaptureSweepMembers(Folder) {
+	Loop Files Folder . "\*", "F"
+		DllCall("Kernel32\DeleteFileW", "WStr", A_LoopFileFullPath, "Int")
 }

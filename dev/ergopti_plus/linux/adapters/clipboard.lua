@@ -32,7 +32,7 @@
 --- 3. The paste keystroke goes through uinput like everything else, so it obeys
 ---    the same grab and the same ordering as the rest of an injection.
 --- 4. Bounded waits everywhere. A clipboard tool with no selection owner blocks
----    forever by design; every read is given a timeout so an expansion cannot
+---    forever by design; every read and write has a timeout so an expansion cannot
 ---    wedge the daemon.
 --- ==============================================================================
 
@@ -54,10 +54,9 @@ local LOG = "adapters.clipboard"
 -- ===============================================
 -- ===============================================
 
--- Seconds a clipboard read may take before it is abandoned. `xclip -o` with no
--- selection owner blocks forever rather than returning empty, and a blocked read
--- on the injection path is a frozen daemon.
-local READ_TIMEOUT_S = 1
+-- Seconds a clipboard operation may take before it is abandoned. A stalled
+-- display can block setters as well as readers and freeze the injection path.
+local IO_TIMEOUT_S = 1
 
 -- Milliseconds to let the target application register the new clipboard content
 -- before the paste keystroke arrives. A paste that races the set pastes what was
@@ -71,6 +70,10 @@ local RESTORE_DELAY_MS = 120
 
 -- Time allowed for the focused application to publish a Ctrl+C selection.
 local COPY_SETTLE_MS = 80
+
+-- Seconds the change-counter read may take. It runs just before a tap-hold's
+-- Ctrl+C, so a hung selection owner must not hold the copy back for long.
+local COUNTER_TIMEOUT_S = "0.5"
 
 -- evdev key values.
 local VALUE_DOWN = 1
@@ -100,12 +103,12 @@ local function backend()
 				name  = "wl-clipboard",
 				-- --no-newline: wl-paste appends one, and an expansion that grows a
 				-- trailing newline every time it round-trips is a corruption.
-				read  = string.format("timeout %d wl-paste --no-newline 2>/dev/null", READ_TIMEOUT_S),
+				read  = string.format("timeout %d wl-paste --no-newline 2>/dev/null", IO_TIMEOUT_S),
 				write = "wl-copy",
 				-- A file manager publishes a copied selection under this target
 				-- (RFC 2483); the plain read gets its text form, if any.
 				read_uri_list = string.format(
-					"timeout %d wl-paste --no-newline --type text/uri-list 2>/dev/null", READ_TIMEOUT_S),
+					"timeout %d wl-paste --no-newline --type text/uri-list 2>/dev/null", IO_TIMEOUT_S),
 			}
 		end
 		return nil
@@ -115,16 +118,16 @@ local function backend()
 		if Shell.has_command("xclip") then
 			return {
 				name  = "xclip",
-				read  = string.format("timeout %d xclip -selection clipboard -o 2>/dev/null", READ_TIMEOUT_S),
+				read  = string.format("timeout %d xclip -selection clipboard -o 2>/dev/null", IO_TIMEOUT_S),
 				write = "xclip -selection clipboard -in",
 				read_uri_list = string.format(
-					"timeout %d xclip -selection clipboard -t text/uri-list -o 2>/dev/null", READ_TIMEOUT_S),
+					"timeout %d xclip -selection clipboard -t text/uri-list -o 2>/dev/null", IO_TIMEOUT_S),
 			}
 		end
 		if Shell.has_command("xsel") then
 			return {
 				name  = "xsel",
-				read  = string.format("timeout %d xsel --clipboard --output 2>/dev/null", READ_TIMEOUT_S),
+				read  = string.format("timeout %d xsel --clipboard --output 2>/dev/null", IO_TIMEOUT_S),
 				write = "xsel --clipboard --input",
 			}
 		end
@@ -170,10 +173,38 @@ end
 --- @param text string
 --- @return boolean
 local function write_backend_checked(selected_backend, text)
-	local ok, command = pcall(Shell.with_exact_stdin, selected_backend.write, text or "")
+	local bounded = string.format("timeout %d %s", IO_TIMEOUT_S, selected_backend.write)
+	local ok, command = pcall(Shell.with_exact_stdin, bounded, text or "")
 	if not ok then return false end
 	local ran, result = pcall(Shell.run, command)
 	return ran and result == true
+end
+
+--- Accepts a saved snapshot only when the text writer can restore its bytes.
+--- Raw readers may return NUL, but the literal sh -c writer cannot carry it.
+--- Refuse before an owner acquires restoration debt or mutates the clipboard.
+local function read_restorable_snapshot(selected_backend)
+	local ok, contents, reason = read_backend_checked(selected_backend)
+	if not ok then return false, "", reason end
+	if contents:find("\0", 1, true) then
+		Logger.warn(LOG, "Clipboard snapshot cannot be restored through the text writer.")
+		return false, "", "clipboard_snapshot_not_restorable"
+	end
+	return true, contents, nil
+end
+
+--- Whether the clipboard may be restored over the text Ergopti put there. A
+--- copy made by another application during the paste replaced that text, and
+--- restoring over it would lose what the user just copied. An unreadable
+--- clipboard proves no such copy, so the restore stays owed.
+--- @param selected_backend table
+--- @param text string The text written for the paste.
+--- @return boolean restorable
+local function holds_pasted_text(selected_backend, text)
+	local ok, contents = read_backend_checked(selected_backend)
+	if not ok or contents == text then return true end
+	Logger.info(LOG, "Another application copied during the paste; its content is kept, not restored over.")
+	return false
 end
 
 --- Runs an injected wait and rejects both exceptions and explicit failure.
@@ -198,6 +229,40 @@ function M.read_checked()
 	return read_backend_checked(selected_backend)
 end
 
+--- Decodes the TIMESTAMP an X11 selection owner answers: xclip prints the raw
+--- 32-bit property, little-endian, and some builds print it as decimal text.
+--- @param raw string xclip's output.
+--- @return number|nil timestamp
+local function decode_selection_timestamp(raw)
+	local digits = raw:match("^%s*(%d+)%s*$")
+	if digits then return tonumber(digits) end
+	if #raw == 4 or #raw == 8 then
+		local b1, b2, b3, b4 = raw:byte(1, 4)
+		return b1 + b2 * 256 + b3 * 65536 + b4 * 16777216
+	end
+	return nil
+end
+
+--- The clipboard's change counter, for the tap-hold copy check: the X11
+--- CLIPBOARD owner's TIMESTAMP (ICCCM), which a toolkit renews each time it
+--- takes the selection, so copying the same text again still moves it.
+--- Wayland gives clients no such counter (only a data-control watcher would
+--- see each new selection, and GNOME offers none), so there it is nil with
+--- its reason and the copy goes unchecked.
+--- @return number|nil counter
+--- @return string|nil reason Why there is none: "unsupported" when the session
+---   can never have one, "unreadable" when this read failed.
+function M.change_counter()
+	if not DisplayServer.is_x11() then return nil, "unsupported" end
+	if not Shell.has_command("xclip") then return nil, "unsupported" end
+	local ok, output = Shell.exec_checked(string.format(
+		"timeout %s xclip -selection clipboard -t TIMESTAMP -o 2>/dev/null", COUNTER_TIMEOUT_S))
+	if not ok then return nil, "unreadable" end
+	local counter = decode_selection_timestamp(output)
+	if counter == nil then return nil, "unreadable" end
+	return counter
+end
+
 --- The command that prints the PRIMARY selection, or nil when no tool can.
 ---
 --- PRIMARY is what the application publishes as soon as text is selected, with
@@ -208,16 +273,16 @@ end
 local function primary_read_command()
 	if DisplayServer.is_wayland() then
 		if Shell.has_command("wl-paste") then
-			return string.format("timeout %d wl-paste --primary --no-newline 2>/dev/null", READ_TIMEOUT_S)
+			return string.format("timeout %d wl-paste --primary --no-newline 2>/dev/null", IO_TIMEOUT_S)
 		end
 		return nil
 	end
 	if DisplayServer.is_x11() then
 		if Shell.has_command("xclip") then
-			return string.format("timeout %d xclip -selection primary -o 2>/dev/null", READ_TIMEOUT_S)
+			return string.format("timeout %d xclip -selection primary -o 2>/dev/null", IO_TIMEOUT_S)
 		end
 		if Shell.has_command("xsel") then
-			return string.format("timeout %d xsel --primary --output 2>/dev/null", READ_TIMEOUT_S)
+			return string.format("timeout %d xsel --primary --output 2>/dev/null", IO_TIMEOUT_S)
 		end
 	end
 	return nil
@@ -263,6 +328,23 @@ end
 -- ===============================================
 -- ===============================================
 
+--- Requires a caller's live destination without making native focus atomic.
+--- Cleanup never uses this admission: the saved clipboard must still be restored.
+--- @param admission function|nil Full-phase destination check.
+--- @return boolean accepted
+local function admitted(admission)
+	if admission == nil then return true end
+	if type(admission) ~= "function" then return false end
+	local checked, current = pcall(admission)
+	return checked and current == true
+end
+
+--- Resolves the paste shortcut before a caller's final native range observation.
+--- @return integer code Exact layout key or the adapter's canonical US fallback.
+function M.paste_keycode()
+	return require("adapters.keyboard_layout").shortcut_keycode("v", US_KEY_V)
+end
+
 --- Emits Ctrl+V through the caller's uinput channel.
 ---
 --- Ctrl+V and not Shift+Insert: it is what every graphical toolkit binds, and
@@ -270,14 +352,100 @@ end
 --- anyway. There is no keystroke that works in every application, which is a
 --- property of the desktop rather than a choice available here.
 --- @param uinput table Channel exposing emit(code, value) -> boolean.
+--- @param admission function|nil Full-phase destination check.
 --- @return boolean True only when the complete chord reached the wire.
-local function press_paste(uinput)
-	local key_v = require("adapters.keyboard_layout").shortcut_keycode("v", US_KEY_V)
+local function press_paste(uinput, admission)
+	local key_v = M.paste_keycode()
+	if not admitted(admission) then return false end
 	if uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_DOWN) ~= true then return false end
 	if uinput.emit(key_v, VALUE_DOWN) ~= true then return false end
 	if uinput.emit(key_v, VALUE_UP) ~= true then return false end
 	if uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_UP) ~= true then return false end
 	return true
+end
+
+--- Reserves reversible clipboard preparation before any desktop I/O starts.
+--- The caller retains this owner across its final native range observation.
+--- @param text string Private replacement bytes.
+--- @param sleep_ms function Existing blocking wait implementation.
+--- @param key_v integer Previously resolved paste shortcut.
+--- @param admission function Original write admission.
+--- @return table stage Explicit prepare, paste and close lifetime.
+function M.new_paste_stage(text, sleep_ms, key_v, admission)
+	assert(type(text) == "string" and text ~= "" and type(key_v) == "number", "invalid clipboard preparation")
+	local stage, b, saved = {}, nil, nil
+	local busy, revoked, restore_required, prepared = false, false, false, false
+	local written, restore_attempted = false, false
+	local function current()
+		return not revoked and admitted(admission) and not revoked
+	end
+	local function restore()
+		if busy then return false end
+		if not restore_required then return true end
+		busy = true
+		local ok, restored = pcall(function()
+			-- Only a completed write proves the clipboard held our text. After a
+			-- failed write or a failed restore, a differing clipboard may be our
+			-- own damage, which the restore must still repair.
+			if written and not restore_attempted and not holds_pasted_text(b, text) then return true end
+			restore_attempted = true
+			return write_backend_checked(b, saved)
+		end)
+		busy = false
+		if ok and restored == true then restore_required, saved = false, nil end
+		return not restore_required
+	end
+	--- Revokes first; an in-flight set must unwind before restoration can run.
+	--- @return boolean settled
+	function stage.close()
+		revoked = true
+		return not busy and restore()
+	end
+	--- Prepares the saved clipboard and canonical settle delay without key output.
+	--- @return boolean ready
+	function stage.prepare()
+		if busy or revoked or prepared then return false end
+		busy = true
+		local ok, ready = pcall(function()
+			if not current() then return false end
+			b = backend()
+			if not b or not current() then return false end
+			local read_ok, bytes = read_restorable_snapshot(b)
+			if not read_ok then return false end
+			saved = bytes
+			if not current() then return false end
+			-- A failed/throwing setter may already have changed the clipboard.
+			restore_required = true
+			if not write_backend_checked(b, text) then return false end
+			written = true
+			if not current() then return false end
+			if not wait_checked(sleep_ms, SETTLE_MS) then return false end
+			return current()
+		end)
+		busy = false
+		prepared = ok and ready == true and not revoked
+		if not prepared then stage.close() end
+		return prepared
+	end
+	--- Pastes already-prepared bytes without a new lookup, write or settle delay.
+	--- @param channel table Checked short output transaction.
+	--- @return boolean issued
+	function stage.paste(channel)
+		if busy or revoked or not prepared then return false end
+		busy = true
+		local ok, issued = pcall(function()
+			if not current() then return false end
+			if channel.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_DOWN) ~= true then return false end
+			if not current() then return false end
+			if channel.emit(key_v, VALUE_DOWN) ~= true then return false end
+			if channel.emit(key_v, VALUE_UP) ~= true then return false end
+			if channel.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_UP) ~= true then return false end
+			return wait_checked(sleep_ms, RESTORE_DELAY_MS)
+		end)
+		busy = false
+		return ok and issued == true
+	end
+	return stage
 end
 
 --- Delivers text by clipboard: save, set, paste, restore.
@@ -288,8 +456,10 @@ end
 --- @param text string Text to deliver.
 --- @param uinput table Channel exposing emit(code, value).
 --- @param sleep_ms function Blocking sleep, injected so this module owns no timer.
+--- @param admission function|nil Rechecks the retained destination after blocking phases.
 --- @return boolean True when the paste was issued.
-function M.paste_text(text, uinput, sleep_ms)
+--- @return string|nil Fixed failure reason when clipboard restoration was refused.
+function M.paste_text(text, uinput, sleep_ms, admission)
 	if type(text) ~= "string" or text == "" then return false end
 	if type(uinput) ~= "table" or type(uinput.emit) ~= "function" then
 		Logger.error(LOG, "paste_text(): no uinput channel to press the paste chord with.")
@@ -303,34 +473,44 @@ function M.paste_text(text, uinput, sleep_ms)
 		return false
 	end
 
-	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	if not admitted(admission) then return false end
+	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then
 		Logger.error(LOG, "paste_text(): could not snapshot the clipboard via %s — %s.",
 			b.name, tostring(snapshot_error or "command failed"))
 		return false
 	end
 
+	if not admitted(admission) then return false end
 	if not write_backend_checked(b, text) then
+		-- A failed launcher may already have transferred clipboard ownership.
+		local restored = write_backend_checked(b, saved)
 		Logger.error(LOG, "paste_text(): could not set the clipboard via %s.", b.name)
+		if not restored then return false, "clipboard restoration failed" end
 		return false
 	end
 
 	local paste_ok, issued = pcall(function()
+		if not admitted(admission) then return false end
 		if not wait_checked(sleep_ms, SETTLE_MS) then return false end
-		if not press_paste(uinput) then return false end
+		-- The shortcut lookup may query the layout, so validate after it and
+		-- immediately before Ctrl DOWN, not merely before the settle delay.
+		if not press_paste(uinput, admission) then return false end
 		if not wait_checked(sleep_ms, RESTORE_DELAY_MS) then return false end
-		return true
+		return admitted(admission)
 	end)
 
 	-- Restored even when it was empty: writing "" back is what leaves the
 	-- clipboard as the user left it, and skipping the restore on an empty save
 	-- would leave our replacement sitting there.
-	if not write_backend_checked(b, saved) then
+	if holds_pasted_text(b, text) and not write_backend_checked(b, saved) then
 		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")
-		return false
+		return false, "clipboard restoration failed"
 	end
 	if not paste_ok or not issued then
-		Logger.error(LOG, "paste_text(): checked paste chord emission failed.")
+		-- An admitted transaction distinguishes expected destination retirement
+		-- from real wire failures after cleanup; only it should notify errors.
+		if admission == nil then Logger.error(LOG, "paste_text(): checked paste chord emission failed.") end
 		return false
 	end
 
@@ -346,15 +526,22 @@ end
 --- @param b table The session's clipboard backend.
 --- @param emit_combo function combo -> boolean
 --- @param sleep_ms function Blocking millisecond wait.
+--- @param publication table|nil Original destination retained across copy boundaries.
 --- @return boolean ok
 --- @return string selected_or_reason The selection, or why there is none.
-local function copy_selection(b, emit_combo, sleep_ms)
+local function copy_selection(b, emit_combo, sleep_ms, publication)
+	local function current() return publication == nil or admitted(publication.current) end
+	if not current() then return false, "destination_changed" end
 	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
 	if not write_backend_checked(b, sentinel) then return false, "clipboard_probe_write_failed" end
-	local copy_ok, copied = pcall(emit_combo, "ctrl+c")
+	if not current() then return false, "destination_changed" end
+	local copy_ok, copied = pcall(emit_combo, "ctrl+c", publication)
 	if not copy_ok or copied ~= true then return false, "copy_chord_failed" end
+	if not current() then return false, "destination_changed" end
 	if not wait_checked(sleep_ms, COPY_SETTLE_MS) then return false, "copy_settle_failed" end
+	if not current() then return false, "destination_changed" end
 	local selection_ok, selected, selection_error = read_backend_checked(b)
+	if not current() then return false, "destination_changed" end
 	if not selection_ok then return false, selection_error or "selection_read_failed" end
 	if selected == sentinel then return false, "no_selection" end
 	return true, selected
@@ -387,7 +574,7 @@ end
 function M.read_selection(emit_combo, sleep_ms)
 	local b, why = selection_backend(emit_combo, sleep_ms)
 	if not b then return false, "", why end
-	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then return false, "", snapshot_error or "clipboard_snapshot_failed" end
 	local copied, selected = copy_selection(b, emit_combo, sleep_ms)
 	if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
@@ -409,22 +596,25 @@ function M.read_selection_uri_list(emit_combo, sleep_ms)
 	local b, why = selection_backend(emit_combo, sleep_ms)
 	if not b then return false, "", why end
 	if not b.read_uri_list then return false, "", b.name .. " cannot read a text/uri-list" end
-	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then return false, "", snapshot_error or "clipboard_snapshot_failed" end
 	-- A text sentinel first, as copy_selection does: files copied earlier
 	-- would otherwise still answer the uri-list read when nothing is selected.
-	if not write_backend_checked(b, "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__") then
+	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
+	if not write_backend_checked(b, sentinel) then
+		if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
 		return false, "", "clipboard_probe_write_failed"
 	end
 	local copy_ok, copied = pcall(emit_combo, "ctrl+c")
 	local settled = copy_ok and copied == true and wait_checked(sleep_ms, COPY_SETTLE_MS)
-	-- Nothing copied leaves the sentinel, which offers no uri-list target: the
-	-- read then fails, which is "no file selected".
+	-- Nothing copied leaves the sentinel. wl-copy offers it under text types
+	-- only, so the uri-list read fails; xclip answers every target with its
+	-- text, so the read returns the sentinel itself. Both are "no file selected".
 	local read_ok, uri_list = false, ""
 	if settled then read_ok, uri_list = Shell.exec_checked(b.read_uri_list) end
 	if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
 	if not settled then return false, "", "copy_chord_failed" end
-	if not read_ok or uri_list == "" then return false, "", "no_file_selection" end
+	if not read_ok or uri_list == "" or uri_list == sentinel then return false, "", "no_file_selection" end
 	Logger.debug(LOG, "Read a %d-byte uri-list selection via %s.", #uri_list, b.name)
 	return true, uri_list, nil
 end
@@ -433,14 +623,18 @@ end
 --- @param transform function selected_text -> replacement_text
 --- @param emit_combo function combo -> boolean
 --- @param sleep_ms function Blocking millisecond wait.
+--- @param publication table|nil Original destination admission, retained through cleanup.
 --- @return boolean ok
 --- @return string|nil reason
-function M.transform_selection(transform, emit_combo, sleep_ms)
+function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 	if type(transform) ~= "function" then return false, "invalid_dependencies" end
+	local function current() return publication == nil or admitted(publication.current) end
+	if not current() then return false, "destination_changed" end
 	local b, why = selection_backend(emit_combo, sleep_ms)
 	if not b then return false, why end
+	if not current() then return false, "destination_changed" end
 
-	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then return false, snapshot_error or "clipboard_snapshot_failed" end
 
 	local function restore()
@@ -450,25 +644,31 @@ function M.transform_selection(transform, emit_combo, sleep_ms)
 		if not restore() then return false, "clipboard_restore_failed" end
 		return false, reason
 	end
-	local copied, selected = copy_selection(b, emit_combo, sleep_ms)
+	if not current() then return fail("destination_changed") end
+	local copied, selected = copy_selection(b, emit_combo, sleep_ms, publication)
 	if not copied then return fail(selected) end
 
 	local transformed_ok, replacement = pcall(transform, selected)
 	if not transformed_ok or type(replacement) ~= "string" then
 		return fail("selection_transform_failed")
 	end
+	if not current() then return fail("destination_changed") end
 	if not write_backend_checked(b, replacement) then
 		return fail("replacement_write_failed")
 	end
+	if not current() then return fail("destination_changed") end
 
 	local paste_ok, pasted = pcall(function()
 		if not wait_checked(sleep_ms, SETTLE_MS) then return false end
-		if emit_combo("ctrl+v") ~= true then return false end
+		if not current() then return false end
+		if emit_combo("ctrl+v", publication) ~= true then return false end
+		if not current() then return false end
 		if not wait_checked(sleep_ms, RESTORE_DELAY_MS) then return false end
 		return true
 	end)
 	local restored = restore()
 	if not restored then return false, "clipboard_restore_failed" end
+	if not current() then return false, "destination_changed" end
 	if not paste_ok or pasted ~= true then return false, "paste_chord_failed" end
 	Logger.debug(LOG, "Replaced a %d-byte selection via %s.", #selected, b.name)
 	return true

@@ -3,10 +3,12 @@
 #
 # Wrapper shell script for the Ergopti hotstring expansion daemon.
 #
-# Resolves the installation directory (either the real install path
-# /usr/lib/ergopti/ or the repo checkout), configures LUA_PATH so
-# that all driver and shared modules are visible to LuaJIT, then
-# exec-replaces itself with the daemon process.
+# Runs the tree it lives in: bin/ -> linux/ -> ergopti_plus/, so a run from a
+# clone always runs that clone, even when a package is installed. Packages
+# never start through this file: they install their own /usr/bin/ergopti, and
+# the installer its standalone launcher (install/standalone_launcher.sh). It
+# configures LUA_PATH so that all driver and shared modules are visible to
+# LuaJIT, then exec-replaces itself with the daemon process.
 #
 # Usage:
 #   ergopti-hotstrings [--install-deps] [-- <luajit flags>]
@@ -15,6 +17,10 @@
 # the required runtime dependencies automatically.
 
 set -euo pipefail
+
+# The sentences this script prints, in the user's language (install/messages.sh).
+# shellcheck source=../install/messages.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/../install/messages.sh"
 
 
 # ========================================
@@ -52,9 +58,9 @@ _check_deps() {
 	fi
 
 	if [ "${#missing[@]}" -gt 0 ]; then
-		echo "Erreur : dépendances manquantes — ${missing[*]}" >&2
-		echo "  Lancez : ergopti-hotstrings --install-deps" >&2
-		echo "  Ou installez manuellement : apt-get install ${missing[*]}" >&2
+		ergopti_msg launcher.missing_dependencies "${missing[*]}" >&2
+		ergopti_msg_with "  " launcher.install_deps_hint >&2
+		ergopti_msg_with "  " launcher.manual_install_hint "${missing[*]}" >&2
 		exit 1
 	fi
 }
@@ -67,7 +73,7 @@ _check_deps() {
 # ====================================
 
 _install_deps() {
-	echo "Installation des dépendances requises…"
+	ergopti_msg launcher.installing_dependencies
 
 	# Same list as _check_deps, and for the same reason ydotool is absent from
 	# both: installing a package the driver stopped using only teaches the user
@@ -81,11 +87,11 @@ _install_deps() {
 	elif _has pacman; then
 		sudo pacman -Sy --noconfirm luajit libnotify
 	else
-		echo "Erreur : gestionnaire de paquets introuvable (apt, dnf ou pacman requis)." >&2
+		ergopti_msg launcher.no_package_manager >&2
 		exit 1
 	fi
 
-	echo "Dépendances installées avec succès."
+	ergopti_msg launcher.dependencies_installed
 }
 
 
@@ -100,17 +106,12 @@ _install_deps() {
 # so the script stays portable; however this is a Linux-only file.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-# Determine the ergopti installation root.
-# When installed via .deb / AppImage: script lives at /usr/bin/ and libs at
-# /usr/lib/ergopti/.  When run from a repo checkout: script lives in
-# static/ergopti_plus/linux/bin/ and we go two levels up to reach the ergopti_plus root.
-if [ -d "/usr/lib/ergopti" ]; then
-	ERGOPTI_ROOT="/usr/lib/ergopti"
-else
-	# Repo checkout: bin/ → linux/ → ergopti_plus/ → …
-	DRIVERS_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
-	ERGOPTI_ROOT="${DRIVERS_ROOT}"
-fi
+# The tree this script belongs to, never another one found on the machine. It
+# used to prefer /usr/lib/ergopti whenever that directory existed, so a clone
+# run on a machine with a package installed silently ran the package; and as
+# the deb, rpm and Arch packages lay the driver out flat (no linux/ under
+# /usr/lib/ergopti), that run then stopped on a missing driver directory.
+ERGOPTI_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
 
 DRIVER_ROOT="${ERGOPTI_ROOT}/linux"
 # _shared, with the underscore. The tree is static/ergopti_plus/_shared in a
@@ -123,7 +124,7 @@ DRIVER_ROOT="${ERGOPTI_ROOT}/linux"
 SHARED_LUA="${ERGOPTI_ROOT}/_shared/lua"
 
 if [ ! -d "${DRIVER_ROOT}" ]; then
-	echo "Erreur : répertoire du driver Linux introuvable : ${DRIVER_ROOT}" >&2
+	ergopti_msg launcher.driver_missing "${DRIVER_ROOT}" >&2
 	exit 1
 fi
 

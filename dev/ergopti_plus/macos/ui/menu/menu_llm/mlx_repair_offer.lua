@@ -37,7 +37,9 @@ local LOG = "menu_llm.mlx_repair_offer"
 local OPEN_BIN = "/usr/bin/open"
 
 -- System Settings > Network, where the relay (proxy) of a managed Mac is set.
-local NETWORK_SETTINGS_URL = "x-apple.systempreferences:com.apple.Network-Settings.extension"
+-- Public: the Ollama pull's network failure opens the same pane.
+M.NETWORK_SETTINGS_URL = "x-apple.systempreferences:com.apple.Network-Settings.extension"
+M.OPEN_BIN = OPEN_BIN
 
 -- Immutable canonical policy, loaded once through the native shared-path owner.
 local _network_contract = nil
@@ -46,6 +48,7 @@ local _network_contract = nil
 local function checker() return require("modules.llm.mlx_deps_checker") end
 local function i18n() return require("infra.i18n") end
 local function router() return require("ui.menu.menu_llm.runtime_install_offer") end
+local function menu_llm() return require("ui.menu.menu_llm") end
 local function dialogs() return require("infra.dialog_util") end
 local function notifications() return require("infra.notifications") end
 local function deferred() return require("infra.deferred_work") end
@@ -263,7 +266,7 @@ local function present(cause)
 		elseif action == "proxy_settings" then
 			local opened, started = pcall(function()
 				if not failure_is_current(cause) then return false end
-				local handle = require("adapters.shell_runner").spawn(OPEN_BIN, { NETWORK_SETTINGS_URL }, nil)
+				local handle = require("adapters.shell_runner").spawn(M.OPEN_BIN, { M.NETWORK_SETTINGS_URL }, nil)
 				return handle ~= nil and handle.start() == true
 			end)
 			if not opened or started ~= true then
@@ -389,41 +392,65 @@ local function run_installation(mode, failure_revision)
 		Logger.warn(LOG, "MLX failure retry retired before native selection admission.")
 		return false
 	end
-	local ok, accepted = pcall(function()
-		return router().select_mlx(function(done)
-			_installation_running = false
-			if done ~= true then
-				local cause = resolve_cause(nil)
-				_last_repair_failure = cause.kind
-				Logger.error(LOG, "The MLX %s failed (%s).", label, tostring(cause.kind))
-				return false
-			end
-			_last_repair_failure = nil
-			Logger.success(LOG, "MLX %s done.", label)
-			pcall(notifications().notify,
-				i18n().get(mode == "repair" and "mlx.repair_done" or "mlx.install_done"),
-				i18n().get("mlx.deps_step_ready"), "success")
-			-- The model restarts outside the installer's completion, which still
-			-- holds its bootstrap intent while it delivers this result.
-			if type(_resume) == "function" then
-				local resume = _resume
-				local committed = deferred().after(0, function()
-					local resumed, result = pcall(resume)
-					if not resumed or result == false then
-						Logger.error(LOG, "The MLX model did not restart after the %s: %s.", label, tostring(result))
-					end
-				end, "mlx_repair_offer.resume")
-				if committed ~= true then
-					Logger.error(LOG, "The MLX model restart could not be scheduled after the %s.", label)
+	local function select()
+		local ok, accepted = pcall(function()
+			return router().select_mlx(function(done)
+				_installation_running = false
+				if done ~= true then
+					local cause = resolve_cause(nil)
+					_last_repair_failure = cause.kind
+					Logger.error(LOG, "The MLX %s failed (%s).", label, tostring(cause.kind))
+					return false
 				end
-			end
-			return true
-		end, mode == "repair" and { repair = true }
-			or failure_revision ~= nil and { failure_revision = failure_revision } or nil)
+				_last_repair_failure = nil
+				Logger.success(LOG, "MLX %s done.", label)
+				pcall(notifications().notify,
+					i18n().get(mode == "repair" and "mlx.repair_done" or "mlx.install_done"),
+					i18n().get("mlx.deps_step_ready"), "success")
+				-- The model restarts outside the installer's completion, which still
+				-- holds its bootstrap intent while it delivers this result.
+				if type(_resume) == "function" then
+					local resume = _resume
+					local committed = deferred().after(0, function()
+						local resumed, result = pcall(resume)
+						if not resumed or result == false then
+							Logger.error(LOG, "The MLX model did not restart after the %s: %s.", label, tostring(result))
+						end
+					end, "mlx_repair_offer.resume")
+					if committed ~= true then
+						Logger.error(LOG, "The MLX model restart could not be scheduled after the %s.", label)
+					end
+				end
+				return true
+			end, mode == "repair" and { repair = true }
+				or failure_revision ~= nil and { failure_revision = failure_revision } or nil)
+		end)
+		if not ok or accepted ~= true then
+			_installation_running = false
+			Logger.error(LOG, "The MLX %s was not accepted: %s.", label, tostring(accepted))
+			return false
+		end
+		return true
+	end
+	if mode ~= "repair" then return select() end
+	-- The repair removes the environment the running MLX server imports from,
+	-- so the server stops first (field log 2026-10-30 01:18: a server started
+	-- 4 s before the repair crashed with ModuleNotFoundError mid-import, and
+	-- that crash turned the AI off while the repair was still running).
+	local stop_ok, stop_accepted = pcall(menu_llm().stop_mlx_server, function(settled, detail)
+		if settled ~= true then
+			_installation_running = false
+			Logger.error(LOG, "The MLX repair was refused: the MLX server did not stop (%s).", tostring(detail))
+			return
+		end
+		select()
 	end)
-	if not ok or accepted ~= true then
-		_installation_running = false
-		Logger.error(LOG, "The MLX %s was not accepted: %s.", label, tostring(accepted))
+	if not stop_ok or stop_accepted ~= true then
+		if _installation_running then
+			_installation_running = false
+			Logger.error(LOG, "The MLX repair was refused: the MLX server stop was not accepted (%s).",
+				tostring(stop_accepted))
+		end
 		return false
 	end
 	return true

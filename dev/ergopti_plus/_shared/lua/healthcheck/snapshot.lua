@@ -148,15 +148,34 @@ end
 --- @return string|nil chunk nil when the file cannot be opened.
 --- @return boolean|string at_file_start, or the open error.
 --- @return number|nil errno of the open failure.
+--- @throws string When an opened file cannot be completely read and closed.
 function M.read_tail(path, max_bytes, open_fn)
 	local fh, err, code = (open_fn or io.open)(path, "rb")
 	if not fh then return nil, tostring(err), code end
-	local size = fh:seek("end")
-	local start = math.max(0, size - max_bytes)
-	fh:seek("set", start)
-	local chunk = fh:read(size - start) or ""
-	fh:close()
-	return chunk, start == 0
+	local read_ok, chunk, at_start = pcall(function()
+		local size, size_detail = fh:seek("end")
+		if type(size) ~= "number" or size < 0 then error("errors file end seek failed: " .. tostring(size_detail)) end
+		local start = math.max(0, size - max_bytes)
+		local position, seek_detail = fh:seek("set", start)
+		if position ~= start then error("errors file position seek failed: " .. tostring(seek_detail)) end
+		local expected = size - start
+		if expected == 0 then return "", start == 0 end
+		local content, read_detail = fh:read(expected)
+		if type(content) ~= "string" or #content ~= expected then
+			error("errors file tail read did not complete: " .. tostring(read_detail))
+		end
+		return content, start == 0
+	end)
+	local close_ok, closed, close_detail = pcall(function() return fh:close() end)
+	if not read_ok then
+		local message = tostring(chunk)
+		if not close_ok or closed ~= true then
+			message = message .. "; errors file close failed: " .. tostring(close_ok and close_detail or closed)
+		end
+		error(message, 2)
+	end
+	if not close_ok or closed ~= true then error("errors file close failed: " .. tostring(close_ok and close_detail or closed), 2) end
+	return chunk, at_start
 end
 
 --- Loads the recent-issue bounds from _shared/modules/diagnostics/recent_issues.json.
@@ -238,15 +257,42 @@ end
 
 --- Loads the three documents a diagnostics host works from.
 --- @param shared function(rel) → absolute path under _shared/.
---- @return table { schema, templates, redaction, repository }
+--- @return table { schema, templates, redaction, repository, day_log }
 function M.load_config(shared)
 	local defaults = read_json(shared("modules/updater/defaults.json"))
+	local schema = M.load_schema(shared("modules/diagnostics/schema.json"))
+	-- Sharing has one fixed language without changing the active UI locale.
+	schema.export_strings = {}
+	for key, value in pairs(read_json(shared("data/locales/en.json"))) do
+		if key:sub(1, 12) == "healthcheck." then schema.export_strings[key] = value end
+	end
 	return {
-		schema     = M.load_schema(shared("modules/diagnostics/schema.json")),
+		schema     = schema,
 		templates  = read_json(shared("modules/diagnostics/issue_templates.json")),
 		redaction  = read_json(shared("modules/diagnostics/redaction.json")),
 		repository = defaults.github,
+		day_log    = require("diagnostics.day_log").check_limits(read_json(shared("modules/diagnostics/day_log.json"))),
 	}
+end
+
+--- Names the slowest collectors of one synchronous collection, so an
+--- over-budget line says which section held the main thread (the 2026-10-30
+--- macOS field report had 29 collections of 100 to 230 ms and no owner).
+--- @param timings table List of { name = string, ms = number } in run order.
+--- @param count integer How many to name: the schema's phase_a_slowest_named.
+--- @return string text `; slowest: system=120.3 ms, ...`, empty without timings.
+function M.slowest_collectors(timings, count)
+	assert(type(timings) == "table" and type(count) == "number" and count >= 1 and count % 1 == 0,
+		"slowest_collectors: a timing list and a positive integer count are required")
+	local ranked = {}
+	for index, entry in ipairs(timings) do ranked[index] = entry end
+	if #ranked == 0 then return "" end
+	table.sort(ranked, function(a, b) return a.ms > b.ms end)
+	local parts = {}
+	for index = 1, math.min(count, #ranked) do
+		parts[index] = string.format("%s=%.1f ms", ranked[index].name, ranked[index].ms)
+	end
+	return "; slowest: " .. table.concat(parts, ", ")
 end
 
 --- True when a schema entry (a section, a field or a probe) applies to a driver.
@@ -279,7 +325,9 @@ function M.pending_probes(schema, driver, selected)
 	local probes = {}
 	for id, probe in pairs(schema.probes) do
 		if M.applies(probe, driver) then
-			probes[id] = selected == false and { state = "not_run", reason = "opt_in_required" } or { state = "pending" }
+			-- A local probe reads only the user's own files: it needs no opt-in
+			local opted_out = selected == false and probe["local"] ~= true
+			probes[id] = opted_out and { state = "not_run", reason = "opt_in_required" } or { state = "pending" }
 		end
 	end
 	return probes

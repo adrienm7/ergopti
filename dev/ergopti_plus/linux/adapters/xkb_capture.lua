@@ -31,8 +31,12 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local NumberRow = require("layout.number_row_native")
 local number_row_receipts = setmetatable({}, { __mode = "k" })
+local receiving_rows = setmetatable({}, { __mode = "k" })
+local original_receiving_rows = nil
+local receiving_native_backends = setmetatable({}, { __mode = "k" })
 
 local Logger = require("logger.shim")
 local Keysym = require("infra.keysym")
@@ -70,6 +74,10 @@ local XKB_RIGHTALT = EvdevCodes.KEY_RIGHTALT + EVDEV_TO_XKB_OFFSET
 -- The highest evdev code the virtual keyboard registers (uinput_writer's
 -- KEY_CODE_MAX); a character on a higher key could never be typed.
 local UINPUT_KEY_MAX = 0x2FF
+
+-- Non-text controls come from the selected keysym, not the keypad's physical
+-- position: NumLock and the live keymap can make that same key type a digit.
+local SEMANTIC_CONTROL_OF_KEYSYM = { [0xff95] = "home" } -- KP_Home
 
 -- The keysyms (keysymdef.h) that make a key a modifier, by the role the
 -- keyboard hook gives it: shift and altgr select a level of the layout and so
@@ -114,9 +122,6 @@ local _locale = nil
 local _source_generation = 0
 local _physical_probe_epoch = 0
 local _physical_chord_receipts = setmetatable({}, { __mode = "k" })
-local _chord_output_receipts = setmetatable({}, { __mode = "k" })
-local _chord_output_occurrence = nil
-local original_process
 local _source_group = nil
 local _source_native_generation = nil
 local _capture_group, _capture_generation = nil, 0
@@ -161,6 +166,9 @@ local function current_locale()
 end
 
 local function destroy(session)
+	for _, record in pairs(receiving_rows) do
+		if record.session == session then pcall(record.retire) end
+	end
 	if session and _backend and type(_backend.destroy) == "function" then
 		pcall(_backend.destroy, session)
 	end
@@ -619,6 +627,7 @@ local function bind_ffi_backend()
 		return table_out
 	end
 
+	receiving_native_backends[backend] = true
 	_backend = backend
 	Logger.debug(LOG, "libxkbcommon capture backend bound.")
 	return true
@@ -802,6 +811,18 @@ function M.inverse_table(require_source)
 	return detached, nil, receipt
 end
 
+--- The 1-based XKB group (layout index plus one) an inverse receipt was taken
+--- in: the group the text model must read for the same keymap.
+--- @param receipt table Receipt returned by inverse_table.
+--- @return integer|nil group, string|nil err
+function M.inverse_receipt_group(receipt)
+	local record = _inverse_receipts[receipt]
+	if type(record) ~= "table" or type(record.group) ~= "number" or record.group < 0 or record.group % 1 ~= 0 then
+		return nil, "inverse-receipt-unknown"
+	end
+	return record.group + 1, nil
+end
+
 --- Checks an exact inverse receipt against its original reconstructed source.
 --- Ordinary key transitions preserve it; observed group ABA and reload retire it.
 --- @param receipt table Opaque receipt returned by inverse_table().
@@ -885,6 +906,64 @@ function M.inverse_republish(previous, require_source)
 end
 
 
+-- A group retarget mints a new readonly inverse; it never revives the old one.
+local inverse_retargeting = false
+local function retarget_inverse(previous)
+	local owned = _inverse_receipts[previous]
+	local function provenance()
+		return owned and owned.revoked == true and owned.desktop_generation ~= nil
+			and rawequal(package.loaded["adapters.xkb_capture"], M)
+			and type(_session) == "table" and getmetatable(_session) == nil
+			and type(_backend) == "table" and getmetatable(_backend) == nil
+			and rawequal(_session, owned.session) and rawequal(_backend, owned.backend)
+			and _keymap_text == owned.raw_map and _inverse_map_owner == owned.map_owner
+			and owned.session.identity == owned.native_map
+			and rawequal(_backend.create, owned.create) and rawequal(_backend.destroy, owned.destroy)
+			and rawequal(_backend.capture_group or _backend.source_group, owned.getter)
+			and rawequal(_backend.inverse, owned.inverse) and rawequal(_backend.source_group, owned.source_getter)
+			and rawequal(M.inverse_table, issue_inverse) and rawequal(M.inverse_current, check_inverse)
+			and rawequal(M.inverse_retarget, retarget_inverse)
+	end
+	if inverse_retargeting or not provenance() then return nil, "inverse-group-renewal-refused" end
+	inverse_retargeting = true
+	local fresh
+	local called, built, reason, receipt = pcall(function()
+		local observed_generation, _, observed = source_identity()
+		local group = _source_group
+		if not provenance() or not observed_generation or type(observed) ~= "function"
+			or group == owned.group then return nil, "inverse-group-renewal-refused" end
+		local values, why, next_receipt = issue_inverse(true)
+		fresh = _inverse_receipts[next_receipt]
+		if not values or not fresh then return nil, why or "inverse-group-renewal-refused" end
+		local checked, current = pcall(check_inverse, next_receipt)
+		if not provenance() or not checked or current ~= true
+			or fresh.group ~= group or fresh.desktop_generation ~= observed_generation then
+			return nil, "inverse-group-renewal-refused"
+		end
+		local sealed, still_observed = pcall(observed)
+		local final, current_fresh = pcall(check_inverse, next_receipt, true)
+		if not provenance() or not sealed or still_observed ~= true or not final or current_fresh ~= true
+			or _source_generation ~= observed_generation or _source_group ~= group then
+			return nil, "inverse-group-renewal-refused"
+		end
+		return values, nil, next_receipt
+	end)
+	inverse_retargeting = false
+	if not called or not built or not receipt then
+		if fresh then fresh.revoked = true end
+		return nil, "inverse-group-renewal-refused"
+	end
+	return built, reason, receipt
+end
+
+--- Renews an automatic desktop inverse for an observed different group only.
+--- Exact old map/session/issuer provenance stays required; old plans stay revoked.
+--- @param previous table Retired inverse receipt from the same live capture.
+--- @return table|nil built Detached output steps, never input/output authority.
+--- @return string|nil reason Closed refusal.
+--- @return table|nil receipt A distinct original readonly inverse receipt.
+M.inverse_retarget = retarget_inverse
+
 --- Enumerates every plain output in a detached state of the active group.
 --- This preserves duplicates for the shared owner to refuse ambiguity.
 --- @param codes table Dense array of registry evdev codes.
@@ -892,39 +971,49 @@ end
 --- @return string|nil error
 function M.direct_sources(codes)
 	if not _session then return nil, "XKB capture state is not ready" end
-	if type(codes) ~= "table" then return nil, "direct source codes are required" end
-	local count, seen, expected = 0, {}, {}
+	if type(codes) ~= "table" or getmetatable(codes) ~= nil then return nil, "direct source codes are required" end
+	local count, seen, expected, snapshot = 0, {}, {}, {}
 	for key, code in pairs(codes) do
 		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #codes
 			or type(code) ~= "number" or code < 1 or code > UINPUT_KEY_MAX or code % 1 ~= 0 or seen[code] then
 			return nil, "invalid direct source codes"
 		end
-		seen[code], expected[key], count = true, code, count + 1
+		seen[code], expected[key], snapshot[key], count = true, code, code, count + 1
 	end
 	if count ~= #codes then return nil, "direct source codes must be dense" end
 	if type(_backend.direct_sources) ~= "function" then return nil, "the capture backend cannot prove direct sources" end
+	-- The validated intent survives caller changes; native callbacks receive only its separate copy.
 	local session, backend, raw_map = _session, _backend, _keymap_text
+	local enumerate, getter, native_map, groups = backend.direct_sources, backend.source_group, session.identity, session.groups
+	local function original_owner()
+		return _session == session and _backend == backend and _keymap_text == raw_map
+			and backend.direct_sources == enumerate and backend.source_group == getter
+			and session.identity == native_map and session.groups == groups
+	end
+	local function exact_request()
+		if getmetatable(snapshot) ~= nil then return false end
+		local found = 0
+		for index, code in pairs(snapshot) do
+			if expected[index] ~= code then return false end
+			found = found + 1
+		end
+		return found == count
+	end
 	local generation, detail = source_identity()
 	if not generation then return nil, detail end
-	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map then
-		return nil, "direct-source-changed"
-	end
-	local group, native_map = _source_group, session.identity
-	local snapshot = {}; for index, code in ipairs(expected) do snapshot[index] = code end
-	local ok, rows, err = pcall(backend.direct_sources, session, snapshot, group)
+	if not original_owner() then return nil, "direct-source-changed" end
+	local group = _source_group
+	local ok, rows, err = pcall(enumerate, session, snapshot, group)
 	if not ok then return nil, tostring(rows) end
 	if type(rows) ~= "table" then return nil, err or "the capture backend returned no direct sources" end
+	-- Do not invoke a getter installed by enumeration or its request validation.
+	if not original_owner() then return nil, "direct-source-changed" end
+	if not exact_request() then return nil, "direct-source-invalid-response" end
 	local after_generation = source_identity()
-	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map
-		or after_generation ~= generation or _source_group ~= group or session.identity ~= native_map then
+	if not original_owner() or after_generation ~= generation or _source_group ~= group then
 		return nil, "direct-source-changed"
 	end
-	local snapshot_count = 0
-	for index, code in pairs(snapshot) do
-		if expected[index] ~= code then return nil, "direct-source-invalid-response" end
-		snapshot_count = snapshot_count + 1
-	end
-	if snapshot_count ~= count then return nil, "direct-source-invalid-response" end
+	if not exact_request() then return nil, "direct-source-invalid-response" end
 	return rows
 end
 
@@ -935,36 +1024,60 @@ end
 --- @return table|nil receipt Native map/source identity and ordered levels.
 --- @return string|nil reason Closed refusal category.
 function M.number_row_levels(codes)
-	if not _session or type(codes) ~= "table" or #codes ~= 10
+	if not _session or type(codes) ~= "table" or getmetatable(codes) ~= nil or #codes ~= 10
 		or type(_backend.number_row_levels) ~= "function" then return nil, "number-row-source-unavailable" end
-	local count, seen = 0, {}
+	local count, seen, expected, requested = 0, {}, {}, {}
 	for key, code in pairs(codes) do
 		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > 10
 			or type(code) ~= "number" or code % 1 ~= 0 or code < 1 or code > UINPUT_KEY_MAX
 			or seen[code] then return nil, "number-row-invalid-positions" end
-		count, seen[code] = count + 1, true
+		count, seen[code], expected[key], requested[key] = count + 1, true, code, code
 	end
 	if count ~= 10 then return nil, "number-row-invalid-positions" end
+	-- The expected positions precede every callback and never reach native callbacks.
+	local function exact_positions(values)
+		if type(values) ~= "table" or getmetatable(values) ~= nil or #values ~= 10 then return false end
+		local found = 0
+		for key, code in pairs(values) do
+			if expected[key] ~= code then return false end
+			found = found + 1
+		end
+		return found == 10
+	end
+	local session, backend, raw_map = _session, _backend, _keymap_text
+	local enumerate, getter, validate = backend.number_row_levels, backend.source_group, NumberRow.levels
+	local function original_owner()
+		return _session == session and _backend == backend and _keymap_text == raw_map
+			and backend.number_row_levels == enumerate and backend.source_group == getter and NumberRow.levels == validate
+			and exact_positions(codes) and exact_positions(requested)
+	end
 	local generation = source_identity()
 	if not generation then return nil, "number-row-native-source-unverified" end
-	local session, backend, group, raw_map = _session, _backend, _source_group, _keymap_text
-	local groups = session.groups
+	if not original_owner() then return nil, "number-row-native-source-changed" end
+	local group, groups, map = _source_group, session.groups, session.identity
 	if type(groups) ~= "number" or groups % 1 ~= 0 or groups < 1 or groups > 32 then return nil, "number-row-native-groups-unavailable" end
-	local map = session.identity
 	if type(map) ~= "string" or map == "" then return nil, "number-row-native-map-unavailable" end
-	local called, rows = pcall(backend.number_row_levels, session, codes, group)
-	local after_generation = source_identity()
-	if not called or type(rows) ~= "table" or _session ~= session or _backend ~= backend
-		or after_generation ~= generation or _source_group ~= group or _keymap_text ~= raw_map
+	local called, rows = pcall(enumerate, session, requested, group)
+	-- Reject a replaced source getter before calling it for the final observation.
+	if not called or type(rows) ~= "table" or not original_owner()
 		or session.identity ~= map or session.groups ~= groups then
 		return nil, "number-row-native-source-changed"
 	end
-	local levels = NumberRow.levels("linux", rows, codes)
-	if not levels then return nil, "number-row-native-levels-refused" end
+	local after_generation = source_identity()
+	if not original_owner() or after_generation ~= generation or _source_group ~= group
+		or session.identity ~= map or session.groups ~= groups then
+		return nil, "number-row-native-source-changed"
+	end
+	local validated, levels = pcall(validate, "linux", rows, expected)
+	if not validated or not levels then return nil, "number-row-native-levels-refused" end
+	if not original_owner() or session.identity ~= map or session.groups ~= groups
+		or _source_generation ~= generation or _source_group ~= group then
+		return nil, "number-row-native-source-changed"
+	end
 	local capability = setmetatable({}, { __newindex = function() error("native row receipts are immutable", 2) end, __metatable = false })
-	local exact_codes = {}; for index, code in ipairs(codes) do exact_codes[index] = code end
 	number_row_receipts[capability] = { generation = generation, group = group, keymap = map, raw_map = raw_map,
-		session = session, backend = backend, groups = groups, levels = levels, codes = exact_codes }
+		session = session, backend = backend, groups = groups, levels = levels, codes = expected,
+		enumerate = enumerate, getter = getter, validate = validate }
 	return capability
 end
 
@@ -972,16 +1085,30 @@ end
 --- Returned action descriptors are detached; callers cannot mutate retained proof.
 function M.number_row_view(capability, codes)
 	local owned = number_row_receipts[capability]
-	if not owned then return nil end
-	local generation = source_identity()
-	if owned.session ~= _session or owned.backend ~= _backend
-		or owned.raw_map ~= _keymap_text or owned.keymap ~= owned.session.identity or owned.generation ~= generation
-		or owned.group ~= _source_group or owned.session.groups ~= owned.groups or type(codes) ~= "table" or #codes ~= 10 then return nil end
-	for index, code in ipairs(owned.codes) do if codes[index] ~= code then return nil end end
-	local function copy(value)
-		if type(value) ~= "table" then return value end
-		local result = {}; for key, child in pairs(value) do result[key] = copy(child) end; return result
+	if not owned or owned.revoked or type(codes) ~= "table" or getmetatable(codes) ~= nil or #codes ~= 10 then return nil end
+	local function refuse()
+		owned.revoked = true
+		return nil
 	end
+	local function original_owner()
+		return owned.session == _session and owned.backend == _backend
+			and owned.raw_map == _keymap_text and owned.keymap == owned.session.identity
+			and owned.session.groups == owned.groups
+			and owned.backend.number_row_levels == owned.enumerate and owned.backend.source_group == owned.getter
+			and NumberRow.levels == owned.validate
+	end
+	if not original_owner() then return refuse() end
+	local generation = source_identity()
+	if not original_owner() or owned.generation ~= generation or owned.group ~= _source_group then return refuse() end
+	-- A source callback may alter the query; invalid caller data retires no source.
+	if type(codes) ~= "table" or getmetatable(codes) ~= nil or #codes ~= 10 then return nil end
+	local count = 0
+	for index, code in pairs(codes) do
+		if owned.codes[index] ~= code then return nil end
+		count = count + 1
+	end
+	if count ~= 10 then return nil end
+	local copy = TableUtil.deep_copy
 	return { generation = owned.generation, group = owned.group, groups = owned.groups, keymap = owned.keymap,
 		levels = copy(owned.levels), codes = copy(owned.codes) }
 end
@@ -1122,72 +1249,6 @@ function M.chord_source_current(capability)
 	return called and observed == true and private()
 end
 
--- Output currency is a separate owner. Physical editor receipts retain their
--- original epoch and never borrow a synthetic transition's acknowledgement.
-function M.capture_chord_output(capability)
-	if not M.chord_source_current(capability) then return nil end
-	local record = _physical_chord_receipts[capability]
-	local copy = {}; for key, value in pairs(record) do copy[key] = value end
-	local owner = {}; _chord_output_receipts[owner] = copy
-	return owner
-end
-
-function M.chord_output_current(owner)
-	local record = _chord_output_receipts[owner]
-	if not record or getmetatable(owner) ~= nil or next(owner) ~= nil then return false end
-	local scope = _chord_output_occurrence
-	local epoch = record.probe_epoch
-	if scope and scope.owner == owner then
-		if scope.processing or scope.refused then return false end
-		epoch = scope.processed and scope.next_epoch or epoch
-	end
-	local function private()
-		return M.process == original_process and _session == record.session and _backend == record.backend
-			and _source_generation == record.epoch and _physical_probe_epoch == epoch
-			and _source_group == record.group and _source_native_generation == record.locked.generation
-			and _keymap_text == record.raw_map and record.session.identity == record.native_map
-	end
-	if not private() then return false end
-	local called, observed = pcall(record.locked.observed_current)
-	return called and observed == true and private()
-end
-
--- The private Hook producer supplies the dispatch and actual original broker
--- outcome. This port grants no output rights and never mutates physical proof.
-function M.with_chord_output(owner, code, value, dispatch, acknowledged)
-	local record = _chord_output_receipts[owner]
-	if _chord_output_occurrence then _chord_output_occurrence.refused = true; return false end
-	if not record or not M.chord_output_current(owner)
-		or type(dispatch) ~= "function" or type(acknowledged) ~= "function" then return false end
-	local scope = { owner = owner, next_epoch = record.probe_epoch }
-	_chord_output_occurrence = scope
-	local function process(actual_code, actual_value)
-		if _chord_output_occurrence ~= scope or scope.processing or scope.processed or scope.refused
-			or actual_code ~= code or actual_value ~= value or not M.chord_output_current(owner) then
-			scope.refused = true; return nil, nil, "owned-output-capture-refused"
-		end
-		scope.processing = true
-		local called, text, identity, reason = pcall(original_process, actual_code, actual_value)
-		scope.processing = false
-		scope.processed = true
-		scope.next_epoch = record.probe_epoch + 1
-		if not called or reason ~= nil or not M.chord_output_current(owner) then
-			scope.refused = true
-			return nil, nil, called and reason or "owned-output-capture-error"
-		end
-		return text, identity, nil
-	end
-	local called = pcall(dispatch, process)
-	local observed, accepted = false, false
-	if called and not scope.refused and M.chord_output_current(owner) then
-		observed, accepted = pcall(acknowledged)
-	end
-	local current = called and observed and accepted == true and not scope.refused and M.chord_output_current(owner)
-	if current then record.probe_epoch = scope.next_epoch else _chord_output_receipts[owner] = nil end
-	_chord_output_occurrence = nil
-	return current == true
-end
-
 --- Native-library-only probe; never qualifies desktop source or physical delivery.
 function M._capture_chord_sources_for_test(requests)
 	local _, group = capture_identity()
@@ -1261,7 +1322,11 @@ local function resolve_press(keycode)
 	elseif status ~= "nothing" then
 		error("invalid Compose status: " .. tostring(status))
 	end
-	return text, identity
+	-- A real composed result keeps its text route. Reporting a known control
+	-- during pending Compose does not cancel or reset the Compose owner.
+	local control = status ~= "composed" and (text == nil or text == "")
+		and SEMANTIC_CONTROL_OF_KEYSYM[sym] or nil
+	return text, identity, control
 end
 
 --- Ends a pending Compose sequence, leaving the key state as it is. For a press
@@ -1313,7 +1378,7 @@ end
 --- state and never apply a duplicate action.
 --- @param evdev_code integer Linux input-event keycode.
 --- @param value integer 0 release, 1 press, 2 repeat.
---- @return string|nil text, string|nil identity, string|nil error
+--- @return string|nil text, string|nil identity, string|nil error, string|nil control
 function M.process(evdev_code, value)
 	_physical_probe_epoch = _physical_probe_epoch + 1
 	if not _session then return nil, nil, "XKB capture state is not ready" end
@@ -1332,7 +1397,7 @@ function M.process(evdev_code, value)
 		return nil, nil, nil
 	end
 
-	local ok_resolve, text, identity = pcall(resolve_press, keycode)
+	local ok_resolve, text, identity, control = pcall(resolve_press, keycode)
 	if not ok_resolve then return nil, nil, tostring(text) end
 	if value == VALUE_DOWN then
 		local ok_update, update_err = pcall(
@@ -1340,10 +1405,202 @@ function M.process(evdev_code, value)
 		if not ok_update then return nil, nil, tostring(update_err) end
 		capture_identity()
 	end
-	return text, identity, nil
+	return text, identity, nil, control
 end
 
 M.EVDEV_TO_XKB_OFFSET = EVDEV_TO_XKB_OFFSET
 
-original_process = M.process
+--- Internal actual-consumer fragment for adapters/xkb_capture.lua.
+--- Called with the original backend/session and original Probe target inspector.
+--- Reuses backend.number_row_levels and central NumberRow; no duplicated layouts.
+
+local function build_receiving_rows(target, backend, session, capture_current, NumberRow)
+	local enumerate, validate, select = backend.number_row_levels, NumberRow.levels, NumberRow.select
+	local plans = setmetatable({}, { __mode = "k" })
+	local busy = false
+	local function current()
+		return capture_current() == true and target.current() == true
+			and backend.number_row_levels == enumerate and NumberRow.levels == validate and NumberRow.select == select
+	end
+	local function snapshot(codes)
+		if not current() then return nil end
+		return target.inspect(session.identity, session.groups, function(scope, scoped_current)
+			if not current() or scoped_current() ~= true then return nil end
+			local rows = enumerate({ keymap = scope.keymap, state = scope.state }, codes, scope.group)
+			local levels = rows and validate("linux", rows, codes)
+			if not levels or scoped_current() ~= true or not current() then return nil end
+			return { levels = levels, caps = scope.caps, group = scope.group, locked = scope.locked,
+				depressed = scope.depressed, latched = scope.latched, shift_mask = scope.shift_mask,
+				device = scope.device, attachment = scope.attachment, raw_map = scope.raw_map }
+		end)
+	end
+	local function matching(a, b)
+		return a and b and a.caps == b.caps and a.group == b.group and a.locked == b.locked
+			and a.shift_mask == b.shift_mask and a.device == b.device and a.attachment == b.attachment
+			and a.raw_map == b.raw_map
+	end
+	local function prepare(codes, mode, position, physical_shift)
+		if busy or not current() then return nil end
+		busy = true
+		local called, facts = pcall(snapshot, codes)
+		local action = called and facts and select(facts.levels, mode, position, facts.caps, physical_shift) or nil
+		-- Shortcut/latched modifiers are outside this finite row transaction.
+		if not action or facts.latched ~= 0 or (facts.depressed ~= 0 and facts.depressed ~= facts.shift_mask)
+			or not current() then busy = false; return nil end
+		local token = {}
+		local copied_codes = {}; for index, code in ipairs(codes) do copied_codes[index] = code end
+		plans[token] = { facts = facts, codes = copied_codes, mode = mode, position = position,
+			physical_shift = physical_shift, action = { code = action.code, shift = action.shift,
+				text = action.text, native_action = { keysym = action.native_action.keysym, dead = action.native_action.dead } } }
+		busy = false
+		return token
+	end
+	local function observe(token, receiving_shift)
+		local record = plans[token]
+		if busy or not record or record.retired or type(receiving_shift) ~= "boolean" or not current() then return nil end
+		busy = true
+		local called, facts = pcall(snapshot, record.codes)
+		local wanted = receiving_shift and record.facts.shift_mask or 0
+		local action = called and facts and select(facts.levels, record.mode, record.position,
+			facts.caps, record.physical_shift) or nil
+		local valid = matching(record.facts, facts) and facts.latched == 0 and facts.depressed == wanted
+			and action and action.code == record.action.code and action.shift == record.action.shift
+			and action.native_action.keysym == record.action.native_action.keysym
+			and action.native_action.dead == record.action.native_action.dead and current()
+		busy = false
+		if not valid then return nil end
+		-- Detached action parameters are data, not a caller-created authorization.
+		return { code = record.action.code, shift = record.action.shift, text = record.action.text,
+			native_action = { keysym = record.action.native_action.keysym, dead = record.action.native_action.dead } }
+	end
+	local function desired(token)
+		local record = plans[token]
+		if not record or record.retired or not current() then return nil end
+		return { code = record.action.code, shift = record.action.shift,
+			physical_shift = record.physical_shift }
+	end
+	local function retire(token)
+		local record = plans[token]
+		if not record then return false end
+		record.retired = true
+		return true -- Pure plan revocation; target/Writer lifetimes retire separately.
+	end
+	return { prepare = prepare, observe = observe, desired = desired, retire = retire, current = current }
+end
+
+--- Internal Capture commit half, used only by the actual Hook row-owner consumer.
+--- All arguments below are private originals captured with the same session.
+--- A native key symbol stays a Compose input; it is never flattened into text.
+
+local function build_row_commit(rows, backend, session, capture_current, physical_epoch)
+	local feed, status, text, reset = backend.compose_feed, backend.compose_status, backend.compose_utf8, backend.compose_reset
+	local update, identity = backend.update_key, backend.sym_utf8
+	local function current()
+		return capture_current() == true and backend.compose_feed == feed and backend.compose_status == status
+			and backend.compose_utf8 == text and backend.compose_reset == reset
+			and backend.update_key == update and backend.sym_utf8 == identity
+	end
+	local function commit(plan, action, code, value, emitted)
+		if not current() or type(emitted) ~= "boolean" or (value ~= 1 and value ~= 2) then return false end
+		local owned = rows.desired(plan)
+		if not owned or owned.code ~= code or type(action) ~= "table" or type(action.native_action) ~= "table" then return false end
+		local observed = rows.observe(plan, owned.physical_shift)
+		if not observed or observed.native_action.keysym ~= action.native_action.keysym
+			or observed.native_action.dead ~= action.native_action.dead or not current() then return false end
+		physical_epoch() -- Original Capture epoch; no native process/physical proof.
+		local sym = observed.native_action.keysym
+		local direct = observed.text ~= "" and observed.text or nil
+		local result
+		if emitted then
+			feed(session, sym)
+			if not current() then return false end
+			local phase = status(session)
+			if not current() then return false end
+			result = direct
+			if phase == "composing" then result = nil
+			elseif phase == "composed" then
+				result = text(session); if not current() then return false end; reset(session)
+			elseif phase == "cancelled" then reset(session)
+			elseif phase ~= "nothing" then return false end
+		end
+		if not current() then return false end
+		if value == 1 and emitted then update(session, code + 8, 1) end
+		if not current() then return false end
+		local native_identity = identity(session, sym)
+		if not current() then return false end
+		return true, result, native_identity
+	end
+	local function release(code)
+		if not current() then return false end
+		physical_epoch()
+		update(session, code + 8, 0)
+		return current()
+	end
+	return { commit = commit, release = release }
+end
+
+--- Native receiving context, created from the actual original session and Probe.
+function M.capture_receiving_rows(writer)
+	if M.capture_receiving_rows ~= original_receiving_rows or not _session or not _backend
+		or _backend.desktop_proof ~= true or receiving_native_backends[_backend] ~= true
+		or type(_backend.number_row_levels) ~= "function" then return nil end
+	local Probe = require("adapters.xkb_source_probe")
+	local probe_capture, probe_ports = Probe.capture_receiving_source, Probe.receiving_source_ports
+	if type(probe_capture) ~= "function" or type(probe_ports) ~= "function" then return nil end
+	local session, backend, generation = _session, _backend, _capture_generation
+	local retired, constructing, target = false, true, nil
+	local function current()
+		return not retired and M.capture_receiving_rows == original_receiving_rows
+			and _session == session and _backend == backend and _capture_generation == generation
+			and package.loaded["adapters.xkb_source_probe"] == Probe
+			and Probe.capture_receiving_source == probe_capture and Probe.receiving_source_ports == probe_ports
+	end
+	local token, record = {}, { session = session }
+	record.retire = function()
+		retired = true
+		if constructing then return false end
+		return not target or target.retire() == true
+	end
+	receiving_rows[token] = record -- Reserve before Probe construction / Logger callbacks.
+	local called, capability = pcall(probe_capture, writer)
+	if called and capability then target = probe_ports(capability) end
+	constructing = false
+	if not called or not target or not current() then record.retire(); return nil end
+	local rows = build_receiving_rows(target, backend, session, current, NumberRow)
+	local commit = build_row_commit(rows, backend, session, current, function() _physical_probe_epoch = _physical_probe_epoch + 1 end)
+	record.rows, record.commit, record.target, record.capture_current = rows, commit, target, current
+	record.preview = function(plan)
+		local desired = rows.desired(plan)
+		if not desired or not current() then return nil end
+		-- No Compose feed before the output ACK. A pending sequence/dead action
+		-- has no speculative text; the consumer still receives native identity.
+		local action = rows.observe(plan, desired.physical_shift)
+		if not action or not current() then return nil end
+		local identity = backend.sym_utf8(session, action.native_action.keysym)
+		if not current() then return nil end
+		local phase = backend.compose_status(session)
+		if not current() then return nil end
+		local text = phase == "nothing" and not action.native_action.dead and action.text ~= "" and action.text or nil
+		return { text = text, identity = identity }
+	end
+	record.suppress = function(plan, code)
+		if not rows.desired(plan) or not current() then return false end
+		_physical_probe_epoch = _physical_probe_epoch + 1
+		backend.update_key(session, code + 8, 1)
+		rows.retire(plan)
+		return current()
+	end
+	return token
+end
+function M.receiving_row_ports(token)
+	local record = receiving_rows[token]
+	if not record or not record.rows then return nil end
+	return { prepare = record.rows.prepare, desired = record.rows.desired, observe = record.rows.observe,
+		retire = record.rows.retire, current = function() return receiving_rows[token] == record and record.rows.current() end,
+		capture_current = record.capture_current, input_allowed = record.target.input_allowed,
+		drive = record.target.drive, close = record.retire, commit = record.commit.commit, release = record.commit.release,
+		preview = record.preview, suppress = record.suppress }
+end
+original_receiving_rows = M.capture_receiving_rows
+
 return M

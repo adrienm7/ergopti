@@ -543,7 +543,7 @@
 				"it": "Rollate",
 				"ja": "ロール",
 				"ko": "롤",
-				"nl": "Rolls",
+				"nl": "Rolbewegingen",
 				"no": "Rolls",
 				"pl": "Rolady",
 				"pt": "Rolagens",
@@ -903,7 +903,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.tab"
+												"key": "key_name.tab"
 											}
 										],
 										"value_label": [
@@ -917,7 +917,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.alt"
+															"key": "key_name.alt"
 														}
 													]
 												]
@@ -933,7 +933,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -947,7 +947,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.ctrl"
+															"key": "key_name.ctrl"
 														}
 													]
 												]
@@ -963,7 +963,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_shift"
+												"key": "key_name.left_shift"
 											}
 										],
 										"value_label": [
@@ -977,7 +977,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -993,7 +993,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_ctrl"
+												"key": "key_name.left_ctrl"
 											}
 										],
 										"value_label": [
@@ -1007,7 +1007,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.ctrl"
+															"key": "key_name.ctrl"
 														}
 													]
 												]
@@ -1023,7 +1023,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											}
 										],
 										"value_label": [
@@ -1062,7 +1062,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											}
 										],
 										"value_label": [
@@ -1076,7 +1076,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.alt_gr"
+															"key": "key_name.alt_gr"
 														}
 													]
 												]
@@ -1092,7 +1092,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.right_ctrl"
+												"key": "key_name.right_ctrl"
 											}
 										],
 										"value_label": [
@@ -1106,7 +1106,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -1131,127 +1131,6 @@
 							{
 								"items": [
 									{
-										"path": "shortcuts.get_hex_value",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.gethexvalue"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.gpt.enabled",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.gpt"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.search.enabled",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.search"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.take_note.enabled",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.takenote"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.microsoft_bold",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.microsoftbold"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.title_case",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.titlecase"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.uppercase",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.uppercase"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.select_line",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "sg_actions.select_line"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.spotlight_mouse",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.spotlightmouse"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.surround_with_parentheses",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.surroundwithparentheses"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.teleport_mouse",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.teleportmouse"
-											}
-										]
-									},
-									{
 										"path": "shortcuts.wrap_text_if_selected",
 										"value": true,
 										"default": false,
@@ -1259,50 +1138,6 @@
 										"label": [
 											{
 												"key": "shortcuts.label_wrap_text"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.open_downloads",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.opendownloads"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.move",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.move"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.screen",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.screen"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.win_caps_lock",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "shortcuts.wincapslock"
 											}
 										]
 									},
@@ -1357,13 +1192,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											}
 										],
 										"value_label": [
@@ -1379,13 +1214,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -1401,13 +1236,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -1417,13 +1252,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.ctrl_b",
+										"path": "shortcuts.keyboard.primary_b",
 										"value": "microsoft_bold",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + B"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "B"
 											}
 										],
 										"value_label": [
@@ -1433,29 +1274,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.ctrl_shift_v",
-										"value": "paste_plain",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + Shift + V"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.paste_plain"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keyboard.win_a",
+										"path": "shortcuts.keyboard.meta_a",
 										"value": "select_line",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + A"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "A"
 											}
 										],
 										"value_label": [
@@ -1465,29 +1296,63 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_g",
-										"value": "open_url",
+										"path": "shortcuts.keyboard.meta_d",
+										"value": "open_downloads",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + G"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "D"
 											}
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.open_url"
+												"key": "sg_actions.open_downloads"
 											}
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_h",
+										"path": "shortcuts.keyboard.meta_g",
+										"value": "open_chatgpt",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "G"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.open_chatgpt"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.meta_h",
 										"value": "screen_capture",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + H"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "H"
 											}
 										],
 										"value_label": [
@@ -1497,13 +1362,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_m",
+										"path": "shortcuts.keyboard.meta_m",
 										"value": "activity_simulation",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + M"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "M"
 											}
 										],
 										"value_label": [
@@ -1513,13 +1384,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_n",
+										"path": "shortcuts.keyboard.meta_n",
 										"value": "take_note",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + N"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "N"
 											}
 										],
 										"value_label": [
@@ -1529,13 +1406,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_o",
+										"path": "shortcuts.keyboard.meta_o",
 										"value": "surround_parens",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + O"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "O"
 											}
 										],
 										"value_label": [
@@ -1545,29 +1428,41 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_s",
-										"value": "search_web",
+										"path": "shortcuts.keyboard.meta_s",
+										"value": "copy_selected_path",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + S"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "S"
 											}
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.search_web"
+												"key": "sg_actions.copy_selected_path"
 											}
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_sc029",
+										"path": "shortcuts.keyboard.meta_sc029",
 										"value": "screen_capture_instant",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + ²"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "²"
 											}
 										],
 										"value_label": [
@@ -1577,13 +1472,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_t",
+										"path": "shortcuts.keyboard.meta_t",
 										"value": "teleport_mouse",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + T"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "T"
 											}
 										],
 										"value_label": [
@@ -1593,13 +1494,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_u",
+										"path": "shortcuts.keyboard.meta_u",
 										"value": "uppercase_selection",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + U"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "U"
 											}
 										],
 										"value_label": [
@@ -1609,13 +1516,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_w",
+										"path": "shortcuts.keyboard.meta_w",
 										"value": "titlecase_selection",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + W"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "W"
 											}
 										],
 										"value_label": [
@@ -1625,13 +1538,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_x",
+										"path": "shortcuts.keyboard.meta_x",
 										"value": "pick_color",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + X"
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "X"
 											}
 										],
 										"value_label": [
@@ -1641,16 +1560,91 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.win_space",
+										"path": "shortcuts.keyboard.meta_capslock",
+										"value": "toggle_capslock",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "key_name.caps_lock"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.toggle_capslock"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.meta_quote",
+										"value": "spotlight_mouse",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.win"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "'"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.spotlight_mouse"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.primary_shift_v",
+										"value": "paste_plain",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "key_name.shift"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "V"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.paste_plain"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.meta_space",
 										"value": "llm_generate_prediction",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Win + "
+												"key": "key_name.win"
 											},
 											{
-												"key": "common.key_space"
+												"text": " + "
+											},
+											{
+												"key": "key_name.space"
 											}
 										],
 										"value_label": [
@@ -1685,6 +1679,7 @@
 						"sub_switch": {
 							"path": "category_enabled.key_combinations",
 							"default": true,
+							"independent": false,
 							"items": [
 								"shortcuts.key_combination_taps.alt_gr_then_left_alt",
 								"shortcuts.key_combination_taps.alt_gr_then_caps_lock",
@@ -1719,7 +1714,7 @@
 									},
 									{
 										"path": "gestures.swipe_3_left",
-										"value": "tab_prev",
+										"value": "tab_next",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1729,13 +1724,13 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.tab_prev"
+												"key": "sg_actions.tab_next"
 											}
 										]
 									},
 									{
 										"path": "gestures.swipe_3_right",
-										"value": "tab_next",
+										"value": "tab_prev",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1745,7 +1740,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.tab_next"
+												"key": "sg_actions.tab_prev"
 											}
 										]
 									},
@@ -1783,7 +1778,7 @@
 									},
 									{
 										"path": "gestures.swipe_4_left",
-										"value": "desktop_prev",
+										"value": "desktop_next",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1793,13 +1788,13 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.desktop_prev"
+												"key": "sg_actions.desktop_next"
 											}
 										]
 									},
 									{
 										"path": "gestures.swipe_4_right",
-										"value": "desktop_next",
+										"value": "desktop_prev",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1809,7 +1804,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.desktop_next"
+												"key": "sg_actions.desktop_prev"
 											}
 										]
 									},
@@ -1875,60 +1870,181 @@
 						"question_key": "menu.layout.enable",
 						"description_key": "onboarding.page.keyboard_layout.description",
 						"consent": false,
-						"groups": [
+						"groups": [],
+						"master": {
+							"path": "category_enabled.layout",
+							"default": false
+						},
+						"controls": [
 							{
-								"items": [
+								"id": "emulated_layout",
+								"kind": "choice",
+								"label_key": "onboarding.layout.emulated_layout",
+								"available": true,
+								"choices": [
 									{
-										"path": "layout.ergopti_base",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
+										"value": "none",
+										"label_key": "onboarding.layout.emulated_none",
+										"writes": [
 											{
-												"key": "layout.ergoptibase"
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": false,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "none",
+												"default": "none"
 											}
 										]
 									},
 									{
-										"path": "layout.direct_access_digits",
-										"value": "digits",
-										"default": "native",
-										"recommended": true,
-										"label": [
+										"value": "ergopti",
+										"label_key": "onboarding.layout.emulated_ergopti",
+										"writes": [
 											{
-												"key": "menu.layout.number_row"
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": true,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "ergopti",
+												"default": "none"
 											}
 										]
 									},
 									{
-										"path": "layout.ergopti_alt_gr",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "layout.ergoptialtgr"
-											}
-										]
-									},
-									{
-										"path": "layout.ergopti_variant",
 										"value": "ergopti_plus",
-										"default": "none",
-										"recommended": true,
-										"label": [
+										"label_key": "onboarding.layout.emulated_ergopti_plus",
+										"writes": [
 											{
-												"key": "layout.ergoptiplus"
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": true,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "ergopti_plus",
+												"default": "none"
+											}
+										]
+									}
+								]
+							},
+							{
+								"id": "alt_gr_emulation",
+								"kind": "check",
+								"label_key": "layout.ergoptialtgr",
+								"available": true,
+								"choices": [
+									{
+										"value": true,
+										"writes": [
+											{
+												"path": "layout.ergopti_alt_gr",
+												"value": true,
+												"default": false
+											}
+										]
+									},
+									{
+										"value": false,
+										"writes": [
+											{
+												"path": "layout.ergopti_alt_gr",
+												"value": false,
+												"default": false
+											}
+										]
+									}
+								]
+							},
+							{
+								"id": "number_row_emulation",
+								"kind": "check",
+								"label_key": "onboarding.layout.number_row_emulation",
+								"available": true,
+								"choices": [
+									{
+										"value": true,
+										"writes": [
+											{
+												"path": "layout.emulate_number_row",
+												"value": true,
+												"default": true
+											}
+										]
+									},
+									{
+										"value": false,
+										"writes": [
+											{
+												"path": "layout.emulate_number_row",
+												"value": false,
+												"default": true
+											}
+										]
+									}
+								]
+							},
+							{
+								"id": "number_row_order",
+								"kind": "choice",
+								"label_key": "menu.layout.number_row",
+								"available": true,
+								"choices": [
+									{
+										"value": "native",
+										"label_key": "menu.layout.number_row_native",
+										"writes": [
+											{
+												"path": "layout.direct_access_digits",
+												"value": "native",
+												"default": "native"
+											}
+										]
+									},
+									{
+										"value": "digits",
+										"label_key": "menu.layout.number_row_digits",
+										"writes": [
+											{
+												"path": "layout.direct_access_digits",
+												"value": "digits",
+												"default": "native"
+											}
+										]
+									},
+									{
+										"value": "symbols",
+										"label_key": "menu.layout.number_row_symbols",
+										"writes": [
+											{
+												"path": "layout.direct_access_digits",
+												"value": "symbols",
+												"default": "native"
 											}
 										]
 									}
 								]
 							}
-						],
-						"master": {
-							"path": "category_enabled.layout",
-							"default": false
-						}
+						]
 					},
 					{
 						"id": "hotstrings",
@@ -1954,7 +2070,7 @@
 												"path": "hotstrings.autocorrection.names.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#names"
@@ -1965,7 +2081,7 @@
 												"path": "hotstrings.autocorrection.abbreviations.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#abbreviations"
@@ -1976,7 +2092,7 @@
 												"path": "hotstrings.autocorrection.technical_terms.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#technical_terms"
@@ -2010,7 +2126,7 @@
 												"path": "hotstrings.magic_key.repeat_corrections.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections"
@@ -2021,7 +2137,7 @@
 												"path": "hotstrings.magic_key.text_expansion_symbols.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
@@ -2032,7 +2148,7 @@
 												"path": "hotstrings.magic_key.text_expansion_symbols_typst.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
@@ -2055,7 +2171,7 @@
 												"path": "hotstrings.distances_reduction.qu.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#qu"
@@ -2066,7 +2182,7 @@
 												"path": "hotstrings.distances_reduction.comma_j.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_j"
@@ -2077,7 +2193,7 @@
 												"path": "hotstrings.distances_reduction.comma_far_letters.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_far_letters"
@@ -2088,7 +2204,7 @@
 												"path": "hotstrings.distances_reduction.dead_key_e_circumflex.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#dead_key_e_circumflex"
@@ -2099,7 +2215,7 @@
 												"path": "hotstrings.distances_reduction.e_circumflex_e.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#e_circumflex_e"
@@ -2110,7 +2226,7 @@
 												"path": "hotstrings.distances_reduction.space_around_symbols.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#space_around_symbols"
@@ -2133,7 +2249,7 @@
 												"path": "hotstrings.sfbs_reduction.comma.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#comma"
@@ -2144,7 +2260,7 @@
 												"path": "hotstrings.sfbs_reduction.e_circ.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_circ"
@@ -2155,7 +2271,7 @@
 												"path": "hotstrings.sfbs_reduction.e_grave.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_grave"
@@ -2166,7 +2282,7 @@
 												"path": "hotstrings.sfbs_reduction.bu.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#bu"
@@ -2177,7 +2293,7 @@
 												"path": "hotstrings.sfbs_reduction.i_e_acute.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#i_e_acute"
@@ -2200,7 +2316,7 @@
 												"path": "hotstrings.rolls.hc.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "HC ➜ WH"
@@ -2211,7 +2327,7 @@
 												"path": "hotstrings.rolls.sx.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "SX ➜ SK"
@@ -2222,7 +2338,7 @@
 												"path": "hotstrings.rolls.cx.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "CX ➜ CK"
@@ -2233,7 +2349,7 @@
 												"path": "hotstrings.rolls.english_negation.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "NT’ ➜ N’T"
@@ -2244,7 +2360,7 @@
 												"path": "hotstrings.rolls.ez.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "EÉ ➜ EZ"
@@ -2255,7 +2371,7 @@
 												"path": "hotstrings.rolls.ct.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "P’ ➜ CT"
@@ -2266,7 +2382,7 @@
 												"path": "hotstrings.rolls.close_chevron_tag.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<@ ➜ </"
@@ -2277,7 +2393,7 @@
 												"path": "hotstrings.rolls.chevron_less.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<% ➜ <="
@@ -2288,7 +2404,7 @@
 												"path": "hotstrings.rolls.chevron_greater.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": ">% ➜ >="
@@ -2299,7 +2415,7 @@
 												"path": "hotstrings.rolls.comment_open.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\\\" ➜ /*"
@@ -2310,7 +2426,7 @@
 												"path": "hotstrings.rolls.comment_close.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\"\\ ➜ */"
@@ -2321,7 +2437,7 @@
 												"path": "hotstrings.rolls.assign.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#! ➜ :="
@@ -2332,7 +2448,7 @@
 												"path": "hotstrings.rolls.not_equal.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "!# ➜ !="
@@ -2343,7 +2459,7 @@
 												"path": "hotstrings.rolls.paren_quote.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "(# ➜ (\""
@@ -2354,7 +2470,7 @@
 												"path": "hotstrings.rolls.bracket_quote.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[# ➜ [\""
@@ -2365,7 +2481,7 @@
 												"path": "hotstrings.rolls.hashtag_parenthesis.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#( ➜ \")"
@@ -2376,7 +2492,7 @@
 												"path": "hotstrings.rolls.hashtag_open_bracket.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#[ ➜ \"]"
@@ -2387,7 +2503,7 @@
 												"path": "hotstrings.rolls.hashtag_close_bracket.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#] ➜ \"]"
@@ -2398,7 +2514,7 @@
 												"path": "hotstrings.rolls.equal_string.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[) ➜ = \"\""
@@ -2409,7 +2525,7 @@
 												"path": "hotstrings.rolls.left_arrow.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=+ = ➜"
@@ -2420,7 +2536,7 @@
 												"path": "hotstrings.rolls.assign_arrow_equal_right.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "$= ➜ =>"
@@ -2431,7 +2547,7 @@
 												"path": "hotstrings.rolls.assign_arrow_equal_left.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=$ ➜ <="
@@ -2442,7 +2558,7 @@
 												"path": "hotstrings.rolls.assign_arrow_minus_right.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "+? ➜ ->"
@@ -2453,7 +2569,7 @@
 												"path": "hotstrings.rolls.assign_arrow_minus_left.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "?+ ➜ <-"
@@ -2486,7 +2602,7 @@
 												"path": "hotstrings.french_autocorrection.accents.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#accents"
@@ -2497,7 +2613,7 @@
 												"path": "hotstrings.french_autocorrection.names.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#names"
@@ -2508,7 +2624,7 @@
 												"path": "hotstrings.french_autocorrection.typographic_apostrophe.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#typographic_apostrophe"
@@ -2519,7 +2635,7 @@
 												"path": "hotstrings.french_autocorrection.errors.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#errors"
@@ -2530,7 +2646,7 @@
 												"path": "hotstrings.french_autocorrection.ou.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#ou"
@@ -2541,7 +2657,7 @@
 												"path": "hotstrings.french_autocorrection.multiple_punctuation_marks.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#multiple_punctuation_marks"
@@ -2552,7 +2668,7 @@
 												"path": "hotstrings.french_autocorrection.suffixes_a_chaining.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#suffixes_a_chaining"
@@ -2563,7 +2679,7 @@
 												"path": "hotstrings.french_autocorrection.minus.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus"
@@ -2574,7 +2690,7 @@
 												"path": "hotstrings.french_autocorrection.minus_apostrophe.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus_apostrophe"
@@ -2597,7 +2713,7 @@
 												"path": "hotstrings.french_magickey.text_expansion.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion"
@@ -2608,7 +2724,7 @@
 												"path": "hotstrings.french_magickey.text_expansion_auto.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_auto"
@@ -2619,7 +2735,7 @@
 												"path": "hotstrings.french_magickey.text_expansion_emojis.enabled",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_emojis"
@@ -2684,7 +2800,7 @@
 						"consent": true,
 						"groups": [],
 						"master": {
-							"path": "metrics.metrics_enabled",
+							"path": "metrics.enabled",
 							"default": false
 						}
 					}
@@ -2716,7 +2832,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.tab"
+												"key": "key_name.tab"
 											}
 										],
 										"value_label": [
@@ -2725,12 +2841,12 @@
 												"args": [
 													[
 														{
-															"key": "sg_actions.alt_tab_windows"
+															"key": "sg_actions.alt_tab_monitor"
 														}
 													],
 													[
 														{
-															"text": "Fn"
+															"key": "key_name.option"
 														}
 													]
 												]
@@ -2746,7 +2862,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -2760,7 +2876,7 @@
 													],
 													[
 														{
-															"text": "Cmd"
+															"key": "key_name.cmd"
 														}
 													]
 												]
@@ -2776,7 +2892,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_shift"
+												"key": "key_name.left_shift"
 											}
 										],
 										"value_label": [
@@ -2790,7 +2906,7 @@
 													],
 													[
 														{
-															"text": "Shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -2806,7 +2922,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.fn"
+												"key": "key_name.fn"
 											}
 										],
 										"value_label": [
@@ -2820,7 +2936,7 @@
 													],
 													[
 														{
-															"text": "Cmd"
+															"key": "key_name.cmd"
 														}
 													]
 												]
@@ -2836,7 +2952,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_ctrl"
+												"key": "key_name.left_ctrl"
 											}
 										],
 										"value_label": [
@@ -2850,7 +2966,7 @@
 													],
 													[
 														{
-															"text": "Ctrl"
+															"key": "key_name.ctrl"
 														}
 													]
 												]
@@ -2866,7 +2982,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_option"
+												"key": "key_name.left_option"
 											}
 										],
 										"value_label": [
@@ -2880,7 +2996,13 @@
 													],
 													[
 														{
-															"text": "Cmd+Shift"
+															"key": "key_name.cmd"
+														},
+														{
+															"text": " + "
+														},
+														{
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -2896,7 +3018,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_command"
+												"key": "key_name.left_command"
 											}
 										],
 										"value_label": [
@@ -2910,7 +3032,7 @@
 													],
 													[
 														{
-															"text": "Layer (hold)"
+															"key": "tap_hold.hold.nav_layer"
 														}
 													]
 												]
@@ -2935,7 +3057,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.right_command"
+												"key": "key_name.right_command"
 											}
 										],
 										"value_label": [
@@ -2965,7 +3087,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.right_option"
+												"key": "key_name.right_option"
 											}
 										],
 										"value_label": [
@@ -2974,12 +3096,19 @@
 												"args": [
 													[
 														{
-															"key": "sg_actions.sticky_shift"
+															"template": "sg_actions.sticky_shift",
+															"args": [
+																[
+																	{
+																		"key": "key_name.shift"
+																	}
+																]
+															]
 														}
 													],
 													[
 														{
-															"text": "Shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -3004,21 +3133,448 @@
 							{
 								"items": [
 									{
-										"path": "shortcuts.keyboard.hs_ctrl_space",
+										"path": "shortcuts.keyboard.secondary_space",
 										"value": "llm_generate_prediction",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + "
+												"key": "key_name.ctrl"
 											},
 											{
-												"key": "common.key_space"
+												"text": " + "
+											},
+											{
+												"key": "key_name.space"
 											}
 										],
 										"value_label": [
 											{
 												"key": "sg_actions.llm_generate_prediction"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_a",
+										"value": "select_line",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "A"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.select_line"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_d",
+										"value": "open_downloads",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "D"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.open_downloads"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_e",
+										"value": "open_file_manager",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "E"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.open_file_manager"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_g",
+										"value": "open_chatgpt",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "G"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.open_chatgpt"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_h",
+										"value": "screenshot_region_clipboard",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "H"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.screenshot_region_clipboard"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_i",
+										"value": "open_system_settings",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "I"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.open_system_settings"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_m",
+										"value": "activity_simulation",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "M"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.activity_simulation"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_o",
+										"value": "surround_parens",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "O"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.surround_parens"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_p",
+										"value": "display_mirror_toggle",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "P"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.display_mirror_toggle"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_s",
+										"value": "copy_selected_path",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "S"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.copy_selected_path"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_t",
+										"value": "teleport_mouse",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "T"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.teleport_mouse"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_u",
+										"value": "uppercase_selection",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "U"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.uppercase_selection"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_w",
+										"value": "titlecase_selection",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "W"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.titlecase_selection"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_x",
+										"value": "pick_color",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "X"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.pick_color"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_capslock",
+										"value": "toggle_capslock",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "key_name.caps_lock"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.toggle_capslock"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_l",
+										"value": "lock_screen",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "L"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.lock_screen"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_period",
+										"value": "open_emoji_picker",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "."
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.open_emoji_picker"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_quote",
+										"value": "spotlight_mouse",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "'"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.spotlight_mouse"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.primary_shift_v",
+										"value": "paste_plain",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.cmd"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "key_name.shift"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "V"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.paste_plain"
 											}
 										]
 									},
@@ -3055,317 +3611,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keys.ctrl_a",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + A"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_a"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_d",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + D"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_d"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_e",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + E"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_e"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_g",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + G"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_g"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_h",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + H"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_h"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_i",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + I"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_i"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_m",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + M"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_m"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_o",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + O"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_o"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_p",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + P"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_p"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_s",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + S"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_s"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_t",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + T"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_t"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_u",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + U"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_u"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_w",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + W"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_w"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_x",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + X"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_x"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_capslock",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + CapsLock"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_capslock"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_l",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + L"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_l"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_period",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + ."
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_period"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.ctrl_quote",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Ctrl + '"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_ctrl_quote"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.cmd_shift_v",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"text": "Cmd + Shift + V"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_cmd_shift_v"
-											}
-										]
-									},
-									{
 										"path": "shortcuts.keys.cmd_star",
 										"value": true,
 										"default": false,
 										"recommended": true,
 										"label": [
 											{
-												"text": "Cmd + ★"
+												"key": "key_name.cmd"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "★"
 											}
 										],
 										"value_label": [
@@ -3393,7 +3651,7 @@
 								"items": [
 									{
 										"path": "gestures.swipe_3_down",
-										"value": "tab_next",
+										"value": "tab_close",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3403,13 +3661,13 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.tab_next"
+												"key": "sg_actions.tab_close"
 											}
 										]
 									},
 									{
 										"path": "gestures.swipe_3_left",
-										"value": "sel_word_prev",
+										"value": "tab_next",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3419,13 +3677,13 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.sel_word_prev"
+												"key": "sg_actions.tab_next"
 											}
 										]
 									},
 									{
 										"path": "gestures.swipe_3_right",
-										"value": "sel_word_next",
+										"value": "tab_prev",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3435,13 +3693,13 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.sel_word_next"
+												"key": "sg_actions.tab_prev"
 											}
 										]
 									},
 									{
 										"path": "gestures.swipe_3_up",
-										"value": "tab_prev",
+										"value": "tab_new",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3451,7 +3709,71 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.tab_prev"
+												"key": "sg_actions.tab_new"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_4_down",
+										"value": "win_app_prev",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_4_down"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.win_app_prev"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_4_left",
+										"value": "space_next",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_4_left"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.space_next"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_4_right",
+										"value": "space_prev",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_4_right"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.space_prev"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_4_up",
+										"value": "win_app_next",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_4_up"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.win_app_next"
 											}
 										]
 									},
@@ -3473,7 +3795,7 @@
 									},
 									{
 										"path": "gestures.tap_4",
-										"value": "win_app_next",
+										"value": "alt_tab_monitor",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3483,7 +3805,39 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.win_app_next"
+												"key": "sg_actions.alt_tab_monitor"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_5_up",
+										"value": "mission_control",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_5_up"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.mission_control"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_5_down",
+										"value": "app_expose",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_5_down"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.app_expose"
 											}
 										]
 									},
@@ -3551,7 +3905,81 @@
 						"description_key": "onboarding.page.keyboard_layout.description",
 						"consent": false,
 						"groups": [],
-						"note_key": "onboarding.page.keyboard_layout.system_note"
+						"note_key": "onboarding.page.keyboard_layout.system_note",
+						"controls": [
+							{
+								"id": "emulated_layout",
+								"kind": "choice",
+								"label_key": "onboarding.layout.emulated_layout",
+								"available": false,
+								"choices": [
+									{
+										"value": "none",
+										"label_key": "onboarding.layout.emulated_none"
+									},
+									{
+										"value": "ergopti",
+										"label_key": "onboarding.layout.emulated_ergopti"
+									},
+									{
+										"value": "ergopti_plus",
+										"label_key": "onboarding.layout.emulated_ergopti_plus"
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "alt_gr_emulation",
+								"kind": "check",
+								"label_key": "layout.ergoptialtgr",
+								"available": false,
+								"choices": [
+									{
+										"value": true
+									},
+									{
+										"value": false
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "number_row_emulation",
+								"kind": "check",
+								"label_key": "onboarding.layout.number_row_emulation",
+								"available": false,
+								"choices": [
+									{
+										"value": true
+									},
+									{
+										"value": false
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "number_row_order",
+								"kind": "choice",
+								"label_key": "menu.layout.number_row",
+								"available": false,
+								"choices": [
+									{
+										"value": "native",
+										"label_key": "menu.layout.number_row_native"
+									},
+									{
+										"value": "digits",
+										"label_key": "menu.layout.number_row_digits"
+									},
+									{
+										"value": "symbols",
+										"label_key": "menu.layout.number_row_symbols"
+									}
+								],
+								"reason_key": "platform_reason.number_row_override_unsupported"
+							}
+						]
 					},
 					{
 						"id": "hotstrings",
@@ -3577,7 +4005,7 @@
 												"path": "hotstrings.modules.autocorrection.names",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#names"
@@ -3588,7 +4016,7 @@
 												"path": "hotstrings.modules.autocorrection.abbreviations",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#abbreviations"
@@ -3599,7 +4027,7 @@
 												"path": "hotstrings.modules.autocorrection.technical_terms",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#technical_terms"
@@ -3633,7 +4061,7 @@
 												"path": "hotstrings.modules.magickey.repeat_corrections",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections"
@@ -3644,7 +4072,7 @@
 												"path": "hotstrings.modules.magickey.text_expansion_symbols",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
@@ -3655,7 +4083,7 @@
 												"path": "hotstrings.modules.magickey.text_expansion_symbols_typst",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
@@ -3678,7 +4106,7 @@
 												"path": "hotstrings.modules.distancesreduction.qu",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#qu"
@@ -3689,7 +4117,7 @@
 												"path": "hotstrings.modules.distancesreduction.comma_j",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_j"
@@ -3700,7 +4128,7 @@
 												"path": "hotstrings.modules.distancesreduction.comma_far_letters",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_far_letters"
@@ -3711,7 +4139,7 @@
 												"path": "hotstrings.modules.distancesreduction.dead_key_e_circumflex",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#dead_key_e_circumflex"
@@ -3722,7 +4150,7 @@
 												"path": "hotstrings.modules.distancesreduction.e_circumflex_e",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#e_circumflex_e"
@@ -3733,7 +4161,7 @@
 												"path": "hotstrings.modules.distancesreduction.space_around_symbols",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#space_around_symbols"
@@ -3756,7 +4184,7 @@
 												"path": "hotstrings.modules.sfbsreduction.comma",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#comma"
@@ -3767,7 +4195,7 @@
 												"path": "hotstrings.modules.sfbsreduction.e_circ",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_circ"
@@ -3778,7 +4206,7 @@
 												"path": "hotstrings.modules.sfbsreduction.e_grave",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_grave"
@@ -3789,7 +4217,7 @@
 												"path": "hotstrings.modules.sfbsreduction.bu",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#bu"
@@ -3800,7 +4228,7 @@
 												"path": "hotstrings.modules.sfbsreduction.i_e_acute",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#i_e_acute"
@@ -3823,7 +4251,7 @@
 												"path": "hotstrings.modules.rolls.hc",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "HC ➜ WH"
@@ -3834,7 +4262,7 @@
 												"path": "hotstrings.modules.rolls.sx",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "SX ➜ SK"
@@ -3845,7 +4273,7 @@
 												"path": "hotstrings.modules.rolls.cx",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "CX ➜ CK"
@@ -3856,7 +4284,7 @@
 												"path": "hotstrings.modules.rolls.english_negation",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "NT’ ➜ N’T"
@@ -3867,7 +4295,7 @@
 												"path": "hotstrings.modules.rolls.ez",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "EÉ ➜ EZ"
@@ -3878,7 +4306,7 @@
 												"path": "hotstrings.modules.rolls.ct",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "P’ ➜ CT"
@@ -3889,7 +4317,7 @@
 												"path": "hotstrings.modules.rolls.close_chevron_tag",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<@ ➜ </"
@@ -3900,7 +4328,7 @@
 												"path": "hotstrings.modules.rolls.chevron_less",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<% ➜ <="
@@ -3911,7 +4339,7 @@
 												"path": "hotstrings.modules.rolls.chevron_greater",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": ">% ➜ >="
@@ -3922,7 +4350,7 @@
 												"path": "hotstrings.modules.rolls.comment_open",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\\\" ➜ /*"
@@ -3933,7 +4361,7 @@
 												"path": "hotstrings.modules.rolls.comment_close",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\"\\ ➜ */"
@@ -3944,7 +4372,7 @@
 												"path": "hotstrings.modules.rolls.assign",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#! ➜ :="
@@ -3955,7 +4383,7 @@
 												"path": "hotstrings.modules.rolls.not_equal",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "!# ➜ !="
@@ -3966,7 +4394,7 @@
 												"path": "hotstrings.modules.rolls.paren_quote",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "(# ➜ (\""
@@ -3977,7 +4405,7 @@
 												"path": "hotstrings.modules.rolls.bracket_quote",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[# ➜ [\""
@@ -3988,7 +4416,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_parenthesis",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#( ➜ \")"
@@ -3999,7 +4427,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_open_bracket",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#[ ➜ \"]"
@@ -4010,7 +4438,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_close_bracket",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#] ➜ \"]"
@@ -4021,7 +4449,7 @@
 												"path": "hotstrings.modules.rolls.equal_string",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[) ➜ = \"\""
@@ -4032,7 +4460,7 @@
 												"path": "hotstrings.modules.rolls.left_arrow",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=+ = ➜"
@@ -4043,7 +4471,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_equal_right",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "$= ➜ =>"
@@ -4054,7 +4482,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_equal_left",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=$ ➜ <="
@@ -4065,7 +4493,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_minus_right",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "+? ➜ ->"
@@ -4076,7 +4504,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_minus_left",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "?+ ➜ <-"
@@ -4109,7 +4537,7 @@
 												"path": "hotstrings.modules.french_autocorrection.accents",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#accents"
@@ -4120,7 +4548,7 @@
 												"path": "hotstrings.modules.french_autocorrection.names",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#names"
@@ -4131,7 +4559,7 @@
 												"path": "hotstrings.modules.french_autocorrection.typographic_apostrophe",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#typographic_apostrophe"
@@ -4142,7 +4570,7 @@
 												"path": "hotstrings.modules.french_autocorrection.errors",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#errors"
@@ -4153,7 +4581,7 @@
 												"path": "hotstrings.modules.french_autocorrection.ou",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#ou"
@@ -4164,7 +4592,7 @@
 												"path": "hotstrings.modules.french_autocorrection.multiple_punctuation_marks",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#multiple_punctuation_marks"
@@ -4175,7 +4603,7 @@
 												"path": "hotstrings.modules.french_autocorrection.suffixes_a_chaining",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#suffixes_a_chaining"
@@ -4186,7 +4614,7 @@
 												"path": "hotstrings.modules.french_autocorrection.minus",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus"
@@ -4197,7 +4625,7 @@
 												"path": "hotstrings.modules.french_autocorrection.minus_apostrophe",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus_apostrophe"
@@ -4220,7 +4648,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion"
@@ -4231,7 +4659,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion_auto",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_auto"
@@ -4242,7 +4670,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion_emojis",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_emojis"
@@ -4255,49 +4683,6 @@
 								"label": [
 									{
 										"text": "🇫🇷 Français"
-									}
-								]
-							},
-							{
-								"label": [
-									{
-										"key": "menu.hotstrings.preview_bubbles"
-									}
-								],
-								"select_all": true,
-								"items": [
-									{
-										"path": "hotstrings.preview_star_enabled",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "menu.hotstrings.tooltip_magic"
-											}
-										]
-									},
-									{
-										"path": "hotstrings.preview_autocorrect_enabled",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "menu.hotstrings.tooltip_autocorrect"
-											}
-										]
-									},
-									{
-										"path": "hotstrings.preview_colored_tooltips",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "menu.hotstrings.tooltip_colored"
-											}
-										]
 									}
 								]
 							}
@@ -4382,7 +4767,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.tab"
+												"key": "key_name.tab"
 											}
 										],
 										"value_label": [
@@ -4396,7 +4781,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.alt"
+															"key": "key_name.alt"
 														}
 													]
 												]
@@ -4412,7 +4797,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -4426,7 +4811,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.ctrl"
+															"key": "key_name.ctrl"
 														}
 													]
 												]
@@ -4442,7 +4827,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_shift"
+												"key": "key_name.left_shift"
 											}
 										],
 										"value_label": [
@@ -4456,7 +4841,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -4472,7 +4857,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_ctrl"
+												"key": "key_name.left_ctrl"
 											}
 										],
 										"value_label": [
@@ -4486,7 +4871,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.ctrl"
+															"key": "key_name.ctrl"
 														}
 													]
 												]
@@ -4502,7 +4887,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											}
 										],
 										"value_label": [
@@ -4541,7 +4926,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											}
 										],
 										"value_label": [
@@ -4555,7 +4940,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.alt_gr"
+															"key": "key_name.alt_gr"
 														}
 													]
 												]
@@ -4571,7 +4956,7 @@
 										"customised_value": "customised",
 										"label": [
 											{
-												"key": "tap_hold.group.right_ctrl"
+												"key": "key_name.right_ctrl"
 											}
 										],
 										"value_label": [
@@ -4585,7 +4970,7 @@
 													],
 													[
 														{
-															"key": "tap_hold.hold.shift"
+															"key": "key_name.shift"
 														}
 													]
 												]
@@ -4627,13 +5012,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.left_alt"
+												"key": "key_name.left_alt"
 											}
 										],
 										"value_label": [
@@ -4649,13 +5034,13 @@
 										"recommended": true,
 										"label": [
 											{
-												"key": "tap_hold.group.alt_gr"
+												"key": "key_name.alt_gr"
 											},
 											{
 												"text": " + "
 											},
 											{
-												"key": "tap_hold.group.caps_lock"
+												"key": "key_name.caps_lock"
 											}
 										],
 										"value_label": [
@@ -4665,13 +5050,41 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.ctrl_g",
+										"path": "shortcuts.key_combination_taps.left_alt_then_caps_lock",
+										"value": "caps_word",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.left_alt"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "key_name.caps_lock"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.caps_word"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.primary_g",
 										"value": "open_chatgpt",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Ctrl + G"
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "G"
 											}
 										],
 										"value_label": [
@@ -4681,16 +5094,19 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.super_space",
+										"path": "shortcuts.keyboard.meta_space",
 										"value": "llm_generate_prediction",
 										"default": "none",
 										"recommended": true,
 										"label": [
 											{
-												"text": "Super + "
+												"key": "key_name.super"
 											},
 											{
-												"key": "common.key_space"
+												"text": " + "
+											},
+											{
+												"key": "key_name.space"
 											}
 										],
 										"value_label": [
@@ -4725,9 +5141,11 @@
 						"sub_switch": {
 							"path": "category_enabled.key_combinations",
 							"default": true,
+							"independent": true,
 							"items": [
 								"shortcuts.key_combination_taps.alt_gr_then_left_alt",
-								"shortcuts.key_combination_taps.alt_gr_then_caps_lock"
+								"shortcuts.key_combination_taps.alt_gr_then_caps_lock",
+								"shortcuts.key_combination_taps.left_alt_then_caps_lock"
 							]
 						}
 					},
@@ -4737,7 +5155,44 @@
 						"question_key": "menu.gestures.enable",
 						"description_key": "onboarding.gestures.desc",
 						"consent": false,
-						"groups": [],
+						"groups": [
+							{
+								"items": [
+									{
+										"path": "gestures.tap_3",
+										"value": "left_click_toggle",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.tap_3"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.left_click_toggle"
+											}
+										]
+									},
+									{
+										"path": "gestures.tap_4",
+										"value": "alt_tab_monitor",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.tap_4"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.alt_tab_monitor"
+											}
+										]
+									}
+								]
+							}
+						],
 						"master": {
 							"path": "gestures.enabled",
 							"default": false
@@ -4751,7 +5206,103 @@
 						"description_key": "onboarding.page.keyboard_layout.description",
 						"consent": false,
 						"groups": [],
-						"note_key": "onboarding.page.keyboard_layout.system_note"
+						"note_key": "onboarding.page.keyboard_layout.system_note",
+						"controls": [
+							{
+								"id": "emulated_layout",
+								"kind": "choice",
+								"label_key": "onboarding.layout.emulated_layout",
+								"available": false,
+								"choices": [
+									{
+										"value": "none",
+										"label_key": "onboarding.layout.emulated_none"
+									},
+									{
+										"value": "ergopti",
+										"label_key": "onboarding.layout.emulated_ergopti"
+									},
+									{
+										"value": "ergopti_plus",
+										"label_key": "onboarding.layout.emulated_ergopti_plus"
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "alt_gr_emulation",
+								"kind": "check",
+								"label_key": "layout.ergoptialtgr",
+								"available": false,
+								"choices": [
+									{
+										"value": true
+									},
+									{
+										"value": false
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "number_row_emulation",
+								"kind": "check",
+								"label_key": "onboarding.layout.number_row_emulation",
+								"available": false,
+								"choices": [
+									{
+										"value": true
+									},
+									{
+										"value": false
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "number_row_order",
+								"kind": "choice",
+								"label_key": "menu.layout.number_row",
+								"available": true,
+								"choices": [
+									{
+										"value": "native",
+										"label_key": "menu.layout.number_row_native",
+										"writes": [
+											{
+												"path": "layout.direct_access_digits",
+												"value": "native",
+												"default": "native"
+											}
+										]
+									},
+									{
+										"value": "digits",
+										"label_key": "menu.layout.number_row_digits",
+										"writes": [
+											{
+												"path": "layout.direct_access_digits",
+												"value": "digits",
+												"default": "native"
+											}
+										]
+									},
+									{
+										"value": "symbols",
+										"label_key": "menu.layout.number_row_symbols",
+										"writes": [
+											{
+												"path": "layout.direct_access_digits",
+												"value": "symbols",
+												"default": "native"
+											}
+										]
+									}
+								],
+								"capability": "number_row_live",
+								"reason_key": "platform_reason.number_row_override_unsupported"
+							}
+						]
 					},
 					{
 						"id": "hotstrings",
@@ -4777,7 +5328,7 @@
 												"path": "hotstrings.modules.autocorrection.names",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#names"
@@ -4788,7 +5339,7 @@
 												"path": "hotstrings.modules.autocorrection.abbreviations",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#abbreviations"
@@ -4799,7 +5350,7 @@
 												"path": "hotstrings.modules.autocorrection.technical_terms",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/autocorrection.toml#technical_terms"
@@ -4833,7 +5384,7 @@
 												"path": "hotstrings.modules.magickey.repeat_corrections",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections"
@@ -4844,7 +5395,7 @@
 												"path": "hotstrings.modules.magickey.text_expansion_symbols",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols"
@@ -4855,7 +5406,7 @@
 												"path": "hotstrings.modules.magickey.text_expansion_symbols_typst",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/magickey.toml#text_expansion_symbols_typst"
@@ -4878,7 +5429,7 @@
 												"path": "hotstrings.modules.distancesreduction.qu",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#qu"
@@ -4889,7 +5440,7 @@
 												"path": "hotstrings.modules.distancesreduction.comma_j",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_j"
@@ -4900,7 +5451,7 @@
 												"path": "hotstrings.modules.distancesreduction.comma_far_letters",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#comma_far_letters"
@@ -4911,7 +5462,7 @@
 												"path": "hotstrings.modules.distancesreduction.dead_key_e_circumflex",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#dead_key_e_circumflex"
@@ -4922,7 +5473,7 @@
 												"path": "hotstrings.modules.distancesreduction.e_circumflex_e",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#e_circumflex_e"
@@ -4933,7 +5484,7 @@
 												"path": "hotstrings.modules.distancesreduction.space_around_symbols",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/distancesreduction.toml#space_around_symbols"
@@ -4956,7 +5507,7 @@
 												"path": "hotstrings.modules.sfbsreduction.comma",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#comma"
@@ -4967,7 +5518,7 @@
 												"path": "hotstrings.modules.sfbsreduction.e_circ",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_circ"
@@ -4978,7 +5529,7 @@
 												"path": "hotstrings.modules.sfbsreduction.e_grave",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#e_grave"
@@ -4989,7 +5540,7 @@
 												"path": "hotstrings.modules.sfbsreduction.bu",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#bu"
@@ -5000,7 +5551,7 @@
 												"path": "hotstrings.modules.sfbsreduction.i_e_acute",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml#i_e_acute"
@@ -5023,7 +5574,7 @@
 												"path": "hotstrings.modules.rolls.hc",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "HC ➜ WH"
@@ -5034,7 +5585,7 @@
 												"path": "hotstrings.modules.rolls.sx",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "SX ➜ SK"
@@ -5045,7 +5596,7 @@
 												"path": "hotstrings.modules.rolls.cx",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "CX ➜ CK"
@@ -5056,7 +5607,7 @@
 												"path": "hotstrings.modules.rolls.english_negation",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "NT’ ➜ N’T"
@@ -5067,7 +5618,7 @@
 												"path": "hotstrings.modules.rolls.ez",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "EÉ ➜ EZ"
@@ -5078,7 +5629,7 @@
 												"path": "hotstrings.modules.rolls.ct",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "P’ ➜ CT"
@@ -5089,7 +5640,7 @@
 												"path": "hotstrings.modules.rolls.close_chevron_tag",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<@ ➜ </"
@@ -5100,7 +5651,7 @@
 												"path": "hotstrings.modules.rolls.chevron_less",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "<% ➜ <="
@@ -5111,7 +5662,7 @@
 												"path": "hotstrings.modules.rolls.chevron_greater",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": ">% ➜ >="
@@ -5122,7 +5673,7 @@
 												"path": "hotstrings.modules.rolls.comment_open",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\\\" ➜ /*"
@@ -5133,7 +5684,7 @@
 												"path": "hotstrings.modules.rolls.comment_close",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "\"\\ ➜ */"
@@ -5144,7 +5695,7 @@
 												"path": "hotstrings.modules.rolls.assign",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#! ➜ :="
@@ -5155,7 +5706,7 @@
 												"path": "hotstrings.modules.rolls.not_equal",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "!# ➜ !="
@@ -5166,7 +5717,7 @@
 												"path": "hotstrings.modules.rolls.paren_quote",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "(# ➜ (\""
@@ -5177,7 +5728,7 @@
 												"path": "hotstrings.modules.rolls.bracket_quote",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[# ➜ [\""
@@ -5188,7 +5739,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_parenthesis",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#( ➜ \")"
@@ -5199,7 +5750,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_open_bracket",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#[ ➜ \"]"
@@ -5210,7 +5761,7 @@
 												"path": "hotstrings.modules.rolls.hashtag_close_bracket",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "#] ➜ \"]"
@@ -5221,7 +5772,7 @@
 												"path": "hotstrings.modules.rolls.equal_string",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "[) ➜ = \"\""
@@ -5232,7 +5783,7 @@
 												"path": "hotstrings.modules.rolls.left_arrow",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=+ = ➜"
@@ -5243,7 +5794,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_equal_right",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "$= ➜ =>"
@@ -5254,7 +5805,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_equal_left",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "=$ ➜ <="
@@ -5265,7 +5816,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_minus_right",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "+? ➜ ->"
@@ -5276,7 +5827,7 @@
 												"path": "hotstrings.modules.rolls.assign_arrow_minus_left",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text": "?+ ➜ <-"
@@ -5309,7 +5860,7 @@
 												"path": "hotstrings.modules.french_autocorrection.accents",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#accents"
@@ -5320,7 +5871,7 @@
 												"path": "hotstrings.modules.french_autocorrection.names",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#names"
@@ -5331,7 +5882,7 @@
 												"path": "hotstrings.modules.french_autocorrection.typographic_apostrophe",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#typographic_apostrophe"
@@ -5342,7 +5893,7 @@
 												"path": "hotstrings.modules.french_autocorrection.errors",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#errors"
@@ -5353,7 +5904,7 @@
 												"path": "hotstrings.modules.french_autocorrection.ou",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#ou"
@@ -5364,7 +5915,7 @@
 												"path": "hotstrings.modules.french_autocorrection.multiple_punctuation_marks",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#multiple_punctuation_marks"
@@ -5375,7 +5926,7 @@
 												"path": "hotstrings.modules.french_autocorrection.suffixes_a_chaining",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#suffixes_a_chaining"
@@ -5386,7 +5937,7 @@
 												"path": "hotstrings.modules.french_autocorrection.minus",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus"
@@ -5397,7 +5948,7 @@
 												"path": "hotstrings.modules.french_autocorrection.minus_apostrophe",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/autocorrection.toml#minus_apostrophe"
@@ -5420,7 +5971,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion"
@@ -5431,7 +5982,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion_auto",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_auto"
@@ -5442,7 +5993,7 @@
 												"path": "hotstrings.modules.french_magickey.text_expansion_emojis",
 												"value": true,
 												"default": false,
-												"recommended": false,
+												"recommended": true,
 												"label": [
 													{
 														"text_ref": "hotstrings/french/magickey.toml#text_expansion_emojis"
@@ -5455,49 +6006,6 @@
 								"label": [
 									{
 										"text": "🇫🇷 Français"
-									}
-								]
-							},
-							{
-								"label": [
-									{
-										"key": "menu.hotstrings.preview_bubbles"
-									}
-								],
-								"select_all": true,
-								"items": [
-									{
-										"path": "hotstrings.preview_star_enabled",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "menu.hotstrings.tooltip_magic"
-											}
-										]
-									},
-									{
-										"path": "hotstrings.preview_autocorrect_enabled",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "menu.hotstrings.tooltip_autocorrect"
-											}
-										]
-									},
-									{
-										"path": "hotstrings.preview_colored_tooltips",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "menu.hotstrings.tooltip_colored"
-											}
-										]
 									}
 								]
 							}

@@ -364,14 +364,22 @@ _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta := unset) {
 		}
 }
 
-; Hotstrings will still be triggered downstream, so SendNewResult("a") can
-; cascade a ➜ b ➜ c (final result). OnlyText=true wraps the payload in {Text}
+; Types Text the way a key of the layout does: a SendEvent at the CALLER's
+; SendLevel. The layout and the keylayout emulation call it from their #InputLevel
+; 2 hotkeys, where the level makes the keys visible to the prefix watcher, which
+; is how a typed trigger (« ia » struck on the layout) reaches the hotstring
+; engine at all. A hotstring's OWN output must not come back that way: it goes
+; through Atomic=true, one SendInput at TEXT_SENDER_SEND_LEVEL, and the engine
+; commits its effect to its buffers itself (hotstring-output-is-final).
+; OnlyText=true wraps the payload in {Text}
 ; to avoid modifier side effects on symbols like ', ", accents. UpdateRing
 ; controls whether Text feeds the last-sent-character ring: pass false for a
 ; backspace-only call (e.g. the Notepad clipboard branch's pre-paste erase),
 ; where Text is a control sequence ("{BackSpace 5}") rather than a real
 ; emitted character — SubStr(Text, -1) on that sequence would record its
 ; trailing "}" instead of what actually landed on screen.
+; @param Atomic {Boolean} True for a hotstring's own output (SendInput at the
+;        TextSender level); false for a stand-in for a typed key (SendEvent).
 _SendVerdictSucceeded(Result) {
 		; Legacy recorder hooks return an empty string after capturing a send. Only an
 		; explicit Boolean false is a failure; type-checking first prevents the AHK v2
@@ -379,7 +387,7 @@ _SendVerdictSucceeded(Result) {
 		return !((Result is Integer) and Result = 0)
 }
 
-SendNewResult(Text, OnlyText := True, UpdateRing := True) {
+SendNewResult(Text, OnlyText := True, UpdateRing := True, Atomic := False) {
 		; Every layout/hotstring callback reaches this primitive.  A failed OS send
 		; must be contained here and must NOT advance the output ring: advancing it
 		; after a failed injection corrupts deadkey/time-gated decisions as though
@@ -389,6 +397,8 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 						Hook := _SendHook
 						if !_SendVerdictSucceeded(Hook("SendNewResult", Text, OnlyText))
 								return false
+				} else if Atomic {
+						_TextSenderAtSendLevel(_AHK_SendInput.Bind(OnlyText ? "{Text}" Text : Text))
 				} else {
 						if OnlyText {
 								SendEvent("{Text}" Text)
@@ -414,6 +424,11 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 		; unqualified pre-fix behaviour is correct.
 		if UpdateRing and (!IsSet(_EmitReachedScreen) or _EmitReachedScreen()) {
 				UpdateLastSentCharacter(SubStr(Text, -_TextTailCodeUnits(Text, 1)))
+				; The ring records the last character only; a delimiter anywhere in
+				; the literal text ends CapsWord. Key syntax ("{BackSpace}", "^v")
+				; is not text and says nothing about what reached the screen.
+				if OnlyText and IsSet(CapsWordAutoOffObserveOutput)
+						CapsWordAutoOffObserveOutput(Text)
 		}
 		return true
 }
@@ -423,13 +438,19 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 _SendFinalResultUnchecked(Text, OnlyText) {
 		if _SendHook {
 				Hook := _SendHook
-				return _SendVerdictSucceeded(Hook("SendFinalResult", Text, OnlyText))
+				Sent := _SendVerdictSucceeded(Hook("SendFinalResult", Text, OnlyText))
+		} else {
+				if OnlyText
+						SendInput("{Text}" Text)
+				else
+						SendInput(Text)
+				Sent := true
 		}
-		if OnlyText
-				SendInput("{Text}" Text)
-		else
-				SendInput(Text)
-		return true
+		; SendInput lifts the script's own hook, so the auto-off InputHook never
+		; sees this text: a checked delimiter in it ends CapsWord here.
+		if Sent and OnlyText and IsSet(CapsWordAutoOffObserveOutput)
+				CapsWordAutoOffObserveOutput(Text)
+		return Sent
 }
 
 ; @param DeclareBufferEffect {Boolean} True when Text is a caret/document edit
@@ -454,6 +475,14 @@ _SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
 		"hotstring_send_instant")
 }
 
+; SendInput lifts the script's own hook and a paste types nothing at all, so
+; the auto-off InputHook never sees what SendInstant puts on screen: a checked
+; delimiter in it ends CapsWord here, once the injection succeeded.
+_SendInstantReport(Text) {
+	if IsSet(CapsWordAutoOffObserveOutput)
+		CapsWordAutoOffObserveOutput(Text)
+}
+
 SendInstant(Text, Prefix := "") {
 	; Sends a large text through the clipboard while keeping Prefix (typically the
 	; hotstring erase sequence) in the SAME SendInput burst as Ctrl+V. Splitting
@@ -462,7 +491,10 @@ SendInstant(Text, Prefix := "") {
 	if _SendHook {
 		try {
 			Hook := _SendHook
-			return _SendVerdictSucceeded(Hook("SendInstant", Text, Prefix))
+			Sent := _SendVerdictSucceeded(Hook("SendInstant", Text, Prefix))
+			if Sent
+				_SendInstantReport(Text)
+			return Sent
 		} catch as Err {
 			try LoggerError("Hotstrings", "SendInstant hook failed: {1}", Err.Message)
 			return false
@@ -479,6 +511,7 @@ SendInstant(Text, Prefix := "") {
 		try LoggerDebug("Hotstrings", "SendInstant: a restore is still in flight; routing through the clipboard-free path.")
 		try {
 			SendInput(Prefix . "{Text}" . Text)
+			_SendInstantReport(Text)
 			return true
 		} catch as Err {
 			try LoggerError("Hotstrings", "SendInstant clipboard-free injection failed: {1}", Err.Message)
@@ -499,6 +532,7 @@ SendInstant(Text, Prefix := "") {
 		try LoggerDebug("Hotstrings", "SendInstant: clipboard is contended or holds a bitmap; routing through the clipboard-free path.")
 		try {
 			SendInput(Prefix . "{Text}" . Text)
+			_SendInstantReport(Text)
 			return true
 		} catch as Err {
 			try LoggerError("Hotstrings", "SendInstant clipboard-free injection failed: {1}", Err.Message)
@@ -514,9 +548,8 @@ SendInstant(Text, Prefix := "") {
 	RestoreCallback := false
 	RestoreTimerArmed := false
 	try {
-		if !CB_Write(Text)
+		if !CB_WriteTextWithReceipt(Text, &OwnedSequence)
 			throw Error("clipboard write failed")
-		OwnedSequence := CB_GetSequenceNumber()
 		if !OwnedSequence
 			throw Error("clipboard sequence unavailable")
 		; Arm every fallible post-paste stage before the irreversible injection. If
@@ -528,15 +561,19 @@ SendInstant(Text, Prefix := "") {
 		; Prefix and Ctrl+V are one kernel injection transaction. Critical callers
 		; therefore cannot be interrupted after the erase but before the paste.
 		SendInput(Prefix . "^v")
+		_SendInstantReport(Text)
 		return true
 	} catch as err {
 		; SendInput can fail after the restore timer was armed. Cancel that exact
 		; callback before doing the cleanup inline so ownership is ended once.
 		if RestoreTimerArmed
 			try SetTimer(RestoreCallback, 0)
-		try CB_RestoreOwnedAllEventually(OldClipboard,
-			IsSet(OwnedSequence) ? OwnedSequence : 0, OwnerToken,
-			"hotstring_send_instant_rollback", true, true)
+		if IsSet(OwnedSequence) && OwnedSequence {
+			try CB_RestoreOwnedAllEventually(OldClipboard, OwnedSequence, OwnerToken,
+				"hotstring_send_instant_rollback")
+		} else {
+			CB_EndOwnedTransaction(OwnerToken)
+		}
 		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
 		return false
 	}
@@ -677,12 +714,16 @@ ActivateHotstrings() {
 ; hotkey thread with ClipWait freezes every low-level hook dispatch behind it.
 ; Keep one owned capture job and poll with a zero-timeout probe instead; callers
 ; receive the text only while the original foreground context is still current.
+; "A newer user action" is a newer physical key-down, mouse-down or wheel: the
+; KS_GetPhysicalInputGeneration ticket. A_TimeIdlePhysical also moves for the
+; key-ups that finish the initiating chord (releasing S, then Win, of Win+S),
+; so a capture judged by it cancelled itself whenever the copy took longer than
+; the user's key release (copy_selected_path then did nothing at all).
 global _SelectionCaptureJob := false
 global _SelectionCaptureNextId := 0
 global SELECTION_CAPTURE_POLL_MS := 15
-global SELECTION_CAPTURE_INPUT_GRACE_MS := 20
 
-GetSelectionAsync(OnReady) {
+GetSelectionAsync(OnReady, Ports := 0) {
 		global _SelectionCaptureJob, _SelectionCaptureNextId
 		global SELECTION_CAPTURE_POLL_MS
 
@@ -690,70 +731,193 @@ GetSelectionAsync(OnReady) {
 				return false
 		if !IsObject(OnReady)
 				throw TypeError("GetSelectionAsync requires a callback object")
+		CaptureId := ++_SelectionCaptureNextId
 
 		; The newest user command owns the clipboard capture. Finishing the prior
 		; job first stops its timer and restores its clipboard snapshot before the
 		; new Ctrl+C clears the clipboard.
-		if IsObject(_SelectionCaptureJob)
+		if IsObject(_SelectionCaptureJob) {
+				; A native snapshot or clear may still be on the interrupted stack.
+				; Its owner must unwind before another request can take a snapshot.
+				if _SelectionCaptureJob.Get("starting", false)
+						return false
 				_SelectionCaptureFinish(_SelectionCaptureJob, "", false, "superseded")
+		}
+		if A_IsSuspended or _SelectionCaptureNextId != CaptureId
+				return false
+		if !(Ports is Map)
+				Ports := Map()
+		SaveFn := Ports.Get("save", CB_SaveAll)
+		ClearFn := Ports.Get("clear", CB_ClearWithReceipt)
+		SendFn := Ports.Get("send", _SelectionSendCopy)
+		SequenceFn := Ports.Get("sequence", _SelectionClipboardSequence)
+		RestoreFn := Ports.Get("restore", CB_RestoreAll)
+		ForegroundFn := Ports.Get("foreground", _SelectionCaptureForeground)
+		GenerationFn := Ports.Get("physical_generation", KS_GetPhysicalInputGeneration)
+		BusyFn := Ports.Get("report_busy", _SelectionReportClipboardBusy)
 
+		; The dispatcher has already counted the key-down which started this
+		; action (InputHook callbacks run before the hotkey thread), so only a
+		; later physical action can advance the generation captured here.
 		Job := Map(
-				"id", ++_SelectionCaptureNextId,
+				"id", CaptureId,
 				"callback", OnReady,
 				"started", A_TickCount,
-				"foreground", WinExist("A"),
+				"physical_generation", GenerationFn.Call(),
+				"generation_fn", GenerationFn,
+				"foreground", 0,
 				"clipboard", "",
 				"clear_sequence", 0,
+				"owned_sequence", 0,
 				"owner_token", 0,
 				"expected_change", 0,
-				"timer", 0
+				"timer", 0,
+				"starting", true,
+				"mutated", false
 		)
+		PreviousCritical := Critical("On")
 		try {
+				if _SelectionCaptureNextId != Job["id"] or IsObject(_SelectionCaptureJob)
+						return false
+				_SelectionCaptureJob := Job
+		} finally Critical(PreviousCritical)
+		Started := false
+		try {
+				Job["foreground"] := ForegroundFn.Call()
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
 				Job["owner_token"] := CB_TryBeginOwnedTransaction("selection_capture")
 				if !Job["owner_token"]
 						throw Error("clipboard transaction busy")
-				Job["clipboard"] := CB_SaveAll()
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+				Job["clipboard"] := SaveFn.Call()
+				; Another program holding the clipboard past ClipboardAll's own
+				; one-second wait is an external condition, not a driver fault:
+				; name the holder to the user instead of opening the error window.
 				if (Type(Job["clipboard"]) == "String"
-						and Job["clipboard"] == "__CB_SAVE_ERROR__")
-						throw Error("clipboard snapshot failed")
-				if !CB_Write("")
+						and Job["clipboard"] == "__CB_SAVE_ERROR__") {
+						BusyFn.Call()
+						return false
+				}
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+				Cleared := ClearFn.Call()
+				if !Cleared
 						throw Error("clipboard clear failed")
-				Job["clear_sequence"] := _SelectionClipboardSequence()
+				Job["mutated"] := true
+				; The default clear authenticates its own generation; sampling it
+				; here could adopt a copy another program made right after it.
+				Job["clear_sequence"] := Cleared is Map ? Cleared["sequence"] : SequenceFn.Call()
+				Job["owned_sequence"] := Job["clear_sequence"]
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
 				Job["expected_change"] := CB_ExpectOwnedChange()
-				SendEvent("^c")
+				SendFn.Call()
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
 				Job["timer"] := _SelectionCapturePoll.Bind(Job)
-				_SelectionCaptureJob := Job
 				SetTimer(Job["timer"], SELECTION_CAPTURE_POLL_MS)
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+				Started := true
 				return true
 		} catch as Err {
-				if Job["expected_change"]
-						CB_CancelExpectedChange(Job["expected_change"])
-				if Job["owner_token"] {
-						try CB_RestoreOwnedAllEventually(Job["clipboard"],
-								Job["clear_sequence"], Job["owner_token"],
-								"selection_capture_rollback", true, true)
-				}
-				Job["clipboard"] := ""
 				try LoggerError("hotstring_engine", "GetSelectionAsync could not start: {1}", Err.Message)
 				return false
+		} finally {
+				Job["starting"] := false
+				if !Started
+						_SelectionCaptureAbortStart(Job, RestoreFn, SequenceFn)
 		}
+}
+
+_SelectionCaptureForeground() {
+		return WinExist("A")
+}
+
+; The copy chord is driver output, not a stand-in for a physical key, so it goes
+; out at TEXT_SENDER_SEND_LEVEL. From the #InputLevel 2 Win broker it used to
+; be sent at level 2, where the driver's own "I1" InputHooks took it for the
+; user's typing: the keystats recorded a "Win+C", and the physical-input
+; generation this capture is judged by advanced on its own Ctrl+C.
+_SelectionSendCopy(SendFn := SendEvent.Bind("^c")) {
+		_TextSenderAtSendLevel(SendFn)
+}
+
+; Tells the user which program holds the clipboard when the snapshot that must
+; precede Ctrl+C failed, and logs the same holder evidence.
+_SelectionReportClipboardBusy() {
+		Holder := CB_DescribeClipboardHolder()
+		try LoggerWarn("hotstring_engine",
+				"GetSelectionAsync could not snapshot the clipboard; the selection was not read (holder: {1}).",
+				Holder["summary"])
+		Message := Holder["process"] != ""
+				? StrReplace(t("selection.clipboard_busy"), "%s", Holder["process"])
+				: t("selection.clipboard_busy_unknown")
+		try TrayTip(Message, t("notify.clipboard"), "Iconx Mute")
+		catch as Err {
+				try LoggerError("hotstring_engine", "The busy-clipboard notice could not be shown: {1}.", Err.Message)
+		}
+}
+
+; Names the new foreground window's process for a "foreground changed" log.
+_SelectionForegroundProcess() {
+		try return WinGetProcessName("A")
+		catch as Err
+				return "unavailable (" . Err.Message . ")"
+}
+
+_SelectionCaptureStartCurrent(Job) {
+		global _SelectionCaptureJob, _SelectionCaptureNextId
+		return !A_IsSuspended and _SelectionCaptureJob == Job
+				and _SelectionCaptureNextId == Job["id"]
+}
+
+; Startup cancellation only revokes admission while the OS call is in flight.
+; Its initiating stack retires the exact snapshot and owner after that call.
+_SelectionCaptureAbortStart(Job, RestoreFn, SequenceFn) {
+		global _SelectionCaptureJob
+		if _SelectionCaptureJob == Job
+				_SelectionCaptureJob := false
+		_SelectionCaptureReleaseTimer(Job)
+		if Job["expected_change"]
+				CB_CancelExpectedChange(Job["expected_change"])
+		if Job["owner_token"] {
+				if Job["mutated"] {
+						CB_RestoreOwnedAllEventually(Job["clipboard"],
+								Job["clear_sequence"], Job["owner_token"],
+								"selection_capture_rollback", true, true, RestoreFn, SequenceFn)
+				} else {
+						CB_EndOwnedTransaction(Job["owner_token"])
+				}
+		}
+		Job["clipboard"] := ""
+}
+
+; Cancelling the native timer does not break Map -> BoundFunc -> Map ownership.
+; Clear the job's callback reference only after the exact timer is cancelled.
+_SelectionCaptureReleaseTimer(Job) {
+		Timer := Job["timer"]
+		if IsObject(Timer)
+				SetTimer(Timer, 0)
+		Job["timer"] := 0
 }
 
 _SelectionCapturePoll(Job) {
 		global _SelectionCaptureJob, GET_SELECTION_TIMEOUT_SEC
-		global SELECTION_CAPTURE_INPUT_GRACE_MS
 
 		if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
 				return
-	Elapsed := TickElapsed(Job["started"])
+		Elapsed := TickElapsed(Job["started"])
 		if A_IsSuspended {
 				_SelectionCaptureFinish(Job, "", false, "suspended")
 				return
 		}
 		; If a new physical action happened after the shortcut, never inject into
-		; its potentially different selection. The small grace absorbs the key-up
-		; events that complete the initiating chord.
-		if (Elapsed - A_TimeIdlePhysical > SELECTION_CAPTURE_INPUT_GRACE_MS) {
+		; its potentially different selection. Releasing the initiating chord is
+		; not a new action and leaves the generation unchanged.
+		if (Job["generation_fn"].Call() != Job["physical_generation"]) {
 				_SelectionCaptureFinish(Job, "", false, "superseded by input")
 				return
 		}
@@ -764,7 +928,7 @@ _SelectionCapturePoll(Job) {
 		; Zero timeout is a probe, never a blocking wait. Accept every clipboard
 		; format so an image selection resolves immediately to an empty text result.
 		if ClipWait(0, 1) {
-				_SelectionCaptureFinish(Job, A_Clipboard, true, "ready")
+				_SelectionCaptureReadReady(Job)
 				return
 		}
 		if (Elapsed >= Round(GET_SELECTION_TIMEOUT_SEC * 1000)) {
@@ -775,35 +939,92 @@ _SelectionCapturePoll(Job) {
 		}
 }
 
+; Admit the sequence of a ready copy before its potentially blocking text
+; read. A later cancellation or external copy cannot rename the clipboard's
+; new contents as this job's own mutation. Zero never replaces proven ownership.
+_SelectionCaptureReadReady(Job, ReadFn := 0, SequenceFn := 0,
+		RestoreFn := 0, ContextFn := 0) {
+		global _SelectionCaptureJob, _SelectionCaptureNextId
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		if !IsObject(SequenceFn)
+				SequenceFn := _SelectionClipboardSequence
+		if !IsObject(ReadFn)
+				ReadFn := () => A_Clipboard
+		Sequence := _SelectionCaptureProbeSequence(SequenceFn)
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		if !Sequence {
+				try LoggerWarn("hotstring_engine", "Selection read refused: clipboard ownership is unavailable.")
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+				_SelectionCaptureFinish(Job, "", false, "clipboard sequence unavailable", RestoreFn, SequenceFn, ContextFn)
+				return true
+		}
+		Job["owned_sequence"] := Sequence
+		try Text := ReadFn.Call()
+		catch as Err {
+				try LoggerWarn("hotstring_engine", "Selection clipboard read failed: {1}.", Err.Message)
+				; A failed getter must not retain its repeating timer forever.
+				; Cleanup is permitted while paused, but never for a replaced job.
+				if _SelectionCaptureJob != Job or _SelectionCaptureNextId != Job["id"]
+						return false
+				_SelectionCaptureFinish(Job, "", false, "clipboard read failed", RestoreFn, SequenceFn, ContextFn)
+				return true
+		}
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		VerifiedSequence := _SelectionCaptureProbeSequence(SequenceFn)
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		Deliver := VerifiedSequence && VerifiedSequence == Sequence
+		if !Deliver {
+				try LoggerWarn("hotstring_engine", "Selection read refused: clipboard ownership changed or became unavailable while reading.")
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+		}
+		_SelectionCaptureFinish(Job, Deliver ? Text : "", Deliver,
+				Deliver ? "ready" : "clipboard changed during read", RestoreFn, SequenceFn, ContextFn)
+		return true
+}
+
+_SelectionCaptureProbeSequence(SequenceFn) {
+		try return SequenceFn.Call()
+		catch as Err {
+				try LoggerWarn("hotstring_engine", "Selection ownership probe failed: {1}.", Err.Message)
+				return 0
+		}
+}
+
 _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 		SequenceFn := 0, ContextFn := 0) {
 		global _SelectionCaptureJob, _SelectionCaptureNextId
-		global SELECTION_CAPTURE_INPUT_GRACE_MS
 
 		if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
 				return
-		SetTimer(Job["timer"], 0)
+		_SelectionCaptureReleaseTimer(Job)
 		_SelectionCaptureJob := false
+		Job["end_reason"] := Reason
+		; A user action that ends without its selection must say why: these
+		; endings used to be silent, so a shortcut that "does nothing" left no
+		; trace. A timeout already logged its own warning.
+		if (!Deliver and Reason != "timeout")
+				try LoggerInfo("hotstring_engine",
+						"Selection capture ended without a selection: {1} (foreground: {2}).",
+						Reason, _SelectionForegroundProcess())
 
-		; On a physical-input cancellation, preserve clipboard data which arrived
-		; after our clear: it may be the user's own copy, and restoring the old
-		; snapshot would silently destroy it. All normal completion paths restore
-		; exactly the prior clipboard contents.
+		; Restore only the clear or received-copy sequence this job admitted.
+		; Sampling current contents here would authorize overwriting a newer
+		; copy on cancellation, or one published during the text read above.
 		if !IsObject(SequenceFn)
 				SequenceFn := _SelectionClipboardSequence
-		PreserveCurrent := (Reason == "superseded by input"
-				and SequenceFn.Call() != Job["clear_sequence"])
 		if Job["expected_change"]
 				CB_CancelExpectedChange(Job["expected_change"])
-		if !PreserveCurrent {
-				OwnedSequence := SequenceFn.Call()
-				if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
-						Job["owner_token"], "selection_capture_" . Reason, true,
-						!OwnedSequence, RestoreFn, SequenceFn)
-						try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
-		} else if Job["owner_token"] {
-				CB_EndOwnedTransaction(Job["owner_token"])
-		}
+		OwnedSequence := Job["owned_sequence"]
+		if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
+				Job["owner_token"], "selection_capture_" . Reason, true,
+				!OwnedSequence, RestoreFn, SequenceFn)
+				try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
 		Job["clipboard"] := ""
 
 		if !Deliver || A_IsSuspended
@@ -813,9 +1034,17 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 		; the restore or the context probe before invoking the continuation.
 		Context := IsObject(ContextFn) ? ContextFn.Call(Job)
 				: _SelectionCaptureCurrentContext(Job)
-		if (Context["foreground"] != Job["foreground"]
-				or Context["elapsed"] - Context["idle"] > SELECTION_CAPTURE_INPUT_GRACE_MS)
+		if (Context["foreground"] != Job["foreground"]) {
+				try LoggerInfo("hotstring_engine",
+						"Selection read but not delivered: the foreground changed to {1}.",
+						_SelectionForegroundProcess())
 				return
+		}
+		if (Context["physical_generation"] != Job["physical_generation"]) {
+				try LoggerInfo("hotstring_engine",
+						"Selection read but not delivered: a newer physical action superseded it.")
+				return
+		}
 		if A_IsSuspended or _SelectionCaptureNextId != Job["id"]
 				return
 		try Job["callback"].Call(Text)
@@ -836,13 +1065,13 @@ GetSelectionCancel(*) {
 		; A completion has already retired its job while restoring the clipboard.
 		; Revoke that continuation even when there is no timer left to cancel.
 		_SelectionCaptureNextId += 1
-		if IsObject(_SelectionCaptureJob)
+		if IsObject(_SelectionCaptureJob) and !_SelectionCaptureJob.Get("starting", false)
 				_SelectionCaptureFinish(_SelectionCaptureJob, "", false, "cancelled")
 }
 
 _SelectionCaptureCurrentContext(Job) {
 		return Map("foreground", WinExist("A"),
-				"elapsed", TickElapsed(Job["started"]), "idle", A_TimeIdlePhysical)
+				"physical_generation", Job["generation_fn"].Call())
 }
 
 _SelectionClipboardSequence() {
@@ -944,15 +1173,40 @@ _LSCResetFrom(Chars) {
 ; @param Character {String} The character that reached the screen.
 ; @param NowTick {Integer|unset} One observed tick shared by a physical chunk.
 AppState_TouchLastSentKey(Character, NowTick := unset) {
-		global LastSentCharacterKeyTime, LAST_SENT_KEY_TIME_MAX_AGE_MS, LAST_SENT_KEY_TIME_PRUNE_AT
+		global LastSentCharacterKeyTime, LastSentCharacterKeyComplex
+		global LAST_SENT_KEY_TIME_MAX_AGE_MS, LAST_SENT_KEY_TIME_PRUNE_AT
 		if !IsSet(NowTick)
 				NowTick := A_TickCount
 		LastSentCharacterKeyTime[Character] := NowTick
+		; Whether Shift, Alt or AltGr was held for this keystroke: the expansion
+		; delay widens for a complex reference key (HSE_ComplexDelayMultiplier).
+		LastSentCharacterKeyComplex[Character] := HSE_KeyIsComplex()
 		if LastSentCharacterKeyTime.Count > LAST_SENT_KEY_TIME_PRUNE_AT {
 				Now := NowTick
 				for k, ts in LastSentCharacterKeyTime.Clone() {
-						if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now)
+						if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now) {
 								LastSentCharacterKeyTime.Delete(k)
+								if LastSentCharacterKeyComplex.Has(k)
+										LastSentCharacterKeyComplex.Delete(k)
+						}
 				}
 		}
+}
+
+; Complexity of each character's last keystroke, keyed like LastSentCharacterKeyTime.
+global LastSentCharacterKeyComplex := Map()
+
+; Test seam: "" reads the keyboard, true / false forces the answer.
+global HSE_ComplexKeyOverride := ""
+
+; Whether the keystroke happening now is complex: Shift, Alt or AltGr is held.
+; On Windows AltGr is the right Alt (with a left Ctrl), so the physical state of
+; Shift, left Alt and right Alt covers the macOS Shift/Alt flags and the Linux
+; shift/alt/altgr roles.
+; @returns {Boolean}
+HSE_KeyIsComplex() {
+		global HSE_ComplexKeyOverride
+		if (HSE_ComplexKeyOverride != "")
+				return HSE_ComplexKeyOverride ? true : false
+		return GetKeyState("Shift", "P") or GetKeyState("LAlt", "P") or GetKeyState("RAlt", "P")
 }

@@ -25,12 +25,98 @@ import (
 	"time"
 )
 
+// BEGIN GENERATED NATIVE HTTP FAILURE STAGES
+// Generated from static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json; do not edit this span.
+func validNativeFailureStage(stage, reason string) bool {
+	switch stage {
+	case "native_policy_load":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_selection_bound":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_lookup":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_budget":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_candidates":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_pac_download":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_pac_evaluation":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_routes":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_wpad_discovery":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_dictionary":
+		switch reason {
+		case "proxy":
+			return true
+		}
+	case "native_route_empty":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_certificate_load":
+		switch reason {
+		case "certificate":
+			return true
+		}
+	case "native_lookup_deadline":
+		switch reason {
+		case "deadline":
+			return true
+		}
+	case "native_dispatch_deadline":
+		switch reason {
+		case "deadline":
+			return true
+		}
+	case "native_session_terminal":
+		switch reason {
+		case "deadline", "cancelled", "offline", "certificate", "proxy", "connect", "unavailable", "protocol", "content_encoding":
+			return true
+		}
+	}
+	return false
+}
+
+// END GENERATED NATIVE HTTP FAILURE STAGES
+
 const maximumFrame = 65536
 
 // Error reports fixed transport evidence without a URL or authentication data.
 type Error struct {
-	Reason string
-	cause  error
+	Reason             string
+	NativeFailureStage string
+	cause              error
 }
 
 func (e *Error) Error() string { return "Native HTTP request failed: " + e.Reason }
@@ -98,7 +184,7 @@ func Do(client *http.Client, request *http.Request) (*http.Response, error) {
 	}
 	var native *Error
 	if errors.As(err, &native) {
-		return response, &Error{Reason: native.Reason, cause: err}
+		return response, &Error{Reason: native.Reason, NativeFailureStage: native.NativeFailureStage, cause: err}
 	}
 	if errors.Is(err, context.Canceled) {
 		return response, &Error{Reason: "cancelled", cause: err}
@@ -185,8 +271,9 @@ func hostPort(request *url.URL) (string, string) {
 	return host, port
 }
 
-func (p *Policy) direct(request *url.URL, environment map[string]string) bool {
-	host, port := hostPort(request)
+// loopbackName reports whether a normalized host is a loopback DNS name the
+// policy sends straight to the local machine, whatever a resolver answers.
+func (p *Policy) loopbackName(host string) bool {
 	for _, value := range p.Loopback.Hosts {
 		if host == value {
 			return true
@@ -196,6 +283,14 @@ func (p *Policy) direct(request *url.URL, environment map[string]string) bool {
 		if strings.HasSuffix(host, value) && len(host) > len(value) {
 			return true
 		}
+	}
+	return false
+}
+
+func (p *Policy) direct(request *url.URL, environment map[string]string) bool {
+	host, port := hostPort(request)
+	if p.loopbackName(host) {
+		return true
 	}
 	address := net.ParseIP(host)
 	if address != nil {
@@ -283,6 +378,9 @@ type Transport struct {
 	IdleTimeout   time.Duration
 	ResolveWorker func() (string, error)
 	Environment   func() map[string]string
+	// Destination repeats the upstream checked dialer's address decision for
+	// routes that never reach that dialer; nil keeps the original policy.
+	Destination func(context.Context, *url.URL) error
 }
 
 // Wrap preserves the original client when the caller did not select this
@@ -322,6 +420,11 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	if request.URL.Scheme != "https" && request.URL.Scheme != "http" || request.URL.User != nil || request.URL.Fragment != "" || request.URL.Hostname() == "" {
 		return nil, fail("protocol")
 	}
+	if t.Destination != nil {
+		if err := t.Destination(request.Context(), request.URL); err != nil {
+			return nil, err
+		}
+	}
 	environment := t.Environment()
 	direct := t.Policy.direct(request.URL, environment)
 	if !direct {
@@ -339,6 +442,12 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 				}
 				clone := transport.Clone()
 				clone.Proxy = http.ProxyURL(relay)
+				if t.Destination != nil {
+					// The checked dialer would see the relay's own address, and
+					// an enterprise relay is usually private: the destination
+					// was already decided above, so the relay hop dials plainly.
+					clone.DialContext = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 3 * time.Minute}).DialContext
+				}
 				clone.TLSClientConfig, err = bootstrapTLSConfig(clone.TLSClientConfig, environment)
 				if err != nil {
 					return nil, err
@@ -619,8 +728,16 @@ func (b *nativeBody) terminal(payload []byte) error {
 		Version int    `json:"version"`
 		Success bool   `json:"success"`
 		Reason  string `json:"reason"`
+		Stage   string `json:"native_refusal_stage"`
 	}
-	if decodeObject(payload, &terminal, "version", "success", "reason") != nil || terminal.Version != 1 {
+	decoded := decodeObject(payload, &terminal, "version", "success", "reason")
+	if decoded != nil {
+		if decodeObject(payload, &terminal, "version", "success", "reason", "native_refusal_stage") != nil ||
+			terminal.Success || !validNativeFailureStage(terminal.Stage, terminal.Reason) {
+			return fail("protocol")
+		}
+	}
+	if terminal.Version != 1 {
 		return fail("protocol")
 	}
 	valid := map[string]bool{"complete": true, "deadline": true, "cancelled": true, "offline": true, "certificate": true, "proxy": true, "connect": true, "unavailable": true, "protocol": true, "content_encoding": true}
@@ -634,7 +751,7 @@ func (b *nativeBody) terminal(payload []byte) error {
 		return b.failure("protocol")
 	}
 	if !terminal.Success {
-		return fail(terminal.Reason)
+		return &Error{Reason: terminal.Reason, NativeFailureStage: terminal.Stage}
 	}
 	if b.context.Err() != nil || b.timedOut.Load() {
 		return b.failure("deadline")

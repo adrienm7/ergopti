@@ -19,6 +19,9 @@ local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
+local LabelValue = require("locale.label_value")
+local KeyNames = require("keycodes.key_names")
+local TextUtils     = require("text_utils")
 local Models        = require("ui.menu.menu_llm.models_manager")
 local Profiles      = require("ui.menu.menu_llm.profiles_manager")
 local Settings      = require("ui.menu.menu_llm.settings_manager")
@@ -29,10 +32,10 @@ local BackendPanel     = require("ui.menu.menu_llm.backend_panel")
 local TriggerPanel     = require("ui.menu.menu_llm.trigger_panel")
 local AgentPanel       = require("ui.menu.menu_llm.agent_panel")
 local ApiPanel         = require("ui.menu.menu_llm.api_panel")
-local LocalServerPanel = require("ui.menu.menu_llm.local_server_panel")
+local ConfigGuard      = require("ui.menu.menu_llm.config_guard")
 local UnreachableOffer = require("ui.menu.menu_llm.unreachable_backend_offer")
 local OllamaEndpoint   = require("modules.llm.ollama_endpoint")
-local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
+local ModelSelectorPage = require("ui.menu.menu_llm.model_selector_page")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local ActivationPauseOwner = require("ui.menu.menu_llm.activation_pause_owner")
@@ -56,6 +59,8 @@ local ManifestMenu     = require("infra.manifest_menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local runtime_install_offer = require("ui.menu.menu_llm.runtime_install_offer")
 local ShellRunner         = require("adapters.shell_runner")
+local TimerScheduler      = require("adapters.timer_scheduler")
+local Timings             = require("infra.timings")
 
 local LOG = "menu_llm"
 
@@ -149,8 +154,9 @@ local is_apple_silicon = BackendPanel.is_apple_silicon()
 
 M.DEFAULT_STATE = {
 		llm_enabled           = llm_mod.DEFAULT_STATE.llm_enabled,
-		llm_backend           = Manifest.default_for("llm.models.selected"),
+		llm_backend           = Manifest.default_for(require("config_keys").KEY.LLM_MODELS_SELECTED),
 		llm_debounce          = llm_mod.DEFAULT_STATE.llm_debounce,
+		llm_min_request_interval = llm_mod.DEFAULT_STATE.llm_min_request_interval,
 		llm_model             = is_apple_silicon and llm_mod.DEFAULT_STATE.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_ollama,
 		llm_model_ollama      = llm_mod.DEFAULT_STATE.llm_model_ollama,
 		llm_model_mlx         = llm_mod.DEFAULT_STATE.llm_model_mlx,
@@ -166,8 +172,9 @@ M.DEFAULT_STATE = {
 		llm_active_profile    = llm_mod.DEFAULT_STATE.llm_active_profile,
 		llm_user_models       = {},
 		llm_disabled_apps          = {},
-		llm_url_bar_filter_enabled        = Manifest.default_for("llm.trigger.url_bar_filter_enabled"),
-		llm_secure_field_filter_enabled   = Manifest.default_for("llm.trigger.secure_filter_enabled"),
+		llm_app_profile_overrides  = "",
+		llm_url_bar_filter_enabled        = Manifest.default_for(require("config_keys").KEY.LLM_TRIGGER_URL_BAR_FILTER_ENABLED),
+		llm_secure_field_filter_enabled   = Manifest.default_for(require("config_keys").KEY.LLM_TRIGGER_SECURE_FILTER_ENABLED),
 		llm_user_profiles     = {},
 		llm_profile_shortcuts = {},
 		llm_after_hotstring   = llm_mod.DEFAULT_STATE.llm_after_hotstring,
@@ -178,9 +185,10 @@ M.DEFAULT_STATE = {
 		llm_instant_on_word_end = llm_mod.DEFAULT_STATE.llm_instant_on_word_end,
 		-- The AI agent's settings (modules/llm/agent_runner.lua); its top-level
 		-- menu is built by ui/menu/menu_llm/agent_panel.lua
-		llm_agent_system1       = Manifest.default_for("llm.agent_system1"),
-		llm_agent_system2       = Manifest.default_for("llm.agent_system2"),
-		llm_agent_mode          = Manifest.default_for("llm.agent_mode"),
+		llm_agent_system1       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM1),
+		llm_agent_system2       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM2),
+		llm_agent_mode          = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_MODE),
+		llm_while_hotstring_tooltip = Manifest.default_for(require("config_keys").KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP),
 		llm_agent_disabled_apps = {},
 }
 
@@ -189,12 +197,71 @@ M.DEFAULT_STATE = {
 -- Cached result of the last async server health check.
 -- nil = not yet checked, true = server responded, false = server unreachable.
 local _llm_health_status = nil
+local _llm_health_origin = nil
 local _llm_health_generation = 0
+
+-- The menubar keeps a static prebuilt menu, so the AI title's dot only changes
+-- when something rebuilds it. A backend turns ready (or fails) after the build
+-- that painted the dot, so this watch re-reads the readiness of the active
+-- backend, whichever it is, and repaints only when the dot would differ.
+local HEALTH_WATCH_SEC = Timings.sec("llm", "ai_health_watch_ms")
+local _health_watch = { handle = nil, painted = nil, read = nil, repaint = nil }
+
+--- Stops the health watch; the next AI menu build re-arms it when needed.
+local function stop_health_watch()
+	local handle = _health_watch.handle
+	_health_watch.handle = nil
+	_health_watch.read = nil
+	_health_watch.repaint = nil
+	if handle then TimerScheduler.cancel(handle) end
+end
+
+--- One watch tick: repaints the AI title once when its dot is out of date.
+local function check_health_watch()
+	local read, repaint = _health_watch.read, _health_watch.repaint
+	if type(read) ~= "function" or type(repaint) ~= "function" then return end
+	local ok, now = pcall(read)
+	if not ok then
+		Logger.error(LOG, "The AI health watch could not read the backend: %s.", tostring(now))
+		return
+	end
+	if now == _health_watch.painted then return end
+	Logger.debug(LOG, "AI health changed from %s to %s: repainting the AI title.",
+		tostring(_health_watch.painted), tostring(now))
+	-- Recorded before the repaint, so a coalesced rebuild never repaints twice
+	_health_watch.painted = now
+	if now == nil then stop_health_watch() end
+	local repainted, err = pcall(repaint)
+	if not repainted then Logger.error(LOG, "The AI title repaint failed: %s.", tostring(err)) end
+end
+
+--- Keeps the dot of the AI title in step with the backend after this build.
+--- @param painted string|nil The status this build painted; nil stops the watch.
+--- @param read function Returns the status the dot should show now.
+--- @param repaint function Rebuilds the menu.
+local function watch_health(painted, read, repaint)
+	_health_watch.painted = painted
+	if painted == nil then stop_health_watch(); return end
+	_health_watch.read = read
+	_health_watch.repaint = repaint
+	if _health_watch.handle then return end
+	local handle, committed = TimerScheduler.every(HEALTH_WATCH_SEC, check_health_watch)
+	if committed ~= true then
+		Logger.error(LOG, "The AI health watch could not start: the AI title dot follows menu rebuilds only.")
+		return
+	end
+	_health_watch.handle = handle
+end
+M.__check_health_watch_for_test = check_health_watch
+M.__watch_health_for_test = watch_health
+M.__stop_health_watch_for_test = stop_health_watch
 
 --- Revokes every pending health writer and clears the shared display value.
 local function invalidate_llm_health()
 	_llm_health_generation = _llm_health_generation + 1
 	_llm_health_status = nil
+	_llm_health_origin = nil
+	stop_health_watch()
 end
 
 --- Revokes pending health callbacks and resets the display to not-yet-checked.
@@ -224,15 +291,21 @@ local function probe_llm_health(state, refresh_fn)
 	local backend_at_dispatch = backend
 	local url
 	if backend == "ollama" then
-		url = "http://127.0.0.1:11434/api/version"
+		url = OllamaEndpoint.get_base_url() .. EnableAdmission.VERSION_PATH
 	else
 		-- The MLX health probe follows the configured port via api_mlx.get_base_url()
 		-- (the single source of truth) — no hardcoded port literal.
 		url = ApiMlx.get_base_url() .. "/v1/models"
 	end
 
+	if _llm_health_origin ~= url then _llm_health_status = nil end
+	_llm_health_origin = url
 	hs.http.asyncGet(url, {}, function(status)
 		if generation ~= _llm_health_generation then return end
+		local current_url = backend_at_dispatch == "ollama"
+			and OllamaEndpoint.get_base_url() .. EnableAdmission.VERSION_PATH
+			or ApiMlx.get_base_url() .. "/v1/models"
+		if url ~= current_url then return end
 		if state.llm_backend ~= backend_at_dispatch or state.llm_enabled ~= true then return end
 		-- Any HTTP response (even 4xx) means the server is reachable
 		_llm_health_status = (type(status) == "number" and status > 0)
@@ -327,8 +400,27 @@ local function start_detached_sweep(label, executable, args)
 	return true
 end
 
---- Kills the orphan helper processes spawned for the local LLM backends (the
---- expander + http server + the `ollama serve` wrapper). Called by the root
+--- The models manager of the last committed AI menu, for owners outside the
+--- menu that run its download flows (the developer field run).
+--- @return table|nil manager nil before the AI menu was created.
+function M.active_models_manager()
+	return _active_models_mgr
+end
+
+--- Retires the owned Ollama daemon for the root teardown, calling back once
+--- the daemon's exact native retirement settles.
+--- @param on_settled function Called once with (settled, detail).
+--- @return boolean accepted True when retired or awaiting the callback.
+function M.retire_owned_ollama(on_settled)
+	local ApiOllama = require("modules.llm.api_ollama")
+	local accepted, state = ApiOllama.retire_owned_server(on_settled)
+	if accepted == true and state == "settled" then
+		on_settled(true, "owned Ollama daemon already retired")
+	end
+	return accepted == true
+end
+
+--- Retires the owned Ollama daemon and sweeps the local expander/HTTP helpers. Called by the root
 --- teardown shared by every controlled reload and quit path, so the quit entry
 --- points can never drift. Stock Karabiner processes are never owned by Ergopti.
 --- The sweeps are asynchronous: this runs on the Hammerspoon main thread during
@@ -336,14 +428,12 @@ end
 --- @return boolean started True when every sweep was dispatched.
 function M.terminate_helper_processes()
 	M.reset_llm_health_status()
-	local all_started = true
+	local ApiOllama = require("modules.llm.api_ollama")
+	local ok, settled = pcall_log("owned Ollama retirement", ApiOllama.stop_owned_server)
+	local all_started = ok == true and settled == true
 	for _, sweep in ipairs({
 		{ label = "expander", pattern = "ergopti_plus_expander" },
 		{ label = "http-server", pattern = "ergopti_plus_http_server" },
-		-- The `ollama serve` wrapper is spawned through a /bin/sh pipeline, so
-		-- terminating its hs.task only reaps the shell; the server itself must be
-		-- matched here. Same shape api_ollama uses to kill a stale one at launch.
-		{ label = "ollama-serve", pattern = "[o]llama serve" },
 	}) do
 		if not start_detached_sweep(sweep.label, PKILL_BIN, { "-f", sweep.pattern }) then
 			all_started = false
@@ -388,12 +478,14 @@ end
 -- =================================
 -- =================================
 
-local function format_mod_string(m_str)
-		if type(m_str) ~= "string" then return "⌃" end
-		local dict = { ctrl="⌃", cmd="⌘", alt="⌥", shift="⇧" }
-		local res = ""
-		for p in m_str:gmatch("[^+]+") do res = res .. (dict[p] or p) end
-		return res == "" and "⌃" or res
+--- The modifiers of a navigation or validation chord as the macOS menus name
+--- them: their glyphs, then the shared key name table's names (« ⌃⇧ Ctrl +
+--- Maj »). The row used to show the glyphs alone, or the stored id itself for
+--- a modifier its own glyph list lacked.
+--- @param mods table Stored modifier ids.
+--- @return string
+local function format_mods(mods)
+		return KeyNames.modifiers_heading(mods, "macos", i18n.get)
 end
 
 
@@ -417,15 +509,14 @@ local function format_shortcut_title(action, mods, none_label, mod_label)
 		-- silently blanked the entire LLM submenu from the menubar. Treat any non-table
 		-- as "disabled" before the concat can ever run.
 		if type(mods) ~= "table" then
-				return action .. " : " .. i18n.get("common.disabled")
+				return LabelValue.compose(i18n.get, action, i18n.get("common.disabled"))
 		end
 		if not mods or mods_has_none(mods) then
-				return action .. " : " .. i18n.get("common.disabled")
+				return LabelValue.compose(i18n.get, action, i18n.get("common.disabled"))
 		elseif #mods == 0 then
-				return action .. " : " .. none_label
+				return LabelValue.compose(i18n.get, action, none_label)
 		else
-				local sym = format_mod_string(table.concat(mods, "+"))
-				return action .. " : " .. sym .. " " .. mod_label
+				return LabelValue.compose(i18n.get, action, format_mods(mods) .. " + " .. mod_label)
 		end
 end
 
@@ -843,6 +934,8 @@ local function create_menu(deps)
 		local apply_llm_profile_shortcut   = trigger_orch.apply_llm_profile_shortcut
 
 		deps.apply_llm_profile_shortcut = apply_llm_profile_shortcut
+		-- The profile submenu changes the per-application overrides through the same transaction as every other AI setting
+		deps.apply_setting_transaction = settings_mgr.apply_setting_transaction
 
 		local profiles_ok, profiles_result = xpcall(
 			Profiles.new, debug.traceback, deps, models_mgr)
@@ -867,7 +960,31 @@ local function create_menu(deps)
 		-- ===== 2.4) Lifecycle & Main Build =======
 		-- =========================================
 
-		local check_startup, startup_scope_idle
+		local check_startup, startup_scope_idle, startup_runtime
+
+		--- Arms what the AI runs at the switch-on and disarms it at the switch-off:
+		--- the profile hotkeys and the download reattachment an off boot left
+		--- waiting. A refused hotkey is logged and leaves the switch committed, as
+		--- on Windows, where a refused AI hotkey leaves the driver running.
+		--- @param enabled boolean The committed switch position.
+		local function sync_ai_runtime(enabled)
+				local phase = enabled == true and "armed at the switch-on" or "disarmed at the switch-off"
+				local shortcuts_fn = enabled == true and trigger_orch.arm_shortcuts or trigger_orch.disarm_shortcuts
+				local shortcuts_ok, shortcuts_settled = pcall_log("AI profile shortcuts " .. phase, shortcuts_fn)
+				local startup_ok, startup_settled = false, false
+				if type(startup_runtime) == "table" then
+						local startup_fn = enabled == true and startup_runtime.arm or startup_runtime.disarm
+						startup_ok, startup_settled = pcall_log("AI startup runtime " .. phase, startup_fn)
+				else
+						Logger.error(LOG, "AI startup runtime cannot be %s: no startup owner.", phase)
+				end
+				if shortcuts_ok == true and shortcuts_settled == true
+					and startup_ok == true and startup_settled == true then
+						Logger.info(LOG, "AI runtime %s.", phase)
+				else
+						Logger.error(LOG, "AI runtime only partly %s.", phase)
+				end
+		end
 		local activation_generation = 0
 		local enable_probe = OllamaEnableProbe.new()
 		local repair_pending = false
@@ -941,7 +1058,7 @@ local function create_menu(deps)
 						actions = {
 								-- Switching to a server that answers is the user's confirmed choice
 								use_server = function(id, model)
-										return LocalServerPanel.use_server(id, model, function(selected)
+										return ModelSelectorPage.use_local_server(id, model, function(selected)
 												if selected then enable_ai(nil) end
 										end)
 								end,
@@ -971,12 +1088,11 @@ local function create_menu(deps)
 				local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 				local is_disabled = (not state.llm_enabled) or paused
 				Logger.debug(LOG, string.format("Menu state: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled)))
-				-- Rows are collected under the id the manifest declares them with, and
-				-- the SHARED renderer places them. The order was the one thing the
-				-- shared spec always claimed to own and only Windows honoured: this
-				-- menu inserted its rows as it built them, so the model row sat ninth
-				-- here and second there, from one description.
-				local rows_by_id = {}
+				-- Rows are supplied as DATA under the `list` id the manifest declares
+				-- them with, and the SHARED renderer places and draws them. The order
+				-- was the one thing the shared spec always claimed to own and only
+				-- Windows honoured: this menu inserted its rows as it built them, so
+				-- the model row sat ninth here and second there, from one description.
 				local group_builders = {}
 				local list_providers = {}
 				local function child_group_for(id, children, disabled)
@@ -986,77 +1102,42 @@ local function create_menu(deps)
 								return { items = rows, disabled = disabled }
 						end
 				end
-				local function row_for(id, row)
-						local bucket = rows_by_id[id]
-						if not bucket then
-								bucket = {}
-								rows_by_id[id] = bucket
+				-- The AI submenus that write config.toml name the same cause as the
+				-- manifest rows when the file refuses writes, and recheck it on a click.
+				local function config_reason()
+						return ConfigGuard.reason_key(require("ui.menu.menu_paths").get("ConfigTomlPath"),
+								require("config_migrate"))
+				end
+				local blocked_reason = config_reason()
+				--- Builds one native parent over a submenu that writes config.toml.
+				--- @param id string Manifest row id, for the renderer's warnings.
+				--- @param title string Parent caption.
+				--- @param menu table Native submenu, kept by identity.
+				--- @param disabled boolean|nil Greying unrelated to the file.
+				--- @return table|nil row
+				local function config_parent(id, title, menu, disabled)
+						ConfigGuard.protect(menu, config_reason)
+						-- The renderer materialises the parent in both states, so an
+						-- enabled parent is not a row this driver builds by hand.
+						local native = ManifestMenu.render_rows({ {
+								label = title, disabled = disabled or blocked_reason ~= nil or nil,
+								disabled_reason_key = blocked_reason, submenu = menu,
+						} }, id)
+						if #native ~= 1 or not rawequal(native[1].menu, menu) then
+								Logger.error(LOG, "Greyed AI parent '%s' handoff refused.", id)
+								return nil
 						end
-						bucket[#bucket + 1] = row
+						return native[1]
 				end
 
 
-				local backend_title, backend_menu = BackendPanel.build({
-						state                = state,
-						keymap               = keymap,
-						paused               = paused,
-						models_mgr           = models_mgr,
-						get_display_model_name = get_display_model_name,
-						switch_model         = switch_model,
-						disable_model        = disable_model,
-						save_prefs           = save_prefs,
-						update_menu          = update_menu,
-						WarmupCtrl           = WarmupCtrl,
-						-- So the API-backend switch can clear a stale MLX/Ollama health
-						-- reading instead of leaking it into the API backend's status
-						-- dot display (F-LOW-6).
-						reset_llm_health_status = M.reset_llm_health_status,
-						-- The local OpenAI-compatible servers that answer, below the API row
-						local_server_rows = function(activate_api)
-								return LocalServerPanel.rows({
-										state = state, paused = paused, keymap = keymap, update_menu = update_menu,
-										WarmupCtrl = WarmupCtrl, activate_api = activate_api,
-								})
-						end,
-				})
-
-				row_for("llm_backend", {
-						title    = backend_title,
-						disabled = MenuLayout.row_disabled("llm_backend", is_disabled, paused),
-						menu     = backend_menu
-				})
-
-				-- API entries CRUD — delegates entirely to ApiPanel.
-				do
-						local api_title, api_menu = ApiPanel.build({
-								state       = state,
-								paused      = paused,
-								is_paused   = deps.script_control and deps.script_control.is_paused,
-								keymap      = keymap,
-								update_menu = update_menu,
-								WarmupCtrl  = WarmupCtrl,
-						})
-						if api_title and api_menu then
-								-- Anchored to the backend row: it configures the backend the row
-								-- above selects, and the manifest declares no row of its own for
-								-- it because Windows has no API-entry CRUD to declare.
-								row_for("llm_backend", {
-										title    = api_title,
-										disabled = paused or nil,
-										menu     = api_menu,
-								})
-						end
-				end
+				-- The Backend chooser, the API entries and the local servers moved to
+				-- the model selector page with the model list (maintainer, 2026-10-27):
+				-- the page collects the panels' actions when it opens, the menu builds
+				-- none of them.
 				local active_display_model = get_display_model_name(state.llm_model)
 				local info = models_mgr.get_model_info(active_display_model) or {}
-				local ram = models_mgr.get_model_ram(active_display_model) or 0
-				local type_str = " [" .. i18n.get((info.type == "completion")
-						and "menu.llm.model_type_completion"
-						or  "menu.llm.model_type_chat") .. "]"
-				local params_ram_str = (info.params and info.params > 0)
-						and string.format(" (%gB params, ~%d Go RAM)", info.params, math.ceil(ram))
-						or string.format(" (~%d Go RAM)", math.ceil(ram))
-				
+
 				-- Trigger a fresh async probe on every menu open so the indicator stays accurate.
 				-- The result arrives after the menu is shown; the next open will display it.
 				-- Pass a guarded callback that only calls update_menu when _llm_health_status
@@ -1082,13 +1163,14 @@ local function create_menu(deps)
 				--      never shown as an eternal "still loading" spinner.
 				-- is_backend_ready() is synchronous and reflects the warmup state accurately
 				-- even on the first menu open after a model swap.
-				local health_dot
-				-- Which row carries the dot is the manifest's call, not this file's:
-				-- the same declaration drives the Windows renderer, so the two cannot
-				-- end up dotting different rows.
-				if not MenuLayout.has_health_dot("llm_model") or not state.llm_enabled or paused then
-						health_dot = ""
-				else
+				-- The dot sits on the AI title, from the glyphs the manifest's top-level
+				-- ``llm`` entry declares for every driver (maintainer, 2026-10-29).
+				local function read_health_status()
+						local live_paused = paused
+						if deps.script_control and type(deps.script_control.is_paused) == "function" then
+								live_paused = deps.script_control.is_paused() == true
+						end
+						if not state.llm_enabled or live_paused then return nil end
 						local backend_ready = false
 						if type(llm_mod.is_backend_ready) == "function" then
 								local ok, ready = pcall(llm_mod.is_backend_ready)
@@ -1102,145 +1184,90 @@ local function create_menu(deps)
 								local ok, failed = pcall(llm_mod.is_backend_load_failed)
 								load_failed = ok and failed == true
 						end
-						if backend_ready then
-								health_dot = "🟢 "
-						elseif load_failed then
-								health_dot = "🔴 "
-						elseif _llm_health_status == true then
-								health_dot = "🟡 "
-						else
-								health_dot = "🔴 "
-						end
+						if backend_ready then return "ready" end
+						if load_failed then return "unreachable" end
+						if _llm_health_status == true then return "warming" end
+						return "unreachable"
+				end
+				local health_status = read_health_status()
+				if type(update_menu) == "function" then
+						watch_health(health_status, read_health_status, update_menu)
 				end
 
-				-- The row's label is the manifest's own key (menu.llm.model_label), the
-				-- one Windows and Linux draw too: one wording in every driver.
-				local model_text
+				-- One button replaces the model list (maintainer, 2026-10-27): the
+				-- backend's emoji, then the model it runs; the page it opens is where
+				-- the model is chosen. Building no list keeps the rebuild cheap.
+				local api_entry_name = nil
 				if state.llm_backend == "api" then
-						-- The local llm_model slot is stale on this backend: show the
-						-- active API entry's automatic name instead, without
-						-- local-model badges.
-						local entry_name = nil
-						if type(ApiPanel.active_entry_display_name) == "function" then
-							entry_name = ApiPanel.active_entry_display_name()
-						end
-						model_text = entry_name or i18n.get("menu.llm.no_model_none")
-				elseif not state.llm_model or state.llm_model == "" then
-						model_text = i18n.get("menu.llm.no_model_none")
-				else
-						model_text = string.format("%s%s%s", active_display_model, type_str, params_ram_str)
+						api_entry_name = ApiPanel.active_entry_caption_text()
 				end
-				local rich_model_title = health_dot .. string.format(i18n.get("menu.llm.model_label"), model_text)
+				local rich_model_title = ModelSelectorPage.caption(state, active_display_model, api_entry_name)
 
-				local model_submenu
-				if state.llm_backend == "api" then
-						model_submenu = ApiPanel.build_model_picker({
-								state       = state,
-								paused      = paused,
-								keymap      = keymap,
-								update_menu = update_menu,
-								WarmupCtrl  = WarmupCtrl,
-						})
-				else
-						model_submenu = ModelsSelector.build({
-								state         = state,
-								models_mgr    = models_mgr,
-								switch_model  = switch_model,
-								disable_model = disable_model,
-								save_prefs    = save_prefs,
-								update_menu   = update_menu,
-								DEFAULT_STATE = M.DEFAULT_STATE,
-								paused        = paused,   -- gate model rows while paused (M-16)
-								is_paused     = deps.script_control and deps.script_control.is_paused,
-						})
-
-						-- The selector owns provider DATA. Complete that child once before
-						-- appending this owner's already-rendered native port controls.
-						local native_model_submenu = ManifestMenu.render_rows(model_submenu, "llm_model")
-
-						-- MLX server port — Ergopti's own server, so let the user move it off
-						-- the default if it collides with another local server they run. Changing
-						-- it persists (api_mlx → hs.settings), then relaunches the server on the
-						-- new port for the current model so the change takes effect immediately.
-						local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
-						if ok_api and type(ApiMlx.get_port) == "function" then
-								-- Row DATA appended to the selector's finished tree: the rows
-								-- above it are ModelsSelector's, these three are this file's,
-								-- and the renderer materialises this file's.
-								local port_rows = ManifestMenu.template_rows("llm_mlx_port_frame", {
-									["llm_mlx_port"] = function()
-										return settings_mgr.set_mlx_port(restart_mlx_for_current_port)
-									end,
-									["llm_mlx_port_reset"] = function()
-										return settings_mgr.reset_mlx_port(restart_mlx_for_current_port)
-									end,
-								}, {
-									llm_mlx_port_caption = function() return tostring(ApiMlx.get_port()) end,
-									llm_mlx_port_reset_caption = function() return tostring(ApiMlx.get_default_port()) end,
-									llm_mlx_port_reset_present = function()
-										return type(ApiMlx.get_default_port) == "function" and ApiMlx.get_port() ~= ApiMlx.get_default_port()
-									end,
-									llm_mlx_port_ready = function() return not paused end,
-								}, {})
-								if not port_rows then return {} end
-								-- Use the actual terminal row DATA as context without rebuilding completed
-								-- catalogue trees. The original row object remains in the selector data.
-								local tail = model_submenu[#model_submenu]
-								if tail ~= nil and (type(tail) ~= "table" or getmetatable(tail) ~= nil
-										or (rawget(tail, "separator") ~= true
-											and (type(rawget(tail, "label")) ~= "string" or rawget(tail, "label") == ""))) then return {} end
-								local context = tail and { tail } or {}
-								for _, row in ipairs(port_rows) do context[#context + 1] = row end
-								local rendered = ManifestMenu.render_rows(context, "llm_model")
-								local first_new = tail and tail.separator ~= true and 2 or 1
-								if first_new == 2 and (rendered[1] == nil
-										or rendered[1].title ~= tail.label
-										or not rawequal(rendered[1].fn,
-											(type(tail.items) ~= "table" and type(tail.submenu) ~= "table") and tail.action or nil)
-										or not rawequal(rendered[1].image, tail.image)) then return {} end
-								for index = first_new, #rendered do
-										table.insert(native_model_submenu, rendered[index])
-								end
-						end
-						model_submenu = native_model_submenu
-				end
-
-				row_for("llm_model", {
-						title    = rich_model_title,
-						disabled = MenuLayout.row_disabled("llm_model", is_disabled, paused),
-						menu     = model_submenu,
+				ModelSelectorPage.bind({
+						state                   = state,
+						keymap                  = keymap,
+						models_mgr              = models_mgr,
+						settings_mgr            = settings_mgr,
+						WarmupCtrl              = WarmupCtrl,
+						DEFAULT_STATE           = M.DEFAULT_STATE,
+						switch_model            = switch_model,
+						disable_model           = disable_model,
+						save_prefs              = save_prefs,
+						update_menu             = update_menu,
+						get_display_model_name  = get_display_model_name,
+						reset_llm_health_status = M.reset_llm_health_status,
+						restart_mlx_for_current_port = restart_mlx_for_current_port,
+						-- Every page action writes config.toml: the page names the same cause.
+						config_reason           = config_reason,
+						-- Only MLX downloads from Hugging Face; the token lives in its CLI's file.
+						hf_token_set            = function()
+								local fh = io.open((os.getenv("HOME") or "") .. "/.huggingface/token", "r")
+								if not fh then return false end
+								local raw = fh:read("*a")
+								fh:close()
+								return type(raw) == "string" and TextUtils.trim(raw) ~= ""
+						end,
+						-- The local server rows keep the native pause port itself, as the
+						-- tray handed it to them before the page.
+						native_is_paused        = deps.script_control and deps.script_control.is_paused,
+						is_paused               = function()
+								local control = deps.script_control
+								if not control or type(control.is_paused) ~= "function" then return paused end
+								local ok, live = xpcall(control.is_paused, debug.traceback)
+								return not ok or live ~= false
+						end,
 				})
+				-- An open page follows the state this rebuild publishes.
+				ModelSelectorPage.refresh()
+				local model_rows = { {
+						label    = rich_model_title,
+						disabled = MenuLayout.row_disabled("llm_model", is_disabled, paused),
+						action   = function() return ModelSelectorPage.open() end,
+				} }
 
 				-- Anchored to the model row it describes. It used to be inserted BEFORE
 				-- that row, because the row itself was placed further down.
 				if info and info.emojis and info.emojis:find("🧠💭") then
 						local info_rows = ManifestMenu.template_rows("llm_thinking_info", {}, {}, {})
 						if not info_rows then return {} end
-						for _, row in ipairs(ManifestMenu.render_rows(info_rows, "llm_model")) do row_for("llm_model", row) end
+						for _, row in ipairs(info_rows) do model_rows[#model_rows + 1] = row end
 				end
-
-				local model_boundary_rows = ManifestMenu.template_rows("llm_after_model_boundary", {}, {}, {})
-				if not model_boundary_rows then return {} end
-				list_providers.llm_after_model_boundary = function() return model_boundary_rows end
+				list_providers.llm_model = function() return model_rows end
 
 
 				local profiles_item = profiles_mgr.get_menu_item()
 				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)
 				-- The profile owner returns a DATA caption over completed native children.
-				-- Materialize only that parent; keep its existing child tree by identity.
-				local native_profile = ManifestMenu.render_rows({ {
+				-- The renderer materializes only that parent; `submenu` keeps the
+				-- existing child tree by identity.
+				ConfigGuard.protect(profiles_item.menu, config_reason)
+				local profile_rows = { {
 					label = profiles_item.label,
-					disabled = profiles_item.disabled,
+					disabled = profiles_item.disabled or blocked_reason ~= nil or nil,
+					disabled_reason_key = blocked_reason,
 					submenu = profiles_item.menu,
-				} }, "llm_profile")
-				if #native_profile ~= 1 or not rawequal(native_profile[1].menu, profiles_item.menu) then
-					Logger.error(LOG, "Profile parent native handoff refused.")
-					return {}
-				end
-				row_for("llm_profile", native_profile[1])
-				local profile_boundary_rows = ManifestMenu.template_rows("llm_after_profile_boundary", {}, {}, {})
-				if not profile_boundary_rows then return {} end
-				list_providers.llm_after_profile_boundary = function() return profile_boundary_rows end
+				} }
+				list_providers.llm_profile = function() return profile_rows end
 
 
 
@@ -1277,7 +1304,7 @@ local function create_menu(deps)
 				for _, row in ipairs(count_rows) do generation_rows[#generation_rows + 1] = row end
 				if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
 					local reset_rows = ManifestMenu.template_rows("llm_generation_count_reset_control", {
-						["llm_generation_count_reset"] = function()
+						[require("config_keys").COMMAND.LLM_GENERATION_COUNT_RESET] = function()
 										return settings_mgr.apply_setting_transaction({
 												key = "llm_num_predictions",
 												value = llm_mod.DEFAULT_STATE.llm_num_predictions,
@@ -1292,9 +1319,6 @@ local function create_menu(deps)
 					if not reset_rows then return {} end
 					for _, row in ipairs(reset_rows) do generation_rows[#generation_rows + 1] = row end
 				end
-				local count_boundary_rows = ManifestMenu.template_rows("llm_generation_count_boundary", {}, {}, {})
-				if not count_boundary_rows then return {} end
-				for _, row in ipairs(count_boundary_rows) do generation_rows[#generation_rows + 1] = row end
 
 				local mw_min = tonumber(state.llm_min_words)
 				local min_words_display = (mw_min and mw_min > 0) and tostring(mw_min) or "1"
@@ -1302,22 +1326,23 @@ local function create_menu(deps)
 				local max_words_display = (mw_max and mw_max > 0) and tostring(mw_max) or i18n.get("menu.llm.unlimited")
 				local default_max_display = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0)
 					and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")
-				local native_generation_rows = ManifestMenu.template_rows("llm_generation_native_controls", {
-					["llm_generation_context"] = settings_mgr.set_context_length,
-					["llm_generation_context_reset"] = settings_mgr.reset_context_length,
-					["llm_generation_min_words"] = settings_mgr.set_min_words,
-					["llm_generation_min_words_reset"] = settings_mgr.reset_min_words,
-					["llm_generation_max_words"] = settings_mgr.set_max_words,
-					["llm_generation_max_words_reset"] = settings_mgr.reset_max_words,
-					["llm_reset_on_nav"] = function()
+				local generation_commands = {
+					[require("config_keys").COMMAND.LLM_GENERATION_CONTEXT] = settings_mgr.set_context_length,
+					[require("config_keys").COMMAND.LLM_GENERATION_CONTEXT_RESET] = settings_mgr.reset_context_length,
+					[require("config_keys").COMMAND.LLM_GENERATION_MIN_WORDS] = settings_mgr.set_min_words,
+					[require("config_keys").COMMAND.LLM_GENERATION_MIN_WORDS_RESET] = settings_mgr.reset_min_words,
+					[require("config_keys").COMMAND.LLM_GENERATION_MAX_WORDS] = settings_mgr.set_max_words,
+					[require("config_keys").COMMAND.LLM_GENERATION_MAX_WORDS_RESET] = settings_mgr.reset_max_words,
+					[require("config_keys").COMMAND.LLM_RESET_ON_NAV] = function()
 						return settings_mgr.apply_setting_transaction({
-							key = "llm_reset_on_nav",
+							key = require("config_keys").COMMAND.LLM_RESET_ON_NAV,
 							value = not state.llm_reset_on_nav,
 							runtime_fn = "set_llm_reset_on_nav",
 							publish_setting = false,
 						})
 					end,
-				}, {
+				}
+				local generation_getters = {
 					llm_generation_ready = function() return not is_disabled end,
 					llm_generation_context_caption = function() return tostring(state.llm_context_length) end,
 					llm_generation_context_reset_caption = function() return tostring(llm_mod.DEFAULT_STATE.llm_context_length) end,
@@ -1329,9 +1354,12 @@ local function create_menu(deps)
 					llm_generation_max_words_caption = function() return max_words_display end,
 					llm_generation_max_words_reset_caption = function() return default_max_display end,
 					llm_generation_max_words_reset_present = function() return state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words end,
-				}, {})
-				if not native_generation_rows then return {} end
-				for _, row in ipairs(native_generation_rows) do generation_rows[#generation_rows + 1] = row end
+				}
+				local word_rows = ManifestMenu.template_rows("llm_generation_word_controls", generation_commands, generation_getters, {})
+				if not word_rows then return {} end
+				for _, row in ipairs(word_rows) do generation_rows[#generation_rows + 1] = row end
+				local context_rows = ManifestMenu.template_rows("llm_generation_context_controls", generation_commands, generation_getters, {})
+				if not context_rows then return {} end
 
 				local generation_ctx = TempPanel.build({
 						state        = state,
@@ -1345,6 +1373,7 @@ local function create_menu(deps)
 				if not generation_ctx then return {} end
 				child_group_for("llm_generation_settings", ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
 					["llm_generation_values"] = function() return generation_rows end,
+					["llm_generation_context_values"] = function() return context_rows end,
 				}), MenuLayout.row_disabled("llm_generation_settings", is_disabled, paused))
 
 
@@ -1413,18 +1442,26 @@ local function create_menu(deps)
 				-- exists, the switch cannot run its transaction: the row is greyed
 				-- through the declared `llm_toggle_ready` key and a click is refused
 				-- with a log line, rather than the row vanishing from the submenu.
+				local function configuration_writable()
+					local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
+					return type(path) == "string" and path ~= ""
+						and require("config_migrate").read_only_reason(path) == nil
+				end
 				local toggle_ready = not paused
+					and configuration_writable()
 					and activation_requirement_owner ~= nil
 					and type(models_mgr.pause_requirements) == "function"
 					and activation_controller.is_registered()
 				local function refuse_toggle()
 						Logger.warn(LOG, "IA switch refused: %s.", paused and "the script is paused"
+							or not configuration_writable() and "the configuration is protected from writes"
 							or "the activation owner is not ready")
 						return false
 				end
 				--- Runs one switch transaction.
 				--- @param opts table|nil Explicit service repair intent from the error's buttons.
 				local function run_toggle(opts)
+						if not configuration_writable() then return refuse_toggle() end
 						if repair_pending then return false end
 						local install_consented = type(opts) == "table" and opts.install_ollama == true
 						activation_generation = activation_generation + 1
@@ -1489,6 +1526,7 @@ local function create_menu(deps)
 										return false
 								end
 								if enabled ~= true then M.reset_llm_health_status() end
+								sync_ai_runtime(enabled)
 								return true
 						end
 
@@ -1922,36 +1960,43 @@ local function create_menu(deps)
 				do
 						local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 						if ok_mm and type(ManifestMenu.build) == "function" then
-								local handlers = {}
-								for _, id in ipairs(MenuLayout.row_ids()) do
-										handlers[id] = function(items)
-												local bucket = rows_by_id[id] or {}
-												-- A declared row nothing filled would render as nothing at
-												-- all, and the renderer would count it as handled — the one
-												-- failure the bijection gate cannot see from outside.
-												if #bucket == 0 then
-														Logger.warn(LOG, "Declared row '%s' has no content — nothing to place.", id)
-												end
-												for _, row in ipairs(bucket) do
-														items[#items + 1] = row
-												end
-										end
-								end
 								-- The restore alone: the AI menu's clear row was retired.
 								local render_ctx = {
 										commands      = {
 											llm_toggle = toggle_action,
-											["scope_restore"] = function()
-												if paused or type(deps.apply_preference_scope) ~= "function" then return false end
+											[require("config_keys").COMMAND.LLM_TEST_PREDICTION] = function()
+												if not keymap or type(keymap.test_prediction) ~= "function" then
+													Logger.error(LOG, "Test prediction refused: the keymap is unavailable.")
+													return false
+												end
+												return keymap.test_prediction()
+											end,
+											[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
+												-- A retained row rechecks what greyed it when it was built.
+												if paused or not configuration_writable() then
+													Logger.warn(LOG, "AI settings restore refused: %s.", paused and "the script is paused"
+														or "the configuration is protected from writes")
+													return false
+												end
+												if type(deps.apply_preference_scope) ~= "function" then return false end
 												return deps.apply_preference_scope("llm", "recommended") == true
 											end,
 										},
 										state_getters = {
 												llm_enabled      = function() return state.llm_enabled == true end,
-												llm_toggle_ready = function() return toggle_ready == true end,
+												llm_toggle_ready = function() return toggle_ready == true and configuration_writable() end,
+												llm_scope_ready  = function() return not paused and configuration_writable() end,
+												config_newer_schema = function()
+													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
+													return require("config_migrate").read_only_status(path) == "newer"
+												end,
+												config_older_schema = function()
+													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
+													return require("config_migrate").read_only_status(path) == "unsupported"
+												end,
 										},
 								}
-								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}
+								main_menu = ManifestMenu.build("llm_menu", "LLM", nil, group_builders, render_ctx, list_providers) or {}
 						else
 								Logger.error(LOG, "Manifest renderer unavailable — the IA submenu has no settings row.")
 						end
@@ -1959,12 +2004,17 @@ local function create_menu(deps)
 
 				-- The tick mirrors the switch; the parent has no action, since a row
 				-- that opens a submenu is never clicked.
-				return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {
+				local parent_row = ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {
 					llm_parent_enabled = function() return state.llm_enabled or nil end,
 				})
+				local title_dot = health_status and MenuLayout.title_health_dot(health_status) or nil
+				if type(parent_row) == "table" and type(parent_row.label) == "string" and title_dot then
+						parent_row.label = parent_row.label .. " " .. title_dot
+				end
+				return parent_row
 		end
 
-		check_startup, startup_scope_idle = StartupCtrl.new({
+		check_startup, startup_scope_idle, startup_runtime = StartupCtrl.new({
 				state                      = state,
 				keymap                     = keymap,
 				models_mgr                 = models_mgr,
@@ -1982,6 +2032,7 @@ local function create_menu(deps)
 				get_startup_silence        = get_startup_silence,
 				set_startup_silence        = set_startup_silence,
 				get_profile_hks            = get_profile_hks,
+				disarm_shortcuts           = trigger_orch.disarm_shortcuts,
 		})
 
 		--- Returns a menu item for the active download progress shortcut, or nil if no download is running.
@@ -1994,8 +2045,55 @@ local function create_menu(deps)
 				)
 				if not is_active then return nil end
 				local _dw = package.loaded["ui.download_window"]
-				local rows = ManifestMenu.template_rows("llm_download_shortcut_frame", {
-					["llm_download_shortcut"] = function()
+				local renderer = rawget(package.loaded, "infra.manifest_menu")
+				if type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end
+				local template_owner, render_owner = rawget(renderer, "template_rows"), rawget(renderer, "render_rows")
+				local root_owner, array_owner = rawget(renderer, "get_root"), rawget(renderer, "get_array")
+				if type(template_owner) ~= "function" or type(render_owner) ~= "function"
+					or type(root_owner) ~= "function" or type(array_owner) ~= "function" then return nil end
+				local function renderer_live()
+					return rawequal(rawget(package.loaded, "infra.manifest_menu"), renderer)
+						and getmetatable(renderer) == nil
+						and rawequal(rawget(renderer, "template_rows"), template_owner)
+						and rawequal(rawget(renderer, "render_rows"), render_owner)
+						and rawequal(rawget(renderer, "get_root"), root_owner)
+						and rawequal(rawget(renderer, "get_array"), array_owner)
+				end
+				local root = root_owner()
+				local source = array_owner("llm_download_shortcut_frame")
+				if not renderer_live() or type(root) ~= "table" or getmetatable(root) ~= nil
+					or type(source) ~= "table" or getmetatable(source) ~= nil
+					or not rawequal(rawget(root, "llm_download_shortcut_frame"), source)
+					or next(source) ~= 1 or next(source, 1) ~= nil then return nil end
+				local declaration = rawget(source, 1)
+				if type(declaration) ~= "table" or getmetatable(declaration) ~= nil then return nil end
+				local fields, platforms, platform_fields = {}, rawget(declaration, "platforms"), {}
+				if type(platforms) ~= "table" or getmetatable(platforms) ~= nil then return nil end
+				for field, value in next, declaration do
+					if type(field) ~= "string" or (field ~= "platforms" and type(value) ~= "string"
+						and type(value) ~= "boolean" and type(value) ~= "number") then return nil end
+					fields[field] = value
+				end
+				for field, value in next, platforms do
+					if type(value) ~= "string" then return nil end
+					platform_fields[field] = value
+				end
+				local function source_live()
+					if not renderer_live() then return false end
+					local current_root, current_source = root_owner(), array_owner("llm_download_shortcut_frame")
+					if not renderer_live() or not rawequal(current_root, root) or not rawequal(current_source, source)
+						or getmetatable(root) ~= nil or getmetatable(source) ~= nil or getmetatable(declaration) ~= nil
+						or not rawequal(rawget(root, "llm_download_shortcut_frame"), source)
+						or not rawequal(rawget(source, 1), declaration) or next(source) ~= 1 or next(source, 1) ~= nil
+						or getmetatable(platforms) ~= nil then return false end
+					for field, value in next, fields do if not rawequal(rawget(declaration, field), value) then return false end end
+					for field in next, declaration do if rawget(fields, field) == nil then return false end end
+					for field, value in next, platform_fields do if rawget(platforms, field) ~= value then return false end end
+					for field in next, platforms do if rawget(platform_fields, field) == nil then return false end end
+					return true
+				end
+				local rows = template_owner("llm_download_shortcut_frame", {
+					[require("config_keys").COMMAND.LLM_DOWNLOAD_SHORTCUT] = function()
 								if _dw and type(_dw.focus) == "function" then
 										pcall(_dw.focus)
 								elseif _dw and type(_dw.is_active) == "function" and not _dw.is_active() then
@@ -2004,9 +2102,22 @@ local function create_menu(deps)
 								end
 						end,
 				}, {}, {})
-				if type(rows) ~= "table" or #rows ~= 1 or type(rows[1].action) ~= "function" then return nil end
-				local row = rows[1]
-				return { title = row.label, fn = row.action }
+				if not source_live() or type(rows) ~= "table" or getmetatable(rows) ~= nil
+					or next(rows) ~= 1 or next(rows, 1) ~= nil then return nil end
+				local row = rawget(rows, 1)
+				if type(row) ~= "table" or getmetatable(row) ~= nil or type(rawget(row, "action")) ~= "function"
+					or type(rawget(row, "label")) ~= "string" or rawget(row, "label") == "" then return nil end
+				local action, label, disabled = rawget(row, "action"), rawget(row, "label"), rawget(row, "disabled")
+				local rendered = render_owner(rows, "llm_download_shortcut_frame")
+				if not source_live() or type(rendered) ~= "table" or getmetatable(rendered) ~= nil
+					or next(rendered) ~= 1 or next(rendered, 1) ~= nil then return nil end
+				local item = rawget(rendered, 1)
+				if type(item) ~= "table" or getmetatable(item) ~= nil or rawget(item, "title") ~= label
+					or not rawequal(rawget(item, "fn"), action) or rawget(item, "disabled") ~= (disabled or nil) then return nil end
+				for field in next, item do
+					if field ~= "title" and field ~= "fn" and field ~= "disabled" then return nil end
+				end
+				return item
 		end
 
 		local scope_runtime = require("ui.menu.menu_llm.scope_runtime").new({
@@ -2031,11 +2142,11 @@ local function create_menu(deps)
 		-- The local models the agent and the screen reading name are
 		-- downloaded by this menu's models manager, in its download window;
 		-- a completed download changes what the AI agent menu shows.
-		require("modules.llm.local_model_offer").set_installer(function(model, on_done)
+		require("modules.llm.local_model_offer").set_installer(function(model, on_done, is_current)
 				return models_mgr.pull_ollama_model(model, function()
 						on_done(true)
 						if type(update_menu) == "function" then pcall_log("update_menu(local model pulled)", update_menu) end
-				end, function(reason) on_done(false, reason) end)
+				end, function(reason) on_done(false, reason) end, { is_current = is_current })
 		end)
 		-- A repaired MLX runtime restarts the model it could not load, as
 		-- selecting that model does; the repair offer owns the button.
@@ -2050,6 +2161,14 @@ local function create_menu(deps)
 		end)
 		-- The llm_agent_auto_toggle action persists the mode it switches to
 		-- through the same transaction as the menu.
+		-- The open_model_browser toggle opens the model selector page. It is
+		-- registered at creation so the shortcut works before the AI menu was
+		-- ever opened: the first open builds the AI item once, which binds the
+		-- page to this session's context.
+		require("ui.window_toggle").set_opener("model_browser", function()
+				if not ModelSelectorPage.is_bound() then build_item() end
+				return ModelSelectorPage.open()
+		end)
 		require("modules.llm.agent_runner").set_mode_persister(function(mode)
 				return settings_mgr.apply_setting_transaction({
 						key = "llm_agent_mode", value = mode, runtime_fn = "set_llm_agent_mode", publish_setting = false,

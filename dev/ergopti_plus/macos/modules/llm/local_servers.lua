@@ -24,6 +24,10 @@
 ---    fix; a success or a sweep that finds the server up clears it.
 --- 5. An address or a key typed before any model is chosen waits here, for
 ---    this session, until the chosen model creates the server's API entry.
+--- 6. Where a server listens comes from its running process, its settings file
+---    or its listening ports (llm.local_server_ports), before its catalogue
+---    port: a server is probed only while its process runs. The last scan is
+---    kept here, with the source of each port, for the menu and the log.
 --- ==============================================================================
 
 local M = {}
@@ -35,6 +39,8 @@ local JsonCodec      = require("adapters.json_codec")
 local AuthPolicy     = require("llm.local_server_auth")
 local Json           = require("json")
 local Discovery      = require("llm.local_server_discovery")
+local PortPolicy     = require("llm.local_server_ports")
+local Fingerprint    = require("llm.local_server_fingerprint")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "llm.local_servers"
@@ -53,6 +59,7 @@ local LOG = "llm.local_servers"
 M.STATUS_UP        = Discovery.STATUS_UP          -- the models endpoint listed the models
 M.STATUS_NEEDS_KEY = Discovery.STATUS_NEEDS_KEY   -- the server answered 401 or 403
 M.STATUS_DOWN      = Discovery.STATUS_DOWN        -- nothing, or something else, answered
+M.STATUS_UNAVAILABLE = Discovery.STATUS_UNAVAILABLE -- native probe infrastructure refused acquisition
 
 -- Why a request to a local server failed
 M.FAILURE_NOT_RUNNING   = "not_running"
@@ -75,6 +82,11 @@ M.FAILURE_MODEL_MISSING = "model_missing"
 --- @return table order Server ids in menu order.
 --- @return table servers Server id -> { id, label, base_url }.
 --- @return boolean published Complete same-source local inventory.
+--- @return table discovery Server id -> validated discovery descriptor.
+--- @return table request_fields Body fields of every request to a local server.
+--- @return table dialect The reasoning controls of every request to a local server.
+--- @return table identities Server id -> the address group and fingerprint of a
+---         row whose default address another row shares (llm.local_server_fingerprint).
 local function load_catalogue()
 	local path = Paths.shared_llm_path("local_servers.json")
 	local raw, status = nil, "error"
@@ -82,12 +94,12 @@ local function load_catalogue()
 	if status ~= "ok" or type(raw) ~= "string" then
 		Logger.error(LOG, "local_servers.json is unreadable at %s (%s): no local server is detected.",
 			tostring(path), tostring(status))
-		return {}, {}, false
+		return {}, {}, false, {}, {}, {}, {}
 	end
 	local ok, root = pcall(JsonCodec.decode, raw)
 	if not ok or type(root) ~= "table" or type(root.server_order) ~= "table" or type(root.servers) ~= "table" then
 		Logger.error(LOG, "local_servers.json is malformed: no local server is detected.")
-		return {}, {}, false
+		return {}, {}, false, {}, {}, {}, {}
 	end
 	local source = Json.decode_lossless(raw)
 	local shaped = type(source) == "table" and not Json.is_array(source) and not Json.is_null(source)
@@ -97,11 +109,31 @@ local function load_catalogue()
 	if #order ~= #root.server_order then
 		Logger.error(LOG, "local_servers.json contains unsupported or duplicate optional-auth descriptors.")
 	end
-	return order, servers, shaped and #order == #source.server_order
+	-- A server without a valid discovery descriptor cannot be found running,
+	-- so it is never probed (api_remote.detect_local_servers)
+	local discovery = {}
+	for _, id in ipairs(order) do
+		local descriptor, reason = PortPolicy.descriptor(id, root.servers[id].discovery)
+		if descriptor then discovery[id] = descriptor
+		else Logger.error(LOG, "local_servers.json: %s; that server is never probed.", reason) end
+	end
+	-- The family controls a local server carries, on top of request_fields
+	local dialect, dialect_reason = require("llm.thinking_off").parse_dialect(root.thinking_dialect)
+	if not dialect then
+		Logger.error(LOG, "local_servers.json thinking_dialect is invalid (%s); only request_fields apply.", tostring(dialect_reason))
+		dialect = {}
+	end
+	-- A refused fingerprint leaves its row to its address's default row
+	local identities, refused = Fingerprint.parse(root, order)
+	for _, reason in ipairs(refused) do
+		Logger.error(LOG, "local_servers.json: %s; that row is not fingerprinted.", reason)
+	end
+	return order, servers, shaped and #order == #source.server_order, discovery, AuthPolicy.request_fields(root), dialect,
+		identities
 end
 
 local config_published
-M.ORDER, M.SERVERS, config_published = load_catalogue()
+M.ORDER, M.SERVERS, config_published, M.DISCOVERY, M.REQUEST_FIELDS, M.THINKING_DIALECT, M.IDENTITIES = load_catalogue()
 
 --- Reports admission of the original local catalogue, including a valid empty list.
 --- Runtime mutations and server reachability cannot grant inventory authority.
@@ -174,6 +206,7 @@ end
 -- This controller only owns logical generations, snapshots and publication.
 local controller = Discovery.new({
 	order = M.ORDER,
+	identities = M.IDENTITIES,
 	clock = function() return TimerScheduler.now() end,
 	max_age = function() return require("infra.timings").sec("llm", "local_server_detection_max_age_ms") end,
 	on_publish = function(results)
@@ -181,7 +214,14 @@ local controller = Discovery.new({
 		for _, id in ipairs(M.ORDER) do
 			local result = results[id]
 			if result and result.status == M.STATUS_UP then M.report_success(id) end
-			if result and result.status ~= M.STATUS_DOWN then found[#found + 1] = id .. "=" .. result.status end
+			if result and result.status ~= M.STATUS_DOWN then
+				local scan = M.port_scan(id)
+				found[#found + 1] = string.format("%s=%s at %s%s%s", id, result.status, tostring(result.base_url),
+					scan and scan.source and scan.base_url == result.base_url and (" (port from " .. scan.source .. ")") or "",
+					result.server and (" (answers as " .. result.server .. ")") or "")
+			elseif result and result.shadowed_by then
+				found[#found + 1] = string.format("%s at %s answers as %s", id, tostring(result.base_url), result.shadowed_by)
+			end
 		end
 		Logger.info(LOG, "Local servers swept: %s.", #found > 0 and table.concat(found, ", ") or "none answers")
 	end,
@@ -193,6 +233,39 @@ local controller = Discovery.new({
 		end
 	end,
 })
+
+local view_order, view_servers = M.ORDER, M.SERVERS
+local source_generation, pending_generation, pending_at_refresh = nil, 0, 0
+
+--- Captures configured view membership without changing registered providers.
+--- Native HTTP clients retain retirement ownership independently of this view.
+--- @param configured_order table
+--- @param configured_servers table Public endpoint descriptors without credentials.
+--- @param generation number Actual native entry identity generation.
+--- @return boolean changed
+function M.configure_views(configured_order, configured_servers, generation)
+	assert(type(generation) == "number", "configured view source identity is required")
+	local next_order, next_servers = {}, {}
+	for _, id in ipairs(M.ORDER) do next_order[#next_order + 1] = id; next_servers[id] = M.SERVERS[id] end
+	for _, id in ipairs(configured_order) do
+		assert(type(configured_servers[id]) == "table" and next_servers[id] == nil, "configured view membership is invalid")
+		next_order[#next_order + 1] = id
+		next_servers[id] = configured_servers[id]
+	end
+	local source_changed = source_generation ~= generation or pending_at_refresh ~= pending_generation
+	local changed = controller.set_order(next_order, source_changed)
+	view_order, view_servers = next_order, next_servers
+	source_generation, pending_at_refresh = generation, pending_generation
+	return changed
+end
+
+--- Returns the current native view order, keeping the canonical catalogue intact.
+--- @return table
+function M.view_order() return view_order end
+
+--- Returns current public view descriptors, never configured credentials.
+--- @return table
+function M.view_servers() return view_servers end
 
 --- Probes every target at once and publishes the verdicts together.
 --- Native acquisition and retirement remain the injected probe's responsibility.
@@ -217,9 +290,60 @@ function M.detected() return controller.detected() end
 --- @return boolean
 function M.is_stale() return controller.is_stale() end
 
---- Returns logical activity, never native HTTP/task retirement.
+-- Server id -> the last port scan result (llm.local_server_ports.resolve)
+local _port_scans = {}
+local _scanning = false
+
+--- Records the last port scan, before the sweep it feeds starts.
+--- @param results table Server id -> scan result.
+function M.set_port_scans(results)
+	assert(type(results) == "table", "local_servers.set_port_scans: results are required")
+	_port_scans = results
+end
+
+--- Returns where the last scan found a catalogue server.
+--- @param id string Server id.
+--- @return table|nil { running, pids, base_url, port, source, detail, api_key };
+---        nil before any scan. api_key is the server's settings-file key.
+function M.port_scan(id)
+	local result = _port_scans[id]
+	if not result then return nil end
+	local pids = {}
+	for index, pid in ipairs(result.pids or {}) do pids[index] = pid end
+	return { running = result.running, pids = pids, base_url = result.base_url, port = result.port,
+		source = result.source, detail = result.detail, api_key = result.api_key }
+end
+
+--- Returns every server's last scan, for matching a keyless request to the
+--- key its loopback server holds (llm.local_server_auth.discovered_key).
+--- @return table Server id -> M.port_scan(id).
+function M.port_scans()
+	local scans = {}
+	for id in pairs(_port_scans) do scans[id] = M.port_scan(id) end
+	return scans
+end
+
+--- The key a running loopback server's own settings file holds, for a
+--- request the user gave no key (oMLX started with auth.api_key answers 401
+--- otherwise, and was neither listed nor addable by hand). Never logged.
+--- @param provider_id string Provider id of the entry or probe.
+--- @param base_url string|nil Its configured address; "" for the scanned one.
+--- @return string key "" when no scanned server holds one.
+function M.discovered_key(provider_id, base_url)
+	return AuthPolicy.discovered_key(provider_id, base_url, M.port_scans(), M.SERVERS)
+end
+
+--- Marks the process scan that precedes a sweep as running or finished.
+--- @param active boolean
+function M.set_scanning(active)
+	assert(type(active) == "boolean", "local_servers.set_scanning: a boolean is required")
+	_scanning = active
+end
+
+--- Returns logical activity (the port scan, then the probes), never native
+--- HTTP/task retirement.
 --- @return boolean
-function M.is_sweeping() return controller.is_sweeping() end
+function M.is_sweeping() return _scanning or controller.is_sweeping() end
 
 
 
@@ -243,7 +367,10 @@ function M.set_pending(id, fields)
 	end
 	local pending = _pending[id] or {}
 	for _, key in ipairs({ "base_url", "token" }) do
-		if fields[key] ~= nil then pending[key] = fields[key] end
+		if fields[key] ~= nil and fields[key] ~= pending[key] then
+			pending[key] = fields[key]
+			pending_generation = pending_generation + 1
+		end
 	end
 	_pending[id] = pending
 end
@@ -258,6 +385,7 @@ end
 --- Forgets what waited for a server once its API entry holds it.
 --- @param id string
 function M.clear_pending(id)
+	if _pending[id] ~= nil then pending_generation = pending_generation + 1 end
 	_pending[id] = nil
 end
 

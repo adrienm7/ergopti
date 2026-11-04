@@ -10,18 +10,70 @@
 --- FEATURES & RATIONALE:
 --- 1. Per-test isolation: `load_with_stubs` resets `package.loaded` and the `hs`
 ---    global so every test starts from a clean slate.
---- 2. Zero-dependency runner: works under plain Lua 5.4 with no external libs;
+--- 2. Timed runner: works under plain Lua 5.4 with native luv.hrtime;
 ---    falls through transparently to busted when present.
 --- 3. Discoverable assertions: `assert_eq` and friends produce diff-style error
 ---    messages that point straight at the failing field.
 --- ==============================================================================
 
 local M = {}
-local CommandLines = require("tests.support.command_lines")
+
+-- A test file run on its own, without tests/run.lua, still loads these helpers
+-- first: isolating here keeps its logs and config away from the account's own
+-- ~/Library/Logs/ergopti_plus. Idempotent, the runner already isolated.
+require("test.runner_home").isolate()
+
+--- English formats of the keys a caption with several getters (caption_getters) reads.
+--- Such a caption refuses a format without its placeholders, so a stub that echoes
+--- the key (the usual one) would drop the whole row; a stub that replaces the
+--- baseline starts from these. A numbered caption (caption_format "numbered")
+--- refuses one without its {1} the same way: the keyboard groups' Add rows echo
+--- their key followed by the modifiers they are filled with.
+M.I18N_PLACEHOLDER_FORMATS = {
+	["menu.llm.server_port_label"] = "%s server port: %s",
+	["menu.shortcuts.alt_add"] = "menu.shortcuts.alt_add {1}",
+	["menu.shortcuts.ctrl_add"] = "menu.shortcuts.ctrl_add {1}",
+	["menu.shortcuts.ctrl_shift_add"] = "menu.shortcuts.ctrl_shift_add {1}",
+	["menu.shortcuts.cmd_add"] = "menu.shortcuts.cmd_add {1}",
+	["menu.shortcuts.cmd_shift_add"] = "menu.shortcuts.cmd_shift_add {1}",
+}
+
+--- The shared timing registry, built from the real file on first use. A fixture that virtualises
+--- the file system or the shared paths calls M.provide_timings() before it does, so a call-time
+--- read of the registry (`require("infra.timings").sec(...)`) answers with the real values
+--- instead of failing on a missing virtual constants.toml.
+local REAL_TIMINGS = nil
+
+--- Builds the real timing registry reader once, while the file system is real. The runner calls it
+--- before any test; M.provide_timings() builds it on demand when a suite runs without the runner.
+local function real_timings()
+	if REAL_TIMINGS == nil then
+		local silent = setmetatable({}, { __index = function() return function() end end })
+		REAL_TIMINGS = require("timings").new({
+			logger = silent, log = "timings", loaded_level = "done",
+			shared_path = function(rel) return M.shared(rel) end,
+			parse = require("infra.toml.reader").parse,
+		})
+	end
+	return REAL_TIMINGS
+end
+
+--- Reads the registry now, before a fixture replaces the file system.
+function M.warm_timings()
+	real_timings()
+end
+
+--- Installs the real timing registry reader as the module the code under test requires.
+function M.provide_timings()
+	package.loaded["infra.timings"] = real_timings()
+end
 local SourceFile = require("tests.support.source_file")
+local NativePath = require("native_path")
 
 -- Value formatting and stack-trace helpers shared with Linux (single source of truth).
 local fmt = require("test.format")
+local _timing = nil
+local _current_module = nil
 M.inspect = fmt.inspect
 M.deep_equal = fmt.deep_equal
 
@@ -68,14 +120,14 @@ end
 --- Ordered TMPDIR first for that reason. There is deliberately no `"."` fallback
 --- and no silent default: a machine with no writable scratch directory must fail
 --- loudly here rather than quietly turn the checkout into one.
---- @return string Absolute path, no trailing slash, forward slashes only.
+--- @return string Absolute native path, no trailing separator; forward slashes on Windows.
 function M.temp_dir()
 	local candidate = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP")
 		or "/tmp"
-	candidate = candidate:gsub("\\", "/"):gsub("/+$", "")
+	if package.config:sub(1, 1) == "\\" then candidate = candidate:gsub("\\", "/") end
+	candidate = NativePath.without_trailing_separators(candidate)
 	-- A relative answer would land inside the checkout, which is the whole defect.
-	local absolute = candidate:sub(1, 1) == "/" or candidate:match("^%a:/") ~= nil
-	if candidate == "" or not absolute then
+	if candidate == "" or not NativePath.is_absolute(candidate) then
 		error("tests: no absolute scratch directory (TMPDIR/TEMP/TMP resolved to '"
 			.. candidate .. "'); refusing to write fixtures into the checkout", 2)
 	end
@@ -101,6 +153,33 @@ function M.shared(rel)
 		return root .. "/" .. rel
 	end
 	return root
+end
+
+
+-- Read canonical data before individual fixtures replace file and environment ports.
+-- The shared TOML writer splices the refused setting into this notice's {1}: a stub
+-- that echoes the key would hide that name, so the baseline carries the real format.
+-- It is read on first use: a suite that re-roots the driver has no locale tree.
+local CASE_TWIN_KEY = "dialog.config_save.case_twin"
+setmetatable(M.I18N_PLACEHOLDER_FORMATS, { __index = function(formats, key)
+	if key ~= CASE_TWIN_KEY then return nil end
+	local english = require("json").decode(SourceFile.read(M.shared("data/locales/en.json")))
+	rawset(formats, key, assert(english[key], "the case-twin notice is localized"))
+	return formats[key]
+end })
+local logger_privacy_policy = SourceFile.read(M.shared("modules/diagnostics/redaction.json"))
+local logger_privacy_owners = setmetatable({}, { __mode = "k" })
+
+--- Gives a real logger instance the same explicit privacy boot as production.
+--- Existing injected logger doubles do not own persisted sinks.
+--- @param logger table Logger instance or fixture double.
+--- @return table The same instance.
+function M.admit_logger_privacy(logger)
+	if type(logger.initialize_privacy) == "function" and not logger_privacy_owners[logger] then
+		logger.initialize_privacy(logger_privacy_policy, { home = "/Users/PrivateUser", user = "PrivateUser" })
+		logger_privacy_owners[logger] = true
+	end
+	return logger
 end
 
 
@@ -260,11 +339,17 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- was first required, and no later call here can reach it. A test that needs
 	-- such a submodule re-read must clear it itself.
 	loaded[module_name] = nil
-	-- The keylogger and its process-lifetime physical-source settlement port
+	-- Foreign ledger readers retain the native hash API across ingest turns.
+	loaded["adapters.foreign_ledger_snapshot"] = nil
+	if module_name == "modules.keystats.export" or module_name == "adapters.foreign_ledger_snapshot" then
+		loaded["infra.paced_job"] = nil
+		loaded["adapters.timer_scheduler"] = nil
+	end
+	-- The keystats and its process-lifetime physical-source settlement port
 	-- form one ownership unit. A fresh fixture parent cannot inherit a child
 	-- bound to the preceding CoreState; the scoped proxy restores both caches.
-	if module_name == "modules.keylogger" or module_name == "modules.keylogger.init" then
-		loaded["modules.keylogger.physical_accounting_mode"] = nil
+	if module_name == "modules.keystats" or module_name == "modules.keystats.init" then
+		loaded["modules.keystats.physical_accounting_mode"] = nil
 	end
 	-- Expander and TerminatorReplay form one ownership unit: Expander.init now
 	-- consumes the replay module's exact commitment, and replay correctly refuses
@@ -359,9 +444,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- { sec = function() ... end }, no M.ms). lib.timings has no hs dependency
 	-- and is cheap to re-parse from constants.toml, so always reloading the real
 	-- module is safe. Without this, any later test whose require chain reaches
-	-- modules.keylogger (which calls Timings.ms(...) at module load time, e.g.
+	-- modules.keystats (which calls Timings.ms(...) at module load time, e.g.
 	-- via modules.keymap.llm_bridge) crashes with "attempt to call a nil value
-	-- (field 'ms')" the moment modules.keylogger is not already cached.
+	-- (field 'ms')" the moment modules.keystats is not already cached.
 	loaded["infra.timings"] = nil
 
 	-- Drop the keyboard-layout install / input-source modules (split out of
@@ -374,6 +459,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded["adapters.one_shot_shift"] = nil
 	-- The console owner captures the native API and must follow the current stub.
 	loaded["ui.console_window"] = nil
+	-- The Accessibility adapter remembers which application left a read
+	-- unanswered and captures hs: each test starts with no cooldown.
+	loaded["adapters.accessibility_permission"] = nil
 
 	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`
@@ -412,14 +500,17 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- AFTER calling load_with_stubs (this baseline is always restored here).
 	-- decorate_section / section mirror the real i18n: menu builders (via
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
-	-- canonical "— … —" decoration, so the stub must expose them or any builder
+	-- shared header format (menu.labels), so the stub must expose them or any builder
 	-- that renders a section header crashes with a nil-field call.
+	-- A caption that takes several getters (caption_getters) refuses a format without its
+	-- placeholders, so the keys the AI menu builds that way carry their English format.
+	local PLACEHOLDER_FORMATS = M.I18N_PLACEHOLDER_FORMATS
 	loaded["infra.i18n"] = {
-		get             = function(key) return key end,
+		get             = function(key) return PLACEHOLDER_FORMATS[key] or key end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
-		decorate_section = function(text) return "— " .. text .. " —" end,
-		section          = function(key) return "— " .. key .. " —" end,
+		decorate_section = function(text) return require("menu.labels").decorate_section(text) end,
+		section          = function(key) return require("menu.labels").decorate_section(key) end,
 		-- Mirrors the real {n} substitution. A stub narrower than the module it
 		-- stands in for is how a production call to a missing function reaches
 		-- nil under test and nobody notices: every consumer of i18n.format would
@@ -479,7 +570,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 		end
 	end
 
-	return require(module_name)
+	local result = require(module_name)
+	if module_name == "infra.logger" then M.admit_logger_privacy(result) end
+	return result
 end
 
 --- Restores native stub state and every cache entry written by load_with_stubs.
@@ -530,35 +623,42 @@ local _production_sources = nil
 
 --- Loads (once) every production Lua file under the driver root.
 --- @return table Array of file bodies, tests/ excluded.
+--- Source text in which each generated config-key reference reads as the quoted string it
+--- stands for, for tests that scan driver source for the literal a call passes. A name the
+--- generated tables do not hold is left as written, so the scan still refuses it.
+--- @param text string Lua source text.
+--- @return string expanded
+function M.expand_config_keys(text)
+	local keys = require("config_keys")
+	local function resolve(whole, root_table, name)
+		local found, tbl = pcall(function() return keys[root_table] end)
+		if not found then return whole end
+		local ok, value = pcall(function() return tbl[name] end)
+		return ok and type(value) == "string" and string.format("%q", value) or whole
+	end
+	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	end)
+	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
+		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
+	end))
+end
+
 local function production_sources()
 	if _production_sources then return _production_sources end
 
-	local root = M.driver_root()
-	local is_windows = package.config:sub(1, 1) == "\\"
-	local command
-	if is_windows then
-		command = 'dir /b /s /a-d "' .. root:gsub("/", "\\") .. '*.lua"'
-	else
-		command = 'find "' .. root:gsub('"', '\\"') .. '" -type f -name "*.lua"'
-	end
+	local Discovery = require("test.runner_discovery")
 
-	-- Collect the PATHS first and sort them, because neither `find` nor `dir /b /s`
-	-- promises an order: it follows the filesystem, so a fresh CI runner returns a
-	-- different one from the last. Every source invariant built on this list was
-	-- therefore non-deterministic, and one of them — the boot-ordering guard — went
-	-- red or green depending on which file the scan happened to reach first.
-	local paths = {}
-	for _, path in ipairs(CommandLines.read(command)) do
-		local normalized = path:gsub("\\", "/")
-		if not normalized:find("/tests/", 1, true) then
-			paths[#paths + 1] = path
-		end
-	end
-	table.sort(paths)
+	-- The relative directory census excludes the harness, never a checkout's parents.
+	-- Native pathnames remain data, including newlines and shell syntax.
+	local paths, detail = Discovery.files(M.driver_root(), function(name)
+		return name:match("%.lua$") ~= nil
+	end, { tests = true })
+	assert(paths, detail)
 
 	local bodies = {}
 	for _, path in ipairs(paths) do
-		bodies[#bodies + 1] = SourceFile.read(path)
+		bodies[#bodies + 1] = M.expand_config_keys(SourceFile.read(path))
 	end
 
 	-- A completed but empty inventory is not reusable source evidence. Leaving
@@ -629,6 +729,29 @@ function M.read_driver_unit(symbol)
 	return matches[1]
 end
 
+--- The module name a driver-relative source path is required by: dots for
+--- slashes, `.lua` dropped, and a package's `init` dropped. Whole-tree scans key
+--- their allowlists by this name, as the code names the module, never by path.
+--- @param rel string Path under the driver root, e.g. "modules/keystats/init.lua".
+--- @return string module_name e.g. "modules.keystats".
+function M.module_name_of(rel)
+	local name = rel:gsub("\\", "/"):gsub("^%./", ""):gsub("%.lua$", ""):gsub("/", ".")
+	return (name:gsub("%.init$", ""))
+end
+
+--- The source of a production module, resolved from its module name through
+--- package.searchpath exactly as require would find it (the Linux helper of the
+--- same name is its twin).
+--- The read goes through SourceFile, so an open, read or close failure raises
+--- naming its phase and path instead of reading as an absent module.
+--- @param module_name string Dotted module name, e.g. "infra.fs_dir".
+--- @return string|nil body, string|nil err Body, or nil plus why the module is not found.
+function M.read_module_source(module_name)
+	local path, missing = package.searchpath(module_name, package.path)
+	if not path then return nil, missing end
+	return SourceFile.read(path)
+end
+
 
 
 
@@ -694,6 +817,9 @@ function M.describe(name, fn)
 	if not ok then
 		print(string.format("  ! suite error: %s", tostring(err)))
 		_suite_results.failed = _suite_results.failed + 1
+		_suite_results.failures[#_suite_results.failures + 1] = {
+			name = name, err = tostring(err), kind = "suite", module = _current_module,
+		}
 	end
 end
 
@@ -710,18 +836,55 @@ function M.it(name, fn)
 	-- --only <substr>: run only tests whose name contains the filter (plain
 	-- substring, no Lua pattern magic) so one behaviour can be re-run in
 	-- isolation from a red message.
-	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
-	local ok, err = pcall(function()
-		if _before_each_fn then _before_each_fn() end
-		fn()
-	end)
+	local ok, err
+	if _timing then
+		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
+		if ok == nil then return end
+	else
+		if _only_filter and not string.find(name, _only_filter, 1, true) then return end
+		ok, err = pcall(function()
+			if _before_each_fn then _before_each_fn() end
+			fn()
+		end)
+	end
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
 	else
 		_suite_results.failed = _suite_results.failed + 1
-		_suite_results.failures[#_suite_results.failures + 1] = { name = name, err = tostring(err) }
+		_suite_results.failures[#_suite_results.failures + 1] = { name = name, err = tostring(err), kind = "case", module = _current_module }
 		print("  FAIL " .. name .. " — " .. tostring(err))
+	end
+end
+
+--- Counterpart of the Linux helper shared contracts call before an io.open
+--- double keyed on a source path. The shared TOML writer's fallback opens
+--- sources with stdio on macOS, so there is nothing to route.
+--- @return function restore No-op.
+function M.route_source_through_stdio()
+	return function() end
+end
+
+--- Builds an hs.execute double that answers FileSystem.exists()'s `/bin/test -e`
+--- probe honestly. Real Hammerspoon always has hs.fs.attributes; a fixture whose
+--- hs double omits hs.fs makes exists() stat through test(1), and a constant
+--- execute stub then classifies every bundled file as absent.
+--- @param fallback function|nil Receives every other command; nil raises.
+--- @param stat function|nil Path -> truthy when present; defaults to the hs stub's real stat.
+--- @return function execute The hs.execute double.
+function M.existence_probe_execute(fallback, stat)
+	local probe = stat or require("tests.stubs.hs").fs.attributes
+	return function(command, ...)
+		local operand = type(command) == "string" and command:match("^/bin/test %-e (.+)$")
+		if operand then
+			-- Fixtures may stub infra.text_utils with an identity shell_quote.
+			local quoted = operand:match("^'(.*)'$")
+			local path = quoted and (quoted:gsub("'\\''", "'")) or operand
+			if probe(path) then return "", true, "exit", 0 end
+			return "", nil, "exit", 1
+		end
+		if fallback == nil then error("unexpected hs.execute in fixture: " .. tostring(command), 2) end
+		return fallback(command, ...)
 	end
 end
 
@@ -732,14 +895,21 @@ function M.make_logger_stub()
 	local noop = function() end
 	return {
 		debug   = noop, trace   = noop, done    = noop,
-		info    = noop, start   = noop, success = noop,
+		info    = noop, start   = noop, success = noop, evidence = noop,
 		warn    = noop, error   = noop,
 		set_level = noop, set_sink = noop, is_enabled = function() return false end,
+		-- The level table is the real shared one: production reads Logger.LEVELS
+		-- to gate work that only an enabled level prints.
+		LEVELS = require("logger").LEVELS,
 		ring_buffer_snapshot = function() return {} end,
 		session_issues = function() return { warn_count = 0, err_count = 0, last_error = nil } end,
 		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
 		callback = function(_, _, fn, ...) return xpcall(fn, debug.traceback, ...) end,
 		build   = function() return noop end,
+		-- Every dialog_util modal runs through this wrapper; it has no clock here.
+		run_modal = function(fn, ...) return fn(...) end,
+		redact_message = function(text) return text end,
+		follow_config_dir = noop,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,
 		-- The logs-folder resolver every consumer asks; a stub without it would
@@ -774,5 +944,31 @@ end
 --- Restricts M.it execution to tests whose name contains `substr` (the --only filter).
 --- @param substr string|nil Substring to match; nil clears the filter (run all).
 function M.set_only_filter(substr) _only_filter = substr end
+
+
+--- Initializes the unit runner clock before test modules can replace stubs.
+--- Support imports by E2E do not acquire a clock or claim unit timing coverage.
+function M.initialize_timing()
+	assert(_timing == nil, "Lua unit timing is already initialized")
+	_timing = require("test.runner_timing").capture("macos")
+end
+
+--- Measures one module load while retaining its current case ownership.
+--- @param name string Exact test module identity.
+--- @param callback function Original require operation.
+--- @return boolean ok Original protected-call verdict.
+--- @return any result Original protected-call result or error.
+function M.measure_module(name, callback)
+	assert(_timing ~= nil, "Lua unit timing is not initialized")
+	local previous = _current_module
+	_current_module = name
+	local ok, result = _timing.measure("module", name, callback, name)
+	_current_module = previous
+	return ok, result
+end
+
+--- Reports timing admission failure without changing assertion counters.
+--- @return boolean failed True if clock or output diagnostics were incomplete.
+function M.timing_failed() return _timing ~= nil and _timing.has_errors() end
 
 return M

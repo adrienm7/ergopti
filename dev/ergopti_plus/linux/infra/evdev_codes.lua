@@ -20,7 +20,7 @@
 ---    is the disjoint question — which physical key is this — and the two must
 ---    not be conflated: a modifier has no character, and asking the layout table
 ---    about one is how a phantom typed character gets invented.
---- 2. Names come back out. The domain callbacks and the keylogger want
+--- 2. Names come back out. The domain callbacks and the keystats want
 ---    "backspace", not 14, and the heatmap wants the code. Both directions live
 ---    here so neither is re-derived at a call site.
 --- 3. Values are from input-event-codes.h and are kernel ABI. They do not change
@@ -48,6 +48,8 @@ M.KEY_RIGHTALT   = 100   -- AltGr
 M.KEY_LEFTMETA   = 125
 M.KEY_RIGHTMETA  = 126
 M.KEY_CAPSLOCK   = 58
+M.KEY_NUMLOCK    = 69
+M.KEY_SCROLLLOCK = 70
 -- A key no layout binds to an action, tapped inside a modifier chord so that
 -- releasing the modifier is not read as a lone Alt tap (which opens the menu
 -- bar in Firefox and other apps with access keys).
@@ -108,6 +110,16 @@ M.KEY_UP        = 103
 M.KEY_DOWN      = 108
 M.KEY_LEFT      = 105
 M.KEY_RIGHT     = 106
+
+--- The pointer buttons the domain names (CapsWord ends on a click of a chosen
+--- button), and the BTN_DIGI range a touchpad reports a finger contact in
+--- (BTN_TOUCH, BTN_TOOL_FINGER, BTN_TOOL_DOUBLETAP...). Every other code of
+--- the pointer button range (infra/input_event) is "another" button.
+M.BTN_LEFT       = 0x110
+M.BTN_RIGHT      = 0x111
+M.BTN_MIDDLE     = 0x112
+M.BTN_DIGI_FIRST = 0x140
+M.BTN_DIGI_LAST  = 0x14f
 
 --- The digit-row keys, KEY_1 to KEY_0, by the prediction slot each numbers (0
 --- is slot 10). The validation chord names the physical key, as the macOS

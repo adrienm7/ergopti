@@ -126,27 +126,25 @@ _LayoutExtensionNext(State) {
 	Partial := State["local"] . State["entry"]["id"] . ".extension.download"
 	LayoutRegistry_Request(LayoutRegistry_RawUrl(Item["file"]), Partial, Map("User-Agent", LAYOUT_REGISTRY_USER_AGENT),
 		LayoutRegistry_Settings()["download_timeout_sec"] * 1000, State["transport"],
-		_LayoutExtensionDownloaded.Bind(State, Item, Partial, State["position"]))
+		_LayoutExtensionDownloaded.Bind(State, Item, State["position"]))
 }
 
-_LayoutExtensionDownloaded(State, Item, Partial, Position, Status, Etag, Err) {
+_LayoutExtensionDownloaded(State, Item, Position, Status, Etag, Err, OutputOwner) {
 	if State["finished"] || State["position"] != Position
 		return
 	try {
 		if Status != 200
 			throw Error("Extension download failed: " . Status . " " . Err)
-		Text := _LayoutRegistryReadText(Partial)
+		Text := OutputOwner.ReadText(LayoutRegistry_Settings()["max_file_bytes"])
 		if !_LayoutExtensionMatches(Item, Text)
 			throw Error("Extension checksum or size mismatch: " . Item["path"])
+		if !OutputOwner.Remove()
+			throw Error("Cannot retire the owned registry extension response.")
 		State["content"][Item["path"]] := Text
 	} catch as Failure {
-		if FileExist(Partial) && !FSDelete(Partial)
-			LoggerWarn("LayoutCatalogue", "Cannot remove the partial extension download {1}.", Partial)
 		_LayoutExtensionFinish(State, false, Failure.Message)
 		return
 	}
-	if !FSDelete(Partial)
-		LoggerWarn("LayoutCatalogue", "Cannot remove the partial extension download {1}.", Partial)
 	_LayoutExtensionNext(State)
 }
 

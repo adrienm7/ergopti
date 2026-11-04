@@ -24,6 +24,7 @@
 ;   [layout]      pad_x                  → UI_PAD_X
 ;   [layout]      pad_y                  → UI_PAD_Y
 ;   [layout]      label_gap              → UI_LABEL_GAP
+;   [layout]      llm_max_content_width  → UI_LLM_MAX_CONTENT_WIDTH
 ;   [layout]      corner_radius × 2      → UI_CORNER_RADIUS (GDI diameter)
 ;   [colors]      bg_hex                 → UI_BG_HEX
 ;   [colors]      border_white/alpha_ahk → UI_BORDER_COLOR_HEX / UI_BORDER_ALPHA
@@ -34,12 +35,11 @@
 ;   [tint]        lightness              → UI_TINT_LIGHTNESS
 ;   [tint]        saturation             → UI_TINT_SATURATION
 ;   [llm_colors]  cursor_hex             → UI_LLM_CURSOR_HEX
-;   [llm_colors]  cmd_sel_hex            → UI_LLM_CMD_SEL_HEX
 ;   [llm_colors]  cmd_dim_hex            → UI_LLM_CMD_DIM_HEX
 ;   [llm_ui]      active_prefix          → UI_LLM_ACTIVE_PREFIX
 ;   [llm_ui]      slot_placeholder       → UI_LLM_SLOT_PLACEHOLDER
 ;   [llm_ui]      footer_space_divider   → UI_LLM_FOOTER_SPACE_DIV
-;   [llm_ui]      hint_accept_single     → UI_LLM_HINT_ACCEPT_SINGLE
+;   [llm_ui]      hint_accept_key        → UI_LLM_HINT_ACCEPT_KEY
 ;   [positioning] caret_offset_y         → UI_OFFSET_BELOW
 ;   [positioning] caret_offset_x         → UI_OFFSET_RIGHT
 ;   [positioning] max_caret_height       → UI_MAX_CARET_HEIGHT_PX
@@ -61,6 +61,7 @@ global UI_FONT_SIZE_INFO  := 0
 global UI_PAD_X           := 0
 global UI_PAD_Y           := 0
 global UI_LABEL_GAP       := 0
+global UI_LLM_MAX_CONTENT_WIDTH := 0
 global UI_LINE_SPACING    := 0
 global UI_HINT_SPACING    := 0
 global UI_CORNER_RADIUS   := 0
@@ -97,7 +98,6 @@ global UI_LLM_NW_SEL_HEX     := ""
 global UI_LLM_UNSEL_GRAY_HEX := ""
 global UI_LLM_LOADING_HEX    := ""
 global UI_LLM_CURSOR_HEX     := ""
-global UI_LLM_CMD_SEL_HEX    := ""
 global UI_LLM_CMD_DIM_HEX    := ""
 global UI_AI_LOADING_HEX     := ""
 
@@ -107,14 +107,13 @@ global UI_LLM_SLOT_PLACEHOLDER      := ""
 global UI_LLM_INACTIVE_ALIGN_CHAR   := ""
 global UI_LLM_FOOTER_SPACE_DIV      := ""
 global UI_LLM_FOOTER_COMBINED_SEP   := ""
-global UI_LLM_SHORTCUT_LABEL_GAP    := ""
-global UI_LLM_HINT_ACCEPT_SINGLE    := ""
-global UI_LLM_HINT_NAV_LEFT         := ""
-global UI_LLM_HINT_NAV_RIGHT        := ""
-global UI_LLM_HINT_ACCEPT_CENTER    := ""
+global UI_LLM_SHORTCUT_ORDER        := ""
+global UI_LLM_SHORTCUT_JOINER       := ""
+global UI_LLM_HINT_ACCEPT_KEY       := ""
+global UI_LLM_HINT_NAV_LEFT_KEYS    := ""
+global UI_LLM_HINT_NAV_RIGHT_KEYS   := ""
 global UI_LLM_HINT_ARROW_LEFT       := ""
 global UI_LLM_HINT_ARROW_RIGHT      := ""
-global UI_LLM_HINT_OR               := ""
 global UI_LLM_HINT_ARROW_SEP_LEFT   := ""
 global UI_LLM_HINT_ARROW_SEP_RIGHT  := ""
 
@@ -159,30 +158,6 @@ _UiStyleRequireHex(c, section, key) {
 	return val
 }
 
-; Reads one numeric member of an inline RGBA table (e.g. cmd_sel.alpha).
-_UiStyleRequireInlineNumber(c, section, key, member) {
-	val := _UiStyleRequire(c, section, key)
-	if (val is Map) {
-		if !val.Has(member)
-			_UiStyleFatal(section, key . "." . member)
-		return Float(val[member])
-	}
-	if !RegExMatch(String(val), "\b" . member . "\s*=\s*([0-9.]+)", &m)
-		_UiStyleFatal(section, key . "." . member)
-	return Float(m[1])
-}
-
-; Blends Hex over BgHex at Alpha (0..1), both "RRGGBB"; returns "RRGGBB".
-_UiStyleBlendHex(Hex, BgHex, Alpha) {
-	out := ""
-	loop 3 {
-		fg := Integer("0x" . SubStr(Hex, A_Index * 2 - 1, 2))
-		bg := Integer("0x" . SubStr(BgHex, A_Index * 2 - 1, 2))
-		out .= Format("{1:02X}", Round(bg * (1 - Alpha) + fg * Alpha))
-	}
-	return out
-}
-
 /** * Reads _shared/modules/tooltip/constants.toml at startup and assigns every tooltip
  * global from the TOML single source of truth. Uses _SharedDir (set by the
  * main entry point) + ParseTomlFile + IniCacheGet.
@@ -209,6 +184,7 @@ UiStyle_LoadSharedConst() {
 	global UI_PAD_X                := Integer(_UiStyleRequire(c, "layout", "pad_x"))
 	global UI_PAD_Y                := Integer(_UiStyleRequire(c, "layout", "pad_y"))
 	global UI_LABEL_GAP            := Integer(_UiStyleRequire(c, "layout", "label_gap"))
+	global UI_LLM_MAX_CONTENT_WIDTH := Integer(_UiStyleRequire(c, "layout", "llm_max_content_width"))
 	global UI_LINE_SPACING         := Integer(_UiStyleRequire(c, "layout", "line_spacing"))
 	global UI_HINT_SPACING         := Integer(_UiStyleRequire(c, "layout", "hint_spacing"))
 	; GDI nWidth/nHeight = full ellipse diameter = 2 × corner_radius.
@@ -254,11 +230,6 @@ UiStyle_LoadSharedConst() {
 	global UI_LLM_UNSEL_GRAY_HEX := _UiStyleRequireHex(c, "llm_colors", "unsel_gray_hex")
 	global UI_LLM_LOADING_HEX    := _UiStyleRequireHex(c, "llm_colors", "loading_hex")
 	global UI_LLM_CURSOR_HEX     := _UiStyleRequireHex(c, "llm_colors", "cursor_hex")
-	; macOS draws cmd_sel at its RGBA alpha; AHK text has no alpha, so the same
-	; colour is pre-blended onto the panel background here.
-	global UI_LLM_CMD_SEL_HEX    := _UiStyleBlendHex(
-		_UiStyleRequireHex(c, "llm_colors", "cmd_sel_hex"), UI_BG_HEX,
-		_UiStyleRequireInlineNumber(c, "llm_colors", "cmd_sel", "alpha"))
 	global UI_LLM_CMD_DIM_HEX    := _UiStyleRequireHex(c, "llm_colors", "cmd_dim_hex")
 	global UI_AI_LOADING_HEX     := _UiStyleRequireHex(c, "accent_colors", "ai_loading_hex")
 
@@ -268,14 +239,17 @@ UiStyle_LoadSharedConst() {
 	global UI_LLM_INACTIVE_ALIGN_CHAR  := _UiStyleRequire(c, "llm_ui", "inactive_align_char")
 	global UI_LLM_FOOTER_SPACE_DIV     := _UiStyleRequire(c, "llm_ui", "footer_space_divider")
 	global UI_LLM_FOOTER_COMBINED_SEP  := _UiStyleRequire(c, "llm_ui", "footer_combined_separator")
-	global UI_LLM_SHORTCUT_LABEL_GAP   := _UiStyleRequire(c, "llm_ui", "shortcut_label_gap")
-	global UI_LLM_HINT_ACCEPT_SINGLE   := _UiStyleRequire(c, "llm_ui", "hint_accept_single")
-	global UI_LLM_HINT_NAV_LEFT        := _UiStyleRequire(c, "llm_ui", "hint_nav_left")
-	global UI_LLM_HINT_NAV_RIGHT       := _UiStyleRequire(c, "llm_ui", "hint_nav_right")
-	global UI_LLM_HINT_ACCEPT_CENTER   := _UiStyleRequire(c, "llm_ui", "hint_accept_center")
+	; The modifiers of the order are named by the shared key name table
+	; (KeyNameLabel), in the active language.
+	global UI_LLM_SHORTCUT_ORDER       := _UiStyleRequire(c, "llm_ui", "shortcut_modifier_order")
+	global UI_LLM_SHORTCUT_JOINER      := _UiStyleRequire(c, "llm_ui", "shortcut_joiner_ahk")
+	; The footer's keys are key name ids its words name in the active language
+	; (_LLM_BuildNavHint); the words themselves are locale text.
+	global UI_LLM_HINT_ACCEPT_KEY      := _UiStyleRequire(c, "llm_ui", "hint_accept_key")
+	global UI_LLM_HINT_NAV_LEFT_KEYS   := _UiStyleRequire(c, "llm_ui", "hint_nav_left_keys")
+	global UI_LLM_HINT_NAV_RIGHT_KEYS  := _UiStyleRequire(c, "llm_ui", "hint_nav_right_keys")
 	global UI_LLM_HINT_ARROW_LEFT      := _UiStyleRequire(c, "llm_ui", "hint_arrow_left")
 	global UI_LLM_HINT_ARROW_RIGHT     := _UiStyleRequire(c, "llm_ui", "hint_arrow_right")
-	global UI_LLM_HINT_OR              := _UiStyleRequire(c, "llm_ui", "hint_or")
 	global UI_LLM_HINT_ARROW_SEP_LEFT  := _UiStyleRequire(c, "llm_ui", "hint_arrow_sep_left")
 	global UI_LLM_HINT_ARROW_SEP_RIGHT := _UiStyleRequire(c, "llm_ui", "hint_arrow_sep_right")
 

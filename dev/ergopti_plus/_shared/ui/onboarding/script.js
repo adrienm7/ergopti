@@ -33,10 +33,15 @@ var _strings = {};
 // Wizard state.
 var _selectedLocale = DEFAULT_LOCALE_CODE;
 var _platform = '';
+// What the host can do beyond persisting answers: { gesture_registration, and any runtime
+// capability a control names (true, or the locale key of the reason it is missing) }.
+var _capabilities = null;
 var _pages = [];
 var _steps = [STEP_LANGUAGE, STEP_CONFIG];
 var _stepIndex = 0;
 var _configDir = '';
+// Folder the native host commits to when the folder input is empty.
+var _emptyConfigDir = '';
 var _loadedDir = '';
 var _requestedDir = '';
 var _configPending = false;
@@ -267,7 +272,44 @@ function _initialState(page) {
 	if (page.magic_key && Object.prototype.hasOwnProperty.call(_current, page.magic_key.path)) {
 		state.magic = _current[page.magic_key.path];
 	}
+	// Persistent controls start at the values in force, never at a
+	// recommendation: a new installation emulates nothing and reorders nothing.
+	state.controls = {};
+	(page.controls || []).forEach(function (control) {
+		state.controls[control.id] = _controlValueInForce(control);
+	});
 	return state;
+}
+
+/**
+ * The choice of a control whose writes all hold in the configuration in force,
+ * or null when none does (a registry layout chosen in the layout manager).
+ * @param {object} control
+ * @returns {*}
+ */
+function _controlValueInForce(control) {
+	if (!control.available) return null;
+	for (var i = 0; i < control.choices.length; i++) {
+		var choice = control.choices[i];
+		var holds = choice.writes.every(function (write) {
+			return _sameValue(_currentValue(write), write.value);
+		});
+		if (holds) return choice.value;
+	}
+	return null;
+}
+
+/**
+ * The choice record of a control for a value, or null.
+ * @param {object} control
+ * @param {*} value
+ * @returns {object|null}
+ */
+function _controlChoice(control, value) {
+	for (var i = 0; i < control.choices.length; i++) {
+		if (_sameValue(control.choices[i].value, value)) return control.choices[i];
+	}
+	return null;
 }
 
 /** Rebuilds every page's state from the configuration in force. */
@@ -313,7 +355,9 @@ function _asks(page) {
 function _contextMagicKey(choice) {
 	var layoutPage = _pageState.keyboard_layout;
 	var system = (window.SYSTEM_LAYOUT || '').toLowerCase();
-	if ((layoutPage && layoutPage.answer) || system.indexOf('ergopti') !== -1)
+	var emulated = layoutPage && layoutPage.controls ? layoutPage.controls.emulated_layout : null;
+	var emulatesErgopti = typeof emulated === 'string' && emulated.indexOf('ergopti') === 0;
+	if ((layoutPage && layoutPage.answer && emulatesErgopti) || system.indexOf('ergopti') !== -1)
 		return choice.recommended;
 	var candidate = system.indexOf('french') !== -1 || system.indexOf('azerty') !== -1 ? 'ù' : ';';
 	return choice.options.some(function (option) {
@@ -341,22 +385,19 @@ function _magicValue(page) {
  * force: off when the answer turns a category switch in force from Yes to No,
  * as that switch once turned those items off, and on when the answer imports
  * one of its items that was not on. Ordinary pages leave a first No and a Yes
- * importing nothing new unwritten. Linux ordered pairs have an independent
- * master: every No disables it, including a first run or an already-off
- * ordinary shortcuts master. A Yes importing no pair preserves the tray choice.
+ * importing nothing new unwritten. An independent sub-switch (the catalogue
+ * says so: Linux ordered pairs) is its own master: every No disables it,
+ * including a first run or an already-off category master. A Yes importing
+ * nothing preserves the tray choice.
  * @param {object} page
  * @param {object} state Page state.
  * @returns {boolean|null}
  */
 function _subSwitchValue(page, state) {
-	// Ordered Linux pairs have their own master: No also covers a first run
-	// and existing pairs while the ordinary shortcuts master is already off.
+	// An independent sub-switch is its own master: No also covers a first run
+	// and existing items while the category master is already off.
 	if (!state.answer)
-		return (_platform === 'linux' &&
-			page.sub_switch.path === 'category_enabled.key_combinations') ||
-			_currentValue(page.master) === true
-			? false
-			: null;
+		return page.sub_switch.independent || _currentValue(page.master) === true ? false : null;
 	var governed = {};
 	page.sub_switch.items.forEach(function (itemPath) {
 		governed[itemPath] = true;
@@ -387,6 +428,19 @@ function _operations() {
 			if (subSwitch !== null) operations.push({ path: page.sub_switch.path, value: subSwitch });
 		}
 		if (!state.answer) return;
+		// A control writes only the paths its choice changes against the values
+		// in force; a control left as it was writes nothing.
+		(page.controls || []).forEach(function (control) {
+			var choice = _controlState(control).available
+				? _controlChoice(control, state.controls[control.id])
+				: null;
+			if (!choice) return;
+			choice.writes.forEach(function (write) {
+				if (!_sameValue(_currentValue(write), write.value)) {
+					operations.push({ path: write.path, value: write.value });
+				}
+			});
+		});
 		_eachItem(page.groups, function (item) {
 			var wanted = state.checked[item.path] === true;
 			if (wanted !== _currentlyOn(item)) {
@@ -533,11 +587,13 @@ function _renderLanguage() {
 function _renderConfig() {
 	document.getElementById('config-title').textContent = _t('dialog.config_folder.title');
 	document.getElementById('config-desc').textContent = _t('dialog.config_folder.label');
-	document.getElementById('config-hint').textContent = _t('dialog.config_folder.hint');
+	document.getElementById('config-hint').textContent = _t('onboarding.config_folder.hint')
+		.split('{1}')
+		.join(_emptyConfigDir);
 	document.getElementById('config-browse').textContent = _t('common.browse');
 	var input = document.getElementById('config-input');
 	input.value = _configDir;
-	input.placeholder = window.DEFAULT_CONFIG_DIR || '';
+	input.placeholder = _emptyConfigDir;
 }
 
 /**
@@ -575,19 +631,110 @@ function _renderPage(page) {
 	document.getElementById('page-no').checked = !state.answer;
 
 	_renderRegister(page, state);
+	_renderControls(page, state);
 	_renderMagicKey(page, state);
 	_renderChecklist(page, state);
 }
 
 /**
- * Shows the Windows gesture-registration panel on the gestures page when the
- * answer is Yes.
+ * Whether a control can be changed now: the catalogue offers it on this platform and, when
+ * it names a runtime capability, the host holds it. A host that cannot says why with the
+ * locale key it gives; the control's own reason is the fallback.
+ * @param {object} control
+ * @returns {{available: boolean, reason_key: string|undefined}}
+ */
+function _controlState(control) {
+	if (!control.available) return { available: false, reason_key: control.reason_key };
+	if (control.capability) {
+		var held = _capabilities[control.capability];
+		if (held !== true) {
+			return {
+				available: false,
+				reason_key: typeof held === 'string' && held !== '' ? held : control.reason_key
+			};
+		}
+	}
+	return { available: true, reason_key: undefined };
+}
+
+/**
+ * Renders the page's persistent controls. A change redraws this box alone:
+ * nothing reloads, and every value is kept across Yes/No, navigation and a
+ * language preview. A control this platform lacks is drawn greyed with why;
+ * the others follow the question, as the checklist does.
+ * @param {object} page
+ * @param {object} state
+ */
+function _renderControls(page, state) {
+	var box = document.getElementById('page-controls');
+	var controls = page.controls || [];
+	box.classList.toggle('hidden', controls.length === 0);
+	box.innerHTML = '';
+	controls.forEach(function (control) {
+		var group = document.createElement('div');
+		group.className = 'control-group';
+		group.dataset.control = control.id;
+		var availability = _controlState(control);
+		var disabled = !availability.available || !state.answer;
+		if (control.kind === 'check') {
+			group.appendChild(
+				_checkRow(
+					{ text: _t(control.label_key) },
+					state.controls[control.id] === true,
+					false,
+					disabled,
+					function (checked) {
+						state.controls[control.id] = checked;
+						_renderControls(page, state);
+					}
+				)
+			);
+		} else {
+			var label = document.createElement('p');
+			label.className = 'question-label';
+			label.textContent = _t(control.label_key);
+			group.appendChild(label);
+			control.choices.forEach(function (choice) {
+				var row = document.createElement('label');
+				row.className = 'radio-card';
+				var radio = document.createElement('input');
+				radio.type = 'radio';
+				radio.name = 'control-' + control.id;
+				radio.value = String(choice.value);
+				radio.checked = _sameValue(state.controls[control.id], choice.value);
+				radio.disabled = disabled;
+				radio.addEventListener('change', function () {
+					if (!radio.checked) return;
+					state.controls[control.id] = choice.value;
+					_renderControls(page, state);
+				});
+				var text = document.createElement('span');
+				text.className = 'radio-label';
+				text.textContent = _t(choice.label_key);
+				row.appendChild(radio);
+				row.appendChild(text);
+				group.appendChild(row);
+			});
+		}
+		if (!availability.available) {
+			var reason = document.createElement('p');
+			reason.className = 'hint';
+			reason.textContent = _t(availability.reason_key);
+			group.appendChild(reason);
+		}
+		box.appendChild(group);
+	});
+}
+
+/**
+ * Shows the gesture-registration panel on the gestures page when the answer is
+ * Yes and the host registers gestures with the system (Windows).
  * @param {object} page
  * @param {object} state
  */
 function _renderRegister(page, state) {
 	var panel = document.getElementById('page-register');
-	var shown = _platform === 'windows' && page.id === 'gestures' && state.answer;
+	var shown = _capabilities.gesture_registration && page.id === 'gestures' && state.answer;
 	panel.classList.toggle('hidden', !shown);
 	if (!shown) return;
 	document.getElementById('register-section').textContent = _t(
@@ -841,13 +988,28 @@ window.applyStrings = function (payload) {
 /**
  * Called by the host once the page is ready.
  * @param {{locale: string, strings: Object, locales: Array, platform: string,
- *   default_config_dir: string, config_dir: string, current: Object,
+ *   capabilities: {gesture_registration: boolean},
+ *   default_config_dir: string, config_dir: string, empty_config_dir: string, current: Object,
  *   metrics_path: string, system_layout?: string}} data
  */
 window.initData = function (data) {
 	var catalogue = _catalogue();
 	var platform = catalogue.platforms[data.platform];
 	if (!platform) throw new Error('onboarding host names an unknown platform: ' + data.platform);
+	if (typeof data.empty_config_dir !== 'string' || data.empty_config_dir.trim() === '') {
+		throw new Error('onboarding host must name the configuration folder used for an empty input');
+	}
+	if (!data.capabilities || typeof data.capabilities.gesture_registration !== 'boolean') {
+		throw new Error('onboarding host must state its gesture_registration capability');
+	}
+	_capabilities = { gesture_registration: data.capabilities.gesture_registration };
+	// Any other capability is a runtime answer for a control: true, or the reason it is missing.
+	Object.keys(data.capabilities).forEach(function (name) {
+		var held = data.capabilities[name];
+		if (name !== 'gesture_registration' && (held === true || typeof held === 'string')) {
+			_capabilities[name] = held;
+		}
+	});
 	_platform = data.platform;
 	_pages = platform.pages;
 	_steps = [STEP_LANGUAGE, STEP_CONFIG].concat(
@@ -860,6 +1022,7 @@ window.initData = function (data) {
 	window.DEFAULT_CONFIG_DIR = data.default_config_dir || '';
 	window.SYSTEM_LAYOUT = data.system_layout || '';
 	_configDir = typeof data.config_dir === 'string' ? data.config_dir : '';
+	_emptyConfigDir = data.empty_config_dir;
 	_loadedDir = _configDir;
 	_requestedDir = '';
 	_configPending = false;
@@ -997,6 +1160,12 @@ document.getElementById('btn-back').addEventListener('click', function () {
 		_configDir = (document.getElementById('config-input').value || '').trim();
 	}
 	if (_stepIndex > 0) _go(_stepIndex - 1);
+});
+
+document.getElementById('config-input').addEventListener('input', function () {
+	// A delayed locale preview can re-render this step before navigation.
+	// Keep raw edits in the page state; leaving the step owns their admission.
+	_configDir = document.getElementById('config-input').value;
 });
 
 document.getElementById('config-browse').addEventListener('click', function () {

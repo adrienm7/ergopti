@@ -14,6 +14,7 @@
 local M = {}
 
 local Fakes = require("tests.fakes")
+local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Json = require("json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
@@ -102,12 +103,15 @@ function M.run(opts, body)
 			list = function() return entries end,
 		}
 		local ai_on = opts.disabled ~= true
-		package.loaded["modules.llm.profiles"] = {
-			init = function() end,
+		local profiles = ProfilesFixture.without_inventory({
+			init = function() return true end,
 			is_enabled = function() return ai_on end,
+			enable = function() ai_on = true; return true end,
+			disable = function() ai_on = false; return true end,
 			get_current_model = function() return "ollama-model" end,
 			get_base_url = function() return world.base_url end,
-		}
+		})
+		package.loaded["modules.llm.profiles"] = profiles
 		if opts.local_backend then
 			package.loaded["modules.llm.api_ollama"] = nil
 		else
@@ -136,7 +140,9 @@ function M.run(opts, body)
 				exec_checked = function(command)
 					world.model_offers[#world.model_offers + 1] = { command = command }
 					if type(opts.on_model_confirm) == "function" then opts.on_model_confirm(world) end
-					return opts.download_choice == true, "", opts.download_choice == true and nil or "command exited with status 1"
+					return opts.download_choice == true, "", opts.download_choice == true and nil or "command exited with status 1",
+						opts.download_choice == true and nil or require("adapter_errors").COMMAND_EXITED_NONZERO,
+						opts.download_choice == true and nil or 1
 				end,
 			}
 		end
@@ -177,9 +183,9 @@ function M.run(opts, body)
 			scheduler = scheduler,
 			clock_ms = function() return scheduler.now * 1000 end,
 			engine = {
-				current_buffer = function() return world.buffer end,
 				reset = function() world.buffer = "" end,
 			},
+			context = { text = function() return world.buffer end, replaced = function() end },
 			is_paused = function() return world.paused end,
 			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
 			overlay = {
@@ -202,10 +208,14 @@ function M.run(opts, body)
 				world.typed[#world.typed + 1] = candidate.to_type
 				return true
 			end,
-			read_selection = function()
-				world.reads = world.reads + 1
-				if world.selection == nil then return false, "", "no_selection" end
-				return true, world.selection, nil
+			read_selection = function(_, authorized, callback)
+				local function complete()
+					world.reads = world.reads + 1
+					if world.selection == nil then callback(false, "", "no_selection"); return true end
+					callback(true, world.selection, nil, world.selection_receipt); return true
+				end
+				if world.defer_selection_read then world.complete_selection_read = complete else complete() end
+				return true
 			end,
 			replace_selection = function() error("the agent never replaces the selection") end,
 			focus_id = function() return world.window.app .. "\1" .. world.window.title end,
@@ -270,13 +280,25 @@ function M.run(opts, body)
 		end
 
 		local ok, err = pcall(body, world)
-		engine.dismiss()
-		os.remove(learning_path)
-		os.remove(learning_path .. ".tmp")
-		Connectors._set_deps_for_test(nil)
+		local cleaned, cleanup_err = pcall(function()
+			engine.dismiss()
+			Connectors.shutdown()
+			-- The scripted launchers must return their outcomes before the strict
+			-- dependency reset; shutdown fences their business callbacks first.
+			for _, run in ipairs(world.runs) do run.callback({ ok = false, code = -1 }) end
+			os.remove(learning_path)
+			os.remove(learning_path .. ".tmp")
+			Connectors._set_deps_for_test(nil)
+		end)
+		-- A failed cleanup must not leave scenario modules in later tests.
 		for _, name in ipairs(RELOADED) do package.loaded[name] = previous[name] end
 		for _, name in ipairs(FAKED) do package.loaded[name] = previous[name] end
+		if not cleaned then
+			if not ok then error(tostring(err) .. "\nScenario cleanup failed: " .. tostring(cleanup_err), 0) end
+			error(cleanup_err, 0)
+		end
 		if not ok then error(err, 0) end
+		profiles.assert_no_inventory()
 	end, { initial = stored })
 end
 

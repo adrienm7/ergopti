@@ -19,4 +19,14 @@ return {
 		schema_version = 1,
 		soname = "libcrypto.so.3",
 	},
+	managed_python = {
+		version = "3.11.16",
+		build = "20260929",
+		archives = {
+			["x86_64-gnu"] = { url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz", sha256 = "f05084f3fbd7a0c7ed762ea6fd2455976a463952bb5c3253fc6cdc777f84728d", bytes = 30792219 },
+			["aarch64-gnu"] = { url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz", sha256 = "0fe7a9925be231f38c7dffc92eb7f5cf47b121661899ffdb9bc77adfdc74ad2f", bytes = 31101929 },
+			["x86_64-musl"] = { url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-x86_64-unknown-linux-musl-install_only_stripped.tar.gz", sha256 = "88df3ffae0ba380ed54c1f6c08697681ba70612fb44fbe7f2e7d122927c1ae31", bytes = 29738762 },
+			["aarch64-musl"] = { url = "https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-aarch64-unknown-linux-musl-install_only_stripped.tar.gz", sha256 = "1a38e436fa144149c8d9562ceac8b243c97013058d61903cde591a8216461679", bytes = 30008097 },
+		},
+	},
 }

@@ -11,7 +11,10 @@
 local Json = require("json")
 local Unicode = require("compat.utf8")
 local Parameter = require("program_parameter")
-local M = { MAX_BYTES = 65536, MAX_CHOICES = 64, MAX_NAME_BYTES = 4096 }
+local Timings = require("infra.timings")
+local M = { MAX_BYTES = Timings.count("limits", "shortcuts_reply_bytes"), MAX_CHOICES = 64, MAX_NAME_BYTES = 4096,
+	-- Seconds a query transport lets one discovery or revalidation run.
+	QUERY_TIMEOUT_SEC = 20 }
 
 local function fields(value, allowed, count)
 	if type(value) ~= "table" or Json.is_null(value) or Json.is_array(value) then return false end
@@ -135,15 +138,19 @@ function M.new(ports)
 		if generation ~= epoch then return false, "stale_discovery" end
 		sequence = sequence + 1
 		local request = { version = 1, nonce = sequence, operation = operation, id = selected and selected.id,
-			limit = M.MAX_BYTES, timeout = 20 }
+			limit = M.MAX_BYTES, timeout = M.QUERY_TIMEOUT_SEC }
 		local entry = { epoch = epoch, cli = cli, constructing = true }
 		active = entry
 		local function complete()
 			if entry.constructing or active ~= entry or not entry.completed or not settled(entry) then return end
+			-- A settlement observer may retire this entry and admit a successor.
+			if active ~= entry then return end
 			active = nil
 			if entry.cancelled or generation ~= entry.epoch then return end
-			if not entry.reply or entry.code ~= 0 or entry.errors ~= "" or not same(cli)
-				or not qualified("discovery") then finish(nil, "query_refused"); return end
+			local refused = not entry.reply or entry.code ~= 0 or entry.errors ~= "" or not same(cli)
+				or not qualified("discovery") or entry.start_refused
+			if entry.cancelled or generation ~= entry.epoch then return end
+			if refused then finish(nil, "query_refused"); return end
 			local value, reason = packet(entry.reply, request)
 			finish(value, reason, cli)
 		end
@@ -162,11 +169,28 @@ function M.new(ports)
 			return false, "transport_refused"
 		end
 		entry.handle = handle
+		local function refuse(reason)
+			-- Cancellation marks the entry before native callbacks; later settlement
+			-- must still clear retained debt after a refused startup.
+			entry.constructing = false
+			cancel(entry)
+			return false, reason
+		end
 		local watching, observed = pcall(handle.onSettled, complete)
-		entry.constructing = false
-		if not watching or observed ~= true or entry.cancelled then cancel(entry); return false, "transport_refused" end
+		if not watching or observed ~= true or entry.cancelled then return refuse("transport_refused") end
 		local started, receipt = pcall(handle.start)
-		if not started or receipt ~= true then cancel(entry); return false, "start_refused" end
+		if not started or receipt ~= true then
+			-- A known closed failure may notify only after the start ACK resolves.
+			-- Even a valid buffered reply cannot turn this rejected start into success.
+			entry.start_refused = true
+			entry.constructing = false
+			complete()
+			-- finish may have admitted a successor; cancel only the captured old entry.
+			cancel(entry)
+			return false, "start_refused"
+		end
+		-- A terminal callback cannot outrun the literal query start acknowledgement.
+		entry.constructing = false
 		complete()
 		return true
 	end
@@ -215,7 +239,7 @@ function M.new(ports)
 				or data.rows[1].accepts_input ~= selected.accepts_input then finish(nil, "stale_discovery"); return end
 			local scalar = Json.encode({ version = 1, executable = selected.cli.executable,
 				arguments = Json.array({ "run", selected.id }) })
-			if not Parameter.parse(scalar, "hs") then finish(nil, "invalid_program"); return end
+			if not Parameter.parse(scalar, "posix") then finish(nil, "invalid_program"); return end
 			finish(scalar)
 		end)
 	end
@@ -236,20 +260,32 @@ function M.new(ports)
 			local ok, ready = observe(admitted, consumer)
 			return ok and ready == true and generation == epoch and choices[key] == selected
 				and same(selected and selected.cli) and qualified("invocation") and qualified("cancellation")
+				and generation == epoch and choices[key] == selected
 		end
 		if not allowed() then return false, "admission_refused" end
 		return owner.resolve(key, {}, function(scalar, reason)
 			if not scalar then finish(false, reason); return end
-			if active or not allowed() then finish(false, "admission_refused"); return end
+			local admitted_now = not active and allowed()
+			if generation ~= epoch or choices[key] ~= selected then return end
+			if not admitted_now then finish(false, "admission_refused"); return end
 			local entry = { epoch = epoch, automation = true, constructing = true }
 			active = entry
 			local function complete()
 				if entry.constructing or active ~= entry or not entry.completed or not settled(entry) then return end
+				if active ~= entry then return end
 				active = nil
 				if entry.cancelled or generation ~= epoch then return end
 				local admitted_now = allowed()
+				if entry.cancelled or generation ~= epoch then return end
 				finish(entry.success == true and admitted_now, not admitted_now and "admission_refused"
 					or entry.success == true and "completed" or "execution_refused")
+			end
+			local function refuse(reason)
+				-- Cancellation can invalidate this consumer while retaining native debt.
+				cancel(entry)
+				entry.constructing = false
+				if generation ~= epoch or choices[key] ~= selected then return end
+				finish(false, reason)
 			end
 			local ok, handle = pcall(ports.invoke, scalar, allowed, function(success)
 				if entry.completed then entry.success = false; cancel(entry); return end
@@ -258,14 +294,17 @@ function M.new(ports)
 			end)
 			if not ok or not handle_valid(handle, true) then
 				entry.constructing, entry.cancelled = false, true
+				if generation ~= epoch then return end
 				finish(false, "transport_refused"); return
 			end
 			entry.handle = handle
 			local watching, observed = pcall(handle.onSettled, complete)
-			entry.constructing = false
-			if not watching or observed ~= true or not allowed() then cancel(entry); return end
+			if not watching or observed ~= true then refuse("transport_refused"); return end
+			if not allowed() then refuse("admission_refused"); return end
 			local started, receipt = pcall(handle.start)
-			if not started or receipt ~= true then cancel(entry); return end
+			if not started or receipt ~= true then refuse("start_refused"); return end
+			-- A synchronous completion cannot outrun the literal start acknowledgement.
+			entry.constructing = false
 			complete()
 		end)
 	end

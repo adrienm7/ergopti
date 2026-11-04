@@ -19,6 +19,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local llm_mod       = require("modules.llm")
 local i18n          = require("infra.i18n")
 local Logger        = require("infra.logger")
@@ -27,6 +28,10 @@ local notifications = require("infra.notifications")
 local ManifestMenu   = require("infra.manifest_menu")
 local ProviderUses   = require("modules.llm.provider_uses")
 local EntryNames     = require("llm.api_entry_names")
+local EntryIdentity  = require("llm.api_entry_identity")
+local LocalAuth      = require("llm.local_server_auth")
+local UrlTemplate    = require("llm.api_url_template")
+local TextUtils = require("text_utils")
 
 local LOG = "api_panel"
 
@@ -100,8 +105,9 @@ end
 
 local function notify_persistence_failure(label)
 	Logger.error(LOG, "%s was rejected; runtime state was restored.", tostring(label))
-	pcall_log("notify(api persistence failure)", notifications.notify,
-		i18n.get("common.error_title"), i18n.get("dialog.bulk_toggle.save_failed"), "error")
+	pcall_log("notify(api persistence failure)", SaveFailure.present, i18n.get, function(message)
+		notifications.notify(i18n.get("common.error_title"), message, "error")
+	end)
 end
 
 --- The automatic name of every entry, by id: <provider>/<model>, with the
@@ -135,16 +141,20 @@ end
 --- @param label string Mutation label for diagnostics.
 --- @return boolean committed
 local function reset_prediction_identity(keymap, label)
-	if type(keymap) ~= "table" or type(keymap.reset_predictions) ~= "function" then
-		Logger.error(LOG, "Cannot %s: keymap.reset_predictions is unavailable.", tostring(label))
+	if type(keymap) ~= "table" or type(keymap.reset_predictions_for_configuration) ~= "function" then
+		Logger.error(LOG, "Cannot %s: keymap.reset_predictions_for_configuration is unavailable.", tostring(label))
+		pcall_log("notify(api configuration unavailable)", notifications.notify,
+			i18n.get("common.error_title"), i18n.get("healthcheck.status.failed"), "error")
 		return false
 	end
 	local ok, committed = xpcall(function()
-		return keymap.reset_predictions(false)
+		return keymap.reset_predictions_for_configuration()
 	end, debug.traceback)
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Cannot %s: prediction identity reset did not commit (result: %s).",
 			tostring(label), tostring(committed))
+		pcall_log("notify(api configuration reset refusal)", notifications.notify,
+			i18n.get("common.error_title"), i18n.get("healthcheck.status.failed"), "error")
 		return false
 	end
 	return true
@@ -176,6 +186,22 @@ function M.active_entry_display_name()
 	return entry_names(remote, remote.get_entries() or {})[active_id]
 end
 
+--- The active entry as the tray's model button names it: the provider's
+--- display name from api_providers.json, then the model its requests use
+--- ("OpenAI/gpt-4o-mini"). The page lists entries by their automatic name.
+--- @return string|nil text Nil when no entry is active.
+function M.active_entry_caption_text()
+	local remote = llm_mod and llm_mod.api_remote
+	if type(remote) ~= "table" or type(remote.get_active_entry) ~= "function" then return nil end
+	local entry = remote.get_active_entry()
+	if type(entry) ~= "table" then return nil end
+	local provider = type(remote.PROVIDERS) == "table" and remote.PROVIDERS[entry.provider] or nil
+	if type(provider) ~= "table" or type(provider.label) ~= "string" or provider.label == "" then return nil end
+	local model = (type(entry.model) == "string" and entry.model ~= "") and entry.model or provider.default_model
+	if type(model) ~= "string" or model == "" then return provider.label end
+	return provider.label .. "/" .. model
+end
+
 -- Shared probe-verdict rendering for the Test action and the post-add
 -- probe: success carries excerpt + latency, failure appends the provider's
 -- own "[status] message" line (no locale key needed for it). Module-level:
@@ -191,7 +217,7 @@ local function probe_fail_body(label, detail)
 	if type(detail) == "table" then
 		local status = tonumber(detail.status) or 0
 		local message = type(detail.message) == "string"
-			and detail.message:match("^%s*(.-)%s*$") or ""
+			and TextUtils.trim(detail.message) or ""
 		if message ~= "" then
 			fail_body = fail_body .. "\n"
 				.. (status > 0 and string.format("[%d] %s", status, message) or message)
@@ -381,8 +407,14 @@ function M.build(ctx)
 	local WarmupCtrl  = ctx.WarmupCtrl
 	local keymap      = ctx.keymap
 
-	if state.llm_backend ~= "api" then
+	-- The model selector page collects the same actions on any backend: it
+	-- switches to the API backend before it runs one of them.
+	local collect = type(ctx.collect) == "table" and ctx.collect or nil
+	if state.llm_backend ~= "api" and not collect then
 		return nil, nil
+	end
+	if collect then
+		collect.entries, collect.select, collect.add = {}, {}, {}
 	end
 
 	local api_remote = llm_mod.api_remote
@@ -413,11 +445,7 @@ function M.build(ctx)
 	-- the new entry immediately.
 	for _, e in ipairs(entries) do
 		if not is_system1_only(api_remote, e) then
-			table.insert(rows, {
-				label    = names[e.id],
-				checked  = (e.id == active_id),
-				disabled = (paused or mutation_busy) or nil,
-				action       = (not paused and not mutation_busy) and function()
+			local select_entry = (not paused and not mutation_busy) and function()
 					if _mutation_owner ~= nil then return false end
 					if reset_prediction_identity(keymap, "select remote API entry") ~= true then return false end
 					local previous_active_id = api_remote.get_active_entry_id()
@@ -445,7 +473,19 @@ function M.build(ctx)
 					end)
 					return true
 				end or nil
+			table.insert(rows, {
+				label    = names[e.id],
+				checked  = (e.id == active_id),
+				disabled = (paused or mutation_busy) or nil,
+				action   = select_entry,
 			})
+			if collect then
+				collect.select[e.id] = select_entry
+				collect.entries[#collect.entries + 1] = {
+					id = e.id, name = names[e.id], provider = e.provider, model = tostring(e.model or ""),
+					active = e.id == active_id, key_missing = api_remote.entry_key_missing(e),
+				}
+			end
 		end
 	end
 
@@ -465,47 +505,102 @@ function M.build(ctx)
 				disabled = (paused or mutation_busy) or nil,
 				action       = (not paused and not mutation_busy) and function()
 					if not add_commands_ready() then return false end
-					local function trim(s) return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "")) end
+					local function trim(s) return TextUtils.trim(tostring(s or "")) end
 					local function prompt_field(title_key, default_val, hint)
 						if not add_commands_ready() then return false, nil end
+						local ok_label = i18n.get("button.ok")
 						local ok, ret_a, ret_b = pcall(dialog.text_prompt,
 							title_key, hint, default_val or "",
-							"OK", i18n.get("button.cancel"))
+							ok_label, i18n.get("button.cancel"))
 						if not ok then return false, nil end
 						local picked_btn, picked_text
-						if ret_a == "OK" or ret_a == i18n.get("button.cancel") then
+						if ret_a == ok_label or ret_a == i18n.get("button.cancel") then
 							picked_btn, picked_text = ret_a, ret_b
 						else
 							picked_text, picked_btn = ret_a, ret_b
 						end
-						if picked_btn ~= "OK" then return false, nil end
+						if picked_btn ~= ok_label then return false, nil end
 						if not add_commands_ready() then return false, nil end
 						return true, trim(picked_text)
 					end
 
 					-- Use existing i18n keys for prompt hints so non-French users
 					-- see localized text. Provider name mixed with field tag.
-					local base_url_ok, base_url = prompt_field(
-						string.format("API %s — URL", p.label),
-						p.base_url,
-						i18n.get("menu.llm.api_prompt_url"))
-					if not base_url_ok then return false end
+					local base_url
+					local fields = UrlTemplate.fields(p.base_url)
+					if #fields > 0 then
+						-- A per-account address: one value per placeholder, filled into the entry's own URL
+						local values = {}
+						for _, name in ipairs(fields) do
+							local field_label = i18n.get("menu.llm.api_prompt_field." .. name)
+							local value_ok, value = prompt_field(
+								string.format("API %s — %s", p.label, field_label), "", field_label)
+							if not value_ok then return false end
+							if not UrlTemplate.valid_value(value) then
+								Logger.error(LOG, "API entry address refused: the '%s' value cannot fill it.", name)
+								pcall_log("notify(api account field refusal)", notifications.notify,
+									i18n.get("common.error_title"),
+									i18n.get("menu.llm.api_prompt_field_invalid"),
+									"error")
+								return false
+							end
+							values[name] = value
+						end
+						base_url = assert(UrlTemplate.expand(p.base_url, values))
+						Logger.info(LOG, "API entry address filled for provider '%s' (%d account field(s)).", pid, #fields)
+					elseif p.optional_address then
+						-- The catalogue's address works; one optional value replaces it
+						local optional = p.optional_address
+						local field_label = i18n.get("menu.llm.api_prompt_field." .. optional.field)
+						local value_ok, value = prompt_field(
+							string.format("API %s — %s", p.label, field_label), "", field_label)
+						if not value_ok then return false end
+						local filled = UrlTemplate.optional_url(optional, value)
+						if not filled then
+							Logger.error(LOG, "API entry address refused: the '%s' value cannot fill it.", optional.field)
+							pcall_log("notify(api account field refusal)", notifications.notify,
+								i18n.get("common.error_title"),
+								i18n.get("menu.llm.api_prompt_field_invalid." .. optional.field),
+								"error")
+							return false
+						end
+						base_url = filled ~= "" and filled or p.base_url
+					else
+						local base_url_ok
+						base_url_ok, base_url = prompt_field(
+							string.format("API %s — URL", p.label),
+							p.base_url,
+							i18n.get("menu.llm.api_prompt_url"))
+						if not base_url_ok then return false end
+					end
 					local token_ok, token = prompt_field(
 						string.format("API %s — Token", p.label),
 						"",
 						i18n.get("menu.llm.api_prompt_token"))
-					if not token_ok or token == "" then return false end
+					if not token_ok then return false end
+					if not LocalAuth.entry_token_allowed(pid, token, base_url,
+						require("modules.llm.local_servers").SERVERS) then
+						Logger.error(LOG, "API entry creation requires a key for this configured endpoint.")
+						pcall_log("notify(api authentication refusal)", notifications.notify,
+							i18n.get("common.error_title"), i18n.get("healthcheck.status.failed"), "error")
+						return false
+					end
 					local model_ok, model = prompt_field(
 						string.format("API %s — Model", p.label),
 						p.default_model,
 						i18n.get("menu.llm.api_prompt_model"))
 					if not model_ok then return false end
+					if model == "" and p.default_model == "" then
+						-- No catalogue default (a per-account provider): the model is the user's deployment
+						Logger.error(LOG, "API entry creation requires a model for provider '%s'.", pid)
+						pcall_log("notify(api model refusal)", notifications.notify,
+							i18n.get("common.error_title"), i18n.get("menu.llm.api_prompt_model"), "error")
+						return false
+					end
 
-					-- Unique id: seq suffix prevents collision when two entries are
-					-- created within the same second (os.time() resolution = 1s).
-					_entry_seq = _entry_seq + 1
-					local id = string.format("%s-%d-%d", pid, os.time(), _entry_seq)
 					local list = api_remote.get_entries() or {}
+					local id
+					id, _entry_seq = EntryIdentity.next(pid, os.time(), _entry_seq, list)
 					local new_entry = {
 						id       = id,
 						provider = pid,
@@ -548,10 +643,14 @@ function M.build(ctx)
 						api_remote.set_entries(previous_entries)
 						api_remote.set_active_entry_id(previous_active_id)
 						state.llm_model = previous_model
-						if kind == "unreachable" then
-							pcall_log("notify(api_unreachable)", notifications.notify,
-								i18n.get("menu.llm.api_unreachable_title"),
-								string.format(i18n.get("menu.llm.api_unreachable_body"), new_name),
+						if kind == "unreachable" or kind == "key_refused" then
+							-- A 401/403 is an answer: saying "did not respond" sent
+							-- the user chasing the URL instead of the key.
+							local prefix = kind == "key_refused" and "menu.llm.api_key_refused_"
+								or "menu.llm.api_unreachable_"
+							pcall_log("notify(api_" .. kind .. ")", notifications.notify,
+								i18n.get(prefix .. "title"),
+								string.format(i18n.get(prefix .. "body"), new_name),
 								"warning")
 						else
 							Logger.error(LOG, "Remote API validation did not commit (%s): %s",
@@ -611,8 +710,12 @@ function M.build(ctx)
 								pcall_log("update_menu(add persistence rollback)", update_menu)
 							end)
 						end,
-						function(_unreachable)
-							rollback_validation("unreachable", "probe rejected credentials")
+						function(_unreachable, status)
+							if status == 401 or status == 403 then
+								rollback_validation("key_refused", "HTTP " .. tostring(status))
+							else
+								rollback_validation("unreachable", "HTTP " .. tostring(status))
+							end
 						end,
 						function(reason)
 							rollback_validation("cancelled", reason)
@@ -621,9 +724,21 @@ function M.build(ctx)
 					if not validation_call_ok or validation_result ~= true then
 						rollback_validation(validation_call_ok and "refused" or "raised",
 							validation_result)
+						return false
 					end
+					-- The backend switch commits only on a literal true receipt.
+					return true
 			end or nil,
 			})
+			if collect then collect.add[pid] = add_rows[#add_rows].action end
+		end
+	end
+
+	if collect then
+		collect.providers = {}
+		for _, pid in ipairs(api_remote.PROVIDER_ORDER) do
+			local p = api_remote.PROVIDERS[pid]
+			if p then collect.providers[#collect.providers + 1] = { id = pid, label = p.label } end
 		end
 	end
 
@@ -671,7 +786,7 @@ function M.build(ctx)
 		if not boundary_rows then return "", {} end
 		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
 	end
-	local test_row = ManifestMenu.command_row("llm_api_active_commands", "api_test_active", {
+	local test_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_TEST_ACTIVE, {
 		api_test_active = function()
 			local probed_id = active_entry.id
 			local probed_label = active_label
@@ -728,7 +843,7 @@ function M.build(ctx)
 	-- the AHK tray's "remove active" semantics. Disabled when nothing is
 	-- configured so the user does not chase a no-op click. Test sits above
 	-- it: the destructive action stays last.
-	local remove_row = ManifestMenu.command_row("llm_api_active_commands", "api_remove_active", {
+	local remove_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_REMOVE_ACTIVE, {
 		api_remove_active = function()
 			if _mutation_owner ~= nil then return false end
 			-- Confirm before destroying — the saved token is gone for good once
@@ -780,6 +895,10 @@ function M.build(ctx)
 	if remove_row then
 		remove_row.label = "🗑️ " .. remove_row.label .. (active_entry and (" (" .. active_label .. ")") or "")
 	end
+	if collect then
+		collect.test_active = test_row and not test_row.disabled and test_row.action or nil
+		collect.remove_active = remove_row and not remove_row.disabled and remove_row.action or nil
+	end
 	local active_rows = { api_test_active = test_row, api_remove_active = remove_row }
 	for _, declaration in ipairs(ManifestMenu.get_array("llm_api_active_commands")) do
 		local row = active_rows[declaration.id]
@@ -824,106 +943,107 @@ function M.build(ctx)
 	return api_title, ManifestMenu.render_rows(rows, "llm_backend")
 end
 
---- Builds the "active model" submenu when the remote API backend is selected.
---- Mirrors Windows ``_LLM_Menu_BuildApiEntriesMenu()`` — local catalogue rows
---- are hidden because they have no ``urls.api`` entry in models.json.
---- @param ctx table Context with fields: state, paused, is_paused, keymap, update_menu, WarmupCtrl.
---- @return table menu Populated API entry picker.
-function M.build_model_picker(ctx)
-	local state       = ctx.state
-	local paused      = ctx.paused
-	local update_menu = ctx.update_menu
-	local WarmupCtrl  = ctx.WarmupCtrl
-	local keymap      = ctx.keymap
-
+--- Clears the active API entry: the API backend's "no model". The model
+--- selector page's "no model" runs it on the API backend; the transaction is
+--- the tray picker's former one (identity reset, lease, persist, rollback).
+--- @param ctx table { state, keymap, update_menu, is_paused }.
+--- @return boolean started
+function M.clear_active_entry(ctx)
+	local state, keymap, update_menu = ctx.state, ctx.keymap, ctx.update_menu
+	if type(ctx.is_paused) ~= "function" then return false end
+	local ok_pause, paused = pcall(ctx.is_paused)
+	if not ok_pause or paused ~= false or _mutation_owner ~= nil then return false end
 	local api_remote = llm_mod.api_remote
-	local entries    = (api_remote and api_remote.get_entries()) or {}
-	local active_id  = (api_remote and api_remote.get_active_entry_id()) or ""
-	local rows       = {}
-	local mutation_busy = _mutation_owner ~= nil
-	local names      = entry_names(api_remote, entries)
-
-	local selection_rows = ManifestMenu.template_rows("llm_api_selection_frame", {
-		["llm_api_no_model"] = function()
-			if _mutation_owner ~= nil then return false end
-			if api_remote and api_remote.set_active_entry_id then
-				if reset_prediction_identity(keymap, "select No Model") ~= true then return false end
-				local previous_active_id = api_remote.get_active_entry_id()
-				local previous_model = state.llm_model
-				local my_generation = begin_mutation()
-				if not my_generation then return false end
-				api_remote.set_active_entry_id("")
-				state.llm_model = ""
-				persist_entries("persist_api_entries(clear_active)", function(ok, reason, durable)
-					if not mutation_is_current(my_generation) then return end
-					finish_mutation(my_generation)
-					if ok == true or durable == true then
-						if ok ~= true then
-							Logger.error(LOG, "No Model selection committed with cleanup debt: %s",
-								tostring(reason))
-						end
-						pcall_log("update_menu(clear_active)", update_menu)
-						return
-					end
-					api_remote.set_active_entry_id(previous_active_id)
-					state.llm_model = previous_model
-					notify_persistence_failure("No Model selection")
-					pcall_log("update_menu(clear_active rollback)", update_menu)
-				end)
-				return true
+	if not api_remote or type(api_remote.set_active_entry_id) ~= "function" then return false end
+	if reset_prediction_identity(keymap, "select No Model") ~= true then return false end
+	local previous_active_id = api_remote.get_active_entry_id()
+	local previous_model = state.llm_model
+	local my_generation = begin_mutation()
+	if not my_generation then return false end
+	api_remote.set_active_entry_id("")
+	state.llm_model = ""
+	persist_entries("persist_api_entries(clear_active)", function(persisted, reason, durable)
+		if not mutation_is_current(my_generation) then return end
+		finish_mutation(my_generation)
+		if persisted == true or durable == true then
+			if persisted ~= true then
+				Logger.error(LOG, "No Model selection committed with cleanup debt: %s", tostring(reason))
 			end
-			return false
-		end,
-	}, {
-		llm_api_no_model_checked = function() return active_id == "" or active_id == nil end,
-		llm_api_selection_ready = function() return not paused and not mutation_busy end,
-		llm_api_entries_present = function() return #entries > 0 end,
-	}, {})
-	if not selection_rows then return {} end
-	for _, row in ipairs(selection_rows) do
-		if paused or mutation_busy then row.action = nil end
-		rows[#rows + 1] = row
-	end
+			pcall_log("update_menu(clear_active)", update_menu)
+			return
+		end
+		api_remote.set_active_entry_id(previous_active_id)
+		state.llm_model = previous_model
+		notify_persistence_failure("No Model selection")
+		pcall_log("update_menu(clear_active rollback)", update_menu)
+	end)
+	return true
+end
 
-	for _, e in ipairs(entries) do
-		if not is_system1_only(api_remote, e) then
-			table.insert(rows, {
-				label    = names[e.id],
-				checked  = (e.id == active_id),
-				disabled = (paused or mutation_busy) or nil,
-				action       = (not paused and not mutation_busy) and function()
-					if _mutation_owner ~= nil then return false end
-					if reset_prediction_identity(keymap, "select remote API entry") ~= true then return false end
-					local previous_active_id = api_remote.get_active_entry_id()
-					local previous_model = state.llm_model
-					local my_generation = begin_mutation()
-					if not my_generation then return false end
-					api_remote.set_active_entry_id(e.id)
-					state.llm_model = tostring(e.model or "")
-					persist_entries("persist_api_entries(set_active)", function(ok, reason, durable)
-						if not mutation_is_current(my_generation) then return end
-						finish_mutation(my_generation)
-						if ok == true or durable == true then
-							if ok ~= true then
-								Logger.error(LOG, "Remote API selection committed with cleanup debt: %s",
-									tostring(reason))
-							end
-							WarmupCtrl.warmup("api_set_active")
-							pcall_log("update_menu(set_active)", update_menu)
-							return
-						end
-						api_remote.set_active_entry_id(previous_active_id)
-						state.llm_model = previous_model
-						notify_persistence_failure("Remote API entry selection")
-						pcall_log("update_menu(set_active rollback)", update_menu)
-					end)
-					return true
-				end or nil,
-			})
+--- Makes one model of an entry's provider the active one: the entry keeps its
+--- provider, address and key and takes the model, then becomes the active
+--- entry. The model selector page offers each model the provider lists, or one
+--- the user types; the transaction is the entry selection's (lease, persist,
+--- rollback, warmup).
+--- @param ctx table { state, keymap, update_menu, WarmupCtrl, is_paused }.
+--- @param entry_id string Entry identifier.
+--- @param model string Model id the provider serves.
+--- @return boolean started
+function M.set_entry_model(ctx, entry_id, model)
+	local state, keymap, update_menu, WarmupCtrl = ctx.state, ctx.keymap, ctx.update_menu, ctx.WarmupCtrl
+	model = TextUtils.trim(tostring(model or ""))
+	if model == "" then
+		Logger.warn(LOG, "API entry model change refused: the model id is empty.")
+		return false
+	end
+	if type(ctx.is_paused) ~= "function" then return false end
+	local ok_pause, paused = pcall(ctx.is_paused)
+	if not ok_pause or paused ~= false or _mutation_owner ~= nil then return false end
+	local api_remote = llm_mod.api_remote
+	local previous_entries = api_remote.get_entries() or {}
+	local changed, found = {}, false
+	for _, e in ipairs(previous_entries) do
+		if e.id == entry_id then
+			local copy = {}
+			for k, v in pairs(e) do copy[k] = v end
+			copy.model = model
+			changed[#changed + 1] = copy
+			found = true
+		else
+			changed[#changed + 1] = e
 		end
 	end
-
-	return ManifestMenu.render_rows(rows, "llm_model")
+	if not found then
+		Logger.warn(LOG, "API entry model change refused: entry '%s' is gone.", tostring(entry_id))
+		return false
+	end
+	if reset_prediction_identity(keymap, "change remote API entry model") ~= true then return false end
+	local my_generation = begin_mutation()
+	if not my_generation then return false end
+	local previous_active_id = api_remote.get_active_entry_id()
+	local previous_model = state.llm_model
+	api_remote.set_entries(changed)
+	api_remote.set_active_entry_id(entry_id)
+	state.llm_model = model
+	Logger.info(LOG, "API entry model change staged (entry=%s, model=%s).", tostring(entry_id), model)
+	persist_entries("persist_api_entries(set_model)", function(persisted, reason, durable)
+		if not mutation_is_current(my_generation) then return end
+		finish_mutation(my_generation)
+		if persisted == true or durable == true then
+			if persisted ~= true then
+				Logger.error(LOG, "Remote API model change committed with cleanup debt: %s", tostring(reason))
+			end
+			WarmupCtrl.warmup("api_set_model")
+			pcall_log("update_menu(set_model)", update_menu)
+			return
+		end
+		api_remote.set_entries(previous_entries)
+		api_remote.set_active_entry_id(previous_active_id)
+		state.llm_model = previous_model
+		notify_persistence_failure("Remote API model change")
+		pcall_log("update_menu(set_model rollback)", update_menu)
+	end)
+	return true
 end
 
 --- Stores what the user chose for a local server (local_servers.json): its
@@ -937,21 +1057,33 @@ end
 --- @param fields table { base_url = string|nil, token = string|nil, model = string|nil }.
 --- @param on_done function|nil Receives (committed) once settled.
 --- @return boolean started False when another entry change is in flight.
-function M.apply_local_server(ctx, server_id, fields, on_done)
+function M.apply_local_server(ctx, server_id, fields, on_done, admission)
 	local api_remote = llm_mod.api_remote
-	if not api_remote.is_local_server(server_id) or type(fields) ~= "table" then
+	if not api_remote.is_local_server_view(server_id) or type(fields) ~= "table" then
 		error("api_panel.apply_local_server: a local server id and fields are required")
 	end
 	local LocalServers = require("modules.llm.local_servers")
 	local function done(committed)
 		if type(on_done) == "function" then pcall_log("apply_local_server(on_done)", on_done, committed) end
 	end
-	if _mutation_owner ~= nil then return false end
-	local provider = api_remote.PROVIDERS[server_id]
+	local function admitted()
+		if type(ctx.is_paused) ~= "function" or ctx.paused == true then return false end
+		local ok, paused = pcall(ctx.is_paused)
+		if not ok or type(paused) ~= "boolean" or paused ~= false then return false end
+		if admission ~= nil then
+			if type(admission) ~= "function" then return false end
+			local allowed, value = pcall(admission)
+			if not allowed or value ~= true then return false end
+		end
+		return true
+	end
+	if _mutation_owner ~= nil or not admitted() then return false end
+	local original_identity = api_remote.get_identity_generation()
+	local provider = api_remote.local_server_descriptor(server_id)
 	local existing = api_remote.local_server_entry(server_id)
 	fields = { base_url = fields.base_url, token = fields.token, model = fields.model }
 	-- The default address is stored as "", so a catalogue change reaches the entry
-	if fields.base_url == provider.base_url then fields.base_url = "" end
+	if (not existing or existing.provider == server_id) and fields.base_url == provider.base_url then fields.base_url = "" end
 	if not existing and fields.model == nil then
 		LocalServers.set_pending(server_id, fields)
 		done(true)
@@ -959,23 +1091,31 @@ function M.apply_local_server(ctx, server_id, fields, on_done)
 	end
 
 	local pending = LocalServers.pending(server_id)
-	local entry = {
-		id       = existing and existing.id or ("local-" .. server_id),
-		provider = server_id,
-		base_url = existing and existing.base_url or pending.base_url or "",
-		token    = existing and existing.token or pending.token or "",
-		model    = existing and existing.model or "",
-	}
+	local entry = {}
+	-- Existing entries retain their producer's metadata and original row position.
+	for key, value in pairs(existing or {}) do entry[key] = value end
+	entry.id = existing and existing.id or ("local-" .. server_id)
+	entry.provider = existing and existing.provider or server_id
+	entry.base_url = existing and existing.base_url or pending.base_url or ""
+	entry.token = existing and existing.token or pending.token or ""
+	entry.model = existing and existing.model or ""
 	for _, key in ipairs({ "base_url", "token", "model" }) do
 		if fields[key] ~= nil then entry[key] = fields[key] end
+	end
+	local configured = server_id:match("^configured:") ~= nil
+	if not (configured and LocalAuth.entry_token_allowed(entry.provider, "", entry.base_url, {})
+		or not configured and LocalAuth.entry_matches(entry.provider, entry.base_url, server_id, LocalServers.SERVERS)) then
+		Logger.warn(LOG, "Local server entry update refused: configured endpoint affinity changed.")
+		done(false)
+		return false
 	end
 	local previous_entries = {}
 	local staged = {}
 	for _, e in ipairs(api_remote.get_entries() or {}) do
 		previous_entries[#previous_entries + 1] = e
-		if e ~= existing then staged[#staged + 1] = e end
+		staged[#staged + 1] = e == existing and entry or e
 	end
-	staged[#staged + 1] = entry
+	if not existing then staged[#staged + 1] = entry end
 
 	local state = ctx.state
 	local previous_active_id = api_remote.get_active_entry_id()
@@ -988,16 +1128,23 @@ function M.apply_local_server(ctx, server_id, fields, on_done)
 	if serving and reset_prediction_identity(ctx.keymap, "apply local server entry") ~= true then
 		return false
 	end
+	if not admitted() or api_remote.get_identity_generation() ~= original_identity then return false end
 	local my_generation = begin_mutation()
 	if not my_generation then return false end
 	api_remote.set_entries(staged)
 	if becomes_active then api_remote.set_active_entry_id(entry.id) end
 	if serving and becomes_active then state.llm_model = entry.model end
+	local staged_identity = api_remote.get_identity_generation()
 	-- A key the user removed leaves no Keychain item behind
 	local cleared_key = existing ~= nil and (existing.token or "") ~= "" and entry.token == ""
 	persist_entries("persist_api_entries(local server)", function(ok, reason, durable)
 		if not mutation_is_current(my_generation) then return end
 		finish_mutation(my_generation)
+		if api_remote.get_identity_generation() ~= staged_identity then
+			Logger.warn(LOG, "Local server entry completion discarded after its native identity changed.")
+			done(false)
+			return
+		end
 		if ok == true or durable == true then
 			if ok ~= true then
 				Logger.error(LOG, "Local server entry committed with cleanup debt: %s", tostring(reason))

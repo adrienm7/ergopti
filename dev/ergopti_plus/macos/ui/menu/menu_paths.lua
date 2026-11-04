@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Menu Paths (the path editor's GUI)
 --- DESCRIPTION:
---- The menu item and webview form that let the user choose the single
+--- The webview form that lets the user choose the single
 --- machine-specific configuration directory. Resolution itself lives in
 --- infra/config_paths.lua.
 ---
@@ -23,6 +23,8 @@
 --- ==============================================================================
 
 local M = {}
+local Json = require("json")
+local NativePath = require("native_path")
 local WebviewResult = require("adapters.webview_result")
 local hs     = hs
 local Logger = require("infra.logger")
@@ -46,6 +48,8 @@ local _webview     = nil
 local _webview_committed = false
 local _focus_owner = nil
 local _usercontent = nil
+local _closing_webview = false
+local _opening_webview = false
 
 
 
@@ -185,8 +189,8 @@ end
 local function pick_dir(current, prompt)
 	if type(current) ~= "string" or current == "" then current = nil end
 	local default_dir = current or ConfigPaths.get_config_dir() or "/"
-	if not default_dir:match("[/\\]$") then
-		default_dir = default_dir:match("^(.+[/\\])") or default_dir
+	if not NativePath.has_trailing_separator(default_dir) then
+		default_dir = NativePath.directory_prefix(default_dir) or default_dir
 	end
 	local ok_attr, attr = pcall(hs.fs.attributes, default_dir)
 	if not ok_attr or not attr or attr.mode ~= "directory" then
@@ -211,17 +215,19 @@ local function pick_dir(current, prompt)
 
 	local ok, r2, raw = hs.osascript.applescript(script)
 	Logger.debug(LOG, "Folder picker completed (ok=%s, result_type=%s).", tostring(ok), type(r2))
+	-- A refused native script returns its diagnostic in raw, not a directory.
+	if ok ~= true then
+		Logger.error(LOG, "Native configuration-folder picker failed; diagnostic content withheld.")
+		return nil
+	end
 
 	if type(r2) == "string" and r2 ~= "" then
-		local p = r2:match("^(.-)%s*$")
-		if not p:match("[/\\]$") then p = p .. "/" end
-		return p
+		return NativePath.with_trailing_separator(r2:match("^(.-)%s*$"))
 	end
 	if type(raw) == "string" and raw ~= "" then
 		local stripped = (raw:match('^"(.*)"$') or raw):match("^(.-)%s*$")
 		if stripped ~= "" then
-			if not stripped:match("[/\\]$") then stripped = stripped .. "/" end
-			return stripped
+			return NativePath.with_trailing_separator(stripped)
 		end
 	end
 	return nil
@@ -246,32 +252,30 @@ end
 --- Closes and cleans up the paths editor webview.
 --- @return boolean committed
 local function close_webview()
-	_focus_owner = nil
-	if not _webview then
-		_webview_committed = false
-		_usercontent = nil
-		return true
-	end
+	if _closing_webview then return false end
+	_closing_webview = true
+	_focus_owner, _webview_committed = nil, false
 	local owned = _webview
-	local owned_usercontent = _usercontent
-	if type(owned.delete) ~= "function" then
-		Logger.error(LOG, "Paths editor close refused; owned WebView has no delete method.")
-		return false
+	if owned then
+		local ok, result = pcall(function() return owned:delete() end)
+		if not ok or result == false then
+			pcall(Logger.error, LOG, "Paths editor close did not commit; exact WebView retained: %s.", tostring(result))
+			_closing_webview = false
+			return false
+		end
+		if _webview == owned then _webview = nil end
 	end
-	_webview_committed = false
-	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
-	if not ok then
-		-- Native deletion may synchronously deliver on_close before raising. Restore
-		-- both exact owners so cancel and open requests remain retryable.
-		_webview = owned
-		_usercontent = owned_usercontent
-		Logger.error(LOG, "Paths editor close did not commit; exact WebView retained: %s.",
-			tostring(err))
-		return false
+	local bridge = _usercontent
+	if bridge then
+		local ok, result = pcall(function() return bridge:setCallback(nil) end)
+		if not ok or result ~= bridge then
+			pcall(Logger.error, LOG, "Paths editor callback cleanup remains pending: %s.", tostring(result))
+			_closing_webview = false
+			return false
+		end
+		if _usercontent == bridge then _usercontent = nil end
 	end
-	if _webview == owned then _webview = nil end
-	_webview_committed = false
-	if _usercontent == owned_usercontent then _usercontent = nil end
+	_closing_webview = false
 	return true
 end
 
@@ -454,8 +458,12 @@ local function handle_message(body)
 			if not owner_is_current(owner) then return end
 			Logger.success(LOG, "Folder picker completed.")
 			if picked and picked ~= "" then
-				local encoded_ok, encoded = pcall(hs.json.encode, picked)
-				if not encoded_ok or type(encoded) ~= "string" then
+				-- The native JSON extension accepts tables only; preserve this exact directory string.
+				local encoded_ok, encoded = pcall(function()
+					if type(picked) ~= "string" or not utf8.len(picked) then return nil end
+					return Json.quote(picked)
+				end)
+				if not encoded_ok or type(encoded) ~= "string" or encoded == "" then
 					report_delivery_failure(owner, "encoding failed")
 					return
 				end
@@ -479,6 +487,8 @@ end
 --- Builds or focuses the paths editor after public lifecycle validation.
 --- @return boolean opened
 local function open_editor_impl()
+	if _closing_webview then return false, true end
+	if _webview == nil and _usercontent ~= nil and close_webview() ~= true then return false, true end
 	if _webview then
 		if _webview_committed ~= true then
 			if close_webview() ~= true then return false, true end
@@ -499,6 +509,8 @@ local function open_editor_impl()
 		return false
 	end
 
+	-- Retain the bound controller even if native creation never publishes a window.
+	_usercontent = uc
 	uc:setCallback(function(message)
 		if _webview_committed ~= true or _usercontent ~= uc then return end
 		if message and type(message.body) == "table" then
@@ -533,17 +545,18 @@ local function open_editor_impl()
 			and _webview == candidate and _usercontent == uc and _focus_owner == focus_owner
 	end
 	local webview = ui_builder.show_webview({
+		delete_on_close = true,
 		frame       = ui_builder.get_centered_frame(win_w, win_h),
-		title       = i18n.get("menu.paths.window_title"),
+		app_id      = "paths_editor",
 		style_masks = style_masks,
 		usercontent = uc,
 		assets_dir    = ASSETS_DIR,
 		on_close      = function()
 			closed = true
-			if _webview ~= candidate then return end
-			_webview     = nil
+			if _closing_webview or _webview ~= candidate then return end
+			_webview = nil
 			_webview_committed = false
-			if _usercontent == uc then _usercontent = nil end
+			close_webview()
 		end,
 		on_navigation = function(action)
 			if action == "didFinishNavigation" then
@@ -555,7 +568,7 @@ local function open_editor_impl()
 			return true
 		end,
 		on_webview_created = function(owned)
-			if _webview ~= nil or _usercontent ~= nil then return false end
+			if _webview ~= nil or _usercontent ~= uc then return false end
 			candidate = owned
 			_webview = owned
 			_webview_committed = false
@@ -567,7 +580,6 @@ local function open_editor_impl()
 		end,
 	})
 	if webview == nil or webview ~= candidate or closed then
-		if candidate == nil and _usercontent == uc then _usercontent = nil end
 		Logger.error(LOG, "Paths editor webview could not be created.")
 		return false
 	end
@@ -575,43 +587,36 @@ local function open_editor_impl()
 	return true
 end
 
+--- The open paths editor window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.editor_window() return _webview end
+
+--- Closes the paths editor window, for ui/window_toggle.
+--- @return boolean committed
+function M.close_editor()
+	if _webview == nil then return true end
+	return close_webview() == true
+end
+
 --- Opens the paths editor as a webview form.
 --- @return boolean opened
 function M.open_editor()
+	if _opening_webview or _closing_webview then return false end
 	if not require_state("open_editor") then return false end
+	_opening_webview = true
 	local ok, opened_or_err, cleanup_attempted = xpcall(open_editor_impl, debug.traceback)
-	if ok and opened_or_err == true then return true end
-	if cleanup_attempted ~= true then close_webview() end
-	if not ok then
-		Logger.error(LOG, "Paths editor open failed: %s.", tostring(opened_or_err))
+	if ok and opened_or_err == true then
+		_opening_webview = false
+		return true
 	end
+	if cleanup_attempted ~= true then close_webview() end
+	if not ok then pcall(Logger.error, LOG, "Paths editor open failed: %s.", tostring(opened_or_err)) end
+	_opening_webview = false
 	return false
 end
 
 
 
 
-
--- =========================================
--- =========================================
--- ======= 3/ Menu Item Construction =======
--- =========================================
--- =========================================
-
-
-
-
-
-
---- Builds the "Dossier de configuration…" menu item for the tray menu.
---- @return table Menu item table.
-function M.build_menu_item()
-	return {
-		label  = i18n.get("menu.paths.menu_item"),
-		action = function()
-			DeferredWork.after(0.05, M.open_editor, "menu_paths.open_editor")
-		end,
-	}
-end
 
 return M

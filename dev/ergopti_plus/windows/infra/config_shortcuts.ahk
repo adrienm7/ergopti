@@ -11,10 +11,10 @@
 ; SECTION LAYOUT inside autohotkey/config.toml:
 ;
 ;   [metrics]
-;   metrics_enabled            = true
+;   enabled                    = true
 ;   private_filter_enabled     = true
 ;   system_auth_filter_enabled = true
-;   metrics_disabled_apps      = ["chrome.exe", "firefox.exe"]
+;   disabled_apps              = ["chrome.exe", "firefox.exe"]
 ;
 ; FEATURES & RATIONALE:
 ; 1. Per-driver subfolder: ``<config_dir>/ahk/`` is auto-created on first
@@ -27,6 +27,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 
 
@@ -68,42 +69,25 @@ global CS_SECTION := "metrics"
 ; Returns a Map of { section_name => Map(key => value) }. Values are
 ; strings, integers, booleans (1/0), or Arrays of strings.
 ; Comments (lines starting with #) and blank lines are skipped.
-CS_Read() {
-		out := Map()
+CS_Read(&Snapshot := 0, &SourcePath := "") {
+		Snapshot := 0
 		path := CS_GetTomlPath()
-		if !FileExist(path)
-				return out
-		content := ""
-		ReadFailed := false
+		SourcePath := path
 		try {
-				content := FileRead(path, "UTF-8")
+				; Bootstrap, feature application and metrics must retain one native
+				; source generation. A physical edit alone grants no new admission.
+				Snapshot := ConfigTomlReadSnapshot(path)
 		} catch as Err {
-				ReadFailed := true
-				try LoggerError("ConfigShortcuts", "Cannot read '{1}': {2}. Metrics settings stay at their in-memory defaults, and persistence is blocked so those defaults cannot be written over the real file.", path, Err.Message)
-		}
-		if (ReadFailed) {
-				; Latch the SAME sentinel SaveFullConfig already honours. This reader
-				; feeds the metrics settings, and a swallowed read left them at their
-				; in-memory DEFAULTS — indistinguishable from a user who never changed
-				; them — which the next full save then wrote over the user's real
-				; values. The file here is config.toml, so reusing the boot latch keeps
-				; one owner for "the in-memory config is not the user's".
 				global _ConfigBootReadFailed
 				_ConfigBootReadFailed := true
-				return out
+				try LoggerError("ConfigShortcuts", "Cannot admit '{1}': {2}. Metrics settings stay at their in-memory defaults, and persistence is blocked so those defaults cannot be written over the real file.", path, Err.Message)
+				return Map()
 		}
-		if (content = "")
-				return out
-
-		; A second lexical grammar silently ignored commented headers and could
-		; not read multiline application opt-outs. Parse the bytes already read
-		; through the canonical reader, retaining native Boolean values and the
-		; metrics-specific unreadable-file latch above.
-		return _ParseTomlFileImpl(path, false, false, content)
+		return Snapshot.Cache
 }
 
 ; Truncate a value at the first '#' that sits OUTSIDE a quoted string, so an
-; inline TOML comment (metrics_enabled = false # off) does not become part of the
+; inline TOML comment (enabled = false # off) does not become part of the
 ; value. Quote/escape state is tracked from the raw character stream (same
 ; discipline as the array tokenizer below), so a '#' inside a quoted value or an
 ; escaped quote is preserved. Without this, "false # x" fell through to the bare-
@@ -177,9 +161,50 @@ CS_Unescape(s) {
 ; =========================================
 ; =========================================
 
-; Populate MetricsShortcuts + MetricsFilters from disk. Safe to call once
-; at boot — missing file or missing keys leave the in-memory defaults
-; untouched.
+; The primary boot loader already reports this exact source generation. A
+; later metrics read must not report the same entry again, while a different
+; file or a changed source still owns its own diagnostic.
+_CS_OutdatedAlreadyReported(Snapshot, Path, Key) {
+	global CS_SECTION, ConfigurationFile, _BootConfigSnapshot, _ConfigBootOutdatedEntries
+	if !IsSet(ConfigurationFile) || ConfigurationFile == ""
+			|| !IsSet(_BootConfigSnapshot) || !IsObject(_BootConfigSnapshot)
+			|| !_BootConfigSnapshot.HasOwnProp("Source")
+			|| !IsSet(_ConfigBootOutdatedEntries) || !(_ConfigBootOutdatedEntries is Map)
+		return false
+	return _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
+		&& Snapshot.Source == _BootConfigSnapshot.Source
+		&& _ConfigBootOutdatedEntries.Has(CS_SECTION . "`n" . Key)
+}
+
+; Keep the complete semantic snapshot intact for cleanup and source admission.
+; Only the metrics consumers receive the canonical effective values; re-decoding
+; an outdated signed zero or quoted Boolean must never grant collection consent.
+_CS_AdmitMetricsCache(Cache, Snapshot, Path) {
+	global CS_SECTION
+	if !Cache.Has(CS_SECTION)
+		return Cache
+	Effective := Cache.Clone()
+	Effective[CS_SECTION] := Cache[CS_SECTION].Clone()
+	for Row in Snapshot.Rows {
+		if Row.Section != CS_SECTION
+			continue
+		if TomlConfigValueMatchesManifest(Row.Section, Row.Key, Row.Value,
+				&ExpectedType, TOML_StripInlineComment(Row.Raw))
+			continue
+		TomlConfigExpectedType(Row.Section, Row.Key, &Entry)
+		if !(Entry is Map) || !Entry.Has("path") || !Entry.Has("default")
+			throw Error("An outdated metrics setting has no manifest default")
+		Effective[CS_SECTION][Row.Key] := _ConfigTomlNativeValue(ManifestDefaultFor(Entry["path"]))
+		if !_CS_OutdatedAlreadyReported(Snapshot, Path, Row.Key)
+			LoggerWarn("ConfigShortcuts",
+				"Ignoring outdated [{1}].{2} in '{3}'; keeping the manifest value for this {4} setting. Source bytes are unchanged.",
+				CS_SECTION, Row.Key, Path, ExpectedType)
+	}
+	return Effective
+}
+
+; Populate MetricsShortcuts + MetricsFilters from disk and return their admitted
+; cache to the widget reader. Missing settings keep their in-memory defaults.
 _CS_RequireBoolean(Value, Key) {
 		if !(Value is Integer) || (Value != 0 && Value != 1)
 				throw TypeError("metrics." . Key . " must be a TOML boolean")
@@ -192,31 +217,17 @@ _CS_RequireString(Value, Key) {
 		return Value
 }
 
-_CS_RequireDisabledApps(Value) {
-		if !(Value is Array)
-				throw TypeError("metrics.metrics_disabled_apps must be a TOML array")
-		Result := Map()
-		for AppName in Value {
-				if !(AppName is String)
-						throw TypeError("metrics.metrics_disabled_apps items must be TOML strings")
-				Normalized := Trim(AppName)
-				if (Normalized != "")
-						Result[StrLower(Normalized)] := true
-		}
-		return Result
-}
-
 _CS_ValidateMetricsSection(Section) {
 		Validated := Map()
-		for Key in ["metrics_enabled", "metrics_wpm_menubar_colors",
-				"private_filter_enabled", "secure_filter_enabled",
-				"system_auth_filter_enabled", "encrypt"] {
+		for Key in ["enabled",
+				ConfigLeaf.PRIVATE_FILTER_ENABLED, ConfigLeaf.SECURE_FILTER_ENABLED,
+				ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED, "encrypt"] {
 				if Section.Has(Key)
 						Validated[Key] := _CS_RequireBoolean(Section[Key], Key)
 		}
-		if Section.Has("metrics_disabled_apps")
-				Validated["metrics_disabled_apps"] :=
-						_CS_RequireDisabledApps(Section["metrics_disabled_apps"])
+		if Section.Has(ConfigLeaf.DISABLED_APPS)
+				Validated[ConfigLeaf.DISABLED_APPS] :=
+						TomlConfigMetricsDisabledApps(Section[ConfigLeaf.DISABLED_APPS])
 		return Validated
 }
 
@@ -227,9 +238,11 @@ CS_Load() {
 		; unspecified point relative to the manifest include, and a privacy default
 		; that depends on include order is one refactor away from flipping.
 		MetricsFiltersApplyManifestDefaults()
-		data := CS_Read()
+		data := CS_Read(&Snapshot, &SourcePath)
+		if IsObject(Snapshot)
+				data := _CS_AdmitMetricsCache(data, Snapshot, SourcePath)
 		if !data.Has(CS_SECTION) {
-				return
+				return data
 		}
 		s := data[CS_SECTION]
 		Validated := _CS_ValidateMetricsSection(s)
@@ -239,24 +252,23 @@ CS_Load() {
 		if Validated.Has("encrypt")
 				KL_Enc_SetEnabled(Validated["encrypt"])
 
-		if Validated.Has("metrics_enabled")
-				MetricsShortcuts.enabled := Validated["metrics_enabled"]
+		if Validated.Has("enabled")
+				MetricsShortcuts.enabled := Validated["enabled"]
 
-		if Validated.Has("metrics_wpm_menubar_colors")
-				MetricsShortcuts.wpm_menubar_colors := Validated["metrics_wpm_menubar_colors"]
 		; Canonical ids, shared with the macOS driver, which reads the same four
 		; through Manifest.default_for("metrics.<id>").
-		if Validated.Has("private_filter_enabled")
-				MetricsFilters.private_browsing := Validated["private_filter_enabled"]
-		if Validated.Has("secure_filter_enabled")
-				MetricsFilters.secure_field := Validated["secure_filter_enabled"]
-		if Validated.Has("system_auth_filter_enabled")
-				MetricsFilters.system_auth := Validated["system_auth_filter_enabled"]
+		if Validated.Has(ConfigLeaf.PRIVATE_FILTER_ENABLED)
+				MetricsFilters.private_browsing := Validated[ConfigLeaf.PRIVATE_FILTER_ENABLED]
+		if Validated.Has(ConfigLeaf.SECURE_FILTER_ENABLED)
+				MetricsFilters.secure_field := Validated[ConfigLeaf.SECURE_FILTER_ENABLED]
+		if Validated.Has(ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED)
+				MetricsFilters.system_auth := Validated[ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED]
 		if Validated.Has("encrypt")
 				MetricsFilters.encrypt := Validated["encrypt"]
 
-		if Validated.Has("metrics_disabled_apps")
-				MetricsFilters.disabled_apps := Validated["metrics_disabled_apps"]
+		if Validated.Has(ConfigLeaf.DISABLED_APPS)
+				MetricsFilters.disabled_apps := Validated[ConfigLeaf.DISABLED_APPS]
+		return data
 }
 
 ; Commit an explicit metrics candidate through the one atomic config.toml

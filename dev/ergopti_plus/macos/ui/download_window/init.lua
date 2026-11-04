@@ -29,13 +29,16 @@ local M = {}
 
 local Logger     = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
+local TimerScheduler = require("adapters.timer_scheduler")
 local Paths      = require("infra.paths")
 local ShellRunner = require("adapters.shell_runner")
+local OwnWindow  = require("adapters.own_window")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local text_utils = require("infra.text_utils")
 local JavaScript = require("ui.download_window.javascript")
 local PendingQueue = require("ui.download_window.pending_queue")
+local NativeTheme = require("native_theme_data")
 
 local LOG = "download_window"
 
@@ -47,7 +50,7 @@ local _on_cancel = nil
 local _on_resolve = nil
 local _on_retry_start = nil
 local _on_retry  = nil
-local _start_ts  = nil
+local _start_ts  = nil -- Awake seconds private to the active presentation operation.
 local _ready     = false
 local _queued    = PendingQueue.new()
 local _log_shown = false
@@ -58,6 +61,37 @@ local _is_hiding = false
 local _session   = 0
 local _kind      = nil      -- Active kind, if any (mlx_install, ollama_install, mlx_model, ollama_model)
 local _mode      = "download" -- "download" (model download) or "bootstrap" (engine install)
+-- Bumped whenever the visible progress of the current operation advances (a
+-- new percentage, byte count, file count or step), never by a repeated frame:
+-- the developer field run extends a download's deadline while it moves.
+local _progress_mark = 0
+local _progress_signature = nil
+-- The one observer of model download percentages (the model selector page)
+-- and the last whole percentage it was told, by session.
+local _percent_listener = nil
+local _told_percent = nil
+
+--- Records one visible progress state; a change is progress.
+--- @param signature string The visible state, prefixed by its session.
+local function note_progress(signature)
+	signature = tostring(_session) .. "|" .. signature
+	if signature ~= _progress_signature then
+		_progress_signature = signature
+		_progress_mark = _progress_mark + 1
+	end
+end
+
+--- Tells the percentage observer a new whole percentage of the current
+--- model download or runtime install (never a repeated one), with its kind
+--- and session.
+--- @param percent integer Whole percentage in [0, 99] while it runs.
+local function tell_percent(percent)
+	if type(_percent_listener) ~= "function" then return end
+	local signature = tostring(_session) .. "|" .. tostring(percent)
+	if signature == _told_percent then return end
+	_told_percent = signature
+	Logger.callback(LOG, "Download percentage observer", _percent_listener, _kind, percent, _session)
+end
 
 --- Distinguishes live presentation authority from a native cleanup capability.
 --- @return boolean
@@ -92,31 +126,35 @@ local PRESETS = {
 		mode             = "bootstrap",
 		default_title    = i18n.get("mlx.install_title"),
 		default_subtitle = i18n.get("mlx.install_subtitle"),
-		accent           = "#4da6ff",
+		accent           = NativeTheme.download_accent.mlx_install,
 	},
 	ollama_install = {
 		mode             = "bootstrap",
 		default_title    = i18n.get("ollama.install_title"),
 		default_subtitle = i18n.get("ollama.install_subtitle"),
-		accent           = "#73d98c",
+		accent           = NativeTheme.download_accent.ollama_install,
 	},
 	mlx_model = {
 		mode             = "download",
 		default_title    = i18n.get("mlx.download_title"),
 		default_subtitle = i18n.get("mlx.download_subtitle"),
-		accent           = "#9973f2",
+		accent           = NativeTheme.download_accent.mlx_model,
 	},
 	ollama_model = {
 		mode             = "download",
 		default_title    = i18n.get("ollama.download_title"),
 		default_subtitle = i18n.get("ollama.download_subtitle"),
-		accent           = "#f2bf4d",
+		accent           = NativeTheme.download_accent.ollama_model,
 	},
 }
 
 -- Auto-dismiss delay applied after set_error before the window fades. Keeps
--- the failure message readable without forcing the user to dismiss it.
-local ERROR_AUTO_DISMISS_SEC = 8.0
+-- the failure message readable without forcing the user to dismiss it. Read
+-- from the shared registry when an error is shown, so loading this window
+-- (which every download path does) does not depend on the registry.
+local function error_auto_dismiss_sec()
+	return require("infra.timings").sec("tooltip", "error_dialog_autodismiss_ms")
+end
 
 --- Invokes one external window controller through the central visible boundary.
 --- @param label string Context included in the ERROR log on failure.
@@ -346,13 +384,14 @@ local function ensure_webview(title)
 		end
 		local show_ok, candidate = xpcall(function()
 			local controller = hs.webview.usercontent.new("dl_bridge")
-			controller:setCallback(function(msg) handle_bridge(owner, msg) end)
 			owner.controller = controller
+			controller:setCallback(function(msg) handle_bridge(owner, msg) end)
 			return ui_builder.show_webview({
 				frame             = frame,
 				title             = title or i18n.get("download_window.title"),
 				style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
 				allow_new_windows = false,
+				delete_on_close   = true,
 				usercontent       = controller,
 				assets_dir        = ASSETS_DIR,
 				on_navigation     = function(action)
@@ -369,11 +408,9 @@ local function ensure_webview(title)
 						if _is_hiding then return end
 						local abort, cancel = _on_abort, _on_cancel
 						_wv = nil
-						_owner = nil
-						_ready = false
-						_queued = PendingQueue.new()
-						M._total_files = nil
-						M._last_file_count = nil
+						owner.view = nil
+						-- The native window is already closing; settle only its controller.
+						M.hide()
 
 						-- Auto-abort download and reset menubar if the window is closed natively.
 						Logger.debug(LOG, "Native window closed (session=%d).", _session)
@@ -399,7 +436,7 @@ local function ensure_webview(title)
 		if owner.loaded then flush() end
 
 		-- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
-		DeferredWork.after(1.0, function()
+		DeferredWork.after(require("infra.timings").sec("ui", "download_window_flush_safety_ms"), function()
 				if not _ready then flush() end
 		end, "download_window.ready_fallback")
 		return true
@@ -432,6 +469,24 @@ function M.session_id()
 	return _session
 end
 
+--- Sets the one observer of progress percentages: it receives
+--- (kind, percent, session) at each new whole percentage of an ollama_model
+--- or mlx_model download and of an ollama_install or mlx_install runtime
+--- install. nil removes it.
+--- @param listener function|nil
+function M.set_percent_listener(listener)
+	if listener ~= nil and type(listener) ~= "function" then
+		error("download_window.set_percent_listener requires a function or nil", 2)
+	end
+	_percent_listener = listener
+end
+
+--- Counts how often the visible progress of the window advanced.
+--- @return integer mark Monotonic; unchanged while no operation progresses.
+function M.progress_mark()
+	return _progress_mark
+end
+
 --- Brings the window to the front and focuses it.
 function M.focus()
 	if not require_active_operation() then return false end
@@ -442,7 +497,7 @@ function M.focus()
 		view:show()
 		if not operation_is_active() or _wv ~= view or _session ~= session then return false end
 		if type(view.hswindow) == "function" then
-			local win = view:hswindow()
+			local win = OwnWindow.for_webview(view)
 			if not operation_is_active() or _wv ~= view or _session ~= session then return false end
 			if win and type(win.focus) == "function" then win:focus() end
 		end
@@ -454,6 +509,8 @@ end
 --- Hides and destroys the progress window.
 --- @return boolean committed
 function M.hide()
+		if _is_hiding then return false end
+		if _javascript_context then JavaScript.retire(_javascript_context) end
 		_is_hiding = true
 		local owned = _wv
 		local owner = _owner
@@ -468,14 +525,26 @@ function M.hide()
 						return false
 				end
 				local ok, err = xpcall(function() owned:delete() end, debug.traceback)
-				_is_hiding = false
 				if not ok then
+						_is_hiding = false
 						Logger.error(LOG, "Download window close did not commit; exact WebView retained: %s.",
 							tostring(err))
 						return false
 				end
 		end
 		if _wv == owned then _wv = nil end
+		if owner then
+				owner.view = nil
+				if owner.controller then
+						local released, err = xpcall(function() owner.controller:setCallback(nil) end, debug.traceback)
+						if not released then
+								_is_hiding = false
+								Logger.error(LOG, "Download window controller release did not commit; exact controller retained: %s.", tostring(err))
+								return false
+						end
+						owner.controller = nil
+				end
+		end
 		if _owner == owner then _owner = nil end
 		_on_abort = nil
 		_on_cancel = nil
@@ -526,6 +595,7 @@ function M.show(opts)
 		Logger.start(LOG, "Showing progress UI (kind=%s, mode=%s).", opts.kind, preset.mode)
 
 		-- New occupant: invalidate any deferred hide armed by the previous one.
+		if _javascript_context then JavaScript.retire(_javascript_context) end
 		_session = _session + 1
 		local session = _session
 		_javascript_context = JavaScript.new_context(session, opts.kind)
@@ -557,7 +627,7 @@ function M.show(opts)
 		-- Its discarded pending payload left no rendered state to reset
 		local reset_required = reusing and _ready
 
-		_start_ts          = hs.timer.secondsSinceEpoch()
+		_start_ts          = TimerScheduler.awake_time()
 		_log_shown         = false
 		M._total_files     = nil
 		M._last_file_count = nil
@@ -611,7 +681,7 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
 		if not require_active_operation() then return false end
 
 		local pct = tonumber(pct_str) or 0
-		local elapsed = hs.timer.secondsSinceEpoch() - (_start_ts or hs.timer.secondsSinceEpoch())
+		local elapsed = TimerScheduler.awake_time() - (_start_ts or TimerScheduler.awake_time())
 
 		local dl_str, speed_str, eta_str, file_count_str
 
@@ -647,7 +717,8 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
             local o_speed = clean_line:match("(%d+%.?%d*%s*[KMG]?B/s)")
             if o_speed then speed_str = o_speed end
 
-            local o_eta = clean_line:match("%s+(%d+[hms%d]+)%s*$")
+            -- A unit letter is required: a bare trailing number is a byte count
+            local o_eta = clean_line:match("%s+(%d+[%dhms]*[hms])%s*$")
             if o_eta then eta_str = o_eta end
         end
 
@@ -717,6 +788,9 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
     -- Cap at 99% during download: 100% is reserved exclusively for done()
     pct = math.min(math.max(0, pct), 99)
 
+    note_progress(string.format("u|%d|%s|%s", math.floor(pct), tostring(dl_str), tostring(file_count_str)))
+    tell_percent(math.floor(pct))
+
     local js = string.format("update(%d,%s,%s,%s,%s)",
         math.floor(pct), js_str(dl_str), js_str(speed_str), js_str(eta_str), js_str(file_count_str))
 
@@ -755,7 +829,7 @@ function M.complete(success, _model_name, error_kind)
         -- the window when it fires. The session identity exists for exactly this
         -- and was applied to one deferred-hide site; these two never got it.
         local sid = M.session_id()
-        DeferredWork.after(4, function()
+        DeferredWork.after(require("infra.timings").sec("ui", "download_window_hide_delay_ms"), function()
             if M.session_id() ~= sid then
                 Logger.debug(LOG, "Auto-hide skipped: the window now belongs to a newer operation.")
                 return
@@ -777,6 +851,7 @@ function M.set_step(label)
     if not require_active_operation() then return false end
     if type(label) ~= "string" then return end
     Logger.debug(LOG, "Step: %s", label)
+    note_progress("s|" .. label)
     eval(string.format("setStep(%s)", js_str(label)), "setStep")
 end
 
@@ -797,6 +872,7 @@ end
 function M.append_log(text)
     if not require_active_operation() then return false end
     if type(text) ~= "string" or text == "" then return end
+    note_progress("l|" .. text)
     eval(string.format("addLog(%s)", js_str(text)), "addLog")
 end
 
@@ -805,11 +881,14 @@ end
 function M.set_progress(pct)
     if not require_active_operation() then return false end
     if pct ~= nil and type(pct) ~= "number" then return end
+    note_progress("p|" .. tostring(pct))
+    -- The model selector page shows a runtime install's progress in its group.
+    if pct ~= nil and pct < 100 then tell_percent(math.floor(pct)) end
     eval(string.format("setProgress(%s)", pct == nil and "null" or tostring(pct)), "setProgress")
 end
 
 --- Switches the UI to "error" presentation: red accent, error step color,
---- and an automatic dismiss after ERROR_AUTO_DISMISS_SEC.
+--- and an automatic dismiss after the shared error auto-dismiss delay.
 --- @param msg string Short French error message (one line).
 function M.set_error(msg)
 	if _wv and not require_active_operation() then return false end
@@ -824,7 +903,7 @@ function M.set_error(msg)
     -- Same session capture as M.complete: "_wv is non-nil" only proves SOME
     -- window is open, not that it is still this operation's.
     local sid = M.session_id()
-    DeferredWork.after(ERROR_AUTO_DISMISS_SEC, function()
+    DeferredWork.after(error_auto_dismiss_sec(), function()
         if not _wv then return end
         if M.session_id() ~= sid then
             Logger.debug(LOG, "Error auto-dismiss skipped: the window now belongs to a newer operation.")

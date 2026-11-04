@@ -1,0 +1,9 @@
+{
+	"_comment": "Single source of the brand and emoji of every AI backend. The tray's model button reads '<emoji> <model>' from here on Windows, macOS and Linux, the Backend submenu names an option '<brand> <emoji>', and the model selector page uses the same emoji in its backend filter and table. Brands and emojis are not translated; tools/test/test-llm-backend-brands-single-source.cjs forbids a second copy.",
+	"order": ["ollama", "mlx", "api"],
+	"backends": {
+		"ollama": { "brand": "Ollama", "emoji": "🦙", "kind": "local" },
+		"mlx": { "brand": "MLX", "emoji": "🚀", "kind": "local" },
+		"api": { "brand": "API", "emoji": "🌐", "kind": "remote" }
+	}
+}

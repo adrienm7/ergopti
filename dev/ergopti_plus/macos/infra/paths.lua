@@ -23,7 +23,12 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local LOG    = "paths"
+
+-- Backslash is a filename byte on macOS and separates components only when the
+-- host itself is Windows (the headless suite): the shared owner applies that rule.
+local parent_of = NativePath.dirname
 
 -- Absolute path of this file's own directory — used as the script-relative
 -- fallback base when hs.configdir does not reach the repository root. The
@@ -31,7 +36,7 @@ local LOG    = "paths"
 local _script_dir = (function()
 	local src = (debug.getinfo(1, "S") or {}).source or ""
 	src = src:gsub("^@", "")
-	return src:match("^(.*)[/\\][^/\\]+$") or ""
+	return parent_of(src) or ""
 end)()
 
 
@@ -55,18 +60,19 @@ end)()
 --- @param base_dir string Starting directory (trailing slash optional).
 --- @param relative_target string Relative path to look for at each level, e.g. ``"static/locales"``.
 --- @param max_steps number|nil Maximum levels to climb (default: 8).
+--- @param required_mode string|nil Optional followed stat mode required for a match.
 --- @return string|nil Absolute path to the match, or nil.
-function M.find_upward(base_dir, relative_target, max_steps)
+function M.find_upward(base_dir, relative_target, max_steps, required_mode)
 	max_steps = max_steps or 8
-	local current = (base_dir or ""):gsub("[/\\]+$", "")
+	local current = NativePath.without_trailing_separators(base_dir or "")
 	for _ = 1, max_steps do
 		local candidate = current .. "/" .. relative_target
 		local ok, attr = pcall(hs.fs.attributes, candidate)
-		if ok and type(attr) == "table" then
+		if ok and type(attr) == "table" and (required_mode == nil or attr.mode == required_mode) then
 			Logger.debug(LOG, "find_upward('%s'): found at '%s'.", relative_target, candidate)
 			return candidate
 		end
-		local parent = current:match("^(.*)[/\\][^/\\]+$")
+		local parent = parent_of(current)
 		if not parent or parent == current then break end
 		current = parent
 	end
@@ -81,9 +87,10 @@ end
 --- remain reachable without requiring a config change on the user's machine.
 --- @param relative_target string Relative path to look for, e.g. ``"static/locales"``.
 --- @param max_steps number|nil Maximum levels to climb (default: 8).
+--- @param required_mode string|nil Optional followed stat mode required for a match.
 --- @return string|nil
-function M.find_from_configdir(relative_target, max_steps)
-	local result = M.find_upward(hs.configdir or "", relative_target, max_steps)
+function M.find_from_configdir(relative_target, max_steps, required_mode)
+	local result = M.find_upward(hs.configdir or "", relative_target, max_steps, required_mode)
 	if result then
 		return result
 	end
@@ -93,7 +100,7 @@ function M.find_from_configdir(relative_target, max_steps)
 	-- holds ergopti_plus/_shared/.
 	if _script_dir ~= "" then
 		Logger.debug(LOG, "find_from_configdir('%s'): retrying from script dir '%s'.", relative_target, _script_dir)
-		result = M.find_upward(_script_dir, relative_target, max_steps)
+		result = M.find_upward(_script_dir, relative_target, max_steps, required_mode)
 		if result then return result end
 	end
 	-- Both attempts failed — this is a genuine misconfiguration worth surfacing.
@@ -127,7 +134,7 @@ local _shared_root = nil
 --- @return string|nil
 function M.shared_root()
 	if _shared_root then return _shared_root end
-	_shared_root = M.find_from_configdir("_shared")
+	_shared_root = M.find_from_configdir("_shared", nil, "directory")
 	return _shared_root
 end
 

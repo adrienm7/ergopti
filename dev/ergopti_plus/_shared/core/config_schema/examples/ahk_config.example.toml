@@ -1,6 +1,9 @@
 # _shared/core/config_schema/examples/ahk_config.example.toml
 # Example AHK v2 configuration — target schema after the Scope C refactor.
-# Generated at first boot by the AHK driver from _shared/modules/features/manifest.toml.
+# A hand-written illustration of a configured file, NOT the first-boot render: the
+# neutral first-run file is windows/_generated/config_template.toml, built from
+# _shared/modules/features/manifest.toml. The [layout] values below are the shipped
+# neutral defaults and tools/test/test-neutral-installation.cjs fails on drift.
 # The user edits this file freely; any unknown key triggers a warn at boot
 # (strict in dev mode via the ERGOPTI_DEV=1 environment variable).
 #
@@ -426,8 +429,10 @@ enabled = true
 private_filter_enabled = true
 secure_filter_enabled = true
 system_auth_filter_enabled = true
-show_wpm_menubar = false
-wpm_menubar_colors = false
+disabled_apps = []
+wpm_widget_visible = false
+wpm_widget_colors = true
+wpm_widget_graph = true
 
 
 
@@ -461,20 +466,37 @@ list = []
 
 [shortcuts]
 # Universal section; the modifier-combo variants are the [shortcuts.*] sub-tables.
-get_hex_value = true
-gpt = { enabled = true, link = "https://chatgpt.com/" }
-search = { enabled = true, search_engine = "https://www.google.com", search_engine_url_query = "https://www.google.com/search?q=" }
-microsoft_bold = true
-take_note = { enabled = true, dated_notes = false, destination_folder = "D:\\Bureau" }
-title_case = true
-uppercase = true
-paste_without_formatting = false
+chatgpt_url = "https://chatgpt.com/"
 save = false
-select_line = true
-spotlight_mouse = true
-surround_with_parentheses = true
-teleport_mouse = true
 wrap_text_if_selected = true
+
+# One chord, one action: a neutral slot id (primary is Ctrl, meta is the Windows
+# key) holding a catalogue action, "none" clearing it.
+[shortcuts.keyboard]
+meta_a = "select_line"
+meta_capslock = "toggle_capslock"
+meta_d = "open_downloads"
+meta_g = "open_chatgpt"
+meta_h = "screen_capture"
+meta_m = "activity_simulation"
+meta_n = "take_note"
+meta_o = "surround_parens"
+meta_quote = "spotlight_mouse"
+meta_s = "copy_selected_path"
+meta_t = "teleport_mouse"
+meta_u = "uppercase_selection"
+meta_w = "titlecase_selection"
+meta_x = "pick_color"
+primary_b = "microsoft_bold"
+primary_shift_v = "none"
+
+[shortcuts.search]
+search_engine = "https://www.google.com"
+search_engine_url_query = "https://www.google.com/search?q="
+
+[shortcuts.take_note]
+dated_notes = false
+destination_folder = "D:\\Bureau"
 
 
 
@@ -485,10 +507,6 @@ wrap_text_if_selected = true
 # Windows-only shortcuts. They are not namespaced by driver: a shortcut is a
 # shortcut, and which drivers implement it is the manifest's "platforms" field.
 ctrl_j = false
-open_downloads = true
-move = true
-screen = true
-win_caps_lock = true
 
 
 [shortcuts.a_grave]
@@ -528,10 +546,11 @@ letter = "z"
 # ======================
 
 [layout]
-ergopti_base = true
-direct_access_digits = true
-ergopti_alt_gr = true
-ergopti_plus = true
+ergopti_base = false
+direct_access_digits = "native"
+ergopti_alt_gr = false
+ergopti_variant = "none"
+emulated_layout = ""
 # ==============================================
 # ===== 6.3 shortcuts.key_combination_taps =====
 # ==============================================

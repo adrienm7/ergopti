@@ -1,6 +1,7 @@
 ﻿; adapters/file_system.ahk
 
 #Include %A_LineFile%\..\..\infra\file_read_activity.ahk
+#Include %A_LineFile%\..\file_system_ports.ahk
 
 ; ==============================================================================
 ; MODULE: FileSystem Adapter (AutoHotkey)
@@ -34,10 +35,28 @@
 ; =======================================================
 ; =======================================================
 
+; Windows path APIs, and the AHK built-ins over them, read a caller String
+; only up to its first NUL code unit: "a.txt" NUL "x" names a.txt, so a refused
+; delete removed that prefix file and a refused read returned its bytes. Every
+; entry below admits a path through this check before any native call.
+; @param Path {Any} Caller value.
+; @return {Boolean} True only for a non-empty String without a NUL code unit.
+FSPathIsAdmissible(Path) {
+	return Path is String && Path != "" && !RegExMatch(Path, "\x00")
+}
+
+; Strict entries refuse an inadmissible path with an exception, as they do for
+; every other native failure; the message never repeats the refused bytes.
+_FSRequirePath(Path, Operation) {
+	if !FSPathIsAdmissible(Path)
+		throw ValueError(Operation . " requires a non-empty path without NUL.")
+}
+
 ; Reads UTF-8 text using AHK's BOM handling and preserves native read failures.
 ; @param Path {String} File path.
 ; @return {String} Text contents; throws when the read fails.
 FSReadStrict(Path) {
+	_FSRequirePath(Path, "A strict read")
 	return FileRead(Path, "UTF-8")
 }
 
@@ -45,14 +64,27 @@ FSReadStrict(Path) {
 ; @param Path {String} File path.
 ; @return {Buffer} The bytes; throws when the read fails.
 FSReadBytesStrict(Path) {
+	_FSRequirePath(Path, "A strict byte read")
 	return FileRead(Path, "RAW")
+}
+
+; Opens an owned native file without changing flags, encoding, or failure behavior.
+; @param Path {String} File path.
+; @param Flags {String|Integer} Native access, sharing and translation flags.
+; @param Encoding {String} Optional encoding; omission retains the native default.
+; @return {File|0} Native file result; native exceptions remain visible.
+FSOpenStrict(Path, Flags, Encoding := unset) {
+	_FSRequirePath(Path, "A strict open")
+	if IsSet(Encoding)
+		return FileOpen(Path, Flags, Encoding)
+	return FileOpen(Path, Flags)
 }
 
 ; Reads the entire contents of a file as a UTF-8 string.
 ; @param Path {String} Absolute path to the file.
 ; @return {String|false} File contents on success, false on any error.
 FSRead(Path) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	try {
 		local FH := FileOpen(Path, "r", "UTF-8-RAW")
@@ -84,7 +116,7 @@ FSWrite(Path, Content, OpenFn := 0, DeleteFn := 0, WriteFn := 0) {
 ; deletion of the partial artifact. OpenFn/DeleteFn make the short-write boundary
 ; deterministic in tests without weakening the public FileSystem port.
 _FSWriteComplete(Path, Content, OpenFn, DeleteFn, WriteFn := 0) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	if !(Content is String)
 		Content := ""
@@ -124,7 +156,7 @@ FSWriteDurable(Path, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0, WriteFn 
 }
 
 _FSWriteDurableComplete(Path, Content, OpenFn, DeleteFn, FlushFn, WriteFn := 0) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	if !(Content is String)
 		Content := ""
@@ -161,7 +193,7 @@ _FSWriteDurableComplete(Path, Content, OpenFn, DeleteFn, FlushFn, WriteFn := 0) 
 ; FileSystem port. A failed partial creation is removed only when this call
 ; actually created it; a collision is byte-preserving.
 FSWriteCreateDurable(Path, Content) {
-	if !(Path is String) or Path = "" or !(Content is String)
+	if !FSPathIsAdmissible(Path) or !(Content is String)
 		return 0
 	static GENERIC_WRITE := 0x40000000
 	static CREATE_NEW := 1
@@ -239,7 +271,7 @@ FSAppend(Path, Content) {
 ; Unlike an overwrite stage, a partially appended user file cannot be safely
 ; deleted or rolled back, so callers must receive failure and retain ownership.
 _FSAppendComplete(Path, Content, OpenFn, WriteFn := 0) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	if !(Content is String)
 		Content := ""
@@ -288,7 +320,7 @@ _FSNativeWrite(Handle, Bytes, ByteCount, &Written) {
 ; @param Path {String} Absolute path to test.
 ; @return {Boolean} True on success, false on error.
 FSExists(Path) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	; FileExist returns a non-empty attribute string on match, "" on miss
 	return FileExist(Path) != "" ? true : false
@@ -298,8 +330,8 @@ FSExists(Path) {
 ; not-found statuses mean absence; access, device, or filesystem errors throw
 ; so recovery never mistakes "could not inspect" for "does not exist".
 FSStrictExists(Path) {
-	if !(Path is String) or Path = ""
-		throw ValueError("A strict existence probe requires a non-empty path.")
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("A strict existence probe requires a non-empty path without NUL.")
 	Attributes := DllCall("kernel32\GetFileAttributesW", "Str", Path, "UInt")
 	if (Attributes != 0xFFFFFFFF)
 		return 1
@@ -357,7 +389,7 @@ FSListDirectoryStrict(Path, Directories := false) {
  * @throws {Error|OSError} Missing directories or incomplete native resolution.
  */
 FSResolveDirectoryPath(Path) {
-	if Path == "" || InStr(Path, "*") || InStr(Path, "?")
+	if !FSPathIsAdmissible(Path) || InStr(Path, "*") || InStr(Path, "?")
 		throw Error("Startup working directory cannot be resolved")
 	if !DirExist(Path)
 		throw Error("Startup working directory does not exist")
@@ -387,8 +419,8 @@ FSResolveDirectoryPath(Path) {
 ; @return {Boolean} True only after native exclusive creation succeeds.
 ; @throws {ValueError|OSError} Invalid paths and all native failures are explicit.
 FSCreateDirectoryExclusiveStrict(Path) {
-	if !(Path is String) || Path == ""
-		throw ValueError("Exclusive directory creation requires a non-empty path.")
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("Exclusive directory creation requires a non-empty path without NUL.")
 	Created := DllCall("kernel32\CreateDirectoryW", "WStr", Path, "Ptr", 0, "Int")
 	ErrorCode := A_LastError
 	if !Created
@@ -401,8 +433,8 @@ FSCreateDirectoryExclusiveStrict(Path) {
 ; @return {Boolean} True when it was created, false when it already existed.
 ; @throws {Error} When it cannot be created.
 FSEnsureDirectoryStrict(Path) {
-	if !(Path is String) || Path == ""
-		throw ValueError("A directory creation requires a non-empty path.")
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("A directory creation requires a non-empty path without NUL.")
 	if DirExist(Path)
 		return false
 	DirCreate(Path)
@@ -425,7 +457,7 @@ _FSDeleteNativeReceipt(Path) {
 }
 
 _FSDeleteWith(Path, DeleteFn) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	try {
 		Receipt := DeleteFn.Call(Path)
@@ -447,6 +479,8 @@ _FSDeleteWith(Path, DeleteFn) {
 ; The callback must return true only for an artifact owned by its caller.
 ; Sharing/identity failures retain the file for a later retry.
 FSDeleteVerified(Path, VerifyFn) {
+	if !FSPathIsAdmissible(Path)
+		return false
 	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
 		"UInt", 1, "Ptr", 0, "UInt", 3, "UInt", 0x00200000, "Ptr", 0, "Ptr")
 	if Handle = -1
@@ -487,8 +521,8 @@ FSDeleteVerified(Path, VerifyFn) {
 ; @param Path {String} Guard path in an existing owned directory.
 ; @returns {Integer} Owned handle, or 0 when unavailable or not an ordinary file.
 FSOpenExclusiveGuard(Path) {
-	if !(Path is String) || Path = ""
-		throw ValueError("An exclusive guard requires a non-empty path.")
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("An exclusive guard requires a non-empty path without NUL.")
 	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0xC0000000,
 		"UInt", 0, "Ptr", 0, "UInt", 4, "UInt", 0x00200080, "Ptr", 0, "Ptr")
 	if Handle = -1
@@ -513,8 +547,8 @@ FSCloseExclusiveGuard(Handle) {
 ; does not route through FileExist (whose empty result conflates absence with
 ; an OS probe failure). Non-absence failures are surfaced to the journal.
 FSDeleteStrict(Path) {
-	if !(Path is String) or Path = ""
-		throw ValueError("A strict delete requires a non-empty path.")
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("A strict delete requires a non-empty path without NUL.")
 	Receipt := _FSDeleteNativeReceipt(Path)
 	if Receipt["deleted"]
 		return 1
@@ -529,7 +563,7 @@ FSDeleteStrict(Path) {
 ; Kept outside the portable port map for transactional file protocols that must
 ; validate an artifact without exposing AHK FileGetSize to domain modules.
 FSSize(Path) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return -1
 	try return FileGetSize(Path)
 	catch
@@ -540,7 +574,7 @@ FSSize(Path) {
 ; This prevents a malformed sidecar from turning an early-boot capability check
 ; into an unbounded allocation.
 FSReadBounded(Path, MaxBytes) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		or !IsNumber(MaxBytes) or MaxBytes <= 0
 		return false
 	FH := 0
@@ -591,7 +625,7 @@ FSReadUtf8ExactBounded(Path, MaxBytes) {
 }
 
 _FSReadUtf8ExactImpl(Path, MaxBytes, Bounded) {
-	if !(Path is String) || Path == ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	static GENERIC_READ := 0x80000000
 	static FILE_SHARE_READ := 0x00000001
@@ -698,8 +732,8 @@ FSAtomicTempOwnerIsGone(FileName, TargetName) {
 ; native information on invalid arguments or a DllCall exception.
 FSAtomicMoveReplace(Source, Destination, &NativeError := 0) {
 	NativeError := 0
-	if !(Source is String) or Source = ""
-		or !(Destination is String) or Destination = ""
+	if !FSPathIsAdmissible(Source)
+		or !FSPathIsAdmissible(Destination)
 		return false
 	static MOVEFILE_REPLACE_EXISTING := 0x00000001
 	static MOVEFILE_WRITE_THROUGH := 0x00000008
@@ -720,8 +754,8 @@ FSAtomicMoveReplace(Source, Destination, &NativeError := 0) {
 ; MOVEFILE_REPLACE_EXISTING makes the directory-entry operation atomic and
 ; collision-preserving; WRITE_THROUGH makes the rename a durable boundary.
 FSAtomicMoveCreate(Source, Destination) {
-	if !(Source is String) or Source = ""
-		or !(Destination is String) or Destination = ""
+	if !FSPathIsAdmissible(Source)
+		or !FSPathIsAdmissible(Destination)
 		return 0
 	static MOVEFILE_WRITE_THROUGH := 0x00000008
 	try return DllCall("kernel32\MoveFileExW", "Str", Source,
@@ -733,7 +767,7 @@ FSAtomicMoveCreate(Source, Destination) {
 ; Atomically replaces Destination with Source when both are on the same volume.
 ; Kept in the adapter so domain modules never call FileMove directly.
 FSMove(Source, Destination, Overwrite := false) {
-        if !(Source is String) or Source = "" or !(Destination is String) or Destination = ""
+        if !FSPathIsAdmissible(Source) or !FSPathIsAdmissible(Destination)
                 return false
         try {
                 FileMove(Source, Destination, Overwrite)
@@ -745,6 +779,7 @@ FSMove(Source, Destination, Overwrite := false) {
 
 /** Open a BOM-aware UTF-8 reader; native refusal reaches the identity owner. */
 FSOpenReadStrict(Path) {
+	_FSRequirePath(Path, "A strict reader")
 	return FileOpen(Path, "r", "UTF-8")
 }
 
@@ -758,7 +793,7 @@ FSOpenReadStrict(Path) {
 ; @param Path {String} Absolute path to the file.
 ; @return {Object|String} An AHK file object, or "" on any error.
 FSOpenRead(Path) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return ""
 	try {
 		local FH := FileOpen(Path, "r", "UTF-8-RAW")
@@ -773,7 +808,7 @@ FSOpenRead(Path) {
 ; @param Path {String} Absolute path to the file.
 ; @return {Object|String} An AHK file object, or "" on any error.
 FSOpenWrite(Path) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return ""
 	try {
 		local FH := FileOpen(Path, "w", "UTF-8-RAW")
@@ -814,6 +849,14 @@ FSHandleSnapshot(FileHandle) {
 	}
 }
 
+; Move an exact file-read byte span, including overlapping carry buffers.
+; @param Destination {Buffer|Integer} A writable span of at least ByteCount bytes.
+; @param Source {Buffer|Integer} A readable span of at least ByteCount bytes.
+; @param ByteCount {Integer} The number of bytes to move without text decoding.
+FSBufferMove(Destination, Source, ByteCount) {
+	DllCall("ntdll\RtlMoveMemory", "Ptr", Destination, "Ptr", Source, "UPtr", ByteCount)
+}
+
 ; Reads an exact byte range together with the identity of the handle it came
 ; from, so a caller can prove the bytes belong to the file it expects. NUL bytes
 ; (an interrupted append's hole) are optionally blanked to spaces: UTF-8
@@ -824,6 +867,8 @@ FSHandleSnapshot(FileHandle) {
 ; @param BlankNul {Boolean} Whether to replace every NUL byte with a space.
 ; @return {Map} ok, buffer, snapshot (FSHandleSnapshot), nul_bytes.
 FSReadRange(Path, Start, Count, BlankNul := false) {
+	if !FSPathIsAdmissible(Path)
+		return Map("ok", false)
 	local Buf := Buffer(Max(Count, 1), 0)
 	local FH := FileOpen(Path, "r")
 	if !IsObject(FH)
@@ -854,18 +899,16 @@ FSReadRange(Path, Start, Count, BlankNul := false) {
 ; the copy reads back as its source. The configuration backup's copies.
 ; @param Source {String} File to copy.
 ; @param Destination {String} New path; an existing one is never replaced.
-; @return {Boolean} True only for a complete, verified copy; a mismatched copy
-;   is removed.
+; @return {Boolean} True only for a complete, verified copy. Unverified output
+;   is retained: its pathname may already belong to a different file.
 FSCopyCreateVerified(Source, Destination) {
-	if !(Source is String) || Source == "" || !(Destination is String) || Destination == ""
+	if !FSPathIsAdmissible(Source) || !FSPathIsAdmissible(Destination)
 		return false
-	try FileCopy(Source, Destination, false)
-	catch
+	; Builtin copy/delete operations interpret patterns; this API owns literal names.
+	if !DllCall("kernel32\CopyFileW", "Str", Source, "Str", Destination, "Int", true, "Int")
 		return false
-	if FSSameBytes(Source, Destination)
-		return true
-	try FileDelete(Destination)
-	return false
+	; A mismatch can describe a foreign replacement, not the copy just created.
+	return FSSameBytes(Source, Destination)
 }
 
 ; Whether two files hold exactly the same bytes.
@@ -873,6 +916,8 @@ FSCopyCreateVerified(Source, Destination) {
 ; @param PathB {String}
 ; @return {Boolean} False when either cannot be read.
 FSSameBytes(PathA, PathB) {
+	if !FSPathIsAdmissible(PathA) || !FSPathIsAdmissible(PathB)
+		return false
 	try {
 		A := FileRead(PathA, "RAW")
 		B := FileRead(PathB, "RAW")
@@ -886,22 +931,295 @@ FSSameBytes(PathA, PathB) {
 	return DllCall("ntdll\RtlCompareMemory", "Ptr", A, "Ptr", B, "UPtr", A.Size, "UPtr") == A.Size
 }
 
-; Replaces a file by the bytes of another through a verified same-directory
-; stage and one atomic rename; a failure leaves the destination as it was.
-; @param Source {String} File whose bytes are published.
-; @param Destination {String} File replaced (or created).
-; @return {Boolean}
-FSCopyReplaceAtomic(Source, Destination) {
-	if !(Source is String) || Source == "" || !(Destination is String) || Destination == ""
+global FS_RESTORE_STAGE_SUFFIX := ".ergopti-restore.tmp"
+global FS_RESTORE_COPY_BLOCK := 65536
+; FILE_BASIC_INFO: four 8-byte timestamps, then the attributes and padding.
+global FS_BASIC_INFO_BYTES := 40
+global FS_ATTRIBUTE_REPARSE_POINT := 0x400
+; List, add file, add subfolder, traverse, read attributes. The rename target
+; check opens the folder for writing, so read and write sharing stay granted;
+; delete sharing is what stops the folder being renamed or removed.
+global FS_HELD_FOLDER_ACCESS := 0x1 | 0x2 | 0x4 | 0x20 | 0x80
+global FS_HELD_FOLDER_SHARE := 0x1 | 0x2
+
+; Replaces one file below RootDir by a copy of Source, holding every object from
+; the first open to the last close. CopyFileW and MoveFileExW take pathnames, so
+; a same-user process could swap the stage, or a folder above it, between any
+; two of them: restore then verified one file and published another. Here no
+; pathname is resolved after the anchor opens: each folder is opened relative
+; to its parent, the stage relative to its folder with no sharing at all, and
+; the rename goes through the stage's own handle into the held folder handle.
+; A folder handle denies delete sharing, so the folder cannot be renamed away.
+; The stage keeps the name restore always used: an existing file of that name
+; belongs to someone else and refuses the attempt untouched. A refused stage
+; goes away through its own handle, never through a name.
+; @param Source {String} File published with its streams and metadata.
+; @param RootDir {String} Existing anchor folder; a link here is followed, since
+;   the configuration folder may legitimately live behind one.
+; @param Relative {String} Destination below RootDir, in "/" or "\" segments.
+;   A link among the segments refuses the attempt.
+; @param Detail {VarRef} Why a false return was false.
+; @return {Boolean} True only when the verified stage is the destination.
+FSCopyReplaceAtomic(Source, RootDir, Relative, &Detail := "") {
+	Detail := ""
+	if !FSPathIsAdmissible(Source) || !FSPathIsAdmissible(RootDir) || !FSPathIsAdmissible(Relative) {
+		Detail := "inadmissible path"
 		return false
-	Stage := Destination . ".ergopti-restore.tmp"
-	try FileCopy(Source, Stage, true)
-	catch
-		return false
-	if FSSameBytes(Source, Stage) && FSAtomicMoveReplace(Stage, Destination)
+	}
+	Names := StrSplit(StrReplace(Relative, "\", "/"), "/")
+	for _, Name in Names
+		if Name == "" || Name == "." || Name == ".." || InStr(Name, ":") {
+			Detail := "invalid relative path"
+			return false
+		}
+	Leaf := Names.Pop()
+	Folders := []
+	SourceHandle := -1, StageHandle := -1, Published := false
+	try {
+		Folders.Push(_FSHoldRootFolder(RootDir))
+		for _, Name in Names
+			Folders.Push(_FSHoldChildFolder(Folders[Folders.Length], Name))
+		SourceHandle := _FSOpenHeldSource(Source)
+		Metadata := _FSHandleBasicInfo(SourceHandle)
+		StageHandle := _FSCreateHeldStage(Folders[Folders.Length], Leaf . FS_RESTORE_STAGE_SUFFIX,
+			NumGet(Metadata, 32, "UInt"))
+		_FSBackupStreamsCopy(SourceHandle, StageHandle)
+		_FSBackupStreamsCompare(SourceHandle, StageHandle)
+		_FSApplyCopyMetadata(StageHandle, Metadata)
+		if !DllCall("kernel32\FlushFileBuffers", "Ptr", StageHandle, "Int")
+			throw OSError(A_LastError, "stage flush")
+		_FSHeldRename(StageHandle, Folders[Folders.Length], Leaf)
+		Published := true
+		if !DllCall("kernel32\FlushFileBuffers", "Ptr", StageHandle, "Int")
+			throw OSError(A_LastError, "published file flush")
 		return true
-	try FileDelete(Stage)
-	return false
+	} catch as Err {
+		Detail := (Published ? "published, but " : "") . Err.Message
+		if !Published && StageHandle != -1
+			Detail .= _FSDiscardHeldStage(StageHandle)
+		return false
+	} finally {
+		if StageHandle != -1
+			DllCall("kernel32\CloseHandle", "Ptr", StageHandle, "Int")
+		if SourceHandle != -1
+			DllCall("kernel32\CloseHandle", "Ptr", SourceHandle, "Int")
+		while Folders.Length
+			DllCall("kernel32\CloseHandle", "Ptr", Folders.Pop(), "Int")
+	}
+}
+
+; Opens the anchor folder: the one pathname of a held copy.
+_FSHoldRootFolder(RootDir) {
+	static OPEN_EXISTING := 3, FILE_FLAG_BACKUP_SEMANTICS := 0x02000000, SYNCHRONIZE := 0x100000
+	Handle := DllCall("kernel32\CreateFileW", "Str", RootDir, "UInt", FS_HELD_FOLDER_ACCESS | SYNCHRONIZE,
+		"UInt", FS_HELD_FOLDER_SHARE, "Ptr", 0, "UInt", OPEN_EXISTING,
+		"UInt", FILE_FLAG_BACKUP_SEMANTICS, "Ptr", 0, "Ptr")
+	if Handle == -1
+		throw OSError(A_LastError, "anchor folder open")
+	return Handle
+}
+
+; Opens or creates one folder inside a held one and refuses a link.
+_FSHoldChildFolder(Parent, Name) {
+	static FILE_OPEN_IF := 3, FILE_DIRECTORY_FILE := 0x1, FILE_ATTRIBUTE_DIRECTORY := 0x10
+	Handle := _FSNtCreateRelative(Parent, Name, FS_HELD_FOLDER_ACCESS, FILE_ATTRIBUTE_DIRECTORY,
+		FS_HELD_FOLDER_SHARE, FILE_OPEN_IF, FILE_DIRECTORY_FILE)
+	Info := Buffer(FS_BASIC_INFO_BYTES, 0)
+	Readable := DllCall("kernel32\GetFileInformationByHandleEx", "Ptr", Handle, "Int", 0,
+		"Ptr", Info, "UInt", Info.Size, "Int")
+	NativeError := A_LastError
+	if Readable && !(NumGet(Info, 32, "UInt") & FS_ATTRIBUTE_REPARSE_POINT)
+		return Handle
+	DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int")
+	throw Readable ? Error("a folder of the path is a link") : OSError(NativeError, "folder identity")
+}
+
+; Reads share only: nothing writes, renames or deletes the source meanwhile.
+_FSOpenHeldSource(Source) {
+	static GENERIC_READ := 0x80000000, FILE_SHARE_READ := 1, OPEN_EXISTING := 3
+	Handle := DllCall("kernel32\CreateFileW", "Str", Source, "UInt", GENERIC_READ,
+		"UInt", FILE_SHARE_READ, "Ptr", 0, "UInt", OPEN_EXISTING, "UInt", 0, "Ptr", 0, "Ptr")
+	if Handle == -1
+		throw OSError(A_LastError, "source open")
+	return Handle
+}
+
+; Creates the stage in its held folder, encrypted like its source as CopyFileW
+; does. Sharing nothing is the whole defence: no other handle can read, write,
+; rename or delete it, and FILE_CREATE never adopts an existing name or link.
+_FSCreateHeldStage(Folder, Name, SourceAttributes) {
+	static GENERIC_READ := 0x80000000, GENERIC_WRITE := 0x40000000, DELETE := 0x10000
+	static FILE_CREATE := 2, FILE_NON_DIRECTORY_FILE := 0x40, FILE_WRITE_THROUGH := 0x2
+	static FILE_ATTRIBUTE_NORMAL := 0x80, FILE_ATTRIBUTE_ENCRYPTED := 0x4000
+	return _FSNtCreateRelative(Folder, Name, GENERIC_READ | GENERIC_WRITE | DELETE,
+		FILE_ATTRIBUTE_NORMAL | (SourceAttributes & FILE_ATTRIBUTE_ENCRYPTED), 0,
+		FILE_CREATE, FILE_NON_DIRECTORY_FILE | FILE_WRITE_THROUGH)
+}
+
+; NtCreateFile on one name relative to a held handle. A reparse point is opened
+; as itself, never followed; the caller decides what that means.
+; @return {Integer} The new handle.
+; @throws {Error} Carrying the NTSTATUS on refusal.
+_FSNtCreateRelative(Root, Name, Access, Attributes, Share, Disposition, Options) {
+	static SYNCHRONIZE := 0x100000, OBJ_CASE_INSENSITIVE := 0x40
+	static FILE_SYNCHRONOUS_IO_NONALERT := 0x20, FILE_OPEN_REPARSE_POINT := 0x200000
+	Wide := Buffer(StrLen(Name) * 2 + 2, 0)
+	StrPut(Name, Wide, "UTF-16")
+	Unicode := Buffer(2 * A_PtrSize, 0)
+	NumPut("UShort", Wide.Size - 2, "UShort", Wide.Size - 2, Unicode)
+	NumPut("Ptr", Wide.Ptr, Unicode, A_PtrSize)
+	ObjectAttributes := Buffer(6 * A_PtrSize, 0)
+	NumPut("UInt", ObjectAttributes.Size, ObjectAttributes, 0)
+	NumPut("Ptr", Root, ObjectAttributes, A_PtrSize)
+	NumPut("Ptr", Unicode.Ptr, ObjectAttributes, 2 * A_PtrSize)
+	NumPut("UInt", OBJ_CASE_INSENSITIVE, ObjectAttributes, 3 * A_PtrSize)
+	Io := Buffer(2 * A_PtrSize, 0)
+	Status := DllCall("ntdll\NtCreateFile", "Ptr*", &Handle := 0, "UInt", Access | SYNCHRONIZE,
+		"Ptr", ObjectAttributes, "Ptr", Io, "Ptr", 0, "UInt", Attributes, "UInt", Share, "UInt", Disposition,
+		"UInt", Options | FILE_SYNCHRONOUS_IO_NONALERT | FILE_OPEN_REPARSE_POINT,
+		"Ptr", 0, "UInt", 0, "UInt")
+	if Status >= 0x80000000
+		throw Error(Format("relative open of a held folder refused (NTSTATUS 0x{:08X})", Status))
+	return Handle
+}
+
+; FILE_BASIC_INFO of a handle: four timestamps, then the attributes at 32.
+_FSHandleBasicInfo(Handle) {
+	Info := Buffer(FS_BASIC_INFO_BYTES, 0)
+	if !DllCall("kernel32\GetFileInformationByHandleEx", "Ptr", Handle, "Int", 0,
+		"Ptr", Info, "UInt", Info.Size, "Int")
+		throw OSError(A_LastError, "file metadata read")
+	return Info
+}
+
+; Copies what CopyFileW copies, by handle: BackupRead yields the content, the
+; named streams and the extended attributes, and BackupWrite applies them. The
+; security descriptor stays out: a copy inherits from its folder, as before.
+_FSBackupStreamsCopy(Source, Stage) {
+	Block := Buffer(FS_RESTORE_COPY_BLOCK), ReadContext := 0, WriteContext := 0
+	_FSRewind(Source)
+	try {
+		loop {
+			if !DllCall("kernel32\BackupRead", "Ptr", Source, "Ptr", Block, "UInt", Block.Size,
+				"UInt*", &Got := 0, "Int", false, "Int", false, "Ptr*", &ReadContext, "Int")
+				throw OSError(A_LastError, "stream read")
+			if Got == 0
+				return
+			if !DllCall("kernel32\BackupWrite", "Ptr", Stage, "Ptr", Block, "UInt", Got,
+				"UInt*", &Put := 0, "Int", false, "Int", false, "Ptr*", &WriteContext, "Int")
+				throw OSError(A_LastError, "stream write")
+			if Put != Got
+				throw Error("short stream write")
+		}
+	} finally {
+		_FSBackupRelease("BackupRead", Source, ReadContext)
+		_FSBackupRelease("BackupWrite", Stage, WriteContext)
+	}
+}
+
+; Reads both held handles back as backup streams and compares every byte. The
+; two sides may split a read differently, so what one side has ahead waits.
+; @throws {Error} On the first difference.
+_FSBackupStreamsCompare(Source, Stage) {
+	Left := Buffer(FS_RESTORE_COPY_BLOCK), Right := Buffer(FS_RESTORE_COPY_BLOCK)
+	LeftContext := 0, RightContext := 0, LeftFill := 0, RightFill := 0
+	_FSRewind(Source)
+	_FSRewind(Stage)
+	try {
+		loop {
+			_FSBackupReadInto(Source, Left, &LeftFill, &LeftContext)
+			_FSBackupReadInto(Stage, Right, &RightFill, &RightContext)
+			if LeftFill == 0 && RightFill == 0
+				return
+			Common := Min(LeftFill, RightFill)
+			if Common == 0
+				throw Error("the verified copy has a different length")
+			if DllCall("ntdll\RtlCompareMemory", "Ptr", Left, "Ptr", Right, "UPtr", Common, "UPtr") != Common
+				throw Error("the verified copy has different bytes")
+			_FSBufferConsume(Left, &LeftFill, Common)
+			_FSBufferConsume(Right, &RightFill, Common)
+		}
+	} finally {
+		_FSBackupRelease("BackupRead", Source, LeftContext)
+		_FSBackupRelease("BackupRead", Stage, RightContext)
+	}
+}
+
+; Tops up one comparison buffer behind what it already holds.
+_FSBackupReadInto(Handle, Block, &Fill, &Context) {
+	if Fill == Block.Size
+		return
+	if !DllCall("kernel32\BackupRead", "Ptr", Handle, "Ptr", Block.Ptr + Fill, "UInt", Block.Size - Fill,
+		"UInt*", &Got := 0, "Int", false, "Int", false, "Ptr*", &Context, "Int")
+		throw OSError(A_LastError, "stream read back")
+	Fill += Got
+}
+
+_FSBufferConsume(Block, &Fill, Count) {
+	Fill -= Count
+	if Fill
+		FSBufferMove(Block, Block.Ptr + Count, Fill)
+}
+
+_FSRewind(Handle) {
+	if !DllCall("kernel32\SetFilePointerEx", "Ptr", Handle, "Int64", 0, "Ptr", 0, "UInt", 0, "Int")
+		throw OSError(A_LastError, "rewind")
+}
+
+; An unfinished backup context owns native memory until an abort call frees it.
+_FSBackupRelease(Function, Handle, Context) {
+	if Context
+		DllCall("kernel32\" . Function, "Ptr", Handle, "Ptr", 0, "UInt", 0, "UInt*", &Done := 0,
+			"Int", true, "Int", false, "Ptr*", &Context, "Int")
+}
+
+; Gives the stage the attributes and write time CopyFileW carries over.
+_FSApplyCopyMetadata(Stage, Metadata) {
+	static WRITE_TIME_OFFSET := 16, ATTRIBUTES_OFFSET := 32, FILE_ATTRIBUTE_NORMAL := 0x80
+	; Read-only, hidden, system, archive and not-content-indexed.
+	static CARRIED_ATTRIBUTES := 0x2027
+	Info := Buffer(FS_BASIC_INFO_BYTES, 0)
+	NumPut("Int64", NumGet(Metadata, WRITE_TIME_OFFSET, "Int64"), Info, WRITE_TIME_OFFSET)
+	Carried := NumGet(Metadata, ATTRIBUTES_OFFSET, "UInt") & CARRIED_ATTRIBUTES
+	NumPut("UInt", Carried ? Carried : FILE_ATTRIBUTE_NORMAL, Info, ATTRIBUTES_OFFSET)
+	if !DllCall("kernel32\SetFileInformationByHandle", "Ptr", Stage, "Int", 0,
+		"Ptr", Info, "UInt", Info.Size, "Int")
+		throw OSError(A_LastError, "stage metadata")
+}
+
+; The publication: the file behind this handle takes Name in that folder handle,
+; replacing what is there, so neither side is a pathname anyone could swap.
+; @throws {Error} Carrying the NTSTATUS on refusal; the destination is unchanged.
+_FSHeldRename(Stage, Folder, Name) {
+	static FileRenameInformation := 10
+	NameOffset := 2 * A_PtrSize + 4
+	Info := Buffer(NameOffset + StrLen(Name) * 2 + 2, 0)
+	NumPut("UChar", true, Info, 0)
+	NumPut("Ptr", Folder, Info, A_PtrSize)
+	NumPut("UInt", StrLen(Name) * 2, Info, 2 * A_PtrSize)
+	StrPut(Name, Info.Ptr + NameOffset, "UTF-16")
+	Io := Buffer(2 * A_PtrSize, 0)
+	Status := DllCall("ntdll\NtSetInformationFile", "Ptr", Stage, "Ptr", Io, "Ptr", Info,
+		"UInt", Info.Size, "UInt", FileRenameInformation, "UInt")
+	if Status >= 0x80000000
+		throw Error(Format("rename refused (NTSTATUS 0x{:08X})", Status))
+}
+
+; Deletes the unpublished stage through its handle: a name could be anyone's.
+; A read-only attribute is cleared first since it refuses the disposition.
+; @return {String} "" or the suffix telling the stage stayed on disk.
+_FSDiscardHeldStage(Stage) {
+	static ATTRIBUTES_OFFSET := 32, FILE_ATTRIBUTE_NORMAL := 0x80, FileDispositionInfo := 4
+	Info := Buffer(FS_BASIC_INFO_BYTES, 0)
+	NumPut("UInt", FILE_ATTRIBUTE_NORMAL, Info, ATTRIBUTES_OFFSET)
+	Cleared := DllCall("kernel32\SetFileInformationByHandle", "Ptr", Stage, "Int", 0,
+		"Ptr", Info, "UInt", Info.Size, "Int")
+	Delete := Buffer(4, 0)
+	NumPut("UChar", true, Delete, 0)
+	if Cleared && DllCall("kernel32\SetFileInformationByHandle", "Ptr", Stage, "Int", FileDispositionInfo,
+		"Ptr", Delete, "UInt", 1, "Int")
+		return ""
+	return Format("; the stage stayed on disk (error {})", A_LastError)
 }
 
 ; Whether a path is a reparse point (a symbolic link or a junction), which a
@@ -909,11 +1227,11 @@ FSCopyReplaceAtomic(Source, Destination) {
 ; @param Path {String}
 ; @return {Boolean}
 FSIsReparsePoint(Path) {
-	return InStr(FileExist(Path), "L") > 0
+	return FSPathIsAdmissible(Path) && InStr(FileExist(Path), "L") > 0
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
-; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_FILE_SYSTEM := Map(
     "read",   FSRead,
@@ -922,3 +1240,299 @@ global ADAPTER_FILE_SYSTEM := Map(
     "exists", FSExists,
     "delete", FSDelete,
 )
+
+
+/** Configuration-only byte receipt; native opening errors never grant write authority. */
+FSConfigReadUtf8Exact(Path, &NativeOpenError := 0) {
+	static OriginalRead := FSReadUtf8Exact, HandleRead := _FSReadUtf8ExactHandle
+	static Enter := FileReadActivityEnter, Bind := FileReadActivityBind, Leave := FileReadActivityLeave
+	NativeOpenError := 0
+	if OriginalRead != FSReadUtf8Exact || HandleRead != _FSReadUtf8ExactHandle
+			|| Enter != FileReadActivityEnter || Bind != FileReadActivityBind || Leave != FileReadActivityLeave
+		return false
+	if !FSPathIsAdmissible(Path)
+		return false
+	static GENERIC_READ := 0x80000000
+	static FILE_SHARE_READ := 0x00000001
+	static OPEN_EXISTING := 3
+	static FILE_ATTRIBUTE_NORMAL := 0x00000080
+	Handle := -1
+	OpeningReturned := false
+	Closed := false
+	Content := false
+	for Owner in [OriginalRead, HandleRead, Enter, Bind, Leave]
+		if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			return false
+	ReadActivity := Enter.Call(Path)
+	try {
+		Handle := DllCall("kernel32\CreateFileW",
+			"Str", Path,
+			"UInt", GENERIC_READ,
+			"UInt", FILE_SHARE_READ,
+			"Ptr", 0,
+			"UInt", OPEN_EXISTING,
+			"UInt", FILE_ATTRIBUTE_NORMAL,
+			"Ptr", 0,
+			"Ptr")
+		OpeningReturned := true
+		if Handle == -1
+			NativeOpenError := A_LastError ; Capture the actual failed CreateFileW before cleanup.
+		if Handle != -1 {
+			if OriginalRead != FSReadUtf8Exact || HandleRead != _FSReadUtf8ExactHandle
+					|| Enter != FileReadActivityEnter || Bind != FileReadActivityBind || Leave != FileReadActivityLeave
+				return false
+			for Owner in [OriginalRead, HandleRead, Enter, Bind, Leave]
+				if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+					return false
+			Bind.Call(ReadActivity, Handle)
+			Content := HandleRead.Call(Handle, 0, false)
+		}
+	} catch {
+		Content := false
+	} finally {
+		if Handle == -1 {
+			; A returned failed opening owns no handle; a thrown acquisition stays debt.
+			Closed := OpeningReturned
+		} else {
+			try Closed := DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int") != 0
+			catch {
+				Closed := false
+			}
+		}
+		if Closed
+			Leave.Call(ReadActivity)
+	}
+	return Closed ? Content : false
+}
+
+; Pure logical admission is consumed only within a configuration native span.
+_FSNativeAdmissionAccepted(AdmissionFn) {
+	if (AdmissionFn is Integer) && AdmissionFn == 0
+		return true
+	if !HasMethod(AdmissionFn, "Call")
+		return false
+	try {
+		Accepted := AdmissionFn.Call()
+		return (Accepted is Integer) && Accepted == 1
+	} catch {
+		return false
+	}
+}
+
+/** Consumes captured unchanged-source admission within the configuration span. */
+FSNativeAcknowledge(AdmissionFn := 0) {
+	static Accept := _FSNativeAdmissionAccepted
+	PreviousCritical := Critical("On")
+	try {
+		for Owner in [Accept]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		Accepted := Accept == _FSNativeAdmissionAccepted && Accept.Call(AdmissionFn)
+		return Accepted && Accept == _FSNativeAdmissionAccepted
+			&& !Object.Prototype.HasOwnProp.Call(Accept, "Call")
+	}
+	finally Critical(PreviousCritical)
+}
+
+/** Configuration replacement through the retained genuine write-through producer. */
+FSConfigAtomicMoveReplace(Source, Destination, &NativeError := 0, AdmissionFn := 0) {
+	static Accept := _FSNativeAdmissionAccepted
+	static Move := FSAtomicMoveReplace
+	NativeError := 0
+	PreviousCritical := Critical("On")
+	try {
+		for Owner in [Accept, Move]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		if Move != FSAtomicMoveReplace || Accept != _FSNativeAdmissionAccepted || !Accept.Call(AdmissionFn)
+				|| Accept != _FSNativeAdmissionAccepted
+				|| Move != FSAtomicMoveReplace {
+			; No native operation ran, so no Win32 error receipt is invented.
+			return false
+		}
+		for Owner in [Accept, Move]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return Move.Call(Source, Destination, &NativeError)
+	} finally Critical(PreviousCritical)
+}
+
+/** Configuration-only no-replace publication keeps the existing producer receipt. */
+FSConfigAtomicMoveCreate(Source, Destination, AdmissionFn := 0) {
+	static Accept := _FSNativeAdmissionAccepted
+	static Move := FSAtomicMoveCreate
+	PreviousCritical := Critical("On")
+	try {
+		for Owner in [Accept, Move]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		if Move != FSAtomicMoveCreate || Accept != _FSNativeAdmissionAccepted || !Accept.Call(AdmissionFn)
+				|| Accept != _FSNativeAdmissionAccepted
+				|| Move != FSAtomicMoveCreate
+			return 0
+		for Owner in [Accept, Move]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return Move.Call(Source, Destination)
+	} finally Critical(PreviousCritical)
+}
+
+/** Configuration-owned recovery removal retains the original strict delete receipt. */
+FSConfigDeleteStrict(Path, AdmissionFn := 0) {
+	static Accept := _FSNativeAdmissionAccepted
+	static Delete := FSDeleteStrict, Receipt := _FSDeleteNativeReceipt
+	static DeleteWith := _FSDeleteWith, Exists := FSStrictExists
+	PreviousCritical := Critical("On")
+	try {
+		for Owner in [Accept, Delete, Receipt, DeleteWith, Exists]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		if Delete != FSDeleteStrict || Receipt != _FSDeleteNativeReceipt
+				|| DeleteWith != _FSDeleteWith || Exists != FSStrictExists
+				|| Accept != _FSNativeAdmissionAccepted || !Accept.Call(AdmissionFn)
+				|| Accept != _FSNativeAdmissionAccepted
+				|| Delete != FSDeleteStrict || Receipt != _FSDeleteNativeReceipt
+				|| DeleteWith != _FSDeleteWith || Exists != FSStrictExists
+			return 0
+		for Owner in [Accept, Delete, Receipt, DeleteWith, Exists]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return Delete.Call(Path)
+	} finally Critical(PreviousCritical)
+}
+
+
+/** Writes a strict UTF-8 stage and retains the original close-before-move order. */
+FSWriteUtf8ReplaceStrict(Path, Text) {
+	Utf8ReplacementStream := FileOpen(Path . ".tmp", "w", "UTF-8-RAW")
+	try Utf8ReplacementStream.Write(Text)
+	finally Utf8ReplacementStream.Close()
+	FileMove(Path . ".tmp", Path, true)
+}
+
+/** Encodes the complete UTF-8 image without its additional terminator byte. */
+FSUtf8Bytes(Content) {
+	Size := StrPut(Content, "UTF-8") - 1
+	Bytes := Buffer(Size, 0)
+	Encoded := Buffer(Size + 1, 0)
+	StrPut(Content, Encoded, "UTF-8")
+	DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", Encoded.Ptr, "UPtr", Size)
+	return Bytes
+}
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 2/ Classified read and publication =======
+; ==================================================
+; ==================================================
+
+; The methods of _shared/lua/file_system/ports.lua. AutoHotkey has no multiple
+; return, so a result is a Map: read_with_status gives content, status and
+; detail, a publication gives committed and detail.
+global FS_STATUS_OK := "ok"
+global FS_STATUS_ABSENT := "absent"
+global FS_STATUS_ERROR := "error"
+
+; Reports one fixed failure category: never a path, never file content.
+_FSReportFailure(OnError, Category) {
+	if HasMethod(OnError, "Call")
+		OnError.Call(Category)
+	return Category
+}
+
+; Reads a classified source a publication can later be conditioned on.
+; @param Path {String} File path.
+; @param OnError {Func|0} Receives the fixed category of an unreadable source.
+; @returns {Map} content ("" unless ok), status (FS_STATUS_*), detail.
+FSReadWithStatus(Path, OnError := 0) {
+	NativeOpenError := 0
+	Content := FSConfigReadUtf8Exact(Path, &NativeOpenError)
+	if (Content is String)
+		return Map("content", Content, "status", FS_STATUS_OK, "detail", "")
+	if (NativeOpenError == 2 || NativeOpenError == 3)
+		return Map("content", "", "status", FS_STATUS_ABSENT, "detail", "")
+	return Map("content", "", "status", FS_STATUS_ERROR,
+		"detail", _FSReportFailure(OnError, "the source cannot be read"))
+}
+
+; Whether a path still holds the classified source a caller read.
+_FSSourceIsUnchanged(Path, Expected) {
+	Current := FSReadWithStatus(Path)
+	return Current["status"] == Expected["status"]
+		&& (Expected["status"] != FS_STATUS_OK || Current["content"] == Expected["content"])
+}
+
+; Publishes through a same-directory stage named as FSAtomicTempOwnerIsGone expects.
+; The check and the rename are not one kernel operation: a writer of another
+; process is excluded by the configuration lease, not here.
+_FSPublishIfUnchanged(Path, Content, Expected, OnError, AdmissionFn) {
+	static StageSerial := 0
+	Refuse(Category) => Map("committed", false, "detail", _FSReportFailure(OnError, Category))
+	if !FSPathIsAdmissible(Path) || !(Content is String) || !(Expected is Map)
+			|| !Expected.Has("status") || (Expected["status"] != FS_STATUS_ABSENT
+				&& (Expected["status"] != FS_STATUS_OK || !(Expected.Get("content", 0) is String)))
+		return Refuse("a publication needs a path, a string payload and a source precondition")
+	if !_FSSourceIsUnchanged(Path, Expected)
+		return Refuse("the source changed since it was read")
+	Stage := Path . "." . A_ScriptHwnd . "-" . (++StageSerial) . ".tmp"
+	if !FSWriteDurable(Stage, Content)
+		return Refuse("the publication stage cannot be written")
+	Committed := Expected["status"] == FS_STATUS_ABSENT
+		? FSConfigAtomicMoveCreate(Stage, Path, AdmissionFn)
+		: FSConfigAtomicMoveReplace(Stage, Path, , AdmissionFn)
+	if Committed
+		return Map("committed", true, "detail", "")
+	FSDelete(Stage)
+	return Refuse("the publication was refused")
+}
+
+; Atomic replacement, refused when the file no longer matches `Expected`.
+; @param Path {String} Destination.
+; @param Content {String} Complete replacement text.
+; @param Expected {Map} status and, for FS_STATUS_OK, content.
+; @param OnError {Func|0} Receives the fixed category of a refusal.
+; @returns {Map} committed, detail.
+FSWriteIfUnchanged(Path, Content, Expected, OnError := 0) {
+	return _FSPublishIfUnchanged(Path, Content, Expected, OnError, 0)
+}
+
+; The same publication with a final logical admission checked just before commit.
+; @param Admission {Func} Returns 1 to admit; required.
+; @returns {Map} committed, detail.
+FSWriteIfUnchangedAdmitted(Path, Content, Expected, OnError, Admission) {
+	if !HasMethod(Admission, "Call")
+		return Map("committed", false, "detail", _FSReportFailure(OnError, "publication admission required"))
+	return _FSPublishIfUnchanged(Path, Content, Expected, OnError, Admission)
+}
+
+; The owner's own method identities, without IO. Windows offers no optional
+; capability, so the removers are 0.
+; @returns {Map} owner, reader, writer, publisher, remover, admitted_remover,
+;   exact_remover, delete.
+FSConfigurationPorts() {
+	return Map("owner", FILE_SYSTEM_OWNER, "reader", FILE_SYSTEM_OWNER["read_with_status"],
+		"writer", FILE_SYSTEM_OWNER["write_if_unchanged"],
+		"publisher", FILE_SYSTEM_OWNER["write_if_unchanged_admitted"],
+		"remover", 0, "admitted_remover", 0, "exact_remover", 0,
+		"delete", FILE_SYSTEM_OWNER["delete"])
+}
+
+; The owner the shared spec describes. ADAPTER_FILE_SYSTEM stays the five portable
+; methods of FileSystem.spec.js. Checked when the file loads: a missing method or a
+; half-offered capability would otherwise fail late, inside a publication.
+global FILE_SYSTEM_OWNER := Map(
+	"read", FSRead,
+	"write", FSWrite,
+	"append", FSAppend,
+	"exists", FSExists,
+	"delete", FSDelete,
+	"read_with_status", FSReadWithStatus,
+	"write_if_unchanged", FSWriteIfUnchanged,
+	"write_if_unchanged_admitted", FSWriteIfUnchangedAdmitted,
+	"configuration_ports", FSConfigurationPorts
+)
+FSPortsCheckOwner(FILE_SYSTEM_OWNER)

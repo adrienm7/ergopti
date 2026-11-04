@@ -22,6 +22,8 @@
 ;    Selecting a registry layout never changes their enabled state.
 ; ============================================================================== 
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -76,7 +78,10 @@ MasterGateDesiredTapHold(TapHoldSource) {
 _MG_DisableFeatureNode(Node, Prefix) {
 	if InStr(Prefix, ".") && Node.Has("enabled") {
 		Node["enabled"] := false
-		return
+		; A group switch (hotstrings.dynamic.enabled) sits beside its members and
+		; must not hide them from the walk; a feature's own parameters end it.
+		if !_MG_HasNestedFeature(Node)
+			return
 	}
 	for Key, Value in Node {
 		Path := Prefix . "." . Key
@@ -85,13 +90,22 @@ _MG_DisableFeatureNode(Node, Prefix) {
 			continue
 		}
 		Entry := ManifestFindEntryByPath(Path)
-		if Path == "layout.ergopti_variant"
+		if Path == ConfigKey.LAYOUT_ERGOPTI_VARIANT
 			Node[Key] := "ergopti"
 		else if (Entry is Map) && Entry.Get("type", "") == "boolean"
 			Node[Key] := false
 		else if Prefix == "shortcuts.personal" && (Value is Integer) && (Value == 0 || Value == 1)
 			Node[Key] := false
 	}
+}
+
+; Whether a Features node holds other features beneath it, not only parameters.
+_MG_HasNestedFeature(Node) {
+	for _, Value in Node {
+		if Value is Map
+			return true
+	}
+	return false
 }
 
 ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
@@ -125,6 +139,19 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 		; Hotstrings master (includes Personal sub-category).
 		if !CategoryGateFn.Call("Hotstrings") and FeaturesTarget.Has("hotstrings") {
 				_MG_DisableFeatureNode(FeaturesTarget["hotstrings"], "hotstrings")
+		}
+
+		; Dynamic hotstrings master (hotstrings.dynamic.enabled, the one switch the
+		; three drivers share): off, no dynamic family or programmable hotstring
+		; runs, whatever its own switch says. The choices stay on disk.
+		if FeaturesTarget.Has("hotstrings") and FeaturesTarget["hotstrings"].Has("dynamic") {
+				DynamicNode := FeaturesTarget["hotstrings"]["dynamic"]
+				if DynamicNode.Has("enabled") and !DynamicNode["enabled"] {
+						for _DynamicId, DynamicValue in DynamicNode {
+								if (Type(DynamicValue) == "Map" and DynamicValue.Has("enabled"))
+										DynamicValue["enabled"] := false
+						}
+				}
 		}
 
 		; Per-TOML-file hotstring sub-category gates. Independent of the top
@@ -190,7 +217,7 @@ LayoutSupersededFeatures() {
 LayoutSupersededReason(ManifestEntry, FeaturesSource := unset) {
 		; These switches choose registry layers too; only Ergopti-specific
 		; overlays become unavailable when another source is selected.
-		if ManifestEntry["section"] == "layout" && ManifestEntry["id"] != "ergopti_variant"
+		if ManifestEntry["section"] == "layout" && ManifestEntry["id"] != ConfigLeaf.ERGOPTI_VARIANT
 				return ""
 		Reason := ManifestEntry.Get("superseded_reason_key", "")
 		if (Reason == "")
@@ -212,7 +239,7 @@ _MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
 		Count := 0
 		for Entry in Entries {
 				; The direct-digit override is independent of the selected source.
-				if Entry["section"] == "layout" && Entry["id"] == "direct_access_digits"
+				if Entry["section"] == "layout" && Entry["id"] == ConfigLeaf.DIRECT_ACCESS_DIGITS
 						continue
 				Node := FeaturesTarget
 				for Part in StrSplit(Entry["section"], ".") {
@@ -223,10 +250,10 @@ _MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
 						Node := Node[Part]
 				}
 				Id := Entry["id"]
-				if Entry["section"] == "layout" && Id == "ergopti_variant" && (Node is Map) && Node.Get(Id, "ergopti") == "ergopti"
+				if Entry["section"] == "layout" && Id == ConfigLeaf.ERGOPTI_VARIANT && (Node is Map) && Node.Get(Id, "ergopti") == "ergopti"
 						continue
 				if (Node is Map) and Node.Has(Id) and Node[Id] {
-						Node[Id] := Entry["section"] == "layout" && Id == "ergopti_variant" ? "ergopti" : false
+						Node[Id] := Entry["section"] == "layout" && Id == ConfigLeaf.ERGOPTI_VARIANT ? "ergopti" : false
 						Count += 1
 				}
 		}
@@ -246,12 +273,40 @@ _MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
 ; Reads and validates hotstring_category_keys from menu_manifest.json.
 ; The manifest is the sole behavioral definition: failure is explicit so a
 ; candidate state can never be partially gated by a stale fallback table.
+; Decodes the exact manifest text just read. The file is still read and
+; validated on EVERY call, so an invalid or changed manifest is judged afresh and
+; throws every time: only a decode of text equal to the last valid one is skipped.
+; The decoded root is read-only for the caller, which builds its own Map from it.
+; Boot and every tray rebuild decoded the unchanged 12.5 KB file several times
+; (about 40 ms each) through this loader.
+_MG_ParseManifestContent(Content) {
+		static LastContent := "", LastRoot := ""
+		if (LastRoot is Map && LastContent == Content) {
+				PerfCount("master_gates.manifest_decode_skipped")
+				return LastRoot
+		}
+		Known := JsonKnownRoot(Content)
+		if (Known is Map) {
+				PerfCount("master_gates.manifest_decode_skipped")
+				LastContent := Content
+				LastRoot := Known
+				return Known
+		}
+		PerfCount("master_gates.manifest_decode")
+		Root := JsonParse(Content)
+		if (Root is Map) {
+				LastContent := Content
+				LastRoot := Root
+		}
+		return Root
+}
+
 _MG_LoadSubCategories(ManifestPath := "") {
 		global _SharedDir
 		; NOT memoized, deliberately. Caching the parsed manifest was tried and
 		; reverted: it defeats the fail-fast contract that an invalid canonical
 		; manifest must throw on EVERY call, which
-		; tests/unit/test_master_gates.ahk pins. The re-read was only harmful because
+		; tests/unit/infra/config/persistence/test_master_gates.ahk pins. The re-read was only harmful because
 		; ToggleCategoryAllFeatures ran this under Critical; that Critical span was
 		; removed (F-01), so a few ms of FileRead + JsonParse per live category toggle
 		; no longer sits on the keyboard-hook starvation path and is not worth trading
@@ -268,7 +323,7 @@ _MG_LoadSubCategories(ManifestPath := "") {
 		if (Content == "") {
 				throw Error("Master gate manifest is empty: " . FilePath)
 		}
-		try Root := JsonParse(Content)
+		try Root := _MG_ParseManifestContent(Content)
 		catch as Err
 				throw Error("Master gate manifest is invalid JSON: " . Err.Message)
 		if !(Root is Map) or !Root.Has("hotstring_category_keys") {

@@ -15,14 +15,24 @@ M.bridge_name = "metrics_apps_bridge"
 
 local Logger = require("logger.shim")
 local LOG = "bridge.metrics_apps"
+local Flush = require("ui.metrics_flush_bridge")
+
+local function default_push(payload, state, context)
+	return Flush.push("metrics_apps", M.bridge_name, payload, state, context)
+end
+M._push = default_push
+local Requests = Flush.new("metrics_apps", function(...) return M._push(...) end)
 
 --- Builds the shared metrics payload expected by the browser dashboard.
 --- @param state table Daemon state.
 --- @return table
 local function _build_initial_payload(state, include_prefetch)
-	local keylogger = state.keylogger
-	if keylogger and type(keylogger.get_dashboard_payload) == "function" then
-		return keylogger.get_dashboard_payload({ include_prefetch = include_prefetch ~= false })
+	local keystats = state.keystats
+	if keystats then
+		local status = Flush.status(keystats)
+		if not status or not status.read_safe or status.stopping
+			or type(keystats.get_dashboard_payload) ~= "function" then return nil end
+		return keystats.get_dashboard_payload({ include_prefetch = include_prefetch ~= false })
 	end
 	return {
 		metrics_manifest = {},
@@ -41,9 +51,9 @@ end
 
 --- Handles an incoming JS message.
 --- @param payload any  String or table from host_bridge.js.
---- @param state  table Daemon state { engine, keylogger, config, llm, layout }.
+--- @param state  table Daemon state { engine, keystats, config, llm, layout }.
 --- @return any|nil  Response to send back to JS.
-function M.on_message(payload, state)
+local function handle(payload, state, request)
 	if type(payload) == "string" then
 		if payload == "ready" then
 			Logger.info(LOG, "Metrics apps UI ready.")
@@ -61,7 +71,9 @@ function M.on_message(payload, state)
 	-- as a field: the page applies each reply as dashboard data, and a bare
 	-- { saved = … } or { supported = false } emptied it until the next poll.
 	local function with_payload(fields)
+		if not request.valid() then return nil end
 		local reply = _build_initial_payload(state, false)
+		if not reply then return nil end
 		for key, value in pairs(fields) do reply[key] = value end
 		return reply
 	end
@@ -72,7 +84,7 @@ function M.on_message(payload, state)
 	end
 
 	-- These four are not sent by the shared page today. They are kept because
-	-- each calls a keylogger function that exists and does what its name says,
+	-- each calls a keystats function that exists and does what its name says,
 	-- and because the bridge is also the daemon's programmatic entry point —
 	-- unlike `app_detail`, which was removed: it called `get_app_detail`, a
 	-- function that has never existed on this driver, behind a
@@ -80,30 +92,31 @@ function M.on_message(payload, state)
 	-- silent nil. The guard read as defensive while making the branch
 	-- permanently unreachable and wrong.
 	if action == "reset" then
-		if state.keylogger and type(state.keylogger.reset_session) == "function" then
-			pcall(state.keylogger.reset_session)
-		end
-		return _build_initial_payload(state, true)
+		return request.reset_session(function(success)
+			local reply = _build_initial_payload(state, true)
+			if reply then reply.reset = success end
+			return reply
+		end)
 	end
 
 	if action == "export" then
-		if state.keylogger and type(state.keylogger.export_json) == "function" then
-			local ok, json = pcall(state.keylogger.export_json)
+		if state.keystats and type(state.keystats.export_json) == "function" then
+			local ok, json = pcall(state.keystats.export_json)
 			return with_payload({ exported = ok, json = ok and json or nil })
 		end
 		return with_payload({ exported = false })
 	end
 
 	if action == "pause" then
-		if state.keylogger and type(state.keylogger.suppress) == "function" then
-			state.keylogger.suppress()
+		if state.keystats and type(state.keystats.suppress) == "function" then
+			state.keystats.suppress()
 		end
 		return with_payload({ suppressed = true })
 	end
 
 	if action == "resume" then
-		if state.keylogger and type(state.keylogger.unsuppress) == "function" then
-			state.keylogger.unsuppress()
+		if state.keystats and type(state.keystats.unsuppress) == "function" then
+			state.keystats.unsuppress()
 		end
 		return with_payload({ suppressed = false })
 	end
@@ -116,11 +129,11 @@ function M.on_message(payload, state)
 	if action == "edit" then
 		local app_name = tostring(payload.app or "")
 		local category = tostring(payload.cat or "")
-		if state.keylogger and type(state.keylogger.set_app_category) == "function" then
-			local ok = state.keylogger.set_app_category(app_name, category, tonumber(payload.score) or 0)
-			return with_payload({ saved = ok })
+		if state.keystats and type(state.keystats.set_app_category) == "function" then
+			local ok = state.keystats.set_app_category(app_name, category, tonumber(payload.score) or 0)
+			return with_payload({ saved = ok == true })
 		end
-		Logger.error(LOG, "Category edit for '%s' arrived but the keylogger cannot store it.", app_name)
+		Logger.error(LOG, "Category edit for '%s' arrived but the keystats cannot store it.", app_name)
 		return with_payload({ saved = false })
 	end
 
@@ -135,6 +148,32 @@ function M.on_message(payload, state)
 
 	Logger.warn(LOG, "Unknown bridge action received: %s.", tostring(action))
 	return nil
+end
+
+--- Routes requests through the flush and native page owner before any action.
+--- @param payload any
+--- @param state table
+--- @param context table|nil
+--- @return table|nil
+function M.on_message(payload, state, context)
+	if type(payload) == "table" then
+		payload = { action = payload.action, app = payload.app, cat = payload.cat, score = payload.score }
+	end
+	local action = type(payload) == "table" and payload.action or payload
+	if action ~= "ready" and action ~= "refresh" and action ~= "reset" and action ~= "export"
+		and action ~= "pause" and action ~= "resume" and action ~= "edit" and action ~= "pick" then return nil end
+	local read = action == "ready" or action == "refresh" or action == "pick" or action == "export"
+	return Requests.run(state, context, function(request) return handle(payload, state, request) end, not read)
+end
+
+--- Revokes deferred actions from the exact page being retired.
+--- @param epoch number
+function M.on_window_closed(epoch) Requests.close(epoch) end
+
+--- Restores test channels and revokes outstanding requests.
+function M._reset()
+	Requests.reset()
+	M._push = default_push
 end
 
 return M

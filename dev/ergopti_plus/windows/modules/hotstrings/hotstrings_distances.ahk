@@ -13,6 +13,8 @@
 ; 3. Rolls: left-hand (chevron, ez, comment) and right-hand (hashtag, operators).
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -69,8 +71,8 @@ _HS_RegisterDistancesAndRolls() {
 	; ===== 1.1) Q becomes QU if a vowel is after =====
 	; =================================================
 
-	if Features["hotstrings"]["distances_reduction"]["qu"]["enabled"] {
-		LoadHotstringsSection("distancesreduction", "qu", Features["hotstrings"]["distances_reduction"]["qu"])
+	if Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["qu"]["enabled"] {
+		LoadHotstringsSection("distancesreduction", "qu", Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["qu"])
 	}
 
 
@@ -80,15 +82,15 @@ _HS_RegisterDistancesAndRolls() {
 	; ===== 1.2) Ê acts like a deadkey =====
 	; ======================================
 
-	if Features["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["enabled"] {
+	if Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["dead_key_e_circumflex"]["enabled"] {
 		; Resolve the activation delay once at registration time — the Features
 		; object only carries Enabled, the actual delay lives in the TOML metadata.
 		DeadKeyECircumflexDelay := HotstringsResolve("distancesreduction", "dead_key_e_circumflex").Delay
 		_HS_RegisterCircumflexDeadkeys(DeadKeyECircumflexDelay)
 	}
 
-	if Features["hotstrings"]["distances_reduction"]["e_circumflex_e"]["enabled"] {
-		LoadHotstringsSection("distancesreduction", "e_circumflex_e", Features["hotstrings"]["distances_reduction"]["e_circumflex_e"])
+	if Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["e_circumflex_e"]["enabled"] {
+		LoadHotstringsSection("distancesreduction", "e_circumflex_e", Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["e_circumflex_e"])
 	}
 
 
@@ -98,7 +100,7 @@ _HS_RegisterDistancesAndRolls() {
 	; ===== 1.3) Comma becomes a J with the vowels =====
 	; ==================================================
 
-	if Features["hotstrings"]["distances_reduction"]["comma_j"]["enabled"] {
+	if Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["comma_j"]["enabled"] {
 		CommaJOptions := Map("TimeActivationSeconds", HotstringsResolve("distancesreduction", "comma_j").Delay)
 		CreateCaseSensitiveHotstrings("*?", ",à", "j", CommaJOptions)
 		CreateCaseSensitiveHotstrings("*?", ",a", "ja", CommaJOptions)
@@ -149,7 +151,7 @@ _HS_RegisterDistancesAndRolls() {
 	; ===== 1.4) Comma makes it possible to type letters that are hard to reach =====
 	; ===============================================================================
 
-	if Features["hotstrings"]["distances_reduction"]["comma_far_letters"]["enabled"] {
+	if Features["hotstrings"][ConfigLeaf.DISTANCES_REDUCTION]["comma_far_letters"]["enabled"] {
 		CommaFarOptions := Map("TimeActivationSeconds", HotstringsResolve("distancesreduction", "comma_far_letters").Delay)
 		; === Top row ===
 		CreateCaseSensitiveHotstrings("*?", ",è", "z", CommaFarOptions)
@@ -168,8 +170,8 @@ _HS_RegisterDistancesAndRolls() {
 	; ===== 1.5) SFBs reduction with Comma =====
 	; ==========================================
 
-	if Features["hotstrings"]["sfbs_reduction"]["comma"]["enabled"] {
-		LoadHotstringsSection("sfbsreduction", "comma", Features["hotstrings"]["sfbs_reduction"]["comma"])
+	if Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["comma"]["enabled"] {
+		LoadHotstringsSection("sfbsreduction", "comma", Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["comma"])
 	}
 
 
@@ -179,8 +181,8 @@ _HS_RegisterDistancesAndRolls() {
 	; ===== 1.6) SFBs reduction with Ê =====
 	; ======================================
 
-	if Features["hotstrings"]["sfbs_reduction"]["e_circ"]["enabled"] {
-		LoadHotstringsSection("sfbsreduction", "e_circ", Features["hotstrings"]["sfbs_reduction"]["e_circ"])
+	if Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["e_circ"]["enabled"] {
+		LoadHotstringsSection("sfbsreduction", "e_circ", Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["e_circ"])
 	}
 
 
@@ -190,8 +192,8 @@ _HS_RegisterDistancesAndRolls() {
 	; ===== 1.7) SFBs reduction with È =====
 	; ======================================
 
-	if Features["hotstrings"]["sfbs_reduction"]["e_grave"]["enabled"] {
-		LoadHotstringsSection("sfbsreduction", "e_grave", Features["hotstrings"]["sfbs_reduction"]["e_grave"])
+	if Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["e_grave"]["enabled"] {
+		LoadHotstringsSection("sfbsreduction", "e_grave", Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["e_grave"])
 	}
 
 
@@ -201,7 +203,7 @@ _HS_RegisterDistancesAndRolls() {
 	; ===== 1.8) SFBs reduction with À =====
 	; ======================================
 
-	if Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] and Features["hotstrings"]["french_magickey"]["text_expansion"]["enabled"] {
+	if Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["bu"]["enabled"] and Features["hotstrings"]["french_magickey"]["text_expansion"]["enabled"] {
 		; Those hotstrings must be defined before bu, otherwise they won't get activated
 		CreateCaseSensitiveHotstrings("*", "il a mà" . ScriptInformation["MagicKey"], "il a mis à jour")
 		CreateCaseSensitiveHotstrings("*", "la mà" . ScriptInformation["MagicKey"], "la mise à jour")
@@ -214,14 +216,14 @@ _HS_RegisterDistancesAndRolls() {
 		CreateCaseSensitiveHotstrings("*", "pià" . ScriptInformation["MagicKey"], "pièce jointe")
 		CreateCaseSensitiveHotstrings("*", "tà" . ScriptInformation["MagicKey"], "toujours")
 	}
-	if Features["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] and Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] {
+	if Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["i_e_acute"]["enabled"] and Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["bu"]["enabled"] {
 		CreateCaseSensitiveHotstrings(
 			; Fix éà★ ➜ ébu insteaf of iéé
 			"*?", "ié" . ScriptInformation["MagicKey"], "ébu",
 			Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "bu").Delay)
 		)
 	}
-	if Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] {
+	if Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["bu"]["enabled"] {
 		CreateCaseSensitiveHotstrings(
 			"*?", "à" . ScriptInformation["MagicKey"], "bu",
 			Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "bu").Delay)
@@ -231,7 +233,7 @@ _HS_RegisterDistancesAndRolls() {
 			Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "bu").Delay)
 		)
 	}
-	if Features["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] {
+	if Features["hotstrings"][ConfigLeaf.SFBS_REDUCTION]["i_e_acute"]["enabled"] {
 		CreateCaseSensitiveHotstrings(
 			"*?", "àé", "éi",
 			Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "i_e_acute").Delay)

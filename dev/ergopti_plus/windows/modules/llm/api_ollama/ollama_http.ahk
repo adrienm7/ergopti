@@ -1,5 +1,7 @@
 ﻿; modules/llm/api_ollama/ollama_http.ahk
 
+#Include curl_tree_owner.ahk
+
 ; ==============================================================================
 ; MODULE: Ollama API — Sync HTTP Client
 ; DESCRIPTION:
@@ -200,17 +202,32 @@ _LLM_OllamaAuxOwner(Owner, Kind, Identity := "") {
 	global LLM_OLLAMA_BASE_URL
 	if Owner is Map
 		return Owner
+	Custody := LLM_OllamaCaptureOriginCustody()
 	return LLM_AuxBegin(Kind, Map(
-		"backend", "ollama",
-		"endpoint", LLM_OLLAMA_BASE_URL,
+		"backend", "ollama", "origin_custody", Custody,
+		"endpoint", Custody.Call("origin"),
 		"identity", Identity))
 }
 
 _LLM_OllamaInvokeAuxResult(Owner, Callback, Value) {
 	if !LLM_AuxIsCurrent(Owner)
 		return false
+	if Owner.Has("origin_custody") && !LLM_OllamaOriginCustodyCurrent(Owner["origin_custody"], Owner.Get("endpoint", "")) {
+		LLM_AuxFinish(Owner)
+		return false
+	}
+	if !LLM_AuxIsCurrent(Owner)
+		return false
 	try _LLM_InvokeCallback(Callback, "on_result", Value)
 	finally LLM_AuxFinish(Owner)
+	return true
+}
+
+; The bound origin callback performs another opaque reader; retain the same operation.
+_LLM_OllamaInvokeCurrentAuxCallback(Owner, Callback, Value) {
+	if !LLM_AuxIsCurrent(Owner)
+		return false
+	_LLM_InvokeCallback(Callback, "on_result", Value)
 	return true
 }
 
@@ -221,15 +238,15 @@ _LLM_OllamaAuxDeletePaths(Paths, DeleteFn := 0) {
 	return true
 }
 
-_LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+_LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid, &ProcessOwner, TreeFactoryFn := unset) {
 	Environment := 0
 	CreationFlags := 0x08000000
 	if Command is Map {
 		if !Command.Has("command_line") or !Command.Has("environment")
 			throw TypeError("A curl launch record requires a command and environment.")
 		Environment := _LLM_CurlBuildEnvironment(Command["environment"])
-		Command := Command["command_line"]
-		CreationFlags |= 0x00000400
+		return _LLM_CurlArtifactRunTree(Command["command_line"], Environment, WorkingDir,
+			&Pid, &ProcessOwner, TreeFactoryFn?)
 	}
 	if !(Command is String) or Command == ""
 		throw TypeError("A curl launch requires a nonempty command string.")
@@ -277,7 +294,7 @@ _LLM_CurlRunOwned(RunFn, Command, WorkingDir, Options, &Pid, Port := 0) {
 		throw Err
 	}
 	if !(ProcessOwner is Map) or ProcessOwner.Get("released", true)
-			or !ProcessOwner.Get("handle", 0)
+			or (!ProcessOwner.Get("handle", 0) && !IsObject(ProcessOwner.Get("tree", 0)))
 		throw Error("Curl launcher returned without an exact process owner.")
 	if ProcessOwner.Get("pid", 0) != Pid {
 		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
@@ -360,22 +377,27 @@ _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 		if ProcessOwner.Get("releasing", false)
 			return false
 		Handle := ProcessOwner.Get("handle", 0)
-		if !Handle
+		if !Handle && !IsObject(ProcessOwner.Get("tree", 0))
 			return false
 		ProcessOwner["releasing"] := true
 	} finally Critical(PreviousCritical)
 	try {
+		if ProcessOwner.Has("tree")
+			return _LLM_CurlTryReleaseTree(ProcessOwner, Terminate)
 		if Terminate {
 			TerminateFn := _LLM_CurlArtifactPortFn(Port,
 				"terminate_process", _LLM_CurlTerminateProcessExact)
-			Terminated := false
-			try Terminated := TerminateFn.Call(Handle) == true
-			if !Terminated {
-				WaitFn := _LLM_CurlArtifactPortFn(Port,
-					"wait_process", _LLM_CurlWaitProcessExact)
-				try Terminated := WaitFn.Call(Handle) = 0
+			; Termination acceptance is only a request. Keep the exact capability
+			; and its process debt until a separate zero-time wait proves exit.
+			try TerminateFn.Call(Handle)
+			WaitFn := _LLM_CurlArtifactPortFn(Port,
+				"wait_process", _LLM_CurlWaitProcessExact)
+			Exited := false
+			try {
+				ExitReceipt := WaitFn.Call(Handle)
+				Exited := ExitReceipt is Integer && ExitReceipt == 0
 			}
-			if !Terminated
+			if !Exited
 				return false
 		}
 		CloseFn := _LLM_CurlArtifactPortFn(Port,
@@ -400,12 +422,14 @@ _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 _LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 	if !(ProcessOwner is Map)
 		return true
-	; Keep failure-to-debt transfer atomic against another AHK thread. Native
-	; operations here are non-blocking: TerminateProcess, zero-time wait and close.
+	; The inner owner serializes native attempts. Job termination can yield,
+	; so only fresh release/debt publication belongs inside this Critical.
+	Released := _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate, Port)
 	NewDebt := false
 	PreviousCritical := Critical("On")
 	try {
-		if _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate, Port) {
+		; Another thread may finish the exact owner after our attempt returns.
+		if Released || ProcessOwner.Get("released", false) {
 			_LLM_CurlRetireProcessCleanupDebt(ProcessOwner)
 			return true
 		}
@@ -428,6 +452,8 @@ _LLM_CurlReleaseEntryProcess(Entry, Terminate := false, Port := 0) {
 _LLM_CurlProcessExited(ProcessOwner, Port := 0) {
 	if !(ProcessOwner is Map) or ProcessOwner.Get("released", false)
 		return true
+	if ProcessOwner.Has("tree")
+		return ProcessOwner.Get("terminal", 0) is Map
 	Handle := ProcessOwner.Get("handle", 0)
 	if !Handle
 		return false
@@ -438,6 +464,31 @@ _LLM_CurlProcessExited(ProcessOwner, Port := 0) {
 		return false
 	; WAIT_OBJECT_0 is the sole proof that this exact retained process exited.
 	return Result = 0
+}
+
+
+; Read the terminal status while custody still retains the exact native object.
+; A signaled exit code 259 is a failed exit, not a process-liveness verdict.
+_LLM_CurlProcessExitCode(ProcessOwner) {
+	PreviousCritical := Critical("On")
+	try {
+		if !(ProcessOwner is Map) || ProcessOwner.Get("released", false)
+				|| ProcessOwner.Get("releasing", false)
+			throw Error("The curl process owner cannot provide a terminal exit receipt.")
+		if !_LLM_CurlProcessExited(ProcessOwner)
+			throw Error("The exact curl process has not acknowledged exit.")
+		if ProcessOwner.Has("tree") {
+			ExitCode := ProcessOwner["terminal"].Get("exit", "")
+			if !(ExitCode is Integer)
+				throw Error("The curl process tree returned an invalid exit receipt.")
+			return ExitCode
+		}
+		ExitCode := 0
+		Diagnostic := ""
+		if !_SR_TreeReadExitCode(ProcessOwner["handle"], &ExitCode, &Diagnostic)
+			throw Error(Diagnostic)
+		return ExitCode
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_CurlMaxFileSizeArg(CurlExe := "", VersionFn := 0) {
@@ -486,7 +537,26 @@ _LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath, MaxBodyBytes := 0,
 			Result["oversize"] := true
 			return Result
 		}
-		Result["body"] := ReadFn.Call(BodyPath, "UTF-8-RAW")
+		; All nonempty bodies consumed here are LLM JSON. Keep the same bounded
+		; byte image through validation and decoding; FileRead's text conversion
+		; repairs invalid UTF-8 before the JSON parser can reject it.
+		Raw := ReadFn.Call(BodyPath, "RAW m" . (MaxBodyBytes + 1))
+		if !(Raw is Buffer)
+			throw TypeError("The curl terminal body reader must return raw bytes.")
+		if Raw.Size > MaxBodyBytes {
+			Result["oversize"] := true
+			return Result
+		}
+		if Raw.Size > 0 && !HTTPIsValidUtf8(Raw, Raw.Size)
+			return Result
+		; FileRead previously removed a leading UTF-8 BOM. An empty successful
+		; DELETE is valid too; neither case may call the decoder with zero bytes.
+		Offset := Raw.Size >= 3 && NumGet(Raw, 0, "UChar") == 0xEF
+			&& NumGet(Raw, 1, "UChar") == 0xBB && NumGet(Raw, 2, "UChar") == 0xBF ? 3 : 0
+		Count := Raw.Size - Offset
+		; A positive StrGet length truncates at NUL. Exact length keeps every
+		; byte visible to JsonParse, including forbidden embedded/trailing NUL.
+		Result["body"] := Count > 0 ? StrGet(Raw.Ptr + Offset, -Count, "UTF-8") : ""
 		Result["body_read"] := true
 	}
 	return Result
@@ -593,6 +663,9 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0, Structured := false) {
 	; uses curl. A curl child does the connect in its OWN process; we only poll
 	; its terminal sidecar (instant), so the AHK message loop is NEVER blocked.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_ping")
+	if Owner.Has("origin_custody")
+		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
+			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
 	ProcessOwner := 0
 	Stage := "private_directory"
 	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=ping owner={1} generation={2}.",
@@ -607,15 +680,14 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0, Structured := false) {
 				"finalizer", _LLM_OllamaAuxDeletePaths.Bind(Paths)))
 			return Owner
 		Stage := "command_build"
-		Origin := Structured ? Owner.Get("endpoint", "") : LLM_OLLAMA_BASE_URL
-		if Structured && (!(Origin is String) || Origin == ""
-				|| StrCompare(Origin, LLM_OLLAMA_BASE_URL, true) != 0 || !LLM_AuxIsCurrent(Owner))
+		Origin := Owner.Get("endpoint", "")
+		if (Structured || Owner.Has("origin_custody")) && (!(Origin is String) || Origin == "" || !LLM_OllamaProbeOriginCurrent(Owner, Origin))
 			throw Error("Selected-origin version ownership is no longer current.")
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: hard 2 s ceiling. A local daemon answers GET /api/version in < 50 ms;
 		; one that needs longer is "not ready yet" for our purposes — the deps poll
 		; retries, and the health tick re-probes, so a slow first answer self-heals.
-		curlCmd := '"' . curl_exe . '" -s -m 2 '
+		curlCmd := '"' . curl_exe . '" --disable -s -m 2 '
 			. _LLM_CurlMaxFileSizeArg() . '-o ' . _Q(tmp_out) . ' '
 			. _Q(Origin . (Structured ? LLM_EnableVersionPath() : "/api/version"))
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
@@ -623,7 +695,7 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0, Structured := false) {
 		Stage := "process_launch"
 		PreviousCritical := Critical("On")
 		try {
-			if Structured && (StrCompare(Origin, LLM_OLLAMA_BASE_URL, true) != 0 || !LLM_AuxIsCurrent(Owner))
+			if (Structured || Owner.Has("origin_custody")) && !LLM_OllamaProbeOriginCurrent(Owner, Origin)
 				throw Error("Selected-origin version dispatch was superseded.")
 			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
 				cmd, "", "Hide", &pid)
@@ -704,9 +776,13 @@ _LLM_OllamaPingDeliver(Owner, Callback, Result, Structured, ScheduleFn := 0) {
 					|| _LLM_CurlCleanupDebt.Count != 0 || !_LLM_AuxCommitPreparedFinish(Owner)
 				return false
 			Ticket["delivered"] := true
+			; Consume the callback with the exact committed ticket. Its caller
+			; may retain this owner, so a delivered callback must not point back.
+			DeliveryCallback := Ticket["callback"]
+			Ticket["callback"] := 0
 			Committed := true
 		} finally Critical(PreviousCritical)
-		_LLM_InvokeCallback(Ticket["callback"], "on_result", Ticket["result"])
+		_LLM_InvokeCallback(DeliveryCallback, "on_result", Ticket["result"])
 		return true
 	} finally {
 		PreviousCritical := Critical("On")
@@ -749,9 +825,7 @@ _LLM_Ollama_PingPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, sta
 		"read_terminal", _LLM_CurlReadTerminal)
 	Terminal := ReadTerminalFn.Call(tmp_status, tmp_exit, tmp_out)
 	if _LLM_CurlTerminalComplete(Terminal) {
-		WaitFn := _LLM_CurlArtifactPortFn(Port, "wait_process", _LLM_CurlWaitProcessExact)
-		Stopped := !Structured || ProcessOwner.Get("released", false)
-			|| WaitFn.Call(ProcessOwner.Get("handle", 0)) == 0
+		Stopped := !Structured || _LLM_CurlProcessExited(ProcessOwner, Port)
 		if Stopped && _LLM_CurlReleaseProcess(ProcessOwner, false, Port) {
 			reachable := Structured ? Map("ok", Terminal["exit"] == 0 && Terminal["body_read"],
 				"status", Terminal["status"], "body", Terminal["body"])
@@ -819,6 +893,9 @@ LLM_OllamaListModels_Async(on_result, Owner := 0, Strict := false) {
 	; tray build (which runs under Critical) for up to its timeout. curl does the connect
 	; in its own process; we only poll its terminal sidecar, so the loop never blocks.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_tags")
+	if Owner.Has("origin_custody")
+		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
+			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
 	ProcessOwner := 0
 	Stage := "private_directory"
 	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=tags owner={1} generation={2}.",
@@ -833,12 +910,13 @@ LLM_OllamaListModels_Async(on_result, Owner := 0, Strict := false) {
 				"finalizer", _LLM_Ollama_TagsFinalize.Bind(Paths, Owner)))
 			return Owner
 		Stage := "command_build"
+		Origin := _LLM_OllamaTagsOrigin(Owner, Strict)
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: a local daemon lists installed tags in well under a second; a slower
 		; answer is "not ready" — the installed-cache TTL re-probes on the next rebuild.
-		curlCmd := '"' . curl_exe . '" -s -m 2 '
+		curlCmd := '"' . curl_exe . '" --disable -s -m 2 '
 			. _LLM_CurlMaxFileSizeArg() . '-o ' . _Q(tmp_out) . ' '
-			. _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
+			. _Q(Origin . "/api/tags")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		Stage := "process_launch"
@@ -864,10 +942,28 @@ LLM_OllamaListModels_Async(on_result, Owner := 0, Strict := false) {
 	return Owner
 }
 
+; Strict model checks retain their originating endpoint. Managed probes may use
+; only the exact native IPv4 listener; ordinary selected-origin owners keep the
+; existing global selection fence.
+_LLM_OllamaTagsOrigin(Owner, Strict) {
+	global LLM_OLLAMA_BASE_URL
+	Origin := Owner.Get("endpoint", "")
+	if !(Origin is String) || Origin == ""
+			|| ((Strict || Owner.Has("origin_custody")) && !LLM_OllamaProbeOriginCurrent(Owner, Origin))
+		throw Error("Selected-origin models ownership is no longer current.")
+	return Origin
+}
+
 _LLM_Ollama_TagsFinalize(Paths, Owner) {
 	_LLM_OllamaAuxDeletePaths(Paths)
-	if HasMethod(Owner.Get("on_retired", 0), "Call")
-		Owner["on_retired"].Call()
+	OnRetired := Owner.Get("on_retired", 0)
+	if HasMethod(OnRetired, "Call") {
+		OnRetired.Call()
+		; The request retains its auxiliary owner. Release the reverse bound
+		; callback only after acknowledgement so failed finalizers remain retryable.
+		if Owner.Get("on_retired", 0) == OnRetired
+			Owner["on_retired"] := 0
+	}
 }
 
 /**
@@ -920,6 +1016,9 @@ _LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, sta
 LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 	global LLM_OLLAMA_BASE_URL, LLM_OLLAMA_DELETE_TIMEOUT_MS
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_delete:" . tag, tag)
+	if Owner.Has("origin_custody")
+		on_result := LLM_OllamaInvokeOriginCurrent.Bind(Owner["origin_custody"], Owner.Get("endpoint", ""),
+			_LLM_OllamaInvokeCurrentAuxCallback.Bind(Owner, on_result), "on_result")
 	if (tag == "") {
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 		return
@@ -961,12 +1060,12 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 		}
 		Stage := "command_build"
 		curl_exe := A_WinDir . "\System32\curl.exe"
-		curlCmd := '"' . curl_exe . '" -s -S -m '
+		curlCmd := '"' . curl_exe . '" --disable -s -S -m '
 			. (LLM_OLLAMA_DELETE_TIMEOUT_MS // 1000) . ' '
 			. _LLM_CurlMaxFileSizeArg() . '-X DELETE '
 			. '-H "Content-Type: application/json" '
 			. '--data-binary @' . _Q(tmp_payload) . ' '
-			. _Q(LLM_OLLAMA_BASE_URL . "/api/delete") . ' '
+			. _Q(Owner.Get("endpoint", "") . "/api/delete") . ' '
 			. '-o ' . _Q(tmp_out)
 		cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
@@ -977,7 +1076,8 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 			; WriteFn can pump a cancellation or endpoint transition. Revalidate the
 			; owner at the same atomic launch boundary used by the other curl paths:
 			; an invalidated model-delete request must never send its destructive POST.
-			if !_LLM_AuxOwnerIsCurrentLocked(Owner) {
+			if !_LLM_AuxOwnerIsCurrentLocked(Owner)
+					|| (Owner.Has("origin_custody") && !LLM_OllamaOriginCustodyCurrent(Owner["origin_custody"], Owner.Get("endpoint", ""))) {
 				launch_blocked := true
 			} else {
 				ProcessOwner := _LLM_CurlRunOwned(RunFn, cmdLine, "", "Hide", &pid, Port)

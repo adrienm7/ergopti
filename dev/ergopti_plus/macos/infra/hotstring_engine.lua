@@ -9,7 +9,7 @@
 --- WHY macOS TAKES ONLY PART OF IT:
 --- the core also carries a whole engine instance — its own rolling buffer, its
 --- own dispatch between the auto and terminator paths. macOS cannot take those:
---- its buffer belongs to the keymap core state and is read by the keylogger, the
+--- its buffer belongs to the keymap core state and is read by the keystats, the
 --- LLM preview, the tooltip and script control. What it takes is `M.decide`, the
 --- pure firing decision, which needs no buffer at all — only the tail that was
 --- typed and the codepoint in front of it. That is the whole reason the decision

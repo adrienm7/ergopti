@@ -20,10 +20,11 @@ local _policy = nil
 
 local function read_shared(name)
 	local path = Paths.shared("modules/llm/" .. name)
-	local handle = path and io.open(path, "r") or nil
-	if not handle then return nil end
-	local body = handle:read("*a")
-	handle:close()
+	local acquired, handle = pcall(require("infra.regular_file_reader").open_source, path)
+	if not acquired or not handle then return nil end
+	local read, body = pcall(handle.read, handle, "*a")
+	local closed, acknowledged = pcall(handle.close, handle)
+	if not read or type(body) ~= "string" or not closed or acknowledged ~= true then return nil end
 	local ok, decoded = pcall(Json.decode, body)
 	return ok and type(decoded) == "table" and decoded or nil
 end

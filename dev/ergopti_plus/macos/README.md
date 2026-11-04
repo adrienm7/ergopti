@@ -46,7 +46,7 @@ brew install --cask ergoptiplus@dev   # dev channel: every 0.0.0-dev.N prereleas
   preferences and caches.
 
 The release job (`Publish Homebrew cask` in
-[`ci.yml`](../../../.github/workflows/ci.yml)) renders the released channel's
+[`ci-release.yml`](../../../.github/workflows/ci-release.yml)) renders the released channel's
 cask with [`tools/build/homebrew-cask.cjs`](../../../tools/build/homebrew-cask.cjs)
 and pushes it to the tap. It needs the `HOMEBREW_TAP_TOKEN` repository secret:
 a fine-grained token with _Contents: read and write_ on
@@ -64,9 +64,9 @@ feature logic lives in the modules it loads.
 | Path                 | Role                                                                                                                                                                                                      |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `init.lua`           | Thin entry: module wiring + boot sequence.                                                                                                                                                                |
-| `adapters/`          | OS-isolation layer — every `hs.*`, `io.open`, `os.execute` call lives here (one file per port). The purity guard `tests/meta/test_port_adapter_coverage.lua` enforces it.                                 |
+| `adapters/`          | OS-isolation layer — every `hs.*`, `io.open`, `os.execute` call lives here (one file per port). The purity guard `tests/meta/architecture/test_port_adapter_coverage.lua` enforces it.                    |
 | `lib/`               | Infrastructure & domain helpers (no UI windows).                                                                                                                                                          |
-| `modules/<feature>/` | One folder per feature (`gestures/`, `keylogger/`, `llm/`, `keymap/`, `karabiner/`, …).                                                                                                                   |
+| `modules/<feature>/` | One folder per feature (`gestures/`, `keystats/`, `llm/`, `keymap/`, `karabiner/`, …).                                                                                                                    |
 | `ui/<window>/`       | One folder per UI window (`menu/`, `tooltip/`, `onboarding/`, `changelog/`, `wpm/`, `model_browser/`, `hotstrings_config_window/`, `hotstring_editor/`, the webview editors, …), each with an `init.lua`. |
 | `data/`              | Pure data + `generate_models.py` (MLX model-list codegen) and its `pyproject.toml` / `uv.lock` venv pins.                                                                                                 |
 | `tests/`             | `meta/` (source-introspection + port-coverage guards), `unit/`, `helpers/`, `stubs/`.                                                                                                                     |
@@ -78,12 +78,11 @@ feature logic lives in the modules it loads.
 > packages stop importing (a `uv.lock` bump in an update, a partial venv), the
 > model check marks it not installed and the next MLX selection rebuilds it.
 > A backend row switches only after its runtime install succeeds. The first
-> selection of the Ollama backend reuses an installed Ollama
-> (`modules/llm/ollama_binary.lua`: Ollama.app, `~/Applications`, Homebrew,
-> Ergopti's Application Support copy, then `PATH`) or offers to download the
-> release pinned in `modules/llm/ollama-release.sh`.
-> `ui/menu/menu_llm/runtime_install_offer.lua` is the only caller of either
-> checker's `install_for_selection()`. `modules/llm/mlx_deps_checker.lua`
+> selection of the Ollama backend reuses Ergopti's own installed runtime
+> (`modules/llm/ollama_binary.lua`; a user's own Ollama is never used) or offers
+> to install it (`modules/llm/ensure-ollama-native-deps.sh`).
+> `ui/menu/menu_llm/runtime_install_offer.lua` is the only caller of the
+> checkers' install entries. `modules/llm/mlx_deps_checker.lua`
 > resolves its script relative to the Hammerspoon root, so moving these files
 > requires updating their path resolution — the Lua unit suite does not exercise
 > the bash/venv runtime.

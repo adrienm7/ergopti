@@ -4,7 +4,7 @@
 --- MODULE: The WPM Readouts, Live, On A Real Display
 --- DESCRIPTION:
 --- The floating widget through its real GTK surface and the tray readout
---- through the real libayatana-appindicator, fed the stats the keylogger
+--- through the real libayatana-appindicator, fed the stats the keystats
 --- hands the daemon's tick:
 ---   - the pill appears where the canon puts it, the size it says, painted in
 ---     the source's colour (read back from real cairo pixels);
@@ -83,6 +83,9 @@ end
 require("tests.support.live_preferences").ensure_directory()
 Widget.restore()
 assert(Widget.set_use_source_colors(true), "the colour fixture must explicitly select source colours")
+-- The graph ships on (decision of 2026-11-03); this part measures the compact
+-- pill, so it states that choice, and part 2 switches the graph on itself.
+assert(Widget.set_graph(false), "the pill fixture must explicitly select the compact pill")
 -- A place kept by an earlier run is not the default this checks.
 expect(Widget.reset_position(), "the widget starts from its default place")
 assert(Widget.start() == true, "the widget must start before testing its native geometry")

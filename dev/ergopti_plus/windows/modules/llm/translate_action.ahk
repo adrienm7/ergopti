@@ -72,6 +72,10 @@ global _LLM_Translate_SourceProbe := 0
  */
 LLM_Translate_Trigger(Value) {
 	global _LLM_Menu, _LLM_Translate_Generation, LLM_TRANSLATE_REFUSAL_CONTEXT
+	global _LLM_Translate_SourceProbe
+	; A readiness or source getter may reenter a backend lifecycle transition.
+	AuxGeneration := LLM_AuxGeneration()
+	PhysicalGeneration := KS_GetPhysicalInputGeneration()
 	Enabled := _LLM_Menu.Get("enabled", false)
 	Refusal := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
 		Enabled && _LLM_Menu_BackendIsReadyForUse(), LLM_TRANSLATE_REFUSAL_CONTEXT)
@@ -98,13 +102,22 @@ LLM_Translate_Trigger(Value) {
 		LoggerInfo("LLM", "Translation refused: the focused app is excluded from the AI.")
 		return false
 	}
+	; Selection replacement belongs to the original control, even when the user
+	; changes windows before the asynchronous capture or remote answer returns.
+	Source := HasMethod(_LLM_Translate_SourceProbe, "Call")
+		? _LLM_Translate_SourceProbe.Call() : _LLM_Engine_CaptureAcceptSource()
 	_LLM_Translate_Generation += 1
 	Flow := Map(
+		"source", _LLM_Engine_NormalizeAcceptSource(Source),
 		"generation", _LLM_Translate_Generation,
+		"aux_generation", AuxGeneration,
+		"physical_generation", PhysicalGeneration,
 		"locale", Locale,
 		"language", Language,
 		"config", Config
 	)
+	if !_LLM_Translate_IsCurrent(Flow)
+		return false
 	if !LLM_SelectionReader().Call(_LLM_Translate_OnSelection.Bind(Flow)) {
 		LoggerInfo("LLM", "Translation #{1} skipped: the selection could not be read (paused or clipboard busy).",
 			Flow["generation"])
@@ -129,17 +142,13 @@ LLM_Translate_Trigger(Value) {
 _LLM_Translate_OnSelection(Flow, Text) {
 	global LLM_TRANSLATE_BLANK_PATTERN
 	if !_LLM_Translate_IsCurrent(Flow) {
-		LoggerInfo("LLM", "Translation #{1} dropped: a newer one superseded it before the selection arrived.",
+		LoggerInfo("LLM", "Translation #{1} dropped: its request lifecycle ended before the selection arrived.",
 			Flow["generation"])
-		return
-	}
-	if A_IsSuspended {
-		LoggerInfo("LLM", "Translation #{1} dropped: the driver is paused.", Flow["generation"])
 		return
 	}
 	if !(Text is String) || Text == "" || RegExMatch(Text, LLM_TRANSLATE_BLANK_PATTERN) {
 		LoggerInfo("LLM", "Translation #{1} skipped: nothing is selected.", Flow["generation"])
-		_LLM_Menu_ShowManualPredictionNotice("llm.translate.no_selection")
+		_LLM_Translate_NotifyCurrent(Flow, "llm.translate.no_selection")
 		return
 	}
 	Config := Flow["config"]
@@ -148,9 +157,10 @@ _LLM_Translate_OnSelection(Flow, Text) {
 		Flow["generation"], StrLen(Text), Flow["locale"])
 	if !LLM_Vision_SendText(LLM_Translate_SystemPrompt(Config, Flow["language"]),
 			LLM_Translate_UserText(Config, Text), Config["max_tokens"],
-			_LLM_Translate_OnAnswer.Bind(Flow), _LLM_Translate_OnFail.Bind(Flow)) {
+			_LLM_Translate_OnAnswer.Bind(Flow), _LLM_Translate_OnFail.Bind(Flow),
+			_LLM_Translate_IsCurrent.Bind(Flow)) {
 		LoggerWarn("LLM", "Translation #{1} failed: the API backend has no entry configured.", Flow["generation"])
-		_LLM_Menu_ShowManualPredictionNotice("llm.translate.failed")
+		_LLM_Translate_NotifyCurrent(Flow, "llm.translate.failed")
 	}
 }
 
@@ -160,22 +170,21 @@ _LLM_Translate_OnSelection(Flow, Text) {
 ; @param {Map} Meta Usage metadata (remote backend), unused.
 _LLM_Translate_OnAnswer(Flow, Raw, Meta := "") {
 	if !_LLM_Translate_IsCurrent(Flow) {
-		LoggerInfo("LLM", "Translation #{1}: answer ignored, a newer translation superseded it.",
+		LoggerInfo("LLM", "Translation #{1}: answer ignored, a newer translation superseded it or its backend lifecycle ended.",
 			Flow["generation"])
-		return
-	}
-	if A_IsSuspended {
-		LoggerInfo("LLM", "Translation #{1} dropped: the driver is paused.", Flow["generation"])
 		return
 	}
 	Text := LLM_Translate_Extract(Flow["config"], Raw)
 	if (Text == "") {
 		LoggerWarn("LLM", "Translation #{1} failed: the answer holds no translation ({2} character(s)).",
 			Flow["generation"], (Raw is String) ? StrLen(Raw) : 0)
-		_LLM_Menu_ShowManualPredictionNotice("llm.translate.failed")
+		_LLM_Translate_NotifyCurrent(Flow, "llm.translate.failed")
 		return
 	}
-	_LLM_Translate_Show(Flow, Text)
+	if !_LLM_Translate_Show(Flow, Text) {
+		LoggerInfo("LLM", "Translation #{1} dropped before publication: its request lifecycle ended.", Flow["generation"])
+		return
+	}
 	LoggerSuccess("LLM", "Translation #{1}: offered ({2} character(s)).", Flow["generation"], StrLen(Text))
 }
 
@@ -184,13 +193,13 @@ _LLM_Translate_OnAnswer(Flow, Raw, Meta := "") {
 ; @param {Map} Failure Failure details, when the backend gives them.
 _LLM_Translate_OnFail(Flow, Failure := "") {
 	if !_LLM_Translate_IsCurrent(Flow) {
-		LoggerInfo("LLM", "Translation #{1}: failure ignored, a newer translation superseded it.",
+		LoggerInfo("LLM", "Translation #{1}: failure ignored, a newer translation superseded it or its backend lifecycle ended.",
 			Flow["generation"])
 		return
 	}
 	LoggerWarn("LLM", "Translation #{1} failed: the request failed ({2}).",
 		Flow["generation"], _LLM_Vision_FailureReason(Failure))
-	_LLM_Menu_ShowManualPredictionNotice("llm.translate.failed")
+	_LLM_Translate_NotifyCurrent(Flow, "llm.translate.failed")
 }
 
 
@@ -208,31 +217,41 @@ _LLM_Translate_OnFail(Flow, Failure := "") {
 ; @param {Map} Flow The translation.
 ; @param {String} Text The translation.
 _LLM_Translate_Show(Flow, Text) {
-	global _LLM_Translate_SourceProbe
-	Source := HasMethod(_LLM_Translate_SourceProbe, "Call")
-		? _LLM_Translate_SourceProbe.Call() : _LLM_Engine_CaptureAcceptSource()
+	Source := Flow["source"]
 	Meta := Map(
 		"offer_id", "translate_" . Flow["generation"],
 		"accept_source", Source,
 		"app_name", _LLM_Engine_AppNameForAcceptSource(Source),
 		"is_final", true,
-		"render_guard", _LLM_Translate_RenderIsCurrent.Bind(Flow["generation"])
+		"render_guard", _LLM_Translate_RenderIsCurrent.Bind(Flow["generation"], Flow["aux_generation"], Flow["physical_generation"])
 	)
-	LLM_Tooltip_Show([{ Text: Text, SelectAfterAccept: true }], 1, true, Meta)
+	if !_LLM_Translate_IsCurrent(Flow)
+		return false
+	return LLM_Tooltip_Show([{ Text: Text, SelectAfterAccept: true }], 1, true, Meta)
 }
 
 ; @param {Map} Flow The translation.
-; @returns {Boolean} True when no newer translation started.
+; @returns {Boolean} True while both the translation and its backend lifecycle are current.
 _LLM_Translate_IsCurrent(Flow) {
-	global _LLM_Translate_Generation
-	return Flow["generation"] == _LLM_Translate_Generation
+	return _LLM_Translate_RenderIsCurrent(Flow["generation"], Flow["aux_generation"], Flow["physical_generation"])
 }
 
 ; Render guard of the candidate: a strict Boolean the tooltip checks before
 ; painting.
 ; @param {Integer} Generation The translation's generation.
+; @param {Integer} AuxGeneration The backend lifecycle at the original trigger.
+; @param {Integer} PhysicalGeneration The original selected-input ticket.
 ; @returns {Integer}
-_LLM_Translate_RenderIsCurrent(Generation) {
-	global _LLM_Translate_Generation
-	return (Generation == _LLM_Translate_Generation && !A_IsSuspended) ? true : false
+_LLM_Translate_RenderIsCurrent(Generation, AuxGeneration, PhysicalGeneration) {
+	global _LLM_Translate_Generation, _LLM_Menu
+	return (Generation == _LLM_Translate_Generation && AuxGeneration == LLM_AuxGeneration()
+		&& PhysicalGeneration is Integer && PhysicalGeneration == KS_GetPhysicalInputGeneration()
+		&& !A_IsSuspended && _LLM_Menu is Map && _LLM_Menu.Get("enabled", false) == true) ? true : false
+}
+
+; Logging may pump a lifecycle transition before an asynchronous notice publishes.
+_LLM_Translate_NotifyCurrent(Flow, Key) {
+	if _LLM_Translate_IsCurrent(Flow)
+		return _LLM_Menu_ShowManualPredictionNotice(Key)
+	return false
 }

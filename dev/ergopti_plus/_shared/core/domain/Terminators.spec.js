@@ -42,7 +42,7 @@
  * @typedef {object} TerminatorDef
  * @property {string}   key             Stable identifier (snake_case).
  * @property {string[]} chars           UTF-8 characters that belong to this slot.
- * @property {string}   label           Human-readable UI label (French).
+ * @property {string}   label_key       Locale key of the menu label.
  * @property {boolean}  default_enabled True = active out of the box.
  * @property {boolean}  consume         True = the char is swallowed, not echoed.
  *
@@ -57,9 +57,10 @@
  *   groups in the menus (it carries no characters and is never enabled).
  * - The magic key lives under the key "star" (historical, shared with the macOS
  *   registry's update_trigger_char sync) and is the only consumed slot.
- * - Labels are static French strings. The macOS shim re-resolves a handful of
- *   keys (nbsp, nnbsp, enter, parenright, equal) through i18n at load time;
- *   every other label is shown verbatim on both drivers.
+ * - Labels are locale keys ("terminators.label_<key>"), never display text:
+ *   every driver resolves them in the active language each time it renders the
+ *   menu. Only user-defined custom slots carry a literal `label`, the text the
+ *   user typed.
  * - Defaults are deliberately conservative: only the BASIC word-terminators
  *   fire out of the box — whitespace (space, tab, enter), the sentence
  *   punctuation (. , ; : ! ?) and the magic key. Everything else (the
@@ -70,94 +71,142 @@
  */
 const TERMINATOR_DEFS = [
 	// Whitespace & dashes
-	{ key: 'space', chars: [' '], label: '␣ : Espace', default_enabled: true, consume: false },
+	{
+		key: 'space',
+		chars: [' '],
+		label_key: 'terminators.label_space',
+		default_enabled: true,
+		consume: false
+	},
 	{
 		key: 'nbsp',
 		chars: [' '],
-		label: '⍽ : Espace insécable',
+		label_key: 'terminators.label_nbsp',
 		default_enabled: false,
 		consume: false
 	},
 	{
 		key: 'nnbsp',
 		chars: [' '],
-		label: '⍽ : Espace fine insécable',
+		label_key: 'terminators.label_nnbsp',
 		default_enabled: false,
 		consume: false
 	},
-	{ key: 'minus', chars: ['-'], label: '- : Tiret', default_enabled: false, consume: false },
+	{
+		key: 'minus',
+		chars: ['-'],
+		label_key: 'terminators.label_minus',
+		default_enabled: false,
+		consume: false
+	},
 	{
 		key: 'underscore',
 		chars: ['_'],
-		label: '_ : Tiret bas',
+		label_key: 'terminators.label_underscore',
 		default_enabled: false,
 		consume: false
 	},
 	{ type: 'separator' },
 	// Tab / Entrée / magic key
-	{ key: 'tab', chars: ['\t'], label: '⇥ : Tabulation', default_enabled: true, consume: false },
-	{ key: 'enter', chars: ['\r', '\n'], label: '⏎ : Entrée', default_enabled: true, consume: false },
-	{ key: 'star', chars: ['★'], label: '★ : Touche magique', default_enabled: true, consume: true },
-	{ type: 'separator' },
-	// Sentence punctuation
-	{ key: 'comma', chars: [','], label: ', : Virgule', default_enabled: true, consume: false },
 	{
-		key: 'semicolon',
-		chars: [';'],
-		label: '; : Point-virgule',
+		key: 'tab',
+		chars: ['\t'],
+		label_key: 'terminators.label_tab',
 		default_enabled: true,
 		consume: false
 	},
-	{ key: 'period', chars: ['.'], label: '. : Point', default_enabled: true, consume: false },
+	{
+		key: 'enter',
+		chars: ['\r', '\n'],
+		label_key: 'terminators.label_enter',
+		default_enabled: true,
+		consume: false
+	},
+	{
+		key: 'star',
+		chars: ['★'],
+		label_key: 'terminators.label_star',
+		default_enabled: true,
+		consume: true
+	},
+	{ type: 'separator' },
+	// Sentence punctuation
+	{
+		key: 'comma',
+		chars: [','],
+		label_key: 'terminators.label_comma',
+		default_enabled: true,
+		consume: false
+	},
+	{
+		key: 'semicolon',
+		chars: [';'],
+		label_key: 'terminators.label_semicolon',
+		default_enabled: true,
+		consume: false
+	},
+	{
+		key: 'period',
+		chars: ['.'],
+		label_key: 'terminators.label_period',
+		default_enabled: true,
+		consume: false
+	},
 	{
 		key: 'ellipsis',
 		chars: ['…'],
-		label: '… : Points de suspension',
+		label_key: 'terminators.label_ellipsis',
 		default_enabled: false,
 		consume: false
 	},
 	{
 		key: 'exclam',
 		chars: ['!'],
-		label: "! : Point d'exclamation",
+		label_key: 'terminators.label_exclam',
 		default_enabled: true,
 		consume: false
 	},
 	{
 		key: 'question',
 		chars: ['?'],
-		label: "? : Point d'interrogation",
+		label_key: 'terminators.label_question',
 		default_enabled: true,
 		consume: false
 	},
-	{ key: 'colon', chars: [':'], label: ': : Deux-points', default_enabled: true, consume: false },
+	{
+		key: 'colon',
+		chars: [':'],
+		label_key: 'terminators.label_colon',
+		default_enabled: true,
+		consume: false
+	},
 	{ type: 'separator' },
 	// Closing delimiters only (the opening ( [ { < never end a word)
 	{
 		key: 'parenright',
 		chars: [')'],
-		label: ') : Parenthèse fermante',
+		label_key: 'terminators.label_parenright',
 		default_enabled: false,
 		consume: false
 	},
 	{
 		key: 'braceright',
 		chars: ['}'],
-		label: '} : Accolade fermante',
+		label_key: 'terminators.label_braceright',
 		default_enabled: false,
 		consume: false
 	},
 	{
 		key: 'bracketright',
 		chars: [']'],
-		label: '] : Crochet fermant',
+		label_key: 'terminators.label_bracketright',
 		default_enabled: false,
 		consume: false
 	},
 	{
 		key: 'anglebracketright',
 		chars: ['>'],
-		label: '> : Guillemet fermant',
+		label_key: 'terminators.label_anglebracketright',
 		default_enabled: false,
 		consume: false
 	},
@@ -166,30 +215,42 @@ const TERMINATOR_DEFS = [
 	{
 		key: 'apostrophe_typo',
 		chars: ['’'],
-		label: '’ : Apostrophe typographique',
+		label_key: 'terminators.label_apostrophe_typo',
 		default_enabled: false,
 		consume: false
 	},
 	{
 		key: 'apostrophe_straight',
 		chars: ["'"],
-		label: "' : Apostrophe droite",
+		label_key: 'terminators.label_apostrophe_straight',
 		default_enabled: false,
 		consume: false
 	},
 	{
 		key: 'quote',
 		chars: ['"'],
-		label: '" : Guillemet double',
+		label_key: 'terminators.label_quote',
 		default_enabled: false,
 		consume: false
 	},
-	{ key: 'equal', chars: ['='], label: '= : Égal', default_enabled: false, consume: false },
-	{ key: 'slash', chars: ['/'], label: '/ : Slash', default_enabled: false, consume: false },
+	{
+		key: 'equal',
+		chars: ['='],
+		label_key: 'terminators.label_equal',
+		default_enabled: false,
+		consume: false
+	},
+	{
+		key: 'slash',
+		chars: ['/'],
+		label_key: 'terminators.label_slash',
+		default_enabled: false,
+		consume: false
+	},
 	{
 		key: 'backslash',
 		chars: ['\\'],
-		label: '\\ : Backslash',
+		label_key: 'terminators.label_backslash',
 		default_enabled: false,
 		consume: false
 	}

@@ -40,7 +40,11 @@ global UPDATER_UNKNOWN_COMMIT_KEY := "menu.about.commit_unknown"
 ; exists, which callers reported as an unreachable network. Mirrors
 ; update_check.releases_url in _shared/modules/updater/defaults.json (pinned
 ; by tools/test/test-updater-constants-single-source.cjs).
-global UPDATER_RELEASES_API_URL_TEMPLATE := "https://api.github.com/repos/{owner}/{repo}/releases?per_page=100"
+global UPDATER_RELEASES_API_URL_TEMPLATE := "https://" . Identifiers.Hosts.GITHUB_API . "/repos/{owner}/{repo}/releases?per_page=100"
+; The public releases Atom feed, read when api.github.com gives no list: a
+; check-only answer, because the feed names no asset and no digest.
+global UPDATER_GITHUB_WEB_ROOT := "https://" . Identifiers.Hosts.GITHUB . "/"
+global UPDATER_RELEASES_FEED_URL_TEMPLATE := UPDATER_GITHUB_WEB_ROOT . "{owner}/{repo}/releases.atom"
 
 ; Returned instead of a release when the list holds none of the requested
 ; channel: distinct from "" (network or HTTP failure), which callers report
@@ -51,7 +55,7 @@ global UPDATER_NO_CHANNEL_RELEASE := "[]"
 ; the presets are the shared ones (_shared/modules/updater/defaults.json, read
 ; through modules/updater/schedule.ahk); a saved value outside them snaps to
 ; the nearest preset. Honoured by ``Updater_StartBackgroundChecks``.
-global UPDATER_INI_INTERVAL_KEY    := "check_interval_seconds"
+global UPDATER_INI_INTERVAL_KEY    := ConfigLeaf.CHECK_INTERVAL_SECONDS
 global UPDATER_DEFAULT_INTERVAL    := UpdateSchedule_Timing()["default_check_interval_sec"]
 global UPDATER_CHECK_INTERVAL      := UPDATER_DEFAULT_INTERVAL
 
@@ -149,6 +153,17 @@ global UPDATER_BACKGROUND_ARM_MAX_ATTEMPTS := 2
 ; response does not count against the anonymous 60 req/h rate limit, which
 ; makes short intervals like 1m viable for background polling.
 global _UpdaterFetchCache          := Map()
+
+; On-disk copy of the complete release list and its ETag, so the first request
+; after a restart revalidates with If-None-Match and a 304 costs no API quota
+; (#95). The folder override is a test seam; "" means the user's Local AppData.
+; The load result is memoised, so the ETag compared before a rewrite is the one
+; on disk (or the last one saved).
+global UPDATER_LIST_CACHE_MAGIC     := "ergopti-release-list-v1"
+global UPDATER_LIST_CACHE_FILE      := "release_list.cache"
+global _UpdaterListCacheDir         := ""
+global _UpdaterListDiskLoaded       := false
+global _UpdaterListDiskEntry        := 0
 
 ; AHK v2 loosely equates the String "0" with false. Native and injected
 ; effect seams therefore acknowledge success only with a non-zero Integer.
@@ -1416,7 +1431,7 @@ _Updater_ScheduleCheckIntervalMenu(MenuScheduleFn := 0) {
 		return _Updater_ResultSucceeded(
 			MenuScheduleFn.Call(Callback, 50))
 	try {
-		SetTimer(Callback, -50)
+		SetTimer(Callback, -TimingsGet("adapters", "updater_callback_defer_ms"))
 		return true
 	} catch as Err {
 		try LoggerError("Updater", "Could not schedule the check-interval menu rebuild: {1}.", Err.Message)
@@ -2111,9 +2126,9 @@ _Updater_ReleaseNotificationReservation(Reservation) {
 	return Released
 }
 
-_Updater_TryPublishFetchCache(Channel, Etag, Json, Request) {
+_Updater_TryPublishFetchCache(Channel, Etag, Json, Request, Index := 0) {
 	global _UpdaterFetchCache, UPDATER_REQUEST_POLICY_ALLOW
-	Entry := { Etag: Etag, Json: Json }
+	Entry := _Updater_NewFetchCacheEntry(Etag, Json, Index)
 	PreviousCritical := A_IsCritical
 	Published := false
 	Critical("On")
@@ -2126,6 +2141,110 @@ _Updater_TryPublishFetchCache(Channel, Etag, Json, Request) {
 		Critical(PreviousCritical ? PreviousCritical : "Off")
 	}
 	return Published
+}
+
+; The folder of the on-disk release list copy.
+; @throws {Error} When Local AppData cannot be resolved.
+_Updater_ListCachePath() {
+	global _UpdaterListCacheDir, UPDATER_LIST_CACHE_FILE
+	Dir := _UpdaterListCacheDir
+	if (Dir == "") {
+		Root := ResolveLocalAppDataDir()
+		if (Root == "")
+			throw Error("Local AppData cannot be resolved for the release list copy.")
+		Dir := Root . "\" . AppDirsFolderName() . "\updater"
+	}
+	return RTrim(Dir, "\/") . "\" . UPDATER_LIST_CACHE_FILE
+}
+
+; Parses the stored copy: magic line, list URL, ETag, then the list verbatim.
+; @returns {Object|Integer} { Etag, Json }, or 0 when the text is not a whole
+;   copy of this list URL (wrong URL, empty ETag, truncated or foreign body).
+_Updater_ParseListCache(Text, Url) {
+	global UPDATER_LIST_CACHE_MAGIC
+	if !(Text is String)
+		return 0
+	Parts := StrSplit(Text, "`n", , 4)
+	if (Parts.Length != 4 || Parts[1] != UPDATER_LIST_CACHE_MAGIC || Parts[2] == "" || Parts[2] != Url || Parts[3] == "")
+		return 0
+	Body := Parts[4]
+	if (SubStr(LTrim(Body, " `t`r`n"), 1, 1) != "[" || SubStr(RTrim(Body, " `t`r`n"), -1) != "]")
+		return 0
+	return { Etag: Parts[3], Json: Body }
+}
+
+; The release list copy an earlier session saved, read once per process. A copy
+; that is not whole is discarded with a warning, so the next request is a full
+; one; an unreadable file is logged and left for a later start.
+; @returns {Object|Integer} { Etag, Json } or 0
+_Updater_LoadListDiskEntry(Url) {
+	global _UpdaterListDiskLoaded, _UpdaterListDiskEntry
+	if _UpdaterListDiskLoaded
+		return _UpdaterListDiskEntry
+	_UpdaterListDiskLoaded := true
+	try {
+		Path := _Updater_ListCachePath()
+		if !FileExist(Path)
+			return 0
+		Entry := _Updater_ParseListCache(FSReadStrict(Path), Url)
+		if IsObject(Entry) {
+			_UpdaterListDiskEntry := Entry
+			try LoggerDebug("Updater", "Loaded the stored release list copy ({1} bytes).", StrLen(Entry.Json))
+			return Entry
+		}
+		try LoggerWarn("Updater", "Discarded the corrupt or foreign release list copy '{1}'.", Path)
+		if !FSDelete(Path)
+			try LoggerError("Updater", "The corrupt release list copy '{1}' could not be removed.", Path)
+	} catch as Err {
+		try LoggerError("Updater", "The stored release list copy could not be read: {1}.", Err.Message)
+	}
+	return 0
+}
+
+; The conditional-GET entry of a channel: this session's, else the stored copy
+; of the real list URL (a restart). Other URLs never touch the disk.
+; @returns {Object|Integer} { Etag, Json } or 0
+_Updater_FetchCacheEntry(Channel, Url) {
+	global _UpdaterFetchCache
+	if _UpdaterFetchCache.Has(Channel)
+		return _UpdaterFetchCache[Channel]
+	if (Url != Updater_ReleaseApiUrl())
+		return 0
+	Entry := _Updater_LoadListDiskEntry(Url)
+	if IsObject(Entry)
+		_UpdaterFetchCache[Channel] := Entry
+	return Entry
+}
+
+; Saves the complete list with its validator, only when the ETag changed, in a
+; stage that replaces the previous copy in one rename. A refused save is logged
+; and this session keeps its in-memory copy; the next start sends a full request.
+; @returns {Boolean} True when the stored copy now holds this ETag.
+_Updater_PersistListCache(Url, Etag, Json) {
+	global UPDATER_LIST_CACHE_MAGIC, _UpdaterListDiskEntry
+	if (Url != Updater_ReleaseApiUrl() || !_Updater_JsonIsList(Json))
+		return false
+	Current := _Updater_LoadListDiskEntry(Url)
+	if (IsObject(Current) && Current.Etag == Etag)
+		return true
+	Stage := ""
+	try {
+		Path := _Updater_ListCachePath()
+		FSEnsureDirectoryStrict(RegExReplace(Path, "[\\/][^\\/]*$"))
+		Stage := Path . "." . A_TickCount . ".tmp"
+		if !FSWriteDurable(Stage, UPDATER_LIST_CACHE_MAGIC . "`n" . Url . "`n" . Etag . "`n" . Json)
+			throw Error("the stage could not be written")
+		if !FSAtomicMoveReplace(Stage, Path)
+			throw Error("the stage could not replace the previous copy")
+		_UpdaterListDiskEntry := { Etag: Etag, Json: Json }
+		try LoggerDebug("Updater", "Saved the release list copy ({1} bytes).", StrLen(Json))
+		return true
+	} catch as Err {
+		if (Stage != "")
+			FSDelete(Stage)
+		try LoggerError("Updater", "The release list copy could not be saved; this session keeps it: {1}.", Err.Message)
+		return false
+	}
 }
 
 ; Drain one retained visible terminal per interrupted manual request after the
@@ -2316,10 +2435,17 @@ Updater_ReleaseApiUrl() {
 		"{owner}", UPDATER_GH_OWNER), "{repo}", UPDATER_GH_REPO)
 }
 
+; Returns the public releases Atom feed URL.
+Updater_ReleaseFeedUrl() {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO, UPDATER_RELEASES_FEED_URL_TEMPLATE
+	return StrReplace(StrReplace(UPDATER_RELEASES_FEED_URL_TEMPLATE,
+		"{owner}", UPDATER_GH_OWNER), "{repo}", UPDATER_GH_REPO)
+}
+
 ; Returns the GitHub Releases HTML page URL (for "Open in browser" actions).
 Updater_ReleasesPageUrl() {
 	global UPDATER_GH_OWNER, UPDATER_GH_REPO
-	return "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases"
+	return UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases"
 }
 
 ; Returns the GitHub release URL to surface as the "current version" deep link
@@ -2334,7 +2460,7 @@ Updater_CurrentReleaseUrl() {
 		and BUNDLE_RELEASE_URL != ""
 		and BUNDLE_RELEASE_URL != "__BUNDLE_RELEASE_URL__"
 		return BUNDLE_RELEASE_URL
-	return "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/latest"
+	return UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/latest"
 }
 
 ; Shared manual URL boundary for both About-menu links and changelog actions.
@@ -2346,7 +2472,7 @@ _Updater_IsAllowedManualUrl(Url) {
 		return false
 	if RegExMatch(Url, "[\x00-\x20\x7f]")
 		return false
-	AllowedRoot := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+	AllowedRoot := UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
 	if SubStr(Url, 1, StrLen(AllowedRoot)) !== AllowedRoot
 		return false
 	Suffix := SubStr(Url, StrLen(AllowedRoot) + 1)
@@ -2437,8 +2563,9 @@ Updater_FetchLatestJson(Channel) {
 		; the top of this file for the per-phase budget and the rationale.
 		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
 			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
-		if _UpdaterFetchCache.Has(Channel) {
-			Etag := _UpdaterFetchCache[Channel].Etag
+		Cached := _Updater_FetchCacheEntry(Channel, Url)
+		if IsObject(Cached) {
+			Etag := Cached.Etag
 			if (Etag is String and Etag != "")
 				Req.SetRequestHeader("If-None-Match", Etag)
 		}
@@ -2446,9 +2573,12 @@ Updater_FetchLatestJson(Channel) {
 			throw Error("The exact managed updater request refused completion.")
 		if _Updater_RequestPolicy(RequestOwner) != UPDATER_REQUEST_POLICY_ALLOW
 			return ""
+		if !Req.ResponseEncodingValid
+			throw Error("The managed latest-release response bytes are not valid UTF-8.")
 		Etag := ""
 		try Etag := Req.GetResponseHeader("ETag")
-		Json := _Updater_InterpretResponse(Req.Status, Req.ResponseText, Etag, Channel, Url, RequestOwner)
+		Json := _Updater_InterpretResponse(Req.Status, Req.ResponseText, Etag, Channel, Url, RequestOwner,
+			_Updater_ReadRateLimit(Req))
 	} catch as Err {
 		LoggerWarn("Updater", "HTTP request failed: {1}.", Err.Message)
 	}
@@ -2463,24 +2593,62 @@ Updater_FetchLatestJson(Channel) {
 ; when the list holds no release of the channel. Updates the per-channel
 ; conditional-GET cache on a fresh 200; the cache keeps the whole list, so a 304
 ; selects the channel's release again.
-_Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
+; Reads the final response's GitHub rate-limit headers; a missing one reads "".
+_Updater_ReadRateLimit(Http) {
+	Remaining := "", Reset := ""
+	try Remaining := Http.GetResponseHeader("X-RateLimit-Remaining")
+	try Reset := Http.GetResponseHeader("X-RateLimit-Reset")
+	return Map("remaining", Remaining, "reset", Reset)
+}
+
+; Names an exhausted GitHub API rate limit (403 or 429 with no call left) and
+; its UTC reset, the sentence of the Lua drivers' updater.rate_limit; "" when
+; the response is not an exhausted rate limit (#95).
+_Updater_RateLimitDetail(Status, Remaining, Reset) {
+	if (Status != 403 && Status != 429) || Remaining != "0"
+		return ""
+	When := ""
+	if RegExMatch(Reset, "^\d+$")
+		When := ", it resets at "
+			. FormatTime(DateAdd("19700101000000", Integer(Reset), "Seconds"), "yyyy-MM-dd HH:mm:ss") . " UTC"
+	return Format("HTTP {1}: the GitHub API rate limit is exhausted{2}", Status, When)
+}
+
+_Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset, RateLimit := 0) {
 	global _UpdaterFetchCache
 	Json := ""
+	; The list is decoded once per response (once per cached entry on a 304)
+	; and both readers below share that index.
+	Index := 0
 	if (Status == 304) {
-		if _UpdaterFetchCache.Has(Channel)
-			Json := _UpdaterFetchCache[Channel].Json
+		Cached := _Updater_FetchCacheEntry(Channel, Url)
+		if IsObject(Cached) {
+			Json := Cached.Json
+			Index := _Updater_CachedListIndex(Cached)
+		}
 		try LoggerDebug("Updater", "GitHub releases unchanged (304) for channel {1}.", Channel)
 	} else if (Status == 200) {
 		Json := Body
 		if (Etag is String and Etag != ""
 			and _Updater_JsonPayloadIsUsable(Json)) {
-			if IsSet(Request)
-				_Updater_TryPublishFetchCache(Channel, Etag, Json, Request)
-			else
-				_UpdaterFetchCache[Channel] := { Etag: Etag, Json: Json }
+			if _Updater_JsonIsList(Json)
+				Index := _Updater_ReleaseListIndex(Json)
+			if IsSet(Request) {
+				if _Updater_TryPublishFetchCache(Channel, Etag, Json, Request, Index)
+					_Updater_PersistListCache(Url, Etag, Json)
+			} else {
+				_UpdaterFetchCache[Channel] := _Updater_NewFetchCacheEntry(Etag, Json, Index)
+				_Updater_PersistListCache(Url, Etag, Json)
+			}
 		}
-	} else if (Status == 403) {
-		try LoggerWarn("Updater", "GitHub API rate limit (HTTP 403) for '{1}'.", Url)
+	} else if (Status == 403 || Status == 429) {
+		Detail := (RateLimit is Map)
+			? _Updater_RateLimitDetail(Status, RateLimit["remaining"], RateLimit["reset"]) : ""
+		if (Detail != "") {
+			try LoggerWarn("Updater", "GitHub releases for '{1}': {2}.", Url, Detail)
+		} else {
+			try LoggerWarn("Updater", "GitHub refused the releases request (HTTP {1}) for '{2}'.", Status, Url)
+		}
 	} else {
 		try LoggerWarn("Updater", "GitHub API HTTP {1} for '{2}'.", Status, Url)
 	}
@@ -2488,13 +2656,44 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
 	; downstream parser receives a single-object JSON string. A manual check also
 	; keeps, on its request, the other channels with a newer release: the
 	; update-check window lists them.
-	if (_Updater_JsonPayloadIsUsable(Json)
-		and SubStr(LTrim(Json), 1, 1) == "[") {
+	if (_Updater_JsonPayloadIsUsable(Json) and _Updater_JsonIsList(Json)) {
+		if !IsObject(Index)
+			Index := _Updater_ReleaseListIndex(Json)
 		if IsSet(Request)
-			_Updater_RecordOtherChannels(Request, Json, Channel)
-		Json := _Updater_SelectChannelRelease(Json, Channel)
+			_Updater_RecordOtherChannels(Request, Json, Channel, Index)
+		Json := _Updater_SelectChannelRelease(Json, Channel, Index)
 	}
 	return Json
+}
+
+; Reports whether a payload's first significant character opens an array,
+; without copying the payload.
+_Updater_JsonIsList(Json) {
+	return Json is String && RegExMatch(Json, "^[ \t\r\n]*\[") > 0
+}
+
+; A conditional-GET entry: the list, its validator and, when already decoded,
+; the list's index (_Updater_CachedListIndex).
+_Updater_NewFetchCacheEntry(Etag, Json, Index := 0) {
+	Entry := { Etag: Etag, Json: Json }
+	if IsObject(Index)
+		Entry.Index := Index
+	return Entry
+}
+
+; The index of a conditional-GET entry's list, decoded on first use. An entry's
+; Json never changes (a new response replaces the whole entry), so its index
+; stays valid for the entry's life and a 304 decodes nothing.
+_Updater_CachedListIndex(Entry) {
+	if !Entry.HasOwnProp("Index")
+		Entry.Index := _Updater_ReleaseListIndex(Entry.Json)
+	return Entry.Index
+}
+
+; The members of each listed release the update check reads: its tag, and its
+; publication time for the other channels' notices.
+_Updater_ReleaseListIndex(Json) {
+	return _Updater_DecodeReleaseList(Json, ["tag_name", "published_at"])
 }
 
 ; Keeps on a manual request the other channels whose latest release in the list
@@ -2502,14 +2701,18 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
 ; @param Request {Object} The request context; only a manual one is annotated.
 ; @param Json {String} The release list.
 ; @param Channel {String} The checked channel.
-_Updater_RecordOtherChannels(Request, Json, Channel) {
+; @param Index {Array} The list's index when already decoded.
+_Updater_RecordOtherChannels(Request, Json, Channel, Index := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	if (Type(Request) != "Object") || !Request.HasProp("Origin")
 		|| (Request.Origin != UPDATER_REQUEST_ORIGIN_MANUAL)
 		return
+	if !IsObject(Index)
+		Index := _Updater_ReleaseListIndex(Json)
 	Releases := []
-	for _, Chunk in _Updater_SplitReleasesArray(Json)
-		Releases.Push(Map("tag", Updater_ParseTagName(Chunk), "published_at", _Updater_ParsePublishedAt(Chunk)))
+	for _, Span in Index
+		Releases.Push(Map("tag", _Updater_ReleaseString(Span["members"], "tag_name"),
+			"published_at", _Updater_ReleaseString(Span["members"], "published_at")))
 	Request.OtherChannels := UpdateChannels_NewerElsewhere(Releases, Channel, Updater_CurrentVersion())
 }
 
@@ -2524,18 +2727,19 @@ _Updater_RequestOtherChannels(Request) {
 ; chosen by the shared registry's tag rule and semver order (GitHub lists by
 ; publish date, so a later stable must not hide a higher dev build or the
 ; reverse), or UPDATER_NO_CHANNEL_RELEASE when the list holds none.
-_Updater_SelectChannelRelease(Json, Channel) {
+; @param Index {Array} The list's index when already decoded.
+_Updater_SelectChannelRelease(Json, Channel, Index := 0) {
 	global UPDATER_NO_CHANNEL_RELEASE
-	Chunks := _Updater_SplitReleasesArray(Json)
+	Releases := IsObject(Index) ? Index : _Updater_ReleaseListIndex(Json)
 	Tags := []
-	for _, Chunk in Chunks
-		Tags.Push(Updater_ParseTagName(Chunk))
+	for _, Span in Releases
+		Tags.Push(_Updater_ReleaseString(Span["members"], "tag_name"))
 	Best := UpdateChannels_PickLatest(Tags, Channel)
 	if !Best {
-		try LoggerInfo("Updater", "No release of channel '{1}' among the {2} listed.", Channel, Chunks.Length)
+		try LoggerInfo("Updater", "No release of channel '{1}' among the {2} listed.", Channel, Releases.Length)
 		return UPDATER_NO_CHANNEL_RELEASE
 	}
-	return Chunks[Best]
+	return SubStr(Json, Releases[Best]["start"], Releases[Best]["length"])
 }
 
 ; Reports whether a fetch answered that its channel has no release yet.
@@ -2547,6 +2751,122 @@ _Updater_JsonIsNoChannelRelease(Json) {
 ; The user-facing sentence for a channel without any release yet.
 _Updater_NoChannelReleaseMessage(Channel) {
 	return StrReplace(t("updater.no_release_on_channel"), "{channel}", _Updater_ChannelLabel(Channel))
+}
+
+; Lists the releases of a GitHub releases Atom feed as the JSON array the update
+; check reads: tag_name and published_at, newest first as the feed orders them.
+; Port of feed_release_list in _shared/lua/updater/release_sources.lua, replaying
+; _shared/tests/corpus/updater/check_only_vectors.json: only an entry whose
+; alternate link is a release tag of this repository counts, and a tag outside
+; [A-Za-z0-9._+-] is dropped.
+; @param Body {String} The feed document.
+; @param Owner {String} Expected repository owner.
+; @param Repo {String} Expected repository name.
+; @param Reason {VarRef} Why the feed gives no list.
+; @returns {String} The JSON array text; "" when the feed gives no list.
+_Updater_ParseReleaseFeed(Body, Owner, Repo, &Detail := "") {
+	Detail := ""
+	if !(Body is String) || !RegExMatch(Body, "<feed[\s>]") {
+		Detail := "not an Atom feed"
+		return ""
+	}
+	Prefix := UPDATER_GITHUB_WEB_ROOT . Owner . "/" . Repo . "/releases/tag/"
+	Rows := ""
+	Position := 1
+	while (Position := RegExMatch(Body, "s)<entry[\s>].*?</entry\s*>", &Entry, Position)) {
+		Position += Entry.Len[0]
+		Tag := _Updater_FeedEntryTag(Entry[0], Prefix)
+		if (Tag == "")
+			continue
+		Updated := RegExMatch(Entry[0], "<updated[^>]*>\s*([^<]*?)\s*</updated>", &Stamp) ? Stamp[1] : ""
+		; Only an ISO timestamp travels: no feed text reaches the JSON unescaped
+		if !RegExMatch(Updated, "^[0-9T:.Z+-]+\z")
+			Updated := ""
+		Rows .= (Rows == "" ? "" : ",") . '{"tag_name":"' . Tag . '","published_at":"' . Updated . '"}'
+	}
+	if (Rows == "") {
+		Detail := "an Atom feed without a release of " . Owner . "/" . Repo
+		return ""
+	}
+	return "[" . Rows . "]"
+}
+
+; The release tag a feed entry's alternate link names under the repository's tag
+; prefix, or "" when it names none.
+; @param Entry {String} One <entry> element.
+; @param Prefix {String} The repository's release tag URL prefix.
+; @returns {String}
+_Updater_FeedEntryTag(Entry, Prefix) {
+	Position := 1
+	while (Position := RegExMatch(Entry, "<link[\s/][^>]*>", &Link, Position)) {
+		Position += Link.Len[0]
+		Rel := _Updater_FeedAttribute(Link[0], "rel")
+		if (Rel != "" && Rel != "alternate")
+			continue
+		Href := _Updater_FeedAttribute(Link[0], "href")
+		if (Href == "")
+			continue
+		if (SubStr(Href, 1, StrLen(Prefix)) !== Prefix)
+			return ""
+		Tag := _Updater_FeedPercentDecode(SubStr(Href, StrLen(Prefix) + 1))
+		return RegExMatch(Tag, "^[A-Za-z0-9._+-]+\z") ? Tag : ""
+	}
+	return ""
+}
+
+; One attribute of a raw start tag, quoted either way; "" when absent.
+_Updater_FeedAttribute(StartTag, Name) {
+	return RegExMatch(StartTag, "\s" . Name . "\s*=\s*([\x22'])(.*?)\1", &Match) ? Match[2] : ""
+}
+
+; Decodes the ASCII percent escapes of a URL path segment. Any other escape stays
+; as text, which the tag rule then refuses.
+_Updater_FeedPercentDecode(Segment) {
+	Out := "", Position := 1
+	while (Found := RegExMatch(Segment, "%([0-7][0-9A-Fa-f])", &Escape, Position)) {
+		Code := Integer("0x" . Escape[1])
+		Out .= SubStr(Segment, Position, Found - Position) . (Code > 0 ? Chr(Code) : Escape[0])
+		Position := Found + Escape.Len[0]
+	}
+	return Out . SubStr(Segment, Position)
+}
+
+; Interprets the feed's response like _Updater_InterpretResponse does the API's:
+; the channel's latest release as a single object, with the other channels kept
+; on the request. Nothing is cached: the list is no copy of the API's.
+; @returns {String} The release object; UPDATER_NO_CHANNEL_RELEASE; "" on a failure.
+_Updater_InterpretFeedResponse(Status, Body, Channel, Request) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if (Status != 200) {
+		try LoggerWarn("Updater", "The public release feed answered HTTP {1}.", Status)
+		return ""
+	}
+	List := _Updater_ParseReleaseFeed(Body, UPDATER_GH_OWNER, UPDATER_GH_REPO, &Detail)
+	if (List == "") {
+		try LoggerWarn("Updater", "The public release feed gives no list: {1}.", Detail)
+		return ""
+	}
+	Index := _Updater_ReleaseListIndex(List)
+	_Updater_RecordOtherChannels(Request, List, Channel, Index)
+	return _Updater_SelectChannelRelease(List, Channel, Index)
+}
+
+; Reads the public feed as the same completion path as an API check; OnJson gets
+; what _Updater_InterpretFeedResponse returns.
+; @param Channel {String}
+; @param Request {Object}
+; @param OnJson {Func} Called as (Json, Request, Terminal).
+; @returns {Object|Integer} The request owner, or 0.
+_Updater_FetchFeedJsonAsync(Channel, Request, OnJson) {
+	Owner := _Updater_RegisterAsyncRequestOwner(0, Channel, OnJson, Updater_ReleaseFeedUrl(), Request)
+	if !IsObject(Owner) {
+		_Updater_InvokeAsyncOnJson(OnJson, "", Request, 0, "invalid feed check ownership")
+		return 0
+	}
+	Owner.Record["feed"] := true
+	_Updater_SendOwnedAsyncRequest(Owner, _Updater_PollAsync,
+		"Async feed check dispatch", _Updater_PrepareFeedAsyncTransport)
+	return Owner
 }
 
 ; Async, non-blocking sibling of Updater_FetchLatestJson. Dispatches the GitHub
@@ -2920,15 +3240,22 @@ _Updater_PrepareLatestAsyncTransport(Owner, FactoryFn := 0) {
 		UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 	if !_Updater_AsyncRequestOwned(Owner)
 		return 0
-	if _UpdaterFetchCache.Has(Record["channel"]) {
-		Etag := _UpdaterFetchCache[Record["channel"]].Etag
+	Cached := _Updater_FetchCacheEntry(Record["channel"], Record["url"])
+	if IsObject(Cached) {
+		Etag := Cached.Etag
 		if (Etag is String and Etag != "")
 			Req.SetRequestHeader("If-None-Match", Etag)
 	}
 	return _Updater_AsyncRequestOwned(Owner) ? Req : 0
 }
 
-_Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0) {
+; The feed's transport: the list's, asking for Atom. No validator: the feed has
+; no copy to answer a 304 from.
+_Updater_PrepareFeedAsyncTransport(Owner, FactoryFn := 0) {
+	return _Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn, "application/atom+xml")
+}
+
+_Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0, Accept := "application/vnd.github+json") {
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 	Record := Owner.Record
@@ -2945,7 +3272,7 @@ _Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0) {
 	Req.Open("GET", Record["url"], true)
 	if !_Updater_AsyncRequestOwned(Owner)
 		return 0
-	Req.SetRequestHeader("Accept", "application/vnd.github+json")
+	Req.SetRequestHeader("Accept", Accept)
 	if !_Updater_AsyncRequestOwned(Owner)
 		return 0
 	Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
@@ -3081,6 +3408,7 @@ _Updater_PollAsync(id) {
 	Status := 0
 	Body := ""
 	Etag := ""
+	RateLimit := 0
 	CancelledDuringLease := false
 	try {
 		http := rec.Get("http", 0)
@@ -3100,7 +3428,10 @@ _Updater_PollAsync(id) {
 			}
 		} else {
 			try Etag := http.GetResponseHeader("ETag")
+			RateLimit := _Updater_ReadRateLimit(http)
 			Status := http.Status
+			if (http is CurlAsyncRequest) && !http.ResponseEncodingValid
+				throw Error("The managed async latest-release response bytes are not valid UTF-8.")
 			Body := http.ResponseText
 		}
 	} catch as Err {
@@ -3128,8 +3459,9 @@ _Updater_PollAsync(id) {
 	Json := ""
 	if (!failed and ready) {
 		try {
-			Json := _Updater_InterpretResponse(
-				Status, Body, Etag, Channel, Url, Request)
+			Json := rec.Get("feed", false)
+				? _Updater_InterpretFeedResponse(Status, Body, Channel, Request)
+				: _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request, RateLimit)
 		} catch as Err {
 			try LoggerDebug("Updater", "Async response read failed: {1}.", Err.Message)
 			Json := ""
@@ -3303,6 +3635,8 @@ _Updater_PollReleasesListAsync(id) {
 			}
 		} else {
 			Status := Req.Status
+			if (Req is CurlAsyncRequest) && !Req.ResponseEncodingValid
+				throw Error("The managed async releases-list response bytes are not valid UTF-8.")
 			Body := Req.ResponseText
 		}
 	} catch as Err {
@@ -3370,6 +3704,8 @@ Updater_FetchReleasesListJson(Channel := "") {
 			throw Error("The exact managed updater request refused completion.")
 		if _Updater_RequestPolicy(RequestOwner) != UPDATER_REQUEST_POLICY_ALLOW
 			return ""
+		if !Req.ResponseEncodingValid
+			throw Error("The managed releases-list response bytes are not valid UTF-8.")
 		if (Req.Status == 200) {
 			Json := Req.ResponseText
 		} else {
@@ -3381,57 +3717,71 @@ Updater_FetchReleasesListJson(Channel := "") {
 	return Json
 }
 
-; Splits the top-level JSON array of releases into one substring per object,
-; honouring quoted strings and escape sequences so a "}" inside a release body
-; cannot fool the depth counter. Returns an Array of object-JSON strings.
+; Strictly decodes one release document with the shared JSON owner, or returns
+; 0 when it is not complete valid JSON. Every metadata field is then read from
+; the selected release object itself (never from a nested object such as the
+; author or an asset), with its escapes decoded exactly once, as the shared Lua
+; release parser does.
+; @param Json {String} One release object (or, for tags, a raw release list).
+; @returns {Map|Array|Integer|String|Object} The decoded root, or 0.
+_Updater_DecodeRelease(Json) {
+	if _Updater_JsonPayloadIsFailure(Json)
+		return 0
+	try return JsonParse(Json)
+	catch
+		return 0
+}
+
+; The release object's own string field; "" for an absent, null or non-string
+; value, or when the release is not an object.
+_Updater_ReleaseString(Release, Key) {
+	if !(Release is Map)
+		return ""
+	Value := Release.Get(Key, "")
+	return Value is String ? Value : ""
+}
+
+; Decodes a complete release list once: the exact span of every root object,
+; in publication order, with the decoded values of only the named members of
+; each release. The whole list is validated, but nothing a reader does not name
+; is built: the assets, author and notes of a 6 MB list are never decoded (the
+; release list freeze). A document that is not an array of objects offers no
+; release at all: a nested array, a scalar or a string that only looks like a
+; release object never reaches version selection.
+; @param Json {String} The release list returned by the GitHub API.
+; @param Members {Array} The release members to decode.
+; @returns {Array} Maps with "start" and "length" (the raw object span in Json)
+;   and "members" (a Map of the named members present).
+_Updater_DecodeReleaseList(Json, Members) {
+	if _Updater_JsonPayloadIsFailure(Json) || !_Updater_JsonIsList(Json)
+		return []
+	try return JsonArrayObjectMembers(Json, Members)
+	catch
+		return []
+}
+
+; Splits the top-level JSON array of releases into the exact raw text of each
+; root object. Returns an Array of object-JSON strings (see
+; _Updater_DecodeReleaseList for what is refused).
 _Updater_SplitReleasesArray(Json) {
 	out := []
-	Trimmed := LTrim(Json)
-	if (SubStr(Trimmed, 1, 1) != "[")
-		return out
-	len := StrLen(Trimmed)
-	pos := 2
-	depth := 0
-	start := 0
-	in_str := false
-	esc := false
-	while (pos <= len) {
-		c := SubStr(Trimmed, pos, 1)
-		if in_str {
-			if esc {
-				esc := false
-			} else if (c == "\") {
-				esc := true
-			} else if (c == '"') {
-				in_str := false
-			}
-		} else {
-			if (c == '"') {
-				in_str := true
-			} else if (c == "{") {
-				if (depth == 0)
-					start := pos
-				depth += 1
-			} else if (c == "}") {
-				depth -= 1
-				if (depth == 0 and start > 0) {
-					out.Push(SubStr(Trimmed, start, pos - start + 1))
-					start := 0
-				}
-			}
-		}
-		pos += 1
-	}
+	for _, Span in _Updater_DecodeReleaseList(Json, [])
+		out.Push(SubStr(Json, Span["start"], Span["length"]))
 	return out
 }
 
 ; Extracts GitHub's boolean "prerelease" flag (the release workflow sets it
 ; from the channel's github_prerelease). Channel membership itself is decided
-; by the tag, through the shared registry. Defaults to false when absent.
+; by the tag, through the shared registry. True only for the release object's
+; own Boolean true: the shared parser folds true and the number 1 into one
+; value, so the member's own source token is the proof.
 _Updater_ParsePrerelease(Json) {
-	if RegExMatch(Json, '"prerelease"\s*:\s*(true|false)', &M)
-		return M[1] == "true"
-	return false
+	if _Updater_JsonPayloadIsFailure(Json)
+		return false
+	try Members := JsonObjectMemberSpans(Json)
+	catch
+		return false
+	return Members.Has("prerelease") && Members["prerelease"]["text"] == "true"
 }
 
 ; Extracts the "html_url" field from a single-release JSON object.
@@ -3441,11 +3791,21 @@ _Updater_ParseHtmlUrl(Json) {
 	return ""
 }
 
-; Extracts the "published_at" ISO-8601 timestamp from a release object.
+; Extracts the release object's own "published_at" timestamp, decoded once.
+; Timestamp validation stays with its consumers.
 _Updater_ParsePublishedAt(Json) {
-	if RegExMatch(Json, '"published_at"\s*:\s*"([^"]+)"', &M)
-		return M[1]
-	return ""
+	return _Updater_ReleaseMember(Json, "published_at")
+}
+
+; One string member of a single release object, validated whole but with only
+; that member decoded (a release carries about 60 KB of assets and notes); ""
+; when the document is not a complete object or the member is not a string.
+_Updater_ReleaseMember(Json, Key) {
+	if _Updater_JsonPayloadIsFailure(Json)
+		return ""
+	try return _Updater_ReleaseString(JsonObjectMembers(Json, [Key]), Key)
+	catch
+		return ""
 }
 
 ; Build an array of release records from the raw JSON list. With a ViewChannel,
@@ -3453,66 +3813,67 @@ _Updater_ParsePublishedAt(Json) {
 ; its own releases and those of every more stable channel), so the dev view
 ; shows every nightly side by side with the stable releases.
 ;
-; Each entry: { Tag, Body, HtmlUrl, PublishedAt, Prerelease, RawJson }. The original
+; Each entry: { Tag, Body, HtmlUrl, PublishedAt, RawJson }. The original
 ; API order is preserved (GitHub returns most-recent first) so callers do not
 ; need to sort. RawJson carries the per-release JSON chunk so changelog-list install
-; can resolve the authenticated asset via _Updater_FindAsset (AHK-07).
+; can resolve the authenticated asset via _Updater_FindAsset (AHK-07). The list
+; is decoded once; no consumer reads a per-release prerelease flag here. A
+; release's Body is decoded from its RawJson on first read: a window lists every
+; release but shows one release's notes at a time.
 Updater_ParseReleasesList(Json, ViewChannel := "") {
 	out := []
-	for _, chunk in _Updater_SplitReleasesArray(Json) {
+	for _, Span in _Updater_DecodeReleaseList(Json, ["tag_name", "published_at"]) {
+		Members := Span["members"]
+		Tag := _Updater_ReleaseString(Members, "tag_name")
+		if (Tag == "")
+			continue
+		if (ViewChannel != "" and !UpdateChannels_VisibleIn(ViewChannel, Tag))
+			continue
+		RawJson := SubStr(Json, Span["start"], Span["length"])
 		rec := {
-			Tag:         Updater_ParseTagName(chunk),
-			Body:        Updater_ParseBody(chunk),
-			HtmlUrl:     _Updater_ParseHtmlUrl(chunk),
-			PublishedAt: _Updater_ParsePublishedAt(chunk),
-			Prerelease:  _Updater_ParsePrerelease(chunk),
-			RawJson:     chunk
+			Tag:         Tag,
+			HtmlUrl:     _Updater_ParseHtmlUrl(RawJson),
+			PublishedAt: _Updater_ReleaseString(Members, "published_at"),
+			RawJson:     RawJson
 		}
-		if (rec.Tag == "")
-			continue
-		if (ViewChannel != "" and !UpdateChannels_VisibleIn(ViewChannel, rec.Tag))
-			continue
+		rec.DefineProp("Body", { get: _Updater_ReleaseRecordBody })
 		out.Push(rec)
 	}
 	return out
 }
 
-; Extracts the "tag_name" field from a GitHub release JSON payload.
-; Handles both a release object and a raw releases array (its first entry).
+; The Body getter of a listed release: its own "body", decoded from its RawJson
+; once, then kept as the record's plain value. RawJson is a span of the list
+; already validated whole, so decoding it cannot fail.
+_Updater_ReleaseRecordBody(Record) {
+	Body := _Updater_ReleaseString(JsonObjectMembers(Record.RawJson, ["body"]), "body")
+	Record.DefineProp("Body", { value: Body })
+	return Body
+}
+
+; Extracts the release object's own "tag_name", decoded once.
+; Handles both a release object and a raw releases array: its first entry
+; decides, even when that entry carries no usable tag.
 Updater_ParseTagName(Json) {
 	if _Updater_JsonPayloadIsFailure(Json)
 		return ""
-	; Unwrap array if callers pass raw list JSON (defensive — normally already
-	; unwrapped by Updater_FetchLatestJson or Updater_ParseReleasesList).
-	if (SubStr(LTrim(Json), 1, 1) == "[")
-		Json := RegExReplace(Json, "^\s*\[", "")
-	if RegExMatch(Json, '"tag_name"\s*:\s*"([^"]+)"', &M)
-		return M[1]
-	return ""
+	if !_Updater_JsonIsList(Json)
+		return _Updater_ReleaseMember(Json, "tag_name")
+	Release := _Updater_DecodeRelease(Json)
+	if Release is Array
+		Release := Release.Length ? Release[1] : 0
+	return _Updater_ReleaseString(Release, "tag_name")
 }
 
-; Extracts the "body" field (release notes markdown) from a GitHub release JSON.
-; Returns "" when the field is absent, null, or an empty string — callers
-; display t("updater.changelog_empty") in that case.
+; Extracts the release object's own "body" (release notes markdown), decoded
+; once by the shared parser. Returns "" when the field is absent, null, not a
+; string or empty — callers display t("updater.changelog_empty") in that case.
+; Carriage returns are kept: both note views normalize line endings when
+; rendering (_Updater_ReleaseNotesChangelog, the shared release-notes page).
 Updater_ParseBody(Json) {
 	if _Updater_JsonPayloadIsFailure(Json)
 		return ""
-	; Unwrap array defensively — normally already done by Updater_FetchLatestJson.
-	if (SubStr(LTrim(Json), 1, 1) == "[")
-		Json := RegExReplace(Json, "^\s*\[", "")
-	; GitHub sets "body": null (not "") when a release has no description.
-	; Detect null before trying the quoted-string pattern.
-	if RegExMatch(Json, '"body"\s*:\s*null', &_)
-		return ""
-	; Possessive quantifier (*+) prevents catastrophic backtracking on large bodies.
-	if RegExMatch(Json, '"body"\s*:\s*"((?:[^"\\]++|\\.)*+)"', &M) {
-		try return JsonStringDecodeContents(M[1])
-		catch as Err {
-			try LoggerWarn("Updater", "Release body JSON decode failed: {1}.", Err.Message)
-			return ""
-		}
-	}
-	return ""
+	return _Updater_ReleaseMember(Json, "body")
 }
 
 _Updater_AttachManagedNetworkFailure(Owner) {

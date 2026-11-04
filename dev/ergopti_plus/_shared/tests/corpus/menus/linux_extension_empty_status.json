@@ -1,0 +1,32 @@
+{
+	"section": "hotstrings_menu",
+	"provider": "hotstring_extensions",
+	"status": "none_installed",
+	"row": {
+		"type": "label",
+		"i18n": "menu.extensions.none_installed"
+	},
+	"captions": {
+		"ar": "لا توجد إضافات مثبتة",
+		"cs": "Není nainstalováno žádné rozšíření",
+		"da": "Ingen udvidelse installeret",
+		"de": "Keine Erweiterung installiert",
+		"en": "No extension installed",
+		"es": "Ninguna extensión instalada",
+		"fr": "Aucune extension installée",
+		"he": "לא הותקנה הרחבה",
+		"hi": "कोई एक्सटेंशन इंस्टॉल नहीं है",
+		"it": "Nessuna estensione installata",
+		"ja": "拡張機能はインストールされていません",
+		"ko": "설치된 확장이 없습니다",
+		"nl": "Geen extensie geïnstalleerd",
+		"no": "Ingen utvidelse installert",
+		"pl": "Nie zainstalowano rozszerzeń",
+		"pt": "Nenhuma extensão instalada",
+		"ru": "Расширения не установлены",
+		"sv": "Inget tillägg installerat",
+		"tr": "Yüklü uzantı yok",
+		"uk": "Розширення не встановлено",
+		"zh": "未安装扩展"
+	}
+}

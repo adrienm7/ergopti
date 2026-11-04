@@ -153,11 +153,11 @@ _CryptoSha256Cng(Data) {
 ; ==========================================
 ; ==========================================
 
-; These back the keylogger's at-rest encryption. They live here, in the crypto
+; These back the keystats's at-rest encryption. They live here, in the crypto
 ; adapter, because the OS-purity ratchet requires every DllCall to sit inside
 ; adapters/ — and CNG is exactly the kind of OS primitive an adapter exists to
 ; wrap. The envelope format and the orchestration live in
-; modules/keylogger/keylogger_text_cipher.ahk, which calls these and holds no
+; modules/keystats/keystats_text_cipher.ahk, which calls these and holds no
 ; DllCall of its own.
 
 ; BCRYPT_ALG_HANDLE_HMAC_FLAG — the SHA-256 provider must be opened with this to
@@ -310,6 +310,127 @@ CryptoBase64Decode(b64) {
 		ok := DllCall("Crypt32\CryptStringToBinaryW", "WStr", b64, "UInt", StrLen(b64),
 				"UInt", flags, "Ptr", out.Ptr, "UInt*", &required, "Ptr", 0, "Ptr", 0)
 		return ok ? out : Buffer(0, 0)
+}
+
+
+; Verifies an ECDSA P-256 / SHA-256 signature with CNG. The caller owns the
+; policy and the key encoding; the OS handles, the BCRYPT_ECCKEY_BLOB layout and
+; their release stay at this boundary.
+; @param {Buffer} Spki - DER SubjectPublicKeyInfo holding the uncompressed point.
+; @param {Integer} PointOffset - Offset of the X coordinate inside Spki.
+; @param {Integer} ComponentBytes - Size of X, Y and of each signature half.
+; @param {String} Message - Text signed, hashed as UTF-8 without a NUL.
+; @param {Buffer} Signature - IEEE P1363 r||s signature.
+; @return {String} "" when it verifies, otherwise "bad_key", "no_native" or "mismatch".
+CryptoEcdsaP256Verify(Spki, PointOffset, ComponentBytes, Message, Signature) {
+	; BCRYPT_ECCKEY_BLOB: magic 'ECS1', the component size, then X and Y
+	Blob := Buffer(8 + 2 * ComponentBytes)
+	NumPut("UInt", 0x31534345, Blob, 0)
+	NumPut("UInt", ComponentBytes, Blob, 4)
+	DllCall("RtlMoveMemory", "Ptr", Blob.Ptr + 8, "Ptr", Spki.Ptr + PointOffset,
+		"UPtr", 2 * ComponentBytes)
+	KeyAlg := 0, HashAlg := 0, Key := 0
+	Reason := "no_native"
+	try {
+		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &KeyAlg, "WStr", "ECDSA_P256", "Ptr", 0, "UInt", 0, "UInt")
+			throw Error("no ECDSA provider")
+		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &HashAlg, "WStr", CRYPTO_BCRYPT_SHA256_ALG, "Ptr", 0, "UInt", 0, "UInt")
+			throw Error("no SHA-256 provider")
+		Reason := "bad_key"
+		if DllCall("bcrypt\BCryptImportKeyPair", "Ptr", KeyAlg, "Ptr", 0, "WStr", "ECCPUBLICBLOB", "Ptr*", &Key,
+			"Ptr", Blob, "UInt", Blob.Size, "UInt", 0, "UInt")
+			throw Error("key refused")
+		Data := Buffer(StrPut(Message, "UTF-8") - 1)
+		StrPut(Message, Data, Data.Size, "UTF-8")
+		Hash := Buffer(32)
+		Reason := "no_native"
+		if DllCall("bcrypt\BCryptHash", "Ptr", HashAlg, "Ptr", 0, "UInt", 0, "Ptr", Data, "UInt", Data.Size,
+			"Ptr", Hash, "UInt", Hash.Size, "UInt")
+			throw Error("hash refused")
+		Status := DllCall("bcrypt\BCryptVerifySignature", "Ptr", Key, "Ptr", 0, "Ptr", Hash, "UInt", Hash.Size,
+			"Ptr", Signature, "UInt", Signature.Size, "UInt", 0, "UInt")
+		Reason := (Status == 0) ? "" : "mismatch"
+	} catch as Err {
+		; Reason keeps the stage that refused; the caller turns it into a closed refusal.
+		LoggerError("Crypto", "CryptoEcdsaP256Verify refused ({1}): {2}", Reason, Err.Message)
+	}
+	if Key
+		DllCall("bcrypt\BCryptDestroyKey", "Ptr", Key, "UInt")
+	if KeyAlg
+		DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", KeyAlg, "UInt", 0, "UInt")
+	if HashAlg
+		DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", HashAlg, "UInt", 0, "UInt")
+	return Reason
+}
+
+
+; The SHA-256 digest of some bytes, through CNG's one-shot hash.
+; @param {Buffer} Data The bytes.
+; @return {Buffer} 32 bytes; throws when CNG refuses.
+CryptoSha256Digest(Data) {
+	HashAlg := 0
+	try {
+		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &HashAlg, "WStr", CRYPTO_BCRYPT_SHA256_ALG, "Ptr", 0, "UInt", 0, "UInt")
+			throw Error("no SHA-256 provider")
+		Digest := Buffer(32)
+		if DllCall("bcrypt\BCryptHash", "Ptr", HashAlg, "Ptr", 0, "UInt", 0, "Ptr", Data.Ptr, "UInt", Data.Size,
+				"Ptr", Digest, "UInt", Digest.Size, "UInt")
+			throw Error("hash refused")
+		return Digest
+	} finally {
+		if HashAlg
+			DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", HashAlg, "UInt", 0, "UInt")
+	}
+}
+
+; What CryptoRsaPkcs1SignSha256 answers instead of a signature.
+global CRYPTO_RSA_NO_PROVIDER := "no_provider"
+global CRYPTO_RSA_KEY_REFUSED := "key_refused"
+; BCRYPT_RSAFULLPRIVATE_BLOB and BCRYPT_PAD_PKCS1
+global CRYPTO_RSA_FULL_PRIVATE_BLOB := "RSAFULLPRIVATEBLOB"
+global CRYPTO_RSA_PAD_PKCS1 := 2
+
+; Signs a SHA-256 digest with RSASSA-PKCS1-v1_5 and opens the signature again. The
+; caller owns the key blob and wipes it; this boundary owns the OS handles.
+; @param {Buffer} Blob BCRYPT_RSAKEY_BLOB of a full private key.
+; @param {Buffer} Digest The SHA-256 digest.
+; @param {Integer} SignatureBytes The size of the modulus.
+; @return {Buffer|String} The signature, else a CRYPTO_RSA_* refusal.
+CryptoRsaPkcs1SignSha256(Blob, Digest, SignatureBytes) {
+	KeyAlg := 0, Key := 0
+	try {
+		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &KeyAlg, "WStr", "RSA", "Ptr", 0, "UInt", 0, "UInt")
+			return CRYPTO_RSA_NO_PROVIDER
+		if DllCall("bcrypt\BCryptImportKeyPair", "Ptr", KeyAlg, "Ptr", 0, "WStr", CRYPTO_RSA_FULL_PRIVATE_BLOB,
+				"Ptr*", &Key, "Ptr", Blob, "UInt", Blob.Size, "UInt", 0, "UInt")
+			return CRYPTO_RSA_KEY_REFUSED
+		; BCRYPT_PKCS1_PADDING_INFO names the digest the padding wraps
+		AlgName := Buffer(StrPut(CRYPTO_BCRYPT_SHA256_ALG, "UTF-16"), 0)
+		StrPut(CRYPTO_BCRYPT_SHA256_ALG, AlgName, "UTF-16")
+		Padding := Buffer(A_PtrSize, 0)
+		NumPut("Ptr", AlgName.Ptr, Padding, 0)
+		Signature := Buffer(SignatureBytes, 0)
+		Written := 0
+		if DllCall("bcrypt\BCryptSignHash", "Ptr", Key, "Ptr", Padding, "Ptr", Digest, "UInt", Digest.Size,
+				"Ptr", Signature, "UInt", Signature.Size, "UInt*", &Written, "UInt", CRYPTO_RSA_PAD_PKCS1, "UInt")
+				|| Written != Signature.Size
+				|| DllCall("bcrypt\BCryptVerifySignature", "Ptr", Key, "Ptr", Padding, "Ptr", Digest, "UInt", Digest.Size,
+					"Ptr", Signature, "UInt", Signature.Size, "UInt", CRYPTO_RSA_PAD_PKCS1, "UInt")
+			return CRYPTO_RSA_KEY_REFUSED
+		return Signature
+	} finally {
+		if Key
+			DllCall("bcrypt\BCryptDestroyKey", "Ptr", Key, "UInt")
+		if KeyAlg
+			DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", KeyAlg, "UInt", 0, "UInt")
+	}
+}
+
+; RtlZeroMemory as a call the compiler of this script cannot drop.
+; @param {Buffer} Bytes Key material to wipe.
+CryptoWipe(Bytes) {
+	if (Bytes.Size > 0)
+		DllCall("Kernel32\RtlZeroMemory", "Ptr", Bytes.Ptr, "UPtr", Bytes.Size)
 }
 
 

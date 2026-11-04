@@ -23,8 +23,9 @@ local Logger      = require("infra.logger")
 local i18n        = require("infra.i18n")
 local Manifest    = require("infra.manifest_reader")
 local TapKeys     = require("modules.shortcuts.tap_keys")
-local Hotkeys     = require("adapters.hotkey_registrar")
-local Chord       = require("chord")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
+local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.bindings"
 
@@ -42,16 +43,12 @@ local LOG = "shortcuts.bindings"
 -- than re-declared, so a change to shortcuts.chatgpt_url cannot diverge from the
 -- AHK driver (which reads the same default from its generated map). Fails fast
 -- if the path is absent.
-M.DEFAULT_CHATGPT_URL = Manifest.default_for("shortcuts.chatgpt_url")
+M.DEFAULT_CHATGPT_URL = Manifest.default_for(ConfigKeys.KEY.SHORTCUTS_CHATGPT_URL)
 local SHORTCUT_ACTION_PARENT = "shortcut_bindings"
 
 local hotkeys       = {}   -- Active hotkey/tap objects, keyed by shortcut id
 local hotkey_defs   = {}   -- Factory functions that create and return a hotkey object
 local hotkey_labels = {}   -- User-facing French label for each shortcut
--- Native built-in factories keep their established object contracts. Their
--- claims live until that exact object acknowledges release, including debt.
-local native_physical_claims = {}
-local native_claim_cleanup = {}
 
 -- Shortcuts explicitly disabled via M.disable() survive a stop/start cycle so
 -- that a resume after focus loss cannot silently re-enable a hotkey the caller
@@ -76,6 +73,13 @@ local native_acquisition_depth = 0
 -- `started=false` while native hotkeys are exchanged. Preserve that intent
 -- independently so a re-entrant PAUSE can restore keep-awake exactly.
 local rebind_recovery_intent = false
+-- Enabled hotkeys whose own registration was refused while the layer started
+-- (name -> why). Independent hotkeys fail alone: one chord macOS refuses, or a
+-- key the active layout cannot resolve yet, must not take every other shortcut
+-- down with it (2026-10-28: a refused Ctrl+G left every shortcut dead).
+local pending_refusals = {}
+-- Bounded retry series of pending_refusals, created once M.bind_pending exists.
+local refusal_retry
 
 local EXACT_RELEASE_IDS = {
 	tap_keys = true,
@@ -176,14 +180,11 @@ end
 
 -- User-configured ChatGPT URL, persisted to config.toml by the menu's save
 -- callback. Set by M.set_chatgpt_url() at boot-time state restoration and on
--- every menu edit, so ctrl_g always opens the URL the user actually configured
--- instead of the hardcoded manifest default (shortcuts-ctrl-g-ignores-config).
--- Falls back to nil so ctrl_g uses M.DEFAULT_CHATGPT_URL.
+-- every menu edit, so the open_chatgpt action (the Ctrl+G slot's recommended
+-- action) always opens the URL the user actually configured instead of the
+-- hardcoded manifest default (shortcuts-ctrl-g-ignores-config).
+-- Falls back to nil so M.get_chatgpt_url() returns M.DEFAULT_CHATGPT_URL.
 local _chatgpt_url = nil
-
--- Canonical modifier ordering used to build display labels
-local MOD_ORDER  = {"cmd", "ctrl", "alt", "shift", "fn"}
-local MOD_LABELS = {cmd = "Cmd", ctrl = "Ctrl", alt = "Alt", shift = "Shift", fn = "Fn"}
 
 
 
@@ -195,79 +196,17 @@ local MOD_LABELS = {cmd = "Cmd", ctrl = "Ctrl", alt = "Alt", shift = "Shift", fn
 -- ===========================================
 -- ===========================================
 
---- Builds a canonical display label from a modifier array and a key name.
---- @param mods table Array of modifier strings (e.g. {"ctrl", "shift"}).
---- @param key string The primary key name or character.
---- @return string Canonical label (e.g. "Ctrl+Shift+S").
-local function make_label(mods, key)
-	local parts = {}
-	for _, m in ipairs(MOD_ORDER) do
-		for _, bm in ipairs(mods) do
-			if bm == m then table.insert(parts, MOD_LABELS[m] or m); break end
-		end
-	end
-	local k = (#key == 1) and key:upper() or (key:sub(1, 1):upper() .. key:sub(2))
-	table.insert(parts, k)
-	return table.concat(parts, "+")
-end
-
---- Resolves the name of the currently frontmost application.
---- Falls back to the focused window's application when frontmostApplication returns nil.
---- @return string The application name, or "Unknown" if unavailable.
-local function get_frontmost_app_name()
-	local app  = hs.application.frontmostApplication()
-	local name = app and app:title()
-	if not name or name == "" then
-		local win = hs.window.focusedWindow()
-		local wa  = win and win:application()
-		name      = wa and wa:title()
-	end
-	return name or "Unknown"
-end
-
---- Logs a shortcut invocation via the keylogger module when it is available.
---- Uses a lazy require so the keylogger is optional and need not be pre-wired.
+--- Logs a shortcut invocation via the keystats module when it is available.
+--- Uses a lazy require so the keystats is optional and need not be pre-wired.
 --- @param label string The canonical shortcut label (e.g. "Ctrl+T").
 --- @param app_name string The name of the app in which the shortcut fired.
 local function log_shortcut(label, app_name)
-	local ok_kl, kl = pcall(require, "modules.keylogger")
+	local ok_kl, kl = pcall(require, "modules.keystats")
 	if ok_kl and kl and type(kl.log_shortcut) == "function" then
 		pcall(kl.log_shortcut, label, app_name)
 	end
 end
 
---- Binds a standard hotkey and logs its invocation before running the action.
---- @param mods table Modifier array.
---- @param key string Primary key.
---- @param fn function Action callback.
---- @return table The hs.hotkey object.
-local function bind_log(mods, key, fn)
-	local label = make_label(mods, key)
-	local claim_owner = SHORTCUT_ACTION_PARENT .. ":" .. label
-	if Hotkeys.replace_physical_claims(claim_owner, {
-		{ chord = Chord.format(mods, key), action = "explicit", binding_id = claim_owner },
-	}) ~= true then
-		native_claim_cleanup[claim_owner] = true
-		return nil
-	end
-	-- Preserve the existing native factory, including Ctrl+CapsLock. The generic
-	-- registrar still rejects modifier keys for ordinary/source acquisitions;
-	-- recording an existing owner's claim does not assert hardware delivery.
-	local ok, native = pcall(hs.hotkey.bind, mods, key, function()
-		if delivery_enabled ~= true then return end
-		log_shortcut(label, get_frontmost_app_name())
-		fn()
-	end)
-	if not ok or native == nil or (type(native) ~= "table" and type(native) ~= "userdata") then
-		if Hotkeys.replace_physical_claims(claim_owner, {}) ~= true then
-			native_claim_cleanup[claim_owner] = true
-		end
-		if not ok then error(native, 0) end
-		return nil
-	end
-	native_physical_claims[native] = claim_owner
-	return native
-end
 
 
 
@@ -356,106 +295,9 @@ hotkey_defs.wrap_text_if_selected   = function()
 		get_live_wrap_pairs, delivery_admitted)
 end
 
--- Ctrl shortcuts — alphabetical by id (mirrors list_shortcuts() sort order)
-hotkey_labels.ctrl_a = i18n.get("shortcuts.label_ctrl_a")
-hotkey_defs.ctrl_a   = function()
-	return bind_log({"ctrl"}, "a", text_acts.select_line)
-end
-
-hotkey_labels.ctrl_d = i18n.get("shortcuts.label_ctrl_d")
-hotkey_defs.ctrl_d   = function()
-	return bind_log({"ctrl"}, "d", app_acts.open_downloads)
-end
-
-hotkey_labels.ctrl_e = i18n.get("shortcuts.label_ctrl_e")
-hotkey_defs.ctrl_e   = function()
-	return bind_log({"ctrl"}, "e", app_acts.open_finder)
-end
-
-hotkey_labels.ctrl_g = i18n.get("shortcuts.label_ctrl_g")
-hotkey_defs.ctrl_g   = function()
-	return bind_log({"ctrl"}, "g", function()
-		app_acts.open_chatgpt(_chatgpt_url or M.DEFAULT_CHATGPT_URL)
-	end)
-end
-
-hotkey_labels.ctrl_h = i18n.get("shortcuts.label_ctrl_h")
-hotkey_defs.ctrl_h   = function()
-	return bind_log({"ctrl"}, "h", sys_acts.interactive_screenshot)
-end
-
-hotkey_labels.ctrl_i = i18n.get("shortcuts.label_ctrl_i")
-hotkey_defs.ctrl_i   = function()
-	return bind_log({"ctrl"}, "i", app_acts.open_settings)
-end
-
-hotkey_labels.ctrl_m = i18n.get("shortcuts.label_ctrl_m")
-hotkey_defs.ctrl_m   = function()
-	return bind_log({"ctrl"}, "m", sys_acts.toggle_awake)
-end
-
-hotkey_labels.ctrl_o = i18n.get("shortcuts.label_ctrl_o")
-hotkey_defs.ctrl_o   = function()
-	return bind_log({"ctrl"}, "o", text_acts.surround_with_parens)
-end
-
-hotkey_labels.ctrl_p = i18n.get("shortcuts.label_ctrl_p")
-hotkey_defs.ctrl_p   = function()
-	return bind_log({"ctrl"}, "p", sys_acts.toggle_display_mirror)
-end
-
-hotkey_labels.ctrl_s = i18n.get("shortcuts.label_ctrl_s")
-hotkey_defs.ctrl_s   = function()
-	return bind_log({"ctrl"}, "s", app_acts.copy_or_open_path)
-end
-
-hotkey_labels.ctrl_t = i18n.get("shortcuts.label_ctrl_t")
-hotkey_defs.ctrl_t   = function()
-	return bind_log({"ctrl"}, "t", sys_acts.teleport_mouse)
-end
-
-hotkey_labels.ctrl_u = i18n.get("shortcuts.label_ctrl_u")
-hotkey_defs.ctrl_u   = function()
-	return bind_log({"ctrl"}, "u", text_acts.toggle_uppercase)
-end
-
-hotkey_labels.ctrl_w = i18n.get("shortcuts.label_ctrl_w")
-hotkey_defs.ctrl_w   = function()
-	return bind_log({"ctrl"}, "w", text_acts.toggle_titlecase)
-end
-
-hotkey_labels.ctrl_x = i18n.get("shortcuts.label_ctrl_x")
-hotkey_defs.ctrl_x   = function()
-	return bind_log({"ctrl"}, "x", sys_acts.copy_pixel_color)
-end
-
-hotkey_labels.ctrl_capslock = i18n.get("shortcuts.label_ctrl_capslock")
-hotkey_defs.ctrl_capslock   = function()
-	return bind_log({"ctrl"}, "capslock", sys_acts.toggle_capslock)
-end
-
-hotkey_labels.ctrl_l = i18n.get("shortcuts.label_ctrl_l")
-hotkey_defs.ctrl_l   = function()
-	return bind_log({"ctrl"}, "l", sys_acts.lock_screen)
-end
-
--- Punctuation shortcuts — after all letter-based ctrl shortcuts
-hotkey_labels.ctrl_period = i18n.get("shortcuts.label_ctrl_period")
-hotkey_defs.ctrl_period   = function()
-	return bind_log({"ctrl"}, ".", sys_acts.open_emoji_picker)
-end
-
-hotkey_labels.ctrl_quote = i18n.get("shortcuts.label_ctrl_quote")
-hotkey_defs.ctrl_quote   = function()
-	return bind_log({"ctrl"}, "'", sys_acts.spotlight_mouse)
-end
-
--- Cmd shortcuts — alphabetical by id
-hotkey_labels.cmd_shift_v = i18n.get("shortcuts.label_cmd_shift_v")
-hotkey_defs.cmd_shift_v   = function()
-	return bind_log({"cmd", "shift"}, "v", text_acts.paste_as_plain_text)
-end
-
+-- Fixed shortcuts that are not catalogue actions. The Ctrl-letter chords (Ctrl+G
+-- included since schema v20) and Cmd+Shift+V are role-named keyboard slots now;
+-- see keyboard_shortcuts.lua.
 hotkey_labels.cmd_star = i18n.get("shortcuts.label_cmd_star")
 hotkey_defs.cmd_star   = function()
 	-- Pass the log callback so bind_cmd_star can log the re-fired Cmd+S
@@ -495,11 +337,6 @@ local function release_hotkey_identity(name, owner)
 		released = ok and ((exact_result_required and result == true)
 			or (not exact_result_required and result ~= false))
 	end
-	if released and native_physical_claims[owner] then
-		local claim_owner = native_physical_claims[owner]
-		released = Hotkeys.replace_physical_claims(claim_owner, {}) == true
-		if released then native_physical_claims[owner] = nil end
-	end
 	return released
 end
 
@@ -509,12 +346,10 @@ end
 --- re-arm). Only the former owns the subsystem-level state — see M.stop().
 --- @return boolean settled True only when every native owner was released.
 local function release_hotkeys()
+	-- A released layer owns no retry: the next start recomputes every refusal.
+	pending_refusals = {}
+	refusal_retry.cancel()
 	local settled = true
-	for claim_owner in pairs(native_claim_cleanup) do
-		if Hotkeys.replace_physical_claims(claim_owner, {}) == true then
-			native_claim_cleanup[claim_owner] = nil
-		else settled = false end
-	end
 	local names = {}
 	for name in pairs(hotkeys) do names[#names + 1] = name end
 	for _, name in ipairs(names) do
@@ -730,6 +565,35 @@ local function children_have_pause_debt()
 	return debt
 end
 
+--- Acquires one enabled hotkey on its own. A refusal is recorded with its cause
+--- and logged by name; it never aborts the sibling hotkeys.
+--- @param name string The shortcut identifier.
+--- @param def function Its factory.
+--- @return boolean bound True when the hotkey now owns its native binding.
+local function acquire_hotkey(name, def)
+	native_acquisition_depth = native_acquisition_depth + 1
+	local ok, obj, refusal = xpcall(def, debug.traceback)
+	native_acquisition_depth = native_acquisition_depth - 1
+	local object_type = type(obj)
+	if ok and obj ~= nil and (object_type == "table" or object_type == "userdata") then
+		hotkeys[name] = obj
+		pending_refusals[name] = nil
+		Logger.debug(LOG, "Hotkey '%s' bound.", name)
+		return true
+	end
+	if not ok then
+		pending_refusals[name] = "its factory raised"
+		Logger.error(LOG, "Hotkey '%s' factory raised; the other shortcuts stay active: %s.",
+			name, tostring(obj))
+		return false
+	end
+	pending_refusals[name] = tostring(refusal or "its factory returned no hotkey")
+	Logger.warn(LOG,
+		"Hotkey '%s' could not be registered (%s); the other shortcuts stay active and it is retried.",
+		name, pending_refusals[name])
+	return false
+end
+
 --- Binds all configured hotkeys and opens every child owner transactionally.
 --- @param preserve_pause_intent boolean Keep the reversible PAUSE snapshot live.
 --- @param hotkeys_only boolean Rebind native hotkeys without touching child state.
@@ -776,7 +640,7 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 		finish_attempt()
 		return false
 	end
-	if (next(hotkeys) ~= nil or next(native_claim_cleanup) ~= nil) and release_hotkeys() ~= true then
+	if next(hotkeys) ~= nil and release_hotkeys() ~= true then
 		Logger.error(LOG, "Shortcuts bindings cannot start while native cleanup is pending.")
 		finish_attempt()
 		return false
@@ -802,26 +666,21 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 
 	_disabled_set.tap_keys = not has_tap_key_assignments()
 	_disabled_set.layer_wheel = not load_layer_wheel()
+	pending_refusals = {}
+	-- Only the layer's lifecycle is all-or-nothing: a pause or stop landing
+	-- mid-start must leave no published hotkey. Each hotkey is an independent
+	-- OS registration, so one refusal is recorded and retried on its own while
+	-- its siblings commit (acquire_hotkey).
 	for name, def in pairs(hotkey_defs) do
 		-- Skip hotkeys that are already active OR that were explicitly disabled
 		-- via M.disable() — the _disabled_set persists across stop/start cycles
 		-- so that resume after focus loss cannot silently re-enable them
 		-- (shortcuts-bindings-reenable-on-resume).
 		if not hotkeys[name] and not _disabled_set[name] then
-			native_acquisition_depth = native_acquisition_depth + 1
-			local ok, obj = xpcall(def, debug.traceback)
-			native_acquisition_depth = native_acquisition_depth - 1
-			local object_type = type(obj)
-			if ok and obj ~= nil and (object_type == "table" or object_type == "userdata") then
-				hotkeys[name] = obj
-				Logger.debug(LOG, "Hotkey '%s' bound.", name)
-				if not admission_open(attempt) then
-					return reject_start(reopened_children,
-						"lifecycle changed during factory '" .. tostring(name) .. "'")
-				end
-			else
+			acquire_hotkey(name, def)
+			if not admission_open(attempt) then
 				return reject_start(reopened_children,
-					"factory '" .. tostring(name) .. "' returned " .. tostring(obj))
+					"lifecycle changed during factory '" .. tostring(name) .. "'")
 			end
 		end
 	end
@@ -832,13 +691,14 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 	-- Seed random for keep-awake jitter on first start
 	math.randomseed(os.time())
 
-	local count = 0
-	for _ in pairs(hotkeys) do count = count + 1 end
+	local count = TableUtil.count(hotkeys)
 	started = true
 	delivery_enabled = true
 	if preserve_pause_intent ~= true then pause_restore_intent = nil end
 	finish_attempt()
-	Logger.success(LOG, "Shortcuts bindings started (%d hotkey(s)).", count)
+	Logger.success(LOG, "Shortcuts bindings started (%d hotkey(s), %d waiting for a retry).",
+		count, TableUtil.count(pending_refusals))
+	if next(pending_refusals) ~= nil then refusal_retry.schedule() end
 	return true
 end
 
@@ -868,7 +728,7 @@ function M.stop()
 	delivery_enabled = false
 	invalidate_lifecycle()
 	start_attempt = nil
-	if not started and next(hotkeys) == nil and next(native_claim_cleanup) == nil and not awake_cleanup_pending
+	if not started and next(hotkeys) == nil and not awake_cleanup_pending
 		and not rebind_recovery_intent
 		and native_acquisition_depth == 0
 		and not children_have_pause_debt() then
@@ -1061,6 +921,40 @@ function M.rebind()
 	return true
 end
 
+--- Retries every enabled hotkey whose registration was refused by the last
+--- start, each on its own. Called when the layout settles again and on the
+--- facade's bounded schedule. The retry series also passes whether it is its
+--- last attempt; no built-in hotkey binds a layout key, so none uses it.
+--- @return boolean settled True when no refused hotkey remains.
+function M.bind_pending()
+	if not started or not admission_open() or start_attempt ~= nil then
+		return next(pending_refusals) == nil
+	end
+	local names = TableUtil.sorted_keys(pending_refusals)
+	local epoch = lifecycle_epoch
+	for _, name in ipairs(names) do
+		if _disabled_set[name] or hotkeys[name] then
+			pending_refusals[name] = nil
+		elseif acquire_hotkey(name, hotkey_defs[name]) then
+			if lifecycle_epoch ~= epoch or not admission_open() then
+				if release_hotkey_identity(name, hotkeys[name]) == true then hotkeys[name] = nil end
+				return false
+			end
+		end
+	end
+	return next(pending_refusals) == nil
+end
+
+--- Lists the enabled hotkeys whose registration is waiting for a retry.
+--- @return table refusals Name to the cause of its refusal (a copy).
+function M.pending_bindings()
+	local copy = {}
+	for name, refusal in pairs(pending_refusals) do copy[name] = refusal end
+	return copy
+end
+
+refusal_retry = RefusalRetry.new(LOG, M.bind_pending)
+
 --- Returns true when bindings have been started and not yet stopped.
 --- @return boolean
 function M.is_started() return started end
@@ -1071,7 +965,6 @@ function M.is_started() return started end
 --- @return boolean pending
 function M.has_pause_debt()
 	return native_acquisition_depth ~= 0
-		or next(native_claim_cleanup) ~= nil
 		or rebind_recovery_intent == true
 		or (started ~= true and next(hotkeys) ~= nil)
 		or children_have_pause_debt()
@@ -1091,8 +984,8 @@ function M.enable(name)
 		Logger.error(LOG, "M.enable(): name must be a string.")
 		return false
 	end
-	if start_attempt ~= nil or next(native_claim_cleanup) ~= nil then
-		Logger.error(LOG, "M.enable(): a start transaction or claim cleanup is pending.")
+	if start_attempt ~= nil then
+		Logger.error(LOG, "M.enable(): a start transaction is pending.")
 		return false
 	end
 	local def = hotkey_defs[name]
@@ -1151,6 +1044,7 @@ function M.disable(name)
 	local h = hotkeys[name]
 	if not h then
 		_disabled_set[name] = true
+		pending_refusals[name] = nil
 		Logger.debug(LOG, "Hotkey '%s' not active — nothing to disable.", name)
 		return true
 	end
@@ -1161,6 +1055,7 @@ function M.disable(name)
 	end
 	hotkeys[name] = nil
 	_disabled_set[name] = true
+	pending_refusals[name] = nil
 	Logger.debug(LOG, "Hotkey '%s' disabled.", name)
 	return true
 end
@@ -1239,11 +1134,11 @@ function M.set_wrap_pairs_getter(getter)
 	return true
 end
 
---- Sets the ChatGPT URL that Ctrl+G opens. Call this whenever the user edits the
---- URL from the menu, and once at boot-time state restoration, so ctrl_g always
---- reflects config.toml (the SSoT) instead of the hardcoded manifest default.
---- No re-arm is needed here: like the wrap-pairs indirection, ctrl_g's closure
---- reads _chatgpt_url fresh on every keypress rather than capturing it once.
+--- Sets the ChatGPT URL that the open_chatgpt action opens. Call this whenever
+--- the user edits the URL from the menu, and once at boot-time state restoration,
+--- so the action always reflects config.toml (the SSoT) instead of the hardcoded
+--- manifest default. No re-arm is needed: the action reads M.get_chatgpt_url()
+--- on every run rather than capturing the value once.
 --- @param url string|nil The configured URL, or nil to fall back to the default.
 function M.set_chatgpt_url(url)
 	_chatgpt_url = (type(url) == "string" and url ~= "") and url or nil

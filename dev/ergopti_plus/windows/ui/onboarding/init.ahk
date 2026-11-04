@@ -27,13 +27,15 @@
 ; INDEX: this file declares nothing itself; it #Include-s the onboarding
 ; sub-modules below. Functions and globals are hoisted into the global
 ; namespace, so load order is irrelevant.
-;   onboarding/core.ahk                 -- State, entry points, i18n preview.
+;   onboarding/core.ahk                 -- State, entry points.
+;   onboarding/translate.ahk            -- Locale preview translation.
 ;   onboarding/answers.ahk              -- Catalogue index, answer validation, values in force.
 ;   onboarding/gesture_registration.ahk -- Elevated touchpad gesture registration.
 ;   onboarding/finish.ahk               -- Transactional config write + reload.
 ;   onboarding/webview.ahk              -- WebView2 host of the shared page.
 
 #Include core.ahk
+#Include translate.ahk
 #Include answers.ahk
 #Include gesture_registration.ahk
 #Include finish.ahk

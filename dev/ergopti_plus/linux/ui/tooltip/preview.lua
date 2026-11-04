@@ -81,6 +81,14 @@ local _config = nil
 -- one's timer rather than letting it fire over the top of the replacement.
 local _expiry = nil
 local _on_expire = nil
+-- The rows this preview drew while it holds the shared window, nil once it is
+-- hidden or covered. The window itself cannot say whose rows it shows: the AI
+-- suggestions are drawn into it too.
+local _showing_rows = nil
+local _showing_opts = nil
+-- Told once the preview has hidden itself, so a suggestion shown together with
+-- it can be drawn again alone.
+local _on_hidden = nil
 local _enabled = {
 	star = true,
 	autocorrect = true,
@@ -95,6 +103,7 @@ function M.init(opts)
 	_style = opts.style
 	_config = opts.config
 	_on_expire = type(opts.on_expire) == "function" and opts.on_expire or nil
+	_on_hidden = type(opts.on_hidden) == "function" and opts.on_hidden or nil
 	if not _style then
 		Logger.error(LOG, "init() without a style — the preview cannot draw.")
 	end
@@ -258,6 +267,10 @@ end
 --- @return string
 local function masked_for_preview(candidate)
 	local value = candidate.replacement
+	-- The row shows what the output types, as on macOS: a {Left} is not text.
+	if candidate.has_key_tokens and type(value) == "string" then
+		value = require("modules.hotstrings.output_tokens").parse(value).text
+	end
 	-- A multi-field row (an @-combo) carries parallel `parts` and `fields` arrays
 	-- instead of one value and one field name. Each part must be masked against
 	-- ITS OWN classification — an IBAN hidden, the phone number beside it shown —
@@ -440,7 +453,7 @@ function M.show(candidates, kind)
 		return false
 	end
 
-	local drawn = Renderer.show(rows, {
+	local draw_opts = {
 		style = _style,
 		-- The panel takes the firing candidate's family colour; each row carries
 		-- its own as a bar, so a bubble holding a personal entry beside a shipped
@@ -448,8 +461,11 @@ function M.show(candidates, kind)
 		accent = accent_for(kind, group),
 		anchor = M.resolve_anchor(),
 		screen = M.screen_frame(),
-	})
+	}
+	local drawn = Renderer.show(rows, draw_opts)
 
+	_showing_rows = drawn and rows or nil
+	_showing_opts = drawn and draw_opts or nil
 	if drawn and not arm_expiry(group, section) then return false end
 	return drawn
 end
@@ -462,12 +478,54 @@ function M.hide()
 		Scheduler.cancel(_expiry)
 		_expiry = nil
 	end
+	local was_showing = _showing_rows ~= nil
+	_showing_rows = nil
+	_showing_opts = nil
 	Renderer.hide()
+	if was_showing and _on_hidden then
+		local ok, err = pcall(_on_hidden)
+		if not ok then Logger.warn(LOG, "Preview hide observer failed: %s", tostring(err)) end
+	end
+end
+
+--- Forgets the rows another owner drew over: the preview is gone from the
+--- window, so neither its expiry nor its hide may withdraw what replaced it.
+function M.note_covered()
+	if _expiry then
+		Scheduler.cancel(_expiry)
+		_expiry = nil
+	end
+	_showing_rows = nil
+	_showing_opts = nil
+end
+
+--- Draws the rows on screen again alone, once a suggestion shown together with
+--- them is withdrawn. Its expiry stays armed as it was.
+--- @return boolean drawn
+function M.redraw()
+	if not _showing_rows or not _showing_opts then return false end
+	return Renderer.show(_showing_rows, _showing_opts) == true
 end
 
 --- @return boolean
 function M.is_visible()
 	return Renderer.is_visible()
+end
+
+--- Whether this preview's rows are on screen: set when it draws, cleared when
+--- it hides or is covered. Unlike is_visible(), never true for the AI rows alone.
+--- @return boolean
+function M.is_showing()
+	return _showing_rows ~= nil
+end
+
+--- The rows on screen, for a suggestion shown together with them.
+--- @return table|nil rows A copy, nil when the preview is not showing.
+function M.showing_rows()
+	if not _showing_rows then return nil end
+	local copy = {}
+	for index, row in ipairs(_showing_rows) do copy[index] = row end
+	return copy
 end
 
 --- Tears the window down.

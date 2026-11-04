@@ -13,6 +13,9 @@ local dialog = require("infra.dialog_util")
 local i18n   = require("infra.i18n")
 local Logger = require("infra.logger")
 local SendInput = require("send_input")
+local NativePresentation = require("infra.native_presentation")
+local TextUtils = require("text_utils")
+local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 
 local LOG = "menu.shortcut_utils"
 
@@ -33,20 +36,10 @@ local VALID_MODS = {
 	shift = true,
 }
 
-local MOD_ORDER = {
-	shift = 1,
-	cmd = 2,
-	alt = 3,
-	ctrl = 4,
-}
+local MOD_BEFORE = require("menu.row_order").comparator("menu_chord_modifiers")
 
 local function sort_modifiers(mods)
-	table.sort(mods, function(a, b)
-		local oa = MOD_ORDER[a] or 99
-		local ob = MOD_ORDER[b] or 99
-		if oa == ob then return a < b end
-		return oa < ob
-	end)
+	table.sort(mods, MOD_BEFORE)
 end
 
 
@@ -66,13 +59,13 @@ end
 --- @return table|nil Normalized shortcut table or nil when invalid.
 function M.normalize_shortcut(mods, key, default_mods)
 	if type(key) ~= "string" then return nil end
-	local clean_key = key:match("^%s*(.-)%s*$")
+	local clean_key = TextUtils.trim(key)
 	if clean_key == "" then return nil end
 
 	local seen = {}
 	local out_mods = {}
 	for _, m in ipairs(type(mods) == "table" and mods or {}) do
-		local mod = tostring(m):lower():match("^%s*(.-)%s*$")
+		local mod = TextUtils.trim(tostring(m):lower())
 		if mod == "option" then mod = "alt" end
 		if mod == "control" then mod = "ctrl" end
 		if VALID_MODS[mod] and not seen[mod] then
@@ -102,7 +95,7 @@ end
 --- @return table|nil Parsed shortcut.
 function M.parse_shortcut_input(raw, default_mods)
 	if type(raw) ~= "string" then return nil end
-	local normalized = raw:match("^%s*(.-)%s*$"):lower()
+	local normalized = TextUtils.trim(raw):lower()
 	if normalized == "" then return nil end
 
 	local parts = {}
@@ -136,7 +129,7 @@ end
 function M.shortcut_to_label(sc, none_label)
 	-- `common.none`, not a French word written here: this is a menu label, and the
 	-- other two drivers already read that key for the same row (Windows in
-	-- menu_settings.ahk, Linux in menu_builder.lua). A literal is a translation of
+	-- menu_settings.ahk, Linux in ui/menu/builder.lua). A literal is a translation of
 	-- exactly one of the twenty-one languages the menu is drawn in.
 	if type(sc) ~= "table" then return none_label or i18n.get("common.none") end
 	local ordered_mods = {}
@@ -181,6 +174,23 @@ local function apply_prompt_update(callback, ...)
 	return true
 end
 
+--- Returns presentation refusal for the exact runtime-intercepted native route.
+--- Syntax and storage acceptance remain owned by the existing parameter parser.
+--- @param value any Existing or proposed private parameter scalar.
+--- @return string|nil reason Existing translated native-runner availability reason.
+function M.program_assignment_reason(value)
+	local checked, reserved = pcall(function()
+		local parsed = require("program_parameter").parse(value, "posix")
+		if not parsed then return false end
+		local Native = require("adapters.apple_shortcuts_native")
+		return Native.is_chosen_program(parsed.executable, parsed.arguments)
+	end)
+	if not checked or reserved ~= false then
+		return i18n.get("platform_reason.program_runner_unavailable")
+	end
+	return nil
+end
+
 --- Delegates a program edit to the session's existing writer-fenced owner.
 --- @param gestures table Gestures facade.
 --- @param binding string Canonical binding identifier.
@@ -190,6 +200,12 @@ end
 --- @param transaction function Session program transaction entry point.
 --- @return boolean committed
 function M.commit_action_parameter(gestures, binding, action, value, mutation, transaction)
+	local reason = action == "run_program" and M.program_assignment_reason(value) or nil
+	if reason then
+		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
+			reason, i18n.get("button.ok"), nil, "warning")
+		return false
+	end
 	if type(transaction) ~= "function" then
 		Logger.error(LOG, "Private program edit refused because its transaction owner is unavailable.")
 		return false
@@ -208,16 +224,31 @@ end
 function M.prompt_shortcut(opts)
 	if type(opts) ~= "table" or type(opts.on_apply) ~= "function" then return false end
 
-	local title = type(opts.title) == "string" and opts.title or i18n.get("shortcuts.shortcut_label")
+	local receipt, title
+	if opts.native_presentation_id ~= nil then
+		if opts.title ~= nil then return false end
+		receipt = PrepareNativePresentation(opts.native_presentation_id, "dialog")
+		title = receipt and NativePresentationTitle(receipt) or nil
+		if title == nil then return false end
+	else
+		title = type(opts.title) == "string" and opts.title or i18n.get("shortcuts.shortcut_label")
+	end
 	local message = type(opts.message) == "string"
 		and opts.message
 		or i18n.get("shortcuts.shortcut_format_hint")
 
 	local current = M.shortcut_to_config_string(opts.current_shortcut)
-	local ok_prompt, button, raw = pcall(dialog.text_prompt, title, message, current, "OK", i18n.get("common.cancel"))
-	if not ok_prompt or button ~= "OK" or type(raw) ~= "string" then return false end
+	local prompt = dialog.text_prompt
+	local cancel_label = i18n.get("common.cancel")
+	local ok_label = i18n.get("button.ok")
+	if receipt ~= nil then
+		title = NativePresentationTitle(receipt)
+		if title == nil then return false end
+	end
+	local ok_prompt, button, raw = pcall(prompt, title, message, current, ok_label, cancel_label)
+	if not ok_prompt or button ~= ok_label or type(raw) ~= "string" then return false end
 
-	local cleaned = raw:match("^%s*(.-)%s*$")
+	local cleaned = TextUtils.trim(raw)
 	if cleaned == "" then
 		return apply_prompt_update(opts.on_apply, nil, nil)
 	end
@@ -227,7 +258,7 @@ function M.prompt_shortcut(opts)
 		return apply_prompt_update(opts.on_apply, parsed.mods, parsed.key)
 	end
 
-	pcall(dialog.alert, i18n.get("shortcut_utils.format_invalid"), i18n.get("shortcut_utils.format_hint"))
+	pcall(dialog.block_alert, i18n.get("shortcut_utils.format_invalid"), i18n.get("shortcut_utils.format_hint"), i18n.get("button.ok"))
 	return false
 end
 
@@ -255,8 +286,134 @@ function M.action_parameter_title(label)
 	return template:sub(1, at - 1) .. tostring(label) .. template:sub(at + 3)
 end
 
+--- Asks for a screen action's vision parameter as the action picker page does:
+--- the backend picked from a list, then the optional model typed with the
+--- backend's default shown. A typed entry used to print every backend on its own
+--- line, about forty with the API catalogue.
+--- @param gestures table The gestures facade (llm_vision_choices).
+--- @param title string The prompt's title.
+--- @param prior string The value shown first.
+--- @return string|nil value Nil when the user cancelled.
+function M.ask_vision_parameter(gestures, title, prior)
+	local Vision = require("llm.vision")
+	local choices = gestures.llm_vision_choices()
+	local parsed = type(prior) == "string" and Vision.parse(prior) or nil
+	local labels, ordered = {}, {}
+	-- The stored backend first: dialog_util.choose preselects its first choice.
+	for _, choice in ipairs(choices) do
+		if parsed and choice.value == parsed.backend then table.insert(ordered, 1, choice) else ordered[#ordered + 1] = choice end
+	end
+	for index, choice in ipairs(ordered) do labels[index] = choice.label end
+	local save_btn, cancel_btn = i18n.get("button.save"), i18n.get("button.cancel")
+	local picked = dialog.choose(title, i18n.get("dialog.action_picker.vision_provider_label"), labels,
+		cancel_btn, save_btn)
+	if picked == nil then return nil end
+	local chosen = ordered[picked]
+	local default_model = chosen.defaultModel or ""
+	local hint = default_model ~= ""
+		and i18n.get("dialog.action_picker.vision_model_default"):gsub("{1}", function() return default_model end)
+		or i18n.get("dialog.action_picker.vision_model_required")
+	local initial = parsed and parsed.backend == chosen.value and parsed.model or ""
+	local prompt_ok, button, typed = pcall(dialog.text_prompt, title,
+		i18n.get("dialog.action_picker.vision_model_label") .. "\n" .. hint, initial, save_btn, cancel_btn)
+	if not prompt_ok or button ~= save_btn then return nil end
+	return Vision.compose_parameter(chosen.value, typed, default_model)
+end
+
+--- Asks the user to choose one option of a closed set, the stored one first
+--- (dialog.choose preselects its first choice).
+--- @param title string The prompt's title.
+--- @param question_key string Locale key of the question.
+--- @param options table Array of { value, key } (key: the option's locale key).
+--- @param prior string|nil The stored value.
+--- @return string|nil value Nil when the user cancelled.
+local function choose_option(title, question_key, options, prior)
+	local ordered, labels = {}, {}
+	for _, option in ipairs(options) do
+		if option.value == prior then table.insert(ordered, 1, option) else ordered[#ordered + 1] = option end
+	end
+	for index, option in ipairs(ordered) do labels[index] = i18n.get(option.key) end
+	local picked = dialog.choose(title, i18n.get(question_key), labels, i18n.get("button.cancel"), i18n.get("button.save"))
+	return picked and ordered[picked].value or nil
+end
+
+-- The output choices of run_command and run_apple_shortcut.
+local OUTPUT_OPTIONS = {
+	{ value = "none", key = "dialog.gestures.param_output_none" },
+	{ value = "type", key = "dialog.gestures.param_output_type" },
+	{ value = "copy", key = "dialog.gestures.param_output_copy" },
+}
+
+--- Asks for a run_command value: the command typed, then how it runs and, for
+--- a hidden run, what its output does. An invalid command is returned as typed
+--- so the caller's validator refuses it with the parameter's own error.
+--- @param gestures table The gestures facade (parameter_prompt).
+--- @param action string The action being configured.
+--- @param title string The prompt's title.
+--- @param prior string The stored value.
+--- @return string|nil value Nil when the user cancelled.
+function M.ask_command_parameter(gestures, action, title, prior)
+	local UserActionParameter = require("user_action_parameter")
+	local stored = UserActionParameter.parse("command", prior) or {}
+	local save_btn = i18n.get("button.save")
+	local prompt_ok, button, typed = pcall(dialog.text_prompt, title, gestures.parameter_prompt(action),
+		stored.command or "", save_btn, i18n.get("button.cancel"))
+	if not prompt_ok or button ~= save_btn or type(typed) ~= "string" then return nil end
+	local mode = choose_option(title, "dialog.gestures.param_command_mode", {
+		{ value = "hidden", key = "dialog.gestures.param_command_mode_hidden" },
+		{ value = "terminal", key = "dialog.gestures.param_command_mode_terminal" },
+	}, stored.mode)
+	if not mode then return nil end
+	local output = "none"
+	if mode == "hidden" then
+		output = choose_option(title, "dialog.gestures.param_output", OUTPUT_OPTIONS, stored.output)
+		if not output then return nil end
+	end
+	local fields = { command = typed, mode = mode, output = output }
+	return UserActionParameter.encode("command", fields) or UserActionParameter.spell("command", fields)
+end
+
+--- Asks for a run_apple_shortcut value: one shortcut of the library, then
+--- whether it receives the selection and what its output does.
+--- @param gestures table The gestures facade (parameter_prompt).
+--- @param action string The action being configured.
+--- @param title string The prompt's title.
+--- @param prior string The stored value.
+--- @return string|nil value Nil when the user cancelled or nothing can be listed.
+function M.ask_apple_shortcut_parameter(gestures, action, title, prior)
+	local UserActionParameter = require("user_action_parameter")
+	local stored = UserActionParameter.parse("apple_shortcut", prior) or {}
+	local rows, reason = require("adapters.apple_shortcuts_cli").list_blocking()
+	if not rows or #rows == 0 then
+		Logger.warn(LOG, "The Shortcuts library could not be listed for an editor: %s.", tostring(reason or "empty"))
+		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
+			i18n.get(rows and "dialog.gestures.param_shortcuts_empty" or "user_actions.shortcuts_unavailable"),
+			i18n.get("button.ok"), nil, "warning")
+		return nil
+	end
+	local ordered, labels = {}, {}
+	for _, row in ipairs(rows) do
+		if row.id == stored.id then table.insert(ordered, 1, row) else ordered[#ordered + 1] = row end
+	end
+	for index, row in ipairs(ordered) do labels[index] = row.name end
+	local picked = dialog.choose(title, gestures.parameter_prompt(action), labels,
+		i18n.get("button.cancel"), i18n.get("button.save"))
+	if not picked then return nil end
+	local input = choose_option(title, "dialog.gestures.param_shortcut_input", {
+		{ value = "none", key = "dialog.gestures.param_output_none" },
+		{ value = "selection", key = "dialog.gestures.param_shortcut_input_selection" },
+	}, stored.input)
+	if not input then return nil end
+	local output = choose_option(title, "dialog.gestures.param_output", OUTPUT_OPTIONS, stored.output)
+	if not output then return nil end
+	local fields = { id = ordered[picked].id, name = ordered[picked].name, input = input, output = output }
+	return UserActionParameter.encode("apple_shortcut", fields) or UserActionParameter.spell("apple_shortcut", fields)
+end
+
 --- Asks for one parameter value the way its kind is chosen: an application is
---- picked in the /Applications chooser, every other kind is typed.
+--- picked in the /Applications chooser, a vision backend in a list, every other
+--- kind is typed.
+--- run_command, open_path and run_apple_shortcut have their own editors.
 --- @param gestures table The gestures facade.
 --- @param action string The action being configured.
 --- @param spec string Its parameter kind.
@@ -264,15 +421,26 @@ end
 --- @param prior string The value shown first.
 --- @return string|nil value Nil when the user cancelled.
 function M.ask_parameter_value(gestures, action, spec, title, prior)
+	if spec == "llm_vision" then return M.ask_vision_parameter(gestures, title, prior) end
 	local prompt = gestures.parameter_prompt(action)
 	if spec == "app" then
 		return dialog.choose_application(prompt, title)
 	end
+	if spec == "path" then return dialog.choose_path(prompt, title) end
+	if spec == "command" then return M.ask_command_parameter(gestures, action, title, prior) end
+	if spec == "apple_shortcut" then return M.ask_apple_shortcut_parameter(gestures, action, title, prior) end
 	local save_btn = i18n.get("button.save")
 	local prompt_ok, button, typed = pcall(dialog.text_prompt,
 		title, prompt, prior, save_btn, i18n.get("button.cancel"))
 	if not prompt_ok or button ~= save_btn then return nil end
 	if spec == "llm_language" and (type(typed) ~= "string" or typed:match("^%s*$")) then return nil end
+	local reason = action == "run_program" and spec == "program"
+		and M.program_assignment_reason(typed) or nil
+	if reason then
+		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
+			reason, i18n.get("button.ok"), nil, "warning")
+		return nil
+	end
 	return typed
 end
 
@@ -317,14 +485,14 @@ local function prompt_action_parameter(gestures, binding, action, spec, picked, 
 		end
 		if type(gestures.validate_action_parameter) == "function"
 			and gestures.validate_action_parameter(action, value) then
-			if spec == "program" then
+			if spec == "program" or mutation ~= nil or transaction ~= nil then
 				return M.commit_action_parameter(gestures, binding, action, value, mutation, transaction)
 			end
 			return apply_prompt_update(gestures.set_action_parameter,
 				binding, action, value)
 		end
 		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-			gestures.parameter_error(action), "OK", nil, "warning")
+			gestures.parameter_error(action), i18n.get("button.ok"), nil, "warning")
 		prior = value or prior
 		value = nil
 	end
@@ -347,6 +515,28 @@ function M.prompt_action_parameter(gestures, binding, action, spec, picked, muta
 		return false
 	end
 	return committed == true
+end
+
+--- Greys the picker rows whose catalogue requirement is proven absent: an
+--- action that needs the AI ("ai:on" in _shared/modules/actions/actions.toml,
+--- the agent's manual actions) stays visible and greyed, with the AI-off hint
+--- (dialog.action_picker.requires_ai) as its reason, while the AI is switched
+--- off. Read at each open, so switching the AI on offers them again without a
+--- reload.
+--- @param items table Picker items, marked in place.
+local function mark_ai_requirements(items)
+	if not require("modules.shortcuts.ai_actions").off() then return end
+	local ok, Catalogue = pcall(require, "_generated.action_catalogue")
+	if not ok or type(Catalogue) ~= "table" or type(Catalogue.actions) ~= "table" then return end
+	for _, item in ipairs(items) do
+		local meta = item.type == "action" and Catalogue.actions[item.id] or nil
+		for _, token in ipairs(meta and meta.requires or {}) do
+			if token == "ai:on" then
+				item.disabled = true
+				item.hint = i18n.get("dialog.action_picker.requires_ai")
+			end
+		end
+	end
 end
 
 -- What picker_parameter_fields reads from the gestures facade.
@@ -372,6 +562,7 @@ local PICKER_EDITOR_FACADE = {
 ---   logged, when the facade lacks what the editor needs, and every value is then
 ---   asked by the native prompt.
 function M.picker_parameter_fields(gestures, items, binding)
+	mark_ai_requirements(items)
 	for _, name in ipairs(PICKER_EDITOR_FACADE) do
 		if type(gestures) ~= "table" or type(gestures[name]) ~= "function" then
 			Logger.error(LOG, "The gestures facade has no %s — the picker cannot edit a value.", name)
@@ -397,6 +588,9 @@ function M.picker_parameter_fields(gestures, items, binding)
 			end
 			item.parameter = kind
 			item.parameterValue = binding and gestures.get_action_parameter(binding, item.id) or ""
+			if kind == "program" and item.id == "run_program" then
+				item.hint = M.program_assignment_reason(item.parameterValue) or item.hint
+			end
 			if SendInput.KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" or kind == "program" then
 				prompts[kind] = gestures.parameter_prompt(item.id)
 				errors[kind] = gestures.parameter_error(item.id)

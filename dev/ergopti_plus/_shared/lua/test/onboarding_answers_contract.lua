@@ -15,6 +15,7 @@
 --- ==============================================================================
 
 local M = {}
+local NativePath = require("native_path")
 
 local Answers    = require("onboarding_answers")
 local TomlCodec  = require("toml_codec")
@@ -49,7 +50,7 @@ end
 --- @return string
 local function new_config_path()
 	local base = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
-	base = base:gsub("\\", "/"):gsub("/+$", "")
+	base = NativePath.without_trailing_separators(base)
 	_sequence = _sequence + 1
 	return string.format("%s/ergopti_onboarding_%d_%d_%d.toml", base, os.time(),
 		math.random(100000, 999999), _sequence)
@@ -173,6 +174,28 @@ function M.register(helpers, opts)
 			local refused, why = Answers.rows(synthetic, { { path = "gestures.enabled", value = "on" } }, Manifest)
 			helpers.assert_nil(refused)
 			helpers.assert_contains(tostring(why), "true or false")
+		end)
+
+		-- A persistent control (the layout step's) claims each path its choices
+		-- write with exactly their values; one this driver lacks claims nothing,
+		-- so a payload writing it is refused (neutral-layout-wizard).
+		helpers.it("claims a persistent control's paths with its choices' values", function()
+			local function catalogue(available)
+				return '{"schema_version":1,"platforms":{"' .. driver .. '":{"pages":['
+					.. '{"id":"gestures","groups":[],"controls":[{"id":"c","kind":"choice","label_key":"x",'
+					.. '"available":' .. tostring(available) .. ',"choices":['
+					.. '{"value":"off","writes":[{"path":"gestures.enabled","value":false,"default":false}]},'
+					.. '{"value":"on","writes":[{"path":"gestures.enabled","value":true,"default":false}]}]}]}]}}}'
+			end
+			local synthetic = Answers.load(catalogue(true), driver)
+			helpers.assert_eq(synthetic.entries["gestures.enabled"].kind, "control")
+			local rows = assert(Answers.rows(synthetic, { { path = "gestures.enabled", value = true } }, Manifest))
+			helpers.assert_eq(rows[1].value, true)
+			local refused, why = Answers.rows(synthetic, { { path = "gestures.enabled", value = "on" } }, Manifest)
+			helpers.assert_nil(refused)
+			helpers.assert_contains(tostring(why), "one of the values its choices write")
+			local lacking = Answers.load(catalogue(false), driver)
+			helpers.assert_nil(lacking.entries["gestures.enabled"], "an unavailable control claims nothing")
 		end)
 
 		helpers.it("routes a checked tap-hold key to the tap-hold writer, never to config.toml", function()

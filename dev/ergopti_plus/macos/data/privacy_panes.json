@@ -1,0 +1,15 @@
+{
+	"_comment": "System Settings privacy panes, the one table every privacy-pane URL is built from (adapters/privacy_settings.lua). A pane URL is a form prefix followed by the pane anchor. macOS 26 refused the legacy com.apple.preference.security form for Screen Recording (ledger L29), so from extension_from_major on the PrivacySecurity extension form is used. tools/dev/collect-macos-field-report.sh opens every form of every pane on the Mac and records each exit code, which proves the choice.",
+	"schema": 1,
+	"forms": {
+		"legacy": "x-apple.systempreferences:com.apple.preference.security?",
+		"extension": "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?"
+	},
+	"extension_from_major": 26,
+	"panes": {
+		"accessibility": "Privacy_Accessibility",
+		"automation": "Privacy_Automation",
+		"input_monitoring": "Privacy_ListenEvent",
+		"screen_recording": "Privacy_ScreenCapture"
+	}
+}

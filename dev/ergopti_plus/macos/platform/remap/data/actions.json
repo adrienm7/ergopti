@@ -9,6 +9,7 @@
 	},
 	{
 		"id": "layer",
+		"hold_layer": "nav",
 		"short_label": "Layer (hold)",
 		"label": "🗂 Layer nav. — Actif tant que maintenu",
 		"holdable": true,
@@ -511,6 +512,7 @@
 	},
 	{
 		"id": "shift",
+		"modifiers": ["shift"],
 		"short_label": "Shift",
 		"label": "⇧ Shift",
 		"holdable": true,
@@ -524,6 +526,7 @@
 	},
 	{
 		"id": "ctrl",
+		"modifiers": ["ctrl"],
 		"short_label": "Ctrl",
 		"label": "⌃ Ctrl",
 		"holdable": true,
@@ -537,6 +540,7 @@
 	},
 	{
 		"id": "cmd",
+		"modifiers": ["cmd"],
 		"short_label": "Cmd",
 		"label": "⌘ Cmd",
 		"holdable": true,
@@ -550,6 +554,7 @@
 	},
 	{
 		"id": "alt",
+		"modifiers": ["option"],
 		"short_label": "Option",
 		"label": "⌥ Option",
 		"holdable": true,
@@ -576,6 +581,7 @@
 	},
 	{
 		"id": "fn",
+		"modifiers": ["fn"],
 		"short_label": "Fn",
 		"label": "Fn",
 		"holdable": true,
@@ -645,6 +651,7 @@
 	},
 	{
 		"id": "cmd_shift",
+		"modifiers": ["cmd", "shift"],
 		"short_label": "Cmd+Shift",
 		"label": "⌘⇧ — Cmd+Shift",
 		"holdable": true,
@@ -659,6 +666,7 @@
 	},
 	{
 		"id": "cmd_option",
+		"modifiers": ["cmd", "option"],
 		"short_label": "Cmd+Option",
 		"label": "⌘⌥ — Cmd+Option",
 		"holdable": true,
@@ -673,6 +681,7 @@
 	},
 	{
 		"id": "cmd_ctrl",
+		"modifiers": ["cmd", "ctrl"],
 		"short_label": "Cmd+Ctrl",
 		"label": "⌘⌃ — Cmd+Ctrl",
 		"holdable": true,
@@ -687,6 +696,7 @@
 	},
 	{
 		"id": "option_shift",
+		"modifiers": ["option", "shift"],
 		"short_label": "Option+Shift",
 		"label": "⌥⇧ — Option+Shift",
 		"holdable": true,
@@ -701,6 +711,7 @@
 	},
 	{
 		"id": "option_ctrl",
+		"modifiers": ["option", "ctrl"],
 		"short_label": "Option+Ctrl",
 		"label": "⌥⌃ — Option+Ctrl",
 		"holdable": true,
@@ -715,6 +726,7 @@
 	},
 	{
 		"id": "ctrl_shift",
+		"modifiers": ["ctrl", "shift"],
 		"short_label": "Ctrl+Shift",
 		"label": "⌃⇧ — Ctrl+Shift",
 		"holdable": true,
@@ -729,6 +741,7 @@
 	},
 	{
 		"id": "fn_shift",
+		"modifiers": ["fn", "shift"],
 		"short_label": "Fn+Shift",
 		"label": "Fn⇧ — Fn+Shift",
 		"holdable": true,
@@ -743,6 +756,7 @@
 	},
 	{
 		"id": "cmd_option_shift",
+		"modifiers": ["cmd", "option", "shift"],
 		"short_label": "Cmd+Option+Shift",
 		"label": "⌘⌥⇧ — Cmd+Option+Shift",
 		"holdable": true,
@@ -757,6 +771,7 @@
 	},
 	{
 		"id": "cmd_option_ctrl",
+		"modifiers": ["cmd", "option", "ctrl"],
 		"short_label": "Cmd+Option+Ctrl",
 		"label": "⌘⌥⌃ — Cmd+Option+Ctrl",
 		"holdable": true,
@@ -771,6 +786,7 @@
 	},
 	{
 		"id": "cmd_shift_ctrl",
+		"modifiers": ["cmd", "shift", "ctrl"],
 		"short_label": "Cmd+Shift+Ctrl",
 		"label": "⌘⇧⌃ — Cmd+Shift+Ctrl",
 		"holdable": true,
@@ -785,6 +801,7 @@
 	},
 	{
 		"id": "option_shift_ctrl",
+		"modifiers": ["option", "shift", "ctrl"],
 		"short_label": "Option+Shift+Ctrl",
 		"label": "⌥⇧⌃ — Option+Shift+Ctrl",
 		"holdable": true,

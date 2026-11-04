@@ -8,19 +8,20 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
 local MODULE_KEYS = {
 	"adapters.file_system",
 	"infra.timings",
-	"keylogger.metrics",
-	"modules.keylogger.aggregator",
-	"modules.keylogger.export",
-	"modules.keylogger.log_manager",
-	"modules.keylogger.rotation",
-	"modules.keylogger.sqlite_writer",
+	"keystats.metrics",
+	"modules.keystats.aggregator",
+	"modules.keystats.export",
+	"adapters.ledger_append", "modules.keystats.log_manager",
+	"modules.keystats.rotation",
+	"modules.keystats.sqlite_writer",
 	"infra.logger",
 	"adapters.timer_scheduler",
-	"modules.keylogger.timestamp",
+	"modules.keystats.timestamp",
 }
 
 --- Runs both ingest retries inside one isolated module and native scope.
@@ -72,8 +73,8 @@ local function run_refused_transaction(failure)
 			ms = function() return 5000 end,
 			sec = function() return 1 end,
 		}
-		package.loaded["keylogger.metrics"] = {}
-		package.loaded["modules.keylogger.aggregator"] = {
+		package.loaded["keystats.metrics"] = {}
+		package.loaded["modules.keystats.aggregator"] = {
 			flush = function() return true end,
 			get_ngram_ctx = function() return {} end,
 			reset_batch = function() observations.resets = observations.resets + 1 end,
@@ -81,10 +82,11 @@ local function run_refused_transaction(failure)
 			set_ngram_ctx = function() end,
 			walk_system_event = function() end,
 		}
-		package.loaded["modules.keylogger.export"] = {
+		package.loaded["modules.keystats.export"] = {
+			cleanup = function() return true end,
 			sync_foreign_data_sql = function() return {} end,
 		}
-		package.loaded["modules.keylogger.rotation"] = {
+		package.loaded["modules.keystats.rotation"] = {
 			get_date = function() return "2026-08-25" end,
 			get_offset = function() return 0 end,
 			read_new_entries = function()
@@ -93,7 +95,7 @@ local function run_refused_transaction(failure)
 			end,
 			set_offset = function() observations.offset_writes = observations.offset_writes + 1 end,
 		}
-		package.loaded["modules.keylogger.sqlite_writer"] = {
+		package.loaded["modules.keystats.sqlite_writer"] = {
 			build_inserts = function()
 				observations.builds = observations.builds + 1
 				next_event_id = next_event_id + 1
@@ -105,8 +107,8 @@ local function run_refused_transaction(failure)
 			set_next_event_id = function(value) next_event_id = value end,
 		}
 
-		package.loaded["modules.keylogger.log_manager"] = nil
-		local manager = helpers.load_with_stubs("modules.keylogger.log_manager")
+		package.loaded["modules.keystats.log_manager"] = nil
+		local manager = EmptyLedger.load()
 		manager.ingest_once()
 		manager.ingest_once()
 		observations.next_event_id = next_event_id

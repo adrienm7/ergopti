@@ -19,8 +19,23 @@ class TrayStartupCommands {
 		this.CommandFn := CommandFn
 		this.ScheduleFn := HasMethod(ScheduleFn, "Call") ? ScheduleFn : SetTimer
 		this.Pending := ""
+		this.RequestSerial := 0
 		this.Active := true
+		this.ReadyObserved := false
 		this.DispatchFn := ObjBindMethod(this, "Dispatch")
+	}
+
+	/** Completed input initialization survives repaint; only Retire revokes this owner. */
+	InputReady() {
+		if !this.Active
+			return false
+		if !this.ReadyObserved {
+			Ready := this.ReadyFn.Call()
+			if !(Ready is Integer) || (Ready != false && Ready != true)
+				throw TypeError("Startup readiness requires an exact Boolean")
+			this.ReadyObserved := Ready
+		}
+		return this.ReadyObserved
 	}
 
 	Request(Id, *) {
@@ -29,15 +44,27 @@ class TrayStartupCommands {
 		if Id != "suspend" && Id != "reload" && Id != "quit"
 			throw ValueError("Unknown startup command", -1, Id)
 		this.Pending := Id
-		try LoggerInfo("BootProfile", Format("Native startup command '{1}' admitted (input_ready={2}).",
-			Id, this.ReadyFn.Call()))
-		if this.ReadyFn.Call()
-			this.ScheduleFn.Call(this.DispatchFn, -1)
+		this.RequestSerial += 1
+		Serial := this.RequestSerial
+		try {
+			Ready := this.InputReady()
+			try LoggerInfo("BootProfile", Format("Native startup command '{1}' admitted (input_ready={2}).",
+				Id, Ready))
+			; Reload uses its ordinary guarded owner to recover a stalled startup.
+			if Id = "reload" || Ready
+				this.ScheduleFn.Call(this.DispatchFn, -1)
+		} catch as Err {
+			; An unadmitted request cannot block recovery forever. A callback
+			; delivered before refusal may already have admitted a new same-id request.
+			if this.RequestSerial == Serial && this.Pending == Id
+				this.Pending := ""
+			throw Err
+		}
 		return true
 	}
 
 	NotifyReady() {
-		if !this.Active || !this.ReadyFn.Call()
+		if !this.Active || !this.InputReady()
 			return false
 		if this.Pending != ""
 			this.ScheduleFn.Call(this.DispatchFn, -1)
@@ -45,7 +72,7 @@ class TrayStartupCommands {
 	}
 
 	Dispatch() {
-		if !this.Active || !this.ReadyFn.Call() || this.Pending == ""
+		if !this.Active || (this.Pending != "reload" && !this.InputReady()) || this.Pending == ""
 			return false
 		Id := this.Pending
 		this.Pending := ""
@@ -81,5 +108,7 @@ TrayStartupOnboarding() {
 /** Executes admitted intents through the ordinary menu command owner. */
 TrayStartupCommand(Id) {
 	Commands := Map("suspend", ToggleSuspend, "reload", ActivateReload, "quit", ActivateExitApp)
-	return MenuCommandRun(MenuStartupSafeCommand(Commands[Id]), [])
+	; A retained Reload meets a reload already in flight like a click on the row.
+	Command := Id == "reload" ? MenuStartupReloadCommand(Commands[Id]) : MenuStartupSafeCommand(Commands[Id])
+	return MenuCommandRun(Command, [])
 }

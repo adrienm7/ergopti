@@ -48,6 +48,8 @@ function createTypingConsumer(root, manifest) {
 		_t: (key) => key,
 		KEYCODE_NAMES: { 29: 'Left Ctrl' }
 	});
+	// data.js draws its colours through ThemeTokens, as the page loads it first.
+	require(path.join(root, 'tools/test/support/theme-tokens.cjs')).installThemeTokens(context);
 	// The complete data owner brings its real helper closure, never policy stubs.
 	vm.runInContext(
 		fs.readFileSync(

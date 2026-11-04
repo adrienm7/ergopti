@@ -4,8 +4,9 @@
 --- MODULE: Gesture actions reach the app-navigation and pixel owners
 --- DESCRIPTION:
 --- Opening Downloads, the file manager or the system settings, copying the
---- path of the selection and reading the pixel colour existed only as fixed
---- shortcut-layer hotkeys (Ctrl+D, Ctrl+E, Ctrl+I, Ctrl+S, Ctrl+X). Both owners
+--- path of the selection, reading the pixel colour and opening ChatGPT existed
+--- only as fixed shortcut-layer hotkeys (Ctrl+D, Ctrl+E, Ctrl+I, Ctrl+S, Ctrl+X,
+--- and Ctrl+G until schema v20). Both owners
 --- are scoped by parent: a gesture runs them under "gestures", a keyboard slot
 --- under "shortcut_bindings", and each feature's PAUSE settles only its own work.
 --- ==============================================================================
@@ -32,7 +33,7 @@ helpers.describe("gesture actions delegate to the app-navigation owner", functio
 			local last = calls.apps_actions[#calls.apps_actions]
 			helpers.assert_eq(last.name, method, action_id .. " must run apps." .. method)
 			helpers.assert_eq(last.parent, "gestures")
-			helpers.assert_eq(actions.execute_single(action_id, "keyboard__cmd_1"), true)
+			helpers.assert_eq(actions.execute_single(action_id, "keyboard__primary_1"), true)
 			helpers.assert_eq(calls.apps_actions[#calls.apps_actions].parent, "shortcut_bindings")
 			checked = checked + 1
 		end
@@ -46,8 +47,27 @@ helpers.describe("gesture actions delegate to the app-navigation owner", functio
 		local last = calls.pixel_actions[#calls.pixel_actions]
 		helpers.assert_eq(last.name, "copy_pixel_color")
 		helpers.assert_eq(last.parent, "gestures")
-		helpers.assert_eq(actions.execute_single("pick_color", "keyboard__cmd_1"), true)
+		helpers.assert_eq(actions.execute_single("pick_color", "keyboard__primary_1"), true)
 		helpers.assert_eq(calls.pixel_actions[#calls.pixel_actions].parent, "shortcut_bindings")
+	end)
+
+	it("opens the configured ChatGPT URL under the dispatching parent (open_chatgpt)", function(fresh_actions)
+		-- Schema v20 retired the fixed Ctrl+G hotkey: the secondary_g slot now
+		-- runs this catalogue action, which must read the live URL setting.
+		local actions = fresh_actions()
+		local opened = {}
+		package.loaded["modules.shortcuts.bindings"] = {
+			get_chatgpt_url = function() return "https://chat.example.invalid/" end,
+		}
+		package.loaded["modules.shortcuts.actions.apps"].open_chatgpt = function(url, parent)
+			opened[#opened + 1] = { url = url, parent = parent }
+			return true
+		end
+		helpers.assert_eq(actions.execute_single("open_chatgpt"), true,
+			"open_chatgpt must be a registered gesture action")
+		helpers.assert_eq(opened[1], { url = "https://chat.example.invalid/", parent = "gestures" })
+		helpers.assert_eq(actions.execute_single("open_chatgpt", "keyboard__secondary_g"), true)
+		helpers.assert_eq(opened[2], { url = "https://chat.example.invalid/", parent = "shortcut_bindings" })
 	end)
 
 	it("pauses and resumes only the dispatching parent's app scope", function(fresh_actions)
@@ -60,7 +80,7 @@ helpers.describe("gesture actions delegate to the app-navigation owner", functio
 		helpers.assert_eq(table.concat(paused_parents, ","), "gestures",
 			"a gesture PAUSE must fence the gesture app scope and nothing else")
 		helpers.assert_eq(actions.execute_single("open_downloads"), false)
-		helpers.assert_eq(actions.execute_single("open_downloads", "keyboard__cmd_1"), true)
+		helpers.assert_eq(actions.execute_single("open_downloads", "keyboard__primary_1"), true)
 		helpers.assert_eq(actions.resume_after_cleanup("gestures"), true)
 		helpers.assert_eq(actions.execute_single("open_downloads"), true)
 	end)

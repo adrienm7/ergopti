@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -48,7 +49,7 @@ LLM_Menu_GetProfileLabel(id) {
 	s := (n > 1) ? "s" : ""
 
 	; Check user profiles
-	for p in _LLM_Menu["user_profiles"] {
+	for p in _LLM_Menu[ConfigLeaf.USER_PROFILES] {
 		if (p.Has("id") && p["id"] == id)
 			return p.Has("label") ? p["label"] : id
 	}
@@ -70,7 +71,7 @@ LLM_Menu_PromptChoices() {
 	Choices := []
 	for Id in LLM_PROFILE_BUILTIN_ORDER
 		Choices.Push(Map("value", Id, "label", LLM_Menu_GetProfileLabel(Id)))
-	for Profile in _LLM_Menu["user_profiles"] {
+	for Profile in _LLM_Menu[ConfigLeaf.USER_PROFILES] {
 		if !(Profile is Map) || !Profile.Has("id")
 			continue
 		Choices.Push(Map("value", Profile["id"],
@@ -139,18 +140,18 @@ _LLM_Menu_ProfileRows() {
 	seen_labels := Map()
 	FrameState := Map()
 	PausedFn := (*) => A_IsSuspended
-	return MenuRenderer_TemplateRows("llm_profile_windows_frame", Map(
-		"llm_profile_create", LLM_Menu_PromptCreateProfile,
-		"llm_profile_clone", LLM_Menu_CloneActiveBuiltinProfile,
-		"llm_profile_auto_detect", (*) => _LLM_Menu_ToggleAutoProfile()), Map(
+	return _LLM_Menu_GuardConfigRows(MenuRenderer_TemplateRows("llm_profile_windows_frame", Map(
+		MenuCommand.LLM_PROFILE_CREATE, LLM_Menu_PromptCreateProfile,
+		MenuCommand.LLM_PROFILE_CLONE, LLM_Menu_CloneActiveBuiltinProfile,
+		MenuCommand.LLM_PROFILE_AUTO_DETECT, (*) => _LLM_Menu_ToggleAutoProfile()), Map(
 		"llm_profile_custom_present", _LLM_Menu_ProfileCustomPresent.Bind(FrameState),
 		"llm_profile_clone_present", _LLM_Menu_ProfileClonePresent,
-		"llm_profile_auto_detect_checked", () => _LLM_Menu["auto_profile_for_model"],
+		"llm_profile_auto_detect_checked", () => _LLM_Menu[ConfigLeaf.AUTO_PROFILE_FOR_MODEL],
 		"llm_profile_create_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn),
 		"llm_profile_clone_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn)), Map(
 		"llm_profile_builtin_rows", _LLM_Menu_ProfileBuiltinRows.Bind(seen_labels),
 		"llm_profile_custom_rows", _LLM_Menu_ProfileCustomRows.Bind(seen_labels, FrameState),
-		"llm_profile_app_overrides", _LLM_Menu_PerAppProfileRows))
+		"llm_profile_app_overrides", _LLM_Menu_PerAppProfileRows)))
 }
 
 ; Native data reads occur only when the shared frame reaches each provider.
@@ -171,15 +172,15 @@ _LLM_Menu_ProfileBuiltinRows(SeenLabels) {
 
 _LLM_Menu_ProfileCustomPresent(FrameState) {
 	global _LLM_Menu
-	user_profiles := _LLM_Menu["user_profiles"]
-	FrameState["user_profiles"] := user_profiles
+	user_profiles := _LLM_Menu[ConfigLeaf.USER_PROFILES]
+	FrameState[ConfigLeaf.USER_PROFILES] := user_profiles
 	return user_profiles.Length > 0
 }
 
 _LLM_Menu_ProfileCustomRows(SeenLabels, FrameState) {
 	global _LLM_Menu
 	Rows := []
-	user_profiles := FrameState["user_profiles"]
+	user_profiles := FrameState[ConfigLeaf.USER_PROFILES]
 	for p in user_profiles {
 		pid         := p.Has("id") ? p["id"] : ""
 		base_plabel := p.Has("label") ? p["label"] : pid
@@ -216,7 +217,7 @@ _LLM_Menu_ProfileClonePresent() {
  */
 _LLM_Menu_PerAppProfileRows() {
 	global _LLM_Menu
-	overrides := _LLM_Menu["app_profile_overrides"]
+	overrides := _LLM_Menu[ConfigLeaf.APP_PROFILE_OVERRIDES]
 	; "Override active app with the currently-selected profile". Lazy
 	; closure so WinGetProcessName fires when the user clicks, not when
 	; the menu is built.
@@ -230,7 +231,7 @@ _LLM_Menu_PerAppProfileRows() {
 		}
 	}
 	Rows := MenuRenderer_TemplateRows("llm_profile_app_override_frame", Map(
-		"llm_profile_override_active_app", (*) => _LLM_Menu_AddOverrideForActiveApp()),
+		MenuCommand.LLM_PROFILE_OVERRIDE_ACTIVE_APP, (*) => _LLM_Menu_AddOverrideForActiveApp()),
 		Map("llm_profile_overrides_present", () => overrides is Map && overrides.Count > 0),
 		Map("llm_profile_override_rows", () => Rows))
 	if !(Rows is Array)
@@ -247,8 +248,8 @@ _LLM_Menu_AddOverrideForActiveApp() {
 	}
 	global _LLM_Menu
 	app := ""
-	try app := StrLower(WinGetProcessName("A"))
-	app := RegExReplace(app, "\.exe$", "")
+	try app := WinGetProcessName("A")
+	app := LLM_AppIdentity_Normalize(app)
 	if (app == "")
 		return false
 	return LLM_Menu_CommitMutation("the active-application profile override",
@@ -258,15 +259,15 @@ _LLM_Menu_AddOverrideForActiveApp() {
 
 _LLM_Menu_SetOverrideCandidate(Candidate, AppName) {
 	if !(Candidate is Map)
-			|| !(Candidate["app_profile_overrides"] is Map)
+			|| !(Candidate[ConfigLeaf.APP_PROFILE_OVERRIDES] is Map)
 		return false
-	Candidate["app_profile_overrides"][AppName] := Candidate["profile_id"]
+	Candidate[ConfigLeaf.APP_PROFILE_OVERRIDES][AppName] := Candidate["profile_id"]
 	return true
 }
 
 _LLM_Menu_ClearOverrideFor(app_name) {
 	global _LLM_Menu
-	overrides := _LLM_Menu["app_profile_overrides"]
+	overrides := _LLM_Menu[ConfigLeaf.APP_PROFILE_OVERRIDES]
 	if !(overrides is Map) or !overrides.Has(app_name)
 		return false
 	return LLM_Menu_CommitMutation("the application profile override removal",
@@ -275,7 +276,7 @@ _LLM_Menu_ClearOverrideFor(app_name) {
 }
 
 _LLM_Menu_ClearOverrideCandidate(Candidate, AppName) {
-	Overrides := Candidate["app_profile_overrides"]
+	Overrides := Candidate[ConfigLeaf.APP_PROFILE_OVERRIDES]
 	if !(Overrides is Map) || !Overrides.Has(AppName)
 		return false
 	Overrides.Delete(AppName)
@@ -288,8 +289,8 @@ _LLM_Menu_ToggleAutoProfile() {
 }
 
 _LLM_Menu_ToggleAutoProfileCandidate(Candidate) {
-	Candidate["auto_profile_for_model"] := !Candidate["auto_profile_for_model"]
-	if Candidate["auto_profile_for_model"]
+	Candidate[ConfigLeaf.AUTO_PROFILE_FOR_MODEL] := !Candidate[ConfigLeaf.AUTO_PROFILE_FOR_MODEL]
+	if Candidate[ConfigLeaf.AUTO_PROFILE_FOR_MODEL]
 		LLM_Menu_AutoApplyProfileForModel(Candidate)
 	return true
 }
@@ -304,23 +305,71 @@ _LLM_Menu_ToggleAutoProfileCandidate(Candidate) {
 ; ====================================
 ; ====================================
 
+_LLM_Menu_ProfilePorts(Port) {
+	if !((Port is Integer) && Port == 0) && !(Port is Map)
+		throw TypeError("Profile dialogs require an optional native port Map.")
+	return Port is Map ? Port : Map()
+}
+
+_LLM_Menu_ProfileSourceBound(Source) {
+	global ConfigurationFile, _LLM_Menu
+	return Source is Map && Source.Get("path", 0) is String
+		&& Source.Get("content", 0) is String && Source.Get("present", -1) is Integer
+		&& (Source["present"] == 0 || Source["present"] == 1)
+		&& Source.Get("menu", 0) is Map
+		&& ConfigurationFile == Source["path"] && _LLM_Menu == Source["menu"]
+}
+
+_LLM_Menu_CaptureProfileSource() {
+	global ConfigurationFile, _LLM_Menu
+	if !IsSet(ConfigurationFile) || !(ConfigurationFile is String) || ConfigurationFile == ""
+			|| !IsSet(_LLM_Menu) || !(_LLM_Menu is Map)
+		return false
+	Source := Map("path", ConfigurationFile, "menu", _LLM_Menu, "present", 0, "content", "")
+	if !ConfigFullStateCanPersist() || !_LLM_Menu_ProfileSourceBound(Source)
+		return false
+	try {
+		Source["present"] := FSStrictExists(Source["path"])
+		if !_LLM_Menu_ProfileSourceBound(Source)
+			return false
+		Source["content"] := Source["present"] ? FSConfigReadUtf8Exact(Source["path"]) : ""
+	} catch
+		return false
+	return _LLM_Menu_ProfileSourceBound(Source) ? Source : false
+}
+
+_LLM_Menu_WriteProfileSource(Source, Path, Updates) {
+	if !_LLM_Menu_ProfileSourceBound(Source) || !(Path == Source["path"])
+		return false
+	; The native writer retains this exact pre-dialog image through stage and
+	; replacement; a fresh schema admission must not adopt later external edits.
+	return TOML_ConfigBatchWrite(Path, Updates, [],
+		_LLM_Menu_ProfileSourceBound.Bind(Source), Source["content"], Source["present"])
+}
+
 /**
  * Shows a context sub-menu style dialog for a user profile (use / edit / delete).
  * AHK has no native submenu on the fly; we show a MsgBox with button choices.
  * @param {Map} profile - The user profile Map object.
  */
-LLM_Menu_OnUserProfileClick(profile) {
+LLM_Menu_OnUserProfileClick(profile, Port := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return LLM_Menu_OnUserProfileClick(profile)
+		try return LLM_Menu_OnUserProfileClick(profile, Port)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
+	Options := _LLM_Menu_ProfilePorts(Port)
+	Source := _LLM_Menu_CaptureProfileSource()
+	if !(Source is Map)
+		return ConfigReportPersistenceFailure("the custom LLM profile action", Options.Get("notify", 0),
+			"the opening configuration source is unavailable")
+	ConfirmFn := Options.Get("confirm", Ui_MsgBox)
 	pid    := profile.Has("id")    ? profile["id"]    : ""
 	plabel := profile.Has("label") ? profile["label"] : pid
 
-	choice := Ui_MsgBox(
+	choice := ConfirmFn.Call(
 		t("menu.profiles.use_profile") . "`n"
 		. t("menu.profiles.edit_profile") . "`n"
 		. t("menu.profiles.delete_profile"),
@@ -329,17 +378,23 @@ LLM_Menu_OnUserProfileClick(profile) {
 	)
 
 	if (choice == "Yes") {
-		; Use this profile
-		LLM_Menu_SetProfile(pid)
+		; Use this profile through the same opening image as the management dialog.
+		LLM_Menu_CommitMutation("the LLM profile selection",
+			(Candidate) => _LLM_Menu_SetProfileCandidate(Candidate, pid),
+			Options.Get("apply", _LLM_Menu_ApplyManualProfileCommitted),
+			_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
+			Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
 	} else if (choice == "No") {
 		; Edit this profile
-		LLM_Menu_PromptEditProfile(profile)
+		LLM_Menu_PromptEditProfile(profile, Port, Source)
 	} else if (choice == "Cancel") {
-		confirm := Ui_MsgBox(t("menu.profiles.delete_profile") . " ?", plabel, "4 48")
+		confirm := ConfirmFn.Call(t("menu.profiles.delete_profile") . " ?", plabel, "4 48")
 		if (confirm == "Yes") {
 			return LLM_Menu_CommitMutation("the custom LLM profile removal",
 				(Candidate) => _LLM_Menu_DeleteProfileCandidate(Candidate, pid),
-				_LLM_Menu_ApplyProfileCommitted)
+				Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
+				_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
+				Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
 		}
 	}
 	return true
@@ -347,12 +402,12 @@ LLM_Menu_OnUserProfileClick(profile) {
 
 _LLM_Menu_DeleteProfileCandidate(Candidate, ProfileId) {
 	if !(Candidate is Map) || !(ProfileId is String) || ProfileId == ""
-			|| !Candidate.Has("user_profiles")
-			|| !(Candidate["user_profiles"] is Array)
+			|| !Candidate.Has(ConfigLeaf.USER_PROFILES)
+			|| !(Candidate[ConfigLeaf.USER_PROFILES] is Array)
 			|| !Candidate.Has("profile_id")
 			|| !(Candidate["profile_id"] is String)
 		return false
-	Profiles := Candidate["user_profiles"]
+	Profiles := Candidate[ConfigLeaf.USER_PROFILES]
 	SeenIds := Map()
 	MatchIndex := 0
 	for Index, Profile in Profiles {
@@ -371,8 +426,8 @@ _LLM_Menu_DeleteProfileCandidate(Candidate, ProfileId) {
 
 	OverrideKeys := []
 	Overrides := 0
-	if Candidate.Has("app_profile_overrides") {
-		Overrides := Candidate["app_profile_overrides"]
+	if Candidate.Has(ConfigLeaf.APP_PROFILE_OVERRIDES) {
+		Overrides := Candidate[ConfigLeaf.APP_PROFILE_OVERRIDES]
 		if !(Overrides is Map)
 			return false
 		for AppName, OverrideId in Overrides {
@@ -393,27 +448,27 @@ _LLM_Menu_DeleteProfileCandidate(Candidate, ProfileId) {
 
 _LLM_Menu_PruneOrphanProfileOverrides(MenuState) {
 	global LLM_PROFILE_BUILTIN_ORDER
-	if !(MenuState is Map) || !MenuState.Has("app_profile_overrides")
-			|| !(MenuState["app_profile_overrides"] is Map)
-			|| !MenuState.Has("user_profiles")
-			|| !(MenuState["user_profiles"] is Array)
+	if !(MenuState is Map) || !MenuState.Has(ConfigLeaf.APP_PROFILE_OVERRIDES)
+			|| !(MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES] is Map)
+			|| !MenuState.Has(ConfigLeaf.USER_PROFILES)
+			|| !(MenuState[ConfigLeaf.USER_PROFILES] is Array)
 		return false
 	Valid := Map()
 	for Id in LLM_PROFILE_BUILTIN_ORDER
 		Valid[Id] := true
-	for Profile in MenuState["user_profiles"] {
+	for Profile in MenuState[ConfigLeaf.USER_PROFILES] {
 		if !(Profile is Map) || !Profile.Has("id")
 				|| !(Profile["id"] is String) || Profile["id"] == ""
 			return false
 		Valid[Profile["id"]] := true
 	}
 	OrphanKeys := []
-	for AppName, ProfileId in MenuState["app_profile_overrides"] {
+	for AppName, ProfileId in MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES] {
 		if !(ProfileId is String) || !Valid.Has(ProfileId)
 			OrphanKeys.Push(AppName)
 	}
 	for AppName in OrphanKeys
-		MenuState["app_profile_overrides"].Delete(AppName)
+		MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES].Delete(AppName)
 	return OrphanKeys.Length > 0
 }
 
@@ -524,9 +579,12 @@ _LLM_Menu_DeserializeUserProfiles(Payload) {
 _LLM_Menu_SerializeAppProfileOverrides(Overrides) {
 	if !(Overrides is Map)
 		return false
+	; The declared neutral value (app_profile_overrides_vectors.json "encode").
+	if Overrides.Count == 0
+		return ""
 	Rows := []
 	for AppName, ProfileId in Overrides {
-		if !(AppName is String) || AppName == "" || !(ProfileId is String) || ProfileId == ""
+		if LLM_AppIdentity_Normalize(AppName) !== AppName || !(ProfileId is String) || ProfileId == ""
 			return false
 		Rows.Push('{"app":"' . _LLM_MenuApiJsonEscape(AppName)
 			. '","profile":"' . _LLM_MenuApiJsonEscape(ProfileId) . '"}')
@@ -537,23 +595,10 @@ _LLM_Menu_SerializeAppProfileOverrides(Overrides) {
 _LLM_Menu_DeserializeAppProfileOverrides(Payload) {
 	if !(Payload is String)
 		return false
-	if SubStr(Payload, 1, 3) != "v1:" {
-		; Strict migration reader for the legacy app=profile;... representation.
-		Decoded := Map()
-		for Pair in StrSplit(Payload, ";") {
-			if Pair == ""
-				return false
-			Separator := InStr(Pair, "=", true, -1)
-			if (Separator <= 1 || Separator == StrLen(Pair))
-				return false
-			AppName := SubStr(Pair, 1, Separator - 1)
-			ProfileId := SubStr(Pair, Separator + 1)
-			if Decoded.Has(AppName)
-				return false
-			Decoded[AppName] := ProfileId
-		}
-		return Decoded
-	}
+	if Payload == "" || Payload == "_"
+		return Map()
+	if SubStr(Payload, 1, 3) !== "v1:"
+		return false
 	try Bytes := CryptoBase64Decode(SubStr(Payload, 4))
 	catch
 		return false
@@ -565,9 +610,9 @@ _LLM_Menu_DeserializeAppProfileOverrides(Payload) {
 	Decoded := Map()
 	for Row in Parsed {
 		if !(Row is Map) || !Row.Has("app") || !Row.Has("profile")
-				|| !(Row["app"] is String) || Row["app"] == ""
+				|| LLM_AppIdentity_Normalize(Row["app"]) !== Row["app"]
 				|| !(Row["profile"] is String) || Row["profile"] == ""
-				|| Decoded.Has(Row["app"])
+				|| StrLen(Row["profile"]) > 256 || Decoded.Has(Row["app"])
 			return false
 		Decoded[Row["app"]] := Row["profile"]
 	}
@@ -591,8 +636,8 @@ _LLM_Menu_CreateProfileReady(PausedFn) {
 _LLM_Menu_CreateProfileRow(OpenFn, PausedFn := 0) {
 	if (PausedFn is Integer) && PausedFn == 0
 		PausedFn := (*) => A_IsSuspended
-	return MenuRenderer_CommandRow("llm_profile_commands", "llm_profile_create",
-		Map("llm_profile_create", OpenFn),
+	return MenuRenderer_CommandRow("llm_profile_commands", MenuCommand.LLM_PROFILE_CREATE,
+		Map(MenuCommand.LLM_PROFILE_CREATE, OpenFn),
 		Map("llm_profile_create_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn)))
 }
 
@@ -605,32 +650,40 @@ _LLM_Menu_CreateProfileRow(OpenFn, PausedFn := 0) {
 _LLM_Menu_CloneProfileRow(OpenFn, PausedFn := 0) {
 	if (PausedFn is Integer) && PausedFn == 0
 		PausedFn := (*) => A_IsSuspended
-	return MenuRenderer_CommandRow("llm_profile_commands", "llm_profile_clone",
-		Map("llm_profile_clone", OpenFn),
+	return MenuRenderer_CommandRow("llm_profile_commands", MenuCommand.LLM_PROFILE_CLONE,
+		Map(MenuCommand.LLM_PROFILE_CLONE, OpenFn),
 		Map("llm_profile_clone_ready", _LLM_Menu_CreateProfileReady.Bind(PausedFn)))
 }
 
 /**
  * Opens InputBox dialogs to create a new user profile (label + prompt).
  */
-LLM_Menu_PromptCreateProfile() {
+LLM_Menu_PromptCreateProfile(Port := 0) {
 	if A_IsSuspended
 		return false
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return LLM_Menu_PromptCreateProfile()
+		try return LLM_Menu_PromptCreateProfile(Port)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
+	Options := _LLM_Menu_ProfilePorts(Port)
+	Source := _LLM_Menu_CaptureProfileSource()
+	if !(Source is Map)
+		return ConfigReportPersistenceFailure("the custom LLM profile creation", Options.Get("notify", 0),
+			"the opening configuration source is unavailable")
+	if A_IsSuspended
+		return false
+	InputFn := Options.Get("input", Ui_InputBox)
 
 	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
 	; to the native InputBox wizard below when the WebView2 runtime is absent.
-	if _PromptEdWeb_TryOpen(0)
+	if _PromptEdWeb_TryOpen(0, Source)
 		return
 
 	; Step 1: label
-	ib_label := Ui_InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.create_profile"), "w450 h120")
+	ib_label := InputFn.Call(t("menu.profiles.prompt_label"), t("menu.profiles.create_profile"), "w450 h120")
 	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &plabel)
 		return
 
@@ -638,7 +691,7 @@ LLM_Menu_PromptCreateProfile() {
 		return false
 
 	; Step 2: system prompt (multi-line via Edit control)
-	ib_prompt := Ui_InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
+	ib_prompt := InputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
 	if (ib_prompt.Result != "OK")
 		return
 	system_single := ib_prompt.Value
@@ -659,13 +712,15 @@ LLM_Menu_PromptCreateProfile() {
 
 	return LLM_Menu_CommitMutation("the custom LLM profile creation",
 		(Candidate) => _LLM_Menu_AddProfileCandidate(Candidate, new_profile),
-		_LLM_Menu_ApplyProfileCommitted)
+		Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
+		_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
 }
 
 _LLM_Menu_AddProfileCandidate(Candidate, Profile) {
-	if !(Candidate["user_profiles"] is Array) || !(Profile is Map)
+	if !(Candidate[ConfigLeaf.USER_PROFILES] is Array) || !(Profile is Map)
 		return false
-	Candidate["user_profiles"].Push(LLM_Menu_DeepClone(Profile))
+	Candidate[ConfigLeaf.USER_PROFILES].Push(LLM_Menu_DeepClone(Profile))
 	Candidate["profile_id"] := Profile["id"]
 	return true
 }
@@ -674,38 +729,46 @@ _LLM_Menu_AddProfileCandidate(Candidate, Profile) {
  * Opens InputBox dialogs to edit an existing user profile in place.
  * @param {Map} profile - The user profile to edit.
  */
-LLM_Menu_PromptEditProfile(profile) {
+LLM_Menu_PromptEditProfile(profile, Port := 0, OpeningSource := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return LLM_Menu_PromptEditProfile(profile)
+		try return LLM_Menu_PromptEditProfile(profile, Port, OpeningSource)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
+	Options := _LLM_Menu_ProfilePorts(Port)
+	Source := OpeningSource is Map ? OpeningSource : _LLM_Menu_CaptureProfileSource()
+	if !(Source is Map) || !_LLM_Menu_ProfileSourceBound(Source)
+		return ConfigReportPersistenceFailure("the custom LLM profile edit", Options.Get("notify", 0),
+			"the opening configuration source is unavailable")
+	InputFn := Options.Get("input", Ui_InputBox)
 	pid := profile.Has("id") ? profile["id"] : ""
 
 	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
 	; to the native InputBox wizard below when the WebView2 runtime is absent.
-	if _PromptEdWeb_TryOpen(profile)
+	if _PromptEdWeb_TryOpen(profile, Source)
 		return
 
-	ib_label := Ui_InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.edit_profile"), "w450 h120",
+	ib_label := InputFn.Call(t("menu.profiles.prompt_label"), t("menu.profiles.edit_profile"), "w450 h120",
 		profile.Has("label") ? profile["label"] : "")
 	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &new_label)
 		return
 
-	ib_prompt := Ui_InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
+	ib_prompt := InputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
 		profile.Has("system_single") ? profile["system_single"] : "")
 	if (ib_prompt.Result != "OK")
 		return
 
 	return LLM_Menu_CommitMutation("the custom LLM profile edit",
 		(Candidate) => _LLM_Menu_EditProfileCandidate(Candidate, pid,
-			new_label, ib_prompt.Value), _LLM_Menu_ApplyProfileCommitted)
+			new_label, ib_prompt.Value), Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
+		_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
 }
 
 _LLM_Menu_EditProfileCandidate(Candidate, ProfileId, Label, Prompt) {
-	for Profile in Candidate["user_profiles"] {
+	for Profile in Candidate[ConfigLeaf.USER_PROFILES] {
 		if (Profile.Has("id") && Profile["id"] == ProfileId) {
 			Profile["label"] := Label
 			Profile["system_single"] := Prompt
@@ -734,7 +797,7 @@ LLM_Menu_CloneActiveBuiltinProfile() {
 	src_id := _LLM_Menu["profile_id"]
 	; Pull the source profile from the live registry — covers the case
 	; where the user re-loaded profiles.json without restarting.
-	src_profile := LLM_GetActiveProfile(src_id, _LLM_Menu["user_profiles"])
+	src_profile := LLM_GetActiveProfile(src_id, _LLM_Menu[ConfigLeaf.USER_PROFILES])
 	if !IsObject(src_profile)
 		return
 	src_label := LLM_Menu_GetProfileLabel(src_id)
@@ -821,7 +884,7 @@ LLM_RecommendProfileForModel(model) {
  * @returns {string} Profile id in effect after the call.
  */
 LLM_Menu_AutoApplyProfileForModel(MenuState) {
-	if !MenuState["auto_profile_for_model"]
+	if !MenuState[ConfigLeaf.AUTO_PROFILE_FOR_MODEL]
 		return MenuState["profile_id"]
 	recommended := LLM_RecommendProfileForModel(MenuState["model"])
 	if (recommended == "" or recommended == MenuState["profile_id"])
@@ -856,8 +919,8 @@ LLM_Menu_GetHotkeyProfileOrder(MenuState := 0) {
 	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT, LLM_TONE_LADDER
 	global LLM_PROFILE_LIVE_TRANSLATIONS
 	State := MenuState is Map ? MenuState : _LLM_Menu
-	if !(State is Map) || !State.Has("user_profiles")
-			|| !(State["user_profiles"] is Array)
+	if !(State is Map) || !State.Has(ConfigLeaf.USER_PROFILES)
+			|| !(State[ConfigLeaf.USER_PROFILES] is Array)
 		return []
 	SkippedIds := Map()
 	for ToneId in LLM_TONE_LADDER
@@ -872,7 +935,7 @@ LLM_Menu_GetHotkeyProfileOrder(MenuState := 0) {
 		if (out.Length >= LLM_PROFILE_HOTKEY_LIMIT)
 			return out
 	}
-	for p in State["user_profiles"] {
+	for p in State[ConfigLeaf.USER_PROFILES] {
 		if !(p is Map) or !p.Has("id")
 			continue
 		out.Push(p["id"])
@@ -884,8 +947,8 @@ LLM_Menu_GetHotkeyProfileOrder(MenuState := 0) {
 
 _LLM_Menu_ProfileCandidateIds(MenuState) {
 	global LLM_PROFILE_BUILTIN_ORDER
-	if !(MenuState is Map) || !MenuState.Has("user_profiles")
-			|| !(MenuState["user_profiles"] is Array)
+	if !(MenuState is Map) || !MenuState.Has(ConfigLeaf.USER_PROFILES)
+			|| !(MenuState[ConfigLeaf.USER_PROFILES] is Array)
 		return 0
 	Ids := Map()
 	for Id in LLM_PROFILE_BUILTIN_ORDER {
@@ -893,7 +956,7 @@ _LLM_Menu_ProfileCandidateIds(MenuState) {
 			return 0
 		Ids[Id] := true
 	}
-	for Profile in MenuState["user_profiles"] {
+	for Profile in MenuState[ConfigLeaf.USER_PROFILES] {
 		if !(Profile is Map) || !Profile.Has("id")
 				|| !(Profile["id"] is String) || Profile["id"] == ""
 				|| Ids.Has(Profile["id"])

@@ -52,6 +52,62 @@ def python_modules() -> list[Path]:
     return sorted(path for path in INSTALLER_DIR.rglob("*.py") if "__pycache__" not in path.parts)
 
 
+def parenthesized_with_lines(source: str) -> tuple[list[int], int]:
+    """Lines of `with` statements whose parentheses enclose the whole item list.
+
+    That spelling is Python 3.9+ grammar once it holds an `as` or several
+    items. `with (expr):` and `with (a), b:` stay legal on 3.8, so the opening
+    parenthesis only counts when its match closes after the last item. A 3.8
+    parser reads `with (a, b):` as one tuple-valued manager, which is flagged
+    too: a tuple is never a context manager. Returns the offending lines and
+    the number of `with` statements scanned.
+    """
+    import ast
+    import io
+    import tokenize
+
+    tree = ast.parse(source)
+    tokens = [
+        token
+        for token in tokenize.generate_tokens(io.StringIO(source).readline)
+        if token.type not in (tokenize.NL, tokenize.COMMENT)
+    ]
+    lines: list[int] = []
+    count = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.With, ast.AsyncWith)):
+            continue
+        count += 1
+        last = node.items[-1]
+        if len(node.items) == 1 and last.optional_vars is None:
+            if isinstance(last.context_expr, ast.Tuple):
+                lines.append(node.lineno)
+            continue
+        keyword = next(
+            index
+            for index, token in enumerate(tokens)
+            if token.type == tokenize.NAME
+            and token.string == "with"
+            and token.start >= (node.lineno, node.col_offset)
+        )
+        if tokens[keyword + 1].string != "(":
+            continue
+        depth = 0
+        for index in range(keyword + 1, len(tokens)):
+            token = tokens[index]
+            if token.type == tokenize.OP and token.string in "([{":
+                depth += 1
+            elif token.type == tokenize.OP and token.string in ")]}":
+                depth -= 1
+                if depth == 0:
+                    closing = token.start
+                    break
+        end = last.optional_vars or last.context_expr
+        if closing >= (end.end_lineno, end.end_col_offset):
+            lines.append(node.lineno)
+    return sorted(lines), count
+
+
 class PythonFloorTests(unittest.TestCase):
     def setUp(self):
         self.floor = python_floor()
@@ -99,6 +155,56 @@ class PythonFloorTests(unittest.TestCase):
             "fail to import at all: add "
             f"`{FUTURE_IMPORT}` at the top of each",
         )
+
+    def test_no_parenthesized_context_managers_below_3_9(self):
+        """(py38-paren-with) `with (a, b):` is a tuple, not two managers, on 3.8.
+
+        The grammar check below cannot see this on every interpreter: from 3.12
+        on, ``ast.parse(feature_version=(3, 8))`` accepts the parenthesized form,
+        and on 3.8 itself ``with (a, b):`` parses as one tuple-valued manager
+        that only fails at run time with ``AttributeError: __enter__``. Ruff's
+        formatter produced 53 of them while the repository targeted py313, and
+        they took down the floor job and the ubuntu-20.04/22.04 real installs.
+        This structural scan answers the same on every interpreter.
+        """
+        if self.floor >= (3, 9):
+            self.skipTest("floor already supports parenthesized context managers")
+        offenders: list[str] = []
+        scanned = 0
+        for path in self.modules:
+            relative = path.relative_to(INSTALLER_DIR)
+            try:
+                lines, count = parenthesized_with_lines(path.read_text(encoding="utf-8"))
+            except SyntaxError as error:
+                # On the floor itself the `as` spelling does not even parse.
+                offenders.append(f"{relative}: {error}")
+                continue
+            scanned += count
+            offenders.extend(f"{relative}:{line}" for line in lines)
+        self.assertGreater(scanned, 0, "no `with` statement was scanned, so this proves nothing")
+        self.assertEqual(
+            offenders,
+            [],
+            "these `with` statements wrap their whole item list in parentheses, "
+            f"which Python {self.floor[0]}.{self.floor[1]} rejects or reads as a "
+            "tuple: write `with a, b:` and let the formatter break inside a call",
+        )
+
+    def test_the_parenthesized_with_detector_sees_both_shapes(self):
+        """(py38-paren-with) The scan above must be able to fail."""
+        # Parses on every interpreter: two managers from 3.9, one tuple on 3.8.
+        tuple_shape = "with (\n    open(a),\n    open(b),\n):\n    pass\n"
+        good = "with (a), open(b) as g:\n    pass\nwith (a):\n    pass\n"
+        good_split = "with open(\n    a\n) as f, open(b):\n    pass\n"
+        self.assertEqual(parenthesized_with_lines(tuple_shape), ([1], 1))
+        self.assertEqual(parenthesized_with_lines(good), ([], 2))
+        self.assertEqual(parenthesized_with_lines(good_split), ([], 1))
+        if sys.version_info >= (3, 9):
+            # 3.8 cannot parse these at all; the grammar test owns them there.
+            as_shape = "with (\n    open(a) as f,\n    open(b),\n):\n    pass\n"
+            as_single = "with (open(a) as f):\n    pass\n"
+            self.assertEqual(parenthesized_with_lines(as_shape), ([1], 1))
+            self.assertEqual(parenthesized_with_lines(as_single), ([1], 1))
 
     def test_every_module_compiles_under_the_floors_grammar(self):
         """Syntax that the floor's parser rejects never reaches a user."""

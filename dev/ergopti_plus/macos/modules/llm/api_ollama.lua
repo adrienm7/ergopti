@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local Logger  = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local Notifications = require("infra.notifications")
@@ -14,6 +15,8 @@ local i18n    = require("infra.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
+local Ports = require("llm.request_plan.ports")
+local TokenBudget = require("llm.request_plan.token_budget")
 -- Independent inference, availability, and warmup owners prevent one semantic
 -- operation from superseding another merely because both use HTTP
 local _infer_client  = require("adapters.http_client").new()
@@ -24,17 +27,29 @@ local _vision_client = require("adapters.http_client").new()
 -- The AI agent menu's model listing never supersedes a request in flight
 local _listing_client = require("adapters.http_client").new()
 local JsonCodec      = require("adapters.json_codec")
+local FileSystem     = require("adapters.file_system")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
 local ShellRunner    = require("adapters.shell_runner")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
+local ManagedDaemon = require("adapters.managed_ollama_daemon")
+local RuntimeChoice = require("core.llm.ollama_runtime_choice")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local LOG            = "llm.api_ollama"
 local LocalModelPolicy = require("llm.local_model_policy")
 
+--- The think field of an Ollama chat body: false, or the effort level of a
+--- family that ignores false (thinking_off.json through thinking_families,
+--- required at the first body: it reads the shared tree).
+--- @param model_name string The Ollama model tag.
+--- @return boolean|string think
+local function ollama_think(model_name)
+	return require("modules.llm.thinking_families").ollama_think(model_name)
+end
+
 -- Ollama bind address. The default port is the single source in
--- _shared/modules/llm/defaults.json (llm_ollama_port, surfaced via DEFAULT_STATE); a user
+-- _shared/modules/llm/defaults.json (llm_ollama_owned_port, surfaced via DEFAULT_STATE); a user
 -- override owned by OllamaEndpoint wins so a port collision can be resolved
 -- without editing any file. Host stays loopback.
 --- Reads a valid user port override from persistent storage, or nil when unset.
@@ -44,7 +59,7 @@ local function read_ollama_port_override()
 end
 
 --- Resolves the Ollama port: a valid user override wins, otherwise the canonical
---- default from _shared/modules/llm/defaults.json (DEFAULT_STATE.llm_ollama_port). init is
+--- default from _shared/modules/llm/defaults.json (DEFAULT_STATE.llm_ollama_owned_port). init is
 --- required lazily to avoid the init <-> api_ollama require cycle.
 --- @return integer
 local function resolve_ollama_port()
@@ -65,15 +80,14 @@ function M.get_port()
 	return resolve_ollama_port()
 end
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 
 local _req_counter = 0
 local _ollama_started = false
 local _ollama_starting = false
 local _ollama_start_generation = 0
 local _ollama_start_transaction = nil
-local _ollama_kill_task = nil
 local _ollama_launch_timer = nil
 local _ollama_serve_task = nil
 local _ollama_ambiguous_task = nil
@@ -85,6 +99,7 @@ local _ollama_start_pause_fenced = false
 -- exact slots are not terminal until the outer start frame returns and is
 -- revalidated, so PAUSE/RESUME must refuse cleanup while this depth is non-zero.
 local _ollama_start_acquisition_depth = 0
+local _ollama_server_retirement_depth = 0
 local _ollama_launch_cleanup_observers = {}
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy lives in _shared/modules/llm/inference.json so the AHK twin can read
@@ -99,16 +114,20 @@ local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT
 -- Holds the current in-flight hs.task; cancelled when a new streaming request starts.
 -- The streaming flag itself is owned by modules/llm/init.lua and passed per-call.
 local _active_stream_task = nil
+local _payload_cleanup = nil
 -- Monotonic counter; each new stream gets its own ID so a stale on_done from a
 -- terminated stream does not clobber the active task reference of a newer one.
 local _stream_generation  = 0
 -- Readiness flag: true once warmup has confirmed the model is loaded
 local _is_ready           = false
+local _ready_origin       = nil
 -- Bumped by reset_ready(); a warmup callback that captured an older value describes
 -- a server/model that is no longer current and must discard itself. Mirrors the
 -- api_mlx _warmup_gen invariant (F-L4).
 local _warmup_gen         = 0
 local _warmup_active      = false
+local _warmup_request     = nil
+local _warmup_acquisition_depth = 0
 local _warmup_last_model  = nil
 local _warmup_resume_pending = false
 local _warmup_explicitly_stopped = false
@@ -116,6 +135,19 @@ local _warmup_resume_timer = nil
 local _warmup_resume_observers = {}
 local _warmup_client_recovery_token = nil
 local WARMUP_RESUME_COMMIT_DELAY_SEC = 0.05
+
+--- Captures daemon custody for a held model consent without starting a service.
+--- The predicate grants no readiness or signalling authority and never joins a
+--- successor occupying the same endpoint after native retirement.
+--- @return function current Exact original daemon generation and retained slots.
+function M.capture_service_owner()
+	local generation = _ollama_start_generation
+	local serve, ambiguous = _ollama_serve_task, _ollama_ambiguous_task
+	return function()
+		return generation == _ollama_start_generation
+			and serve == _ollama_serve_task and ambiguous == _ollama_ambiguous_task
+	end
+end
 
 --- Reads ScriptControl's exact public pause state and epoch without requiring it
 --- through the LLM dependency cycle.
@@ -181,7 +213,8 @@ end
 local function register_ollama_start_transaction(options, generation)
 	if options == nil then return true end
 	if type(options) ~= "table" or type(options.on_settled) ~= "function"
-		or type(options.is_authorized) ~= "function" then
+		or type(options.is_authorized) ~= "function"
+		or (options.on_acquired ~= nil and type(options.on_acquired) ~= "function") then
 		Logger.error(LOG, "ensure_running(): supervised options require on_settled and is_authorized callbacks.")
 		return false
 	end
@@ -193,6 +226,7 @@ local function register_ollama_start_transaction(options, generation)
 		generation = generation,
 		on_settled = options.on_settled,
 		is_authorized = options.is_authorized,
+		on_acquired = options.on_acquired,
 	}
 	return true
 end
@@ -399,6 +433,7 @@ end
 --- Returns true when the backend has confirmed it can answer inference requests.
 --- @return boolean
 function M.is_ready()
+	if _is_ready == true and _ready_origin ~= M.get_base_url() then M.reset_ready() end
 	if has_ollama_resume_intent() and _warmup_client_recovery_token == nil then
 		local paused, epoch, state_ok = read_script_pause_state()
 		if state_ok == true and paused ~= true then
@@ -414,12 +449,13 @@ end
 
 --- Clears the readiness flag so the NEXT warmup must re-confirm the backend.
 --- _is_ready is only ever set true by a 200 warmup; nothing else cleared it, so a
---- backend round-trip (MLX kills `ollama serve`, then back to Ollama) or a model
+--- backend round-trip (MLX retires the owned `ollama serve`, then back to Ollama) or a model
 --- switch left it stale-true. The warmup retry chain then self-terminates on the
 --- stale flag and perform_check dispatches to a dead/cold server. Mirrors the MLX
 --- reset_endpoints() invariant: a fresh server/model deserves a fresh verdict (F-M8).
 function M.reset_ready()
 	_is_ready = false
+	_ready_origin = nil
 	-- Clearing the flag alone is racy: an Ollama warmup POST triggers the actual
 	-- model load and can stay in flight for tens of seconds, so a response issued
 	-- against the PREVIOUS server can still land after this reset and flip
@@ -455,8 +491,7 @@ end
 --- A published daemon deliberately remains outside pause ownership.
 --- @return boolean pending
 has_pending_ollama_start_owner = function()
-	return _ollama_kill_task ~= nil
-		or _ollama_launch_timer ~= nil
+	return _ollama_launch_timer ~= nil
 		or _ollama_ambiguous_task ~= nil
 		or (_ollama_serve_task ~= nil and _ollama_started ~= true)
 end
@@ -535,11 +570,6 @@ end
 --- @return boolean settled
 local function settle_ollama_start_cleanup()
 	if _ollama_start_acquisition_depth > 0 then return false end
-	local kill_task = _ollama_kill_task
-	local kill_settled = settle_ollama_start_task(
-		"Ollama stale-process task", kill_task,
-		function() return _ollama_kill_task == kill_task end,
-		function() if _ollama_kill_task == kill_task then _ollama_kill_task = nil end end)
 	local timer_settled = settle_ollama_launch_timer()
 	local serve_settled = true
 	if _ollama_started ~= true then
@@ -554,7 +584,7 @@ local function settle_ollama_start_cleanup()
 		"Ollama ambiguous startup task", ambiguous_task,
 		function() return _ollama_ambiguous_task == ambiguous_task end,
 		function() if _ollama_ambiguous_task == ambiguous_task then _ollama_ambiguous_task = nil end end)
-	local settled = kill_settled and timer_settled and serve_settled
+	local settled = timer_settled and serve_settled
 		and ambiguous_settled and not has_pending_ollama_start_owner()
 	if settled then _ollama_start_cleanup_pending = false end
 	return settled
@@ -588,11 +618,23 @@ local function quiesce_warmup()
 	_warmup_gen = _warmup_gen + 1
 	_warmup_active = false
 	local timer_settled = cancel_warmup_resume_timer() == true
-	local ok, result = xpcall(function() return _warmup_client.cancel() end, debug.traceback)
+	local detail
+	local ok, result = xpcall(function()
+		local settled, cancel_detail = _warmup_client.cancel()
+		detail = cancel_detail
+		return settled
+	end, debug.traceback)
 	local client_settled = ok == true and result == true
 	if client_settled then _warmup_client_recovery_token = nil end
+	-- hs.http.asyncPost returns no task: a POST in flight is revoked logically and
+	-- its answer is fenced by _warmup_gen, so the stop has happened (as for MLX).
+	if ok == true and result == false and detail == "pending" then client_settled = true end
 	if not client_settled then
 		Logger.error(LOG, "stop_warmup() could not retire its HTTP owner: %s.", tostring(result))
+	end
+	if _warmup_acquisition_depth > 0 then
+		Logger.error(LOG, "stop_warmup() is waiting for the original POST acquisition to unwind.")
+		return false
 	end
 	if not timer_settled or not client_settled then return false end
 	Logger.debug(LOG, "stop_warmup() — gen bumped to %d, in-flight warmup invalidated.", _warmup_gen)
@@ -603,6 +645,68 @@ function M.stop_warmup()
 	_warmup_resume_pending = false
 	_warmup_explicitly_stopped = true
 	return quiesce_warmup()
+end
+
+--- Retires only this module's original foreground daemon, including a published
+--- READY owner. External servers never acquire a handle here. EOF is a request;
+--- the exact RETIRED receipt and native completion remain required for release.
+--- @return boolean settled True only when the retained daemon owners are joined.
+function M.stop_owned_server()
+	if _ollama_server_retirement_depth > 0 then return false end
+	_ollama_server_retirement_depth = _ollama_server_retirement_depth + 1
+	local ok, settled = xpcall(function()
+		local generation = _ollama_start_generation
+		_ollama_start_generation = generation + 1
+		_ollama_start_resume_pending = false
+		_ollama_starting = false
+		_ollama_started = false
+		_ollama_start_cleanup_pending = true
+		M.reset_ready()
+		settle_ollama_start_transaction(generation, false, "owned server retirement")
+		local warmup_settled = M.stop_warmup()
+		local daemon_settled = settle_ollama_start_cleanup()
+		return warmup_settled == true and daemon_settled == true
+	end, debug.traceback)
+	_ollama_server_retirement_depth = _ollama_server_retirement_depth - 1
+	if not ok then Logger.error(LOG, "Owned Ollama server retirement failed: %s.", tostring(settled)) end
+	return ok == true and settled == true
+end
+
+--- Retires the owned daemon for the root reload/quit teardown. Where
+--- `stop_owned_server` only refuses while the daemon exits after its stdin EOF,
+--- this awaits the exact native retirement of the retained task, then retries.
+--- @param on_settled function Called once with (settled, detail) when pending.
+--- @return boolean accepted
+--- @return string state "settled" when already retired, else "pending".
+function M.retire_owned_server(on_settled)
+	if type(on_settled) ~= "function" then
+		Logger.error(LOG, "Owned Ollama retirement refused: settlement callback is not callable.")
+		return false, "refused"
+	end
+	if M.stop_owned_server() == true then return true, "settled" end
+	local task = _ollama_serve_task or _ollama_ambiguous_task
+	if type(task) ~= "table" or type(task.onSettled) ~= "function" then
+		Logger.error(LOG, "Owned Ollama retirement refused: no retained daemon task can report its exit.")
+		return false, "refused"
+	end
+	local fired = false
+	local registered_ok, registered = pcall(task.onSettled, function()
+		if fired then return end
+		fired = true
+		-- The task's own completion observer has released its slot by now
+		local retried_ok, retired = pcall(M.stop_owned_server)
+		local settled = retried_ok and retired == true
+		if not settled then
+			Logger.error(LOG, "Owned Ollama daemon exited but its retirement did not settle: %s.",
+				tostring(retired))
+		end
+		on_settled(settled, settled and "owned Ollama daemon retired" or "owned Ollama retirement refused")
+	end)
+	if not registered_ok or registered ~= true then
+		Logger.error(LOG, "Owned Ollama retirement refused: the daemon task refused its exit observer.")
+		return false, "refused"
+	end
+	return true, "pending"
 end
 
 --- Quiesces one in-flight warmup while retaining its exact pre-pause intent.
@@ -630,9 +734,6 @@ function M.pause_warmup()
 	return daemon_settled and warmup_settled
 end
 
--- Delay before launching Ollama after killing a stale instance (seconds)
-local OLLAMA_KILL_SETTLE_SEC = 0.1
-
 -- curl --max-time ceiling for streaming requests (seconds).
 -- STREAM_TMPFILE_CLEANUP_SEC is the safety-net delay before removing the
 -- payload temp file; it must be strictly greater than STREAM_MAX_TIME_SEC so
@@ -646,6 +747,7 @@ local STREAM_TMPFILE_CLEANUP_SEC = 70
 -- @return boolean accepted True when a daemon is running or one launch attempt
 -- was committed to native async ownership.
 local function ensure_ollama_running(options)
+	if _ollama_server_retirement_depth > 0 then return false end
 	if _ollama_ambiguous_task ~= nil then _ollama_start_cleanup_pending = true end
 	if _ollama_start_cleanup_pending == true
 		and settle_ollama_start_cleanup() ~= true then
@@ -698,8 +800,7 @@ local function ensure_ollama_running(options)
 		if my_generation ~= _ollama_start_generation then
 			settle_ollama_start_transaction(my_generation, false, "startup superseded")
 			if ambiguous_task ~= nil
-				and (_ollama_kill_task == ambiguous_task
-					or _ollama_serve_task == ambiguous_task) then
+				and _ollama_serve_task == ambiguous_task then
 				_ollama_start_cleanup_pending = true
 			end
 			if _ollama_start_acquisition_depth == 0
@@ -710,7 +811,6 @@ local function ensure_ollama_running(options)
 			return false
 		end
 		if ambiguous_task then
-			if _ollama_kill_task == ambiguous_task then _ollama_kill_task = nil end
 			if _ollama_serve_task == ambiguous_task then _ollama_serve_task = nil end
 			_ollama_ambiguous_task = ambiguous_task
 		end
@@ -721,6 +821,8 @@ local function ensure_ollama_running(options)
 				Logger.error(LOG, "Ollama %s left unsettled native ownership; retry fenced.",
 					tostring(stage))
 			end
+		else
+			_ollama_start_cleanup_pending = false
 		end
 		if stage == "runtime authority superseded" then
 			Logger.debug(LOG, "Ollama startup stopped at a superseded runtime boundary.")
@@ -732,231 +834,119 @@ local function ensure_ollama_running(options)
 		return false
 	end
 
-	-- Locals are declared above the callbacks that capture them. Moving either
-	-- declaration below its closure silently binds a nil global in Lua.
-	local kill_handle
-	local kill_completed = false
-	local function on_kill_done()
-		local callback_ok, callback_err = xpcall(function()
-			kill_completed = true
-			local claimed = false
-			if _ollama_kill_task == kill_handle then
-				_ollama_kill_task = nil
-				claimed = true
-			end
-			if _ollama_ambiguous_task == kill_handle then
-				_ollama_ambiguous_task = nil
-				claimed = true
-			end
-			if not claimed then return end
-			if my_generation ~= _ollama_start_generation or not _ollama_starting
-				or ollama_start_authorized(my_generation) ~= true then
-				if my_generation == _ollama_start_generation and _ollama_starting then
-					fail_start("runtime authority superseded", false)
-				end
-				recover_ollama_start_after_settlement()
-				return
-			end
-
-			local launch_handle
-			local launch_callback_ran = false
-			local launch_observer_registered = false
-			local function activate_server()
-				local launch_ok, launch_err = xpcall(function()
-					if my_generation ~= _ollama_start_generation or not _ollama_starting
-						or ollama_start_authorized(my_generation) ~= true then
-						fail_start("runtime authority superseded", false)
-						return
-					end
-
-					-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
-					-- [OLLAMA-SERVER] prefix. The shared builder captures only the stable
-					-- directory; its shell loop derives the dated filename for every line.
-					local ollama_bin, binary_err, source_kind = OllamaBinary.resolve()
-					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
-					if not ollama_bin then
-						fail_start("server executable resolution", binary_err)
-						return
-					end
-					if ollama_start_authorized(my_generation) ~= true then
-						fail_start("runtime authority superseded", false)
-						return
-					end
-					local launch_cmd, command_err = OllamaServerCommand.build(
-						ollama_bin, Logger.today_log_path(), resolve_ollama_port(), source_kind)
-					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
-					if not launch_cmd then
-						fail_start("server command creation", command_err)
-						return
-					end
-
-					local serve_handle
-					local serve_completed = false
-					local function on_serve_done()
-						local done_ok, done_err = xpcall(function()
-							serve_completed = true
-							local claimed = false
-							if _ollama_serve_task == serve_handle then
-								_ollama_serve_task = nil
-								claimed = true
-							end
-							if _ollama_ambiguous_task == serve_handle then
-								_ollama_ambiguous_task = nil
-								claimed = true
-							end
-							if not claimed then return end
-							if my_generation ~= _ollama_start_generation then
-								recover_ollama_start_after_settlement()
-								return
-							end
-							if _ollama_started ~= true or _ollama_starting == true then
-								fail_start("server task exited before publication", false)
-								return
-							end
-							_ollama_started = false
-							_ollama_starting = false
-							M.reset_ready()
-							_warmup_active = false
-							if delegate_daemon_exit_recovery() == true then
-								Logger.warn(LOG,
-									"Ollama server task exited; readiness invalidated and recovery delegated.")
-							else
-								Logger.error(LOG,
-									"Ollama server task exited; readiness invalidated but recovery remains pending.")
-							end
-						end, debug.traceback)
-						if not done_ok then Logger.error(LOG, "Ollama server completion callback raised: %s", tostring(done_err)) end
-					end
-
-					_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
-					local spawn_ok, spawned = xpcall(function()
-						return ShellRunner.spawn("/bin/sh", { "-c", launch_cmd }, on_serve_done)
-					end, debug.traceback)
-					_ollama_start_acquisition_depth = _ollama_start_acquisition_depth - 1
-					if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
-						fail_start("server task creation", spawned)
-						return
-					end
-					serve_handle = spawned
-					_ollama_serve_task = serve_handle
-					if my_generation ~= _ollama_start_generation or not _ollama_starting
-						or _ollama_start_pause_fenced == true
-						or ollama_start_authorized(my_generation) ~= true then
-						fail_start("server task creation superseded", spawned, serve_handle)
-						return
-					end
-					_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
-					local start_ok, start_result = xpcall(function() return serve_handle.start() end, debug.traceback)
-					_ollama_start_acquisition_depth = _ollama_start_acquisition_depth - 1
-					if not start_ok or start_result ~= true then
-						local ambiguous = not serve_completed and serve_handle or nil
-						fail_start("server task start", start_result, ambiguous)
-						return
-					end
-					if not serve_completed and (my_generation ~= _ollama_start_generation
-						or not _ollama_starting or _ollama_start_pause_fenced == true
-						or ollama_start_authorized(my_generation) ~= true) then
-						fail_start("server task start superseded", start_result, serve_handle)
-						return
-					end
-					if not serve_completed and my_generation == _ollama_start_generation then
-						_ollama_started = true
-						_ollama_starting = false
-						settle_ollama_start_transaction(my_generation, true, "daemon published")
-						Logger.debug(LOG, "Ollama server launched asynchronously.")
-					end
-				end, debug.traceback)
-				if not launch_ok then fail_start("server launch callback", launch_err) end
-			end
-
-			local function continue_after_launch_settlement()
-				if _ollama_launch_timer ~= launch_handle then return end
-				_ollama_launch_timer = nil
-				if my_generation ~= _ollama_start_generation or not _ollama_starting then
-					recover_ollama_start_after_settlement()
-					return
-				end
-				activate_server()
-			end
-
-			local function launch_server()
-				launch_callback_ran = true
-				if _ollama_launch_timer ~= launch_handle then return end
-				if type(launch_handle) == "table" and launch_handle.timer ~= nil then
-					if launch_observer_registered then return end
-					launch_observer_registered = true
-					local ok_observer, registered_or_err = xpcall(function()
-						return TimerScheduler.onSettled(launch_handle, function()
-							if not launch_observer_registered then return end
-							launch_observer_registered = false
-							continue_after_launch_settlement()
-						end)
-					end, debug.traceback)
-					if not ok_observer or registered_or_err ~= true then
-						launch_observer_registered = false
-						Logger.error(LOG, "Ollama launch timer settlement observer failed: %s.",
-							tostring(registered_or_err))
-					end
-					return
-				end
-				continue_after_launch_settlement()
-			end
-
-			_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
-			local schedule_ok, scheduled, settle_committed = xpcall(function()
-				return TimerScheduler.after(OLLAMA_KILL_SETTLE_SEC, launch_server)
-			end, debug.traceback)
-			_ollama_start_acquisition_depth = _ollama_start_acquisition_depth - 1
-			launch_handle = scheduled
-			if type(launch_handle) == "table" and launch_handle.timer ~= nil then
-				_ollama_launch_timer = launch_handle
-			end
-			local launch_current = my_generation == _ollama_start_generation
-				and _ollama_starting == true
-				and _ollama_start_pause_fenced ~= true
-				and ollama_start_authorized(my_generation) == true
-			if not schedule_ok or settle_committed ~= true
-				or type(launch_handle) ~= "table" or launch_handle.timer == nil
-				or launch_callback_ran or launch_current ~= true then
-				if type(launch_handle) == "table" and launch_handle.timer ~= nil then
-					observe_ollama_launch_cleanup(launch_handle)
-				end
-				fail_start("settle timer", scheduled)
-				return
-			end
-		end, debug.traceback)
-		if not callback_ok then fail_start("kill completion callback", callback_err) end
+	-- Classification precedes acquisition. An installed stock daemon remains a
+	-- client endpoint; its source label never grants stop or launch authority.
+	local resolved_ok, ollama_bin, binary_err, source_kind = xpcall(OllamaBinary.resolve, debug.traceback)
+	if not resolved_ok or not ollama_bin then
+		return fail_start("server executable resolution", binary_err)
 	end
+	if RuntimeChoice.classify(source_kind) ~= "native" then
+		return fail_start(Errors.OLLAMA_EXTERNAL_RUNTIME_MANUAL, false)
+	end
+	if my_generation ~= _ollama_start_generation or not _ollama_starting
+		or ollama_start_authorized(my_generation) ~= true then
+		return fail_start("runtime authority superseded", false)
+	end
+	local nonce_ok, uuid = pcall(function() return hs.host.uuid() end)
+	if not nonce_ok or type(uuid) ~= "string"
+		or not uuid:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then
+		return fail_start("caller nonce unavailable", false)
+	end
+	local nonce = uuid:gsub("%-", ""):lower()
+	local launch_cmd, command_err = OllamaServerCommand.build(
+		ollama_bin, Logger.today_log_path(), resolve_ollama_port(), source_kind, nonce)
+	if not launch_cmd then return fail_start("server command creation", command_err) end
 
+	local serve_handle
+	local function claims_exact()
+		return serve_handle ~= nil and (_ollama_serve_task == serve_handle
+			or _ollama_ambiguous_task == serve_handle)
+	end
+	local function joined_completion(handle)
+		-- A stale business generation still retires its original exact custody.
+		if handle ~= serve_handle or not claims_exact() or handle.isSettled() ~= true then return end
+		if _ollama_serve_task == handle then _ollama_serve_task = nil end
+		if _ollama_ambiguous_task == handle then _ollama_ambiguous_task = nil end
+		if my_generation ~= _ollama_start_generation then
+			recover_ollama_start_after_settlement()
+			return
+		end
+		if _ollama_started ~= true or _ollama_starting == true then
+			fail_start(Errors.OLLAMA_SERVER_EXITED_BEFORE_PUBLICATION, false)
+			return
+		end
+		_ollama_started = false
+		_ollama_starting = false
+		M.reset_ready()
+		_warmup_active = false
+		delegate_daemon_exit_recovery()
+	end
+	local function ready_observation(handle)
+		if handle ~= serve_handle or _ollama_serve_task ~= handle then return end
+		if my_generation ~= _ollama_start_generation or not _ollama_starting
+			or _ollama_start_pause_fenced == true then
+			fail_start("runtime authority superseded", false, handle)
+			return
+		end
+		local transaction = _ollama_start_transaction
+		local authorized = ollama_start_authorized(my_generation)
+		-- Authority can synchronously pause or retire this exact original owner.
+		-- Refence only local custody before publishing the READY observation.
+		if handle ~= serve_handle or _ollama_serve_task ~= handle then return end
+		if my_generation ~= _ollama_start_generation or not _ollama_starting
+			or _ollama_start_pause_fenced == true or _ollama_start_transaction ~= transaction
+			or authorized ~= true then
+			fail_start("runtime authority superseded", false, handle)
+			return
+		end
+		_ollama_started = true
+		_ollama_starting = false
+		settle_ollama_start_transaction(my_generation, true, "daemon published")
+	end
 	_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
-	local spawn_ok, spawned = xpcall(function()
-		return ShellRunner.spawn("/bin/sh", {
-			"-c", "pkill -f '[o]llama serve' 2>/dev/null || true"
-		}, on_kill_done)
+	local prepare_ok, prepared, prepare_err, partial = xpcall(function()
+		return ManagedDaemon.prepare(launch_cmd, nonce, {
+			on_ready = ready_observation,
+			on_done = joined_completion,
+			on_debt = function(handle)
+				if handle == serve_handle and claims_exact() then
+					fail_start("native lifecycle receipt unsettled", false, handle)
+				end
+			end,
+		})
 	end, debug.traceback)
 	_ollama_start_acquisition_depth = _ollama_start_acquisition_depth - 1
-	if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
-		return fail_start("stale-process task creation", spawned)
+	if not prepare_ok or type(prepared) ~= "table" then
+		if type(partial) == "table" then _ollama_ambiguous_task = partial end
+		return fail_start("server task preparation", prepare_err or prepared)
 	end
-	kill_handle = spawned
-	_ollama_kill_task = kill_handle
+	serve_handle = prepared
+	_ollama_serve_task = serve_handle
+	serve_handle.onSettled(function() joined_completion(serve_handle) end)
+	local transaction = _ollama_start_transaction
+	if transaction and transaction.generation == my_generation and transaction.on_acquired then
+		local acquired_ok, accepted = pcall(transaction.on_acquired, serve_handle)
+		if not acquired_ok or accepted ~= true then
+			return fail_start("server task acquisition refused", false, serve_handle)
+		end
+	end
 	if my_generation ~= _ollama_start_generation or not _ollama_starting
-		or _ollama_start_pause_fenced == true
-		or ollama_start_authorized(my_generation) ~= true then
-		return fail_start("stale-process task creation superseded", spawned, kill_handle)
+		or _ollama_start_pause_fenced == true or ollama_start_authorized(my_generation) ~= true then
+		return fail_start("server task creation superseded", false, serve_handle)
 	end
 	_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
-	local start_ok, start_result = xpcall(function() return kill_handle.start() end, debug.traceback)
+	local start_ok, started = xpcall(serve_handle.start, debug.traceback)
 	_ollama_start_acquisition_depth = _ollama_start_acquisition_depth - 1
-	if not start_ok or start_result ~= true then
-		local ambiguous = not kill_completed and kill_handle or nil
-		return fail_start("stale-process task start", start_result, ambiguous)
+	if not start_ok or started ~= true then
+		return fail_start("server task start", started,
+			serve_handle.isSettled() ~= true and serve_handle or nil)
 	end
-	if not kill_completed and (my_generation ~= _ollama_start_generation
-		or not _ollama_starting or _ollama_start_pause_fenced == true
-		or ollama_start_authorized(my_generation) ~= true) then
-		return fail_start("stale-process task start superseded", start_result, kill_handle)
+	if claims_exact() and (my_generation ~= _ollama_start_generation
+		or _ollama_start_pause_fenced == true or ollama_start_authorized(my_generation) ~= true) then
+		return fail_start("server task start superseded", false, serve_handle)
 	end
+	-- Acceptance retains the foreground owner. Only the fixed READY callback
+	-- above publishes business readiness; the start return cannot do so.
 	return true
 end
 
@@ -964,9 +954,32 @@ end
 --- An acknowledged published daemon is stable ownership, not cleanup debt.
 --- @return boolean idle
 function M.startup_idle()
-	return _ollama_start_acquisition_depth == 0 and _ollama_starting ~= true
+	return _ollama_start_acquisition_depth == 0 and _ollama_server_retirement_depth == 0
+		and _ollama_starting ~= true
 		and _ollama_start_transaction == nil and _ollama_start_cleanup_pending ~= true
 		and _ollama_start_resume_pending ~= true and not has_pending_ollama_start_owner()
+end
+
+--- Reports migration admission without cancelling any current operation.
+--- Every original HTTP, stream, resume and daemon owner must already be idle.
+--- @return boolean idle
+function M.migration_idle()
+	if _warmup_acquisition_depth > 0 or M.startup_idle() ~= true or _ollama_serve_task ~= nil or _ollama_started == true
+		or _active_stream_task ~= nil or _warmup_active == true
+		or _warmup_resume_pending == true or _warmup_resume_timer ~= nil
+		or next(_warmup_resume_observers) ~= nil or _warmup_client_recovery_token ~= nil then return false end
+	for _, client in ipairs({ _infer_client, _check_client, _warmup_client, _vision_client, _listing_client }) do
+		local getter = client.isSettled
+		if type(getter) ~= "function" then return false end
+		local ok, settled = pcall(getter)
+		if not ok or settled ~= true then return false end
+	end
+	-- An external predicate can reenter a caller. Recheck local retained slots
+	-- after observing all original client settlement ports.
+	return _warmup_acquisition_depth == 0 and M.startup_idle() == true and _ollama_serve_task == nil and _ollama_started ~= true
+		and _active_stream_task == nil and _warmup_active ~= true
+		and _warmup_resume_pending ~= true and _warmup_resume_timer == nil
+		and next(_warmup_resume_observers) == nil and _warmup_client_recovery_token == nil
 end
 
 --- Ensures the Ollama daemon is running.
@@ -996,90 +1009,156 @@ function M.warmup(model_name, on_acquired)
 		acquisition_reported = true
 		if type(on_acquired) ~= "function" then return end
 		local ok, err = xpcall(function() on_acquired(committed == true) end, debug.traceback)
-		if not ok then
-			Logger.error(LOG, "Ollama warmup acquisition callback raised: %s.", tostring(err))
-		end
+		if not ok then Logger.error(LOG, "Ollama warmup acquisition callback raised: %s.", tostring(err)) end
 	end
 	if type(model_name) ~= "string" or model_name == "" then
 		report_acquisition(false)
-		return false
+		return false, false
 	end
+	if _warmup_acquisition_depth > 0 then
+		Logger.error(LOG, "Warmup acquisition refused while the original transaction remains on-stack.")
+		report_acquisition(false)
+		return false, false
+	end
+	local entry_generation, previous_request = _warmup_gen, _warmup_request
+	local service_current = M.capture_service_owner()
+	local origin = M.get_base_url()
+	local function entry_current()
+		return entry_generation == _warmup_gen and previous_request == _warmup_request
+			and service_current()
+	end
+	if not entry_current() then report_acquisition(false); return false, false end
+	local function entry_origin_current()
+		if not entry_current() then return false end
+		local current_origin = M.get_base_url()
+		return entry_current() and current_origin == origin
+	end
+	-- Reuse is an ordinary pending observation, never a fresh resume acquisition.
+	if type(on_acquired) ~= "function" and type(previous_request) == "table"
+		and previous_request.committed == true and _warmup_active == true
+		and previous_request.model == model_name and previous_request.origin == origin
+		and previous_request.generation == entry_generation and previous_request.service_current()
+		and _warmup_client.isActive() == true then
+		local observed_origin = M.get_base_url()
+		if not entry_current() then report_acquisition(false); return false, false end
+		if observed_origin == origin and previous_request.service_current() then
+			Logger.debug(LOG, "Warmup retry retains the pending request for '%s'.", model_name)
+			if not entry_origin_current() or _warmup_active ~= true
+				or _warmup_client.isActive() ~= true then return false, false end
+			return true, false
+		end
+	end
+	if not entry_current() then report_acquisition(false); return false, false end
 	_warmup_explicitly_stopped = false
 	_warmup_last_model = model_name
 	Logger.debug(LOG, "Warming up model '%s'…", model_name)
 	local encoded, enc_err = JsonCodec.encode({
-		model      = model_name,
-		messages   = { { role = "user", content = " " } },
-		stream     = false,
+		model = model_name,
+		messages = { { role = "user", content = " " } },
+		stream = false,
+		-- Its one token must not open a reasoning block
+		think = ollama_think(model_name),
 		keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
-		options    = { num_predict = 1, temperature = 0 },
+		options = { num_predict = 1, temperature = 0 },
 	})
 	if not encoded then
 		report_acquisition(false)
 		Logger.error(LOG, "warmup: encode failed — %s", tostring(enc_err))
-		return false
+		return false, false
 	end
-	-- Snapshot the warmup generation: if reset_ready() bumps it while this POST is
-	-- in flight, the response describes a now-stale server/model and its callback
-	-- must not touch _is_ready (see reset_ready for the self-termination scenario).
-	local my_warmup_gen = _warmup_gen
+	local observed_origin = M.get_base_url()
+	if not entry_current() or observed_origin ~= origin then report_acquisition(false); return false, false end
+	local my_warmup_gen = entry_generation
+	local request = { model = model_name, origin = origin, generation = my_warmup_gen,
+		service_current = service_current, committed = false }
+	_warmup_request = request
 	_warmup_active = true
-	local dispatch_committed = false
-	local pending_response = nil
-	local dispatch_ok, accepted_or_err = xpcall(function()
-		return _warmup_client.post(
-		M.get_base_url() .. "/api/chat",
-		{ ["Content-Type"] = "application/json" },
-		encoded,
-		function(r)
-			local function apply_response()
-			if my_warmup_gen ~= _warmup_gen then
-				Logger.debug(LOG, "Discarding stale Ollama warmup response (gen %d != %d) — it describes a server/model that is no longer current.",
-					my_warmup_gen, _warmup_gen)
-				return
-			end
+	_warmup_acquisition_depth = _warmup_acquisition_depth + 1
+	local function request_owner_current()
+		return _warmup_request == request and my_warmup_gen == _warmup_gen and service_current()
+	end
+	local function request_current()
+		if not request_owner_current() then return false end
+		local current_origin = M.get_base_url()
+		return request_owner_current() and current_origin == origin
+	end
+	local function retire_request()
+		if _warmup_request ~= request then return false end
+		local settled = _warmup_client.cancel()
+		if settled == true and _warmup_request == request then
 			_warmup_active = false
-			if r.status == 200 then
-				local became_ready = (_is_ready ~= true)
-				_is_ready = true
-				Logger.info(LOG, "Model '%s' warmed up — GPU cache ready.", model_name)
-				if became_ready then
-					Notifications.notify(i18n.get("llm.server_ready_title"), i18n.get("llm.server_ollama_ready_body"), "success")
-				end
-			else
-				_is_ready = false
-				Logger.debug(LOG, "Warmup request returned %s — model may not be loaded yet.", tostring(r.status))
-			end
-			end
-			if dispatch_committed ~= true then
-				pending_response = apply_response
-				return
-			end
-			apply_response()
-		end)
-	end, debug.traceback)
-	if not dispatch_ok or accepted_or_err ~= true then
-		pending_response = nil
-		_warmup_active = false
-		Logger.error(LOG, "Ollama warmup POST acquisition failed: %s.",
-			tostring(accepted_or_err))
-		report_acquisition(false)
+			_warmup_request = nil
+			return true
+		end
+		Logger.error(LOG, "Withdrawn warmup retains its original HTTP cleanup debt.")
 		return false
 	end
-	dispatch_committed = true
-	if pending_response ~= nil then
-		local apply_response = pending_response
-		pending_response = nil
-		apply_response()
+	local acquisition_ok, accepted_or_err = xpcall(function()
+		local dispatch_committed = false
+		local pending_response = nil
+		local posted = _warmup_client.post(
+			origin .. "/api/chat",
+			{ ["Content-Type"] = "application/json" },
+			encoded,
+			function(response)
+				local function apply_response()
+					if not request_current() then
+						Logger.debug(LOG, "Discarding withdrawn Ollama warmup response.")
+						return
+					end
+					local response_origin = M.get_base_url()
+					if not request_current() then return end
+					_warmup_active = false
+					if origin ~= response_origin then
+						Logger.debug(LOG, "Discarding Ollama warmup response from a superseded endpoint.")
+						return
+					end
+					if response.status == 200 then
+						local became_ready = _is_ready ~= true
+						_is_ready = true
+						_ready_origin = origin
+						Logger.info(LOG, "Model '%s' warmed up — GPU cache ready.", model_name)
+						if became_ready and request_current() then
+							Notifications.notify(i18n.get("llm.server_ready_title"), i18n.get("llm.server_ollama_ready_body"), "success")
+						end
+					else
+						_is_ready = false
+						Logger.debug(LOG, "Warmup request returned %s — model may not be loaded yet.", tostring(response.status))
+					end
+				end
+				if dispatch_committed ~= true then pending_response = apply_response; return end
+				apply_response()
+			end)
+		if posted ~= true then
+			Logger.error(LOG, "Ollama warmup POST acquisition failed: %s.", tostring(posted))
+			return false
+		end
+		if not request_current() then return false end
+		request.committed = true
+		dispatch_committed = true
+		if pending_response ~= nil then pending_response() end
+		-- Synchronous completion can notify observers which revoke this request.
+		return request_current()
+	end, debug.traceback)
+	local accepted = acquisition_ok == true and accepted_or_err == true
+	local cleanup_ok, cleanup_error = true, nil
+	if not accepted then
+		cleanup_ok, cleanup_error = xpcall(retire_request, debug.traceback)
 	end
-	report_acquisition(true)
-	return true
+	_warmup_acquisition_depth = _warmup_acquisition_depth - 1
+	if not acquisition_ok then Logger.error(LOG, "Ollama warmup acquisition failed: %s.", tostring(accepted_or_err)) end
+	if not cleanup_ok then Logger.error(LOG, "Ollama warmup rollback failed: %s.", tostring(cleanup_error)) end
+	-- Recovery observers may synchronously acquire another POST only after the
+	-- old frame and its exact rollback have released their acquisition fence.
+	report_acquisition(accepted)
+	return accepted, accepted
 end
+
 
 --- Restarts only the exact warmup that pause_warmup() invalidated.
 --- @return boolean committed
 function M.resume_warmup()
-	if _ollama_start_acquisition_depth > 0 then return false end
+	if _ollama_start_acquisition_depth > 0 or _warmup_acquisition_depth > 0 then return false end
 	local timer_settled = cancel_warmup_resume_timer() == true
 	local ok_cancel, cancel_result = xpcall(function()
 		return _warmup_client.cancel()
@@ -1102,6 +1181,14 @@ function M.resume_warmup()
 	return begin_warmup_resume_activation(epoch, true)
 end
 
+--- Returns true only when the original ShellRunner handle has physically settled.
+--- @param task table Exact streaming task handle.
+--- @return boolean settled
+local function stream_task_is_settled(task)
+	local ok, settled = xpcall(function() return task.isSettled() end, debug.traceback)
+	return ok == true and settled == true
+end
+
 --- Terminates the in-flight streaming task if one is active.
 --- Called when a newer request supersedes the current one.
 function M.cancel_streaming()
@@ -1109,9 +1196,13 @@ function M.cancel_streaming()
 	_stream_generation = _stream_generation + 1
 	if _active_stream_task then
 		local task = _active_stream_task
-		local ok, result = xpcall(function() return task.terminate() end, debug.traceback)
-		if not ok or result ~= true then
-			Logger.error(LOG, "Active Ollama stream cancellation failed; retained for retry: %s", tostring(result))
+		local ok, result, state = xpcall(function() return task.terminate() end, debug.traceback)
+		-- An exact completion may revoke the slot inside terminate(), even when
+		-- the native call subsequently throws. An accepted signal alone cannot.
+		if _active_stream_task ~= task then return _active_stream_task == nil end
+		if not ok or result ~= true or state ~= "settled" or not stream_task_is_settled(task) then
+			Logger.error(LOG, "Active Ollama stream cancellation remains unsettled; retained for retry: %s",
+				tostring(state or result))
 			return false
 		end
 		_active_stream_task = nil
@@ -1195,6 +1286,10 @@ local MAX_LOGGED_SERVER_ERROR = 300
 -- owners cannot publish an older inventory over a newer or forgotten receipt.
 local _listed_models = nil
 local _model_listing_epoch = 0
+-- Consecutive failed model-list reads of the current outage.
+local _listing_failures = 0
+-- Chat and vision share one HTTP owner; an inventory refresh has a different one.
+local _prebuilt_request_epoch = 0
 
 --- Normalizes a model name as the local server matches it: case-insensitive,
 --- with its implicit ":latest" tag written out.
@@ -1229,12 +1324,27 @@ end
 --- @return string|nil model nil for any other failure.
 local missing_model_of = LocalModelPolicy.missing_model
 
+--- Checks original daemon custody around an opaque endpoint read.
+--- @param origin string Captured endpoint.
+--- @param service_current function Exact original daemon predicate.
+--- @return boolean current
+local function source_current(origin, service_current)
+	if package.loaded["modules.llm.api_ollama"] ~= M or type(service_current) ~= "function" then return false end
+	local ok, current = pcall(service_current)
+	if not ok or current ~= true then return false end
+	local origin_ok, observed_origin = pcall(M.get_base_url)
+	local still_ok, still_current = pcall(service_current)
+	return origin_ok and observed_origin == origin and still_ok and still_current == true
+		and package.loaded["modules.llm.api_ollama"] == M
+end
+
 --- Whether this inventory still describes the canonical current endpoint.
 --- @param receipt table|nil Captured inventory acquisition.
 --- @return boolean
 local function listing_current(receipt)
 	return type(receipt) == "table" and receipt.epoch == _model_listing_epoch
-		and receipt.origin == M.get_base_url()
+		and source_current(receipt.origin, receipt.service_current)
+		and receipt.epoch == _model_listing_epoch
 end
 
 --- Asks the local server which models it holds and records the answer.
@@ -1242,9 +1352,14 @@ end
 ---        newer request supersedes the listing as it supersedes the request.
 --- @param on_done function Receives the listed names, or nil and a reason.
 --- @param origin string|nil Canonical endpoint captured by the originating request.
-local function list_models(client, on_done, origin)
+--- @param service_current function|nil Original request's retained daemon predicate.
+local function list_models(client, on_done, origin, service_current)
+	local original_service = service_current or M.capture_service_owner()
 	_model_listing_epoch = _model_listing_epoch + 1
-	local receipt = { origin = origin or M.get_base_url(), epoch = _model_listing_epoch }
+	local epoch = _model_listing_epoch
+	local receipt = { origin = origin or M.get_base_url(), epoch = epoch,
+		service_current = original_service }
+	if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
 	client.get(receipt.origin .. "/api/tags", {}, function(r)
 		Logger.pcall(LOG, function()
 			if not listing_current(receipt) then
@@ -1252,8 +1367,19 @@ local function list_models(client, on_done, origin)
 				return
 			end
 			if r.status ~= 200 then
-				Logger.error(LOG, "The local server's model list is unavailable: HTTP %s (%s).",
-					tostring(r.status), server_error_text(r))
+				local server_error = server_error_text(r)
+				if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
+				-- One line per outage: every poll while the daemon is down used to log
+				-- the same error (field log 2026-10-30 17:37: 20 lines in 38 s).
+				_listing_failures = _listing_failures + 1
+				if _listing_failures == 1 then
+					Logger.error(LOG, "The local server's model list is unavailable: HTTP %s (%s).",
+						tostring(r.status), server_error)
+				else
+					Logger.debug(LOG, "The local server's model list is still unavailable (read %d): HTTP %s.",
+						_listing_failures, tostring(r.status))
+				end
+				if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
 				on_done(nil, "http_" .. tostring(r.status or "unknown"))
 				return
 			end
@@ -1261,8 +1387,10 @@ local function list_models(client, on_done, origin)
 			-- an array. The shared lossless receipt keeps unknown inventories
 			-- separate from a proved empty installation list on every driver.
 			local names, reason = LocalModelPolicy.list_receipt({ ok = true, status = r.status, body = r.body })
+			if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
 			if names == nil then
 				Logger.error(LOG, "The local server's model list is unreadable (%d byte(s)).", #(r.body or ""))
+				if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
 				on_done(nil, reason)
 				return
 			end
@@ -1274,8 +1402,13 @@ local function list_models(client, on_done, origin)
 			end
 			receipt.models = names
 			_listed_models = receipt
+			if _listing_failures > 0 then
+				Logger.info(LOG, "The local server's model list is available again after %d failed read(s).",
+					_listing_failures)
+				_listing_failures = 0
+			end
 			Logger.debug(LOG, "The local server returned a readable model list.")
-			if not listing_current(receipt) then
+			if _listed_models ~= receipt or not listing_current(receipt) or _listed_models ~= receipt then
 				on_done(nil, "model_list_unavailable")
 				return
 			end
@@ -1288,9 +1421,10 @@ end
 --- @param model string The model name.
 --- @return boolean|nil installed nil while no listing succeeded.
 function M.local_model_installed(model)
+	local receipt = _listed_models
 	local name = normalize_model_name(model)
-	if name == nil or not listing_current(_listed_models) then return nil end
-	return _listed_models.models[name] == true
+	if name == nil or not listing_current(receipt) or _listed_models ~= receipt then return nil end
+	return receipt.models[name] == true
 end
 
 --- Lists the local server's models again, for the menus.
@@ -1359,7 +1493,6 @@ local function build_options(temperature, num_predict_tokens, model_name, is_bat
         stop        = (line_mode and not is_batch) and STOP_LINE or STOP_BATCH,
     }
     
-    opts.think = false
     opts.thinking_budget = 0
     
     return opts
@@ -1438,7 +1571,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         model      = tostring(model_name),
         messages   = messages,
         stream     = false,
-        think      = false,
+        think      = ollama_think(model_name),
         keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
         options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
     }
@@ -1464,8 +1597,8 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 
 				if not status or status ~= 200 then
 					Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%d: %s", model_name, req_id, status or -1, (body or ""):sub(1, 200))
-					if keylogger and type(keylogger.log_llm_failed) == "function" then
-						pcall(keylogger.log_llm_failed, full_text, nil, {
+					if keystats and type(keystats.log_llm_failed) == "function" then
+						pcall(keystats.log_llm_failed, full_text, nil, {
 							backend        = "ollama",
 							model          = tostring(model_name),
 							system_prompt  = system_prompt,
@@ -1534,8 +1667,8 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                     if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end return
                 end
                 Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s)", model_name, req_id, #results)
-                if keylogger and type(keylogger.log_llm) == "function" then
-                    pcall(keylogger.log_llm, full_text, results, nil, {
+                if keystats and type(keystats.log_llm) == "function" then
+                    pcall(keystats.log_llm, full_text, results, nil, {
                         backend       = "ollama",
                         model         = tostring(model_name),
                         system_prompt = system_prompt,
@@ -1579,6 +1712,15 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		return
 	end
 
+	if not _payload_cleanup then
+		_payload_cleanup = require("modules.llm.stream_payload_cleanup").new(Logger, LOG)
+	end
+	if _payload_cleanup.settle_pending() ~= true then
+		Logger.error(LOG, "Cannot start Ollama stream while earlier payload cleanup remains owned.")
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
 	_stream_generation = _stream_generation + 1
 	local my_generation = _stream_generation
 
@@ -1596,7 +1738,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		model      = tostring(model_name),
 		messages   = messages,
 		stream     = true,
-		think      = false,
+		think      = ollama_think(model_name),
 		keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
 		options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
 	}
@@ -1608,34 +1750,40 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		return
 	end
 
-	-- Write payload to a temp file so curl reads it directly — avoids the
-	-- stdin-pipe/streaming-callback conflict in hs.task.
-	-- os.tmpname() creates an empty file at the base path; remove it immediately
-	-- so only the suffixed path (which we own) exists in /tmp.
-	-- Declared BEFORE on_done so the closure captures the real `tmp_path` upvalue
-	-- (Lua lexical scoping: a local declared after the closure resolves to the
-	-- nil global, making os.remove(tmp_path) throw and abort the whole callback).
-	local _tmp_base = os.tmpname()
-	local tmp_path = _tmp_base .. "_ollama_stream.json"
-	os.remove(_tmp_base)
-	local fh = io.open(tmp_path, "w")
-	if not fh then
-		Logger.error(LOG, "Failed to open temp file '%s' for Ollama streaming payload.", tmp_path)
+	-- Retain the private file created by the allocator. Removing it and opening
+	-- a suffixed pathname would lose its owner-only mode under a normal umask.
+	-- Declare the path before callbacks so they capture this exact request file.
+	local tmp_path, allocation_error = FileSystem.create_secure_temp_file()
+	if type(tmp_path) ~= "string" or tmp_path == "" then
+		Logger.error(LOG, "Failed to allocate a private Ollama streaming payload: %s.", tostring(allocation_error))
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
-	fh:write(encoded)
-	fh:close()
+	local written, write_error = ApiCommon.write_stream_payload(tmp_path, encoded)
+	if not written then
+		Logger.error(LOG, "Failed to write temp file '%s' for Ollama streaming payload: %s.", tmp_path, tostring(write_error))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
+	local task = nil
+	local retire_payload = _payload_cleanup.capture(tmp_path, function() return task end)
 
 	local accumulated = ""
 	local line_buf    = ""
-	local task = nil
+	local stream_failed = false
+	local stream_done = false
 	local task_completed = false
 
 	-- Parse one complete NDJSON line and append its content to accumulated
 	local function process_line(line)
+		if stream_failed or line:match("^%s*$") then return end
 		local obj, _ = JsonCodec.decode(line)
-		if type(obj) ~= "table" then return end
+		-- HTTP EOF proves only transport delivery. Ollama closes generation
+		-- with a boolean done record; no further provider record belongs to it.
+		if stream_done or type(obj) ~= "table" or obj.error ~= nil
+			or type(obj.done) ~= "boolean" then stream_failed = true; return end
+		stream_done = obj.done
 		if type(obj.message) == "table" and type(obj.message.content) == "string" then
 			local token = obj.message.content
 			if token ~= "" then
@@ -1661,6 +1809,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		if not chunk or chunk == "" then return true end
 		-- Generation check: discard chunks from a stream that has been superseded
 		if my_generation ~= _stream_generation then return false end
+		if stream_failed then return true end
 		line_buf = line_buf .. chunk
 		flush_lines()
 		return true
@@ -1668,15 +1817,19 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 	-- Completion callback: fired when curl exits
 	local function on_done(exit_code, remaining, stderr_out)
+		if not stream_task_is_settled(task) then
+			Logger.error(LOG, "STREAM completion arrived before exact task settlement; ownership retained.")
+			return
+		end
 		task_completed = true
 		-- Relinquish the exact native capability before any parser/file/logger call
 		-- can raise. A callback throw must never leave a completed task published.
-		if my_generation == _stream_generation and _active_stream_task == task then
+		if _active_stream_task == task then
 			_active_stream_task = nil
 		end
 		-- Remove the payload temp file as soon as curl exits so it doesn't linger
 		-- for the full STREAM_TMPFILE_CLEANUP_SEC fallback window.
-		os.remove(tmp_path)
+		retire_payload()
 		-- Generation check: a newer request superseded this stream — don't touch
 		-- shared state (otherwise we untrack the active stream and leak its task)
 		if my_generation ~= _stream_generation then
@@ -1693,6 +1846,16 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()
+		end
+		if line_buf ~= "" then
+			local final_line = line_buf
+			line_buf = ""
+			process_line(final_line)
+		end
+		if stream_failed or not stream_done then
+			Logger.warn(LOG, "[%s] #%d STREAM provider or protocol failure — discarding partial output.", model_name, req_id)
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			return
 		end
 
 		if accumulated == "" then
@@ -1723,8 +1886,8 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			return
 		end
 		Logger.debug(LOG, "[%s] #%d STREAM: %d result(s).", model_name, req_id, #results)
-		if keylogger and type(keylogger.log_llm) == "function" then
-			pcall(keylogger.log_llm, full_text, results, nil, {
+		if keystats and type(keystats.log_llm) == "function" then
+			pcall(keystats.log_llm, full_text, results, nil, {
 				backend       = "ollama",
 				model         = tostring(model_name),
 				system_prompt = system_prompt,
@@ -1745,7 +1908,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		}, on_done, on_chunk)
 	end, debug.traceback)
 	if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
-		pcall(os.remove, tmp_path)
+		retire_payload()
 		Logger.error(LOG, "[%s] #%d STREAM task creation did not commit (result: %s).",
 			tostring(model_name), req_id, tostring(spawned))
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
@@ -1757,22 +1920,26 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	_active_stream_task = task
 	local start_ok, start_result = xpcall(function() return task.start() end, debug.traceback)
 	if not start_ok or start_result ~= true then
-		if not start_ok then
-			local stop_ok, stop_result = xpcall(function() return task.terminate() end, debug.traceback)
-			if stop_ok and stop_result == true then
-				if _active_stream_task == task then _active_stream_task = nil end
-			else
-				Logger.error(LOG, "[%s] #%d STREAM ambiguous task retained for cancellation retry: %s",
-					tostring(model_name), req_id, tostring(stop_result))
-			end
-		elseif _active_stream_task == task then
-			-- ShellRunner's false result proves hs.task never launched.
-			_active_stream_task = nil
+		-- A refused start can still retain a native task. Revoke business effects,
+		-- but preserve its exact slot and input until physical settlement.
+		if my_generation == _stream_generation then _stream_generation = _stream_generation + 1 end
+		local function settle_failed_start()
+			if not stream_task_is_settled(task) then return false end
+			if _active_stream_task == task then _active_stream_task = nil end
+			retire_payload()
+			return true
 		end
-		local removed, remove_err = pcall(os.remove, tmp_path)
-		if not removed then
-			Logger.error(LOG, "[%s] #%d STREAM payload cleanup failed: %s",
-				tostring(model_name), req_id, tostring(remove_err))
+		if not settle_failed_start() then
+			-- ShellRunner suppresses business completion after an uncommitted
+			-- start; its exact settlement observer still owns cleanup.
+			local observed, registered = xpcall(function()
+				return task.onSettled(settle_failed_start)
+			end, debug.traceback)
+			if not observed or registered ~= true then
+				Logger.error(LOG, "STREAM settlement observer refused; task and payload retained.")
+			end
+			M.cancel_streaming()
+			settle_failed_start()
 		end
 		Logger.error(LOG, "[%s] #%d STREAM task start did not commit (result: %s).",
 			tostring(model_name), req_id, tostring(start_result))
@@ -1786,7 +1953,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	-- at all. Delay must be > STREAM_MAX_TIME_SEC so curl has finished reading.
 	local cleanup_ok, cleanup_handle, cleanup_committed = xpcall(function()
 		return TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
-			os.remove(tmp_path)
+			retire_payload()
 		end)
 	end, debug.traceback)
 	if not cleanup_ok or cleanup_committed ~= true then
@@ -1824,7 +1991,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 
 	local effective_temp = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
-	local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
+	local tokens         = TokenBudget.for_call(tonumber(max_predict), num_predictions)
 	local is_batch       = profile.batch
 	local dedup_stats    = ApiCommon.new_dedup_stats()
 	local post_fn        = streaming and post_and_parse_streaming or post_and_parse
@@ -1892,16 +2059,29 @@ end
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back,
 ---        and { model } for MODEL_MISSING.
-local function request_prebuilt(client, label, body, on_text, on_fail)
+--- @param continuation_check function|nil Exact producer authority before private dispatch.
+local function request_prebuilt(client, label, body, on_text, on_fail, continuation_check)
 	if type(body) ~= "table" or type(on_text) ~= "function" or type(on_fail) ~= "function" then
 		error("api_ollama." .. label .. " request: a body, on_text and on_fail are required")
 	end
+	assert(continuation_check == nil or type(continuation_check) == "function",
+		"api_ollama prebuilt continuation check must be a function or nil")
 	local model = body.model
 	if normalize_model_name(model) == nil then
 		error("api_ollama." .. label .. " request: the body names no model")
 	end
+	_prebuilt_request_epoch = _prebuilt_request_epoch + 1
+	local request_epoch = _prebuilt_request_epoch
+	local service_current = M.capture_service_owner()
 	local origin = M.get_base_url()
+	local function request_current()
+		return request_epoch == _prebuilt_request_epoch and source_current(origin, service_current)
+			and request_epoch == _prebuilt_request_epoch
+	end
 	local encoded, encode_error = JsonCodec.encode(body)
+	if not request_current() then
+		return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+	end
 	if not encoded then
 		Logger.error(LOG, "%s request body encode failed: %s.", label, tostring(encode_error))
 		ApiCommon.protected_call(on_fail, "on_fail", "encode_failed")
@@ -1909,30 +2089,52 @@ local function request_prebuilt(client, label, body, on_text, on_fail)
 	end
 	local function post(receipt)
 		local function current()
-			return listing_current(receipt) and receipt.origin == origin and _listed_models == receipt
+			return request_current() and listing_current(receipt)
+				and receipt.origin == origin and _listed_models == receipt
 		end
 		if not current() then
 			return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 		end
 		local t0 = TimerScheduler.now()
+		if not current() then
+			return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+		end
 		Logger.info(LOG, "%s request to the local server (model %s, %d byte(s)).", label, model, #encoded)
 		-- The logger and timer are native boundaries too. Recheck immediately
 		-- before handing private bytes to the captured endpoint's HTTP owner.
 		if not current() then
 			return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 		end
+		if continuation_check ~= nil then
+			local ok, admitted = pcall(continuation_check)
+			if not ok then
+				Logger.error(LOG, "%s request continuation check raised: %s.", label, tostring(admitted))
+			end
+			if not ok or admitted ~= true then
+				return ApiCommon.protected_call(on_fail, "on_fail", "cancelled")
+			end
+			if not current() then
+				return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+			end
+		end
 		client.post(origin .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
 			function(r)
 				Logger.pcall(LOG, function()
-					if origin ~= M.get_base_url() then
+					if not request_current() then
 						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 					end
 					local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+					if not request_current() then
+						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+					end
 					if r.status ~= 200 then
 						local server_error = server_error_text(r)
+						if not request_current() then
+							return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+						end
 						Logger.error(LOG, "%s request to the local server failed in %dms: HTTP %s (%s).",
 							label, ms, tostring(r.status), server_error)
-						if origin ~= M.get_base_url() then
+						if not request_current() then
 							return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 						end
 						local missing = missing_model_of(r.status, server_error)
@@ -1946,19 +2148,27 @@ local function request_prebuilt(client, label, body, on_text, on_fail)
 						return
 					end
 					local resp = JsonCodec.decode(r.body)
+					if not request_current() then
+						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+					end
 					local content = type(resp) == "table" and type(resp.message) == "table"
 						and resp.message.content or nil
 					local text = type(content) == "string" and Parser.strip_thinking(content) or ""
+					if not request_current() then
+						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+					end
 					if text == "" then
 						Logger.warn(LOG, "%s answer of the local server holds no text (%dms).", label, ms)
-						if origin ~= M.get_base_url() then
+						if not request_current() then
 							return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 						end
 						ApiCommon.protected_call(on_fail, "on_fail", "empty_answer")
 						return
 					end
 					Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
-					if origin ~= M.get_base_url() then
+					require("perf_budget").judge(Logger, LOG, "llm.local", ms,
+						function() return require("infra.timings").ms("budgets", "llm_local_request_ms") end)
+					if not request_current() then
 						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 					end
 					ApiCommon.protected_call(on_text, "on_text", text)
@@ -1968,20 +2178,23 @@ local function request_prebuilt(client, label, body, on_text, on_fail)
 	if M.local_model_installed(model) == true then return post(_listed_models) end
 	Logger.info(LOG, "%s request: checking that the local server holds model %s…", label, model)
 	list_models(client, function(names, reason, receipt)
+		if not request_current() then
+			return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+		end
 		if names == nil then
 			ApiCommon.protected_call(on_fail, "on_fail", reason)
 			return
 		end
 		if names[normalize_model_name(model)] ~= true then
 			Logger.warn(LOG, "%s request not sent: the local server does not hold model %s.", label, model)
-			if not listing_current(receipt) then
+			if not request_current() or not listing_current(receipt) then
 				return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 			end
 			ApiCommon.protected_call(on_fail, "on_fail", M.MODEL_MISSING, { model = model })
 			return
 		end
 		post(receipt)
-	end, origin)
+	end, origin, service_current)
 end
 
 --- Posts one prebuilt vision request body (a screenshot and its prompt) to the
@@ -1989,8 +2202,9 @@ end
 --- @param body table The request body.
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
-function M.request_vision(body, on_text, on_fail)
-	return request_prebuilt(_vision_client, "Vision", body, on_text, on_fail)
+--- @param continuation_check function|nil Exact producer authority after model preflight.
+function M.request_vision(body, on_text, on_fail, continuation_check)
+	return request_prebuilt(_vision_client, "Vision", body, on_text, on_fail, continuation_check)
 end
 
 --- Posts one prebuilt text chat body (no image) to the local server: the AI
@@ -1998,8 +2212,9 @@ end
 --- @param body table The request body.
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
-function M.request_chat(body, on_text, on_fail)
-	return request_prebuilt(_vision_client, "Agent", body, on_text, on_fail)
+--- @param continuation_check function|nil Exact producer authority after model preflight.
+function M.request_chat(body, on_text, on_fail, continuation_check)
+	return request_prebuilt(_vision_client, "Agent", body, on_text, on_fail, continuation_check)
 end
 
 --- Dispatches multiple sequential API requests.
@@ -2081,6 +2296,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 			post_fn(model_name, system_prompt, full_text, tail_text,
 				temp, tokens, 1, false,
 				function(preds)
+					if not request_is_current() then return end
 					if type(preds) == "table" and type(preds[1]) == "table" then
 						if #results < requested_predictions then
 							ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
@@ -2110,6 +2326,13 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	end
 
 	do_next()
+end
+
+--- Hands in the HttpClient that sends inference requests (engine init, the
+--- HttpClient port of the shared request plan). The default stays this module's own client.
+--- @param client table Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	_infer_client = Ports.check("HttpClient", client)
 end
 
 return M

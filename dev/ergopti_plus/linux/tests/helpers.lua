@@ -5,10 +5,10 @@
 --- DESCRIPTION:
 --- Shared utilities for the Linux driver test suite — path resolution,
 --- lightweight assertions, and a minimal describe/it layer usable under plain
---- LuaJIT with no external dependencies.
+--- LuaJIT with the native luv wall-clock provider.
 ---
 --- FEATURES & RATIONALE:
---- 1. Zero-dependency runner: works under LuaJIT 2.x with no external libs;
+--- 1. Timed runner: works under LuaJIT 2.x with native luv.hrtime;
 ---    the describe/it API mirrors the Hammerspoon helpers so test files are
 ---    easy to port between drivers.
 --- 2. Per-test isolation: load_module() wipes the package cache before
@@ -22,8 +22,15 @@
 
 local M = {}
 
+-- A test file run on its own, without tests/run.lua, still loads these helpers
+-- first: isolating here keeps its logs and config away from the account's own
+-- home. Idempotent, the runner already isolated.
+require("test.runner_home").isolate()
+
 -- Value formatting and stack-trace helpers shared with macOS (single source of truth).
 local fmt = require("test.format")
+local _timing = nil
+local _current_module = nil
 M.inspect = fmt.inspect
 M.deep_equal = fmt.deep_equal
 
@@ -37,6 +44,27 @@ local _fail_msg = fmt.fail_msg_for("helpers%.lua$")
 -- ===================================
 -- ===================================
 
+--- Source text in which each generated config-key reference reads as the quoted string it
+--- stands for, for tests that scan driver source for the literal a call passes. A name the
+--- generated tables do not hold is left as written, so the scan still refuses it.
+--- @param text string Lua source text.
+--- @return string expanded
+function M.expand_config_keys(text)
+	local keys = require("config_keys")
+	local function resolve(whole, root_table, name)
+		local found, tbl = pcall(function() return keys[root_table] end)
+		if not found then return whole end
+		local ok, value = pcall(function() return tbl[name] end)
+		return ok and type(value) == "string" and string.format("%q", value) or whole
+	end
+	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	end)
+	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
+		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
+	end))
+end
+
 --- Returns the absolute path of the Linux driver root (no trailing slash).
 --- @return string Absolute path.
 function M.driver_root()
@@ -45,6 +73,92 @@ function M.driver_root()
 	-- src is .../tests/helpers.lua — go one dir up.
 	local tests_dir = src:match("^(.*)[/\\\\]helpers%.lua$") or "."
 	return (tests_dir:match("^(.*)[/\\\\]tests$") or tests_dir):gsub("\\\\", "/")
+end
+
+-- Production sources, read once per process: the tree is never mutated by a test.
+local _production_sources = nil
+
+--- Loads (once) every production Lua file under the driver root, tests/ excluded.
+--- @return table bodies
+local function production_sources()
+	if _production_sources then return _production_sources end
+	local paths, detail = require("test.runner_discovery").files(M.driver_root(), function(name)
+		return name:match("%.lua$") ~= nil
+	end, { tests = true })
+	assert(paths, detail)
+	local bodies = {}
+	for _, path in ipairs(paths) do
+		local handle = assert(io.open(path, "rb"))
+		bodies[#bodies + 1] = assert(handle:read("*a"))
+		assert(handle:close())
+	end
+	-- An empty inventory is no evidence: left uncached, the caller's floor refuses it.
+	if #bodies > 0 then _production_sources = bodies end
+	return bodies
+end
+
+--- The ONE production file containing `symbol` (the Linux twin of the macOS
+--- helper of the same name). A source invariant names a declaration unique to
+--- its file, never the file's path, so the module can move or split without
+--- turning the invariant into a path error.
+--- @param symbol string A string unique to the file being asked for.
+--- @return string|nil body, string|nil err Body, or nil plus why.
+function M.read_driver_unit(symbol)
+	if type(symbol) ~= "string" or symbol == "" then
+		return nil, "read_driver_unit() needs a symbol to look for"
+	end
+	local matches = {}
+	for _, body in ipairs(production_sources()) do
+		if body:find(symbol, 1, true) then matches[#matches + 1] = body end
+	end
+	if #matches == 0 then return nil, string.format("no production file contains %q", symbol) end
+	if #matches > 1 then
+		return nil, string.format("%d production files contain %q; name a symbol unique to one file",
+			#matches, symbol)
+	end
+	return matches[1]
+end
+
+--- The source of a production module, resolved from its module name through
+--- package.searchpath exactly as require would find it, so a test listing
+--- several modules names them as the code does, never by a driver path.
+--- @param module_name string Dotted module name, e.g. "adapters.http_client".
+--- @return string|nil body, string|nil err Body, or nil plus why.
+function M.read_module_source(module_name)
+	local path, missing = package.searchpath(module_name, package.path)
+	if not path then return nil, missing end
+	local handle, open_error = io.open(path, "rb")
+	if not handle then return nil, open_error end
+	local body = handle:read("*a")
+	handle:close()
+	return body
+end
+
+--- Returns the tray root's source followed by every section module it binds.
+--- ui/menu/builder.lua binds each section builder from its own
+--- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
+--- finds it in whichever of these files now holds it.
+--- @return string The root's text, then each module it or a part binds, in binding order.
+function M.read_menu_source()
+	local directory = M.driver_root() .. "/ui/menu/"
+	local function read(name)
+		local handle = assert(io.open(directory .. name .. ".lua", "rb"))
+		local text = assert(handle:read("*a"))
+		assert(handle:close())
+		return text
+	end
+	-- A part may bind another part (the dialogs), which the root no longer names.
+	local texts, seen, index = { read("builder") }, {}, 1
+	while texts[index] do
+		for name in texts[index]:gmatch('require%("ui%.menu%.(menu_[a-z_]+)"%)') do
+			if not seen[name] then
+				seen[name] = true
+				texts[#texts + 1] = read(name)
+			end
+		end
+		index = index + 1
+	end
+	return table.concat(texts, "\n")
 end
 
 
@@ -60,6 +174,20 @@ end
 function M.load_module(module_name)
 	package.loaded[module_name] = nil
 	return require(module_name)
+end
+
+--- Loads a fresh instance of a module by name and leaves the package cache as
+--- it found it, as dofile on its path would, so a test can run private copies
+--- without naming the file a move would break.
+--- @param module_name string Dotted Lua module name to load.
+--- @return any The module's return value.
+function M.fresh_module(module_name)
+	local cached = package.loaded[module_name]
+	package.loaded[module_name] = nil
+	local ok, result = pcall(require, module_name)
+	package.loaded[module_name] = cached
+	if not ok then error(result, 0) end
+	return result
 end
 
 --- Loads a fresh module with one dependency explicitly present or unavailable.
@@ -136,6 +264,42 @@ function M.openssl_stdout_receipt(command, output, status)
 	return output
 end
 
+--- Hands one admitted regular source to stdio on its own path name.
+--- Production reads TOML through a pinned /proc/self/fd alias, which a test's
+--- io.open double keyed on the path never sees. Native classification still
+--- runs first, so a FIFO or a missing file keeps its real receipt; only the
+--- stream of an admitted regular file is reopened by name for the double.
+--- A virtual path and its staging exist only inside the double, so both skip
+--- native admission while keeping the double's own write/close/remove receipts.
+--- Physical staging image checks belong to the native file integration tests.
+--- @param path string Exact source path the test's io.open double recognises.
+--- @param virtual boolean|nil True when no file exists on disk at that path.
+--- @return function restore Reinstates the native admission.
+function M.route_source_through_stdio(path, virtual)
+	local Reader = require("infra.regular_file_reader")
+	local native = Reader.open
+	local Writer, native_write
+	if virtual then
+		Writer = require("infra.regular_file_writer"); native_write = Writer.open
+		Writer.open = function(candidate, mode)
+			if candidate ~= path .. ".tmp" or mode ~= "wx" then return native_write(candidate, mode) end
+			local stream, detail, errno = io.open(candidate, "w")
+			return stream, detail, errno, function() return os.remove(candidate) end, function() return true end
+		end
+	end
+	Reader.open = function(candidate)
+		if virtual and candidate == path then return io.open(candidate, "r") end
+		local stream, detail, errno = native(candidate)
+		if candidate ~= path or not stream then return stream, detail, errno end
+		assert(stream:close(), "admitted source stream must close before stdio reopens it")
+		return io.open(candidate, "r")
+	end
+	return function()
+		Reader.open = native
+		if Writer then Writer.open = native_write end
+	end
+end
+
 
 
 
@@ -171,6 +335,9 @@ function M.describe(name, fn)
 	if not ok then
 		print(string.format("  ! suite error: %s", tostring(err)))
 		_suite_results.failed = _suite_results.failed + 1
+		_suite_results.failures[#_suite_results.failures + 1] = {
+			name = name, err = tostring(err), kind = "suite", module = _current_module,
+		}
 	end
 end
 
@@ -187,17 +354,23 @@ end
 function M.it(name, fn)
 	-- --only <substr>: run only tests whose name contains the filter (plain
 	-- substring) so one behaviour can be re-run in isolation.
-	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
-	local ok, err = pcall(function()
-		if _before_each_fn then _before_each_fn() end
-		fn()
-	end)
+	local ok, err
+	if _timing then
+		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
+		if ok == nil then return end
+	else
+		if _only_filter and not string.find(name, _only_filter, 1, true) then return end
+		ok, err = pcall(function()
+			if _before_each_fn then _before_each_fn() end
+			fn()
+		end)
+	end
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
 	else
 		_suite_results.failed = _suite_results.failed + 1
-		_suite_results.failures[#_suite_results.failures + 1] = { name = name, err = tostring(err) }
+		_suite_results.failures[#_suite_results.failures + 1] = { name = name, err = tostring(err), kind = "case", module = _current_module }
 		print("  FAIL " .. name .. " — " .. tostring(err))
 	end
 end
@@ -230,5 +403,101 @@ end
 --- Restricts M.it execution to tests whose name contains `substr` (the --only filter).
 --- @param substr string|nil Substring to match; nil clears the filter (run all).
 function M.set_only_filter(substr) _only_filter = substr end
+
+
+--- Initializes the unit runner clock before test modules can replace stubs.
+--- Support imports by E2E do not acquire a clock or claim unit timing coverage.
+function M.initialize_timing()
+	assert(_timing == nil, "Lua unit timing is already initialized")
+	_timing = require("test.runner_timing").capture("linux")
+end
+
+--- Whether a package.loaded value is a test double: a table holding a function
+--- defined under tests/ or the shared test library. A real module reloaded by a
+--- test is not one, since its functions come from the product tree.
+--- @param value any Loaded value.
+--- @param roots string[] Path prefixes of test code, with a trailing slash.
+--- @return boolean
+local function is_test_double(value, roots)
+	if type(value) ~= "table" then return false end
+	for _, field in pairs(value) do
+		if type(field) == "function" then
+			local source = debug.getinfo(field, "S").source:gsub("^@", ""):gsub("\\", "/")
+			for _, root in ipairs(roots) do
+				if source:sub(1, #root) == root then return true end
+			end
+		end
+	end
+	return false
+end
+
+--- Puts back every product module left replaced by a test double since a
+--- snapshot. Without this, one fixture that failed before its restore left
+--- doubles installed for every later module: the document fixture's timings
+--- double, which refuses all keys but one, failed about 1200 Linux tests that
+--- never touched it.
+--- @param before table Shallow copy of package.loaded taken earlier.
+--- @return string[] leaked Sorted names that held a double, now restored.
+function M.restore_leaked_doubles(before)
+	local driver = M.driver_root()
+	local roots = { driver .. "/tests/", (driver:match("^(.*)/[^/]+$") or driver) .. "/_shared/lua/test/" }
+	local leaked = {}
+	for key, value in pairs(package.loaded) do
+		if type(key) == "string" and not key:match("^tests?%.") and value ~= before[key]
+			and is_test_double(value, roots) then
+			leaked[#leaked + 1] = key
+		end
+	end
+	table.sort(leaked)
+	for _, key in ipairs(leaked) do package.loaded[key] = before[key] end
+	return leaked
+end
+
+--- Restores the doubles a test module left behind and records one failure each.
+--- @param name string Test module identity.
+--- @param before table Shallow copy of package.loaded before the module ran.
+local function fail_leaked_doubles(name, before)
+	for _, key in ipairs(M.restore_leaked_doubles(before)) do
+		local err = "left a test double in package.loaded['" .. key .. "']; restore it before the module ends"
+		_suite_results.failed = _suite_results.failed + 1
+		_suite_results.failures[#_suite_results.failures + 1] = {
+			name = name, err = err, kind = "module", module = name,
+		}
+		print("  FAIL " .. name .. " — " .. err)
+	end
+end
+
+--- Records the current package.loaded entries a test module replaces, for the
+--- module to put back at its end (the runner fails a module that leaves a double).
+--- @param names string[] Module names the test module or its fixtures replace.
+--- @return function restore Puts every recorded entry back.
+function M.keep_loaded(names)
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
+	return function()
+		for name, entry in pairs(saved) do package.loaded[name] = entry.value end
+	end
+end
+
+--- Measures one module load while retaining its current case ownership.
+--- @param name string Exact test module identity.
+--- @param callback function Original require operation.
+--- @return boolean ok Original protected-call verdict.
+--- @return any result Original protected-call result or error.
+function M.measure_module(name, callback)
+	assert(_timing ~= nil, "Lua unit timing is not initialized")
+	local before = {}
+	for key, value in pairs(package.loaded) do before[key] = value end
+	local previous = _current_module
+	_current_module = name
+	local ok, result = _timing.measure("module", name, callback, name)
+	_current_module = previous
+	fail_leaked_doubles(name, before)
+	return ok, result
+end
+
+--- Reports timing admission failure without changing assertion counters.
+--- @return boolean failed True if clock or output diagnostics were incomplete.
+function M.timing_failed() return _timing ~= nil and _timing.has_errors() end
 
 return M

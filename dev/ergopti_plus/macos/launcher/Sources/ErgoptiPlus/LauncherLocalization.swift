@@ -67,13 +67,24 @@ struct LauncherLocalization {
 		) as? String
 	}
 
-	/// Returns one localized string with `{1}`, `{2}`… replaced in order.
+	/// Fills numbered placeholders from the original catalog text once, keeping
+	/// braces inside argument values literal and unprovided slots unchanged.
 	func text(_ key: String, _ arguments: [String] = []) -> String? {
-		guard var value = strings[key], !value.isEmpty else { return nil }
-		for (index, argument) in arguments.enumerated() {
-			value = value.replacingOccurrences(of: "{\(index + 1)}", with: argument)
+		guard let value = strings[key], !value.isEmpty else { return nil }
+		let components = value.components(separatedBy: "{")
+		var rendered = components[0]
+		for component in components.dropFirst() {
+			guard let closing = component.firstIndex(of: "}"),
+				let position = Int(component[..<closing]), position > 0,
+				position <= arguments.count, component[..<closing] == String(position)
+			else {
+				rendered += "{" + component
+				continue
+			}
+			rendered += arguments[position - 1]
+			rendered += String(component[component.index(after: closing)...])
 		}
-		return value
+		return rendered
 	}
 }
 

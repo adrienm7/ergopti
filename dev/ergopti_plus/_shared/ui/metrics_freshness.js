@@ -7,7 +7,8 @@
 // snapshot painted from the host's cache names the moment it was computed and
 // says that an update is running; a first open without a snapshot shows a
 // loading notice; a failed update keeps the snapshot's date on screen. Fresh
-// data hides the banner.
+// data hides the banner. Data built from an incomplete history read is shown
+// with a notice saying so.
 //
 // FEATURES & RATIONALE:
 // 1. Host-driven only. The state comes from the host with each publication;
@@ -15,8 +16,13 @@
 // 2. Ordered. Each state carries the host's publication revision and an older
 //    one never replaces a newer one, so a delayed "stale" notice cannot cover
 //    fresh data.
-// 3. Pure core. describe_freshness turns a state into display text without
-//    touching the DOM, so it is unit-tested in Node.
+// 3. Pure core. describe_freshness and describe_incomplete turn host state
+//    into display text without touching the DOM, so they are unit-tested in
+//    Node.
+// 4. Incomplete reads stay visible. A host that could not read the whole
+//    history still shows the counts it read; the manifest and the n-gram data
+//    each carry their own flag, and the notice stays until both parts arrive
+//    complete. The host never caches such data, so the next read retries.
 // ==============================================================================
 
 (function () {
@@ -94,8 +100,20 @@
 		return { visible: false, failed: false, text: '' };
 	}
 
+	/**
+	 * Labels data built from an incomplete history read.
+	 * @param {Object} parts {manifest, range} incompleteness flags.
+	 * @param {Object} strings Active locale strings.
+	 * @returns {string} Notice text, empty when every part is complete.
+	 */
+	function describe_incomplete(parts, strings) {
+		if (!parts || (parts.manifest !== true && parts.range !== true)) return '';
+		return lookup(strings, 'ui_metrics_freshness.incomplete');
+	}
+
 	const api = {
 		describe_freshness: describe_freshness,
+		describe_incomplete: describe_incomplete,
 		format_moment: format_moment
 	};
 
@@ -106,6 +124,8 @@
 
 	let root = null;
 	let applied_revision = -1;
+	let freshness_view = { visible: false, failed: false, text: '' };
+	const incomplete_parts = { manifest: false, range: false };
 
 	function ensure_root() {
 		if (root) return;
@@ -113,7 +133,8 @@
 		style.textContent =
 			'#metrics_freshness_banner{position:sticky;top:0;z-index:49;padding:8px 14px;font-size:13px;' +
 			'background:rgba(59,130,246,0.12);border-bottom:1px solid rgba(59,130,246,0.35);display:none}' +
-			'#metrics_freshness_banner.failed{background:rgba(220,53,69,0.16);border-color:rgba(220,53,69,0.5)}';
+			'#metrics_freshness_banner.failed{background:rgba(220,53,69,0.16);border-color:rgba(220,53,69,0.5)}' +
+			'#metrics_freshness_banner.incomplete{background:rgba(245,158,11,0.16);border-color:rgba(245,158,11,0.5)}';
 		document.head.appendChild(style);
 		root = document.createElement('div');
 		root.id = 'metrics_freshness_banner';
@@ -128,15 +149,36 @@
 	 * @param {number} revision Host publication revision.
 	 * @returns {boolean} Whether the state was applied.
 	 */
+	function render() {
+		ensure_root();
+		const notice = describe_incomplete(incomplete_parts, window._i18n_strings);
+		const texts = [freshness_view.visible ? freshness_view.text : '', notice].filter(Boolean);
+		root.style.display = texts.length ? 'block' : 'none';
+		root.classList.toggle('failed', freshness_view.failed);
+		root.classList.toggle('incomplete', !freshness_view.failed && notice !== '');
+		root.textContent = texts.join(' ');
+	}
+
 	api.show = function (freshness, revision) {
 		if (!Number.isSafeInteger(revision) || revision < applied_revision) return false;
 		applied_revision = revision;
-		const view = describe_freshness(freshness, window._i18n_strings, window._i18n_locale);
-		ensure_root();
-		root.style.display = view.visible ? 'block' : 'none';
-		root.classList.toggle('failed', view.failed);
-		root.textContent = view.text;
+		freshness_view = describe_freshness(freshness, window._i18n_strings, window._i18n_locale);
+		render();
 		return true;
+	};
+
+	/**
+	 * Records whether the data just applied came from an incomplete read.
+	 * @param {string} part "manifest" or "range".
+	 * @param {boolean} incomplete True when the host could not read every row.
+	 */
+	api.mark_incomplete = function (part, incomplete) {
+		if (part !== 'manifest' && part !== 'range') {
+			throw new TypeError('Incomplete metrics part must be "manifest" or "range"');
+		}
+		if (incomplete_parts[part] === (incomplete === true)) return;
+		incomplete_parts[part] = incomplete === true;
+		render();
 	};
 	window.metrics_freshness = api;
 })();

@@ -82,9 +82,9 @@ local function load_fixture(show_result)
 			usercontent = {
 				new = function()
 					calls.bridges = calls.bridges + 1
-					return { setCallback = function(_, callback)
+					return { setCallback = function(controller, callback)
 						calls.bridge_callback = callback
-						return true
+						return controller
 					end }
 				end,
 			},

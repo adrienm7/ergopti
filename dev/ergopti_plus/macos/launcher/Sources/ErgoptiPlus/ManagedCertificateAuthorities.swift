@@ -8,6 +8,18 @@ import Security
 enum ManagedCertificateAuthorities {
 	enum Refusal: Error { case certificate }
 
+	/// Removes an inherited SSL_CERT_FILE and SSL_CERT_DIR from this process
+	/// before a release download role reads its environment, so its trust is the
+	/// system and keychain only. Ergopti never sets either; the field run of
+	/// 2026-10-27 19:47 inherited one this loader refused, and every download
+	/// stopped. The shell that starts a download child names the drop at INFO.
+	/// The wire-test fixture has its own entry point and keeps its CA channel.
+	/// - Returns: false when a name could not be removed; the role must stop.
+	static func dropInheritedTrustVariables() -> Bool {
+		let removed = ManagedNetworkBootstrapPolicy.trustEnvironment.map { Darwin.unsetenv($0) == 0 }
+		return !removed.contains(false)
+	}
+
 	/// Certificate data is bounded independently of the network request. These
 	/// paths arrive only from the admitted immutable private bootstrap snapshot.
 	static func load(environment: [String: String]) throws -> [SecCertificate] {

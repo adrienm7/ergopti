@@ -38,6 +38,11 @@ func TestMain(m *testing.M) {
 			os.Stdout.Write(length[:])
 			os.Stdout.Write(append([]byte{tag}, []byte(payload)...))
 		}
+		if mode == "stage-terminal" {
+			frame('C', os.Getenv("ERGOPTI_TEST_FAILURE_STAGE_TERMINAL"))
+			status, _ := strconv.Atoi(os.Getenv("ERGOPTI_TEST_FAILURE_STAGE_STATUS"))
+			os.Exit(status)
+		}
 		if mode == "stall-header" {
 			time.Sleep(10 * time.Second)
 			os.Exit(9)
@@ -259,7 +264,9 @@ func TestBypassIndependentVectors(t *testing.T) {
 
 func TestIdleDeadlinePhysicallyRetiresPeer(t *testing.T) {
 	transport, record := peerTransport(t, "stall-body")
-	transport.IdleTimeout = 100 * time.Millisecond
+	// The idle clock starts with the worker process; 100 ms left a slow runner
+	// no time to start the peer before headers, so RoundTrip itself expired.
+	transport.IdleTimeout = time.Second
 	request, _ := http.NewRequest("GET", "https://example.test/blob", nil)
 	response, err := transport.RoundTrip(request)
 	if err != nil {

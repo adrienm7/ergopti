@@ -7,7 +7,7 @@
 --- previous projection that covers past days. Only days after the cached
 --- watermark are read again; a changed past-data fingerprint discards the
 --- cache and rebuilds from scratch. All reads go through
---- `modules.keylogger.sqlite_reader`, the single owner of the aggregation.
+--- `modules.keystats.sqlite_reader`, the single owner of the aggregation.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Exact increments: manifest cells belong to one day, and every n-gram
@@ -21,12 +21,16 @@
 ---    re-encodes only today's slice instead of the whole history.
 --- 4. Bounded memory: at most MAX_RANGE_ENTRIES n-gram histories are kept, and
 ---    `reset()` drops everything (dashboard Reset clears the disk snapshot too).
+--- 5. Partial reads are shown, never cached. A read that missed rows still
+---    returns the counts it read, flagged `incomplete`, and leaves the cache as
+---    it was so the next request retries the whole read.
 --- ==============================================================================
 
 local M = {}
 
 local Logger    = require("infra.logger")
 local PacedJson = require("infra.paced_json")
+local TableUtil = require("table_util")
 
 local LOG = "metrics_typing.projection"
 
@@ -107,9 +111,7 @@ end
 --- @param members table key→encoded JSON.
 --- @return string json
 local function assemble_object(members)
-	local keys = {}
-	for key in pairs(members) do keys[#keys + 1] = key end
-	table.sort(keys)
+	local keys = TableUtil.sorted_keys(members)
 	local parts = {}
 	for index, key in ipairs(keys) do
 		parts[index] = PacedJson.encode(key) .. ":" .. members[key]
@@ -136,7 +138,7 @@ end
 
 --- Opens one projection session. A session memoizes fingerprints so the
 --- manifest and range reads of one job validate against the same values.
---- @param reader table `modules.keylogger.sqlite_reader`.
+--- @param reader table `modules.keystats.sqlite_reader`.
 --- @param sqlite_path string Path to db.sqlite.
 --- @param today string Current day (YYYY-MM-DD), fixed for the whole job.
 --- @param pacer table|nil Pacer from `infra.paced_job`.
@@ -169,6 +171,7 @@ function M.session(reader, sqlite_path, today, pacer)
 	--- Projects the manifest.
 	--- @return table manifest Decoded manifest (date→app→cell).
 	--- @return string json Encoded manifest.
+	--- @return boolean manifest_complete All requested manifest queries succeeded.
 	function session.manifest()
 		-- The new watermark is fingerprinted before anything is read
 		local target_fp = fingerprint(yesterday)
@@ -186,62 +189,85 @@ function M.session(reader, sqlite_path, today, pacer)
 			Logger.info(LOG, "Manifest projected from scratch (%s).",
 				_manifest and "past data changed" or "no cached projection")
 		end
-		for date, day in pairs(reader.read_manifest(sqlite_path, read_from, nil, pacer)) do
+		local fresh, complete = reader.read_manifest(sqlite_path, read_from, nil, pacer)
+		for date, day in pairs(fresh) do
 			days[date] = day
 			encoded[date] = nil
 		end
 		for date, day in pairs(days) do
 			if not encoded[date] then encoded[date] = PacedJson.encode(day, pacer) end
 		end
-		if target_fp then
+		-- A fingerprint certifies stored rows, not a projection's successful reads.
+		if target_fp and complete == true then
 			_manifest = { through = yesterday, fingerprint = target_fp, days = days, json = encoded }
 		else
 			_manifest = nil
 		end
-		return days, assemble_object(encoded)
+		return days, assemble_object(encoded), complete == true
 	end
 
 	--- Projects one range request exactly as `read_range_split_today` would.
 	--- @param start_date string|nil Inclusive lower bound.
 	--- @param end_date string|nil Inclusive upper bound.
 	--- @param apps table|nil Requested apps.
-	--- @return string json Encoded { historical, today }.
+	--- @return string json Encoded { historical, today }, plus `"incomplete":true`
+	---     when a read missed rows.
+	--- @return boolean range_complete All requested historical and today reads succeeded.
 	function session.range(start_date, end_date, apps)
 		if start_date == "" then start_date = nil end
 		if end_date == "" then end_date = nil end
 		local through = reader.split_bounds(start_date, end_date, today).historical_end
 		local historical_json = EMPTY_NGRAMS_JSON
+		local history_complete = true
 		if not start_date or start_date <= through then
 			local open_ended = through == yesterday
 			local key = range_key(start_date, open_ended, through, apps)
 			local target_fp = fingerprint(through)
-			local entry = find_range(key)
-			if still_valid(entry, through) then
-				if entry.through < through then
-					local added = reader.read_ngrams(sqlite_path, reader.next_day(entry.through), through, apps, pacer)
-					reader.merge_ngrams(entry.data, added)
-					entry.json = PacedJson.encode(entry.data, pacer)
-					Logger.info(LOG, "N-gram history extended from %s to %s.", entry.through, through)
+			local cached = find_range(key)
+			-- The cached entry is never mutated: the next one is built aside and
+			-- published only after every pausable step, so a job abandoned at a
+			-- pause cannot leave merged days under the previous watermark.
+			local data, json
+			if still_valid(cached, through) then
+				data, json = cached.data, cached.json
+				if cached.through < through then
+					local added
+					added, history_complete = reader.read_ngrams(
+						sqlite_path, reader.next_day(cached.through), through, apps, pacer)
+					-- Merged into a copy: a refused day cannot alter the accepted
+					-- history or its watermark, yet its partial counts are shown.
+					data = reader.merge_ngrams(reader.merge_ngrams({}, cached.data), added)
+					json = PacedJson.encode(data, pacer)
+					if history_complete == true then
+						Logger.info(LOG, "N-gram history extended from %s to %s.", cached.through, through)
+					end
 				end
 			else
 				Logger.info(LOG, "N-gram history projected from scratch through %s (%s).", through,
-					entry and "past data changed" or "no cached projection")
-				local data = reader.read_ngrams(sqlite_path, start_date, through, apps, pacer)
-				entry = { key = key, start = start_date, data = data, json = PacedJson.encode(data, pacer) }
+					cached and "past data changed" or "no cached projection")
+				data, history_complete = reader.read_ngrams(sqlite_path, start_date, through, apps, pacer)
+				json = PacedJson.encode(data, pacer)
 			end
-			entry.through = through
-			entry.fingerprint = target_fp
-			if target_fp then
-				remember_range(entry)
-			else
-				for index = #_ranges, 1, -1 do
-					if _ranges[index].key == key then table.remove(_ranges, index) end
+			if history_complete == true then
+				local entry = { key = key, start = start_date, data = data, json = json,
+					through = through, fingerprint = target_fp }
+				-- A fingerprint certifies stored rows, not a projection's successful reads.
+				if target_fp then
+					remember_range(entry)
+				else
+					for index = #_ranges, 1, -1 do
+						if _ranges[index].key == key then table.remove(_ranges, index) end
+					end
 				end
+			else
+				Logger.warn(LOG, "N-gram history read incomplete through %s; partial counts shown, accepted cache unchanged and next request retries.", through)
 			end
-			historical_json = entry.json
+			historical_json = json
 		end
-		local today_idx = reader.read_today_split(sqlite_path, start_date, end_date, apps, pacer, today)
-		return '{"historical":' .. historical_json .. ',"today":' .. PacedJson.encode(today_idx, pacer) .. "}"
+		local today_idx, today_complete = reader.read_today_split(sqlite_path, start_date, end_date, apps, pacer, today)
+		local range_complete = history_complete == true and today_complete == true
+		return '{"historical":' .. historical_json .. ',"today":' .. PacedJson.encode(today_idx, pacer)
+			.. (range_complete and "" or ',"incomplete":true') .. "}", range_complete
 	end
 
 	return session

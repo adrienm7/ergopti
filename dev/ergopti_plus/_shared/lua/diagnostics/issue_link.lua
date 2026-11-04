@@ -16,11 +16,15 @@
 ---    a whole code point, ending with the truncation marker; a parameter that
 ---    cannot keep one code point is dropped; the title goes last and the
 ---    template never.
---- 4. The JS original and the AHK port (windows/infra/issue_link.ahk) replay the
+--- 4. A cut field can carry a note (one line saying where the complete text is),
+---    appended after the truncation marker and counted in the budget: the caller
+---    passes it only for the field that holds the complete report.
+--- 5. The JS original and the AHK port (windows/infra/issue_link.ahk) replay the
 ---    same vectors: _shared/tests/corpus/diagnostics/issue_link_vectors.json.
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 
 
@@ -68,21 +72,12 @@ local function code_points(text)
 	return out
 end
 
---- Percent-encodes one code point; only RFC 3986 unreserved characters stay.
---- @param ch string One code point.
---- @return string
-local function encode_code_point(ch)
-	if #ch == 1 and ch:match("^[A-Za-z0-9%-%._~]$") then return ch end
-	return (ch:gsub(".", function(byte) return string.format("%%%02X", byte:byte()) end))
-end
-
 --- Percent-encodes a query value as UTF-8, only unreserved characters literal.
+--- An invalid byte is first replaced by U+FFFD, as in the JS and AHK ports.
 --- @param text string
 --- @return string
 function M.percent_encode(text)
-	local parts = code_points(tostring(text))
-	for i = 1, #parts do parts[i] = encode_code_point(parts[i]) end
-	return table.concat(parts)
+	return TextUtils.percent_encode(table.concat(code_points(tostring(text))))
 end
 
 
@@ -116,7 +111,7 @@ local function cut_value(value, budget, marker)
 	local kept, used = {}, 0
 	-- Strictly shorter than the value: a cut that keeps everything is no cut
 	for i = 1, #parts - 1 do
-		local cost = #encode_code_point(parts[i])
+		local cost = #TextUtils.percent_encode(parts[i])
 		if used + cost > room then break end
 		kept[#kept + 1] = parts[i]
 		used = used + cost
@@ -130,8 +125,10 @@ end
 --- @param repository table { owner, repo } from the updater defaults.json.
 --- @param template_id string Key of templates.templates ("bug", "feature").
 --- @param values table|nil Title and field values by id.
+--- @param notes table|nil One line per field id, appended on its own line after
+---   the truncation marker when that field is cut.
 --- @return string The URL, at most templates.max_url_bytes long.
-function M.build_url(templates, repository, template_id, values)
+function M.build_url(templates, repository, template_id, values, notes)
 	local template = type(templates) == "table" and type(templates.templates) == "table"
 		and templates.templates[template_id] or nil
 	if type(template) ~= "table" then
@@ -153,6 +150,7 @@ function M.build_url(templates, repository, template_id, values)
 	local repo_at = base:find("{repo}", 1, true)
 	base = base:sub(1, repo_at - 1) .. repository.repo .. base:sub(repo_at + #"{repo}")
 	values = type(values) == "table" and values or {}
+	notes = type(notes) == "table" and notes or {}
 
 	local params = { { "template", template.file } }
 	if type(values.title) == "string" and values.title ~= "" then
@@ -166,7 +164,9 @@ function M.build_url(templates, repository, template_id, values)
 	for i = #params, 2, -1 do
 		local over = #join_url(base, params) - max
 		if over <= 0 then break end
-		local cut = cut_value(params[i][2], #M.percent_encode(params[i][2]) - over, marker)
+		local note = notes[params[i][1]]
+		local ending = (type(note) == "string" and note ~= "") and (marker .. "\n\n" .. note) or marker
+		local cut = cut_value(params[i][2], #M.percent_encode(params[i][2]) - over, ending)
 		if cut == nil then
 			table.remove(params, i)
 		else

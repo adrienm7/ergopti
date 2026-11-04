@@ -20,7 +20,7 @@
 ; ===============================================
 
 LocalServerAuthCatalogue(Root, Occupied) {
-	Order := [], Servers := Map()
+	Order := [], Servers := Map(), Defaults := Map()
 	if !(Root is Map) || !(Occupied is Map)
 			|| !(Root.Get("server_order", 0) is Array) || !(Root.Get("servers", 0) is Map)
 		return Map("order", Order, "servers", Servers)
@@ -34,7 +34,11 @@ LocalServerAuthCatalogue(Root, Occupied) {
 				|| !(Desc.Get("label", 0) is String) || StrLen(Desc["label"]) == 0
 				|| !(Desc.Get("base_url", 0) is String) || !RegExMatch(Desc["base_url"], "^https?://\S+$")
 			continue
-		Servers[Id] := Map("id", Id, "label", Desc["label"], "base_url", Desc["base_url"], "auth", Desc["auth"])
+		; The first row of a shared default address is that address's default row
+		if !Defaults.Has(Desc["base_url"])
+			Defaults[Desc["base_url"]] := Id
+		Servers[Id] := Map("id", Id, "label", Desc["label"], "base_url", Desc["base_url"], "auth", Desc["auth"],
+			"address_default", Defaults[Desc["base_url"]])
 		Order.Push(Id)
 	}
 	return Map("order", Order, "servers", Servers)
@@ -68,4 +72,101 @@ LocalServerAuthModelsReceipt(Result) {
 		Ids.Push(Row["id"])
 	}
 	return Ids
+}
+
+/**
+ * Matches a configured API identity without inferring a product from its payload.
+ * @param {String} Provider Persisted provider identity.
+ * @param {String} BaseUrl Explicit configured endpoint for generic providers.
+ * @param {String} ServerId Declared local catalogue identity.
+ * @param {Map} Servers Validated local catalogue.
+ * @returns {Boolean} Exact provider ownership or canonical loopback affinity.
+ */
+LocalServerAuthEntryMatches(Provider, BaseUrl, ServerId, Servers) {
+	if !(Provider is String) || !(BaseUrl is String) || !(ServerId is String)
+			|| !(Servers is Map) || !(Servers.Get(ServerId, 0) is Map)
+		return false
+	if Provider == ServerId
+		return true
+	if !(Provider == "openai") && !(Provider == "openai_compat")
+		return false
+	; At a default address two rows share (oMLX and vLLM on 8000), a generic entry
+	; belongs to the address's default row only, as local_server_auth.lua decides.
+	AddressDefault := Servers[ServerId].Get("address_default", ServerId)
+	if !(AddressDefault == ServerId)
+		return false
+	Configured := _LocalServerAuthLoopbackIdentity(BaseUrl)
+	Declared := _LocalServerAuthLoopbackIdentity(Servers[ServerId].Get("base_url", 0))
+	return Configured is Map && Declared is Map
+		&& Configured["scheme"] == Declared["scheme"] && Configured["port"] == Declared["port"]
+		&& Configured["path"] == Declared["path"]
+}
+
+; Only equivalent loopback spellings share affinity. Host aliases do not turn a
+; custom port, alternate path, remote credential or payload into product identity.
+_LocalServerAuthLoopbackIdentity(Url) {
+	if !(Url is String) || RegExMatch(Url, "[[:space:][:cntrl:]]")
+			|| InStr(Url, "\") || InStr(Url, "@") || InStr(Url, "?") || InStr(Url, "#")
+		return false
+	if !RegExMatch(Url, "i)^(https?)://([^/:]+|\[[^]]+\])(?::([0-9]+))?(/.*)?$", &Parts)
+		return false
+	Host := StrLower(Parts[2])
+	if !(Host == "localhost") && !(Host == "127.0.0.1") && !(Host == "[::1]")
+		return false
+	try Port := Parts[3] == "" ? (StrLower(Parts[1]) == "http" ? 80 : 443) : Integer(Parts[3])
+	catch
+		return false
+	if Port < 1 || Port > 65535
+		return false
+	return Map("scheme", StrLower(Parts[1]), "port", Port, "path", RTrim(Parts[4], "/"))
+}
+
+/**
+ * Keeps optional authentication tied to the configured native endpoint.
+ * @param {String} Provider Original provider identity; never rewritten locally.
+ * @param {String} Token Exact configured credential.
+ * @param {String} BaseUrl Explicit configured endpoint.
+ * @param {Map} Servers Validated local catalogue for ordinary provider policy.
+ * @returns {Boolean} Provider authentication or explicitly keyless loopback API.
+ */
+LocalServerAuthEntryTokenAllowed(Provider, Token, BaseUrl, Servers) {
+	if LocalServerAuthTokenAllowed(Provider, Token, Servers)
+		return true
+	return Token is String && Token == "" && Provider is String
+		&& ((Provider == "openai") || (Provider == "openai_compat"))
+		&& _LocalServerAuthLoopbackIdentity(BaseUrl) is Map
+}
+
+/** Returns credential-free configured views, preserving validated entry order. */
+LocalServerAuthConfiguredViews(Entries, Servers, Providers) {
+	Order := [], Views := Map()
+	Views.CaseSense := "On"
+	if !(Entries is Array) || !(Servers is Map) || !(Providers is Map)
+		return Map("order", Order, "views", Views)
+	for Entry in Entries {
+		if !(Entry is Map) || !(Entry.Get("Id", 0) is String) || Entry["Id"] == ""
+				|| !(Entry.Get("Provider", 0) is String) || !(Entry.Get("BaseUrl", 0) is String)
+				|| !(Entry.Get("Token", 0) is String)
+			continue
+		Provider := Entry["Provider"]
+		if !(Provider == "openai") && !(Provider == "openai_compat")
+			continue
+		Descriptor := Providers.Get(Provider, 0)
+		Label := Descriptor is Map ? Descriptor.Get("Label", Descriptor.Get("label", 0)) : 0
+		if !(Label is String) || Label == "" || !(_LocalServerAuthLoopbackIdentity(Entry["BaseUrl"]) is Map)
+			continue
+		Canonical := false
+		for Id, Server in Servers {
+			if LocalServerAuthEntryMatches(Provider, Entry["BaseUrl"], Id, Servers) {
+				Canonical := true
+				break
+			}
+		}
+		Id := "configured:" . Entry["Id"]
+		if Canonical || Views.Has(Id)
+			continue
+		Views[Id] := Map("id", Id, "entry_id", Entry["Id"], "provider", Provider, "label", Label, "base_url", Entry["BaseUrl"])
+		Order.Push(Id)
+	}
+	return Map("order", Order, "views", Views)
 }

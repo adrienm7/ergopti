@@ -1,3 +1,5 @@
 {
-  "branch": "dev"
+  "branch": "dev",
+  "base_path": "/dev",
+  "source_sha": "70edd5600df7805f9c35a2c5fe1693da4979a363"
 }

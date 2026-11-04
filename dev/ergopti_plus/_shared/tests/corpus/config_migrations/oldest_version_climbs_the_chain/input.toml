@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/oldest_version_climbs_the_chain/input.toml
+
+[_meta]
+schema_version = 2
+
+[gestures]
+enabled = true
+space_wrap = false

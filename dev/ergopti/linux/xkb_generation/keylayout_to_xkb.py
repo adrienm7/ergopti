@@ -1,11 +1,12 @@
 """Convert any macOS .keylayout into an XKB symbols file and an XCompose file.
 
-This is the one converter from the layout registry's only layout format (a
-macOS keyboard layout) to Linux. The repository uses it to regenerate the
-shipped Ergopti files (generate_xkb_files.py), and the Linux package runs it on
-the user's machine when a registry layout is installed, so it must stay
-standard-library only and importable by the oldest Python the installers
-support (3.8).
+This converter regenerates the shipped Ergopti files (generate_xkb_files.py) and
+is the reference the Linux driver's Lua converter (_shared/lua/layouts/
+xkb_converter.lua, which installs a registry layout on the user's machine) is
+compared with, byte for byte, on every registry and archived layout
+(tools/test/test-keylayout-canonical-parity.cjs). Change the two together. It
+must stay standard-library only and importable by the oldest Python the
+installers support (3.8).
 
 Nothing here is specific to one layout:
 
@@ -157,6 +158,10 @@ PRIVATE_USE_FIRST = 0xF0000
 
 NO_SYMBOL = "NoSymbol"
 
+# macOS codes of the numeric keypad. XKB keeps its own keypad symbols, so a
+# layout's keypad keys are not placed and not reported (see Conversion.unplaced).
+KEYPAD_CODES = range(65, 93)
+
 
 class KeylayoutError(ValueError):
     """The .keylayout is malformed or uses a construct the converter rejects."""
@@ -167,10 +172,19 @@ class KeylayoutError(ValueError):
 # ---------------------------------------------------------------------------
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+# XML lets an attribute value sit in double or single quotes; both are read.
 _TAG_RE = re.compile(
-    r"<(/?)([A-Za-z][A-Za-z0-9]*)((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*\"[^\"]*\")*)\s*(/?)>"
+    r"<(/?)([A-Za-z][A-Za-z0-9]*)"
+    r"((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*(?:\"[^\"]*\"|'[^']*'))*)\s*(/?)>"
 )
-_ATTR_RE = re.compile(r"([A-Za-z_:][\w:.-]*)\s*=\s*\"([^\"]*)\"")
+_ATTR_RE = re.compile(r"([A-Za-z_:][\w:.-]*)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')")
+# The elements a conversion reads. A tag of one of them that the grammar above
+# cannot read is refused: skipping it silently dropped keys or whole keyMaps.
+_KNOWN_ELEMENTS = (
+    "keyboard|layouts|layout|modifierMap|keyMapSelect|modifier|keyMapSet|keyMap|key|"
+    "actions|action|when|terminators"
+)
+_KNOWN_TAG_START_RE = re.compile(r"<(/?)(?:%s)(?=[\s/>])" % _KNOWN_ELEMENTS)
 _ENTITY_RE = re.compile(r"&(#x[0-9A-Fa-f]+|#[0-9]+|lt|gt|amp|quot|apos);")
 _NAMED_ENTITIES = {"lt": "<", "gt": ">", "amp": "&", "quot": '"', "apos": "'"}
 
@@ -253,6 +267,114 @@ class Keylayout:
             return self._key_entry(base[0], base[1], code, depth + 1)
         return None
 
+    # -- canonical form ----------------------------------------------------
+
+    CANONICAL_SCHEMA = 1
+
+    def to_canonical(self) -> dict:
+        """The schema-1 canonical form shared with the Lua parser.
+
+        The form is documented in _shared/lua/layouts/keylayout.lua; absent
+        fields are omitted, never null.
+        """
+        selects = []
+        for index, modifiers in self.selects:
+            selects.append(
+                {
+                    "index": index,
+                    "modifiers": [
+                        {"required": sorted(required), "optional": sorted(optional)}
+                        for required, optional in modifiers
+                    ],
+                }
+            )
+        key_map_sets = []
+        for set_id, maps in self.key_map_sets.items():
+            key_maps = []
+            for index, entries in maps.items():
+                key_map: dict = {"index": index}
+                base = self.key_map_bases.get(set_id, {}).get(index)
+                if base is not None:
+                    key_map["base"] = {"set": base[0], "index": base[1]}
+                key_map["keys"] = [
+                    {"code": code, kind: value} for code, (kind, value) in entries.items()
+                ]
+                key_maps.append(key_map)
+            key_map_sets.append({"id": set_id, "key_maps": key_maps})
+        actions = []
+        for action in self.actions.values():
+            whens = []
+            for state, (output, next_state) in action.whens.items():
+                when: dict = {"state": state}
+                if output is not None:
+                    when["output"] = output
+                if next_state is not None:
+                    when["next"] = next_state
+                whens.append(when)
+            actions.append({"id": action.id, "whens": whens})
+        return {
+            "schema": self.CANONICAL_SCHEMA,
+            "name": self.name,
+            "map_set": self.map_set_id,
+            "default_index": self.default_index,
+            "selects": selects,
+            "key_map_sets": key_map_sets,
+            "actions": actions,
+            "terminators": [
+                {"state": state, "output": output} for state, output in self.terminators.items()
+            ],
+        }
+
+    @classmethod
+    def from_canonical(cls, data: dict) -> "Keylayout":
+        """Build a Keylayout from the schema-1 canonical form.
+
+        Raises:
+            KeylayoutError: when the form is not schema 1 or lacks a part every
+                conversion needs.
+        """
+        if not isinstance(data, dict) or data.get("schema") != cls.CANONICAL_SCHEMA:
+            raise KeylayoutError("canonical keylayout must be schema %d" % cls.CANONICAL_SCHEMA)
+        try:
+            layout = cls()
+            layout.name = data["name"]
+            layout.map_set_id = data["map_set"]
+            layout.default_index = int(data["default_index"])
+            for select in data["selects"]:
+                layout.selects.append(
+                    (
+                        int(select["index"]),
+                        [
+                            (frozenset(item["required"]), frozenset(item["optional"]))
+                            for item in select["modifiers"]
+                        ],
+                    )
+                )
+            for key_map_set in data["key_map_sets"]:
+                maps = layout.key_map_sets.setdefault(key_map_set["id"], {})
+                for key_map in key_map_set["key_maps"]:
+                    entries = maps.setdefault(int(key_map["index"]), {})
+                    base = key_map.get("base")
+                    if base is not None:
+                        layout.key_map_bases.setdefault(key_map_set["id"], {})[
+                            int(key_map["index"])
+                        ] = (base["set"], int(base["index"]))
+                    for key in key_map["keys"]:
+                        kind = "output" if "output" in key else "action"
+                        entries[int(key["code"])] = (kind, key[kind])
+            for item in data["actions"]:
+                action = Action(item["id"])
+                for when in item["whens"]:
+                    action.whens[when["state"]] = (when.get("output"), when.get("next"))
+                layout.actions[action.id] = action
+            for item in data["terminators"]:
+                layout.terminators[item["state"]] = item["output"]
+        except (KeyError, TypeError, ValueError) as error:
+            raise KeylayoutError("malformed canonical keylayout: %s" % error)
+        if layout.map_set_id not in layout.key_map_sets:
+            raise KeylayoutError("keyMapSet %r is not defined" % layout.map_set_id)
+        return layout
+
 
 def _parse_modifier_keys(keys: str) -> Tuple[frozenset, frozenset]:
     required, optional = set(), set()
@@ -282,9 +404,20 @@ def parse_keylayout(text: str) -> Keylayout:
     current_action: Optional[Action] = None
     in_terminators = False
 
+    read_starts = set()
+    for match in _TAG_RE.finditer(body):
+        read_starts.add(match.start())
+    for start in _KNOWN_TAG_START_RE.finditer(body):
+        if start.start() not in read_starts:
+            line = body.count("\n", 0, start.start()) + 1
+            raise KeylayoutError("malformed tag on line %d of the comment-free text" % line)
+
     for match in _TAG_RE.finditer(body):
         closing, tag, raw_attrs, self_closing = match.groups()
-        attrs = {name: decode_entities(value) for name, value in _ATTR_RE.findall(raw_attrs)}
+        attrs = {
+            name: decode_entities(double if double or not single else single)
+            for name, double, single in _ATTR_RE.findall(raw_attrs)
+        }
         if closing:
             if tag == "modifierMap":
                 current_modifier_map = None
@@ -473,12 +606,12 @@ class Conversion:
         # works on keysyms, so two keys typing the same keysym cannot be told
         # apart; the first output wins and the conflict is reported here.
         self.conflicts: List[Tuple[str, str, str]] = []
-        # (dead-key state, action) outputs no key can reach: the Compose line
-        # names the character the action is called after, but every key using
-        # that action sends another keysym (a dead key pressed inside a
-        # dead-key state sends its own dead keysym). Reported, not fixed, so
-        # the shipped Ergopti files keep their historical sequences.
-        self.unreachable: List[Tuple[str, str]] = []
+        # macOS codes of keys the layout defines (an output that types
+        # something, or an action) that the shared keycode table names no XKB
+        # key for, keypad excepted: what they type is not on the Linux layout.
+        # A JIS or ABNT key is the usual case. Reported, so a registry layout
+        # that has one fails its conversion test instead of losing keys.
+        self.unplaced: List[int] = []
 
 
 class _Converter:
@@ -565,6 +698,29 @@ class _Converter:
         if len(text) == 1:
             return self.keysyms.get(text) or unicode_keysym(text)
         return self.keysyms.get(text, text)
+
+    def state_keysyms(self, action_id: str) -> List[str]:
+        """Keysyms ending a Compose sequence for ``action_id`` in a dead state.
+
+        A key pressed inside a dead-key state sends what it sends from the
+        neutral state: a dead key sends its own dead keysym, not the character
+        it types alone, and an action whose one-character id is not what it
+        types sends its output. Naming only the base keysym (base_keysym) left
+        those untypable (Ergopti's ^ ^) and made a plain action and a dead-key
+        action whose base keysyms agree collide on one sequence (Bépo's "^" and
+        circumflex dead key inside its science dead key). The base keysym
+        stays first when a key sends it, so those lines keep their historical
+        form; a dead key also using the action adds its own trigger, and an
+        action no key uses (untypable on macOS too) keeps its base keysym.
+        """
+        typed = self._keysyms_typing_action(action_id)
+        base = self.base_keysym(action_id)
+        if not typed:
+            return [base]
+        if base not in typed:
+            return list(typed)
+        dead = set(self.dead_triggers.values())
+        return [base] + [keysym for keysym in typed if keysym in dead and keysym != base]
 
     def dead_trigger(self, state: str) -> str:
         """Keysym a dead key entering ``state`` produces."""
@@ -701,11 +857,6 @@ class _Converter:
         for state in sorted(outputs):
             if state not in sequences:
                 continue
-            for action_id, _output in sorted(outputs[state]):
-                # An action no key uses cannot be typed on macOS either.
-                typed = self._keysyms_typing_action(action_id)
-                if typed and self.base_keysym(action_id) not in typed:
-                    self.result.unreachable.append((state, action_id))
             for prefix in sequences[state]:
                 if not first:
                     lines.append("")
@@ -715,13 +866,14 @@ class _Converter:
                     "%s\t: %s" % (head, compose_string(self.layout.terminators.get(state, "")))
                 )
                 for action_id, output in sorted(outputs[state]):
-                    sequence = "%s <%s>" % (head, self.base_keysym(action_id))
-                    if sequence in emitted:
-                        if emitted[sequence] != output:
-                            self.result.conflicts.append((sequence, emitted[sequence], output))
-                        continue
-                    emitted[sequence] = output
-                    lines.append("%s\t: %s" % (sequence, compose_string(output)))
+                    for keysym in self.state_keysyms(action_id):
+                        sequence = "%s <%s>" % (head, keysym)
+                        if sequence in emitted:
+                            if emitted[sequence] != output:
+                                self.result.conflicts.append((sequence, emitted[sequence], output))
+                            continue
+                        emitted[sequence] = output
+                        lines.append("%s\t: %s" % (sequence, compose_string(output)))
         return 'include "%L"\n\n' + "\n".join(lines) + "\n"
 
 
@@ -752,9 +904,19 @@ def convert(
         display_name: Name shown by desktop layout pickers.
         hints: Per-layout choices from the registry index (XkbHints).
     """
+    return convert_layout(parse_keylayout(keylayout_text), keycodes, layout_id, display_name, hints)
+
+
+def convert_layout(
+    layout: Keylayout,
+    keycodes: Sequence[Tuple[str, int]],
+    layout_id: str,
+    display_name: str,
+    hints: Optional[XkbHints] = None,
+) -> Conversion:
+    """Convert a parsed Keylayout (from parse_keylayout or from_canonical)."""
     if not re.fullmatch(r"[A-Za-z0-9_]+", layout_id):
         raise KeylayoutError("layout id %r must be letters, digits and _" % layout_id)
-    layout = parse_keylayout(keylayout_text)
     converter = _Converter(layout, keycodes, hints or XkbHints())
     template = (DATA_DIR / "xkb_symbols.txt").read_text(encoding="utf-8")
     # Dead triggers first, in state order, so borrowed keysyms do not depend
@@ -764,11 +926,26 @@ def convert(
     ):
         converter.dead_trigger(state)
     result = converter.result
+    result.unplaced = unplaced_codes(layout, keycodes)
     result.symbols_text = converter.symbols(template, layout_id, display_name)
     result.compose_text = converter.compose()
     result.borrowed = dict(converter.borrowed)
     result.dead_triggers = dict(converter.dead_triggers)
     return result
+
+
+def unplaced_codes(layout: Keylayout, keycodes: Sequence[Tuple[str, int]]) -> List[int]:
+    """Codes of defined keys the keycode table places nowhere (keypad excepted)."""
+    placed = {code for _xkb, code in keycodes}
+    found = set()
+    for maps in layout.key_map_sets.values():
+        for entries in maps.values():
+            for code, (kind, value) in entries.items():
+                if code in placed or code in KEYPAD_CODES:
+                    continue
+                if kind == "action" or is_printable(value):
+                    found.add(code)
+    return sorted(found)
 
 
 def write_package(result: Conversion, out_dir: Path, layout_id: str) -> List[Path]:
@@ -816,9 +993,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         registry_id = args.registry_id or args.layout_id
         hints = hints_from_index(args.index, registry_id) if args.index else XkbHints()
-        text = args.keylayout.read_text(encoding="utf-8")
-        result = convert(
-            text,
+        result = convert_layout(
+            parse_keylayout(args.keylayout.read_text(encoding="utf-8")),
             load_keycodes(args.keycodes, args.convention),
             args.layout_id,
             args.display_name,

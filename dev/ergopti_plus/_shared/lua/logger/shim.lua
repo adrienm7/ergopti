@@ -64,6 +64,7 @@ M.done    = function(t, f, ...) _log("DONE",    t, f, ...) end
 M.info    = function(t, f, ...) _log("INFO",    t, f, ...) end
 M.start   = function(t, f, ...) _log("START",   t, f, ...) end
 M.success = function(t, f, ...) _log("SUCCESS", t, f, ...) end
+M.evidence = function(t, f, ...) _log("INFO",   t, f, ...) end
 M.warn    = function(t, f, ...) _log("WARN",    t, f, ...) end
 M.error   = function(t, f, ...) _log("ERROR",   t, f, ...) end
 

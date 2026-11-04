@@ -19,6 +19,7 @@
 local M = {}
 
 local Logger      = require("infra.logger")
+local NativePath = require("native_path")
 local Snapshot    = require("diagnostics.snapshot")
 
 M.DRIVER = "macos"
@@ -31,7 +32,7 @@ local COMMIT_LOG = "BuildCommit"
 local _emitted = false
 
 -- Directory of this file, the start of the git HEAD lookup for source installs.
-local SOURCE_DIR = (debug.getinfo(1, "S").source:match("^@(.*)[/\\][^/\\]+$")) or "."
+local SOURCE_DIR = NativePath.dirname((debug.getinfo(1, "S").source:gsub("^@", ""))) or "."
 
 
 

@@ -76,16 +76,15 @@ set -o pipefail 2>/dev/null || true
 
 export HF_HUB_DISABLE_XET=1
 
-# The native no-Python PTY retains the admitted source as descriptor 3. Its
-# trusted source directory is derived by that native owner before executing
-# the descriptor; ordinary pathname invocations never use the override.
-case "$0" in
-	/dev/fd/3)
-		case "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" in /*) ;; *) exit 78 ;; esac
-		SCRIPT_DIR="$(cd "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" && pwd)"
-		;;
-	*) SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)" ;;
-esac
+# The native no-Python PTY runs a private, hash-verified snapshot of this file
+# at the exact path it exports. Its trusted source directory is derived by that
+# native owner; ordinary pathname invocations never use the override.
+if [ -n "${ERGOPTI_BOOTSTRAP_SNAPSHOT:-}" ] && [ "$0" = "$ERGOPTI_BOOTSTRAP_SNAPSHOT" ]; then
+	case "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" in /*) ;; *) exit 78 ;; esac
+	SCRIPT_DIR="$(cd "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" && pwd)"
+else
+	SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 NETWORK_RETRY_LIB="$SCRIPT_DIR/network-retry.sh"
 UV_RELEASE_FILE="$SCRIPT_DIR/uv-release.sh"
 for dependency_file in "$NETWORK_RETRY_LIB" "$UV_RELEASE_FILE"; do
@@ -187,6 +186,18 @@ clear_quarantine() {
 
 # The system relay and trust store reach every child from here on.
 apply_system_network
+
+# uv reads only environment relay variables, so under a company PAC the origins
+# it contacts (the package index, its file host and the interpreter release
+# with its redirect host) are named to the route lookup before the opaque
+# admission. Only the opaque admissions use them: the native download helpers
+# resolve each request and redirect themselves and must keep the system route.
+use_uv_route_origins() {
+	if ! OPAQUE_NETWORK_PAC_PROBE_URLS="$(route_origins_for_client uv)"; then
+		OPAQUE_NETWORK_PAC_PROBE_URLS=""
+		log_info "The shared origin inventory of the package installer is unreadable."
+	fi
+}
 
 # The processor the app runs on, as the Lua caller names it
 # (adapters/python_interpreter.lua); uname answers when run by hand.
@@ -290,35 +301,57 @@ fi
 # ====================================
 # ====================================
 
+# Each bootstrap subshell owns only the directory identity it allocated. An
+# interrupted download must retire that directory before the PTY worker exits.
+cleanup_mlx_bootstrap_workspace() {
+	local rc="$1" work="$2" identity="$3" current
+	trap - EXIT INT TERM HUP
+	if [ -n "$work" ]; then
+		current="$(/usr/bin/stat -f '%d:%i' "$work" 2>/dev/null)" || current=""
+		if [ -n "$identity" ] && [ "$current" = "$identity" ] && [ -d "$work" ] && [ ! -L "$work" ]; then
+			if ! rm -rf "$work"; then
+				log_error "Could not remove the owned MLX bootstrap workspace: $work" || true
+				[ "$rc" -ne 0 ] || rc=1
+			fi
+		else
+			log_error "Refusing to remove an unverified MLX bootstrap workspace: $work" || true
+			[ "$rc" -ne 0 ] || rc=1
+		fi
+	fi
+	exit "$rc"
+}
+
 # Installs the pinned uv wheel's executable into the install folder: PyPI's
 # own file, checked against its SHA-256, and no installer script.
-install_pinned_uv() {
+install_pinned_uv() (
 	local target_dir="${UV_INSTALL_DIR:-$HOME/.local/bin}"
-	local work wheel digest
+	local work="" identity="" wheel digest
+	trap - EXIT INT TERM HUP
+	trap 'cleanup_mlx_bootstrap_workspace "$?" "$work" "$identity"' EXIT
+	trap 'exit 130' INT
+	trap 'exit 143' TERM
+	trap 'exit 129' HUP
 	work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-uv.XXXXXX")" || return 1
+	identity="$(/usr/bin/stat -f '%d:%i' "$work")" || return 1
 	wheel="$work/uv.whl"
 	if ! managed_bootstrap_download "$UV_WHEEL_ARM64_URL" "$wheel" "$UV_WHEEL_ARM64_SHA256" "" resilient >&2; then
-		rm -rf "$work"
 		return 1
 	fi
-	digest="$(shasum -a 256 "$wheel" | awk '{print $1}')"
+	digest="$(sha256_file_digest "$wheel")"
 	if [ "$digest" != "$UV_WHEEL_ARM64_SHA256" ]; then
 		log_error "The uv $UV_RELEASE_VERSION wheel does not match its pinned SHA-256 (got $digest)."
-		rm -rf "$work"
 		return 1
 	fi
 	if ! /usr/bin/unzip -q -o "$wheel" "uv-$UV_RELEASE_VERSION.data/scripts/uv" -d "$work/unpacked" >&2; then
 		log_error "The uv $UV_RELEASE_VERSION wheel could not be unpacked."
-		rm -rf "$work"
 		return 1
 	fi
 	mkdir -p "$target_dir" \
 		&& mv -f "$work/unpacked/uv-$UV_RELEASE_VERSION.data/scripts/uv" "$target_dir/uv" \
 		&& chmod 755 "$target_dir/uv"
 	local rc=$?
-	rm -rf "$work"
 	return "$rc"
-}
+)
 
 UV_BIN=""
 if UV_BIN="$(locate_uv)"; then
@@ -402,22 +435,29 @@ native_offline_bootstrap() {
 # Generated metadata comes from the shared release contract; genuine uv owns
 # the offline hash check, extraction and publication of its Python directory.
 native_install_managed_python_without_python() {
-	local work rc python_path
+	local rc python_path
 	[ -f "$SCRIPT_DIR/managed-python-release.sh" ] || return 78
 	# shellcheck source=/dev/null
-	source "$SCRIPT_DIR/managed-python-release.sh"
+	source "$SCRIPT_DIR/managed-python-release.sh" || return 78
 	[ "$MANAGED_PYTHON_UV_RELEASE" = "$UV_RELEASE_VERSION" ] || return 78
 	case "$MANAGED_PYTHON_REQUEST" in cpython-"$PYTHON_VERSION".*-macos-aarch64-none) ;; *) return 78 ;; esac
 	[ -f "$SCRIPT_DIR/$MANAGED_PYTHON_DOWNLOADS_BASENAME" ] || return 78
-	work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-native-python.XXXXXX")" || return 1
-	if ! managed_bootstrap_download "$MANAGED_PYTHON_URL" "$work/$MANAGED_PYTHON_CACHE_BASENAME" "$MANAGED_PYTHON_SHA256" "" resilient >&2; then
-		rm -rf "$work"
-		return 1
-	fi
-	UV_PYTHON_CACHE_DIR="$work" UV_PYTHON_DOWNLOADS=manual "$UV_BIN" python install "$MANAGED_PYTHON_REQUEST" \
-		--offline --no-config --python-downloads-json-url "$SCRIPT_DIR/$MANAGED_PYTHON_DOWNLOADS_BASENAME" >&2
+	(
+		local work="" identity=""
+		trap - EXIT INT TERM HUP
+		trap 'cleanup_mlx_bootstrap_workspace "$?" "$work" "$identity"' EXIT
+		trap 'exit 130' INT
+		trap 'exit 143' TERM
+		trap 'exit 129' HUP
+		work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-native-python.XXXXXX")" || exit 1
+		identity="$(/usr/bin/stat -f '%d:%i' "$work")" || exit 1
+		if ! managed_bootstrap_download "$MANAGED_PYTHON_URL" "$work/$MANAGED_PYTHON_CACHE_BASENAME" "$MANAGED_PYTHON_SHA256" "" resilient >&2; then
+			exit 1
+		fi
+		UV_PYTHON_CACHE_DIR="$work" UV_PYTHON_DOWNLOADS=manual "$UV_BIN" python install "$MANAGED_PYTHON_REQUEST" \
+			--offline --no-config --python-downloads-json-url "$SCRIPT_DIR/$MANAGED_PYTHON_DOWNLOADS_BASENAME" >&2
+	)
 	rc=$?
-	rm -rf "$work"
 	[ "$rc" -eq 0 ] || return "$rc"
 	python_path="$("$UV_BIN" python find "$MANAGED_PYTHON_REQUEST" --offline)" || return 1
 	[ -x "$python_path" ] && ! lacks_native_slice "$python_path" || return 1
@@ -435,7 +475,7 @@ else
 	# 'uv python find' returns non-zero when no managed interpreter matching
 	# the request is available. In that case we ask uv to download one.
 	if ! "$UV_BIN" python find "$PYTHON_REQUEST" >/dev/null 2>&1; then
-		if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
+		if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque || exit $?; fi
 		emit_marker "PYTHON_INSTALLING"
 		log_info "Téléchargement de Python $PYTHON_VERSION via uv (interpréteur managé)…"
 		# uv prints "Downloading cpython-3.11.x (45 MB)…" on stderr — we forward
@@ -477,8 +517,8 @@ fi
 # resolution invalidates the environment.
 dependency_fingerprint() {
 	local pyproject_hash lock_hash
-	pyproject_hash="$(shasum -a 256 "$PYPROJECT" | awk '{print $1}')" || return 1
-	lock_hash="$(shasum -a 256 "$UV_LOCK" | awk '{print $1}')" || return 1
+	pyproject_hash="$(sha256_file_digest "$PYPROJECT")" || return 1
+	lock_hash="$(sha256_file_digest "$UV_LOCK")" || return 1
 	printf "%s:%s" "$pyproject_hash" "$lock_hash"
 }
 
@@ -492,35 +532,47 @@ fi
 # script derived, and only when it is a real folder holding a Python
 # environment (or nothing): never a link, a file, or a foreign folder.
 venv_is_removable() {
-	if [ -L "$VENV_DIR" ]; then
-		log_error "Refusing to remove '$VENV_DIR': it is a symbolic link, not Ergopti's MLX venv."
+	local target="$1"
+	if [ -L "$target" ]; then
+		log_error "Refusing to remove '$target': it is a symbolic link, not Ergopti's MLX venv."
 		return 1
 	fi
-	if [ ! -e "$VENV_DIR" ]; then
+	if [ ! -e "$target" ]; then
 		return 0
 	fi
-	if [ ! -d "$VENV_DIR" ]; then
-		log_error "Refusing to remove '$VENV_DIR': it is not a folder."
+	if [ ! -d "$target" ]; then
+		log_error "Refusing to remove '$target': it is not a folder."
 		return 1
 	fi
-	if [ -f "$VENV_DIR/pyvenv.cfg" ] || [ -e "$VENV_DIR/bin/python" ] || [ -L "$VENV_DIR/bin/python" ]; then
+	local contents
+	# Preserve newline-only entry names across command substitution; only the
+	# sentinel by itself proves that a successfully inspected folder is empty.
+	if ! contents="$(ls -A "$target" 2>/dev/null && printf '.')"; then
+		log_error "Cannot inspect MLX repair candidate contents."
+		return 1
+	fi
+	if [ -f "$target/pyvenv.cfg" ] || [ -e "$target/bin/python" ] || [ -L "$target/bin/python" ]; then
 		return 0
 	fi
-	if [ -z "$(ls -A "$VENV_DIR" 2>/dev/null)" ]; then
+	if [ "$contents" = "." ]; then
 		return 0
 	fi
-	log_error "Refusing to remove '$VENV_DIR': it holds no Python environment."
+	log_error "Refusing to remove '$target': it holds no Python environment."
 	return 1
 }
 
 if [ "$REPAIR_MODE" = "1" ]; then
 	emit_marker "VENV_SYNC_RAN"
 	emit_marker "VENV_REMOVING"
-	if ! venv_is_removable; then
-		exit 5
-	fi
-	if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
-	for leftover in "$VENV_DIR" "$VENV_DIR".bootstrap.* "$VENV_DIR".rollback.*; do
+	# A matching basename does not establish an environment. Inspect every
+	# candidate before deleting the live venv, so a refused neighbor leaves
+	# the previously installed runtime available as well as its own bytes.
+	REPAIR_CANDIDATES=("$VENV_DIR" "$VENV_DIR".bootstrap.* "$VENV_DIR".rollback.*)
+	for leftover in "${REPAIR_CANDIDATES[@]}"; do
+		if ! venv_is_removable "$leftover"; then exit 5; fi
+	done
+	if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque || exit $?; fi
+	for leftover in "${REPAIR_CANDIDATES[@]}"; do
 		if [ ! -e "$leftover" ] && [ ! -L "$leftover" ]; then
 			continue
 		fi
@@ -579,7 +631,7 @@ fi
 
 # Admission precedes uv venv (which may fetch Python) and uv sync. A verified
 # cached environment returned above requires no opaque network capability.
-if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
+if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque || exit $?; fi
 
 # Slow path: real work is about to happen. Emit VENV_SYNC_RAN FIRST so the
 # Hammerspoon caller surfaces a "patientez" notification immediately, then

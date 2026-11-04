@@ -45,7 +45,12 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local original_output_observer_factory, original_capture_output = nil, nil
+local kernel_backends = setmetatable({}, { __mode = "k" })
+local kernel_declared = setmetatable({}, { __mode = "k" })
+local original_kernel_capture, original_kernel_ports = nil, nil
+local kernel_sources = setmetatable({}, { __mode = "k" })
 
 local Logger = require("logger.shim")
 local LOG = "adapters.uinput_writer"
@@ -62,7 +67,16 @@ local LOG = "adapters.uinput_writer"
 -- linux/input-event-codes.h
 local EV_SYN     = 0x00
 local EV_KEY     = 0x01
+local EV_REL     = 0x02
 local SYN_REPORT = 0x00
+
+-- The relative axes the device can send: pointer motion and both wheels, in
+-- their classic and high-resolution reports. The keyboard hook forwards a mouse
+-- through them while the navigation layer owns its wheel (adapters/keyboard_hook).
+local RELATIVE_AXES = { 0x00, 0x01, 0x06, 0x08, 0x0b, 0x0c }
+local RELATIVE_AXIS = {}
+for _, axis in ipairs(RELATIVE_AXES) do RELATIVE_AXIS[axis] = true end
+local RELATIVE_VALUE_LIMIT = 0x7FFFFFFF
 
 -- linux/uinput.h ioctl requests, asm-generic _IOC encoding.
 --   UI_SET_EVBIT   = _IOW('U', 100, int)                → 0x40045564
@@ -72,6 +86,8 @@ local SYN_REPORT = 0x00
 --   UI_DEV_DESTROY = _IO ('U',   2)                     → 0x5502
 local UI_SET_EVBIT   = 0x40045564
 local UI_SET_KEYBIT  = 0x40045565
+--   UI_SET_RELBIT  = _IOW('U', 102, int)                → 0x40045566
+local UI_SET_RELBIT  = 0x40045566
 local UI_DEV_SETUP   = 0x405C5503
 local UI_DEV_CREATE  = 0x5501
 local UI_DEV_DESTROY = 0x5502
@@ -107,7 +123,7 @@ local UINPUT_PATH = "/dev/uinput"
 
 -- errno for "present but this user may not read it". A write-only group grant on
 -- /dev/uinput answers exactly this to a read probe.
-local EACCES = 13
+local EACCES = "EACCES"
 
 -- The node every probe and open() targets. Only the tests move it: probing the
 -- real node from a root test run is how a stray regular file came to sit there.
@@ -282,6 +298,36 @@ local function emit_owned(capability, code, value, transaction)
 	return called and acknowledged == true
 end
 
+--- Writes a complete REL/SYN attempt through one captured native owner, outside
+--- any key transaction: a pointer movement or wheel notch never interleaves with
+--- an injected text.
+--- @param capability table Opaque capability.
+--- @param axis integer One of RELATIVE_AXES.
+--- @param value integer A signed 32-bit delta.
+--- @return boolean acknowledged
+local function emit_relative_owned(capability, axis, value)
+	local output = _output
+	if _busy or _debt or _transaction ~= nil or not output_identity(output)
+		or not rawequal(capability, output.capability) then return false end
+	if not RELATIVE_AXIS[axis] or type(value) ~= "number" or value ~= math.floor(value)
+		or value < -RELATIVE_VALUE_LIMIT or value > RELATIVE_VALUE_LIMIT then return false end
+	_busy = true
+	output.write_epoch = output.write_epoch + 1
+	local called, acknowledged = pcall(function()
+		if output.write(output.fd, encode_event(EV_REL, axis, value)) ~= true then return false end
+		if not output_identity(output) then return false end
+		if output.write(output.fd, encode_event(EV_SYN, SYN_REPORT, 0)) ~= true then return false end
+		return output_identity(output)
+	end)
+	if not called or acknowledged ~= true then
+		_debt = true
+		output.write_debt = true
+		pcall(Logger.error, LOG, "An owned native REL/SYN attempt was not acknowledged.")
+	end
+	_busy = false
+	return called and acknowledged == true
+end
+
 --- Retires only the captured native descriptor, never a successor's descriptor.
 --- @param capability table Opaque capability.
 --- @return boolean retired
@@ -355,6 +401,212 @@ end
 --- interpreter: plain Lua 5.4 (what developers run) has no ffi, LuaJIT (what CI
 --- and the daemon run) does, and neither should fail to LOAD the module.
 --- @return table|nil backend, string|nil err
+--- Internal implementation fragment for adapters/uinput_writer.lua.
+--- SOURCE DRAFT: not installed, imported, compiled or exercised.
+--- The factory is called only inside build_ffi_backend, before native open.
+--- Its owner_current argument is the Writer's private original-fd/generation join.
+--- It observes metadata only: no input read, grab, event injection or output grant.
+
+local function build_kernel_node_ports(ffi)
+	if not ffi.abi("64bit") or (ffi.arch ~= "x64" and ffi.arch ~= "arm64") then return nil end
+	if not kernel_declared[ffi] then
+	ffi.cdef([[
+		typedef struct { int64_t tv_sec; uint32_t tv_nsec; int32_t reserved; } ErgoptiStatxTime107;
+		typedef struct {
+			uint32_t mask, blksize; uint64_t attributes;
+			uint32_t nlink, uid, gid; uint16_t mode, spare0;
+			uint64_t ino, size, blocks, attributes_mask;
+			ErgoptiStatxTime107 atime, btime, ctime, mtime;
+			uint32_t rdev_major, rdev_minor, dev_major, dev_minor;
+			uint64_t mnt_id; uint32_t dio_mem_align, dio_offset_align;
+			uint64_t subvol; uint32_t atomic_write_unit_min, atomic_write_unit_max;
+			uint32_t atomic_write_segments_max, spare1; uint64_t spare3[9];
+		} ErgoptiStatx107;
+		int statx(int dirfd, const char *pathname, int flags, unsigned int mask, ErgoptiStatx107 *buf);
+		int openat(int dirfd, const char *pathname, int flags, ...);
+		long pread(int fd, void *buf, unsigned long count, long offset);
+	]])
+	kernel_declared[ffi] = true
+	end
+	if ffi.sizeof("ErgoptiStatx107") ~= 256 or ffi.offsetof("ErgoptiStatx107", "mode") ~= 28
+		or ffi.offsetof("ErgoptiStatx107", "ino") ~= 32
+		or ffi.offsetof("ErgoptiStatx107", "rdev_major") ~= 128
+		or ffi.offsetof("ErgoptiStatx107", "rdev_minor") ~= 132 then return nil end
+	-- These are additional optional ports; existing ordinary Writer ports stay intact.
+	local ports = { openat = ffi.C.openat, statx = ffi.C.statx, pread = ffi.C.pread,
+		close = ffi.C.close, ioctl = ffi.C.ioctl, new = ffi.new, string = ffi.string, errno = ffi.errno }
+	local function ports_current()
+		return ffi.C.openat == ports.openat and ffi.C.statx == ports.statx and ffi.C.pread == ports.pread
+			and ffi.C.close == ports.close and ffi.C.ioctl == ports.ioctl
+			and ffi.new == ports.new and ffi.string == ports.string and ffi.errno == ports.errno
+	end
+	local O_PATH, O_NOFOLLOW, O_CLOEXEC, O_DIRECTORY = 2097152, 131072, 524288, 65536
+	local DIR_FLAGS = O_PATH + O_NOFOLLOW + O_CLOEXEC + O_DIRECTORY
+	local AT_FDCWD, NOFOLLOW, EMPTY_PATH = -100, 256, 4096
+	local TYPE_MASK, INO_MASK = 1, 256
+	local UI_GET_SYSNAME_64 = 0x8040552c -- _IOC(_IOC_READ, 'U', 44, 64), asm-generic.
+	local metadata_debt, busy = false, false
+	local function current(owner_current)
+		local ok, value = pcall(function()
+			if owner_current() ~= true then return false end
+			local matched = ports_current()
+			return matched and owner_current() == true
+		end)
+		return ok and value == true and not metadata_debt
+	end
+	local function stat(dirfd, name, flags)
+		local buffer = ports.new("ErgoptiStatx107[1]")
+		if ports.statx(dirfd, name, flags, TYPE_MASK + INO_MASK, buffer) ~= 0 then return nil end
+		local value = buffer[0]
+		local mask = tonumber(value.mask)
+		if mask % 2 ~= 1 or math.floor(mask / INO_MASK) % 2 ~= 1 then return nil end
+		return { ino = ports.new("uint64_t", value.ino), dev_major = tonumber(value.dev_major),
+			dev_minor = tonumber(value.dev_minor), kind = math.floor(tonumber(value.mode) / 4096) * 4096,
+			rdev_major = tonumber(value.rdev_major), rdev_minor = tonumber(value.rdev_minor) }
+	end
+	local function same(a, b)
+		return a and b and a.ino == b.ino and a.dev_major == b.dev_major and a.dev_minor == b.dev_minor
+			and a.kind == b.kind and a.rdev_major == b.rdev_major and a.rdev_minor == b.rdev_minor
+	end
+	local function sysname(fd)
+		local buffer = ports.new("unsigned char[64]")
+		local count = tonumber(ports.ioctl(fd, UI_GET_SYSNAME_64, buffer))
+		-- Kernel length includes NUL; count == capacity is ambiguous truncation.
+		if not count or count % 1 ~= 0 or count <= 1 or count >= 64 then return nil end
+		local bytes = ports.string(buffer, count)
+		if bytes:sub(-1) ~= "\0" then return nil end
+		local name = bytes:sub(1, -2)
+		if name:find("\0", 1, true) or not name:match("^input[0-9]+$") then return nil end
+		return name
+	end
+	local function close_once(entry)
+		if entry.close_attempted then return false end
+		entry.close_attempted = true
+		local ok, result = pcall(ports.close, entry.fd)
+		if not ok or result ~= 0 then metadata_debt = true; return false end
+		entry.closed = true
+		return true
+	end
+	local function retire_record(record)
+		if record.retired then return record.closed == true end
+		record.retired = true
+		local closed = true
+		for index = #record.entries, 1, -1 do
+			if not close_once(record.entries[index]) then closed = false end
+		end
+		record.closed = closed
+		return closed
+	end
+	local function decimal(value)
+		return value == "0" or value:match("^[1-9][0-9]*$") ~= nil
+	end
+	local function device_numbers(fd)
+		local buffer = ports.new("unsigned char[65]")
+		local count = tonumber(ports.pread(fd, buffer, 65, 0))
+		if not count or count % 1 ~= 0 or count <= 0 or count > 64 then return nil end
+		local bytes = ports.string(buffer, count)
+		local a, b = bytes:match("^([0-9]+):([0-9]+)\n$")
+		if not a or not decimal(a) or not decimal(b) then return nil end
+		local major, minor = tonumber(a), tonumber(b)
+		if not major or not minor or major > 4294967295 or minor > 4294967295 then return nil end
+		-- Refuse a prefix-only read; the held regular metadata fd must reach EOF.
+		if ports.pread(fd, buffer, 1, count) ~= 0 then return nil end
+		return major, minor
+	end
+	local function named_current(record)
+		for _, entry in ipairs(record.entries) do
+			if entry.closed or entry.close_attempted or not same(entry.identity, stat(entry.fd, "", EMPTY_PATH))
+				or not same(entry.identity, stat(entry.parent, entry.name, NOFOLLOW)) then return false end
+		end
+		return true
+	end
+	local function acquire(fd, owner_current, path)
+		if busy or metadata_debt or type(path) ~= "string" or #path > 1024
+			or not path:match("^/dev/input/event[0-9]+$") or not current(owner_current) then return nil, "kernel-node-unavailable" end
+		busy = true
+		local record = { entries = {}, owner_current = owner_current, fd = fd, path = path }
+		local disposition = "refused"
+		local function open_entry(parent, name, flags, kind)
+			if not current(owner_current) then return nil end
+			local opened, value = pcall(ports.openat, parent, name, flags)
+			if not opened then metadata_debt = true; return nil end
+			local error_number = value ~= nil and tonumber(value) < 0 and ports.errno() or nil
+			value = tonumber(value)
+			if value and value < 0 then return nil, error_number == 2 and "missing" or "refused" end
+			if not value or value % 1 ~= 0 or value < 0 or value > 2147483647 then return nil end
+			local entry = { fd = value, parent = parent, name = name }
+			record.entries[#record.entries + 1] = entry -- Retain before any observer.
+			entry.identity = stat(value, "", EMPTY_PATH)
+			if not entry.identity or entry.identity.kind ~= kind
+				or not same(entry.identity, stat(parent, name, NOFOLLOW)) or not current(owner_current) then return nil end
+			return entry
+		end
+		local ok, accepted = pcall(function()
+			record.sysname = sysname(fd)
+			if not record.sysname or not current(owner_current) then return false end
+			local root = open_entry(AT_FDCWD, "/", DIR_FLAGS, 0x4000)
+			if not root then return false end
+			local dev = open_entry(root.fd, "dev", DIR_FLAGS, 0x4000)
+			local input = dev and open_entry(dev.fd, "input", DIR_FLAGS, 0x4000)
+			local event = path:match("(event[0-9]+)$")
+			record.node = input and open_entry(input.fd, event, O_PATH + O_NOFOLLOW + O_CLOEXEC, 0x2000)
+			if not record.node then return false end
+			local sys = open_entry(root.fd, "sys", DIR_FLAGS, 0x4000)
+			local devices = sys and open_entry(sys.fd, "devices", DIR_FLAGS, 0x4000)
+			local virtual = devices and open_entry(devices.fd, "virtual", DIR_FLAGS, 0x4000)
+			local inputs = virtual and open_entry(virtual.fd, "input", DIR_FLAGS, 0x4000)
+			local owned = inputs and open_entry(inputs.fd, record.sysname, DIR_FLAGS, 0x4000)
+			if not owned then return false end
+			local child, refusal = open_entry(owned.fd, event, DIR_FLAGS, 0x4000)
+			if not child then
+				-- Missing only this event child under the held original Writer inputN
+				-- can prove a foreign node. Permission/stat/read errors never do.
+				if refusal == "missing" and named_current(record) and sysname(fd) == record.sysname and current(owner_current) then
+					disposition = "nonmatch"
+				end
+				return false
+			end
+			record.dev = child and open_entry(child.fd, "dev", O_NOFOLLOW + O_CLOEXEC, 0x8000)
+			if not record.dev then return false end
+			local major, minor = device_numbers(record.dev.fd)
+			if not major or not minor then return false end
+			if major ~= record.node.identity.rdev_major or minor ~= record.node.identity.rdev_minor then
+				if named_current(record) and sysname(fd) == record.sysname and current(owner_current) then disposition = "nonmatch" end
+				return false
+			end
+			return named_current(record) and sysname(fd) == record.sysname and current(owner_current)
+		end)
+		if not ok or accepted ~= true then
+			local closed = retire_record(record)
+			busy = false
+			return nil, ok and closed and not metadata_debt and disposition or "refused"
+		end
+		busy = false
+		return record, "matched"
+	end
+	local function observe(record)
+		if busy or not record or record.retired or metadata_debt then return false end
+		busy = true
+		local ok, value = pcall(function()
+			if not current(record.owner_current) or sysname(record.fd) ~= record.sysname or not named_current(record) then return false end
+			local major, minor = device_numbers(record.dev.fd)
+			return major == record.node.identity.rdev_major and minor == record.node.identity.rdev_minor
+				and named_current(record) and sysname(record.fd) == record.sysname and current(record.owner_current)
+		end)
+		busy = false
+		return ok and value == true and not record.retired
+	end
+	local function retire(record)
+		if busy or not record then return false end
+		busy = true
+		local closed = retire_record(record)
+		busy = false
+		return closed
+	end
+	-- Private metadata ports: caller retains records; none is an output capability.
+	return { acquire = acquire, current = observe, retire = retire, ports_current = ports_current, closed = function() return not metadata_debt end }
+end
+
 local function build_ffi_backend()
 	local ok_ffi, ffi = pcall(require, "ffi")
 	if not ok_ffi or type(ffi) ~= "table" then
@@ -377,7 +629,7 @@ local function build_ffi_backend()
 	-- cannot substitute a syscall after the native channel is acknowledged.
 	local native_open, native_close = ffi.C.open, ffi.C.close
 	local native_ioctl, native_write, cast = ffi.C.ioctl, ffi.C.write, ffi.cast
-	return {
+	local backend = {
 		open = function(path, flags)
 			local fd = native_open(path, flags)
 			if fd < 0 then return nil, "open failed" end
@@ -400,6 +652,9 @@ local function build_ffi_backend()
 			return native_close(fd) == 0
 		end,
 	}
+	local admitted, metadata = pcall(build_kernel_node_ports, ffi)
+	if admitted and metadata then kernel_backends[backend] = metadata end
+	return backend
 end
 
 --- Binds the production FFI backend.
@@ -430,17 +685,13 @@ end
 --- True when this channel can plausibly be opened: a backend exists and
 --- /dev/uinput is present.
 ---
---- Deliberately does NOT open the device. Callers use this to choose a channel
---- during startup, and a probe with side effects would leave a half-created
---- virtual keyboard behind on every check.
+--- The temporary read probe never blocks, creates a node or issues an ioctl.
+--- Only open() creates a virtual keyboard.
 --- @return boolean
 function M.is_available()
 	if not _backend and not M.use_ffi_backend() then return false end
-	local fh, _, errno = io.open(_uinput_path, "r")
-	if fh then
-		fh:close()
-		return true
-	end
+	local readable, errno = require("infra.device_access").readable(_uinput_path)
+	if readable then return true end
 	-- Unreadable but present is normal: /dev/uinput is commonly write-only for
 	-- the owning group, so the honest write test is deferred to open(), where
 	-- opening IS the side effect. It is never probed with a write-mode io.open:
@@ -501,6 +752,10 @@ function M.open()
 		if not admit(UI_SET_EVBIT, EV_KEY) then return false end
 		for code = 1, KEY_CODE_MAX do
 			if not admit(UI_SET_KEYBIT, code) then return false end
+		end
+		if not admit(UI_SET_EVBIT, EV_REL) then return false end
+		for _, axis in ipairs(RELATIVE_AXES) do
+			if not admit(UI_SET_RELBIT, axis) then return false end
 		end
 		if not admit(UI_SET_EVBIT, EV_SYN) then return false end
 		if not admit(UI_DEV_SETUP, encode_setup()) then return false end
@@ -614,6 +869,35 @@ function M.emit(code, value)
 	return true
 end
 
+--- Writes one relative report (a pointer movement or a wheel notch) and its SYN.
+--- Refused while a key transaction or a dispatch owns the channel.
+--- @param axis integer REL_X, REL_Y, REL_HWHEEL, REL_WHEEL or a high-resolution wheel.
+--- @param value integer Signed delta.
+--- @return boolean written
+function M.emit_relative(axis, value)
+	if _dispatch or _busy or _debt or _transaction ~= nil then return false end
+	if _output ~= nil then return emit_relative_owned(_output.capability, axis, value) end
+	if not RELATIVE_AXIS[axis] or type(value) ~= "number" or value ~= math.floor(value)
+		or value < -RELATIVE_VALUE_LIMIT or value > RELATIVE_VALUE_LIMIT then
+		Logger.error(LOG, "emit_relative(): invalid arguments — axis=%s value=%s.", tostring(axis), tostring(value))
+		return false
+	end
+	if not _fd then
+		Logger.error(LOG, "emit_relative(): device is not open.")
+		return false
+	end
+	_legacy_wire = true
+	if not _backend.write(_fd, M.encode_event(EV_REL, axis, value)) then
+		Logger.warn(LOG, "emit_relative(%d:%d): write failed.", axis, value)
+		return false
+	end
+	if not _backend.write(_fd, M.encode_event(EV_SYN, SYN_REPORT, 0)) then
+		Logger.warn(LOG, "emit_relative(%d:%d): SYN_REPORT write failed.", axis, value)
+		return false
+	end
+	return true
+end
+
 --- Captures a fresh, strictly acknowledged channel before any untracked wire attempt.
 --- @return table|nil capability Opaque; carries no descriptor/backend.
 --- @return function|nil factory Original private observer issuer; grants no new rights.
@@ -648,9 +932,7 @@ end
 --- @return table|nil view
 function M.output_view(capability)
 	if not output_current(capability) then return nil end
-	local down = {}
-	for code in pairs(_output.down) do down[#down + 1] = code end
-	table.sort(down)
+	local down = TableUtil.sorted_keys(_output.down)
 	return { generation = _output.generation, write_epoch = _output.write_epoch,
 		down = down, roster_known = _output.roster_known }
 end
@@ -880,11 +1162,77 @@ M.INPUT_EVENT_SIZE = INPUT_EVENT_SIZE
 M.KEY_CODE_MAX = KEY_CODE_MAX
 M.UI_SET_EVBIT   = UI_SET_EVBIT
 M.UI_SET_KEYBIT  = UI_SET_KEYBIT
+M.UI_SET_RELBIT  = UI_SET_RELBIT
+M.EV_REL     = EV_REL
+M.RELATIVE_AXES = RELATIVE_AXES
 M.UI_DEV_SETUP   = UI_DEV_SETUP
 M.UI_DEV_CREATE  = UI_DEV_CREATE
 M.UI_DEV_DESTROY = UI_DEV_DESTROY
 M.UINPUT_PATH = UINPUT_PATH
 
 original_output_observer_factory, original_capture_output = M.capture_output_observer, M.capture_output
+
+
+--- Private native observation issuer, bound to the original open Writer.
+--- A scripted transport/backend or detached output view cannot construct it.
+function M.capture_kernel_source()
+	if M.capture_kernel_source ~= original_kernel_capture or M.capture_output ~= original_capture_output then return nil end
+	local capability, factory = original_capture_output()
+	local owned = _output
+	local metadata = owned and kernel_backends[owned.backend]
+	if not capability or not owned or owned.capability ~= capability
+		or factory ~= original_output_observer_factory or not metadata or not output_current(capability) then return nil end
+	local retired, records, unresolved = false, {}, false
+	local function current()
+		return not retired and not unresolved and M.capture_kernel_source == original_kernel_capture
+			and M.capture_output == original_capture_output and _output == owned
+			and output_current(capability) and kernel_backends[owned.backend] == metadata
+			and metadata.ports_current() and metadata.closed()
+	end
+	local function retire_node(node)
+		if not records[node] then return false end
+		records[node] = nil -- Physical close is attempted only once by metadata.retire.
+		local called, value = pcall(metadata.retire, node)
+		if not called or value ~= true then unresolved = true; return false end
+		return true
+	end
+	local issuer = {}
+	issuer.owner_current = current
+	issuer.acquire_path = function(path)
+		if not current() then return nil, "refused" end
+		local called, node, disposition = pcall(metadata.acquire, owned.fd, current, path)
+		if not called then unresolved = true; return nil, "refused" end
+		if node then records[node] = true end -- Stage before any subsequent observer.
+		if not current() then
+			if node then retire_node(node) end
+			return nil, "refused"
+		end
+		return node, disposition
+	end
+	issuer.current = function(node)
+		return records[node] == true and current() and metadata.current(node, current) == true
+	end
+	issuer.retire = retire_node
+	issuer.closed = function() return not unresolved and metadata.closed() end
+	issuer.close = function()
+		retired = true
+		local closed = not unresolved
+		for node in pairs(records) do if not retire_node(node) then closed = false end end
+		return closed and metadata.closed()
+	end
+	local token = {}
+	local expected = {}
+	for name, port in pairs(issuer) do expected[name] = port end
+	kernel_sources[token] = { ports = issuer, expected = expected }
+	return token
+end
+function M.kernel_source_ports(token)
+	if M.capture_kernel_source ~= original_kernel_capture or M.kernel_source_ports ~= original_kernel_ports then return nil end
+	local record = kernel_sources[token]
+	if not record then return nil end
+	for name, port in pairs(record.expected) do if record.ports[name] ~= port then return nil end end
+	return record.ports
+end
+original_kernel_capture, original_kernel_ports = M.capture_kernel_source, M.kernel_source_ports
 
 return M

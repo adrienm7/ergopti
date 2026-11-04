@@ -33,6 +33,9 @@
 
 local M = {}
 
+local NativePath = require("native_path")
+local TableUtil = require("table_util")
+
 
 
 
@@ -79,10 +82,7 @@ local SIMPLE_ESCAPES = "btnfr\"\\"
 --- @param t table Any table.
 --- @return table keys Sorted list of the table's keys.
 local function sorted_keys(t)
-	local out = {}
-	for k in pairs(t) do out[#out + 1] = k end
-	table.sort(out, function(a, b) return tostring(a) < tostring(b) end)
-	return out
+	return TableUtil.sorted_keys(t, TableUtil.by_text)
 end
 
 --- @param list table A sequence.
@@ -343,7 +343,7 @@ end
 ---   read_file(path) returns the file content or raises.
 --- @return table ctx The loader context.
 function M.load_context(opts)
-	local root = (tostring(opts.shared_root):gsub("[/\\]$", ""))
+	local root = NativePath.without_trailing_separators(tostring(opts.shared_root))
 	local registry_text = opts.read_file(root .. "/data/keycodes/physical_keys.json")
 	local vocabulary_text = opts.read_file(root .. "/keymap/layer_actions.toml")
 	local registry = opts.json_decode(registry_text)
@@ -358,7 +358,7 @@ end
 --- @param ctx table The loader context.
 --- @return string path Where the user's layer file lives.
 function M.user_file_path(config_dir, ctx)
-	local dir = (tostring(config_dir):gsub("[/\\]$", ""))
+	local dir = NativePath.without_trailing_separators(tostring(config_dir))
 	return dir .. "/" .. ctx.vocabulary._meta.user_file
 end
 

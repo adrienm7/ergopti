@@ -23,23 +23,37 @@ class ConfigCleanupSession {
 		this.State := Map("session", this.Token, "path", Path, "status", "empty", "keys", [])
 	}
 
-	; Captures the exact source around the scanner so a racing writer cannot
-	; associate an older preview with newer confirmation bytes.
-	Refresh() {
-		Before := FSReadUtf8Exact(this.Path)
-		this.Scan := ConfigUnusedKeysFind(this.Path)
-		After := FSReadUtf8Exact(this.Path)
-		this.State["keys"] := this.Scan["keys"]
-		this.State["reason_key"] := "dialog.unused_keys.reason.unreadable"
-		if (this.Scan["status"] != "ok")
-			this.State["status"] := "failed"
-		else if !(Before == After)
-			this.State["status"] := "changed"
-		else {
-			this.Source := After
-			this.State["status"] := this.Scan["keys"].Length ? "ready" : "empty"
-		}
-		return this.State
+	; Matching outer reads alone miss an ABA edit while the scanner runs.
+	; Bind the preview to the image the scanner itself actually classified.
+	Refresh(ReadFn := FSReadUtf8Exact, FindFn := ConfigUnusedKeysFind) {
+		if this.Closed
+			return 0
+		Before := ReadFn.Call(this.Path)
+		if this.Closed
+			return 0
+		Scan := FindFn.Call(this.Path)
+		if this.Closed
+			return 0
+		After := ReadFn.Call(this.Path)
+		; Every I/O may pump a close. Publish one snapshot only while the session
+		; still owns it; a closed window must not recover its discarded scan.
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed
+				return 0
+			this.Scan := Scan
+			this.State["keys"] := Scan["keys"]
+			this.State["reason_key"] := "dialog.unused_keys.reason.unreadable"
+			if (Scan["status"] != "ok")
+				this.State["status"] := "failed"
+			else if !(Before == After) || !(Scan["source"] == After)
+				this.State["status"] := "changed"
+			else {
+				this.Source := Scan["source"]
+				this.State["status"] := Scan["keys"].Length ? "ready" : "empty"
+			}
+			return this.State
+		} finally Critical(PreviousCritical)
 	}
 
 	Close() {
@@ -118,8 +132,8 @@ class ConfigCleanupWindow extends WebViewHost {
 		Host := ConfigCleanupWindow()
 		Host.AppId := "config_cleanup"
 		Host.Session := ConfigCleanupSession(Path)
-		Host.Opts := Map("Title", "ErgoptiPlus — " . t("dialog.unused_keys.title"),
-			"NoActivate", true, "OnReady", (ReadyHost) => ReadyHost.Deliver("ready"),
+		; The host names the window from the manifest and adds the product name.
+		Host.Opts := Map("NoActivate", true, "OnReady", (ReadyHost) => ReadyHost.Deliver("ready"),
 			"OnMessage", (MessageHost, Message) => MessageHost.Deliver(Message))
 		ConfigCleanupWindow.Current := Host
 		try Built := Host._Build()
@@ -162,7 +176,24 @@ class ConfigCleanupWindow extends WebViewHost {
 		return Geo
 	}
 
-	Deliver(Message) {
+	; A confirmation can arrive while another configuration write holds its lease:
+	; the page message interrupts that writer's thread, which keeps the lease
+	; until this one returns, so running the cleanup now could only be refused.
+	; It waits for the write through the menu commands' bounded deferral instead.
+	; @param Message {String|Map} Page message.
+	; @param BusyFn {Func} Test seam: whether a configuration write is in progress.
+	; @param ArmFn {Func} Test seam for the one-shot retry timer.
+	Deliver(Message, BusyFn := 0, ArmFn := 0) {
+		if this.ResetDone || this.Cancelled
+			return
+		if (Message is Map) && Message.Get("action", "") == "clean" {
+			MenuCommandRun(ObjBindMethod(this, "_DeliverNow"), [Message], 0, BusyFn, ArmFn)
+			return
+		}
+		this._DeliverNow(Message)
+	}
+
+	_DeliverNow(Message) {
 		if this.ResetDone || this.Cancelled
 			return
 		if this.Session.Handle(Message)

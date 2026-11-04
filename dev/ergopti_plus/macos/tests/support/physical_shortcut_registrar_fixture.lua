@@ -4,6 +4,57 @@
 local helpers = require("tests.helpers")
 local M = {}
 
+--- Receives a real original compiled empty Navigation owner for the scope fixture.
+--- Only native boundaries use the existing transaction doubles; source admission,
+--- original Nav load, compiler route and publication fence are production code.
+local function with_compiled_navigation(body, controls, files)
+	local lfs = require("lfs")
+	local directory = helpers.temp_dir() .. "/physical-scope-nav-" .. tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999))
+	assert(lfs.mkdir(directory))
+	local path = directory .. "/config_karabiner.toml"
+	local stream = assert(io.open(path, "wb"))
+	assert(stream:write('[karabiner]\nintegration_enabled = true\n[tap_holds]\nenabled = false\n'))
+	assert(stream:close())
+	controls.navigation_source_path = path
+	local saved, original_hs = {}, _G.hs
+	for name, value in pairs(package.loaded) do saved[name] = value end
+	local outcome = table.pack(xpcall(function()
+		return helpers.with_stub_scope({ "platform.remap.nav_layer" }, function()
+			package.loaded["platform.remap.nav_layer"] = nil
+			return require("tests.support.remap_transaction_fixture")(function(fixture)
+				local remap, observations = fixture.load_enabled_remap({ real_user_config_path = path, initially_enabled = false })
+				local paths = package.loaded["infra.config_paths"]
+				paths.get = function(key) if key == "KarabinerConfigPath" then return path end; return "config" end
+				paths.get_config_dir = function() return directory end
+				local terminal, reason
+				local accepted = remap.regenerate(function(ok, detail) terminal, reason = ok, detail end)
+				if observations.start_paused_callback ~= nil then observations.deliver_ready(true, "owned-fixture-ready") end
+				if #observations.resume_callbacks > 0 then observations.deliver_resumed(true, "owned-fixture-resumed") end
+				assert(accepted == true and terminal == true, "original Navigation compilation must actually publish: " .. tostring(reason))
+				local inventory = assert(remap.capture_configured_navigation_inventory(), "original compiled Navigation receipt is required")
+				assert(#inventory.codes == 0 and inventory.current() == true, "only a genuine empty compiled layer admits this fixture")
+				local retained = { ["platform.remap"] = true, ["platform.remap.config"] = true,
+					["platform.remap.nav_layer"] = true, ["infra.config_paths"] = true,
+					["adapters.file_system"] = true, ["json"] = true, ["toml_codec"] = true,
+					["toml_codec.writer"] = true, ["keymap.layers"] = true }
+				-- The scope's own recorded native/port identities stay unchanged.
+				-- Retain only the exact dependencies the compiled producer rejoins.
+				for name in pairs(package.loaded) do if not retained[name] and saved[name] == nil then package.loaded[name] = nil end end
+				for name, value in pairs(saved) do if not retained[name] then package.loaded[name] = value end end
+				_G.hs = original_hs
+				assert(inventory.current() == true, "restoring unrelated scope ports must preserve the original producer")
+				controls.navigation_owner = remap
+				return body()
+			end, { files = files })
+		end)
+	end, debug.traceback))
+	_G.hs = original_hs
+	controls.navigation_source_path = nil
+	assert(os.remove(path)); assert(lfs.rmdir(directory))
+	if not outcome[1] then error(outcome[2], 0) end
+	return table.unpack(outcome, 2, outcome.n)
+end
+
 local function run_fixture(body, source)
 	local root = helpers.driver_root()
 	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared/lua"))
@@ -40,14 +91,17 @@ local function run_fixture(body, source)
 		end
 		return event
 	end
-	local files = { config = source or '[shortcuts]\nenabled = true\nchatgpt_url = "https://example.test"\nkeyboard = { cmd_a = "send_text", foreign = 17 }\ntap_keys = { number_row_left = "send_text", foreign = 21 }\nscript_control = { chords_enabled = true, script_altgr_enter = "open_url", script_altgr_backspace = "none", script_altgr_escape = "none", future = 42 }\nkeys = { ctrl_g = true, future = true }\n[gestures]\naction_parameters = { keyboard__cmd_a__send_text = "keyboard", tap_key__number_row_left__send_text = "tap", script__script_altgr_enter__open_url = "https://example.test", tap_4__open_url = "https://apple.com", future = { keep = 9 } }\n[future]\nkeep = 7\n' }
+	local files = { config = source or '[shortcuts]\nenabled = true\nchatgpt_url = "https://example.test"\nkeyboard = { primary_a = "send_text", foreign = 17 }\ntap_keys = { number_row_left = "send_text", foreign = 21 }\nscript_control = { chords_enabled = true, script_altgr_enter = "open_url", script_altgr_backspace = "none", script_altgr_escape = "none", future = 42 }\nkeys = { ctrl_g = true, future = true }\n[gestures]\naction_parameters = { keyboard__primary_a__send_text = "keyboard", tap_key__number_row_left__send_text = "tap", script__script_altgr_enter__open_url = "https://example.test", tap_4__open_url = "https://apple.com", future = { keep = 9 } }\n[future]\nkeep = 7\n' }
 	if source == false then files.config = nil end
 	local file_port = {
 		read = function(path)
 			local file = assert(io.open(path, "rb"))
 			local content = file:read("*a"); file:close(); return content
 		end,
-		read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
+		read_with_status = function(path)
+			if path == controls.navigation_source_path then return require("toml_codec.writer").read_classified(path) end
+			return files[path], files[path] and "ok" or "absent"
+		end,
 		write = function() error("scope requires conditional publication") end,
 		write_if_unchanged = function(path, value, expected)
 			if controls.refuse_write and path == "config" then return false end
@@ -59,7 +113,7 @@ local function run_fixture(body, source)
 	}
 	package.loaded["adapters.file_system"] = file_port
 	package.loaded["infra.config_paths"] = { get = function() return "config" end }
-	package.loaded["infra.paths"] = { shared = helpers.shared }
+	package.loaded["infra.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 	local logger = helpers.make_logger_stub()
 	controls.errors = {}
 	logger.error = function(_, message, ...) controls.errors[#controls.errors + 1] = string.format(message, ...) end
@@ -204,7 +258,7 @@ local function run_fixture(body, source)
 	local state = { shortcuts = true, script_control_enabled = true,
 		script_control_shortcuts = { script_altgr_enter = "open_url", script_altgr_backspace = "none",
 			script_altgr_delete = "open_personal_shortcuts", script_altgr_escape = "none" },
-		shortcut_keys = { ctrl_g = true }, chatgpt_url = "https://example.test" }
+		shortcut_keys = { cmd_star = true }, chatgpt_url = "https://example.test" }
 	for key, value in pairs(saved.gesture_action_parameters or {}) do
 		local binding, action = gestures.split_action_parameter_key(key)
 		if binding and action and type(value) == "string" then
@@ -212,7 +266,7 @@ local function run_fixture(body, source)
 		end
 	end
 	taps.load(gestures.is_assignable)
-	bindings.pause_hotkeys_only(); bindings.enable("ctrl_g")
+	bindings.pause_hotkeys_only(); bindings.enable("cmd_star")
 	bindings.set_chatgpt_url(state.chatgpt_url)
 	helpers.assert_eq(shortcuts.start(), true)
 	helpers.assert_eq(bindings.is_started(), true, "fixture static registry started")
@@ -246,9 +300,13 @@ local function run_fixture(body, source)
 			return result, detail
 		end,
 	})
-	local ok, detail = pcall(body, { owner = owner, state = state, files = files, controls = controls,
-		gestures = gestures, bindings = bindings, keyboard = keyboard, taps = taps, script = script,
-		shortcuts = shortcuts, prefs = prefs, save = save, demotions = demotions, checkpoint = checkpoint })
+	local ok, detail = pcall(function()
+		return with_compiled_navigation(function()
+			return body({ owner = owner, state = state, files = files, controls = controls,
+				gestures = gestures, bindings = bindings, keyboard = keyboard, taps = taps, script = script,
+				shortcuts = shortcuts, prefs = prefs, save = save, demotions = demotions, checkpoint = checkpoint })
+		end, controls, file_port)
+	end)
 	controls.refuse_stop, controls.refuse_script_stop = nil, false
 	shortcuts.pause_bindings("feature_toggle"); script.stop()
 	if not ok then error(detail, 0) end

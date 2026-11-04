@@ -1,0 +1,461 @@
+--- tests/unit/modules/keystats/log_manager/test_rotation.lua
+
+--- ==============================================================================
+--- MODULE: keystats.rotation Unit Tests
+--- DESCRIPTION:
+--- Verifies the offset/date state accessors, the init validation guard, and the
+--- rollover logic of the rotation module. All filesystem and hs.* calls are
+--- intercepted by the standard hs stub so no real files are created.
+---
+--- FEATURES & RATIONALE:
+--- 1. Offset Accessors: get_offset / set_offset / get_date must form a coherent
+---    round-trip and persist across repeated reads.
+--- 2. Init Guard: walkers called before M.init() must be safe no-ops.
+--- 3. Init Validation: nil / bad deps must be rejected without crashing.
+--- 4. Rollover: M.rollover() must reset the offset to 0 and update the date.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 1/ Module Loading ===========
+-- =====================================
+-- =====================================
+
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
+
+local ROT = helpers.load_with_stubs("modules.keystats.rotation")
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 2/ Module Surface Invariants ========
+-- =============================================
+-- =============================================
+
+helpers.describe("rotation — public surface", function()
+	helpers.it("exposes init, append_log, read_new_entries, rollover, get_offset, set_offset, get_date", function()
+		helpers.assert_eq(type(ROT.init),             "function")
+		helpers.assert_eq(type(ROT.append_log),       "function")
+		helpers.assert_eq(type(ROT.read_new_entries), "function")
+		helpers.assert_eq(type(ROT.rollover),         "function")
+		helpers.assert_eq(type(ROT.get_offset),       "function")
+		helpers.assert_eq(type(ROT.set_offset),       "function")
+		helpers.assert_eq(type(ROT.get_date),         "function")
+	end)
+end)
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 3/ Pre-init State Defaults ==========
+-- =============================================
+-- =============================================
+
+helpers.describe("rotation — pre-init defaults", function()
+	helpers.it("get_offset returns 0 before init", function()
+		helpers.assert_eq(ROT.get_offset(), 0)
+	end)
+
+	helpers.it("get_date returns nil before init", function()
+		helpers.assert_nil(ROT.get_date())
+	end)
+end)
+
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 4/ Pre-init Guard Enforcement =======
+-- =============================================
+-- =============================================
+
+helpers.describe("rotation — pre-init guard", function()
+	helpers.it("append_log before init does not crash", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		-- Called directly. An append before init must write NOTHING: the offset is
+		-- still zero, and a line written past it is a line the next flush replays.
+		helpers.assert_eq(r.append_log({ type = "typing", text = "hello" }), false,
+			"an append rejected by the pre-init guard must report exact false")
+		helpers.assert_eq(r.get_offset(), 0,
+			"an append before init must not advance the offset")
+	end)
+
+	helpers.it("read_new_entries before init returns a failed status at offset 0", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		local entries, off, status = r.read_new_entries()
+		helpers.assert_eq(type(entries), "table")
+		helpers.assert_eq(#entries, 0)
+		helpers.assert_eq(off, 0)
+		helpers.assert_eq(status, r.READ_STATUS_FAILED)
+	end)
+
+	helpers.it("rollover before init does not crash", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.rollover("/tmp/data.sql")
+		helpers.assert_eq(r.get_offset(), 0,
+			"a rollover before init must leave the offset where it was")
+	end)
+end)
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 5/ Init Validation ==================
+-- =============================================
+-- =============================================
+
+helpers.describe("rotation — init validation", function()
+	helpers.it("rejects nil deps", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.init(nil)
+		-- offset must remain 0 — module did not initialize
+		helpers.assert_eq(r.get_offset(), 0)
+	end)
+
+	helpers.it("rejects deps with missing paths table", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.init({ state = {} })
+		helpers.assert_eq(r.get_offset(), 0)
+	end)
+
+	helpers.it("rejects deps with missing state table", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.init({ paths = { today_log_path = "/tmp/today.log" } })
+		helpers.assert_eq(r.get_offset(), 0)
+	end)
+
+	helpers.it("rejects deps without an integer recovery turn budget", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.init({ paths = { today_log_path = "/tmp/today.log" }, state = {}, today_log_offset = 64 })
+		helpers.assert_eq(r.get_offset(), 0)
+		helpers.assert_eq(r.is_initialized(), false)
+		r.init({ paths = { today_log_path = "/tmp/today.log" }, state = {}, today_log_offset = 64,
+			recovery_turn_bytes = 4096.5 })
+		helpers.assert_eq(r.is_initialized(), false)
+	end)
+
+	helpers.it("accepts valid deps and restores provided offset", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.init({
+			recovery_turn_bytes = 65536,
+			paths              = { today_log_path = "/tmp/today.log" },
+			state              = {},
+			today_log_offset   = 1024,
+			today_log_date     = "2024-06-01",
+		})
+		helpers.assert_eq(r.get_offset(), 1024)
+		helpers.assert_eq(r.get_date(), "2024-06-01")
+	end)
+
+	helpers.it("defaults offset to 0 when not provided in deps", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.init({
+			recovery_turn_bytes = 65536,
+			paths  = { today_log_path = "/tmp/today.log" },
+			state  = {},
+		})
+		helpers.assert_eq(r.get_offset(), 0)
+	end)
+
+	helpers.it("ignores a duplicate init call", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.init({
+			recovery_turn_bytes = 65536,
+			paths  = { today_log_path = "/tmp/today.log" },
+			state  = {},
+			today_log_offset = 512,
+		})
+		-- Second call with a different offset must be silently ignored.
+		r.init({
+			recovery_turn_bytes = 65536,
+			paths  = { today_log_path = "/tmp/today.log" },
+			state  = {},
+			today_log_offset = 9999,
+		})
+		helpers.assert_eq(r.get_offset(), 512)
+	end)
+
+	-- Rotation owns file offsets and day boundaries, not the decision to record.
+	-- Both claims below used to be assert_true(true) with the sentence attached;
+	-- both are checkable against the module's own source.
+	helpers.it("holds no pause state of its own (project_suspend_pause_invariant)", function()
+		-- The gate is the keystroke path's early return. A second check here would
+		-- mean two modules decide whether a keystroke is recorded, and the one
+		-- that loses silently advances an offset past bytes nobody wrote.
+		local src = helpers.read_driver_source("function M.set_offset")
+		helpers.assert_true(src ~= nil, "modules/keystats/rotation.lua source must be locatable")
+		helpers.assert_true(src:find("paus") == nil,
+			"rotation must not gate on pause — the ingest path early-returns before reaching it")
+		helpers.assert_true(src:find("suspend") == nil, "same for suspend")
+	end)
+
+	helpers.it("the offset state it exposes carries no keystroke content", function()
+		-- The privacy claim is narrow and precise: rotation's public state is an
+		-- integer and a date. If a future change parked the pending buffer here
+		-- so a rollover could re-emit it, this module would start holding raw
+		-- keys — in a table that is written to disk on every rotation.
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.init({ recovery_turn_bytes = 65536, paths = { today_log_path = "/tmp/today.log" }, state = {} })
+		r.set_offset(4096, "2024-06-15")
+		helpers.assert_eq(type(r.get_offset()), "number", "the offset must stay a byte count")
+		helpers.assert_eq(type(r.get_date()), "string", "the date must stay a date")
+		helpers.assert_eq(r.get_date(), "2024-06-15",
+			"and it must be the date that was set, not a value derived from what was typed")
+	end)
+end)
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 6/ Offset Accessors =================
+-- =============================================
+-- =============================================
+
+helpers.describe("rotation — set_offset / get_offset / get_date", function()
+	local r
+
+	helpers.it("setup: init with zero offset", function()
+		r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.init({
+			recovery_turn_bytes = 65536,
+			paths = { today_log_path = "/tmp/today.log" },
+			state = {},
+		})
+		-- The setup case earns its place by asserting the starting point the cases
+		-- below depend on: they all measure a CHANGE from zero, and read as passing
+		-- if init silently left a stale offset behind.
+		helpers.assert_eq(r.get_offset(), 0, "a fresh init must start at offset zero")
+	end)
+
+	helpers.it("set_offset updates both offset and date", function()
+		r.set_offset(4096, "2024-06-15")
+		helpers.assert_eq(r.get_offset(), 4096)
+		helpers.assert_eq(r.get_date(), "2024-06-15")
+	end)
+
+	helpers.it("set_offset can advance the offset multiple times", function()
+		r.set_offset(100, "2024-07-01")
+		r.set_offset(200, "2024-07-01")
+		r.set_offset(350, "2024-07-01")
+		helpers.assert_eq(r.get_offset(), 350)
+	end)
+
+	helpers.it("get_offset always reflects the last set value", function()
+		r.set_offset(0, "2024-07-02")
+		helpers.assert_eq(r.get_offset(), 0)
+	end)
+end)
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 7/ Rollover Resets Offset ===========
+-- =============================================
+-- =============================================
+
+--- Runs the real rotation state machine with an explicitly acknowledged ledger owner.
+--- @param callback function Receives the fresh Rotation module and exact fixture controls.
+local function with_rollover_owner(callback)
+	return helpers.with_stub_scope({
+		"modules.keystats.rotation", "adapters.ledger_append", "infra.logger",
+		"modules.keystats.timestamp", "adapters.timer_scheduler", "error_description", "number_policy",
+	}, function()
+		local real_open, real_date = io.open, os.date
+		local controls = {
+			date = "2024-07-01", opens = 0, closes = 0, writes = 0,
+			rollovers = 0, recoveries = 0, resets = 0, origins = 0,
+			owner_ack = true, reset_ack = true, after_reset_ack = true, recover_ack = true,
+			completion = {},
+		}
+		local outcome = table.pack(xpcall(function()
+			controls.reset = function(next_date)
+				helpers.assert_eq(next_date, "2024-07-01")
+				controls.resets = controls.resets + 1
+				return controls.reset_ack
+			end
+			controls.origin = function(content)
+				helpers.assert_eq(content, "fixture legacy ledger\n")
+				controls.origins = controls.origins + 1
+				return true
+			end
+			package.loaded["adapters.ledger_append"] = {
+				rollover = function(data_sql, today_path, offset, previous_date, next_date, checked_reset, origin)
+					helpers.assert_eq(data_sql, "/tmp/test_data.sql")
+					helpers.assert_eq(today_path, "/tmp/today.log")
+					helpers.assert_eq(offset, 8192)
+					helpers.assert_eq(previous_date, "2024-06-30")
+					helpers.assert_eq(next_date, "2024-07-01")
+					helpers.assert_eq(type(checked_reset), "function")
+					helpers.assert_true(rawequal(origin, controls.origin))
+					helpers.assert_eq(controls.closes, 1, "close the old stream before durable-owner entry")
+					controls.rollovers = controls.rollovers + 1
+					if controls.owner_ack ~= true then return controls.owner_ack end
+					helpers.assert_eq(origin("fixture legacy ledger\n"), true)
+					if checked_reset(next_date, controls.completion) ~= true then return false end
+					return controls.after_reset_ack
+				end,
+				recover = function(data_sql, outbox, today_path, checked_reset, completion)
+					helpers.assert_eq(data_sql, "/tmp/test_data.sql")
+					helpers.assert_eq(outbox, "")
+					helpers.assert_eq(today_path, "/tmp/today.log")
+					helpers.assert_eq(type(checked_reset), "function")
+					helpers.assert_true(rawequal(completion, controls.completion))
+					helpers.assert_eq(controls.rollovers, 1, "recovery must not prepare another rollover")
+					helpers.assert_eq(controls.closes, 1)
+					controls.recoveries = controls.recoveries + 1
+					if controls.recover_ack ~= true then return controls.recover_ack end
+					return checked_reset("2024-07-01", completion) == true
+				end,
+			}
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			-- Rebind Timestamp's scheduler and its native hs capture before native IO ports.
+			local r = helpers.load_with_stubs("modules.keystats.rotation")
+			io.open = function(path, mode)
+				helpers.assert_eq(path, "/tmp/today.log")
+				helpers.assert_eq(mode, "a+", "pending reads must return before opening the journal")
+				controls.opens = controls.opens + 1
+				local handle = {}
+				local bytes = ""
+				handle.setvbuf = function(self, buffering)
+					helpers.assert_true(rawequal(self, handle))
+					helpers.assert_eq(buffering, "no")
+					return true
+				end
+				handle.write = function(self, content)
+					helpers.assert_true(rawequal(self, handle))
+					helpers.assert_eq(type(content), "string")
+					controls.writes = controls.writes + 1
+					bytes = bytes .. content
+					return handle
+				end
+				handle.close = function(self)
+					helpers.assert_true(rawequal(self, handle))
+					controls.closes = controls.closes + 1
+					return true
+				end
+				return ByteCursor.attach(handle, function() return bytes end)
+			end
+			os.date = function(format, ...)
+				if format == "%Y-%m-%d" then return controls.date end
+				return real_date(format, ...)
+			end
+			r.init({
+				recovery_turn_bytes = 65536,
+				paths = { today_log_path = "/tmp/today.log" }, state = {},
+				today_log_offset = 8192, today_log_date = "2024-06-30",
+			})
+			return callback(r, controls)
+		end, debug.traceback))
+		io.open, os.date = real_open, real_date
+		if not outcome[1] then error(outcome[2], 0) end
+		return table.unpack(outcome, 2, outcome.n)
+	end)
+end
+
+helpers.describe("rotation — rollover", function()
+	helpers.it("rollover resets offset to 0 and updates the date to today", function()
+		with_rollover_owner(function(r, controls)
+			helpers.assert_eq(r.get_offset(), 8192)
+
+			-- Confirm the native delete boundary explicitly; a missing fixture path is
+			-- not a successful rollover and must not reset the in-memory bookmark.
+			-- The durable owner is modeled here; integration covers native retirement.
+			-- Called directly. A rollover RESETS the offset — that is what it is for, and
+			-- an offset left where it was means the next read replays a whole day.
+			helpers.assert_eq(r.rollover("/tmp/test_data.sql", r.READ_STATUS_EOF,
+				controls.reset, controls.origin), true)
+			helpers.assert_eq(r.get_offset(), 0, "a rollover must reset the offset to zero")
+
+			-- Offset is 0 after the durable owner acknowledges the checked reset.
+			helpers.assert_eq(r.get_offset(), 0)
+			helpers.assert_eq(r.get_date(), "2024-07-01")
+			helpers.assert_eq(controls.rollovers, 1)
+			helpers.assert_eq(controls.resets, 1)
+			helpers.assert_eq(controls.origins, 1)
+			helpers.assert_eq(controls.opens, 1)
+		end)
+	end)
+
+	helpers.it("refuses a non-EOF rollover before closing or entering the owner (rollover-owner-port)", function()
+		with_rollover_owner(function(r, controls)
+			helpers.assert_eq(r.rollover("/tmp/test_data.sql", r.READ_STATUS_BATCH,
+				controls.reset, controls.origin), false)
+			helpers.assert_eq(controls.rollovers, 0)
+			helpers.assert_eq(controls.resets, 0)
+			helpers.assert_eq(controls.closes, 0)
+			helpers.assert_eq(r.get_offset(), 8192)
+			helpers.assert_eq(r.get_date(), "2024-06-30")
+			helpers.assert_eq(r.append_log({ type = "typing", timestamp = "fixture" }), true)
+			helpers.assert_eq(controls.writes, 1)
+		end)
+	end)
+
+	helpers.it("fences pending I/O until owner and reset acknowledge literal true (rollover-owner-port)", function()
+		for _, refusal in ipairs({
+			{ port = "owner_ack", value = false }, { port = "owner_ack" },
+			{ port = "reset_ack", value = false }, { port = "reset_ack" },
+		}) do
+			with_rollover_owner(function(r, controls)
+				controls[refusal.port] = refusal.value
+				helpers.assert_eq(r.rollover("/tmp/test_data.sql", r.READ_STATUS_EOF,
+					controls.reset, controls.origin), false)
+				helpers.assert_eq(r.get_offset(), 8192)
+				helpers.assert_eq(r.get_date(), "2024-06-30")
+				helpers.assert_eq(controls.closes, 1)
+				helpers.assert_eq(r.append_log({ type = "typing", timestamp = "fixture" }), false)
+				local entries, offset, status = r.read_new_entries()
+				helpers.assert_eq(entries, {})
+				helpers.assert_eq(offset, 8192)
+				helpers.assert_eq(status, r.READ_STATUS_FAILED)
+				helpers.assert_eq(controls.opens, 1)
+				helpers.assert_eq(controls.writes, 0)
+				controls[refusal.port], controls.date = true, "2024-07-02"
+				helpers.assert_eq(r.rollover("/tmp/test_data.sql", r.READ_STATUS_FAILED,
+					controls.reset, controls.origin), true)
+				helpers.assert_eq(controls.rollovers, 2)
+				helpers.assert_eq(controls.recoveries, 0)
+				helpers.assert_eq(r.get_offset(), 0)
+				helpers.assert_eq(r.get_date(), "2024-07-01")
+				helpers.assert_eq(controls.opens, 1)
+			end)
+		end
+	end)
+
+	helpers.it("recovers the exact acknowledged completion without a new rollover (rollover-owner-port)", function()
+		with_rollover_owner(function(r, controls)
+			controls.after_reset_ack = false
+			helpers.assert_eq(r.rollover("/tmp/test_data.sql", r.READ_STATUS_EOF,
+				controls.reset, controls.origin), false)
+			helpers.assert_eq(controls.resets, 1)
+			helpers.assert_eq(r.get_offset(), 8192)
+			helpers.assert_eq(r.get_date(), "2024-06-30")
+			controls.date = "2024-07-02"
+			helpers.assert_eq(r.rollover("/tmp/test_data.sql", r.READ_STATUS_FAILED,
+				controls.reset, controls.origin), true)
+			helpers.assert_eq(controls.rollovers, 1)
+			helpers.assert_eq(controls.recoveries, 1)
+			helpers.assert_eq(controls.closes, 1)
+			helpers.assert_eq(r.get_offset(), 0)
+			helpers.assert_eq(r.get_date(), "2024-07-01")
+		end)
+	end)
+end)

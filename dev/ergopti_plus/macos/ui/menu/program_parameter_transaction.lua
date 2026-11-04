@@ -14,13 +14,11 @@ local Codec = require("toml_codec")
 local Writer = require("toml_codec.writer")
 local Assignment = require("shortcuts.assignment")
 local Manifest = require("infra.manifest_reader")
+local PhysicalSlots = require("shortcuts.physical_slots")
+local TableUtil = require("table_util")
 local LOG = "menu.program_parameter_transaction"
 
-local function copy(source)
-	local result = {}
-	for key, value in pairs(source) do result[key] = value end
-	return result
-end
+local copy = TableUtil.shallow_copy
 
 local function equal(left, right)
 	if type(left) ~= "table" or type(right) ~= "table" then return false end
@@ -87,7 +85,7 @@ function M.new(options)
 	local function assignment_source(source, mutation, action)
 		if mutation.publishes_assignment ~= true then return source end
 		local row
-		if mutation.section == "shortcuts.keyboard" then
+		if mutation.section == require("config_keys").KEY.SHORTCUTS_KEYBOARD then
 			row = Assignment.operation(mutation.key, action, function(key) return key == mutation.key end, gestures.is_assignable)
 		else
 			row = Manifest.sparse_operation(mutation.section .. "." .. mutation.key, action)
@@ -98,17 +96,19 @@ function M.new(options)
 		return { status = "ok", content = content }
 	end
 	local function guard(saved)
+		if saved.parameter_spec ~= nil and (gestures.get_action_parameter_spec(saved.action) ~= saved.parameter_spec
+			or gestures.validate_action_parameter(saved.action, saved.value) ~= true) then return false end
 		if not current_path() or not deep_equal(checkpoint.capture(), saved.checkpoint)
 			or not deep_equal(preferences.publication_receipt(options.path), saved.receipt) then return false end
 		local observed_action = saved.mutation.read()
 		if saved.assignment_restored or not saved.assignment_attempted then
 			if observed_action ~= saved.previous then return false end
-		elseif observed_action ~= saved.previous and observed_action ~= "run_program" then return false end
+		elseif observed_action ~= saved.previous and observed_action ~= saved.action then return false end
 		if saved.mutation.read_menu then
 			local menu_action = saved.mutation.read_menu()
 			if saved.assignment_restored or not saved.assignment_attempted then
 				if menu_action ~= saved.previous then return false end
-			elseif menu_action ~= saved.previous and menu_action ~= "run_program" then return false end
+			elseif menu_action ~= saved.previous and menu_action ~= saved.action then return false end
 		end
 		local parameters = gestures.get_all_action_parameters()
 		if saved.parameters_restored then
@@ -290,19 +290,30 @@ function M.new(options)
 	end
 	--- Publishes one scalar and assignment only with exact native and disk receipts.
 	--- @param binding string Canonical invoker identifier.
-	--- @param action string Program action identifier.
-	--- @param value string Validated private program scalar.
+	--- @param action string Parameterized action identifier.
+	--- @param value string Validated parameter scalar.
 	--- @param mutation table Assignment read, apply and restore ports, plus disk section/key.
 	--- @return boolean committed
 	function owner.apply(binding, action, value, mutation)
-		if action ~= "run_program" or type(binding) ~= "string" or type(value) ~= "string"
+		if type(action) ~= "string" or type(binding) ~= "string" or type(value) ~= "string"
 			or type(mutation) ~= "table" then return false end
+		-- Physical assignments belong to their joint scope publication owner.
+		-- Namespace refusal includes malformed keys, before any admission or mutation.
+		if PhysicalSlots.is_namespace(binding:match("^keyboard__(.*)$"))
+			or mutation.section == require("config_keys").KEY.SHORTCUTS_KEYBOARD and PhysicalSlots.is_namespace(mutation.key) then return false end
 		for _, name in ipairs({ "read", "apply", "restore" }) do if type(mutation[name]) ~= "function" then return false end end
 		return options.admission("Private program parameter edit", function()
 			if options.paused() ~= false or not current_path() then return false end
 			if claim.pending() and claim.retry_restore() ~= true then return false end
 			local stage = "capture"
 			local called, committed = pcall(function()
+				local parameter_spec
+				if action ~= "run_program" then
+					if type(gestures.get_action_parameter_spec) ~= "function"
+						or type(gestures.validate_action_parameter) ~= "function" then return false end
+					parameter_spec = gestures.get_action_parameter_spec(action)
+					if type(parameter_spec) ~= "string" or gestures.validate_action_parameter(action, value) ~= true then return false end
+				end
 				local source = preferences.source_snapshot(options.path)
 				if not matches(source, physical()) then return false end
 				local previous, parameters = mutation.read(), gestures.get_all_action_parameters()
@@ -314,7 +325,8 @@ function M.new(options)
 				if not candidate_source or not current_path() then return false end
 				local candidate = copy(parameters)
 				candidate[binding .. "__" .. action] = value
-				debt = { mutation = mutation, previous = previous, parameters = copy(parameters), candidate_parameters = candidate,
+				debt = { mutation = mutation, action = action, value = value, parameter_spec = parameter_spec,
+					previous = previous, parameters = copy(parameters), candidate_parameters = candidate,
 					source = source, sources = { source, candidate_source }, checkpoint = revision, prior_checkpoint = revision, receipt = receipt }
 				stage = "parameter"
 				if not invoke("parameter mutation", gestures.set_action_parameter, binding, action, value) then return false end

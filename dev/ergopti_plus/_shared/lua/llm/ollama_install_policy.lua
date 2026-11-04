@@ -8,6 +8,7 @@
 --- admission, consent and process lifecycle remain driver-owned capabilities.
 --- ==============================================================================
 
+local Identifiers = require("identifiers")
 local M = {}
 local ASSETS = {
 	linux = { x86_64 = "linux-amd64", amd64 = "linux-amd64", aarch64 = "linux-arm64", arm64 = "linux-arm64" },
@@ -57,7 +58,7 @@ function M.asset(catalogue, platform, architecture)
 		or type(digest) ~= "string" or #digest ~= 64 or not digest:match("^[0-9a-f]+$")
 		or type(bytes) ~= "number" or bytes <= 0 or bytes % 1 ~= 0 then return nil, "ollama_release_unreadable" end
 	return { key = key, version = version, name = name, sha256 = digest, bytes = bytes,
-		url = "https://github.com/ollama/ollama/releases/download/v" .. version .. "/" .. name }
+		url = "https://" .. Identifiers.hosts.github .. "/ollama/ollama/releases/download/v" .. version .. "/" .. name }
 end
 
 --- Chooses only a valid explicit XDG root or an actual absolute HOME fallback.

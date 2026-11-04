@@ -37,10 +37,112 @@ DiagSnapshot_Fields() {
 	static Fields := [
 		"driver", "version", "commit", "os", "os_version", "arch", "runtime",
 		"elevated", "locale", "keyboard_layout", "monitors", "dpi", "display",
-		"config_dir", "logs_dir", "log_level", "features_enabled", "boot_ms"
+		"config_dir", "logs_dir", ConfigLeaf.LOG_LEVEL, "features_enabled", "boot_ms"
 	]
 	return Fields
 }
+
+/** Produces closed collector identity fields without paths or personal state. */
+DiagSnapshot_CollectionIdentity() {
+	global _SharedDir, BUNDLE_COMMIT
+	if A_IsCompiled {
+		if !IsSet(BUNDLE_COMMIT) || !RegExMatch(BUNDLE_COMMIT, "i)^[0-9a-f]{40}$")
+			throw Error("Installed diagnostic collection requires its complete source build stamp.")
+		SourceSha := StrLower(BUNDLE_COMMIT)
+	} else {
+		SourceSha := DiagSnapshot_GitCommit(A_ScriptDir, true)
+		if SourceSha == ""
+			SourceSha := "unknown"
+	}
+	Identity := Map("compiled", A_IsCompiled ? 1 : 0, "evidence_origin", "resident_driver", "version", Updater_CurrentVersion(),
+		"source_sha", SourceSha, "architecture", A_PtrSize == 8 ? "x64" : "x86",
+		"runtime", A_AhkVersion, "receiver_title", t("healthcheck.collection.start"))
+	Rules := JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\redaction.json"))
+	Context := HealthCheck_RedactionContext()
+	for Key in ["version", "source_sha", "architecture", "runtime", "receiver_title"] {
+		if Redact_Apply(Identity[Key], Rules, Context) != Identity[Key]
+			throw Error("Diagnostic technical identity failed redaction admission.")
+	}
+	Identity["redaction_verified"] := true
+	ProcessIdentity := PLC_CurrentProcessIdentity()
+	global _DriverMutexDecision, _DriverMutexHandle, _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
+	Identity["input_owner"] := Map("pid", ProcessIdentity["pid"],
+		"created_filetime", ProcessIdentity["created_filetime"],
+		"mutex", IsSet(_DriverMutexDecision) ? _DriverMutexDecision : "unavailable",
+		"mutex_handle_retained", IsSet(_DriverMutexHandle) && _DriverMutexHandle != 0 ? 1 : 0,
+		"dispatcher_started", HookDispatcher._started ? 1 : 0,
+		"native_started", _LLM_NavEventOwnerStarted ? 1 : 0,
+		"native_quarantined", _LLM_NavEventOwnerQuarantined ? 1 : 0)
+	return Identity
+}
+
+/** Reads closed resident state without acquiring an input, model or capture owner. */
+DiagSnapshot_ResidentObservations(Contract := 0) {
+	global _SharedDir, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration, HSE_RegistryTransitionDepth, HSE_Suppressed
+	global _PrefixContentGeneration, _PrefixWatcherSuppressed, _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
+	global _OllamaIdentityPendingHandles
+	if !(Contract is Map)
+		Contract := JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\collection.json"))
+	Fields := Contract["resident_observation_fields"]
+	Rows := []
+	for Id in ["hotstrings", "ai", "capture_replay", "fifo"]
+		Rows.Push(_DiagSnapshot_ResidentRow(Id, Fields[Id], Contract["resident_observation_preconditions"]))
+	PreviousCritical := Critical("On")
+	try {
+		Row := Rows[1]
+		Row["status"] := "PASS", Row["scope"] := "runtime_state", Row["reason"] := "resident_generations_observed"
+		Row["values"] := Map("registry_generation", HSE_RegistryGeneration, "runtime_generation", HSE_RuntimeDecisionGeneration,
+			"transition_depth", HSE_RegistryTransitionDepth, "suppression_depth", HSE_Suppressed,
+			"prefix_generation", _PrefixContentGeneration, "prefix_suppression_depth", _PrefixWatcherSuppressed)
+		try _DiagSnapshot_ResidentNativeReads(Rows)
+		catch as Err {
+			LoggerWarn("DiagnosticsCollection", "Resident native state queries failed; their observations remain incomplete.")
+			for Index in [3, 4]
+				Rows[Index]["status"] := "FAIL", Rows[Index]["reason"] := "native_observation_error",
+					Rows[Index]["errors"] := [Map("reason", "native_observation_error")]
+		}
+		Flow := IsSet(_LLM_ManagedBootstrap) ? _LLM_ManagedBootstrap : 0
+		Row := Rows[2]
+		Row["values"]["managed_owner_present"] := IsObject(Flow) ? 1 : 0
+		Row["values"]["identity_handle_debt"] := _OllamaIdentityPendingHandles.Count
+		if IsObject(Flow) && !(Flow.Port is Map) && Flow.Ready && IsObject(Flow.Runtime) && Flow.Runtime.Record is Map {
+			Record := Flow.Runtime.Record
+			Target := Record.Get("target", 0)
+			if _OllamaIdentityPendingHandles.Count {
+				; A diagnostic read cannot perform another operation's debt retirement.
+				Row["reason"] := "native_identity_cleanup_pending"
+			} else if Target is Map && Record.Get("ready", false) && !Record.Get("cancelled", true)
+					&& !Record.Get("terminal", true) && Flow.Runtime.HasOwner() && Flow.Endpoint == LLM_OLLAMA_BASE_URL {
+				Started := A_TickCount
+				Ready := OllamaNativeIdentityReady(Record.Get("process_receipt", 0), Target.Clone())
+				Ready := Ready && _LLM_ManagedBootstrap == Flow && Flow.Runtime.Record == Record
+					&& Flow.Ready && !Flow.Cancelled && Flow.Endpoint == LLM_OLLAMA_BASE_URL
+				Row["status"] := Ready ? "PASS" : "FAIL", Row["scope"] := "native_readonly"
+				Row["reason"] := Ready ? "native_managed_listener_identity_observed" : "native_managed_listener_identity_refused"
+				Row["duration_ms"] := TickElapsed(Started), Row["values"]["live_identity"] := Ready ? 1 : 0
+			}
+		}
+	} catch as Err {
+		; The archive exports only a closed failure, never exception text or user paths.
+		LoggerWarn("DiagnosticsCollection", "Resident state observation failed; functional qualification remains unavailable.")
+		Row["status"] := "FAIL", Row["reason"] := "resident_observation_error"
+		Row["errors"] := [Map("reason", "resident_observation_error")]
+		Rows[2]["values"]["identity_handle_debt"] := _OllamaIdentityPendingHandles.Count
+	} finally Critical(PreviousCritical)
+	CapturedAt := PLC_CurrentFiletime()
+	return Map(ConfigLeaf.SCHEMA_VERSION, Contract["resident_observation_schema_version"],
+		"captured_at_filetime", CapturedAt, "rows", Rows)
+}
+
+_DiagSnapshot_ResidentRow(Id, Fields, Preconditions) {
+	Values := Map()
+	for Field in Fields
+		Values[Field] := -1
+	return Map("id", Id, "status", "UNRUN", "scope", "unexecuted", "reason", "resident_owner_unavailable",
+		"duration_ms", 0, "scenario_qualified", false, "values", Values,
+		"evidence_class", "automatic", "preconditions", Preconditions.Clone(), "errors", [])
+}
+
 
 ; Log tag of the snapshot line, shared with the other drivers.
 ; @returns {String}
@@ -123,8 +225,9 @@ _DiagSnapshot_ReadTrimmed(Path) {
 ; first question of every bug report, so HEAD is read directly instead of
 ; spawning git after boot.
 ; @param StartDir {String}
-; @returns {String} Abbreviated commit id, or "" outside a repository.
-DiagSnapshot_GitCommit(StartDir) {
+; @param Full {Boolean} Preserve the complete id for a versioned collection manifest.
+; @returns {String} Commit id, or "" outside a repository.
+DiagSnapshot_GitCommit(StartDir, Full := false) {
 	static SHORT_SHA_LENGTH := 9
 	static MAX_WALK_DEPTH := 40
 	Dir := RTrim(StartDir, "\/")
@@ -153,7 +256,7 @@ DiagSnapshot_GitCommit(StartDir) {
 		return ""
 	Head := _DiagSnapshot_ReadTrimmed(GitDir . "\HEAD")
 	if RegExMatch(Head, "^[0-9a-f]{40}$")
-		return SubStr(Head, 1, SHORT_SHA_LENGTH)
+		return Full ? Head : SubStr(Head, 1, SHORT_SHA_LENGTH)
 	if !RegExMatch(Head, "^ref:\s*(\S+)$", &RefMatch)
 		return ""
 	Ref := RefMatch[1]
@@ -170,7 +273,7 @@ DiagSnapshot_GitCommit(StartDir) {
 		if RegExMatch(Packed, "m)^([0-9a-f]{40}) \Q" . Ref . "\E$", &PackedMatch)
 			Sha := PackedMatch[1]
 	}
-	return RegExMatch(Sha, "^[0-9a-f]{40}$") ? SubStr(Sha, 1, SHORT_SHA_LENGTH) : ""
+	return RegExMatch(Sha, "^[0-9a-f]{40}$") ? (Full ? Sha : SubStr(Sha, 1, SHORT_SHA_LENGTH)) : ""
 }
 
 ; The commit a compiled release was stamped with (CI replaces the placeholder in
@@ -322,7 +425,7 @@ DiagSnapshot_Collect(BootMs) {
 		? DiagSnapshot_RedactHome(_ConfigDir, EnvGet("USERPROFILE")) : ""
 	; Where this report's own logs are, from the logger's one resolver.
 	Values["logs_dir"] := DiagSnapshot_RedactHome(LoggerLogsDir(), EnvGet("USERPROFILE"))
-	Values["log_level"] := IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : ""
+	Values[ConfigLeaf.LOG_LEVEL] := IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : ""
 	if (IsSet(Features) && Features is Map) {
 		Counts := DiagSnapshot_CountFeatures(Features)
 		Values["features_enabled"] := Counts["enabled"] . "/" . Counts["total"]

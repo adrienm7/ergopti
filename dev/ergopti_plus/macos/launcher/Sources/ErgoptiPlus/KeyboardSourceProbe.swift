@@ -14,7 +14,7 @@ import Foundation
 
 let kKeyboardSourceProbeFlag = "--keyboard-source-probe"
 private let kKeyboardSourceProbeVersion = 1
-private let kMaximumKeyboardSourceIDBytes = 1_024
+let kMaximumKeyboardSourceIDBytes = 1_024
 private let kMaximumKeyboardSourceCodes = 128
 private let kMaximumKeyboardVirtualCode: UInt16 = 127
 private let kMaximumKeyboardTranslationUnits = 256

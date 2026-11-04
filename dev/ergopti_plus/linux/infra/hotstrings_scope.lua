@@ -37,13 +37,22 @@ local LeafRows = require("toml_codec.leaf_rows")
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec")
 local Planner = require("hotstrings.scope_overrides")
+local PersonalFiles = require("hotstrings.personal_files")
+
+-- The category personal.toml loads as (ui/hotstring_editor/bridge.lua).
+local PERSONAL_CATEGORY = "personal"
 local ScopeFile = require("config_scope_file")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
+local ConfigKeys = require("config_keys")
 
 local LOG = "infra.hotstrings_scope"
-local REPEAT_PATH = "hotstrings.repeat_key_enabled"
+local REPEAT_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
+local BASE_DELAY_PATH = require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY
+local NativePath = require("native_path")
+local TableUtil = require("table_util")
 local _owner, _sequence = nil, 0
+require("infra.scope_registry").register("hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Whether a category or section identity can be named by a canonical path.
 --- @param id string
@@ -54,7 +63,7 @@ end
 
 --- Builds one transaction over the real owners.
 --- @param options table path, backup_suffix, is_paused, and the runtime owners:
----   config, preferences, repeat_key, magic_key, terminators, dynamic (optional),
+---   config, preferences, repeat_key, word_reset, magic_key, terminators, dynamic (optional),
 ---   preview_settings with preview (optional), files, remove.
 --- @return table owner apply(mode), revert(), release(), pending(), retry_restore()
 function M.new(options)
@@ -62,9 +71,11 @@ function M.new(options)
 		and type(options.backup_suffix) == "string", "hotstrings scope requires its path and pause owner")
 	local Config, Preferences = options.config, options.preferences
 	local RepeatKey, MagicKey = options.repeat_key, options.magic_key
+	local WordReset = options.word_reset
 	local Dynamic, PreviewSettings, preview = options.dynamic, options.preview_settings, options.preview
 	local Terminators = options.terminators
 	assert(type(Config) == "table" and type(Preferences) == "table" and type(RepeatKey) == "table"
+		and type(WordReset) == "table"
 		and type(MagicKey) == "table" and type(PreviewSettings) == "table" and type(Terminators) == "table",
 		"hotstrings scope owners are incomplete")
 	local files = options.files or require("adapters.file_system")
@@ -103,19 +114,24 @@ function M.new(options)
 		local bundled = Config.bundled_categories()
 		local groups = {}
 		for id, category in pairs(Config.get_categories()) do
-			local sections = {}
-			for section in pairs(category.sections or {}) do sections[#sections + 1] = section end
-			table.sort(sections)
-			groups[#groups + 1] = { id = id, override = { id }, sections = sections, bundled = bundled[id] == true }
+			local sections = TableUtil.sorted_keys(category.sections or {})
+			-- personal.toml (the "personal" category) and each additional personal file.
+			local personal = id == PERSONAL_CATEGORY or PersonalFiles.components(id) ~= nil
+			groups[#groups + 1] = { id = id, override = { id }, sections = sections, bundled = bundled[id] == true,
+				personal = personal }
 		end
 		table.sort(groups, function(left, right) return left.id < right.id end)
+		-- The base expansion delay is one of the scope's own preferences: after it the
+		-- base is the recommended value (restore) or the default (clear), and the
+		-- delays below are offsets of THAT base, whatever the user's is today.
+		local base_after = mode == "recommended" and Manifest.recommended_for(BASE_DELAY_PATH)
+			or Manifest.default_for(BASE_DELAY_PATH)
 		local changes = Planner.plan({ mode = mode, features = Manifest.features(), groups = groups,
-			inherited = Config.inherited_delay,
-			extra = { { override = { "_global" }, fields = { "delay" } },
-				{ override = { "dynamichotstrings" }, fields = Planner.FIELDS } } })
+			inherited = function(group, section) return Config.inherited_delay(group, section, base_after) end,
+			extra = { { override = { "dynamichotstrings" }, fields = Planner.FIELDS } } })
 		secondary = ScopeFile.new({ path = Config.override_path(),
 			backup_path = Config.override_path() .. options.backup_suffix, remove = remove })
-		return secondary.prepare(Planner.writer_rows(changes))
+		return secondary.prepare(Planner.writer_rows(changes, base_after))
 	end
 
 	local function capture()
@@ -126,6 +142,7 @@ function M.new(options)
 		if Dynamic and Dynamic.user_code_time_activation and Dynamic.user_code_time_activation() ~= nil
 			and type(programmable) ~= "table" then return nil end
 		active_snapshot = { config = config, preferences = preferences, programmable = programmable, repeat_enabled = RepeatKey.is_enabled(),
+			word_reset = WordReset.snapshot(),
 			trigger = MagicKey.get(), terminators = Terminators.snapshot() }
 		return active_snapshot
 	end
@@ -151,6 +168,7 @@ function M.new(options)
 		if secondary and secondary.restore() ~= true then return false end
 		if Preferences.restore(owner, snapshot.preferences) ~= true then return false end
 		if RepeatKey.restore_configuration(snapshot.repeat_enabled) ~= true then return false end
+		if WordReset.restore_configuration(snapshot.word_reset) ~= true then return false end
 		if Terminators.restore_configuration(snapshot.terminators) ~= true then return false end
 		local current = MagicKey.get()
 		if Config.restore_configuration(owner, snapshot.config) ~= true then return false end
@@ -190,13 +208,14 @@ function M.new(options)
 			local previous = MagicKey.get()
 			if Preferences.adopt(owner, decoded) ~= true then return false end
 			if RepeatKey.adopt_configuration(decoded) ~= true then return false end
+			if WordReset.adopt_configuration(decoded) ~= true then return false end
 			if Terminators.adopt_configuration(decoded) ~= true then return false end
 			local trigger = MagicKey.get()
 			if trigger ~= previous and Config.set_magic_key(trigger, MagicKey.default()) ~= true then return false end
 			if Config.apply_configuration(owner, decoded, secondary.candidate(), secondary.target()) ~= true then return false end
 			if not apply_dependents(trigger, previous, active_snapshot.programmable) then return false end
 			-- A first write creates the configuration folder the two files share.
-			local directory = options.path:match("^(.*)/[^/]+$")
+			local directory = NativePath.dirname(options.path)
 			if not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then return false end
 			local published, why = secondary.publish()
 			if published ~= true then
@@ -239,6 +258,7 @@ function M.apply(mode, is_paused, ports)
 		config = require("modules.hotstrings.hotstrings_config"),
 		preferences = require("infra.hotstring_preferences"),
 		repeat_key = require("modules.hotstrings.repeat_key"),
+		word_reset = require("modules.hotstrings.word_reset"),
 		magic_key = require("modules.hotstrings.magic_key"),
 		terminators = require("modules.hotstrings.terminator_settings"),
 		preview_settings = require("modules.hotstrings.preview_settings"),

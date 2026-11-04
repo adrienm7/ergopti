@@ -243,9 +243,8 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
 
     def test_a_tree_that_does_not_compile_is_rolled_back(self):
         roots = self.roots()
-        with (
-            mock.patch.dict(os.environ, self.env, clear=False),
-            mock.patch.object(legacy, "compile_check", return_value=False),
+        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(
+            legacy, "compile_check", return_value=False
         ):
             with self.assertRaises(legacy.LegacyInstallError):
                 legacy.perform_install(
@@ -262,11 +261,9 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
 
     def test_an_unverified_tree_is_kept_with_a_warning(self):
         roots = self.roots()
-        with (
-            mock.patch.dict(os.environ, self.env, clear=False),
-            mock.patch.object(legacy, "compile_check", return_value=None),
-            self.assertLogs(level="WARNING") as logs,
-        ):
+        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(
+            legacy, "compile_check", return_value=None
+        ), self.assertLogs(level="WARNING") as logs:
             spec = legacy.perform_install(
                 roots,
                 LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb",
@@ -325,12 +322,11 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                             expected_error = (
                                 KeyboardInterrupt if interruption else legacy.LegacyInstallError
                             )
-                            with (
-                                mock.patch.dict(os.environ, fixture.env),
-                                mock.patch.object(Path, "write_text", write_text),
-                                mock.patch.object(legacy.ET.ElementTree, "write", write_xml),
-                                mock.patch.object(legacy, "compile_check") as compiler,
-                            ):
+                            with mock.patch.dict(os.environ, fixture.env), mock.patch.object(
+                                Path, "write_text", write_text
+                            ), mock.patch.object(
+                                legacy.ET.ElementTree, "write", write_xml
+                            ), mock.patch.object(legacy, "compile_check") as compiler:
                                 with self.assertRaises(expected_error):
                                     legacy.perform_install(
                                         fixture.roots(),
@@ -405,9 +401,8 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         desktop user's home, which the sandbox override stands in for."""
         (self.home / ".XCompose").write_text("ergopti compose\n", encoding="utf-8")
         (self.home / ".XCompose.1").write_text("user compose\n", encoding="utf-8")
-        with (
-            mock.patch.dict(os.environ, self.env, clear=False),
-            mock.patch.object(legacy, "purge_cache"),
+        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(
+            legacy, "purge_cache"
         ):
             self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
         self.assertEqual((self.home / ".XCompose").read_text(encoding="utf-8"), "user compose\n")
@@ -423,9 +418,8 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         self.assertIsNotNone(backup)
         upgraded = pristine + b"\n// upgraded by the package manager\n"
         self.paths.types_extra.write_bytes(upgraded)
-        with (
-            mock.patch.dict(os.environ, self.env, clear=False),
-            mock.patch.object(legacy, "purge_cache"),
+        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(
+            legacy, "purge_cache"
         ):
             self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
         self.assertEqual(self.paths.types_extra.read_bytes(), upgraded)
@@ -463,11 +457,8 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
 
     @unittest.skipIf(sys.platform == "win32", "the legacy CLI refuses to run on Windows")
     def test_uninstall_refusal_reaches_the_cli_exit_code(self):
-        with (
-            mock.patch.dict(os.environ, self.env),
-            mock.patch.object(
-                legacy, "deactivate_desktop_entries", return_value=legacy.CleanupStatus.FAILED
-            ),
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(
+            legacy, "deactivate_desktop_entries", return_value=legacy.CleanupStatus.FAILED
         ):
             self.assertNotEqual(legacy.main(["--uninstall"]), legacy.EXIT_OK)
         for path, original in self.originals.items():
@@ -485,9 +476,8 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                 raise OSError(errno.EACCES, "injected restore refusal")
             return original_copy(source, destination)
 
-        with (
-            mock.patch.dict(os.environ, self.env),
-            mock.patch.object(legacy.shutil, "copy", fail_one_restore),
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(
+            legacy.shutil, "copy", fail_one_restore
         ):
             self.assertFalse(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
         self.assertEqual(
@@ -511,9 +501,8 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                 raise OSError(errno.EACCES, "injected unreadable system file")
             return original_read(path, *args, **kwargs)
 
-        with (
-            mock.patch.dict(os.environ, self.env),
-            mock.patch.object(Path, "read_text", refuse_target_read),
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(
+            Path, "read_text", refuse_target_read
         ):
             self.assertFalse(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
         self.assertEqual(backup.read_bytes(), self.originals[target])
@@ -546,12 +535,9 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
                         str(LAYOUT_VERSION_DIR / "xkb_types.txt"),
                         "--skip-activation",
                     ]
-                    with (
-                        mock.patch.dict(os.environ, fixture.env),
-                        mock.patch.object(
-                            legacy, "compile_check", return_value=failure != "compiler-rejection"
-                        ) as compiler,
-                    ):
+                    with mock.patch.dict(os.environ, fixture.env), mock.patch.object(
+                        legacy, "compile_check", return_value=failure != "compiler-rejection"
+                    ) as compiler:
                         code = legacy.main(arguments)
                     if failure is None:
                         self.assertEqual(code, 0)

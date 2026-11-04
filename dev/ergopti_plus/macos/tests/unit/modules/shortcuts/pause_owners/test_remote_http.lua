@@ -68,6 +68,7 @@ local function load_remote_native_http()
 			end
 			state.post_calls = state.post_calls + 1
 			state.callbacks[#state.callbacks + 1] = callback
+			if state.taskless_post == true then return nil end
 			return new_task()
 		end,
 		asyncGet = function(_, _, callback)
@@ -80,6 +81,7 @@ local function load_remote_native_http()
 		asyncPost = function(_, _, _, callback)
 			state.post_calls = state.post_calls + 1
 			state.callbacks[#state.callbacks + 1] = callback
+			if state.taskless_post == true then return nil end
 			return new_task()
 		end,
 	}
@@ -113,6 +115,24 @@ local function load_remote_native_http()
 end
 
 helpers.describe("HS-012 real Remote HTTP pause ownership", function()
+	helpers.it("settles a taskless inference POST cancelled before its answer", function()
+		-- hs.http.asyncPost returns no task: cancelling a prediction superseded by
+		-- the next keystroke logged "Remote inference cancellation failed: false".
+		local api, native = load_remote_native_http()
+		native.taskless_post = true
+		local infer_client = get_upvalue(api.cancel_streaming, "_infer_client")
+		local deliveries = 0
+		helpers.assert_true(infer_client.post(
+			"https://fixture.invalid/infer", {}, "{}", function()
+				deliveries = deliveries + 1
+			end))
+		helpers.assert_eq(#native.tasks, 0)
+		helpers.assert_eq(api.cancel_streaming(), true,
+			"a logically revoked taskless POST is a completed cancellation")
+		native.callbacks[1](200, [[{"choices":[]}]], {})
+		helpers.assert_eq(deliveries, 0,
+			"the late answer of the revoked POST must stay fenced")
+	end)
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("propagates inference " .. mode
 			.. " cancellation through prediction reset", function()

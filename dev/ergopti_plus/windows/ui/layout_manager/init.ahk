@@ -21,6 +21,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -52,7 +53,8 @@ global LAYMGR_HOST_ACCESS_ALLOW := 1
 ; The only actions the page may send (the page and the Lua hosts declare the
 ; same list; tools/test/test-layout-manager-page.cjs pins the three).
 global LAYMGR_ACTIONS := Map("ready", true, "refresh", true, "install", true, "update", true,
-	"uninstall", true, "select", true, "open_homepage", true, "close", true)
+	"uninstall", true, "select", true, "open_homepage", true, "close", true,
+	"composer_open", true, "composer_save", true, "composer_remove", true)
 
 
 
@@ -90,7 +92,7 @@ LayoutManager_ActiveId(FeaturesSource := unset) {
 	if (Selected != "")
 		return Selected
 	Layout := FeaturesSource.Has("layout") ? FeaturesSource["layout"] : Map()
-	if !(Layout.Get("ergopti_base", false) = true)
+	if !(Layout.Get(ConfigLeaf.ERGOPTI_BASE, false) = true)
 		return ""
 	return ErgoptiLayout_BuiltinVariant(FeaturesSource)
 }
@@ -144,8 +146,12 @@ LayoutManager_PageState(LocalDir := unset) {
 	}
 	global _LayMgrWeb_RuntimeRefresh
 	Busy := (_LayMgrWeb_RuntimeRefresh is Map) ? _LayMgrWeb_RuntimeRefresh : LayoutCatalogue_Busy()
+	; shortcut_menu_path: the extension file this driver loads as a layout's
+	; shortcut menu (ui/menu/menu_shortcuts.ahk); the page counts it and never
+	; derives it from the platform.
 	return Map(
 		"platform", LAYOUT_CATALOGUE_PLATFORM,
+		"shortcut_menu_path", "shortcuts/menu.ahk",
 		"index", (Index is Map) ? Index : JSON_NULL,
 		"source", Source,
 		"error", (Last["error"] is Map) ? Last["error"] : JSON_NULL,
@@ -188,26 +194,39 @@ _LayMgrWeb_Strings() {
  * @param {Map} Payload - Decoded message.
  * @param {Map} Deps - "local_dir", "push" (FunctionName, Payload), "install",
  *   "uninstall", "select", "refresh", "open_url", "close"; the production ones by default.
+ * @param {Integer} SessionEpoch - The scheduling session; the current one for direct callers.
  * @returns {boolean} Whether the message was accepted.
  */
-LayoutManager_HandleMessage(Payload, Deps := 0) {
-	global LAYMGR_ACTIONS, _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
-	if !(Deps is Map)
-		Deps := _LayMgrWeb_DefaultDeps()
+LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
+	global LAYMGR_ACTIONS, _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_SessionEpoch
+	if !IsSet(SessionEpoch)
+		SessionEpoch := _LayMgrWeb_SessionEpoch
 	if !(Payload is Map) || !Payload.Has("action") || !(Payload["action"] is String)
 			|| !LAYMGR_ACTIONS.Has(Payload["action"]) {
 		LoggerWarn("LayoutManager", "Refused a layout manager message outside the allowlist.")
 		return false
 	}
 	Action := Payload["action"]
+	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+		return false
+	if !(Deps is Map)
+		Deps := _LayMgrWeb_DefaultDeps()
+	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+		return false
 	if (_LayMgrWeb_RuntimeRefresh is Map) && (Action == "install" || Action == "update"
-			|| Action == "uninstall" || Action == "select") {
+			|| Action == "uninstall" || Action == "select" || Action == "composer_save"
+			|| Action == "composer_remove") {
 		LoggerWarn("LayoutManager", "Refused a layout mutation while runtime refresh is pending.")
 		return false
 	}
 	if (Action == "ready") {
 		_LayMgrWeb_Result := 0
-		Deps["push"].Call("initData", Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"])))
+		Initial := Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"]))
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
+		Deps["push"].Call("initData", Initial)
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
 		return true
 	}
@@ -219,12 +238,16 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 		Deps["close"].Call()
 		return true
 	}
+	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_remove")
+		return LayoutComposer_Handle(Action, Payload, Deps)
 	Id := Payload.Has("id") ? Payload["id"] : ""
 	if !LayoutRegistry_IsValidId(Id) {
 		LoggerWarn("LayoutManager", "Refused a layout manager '{1}' without a valid layout id.", Action)
 		return false
 	}
 	State := LayoutManager_PageState(Deps["local_dir"])
+	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+		return false
 	Entry := LayoutCatalogue_Entry(State["index"], Id)
 	if (Action == "open_homepage") {
 		Source := (Entry is Map) ? Entry : State["installed"].Get(Id, 0)
@@ -233,6 +256,8 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 			LoggerWarn("LayoutManager", "Refused to open the homepage of '{1}': none is published over https.", Id)
 			return false
 		}
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
 		Deps["open_url"].Call(Homepage)
 		return true
 	}
@@ -241,11 +266,16 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 			LoggerWarn("LayoutManager", "Refused to {1} '{2}': the catalogue does not list it.", Action, Id)
 			return false
 		}
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
 		Deps["install"].Call(Id, _LayMgrWeb_OnDone.Bind(Deps, Id, Action))
-		_LayMgrWeb_PushState(Deps)
+		if _LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			_LayMgrWeb_PushState(Deps)
 		return true
 	}
 	if (Action == "select" && State["builtin"].Has(Id)) {
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
 		Deps["select"].Call(Id)
 		return true
 	}
@@ -254,12 +284,22 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 		return false
 	}
 	if (Action == "uninstall") {
+		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+			return false
 		Outcome := Deps["uninstall"].Call(Id)
 		_LayMgrWeb_OnDone(Deps, Id, Action, Outcome["ok"], Outcome.Get("code", ""), Outcome.Get("detail", ""))
 		return true
 	}
+	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
+		return false
 	Deps["select"].Call(Id)
 	return true
+}
+
+; Readiness initializes the admitted page under pause; user commands do not.
+_LayMgrWeb_CommandCurrent(SessionEpoch, Action) {
+	global _LayMgrWeb_SessionEpoch
+	return SessionEpoch == _LayMgrWeb_SessionEpoch && (Action == "ready" || !A_IsSuspended)
 }
 
 _LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
@@ -357,11 +397,11 @@ _LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
 		throw Error("The selected helper source intent changed or could not be admitted.")
 	if LayoutManager_BuiltinIds().Has(Id)
 		return [
-			ManifestSparseOperation("layout.emulated_layout", ""),
-			ManifestSparseOperation("layout.ergopti_base", true),
-			ManifestSparseOperation("layout.ergopti_variant", Id),
+			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
+			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_BASE, true),
+			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, Id),
 		]
-	return [ManifestSparseOperation("layout.emulated_layout", Id)]
+	return [ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, Id)]
 }
 
 ; The successor discovers committed extension roots even for nonselected layouts.
@@ -387,7 +427,7 @@ _LayMgrWeb_After(Id, Action, OnDone, Options := unset) {
 	}
 	if Selected && Action == "uninstall" {
 		LoggerInfo("LayoutManager", "The emulated '{1}' layout was uninstalled; back to the system layout.", Id)
-		WriteSelection := Options.Get("write_selection", (Value) => WriteFeatureV2(Features, "layout.emulated_layout", Value))
+		WriteSelection := Options.Get("write_selection", (Value) => WriteFeatureV2(Features, ConfigKey.LAYOUT_EMULATED_LAYOUT, Value))
 		if !WriteSelection.Call("")
 			return ConfigReportPersistenceFailure("the layout selection")
 	}
@@ -470,17 +510,33 @@ LayoutManager_Open(*) {
 	Placeholder := g.Add("Text", "x0 y0 w720 h560", "")
 	g.OnEvent("Close", _LayMgrWeb_SessionCall.Bind(SessionEpoch, _LayMgrWeb_Close))
 	g.OnEvent("Size", _LayMgrWeb_SessionCall.Bind(SessionEpoch, _LayMgrWeb_OnResize))
+	; Native Show can deliver Close before returning. Its original callback
+	; must already own this exact window so cancellation can destroy it.
+	_LayMgrWeb_Gui := g
 	; Shown before the control: a hidden Gui has a zero client rect.
 	g.Show("w720 h560 Center")
-	_LayMgrWeb_Gui := g
-	try {
-		_LayMgrWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll"))
-	} catch as Err {
-		LoggerError("LayoutManager", "WebView2 create failed: {1}", Err.Message)
-		_LayMgrWeb_Close()
+	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != g {
+		try g.Destroy()
+		LoggerInfo("LayoutManager", "Layout manager opening cancelled while its window was being shown.")
 		return false
 	}
-	_LayMgrWeb_WebView := _LayMgrWeb_Controller.CoreWebView2
+	try {
+		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll"))
+	} catch as Err {
+		LoggerError("LayoutManager", "WebView2 create failed: {1}", Err.Message)
+		if SessionEpoch == _LayMgrWeb_SessionEpoch && _LayMgrWeb_Gui == g
+			_LayMgrWeb_Close()
+		return false
+	}
+	; SDK creation pumps messages while awaiting COM. The exact opening window
+	; may have closed or been replaced before the controller becomes available.
+	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != g {
+		CreatedController.Close()
+		LoggerInfo("LayoutManager", "Layout manager opening cancelled after its window was closed or replaced.")
+		return false
+	}
+	_LayMgrWeb_Controller := CreatedController
+	_LayMgrWeb_WebView := CreatedController.CoreWebView2
 	try {
 		s := _LayMgrWeb_WebView.Settings
 		s.AreDevToolsEnabled := false
@@ -537,6 +593,12 @@ _LayMgrWeb_SessionCall(SessionEpoch, Callback, Params*) {
 		; Claim before dispatch: both native navigation and the page emit ready.
 		_LayMgrWeb_ReadyEpoch := SessionEpoch
 	}
+	; Preserve the scheduling epoch across dependency reads and page snapshots.
+	if Callback == LayoutManager_HandleMessage && Params.Length > 0 {
+		if Params.Length == 1
+			Params.Push(0)
+		Params.Push(SessionEpoch)
+	}
 	try Callback(Params*)
 	catch as Err {
 		if IsReady && _LayMgrWeb_ReadyEpoch == SessionEpoch
@@ -561,7 +623,7 @@ _LayMgrWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_LayMgrWeb_Controller)
-		try _LayMgrWeb_Controller.Fill()
+		try WebView_FitToWindow(_LayMgrWeb_Controller)
 }
 
 _LayMgrWeb_Close(*) {
@@ -604,18 +666,18 @@ _LayMgrWeb_BuiltinVariantSnapshot(Path) {
 		Legacy := _TOML_DocumentLookup(Document, ["layout", "ergopti_plus"])
 		if Legacy["found"] || Legacy["blocked"]
 			return Snapshot
-		for Field in ["layout.ergopti_variant", "layout.emulated_layout", "layout.ergopti_base",
-			"layout.ergopti_alt_gr", "category_enabled.layout"] {
+		for Field in [ConfigKey.LAYOUT_ERGOPTI_VARIANT, ConfigKey.LAYOUT_EMULATED_LAYOUT, ConfigKey.LAYOUT_ERGOPTI_BASE,
+			ConfigKey.LAYOUT_ERGOPTI_ALT_GR, "category_enabled.layout"] {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Field, "."))
 			if Read["blocked"]
 				return Snapshot
 			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Field)
-			if Field == "layout.ergopti_base" || Field == "layout.ergopti_alt_gr" || Field == "category_enabled.layout" {
+			if Field == ConfigKey.LAYOUT_ERGOPTI_BASE || Field == ConfigKey.LAYOUT_ERGOPTI_ALT_GR || Field == "category_enabled.layout" {
 				if Read["found"] && !(Value is TOML_Bool)
 					return Snapshot
 				if Value is TOML_Bool
 					Value := Value.Value
-			} else if Field == "layout.ergopti_variant" {
+			} else if Field == ConfigKey.LAYOUT_ERGOPTI_VARIANT {
 				if !(Value is String) || (StrCompare(Value, "none", true) != 0 && StrCompare(Value, "ergopti", true) != 0 && StrCompare(Value, "ergopti_plus", true) != 0)
 					return Snapshot
 			} else if !(Value is String) || (Value != "" && !LayoutRegistry_IsValidId(Value))

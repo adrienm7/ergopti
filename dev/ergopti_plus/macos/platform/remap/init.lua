@@ -47,12 +47,15 @@ local Timings     = require("infra.timings")
 local FileSystem  = require("adapters.file_system")
 local Manifest    = require("infra.manifest_reader")
 local TomlWriter  = require("toml_codec.writer")
+local NavigationInventory = { config = Config.load_user_config, save = Config.save_user_config,
+	write = FileSystem.write_if_unchanged, read = FileSystem.read_with_status,
+	load = NavLayer.load, observe = NavLayer.capture_configured_inputs }
 
 -- The managed-output classifier is a lease prerequisite even when the
--- keylogger feature is disabled. A load failure must keep generated rules
--- PAUSED; activating without it would let a later keylogger start classify
+-- keystats feature is disabled. A load failure must keep generated rules
+-- PAUSED; activating without it would let a later keystats start classify
 -- Karabiner output as physical input.
-local ok_kcb, KcBridge = pcall(require, "modules.keylogger.kc_bridge")
+local ok_kcb, KcBridge = pcall(require, "modules.keystats.kc_bridge")
 if not ok_kcb then KcBridge = nil end
 
 local LOG = "karabiner"
@@ -72,14 +75,16 @@ local LEASE_RECOVERY_RETRY_DELAYS_SEC = { 1.0, 10.0, 30.0 }
 local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
 local LEASE_GUARDIAN_STATUS_POLL_SEC = 3.0
 local LEASE_GUARDIAN_PROBE_TIMEOUT_SEC = 2.0
--- The launcher's registration role runs at most five bounded launchctl steps
--- (3 s each plus a 0.25 s termination grace) and two 3 s guardian health waits
--- (a loaded job whose health check fails is booted out and bootstrapped again):
--- 22.25 s. The deadline keeps 2 s over that for the pipe and the main thread;
--- at 20 s it killed a slow registration that was still inside its own budget
+-- The launcher's registration role runs at most eight bounded launchctl steps
+-- (3 s each plus a 0.25 s termination grace) and four 3 s waits: an ad hoc
+-- build's reset (legacy removal, then the old guardian's exit), the modern
+-- health wait, and the legacy path's two health waits (a loaded job whose
+-- health check fails is booted out and bootstrapped again): 38 s. The deadline
+-- keeps 2 s over that for the pipe and the main thread; at 20 s it killed a
+-- slow registration still inside its own budget
 -- (hardening-d-native-timeout-contract).
-local LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC = 25.0
-local FIRST_RUN_WIZARD_DELAY_SEC = 2.0
+local LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC = 40.0
+local FIRST_RUN_WIZARD_DELAY_SEC = Timings.sec("ui", "onboarding_startup_delay_ms")
 local FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS = 3
 -- A retained input-source event is an ordering barrier for lease recovery: the
 -- replacement must not resolve keycodes until TIS has settled.  Transient
@@ -101,17 +106,16 @@ local LOGIN_ITEMS_SETTINGS_URL = "x-apple.systempreferences:com.apple.LoginItems
 
 -- Resolve the directory that contains this init.lua at load time.
 -- Works whether the file is symlinked, run from the project, or deployed.
-local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
 
 -- Data JSONs live alongside this module under data/; Karabiner-Elements is
 -- macOS-exclusive so there is no reason to put these files in _shared/.
-local _DATA_DIR = _SELF_DIR .. "data/"
+local _DATA_DIR = (require("native_path").directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./") .. "data/"
 
 -- Standard Karabiner-Elements config path, expressed as a tilde path so the
 -- FileSystem port adapter can resolve it through hs.fs.pathToAbsolute (which
 -- follows symlinks and honours any macOS path aliasing), rather than naively
 -- concatenating HOME ourselves.  The CI/test override is still honoured first.
-local KARABINER_KE_TILDE_PATH = "~/.config/karabiner/karabiner.json"
+local KARABINER_KE_TILDE_PATH = require("platform.remap.ke_paths").config_file_for("shared")
 
 -- Resolved at M.init() time via the injected FileSystem adapter.
 -- Kept as a module-level variable (not constant) so generator calls can
@@ -201,6 +205,20 @@ local _lease_user_intent_revision = 0  -- Fences late recovery callbacks after a
 local _ke_variables_recovery_observer = nil -- Exact callback owned by this remap lifecycle
 
 local _state = nil
+
+-- The owned runtime (ADR 011) is a field of the module table because this chunk
+-- is at Lua's limit of 200 local variables. `owner` is the runtime owner module,
+-- present only after an explicit opt-in with `[karabiner] runtime = "owned"`;
+-- default boot never requires that module. `paths` is the runtime-selected
+-- path table.
+M._owned = { owner = nil, activation = nil, paused = false, paths = require("platform.remap.ke_paths") }
+
+--- True when this boot opted in to the owned runtime.
+--- @return boolean owned
+function M._owned.selected()
+	return _state ~= nil and _state.runtime == M._owned.paths.RUNTIME_OWNED
+end
+
 local _enabled_transition = nil
 local _enabled_preflight = nil -- Owns async onboarding settlement before disable can enter STOPPED
 local _bulk_settings_transaction = nil -- Owns candidate publication and exact inverse recovery
@@ -304,10 +322,14 @@ local function persist_enabled_flag(enabled, transaction)
 	local persisted = {}
 	for key, item in pairs(_state) do persisted[key] = item end
 	persisted.enabled = enabled == true
-	local ok, saved_or_err, _, receipt = pcall(Config.save_user_config, persisted, resolve_user_config())
+	local navigation_publication = NavigationInventory.begin_enable_save(transaction)
+	local selected_save, selected_write = Config.save_user_config, FileSystem.write_if_unchanged
+	local ok, saved_or_err, _, receipt = pcall(selected_save, persisted, resolve_user_config())
 	if ok and type(receipt) == "table" and transaction ~= nil then
 		transaction.file = receipt
 	end
+	NavigationInventory.finish_enable_save(navigation_publication, transaction,
+		selected_save, selected_write, ok and saved_or_err == true, receipt)
 	if not ok or saved_or_err ~= true then
 		Logger.error(LOG, "Karabiner enabled preference could not be persisted: %s.",
 			tostring(ok and saved_or_err or saved_or_err))
@@ -330,6 +352,7 @@ local function commit_enable_transition(transaction)
 	if not persist_enabled_flag(true, transaction) then return false, "persistence-failed" end
 	_state.enabled = true
 	transaction.committed = true
+	NavigationInventory.commit_enabled(transaction)
 	return true, "enabled"
 end
 
@@ -846,7 +869,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused, recove
 	return true, "inputs-ready"
 end
 
---- Refreshes the keylogger classifier without letting a failure disappear from
+--- Refreshes the keystats classifier without letting a failure disappear from
 --- the asynchronous lease callback that owns activation.
 --- @return boolean refreshed
 --- @return any reason
@@ -1223,15 +1246,64 @@ local function is_current_lifecycle(epoch)
 	return _running and _lifecycle_epoch == epoch and _state ~= nil
 end
 
---- Resolves the current action list without silently swallowing malformed layout data.
---- @param label string Diagnostic context.
---- @return boolean ok
---- @return number|nil resolved_count
-local function resolve_current_layout_actions(label)
-	if M.AVAILABLE_ACTIONS == nil then return true, 0 end
-	return run_async_step(label, function()
-		return Config.resolve_layout_actions(M.AVAILABLE_ACTIONS)
-	end)
+-- The user's virtual keyboard choice and its resolver share one block scope: the
+-- source the boot registered stays out of this file's crowded top-level locals.
+local resolve_current_layout_actions
+do
+	local Layout = require("modules.keymap.layout")
+	local registered_source = nil -- The user's virtual keyboard choice the boot registered, or nil
+
+	--- Registers the owner of the user's virtual keyboard choice (config.toml
+	--- [layout] virtual_keyboard), which each regeneration reads: the menu persists
+	--- a new choice and then asks for a regeneration.
+	--- @param source function Returns "auto", "iso" or "ansi"; raises when the configuration is unreadable.
+	--- @return boolean registered False when a source is already registered.
+	function M.set_virtual_keyboard_source(source)
+		if type(source) ~= "function" then
+			error("platform.remap.set_virtual_keyboard_source(): source must be a function", 2)
+		end
+		if registered_source ~= nil then
+			Logger.error(LOG, "The virtual keyboard choice's source is already registered; keeping the first one.")
+			return false
+		end
+		registered_source = source
+		Logger.debug(LOG, "Virtual keyboard choice's source registered.")
+		return true
+	end
+
+	--- The virtual keyboard product to deploy: the user's choice, read at the moment a
+	--- generation resolves its actions so one generation uses one product. Before
+	--- the boot registered the choice's owner (M.set_virtual_keyboard_source) the
+	--- shipped default applies. A refused read raises instead of guessing.
+	--- @return string product "ansi" or "iso".
+	local function current_virtual_keyboard_product()
+		if registered_source == nil then return Layout.default_virtual_keyboard_product() end
+		return Layout.virtual_keyboard_product(registered_source())
+	end
+
+	--- Resolves the current action list without silently swallowing malformed layout data.
+	--- @param label string Diagnostic context.
+	--- @return boolean ok
+	--- @return number|nil resolved_count
+	function resolve_current_layout_actions(label)
+		if M.AVAILABLE_ACTIONS == nil then return true, 0 end
+		return run_async_step(label, function()
+			-- The user's choice names the product; the layout only tells which keycode
+			-- convention keys arrive in, and never overrides an explicit choice.
+			local product = current_virtual_keyboard_product()
+			local count, form = Config.resolve_layout_actions(M.AVAILABLE_ACTIONS, product)
+			if form ~= "ansi" and form ~= "iso" then
+				error("The resolved action list has no valid virtual keyboard convention.")
+			end
+			-- The generator must consume the convention that resolved these actions,
+			-- rather than rereading a changed layout registry for the virtual HID.
+			if _state then
+				_state.virtual_keyboard_type = form
+				_state.virtual_keyboard_product = product
+			end
+			return count
+		end)
+	end
 end
 
 --- Reads the pause state fail-closed and returns the same module for rebind.
@@ -2173,6 +2245,9 @@ local function queue_guardian_regeneration(context)
 			and retained.enabled_transaction == context.enabled_transaction
 		if equivalent and not retained.settled then
 			join_guardian_regeneration_context(retained, context)
+			Logger.info(LOG,
+				"Karabiner deploy decision: coalesced (a %s regeneration joined the one waiting for its guardian proof; one build, at most one reload).",
+				tostring(context.intent))
 			return true
 		end
 	end
@@ -2397,6 +2472,39 @@ local function run_lease_recovery_attempt(recovery, guardian_proven_ready)
 		cancel_lease_recovery("lease-superseded-in-phase-" .. tostring(phase))
 		return
 	end
+	-- The deploy below reloads Karabiner; let a typing burst finish first
+	-- (platform/remap/deploy_pacing.lua). Required here: this chunk is at
+	-- Lua's 200-local limit.
+	local waited = recovery.typing_deferred_sec or 0
+	local recheck = require("platform.remap.deploy_pacing").recheck_after(waited, recovery.attempt)
+	if recheck then
+		retry_lease_recovery_timer_cleanup()
+		local recheck_timer = nil
+		local recheck_armed = false
+		local recheck_fired_early = false
+		local recheck_ok, recheck_or_err, recheck_committed = pcall(TimerScheduler.after, recheck, function()
+			if not recheck_armed then
+				recheck_fired_early = true
+				return
+			end
+			if _lease_recovery ~= recovery or recovery.timer ~= recheck_timer then return end
+			run_async_step("Karabiner deploy typing deferral", function()
+				run_lease_recovery_attempt(recovery)
+			end)
+		end)
+		if recheck_ok then recheck_timer = recheck_or_err end
+		if recheck_committed == true and type(recheck_timer) == "table"
+			and recheck_timer.fired ~= true and not recheck_fired_early then
+			recovery.timer = recheck_timer
+			recovery.typing_deferred_sec = waited + recheck
+			recheck_armed = true
+			return
+		end
+		reject_lease_recovery_timer(recheck_timer, "Deploy typing deferral")
+		Logger.warn(LOG, "Karabiner deploy typing deferral could not arm; deploying now: %s.",
+			tostring(recheck_ok and "invalid timer handle" or recheck_or_err))
+	end
+	recovery.typing_deferred_sec = nil
 
 	recovery.in_flight = true
 	recovery.waiting_for_phase = false
@@ -3521,6 +3629,19 @@ function M.get_enabled()
 	return _state.enabled == true
 end
 
+--- The keycode convention keys arrive in while the integration is on: the
+--- active layout's, which the ANSI virtual keyboard passes through (issue #99)
+--- and the ISO one swaps for the ISO pair. Read from memory: input callbacks
+--- resolve the ISO pair with it.
+--- @return string|nil form "ansi" or "iso"; nil when off or not yet resolved.
+function M.virtual_keyboard_form()
+	if not _state or _state.enabled ~= true then return nil end
+	if _state.virtual_keyboard_type == nil then return nil end
+	local Layout = require("modules.keymap.layout")
+	return Layout.arrival_form(_state.virtual_keyboard_type,
+		_state.virtual_keyboard_product or Layout.default_virtual_keyboard_product())
+end
+
 --- The remap guardian's state for the diagnostics permissions table, read
 --- from memory without any native observation or side effect.
 --- @return string state `ready`, `requires_approval`, `unavailable`,
@@ -4025,7 +4146,7 @@ end
 --- @return boolean accepted True when accepted or settled successfully.
 function M.remove_from_karabiner(on_done)
 	Logger.info(LOG, "Remove Ergopti from Karabiner requested.")
-	if not require_state("remove_from_karabiner") then
+	if not require_state(require("config_keys").COMMAND.REMOVE_FROM_KARABINER) then
 		invoke_public_callback("remove from Karabiner", on_done, false, "not-initialized", 0)
 		return false
 	end
@@ -4070,9 +4191,11 @@ local function publish_settings_state(candidate)
 	_state.tap_hold_config = candidate.tap_hold_config
 	_state.mod_combos_config = candidate.mod_combos_config
 	_state.tap_hold_timeout_ms = candidate.tap_hold_timeout_ms
+	_state.lone_modifier_tap_max_ms = candidate.lone_modifier_tap_max_ms
 	_state.sticky_timeout_ms = candidate.sticky_timeout_ms
 	_state.simultaneous_threshold_ms = candidate.simultaneous_threshold_ms
 	_state.combo_symmetric = candidate.combo_symmetric
+	_state.close_other_instances = candidate.close_other_instances
 end
 
 --- Persists and then publishes one detached settings candidate.
@@ -4080,9 +4203,10 @@ end
 --- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
 --- @param label string Stable operation label for diagnostics.
 --- @param expected_source table|nil Exact bytes a scope backed up before this save.
+--- @param intent table|nil Leaves the user explicitly set (Config.explicit_leaves).
 --- @return boolean committed
 --- @return table|nil receipt Exact native publication ownership.
-local function persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source)
+local function persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source, intent)
 	local payload = clone_settings_state(candidate)
 	-- Settings compensation must never roll back a separately owned preference
 	payload.enabled = _state.enabled == true
@@ -4091,7 +4215,8 @@ local function persist_and_publish_settings(candidate, overwrite_corrupt, label,
 		payload,
 		resolve_user_config(),
 		overwrite_corrupt,
-		expected_source
+		expected_source,
+		intent
 	)
 	if not call_ok or saved ~= true then
 		Logger.error(LOG, "%s did not persist; live Karabiner settings were preserved: %s.",
@@ -4632,8 +4757,10 @@ end
 --- failed save cannot leak a partial setter mutation through shared references.
 --- @param mutate function Receives a detached candidate state.
 --- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
+--- @param leaf string|nil The one leaf the user explicitly sets through this
+---        mutation: only that obsolete leaf may be replaced (Config.explicit_leaves).
 --- @return boolean committed
-local function commit_state_mutation(mutate, overwrite_corrupt)
+local function commit_state_mutation(mutate, overwrite_corrupt, leaf)
 	if not _running or _shutdown_requested then
 		Logger.error(LOG, "Karabiner setting mutation refused while lifecycle is inactive.")
 		return false
@@ -4661,6 +4788,32 @@ local function commit_state_mutation(mutate, overwrite_corrupt)
 			"Karabiner setting mutation continues: the retained '%s' recovery settled on retry.",
 			tostring(phase))
 	end
+	-- A live menu saves first and then regenerates. During a lease transition
+	-- that second step refuses, leaving the new saved choice behind old rules
+	-- until reload. Refuse before saving instead; intentional paused/offline
+	-- edits still persist without claiming that their rules are already live.
+	if _state.enabled == true then
+		local pause_ok, _, script_paused = query_shortcuts_pause_state(
+			"Karabiner setting mutation pause-state query"
+		)
+		if not pause_ok then return false end
+		if not script_paused then
+			local status_ok, phase, snapshot = pcall(LeaseController.status)
+			if not status_ok or type(phase) ~= "string" or type(snapshot) ~= "table"
+				or type(snapshot.activation_blocked) ~= "boolean" then
+				Logger.error(LOG,
+					"Karabiner setting mutation refused because exact lease status is unavailable.")
+				return false
+			end
+			if snapshot.activation_blocked == true or phase == "pausing" or phase == "resuming"
+				or phase == "recovering" or phase == "fencing" or phase == "stopping" then
+				Logger.error(LOG,
+					"Karabiner setting mutation refused during exact lease phase '%s'; retry when the lease is ACTIVE.",
+					tostring(phase))
+				return false
+			end
+		end
+	end
 	local snapshot = clone_settings_state(_state)
 	local candidate = clone_settings_state(snapshot)
 	local mutate_ok, mutate_err = xpcall(function() mutate(candidate) end, debug.traceback)
@@ -4669,7 +4822,9 @@ local function commit_state_mutation(mutate, overwrite_corrupt)
 			tostring(mutate_err))
 		return false
 	end
-	local saved, file = persist_and_publish_settings(candidate, overwrite_corrupt, "Karabiner setting mutation")
+	local intent = leaf ~= nil and { leaves = { [leaf] = true } } or nil
+	local saved, file = persist_and_publish_settings(candidate, overwrite_corrupt, "Karabiner setting mutation",
+		nil, intent)
 	if saved ~= true and file ~= nil then
 		-- The public mutation stayed refused, but its native publication may
 		-- have changed the file and still owns exact cleanup or inverse debt.
@@ -4714,7 +4869,7 @@ function M.set_tap_action(key_id, action_id)
 			hold = cfg.hold or "none",
 			timeout_ms = cfg.timeout_ms,
 		}
-	end)
+	end, nil, "tap_holds.config." .. key_id)
 	if committed then Logger.debug(LOG, "Key '%s' tap → '%s'.", key_id, action_id) end
 	return committed
 end
@@ -4735,14 +4890,14 @@ function M.set_hold_action(key_id, action_id)
 				hold = action_id,
 				timeout_ms = cfg.timeout_ms,
 			}
-		end)
+		end, nil, "tap_holds.config." .. key_id)
 	end)
 	if committed then Logger.debug(LOG, "Key '%s' hold → '%s'.", key_id, action_id) end
 	return committed
 end
 
 --- Returns the per-key tap/hold threshold override in milliseconds, or nil when
---- the key inherits the global tap/hold timeout (no per-key customisation).
+--- the key follows the global tap/hold timeout (M.get_tap_hold_timeout).
 --- @param key_id string Key id.
 --- @return number|nil Per-key override in milliseconds, or nil.
 function M.get_tap_timeout(key_id)
@@ -4752,9 +4907,10 @@ function M.get_tap_timeout(key_id)
 end
 
 --- Sets or clears the per-key tap/hold threshold override and persists it.
---- A positive value overrides the global timeout for this key only; nil or a
---- non-positive value clears the override so the key inherits the single global
---- value again — no stale per-key literal is left behind. Does NOT regenerate.
+--- A positive value overrides the global timeout for this key only, and a later
+--- change of the global leaves it alone; nil or a non-positive value clears the
+--- override so the key follows the global again — no stale per-key literal is left
+--- behind. Does NOT regenerate.
 --- @param key_id string Key id.
 --- @param ms number|nil Per-key override in milliseconds, or nil to clear.
 function M.set_tap_timeout(key_id, ms)
@@ -4772,7 +4928,7 @@ function M.set_tap_timeout(key_id, ms)
 			hold = cfg.hold or "none",
 			timeout_ms = value,
 		}
-	end)
+	end, nil, "tap_holds.config." .. key_id)
 	if committed then
 		Logger.debug(LOG, "Key '%s' tap/hold timeout override → %s.",
 			key_id, value and (value .. " ms") or "global")
@@ -4836,7 +4992,7 @@ function M.set_combo_tap_action(combo_id, action_id)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_config[combo_id] = update_combo_slot(
 			candidate.mod_combos_config, combo_id, "tap", action_id)
-	end)
+	end, nil, "mod_combos.config." .. combo_id)
 	if committed then Logger.debug(LOG, "Combo '%s' tap → '%s'.", combo_id, action_id) end
 	return committed
 end
@@ -4853,7 +5009,7 @@ function M.set_combo_hold_action(combo_id, action_id)
 		return commit_state_mutation(function(candidate)
 			candidate.mod_combos_config[combo_id] = update_combo_slot(
 				candidate.mod_combos_config, combo_id, "hold", action_id)
-		end)
+		end, nil, "mod_combos.config." .. combo_id)
 	end)
 	if committed then Logger.debug(LOG, "Combo '%s' hold → '%s'.", combo_id, action_id) end
 	return committed
@@ -4868,7 +5024,7 @@ function M.set_combo_combo_action(combo_id, action_id)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_config[combo_id] = update_combo_slot(
 			candidate.mod_combos_config, combo_id, "combo", action_id)
-	end)
+	end, nil, "mod_combos.config." .. combo_id)
 	if committed then Logger.debug(LOG, "Combo '%s' combo → '%s'.", combo_id, action_id) end
 	return committed
 end
@@ -4895,8 +5051,33 @@ function M.set_tap_hold_timeout(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_hold_timeout_ms = value
-	end)
+	end, nil, require("config_keys").KEY.TAP_HOLDS_TIMEOUT_MS)
 	if committed then Logger.debug(LOG, "Tap/hold timeout: %d ms.", value) end
+	return committed
+end
+
+--- Returns how long a modifier key pressed alone still types its tap.
+--- @return number milliseconds 0 for the strict tap-hold.
+function M.get_lone_modifier_tap_max_ms()
+	if not require_state("get_lone_modifier_tap_max_ms") then return nil end
+	return _state.lone_modifier_tap_max_ms
+end
+
+--- Sets the lone modifier tap window and persists it.
+--- Logs an error and returns without saving if the value is invalid.
+--- Does NOT regenerate — call M.regenerate() explicitly when ready.
+--- @param ms number 0 (the strict tap-hold) or a positive whole number of milliseconds.
+function M.set_lone_modifier_tap_max_ms(ms)
+	if not require_state("set_lone_modifier_tap_max_ms") then return false end
+	local valid, value = pcall(require("tap_hold.lone_tap").validate, ms)
+	if not valid then
+		Logger.error(LOG, "set_lone_modifier_tap_max_ms: invalid value '%s' — ignoring.", tostring(ms))
+		return false
+	end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.lone_modifier_tap_max_ms = value
+	end, nil, require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
+	if committed then Logger.debug(LOG, "Lone modifier tap window: %d ms.", value) end
 	return committed
 end
 
@@ -4920,7 +5101,7 @@ function M.set_sticky_timeout(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.sticky_timeout_ms = value
-	end)
+	end, nil, require("config_keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
 	if committed then Logger.debug(LOG, "Sticky timeout: %d ms.", value) end
 	return committed
 end
@@ -4945,7 +5126,7 @@ function M.set_simultaneous_threshold(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.simultaneous_threshold_ms = value
-	end)
+	end, nil, require("config_keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 	if committed then Logger.debug(LOG, "Simultaneous threshold: %d ms.", value) end
 	return committed
 end
@@ -4967,7 +5148,7 @@ function M.set_combo_symmetric(value)
 	local normalized = value == true
 	local committed = commit_state_mutation(function(candidate)
 		candidate.combo_symmetric = normalized
-	end)
+	end, nil, require("config_keys").KEY.MOD_COMBOS_SYMMETRIC)
 	if committed then Logger.debug(LOG, "Combo symmetric: %s.", tostring(normalized)) end
 	return committed
 end
@@ -4995,8 +5176,87 @@ function M.set_tap_holds_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_holds_enabled = value
-	end)
+	end, nil, require("config_keys").KEY.TAP_HOLDS_ENABLED)
 	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
+	return committed
+end
+
+--- Whether this boot runs Ergopti's own Karabiner runtime, for the menu rows
+--- that only exist with it.
+--- @return boolean owned
+function M.owned_runtime_selected()
+	return M._owned.selected()
+end
+
+--- The owned runtime owner's state and stable reason, for the menu row that
+--- explains a block (the one-driver-version rule of the VirtualHIDDevice).
+--- @return table|nil status { state, reason } or nil when no owner is bound.
+function M.owned_runtime_status()
+	local owner = M._owned.owner
+	if not owner then return nil end
+	local status = owner.status()
+	return { state = status.state, reason = status.reason }
+end
+
+--- The driver version the owned runtime needs, for the update offer of an
+--- incompatible VirtualHIDDevice.
+--- @return string|nil version Nil when the manifest pins none.
+function M.owned_virtual_hid_version()
+	return require("adapters.runtime_owner_ports").virtual_hid_version()
+end
+
+--- Replaces an incompatible VirtualHIDDevice with the pinned driver after the
+--- user confirmed it. The caller reloads after telling the user, so the next
+--- owner admits the new driver or names the System Settings approval macOS
+--- may still wait for (ui/virtual_hid_update.lua).
+--- @param on_done function fn(ok, reason|nil, explanation|nil) called once.
+--- @return boolean started False when no incompatible driver blocks the owned runtime.
+function M.update_virtual_hid_driver(on_done)
+	assert(type(on_done) == "function", "update_virtual_hid_driver(): a completion callback is required")
+	local status = M.owned_runtime_status()
+	if not M._owned.selected() or type(status) ~= "table"
+		or status.reason ~= require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE then
+		Logger.error(LOG, "VirtualHIDDevice update refused: no incompatible driver blocks the owned runtime.")
+		return false
+	end
+	require("adapters.runtime_owner_ports").update_virtual_hid(on_done)
+	return true
+end
+
+--- Whether Ergopti closed the user's own Karabiner-Elements and has not given
+--- it back yet, for the menu row that says so.
+--- @return boolean closed
+function M.user_karabiner_closed()
+	if not M._owned.selected() then return false end
+	return require("adapters.runtime_owner_ports").marker().get() == true
+end
+
+--- The user's consent to closing their own Karabiner while Ergopti runs.
+--- @return boolean consent
+function M.get_close_other_instances()
+	if not require_state("get_close_other_instances") then return false end
+	return _state.close_other_instances == true
+end
+
+--- Sets and persists `[karabiner] close_other_instances`, then applies the
+--- activation rule so a runtime that waited on the consent starts.
+--- @param value boolean Desired consent.
+--- @return boolean committed
+function M.set_close_other_instances(value)
+	if not require_state("set_close_other_instances") then return false end
+	if type(value) ~= "boolean" then
+		Logger.error(LOG, "set_close_other_instances(): value must be a boolean.")
+		return false
+	end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.close_other_instances = value
+	end)
+	if committed then
+		Logger.info(LOG, "Close other Karabiner instances: %s.", value and "on" or "off")
+		if M._owned.selected() and M._owned.reconcile() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime could not follow the close option.")
+		end
+	end
 	return committed
 end
 
@@ -5022,7 +5282,7 @@ function M.set_mod_combos_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_enabled = value
-	end)
+	end, nil, require("config_keys").KEY.MOD_COMBOS_ENABLED)
 	if committed then Logger.info(LOG, "Key combinations: %s.", value and "on" or "off") end
 	return committed
 end
@@ -5238,6 +5498,7 @@ local function clone_persisted_settings(source)
 		or type(source.enabled) ~= "boolean"
 		or type(source.tap_hold_timeout_ms) ~= "number"
 		or type(source.sticky_timeout_ms) ~= "number"
+		or (source.lone_modifier_tap_max_ms ~= nil and type(source.lone_modifier_tap_max_ms) ~= "number")
 		or type(source.simultaneous_threshold_ms) ~= "number"
 		or type(source.combo_symmetric) ~= "boolean"
 		or (source.mod_combos_enabled ~= nil and type(source.mod_combos_enabled) ~= "boolean") then
@@ -5251,11 +5512,292 @@ local function clone_persisted_settings(source)
 		tap_hold_config = detached.tap_hold_config,
 		mod_combos_config = detached.mod_combos_config,
 		tap_hold_timeout_ms = detached.tap_hold_timeout_ms,
+		lone_modifier_tap_max_ms = detached.lone_modifier_tap_max_ms,
 		sticky_timeout_ms = detached.sticky_timeout_ms,
 		simultaneous_threshold_ms = detached.simultaneous_threshold_ms,
 		combo_symmetric = detached.combo_symmetric == true,
 	}
 end
+
+-- Configured-map receipts stay private to the original regeneration attempt.
+-- Preparation is observational; only its original successful final fence admits
+-- an inventory, and no receipt grants native installation or output authority.
+(function(ports)
+	local function snapshot(source)
+		if type(source) ~= "table" or getmetatable(source) ~= nil
+			or type(source.enabled) ~= "boolean" or (source.tap_holds_enabled ~= nil and type(source.tap_holds_enabled) ~= "boolean")
+			or (source.mod_combos_enabled ~= nil and type(source.mod_combos_enabled) ~= "boolean")
+			or type(source.combo_symmetric) ~= "boolean" then return nil end
+		local result = { enabled = source.enabled, tap_holds_enabled = source.tap_holds_enabled ~= false,
+			mod_combos_enabled = source.mod_combos_enabled ~= false, combo_symmetric = source.combo_symmetric }
+		for _, name in ipairs({ "tap_hold_config", "mod_combos_config" }) do
+			local entries = rawget(source, name)
+			if type(entries) ~= "table" or getmetatable(entries) ~= nil then return nil end
+			local rows = {}
+			for id, cfg in pairs(entries) do
+				if type(id) ~= "string" or type(cfg) ~= "table" or getmetatable(cfg) ~= nil then return nil end
+				local row = {}
+				for key, value in pairs(cfg) do
+					if (key == "tap" or key == "hold" or key == "combo") and type(value) == "string" then row[key] = value
+					elseif key == "timeout_ms" and type(value) == "number" and value == value
+						and value > 0 and value % 1 == 0 then row[key] = value
+					else return nil end
+				end
+				rows[id] = row
+			end
+			result[name] = rows
+		end
+		return result
+	end
+	local function equal(left, right)
+		if type(left) ~= type(right) then return false end
+		if type(left) ~= "table" then return left == right end
+		for key, value in pairs(left) do if not equal(value, right[key]) then return false end end
+		for key in pairs(right) do if left[key] == nil then return false end end
+		return true
+	end
+
+	local function capture_metadata()
+		local taps, combos, noncanonical, actions = M.TAP_HOLD_KEYS, M.MOD_COMBOS, M.NON_CANONICAL_COMBOS, M.AVAILABLE_ACTIONS
+		if type(taps) ~= "table" or getmetatable(taps) ~= nil or type(combos) ~= "table" or getmetatable(combos) ~= nil
+			or type(noncanonical) ~= "table" or getmetatable(noncanonical) ~= nil then return nil end
+		local rows = {}
+		for _, definitions in ipairs({ taps, combos }) do
+			local entries, count = {}, 0
+			for index, definition in pairs(definitions) do
+				if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(definition) ~= "table"
+					or getmetatable(definition) ~= nil or type(rawget(definition, "id")) ~= "string" then return nil end
+				local from = rawget(definition, "from")
+				if from ~= nil and (type(from) ~= "table" or getmetatable(from) ~= nil) then return nil end
+				entries[index] = { definition = definition, id = definition.id, from = from,
+					key = from and rawget(from, "key_code"), hidden = rawget(definition, "menu_hidden") }
+				count = count + 1
+			end
+			for index = 1, count do if rawget(definitions, index) == nil then return nil end end
+			rows[#rows + 1] = { definitions = definitions, entries = entries, count = count }
+		end
+		local symmetric_halves = {}
+		for id, value in pairs(noncanonical) do
+			if type(id) ~= "string" or type(value) ~= "boolean" then return nil end
+			symmetric_halves[id] = value
+		end
+		local function activation_snapshot()
+			if M.AVAILABLE_ACTIONS ~= actions or type(actions) ~= "table" or getmetatable(actions) ~= nil then return nil end
+			local result, count = {}, 0
+			for index, action in pairs(actions) do
+				if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(action) ~= "table"
+					or getmetatable(action) ~= nil or type(rawget(action, "id")) ~= "string"
+					or result[action.id] ~= nil then return nil end
+				local activates, events = false, rawget(action, "karabiner_to")
+				if events ~= nil then
+					if type(events) ~= "table" or getmetatable(events) ~= nil then return nil end
+					for _, event in ipairs(events) do
+						if type(event) ~= "table" or getmetatable(event) ~= nil then return nil end
+						local variable = rawget(event, "set_variable")
+						if variable ~= nil then
+							if type(variable) ~= "table" or getmetatable(variable) ~= nil then return nil end
+							if rawget(variable, "name") == "layer_active" and rawget(variable, "value") == 1 then activates = true end
+						end
+					end
+				end
+				result[action.id] = activates
+				count = count + 1
+			end
+			for index = 1, count do if rawget(actions, index) == nil then return nil end end
+			return result
+		end
+		local activators = activation_snapshot()
+		if activators == nil then return nil end
+		local function definitions_current()
+			if M.TAP_HOLD_KEYS ~= taps or M.MOD_COMBOS ~= combos then return false end
+			for _, cohort in ipairs(rows) do
+				if getmetatable(cohort.definitions) ~= nil then return false end
+				local count = 0
+				for index, definition in pairs(cohort.definitions) do
+					local original = cohort.entries[index]
+					if not original or definition ~= original.definition or getmetatable(definition) ~= nil
+						or rawget(definition, "id") ~= original.id or rawget(definition, "from") ~= original.from
+						or rawget(definition, "menu_hidden") ~= original.hidden then return false end
+					if original.from ~= nil and (getmetatable(original.from) ~= nil or rawget(original.from, "key_code") ~= original.key) then return false end
+					count = count + 1
+				end
+				if count ~= cohort.count then return false end
+			end
+			local actual = activation_snapshot()
+			if actual == nil then return false end
+			for id, value in pairs(activators) do if actual[id] ~= value then return false end end
+			for id, value in pairs(actual) do if activators[id] ~= value then return false end end
+			if M.NON_CANONICAL_COMBOS ~= noncanonical or getmetatable(noncanonical) ~= nil then return false end
+			for id, value in pairs(symmetric_halves) do if rawget(noncanonical, id) ~= value then return false end end
+			for id, value in pairs(noncanonical) do if symmetric_halves[id] ~= value then return false end end
+			return true
+		end
+		return { taps = taps, combos = combos, activators = activators,
+			symmetric_halves = symmetric_halves, current = definitions_current }
+
+	end
+
+	local function source_ports_current()
+		return package.loaded["platform.remap"] == M and getmetatable(M) == nil
+			and M.capture_configured_navigation_inventory == ports.capture
+			and package.loaded["platform.remap.config"] == Config and getmetatable(Config) == nil
+			and Config.load_user_config == ports.config and Config.save_user_config == ports.save
+			and package.loaded["adapters.file_system"] == FileSystem and getmetatable(FileSystem) == nil
+			and FileSystem.read_with_status == ports.read and FileSystem.write_if_unchanged == ports.write
+			and package.loaded["platform.remap.nav_layer"] == NavLayer and getmetatable(NavLayer) == nil
+			and NavLayer.load == ports.load and NavLayer.capture_configured_inputs == ports.observe
+	end
+
+	function ports.invalidate() ports.record = nil end
+
+	--- Prepares optional source facts before the original compiler consumes them.
+	--- The opaque observation is exactly the same Nav.load second return.
+	function ports.prepare(layer, observation, epoch)
+		ports.record = nil
+		if not source_ports_current() or _state == nil or _state.nav_layer ~= layer
+			or _lifecycle_epoch ~= epoch then return nil end
+		local frame = { owner = setmetatable({ _state }, { __mode = "v" }), epoch = epoch,
+			layer = layer, metadata = capture_metadata(), settings = snapshot(_state), eligible = false,
+			enable_transaction = _enabled_transition and _enabled_transition.kind == "enabling"
+				and _state.enabled == false and _enabled_transition or nil }
+		if frame.metadata == nil or frame.settings == nil then return nil end
+		local function owned(expected)
+			local state = frame.owner[1]
+			return source_ports_current() and state ~= nil and _state == state
+				and _lifecycle_epoch == frame.epoch and _state.nav_layer == layer
+				and frame.metadata.current() and equal(expected or frame.settings, snapshot(state))
+		end
+		if not owned() then return nil end
+		local path = resolve_user_config()
+		if type(path) ~= "string" or not owned() then return nil end
+		local called, parsed, status, source = pcall(ports.config, frame.metadata.taps, frame.metadata.combos, path)
+		if not called or not owned() or not equal(frame.settings, snapshot(parsed))
+			or (status ~= "ok" and status ~= "absent") or type(source) ~= "table" or source.path ~= path
+			or source.status ~= status or (status == "ok" and type(source.content) ~= "string") then return nil end
+		local content = source.content
+		local function settings_current()
+			if not owned() then return false end
+			local actual_path = resolve_user_config()
+			if actual_path ~= path or not owned() then return false end
+			local actual, actual_status = ports.read(path)
+			return actual_status == status and actual == content and owned()
+		end
+		if not settings_current() then return nil end
+		local captured, nav = pcall(ports.observe, layer, observation)
+		if not captured or type(nav) ~= "table" or type(nav.codes) ~= "table"
+			or type(nav.current) ~= "function" or type(nav.sealed) ~= "function"
+			or not settings_current() then return nil end
+		frame.codes = {}; for index, code in ipairs(nav.codes) do frame.codes[index] = code end
+		frame.current = function()
+			if ports.record ~= frame or not settings_current() or nav.current() ~= true then return false end
+			return settings_current() and nav.sealed() == true and ports.record == frame
+		end
+		-- This handoff accepts only the original acknowledged save from the exact
+		-- enabling transaction. Later reads validate its candidate; they never
+		-- establish a replacement baseline for a compile made from older settings.
+		frame.commit_enabled = function(transaction, receipt)
+			if ports.record ~= frame or transaction ~= frame.enable_transaction
+				or _enabled_transition ~= transaction or transaction.kind ~= "enabling"
+				or transaction.committed ~= true or transaction.file ~= receipt
+				or frame.enable_receipt ~= receipt or type(receipt) ~= "table" or getmetatable(receipt) ~= nil
+				or receipt.path ~= path or type(receipt.candidate) ~= "string"
+				or receipt.verify_absence ~= true or receipt.publication_cleanup ~= nil
+				or type(receipt.source) ~= "table" or getmetatable(receipt.source) ~= nil
+				or receipt.source.status ~= status or receipt.source.content ~= content
+				or frame.settings.enabled ~= false then return false end
+			local expected = {}
+			for name, value in pairs(frame.settings) do expected[name] = value end
+			expected.enabled = true
+			if not owned(expected) or nav.current() ~= true or ports.record ~= frame then return false end
+			local called, parsed, actual_status, actual_source = pcall(ports.config,
+				frame.metadata.taps, frame.metadata.combos, path)
+			if not called or actual_status ~= "ok" or type(actual_source) ~= "table"
+				or actual_source.path ~= path or actual_source.status ~= "ok"
+				or actual_source.content ~= receipt.candidate or not equal(expected, snapshot(parsed))
+				or not owned(expected) or nav.current() ~= true or ports.record ~= frame then return false end
+			content, status, frame.settings = receipt.candidate, "ok", expected
+			return frame.current()
+		end
+		ports.record = frame
+		if not frame.current() then
+			if ports.record == frame then ports.record = nil end
+			return nil
+		end
+		return frame
+	end
+
+	function ports.begin_enable_save(transaction)
+		local frame = ports.record
+		if frame == nil or transaction == nil or frame.enable_transaction ~= transaction
+			or _enabled_transition ~= transaction or transaction.kind ~= "enabling"
+			or transaction.committed == true or frame.settings.enabled ~= false then return nil end
+		local called, current = pcall(frame.current)
+		if not called or current ~= true or ports.record ~= frame then return nil end
+		return frame
+	end
+
+	function ports.finish_enable_save(frame, transaction, save, write, accepted, receipt)
+		if frame == nil or ports.record ~= frame or transaction ~= frame.enable_transaction
+			or _enabled_transition ~= transaction or transaction.kind ~= "enabling"
+			or transaction.committed == true or accepted ~= true or receipt ~= transaction.file
+			or save ~= ports.save or write ~= ports.write or not source_ports_current() then return end
+		frame.enable_receipt = receipt
+	end
+
+	function ports.commit_enabled(transaction)
+		local frame = ports.record
+		if frame == nil or frame.enable_transaction ~= transaction then return end
+		local called, accepted = pcall(frame.commit_enabled, transaction, transaction.file)
+		if ports.record == frame and (not called or accepted ~= true) then ports.record = nil end
+	end
+
+	--- Settles only the exact optional preparation after original final admission.
+	function ports.settle(frame, accepted)
+		if frame == nil or ports.record ~= frame then return end
+		local called, current = pcall(frame.current)
+		if ports.record ~= frame then return end
+		if accepted == true and called and current == true then frame.eligible = true
+		else ports.record = nil end
+	end
+
+	--- Returns reservations from the original successful configured compilation.
+	--- Later reads compare the original facts; they never establish a baseline.
+	--- @return table|nil inventory Detached native input codes with a currency join.
+	function M.capture_configured_navigation_inventory()
+		local frame = ports.record
+		if frame == nil or not frame.eligible or not _running or _shutdown_requested
+			or _enabled_preflight or _enabled_transition or _bulk_settings_transaction then return nil end
+		local function current()
+			return ports.record == frame and frame.eligible and _running and not _shutdown_requested
+				and not _enabled_preflight and not _enabled_transition and not _bulk_settings_transaction
+				and frame.current()
+		end
+		if not current() then return nil end
+		local baseline, metadata, enters = frame.settings, frame.metadata, false
+		if baseline.enabled then
+			for _, definition in ipairs(metadata.taps) do
+				local cfg = baseline.tap_hold_config[definition.id] or {}
+				-- Right Command stays generated for Script-Control with Tap-Holds off.
+				if (baseline.tap_holds_enabled or definition.from and definition.from.key_code == "right_command")
+					and (metadata.activators[cfg.tap or "none"] == true or metadata.activators[cfg.hold or "none"] == true) then enters = true end
+			end
+			if baseline.mod_combos_enabled then
+				for _, definition in ipairs(metadata.combos) do
+					local cfg = baseline.mod_combos_config[definition.id] or {}
+					if not definition.menu_hidden and (metadata.activators[cfg.tap or "none"] == true
+						or metadata.activators[cfg.hold or "none"] == true
+						or metadata.activators[cfg.combo or "none"] == true
+							and not (baseline.combo_symmetric and metadata.symmetric_halves[definition.id])) then enters = true end
+				end
+			end
+		end
+		local codes = {}
+		if enters then for index, code in ipairs(frame.codes) do codes[index] = code end end
+		if not current() then return nil end
+		return { codes = codes, current = current }
+	end
+	ports.capture = M.capture_configured_navigation_inventory
+end)(NavigationInventory)
 
 --- Captures one detached, persistence-only settings snapshot.
 --- A parent transaction must never snapshot an enabled/bulk candidate in flight.
@@ -5316,6 +5858,7 @@ function M.restore_settings(snapshot, on_done, layer_receipt)
 		candidate.tap_hold_config = restored.tap_hold_config
 		candidate.mod_combos_config = restored.mod_combos_config
 		candidate.tap_hold_timeout_ms = restored.tap_hold_timeout_ms
+		candidate.lone_modifier_tap_max_ms = restored.lone_modifier_tap_max_ms
 		candidate.sticky_timeout_ms = restored.sticky_timeout_ms
 		candidate.simultaneous_threshold_ms = restored.simultaneous_threshold_ms
 		candidate.combo_symmetric = restored.combo_symmetric
@@ -5365,7 +5908,7 @@ end
 -- The bulk scope of the Tap-Hold submenu. The key combinations are drawn in
 -- the Shortcuts group with a switch of their own, so the Tap-Hold restore and
 -- clear rows must leave them, and that switch, as the user set them.
-local BULK_SCOPE_TAP_HOLDS = "tap_holds"
+local BULK_SCOPE_TAP_HOLDS = require("config_keys").KEY.TAP_HOLDS
 
 --- Resolves a bulk command's scope, refusing an unknown one through its callback.
 --- @param label string Stable operation label.
@@ -5439,7 +5982,7 @@ end
 
 --- The remap file's top-level tables, each owned by the manifest scope whose
 --- prefixes declare it: the keys by tap_holds, the chords by shortcuts.
-local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos", key_combinations = "mod_combos" }
+local REMAP_SCOPE_SECTIONS = { tap_holds = require("config_keys").KEY.TAP_HOLDS, shortcuts = require("config_keys").KEY.MOD_COMBOS, key_combinations = require("config_keys").KEY.MOD_COMBOS }
 
 --- Applies the remap part of a manifest scope as one exact transaction: a
 --- verified backup of config_karabiner.toml, a save that only replaces those
@@ -5472,13 +6015,13 @@ function M.apply_scope(request, on_done)
 		return false
 	end
 	Logger.debug(LOG, "Remap scope %s '%s' transaction requested.", request.scope, request.mode)
-	local sibling = request.scope == "tap_holds" and request.mode == "recommended"
+	local sibling = request.scope == require("config_keys").KEY.TAP_HOLDS and request.mode == "recommended"
 		and require("platform.remap.scope_layer").import() or nil
 	return apply_bulk_settings_transaction(label, function(candidate)
 		local target = request.mode == "recommended"
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 			or Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
-		if section == "mod_combos" then
+		if section == require("config_keys").KEY.MOD_COMBOS then
 			-- The shared combination scope keeps its switch on clear, including
 			-- when composed into Shortcuts; restore imports the neutral-on gate.
 			if request.mode ~= "clear" then
@@ -5489,13 +6032,19 @@ function M.apply_scope(request, on_done)
 			candidate.combo_symmetric = target.combo_symmetric
 			return #M.MOD_COMBOS
 		end
+		-- The manifest rows of the scope, each with its state field.
+		local fields = {
+			[require("config_keys").KEY.TAP_HOLDS_ENABLED] = "tap_holds_enabled",
+			-- config-key-literal-ok: the value is the remap state field, named like its leaf
+			[require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = "lone_modifier_tap_max_ms",
+		}
 		for _, row in ipairs(Manifest.scope_plan(request.scope, request.mode).operations) do
 			local path = row.section .. "." .. row.key
-			assert(path == "tap_holds.enabled", "tap-hold scope row has no remap owner: " .. path)
+			local field = assert(fields[path], "tap-hold scope row has no remap owner: " .. path)
 			if row.delete then
-				candidate.tap_holds_enabled = Manifest.default_for(path)
+				candidate[field] = Manifest.default_for(path)
 			else
-				candidate.tap_holds_enabled = row.value
+				candidate[field] = row.value
 			end
 		end
 		candidate.tap_hold_config = target.tap_hold_config
@@ -5520,6 +6069,7 @@ function M.reset_to_defaults(on_done, scope)
 		candidate.tap_holds_enabled         = defaults.tap_holds_enabled
 		candidate.tap_hold_config           = defaults.tap_hold_config
 		candidate.tap_hold_timeout_ms       = defaults.tap_hold_timeout_ms
+		candidate.lone_modifier_tap_max_ms  = defaults.lone_modifier_tap_max_ms
 		candidate.sticky_timeout_ms         = defaults.sticky_timeout_ms
 		if not includes_combos then return #M.TAP_HOLD_KEYS end
 		candidate.mod_combos_enabled        = defaults.mod_combos_enabled
@@ -5594,7 +6144,8 @@ function M.regenerate(
 			if type(on_done) == "function" then
 				retained.callbacks[#retained.callbacks + 1] = on_done
 			end
-			Logger.debug(LOG, "Joined retained %s regeneration after a layout change.",
+			Logger.info(LOG,
+				"Karabiner deploy decision: coalesced (joined the %s regeneration retained until the layout change settles).",
 				tostring(retained.intent))
 			return true
 		end
@@ -5662,6 +6213,8 @@ function M.regenerate(
 	context.attempt_finished = false
 	context.layout_invalidated = false
 	local callback_settled = false
+	local navigation_receipt
+	NavigationInventory.invalidate()
 	local function finish(ok, reason)
 		if callback_settled then return end
 		callback_settled = true
@@ -5681,6 +6234,7 @@ function M.regenerate(
 				context.built_layout_serial
 			)
 		end
+		NavigationInventory.settle(navigation_receipt, ok == true)
 		context:settle(ok == true, reason)
 	end
 	local function fail(reason)
@@ -5710,6 +6264,12 @@ function M.regenerate(
 	if not _state.enabled and not is_enable_transition then
 		Logger.debug(LOG, "Regenerate skipped — Karabiner integration is disabled.")
 		return fail("integration-disabled")
+	end
+	-- The owned runtime never falls back to the shared one: until it is admitted
+	-- nothing is generated, and the owner's own log names why.
+	if M._owned.selected() and not (M._owned.owner and M._owned.owner.admitted()) then
+		Logger.warn(LOG, "Regenerate skipped — the owned Karabiner runtime is not admitted.")
+		return fail("owned-runtime-not-admitted")
 	end
 
 	-- « pause = tout éteint ». Normal rules are now also gated by the exact pause
@@ -5795,10 +6355,15 @@ function M.regenerate(
 	-- Cheap enough to do unconditionally: load_available_actions memoises the
 	-- built list, so this walks the logical_char entries and mutates their key
 	-- codes in place rather than rebuilding 673 action tables.
+	-- Each stage is a phase: a late run loop or a hold names the stage that cost
+	-- (2026-10-31: 360 ms for a layout-settle regeneration that changed nothing).
+	local Phases = require("infra.phase_stats")
+	local stage_started = Phases.now()
 	if M.AVAILABLE_ACTIONS then
 		local layout_ok = resolve_current_layout_actions("Karabiner regeneration layout-action resolution")
 		if not layout_ok then return fail("layout-resolution-failed") end
 	end
+	Phases.stop("karabiner.layout_actions", stage_started)
 	context.built_layout_serial = _layout_event_serial
 	context.built_after_tis_settle = _layout_settled_serial >= context.built_layout_serial
 
@@ -5812,12 +6377,15 @@ function M.regenerate(
 
 	-- The navigation layer is data: layers.toml is read again for every
 	-- regeneration, so an edited file applies with the next one.
-	local ok_nav, nav_layer = pcall(NavLayer.load)
+	stage_started = Phases.now()
+	local ok_nav, nav_layer, nav_observation = pcall(NavLayer.load)
 	if not ok_nav then
 		Logger.error(LOG, "The navigation layer could not be read: %s.", tostring(nav_layer))
 		return fail("nav-layer-unavailable")
 	end
 	_state.nav_layer = nav_layer
+	local observed, receipt = pcall(NavigationInventory.prepare, nav_layer, nav_observation, context.epoch)
+	if observed then navigation_receipt = receipt end
 
 	-- The script chords that run now, read like the layer for every build.
 	if _script_chords_source ~= nil then
@@ -5829,6 +6397,8 @@ function M.regenerate(
 		_state.script_chords = chords
 	end
 
+	Phases.stop("karabiner.inputs", stage_started)
+	stage_started = Phases.now()
 	local ok_build, result, build_err, legacy_rules, legacy_context = pcall(
 		Generator.build_karabiner_json,
 		_state,
@@ -5844,9 +6414,14 @@ function M.regenerate(
 		return fail("generation-failed")
 	end
 
+	Phases.stop("karabiner.build", stage_started)
 	-- Counted before the call: a failed deploy may still have written.
 	_deploy_serial = _deploy_serial + 1
+	stage_started = Phases.now()
 	local deploy_ok, deployed, deploy_detail, _, deploy_refusal = xpcall(function()
+		if M._owned.selected() then
+			return Generator.deploy_owned_config(result, KARABINER_OUT)
+		end
 		return Generator.merge_and_deploy_config(
 			result,
 			KARABINER_OUT,
@@ -5854,6 +6429,7 @@ function M.regenerate(
 			legacy_context
 		)
 	end, debug.traceback)
+	Phases.stop("karabiner.deploy", stage_started)
 	if not deploy_ok or deployed ~= true then
 		local deploy_failure = deploy_ok and deploy_detail or deployed
 		Logger.error(LOG, "Karabiner deploy failed → '%s': %s.",
@@ -5874,7 +6450,7 @@ function M.regenerate(
 
 	-- Ensure the parent directory of the KC physical log exists before Karabiner
 	-- starts writing to it via shell_command echo redirects
-	local kc_parent = Generator.KE_PHYSICAL_KC_LOG and Generator.KE_PHYSICAL_KC_LOG:match("^(.*)/[^/]+$")
+	local kc_parent = Generator.KE_PHYSICAL_KC_LOG and require("native_path").dirname(Generator.KE_PHYSICAL_KC_LOG)
 	if kc_parent and not _kc_parent_ensured then
 		-- POSIX single-quoting, not Lua's %q. %q escapes for a LUA literal — it leaves
 		-- $, backticks and ! untouched — so a config dir containing any of them was
@@ -5882,8 +6458,12 @@ function M.regenerate(
 		-- is the same shell-quoting rule the generator applies 150 lines away, and the
 		-- generator's own regression test covers only that file. Memoised because this
 		-- runs on every regenerate: the directory does not stop existing.
-		local function sq(v) return "'" .. tostring(v):gsub("'", "'\\''") .. "'" end
-		pcall(hs.execute, "mkdir -p " .. sq(kc_parent))
+		-- An existing folder needs no shell fork (about 40 ms on the Mac, inside
+		-- the boot regeneration).
+		local ok_mode, mode = pcall(hs.fs.attributes, kc_parent, "mode")
+		if not (ok_mode and mode == "directory") then
+			pcall(hs.execute, "mkdir -p " .. require("text_utils").shell_quote(kc_parent))
+		end
 		_kc_parent_ensured = true
 	end
 
@@ -5919,6 +6499,19 @@ function M.regenerate(
 		Logger.error(LOG, "Karabiner lease cannot regenerate from phase '%s'.",
 			tostring(status_phase))
 		return fail("invalid-lease-phase")
+	end
+	if M._owned.selected() then
+		-- The user-side process starts only now that its configuration is on disk.
+		local prepared_start = start_lease
+		start_lease = function(on_ready)
+			return M._owned.owner.ensure_peers(function(ready, why)
+				if ready ~= true then
+					on_ready(false, "owned-runtime-" .. tostring(why))
+					return
+				end
+				if prepared_start(on_ready) ~= true then on_ready(false, "activation-request-rejected") end
+			end)
+		end
 	end
 	local layout_guard = nil
 	if not is_lease_failure_recovery then
@@ -6115,6 +6708,11 @@ end
 --- @param on_done function|nil Callback fn(ok, reason) after PAUSED or failure.
 --- @param onboarding_gate table|nil Private exact-settlement continuation token.
 function M.pause(on_done, onboarding_gate)
+	if onboarding_gate == nil and M._owned.selected() and M._owned.paused ~= true then
+		-- Ergopti paused: its own runtime stops and a Karabiner it closed comes back.
+		M._owned.paused = true
+		if M._owned.reconcile() ~= true then Logger.error(LOG, "Owned Karabiner runtime could not follow the pause.") end
+	end
 	if not _state or not _state.enabled then
 		invoke_public_callback("pause", on_done, false, "integration-disabled")
 		return false
@@ -6226,6 +6824,11 @@ end
 --- acknowledgement names the same ACTIVE token.
 --- @param on_done function|nil Callback fn(ok, reason) after the full transaction.
 function M.resume(on_done)
+	if M._owned.selected() and M._owned.paused == true then
+		-- Ergopti resumes: its own runtime runs again and closes the user's Karabiner.
+		M._owned.paused = false
+		if M._owned.reconcile() ~= true then Logger.error(LOG, "Owned Karabiner runtime could not follow the resume.") end
+	end
 	if not _state or not _state.enabled then
 		invoke_public_callback("resume", on_done, false, "integration-disabled")
 		return false
@@ -6298,6 +6901,57 @@ end
 -- ============================
 -- ============================
 
+--- Binds the owned runtime owner and its activation rule once, to the real Mac
+--- ports. Nothing is started here.
+--- @return table|nil activation Nil when the owner could not be bound.
+function M._owned.bind()
+	if M._owned.activation then return M._owned.activation end
+	local Owner = require("platform.remap.runtime_owner")
+	Logger.start(LOG, "Binding the owned Karabiner runtime…")
+	local OwnerPorts = require("adapters.runtime_owner_ports")
+	local ports_ok, ports = pcall(OwnerPorts.new)
+	if not ports_ok then
+		Logger.error(LOG, "Owned Karabiner runtime ports could not be built: %s.", tostring(ports))
+		return nil
+	end
+	if not Owner.init(ports) then
+		Logger.error(LOG, "Owned Karabiner runtime owner was already bound; the bridge stays fail-closed.")
+		return nil
+	end
+	M._owned.owner = Owner
+	-- A second capture cannot start in this Lua VM, so a resume reloads the driver.
+	M._owned.activation = require("platform.remap.runtime_activation").new(OwnerPorts.activation(Owner,
+		function() return _state ~= nil and _state.close_other_instances == true end,
+		function()
+			Logger.info(LOG, "Reloading so that Ergopti's own Karabiner runtime starts again.")
+			hs.reload()
+		end))
+	Logger.success(LOG, "Owned Karabiner runtime bound.")
+	return M._owned.activation
+end
+
+--- Applies the activation rule (platform/remap/runtime_activation.lua): while
+--- Ergopti runs and is not paused its own runtime is active and closes the
+--- user's Karabiner; paused, it stops and gives back a Karabiner it closed. Admission
+--- failure is reported by the owner with a named reason and leaves the bridge
+--- fail-closed: nothing falls back to the shared runtime. When admission
+--- succeeds, the configuration is generated and deployed to the owned path.
+--- @return boolean applied False when the owner could not be bound.
+function M._owned.reconcile()
+	local activation = M._owned.bind()
+	if not activation then return false end
+	local epoch = _lifecycle_epoch
+	local lifecycle = { running = _running == true and not _shutdown_requested, paused = M._owned.paused == true }
+	local action = activation.reconcile(require("platform.remap.runtime_activation").wanted(lifecycle), function()
+		if epoch ~= _lifecycle_epoch or not _running then return end
+		if _state.enabled == true and not M.regenerate() then
+			Logger.error(LOG, "Owned Karabiner runtime was admitted but its configuration could not be requested.")
+		end
+	end)
+	Logger.info(LOG, "Owned Karabiner runtime activation: %s.", action)
+	return true
+end
+
 --- Initializes the Karabiner bridge.
 --- @param file_system table FileSystem port adapter (adapters/file_system.lua).
 ---   Used to resolve the KE config path through hs.fs.pathToAbsolute so the
@@ -6357,6 +7011,23 @@ function M.init(file_system)
 		return false
 	end
 	local first_launch = user_config_status == "absent"
+
+	-- The runtime this boot targets: shared unless config_karabiner.toml opted
+	-- in by hand. The command line tool every variable writer spells is chosen
+	-- here, once, and an owned boot writes its own complete file.
+	local runtime = user_cfg.runtime or M._owned.paths.RUNTIME_SHARED
+	local runtime_ok, runtime_err = pcall(M._owned.paths.select_runtime, runtime)
+	if not runtime_ok then
+		Logger.error(LOG, "Karabiner bridge initialization refused: %s", tostring(runtime_err))
+		return false
+	end
+	if runtime == M._owned.paths.RUNTIME_OWNED then
+		Logger.warn(LOG, "Opted in to the owned Karabiner runtime (not shipped; hidden preference).")
+		if not (env_override and env_override ~= "") then
+			KARABINER_OUT = file_system.expand_path(M._owned.paths.config_file_for(runtime))
+			Logger.info(LOG, "Owned KE config path resolved: '%s'.", KARABINER_OUT)
+		end
+	end
 
 	--- Retains failed boot publication before any remap runtime or native lease.
 	--- Failed native publication retains cleanup only: these saved defaults or
@@ -6418,11 +7089,14 @@ function M.init(file_system)
 
 	_state = {
 		enabled                   = user_cfg.enabled,
+		runtime                   = runtime,
+		close_other_instances     = user_cfg.close_other_instances,
 		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
 		mod_combos_enabled        = user_cfg.mod_combos_enabled,
 		tap_hold_config           = user_cfg.tap_hold_config,
 		mod_combos_config         = user_cfg.mod_combos_config,
 		tap_hold_timeout_ms       = user_cfg.tap_hold_timeout_ms,
+		lone_modifier_tap_max_ms  = user_cfg.lone_modifier_tap_max_ms,
 		sticky_timeout_ms         = user_cfg.sticky_timeout_ms,
 		simultaneous_threshold_ms = user_cfg.simultaneous_threshold_ms,
 		combo_symmetric           = user_cfg.combo_symmetric,
@@ -6563,11 +7237,22 @@ function M.init(file_system)
 			-- This step is independent and guarded so a layout failure cannot suppress
 			-- the first post-wake liveness proof.
 			if _state.enabled == true then
+				local refresh_reason = nil
 				local refresh_ok, refreshed = run_async_step(
 					"Wake exact-lease liveness refresh",
-					LeaseController.refresh_liveness
+					function()
+						local sent, reason = LeaseController.refresh_liveness()
+						refresh_reason = reason
+						return sent
+					end
 				)
-				if not refresh_ok or refreshed ~= true then
+				if refresh_ok and refreshed ~= true and refresh_reason == "no-live-generation" then
+					-- The 2026-10-27 19:46 wake found the generation gone and only warned, so
+					-- remapping stayed off until a reload. The bounded failure recovery owns
+					-- the re-acquisition: it refuses while disabled, paused or transitioning.
+					Logger.info(LOG, "Wake found no live Karabiner lease; re-acquiring it.")
+					begin_lease_recovery(_last_failed_lease_token or "wake-without-generation")
+				elseif not refresh_ok or refreshed ~= true then
 					Logger.warn(LOG, "Wake refresh could not renew the exact Karabiner lease liveness.")
 				end
 			end
@@ -6623,7 +7308,14 @@ function M.init(file_system)
 	-- aborting the timer while still making it visible in the file logger.
 	-- The session guard prevents the dialog from re-appearing on every
 	-- hs.reload() within the same Hammerspoon session.
-	if _state.enabled and not _wizard_ran_this_session then
+	-- The owned runtime is installed by its own installer, not by the wizard that
+	-- offers the official application.
+	if M._owned.selected() then
+		if M._owned.reconcile() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime could not be bound; remapping stays off.")
+		end
+	end
+	if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session then
 		_wizard_ran_this_session = true
 		local wizard_epoch = _lifecycle_epoch
 		if schedule_first_run_wizard(wizard_epoch) ~= true then
@@ -6649,6 +7341,22 @@ local function stop_local_resources()
 	_pending_layout_refresh = nil
 	local all_stopped = cancel_lease_recovery("local-teardown") == true
 	if clear_ke_variables_recovery_observer() ~= true then all_stopped = false end
+	if M._owned.owner then
+		local stopped = M._owned.owner.stop()
+		if stopped ~= true or M._owned.owner.release() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime is still retained after teardown.")
+			all_stopped = false
+		else
+			-- Ours no longer runs. On a quit a Karabiner Ergopti closed is given
+			-- back; a reload brings ours straight back and must not hand the
+			-- keyboards to theirs in between. The marker survives a quit that ends
+			-- before this settles, and the next boot with Tap-Hold off restores it.
+			if M._owned.activation and M._owned.teardown_reason ~= "hammerspoon_reload" then
+				M._owned.activation.restore_if_closed()
+			end
+			M._owned.owner, M._owned.activation = nil, nil
+		end
+	end
 	-- The module-level contract owns timers, installer tasks, partials, and mounts
 	if stop_loaded_onboarding("Karabiner local teardown") ~= true then all_stopped = false end
 	if release_wake_watcher("Wake watcher") ~= true then all_stopped = false end
@@ -6725,6 +7433,8 @@ end
 --- @param on_done function|nil Callback fn(fenced, reason).
 --- @return boolean True when exact revocation was accepted.
 function M.revoke(reason, on_done)
+	-- A reload starts the same rule again at once; only a quit gives a closed Karabiner back.
+	M._owned.teardown_reason = reason
 	if _enabled_transition ~= nil and _enabled_transition.file ~= nil then
 		local transaction = _enabled_transition
 		if transaction.before_lifecycle() ~= true then
@@ -6773,6 +7483,9 @@ function M.revoke(reason, on_done)
 		invoke_public_callback("revoke", on_done, ok == true, detail)
 	end
 	local function settle_join_if_ready()
+		-- Both halves may answer inside their own calls; the join then already
+		-- settled, and the trailing join below must not report it twice.
+		if callback_fired then return end
 		if not onboarding_done or not lease_done then return end
 		if onboarding_succeeded ~= true then
 			Logger.error(LOG, "Ergopti onboarding revocation failed: %s.",

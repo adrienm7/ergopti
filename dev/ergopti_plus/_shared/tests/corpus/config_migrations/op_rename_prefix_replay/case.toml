@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/op_rename_prefix_replay/case.toml
+
+[case]
+description = "rename_prefix over keys that already carry the new prefix changes nothing: a replay never renames twice."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

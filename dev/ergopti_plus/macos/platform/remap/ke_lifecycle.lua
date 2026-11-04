@@ -28,6 +28,7 @@ local Notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local KePaths       = require("platform.remap.ke_paths")
+local Timings       = require("infra.timings")
 
 local LOG = "karabiner"
 
@@ -64,8 +65,8 @@ local KE_GRABBER_CHECK = "{ /usr/bin/pgrep -q -u root -f -x "
 	.. text_utils.shell_quote(ere_literal(KePaths.GRABBER))
 	.. "; } 2>/dev/null"
 
-local KARABINER_READY_NOTIFY_COOLDOWN_SEC = 10
-local KARABINER_READY_NOTIFY_DELAY_SEC    = 2.5
+local KARABINER_READY_NOTIFY_COOLDOWN_SEC = Timings.sec("ui", "karabiner_ready_notify_cooldown_ms")
+local KARABINER_READY_NOTIFY_DELAY_SEC    = Timings.sec("ui", "karabiner_ready_notify_delay_ms")
 local KARABINER_READY_RETRY_EPSILON_SEC   = 0.1
 local KARABINER_READY_FAILURE_RETRY_SEC   = KARABINER_READY_NOTIFY_COOLDOWN_SEC
 	+ KARABINER_READY_RETRY_EPSILON_SEC

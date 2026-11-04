@@ -1,0 +1,6 @@
+{
+	"schema_version": 1,
+	"serve_environment": {
+		"OLLAMA_NO_CLOUD": "1"
+	}
+}

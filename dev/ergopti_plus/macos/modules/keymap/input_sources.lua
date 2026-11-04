@@ -6,7 +6,7 @@
 --- Enumerates and switches the macOS keyboard input sources (the live HIToolbox
 --- list), maps the layouts an installed bundle declares to their TIS identifiers,
 --- adds or removes any installed .keylayout in the enabled list, and selects a
---- source via isolated osascript. Extracted from ui/menu/menu_keyboard_layout.lua
+--- source via the isolated native launcher. Extracted from ui/menu/menu_keyboard_layout.lua
 --- (audit F4) — the ~660-line input-source layer that the submenu builder drives.
 ---
 --- FEATURES & RATIONALE:
@@ -14,7 +14,7 @@
 ---    _active_layouts_cache and refreshed asynchronously off the click path.
 --- 2. Legacy-id migration: upgrades pre-namespace Ergopti ids to the current TIS
 ---    namespace so older installs keep working.
---- 3. Isolated osascript: TIS calls run in their own subprocess so a hang cannot
+--- 3. Isolated mutations: TIS calls run in their own subprocess so a hang cannot
 ---    stall the Hammerspoon run loop.
 ---
 --- Owns the active-layout probe cache; depends on layout_install for on-disk
@@ -23,13 +23,14 @@
 
 local hs      = hs
 local Logger  = require("infra.logger")
-local text_utils = require("infra.text_utils")
+local NativePath = require("native_path")
 local Timings = require("infra.timings")
 local install = require("modules.keymap.layout_install")
 local ShellRunner = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 local OpenStepPlist = require("infra.openstep_plist")
 local PythonInterpreter = require("adapters.python_interpreter")
+local InputSourceSelector = require("adapters.input_source_selector")
 local LOG     = "menu.keyboard_layout"
 
 -- Install-layer helpers used by the enumeration / selection logic below.
@@ -50,12 +51,14 @@ local INPUT_SOURCE_OPERATION_TIMEOUT_SEC =
 -- Records from the (expensive) HIToolbox active-layout probe. nil until first
 -- computed; refreshed asynchronously so menu opens never pay a subprocess.
 local _active_layouts_cache = nil
--- Epoch seconds of the last async refresh (throttle anchor); 0 forces a refresh.
-local _active_layouts_last_refresh = 0
+-- Awake seconds of the last refresh attempt; nil admits the initial sample, including zero.
+local _active_layouts_last_refresh = nil
 -- Exact active read-only probe owner. ShellRunner retains every native task
 -- through settlement; this owner additionally fences cache publication and the
 -- watchdog so a late terminal cannot overwrite a successor.
 local _active_probe_owner = nil
+-- A successful enabled-list edit retires every earlier read's cache authority.
+local _active_layouts_generation = 0
 
 -- Input-source mutations are serialized. A timed-out child remains the exact
 -- owner until its native completion callback settles, so a successor cannot
@@ -102,8 +105,9 @@ end
 --- @param executable string Absolute executable path.
 --- @param args table Argument vector.
 --- @param on_done function|nil fn(ok, stdout, reason, stderr).
+--- @param environment table|nil Exact child environment overrides.
 --- @return boolean accepted True only when the subprocess start commits.
-local function run_bounded_process(label, executable, args, on_done)
+local function run_bounded_process(label, executable, args, on_done, environment)
 	if reject_if_mutation_busy(label, on_done) then return false end
 
 	local owner = {
@@ -130,6 +134,9 @@ local function run_bounded_process(label, executable, args, on_done)
 			return false
 		end
 		owner.pending_terminal = nil
+		-- Both native owners have settled: free the slot first, so a terminal
+		-- callback that starts the next mutation (a rollback) is admitted.
+		release_mutation_if_settled(owner)
 		return publish_terminal(pending.ok, pending.stdout, pending.reason, pending.stderr)
 	end
 
@@ -147,7 +154,7 @@ local function run_bounded_process(label, executable, args, on_done)
 		if deadline_settled == true then owner.deadline_settled = true end
 		publish_pending_terminal()
 		release_mutation_if_settled(owner)
-	end)
+	end, nil, environment)
 	owner.handle = handle
 
 	local observed_task = handle.onSettled(function()
@@ -220,8 +227,9 @@ end
 --- Clears the active-layout cache and resets the throttle so the next menu open
 --- recomputes immediately. Called after the enabled input-source set changes.
 local function invalidate_active_layouts_cache()
+	_active_layouts_generation = _active_layouts_generation + 1
 	_active_layouts_cache        = nil
-	_active_layouts_last_refresh = 0
+	_active_layouts_last_refresh = nil
 end
 
 --- Test seam: overwrite the active-layout cache directly (latency tests prime it
@@ -293,22 +301,8 @@ local function format_ergopti_display(id)
 	return "Ergopti" .. variant .. ansi_part .. version_part
 end
 
---- Runs an AppleScript in an owned, deadline-bounded child process so Carbon/TIS
---- failures stay contained without blocking the Hammerspoon runloop.
---- @param script string The AppleScript source code to execute.
---- @param on_done function|nil fn(ok, output, reason).
---- @return boolean accepted True only when the child start commits.
-local function run_osascript_isolated_async(script, on_done)
-	if type(script) ~= "string" or script == "" then
-		invoke_mutation_done("osascript.reject", on_done, false, nil, "invalid_script")
-		return false
-	end
-	return run_bounded_process("Input-source AppleScript", "/usr/bin/osascript",
-		{ "-e", script }, on_done)
-end
-
---- Enumerates every enabled keyboard-layout input source via Carbon TIS
---- in an isolated osascript subprocess. Returns a list of records:
+--- Enumerates enabled keyboard-layout input sources through the isolated
+--- defaults reader. Returns a list of records:
 ---
 ---     { id = "com.apple.keylayout.ergopti.plus",
 ---       name = "Ergopti+",
@@ -459,7 +453,7 @@ local function finalize_active_probe(owner)
 		or owner.task_settled ~= true then
 		return false
 	end
-	if _active_probe_owner == owner then
+	if _active_probe_owner == owner and owner.cache_generation == _active_layouts_generation then
 		local records = parse_active_layouts(owner.raw_output, owner.current_name)
 		if records then
 			_active_layouts_cache = records
@@ -510,6 +504,7 @@ local function refresh_active_layouts_async(on_done)
 	end
 
 	local owner = {
+		cache_generation = _active_layouts_generation,
 		waiters = {},
 		current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
 			and hs.keycodes.currentLayout() or nil,
@@ -589,12 +584,12 @@ end
 --- spawn overlapping probes.
 --- @param force boolean|nil When true, bypasses the throttle (startup prime).
 local function maybe_refresh_active_layouts(force)
-	local now = (hs.timer and type(hs.timer.secondsSinceEpoch) == "function")
-		and hs.timer.secondsSinceEpoch() or nil
-	if not force and now and (now - _active_layouts_last_refresh) < ACTIVE_LAYOUTS_REFRESH_THROTTLE_SEC then
+	local now = TimerScheduler.awake_time()
+	if not force and _active_layouts_last_refresh ~= nil
+		and (now - _active_layouts_last_refresh) < ACTIVE_LAYOUTS_REFRESH_THROTTLE_SEC then
 		return
 	end
-	if now then _active_layouts_last_refresh = now end
+	_active_layouts_last_refresh = now
 	refresh_active_layouts_async(nil)
 end
 
@@ -632,9 +627,9 @@ local build_kl_name_to_tis_id
 ---      "Ergopti_v2_2_2_plus") is NOT accepted by setLayout.
 ---   2. hs.keycodes.setLayout(kl_name) — fallback using the internal name in case
 ---      the localised form differs from what hs.keycodes expects.
----   3. TISSelectInputSource via osascript with the stable TIS ID resolved from
----      kl_name through build_kl_name_to_tis_id() — covers Ergopti variants on
----      macOS Sequoia where setLayout fails for third-party bundles.
+---   3. TISSelectInputSource via the native launcher: installed Ergopti layouts
+---      use their declared stable ID; other menu names resolve uniquely within
+---      one native inventory, preserving the exact ID candidate when present.
 --- @param localised_name string The display / localised name (r.name), e.g. "French".
 --- @param kl_name string The raw KeyboardLayout Name (r.id), e.g. "Ergopti_v2_2_2_plus".
 --- @param on_done function|nil fn(ok, output, reason).
@@ -669,30 +664,33 @@ local function set_input_source_async(localised_name, kl_name, on_done)
 			Logger.debug(LOG, "hs.keycodes declined the kl_name '%s' — falling back to TIS…", kl_name)
 		end
 	end
-	-- Resolve the stable TIS ID for Ergopti variants via the installed bundle map,
-	-- then fall back to using kl_name directly as the TIS ID for standard layouts.
+	-- A menu's raw name ("French") is not a TIS ID. Resolve names and native
+	-- identities from the same Carbon inventory rather than pairing two separate
+	-- hs.keycodes.layouts() snapshots, whose ordering can change between calls.
 	local tis_id = kl_name or localised_name or ""
+	local mapped_id = nil
 	if type(kl_name) == "string" and kl_name ~= "" then
 		local kl_map = build_kl_name_to_tis_id() or {}
-		tis_id = kl_map[kl_name] or kl_name
+		mapped_id = kl_map[kl_name]
+		tis_id = mapped_id or kl_name
 	end
-	local script = text_utils.applescript_format([[
-use framework "Carbon"
-use framework "Foundation"
-on run
-	set theProps to current application's NSDictionary's dictionaryWithObjects:{"%s"} forKeys:{"TISPropertyInputSourceID"}
-	set theSources to current application's TISCreateInputSourceList(theProps, true)
-	if theSources is not missing value and (count of (theSources as list)) > 0 then
-		set theSource to item 1 of (theSources as list)
-		current application's TISSelectInputSource(theSource)
-		return "OK"
-	end if
-	return "MISS"
-end run
-]], tis_id)
-	return run_osascript_isolated_async(script, function(process_ok, out, reason)
+	local executable, arguments, environment, resolve_reason
+	if mapped_id == nil and type(localised_name) == "string" and localised_name ~= "" then
+		executable, arguments, environment, resolve_reason = InputSourceSelector.command_named(localised_name, tis_id)
+	else
+		executable, arguments, environment, resolve_reason = InputSourceSelector.command(tis_id)
+	end
+	if executable == nil then
+		Logger.warn(LOG, "Native input-source selection could not resolve its exact helper: %s.",
+			tostring(resolve_reason))
+		invoke_mutation_done("set_input_source.tis", on_done, false, nil, resolve_reason)
+		return false
+	end
+	return run_bounded_process("Native input-source selection", executable, arguments, function(process_ok, out, reason)
 		local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
-		local switched = process_ok == true and out_text == "OK"
+		-- Carbon returns an OSStatus independently of the helper's process exit.
+		-- Finding the source does not prove the native selection was accepted.
+		local switched = process_ok == true and out_text == "0"
 		if switched then
 			Logger.info(LOG, "Active layout switched to '%s' (TIS subprocess, tis_id=%s).",
 				localised_name or kl_name, tis_id)
@@ -700,10 +698,10 @@ end run
 			return
 		end
 		local failure_reason = reason or "invalid_output"
-		Logger.warn(LOG, "Failed to switch active layout to '%s' / '%s' (tis_id=%s, reason=%s).",
-			tostring(localised_name), tostring(kl_name), tis_id, failure_reason)
+		Logger.warn(LOG, "Failed to switch active layout to '%s' / '%s' (tis_id=%s, reason=%s, result=%s).",
+			tostring(localised_name), tostring(kl_name), tis_id, failure_reason, out_text)
 		invoke_mutation_done("set_input_source.tis", on_done, false, out_text, failure_reason)
-	end)
+	end, environment)
 end
 
 --- Builds a mapping from KeyboardLayout Name (internal HIToolbox name) to stable TIS ID
@@ -718,7 +716,7 @@ function build_kl_name_to_tis_id()
 	local sb      = sb_sys or sb_user
 	local sb_dir  = sb_sys and SYSTEM_LAYOUTS_DIR or (sb_user and USER_LAYOUTS_DIR) or nil
 	if not sb or not sb_dir then return nil end
-	local bundle_path = sb_dir:gsub("[/\\]$", "") .. "/" .. sb.name
+	local bundle_path = NativePath.without_trailing_separators(sb_dir) .. "/" .. sb.name
 	local map = {}
 	for _, variant in ipairs(install.bundle_variants(bundle_path)) do
 		map[variant.name] = variant.tis_id
@@ -728,8 +726,19 @@ end
 
 
 -- Edits the user's enabled input-source list (AppleEnabledInputSources of
--- com.apple.HIToolbox) through `defaults export` / `defaults import`, then
--- restarts SystemUIServer so the change takes effect immediately.
+-- com.apple.HIToolbox) through `defaults export` / `defaults import`. macOS
+-- reads that list at login: a layout written while the session runs is listed
+-- by the preference at once but turned on only at the next login (macOS 26
+-- field probe, TODO.md L25). Whether it is on now is read
+-- separately, from the live list (is_live_enabled).
+--
+-- The script used to end with `launchctl kickstart -k user/<uid>/
+-- com.apple.SystemUIServer`. That service is not in the user domain
+-- (SystemUIServer is com.apple.SystemUIServer.agent in gui/<uid>), so launchctl
+-- answered 113 after every successful write, the script exited 1 and every
+-- enable was reported "process_failed" (L52). Nothing was ever restarted, so
+-- removing it changes no effect; whether any re-read makes the write take
+-- effect without a logout is what the probe's P9 measures.
 --
 -- The Carbon TIS ObjC-bridge approach (TISCreateInputSourceList +
 -- TISEnableInputSource called from osascript) was tried extensively but
@@ -865,10 +874,6 @@ try:
 finally:
     os.unlink(tmp)
 
-# Reload the input-source list. launchctl kickstart is safer than killall
-# on Sequoia: it re-spawns the agent cleanly without flushing the cfprefsd cache.
-uid = str(os.getuid())
-run_child(["launchctl", "kickstart", "-k", "user/" + uid + "/com.apple.SystemUIServer"])
 print("OK")
 ]]
 
@@ -906,9 +911,302 @@ local function edit_enabled_list_async(mode, target, display, accepted, on_done)
 		end)
 end
 
+-- Reads, and optionally registers or refreshes, one keyboard layout from a
+-- FRESH process. The macOS 26 field probe (v5, P5 and P9) showed that the
+-- enabled-sources preference turns a layout on at once, but a process that
+-- already used TIS keeps its stale list (it answers enabled=false and select
+-- -50), while a process started after the write sees enabled=true and selects
+-- it. Hammerspoon's own list (hs.keycodes) is such a stale cache, so the state
+-- is read here, in a child started after the write. P8 a: new content of an
+-- enabled loose layout applies once the file is registered again.
+--
+-- argv: KeyboardLayout Name, the .keylayout path to register ("" for none),
+-- and comma-separated flags: "enable" calls TISEnableInputSource on a listed
+-- source that reads off, "refresh" selects another layout and back when the
+-- target is selected (so a rewritten layout is reloaded), then the pause in
+-- seconds after each of those selections. Prints one JSON object:
+--   {"listed", "id", "enabled", "select_capable", "selected", "register", "enable", "refreshed"}
+-- Carbon is called through ctypes: the AppleScript ObjC bridge crashes on these
+-- calls (see ENABLED_LIST_SCRIPT), the C API does not.
+local CONFIRM_SOURCE_SCRIPT = [[
+import ctypes, json, math, sys, time
+
+TARGET = sys.argv[1]
+REGISTER_PATH = sys.argv[2]
+FLAGS = sys.argv[3].split(",")
+if len(sys.argv) != 5:
+    raise ValueError("input-source confirmation requires an explicit settle delay")
+SETTLE_SEC = float(sys.argv[4])
+if not math.isfinite(SETTLE_SEC) or SETTLE_SEC <= 0:
+    raise ValueError("input-source settle delay must be finite and positive")
+REFRESH = "refresh" in FLAGS
+ENABLE = "enable" in FLAGS
+UTF8 = 0x08000100
+
+cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+tis = ctypes.CDLL("/System/Library/Frameworks/Carbon.framework/Carbon")
+P = ctypes.c_void_p
+cf.CFArrayGetCount.argtypes = [P]
+cf.CFArrayGetCount.restype = ctypes.c_long
+cf.CFArrayGetValueAtIndex.argtypes = [P, ctypes.c_long]
+cf.CFArrayGetValueAtIndex.restype = P
+cf.CFStringGetCString.argtypes = [P, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32]
+cf.CFStringGetCString.restype = ctypes.c_bool
+cf.CFBooleanGetValue.argtypes = [P]
+cf.CFBooleanGetValue.restype = ctypes.c_bool
+cf.CFRelease.argtypes = [P]
+cf.CFRelease.restype = None
+cf.CFURLCreateFromFileSystemRepresentation.argtypes = [P, ctypes.c_char_p, ctypes.c_long, ctypes.c_bool]
+cf.CFURLCreateFromFileSystemRepresentation.restype = P
+tis.TISCreateInputSourceList.argtypes = [P, ctypes.c_bool]
+tis.TISCreateInputSourceList.restype = P
+tis.TISGetInputSourceProperty.argtypes = [P, P]
+tis.TISGetInputSourceProperty.restype = P
+tis.TISSelectInputSource.argtypes = [P]
+tis.TISSelectInputSource.restype = ctypes.c_int32
+tis.TISRegisterInputSource.argtypes = [P]
+tis.TISRegisterInputSource.restype = ctypes.c_int32
+tis.TISEnableInputSource.argtypes = [P]
+tis.TISEnableInputSource.restype = ctypes.c_int32
+
+def key(name):
+    return P.in_dll(tis, name).value
+
+K_ID = key("kTISPropertyInputSourceID")
+K_NAME = key("kTISPropertyLocalizedName")
+K_TYPE = key("kTISPropertyInputSourceType")
+K_ENABLED = key("kTISPropertyInputSourceIsEnabled")
+K_SELECT_CAPABLE = key("kTISPropertyInputSourceIsSelectCapable")
+K_SELECTED = key("kTISPropertyInputSourceIsSelected")
+
+def text(ref):
+    if not ref:
+        return None
+    buffer = ctypes.create_string_buffer(1024)
+    return buffer.value.decode("utf-8") if cf.CFStringGetCString(ref, buffer, 1024, UTF8) else None
+
+def string_property(source, name):
+    return text(tis.TISGetInputSourceProperty(source, name))
+
+def flag(source, name):
+    ref = tis.TISGetInputSourceProperty(source, name)
+    return bool(ref) and bool(cf.CFBooleanGetValue(ref))
+
+def sources():
+    listed = tis.TISCreateInputSourceList(None, True)
+    if not listed:
+        print(json.dumps({"error": "TISCreateInputSourceList returned nothing"}))
+        sys.exit(1)
+    return listed, [cf.CFArrayGetValueAtIndex(listed, i) for i in range(cf.CFArrayGetCount(listed))]
+
+def is_target(source):
+    source_id = string_property(source, K_ID) or ""
+    return string_property(source, K_NAME) == TARGET or source_id == TARGET or source_id.endswith("." + TARGET)
+
+register = None
+if REGISTER_PATH:
+    raw = REGISTER_PATH.encode("utf-8")
+    url = cf.CFURLCreateFromFileSystemRepresentation(None, raw, len(raw), False)
+    if not url:
+        print(json.dumps({"error": "the layout path is not a URL"}))
+        sys.exit(1)
+    register = tis.TISRegisterInputSource(url)
+    cf.CFRelease(url)
+
+listed, everything = sources()
+target = next((source for source in everything if is_target(source)), None)
+enable = None
+if target is not None and ENABLE and not flag(target, K_ENABLED):
+    # The preference already lists it; this asks the text-input system too. The
+    # answer of this process can stay stale: the caller reads again, fresh.
+    enable = tis.TISEnableInputSource(target)
+refreshed = None
+if target is not None and REFRESH and flag(target, K_SELECTED):
+    layout_type = "TISTypeKeyboardLayout"
+    other = next((source for source in everything if source != target
+        and string_property(source, K_TYPE) == layout_type
+        and flag(source, K_ENABLED) and flag(source, K_SELECT_CAPABLE)), None)
+    if other is not None:
+        away = tis.TISSelectInputSource(other)
+        time.sleep(SETTLE_SEC)
+        back = tis.TISSelectInputSource(target)
+        time.sleep(SETTLE_SEC)
+        refreshed = {"away": away, "back": back}
+    else:
+        refreshed = {"away": None, "back": None}
+
+state = {"listed": target is not None, "register": register, "enable": enable, "refreshed": refreshed}
+if target is not None:
+    state.update({
+        "id": string_property(target, K_ID),
+        "enabled": flag(target, K_ENABLED),
+        "select_capable": flag(target, K_SELECT_CAPABLE),
+        "selected": flag(target, K_SELECTED),
+    })
+cf.CFRelease(listed)
+print(json.dumps(state))
+]]
+
+--- Reads one keyboard layout's state from a fresh process (CONFIRM_SOURCE_SCRIPT).
+--- @param keyboard_name string KeyboardLayout Name (the .keylayout's name=).
+--- @param options table|nil { register_path = string|nil, refresh = boolean|nil, enable = boolean|nil }.
+--- @param on_done function fn(ok, state, reason): state is the decoded JSON object.
+--- @return boolean accepted True only when the child start commits.
+local function confirm_source_async(keyboard_name, options, on_done)
+	options = options or {}
+	if type(keyboard_name) ~= "string" or keyboard_name == "" then
+		invoke_mutation_done("confirm_source.reject", on_done, false, nil, "invalid_name")
+		return false
+	end
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		require("ui.python_runtime_offer").offer(python_state)
+		invoke_mutation_done("confirm_source.done", on_done, false, nil, "python_unavailable")
+		return false
+	end
+	local register_path = type(options.register_path) == "string" and options.register_path or ""
+	local flags = {}
+	if options.refresh == true then flags[#flags + 1] = "refresh" end
+	if options.enable == true then flags[#flags + 1] = "enable" end
+	return run_bounded_process("Confirm keyboard input source", python_bin,
+		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, table.concat(flags, ","),
+			tostring(Timings.sec("ui", "input_source_reselect_settle_ms")) },
+		function(process_ok, out, reason)
+			local decoded_ok, state = pcall(require("json").decode, tostring(out or ""))
+			if process_ok ~= true or not decoded_ok or type(state) ~= "table" or type(state.listed) ~= "boolean" then
+				local failure_reason = reason or "invalid_output"
+				Logger.warn(LOG, "The state of '%s' could not be read from a fresh process (reason=%s, output=%s).",
+					keyboard_name, failure_reason, tostring(out))
+				invoke_mutation_done("confirm_source.done", on_done, false, nil, failure_reason)
+				return
+			end
+			Logger.info(LOG, "Input source '%s' seen by a fresh process: listed=%s enabled=%s selected=%s register=%s enable=%s.",
+				keyboard_name, tostring(state.listed), tostring(state.enabled), tostring(state.selected),
+				tostring(state.register), tostring(state.enable))
+			invoke_mutation_done("confirm_source.done", on_done, true, state, nil)
+		end)
+end
+
+-- The 12:51 field run (2026-10-28) read the composed layout 140 ms after the
+-- preference write and found it off, while probe v5 read it seconds later and
+-- found it on: the system needs a moment to apply the write. Fresh reads
+-- are repeated with a doubling delay within one bounded window ([ui]
+-- input_source_confirm_retry_base_ms and input_source_confirm_window_ms, read
+-- when a confirmation starts, so loading this module reads only its deadline).
+
+--- Registers and enables a layout from a fresh process, then reads it again from
+--- new fresh processes until it is on or the window ends.
+--- @param keyboard_name string KeyboardLayout Name (the .keylayout's name=).
+--- @param options table|nil { register_path, refresh } for the first child, which also enables.
+--- @param on_done function fn(ok, state, reason): the last state read.
+--- @return boolean accepted True only when the first child start commits.
+local function confirm_enabled_async(keyboard_name, options, on_done)
+	options = options or {}
+	local window = Timings.sec("ui", "input_source_confirm_window_ms")
+	local waited, delay, reads = 0, Timings.sec("ui", "input_source_confirm_retry_base_ms"), 0
+	local function settle(ok, state, reason)
+		reads = reads + 1
+		if not ok or state.enabled == true or state.listed ~= true or waited + delay > window then
+			if ok and state.enabled ~= true then
+				Logger.warn(LOG, "Input source '%s' still reads off after %d fresh read(s) over %.1f s.",
+					keyboard_name, reads, waited)
+			elseif ok and reads > 1 then
+				Logger.info(LOG, "Input source '%s' reads on after %d fresh read(s) over %.1f s.",
+					keyboard_name, reads, waited)
+			end
+			invoke_mutation_done("confirm_enabled.done", on_done, ok, state, reason)
+			return
+		end
+		local wait = delay
+		waited = waited + wait
+		delay = delay * 2
+		local _, committed = TimerScheduler.after(wait, function()
+			confirm_source_async(keyboard_name, {}, settle)
+		end)
+		if committed ~= true then
+			Logger.error(LOG, "The next fresh read of '%s' could not be scheduled.", keyboard_name)
+			invoke_mutation_done("confirm_enabled.done", on_done, false, nil, "deadline_unavailable")
+		end
+	end
+	return confirm_source_async(keyboard_name, {
+		register_path = options.register_path, refresh = options.refresh, enable = true,
+	}, settle)
+end
+
+-- Reads, from a FRESH process, the selected keyboard input source and the exact
+-- enabled-sources preference, so a caller that changes them (the field run's
+-- layout rows check) can put back exactly what it found. argv: the timeout of
+-- the defaults child in seconds. Prints {"selected": id|null, "enabled": [...]|null}.
+local SOURCES_STATE_SCRIPT = [[
+import ctypes, json, plistlib, subprocess, sys
+
+TIMEOUT = float(sys.argv[1])
+UTF8 = 0x08000100
+enabled = None
+try:
+    exported = subprocess.run(["/usr/bin/defaults", "export", "com.apple.HIToolbox", "-"],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=TIMEOUT, check=True).stdout
+    enabled = plistlib.loads(exported).get("AppleEnabledInputSources", [])
+except Exception:
+    enabled = None
+
+cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+tis = ctypes.CDLL("/System/Library/Frameworks/Carbon.framework/Carbon")
+P = ctypes.c_void_p
+cf.CFStringGetCString.argtypes = [P, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32]
+cf.CFStringGetCString.restype = ctypes.c_bool
+cf.CFRelease.argtypes = [P]
+cf.CFRelease.restype = None
+tis.TISCopyCurrentKeyboardInputSource.argtypes = []
+tis.TISCopyCurrentKeyboardInputSource.restype = P
+tis.TISGetInputSourceProperty.argtypes = [P, P]
+tis.TISGetInputSourceProperty.restype = P
+selected = None
+source = tis.TISCopyCurrentKeyboardInputSource()
+if source:
+    ref = tis.TISGetInputSourceProperty(source, P.in_dll(tis, "kTISPropertyInputSourceID").value)
+    buffer = ctypes.create_string_buffer(1024)
+    if ref and cf.CFStringGetCString(ref, buffer, 1024, UTF8):
+        selected = buffer.value.decode("utf-8")
+    cf.CFRelease(source)
+print(json.dumps({"selected": selected, "enabled": enabled}, sort_keys=True, default=str))
+]]
+
+--- Reads the selected source and the enabled-sources preference from a fresh process.
+--- @param on_done function fn(ok, state, reason): state { selected, enabled, enabled_json }.
+--- @return boolean accepted True only when the child start commits.
+local function read_sources_state_async(on_done)
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		require("ui.python_runtime_offer").offer(python_state)
+		invoke_mutation_done("sources_state.done", on_done, false, nil, "python_unavailable")
+		return false
+	end
+	local child_timeout = math.max(1, INPUT_SOURCE_OPERATION_TIMEOUT_SEC - 1)
+	return run_bounded_process("Read keyboard input sources", python_bin,
+		{ "-c", SOURCES_STATE_SCRIPT, tostring(child_timeout) },
+		function(process_ok, out, reason)
+			local Json = require("json")
+			local decoded_ok, state = pcall(Json.decode, tostring(out or ""))
+			if process_ok ~= true or not decoded_ok or type(state) ~= "table" then
+				Logger.warn(LOG, "The input sources could not be read from a fresh process (reason=%s).",
+					tostring(reason or "invalid_output"))
+				invoke_mutation_done("sources_state.done", on_done, false, nil, reason or "invalid_output")
+				return
+			end
+			-- Compared as the child encoded it (sorted keys): an exact restore is equal text.
+			state.enabled_json = type(state.enabled) == "table" and Json.encode(state.enabled) or nil
+			Logger.info(LOG, "Input sources seen by a fresh process: selected=%s, %s enabled.",
+				tostring(state.selected), type(state.enabled) == "table" and tostring(#state.enabled) or "unreadable")
+			invoke_mutation_done("sources_state.done", on_done, true, state, nil)
+		end)
+end
+
 --- Adds an installed .keylayout to the user's enabled input sources. Its
 --- KeyboardLayout ID and Name are read from the file, so any layout works,
 --- whether it sits in a bundle or on its own in ~/Library/Keyboard Layouts.
+--- Success means the preference lists it; macOS turns it on at the next login
+--- unless it already is: callers read is_live_enabled for the state now.
 --- @param keylayout_path string Absolute path of the installed .keylayout.
 --- @param label string Human-readable label used in log messages.
 --- @param on_done function|nil fn(ok, output, reason).
@@ -936,6 +1234,34 @@ local function disable_keylayout_source_async(keyboard_name, label, on_done)
 	end
 	local display = (type(label) == "string" and label ~= "") and label or keyboard_name
 	return edit_enabled_list_async("disable", keyboard_name, display, { OK = true, ABSENT = true }, on_done)
+end
+
+--- Whether the text-input system has a keyboard layout turned on right now, by
+--- its KeyboardLayout Name: a loose layout is listed under that name and as
+--- org.unknown.keylayout.<name>, an Ergopti bundle layout under its display.
+--- @param keyboard_name string KeyboardLayout Name (the .keylayout's name=).
+--- @param layouts table|nil Override of the live list, for tests.
+--- @return boolean|nil live
+--- @return string|nil error Why the live list could not be read.
+local function is_live_enabled(keyboard_name, layouts)
+	if type(keyboard_name) ~= "string" or keyboard_name == "" then return nil, "invalid_name" end
+	local err
+	-- Required here: the adapter reads its limits when loaded, and the menu
+	-- layer loads this module long before any layout is installed.
+	if layouts == nil then layouts, err = require("adapters.keyboard_source_probe").enabled_layouts() end
+	if type(layouts) ~= "table" then
+		Logger.error(LOG, "The live keyboard layouts cannot be read: %s.", tostring(err))
+		return nil, "live_state_unreadable"
+	end
+	local display = format_ergopti_display(keyboard_name)
+	for _, name in ipairs(layouts.names or {}) do
+		if name == keyboard_name or (display ~= nil and name == display) then return true, nil end
+	end
+	local suffix = "." .. keyboard_name
+	for _, id in ipairs(layouts.ids or {}) do
+		if id == keyboard_name or id:sub(-#suffix) == suffix then return true, nil end
+	end
+	return false, nil
 end
 
 --- Returns true if the given layout name looks like a legacy versioned Ergopti
@@ -974,8 +1300,8 @@ end
 
 --- Replaces legacy Ergopti entries in the user's active input-source list with
 --- their v2.2.2+ stable-id equivalents, then re-activates the appropriate
---- variant. Uses TISDisableInputSource / TISEnableInputSource via the
---- AppleScript ObjC bridge so no external tooling is required.
+--- variant. The native launcher retains every source before invoking the
+--- typed Carbon mutations, and refuses a missing replacement before any effect.
 --- The latest bundle MUST already be installed locally — TIS only enables
 --- input sources for layouts present on disk.
 --- @param legacy_active table TIS ids from list_active_keyboard_layouts() that look legacy.
@@ -986,58 +1312,35 @@ local function upgrade_active_list_async(legacy_active, on_done)
 		invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
 		return false
 	end
-	-- Build the AppleScript: a sequence of disable+enable operations
-	local lines = {
-		"use framework \"Carbon\"",
-		"use framework \"Foundation\"",
-		"on findSource(theID)",
-		"\tset theProps to current application's NSDictionary's dictionaryWithObjects:{theID} forKeys:{\"TISPropertyInputSourceID\"}",
-		"\tset theSources to current application's TISCreateInputSourceList(theProps, true)",
-		"\tif theSources is missing value then return missing value",
-		"\tset theList to theSources as list",
-		"\tif (count of theList) = 0 then return missing value",
-		"\treturn item 1 of theList",
-		"end findSource",
-		"on run",
-		"\tset disabled to {}",
-		"\tset enabled to {}",
-	}
-	-- Disable each legacy id, then enable its migrated equivalent. The last
-	-- migrated id is also selected so the active layout follows the upgrade.
-	local last_new
-	for _, old in ipairs(legacy_active) do
-		local new_id = migrate_legacy_id(old)
-		last_new = new_id
-		table.insert(lines, text_utils.applescript_format("\tset oldSrc to my findSource(\"%s\")", old))
-		table.insert(lines, "\tif oldSrc is not missing value then")
-		table.insert(lines, "\t\tcurrent application's TISDisableInputSource(oldSrc)")
-		table.insert(lines, "\t\tset end of disabled to oldSrc")
-		table.insert(lines, "\tend if")
-		table.insert(lines, text_utils.applescript_format("\tset newSrc to my findSource(\"%s\")", new_id))
-		table.insert(lines, "\tif newSrc is not missing value then")
-		table.insert(lines, "\t\tcurrent application's TISEnableInputSource(newSrc)")
-		table.insert(lines, "\t\tset end of enabled to newSrc")
-		table.insert(lines, "\tend if")
+	local requested_upgrades = #legacy_active
+	local replacements = {}
+	local entry_count = 0
+	for index, old in pairs(legacy_active) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > requested_upgrades then
+			invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
+			return false
+		end
+		entry_count = entry_count + 1
+		replacements[index] = { old_id = old, new_id = migrate_legacy_id(old) }
 	end
-	if last_new then
-		table.insert(lines, text_utils.applescript_format("\tset selSrc to my findSource(\"%s\")", last_new))
-		table.insert(lines, "\tif selSrc is not missing value then current application's TISSelectInputSource(selSrc)")
+	if entry_count ~= requested_upgrades then
+		invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
+		return false
 	end
-	-- Both counts coerced to text FIRST. AppleScript's & on two non-string
-	-- operands builds a LIST, so this returned "1, /, 2" rather than "1/2" and the
-	-- Lua pattern below matched nothing — enabled_n stayed nil, the > 0 test
-	-- failed, and every SUCCESSFUL upgrade was reported to the user as a failure.
-	table.insert(lines, "\treturn ((count of disabled) as text) & \"/\" & ((count of enabled) as text)")
-	table.insert(lines, "end run")
-	local script = table.concat(lines, "\n")
-	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)
-	return run_osascript_isolated_async(script, function(process_ok, out, reason)
-		-- osascript exits 0 even when findSource resolved nothing, so the status
-		-- bit is insufficient. Require the script's own enabled count.
+	local executable, arguments, environment, resolve_reason = InputSourceSelector.upgrade(replacements)
+	if executable == nil then
+		Logger.error(LOG, "Native input-source upgrade could not resolve its exact command: %s.",
+			tostring(resolve_reason))
+		invoke_mutation_done("upgrade_active_list.done", on_done, false, nil, resolve_reason)
+		return false
+	end
+	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", requested_upgrades)
+	return run_bounded_process("Native input-source upgrade", executable, arguments, function(process_ok, out, reason)
+		-- Process exit alone cannot acknowledge the complete native operation.
+		-- Every requested replacement must be present in the enabled count.
 		local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
 		local _disabled_n, enabled_n = out_text:match("^(%d+)%s*/%s*(%d+)$")
-		local upgraded = process_ok == true and tonumber(enabled_n or 0) ~= nil
-			and tonumber(enabled_n or 0) > 0
+		local upgraded = process_ok == true and tonumber(enabled_n) == requested_upgrades
 		if upgraded then
 			invalidate_active_layouts_cache()
 			Logger.success(LOG, "List upgrade applied (%s).", out_text)
@@ -1045,9 +1348,10 @@ local function upgrade_active_list_async(legacy_active, on_done)
 			return
 		end
 		local failure_reason = reason or "invalid_output"
-		Logger.error(LOG, "List upgrade failed (reason=%s).", failure_reason)
+		Logger.error(LOG, "List upgrade failed (expected=%d, reason=%s, result=%s).",
+			requested_upgrades, failure_reason, out_text)
 		invoke_mutation_done("upgrade_active_list.done", on_done, false, out_text, failure_reason)
-	end)
+	end, environment)
 end
 
 --- Strips the Apple keylayout / keyboardlayout / inputmethod prefixes from a
@@ -1121,6 +1425,10 @@ return {
 	list_active_keyboard_layouts  = list_active_keyboard_layouts,
 	set_input_source_async        = set_input_source_async,
 	enable_keylayout_source_async = enable_keylayout_source_async,
+	is_live_enabled               = is_live_enabled,
+	confirm_source_async          = confirm_source_async,
+	confirm_enabled_async         = confirm_enabled_async,
+	read_sources_state_async      = read_sources_state_async,
 	disable_keylayout_source_async = disable_keylayout_source_async,
 	is_legacy_ergopti_id          = is_legacy_ergopti_id,
 	migrate_legacy_id             = migrate_legacy_id,

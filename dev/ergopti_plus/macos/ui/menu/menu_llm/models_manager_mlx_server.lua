@@ -369,13 +369,15 @@ function M.install(ctx)
 	--- Joins the complete API/discovery owner before a server identity is retired
 	--- or replaced. Only literal true authorizes successor publication.
 	--- @param operation string Diagnostic context.
+	--- @param options table|nil `{ awaiting_pgid = true }` only before a cold launch,
+	--- whose bash wrapper reports the PGID that stop and adoption never print.
 	--- @return boolean settled
-	local function reset_mlx_endpoints(operation)
+	local function reset_mlx_endpoints(operation, options)
 		local ok_reset, reset_result = xpcall(function()
 			if type(ApiMlx) ~= "table" or type(ApiMlx.reset_endpoints) ~= "function" then
 				return false
 			end
-			return ApiMlx.reset_endpoints()
+			return ApiMlx.reset_endpoints(options)
 		end, debug.traceback)
 		if not ok_reset or reset_result ~= true then
 			Logger.error(LOG, "%s refused MLX endpoint reset: %s.",
@@ -802,7 +804,15 @@ function M.install(ctx)
 				return true
 			end
 			if not current_or_cancel() then return false end
+			local replacement_epoch = obj._server_transition_epoch
 			Logger.info(LOG, "MLX server identity changed — queueing replacement after exact predecessor settlement.")
+			if not current_or_cancel() then return false end
+			-- The diagnostic may have replaced this predecessor or its intent.
+			if obj._server_lifecycle_owner ~= lifecycle
+				or obj._server_transition_epoch ~= replacement_epoch then
+				settle_cancel("superseded")
+				return false
+			end
 
 			local replacement_opts = {}
 			if type(opts) == "table" then
@@ -870,17 +880,27 @@ function M.install(ctx)
 		-- the old async pre-probe but synchronously with a hard 1 s curl timeout, so
 		-- it can never stall the boot path the way the async callback could.
 		if not (deps.active_tasks and deps.active_tasks["mlx_server"]) then
-			local ok_probe, body = pcall(hs.execute,
-				"/usr/bin/curl --silent --max-time 1 --no-keepalive " ..
-				"-H 'Connection: close' http://127.0.0.1:" .. target_port .. "/v1/models")
+			local SystemCurl = require("adapters.system_curl")
+			local ok_probe, body = SystemCurl.check("the MLX adoption probe"), nil
+			if ok_probe then ok_probe, body = pcall(hs.execute,
+				SystemCurl.PATH .. " --silent --max-time 1 --no-keepalive " ..
+				"-H 'Connection: close' http://127.0.0.1:" .. target_port .. "/v1/models") end
 			if not current_or_cancel() then return false end
 			if ok_probe and probe_matches_target(body) then
 				if reset_mlx_endpoints("Cross-session adoption") ~= true then
 					settle_cancel("endpoint_reset_refused")
 					return false
 				end
+				local adoption_epoch = obj._server_transition_epoch
 				Logger.info(LOG, "Adopting MLX server from a previous session (already serving '%s' on :%d) — skipping cold restart.",
 					tostring(target_model), target_port)
+				if not current_or_cancel() then return false end
+				-- A diagnostic sink may have dispatched and even completed a newer
+				-- server. Preserve that transition before publishing this adoption.
+				if obj._server_transition_epoch ~= adoption_epoch then
+					settle_cancel("superseded")
+					return false
+				end
 				local adopted_owner = {
 					task = nil,
 					identity = target_identity,
@@ -917,7 +937,7 @@ function M.install(ctx)
 		-- causing the task to never be created and predictions to stay locked indefinitely.
 		do
 			if not current_or_cancel() then return false end
-			if reset_mlx_endpoints("Cold server launch") ~= true then
+			if reset_mlx_endpoints("Cold server launch", { awaiting_pgid = true }) ~= true then
 				settle_cancel("endpoint_reset_refused")
 				return false
 			end
@@ -940,8 +960,16 @@ function M.install(ctx)
 			-- [MLX-SERVER] downstream so it stands out from Hammerspoon's own
 			-- log entries.
 			local unified_log_file = Logger.today_log_path()
+			local launch_epoch = obj._server_transition_epoch
 			Logger.info(LOG, "Starting MLX server process for model %s — output prefixed [MLX-SERVER] in %s",
 				tostring(target_model), unified_log_file)
+			if not current_or_cancel() then return false end
+			-- A diagnostic continuation may already own a newer server or intent.
+			if obj._server_lifecycle_owner ~= lifecycle
+				or obj._server_transition_epoch ~= launch_epoch then
+				settle_cancel("superseded")
+				return false
+			end
 			local startup_confirmed = false
 			local startup_closed = false
 			-- A fresh server is not ready, and any waiter queued against the PREVIOUS
@@ -1255,7 +1283,7 @@ function M.install(ctx)
 				-- Hammerspoon itself. Verify the process is still a python interpreter
 				-- running mlx_lm before issuing kill -9; otherwise we risk taking
 				-- down the menubar app on every model switch.
-				"OLD_COMM=$(ps -o comm= -p \"$OLD_PID\" 2>/dev/null | tr -d '[:space:]'); " ..
+				"OLD_COMM=$(ps -o ucomm= -p \"$OLD_PID\" 2>/dev/null | tr -d '[:space:]'); " ..
 				"OLD_ARGS=$(ps -o args= -p \"$OLD_PID\" 2>/dev/null); " ..
 				"if echo \"$OLD_COMM\" | grep -qi python && echo \"$OLD_ARGS\" | grep -q mlx_lm; then " ..
 				"echo \"[MLX] Killing previous server PID $OLD_PID (verified python+mlx_lm)…\"; " ..
@@ -1274,7 +1302,7 @@ function M.install(ctx)
 				-- the substring 'python… -m mlx_lm', so the regex hits it. Killing that PID
 				-- is suicide on the Hammerspoon-watched task. Using $2 (comm) instead skips
 				-- bash cleanly: only processes whose executable starts with python qualify.
-				"PGREP_PIDS=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); " ..
+				"PGREP_PIDS=$(ps -axo pid=,ucomm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); " ..
 				"if [ -n \"$PGREP_PIDS\" ]; then " ..
 				"echo \"[MLX] mlx_lm process(es) still alive (PIDs: $PGREP_PIDS) — killing…\"; " ..
 				"echo \"$PGREP_PIDS\" | xargs kill -9 2>/dev/null || true; " ..
@@ -1482,7 +1510,7 @@ function M.install(ctx)
 					tostring(target_model), tostring(reason_line))
 				dump_mlx_server_log("MLX crash for ‘" .. tostring(target_model) .. "’")
 				if not silent_notifications then
-					pcall(notifications.notify, "MLX incompatible",
+					pcall(notifications.notify, i18n.get("mlx.model_incompatible_title"),
 						string.format(i18n.get("mlx.model_incompatible"), tostring(target_model)), "error")
 				end
 				-- Flip api_mlx into the failed state so the status dot turns RED at once

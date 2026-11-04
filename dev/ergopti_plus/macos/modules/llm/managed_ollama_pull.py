@@ -75,7 +75,7 @@ def request(deadline):
         or not isinstance(value["model"], str)
         or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9./_:-]*", value["model"]) is None
         or not isinstance(value["nonce"], str)
-        or re.fullmatch(r"[A-Za-z0-9-]{36}", value["nonce"]) is None
+        or re.fullmatch(NONCE_PATTERN, value["nonce"]) is None
         or not isinstance(value["receipt_path"], str)
         or not Path(value["receipt_path"]).is_absolute()
     ):
@@ -107,7 +107,7 @@ def select_owner(value, deadline, idle_timeout, maximum_bytes):
             contract,
             asset,
         )
-    actual = binary.stat(follow_symlinks=False)
+    actual = os.stat(binary, follow_symlinks=False)
     expected = {
         "source_commit": asset["source_commit"],
         "binary_sha256": asset["binary_sha256"],
@@ -169,7 +169,7 @@ def select_alias_owner(
     )
     target = RUNTIME.owned_directory()
     binary = target / contract["binary_path"]
-    actual = binary.stat(follow_symlinks=False)
+    actual = os.stat(binary, follow_symlinks=False)
     if not stat.S_ISREG(actual.st_mode) or actual.st_uid != os.geteuid() or actual.st_mode & 0o022:
         raise POLICY.RuntimeRefusal("session")
     expected = {
@@ -274,6 +274,8 @@ def execute(
         if before_submit is not None:
             before_submit(owner)
         status = 0 if owner.pull(value["model"], emit, timeout=None) else 1
+        if status == 1:
+            emit({"outcome": getattr(owner, "outcome", "unknown")})
     except Cancelled:
         status = 130
     except Exception:
@@ -322,12 +324,21 @@ def execute(
     return status
 
 
+# The caller's operation identity, a hs.host.uuid() string.
+NONCE_PATTERN = r"[A-Za-z0-9-]{36}"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--admission-timeout", type=float, required=True)
     parser.add_argument("--idle-timeout", type=float, required=True)
     parser.add_argument("--retirement-timeout", type=float, required=True)
     parser.add_argument("--maximum-bytes", type=int, required=True)
+    # The reserved receipt and the nonce also travel on the command line, so a
+    # request refused while it is read still closes the caller's task slot
+    # (Mac field report 2026-10-30 21:01: such a pull left the receipt empty).
+    parser.add_argument("--receipt-path", required=True)
+    parser.add_argument("--nonce", required=True)
     options = parser.parse_args()
     if (
         any(
@@ -339,6 +350,8 @@ def main():
             )
         )
         or not 1 <= options.maximum_bytes <= 65536
+        or not Path(options.receipt_path).is_absolute()
+        or re.fullmatch(NONCE_PATTERN, options.nonce) is None
     ):
         return 64
     cancellation = Cancellation()
@@ -346,58 +359,174 @@ def main():
         signal.signal(name, cancellation.signal)
     deadline = time.monotonic() + options.admission_timeout
     try:
-        value = request(deadline)
-        with RECEIPT.ReservedReceipt(value["receipt_path"]) as private_receipt:
-
-            def emit(progress):
-                # Native error/status strings may include request URLs. UI
-                # receives only independent bounded byte progress or a scalar.
-                if "completed" in progress and "total" in progress:
-                    print(
-                        "OLLAMA_PULL_BYTES "
-                        + str(progress["completed"])
-                        + " "
-                        + str(progress["total"]),
-                        flush=True,
-                    )
-                elif progress.get("status") == "success":
-                    print("OLLAMA_PULL_COMPLETE", flush=True)
-
-            files = AUTH.OperationFiles(value["anchor"], value["nonce"])
+        with RECEIPT.ReservedReceipt(options.receipt_path) as private_receipt:
+            # Set once execute() may submit work: from then on only its own
+            # receipt can prove the daemon side retired.
+            dispatched = False
             try:
-                policy = {
-                    "retirement_ms": math.ceil(options.retirement_timeout * 1000),
-                    "idle_ms": math.ceil(options.idle_timeout * 1000),
-                    "maximum_bytes": options.maximum_bytes,
-                }
-                if max(policy["retirement_ms"], policy["idle_ms"]) > (1 << 31) - 1:
-                    raise AUTH.AuthorityRefusal()
-                result = execute(
-                    value,
-                    owner_factory=select_owner,
-                    idle_timeout=options.idle_timeout,
-                    maximum_bytes=options.maximum_bytes,
-                    deadline=deadline,
-                    retirement_timeout=options.retirement_timeout,
-                    cancellation=cancellation,
-                    emit=emit,
-                    private_receipt=private_receipt,
-                    before_submit=lambda owner: files.bind(
-                        owner, policy, POLICY.private_session, PORTS.listener
-                    ),
-                    on_retirement_clock=lambda stop: files.seal_window(stop, CLEANUP.boot_session),
-                    on_completion=lambda proof: (
-                        files.remove() if proof["state"] == "retired" and not files.sealed else None
-                    ),
-                )
-                return result
-            finally:
-                files.close()
+                value = request(deadline)
+                if value["receipt_path"] != options.receipt_path or value["nonce"] != options.nonce:
+                    raise POLICY.RuntimeRefusal("protocol")
+
+                def emit(progress):
+                    # Native error/status strings may include request URLs. UI
+                    # receives only independent bounded byte progress or a scalar.
+                    if "completed" in progress and "total" in progress:
+                        print(
+                            "OLLAMA_PULL_BYTES "
+                            + str(progress["completed"])
+                            + " "
+                            + str(progress["total"]),
+                            flush=True,
+                        )
+                    elif progress.get("status") == "success":
+                        print("OLLAMA_PULL_COMPLETE", flush=True)
+                    elif "outcome" in progress:
+                        print("OLLAMA_PULL_OUTCOME " + progress["outcome"], flush=True)
+                    elif "error" in progress:
+                        print("OLLAMA_PULL_ERROR " + error_class(progress["error"]), flush=True)
+                    elif "status" in progress:
+                        print("OLLAMA_PULL_STATUS " + status_word(progress["status"]), flush=True)
+
+                files = AUTH.OperationFiles(value["anchor"], value["nonce"])
+                try:
+                    policy = {
+                        "retirement_ms": math.ceil(options.retirement_timeout * 1000),
+                        "idle_ms": math.ceil(options.idle_timeout * 1000),
+                        "maximum_bytes": options.maximum_bytes,
+                    }
+                    if max(policy["retirement_ms"], policy["idle_ms"]) > (1 << 31) - 1:
+                        raise AUTH.AuthorityRefusal()
+                    dispatched = True
+                    result = execute(
+                        value,
+                        owner_factory=select_owner,
+                        idle_timeout=options.idle_timeout,
+                        maximum_bytes=options.maximum_bytes,
+                        deadline=deadline,
+                        retirement_timeout=options.retirement_timeout,
+                        cancellation=cancellation,
+                        emit=emit,
+                        private_receipt=private_receipt,
+                        before_submit=lambda owner: files.bind(
+                            owner, policy, POLICY.private_session, PORTS.listener
+                        ),
+                        on_retirement_clock=lambda stop: files.seal_window(
+                            stop, CLEANUP.boot_session
+                        ),
+                        on_completion=lambda proof: (
+                            files.remove()
+                            if proof["state"] == "retired" and not files.sealed
+                            else None
+                        ),
+                    )
+                    return result
+                finally:
+                    files.close()
+            except Cancelled:
+                if not dispatched:
+                    publish_pre_dispatch_refusal(private_receipt, options.nonce, 130)
+                raise
+            except Exception:
+                if not dispatched:
+                    publish_pre_dispatch_refusal(private_receipt, options.nonce, 78)
+                raise
     except Cancelled:
         return 130
-    except Exception:
-        print("Managed Ollama pull admission refused.", file=sys.stderr)
+    except Exception as error:
+        # Field run of 2026-10-30 20:47: the pull exited 78 after 30 s with no
+        # trace of which check refused it.
+        print(
+            "Managed Ollama pull admission refused: %s."
+            % RUNTIME.describe_refusal(error, __file__),
+            file=sys.stderr,
+        )
         return 78
+
+
+# Closed vocabularies for the pull's non-byte rows: Ollama's status and error
+# strings carry digests, paths and URLs, which never reach the log. Field run
+# of 2026-10-30 23:10: a pull exited 1 after its last byte row and nothing
+# said which row ended it.
+STATUS_WORDS = {
+    "pulling manifest": "pulling_manifest",
+    "verifying sha256 digest": "verifying_digest",
+    "writing manifest": "writing_manifest",
+    "removing unused layers": "removing_unused_layers",
+}
+ERROR_CLASSES = (
+    ("digest mismatch", "digest_mismatch"),
+    ("no space left", "no_space"),
+    ("permission denied", "permission_denied"),
+    ("context canceled", "cancelled"),
+    ("max retries", "max_retries"),
+    # Before "manifest": Ollama prefixes a failed fetch with "pull model manifest".
+    ("deadline exceeded", "timeout"),
+    ("timeout", "timeout"),
+    ("certificate", "certificate"),
+    ("tls", "certificate"),
+    ("no such host", "dns"),
+    ("connection refused", "connection"),
+    ("connection reset", "connection"),
+    ("unexpected eof", "connection"),
+    ("too many requests", "rate_limited"),
+    ("manifest", "manifest"),
+    ("file does not exist", "not_found"),
+)
+
+
+def status_word(status):
+    """Name one Ollama pull status without its digest."""
+    if status in STATUS_WORDS:
+        return STATUS_WORDS[status]
+    if status.startswith("pulling "):
+        return "pulling_layer"
+    if status.startswith("couldn't remove unused layers"):
+        return "unused_layers_not_removed"
+    return "other"
+
+
+def error_class(error):
+    """Name one Ollama pull error without its paths or URLs."""
+    lowered = error.lower()
+    for marker, name in ERROR_CLASSES:
+        if marker in lowered:
+            return name
+    return "other"
+
+
+def publish_pre_dispatch_refusal(private_receipt, nonce, status):
+    """Close a refusal that happened before any daemon work could be submitted.
+
+    Field run of 2026-10-30 20:47, 20:56 and 21:05: each refused pull left its
+    reserved receipt empty, so the menu kept the exact task slot and logged
+    that the pull "could not be settled".
+    """
+    if private_receipt.published:
+        return
+    try:
+        private_receipt.publish(
+            {
+                "version": 1,
+                "nonce": nonce,
+                "state": "retired",
+                "worker_status": status,
+                "source_admitted": False,
+                "listener_bound": False,
+                "request_reaped": True,
+                "daemon_operation_retired": True,
+                "operation": "",
+                "source_commit": "",
+                "binary_sha256": "",
+                "asset_sha256": "",
+            }
+        )
+    except Exception as error:
+        print(
+            "Managed Ollama pull refusal receipt was not published: %s."
+            % RUNTIME.describe_refusal(error, __file__),
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

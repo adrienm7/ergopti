@@ -39,6 +39,38 @@
 // ===================================
 // ===================================
 
+// Expected token count for each fixed-length n-gram tab.
+const NGRAM_EXPECTED_LEN = { bg: 2, tg: 3, qg: 4, pg: 5, hx: 6, hp: 7 };
+
+/**
+ * Lowercases grouping keys without inventing fixed native character tokens.
+ * Word and shortcut keys retain whole-text Unicode default lowercase.
+ * @param {string} key - The original native grouping key.
+ * @param {string} tab_name - The destination metric category.
+ * @returns {string} The category's case-insensitive grouping key.
+ */
+function lowercase_metric_key(key, tab_name) {
+	const lowered = key.toLowerCase();
+	if (tab_name !== 'c' && !Object.hasOwn(NGRAM_EXPECTED_LEN, tab_name)) return lowered;
+	if (lowered === key || /^[\x00-\x7F]*$/.test(key)) return lowered;
+	const source_chars = Array.from(key);
+	const lowered_chars = Array.from(lowered);
+	if (source_chars.length === lowered_chars.length) return lowered;
+
+	// Keep full-string context (Greek final sigma), but retain any scalar whose
+	// lowercase spelling would manufacture additional native character tokens.
+	let lowered_index = 0;
+	const projected = source_chars.map((character) => {
+		const width = Array.from(character.toLowerCase()).length;
+		const result = width === 1 ? lowered_chars[lowered_index] : character;
+		lowered_index += width;
+		return result;
+	});
+	if (lowered_index !== lowered_chars.length)
+		throw new Error('Metric lowercase mapping lost Unicode scalar alignment');
+	return projected.join('');
+}
+
 /**
  * Merges one source n-gram dictionary into a target accumulator, respecting
  * all active toggle filters (HS, LLM, manual, spaces, case-sensitivity).
@@ -71,27 +103,18 @@ function merge_dict(
 		tab_name === 'sc_pg';
 
 	Object.keys(source).forEach((k) => {
-		// Fix potential mojibake BEFORE toLowerCase: Hammerspoon's json.encode may pass
-		// raw UTF-8 bytes through evaluateJavaScript where each byte is treated as a
-		// Latin-1 code point.
-		// The UTF-8 encoding of NBSP (U+00A0) is [0xC2, 0xA0] → "Â\u00A0" (2 chars).
-		// The UTF-8 encoding of NNBSP (U+202F) is [0xE2, 0x80, 0xAF] → "â\u0080¯" (3 chars).
-		// CRITICAL: normalization must happen before toLowerCase() because toLowerCase()
-		// converts U+00C2 ("Â") to U+00E2 ("â"), breaking the NBSP replacement pattern.
-		// U+0080 (PAD control) never appears in legitimate typed text, making these safe.
-		let display_k = k
-			.replace(/\u00C2\u00A0/g, '\u00A0') // "Â" + NBSP → NBSP
-			.replace(/\u00E2\u0080\u00AF/g, '\u202F'); // "â" + PAD + "¯" → NNBSP
+		// Native JSON already carries Unicode; byte-repair guesses corrupt literal text.
+		let display_k = k;
 
-		if (!case_sensitive) display_k = display_k.toLowerCase();
+		if (!case_sensitive) display_k = lowercase_metric_key(display_k, tab_name);
 
 		// Normalize known control characters to their bracket-marker or space equivalents
 		// so they pass the ctrl-char filters and render with proper chip labels in all tabs.
-		// RS (0x1E) is used by some keylogger versions as a space placeholder.
+		// RS (0x1E) is used by some keystats versions as a space placeholder.
 		display_k = display_k
 			.replace(/\x08/g, '[BS]')
 			.replace(/\x09/g, '[TAB]')
-			// LF (\x0A) was used by older keylogger builds; CR (\x0D) matches
+			// LF (\x0A) was used by older keystats builds; CR (\x0D) matches
 			// some edge cases — both map to [ENTER] so historical data is handled.
 			.replace(/[\x0A\x0D]/g, '[ENTER]')
 			.replace(/\x1B/g, '[ESC]')
@@ -106,7 +129,9 @@ function merge_dict(
 		if (!show_spaces && !is_word_ngram && display_k.includes(' ')) return;
 
 		const item = source[k];
-		const total_c = item.c || 0;
+		// Word storage separates clean and corrected completions; both are occurrences.
+		const error_c = item.e || 0;
+		const total_c = (item.c || 0) + (tab_name === 'w' || is_word_ngram ? error_c : 0);
 		const hs_c = item.hs || 0;
 		const llm_c = item.llm || 0;
 		const other_c = item.o || 0;
@@ -127,20 +152,33 @@ function merge_dict(
 
 		if (real_count <= 0) return;
 
-		if (!target[display_k]) {
-			target[display_k] = {
-				count: 0,
-				time: 0,
-				errors: 0,
-				synth_hs: 0,
-				synth_llm: 0,
-				synth_other: 0
-			};
+		if (!Object.hasOwn(target, display_k)) {
+			// Native text is data even when it names an inherited member or setter.
+			Object.defineProperty(target, display_k, {
+				value: {
+					count: 0,
+					time: 0,
+					errors: 0,
+					accuracy_errors: 0,
+					synth_hs: 0,
+					synth_llm: 0,
+					synth_other: 0
+				},
+				enumerable: true,
+				writable: true,
+				configurable: true
+			});
 		}
 
 		target[display_k].count += real_count;
 		target[display_k].time += item.t || 0;
-		target[display_k].errors += item.e || 0;
+		target[display_k].errors += error_c;
+		// Evaluate physical-control policy before case folding can erase marker identity.
+		const accuracy_exempt =
+			tab_name !== 'w' &&
+			!is_word_ngram &&
+			(k.includes('[BS]') || k.includes('\x08') || k.toLowerCase() === 'backspace');
+		target[display_k].accuracy_errors += accuracy_exempt ? 0 : error_c;
 		target[display_k].synth_hs += filtered_hs;
 		target[display_k].synth_llm += filtered_llm;
 		target[display_k].synth_other += other_c;
@@ -195,6 +233,7 @@ window.publishTypingMetricsData = function (payload, metadata) {
 		window._prefetch_data = payload.initial_data === undefined ? null : payload.initial_data;
 		appliedTypingManifestRevision = metadata.manifest_revision;
 		manifestChanged = true;
+		mark_incomplete_read('manifest', payload.manifest_incomplete === true);
 	}
 	if (
 		metadata.assets_revision !== undefined &&
@@ -222,61 +261,89 @@ window.setTypingMetricsFreshness = function (freshness, revision) {
 	return !!(window.metrics_freshness && window.metrics_freshness.show(freshness, revision));
 };
 
+/** Reconciles the admitted manifest without changing native range ownership. */
+function update_manifest_scope() {
+	const start_input = document.getElementById('date_start');
+	const end_input = document.getElementById('date_end');
+	app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
+	const app_set = new Set();
+	app_state.manifest_dates_sorted.forEach((date) => {
+		Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
+			if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
+				app_set.add(app_name);
+			}
+		});
+	});
+
+	const previous_selection = new Set(app_state.selected_apps);
+	const previous_mode = app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
+
+	app_state.available_apps = Array.from(app_set).sort((a, b) => a.localeCompare(b));
+
+	if (
+		previous_mode === APP_SELECTION_MODE.UNINITIALIZED ||
+		previous_mode === APP_SELECTION_MODE.ALL
+	) {
+		app_state.selected_apps = new Set(app_state.available_apps);
+		app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
+	} else if (previous_mode === APP_SELECTION_MODE.NONE) {
+		app_state.selected_apps = new Set();
+	} else {
+		const next_sel = new Set();
+		app_state.available_apps.forEach((app) => {
+			if (previous_selection.has(app)) next_sel.add(app);
+		});
+		app_state.selected_apps = next_sel;
+		if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
+	}
+
+	if (start_input && end_input && (!start_input.value || !end_input.value)) {
+		const range = get_default_date_range();
+		if (!start_input.value) start_input.value = range.start;
+		if (!end_input.value) end_input.value = range.end;
+	}
+}
+
+/** Refreshes manifest charts and metadata without creating another n-gram query. */
+function refresh_manifest_projection() {
+	update_manifest_scope();
+	update_app_btn_text();
+	compute_manifest_metrics();
+}
+
 /**
  * Processes the manifest after it is injected by the Lua backend. On first
- * call applies the initial reset; on subsequent calls recomputes KPIs and
+ * call initializes untouched filters; on subsequent calls recomputes KPIs and
  * fetches updated n-gram data.
  */
 function process_manifest() {
-	if (Object.keys(window.metrics_manifest).length > 0) {
-		app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
-
-		const app_set = new Set();
-		app_state.manifest_dates_sorted.forEach((date) => {
-			Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
-				if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
-					app_set.add(app_name);
-				}
-			});
-		});
-
-		const previous_selection = new Set(app_state.selected_apps);
-		const previous_mode = app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
-
-		app_state.available_apps = Array.from(app_set).sort((a, b) => a.localeCompare(b));
-
-		if (
-			previous_mode === APP_SELECTION_MODE.UNINITIALIZED ||
-			previous_mode === APP_SELECTION_MODE.ALL
-		) {
-			app_state.selected_apps = new Set(app_state.available_apps);
-			app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
-		} else if (previous_mode === APP_SELECTION_MODE.NONE) {
-			app_state.selected_apps = new Set();
-		} else {
-			const next_sel = new Set();
-			app_state.available_apps.forEach((app) => {
-				if (previous_selection.has(app)) next_sel.add(app);
-			});
-			app_state.selected_apps = next_sel;
-			if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
-		}
-
-		const start_input = document.getElementById('date_start');
-		const end_input = document.getElementById('date_end');
-		if (start_input && end_input && (!start_input.value || !end_input.value)) {
-			apply_default_date_range();
-		}
-	}
+	const start_input = document.getElementById('date_start');
+	const end_input = document.getElementById('date_end');
+	// A filtered request or an app-modal selection predates this first reply.
+	// Nonempty date edits also count before the native input dispatches change.
+	// Their projection must retain its original native ownership token.
+	const has_initial_range_intent =
+		app_state.range_request_sequence > 0 ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.NONE ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.SUBSET ||
+		!!start_input?.value ||
+		!!end_input?.value;
+	update_manifest_scope();
 
 	if (!app_state.did_apply_initial_reset) {
 		app_state.did_apply_initial_reset = true;
 		ensure_live_refresh();
-		reset_filters(false);
+		if (app_state.app_selection_mode === APP_SELECTION_MODE.UNINITIALIZED) {
+			app_state.selected_apps = new Set(app_state.available_apps);
+			app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
+		}
+		update_app_btn_text();
+		compute_manifest_metrics();
+		request_range_data();
 
-		// Initial filters scheduled a range request but must not purge the cache
-		// Prefetch can replace that round-trip unless an explicit Reset owns delivery
-		if (window._prefetch_data && !app_state.active_cache_reset_id) {
+		// Only the untouched default range may borrow the initial full prefetch.
+		// User-owned replies are delivered by the bootstrap with their original id.
+		if (window._prefetch_data && !has_initial_range_intent && !app_state.active_cache_reset_id) {
 			receive_range_data(window._prefetch_data, app_state.active_range_request_id);
 		}
 		window._prefetch_data = null;
@@ -421,15 +488,16 @@ function compute_manifest_metrics() {
 			if (app.hourly_min5) {
 				Object.keys(app.hourly_min5).forEach((bucket) => {
 					const md = app.hourly_min5[bucket] || {};
-					if (!app_state.minute5_series[bucket]) {
-						app_state.minute5_series[bucket] = { c: 0, es: 0, e_buckets: {} };
+					const datedBucket = `${date_str}T${bucket}`;
+					if (!app_state.minute5_series[datedBucket]) {
+						app_state.minute5_series[datedBucket] = { c: 0, es: 0, e_buckets: {} };
 					}
-					app_state.minute5_series[bucket].c += md.c || 0;
-					app_state.minute5_series[bucket].es += md.es || 0;
+					app_state.minute5_series[datedBucket].c += md.c || 0;
+					app_state.minute5_series[datedBucket].es += md.es || 0;
 					const src_eb = md.e_buckets || {};
 					Object.keys(src_eb).forEach((k) => {
-						app_state.minute5_series[bucket].e_buckets[k] =
-							(app_state.minute5_series[bucket].e_buckets[k] || 0) + (src_eb[k] || 0);
+						app_state.minute5_series[datedBucket].e_buckets[k] =
+							(app_state.minute5_series[datedBucket].e_buckets[k] || 0) + (src_eb[k] || 0);
 					});
 				});
 			}
@@ -549,7 +617,7 @@ function compute_manifest_metrics() {
 
 /**
  * Recomputes the global speed KPI (CPM/MPM) honestly using the precise
- * cache buckets emitted by the keylogger (time_buckets, credited_buckets,
+ * cache buckets emitted by the keystats (time_buckets, credited_buckets,
  * hs_input_*_buckets, llm_input_*_buckets).
  *
  * Vocabulary
@@ -988,7 +1056,7 @@ function render_repetitions_kpi() {
 	const doublings = [];
 
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		total_count += item.count || 0;
 		// Bigram is a "doubling" when both grapheme clusters are identical
 		if (chars.length === 2 && chars[0] === chars[1]) {
@@ -1202,7 +1270,7 @@ function render_sfb_kpi() {
 	let bigram_total = 0;
 
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const count = item.count || 0;
 		bigram_total += count;
@@ -1278,7 +1346,7 @@ function render_sfb_kpi() {
 	let sfb_avoided_hs = 0;
 	let bg_hs_total = 0;
 	Object.entries(hs_bg).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const count = item.count || 0;
 		bg_hs_total += count;
@@ -1522,7 +1590,7 @@ function render_distance_kpi() {
 	const char_to_kc = _build_char_to_kc_map();
 	const kc_bigram = {}; // kc_a → kc_b → count
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const kc_a = char_to_kc[chars[0].toLowerCase()];
 		const kc_b = char_to_kc[chars[1].toLowerCase()];
@@ -1917,7 +1985,7 @@ function render_ergo_bigram_kpi() {
 		top_roll_out = [];
 
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		const count = item.count || 0;
 		if (count <= 0) return;
@@ -2009,7 +2077,7 @@ function render_ergo_bigram_table() {
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
 				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:center;color:#aaa;">${d.kind}</td></tr>`
+				`<td style="text-align:center;color:${ThemeTokens.color('grey-aaa')};">${d.kind}</td></tr>`
 		)
 		.join('');
 
@@ -2110,7 +2178,7 @@ function render_ergo_trigram_kpi() {
 		top_bad_redir = [];
 
 	Object.entries(tg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 3) return;
 		const count = item.count || 0;
 		if (count <= 0) return;
@@ -2194,7 +2262,7 @@ function render_ergo_trigram_table() {
 			(d) =>
 				`<tr><td>${escape_html(d.seq)}</td>` +
 				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:center;color:#aaa;">${d.kind}</td></tr>`
+				`<td style="text-align:center;color:${ThemeTokens.color('grey-aaa')};">${d.kind}</td></tr>`
 		)
 		.join('');
 
@@ -2245,7 +2313,7 @@ function render_errors_kpi() {
 		total_errs = 0;
 	const rows = [];
 	Object.entries(bg_dict).forEach(([k, item]) => {
-		const chars = Array.from(k);
+		const chars = key_chars(k);
 		if (chars.length !== 2) return;
 		// Skip bigrams whose second char is a control / bracket marker (already
 		// represented by [BS] / [ENTER] etc.) — they're not "user-correctable" pairs.
@@ -2334,8 +2402,8 @@ function render_errors_table() {
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
 				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:right;color:#f87171;">${format_number(d.errors)}</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#f87171;"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
+				`<td style="text-align:right;color:${ThemeTokens.color('hue-f87171')};">${format_number(d.errors)}</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('hue-f87171')};"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
 				`</tr>`
 		)
 		.join('');
@@ -2556,7 +2624,7 @@ function render_lexical_kpi() {
 		const label = l === 15 ? '15+' : String(l);
 		bars_html.push(
 			`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#aaa;width:42px;">${label} car.</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:42px;">${label} car.</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(251, 191, 36);"></div>` +
@@ -2689,7 +2757,7 @@ function render_rhythm_kpi() {
 			const label = k === '500+' ? '500+ car.' : `≤ ${k} car.`;
 			return (
 				`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#aaa;width:78px;">${label}</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:78px;">${label}</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(56, 189, 248);"></div>` +
@@ -2831,18 +2899,23 @@ function render_records_kpi() {
 	let streak_max = 0,
 		streak_cur = 0,
 		prev = null;
-	const ymd = (s) => new Date(s + 'T12:00:00').getTime();
 	sorted_dates.forEach((d) => {
-		if (prev && ymd(d) - prev === 86400_000) streak_cur += 1;
+		const ordinal = parseDateKey(d);
+		if (prev !== null && shiftMetricsDay(prev, 1) === ordinal) streak_cur += 1;
 		else streak_cur = 1;
 		if (streak_cur > streak_max) streak_max = streak_cur;
-		prev = ymd(d);
+		prev = ordinal;
 	});
 
 	const fr_short = (date_str) => {
 		if (!date_str) return '—';
-		const d = new Date(date_str + 'T12:00:00');
-		return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' });
+		const d = new Date(parseDateKey(date_str));
+		return d.toLocaleDateString('fr-FR', {
+			day: 'numeric',
+			month: 'short',
+			year: '2-digit',
+			timeZone: 'UTC'
+		});
 	};
 
 	const set = (id, html) => {
@@ -2984,7 +3057,7 @@ function render_charmix_kpi() {
 			(s) =>
 				`<div title="${s.label || (s.label || '') + ' ' + s.pct.toFixed(2) + '%'}" ` +
 				`style="flex-basis:${s.pct}%;background:${s.color};display:flex;align-items:center;justify-content:center;` +
-				`color:#0f172a;font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;">${s.label}</div>`
+				`color:${ThemeTokens.color('hue-0f172a')};font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;">${s.label}</div>`
 		)
 		.join('');
 	container.innerHTML =
@@ -3012,13 +3085,18 @@ let _apps_sort_asc = false;
  * is the user's most-alternated workflow (typically editor ↔ browser).
  */
 function render_apps_kpi() {
-	const per_app = {}; // app → { chars, time_ms, switches_out: { other: count } }
+	const per_app = Object.create(null); // app → { chars, time_ms, switches_out: { other: count } }
 	const layouts_total = {}; // layout_id → cumulative count across filtered apps
 	const kc_hold_total = {}; // kc_str → { s, n, m } summed across filtered apps
 	_foreach_filtered_app((app, date_str, app_name) => {
 		const a =
 			per_app[app_name] ||
-			(per_app[app_name] = { chars: 0, time_ms: 0, app_time_ms: 0, switches_out: {} });
+			(per_app[app_name] = {
+				chars: 0,
+				time_ms: 0,
+				app_time_ms: 0,
+				switches_out: Object.create(null)
+			});
 		a.chars += app.chars || 0;
 		a.time_ms += app.time || 0;
 		a.app_time_ms += app.app_time_ms || 0;
@@ -3083,17 +3161,22 @@ function render_apps_kpi() {
 	);
 
 	// Build symmetric app-pair affinity: both directions of switching count.
-	const pair_count = {};
+	const pair_count = new Map();
 	_apps_data.forEach((d) => {
 		Object.entries(d.switches_out).forEach(([other, n]) => {
-			const key = [d.name, other].sort().join(' ↔ ');
-			pair_count[key] = (pair_count[key] || 0) + n;
+			const endpoints = [d.name, other].sort();
+			const key = JSON.stringify(endpoints);
+			const pair = pair_count.get(key);
+			if (pair) pair.count += n;
+			else pair_count.set(key, { endpoints, count: n });
 		});
 	});
-	const top_pair = Object.entries(pair_count).sort((a, b) => b[1] - a[1])[0];
+	const top_pair = Array.from(pair_count.values()).sort((a, b) => b.count - a.count)[0];
 	set(
 		'apps_top_pair',
-		top_pair ? `${escape_html(top_pair[0])} (${format_number(top_pair[1])}×)` : '—'
+		top_pair
+			? `${escape_html(top_pair.endpoints.join(' ↔ '))} (${format_number(top_pair.count)}×)`
+			: '—'
 	);
 
 	// Layouts seen — sorted by usage, top 3 to keep the value compact
@@ -3185,7 +3268,7 @@ function render_apps_table() {
 				`</div>` +
 				`</td>` +
 				`<td style="text-align:right;font-variant-numeric:tabular-nums;">${d.cpm > 0 ? d.cpm.toFixed(0) : '—'}</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:#aaa;">${fmt_dur(d.time_ms)}</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};">${fmt_dur(d.time_ms)}</td>` +
 				`</tr>`
 			);
 		})
@@ -3215,6 +3298,8 @@ function sort_apps_table(col) {
 // ===================================================
 // ===================================================
 
+// [ui] metrics_typing_dispatch_delay_ms (pinned: a page script cannot read the registry)
+const DISPATCH_DELAY_MS = 50;
 const LONG_SESSION_THRESHOLD_MS = 90 * 60 * 1000; // 90 min — clinical RSI risk threshold
 
 /**
@@ -3382,7 +3467,7 @@ function render_wellness_kpi() {
 		const text_color = pct > 18 ? 'color:rgb(248,113,113);font-weight:600;' : '';
 		return (
 			`<tr>` +
-			`<td style="color:#aaa;width:90px;">${label}</td>` +
+			`<td style="color:${ThemeTokens.color('grey-aaa')};width:90px;">${label}</td>` +
 			`<td style="text-align:center;width:24px;">${f.startsWith('l') ? 'G' : 'D'}</td>` +
 			`<td style="padding:2px 6px;">` +
 			`<div style="display:flex;align-items:center;gap:6px;">` +
@@ -3419,7 +3504,10 @@ function request_cache_reset() {
 		window.chrome.webview.postMessage(JSON.stringify({ action: 'clear_cache' }));
 		return;
 	}
-	if (window.__ergopti_host === 'linux' && window.webkit?.messageHandlers?.metrics_typing_bridge) {
+	if (
+		hostHasCapability('document_bridge') &&
+		window.webkit?.messageHandlers?.metrics_typing_bridge
+	) {
 		window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'clear_cache' });
 		return;
 	}
@@ -3577,7 +3665,7 @@ function request_range_data(show_loader = true) {
 		// Send the selected range directly so date/app changes refresh the
 		// n-gram tables instead of leaving the initial prefetch on screen.
 		if (
-			window.__ergopti_host === 'linux' &&
+			hostHasCapability('document_bridge') &&
 			window.webkit?.messageHandlers?.metrics_typing_bridge
 		) {
 			try {
@@ -3593,36 +3681,58 @@ function request_range_data(show_loader = true) {
 		}
 		window._lua_request = JSON.stringify(req);
 	};
-	setTimeout(dispatch, 50);
+	setTimeout(dispatch, DISPATCH_DELAY_MS);
+}
+
+/**
+ * Checks range ownership before either the renderer or native bootstrap mutates
+ * its caches. Untagged live data waits while a selected range or Reset owns them.
+ * @param {number|null} [request_id=null] - Native range ownership token.
+ * @returns {boolean} Whether this response may publish data for the current view.
+ */
+function can_receive_range_data(request_id = null) {
+	if (app_state.active_cache_reset_id) return false;
+	if (request_id === null) return app_state.active_range_request_id === 0;
+	return (
+		Number.isSafeInteger(request_id) &&
+		request_id > 0 &&
+		request_id === app_state.active_range_request_id
+	);
+}
+
+/**
+ * Labels the dashboard while the data shown came from an incomplete host read.
+ * @param {string} part - "manifest" or "range".
+ * @param {boolean} incomplete - Whether that part's host read missed rows.
+ */
+function mark_incomplete_read(part, incomplete) {
+	if (window.metrics_freshness) window.metrics_freshness.mark_incomplete(part, incomplete);
 }
 
 /**
  * Receives the decoded n-gram payload from the Lua backend and triggers the
  * local filter/render pipeline.
- * @param {Object} payload - Contains { historical, today } n-gram dictionaries.
+ * @param {Object} payload - Contains { historical, today } n-gram dictionaries,
+ *     plus `incomplete: true` when the host read missed rows.
  * @param {number|null} [request_id=null] - Native request ownership token.
  * @returns {boolean} Whether the payload was current and rendered.
  */
 function receive_range_data(payload, request_id = null) {
-	if (app_state.active_cache_reset_id) return false;
-	if (request_id === null) {
-		// Untagged prefetch/live pushes are valid only while no selected-range
-		// request owns the table. Otherwise they would overwrite its filtered
-		// result and release the wrong loading latch.
-		if (app_state.active_range_request_id !== 0) return false;
-	} else if (!complete_range_request(request_id, payload ? 'ok' : 'failed')) {
+	if (!can_receive_range_data(request_id)) return false;
+	if (request_id !== null && !complete_range_request(request_id, payload ? 'ok' : 'failed')) {
 		return false;
 	}
 	if (!payload) return false;
 	invalidate_typing_projection_cache();
 	app_state.historical_cache = payload.historical;
 	app_state.today_live_data = payload.today;
+	mark_incomplete_read('range', payload.incomplete === true);
 	apply_local_filters();
 	return true;
 }
 
 /**
- * Receives a real-time live-update push from the Lua keylogger and
+ * Receives a real-time live-update push from the Lua keystats and
  * re-renders the table after a short debounce to batch rapid keystrokes.
  * @param {Object} today_idx - The current session's live n-gram data.
  */

@@ -5,6 +5,7 @@
 --- Explicitly simulates native constructor refusal and handle invalidation.
 --- Libuv handles, EINVAL receipts, child groups, output, deadlines, cancellation
 --- and reaping are real. No ordinary native allocation failure is claimed.
+--- Nonfinite deadlines must refuse before any actual allocation or dispatch.
 --- ==============================================================================
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_shell_async_admission%.lua$"))
@@ -37,7 +38,8 @@ local function check(name, test)
 	local state = { allocations = {}, callbacks = 0 }
 	uv.spawn = function(...)
 		local process, pid, code = originals.spawn(...)
-		state.pid, state.process = pid, process
+		state.process, state.spawn_code = process, code
+		state.pid = type(pid) == "number" and pid or nil
 		return process, pid, code
 	end
 	local ok, err = xpcall(function() test(state) end, debug.traceback)
@@ -54,6 +56,31 @@ local function check(name, test)
 		failures = failures + 1
 		io.stderr:write("FAIL " .. name .. ": " .. tostring(err) .. "\n")
 	end
+end
+
+for _, case in ipairs({
+	{ name = "NaN", value = 0 / 0 },
+	{ name = "positive infinity", value = math.huge },
+	{ name = "negative infinity", value = -math.huge },
+	{ name = "overflowed numeric string", value = "1e999" },
+}) do
+	check("nonfinite deadline " .. case.name .. " refuses before native acquisition", function(state)
+		for _, method in ipairs({ "new_pipe", "new_timer" }) do
+			uv[method] = function(...)
+				local handle = originals[method](...)
+				state.allocations[#state.allocations + 1] = handle
+				return handle
+			end
+		end
+		local token, reason = Shell.run_async("/bin/sleep", { "30" }, { timeout_ms = case.value }, function()
+			state.callbacks = state.callbacks + 1
+		end)
+		state.token = token
+		assert(token == nil and type(reason) == "string" and reason:find("timeout_ms", 1, true),
+			"nonfinite deadline admitted a native process")
+		assert(#state.allocations == 0 and state.pid == nil, "deadline refusal still acquired native ownership")
+		assert(state.callbacks == 0, "synchronous deadline refusal also delivered a callback")
+	end)
 end
 
 for _, operation in ipairs({ "timer", "stdout", "stderr", "second pipe raised", "timer allocation nil" }) do
@@ -94,17 +121,41 @@ for _, operation in ipairs({ "timer", "stdout", "stderr", "second pipe raised", 
 		assert(ran and token == nil and type(reason) == "string" and reason ~= "",
 			"startup failure did not return the production nil/error refusal contract")
 		assert(state.callbacks == 0, "startup refusal also published a callback")
-		local expected_allocations = operation == "second pipe raised" and 1 or operation == "timer allocation nil" and 2 or 3
+		local expected_allocations = operation == "second pipe raised" and 1 or operation == "timer allocation nil" and 2 or 4
 		assert(#state.allocations == expected_allocations, "fixture did not acquire the expected real allocations")
-		for _, handle in ipairs(state.allocations) do assert(uv.is_closing(handle), "production retained a native allocation") end
 		if operation == "stdout" or operation == "stderr" then
+			local monitors = 0
+			for _, handle in ipairs(state.allocations) do
+				if not uv.is_closing(handle) then monitors = monitors + 1 end
+			end
+			assert(monitors == 1, "native group retirement must retain its exact cleanup monitor")
 			assert(state.pid, "native reader refusal must occur after actual child dispatch")
 		else assert(state.pid == nil, "pre-spawn refusal still dispatched a child") end
 		drain()
 		if state.pid then absent(state.pid) end
+		for _, handle in ipairs(state.allocations) do assert(uv.is_closing(handle), "production retained a native allocation") end
 		assert(state.callbacks == 0, "late real child exit published a refused run")
 	end)
 end
+
+check("actual oversized argv retains safe E2BIG without exposing caller bytes", function(state)
+	local private_marker = "PRIVATE_OVERSIZED_ARGUMENT_NEVER_LOG"
+	-- Exceed the native single-argument bound on both 4 KiB and 64 KiB pages
+	local oversized_bytes = 4 * 1024 * 1024
+	local logger = require("logger.shim")
+	local token, error_message = Shell.run_async("/usr/bin/printf", { string.rep(private_marker, math.ceil(oversized_bytes / #private_marker)) },
+		{ timeout_ms = 1000 }, function() state.callbacks = state.callbacks + 1 end)
+	assert(token == nil and state.pid == nil and state.process == nil and state.spawn_code == "E2BIG",
+		"oversized actual argv did not produce the expected typed native refusal")
+	assert(error_message == "spawn failed: E2BIG", "safe native E2BIG diagnostic was lost")
+	assert(not error_message:find(private_marker, 1, true), "refusal exposed caller argv")
+	drain()
+	assert(state.callbacks == 0, "synchronous native refusal also delivered a callback")
+	assert(type(logger.ring_buffer_snapshot) == "function", "actual logger ring is required")
+	for _, line in ipairs(logger.ring_buffer_snapshot()) do
+		assert(not line:find(private_marker, 1, true), "native spawn diagnostics logged caller argv")
+	end
+end)
 
 check("native zero-valued receipts preserve exact successful streams once", function(state)
 	local results, receipts = {}, {}

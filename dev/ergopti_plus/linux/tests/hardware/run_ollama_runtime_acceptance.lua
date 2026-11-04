@@ -35,8 +35,35 @@ local Native = require("adapters.owned_process")
 local Timings = require("infra.timings")
 local Engine, Profiles
 local chronological, native_services = {}, {}
+-- Timestamped step lines name the step a stalled run is waiting on. They carry
+-- hosts and program names only, never a URL path, query or model text.
+local trace_origin = uv.hrtime()
+local function trace(step)
+	print(string.format("ACCEPTANCE_TRACE %d %s", math.floor((uv.hrtime() - trace_origin) / 1e6), step))
+	io.stdout:flush()
+end
+local function host_of(url) return tostring(type(url) == "string" and url:match("^%a+://([^/]+)") or "?") end
+local SystemProxy = require("adapters.system_proxy")
+local original_lookup_owned = SystemProxy.lookup_owned
+SystemProxy.lookup_owned = function(url, options, callback)
+	trace("proxy-lookup-start " .. host_of(url))
+	return original_lookup_owned(url, options, function(...)
+		trace("proxy-lookup-end " .. host_of(url))
+		return callback(...)
+	end)
+end
 local original_native_start = Native.start
 Native.start = function(executable, arguments, options, callback)
+	local program = tostring(executable):match("[^/]+$") or "?"
+	local verb = type(arguments) == "table" and tostring(arguments[1] or "") or ""
+	trace("process-start " .. program .. " " .. verb)
+	local inner = callback
+	if type(callback) == "function" then
+		callback = function(...)
+			trace("process-end " .. program .. " " .. verb)
+			return inner(...)
+		end
+	end
 	local operation = original_native_start(executable, arguments, options, callback)
 	if arguments[1] == "serve" then native_services[#native_services + 1] = { operation = operation, executable = executable, timeout = options.timeout_ms } end
 	return operation
@@ -45,7 +72,10 @@ local original_get_owned = Http.get_owned
 local archive_dispatches, scripted_choices, changed = 0, 0, 0
 local archive_options, archive_operation, checksum_receipt
 local owned_get_operations = {}
-local function checkpoint(phase) print("ACCEPTANCE_PHASE " .. phase) end
+local function checkpoint(phase)
+	print("ACCEPTANCE_PHASE " .. phase)
+	assert(io.stdout:flush(), "acceptance phase stdout flush failed")
+end
 local configured_origin = "http://127.0.0.1:" .. tostring(port)
 local observed_urls = {}
 -- Observe production archive transport unchanged; never replace HTTP or package effects.
@@ -55,7 +85,9 @@ Http.get_owned = function(url, headers, options, callback)
 		archive_options = { url = url, https_only = options.https_only, bytes = options.max_download_bytes }
 	end
 	observed_urls[#observed_urls + 1] = url
+	trace("http-start " .. host_of(url) .. (options.output_path and " archive" or ""))
 	local operation = original_get_owned(url, headers, options, function(result)
+		trace("http-end " .. host_of(url) .. " status=" .. tostring(type(result) == "table" and result.status or "?"))
 		local typed = require("llm.enable_admission").receipt(result)
 		if typed then
 			chronological[#chronological + 1] = { kind = "typed_version", engine = Engine.is_enabled(),
@@ -72,7 +104,11 @@ Http.download_output_owned = function(url, headers, target, options, callback)
 	archive_dispatches = archive_dispatches + 1
 	archive_options = { url = url, https_only = options.https_only, bytes = options.max_download_bytes }
 	observed_urls[#observed_urls + 1] = url
-	local operation = original_download_output_owned(url, headers, target, options, callback)
+	trace("download-start " .. host_of(url))
+	local operation = original_download_output_owned(url, headers, target, options, function(...)
+		trace("download-end " .. host_of(url))
+		return callback(...)
+	end)
 	owned_get_operations[#owned_get_operations + 1] = operation
 	archive_operation = operation
 	return operation
@@ -86,7 +122,9 @@ Digest.native = function(...)
 	local start = worker.start
 	observed_digest_workers[#observed_digest_workers + 1] = { owner = worker, start = start }
 	worker.start = function(fd, length, current, deadline, callback)
+		trace("digest-start bytes=" .. tostring(length))
 		return start(fd, length, current, deadline, function(digest, receipt)
+			trace("digest-end")
 			checksum_receipt = { accepted = false, bytes = length, digest = digest, receipt = receipt }
 			return callback(digest, receipt)
 		end)
@@ -99,7 +137,9 @@ Archive.native_ollama_artifact = function(...)
 		local seal = factory.seal_and_adopt
 		observed_artifact_factories[#observed_artifact_factories + 1] = { owner = factory, seal = seal }
 		factory.seal_and_adopt = function(brand, completion, expected, deadline, callback)
+			trace("seal-start")
 			return seal(brand, completion, expected, deadline, function(path, refusal, receipt)
+				trace("seal-end refusal=" .. tostring(refusal))
 				if checksum_receipt then
 					checksum_receipt.accepted = type(path) == "string" and path ~= ""
 						and refusal == nil and receipt == nil and checksum_receipt.receipt == nil
@@ -223,15 +263,15 @@ local ok, diagnostic = xpcall(function()
 		"actual existing writer acknowledges engine enable")
 	assert(scripted_choices == 1 and archive_dispatches == 1 and changed == 1,
 		"one explicit binary-only choice, one actual HTTPS archive and one writer refresh")
-	assert(archive_options.url == "https://github.com/ollama/ollama/releases/download/v0.24.0/ollama-linux-amd64.tar.zst"
-		and archive_options.https_only == true and archive_options.bytes == 1198635318,
+	assert(archive_options.url == "https://github.com/ollama/ollama/releases/download/v0.40.4/ollama-linux-amd64.tar.zst"
+		and archive_options.https_only == true and archive_options.bytes == 1436408810,
 		"exact independently frozen official HTTPS archive admission")
-	assert(checksum_receipt and checksum_receipt.accepted == true and checksum_receipt.bytes == 1198635318
-		and checksum_receipt.digest == "15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb",
+	assert(checksum_receipt and checksum_receipt.accepted == true and checksum_receipt.bytes == 1436408810
+		and checksum_receipt.digest == "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a",
 		"full actual archive digest matches independent official receipt before extraction")
 	assert(archive_operation and archive_operation:is_settled() == true, "exact archive HTTP physically settled")
 	assert(#chronological >= 2 and chronological[1].kind == "typed_version"
-		and chronological[1].version == "0.24.0" and chronological[1].engine == false
+		and chronological[1].version == "0.40.4" and chronological[1].engine == false
 		and chronological[1].profile == false and chronological[2].kind == "profile_write",
 		"actual typed readiness before enable publication")
 	assert(#native_services == 1 and native_services[1].timeout == nil
@@ -275,9 +315,14 @@ local ok, diagnostic = xpcall(function()
 	local wrote, closed = answer:write(inference_text), answer:close()
 	assert(wrote and closed, "private inference receipt captured")
 	assert(Engine.disable() == true and not Engine.is_enabled(), "actual master disable after inference")
-	assert(native_services[1].operation:is_running() == true, "exact daemon survives disabled enable ticket")
+	-- Switching the AI off ends the Ollama the app started for it.
+	local function daemon_retired()
+		return native_services[1].operation:is_settled() == true and not Engine.runtime_pending()
+	end
+	wait_until(daemon_retired)
+	assert(daemon_retired(), "master disable retires the exact app-started daemon")
 end, debug.traceback)
-checkpoint("terminal-physical-shutdown")
+local terminal_checkpoint_ok, terminal_checkpoint_error = pcall(checkpoint, "terminal-physical-shutdown")
 -- Exercise the adopted terminal engine owner through the actual coordinator
 -- and actual native event-loop idle pump. Only keyboard presence is controlled.
 local shutdown_polls, stop_before_ack, coordinator_requested = 0, false, false
@@ -336,6 +381,7 @@ assert(not Download.is_active() and not Engine.runtime_pending(), "model HTTP an
 if #native_services == 1 then assert(native_services[1].operation:is_settled() == true, "exact owned serve physically retired") end
 Http.get_owned, Http.postStream, Http.post_stream_owned = original_get_owned, original_post, original_owned_post
 Http.download_output_owned = original_download_output_owned
+SystemProxy.lookup_owned = original_lookup_owned
 Digest.native, Archive.native_ollama_artifact = original_digest_native, original_artifact_new
 for _, item in ipairs(observed_digest_workers) do item.owner.start = item.start end
 for _, item in ipairs(observed_artifact_factories) do item.owner.seal_and_adopt = item.seal end
@@ -343,6 +389,7 @@ Native.start, Profiles.enable, Window.complete, Window.show = original_native_st
 Offer._reset_for_test()
 if not ok then error(diagnostic) end
 if not shutdown_ok then error(shutdown_error) end
+if not terminal_checkpoint_ok then error(terminal_checkpoint_error) end
 print(Json.encode({ passed = true, model = model, explicit_binary_choices = scripted_choices,
 	explicit_model_choices = model_consents, pull_dispatches = pull_dispatches, chat_dispatches = chat_dispatches,
 	shutdown_idle_polls = shutdown_polls, terminal_shutdown_requested = coordinator_requested,

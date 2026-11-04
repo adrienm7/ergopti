@@ -13,7 +13,7 @@
 ; 1. Shared UX: one editor frontend for both drivers — fixing a wording or a
 ;    behaviour there updates Windows and macOS at once. The bridge mirrors the
 ;    proven onboarding WebView2 host (infra/webview_utils + vendor/WebView2), and
-;    carries the same four hard-won gotcha fixes (see PROJECT_MEMORY
+;    carries the same four hard-won gotcha fixes (see docs/memory
 ;    project-webview2-bridge-gotchas): show-before-create, virtual-host origin,
 ;    stored WebMessageReceived subscription, and fire-and-forget ExecuteScript.
 ; 2. Reuses the native I/O: ReadPersonalToml / WritePersonalToml /
@@ -31,7 +31,7 @@
 ; Virtual host mapped to the _shared tree so the editor loads from a stable
 ; origin (https://<host>/…) instead of an opaque file:// origin — file:// pages
 ; are unique security origins and the chrome.webview JS->AHK channel does not
-; reliably deliver from them (see PROJECT_MEMORY project-webview2-bridge-gotchas).
+; reliably deliver from them (see docs/memory project-webview2-bridge-gotchas).
 ; One host covers the frontend (ui/hotstring_editor/), the shared i18n.js
 ; (ui/i18n.js) and the locale JSON (data/locales/).
 global HSED_VHOST := "ergopti.hotstrings"   ; -> _SharedDir
@@ -85,83 +85,162 @@ _HsEdWeb_Available() {
 ; @param DefaultSection string Section to pre-select (currently advisory; the
 ;        frontend restores its own default-section preference).
 _HsEdWeb_TryOpen(DefaultSection := "") {
-	global _HsEdWeb_Gui, _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
-	global _HsEdWeb_ResetDone, _HsEdWeb_SessionEpoch
+	global _HsEdWeb_Gui, _HsEdWeb_Controller, _HsEdWeb_WebView
+	global _HsEdWeb_MsgSub, _HsEdWeb_NavSub, _HsEdWeb_ResetDone, _HsEdWeb_SessionEpoch
 	global _VendorDir, _SharedDir
 
 	if !_HsEdWeb_Available()
 		return false
 
-	; Singleton — bring the existing editor to the front.
+	; Focus only the captured singleton; presentation may pump native events.
 	if (_HsEdWeb_Gui != 0) {
-		WMPresentWindow(_HsEdWeb_Gui)
+		Window := _HsEdWeb_Gui, SessionEpoch := _HsEdWeb_SessionEpoch
+		if _HsEdWeb_StartupCurrent(SessionEpoch, Window)
+			WMPresentWindow(Window)
 		return true
 	}
-	_HsEdWeb_SessionEpoch += 1
-	SessionEpoch := _HsEdWeb_SessionEpoch
-	_HsEdWeb_ResetDone := false
+	PreviousCritical := Critical("On")
+	try {
+		if _HsEdWeb_Gui != 0
+			return true
+		_HsEdWeb_SessionEpoch += 1
+		SessionEpoch := _HsEdWeb_SessionEpoch
+		_HsEdWeb_ResetDone := false
+	} finally Critical(PreviousCritical)
+
+	if !_HsEdWeb_OpeningCurrent(SessionEpoch)
+		return true
 
 	g := Gui_Create("+Resize +MinSize720x520", t("editor.hotstrings.window_title"))
-	g.BackColor := "0x1e1e1e"
-	g.MarginX   := 0
-	g.MarginY   := 0
-	Placeholder := g.Add("Text", "x0 y0 w960 h640", "")
-	g.OnEvent("Close", _HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_OnClose))
-	g.OnEvent("Size",  _HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_OnResize))
-
-	; Show BEFORE creating the control: creating/Fill()-ing against a hidden Gui
-	; sizes the control to a zero client rect (blank page that never lays out).
-	g.Show("w960 h640 Center")
-	_HsEdWeb_Gui := g
-
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
+	Installed := false, FactoryFailed := false, ResetForFallback := false
 	try {
-		_HsEdWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
-	} catch as Err {
-		try LoggerError("HsEditor", "WebView2 create failed: {1} — falling back to native editor.", Err.Message)
-		try g.Destroy()
-		_HsEdWeb_Reset()
-		_HsEdWeb_Gui := 0
-		return false
+		if !_HsEdWeb_OpeningCurrent(SessionEpoch)
+			return true
+		g.BackColor := "0x1e1e1e"
+		g.MarginX := 0
+		g.MarginY := 0
+		Placeholder := g.Add("Text", "x0 y0 w960 h640", "")
+		g.OnEvent("Close", _HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_OnClose))
+		g.OnEvent("Size", _HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_OnResize))
+
+		; Native Show can dispatch Close. Publish the exact GUI first; a retired
+		; Show frame must never re-publish it after that native pump returns.
+		Published := false
+		PreviousCritical := Critical("On")
+		try {
+			if _HsEdWeb_OpeningCurrent(SessionEpoch) {
+				_HsEdWeb_Gui := g
+				Published := true
+			}
+		} finally Critical(PreviousCritical)
+		if !Published || !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		g.Show("w960 h640 Center")
+		if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+			return true
+
+		loader := _VendorDir . "\64bit\WebView2Loader.dll"
+		try {
+			Environment := WebView_SharedEnvironment(loader)
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			Controller := WebView2.create(Placeholder.Hwnd, , Environment)
+		} catch as Err {
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try LoggerError("HsEditor", "WebView2 create failed: {1} — falling back to native editor.", Err.Message)
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			FactoryFailed := true
+		}
+		if !FactoryFailed {
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			View := Controller.CoreWebView2
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+
+			try {
+				s := View.Settings
+				if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+					return true
+				s.AreDevToolsEnabled := false
+				if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+					return true
+				s.AreDefaultContextMenusEnabled := false
+				if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+					return true
+				s.IsStatusBarEnabled := false
+				if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+					return true
+				s.AreBrowserAcceleratorKeysEnabled := false
+				if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+					return true
+				s.IsSwipeNavigationEnabled := false
+			}
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+
+			MsgSub := View.WebMessageReceived(_HsEdWeb_OnWebMessage.Bind(SessionEpoch))
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			NavSub := View.NavigationCompleted(_HsEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try View.SetVirtualHostNameToFolderMapping(HSED_VHOST, _SharedDir, HSED_HOST_ACCESS_ALLOW)
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			Seed := _HsEdWeb_I18nSeed()
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try View.AddScriptToExecuteOnDocumentCreated(Seed)
+
+			; Globals retain subscription references before the aliases leave this
+			; RAM-only transaction; no COM call or final reference release occurs inside it.
+			PreviousCritical := Critical("On")
+			try {
+				if _HsEdWeb_StartupCurrent(SessionEpoch, g) {
+					_HsEdWeb_Controller := Controller
+					_HsEdWeb_WebView := View
+					_HsEdWeb_MsgSub := MsgSub
+					_HsEdWeb_NavSub := NavSub
+					MsgSub := unset
+					NavSub := unset
+					Installed := true
+				}
+			} finally Critical(PreviousCritical)
+			if !Installed || !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+
+			Url := _HsEdWeb_HtmlUrl()
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try View.Navigate(Url)
+			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try Controller.Fill()
+			if _HsEdWeb_StartupCurrent(SessionEpoch, g)
+				try LoggerSuccess("HsEditor", "Personal hotstring editor shown via WebView2.")
+			return true
+		}
+	} finally {
+		if !Installed {
+			; Revoke only this opening before private unsubscribe/Close/Destroy
+			; can pump callbacks. A stale frame never Reset()s its successor.
+			ResetForFallback := _HsEdWeb_Reset(SessionEpoch, g)
+			try MsgSub := unset
+			try NavSub := unset
+			if IsSet(Controller) {
+				try Controller.Close()
+				catch as Err
+					try LoggerError("HsEditor", "Retired browser cleanup failed: {1}.", Err.Message)
+			}
+			try g.Destroy()
+		}
 	}
-
-	_HsEdWeb_WebView := _HsEdWeb_Controller.CoreWebView2
-	; This controller/webview pair is fresh — re-arm the Reset() guard so the
-	; NEXT close actually tears it down instead of short-circuiting on the flag
-	; left behind by a previous editor session.
-
-	; Harden the surface — no devtools, context menu, status bar, accelerators.
-	try {
-		s := _HsEdWeb_WebView.Settings
-		s.AreDevToolsEnabled               := false
-		s.AreDefaultContextMenusEnabled    := false
-		s.IsStatusBarEnabled               := false
-		s.AreBrowserAcceleratorKeysEnabled := false
-		s.IsSwipeNavigationEnabled         := false
-	}
-
-	; JS -> AHK bridge. Store the subscription handle in a persistent global —
-	; discarding it lets the binding GC it and silently unsubscribe the handler.
-	global _HsEdWeb_MsgSub := _HsEdWeb_WebView.WebMessageReceived(_HsEdWeb_OnWebMessage.Bind(SessionEpoch))
-	; The frontend never posts a "ready" action, so push initData once the page
-	; has finished loading (and i18n.js has run). Subscription stored for the
-	; same lifetime reason as the message handler.
-	global _HsEdWeb_NavSub := _HsEdWeb_WebView.NavigationCompleted(_HsEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
-
-	; Map the virtual host BEFORE navigating so the document and every relative
-	; asset (style.css, ../i18n.js) and the locale fetch resolve through it.
-	try _HsEdWeb_WebView.SetVirtualHostNameToFolderMapping(HSED_VHOST, _SharedDir, HSED_HOST_ACCESS_ALLOW)
-
-	; Seed the i18n base + active locale before page scripts run, so the shared
-	; i18n.js fetches the right locale JSON over the virtual host (model_browser
-	; pattern). Runs on every document creation.
-	try _HsEdWeb_WebView.AddScriptToExecuteOnDocumentCreated(_HsEdWeb_I18nSeed())
-
-	try _HsEdWeb_WebView.Navigate(_HsEdWeb_HtmlUrl())
-	try _HsEdWeb_Controller.Fill()
-
-	try LoggerSuccess("HsEditor", "Personal hotstring editor shown via WebView2.")
-	return true
+	; Only now have all private cleanup callouts completed. A later session
+	; cannot lend its authority to this failed opening's native fallback.
+	return !(FactoryFailed && ResetForFallback && _HsEdWeb_FallbackCurrent(SessionEpoch + 1))
 }
 
 
@@ -235,6 +314,24 @@ _HsEdWeb_SessionCurrent(SessionEpoch) {
 	return SessionEpoch == _HsEdWeb_SessionEpoch
 }
 
+; Startup has no source/save authority: InitData captures the real opening
+; image separately. These predicates only retain the exact native owner.
+_HsEdWeb_OpeningCurrent(SessionEpoch) {
+	global _HsEdWeb_Gui, _HsEdWeb_ResetDone
+	return _HsEdWeb_SessionCurrent(SessionEpoch) && !_HsEdWeb_ResetDone && _HsEdWeb_Gui == 0
+}
+
+_HsEdWeb_StartupCurrent(SessionEpoch, Window) {
+	global _HsEdWeb_Gui, _HsEdWeb_ResetDone
+	return _HsEdWeb_SessionCurrent(SessionEpoch) && !_HsEdWeb_ResetDone && _HsEdWeb_Gui == Window
+}
+
+; Only the failed opening's own retired epoch can admit a native fallback.
+_HsEdWeb_FallbackCurrent(SessionEpoch) {
+	global _HsEdWeb_Gui, _HsEdWeb_ResetDone
+	return _HsEdWeb_SessionCurrent(SessionEpoch) && _HsEdWeb_ResetDone && _HsEdWeb_Gui == 0
+}
+
 _HsEdWeb_SessionCall(SessionEpoch, Callback, Params*) {
 	if !_HsEdWeb_SessionCurrent(SessionEpoch)
 		return false
@@ -305,7 +402,7 @@ _HsEdWeb_ReportSaveFailure() {
 		Map("title", t("editor.hotstrings.save_error"), "level", "error"))
 }
 
-_HsEdWeb_DeferredSaveCompleted(OpeningSource, CommitResult) {
+_HsEdWeb_DeferredSaveCompleted(OpeningSource, Added, CommitResult) {
 	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
 		return
 	global PERSONAL_TOML_COMMIT_FAILED
@@ -321,6 +418,7 @@ _HsEdWeb_DeferredSaveCompleted(OpeningSource, CommitResult) {
 	}
 	try LoggerSuccess("HsEditor",
 		"Deferred personal hotstrings saved and reloaded.")
+	_HsEdWeb_EnableAdded(Added)
 }
 
 _HsEdWeb_Save(Data) {
@@ -348,9 +446,11 @@ _HsEdWeb_Save(Data) {
 	)
 
 	try LoggerStart("HsEditor", "Saving personal hotstrings ({1} section(s))…", order.Length)
+	; Sections this save creates are switched on once it has committed.
+	Added := HS_PersonalSectionsAdded(ReadPersonalToml(true)["sections_order"], order)
 	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_DEFERRED
 	CommitResult := PersonalTomlCommitAndReload(WriteData,
-		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind(OpeningSource), 0, OpeningSource)
+		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind(OpeningSource, Added), 0, OpeningSource)
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
 		if A_IsSuspended
 			_HsEdWeb_ShowSaveFailure()
@@ -365,6 +465,26 @@ _HsEdWeb_Save(Data) {
 	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
 		return
 	try LoggerSuccess("HsEditor", "Personal hotstrings saved and reloaded.")
+	_HsEdWeb_EnableAdded(Added)
+}
+
+; A section the user has just created is meant to be used: enable it.
+_HsEdWeb_EnableAdded(Added) {
+	if !Added.Length
+		return true
+	Reason := "refused"
+	try {
+		if HS_EnableNewPersonalSections(Added) {
+			try LoggerSuccess("HsEditor", "{1} new personal section(s) enabled.", Added.Length)
+			return true
+		}
+	} catch as Err
+		Reason := Err.Message
+	try LoggerError("HsEditor", "The {1} new personal section(s) could not be enabled ({2}); enable them from the tray.",
+		Added.Length, Reason)
+	try NotifierSend(t("editor.hotstrings.err_write"),
+		Map("title", t("editor.hotstrings.save_error"), "level", "error"))
+	return false
 }
 
 ; Persists a single UI preference. The frontend uses its own key names
@@ -387,15 +507,20 @@ _HsEdWeb_SavePref(Data) {
 }
 
 ; Closes the editor window (frontend "close" button / Esc).
-_HsEdWeb_Close() {
-	global _HsEdWeb_Gui
-	saved := (_HsEdWeb_Gui != 0) ? _HsEdWeb_Gui : 0
-	_HsEdWeb_Reset()
+_HsEdWeb_Close(ExpectedWindow := unset) {
+	global _HsEdWeb_Gui, _HsEdWeb_SessionEpoch
+	PreviousCritical := Critical("On")
 	try {
-		if saved
-			saved.Destroy()
-	}
-	_HsEdWeb_Gui := 0
+		Window := IsSet(ExpectedWindow) ? ExpectedWindow : _HsEdWeb_Gui
+		if !IsObject(Window) || _HsEdWeb_Gui != Window
+			return false
+		SessionEpoch := _HsEdWeb_SessionEpoch
+	} finally Critical(PreviousCritical)
+	if !_HsEdWeb_Reset(SessionEpoch, Window)
+		return false
+	; Reset detached this exact GUI before any unsubscribe/Close could reenter.
+	try Window.Destroy()
+	return true
 }
 
 
@@ -463,7 +588,7 @@ _HsEdWeb_InitDataJs() {
 	}
 
 	compact   := (_EditorPrefGet("compact_view", "0") == "1") ? "true" : "false"
-	autoClose := (_EditorPrefGet("close_on_add", "0") == "1") ? "true" : "false"
+	autoClose := _EditorCloseOnAddEnabled() ? "true" : "false"
 	defSec    := _EditorPrefGet("default_section", "")
 	defSecJs  := (defSec == "") ? "null" : _HsEdWeb_JsStr(defSec)
 	defPrio   := _GetSharedPersonalDefault()
@@ -533,52 +658,57 @@ _HsEdWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_HsEdWeb_Controller)
-		try _HsEdWeb_Controller.Fill()
+		try WebView_FitToWindow(_HsEdWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4): drop the controller, clear the singleton sentinel.
-_HsEdWeb_OnClose(*) {
-	_HsEdWeb_Close()
+_HsEdWeb_OnClose(Window, *) {
+	return _HsEdWeb_Close(Window)
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
 ; whether to destroy the window). Idempotent: a second call (e.g. the JS "close"
 ; message and the native Gui "Close" event both firing for the same teardown) is
 ; a true no-op instead of touching the globals again.
-_HsEdWeb_Reset() {
-	global _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
+_HsEdWeb_Reset(ExpectedEpoch := unset, ExpectedWindow := unset) {
+	global _HsEdWeb_Gui, _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
 	global _HsEdWeb_ResetDone, _HsEdWeb_SessionEpoch, _HsEdWeb_OpeningSource
 
-	; A prior Reset() already released remove_WebMessageReceived/remove_NavigationCompleted
-	; against this controller. Re-running the unset lines below would call __Delete's
-	; bound ComCall a SECOND time against a COM pointer WebView2 has already torn down
-	; (Controller.Close() releases CoreWebView2's underlying interfaces) — that is a
-	; genuine SEH access violation (real crash: "[ComCall] ... remove_WebMessageReceived"),
-	; which no try/catch can intercept because it never raises an AHK exception.
-	if _HsEdWeb_ResetDone
-		return
-	_HsEdWeb_ResetDone := true
-	_HsEdWeb_SessionEpoch += 1
-	_HsEdWeb_OpeningSource := false
-
-	; The whole teardown runs under one try: a hard COM access violation can occur
-	; mid-sequence (e.g. if the controller was invalidated by the host Gui already
-	; being destroyed), and a bare per-line `try` only catches ordinary AHK
-	; exceptions — it does NOT catch that class of failure, but wrapping the
-	; sequence still protects the *other* lines from a preceding non-fatal COM
-	; error (e.g. remove_NavigationCompleted throwing a normal exception) so the
-	; globals below are always cleared even when the unsubscribe itself fails.
+	PreviousCritical := Critical("On")
 	try {
-		; Release the event subscriptions FIRST, while the controller is still alive.
-		; Each handle's __Delete unsubscribes via remove_X on the live controller; doing
-		; it AFTER Controller.Close() raises a COM error that — uncaught in the window's
-		; Close-event thread — terminates the entire AHK script (so closing the editor
-		; would also quit Ergopti+).
+		if IsSet(ExpectedEpoch) && ExpectedEpoch != _HsEdWeb_SessionEpoch
+			return false
+		if IsSet(ExpectedWindow) && _HsEdWeb_Gui != ExpectedWindow
+			return false
+		if _HsEdWeb_ResetDone
+			return false
+		; Retain every old reference before removing its globals. No COM release,
+		; source-map finalization or native Destroy runs in this RAM transaction.
+		RetiredWindow := _HsEdWeb_Gui
+		RetiredOpeningSource := _HsEdWeb_OpeningSource
+		if IsSet(_HsEdWeb_Controller)
+			RetiredController := _HsEdWeb_Controller
+		if IsSet(_HsEdWeb_WebView)
+			RetiredView := _HsEdWeb_WebView
+		if IsSet(_HsEdWeb_MsgSub)
+			RetiredMsgSub := _HsEdWeb_MsgSub
+		if IsSet(_HsEdWeb_NavSub)
+			RetiredNavSub := _HsEdWeb_NavSub
+		_HsEdWeb_ResetDone := true
+		_HsEdWeb_SessionEpoch += 1
+		_HsEdWeb_Gui := 0
+		_HsEdWeb_OpeningSource := false
 		_HsEdWeb_MsgSub := unset
 		_HsEdWeb_NavSub := unset
-		if IsSet(_HsEdWeb_Controller)
-			_HsEdWeb_Controller.Close()
-	}
-	_HsEdWeb_Controller := unset
-	_HsEdWeb_WebView    := unset
+		_HsEdWeb_Controller := unset
+		_HsEdWeb_WebView := unset
+	} finally Critical(PreviousCritical)
+
+	; Release subscriptions while their exact controller is still alive. These
+	; callouts may open another editor; no old frame writes globals afterward.
+	try RetiredMsgSub := unset
+	try RetiredNavSub := unset
+	if IsSet(RetiredController)
+		try RetiredController.Close()
+	return true
 }

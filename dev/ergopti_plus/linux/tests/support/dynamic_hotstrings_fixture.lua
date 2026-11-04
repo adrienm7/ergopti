@@ -56,4 +56,20 @@ function M.install()
 	return restore
 end
 
+--- Calls the real single-field manager with a live fixture-owned destination.
+--- @param manager table Dynamic hotstrings manager.
+--- @param buffer string Current engine buffer.
+--- @param trigger string Configured trigger character.
+--- @param start_is_boundary boolean|nil Retained engine boundary.
+--- @return boolean fired
+--- @return table|nil event
+function M.trigger(manager, buffer, trigger, start_is_boundary)
+	local fired, event
+	require("tests.support.text_owner_fixture").with(function(guard)
+		fired, event = manager.on_trigger(buffer, trigger, start_is_boundary,
+			assert(guard.capture_text_owner()))
+	end)
+	return fired, event
+end
+
 return M

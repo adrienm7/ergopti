@@ -12,7 +12,7 @@ The Windows implementation of ErgoptiPlus.
 >
 > Two name collisions to know before navigating: `modules/keymap/` is the
 > **physical layout remap** here and the **hotstring expansion engine** on macOS;
-> `lib/registry.ahk` is a **Windows-registry** wrapper while
+> `infra/registry.ahk` is a **Windows-registry** wrapper while
 > `macos/modules/keymap/registry.lua` is the **hotstring registry**.
 
 ## Entry point
@@ -29,14 +29,23 @@ includes.
 > can hide a test. Edit with tooling that preserves both; never append via a POSIX
 > `cat >>`. The suite enforces it (`npm run test:ahk-encoding`).
 
+## Developer mode
+
+`powershell -ExecutionPolicy Bypass -File tools\dev\run-windows-dev.ps1` (from
+the clone root, or `npm run dev:windows`) asks a running ErgoptiPlus to close,
+then runs this `ErgoptiPlus.ahk` with AutoHotkey v2 x64 and the same `vendor\`
+helpers, AI runtimes and `%APPDATA%\Ergopti\paths.toml` as the exe. A saved
+driver `.ahk` reloads it (`infra/dev_source.ahk`), as does the tray's Reload; the
+updater stays off. See `docs/design/developer-mode.md`.
+
 ## Layout
 
 | Path                 | Role                                                                                                                                                                                             |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `ErgoptiPlus.ahk`    | Thin entry: directives + include manifest + error net + boot.                                                                                                                                    |
 | `adapters/`          | OS-isolation layer — every `DllCall`, `Send*`, `WinGet*`, file/COM call lives here (one file per port of `_shared/core/ports/contracts.json`), so domain code stays OS-agnostic.                 |
-| `lib/`               | Infrastructure & domain helpers (no UI windows). Foldered submodules (`lib/hotstrings/`, `lib/updater/`, …) for the large ones.                                                                  |
-| `modules/<feature>/` | One folder per feature (`gestures/`, `keylogger/`, `keymap/`, `llm/`, `tap_holds/`, `shortcuts/`, …).                                                                                            |
+| `infra/`             | Infrastructure helpers (no UI windows): boot, configuration, logger, paths, registry. Foldered submodules (`infra/hotstrings/`, `infra/metrics/`, `infra/timings/`) for the large ones.          |
+| `modules/<feature>/` | One folder per feature (`gestures/`, `keystats/`, `keymap/`, `llm/`, `tap_holds/`, `shortcuts/`, …).                                                                                             |
 | `ui/<window>/`       | One folder per UI window (`menu/`, `tooltip/`, `onboarding/`, `healthcheck/`, `changelog/`, `spotlight/`, `wpm/`, `model_browser/`, `hotstrings_config_window/`), each with an `init.ahk` index. |
 | `build/`             | Untracked build output (compiled bundle).                                                                                                                                                        |
 | `_generated/`        | Codegen output — never hand-edited (regenerated from `_shared/`).                                                                                                                                |

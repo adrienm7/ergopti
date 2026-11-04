@@ -116,6 +116,16 @@ class RealPeerControls(unittest.TestCase):
             ],
         )
 
+    def testRefusedProxyPortIsHeldByNoSocket(self):
+        # XNU drops a SYN to a bound non-listening socket without a RST, so
+        # the refused route must be a port no socket holds: this bind fails
+        # with EADDRINUSE while the fixture still owns one.
+        probe = socket.socket()
+        try:
+            probe.bind(("127.0.0.1", self.fixture.ports["refused"]))
+        finally:
+            probe.close()
+
     def testBoundRefusalAndActual407DoNotDeliverOriginBytes(self):
         with self.assertRaises(ConnectionRefusedError):
             socket.create_connection(("127.0.0.1", self.fixture.ports["refused"]), timeout=3)
@@ -126,6 +136,26 @@ class RealPeerControls(unittest.TestCase):
         snapshot = self.fixture.stats()
         self.assertEqual(snapshot["active"], 0)
         self.assertEqual(snapshot["records"], [{"event": "connect", "route": "auth"}])
+
+    def testStalledHandshakeDoesNotHoldBackTheNextOrigin(self):
+        # A client that opens a tunnel and never starts TLS used to hold the
+        # origin's accept loop for ten seconds, past a receiving deadline.
+        stalled, _ = self.connect("second")
+        self.addCleanup(stalled.close)
+        context = ssl.create_default_context(cafile=str(self.fixture.ca))
+        raw, head = self.connect("first")
+        self.assertIn(b"200 Connection Established", head)
+        with context.wrap_socket(raw, server_hostname=self.fixture.host) as tls:
+            tls.sendall(
+                f"GET /alpha?case=one HTTP/1.1\r\nHost: {self.fixture.host}\r\nConnection: close\r\n\r\n".encode()
+            )
+            response = bytearray()
+            while True:
+                part = tls.recv(65536)
+                if not part:
+                    break
+                response += part
+        self.assertEqual(bytes(response).split(b"\r\n\r\n", 1)[1], b"owned\x00native\xffwire")
 
     def testRealUntrustedCAFailsBeforeOriginHTTPAndPhysicallyClosesPeer(self):
         raw, _ = self.connect("first")
@@ -141,7 +171,7 @@ class RealPeerControls(unittest.TestCase):
 
 if __name__ == "__main__":
     print(
-        "Selected: 3 actual portable TLS/CONNECT/SOCKS5 peer controls. Native Apple networking/trust: not executed.",
+        "Selected: 4 actual portable TLS/CONNECT/SOCKS5 peer controls. Native Apple networking/trust: not executed.",
         flush=True,
     )
     unittest.main(verbosity=2)

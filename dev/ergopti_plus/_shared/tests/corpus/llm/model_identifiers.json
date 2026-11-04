@@ -1,0 +1,44 @@
+{
+	"_comment": "Identifiers the model selector page accepts when the user adds a model, and the ones it refuses. The page, _shared/lua/llm/model_identifier.lua and windows/modules/llm/models.ahk each validate this corpus (tools/test/test-model-selector-page.cjs, the macOS and Linux unit suites, the AHK suite).",
+	"ollama": {
+		"valid": [
+			"qwen3:4b",
+			"llama3.2",
+			"llama3.2:3b-instruct-q4_K_M",
+			"hf.co/bartowski/Qwen3-4B-GGUF:Q4_K_M",
+			"library/mistral:7b",
+			"my-model_1.5"
+		],
+		"invalid": [
+			"",
+			" qwen3",
+			"qwen3 4b",
+			"qwen3:",
+			":4b",
+			"Qwen3:4b",
+			"qwen3;rm",
+			"../etc",
+			"qwen3:4b:extra",
+			"a/b/c/d/e"
+		]
+	},
+	"mlx": {
+		"valid": [
+			"mlx-community/Qwen3-4B-4bit",
+			"Qwen/Qwen3-0.6B",
+			"mlx-community/Llama-3.2-3B-Instruct-4bit",
+			"a1/b_c.d-e"
+		],
+		"invalid": [
+			"",
+			"Qwen3-4B",
+			"/Qwen3",
+			"mlx-community/",
+			"mlx community/Qwen",
+			"mlx-community/Qwen3/extra",
+			"https://huggingface.co/Qwen/Qwen3",
+			"-bad/name",
+			"owner/.hidden"
+		]
+	}
+}

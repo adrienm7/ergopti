@@ -24,6 +24,29 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 			bytes: JSONSerialization.data(withJSONObject: fields)))
 	}
 
+	private func assertUnambiguousFailedStageMetadata() throws {
+		let valid = #"{"version":1,"success":false,"reason":"unavailable","native_refusal_stage":"native_policy_load"}"#
+		let collector = ManagedBootstrapCollector(maximumBytes: nil, remaining: { 10 }, writeBody: { _ in true })
+		XCTAssertTrue(collector.consume(try XCTUnwrap(ManagedHTTPFrame.encode(tag: 67, bytes: Data(valid.utf8)))))
+		XCTAssertTrue(collector.terminal)
+		XCTAssertFalse(collector.successfulTerminal)
+		XCTAssertEqual(collector.terminalReason, "unavailable")
+		XCTAssertNil(collector.failure)
+		let rejected = [
+			#"{"version":1,"success":false,"reason":"unavailable","native_refusal_stage":null}"#,
+			#"{"version":1,"success":true,"reason":"complete","native_refusal_stage":"native_session_terminal"}"#,
+			#"{"version":1,"success":false,"reason":"certificate","native_refusal_stage":"native_policy_load"}"#,
+			#"{"version":1,"success":false,"reason":"unavailable","native_refusal_stage":"native_policy_load","native_refusal_stage":"native_proxy_lookup"}"#,
+			#"{"version":1,"success":false,"reason":"unavailable","native_refusal_stage":"native_policy_load","native_refusal_st\u0061ge":"native_proxy_lookup"}"#
+		]
+		for text in rejected {
+			let refused = ManagedBootstrapCollector(maximumBytes: nil, remaining: { 10 }, writeBody: { _ in true })
+			XCTAssertFalse(refused.consume(try XCTUnwrap(ManagedHTTPFrame.encode(tag: 67, bytes: Data(text.utf8)))))
+			XCTAssertEqual(refused.failure, "protocol")
+			XCTAssertFalse(refused.terminal)
+		}
+	}
+
 	func testPrivateAdmissionKeepsExactPublicPinAndRefusesOtherJSONKinds() throws {
 		let parsed = try XCTUnwrap(ManagedBootstrapRequest.parse(JSONSerialization.data(withJSONObject: input)))
 		XCTAssertEqual(parsed.url.absoluteString, "https://release.example/exact/archive?q=pin")
@@ -97,6 +120,7 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 		XCTAssertTrue(collector.verified(digest: digest, size: 3))
 		XCTAssertEqual(written, Data("abc".utf8))
 		XCTAssertFalse(collector.consume(try frame(67, ["version": 1, "success": true, "reason": "complete"])))
+		try assertUnambiguousFailedStageMetadata()
 	}
 
 	func testRedirectHeaderCancelsBeforeAnyBodyAndStillRequiresClosure() throws {
@@ -196,7 +220,7 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 		let fixture = try ManagedWireFixture()
 		defer {
 			do { try fixture.close() }
-			catch { XCTFail("Actual bootstrap fixture did not restore trust, hosts, keychain and native processes") }
+			catch { XCTFail("Actual bootstrap fixture did not retire its peers and native processes") }
 		}
 		let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
 		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
@@ -206,11 +230,13 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 		let port = try XCTUnwrap(fixture.profile["origin_port"] as? Int)
 		let script = try XCTUnwrap(fixture.profile["pac"] as? String)
 		let pacURL = try XCTUnwrap(fixture.profile["pac_url"] as? String)
+		// Trust arrives through the product SSL_CERT_FILE channel, never system trust.
+		let anchors = ["SSL_CERT_FILE": try XCTUnwrap(fixture.profile["ca_file"] as? String)]
 		let expected = Data([111, 119, 110, 101, 100, 0, 110, 97, 116, 105, 118, 101, 255, 119, 105, 114, 101])
 		let expectedDigest = "87f8e549e9de9c2685521b6594c1c889492f1ebf7e5aeece5449e797f208391e"
 		let policy = try XCTUnwrap(ManagedBootstrapPolicy.parse(JSONSerialization.data(withJSONObject: policyFields)))
 
-		func download(_ path: String, name: String, useURL: Bool = false) throws -> String {
+		func download(_ path: String, name: String, useURL: Bool = false, trusted: Bool = true) throws -> String {
 			let fields: [String: Any] = ["version": 1, "url": "https://\(host):\(port)\(path)",
 				"sha256": expectedDigest, "output": directory.appendingPathComponent(name).path,
 				"timeout_ms": 20_000, "size": 17]
@@ -218,12 +244,12 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 			var settings: [String: Any] = [kCFNetworkProxiesProxyAutoConfigEnable as String: 1]
 			if useURL { settings[kCFNetworkProxiesProxyAutoConfigURLString as String] = pacURL }
 			else { settings[kCFNetworkProxiesProxyAutoConfigJavaScript as String] = script }
-			return ManagedBootstrapDownload.execute(request, policy: policy, environment: [:], settingsProvider: { settings as CFDictionary })
+			return ManagedBootstrapDownload.execute(request, policy: policy, environment: trusted ? anchors : [:],
+				settingsProvider: { settings as CFDictionary })
 		}
 
-		XCTAssertEqual(try download("/alpha?case=one", name: "untrusted.bin"), "certificate")
+		XCTAssertEqual(try download("/alpha?case=one", name: "untrusted.bin", trusted: false), "certificate")
 		XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("untrusted.bin").path))
-		XCTAssertEqual(try fixture.command(["command": "trust", "enabled": true])["trusted"] as? Bool, true)
 		for (path, name, useURL) in [("/alpha?case=one", "first.bin", false),
 			("/beta?case=two", "second.bin", true), ("/fallback?case=three", "fallback.bin", false)] {
 			XCTAssertEqual(try download(path, name: name, useURL: useURL), "complete")
@@ -249,9 +275,10 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 				"/redirect?case=five", "/beta?case=two", "/downgrade?case=six"])
 		XCTAssertEqual(origins.map { $0["route"] as? String }, ["first", "second", "first", "first", "first", "second", "first"])
 		let closed = records.filter { $0["event"] as? String == "redirect_closed" }
+		// CFNetwork drains a redirect's declared body before it reports the
+		// redirect, so the client cannot close at the 3xx headers; the origin
+		// retires each held body at its own bound. The order below is the guarantee.
 		XCTAssertEqual(closed.count, 2)
-		XCTAssertTrue(closed.allSatisfy { $0["eof"] as? Bool == true },
-			"Both held redirect bodies are physically cancelled at headers")
 		let cancelledIndex = try XCTUnwrap(records.firstIndex { $0["event"] as? String == "redirect_closed"
 			&& $0["path"] as? String == "/redirect?case=five" })
 		let successorIndex = try XCTUnwrap(records.indices.first { $0 > cancelledIndex

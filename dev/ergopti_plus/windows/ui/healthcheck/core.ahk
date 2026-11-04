@@ -27,6 +27,7 @@
 ; hoisted, so load order across the healthcheck/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\adapters\diagnostics_control.ahk
 
 
 ; Module-level state. _HealthCheckStartMs anchors the uptime origin at module
@@ -36,6 +37,162 @@ global _HealthCheckStartMs   := A_TickCount
 global _HealthCheckLastError := ""
 global _HealthCheckWarnCount := 0
 global _HealthCheckErrCount  := 0
+global _HealthCheckWindowControl := 0
+
+/** Owns one listener and its coalesced deferred window request. */
+class HealthCheckWindowControl {
+	__New(MessageFn, ListenFn, TimerFn, ShowFn, ReadyFn, HostWindow, OwnerPid, OwnerCreation) {
+		for Fn in [MessageFn, ListenFn, TimerFn, ShowFn, ReadyFn]
+			if !HasMethod(Fn, "Call")
+				throw TypeError("Diagnostics control requires callable collaborators.")
+		if !(HostWindow is Integer) || HostWindow <= 0
+			throw ValueError("Diagnostics control requires its exact host window.")
+		if !(OwnerPid is Integer) || OwnerPid <= 0 || !(OwnerCreation is Integer) || OwnerCreation <= 0
+			throw ValueError("Diagnostics control requires its own process lifetime.")
+		this.OwnerPid := OwnerPid, this.OwnerCreation := OwnerCreation
+		this.MessageFn := MessageFn, this.ListenFn := ListenFn, this.TimerFn := TimerFn
+		this.ShowFn := ShowFn, this.ReadyFn := ReadyFn, this.HostWindow := HostWindow
+		this.Message := 0, this.Started := false, this.Active := false
+		this.Closed := false, this.Listening := false, this.Pending := false, this.Opening := false
+		this.Listener := ObjBindMethod(this, "OnMessage")
+		this.Callback := ObjBindMethod(this, "Open")
+	}
+
+	/** Publishes the listener only after native registration returns. */
+	Start() {
+		if this.Started || this.Closed
+			throw Error("Diagnostics control cannot be initialized twice or after retirement.")
+		this.Started := true
+		try {
+			Message := this.MessageFn.Call()
+			if this.Closed
+				throw Error("Diagnostics control was withdrawn during message resolution.")
+			if !(Message is Integer) || Message < 0xC000 || Message > 0xFFFF
+				throw ValueError("Diagnostics control returned an invalid registered message.")
+			this.Message := Message, this.Listening := true
+			try this.ListenFn.Call(Message, this.Listener, 1)
+			finally {
+				; A reentrant Stop may run before the native registration lands.
+				; The returning acquisition still owes its exact listener's cleanup.
+				this.Listening := true
+			}
+			PreviousCritical := Critical("On")
+			try {
+				if this.Closed
+					throw Error("Diagnostics control was withdrawn during registration.")
+				this.Active := true
+			} finally Critical(PreviousCritical)
+		} catch as FirstError {
+			; A global Stop may already have cleared its reference to this owner.
+			try this.Stop()
+			catch as CleanupError
+				FirstError.ControlRetirementError := CleanupError
+			throw FirstError
+		}
+	}
+
+	/** Invalidates callbacks before attempting both native retirement boundaries. */
+	Stop() {
+		this.Active := false, this.Closed := true
+		Failure := 0
+		if this.Pending {
+			try {
+				this.TimerFn.Call(this.Callback, 0)
+				this.Pending := false
+			} catch as Err
+				Failure := Err
+		}
+		if this.Listening {
+			try {
+				this.ListenFn.Call(this.Message, this.Listener, 0)
+				this.Listening := false
+			} catch as Err {
+				if IsObject(Failure)
+					Failure.ListenerRetirementError := Err
+				else
+					Failure := Err
+			}
+		}
+		if IsObject(Failure)
+			throw Failure
+	}
+
+	/** Acknowledges a queued request; it never runs WebView2 inside SendMessage. */
+	OnMessage(wParam, lParam, Message, Window) {
+		if !this.Active || Window != this.HostWindow || Message != this.Message
+				|| wParam != this.OwnerPid || lParam != this.OwnerCreation
+			return 0
+		if !this.ReadyFn.Call() || !this.Active
+			return 0
+		if this.Pending || this.Opening
+			return 1
+		this.Pending := true
+		try this.TimerFn.Call(this.Callback, -1)
+		catch as Err {
+			; A throwing timer may already have acquired the callback.
+			this.Active := false
+			LoggerError("DiagnosticsControl", "Window request scheduling failed; callback retirement remains owned: {1}.", Err.Message)
+			return 0
+		}
+		return this.Active ? 1 : 0
+	}
+
+	/** Opens only while the same listener still owns this deferred request. */
+	Open() {
+		if !this.Active || !this.Pending
+			return false
+		this.Pending := false
+		if !this.ReadyFn.Call() || !this.Active
+			return false
+		this.Opening := true
+		try {
+			this.ShowFn.Call()
+			return true
+		} finally {
+			this.Opening := false
+		}
+	}
+}
+
+/** Activates the read-only control endpoint after the actual driver is ready. */
+HealthCheck_StartWindowControl() {
+	global _HealthCheckWindowControl
+	if IsObject(_HealthCheckWindowControl)
+		throw Error("The diagnostics window control already has an owner.")
+	LoggerStart("DiagnosticsControl", "Registering the diagnostics window control…")
+	try {
+		Control := HealthCheckWindowControl(HealthCheck_ControlMessage,
+			(Message, Callback, Threads) => OnMessage(Message, Callback, Threads),
+			HealthCheck_ControlTimer, HealthCheck_ShowWindow,
+			_HealthCheck_WindowControlReady, A_ScriptHwnd, ProcessExist(), HealthCheck_ControlCreationTime())
+		_HealthCheckWindowControl := Control
+		Control.Start()
+	}
+	catch as FirstError {
+		try HealthCheck_StopWindowControl()
+		catch as CleanupError
+			FirstError.ControlRetirementError := CleanupError
+		LoggerError("DiagnosticsControl", "Window control registration failed: {1}.", FirstError.Message)
+		throw FirstError
+	}
+	LoggerSuccess("DiagnosticsControl", "Diagnostics window control registered.")
+}
+
+/** Retires the listener without relinquishing a callback whose cancellation failed. */
+HealthCheck_StopWindowControl() {
+	global _HealthCheckWindowControl
+	if !IsObject(_HealthCheckWindowControl)
+		return
+	_HealthCheckWindowControl.Stop()
+	_HealthCheckWindowControl := 0
+	LoggerInfo("DiagnosticsControl", "Diagnostics window control retired.")
+}
+
+_HealthCheck_WindowControlReady() {
+	global _DriverReady, _DriverBootPhase, _DriverIsDetachedWorker
+	return IsSet(_DriverReady) && _DriverReady && IsSet(_DriverBootPhase)
+		&& _DriverBootPhase == "ready" && IsSet(_DriverIsDetachedWorker) && !_DriverIsDetachedWorker
+}
 
 
 
@@ -152,12 +309,20 @@ HealthCheck_Config() {
 	Schema := JsonParse(RawSchema)
 	if !(Schema is Map) || (Schema.Get("schema_version", 0) != 2)
 		throw ValueError("The diagnostics schema is not a version 2 schema.")
+	; Export labels come from canonical English, independently of UI locale.
+	Schema["export_strings"] := Map()
+	English := JsonParse(FSReadStrict(_SharedDir . "\data\locales\en.json"))
+	for Key, Value in English
+		if SubStr(Key, 1, 12) == "healthcheck."
+			Schema["export_strings"][Key] := Value
+	RawSchema := _HC_ValueToJson(Schema)
 	_HC_Config := Map(
 		"schema",        Schema,
 		"raw_schema",    RawSchema,
 		"redaction",     JsonParse(RawRedaction),
 		"raw_redaction", RawRedaction,
 		"templates",     JsonParse(FileRead(_SharedDir . "\modules\diagnostics\issue_templates.json", "UTF-8")),
+		"day_log",       DayLog_CheckLimits(JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\day_log.json"))),
 		"repository",    JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"])
 	return _HC_Config
 }
@@ -178,17 +343,41 @@ HealthCheck_Config() {
 ; @param Name {String} Collector name, used in the log lines.
 ; @param Collector {Func} Zero-argument collector to invoke.
 ; @param Fallback {Any} Value substituted when the collector fails.
+; @param Timings {Array|Integer} Receives Map("name", Name, "ms", duration) when an Array.
 ; @return {Any} The collected value, or Fallback.
-_HealthCheck_Collect(Name, Collector, Fallback) {
+_HealthCheck_Collect(Name, Collector, Fallback, Timings := 0) {
 	try LoggerTrace("Healthcheck", "Collecting '{1}'…", Name)
+	CollectStarted := _HealthCheck_NowMs()
 	Value := Fallback
 	try {
 		Value := Collector()
 	} catch as e {
 		try LoggerWarn("Healthcheck", "Collector '{1}' failed, field degraded: {2}.", Name, e.Message)
 	}
+	if (Timings is Array)
+		Timings.Push(Map("name", Name, "ms", _HealthCheck_NowMs() - CollectStarted))
 	try LoggerDone("Healthcheck", "Collected '{1}'.", Name)
 	return Value
+}
+
+; Names the slowest collectors of one synchronous collection, so an
+; over-budget line says which section held the thread (the 2026-10-30 macOS
+; field report had 29 collections of 100 to 230 ms and no owner).
+; @param Timings {Array} Maps { name, ms } in run order.
+; @param Count {Integer} How many to name: the schema's phase_a_slowest_named.
+; @returns {String} "; slowest: system=120.3 ms, ...", empty without timings.
+_HealthCheck_SlowestCollectors(Timings, Count) {
+	Remaining := Timings.Clone()
+	Parts := []
+	while (Parts.Length < Count && Remaining.Length > 0) {
+		Slowest := 1
+		for Index, Entry in Remaining
+			if (Entry["ms"] > Remaining[Slowest]["ms"])
+				Slowest := Index
+		Entry := Remaining.RemoveAt(Slowest)
+		Parts.Push(Entry["name"] . "=" . Format("{:.1f}", Entry["ms"]) . " ms")
+	}
+	return Parts.Length > 0 ? "; slowest: " . _HC_Join(Parts, ", ") : ""
 }
 
 ; The warnings and errors: the session counters, the last error and the
@@ -220,7 +409,7 @@ _HealthCheck_Developer() {
 		"modules_disabled", [],
 		"ring_lines",       LoggerRingBufferSnapshot().Length)
 	if IsSet(LOGGER_MIN_LEVEL)
-		Developer["log_level"] := String(LOGGER_MIN_LEVEL)
+		Developer[ConfigLeaf.LOG_LEVEL] := String(LOGGER_MIN_LEVEL)
 	return Developer
 }
 
@@ -231,7 +420,8 @@ _HealthCheck_PendingProbes(Schema, Selected := true) {
 	Probes := Map()
 	for Id, Probe in Schema["probes"]
 		if _HealthCheck_Applies(Probe)
-			Probes[Id] := Selected ? Map("state", "pending") : Map("state", "not_run", "reason", "opt_in_required")
+			; A local probe reads only the user's own files: it needs no opt-in
+			Probes[Id] := (Selected || Probe.Get("local", false) == true) ? Map("state", "pending") : Map("state", "not_run", "reason", "opt_in_required")
 	return Probes
 }
 
@@ -261,23 +451,24 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	; session (about 30 ms on the first opening), before the clock starts
 	Schema := HealthCheck_Config()["schema"]
 	Started := _HealthCheck_NowMs()
-	UptimeSec := (A_TickCount - (_HealthCheckStartMs) & 0xFFFFFFFF) // 1000
+	UptimeSec := (A_TickCount - (_HealthCheckStartMs)) // 1000
 	ReportSubdir := Schema["report"]["subdir"]
 
 	; Every collector is hoisted out of the Map(...) constructor and run through
 	; _HealthCheck_Collect: inside the constructor a bare call could not be
 	; guarded, and the first one to throw took the whole snapshot — and the
 	; crash report it was run for — down with it.
-	Paths       := _HealthCheck_Collect("paths", () => _HealthCheck_Paths(ReportSubdir), Map())
-	Versions    := _HealthCheck_Collect("versions", _HealthCheck_Versions, Map())
-	Hardware    := _HealthCheck_Collect("hardware", _HealthCheck_Hardware, Map())
-	System      := _HealthCheck_Collect("system", () => _HealthCheck_System(Detailed, UptimeSec), Map())
-	Input       := _HealthCheck_Collect("input", _HealthCheck_Input, Map())
-	Features    := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []))
-	Ai          := _HealthCheck_Collect("ai", _HealthCheck_Ai, Map())
-	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []))
-	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map())
-	Developer   := _HealthCheck_Collect("developer", _HealthCheck_Developer, Map())
+	Timings := []
+	Paths       := _HealthCheck_Collect("paths", () => _HealthCheck_Paths(ReportSubdir), Map(), Timings)
+	Versions    := _HealthCheck_Collect("versions", _HealthCheck_Versions, Map(), Timings)
+	Hardware    := _HealthCheck_Collect("hardware", _HealthCheck_Hardware, Map(), Timings)
+	System      := _HealthCheck_Collect("system", () => _HealthCheck_System(Detailed, UptimeSec), Map(), Timings)
+	Input       := _HealthCheck_Collect("input", _HealthCheck_Input, Map(), Timings)
+	FeatureMap  := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []), Timings)
+	Ai          := _HealthCheck_Collect("ai", _HealthCheck_Ai, Map(), Timings)
+	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []), Timings)
+	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map(), Timings)
+	Developer   := _HealthCheck_Collect("developer", _HealthCheck_Developer, Map(), Timings)
 	Probes      := _HealthCheck_PendingProbes(Schema, Extensive)
 
 	Sections := Map(
@@ -286,7 +477,11 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 		"hardware",    Hardware,
 		"system",      System,
 		"input",       Input,
-		"features",    Features,
+		"features",    FeatureMap,
+		; Filled by the configuration probe: reading and parsing the files is far
+		; over the phase A budget
+		"configuration_files", Map("items", []),
+		"configuration", Map("items", []),
 		"ai",          Ai,
 		"network",     Map(),
 		"peripherals", Peripherals,
@@ -307,8 +502,8 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	; Not a warning: the next snapshot would count it among the session's
 	; problems. The report's developer section carries the duration.
 	if (Elapsed > Schema["phase_a_budget_ms"])
-		try LoggerInfo("Healthcheck", "The synchronous diagnostics took {1} ms, over the {2} ms budget.",
-			Elapsed, Schema["phase_a_budget_ms"])
+		try LoggerInfo("Healthcheck", "The synchronous diagnostics took {1} ms, over the {2} ms budget{3}.",
+			Elapsed, Schema["phase_a_budget_ms"], _HealthCheck_SlowestCollectors(Timings, Schema["phase_a_slowest_named"]))
 	Undeclared := HealthCheck_CheckFields(Snapshot, Schema)["undeclared"]
 	if (Undeclared.Length > 0)
 		try LoggerError("Healthcheck", "The diagnostics snapshot carries fields the schema does not declare: {1}.",
@@ -444,7 +639,7 @@ global HC_WIDTH  := 1060
 global HC_HEIGHT := 720
 
 ; The fallback export row is reserved below the structured tree.
-global HC_NATIVE_EXPORT_ROW := 38
+global HC_NATIVE_EXPORT_ROW := 102
 global HC_NATIVE_EXPORT_MARGIN := 6
 
 ; Virtual host for the shared page — maps _SharedDir so relative assets
@@ -469,13 +664,13 @@ global _HC_Gui := unset
 global _HC_ResetDone := false
 
 ; The page session of the open window: its epoch, its snapshot, whether
-; details are included and the mode it opened in (0 when closed).
+; details are included (0 when closed).
 global _HC_Session := 0
 ; One retained controller; navigation renews the document and every session.
 global _HC_ReuseKey := ""
 global _HC_OpenStarted := 0
 global _HC_Opening := false
-global _HC_PendingMode := unset
+global _HC_PendingOpen := false
 global _HC_RequestSerial := 0
 global _HC_PendingSerial := 0
 global _HC_CloseDuringOpen := false
@@ -489,11 +684,11 @@ _HC_CanReuse(Key) {
 }
 
 /** A newer open or close supersedes a request queued during native setup. */
-_HC_ResumePending(Mode, Serial) {
+_HC_ResumePending(Serial) {
 	global _HC_RequestSerial
 	if Serial != _HC_RequestSerial
 		return
-	HealthCheck_ShowWindow(Mode)
+	HealthCheck_ShowWindow()
 }
 
 ; Keep native title construction with the GUI owner, independent of diagnostics collection.
@@ -518,17 +713,16 @@ _HC_OpenTimingMark(Phase, Timing) {
 }
 
 ; Opens the diagnostics window, replacing any previous one.
-; @param Mode {String} "report" opens it at the preview and the report button.
-HealthCheck_ShowWindow(Mode := "") {
+HealthCheck_ShowWindow() {
 	global _VendorDir, _SharedDir, _I18nLocale, HC_WIDTH, HC_HEIGHT, HC_VHOST, HC_HOST_ACCESS_ALLOW
 	global _HC_Controller, _HC_WebView, _HC_MsgSub, _HC_ResetDone, _HC_Gui
 	global _HC_WindowEpoch, _HC_Session, _HC_ReuseKey, _HC_OpenStarted
 
-	global _HC_Opening, _HC_PendingMode, _HC_CloseDuringOpen, _HC_Retiring
+	global _HC_Opening, _HC_PendingOpen, _HC_CloseDuringOpen, _HC_Retiring
 	global _HC_RequestSerial, _HC_PendingSerial
 	_HC_RequestSerial += 1
 	if _HC_Opening || _HC_Retiring {
-		_HC_PendingMode := Mode
+		_HC_PendingOpen := true
 		_HC_PendingSerial := _HC_RequestSerial
 		LoggerDebug("Healthcheck", "Diagnostics opening already in progress; latest request retained.")
 		return
@@ -604,7 +798,8 @@ HealthCheck_ShowWindow(Mode := "") {
 				_HC_WindowEpoch += 1
 				WindowEpoch := _HC_WindowEpoch
 				PageUrl := "https://" . HC_VHOST . "/ui/healthcheck/index.html?cb=" . A_TickCount . "&epoch=" . WindowEpoch
-				_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "extensive", false, "mode", Mode,
+				Snapshot["export_revision"] := 1
+				_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "extensive", false,
 					"page_url", PageUrl)
 
 				try {
@@ -642,6 +837,8 @@ HealthCheck_ShowWindow(Mode := "") {
 		}
 
 		ContentCtl.Visible := false
+		; No page runs probes here: the configuration is collected now
+		HealthCheck_CompleteConfiguration(Snapshot, HealthCheck_Config()["schema"])
 		_HC_ShowNativeSnapshot(G, Snapshot)
 		_HC_OpenTimingMark("native_controls", Timing)
 		LoggerSuccess("Healthcheck", "Diagnostics window opened with structured native controls.")
@@ -649,10 +846,9 @@ HealthCheck_ShowWindow(Mode := "") {
 		if IsSet(Timing)
 			HotPath_RecordLatency("Diagnostics.total", _HealthCheck_NowMs() - _HC_OpenStarted, 5)
 		_HC_Opening := false
-		if IsSet(_HC_PendingMode) {
-			PendingMode := _HC_PendingMode
-			_HC_PendingMode := unset
-			TimerArmOneShotMs(_HC_ResumePending.Bind(PendingMode, _HC_PendingSerial), 1)
+		if _HC_PendingOpen {
+			_HC_PendingOpen := false
+			TimerArmOneShotMs(_HC_ResumePending.Bind(_HC_PendingSerial), 1)
 		}
 	}
 }
@@ -664,8 +860,10 @@ _HC_ShowNativeSnapshot(G, Snapshot) {
 	global HC_WIDTH, HC_HEIGHT, HC_NATIVE_EXPORT_ROW, HC_NATIVE_EXPORT_MARGIN
 	Tree := G.Add("TreeView", "x0 y0 w" . HC_WIDTH . " h" . (HC_HEIGHT - HC_NATIVE_EXPORT_ROW) . " +HScroll")
 	G.NativeDiagnostics := Tree
-	NativeSave := G.Add("Button", "x8 y" . (HC_HEIGHT - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN)
-		. " w160", t("healthcheck.toolbar.save"))
+	_HC_NativeCollectionControls(G)
+	NativeSave := G.Add("Button", "x452 y" . (HC_HEIGHT - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN + 32)
+		. " w170", t("healthcheck.toolbar.save"))
+	G.NativeCollection["save"] := NativeSave
 	NativeSave.OnEvent("Click", _HC_NativeSaveSnapshot.Bind(Snapshot))
 	Summary := Tree.Add(t("healthcheck.section.summary"), 0, "Bold Expand")
 	_HC_NativeAddValue(Tree, t("healthcheck.export.driver"), Snapshot["driver"], Summary)
@@ -688,6 +886,57 @@ _HC_ShowNativeSnapshot(G, Snapshot) {
 		}
 	}
 	return Tree
+}
+
+/** Keeps collection available when the browser runtime cannot create a page. */
+_HC_NativeCollectionControls(G) {
+	global HC_WIDTH, HC_HEIGHT, HC_NATIVE_EXPORT_ROW, HC_NATIVE_EXPORT_MARGIN
+	Top := HC_HEIGHT - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN
+	Controls := Map()
+	for Row in [
+		["start", "collect_windows", "healthcheck.collection.start", 8, 0, 300],
+		["cancel", "collection_cancel", "common.cancel", 320, 0, 120],
+		["open", "collection_open", "healthcheck.collection.open", 452, 0, 170],
+		["guided", "collection_guided", "healthcheck.collection.guided", 8, 32, 300],
+		["skip", "collection_skip", "healthcheck.collection.skip", 320, 32, 120]] {
+		Button := G.AddButton("x" . Row[4] . " y" . (Top + Row[5]) . " w" . Row[6], t(Row[3]))
+		Button.OnEvent("Click", _HC_NativeCollectionAction.Bind(Row[2]))
+		Controls[Row[1]] := Button
+	}
+	Controls["progress"] := G.AddText("x8 y" . (Top + 64) . " w" . (HC_WIDTH - 16) . " h24")
+	G.NativeCollection := Controls
+	_HC_NativeCollectionUpdate(G)
+}
+
+_HC_NativeCollectionAction(Action, *) {
+	global _HC_Gui
+	try _HC_PerformPageAction(0, Map("action", Action), HealthCheck_Config())
+	catch as Err {
+		LoggerError("DiagnosticsCollection", "The native diagnostic collection action failed.")
+		if IsSet(_HC_Gui) && _HC_Gui.HasProp("NativeCollection")
+			_HC_Gui.NativeCollection["progress"].Text := t("healthcheck.collection.failed")
+		return false
+	}
+	return true
+}
+
+/** Projects the retained owner; closing this view never abandons cleanup. */
+_HC_NativeCollectionUpdate(G) {
+	global _HC_Collection
+	Value := IsObject(_HC_Collection) ? _HC_Collection.Result : Map("phase", "idle")
+	Controls := G.NativeCollection
+	Phase := Value.Get("phase", "idle")
+	Active := Value.Get("owner_pending", false) || (Phase != "idle" && Phase != "completed" && Phase != "failed")
+	Controls["start"].Enabled := !Active
+	Controls["cancel"].Enabled := Active
+	Controls["open"].Enabled := Value.Get("archive_created", false) || Value.Get("folder_available", false)
+	Controls["guided"].Enabled := Phase == "guided"
+	Controls["skip"].Enabled := Phase == "guided"
+	Progress := StrReplace(t("healthcheck.deep_tests.progress"), "%s", Value.Get("completed", 0), , , 1)
+	Progress := StrReplace(Progress, "%s", Value.Get("total", 0), , , 1)
+	Controls["progress"].Text := Phase == "idle" ? "" : Phase == "completed" ? t("healthcheck.collection.complete")
+		: Phase == "failed" ? t("healthcheck.collection.failed")
+		: Progress
 }
 
 /** Formats the quick native report with an explicit unexecuted-test status. */
@@ -720,31 +969,39 @@ _HC_NativeAddValue(Tree, Label, Value, Parent) {
 			_HC_NativeAddValue(Tree, String(Key), Item, Node)
 		return Node
 	}
-	return Tree.Add(Label . ": " . _HealthCheck_PlainValue(Value), Parent)
+	return Tree.Add(LabelValue(Label, _HealthCheck_PlainValue(Value)), Parent)
 }
 
 ; Keeps the page filling the window when it is resized.
 ; @param ContentCtl {Gui.Text} The WebView2 host control.
 _HC_OnSize(ContentCtl, GuiObj, MinMax, Width, Height) {
-	global _HC_Controller, _HC_ResetDone
+	global _HC_Controller, _HC_ResetDone, HC_NATIVE_EXPORT_ROW, HC_NATIVE_EXPORT_MARGIN
 	if (MinMax == -1)
 		return
 	ContentCtl.Move(0, 0, Width, Height)
-	if GuiObj.HasProp("NativeDiagnostics")
-		GuiObj.NativeDiagnostics.Move(0, 0, Width, Height)
+	if GuiObj.HasProp("NativeDiagnostics") {
+		GuiObj.NativeDiagnostics.Move(0, 0, Width, Height - HC_NATIVE_EXPORT_ROW)
+		if GuiObj.HasProp("NativeCollection") {
+			for Name, Control in GuiObj.NativeCollection {
+				Offset := Name == "progress" ? 64 : Name == "guided" || Name == "skip" || Name == "save" ? 32 : 0
+				Control.Move(, Height - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN + Offset)
+			}
+			GuiObj.NativeCollection["progress"].Move(, , Width - 16)
+		}
+	}
 	if !_HC_ResetDone && IsSet(_HC_Controller)
 		try _HC_Controller.Fill()
 }
 
 _HealthCheck_CloseGui(G, UserRequest := true) {
 	global _HC_Gui, _HC_Controller, _HC_MsgSub, _HC_WindowEpoch, _HC_Session
-	global _HC_Opening, _HC_CloseDuringOpen, _HC_Retiring, _HC_PendingMode
+	global _HC_Opening, _HC_CloseDuringOpen, _HC_Retiring, _HC_PendingOpen
 	global _HC_RequestSerial, _HC_PendingSerial
 	if !IsSet(_HC_Gui) || !(G == _HC_Gui) || _HC_Retiring
 		return 1
 	if UserRequest {
 		_HC_RequestSerial += 1
-		_HC_PendingMode := unset
+		_HC_PendingOpen := false
 	}
 	if _HC_Opening && UserRequest
 		_HC_CloseDuringOpen := true
@@ -764,10 +1021,9 @@ _HealthCheck_CloseGui(G, UserRequest := true) {
 		throw Err
 	} finally {
 		_HC_Retiring := false
-		if !_HC_Opening && IsSet(_HC_PendingMode) {
-			PendingMode := _HC_PendingMode
-			_HC_PendingMode := unset
-			TimerArmOneShotMs(_HC_ResumePending.Bind(PendingMode, _HC_PendingSerial), 1)
+		if !_HC_Opening && _HC_PendingOpen {
+			_HC_PendingOpen := false
+			TimerArmOneShotMs(_HC_ResumePending.Bind(_HC_PendingSerial), 1)
 		}
 	}
 	return 1
@@ -805,12 +1061,21 @@ _HC_HandleMessage(WindowEpoch, Raw) {
 	global _HC_WindowEpoch, _HC_ResetDone, _HC_Session, _HC_Controller, _HC_OpenStarted
 	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !(_HC_Session is Map)
 		return
+	Session := _HC_Session
 	if (Raw == "ready") {
+		Controller := _HC_Controller
 		LoggerInfo("Healthcheck", "Diagnostics page ready in {1} ms.",
 			Round(_HealthCheck_NowMs() - _HC_OpenStarted, 2))
 		try {
-			_HC_Send(WindowEpoch, _HC_InitJson(_HC_Session))
-			_HC_Controller.IsVisible := true
+			Json := _HC_InitJson(Session)
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
+			_HC_Send(WindowEpoch, Json)
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
+			Controller.IsVisible := true
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
 			_HC_RestartProbes(WindowEpoch)
 		} catch as Err {
 			LoggerError("Healthcheck", "The diagnostics page could not be initialised: {1}", Err.Message)
@@ -845,7 +1110,12 @@ _HC_HandleMessage(WindowEpoch, Raw) {
 ; @param Session {Map} The exact window session being refreshed.
 _HC_ArchiveCleanupMetadata(Session) {
 	Rows := Map()
+	Declared := HealthCheck_Config()["schema"]["probes"]
 	for Id, Result in Session["snapshot"]["probes"] {
+		; A local probe owns nothing outside the process (a timer and file
+		; reads), so its cancellation leaves no cleanup to remember
+		if Declared.Has(Id) && Declared[Id].Get("local", false) == true
+			continue
 		if Result.Get("state", "") == "pending" {
 			Result := Result.Clone()
 			Result["state"] := "cancelled"
@@ -866,33 +1136,86 @@ _HC_ArchiveCleanupMetadata(Session) {
 ; @param Config {Map} From HealthCheck_Config().
 _HC_PerformPageAction(WindowEpoch, Action, Config) {
 	global _HC_Session
+	; Native collection controls outlive the page; no other action has epoch zero.
+	CollectionAction := Map("collect_windows", 1, "collection_cancel", 1,
+		"collection_guided", 1, "collection_skip", 1, "collection_open", 1).Has(Action["action"])
+	if WindowEpoch != 0 || !CollectionAction {
+		Session := _HC_Session
+		if !_HC_SessionCurrent(WindowEpoch, Session)
+			return
+		Snapshot := Session["snapshot"]
+	}
 	switch Action["action"] {
+		case "collect_windows":
+			HealthCheck_CollectWindows()
+		case "collection_cancel", "collection_guided", "collection_skip", "collection_open":
+			global _HC_Collection
+			if IsObject(_HC_Collection) {
+				switch Action["action"] {
+					case "collection_cancel": _HC_Collection.Cancel()
+					case "collection_guided": _HC_Collection.Guided()
+					case "collection_skip": _HC_Collection.SkipGuided()
+					case "collection_open": _HC_Collection.OpenFolder()
+				}
+			}
 		case "close":
+			HealthCheck_DayLogDiscard(Snapshot)
 			global _HC_Gui
 			_HealthCheck_CloseGui(_HC_Gui)
 		case "export_snapshot":
-			_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot",
-				"ok", true, "export_sequence", Action["export_sequence"], "snapshot", _HC_Session["snapshot"],
-				"share_text", HealthCheck_ShareDocument(_HC_Session["snapshot"], Config["schema"])["text"])))
-		case "cancel":
-			HealthCheck_CancelProbes()
-			for CancelledProbe in _HC_Session["snapshot"]["probes"] {
-				ProbeResult := _HC_Session["snapshot"]["probes"][CancelledProbe]
-				if ProbeResult.Get("state", "") == "pending"
-					_HC_Session["snapshot"]["probes"][CancelledProbe] := Map("state", "cancelled", "cleanup", "pending")
+			if !HealthCheck_CapturePageChecks(Snapshot, Action) {
+				_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot", "ok", false,
+					"export_sequence", Action["export_sequence"])))
+				return
 			}
-			_HC_Send(WindowEpoch, '{"type":"action","action":"cancel","ok":true,"snapshot":' . _HC_ValueToJson(_HC_Session["snapshot"]) . '}')
+			_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot",
+				"ok", true, "export_sequence", Action["export_sequence"], "snapshot", Snapshot,
+				"share_text", HealthCheck_ShareDocument(Snapshot, Config["schema"], Action.Get("day_log", false))["text"])))
+		case "day_log":
+			; Opt-in: ticking collects and redacts today's log; unticking drops it
+			if Action["enabled"] {
+				Reply := HealthCheck_DayLogPrepare(Snapshot, Config, HealthCheck_RedactionContext())
+			} else {
+				HealthCheck_DayLogDiscard(Snapshot)
+				Reply := Map("type", "action", "action", "day_log", "ok", true, "state", "off")
+			}
+			if _HC_SessionCurrent(WindowEpoch, Session)
+				_HC_Send(WindowEpoch, _HC_ValueToJson(Reply))
+		case "cancel":
+			HealthCheck_CancelProbes(_HC_SessionCurrent.Bind(WindowEpoch, Session))
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
+			for CancelledProbe in Snapshot["probes"] {
+				ProbeResult := Snapshot["probes"][CancelledProbe]
+				if ProbeResult.Get("state", "") == "pending"
+					Snapshot["probes"][CancelledProbe] := Map("state", "cancelled", "cleanup", "pending")
+			}
+			_HC_Send(WindowEpoch, '{"type":"action","action":"cancel","ok":true,"snapshot":' . _HC_ValueToJson(Snapshot) . '}')
 		case "refresh":
-			HealthCheck_CancelProbes()
-			_HC_ArchiveCleanupMetadata(_HC_Session)
-			_HC_Session["extensive"] := Action["extensive"]
-			_HC_Session["detailed"] := Action["detailed"]
-			_HC_Session["snapshot"] := HealthCheck_Run(Action["detailed"], Action["extensive"])
-			_HC_Session["snapshot"]["retired_probes"] := _HC_Session.Get("cleanup_history", [])
-			_HC_Send(WindowEpoch, '{"type":"snapshot","snapshot":' . _HC_ValueToJson(_HC_Session["snapshot"]) . '}')
+			HealthCheck_CancelProbes(_HC_SessionCurrent.Bind(WindowEpoch, Session))
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
+			_HC_ArchiveCleanupMetadata(Session)
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
+			; A refreshed snapshot starts without the optional day log
+			HealthCheck_DayLogDiscard(Snapshot)
+			Revision := Snapshot.Get("export_revision", 1) + 1
+			Fresh := HealthCheck_Run(Action["detailed"], Action["extensive"])
+			Fresh["export_revision"] := Revision
+			Fresh["retired_probes"] := Session.Get("cleanup_history", [])
+			PreviousCritical := Critical("On")
+			try {
+				if !_HC_SessionCurrent(WindowEpoch, Session)
+					return
+				Session["extensive"] := Action["extensive"]
+				Session["detailed"] := Action["detailed"]
+				Session["snapshot"] := Fresh
+			} finally Critical(PreviousCritical)
+			_HC_Send(WindowEpoch, '{"type":"snapshot","snapshot":' . _HC_ValueToJson(Fresh) . '}')
 			_HC_RestartProbes(WindowEpoch)
 		default:
-			Outcome := HealthCheck_PerformAction(Action, _HC_Session["snapshot"]["sections"]["paths"], Config, 0, _HC_Session["snapshot"])
+			Outcome := HealthCheck_PerformAction(Action, Snapshot["sections"]["paths"], Config, 0, Snapshot)
 			Json := '{"type":"action","action":' . _HC_JsStr(Action["action"])
 				. ',"ok":' . (Outcome["ok"] ? "true" : "false")
 			if Outcome.Has("path")
@@ -905,17 +1228,20 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 
 ; The page's first message: its configuration and the first snapshot. The
 ; schema and the redaction rules go as their files are; the redaction context
-; is written by hand so its flag is a JSON true, not the 1 AHK stores.
+; is written by hand so its flag is a JSON true, not the 1 AHK stores. This
+; host runs the guided diagnostic collection, so it says so to the page.
 ; @param Session {Map}
 ; @returns {String}
 _HC_InitJson(Session) {
 	Config := HealthCheck_Config()
 	Context := HealthCheck_RedactionContext()
-	return '{"type":"init","config":{"schema":' . Config["raw_schema"]
+	global _HC_Collection
+	Collection := IsObject(_HC_Collection) ? _HC_Collection.Result : Map("phase", "idle")
+	return '{"type":"init","collection":' . _HC_ValueToJson(Collection) . ',"config":{"schema":' . Config["raw_schema"]
 		. ',"redaction":' . Config["raw_redaction"]
 		. ',"context":{"home":' . _HC_JsStr(Context["home"]) . ',"user":' . _HC_JsStr(Context["user"])
-		. ',"case_insensitive":true},"mode":' . _HC_JsStr(Session["mode"])
-		. '},"snapshot":' . _HC_ValueToJson(Session["snapshot"]) . '}'
+		. ',"config_dir":' . _HC_JsStr(Context["config_dir"]) . ',"case_insensitive":true}'
+		. ',"capabilities":{"diagnostic_collection":true}},"snapshot":' . _HC_ValueToJson(Session["snapshot"]) . '}'
 }
 
 ; Sends one message into the window's page.
@@ -925,10 +1251,18 @@ _HC_Send(WindowEpoch, Json) {
 	global _HC_WebView, _HC_WindowEpoch, _HC_ResetDone, _HC_Session
 	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !IsSet(_HC_WebView) || !(_HC_Session is Map)
 		return
-	WebView_RunScriptAsync(_HC_WebView,
-		"if(location.href===" . JsonStringLiteral(_HC_Session["page_url"])
-			. "&&window.receiveDiagnostics)window.receiveDiagnostics(" . Json . ")",
-		"HealthCheck")
+	Session := _HC_Session, WebView := _HC_WebView
+	Script := "if(location.href===" . JsonStringLiteral(Session["page_url"])
+		. "&&window.receiveDiagnostics)window.receiveDiagnostics(" . Json . ")"
+	if _HC_SessionCurrent(WindowEpoch, Session)
+		WebView_RunScriptAsync(WebView, Script, "HealthCheck")
+}
+
+/** Tests the exact window owner again after calls that can dispatch messages. */
+_HC_SessionCurrent(WindowEpoch, Session) {
+	global _HC_Session, _HC_WindowEpoch, _HC_ResetDone
+	return WindowEpoch != 0 && !_HC_ResetDone && WindowEpoch == _HC_WindowEpoch
+		&& Session is Map && _HC_Session == Session
 }
 
 ; Restarts the probes of the window's snapshot; each answer is kept in the
@@ -936,19 +1270,29 @@ _HC_Send(WindowEpoch, Json) {
 ; @param WindowEpoch {Integer}
 _HC_RestartProbes(WindowEpoch, StartFn := unset) {
 	global _HC_Session
-	HealthCheck_CancelProbes()
-	Selected := _HC_Session.Get("extensive", false)
+	Session := _HC_Session
+	if !_HC_SessionCurrent(WindowEpoch, Session)
+		return false
+	Selected := Session.Get("extensive", false)
 	if !(Selected is Integer) || (Selected != 0 && Selected != 1)
 		throw TypeError("The diagnostics session has an invalid extensive selection.")
-	if !Selected
+	Schema := HealthCheck_Config()["schema"]
+	if !_HC_SessionCurrent(WindowEpoch, Session)
 		return false
+	if !Selected {
+		; Without the extensive opt-in only the local probes run (the configuration)
+		if !IsSet(StartFn)
+			HealthCheck_StartProbes(WindowEpoch, Schema, _HC_PublishProbe, true, 0,
+				_HC_SessionCurrent.Bind(WindowEpoch, Session))
+		return false
+	}
 	if IsSet(StartFn) {
 		if !HasMethod(StartFn, "Call")
 			throw TypeError("The diagnostics starter must be callable.")
-		return StartFn.Call(WindowEpoch, HealthCheck_Config()["schema"], _HC_PublishProbe)
+		return StartFn.Call(WindowEpoch, Schema, _HC_PublishProbe)
 	}
-	HealthCheck_StartProbes(WindowEpoch, HealthCheck_Config()["schema"], _HC_PublishProbe)
-	return true
+	return HealthCheck_StartProbes(WindowEpoch, Schema, _HC_PublishProbe, false, 0,
+		_HC_SessionCurrent.Bind(WindowEpoch, Session))
 }
 
 ; Publishes one probe's answer into its window.
@@ -978,7 +1322,10 @@ _HC_PublishProbe(WindowEpoch, Id, Result, Sections) {
 ; Converts an AHK value to JSON: Maps become objects, Arrays arrays, numbers
 ; stay numbers (true and false are the 1 and 0 AHK stores).
 _HC_ValueToJson(Val) {
+	global JSON_NULL
 	if !IsSet(Val)
+		return "null"
+	if IsObject(Val) && ObjPtr(Val) == ObjPtr(JSON_NULL)
 		return "null"
 	if (Val is String)
 		return _HC_JsStr(Val)

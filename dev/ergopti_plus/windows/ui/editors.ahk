@@ -10,6 +10,10 @@
 ; their menu/hotkey call sites elsewhere are unaffected.
 ; ==============================================================================
 
+; The generated key vocabulary the word-reset and cascade settings are named by
+; (a dedupe-safe include: menu_init.ahk and menu_manifest.ahk name it too).
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 global _MagicKeyEditorInputHook := ""
 global _MagicKeyEditorStopDebt := false
 ; The window of the live capture, published with its hook.
@@ -37,17 +41,19 @@ MagicKeyEditor(*) {
 				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
 						return
 		}
-		GuiToShow := Gui_Create("", t("dialog.magic_key.title"))
-		GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
-		GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
-		GuiToShow.Show("Center")
-		IH := InputHook("L1 I", "{Escape}")
-		GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
+		; Prepare the cached scalar membership before any dialog is visible.
+		; I keeps its existing MinSendLevel=1 admission for non-AHK input.
+		ScalarEndKeys := _SIHO_ScalarEndKeys() . "{Escape}"
 		_InheritedCritical := A_IsCritical
+		GuiToShow := 0, IH := 0
 		try {
-				; Publish + Start is one lifecycle transaction. If suspend lands before
-				; publication this gate refuses Start; if it lands afterwards, suspend
-				; owns this exact live hook and stops it synchronously.
+				GuiToShow := Gui_Create("", t("dialog.magic_key.title"))
+				GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
+				GuiToShow.Add("Text", "w300", t("button.cancel") . " → " . t("layer_editor.key.escape"))
+				; Construct while hidden: native Close otherwise hides an unowned Gui
+				; before the later factory returns and starts an invisible capture.
+				IH := InputHook("L2 E C I", ScalarEndKeys)
+				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 				Critical("On")
 				try {
 						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
@@ -56,26 +62,44 @@ MagicKeyEditor(*) {
 						_MagicKeyEditorGui := GuiToShow
 						_MagicKeyEditorStopDebt := false
 						IH.Start()
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
+						; Show pumps messages. Its Close handler must already own the
+						; started hook, with no later Start able to revive that capture.
+						GuiToShow.Show("Center")
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
 				} finally {
-						; Wait() pumps messages and may block indefinitely. It must never
-						; inherit a Critical menu caller after publication is complete.
+						; Wait must never inherit a Critical menu caller.
 						Critical("Off")
 				}
 				IH.Wait()
 		} finally {
-				_MagicKeyEditorStopOwned(IH)
-				if (_MagicKeyEditorGui == GuiToShow)
-						_MagicKeyEditorGui := ""
-				; The Close event may already have destroyed the native window.
-				try GuiToShow.Destroy()
-				Critical(_InheritedCritical)
+				CaptureSettled := false
+				try {
+						if IsObject(IH)
+								CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
+				} finally {
+						if IsObject(GuiToShow) {
+								if (_MagicKeyEditorGui == GuiToShow)
+										_MagicKeyEditorGui := ""
+								; Close or a constructor failure may already retire this Gui.
+								try GuiToShow.Destroy()
+						}
+						Critical(_InheritedCritical)
+				}
 		}
-		; InputHook.Wait pumps messages and native Suspend does not stop hooks by
-		; itself. Discard a capture whose wait crossed the pause boundary.
-		if A_IsSuspended
+
+		; Close or a complete pause/resume may retire this exact owner while a
+		; completed native hook still retains its reason and captured units. Only the
+		; terminal path which actually retires that owner may persist its result.
+		if !CaptureSettled || A_IsSuspended
 				return
-		if (IH.EndReason = "Max" && IH.Input != "")
-				ModifyMagicKey(0, IH.Input)
+		Capture := _SIHO_ReadScalar(IH, "{Escape}")
+		if Capture.Reason != ""
+				LoggerWarn("Editors", "Discarded invalid Magic Key scalar capture ({1}).", Capture.Reason)
+		if Capture.Kind == "text"
+				ModifyMagicKey(0, Capture.Text)
 }
 
 _MagicKeyEditorClose(IH, GuiToClose, *) {
@@ -85,17 +109,19 @@ _MagicKeyEditorClose(IH, GuiToClose, *) {
 		return !_MagicKeyEditorStopOwned(IH)
 }
 
-_MagicKeyEditorStopOwned(IH) {
+; Cleanup is idempotent for Close/lifecycle callers. Terminal capture delivery
+; instead requires this call to retire the exact owner after native Stop.
+_MagicKeyEditorStopOwned(IH, SettleCapture := false) {
 		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt
 		PreviousCritical := Critical("On")
 		try {
 				if !IsObject(_MagicKeyEditorInputHook) {
 						_MagicKeyEditorStopDebt := false
-						return true
+						return !SettleCapture
 				}
 				; A stale Close/finally must never stop or clear a successor editor.
 				if _MagicKeyEditorInputHook != IH
-						return true
+						return !SettleCapture
 		} finally Critical(PreviousCritical)
 
 		try IH.Stop()
@@ -111,7 +137,7 @@ _MagicKeyEditorStopOwned(IH) {
 				} finally Critical(PreviousCritical)
 				; Stop may have pumped an OnEnd/finally that settled this owner first.
 				if !OwnerRetained
-						return true
+						return !SettleCapture
 				LoggerError("Editors", "Could not stop the Magic Key capture; cleanup ownership was retained: {1}.", Err.Message)
 				return false
 		}
@@ -122,9 +148,12 @@ _MagicKeyEditorStopOwned(IH) {
 				and _MagicKeyEditorInputHook == IH {
 						_MagicKeyEditorInputHook := ""
 						_MagicKeyEditorStopDebt := false
+						return true
 				}
 		} finally Critical(PreviousCritical)
-		return true
+		; Cleanup remains idempotent for Close/lifecycle callers. A capture
+		; receipt additionally proves that no reentrant Stop already revoked it.
+		return !SettleCapture
 }
 
 _EditorWriteToml(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
@@ -178,12 +207,12 @@ _EditorDestroyAfterCommit(gui, Context) {
 _EditorBuildMagicKeyPlan(NewValue) {
 	global Features
 	if _FeatureUsesDesiredState(Features) {
-		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.trigger_char", NewValue, "")
+		Plan := _FeatureBuildSinglePlan(Features, ConfigKey.HOTSTRINGS_TRIGGER_CHAR, NewValue, "")
 		Plan.publish := _EditorPublishDesiredMagicKey.Bind(Plan.publish, NewValue)
 		return Plan
 	}
 	return {
-		updates: [{ Section: "hotstrings", Key: "trigger_char", Value: NewValue }],
+		updates: [{ Section: "hotstrings", Key: ConfigLeaf.TRIGGER_CHAR, Value: NewValue }],
 		publish: _EditorPublishMagicKey.Bind(NewValue),
 	}
 }
@@ -198,7 +227,7 @@ _EditorPublishMagicKey(NewValue) {
 	global ScriptInformation, Features
 	ScriptInformation["MagicKey"] := NewValue
 	if IsSet(Features) && Features.Has("hotstrings")
-		Features["hotstrings"]["trigger_char"] := NewValue
+		Features["hotstrings"][ConfigLeaf.TRIGGER_CHAR] := NewValue
 }
 
 ModifyMagicKey(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
@@ -250,20 +279,19 @@ MagicKeySourceCapture(*) {
 				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
 						return
 		}
-		GuiToShow := Gui_Create("", t("dialog.magic_key_source.title"))
-		GuiToShow.Add("Text", "w300", t("dialog.magic_key_source.prompt"))
-		GuiToShow.Show("Center")
-		State := _MagicKeySourceCaptureState()
-		; L0: no text is collected, every key is reported to OnKeyDown (N) and
-		; kept from the application (S); T ends the wait on the shared timeout.
-		IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
-		IH.KeyOpt("{All}", "NS")
-		IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(State)
-		MagicKeyCapturePoll := _MagicKeySourceCapturePoll.Bind(State, IH)
-		GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 		_InheritedCritical := A_IsCritical
+		GuiToShow := 0, IH := 0, MagicKeyCapturePoll := 0
 		try {
-				; Publish + Start is one lifecycle transaction, as in MagicKeyEditor.
+				GuiToShow := Gui_Create("", t("dialog.magic_key_source.title"))
+				GuiToShow.Add("Text", "w300", t("dialog.magic_key_source.prompt"))
+				State := _MagicKeySourceCaptureState()
+				; Prepare the whole capture before showing an actionable dialog.
+				; L0 collects no text. NS reports and suppresses every physical key.
+				IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
+				IH.KeyOpt("{All}", "NS")
+				IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(State)
+				MagicKeyCapturePoll := _MagicKeySourceCapturePoll.Bind(State, IH)
+				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 				Critical("On")
 				try {
 						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
@@ -272,21 +300,39 @@ MagicKeySourceCapture(*) {
 						_MagicKeyEditorGui := GuiToShow
 						_MagicKeyEditorStopDebt := false
 						IH.Start()
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
+						GuiToShow.Show("Center")
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
 				} finally {
 						Critical("Off")
 				}
 				SetTimer(MagicKeyCapturePoll, TimingsGet("ui", "magic_key_capture_poll_ms"))
 				IH.Wait()
 		} finally {
-				SetTimer(MagicKeyCapturePoll, 0)
-				_MagicKeyEditorStopOwned(IH)
-				if (_MagicKeyEditorGui == GuiToShow)
-						_MagicKeyEditorGui := ""
-				try GuiToShow.Destroy()
-				Critical(_InheritedCritical)
+				try {
+						if HasMethod(MagicKeyCapturePoll, "Call")
+								SetTimer(MagicKeyCapturePoll, 0)
+				} finally {
+						CaptureSettled := false
+						try {
+								if IsObject(IH)
+										CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
+						} finally {
+								if IsObject(GuiToShow) {
+										if (_MagicKeyEditorGui == GuiToShow)
+												_MagicKeyEditorGui := ""
+										try GuiToShow.Destroy()
+								}
+								Critical(_InheritedCritical)
+						}
+				}
 		}
-		; A capture whose wait crossed the pause boundary is discarded.
-		if A_IsSuspended
+
+		; A completed candidate can outlive external Close or pause/resume. Its
+		; retained Scan/Stopped result is valid only for the terminal owner.
+		if !CaptureSettled || A_IsSuspended
 				return
 		; Escape, Close and the timeout all end without an answer.
 		if (IH.EndReason != "Stopped")
@@ -309,7 +355,7 @@ MagicKeySourceCapture(*) {
 _MagicKeySourceCaptureState(IsDown := _MagicKeySourceIsDown) {
 		Scans := []
 		Keycodes := LayoutRegistry_Keycodes()
-		for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+		for Code in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
 				if MagicKeySourceIsCandidate(Code)
 						Scans.Push(LayoutRegistry_KeyScan(Code, Keycodes))
 		}
@@ -365,11 +411,11 @@ _MagicKeySourceCapturePoll(State, IH) {
 MagicKeySourceMenuRows() {
 	global ScriptInformation
 	Current := ScriptInformation["MagicKeySource"]
-	Automatic := ManifestDefaultFor("hotstrings.magic_key_source")
+	Automatic := ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	Keycodes := LayoutRegistry_Keycodes()
 	Hkl := KS_ResolveKeyboardLayout()
 	Items := []
-	for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+	for Code in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
 		if (Code == Automatic)
 			continue
 		Reason := MagicKeySourceChoiceReason(Code)
@@ -379,13 +425,13 @@ MagicKeySourceMenuRows() {
 		Items.Push(Map("label", Label, "checked", Current == Code, "disabled", Reason != "",
 			"action", ((Chosen) => (*) => ModifyMagicKeySource(Chosen))(Code)))
 	}
-	Commands := Map("magic_key_source_capture", MagicKeySourceCapture,
-		"magic_key_source_automatic", (*) => ModifyMagicKeySource(Automatic))
+	Commands := Map(MenuCommand.MAGIC_KEY_SOURCE_CAPTURE, MagicKeySourceCapture,
+		MenuCommand.MAGIC_KEY_SOURCE_AUTOMATIC, (*) => ModifyMagicKeySource(Automatic))
 	Getters := Map("magic_key_source_capture_ready", (*) => true,
 		"magic_key_source_is_automatic", (*) => Current == Automatic)
 	Children := MenuRenderer_TemplateRows("magic_key_source_children", Commands, Getters,
 		Map("magic_key_source_candidates", (*) => Items))
-	if !(Children is Array) || Children.Length != ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"].Length + 3
+	if !(Children is Array) || Children.Length != ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"].Length + 3
 		return []
 	Rows := MenuRenderer_TemplateRows("magic_key_source_menu", Commands, Getters,
 		Map("magic_key_source_heading", Children))
@@ -393,7 +439,7 @@ MagicKeySourceMenuRows() {
 		return []
 	Shown := (Current == Automatic) ? t("menu.layout.magic_key_source.auto")
 		: _MagicKeySourceLabel(Current, Keycodes, Hkl)
-	Rows[1]["label"] .= " : " . Shown
+	Rows[1]["label"] := LabelValue(Rows[1]["label"], Shown)
 	return Rows
 }
 
@@ -401,7 +447,7 @@ MagicKeySourceMenuRows() {
 ; @param {String} Value Candidate or automatic source.
 ; @returns {String} Locale reason key, or empty when there is no conflict.
 MagicKeySourceChoiceReason(Value) {
-	if Value == ManifestDefaultFor("hotstrings.magic_key_source")
+	if Value == ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 		return ""
 	Scan := LayoutRegistry_KeyScan(Value, LayoutRegistry_Keycodes())
 	if TapKeyAssignedToScan(Integer("0x" . SubStr(Scan, 3))) != ""
@@ -446,9 +492,9 @@ _MagicKeySourceCaptureKeyDown(State, IH, VK, SC) {
 MagicKeySourceIsCandidate(Code) {
 		if !(Code is String) || Code == ""
 				return false
-		if (Code == ManifestDefaultFor("hotstrings.magic_key_source"))
+		if (Code == ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE))
 				return false
-		for Allowed in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+		for Allowed in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
 				if (Allowed == Code)
 						return true
 		}
@@ -458,12 +504,12 @@ MagicKeySourceIsCandidate(Code) {
 _EditorBuildMagicKeySourcePlan(Value) {
 	global Features
 	if _FeatureUsesDesiredState(Features) {
-		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.magic_key_source", Value, "")
+		Plan := _FeatureBuildSinglePlan(Features, ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE, Value, "")
 		Plan.publish := _EditorPublishDesiredMagicKeySource.Bind(Plan.publish, Value)
 		return Plan
 	}
 	return {
-		updates: [{ Section: "hotstrings", Key: "magic_key_source", Value: Value }],
+		updates: [{ Section: "hotstrings", Key: ConfigLeaf.MAGIC_KEY_SOURCE, Value: Value }],
 		publish: _EditorPublishMagicKeySource.Bind(Value),
 	}
 }
@@ -476,9 +522,9 @@ _EditorPublishDesiredMagicKeySource(PublishFn, Value) {
 _EditorPublishMagicKeySource(Value) {
 	global ScriptInformation, Features
 	ScriptInformation["MagicKeySource"] := Value
-	ScriptInformation["MagicKeySourceChosen"] := Value !== ManifestDefaultFor("hotstrings.magic_key_source")
+	ScriptInformation["MagicKeySourceChosen"] := Value !== ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	if IsSet(Features) && Features.Has("hotstrings")
-		Features["hotstrings"]["magic_key_source"] := Value
+		Features["hotstrings"][ConfigLeaf.MAGIC_KEY_SOURCE] := Value
 }
 
 ; Persists the physical magic key ([hotstrings] magic_key_source) and reloads:
@@ -487,7 +533,7 @@ _EditorPublishMagicKeySource(Value) {
 ; @returns {Boolean} Whether the choice was written and the reload accepted.
 ModifyMagicKeySource(Value, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 	global ConfigurationFile
-	if !MagicKeySourceIsCandidate(Value) && Value !== ManifestDefaultFor("hotstrings.magic_key_source") {
+	if !MagicKeySourceIsCandidate(Value) && Value !== ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE) {
 		LoggerWarn("Editors", "Refused physical magic key '{1}': no candidate key has that code.", String(Value))
 		return false
 	}
@@ -514,14 +560,14 @@ ModifyMagicKeySource(Value, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 _EditorBuildRepeatKeyPlan() {
 	global HSE_RepeatEnabled, Features
 	if _FeatureUsesDesiredState(Features) {
-		Candidate := !ReadFeatureStateV2("hotstrings.repeat_key_enabled")["enabled"]
-		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.repeat_key_enabled", Candidate, "")
+		Candidate := !ReadFeatureStateV2(ConfigKey.HOTSTRINGS_REPEAT_KEY_ENABLED)["enabled"]
+		Plan := _FeatureBuildSinglePlan(Features, ConfigKey.HOTSTRINGS_REPEAT_KEY_ENABLED, Candidate, "")
 		Plan.publish := _EditorPublishDesiredRepeatKey.Bind(Plan.publish)
 		return Plan
 	}
 	Candidate := !HSE_RepeatEnabled
 	return {
-		updates: [{ Section: "hotstrings", Key: "repeat_key_enabled", Value: Candidate }],
+		updates: [{ Section: "hotstrings", Key: ConfigLeaf.REPEAT_KEY_ENABLED, Value: Candidate }],
 		publish: _EditorPublishRepeatKey.Bind(Candidate),
 	}
 }
@@ -529,7 +575,7 @@ _EditorBuildRepeatKeyPlan() {
 _EditorPublishDesiredRepeatKey(PublishFn) {
 	global HSE_RepeatEnabled, Features
 	PublishFn.Call()
-	HSE_RepeatEnabled := Features["hotstrings"]["repeat_key_enabled"]
+	HSE_RepeatEnabled := Features["hotstrings"][ConfigLeaf.REPEAT_KEY_ENABLED]
 	if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 		HSE_AdvanceRuntimeDecisionGeneration()
 }
@@ -538,7 +584,7 @@ _EditorPublishRepeatKey(Candidate) {
 	global HSE_RepeatEnabled, Features
 	HSE_RepeatEnabled := Candidate
 	if IsSet(Features) && Features.Has("hotstrings")
-		Features["hotstrings"]["repeat_key_enabled"] := Candidate
+		Features["hotstrings"][ConfigLeaf.REPEAT_KEY_ENABLED] := Candidate
 	if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 		HSE_AdvanceRuntimeDecisionGeneration()
 	return true
@@ -568,6 +614,205 @@ ToggleRepeatKeyEnabled(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 	return true
 }
 
+; The engine global each word-reset setting publishes to.
+_EditorWordResetGlobal(Key, Value) {
+	global HSE_IdleResetSeconds, HSE_ClickResetsWord, HSE_CascadeMaxArrows
+	global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
+	if (Key == ConfigLeaf.IDLE_RESET_SECONDS)
+		HSE_IdleResetSeconds := Value
+	else if (Key == ConfigLeaf.CASCADE_MAX_ARROWS)
+		HSE_CascadeMaxArrows := Value
+	else if (Key == ConfigLeaf.CLICK_RESETS_WORD)
+		HSE_ClickResetsWord := Value
+	else if (Key == ConfigLeaf.ARROW_RESETS_WORD)
+		HSE_ArrowResetsWord := Value
+	else if (Key == ConfigLeaf.SHORTCUT_RESETS_WORD)
+		HSE_ShortcutResetsWord := Value
+	else if (Key == ConfigLeaf.TAP_HOLD_RESETS_WORD)
+		HSE_TapHoldResetsWord := Value
+	else if HSE_PreviewSwitchIsKnown(Key)
+		HSE_PreviewSwitchPublish(Key, Value)
+	else
+		throw ValueError("Unknown word-reset setting: " . Key)
+}
+
+; One plan for both word-reset settings (hotstrings.idle_reset_seconds and
+; hotstrings.click_resets_word), through the same desired-state gateway as the
+; repeat key. The engine reads both live: no reload.
+_EditorBuildWordResetPlan(Key, Value) {
+	global Features
+	if _FeatureUsesDesiredState(Features) {
+		Plan := _FeatureBuildSinglePlan(Features, "hotstrings." . Key, Value, "")
+		Plan.publish := _EditorPublishDesiredWordReset.Bind(Plan.publish, Key, Value)
+		return Plan
+	}
+	return {
+		updates: [{ Section: "hotstrings", Key: Key, Value: Value }],
+		publish: _EditorPublishWordReset.Bind(Key, Value),
+	}
+}
+
+_EditorPublishDesiredWordReset(PublishFn, Key, Value) {
+	PublishFn.Call()
+	_EditorWordResetGlobal(Key, Value)
+}
+
+_EditorPublishWordReset(Key, Value) {
+	global Features
+	_EditorWordResetGlobal(Key, Value)
+	if IsSet(Features) && (Features is Map) && Features.Has("hotstrings")
+		Features["hotstrings"][Key] := Value
+	return true
+}
+
+; Persists one word-reset setting, publishes it to the engine and redraws the
+; tray so the tick and the caption follow.
+_EditorCommitWordReset(Key, Value, Context, WriterFn, NotifyFn, RebuildFn) {
+	global ConfigurationFile
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _EditorCommitWordReset(Key, Value, Context, WriterFn, NotifyFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	if !_EditorWriteToml(ConfigurationFile, Context,
+			_EditorBuildWordResetPlan.Bind(Key, Value), WriterFn, NotifyFn)
+		return false
+	try LoggerInfo("Editors", "hotstrings.{1} set to {2}.", Key, String(Value))
+	return _EditorRebuildAfterCommit(RebuildFn)
+}
+
+/**
+ * Sets the pause after which the next key starts a new word.
+ * @param {Number} Seconds Finite and non-negative; 0 disables the reset.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+SetHotstringsIdleResetSeconds(Seconds, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_ValidIdleResetSeconds(Seconds) {
+		try LoggerError("Editors", "Refused idle-reset delay: not a number of seconds, 0 or more.")
+		return false
+	}
+	return _EditorCommitWordReset(ConfigLeaf.IDLE_RESET_SECONDS, Seconds, "the idle-reset delay",
+		WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Sets the longest chain of hotstrings: how many expansions (arrows) it may hold.
+ * @param {Integer} Arrows A whole number from 1 (a single expansion) to 10.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+SetHotstringsCascadeMaxArrows(Arrows, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_ValidCascadeMaxArrows(Arrows) {
+		try LoggerError("Editors", "Refused cascade arrow count: not a whole number from 1 to 10.")
+		return false
+	}
+	return _EditorCommitWordReset(ConfigLeaf.CASCADE_MAX_ARROWS, Arrows, "the cascade arrow count",
+		WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Parses a typed idle delay: a decimal point or comma, surrounding blanks
+ * allowed. Returns "" for anything that is no number of seconds, 0 or more.
+ * @param {String} Raw The prompt's text.
+ * @returns {Number|String}
+ */
+ParseHotstringsIdleResetSeconds(Raw) {
+	if !(Raw is String)
+		return ""
+	Text := StrReplace(Trim(Raw, " `t"), ",", ".")
+	if (Text == "" || !RegExMatch(Text, "^\d+(\.\d+)?$|^\.\d+$"))
+		return ""
+	Value := Text + 0
+	if (Value = Round(Value))
+		Value := Integer(Round(Value))
+	return HSE_ValidIdleResetSeconds(Value) ? Value : ""
+}
+
+/**
+ * Asks for a free idle delay, prefilled with the current one.
+ * @param {Func} PromptFn Optional seam with Ui_InputBox's signature.
+ * @param {Func} NotifyFn Optional seam called with the invalid-value message.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+PromptHotstringsIdleResetSeconds(PromptFn := 0, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return PromptHotstringsIdleResetSeconds(PromptFn, WriterFn, NotifyFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	Current := HSE_IdleResetSecondsCurrent()
+	Prefill := _MR_FormatFreeNumber(Current)
+	Prompt := t("menu.hotstrings.idle_reset_prompt")
+	Title := t("menu.hotstrings.idle_reset_title")
+	Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w380 h150", Prefill)
+		: Ui_InputBox(Prompt, Title, "w380 h150", Prefill)
+	if !(Answer is Object) || Answer.Result != "OK"
+		return false
+	Seconds := ParseHotstringsIdleResetSeconds(Answer.Value)
+	if (Seconds == "") {
+		try LoggerWarn("Editors", "Invalid idle-reset delay typed — ignored.")
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(t("menu.hotstrings.idle_reset_invalid"), "Icon!")
+		else
+			Ui_MsgBox(t("menu.hotstrings.idle_reset_invalid"), t("dialog.gestures.param_error_title"), "Icon!")
+		return false
+	}
+	return SetHotstringsIdleResetSeconds(Seconds, WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Flips whether a mouse click starts a new word.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+ToggleHotstringsClickResetsWord(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	return _EditorCommitWordReset(ConfigLeaf.CLICK_RESETS_WORD, !HSE_ClickResetsWordCurrent(),
+		"the click word-reset toggle", WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Flips one event word-reset setting: whether an arrow key, a shortcut, or a
+ * tap-hold key's own output starts a new word.
+ * @param {String} Key "arrow_resets_word", "shortcut_resets_word" or
+ *        "tap_hold_resets_word".
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+ToggleHotstringsWordResetFlag(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	return _EditorCommitWordReset(Key, !HSE_WordResetFlagCurrent(Key),
+		"the " . Key . " toggle", WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Flips one preview-bubble switch (hotstrings.preview_star_enabled,
+ * preview_autocorrect_enabled, preview_ai_enabled, preview_colored_tooltips).
+ * The engine and the prediction path read the switches live, so there is no
+ * reload; the bubble on screen is retired because it was promised under the old
+ * value (macOS and Linux revoke it the same way).
+ * @param {String} Key One of HSE_PreviewSwitchKeys().
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+ToggleHotstringsPreviewSwitch(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_PreviewSwitchIsKnown(Key) {
+		try LoggerError("Editors", "Refused unknown preview switch.")
+		return false
+	}
+	Candidate := !HSE_PreviewSwitchCurrent(Key)
+	if !_EditorCommitWordReset(Key, Candidate, "the " . Key . " toggle",
+			WriterFn, NotifyFn, RebuildFn)
+		return false
+	; Retire what the old value promised: a bubble on screen, a prediction timer.
+	TooltipHide("PreviewSwitch", true)
+	if (Key == ConfigLeaf.PREVIEW_AI_ENABLED && !Candidate && IsSet(LLM_Engine_CancelTimer))
+		LLM_Engine_CancelTimer()
+	static NoticeKeys := Map(ConfigLeaf.PREVIEW_STAR_ENABLED, "menu.hotstrings.notify_bubble_star",
+		ConfigLeaf.PREVIEW_AUTOCORRECT_ENABLED, "menu.hotstrings.notify_bubble_autocorrect",
+		ConfigLeaf.PREVIEW_AI_ENABLED, "menu.hotstrings.notify_bubble_ai",
+		ConfigLeaf.PREVIEW_COLORED_TOOLTIPS, "menu.hotstrings.notify_bubble_colored")
+	if NoticeKeys.Has(Key)
+		NotifyFeature(t(NoticeKeys[Key]), Candidate)
+	return true
+}
+
 _PersonalInfoReportSaveFailure(NotifyFn := 0) {
 	try {
 		if HasMethod(NotifyFn, "Call")
@@ -584,16 +829,25 @@ _PersonalInfoReportSaveFailure(NotifyFn := 0) {
 }
 
 PersonalInformationEditor(*) {
+		global PersonalInformation, PersonalInformationLetters
 		; Prefer the shared WebView2 editor (identical UI to macOS); the native
 		; multi-field dialog below remains as an automatic fallback.
 		if _PiEdWeb_TryOpen()
 				return
+		Path := PersonalInfoTomlPath()
+		ConfiguredKey := _ConfigWriteLeaseKey(Path)
+		ReadPersonalInfoToml(Path)
+		EditorSource := _PersonalInfoCaptureEditorSource(Path, true, ConfiguredKey)
+		if !_PersonalInfoEditorPathCurrent(EditorSource)
+			return
 		GuiToShow := Gui_Create(, t("dialog.personal_info.title"))
+		GuiToShow.OnEvent("Close", _PersonalInfoCloseEditor.Bind(GuiToShow, EditorSource))
+		GuiToShow.OnEvent("Escape", _PersonalInfoCloseEditor.Bind(GuiToShow, EditorSource))
 		UpdatedPersonalInformation := Map()
 		ReverseLetters := Map()
-		for k, v in PersonalInformationLetters
+		for k, v in EditorSource["letters"]
 				ReverseLetters[v] := k
-		for PersonalInformationKey, OldValue in PersonalInformation {
+		for PersonalInformationKey, OldValue in EditorSource["information"] {
 				TextToAdd := ""
 				if ReverseLetters.Has(PersonalInformationKey)
 						TextToAdd := " (@" . ReverseLetters[PersonalInformationKey] . ScriptInformation["MagicKey"] . ")"
@@ -603,12 +857,18 @@ PersonalInformationEditor(*) {
 				NewValue := GuiToShow.Add("Edit", "w300", OldValue)
 				UpdatedPersonalInformation[PersonalInformationKey] := NewValue
 		}
-		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ProcessUserInput(GuiToShow, UpdatedPersonalInformation))
+		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click",
+			(*) => ProcessUserInput(GuiToShow, UpdatedPersonalInformation, 0, 0, 0, 0, 0, 0, 0, EditorSource))
 		GuiToShow.Show("Center")
 }
 
+_PersonalInfoCloseEditor(Window, EditorSource, *) {
+	EditorSource["active"] := false
+	Window.Destroy()
+}
+
 ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
-		AuthorizeFn := 0, NotifyFn := 0, ReloadFn := 0, ConfirmFn := 0) {
+		AuthorizeFn := 0, NotifyFn := 0, ReloadFn := 0, ConfirmFn := 0, EditorSource := unset) {
 	global PersonalInformation, ScriptInformation
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
@@ -616,7 +876,7 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 		; may be Critical, but this complete user action must remain interruptible.
 		Critical("Off")
 		try return ProcessUserInput(gui, edits, WriterFn, ReplaceFn, DeleteFn,
-			AuthorizeFn, NotifyFn, ReloadFn, ConfirmFn)
+			AuthorizeFn, NotifyFn, ReloadFn, ConfirmFn, EditorSource?)
 		finally Critical(InheritedCritical)
 	}
 	if !(edits is Map) {
@@ -644,8 +904,16 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 			Changed[Key] := true
 	}
 
-	if !PersonalInfoCommitValues(ScriptInformation["PersonalInfoTomlPath"],
-			Values, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn) {
+	Path := ScriptInformation["PersonalInfoTomlPath"]
+	if !IsSet(EditorSource) {
+		AdapterSource := _PersonalInfoEditorAdapterSource(Path)
+		if AdapterSource is Map
+			EditorSource := AdapterSource
+	}
+	if IsSet(EditorSource) && EditorSource is Map && EditorSource.Get("path", 0) is String
+		Path := EditorSource["path"]
+	if !PersonalInfoCommitValues(Path,
+			Values, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn, EditorSource?) {
 		try LoggerError("PersonalInfo",
 			"Personal information NOT saved — keeping the native editor open so the values are not lost.")
 		return _PersonalInfoReportSaveFailure(NotifyFn)
@@ -653,7 +921,7 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 
 	PersonalInformationSummary := ""
 	for Key, _ in Changed
-		PersonalInformationSummary .= Key . ": " . PersonalInformation[Key] . "`n"
+		PersonalInformationSummary .= LabelValue(Key, PersonalInformation[Key]) . "`n"
 	try {
 		if HasMethod(ConfirmFn, "Call")
 			ConfirmFn.Call(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
@@ -669,12 +937,21 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 	return true
 }
 
+; Every opening creates a fresh native dialog. Default Close only hides it,
+; retaining its edit control and the button callback that captures this Gui.
+_GPTLinkEditorClose(Window, *) {
+	Window.Destroy()
+	return true
+}
+
 GPTLinkEditor(*) {
 		global Features
 		CurrentLink := ""
-		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") and Features["shortcuts"]["gpt"].Has("link")
-				CurrentLink := Features["shortcuts"]["gpt"]["link"]
+		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has(ConfigLeaf.CHATGPT_URL)
+				CurrentLink := Features["shortcuts"][ConfigLeaf.CHATGPT_URL]
 		GuiToShow := Gui_Create(, t("dialog.gpt_link.title"))
+		GuiToShow.OnEvent("Close", _GPTLinkEditorClose)
+		GuiToShow.OnEvent("Escape", _GPTLinkEditorClose)
 		NewValue := GuiToShow.Add("Edit", "w300", CurrentLink)
 		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
 		GuiToShow.Show("Center")
@@ -683,17 +960,17 @@ GPTLinkEditor(*) {
 _EditorBuildLinkPlan(NewValue) {
 	global Features
 	if _FeatureUsesDesiredState(Features)
-		return _FeatureBuildSinglePlan(Features, "shortcuts.gpt", NewValue, "link")
+		return _FeatureBuildSinglePlan(Features, ConfigKey.SHORTCUTS_CHATGPT_URL, NewValue, "")
 	return {
-		updates: [{ Section: "shortcuts.gpt", Key: "link", Value: NewValue }],
+		updates: [{ Section: "shortcuts", Key: ConfigLeaf.CHATGPT_URL, Value: NewValue }],
 		publish: _EditorPublishLink.Bind(NewValue),
 	}
 }
 
 _EditorPublishLink(NewValue) {
 	global Features
-	if IsSet(Features) && Features.Has("shortcuts") && Features["shortcuts"].Has("gpt")
-		Features["shortcuts"]["gpt"]["link"] := NewValue
+	if IsSet(Features) && Features.Has("shortcuts")
+		Features["shortcuts"][ConfigLeaf.CHATGPT_URL] := NewValue
 }
 
 ModifyLink(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {

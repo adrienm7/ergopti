@@ -28,6 +28,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -80,6 +81,12 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 	; global, throws inside a hotkey thread while _DriverBootPhase is still
 	; "starting", and the error net treats that as a fatal boot fault: pressing a
 	; debug rescue hotkey killed the boot it was meant to rescue.
+	; With the AI off there is nothing to rescue: the hotkey must not probe or
+	; install Ollama behind a disabled feature (issue #97).
+	if !LLM_Menu_AiEnabled() {
+		try LoggerInfo("LLM", "Debug hotkey Ctrl+Alt+Shift+I ignored: the AI is off.")
+		return
+	}
 	try LoggerInfo("LLM", "Debug hotkey Ctrl+Alt+Shift+I — direct install trigger.")
 	try TrayTip(t("llm.deps.tray_title"), t("llm.deps.install_launching_hotkey"), 0x1)
 	try LLM_Menu_BootstrapOllama(true)
@@ -88,19 +95,32 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 LLM_Menu_OnToggle(EnablePort := 0, *) {
 	global _LLM_Menu
 	static _Toggling := false
-	if _Toggling
+	if _Toggling {
+		_LLM_Menu_ObservationEnd("toggle-entry", A_TickCount, "reentrant-refusal")
 		return false
+	}
 	_Toggling := true
+	ToggleResult := "not-confirmed"
+	ToggleStarted := A_TickCount
 	try {
+		ToggleStarted := _LLM_Menu_ObservationBegin("toggle-entry")
+		try LoggerInfo("LLMObservation.toggle-entry.state", "Toggle state observed (enabled={1}).", _LLM_Menu.Get("enabled", false) ? 1 : 0)
 		if !_LLM_Menu.Get("enabled", false)
 				&& LLM_EnableRequiresProbe(_LLM_Menu.Get("backend", ""))
-			return LLM_Menu_RequestEnableAdmission(EnablePort)
-		LLM_Menu_CancelEnableAdmission()
-		return LLM_Menu_CommitMutation("the LLM enabled-state change",
+		{
+			ToggleResult := LLM_Menu_RequestEnableAdmission(EnablePort)
+			return ToggleResult
+		}
+		CancelStarted := _LLM_Menu_ObservationBegin("toggle-cancel-admission")
+		Canceled := LLM_Menu_CancelEnableAdmission()
+		_LLM_Menu_ObservationEnd("toggle-cancel-admission", CancelStarted, Canceled)
+		ToggleResult := LLM_Menu_CommitMutation("the LLM enabled-state change",
 			(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, "enabled"),
 			_LLM_Menu_ApplyToggleCommitted)
+		return ToggleResult
 	} finally {
-		_Toggling := false
+		try _LLM_Menu_ObservationEnd("toggle-entry", ToggleStarted, ToggleResult)
+		finally _Toggling := false
 	}
 }
 
@@ -108,17 +128,24 @@ _LLM_Menu_ApplyToggleCommitted(Candidate, ShowUi := true) {
 	global LLM_HEALTH_PROBE_INTERVAL_MS
 	LoggerInfo("LLM", "Toggle clicked — enabled: "
 		. (Candidate["enabled"] ? "true" : "false") . ".")
-	LLM_Menu_RequestBuild("toggle_committed")
 	if Candidate["enabled"] {
 		; Model readiness is checked by the deferred bootstrap after this global
 		; barrier releases, so it cannot start a nested persistence transaction.
 		SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
 		LLM_Menu_ScheduleBackendLifecycle(ShowUi)
+		; A boot with the AI off left its hotkeys inactive until now.
+		LLM_Menu_ScheduleHotkeysAwaitingEnable()
+		; A boot with the AI off did not check the curl its requests need.
+		HTTP_ScheduleCurlCheck(true)
 	} else {
 		SetTimer(_LLM_Menu_FireHealthProbe, 0)
 		LLM_Menu_BackendLifecycleInvalidate(true)
 		LLM_Bridge_Stop()
+		LLM_Agent_OnAiSwitchedOff()
 	}
+	KeyboardShortcutsFollowAiSwitch()
+	; Runtime admission/retirement precedes a potentially slow or refused repaint.
+	LLM_Menu_RequestBuild("toggle_committed")
 	return true
 }
 
@@ -196,7 +223,7 @@ _LLM_Menu_ResumeAfterRefusedReload(RequestedGeneration, *) {
 LLM_Menu_OnInstantToggle(*) {
 	return LLM_Menu_CommitMutation("the instant-on-word-end setting",
 		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate,
-			"instant_on_word_end"), _LLM_Menu_ApplyStandardCommitted)
+			ConfigLeaf.INSTANT_ON_WORD_END), _LLM_Menu_ApplyStandardCommitted)
 }
 
 /**
@@ -223,6 +250,25 @@ LLM_Menu_ToggleBool(key) {
 ; ==================================
 ; ==================================
 
+/**
+ * Stores what an automatic prediction does while a hotstring tooltip shows.
+ * @param {String} Value "wait" or "both" (the manifest's enum values).
+ * @returns {Boolean} True when the choice is durable and live; false when it
+ *     is already the current one or the transaction refused it.
+ */
+LLM_Menu_SetWhileHotstringTooltip(Value) {
+	if !LLM_Option_TryNormalize(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP, Value, &Normalized)
+		throw ValueError("LLM_Menu_SetWhileHotstringTooltip: unknown value " . String(Value) . ".")
+	if (LLM_Menu_WhileHotstringTooltip() == Normalized)
+		return false
+	if LLM_Menu_CommitMutation("the AI prediction while a hotstring tooltip shows",
+			_LLM_Menu_SetCandidateWhileHotstringTooltip.Bind(Normalized),
+			_LLM_Menu_ApplyStandardCommitted) != true
+		return false
+	LoggerInfo("LLM", "AI prediction while a hotstring tooltip shows set to '{1}'.", Normalized)
+	return true
+}
+
 /** Changes one privacy leaf through the retained configuration lease owner. */
 LLM_Menu_SetPrivacy(Key, Value, Expected) {
 	return LLM_Menu_CommitMutation("the LLM privacy filter",
@@ -237,10 +283,10 @@ _LLM_Menu_PrivacyWrite(Expected, Key, Path, Updates, WriterFn := 0) {
 	if !Decision["admitted"]
 			|| !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
 		return false
-	NativeKey := Key == "disable_url_bars" ? "url_bar_filter_enabled" : "secure_filter_enabled"
+	NativeKey := Key == "disable_url_bars" ? ConfigLeaf.URL_BAR_FILTER_ENABLED : ConfigLeaf.SECURE_FILTER_ENABLED
 	Owned := []
 	for Update in Updates {
-		if Update.Section == "llm.trigger" && Update.Key == NativeKey
+		if Update.Section == ConfigKey.LLM_TRIGGER && Update.Key == NativeKey
 			Owned.Push(Update)
 	}
 	if Owned.Length != 1
@@ -257,7 +303,7 @@ _LLM_Menu_PrivacyWrite(Expected, Key, Path, Updates, WriterFn := 0) {
 		return false
 	if HasMethod(WriterFn, "Call")
 		return WriterFn.Call(Path, Owned, Content, 1)
-	return _TOML_BatchWriteImpl(Path, Owned, [], "write", Content, 1)
+	return TOML_ConfigBatchWrite(Path, Owned, [], 0, Content, 1)
 }
 
 LLM_Menu_SetBackend(id) {
@@ -335,7 +381,7 @@ _LLM_Menu_FireHealthProbe(Force := false, NowTick := unset, DispatchFn := unset)
 	; Pause invariant: SetTimer callbacks bypass native Suspend, so this 10 s
 	; health tick keeps pinging Ollama (and can trigger a full tray rebuild)
 	; while the user believes the driver is fully paused. Mirror the guard used
-	; in hotstring_prefix_watcher.ahk / tooltip.ahk / keylogger so the probe is
+	; in hotstring_prefix_watcher.ahk / tooltip.ahk / keystats so the probe is
 	; inert during suspend; the next unpaused tick refreshes the dot. Force is
 	; powerless here — a paused driver stays silent whoever asks.
 	if A_IsSuspended
@@ -406,6 +452,9 @@ _LLM_Menu_FireInstalledTagsProbe(NowTick := unset, DispatchFn := unset) {
 		return
 	if (_LLM_Menu["backend"] != "ollama")
 		return
+	; No AI request of any kind runs while the AI is off (issue #97).
+	if !_LLM_Menu.Get("enabled", false)
+		return
 	; The install dots only mean something once Ollama is confirmed reachable —
 	; mirrors the menu's own deps_ready gate on the per-row probe. When the daemon
 	; is down the async request would just time out with nothing to paint.
@@ -444,9 +493,9 @@ _LLM_Menu_SetProfileCandidate(Candidate, Id) {
 	; for the current model is still computed live by the auto-detect
 	; helper, so flipping the toggle back on later re-applies it.
 	recommended := LLM_RecommendProfileForModel(Candidate["model"])
-	if (Candidate["auto_profile_for_model"] and recommended != ""
+	if (Candidate[ConfigLeaf.AUTO_PROFILE_FOR_MODEL] and recommended != ""
 			and Id != recommended) {
-		Candidate["auto_profile_for_model"] := false
+		Candidate[ConfigLeaf.AUTO_PROFILE_FOR_MODEL] := false
 	}
 	Candidate["profile_id"] := Id
 	return true
@@ -461,7 +510,7 @@ LLM_Menu_SetN(n) {
 /** Publishes one Info Bar value through the existing leased transaction. */
 LLM_Menu_SetInfoBar(Value, Expected) {
 	return LLM_Menu_CommitMutation("the LLM Info Bar setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "show_info_bar", Value),
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, ConfigLeaf.SHOW_INFO_BAR, Value),
 		_LLM_Menu_ApplyStandardCommitted, _LLM_Menu_InfoBarWrite.Bind(Expected))
 }
 
@@ -473,7 +522,7 @@ _LLM_Menu_InfoBarWrite(Expected, Path, Updates, WriterFn := 0) {
 		return false
 	Owned := []
 	for Update in Updates {
-		if Update.Section == "llm.display" && Update.Key == "show_info_bar"
+		if Update.Section == ConfigKey.LLM_DISPLAY && Update.Key == ConfigLeaf.SHOW_INFO_BAR
 			Owned.Push(Update)
 	}
 	if Owned.Length != 1
@@ -485,13 +534,13 @@ _LLM_Menu_InfoBarWrite(Expected, Path, Updates, WriterFn := 0) {
 		return false
 	if HasMethod(WriterFn, "Call")
 		return WriterFn.Call(Path, Owned, Content, 1)
-	return _TOML_BatchWriteImpl(Path, Owned, [], "write", Content, 1)
+	return TOML_ConfigBatchWrite(Path, Owned, [], 0, Content, 1)
 }
 
 LLM_Menu_SetIndent(lvl, Expected := 0) {
 	Writer := Expected is Map ? _LLM_Menu_IndentWrite.Bind(Expected) : 0
 	return LLM_Menu_CommitMutation("the LLM indentation setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "pred_indent", lvl),
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, ConfigLeaf.PRED_INDENT, lvl),
 		_LLM_Menu_ApplyStandardCommitted, Writer)
 }
 
@@ -503,14 +552,17 @@ _LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn := 0) {
 		return false
 	Owned := []
 	for Update in Updates {
-		if Update.Section == "llm.display" && Update.Key == "pred_indent"
+		if Update.Section == ConfigKey.LLM_DISPLAY && Update.Key == ConfigLeaf.PRED_INDENT
 			Owned.Push(Update)
 	}
 	if Owned.Length != 1
 		return false
 	; This choice owns one presentation leaf, so unrelated external settings
 	; remain byte-owned by their existing source instead of the RAM full collector.
-	return HasMethod(WriterFn, "Call") ? WriterFn.Call(Path, Owned) : TOML_BatchWrite(Path, Owned)
+	Content := FSReadUtf8Exact(Path)
+	if !(Content is String) || !_LLM_Menu_EnableSourceMatches(Expected["source"], _LLM_Menu_EnableReadSource())
+		return false
+	return HasMethod(WriterFn, "Call") ? WriterFn.Call(Path, Owned, Content, 1) : TOML_ConfigBatchWrite(Path, Owned, [], 0, Content, 1)
 }
 
 
@@ -534,7 +586,7 @@ LLM_Menu_OpenAppPicker() {
 		"title",    t("menu.llm.exclude_from_ai"),
 		"prompt",   t("dialog.llm.exclude_prompt"),
 		"ok_label", t("dialog.llm.exclude_ok"),
-		"initial",  _LLM_Menu["disabled_apps"],
+		"initial",  _LLM_Menu[ConfigLeaf.DISABLED_APPS],
 		"on_save",  LLM_Menu_OnAppPickerSave
 	))
 }
@@ -615,6 +667,9 @@ LLM_Menu_EnsureModelReady() {
 		return true
 	if (_LLM_Menu["backend"] != "ollama")
 		return true
+	; With the AI off there is no model to ready: no probe, no correction (issue #97).
+	if !_LLM_Menu.Get("enabled", false)
+		return true
 	; Never run the blocking installed-models probe (GET /api/tags, up to a 5 s
 	; WinHTTP timeout) unless the Ollama daemon is confirmed reachable. At boot
 	; the deps state is "pending", so a dead-port connect to localhost:11434
@@ -640,7 +695,8 @@ LLM_Menu_EnsureModelReady() {
 			return true
 		return LLM_Menu_CommitMutation("the default installed LLM model",
 			(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-				"model", model))
+				"model", model),
+			_LLM_Menu_ApplyModelCommitted)
 	}
 	replacement := LLM_PickBestInstalledDisplayName()
 	if (replacement == "")
@@ -649,7 +705,8 @@ LLM_Menu_EnsureModelReady() {
 	new_tag := _LLM_ResolveOllamaTagCore(replacement, false)
 	Committed := LLM_Menu_CommitMutation("the installed LLM model correction",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"model", replacement))
+			"model", replacement),
+		_LLM_Menu_ApplyModelCommitted)
 	if Committed {
 		try LoggerWarn("LLM",
 			"Model '{1}' (tag '{2}') is not installed — switched to '{3}' (tag '{4}').",
@@ -665,6 +722,8 @@ LLM_Menu_OnResume() {
 	global _LLM_Menu
 	if A_IsSuspended
 		return
+	if IsSet(OllamaWV_OnResume)
+		OllamaWV_OnResume()
 	; The AI hotkeys of a first menu build made under a pause (a driver
 	; reloaded while paused) were deferred to this resume.
 	LLM_Menu_ActivateDeferredHotkeys()

@@ -30,6 +30,7 @@ local Tone       = require("llm.tone")
 local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local WindowInfo = require("adapters.window_info")
+local SelectionPublication = require("modules.llm.selection_publication")
 
 local LOG = "llm.tone_rewrite"
 
@@ -87,9 +88,10 @@ end
 --- @param focus string The focused window identity when the request was sent.
 --- @param block string The model's answer.
 --- @param parent string|nil Stable action parent.
-local function apply_answer(generation, plan, selection, focus, block, parent)
-	if generation ~= _generation then
-		Logger.info(LOG, "Tone answer ignored: a newer step superseded it.")
+--- @param publication table Exact full/cached selection receipt.
+local function apply_answer(generation, plan, selection, focus, block, parent, publication)
+	if generation ~= _generation or not publication.current() then
+		Logger.info(LOG, "Tone answer ignored: its selection owner was revoked.")
 		return
 	end
 	local text = Tone.extract(block)
@@ -113,8 +115,8 @@ local function apply_answer(generation, plan, selection, focus, block, parent)
 		-- Remembered as the paste starts: a paste that fails leaves a selection
 		-- that does not match the memory, which then restarts at neutral
 		_memory = Tone.remember(plan, text)
-		Logger.info(LOG, "Selection rewritten to '%s' (%d byte(s)).", plan.profile_id, #text)
-	end)
+		Logger.info(LOG, "Tone replacement admitted for '%s' (%d byte(s)).", plan.profile_id, #text)
+	end, publication)
 	if not started then
 		Logger.warn(LOG, "Tone answer not typed: another text action still owns the clipboard.")
 	end
@@ -126,9 +128,12 @@ end
 --- @param cycle boolean Whether to wrap around at the ends of the ladder.
 --- @param selection string The selected text.
 --- @param parent string|nil Stable action parent.
-local function request_step(generation, direction, cycle, selection, parent)
-	if generation ~= _generation then
-		Logger.info(LOG, "Tone step dropped: a newer step superseded it.")
+--- @param focus string Native identity retained before selection copy.
+--- @param publication table Exact full/cached selection receipt.
+--- @param engine table Retained prediction engine admission owner.
+local function request_step(generation, direction, cycle, selection, parent, focus, publication, engine)
+	if generation ~= _generation or not publication.current() then
+		Logger.info(LOG, "Tone step dropped: its selection owner was revoked.")
 		return
 	end
 	local plan, reason = Tone.plan(selection, _memory, direction, cycle)
@@ -141,21 +146,15 @@ local function request_step(generation, direction, cycle, selection, parent)
 		end
 		return
 	end
-	local engine = dependency("modules.llm.prediction_engine", "request_selection_rewrite")
-	if not engine then return end
-	local focus = WindowInfo.focused_identity()
-	if focus == nil then
-		Logger.warn(LOG, "Tone step refused: the focused window cannot be identified.")
-		return
-	end
+	if generation ~= _generation or not publication.current() then return end
 	engine.request_selection_rewrite(plan.profile_id, plan.source,
 		function(block)
-			apply_answer(generation, plan, selection, focus, block, parent)
+			apply_answer(generation, plan, selection, focus, block, parent, publication)
 		end,
 		function()
-			if generation ~= _generation then return end
+			if generation ~= _generation or not publication.current() then return end
 			Logger.warn(LOG, "Tone rewrite to '%s' failed: the model gave no answer.", plan.profile_id)
-		end)
+		end, publication.current)
 end
 
 
@@ -177,14 +176,31 @@ function M.step(direction, cycle, parent)
 		error("tone_rewrite.step: direction must be Tone.MORE_FORMAL or Tone.MORE_FAMILIAR")
 	end
 	if type(cycle) ~= "boolean" then error("tone_rewrite.step: cycle must be a boolean") end
+	local engine = dependency("modules.llm.prediction_engine", "admit_answer_request")
+	if not engine or not engine.admit_answer_request("Tone rewrite") then return false end
+	local focus = WindowInfo.focused_identity()
+	if focus == nil then
+		Logger.info(LOG, "Tone step refused: the focused window cannot be identified.")
+		return false
+	end
+	local request_revision = engine.current_request_revision()
 	local Text = dependency("modules.shortcuts.actions.text", "read_copied_selection")
 	if not Text then return false end
 	local previous = _generation
 	_generation = previous + 1
 	local generation = _generation
-	local started = Text.read_copied_selection(parent, function(selection)
-		request_step(generation, direction, cycle, selection, parent)
+	local publication = SelectionPublication.capture(focus, function()
+		return generation == _generation and engine.current_request_revision() == request_revision
+			and engine.get_llm_enabled() == true
 	end)
+	if not publication then
+		if _generation == generation then _generation = previous end
+		Logger.info(LOG, "Tone step refused: the native text destination is not classified.")
+		return false
+	end
+	local started = Text.read_copied_selection(parent, function(selection)
+		request_step(generation, direction, cycle, selection, parent, focus, publication, engine)
+	end, nil, publication)
 	if not started then
 		-- Nothing was read: the step in flight, if any, stays the current one
 		if _generation == generation then _generation = previous end

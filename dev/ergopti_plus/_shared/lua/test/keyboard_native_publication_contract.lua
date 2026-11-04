@@ -27,7 +27,9 @@ end
 function M.register(helpers, driver)
 	local Publication = require("config_keyboard_publication")
 	local native = "modules.shortcuts.keyboard_shortcuts"
-	local prefix = driver == "macos" and "hs_ctrl_" or "ctrl_"
+	local prefix = driver == "macos" and "secondary_" or "primary_"
+	-- macOS accepts two slot-only keys (Caps Lock, apostrophe) beyond the 40 shared ones.
+	local slots_per_group = driver == "macos" and 42 or 40
 	local function fresh()
 		package.loaded[native] = nil
 		return require(native)
@@ -40,7 +42,7 @@ function M.register(helpers, driver)
 				io.open = function() error("cold accessor must not read") end
 				helpers.assert_nil(owner.published_binding_catalogue())
 				io.open = previous_open
-				helpers.assert_eq(#owner.available_slots(prefix), 40)
+				helpers.assert_eq(#owner.available_slots(prefix), slots_per_group)
 				io.open = function() error("logical-only authority cannot load physical source") end
 				helpers.assert_nil(owner.published_binding_catalogue(), "one source does not claim complete authority")
 				io.open = previous_open
@@ -52,7 +54,7 @@ function M.register(helpers, driver)
 					if id:sub(1, 9) == "physical_" then physical_count = physical_count + 1
 					else count = count + 1 end
 				end
-				helpers.assert_eq(count, driver == "macos" and 201 or 241)
+				helpers.assert_eq(count, driver == "macos" and 211 or 241)
 				helpers.assert_eq(physical_count, 1536, "96 registry key positions times all 16 exact modifier subsets")
 				helpers.assert_eq(published.slots.physical_none_KeyJ, true)
 				helpers.assert_eq(published.slots.physical_ctrl_alt_shift_super_KeyJ, true)
@@ -61,7 +63,7 @@ function M.register(helpers, driver)
 				helpers.assert_eq(published.slots[prefix .. "enter"], true)
 				if driver == "linux" then
 					helpers.assert_eq(published.slots.alt_shift_enter, true)
-					helpers.assert_eq(published.slots.super_shift_enter, true)
+					helpers.assert_eq(published.slots.meta_shift_enter, true)
 				end
 				published.slots[prefix .. "enter"] = nil
 				published.slots.removed_key = true
@@ -75,7 +77,7 @@ function M.register(helpers, driver)
 		helpers.it("withdraws a replaced compositor without invoking fabricated authority or reading either source", function()
 			scope(function()
 				local owner = fresh()
-				helpers.assert_eq(#owner.available_slots(prefix), 40)
+				helpers.assert_eq(#owner.available_slots(prefix), slots_per_group)
 				helpers.assert_type(owner.physical_slot_descriptor("physical_none_KeyJ"), "table")
 				local compose, open, calls, reads = Publication.compose, io.open, 0, 0
 				Publication.compose = function()
@@ -103,7 +105,7 @@ function M.register(helpers, driver)
 		helpers.it("withdraws replaced source classes through raw identity and restores only the exact classes", function()
 			scope(function()
 				local owner, callbacks = fresh(), 0
-				helpers.assert_eq(#owner.available_slots(prefix), 40)
+				helpers.assert_eq(#owner.available_slots(prefix), slots_per_group)
 				local Model = require("shortcuts.physical_slots")
 				local proxy = setmetatable({}, {
 					__index = function() callbacks = callbacks + 1; error("replacement class must not be inherited") end,
@@ -138,7 +140,7 @@ function M.register(helpers, driver)
 		helpers.it("rejects a replaced physical constructor before reading or accepting fabricated authority", function()
 			scope(function()
 				local owner = fresh()
-				helpers.assert_eq(#owner.available_slots(prefix), 40)
+				helpers.assert_eq(#owner.available_slots(prefix), slots_per_group)
 				local Model = require("shortcuts.physical_slots")
 				local constructor, calls, reads = Model.new, 0, 0
 				local open = io.open
@@ -255,7 +257,7 @@ function M.register(helpers, driver)
 				helpers.it("does not publish physical authority after an unacknowledged physical read: " .. receipt_mode, function()
 					scope(function()
 						local owner, previous_open, closes = fresh(), io.open, 0
-						helpers.assert_eq(#owner.available_slots(prefix), 40)
+						helpers.assert_eq(#owner.available_slots(prefix), slots_per_group)
 						io.open = function(path, mode)
 							local file = assert(previous_open(path, mode))
 							return {

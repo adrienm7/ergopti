@@ -12,9 +12,10 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Data-only steps, read at runtime with the driver's own TOML reader. A
-;    step is a list of ops from a closed set (rename, move_section, merge_into,
-;    map_value, delete, set_if_absent) and this file holds their only Windows
-;    semantics. The corpus under _shared/tests/corpus/config_migrations is
+;    step is a list of ops from a closed set (rename, rename_prefix,
+;    move_section, merge_into, map_value, wrap_value, encode_value, delete,
+;    set_if_absent)
+;    and this file holds their only Windows semantics. The corpus under _shared/tests/corpus/config_migrations is
 ;    replayed here, by the Lua engine and by the JS reference, so the three
 ;    cannot drift; _shared/tests/corpus/config_migration_registries pins which
 ;    registries all three accept.
@@ -32,6 +33,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ../_generated/config_migration_ops.ahk
 #Include config_migrate_records.ahk
 
 #Include config_registry_cache.ahk
@@ -53,22 +55,6 @@ ConfigMigrateRegistryPath() {
 	global _SharedDir
 	static Relative := "core/config_schema/migrations.toml"
 	return _SharedDir . "\" . StrReplace(Relative, "/", "\")
-}
-
-; Required and optional fields of each op of the closed set.
-_ConfigMigrateOpFields() {
-	static Fields := Map(
-		"rename", [["section", "key"], ["to_section", "to_key"]],
-		"copy_if_absent", [["section", "key"], ["to_section", "to_key"]],
-		"move_ergopti_variant", [["section", "key", "to_key", "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant"], ["neutral_variant"]],
-		"move_chord_action", [["section", "key", "to_section", "action", "conditional_key", "disabled_action", "platform"], []],
-		"move_section", [["section", "to_section"], []],
-		"merge_into", [["section", "to_section"], []],
-		"map_value", [["section", "key", "map"], []],
-		"delete", [["section"], ["key"]],
-		"set_if_absent", [["section", "key", "value"], []]
-	)
-	return Fields
 }
 
 ; A positive integral number; a TOML 3.0 counts as 3 on every interpreter.
@@ -104,7 +90,7 @@ _ConfigMigrateParse(Source, Label) {
 _ConfigMigrateValidateOp(Op, Where) {
 	if !(Op is Map) || !Op.Has("op") || !(Op["op"] is String)
 		throw Error(Where . ": an op must be an inline table with an op name")
-	Fields := _ConfigMigrateOpFields()
+	Fields := ConfigMigrateOpFieldsData()
 	if !Fields.Has(Op["op"])
 		throw Error(Where . ": unknown op '" . Op["op"] . "'")
 	Allowed := Map("op", true)
@@ -127,8 +113,18 @@ _ConfigMigrateValidateOp(Op, Where) {
 		if Op.Has(Field) && !_ConfigMigrateIsBareKey(Op[Field])
 			throw Error(Where . ": '" . Field . "' must be one bare segment")
 	}
+	if (Op["op"] == "encode_value" && !(Op["encoding"] == "user_profile_registry"))
+		throw Error(Where . ": encode_value names no known encoding")
 	if ((Op["op"] == "rename" || Op["op"] == "copy_if_absent") && !Op.Has("to_section") && !Op.Has("to_key"))
 		throw Error(Where . ": " . Op["op"] . " needs to_section or to_key")
+	if Op["op"] == "rename_prefix" {
+		if !_ConfigMigrateIsBareKey(Op["prefix"]) || !_ConfigMigrateIsBareKey(Op["to_prefix"])
+			throw Error(Where . ": 'prefix' and 'to_prefix' must be bare key text")
+		; A prefix that extends the other would match a renamed key again on replay.
+		if SubStr(Op["prefix"], 1, StrLen(Op["to_prefix"])) == Op["to_prefix"]
+				|| SubStr(Op["to_prefix"], 1, StrLen(Op["prefix"])) == Op["prefix"]
+			throw Error(Where . ": rename_prefix prefixes must not extend each other")
+	}
 	if Op["op"] == "move_ergopti_variant" {
 		for Field in ["base_key", "alt_gr_key", "source_key", "false_variant", "true_variant"] {
 			if !_ConfigMigrateIsBareKey(Op[Field])
@@ -177,14 +173,14 @@ _ConfigMigrateValidateOp(Op, Where) {
 }
 
 ; Validates parsed registry sections and returns Map("current", "unstamped",
-; "steps") with the steps in execution order, each a Map of "from", "to",
+; "oldest", "steps") with the steps in execution order, each a Map of "from", "to",
 ; "drivers" (a set), "reason" and "ops". Throws on the first defect.
 ConfigMigrateValidateRegistry(Sections) {
 	if !(Sections is Map) || !Sections.Has("registry")
 		throw Error("the registry has no [registry] table")
 	Head := Sections["registry"]
 	for Field in Head {
-		if !(Field == "current_version" || Field == "unstamped_version")
+		if !(Field == "current_version" || Field == "unstamped_version" || Field == "oldest_version")
 			throw Error("[registry] has an unknown key '" . Field . "'")
 	}
 	Current := Head.Get("current_version", "")
@@ -192,8 +188,14 @@ ConfigMigrateValidateRegistry(Sections) {
 	if !_ConfigMigrateIsVersion(Current) || !_ConfigMigrateIsVersion(Unstamped)
 			|| Unstamped > Current
 		throw Error("current_version and unstamped_version must be integers with 1 <= unstamped <= current")
+	; Steps below the oldest supported version were squashed away: the chain
+	; starts there, and anything older is refused rather than half migrated.
+	Oldest := Head.Get("oldest_version", Unstamped)
+	if !_ConfigMigrateIsVersion(Oldest) || Oldest < Unstamped || Oldest > Current
+		throw Error("oldest_version must be an integer with unstamped <= oldest <= current")
 	Current := Integer(Current)
 	Unstamped := Integer(Unstamped)
+	Oldest := Integer(Oldest)
 	Steps := []
 	for Name, Step in Sections {
 		if (Name == "registry")
@@ -237,11 +239,11 @@ ConfigMigrateValidateRegistry(Sections) {
 		Steps.Push(Map("from", From, "to", From + 1, "drivers", DriverSet,
 			"reason", Reason, "ops", Ops))
 	}
-	if (Steps.Length != Current - Unstamped)
-		throw Error("the steps do not chain v" . Unstamped . " to v" . Current)
+	if (Steps.Length != Current - Oldest)
+		throw Error("the steps do not chain v" . Oldest . " to v" . Current)
 	Ordered := []
 	loop Steps.Length {
-		Wanted := Unstamped + A_Index - 1
+		Wanted := Oldest + A_Index - 1
 		Found := 0
 		for Step in Steps {
 			if (Step["from"] == Wanted) {
@@ -253,7 +255,7 @@ ConfigMigrateValidateRegistry(Sections) {
 			throw Error("the chain has a gap at v" . Wanted)
 		Ordered.Push(Found)
 	}
-	return Map("current", Current, "unstamped", Unstamped, "steps", Ordered)
+	return Map("current", Current, "unstamped", Unstamped, "oldest", Oldest, "steps", Ordered)
 }
 
 ; Reads and validates a registry file. Throws on any defect.
@@ -263,6 +265,16 @@ ConfigMigrateLoadRegistry(Path) {
 	Source := FSReadUtf8Exact(Path)
 	if !(Source is String)
 		throw Error("the registry '" . Path . "' could not be read")
+	; The shipped registry was validated from source text with a known SHA-256. The same
+	; text needs no second 38 KB parse (about 0.5 s per boot): an independent copy of that
+	; validated registry is exactly what parsing it would give. Any other content, a
+	; changed or invalid file, is parsed and validated as before; a removed file threw above.
+	Held := ConfigRegistryPristineFor(Path, CryptoSha256(Source))
+	if Held is Map {
+		PerfCount("config_migrate.registry_source_hash_match")
+		return Held
+	}
+	PerfCount("config_migrate.registry_source_parsed")
 	return ConfigMigrateValidateRegistry(_ConfigMigrateParse(Source, "the registry '" . Path . "'"))
 }
 
@@ -374,6 +386,32 @@ _ConfigMigrateMove(Model, Section, Key, ToSection, ToKey) {
 	}
 	try LoggerInfo("ConfigMigrate", "[{1}] {2} already holds a value; the old [{3}] {4} is dropped.",
 		ToSection, ToKey, Section, Key)
+}
+
+; Renames every key of one section that starts with a prefix, keeping the
+; remainder. A renamed key that would land on an occupied key or namespace
+; refuses the whole migration before any key moves: the two values cannot
+; both survive, and dropping either would lose a user's setting unseen.
+_ConfigMigrateRenamePrefix(Model, Op) {
+	Section := Op["section"]
+	if !Model.Has(Section)
+		return
+	Entries := Model[Section]
+	Prefix := Op["prefix"]
+	Moves := []
+	for Key in _ConfigMigrateKeys(Entries) {
+		if !(SubStr(Key, 1, StrLen(Prefix)) == Prefix)
+			continue
+		Target := Op["to_prefix"] . SubStr(Key, StrLen(Prefix) + 1)
+		if !_ConfigMigrateCopyDestinationAbsent(Model, Section, Target)
+			throw ConfigMigratePrefixRefusal("Prefix rename refused: [" . Section . "] " . Key
+				. " would land on the occupied " . Target)
+		Moves.Push([Key, Target])
+	}
+	for Move in Moves {
+		Entries[Move[2]] := Entries[Move[1]]
+		Entries.Delete(Move[1])
+	}
 }
 
 ; Ancestor values and child sections occupy their whole destination namespace.
@@ -490,6 +528,49 @@ _ConfigMigrateMoveChordAction(Model, Op, Context) {
 	}
 }
 
+; A non-empty array of tables becomes the encoded string of its new key. An
+; occupied target wins (the source stays for the cleanup), and anything the
+; encoding cannot carry stays where it is: not encoded means not deleted.
+_ConfigMigrateEncodeValue(Model, Op) {
+	Section := Op["section"]
+	if !Model.Has(Section) || !Model[Section].Has(Op["key"])
+		return
+	Value := Model[Section][Op["key"]]
+	if !(Value is Array) || Value.Length == 0
+		return
+	if Model.Has(Op["to_section"]) && Model[Op["to_section"]].Has(Op["to_key"])
+		return
+	for Item in Value {
+		if !(Item is Map)
+			return
+	}
+	if !Model.Has(Op["to_section"])
+		Model[Op["to_section"]] := Map()
+	Model[Op["to_section"]][Op["to_key"]] := "v1:" . CryptoBase64EncodeUtf8(_ConfigMigrateCanonicalJson(Value))
+	Model[Section].Delete(Op["key"])
+	_ConfigMigrateDropIfEmpty(Model, Section)
+}
+
+; JSON with sorted keys and no spaces: the bytes the Lua and JS interpreters
+; encode for the same value. A Map enumerates its keys in order.
+_ConfigMigrateCanonicalJson(Value) {
+	if Value is Map {
+		Parts := ""
+		for Key, Item in Value
+			Parts .= (Parts == "" ? "" : ",") . JsonStringLiteral(Key) . ":" . _ConfigMigrateCanonicalJson(Item)
+		return "{" . Parts . "}"
+	}
+	if Value is Array {
+		Parts := ""
+		for Item in Value
+			Parts .= (A_Index == 1 ? "" : ",") . _ConfigMigrateCanonicalJson(Item)
+		return "[" . Parts . "]"
+	}
+	if Value is TOML_Bool
+		return Value.Value ? "true" : "false"
+	return (Value is String) ? JsonStringLiteral(Value) : String(Value)
+}
+
 ; Applies one validated op to the model.
 _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 	Section := Op["section"]
@@ -499,6 +580,8 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 			_ConfigMigrateMove(Model, Section, Op["key"], ToSection, Op.Get("to_key", Op["key"]))
 			_ConfigMigrateDropIfEmpty(Model, Section)
 			_ConfigMigrateDropIfEmpty(Model, ToSection)
+		case "rename_prefix":
+			_ConfigMigrateRenamePrefix(Model, Op)
 		case "copy_if_absent":
 			if !Model.Has(Section) || !Model[Section].Has(Op["key"])
 				return
@@ -537,6 +620,18 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 					return
 				}
 			}
+		case "wrap_value":
+			; A scalar where the manifest keeps a feature row becomes that row's
+			; switch in its own [section.key] table. A table, an array or an absent
+			; key stays, so a replay is a no-op.
+			if !Model.Has(Section) || !Model[Section].Has(Op["key"])
+				return
+			if !_ConfigMigrateIsScalar(Model[Section][Op["key"]])
+				return
+			_ConfigMigrateMove(Model, Section, Op["key"], Section . "." . Op["key"], Op["to_key"])
+			_ConfigMigrateDropIfEmpty(Model, Section)
+		case "encode_value":
+			_ConfigMigrateEncodeValue(Model, Op)
 		case "delete":
 			if !Op.Has("key") {
 				for Name in _ConfigMigrateSectionsAtOrBelow(Model, Section)
@@ -558,7 +653,8 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 
 ; Reads a model's version against a registry: "current", "migrate", "newer",
 ; "invalid" or "unsupported". Version receives the file's version (the
-; unstamped version when the file carries none).
+; unstamped version when the file carries none, the current one when the chain
+; no longer reaches it).
 ConfigMigrateClassify(Model, Registry, &Version) {
 	Version := Registry["unstamped"]
 	if Model.Has("_meta") && Model["_meta"].Has("schema_version") {
@@ -566,12 +662,17 @@ ConfigMigrateClassify(Model, Registry, &Version) {
 		if !_ConfigMigrateIsVersion(Version)
 			return "invalid"
 		Version := Integer(Version)
+	} else if (Registry["unstamped"] < Registry["oldest"]) {
+		; The steps a file with no stamp would need are gone: it is hand-written or
+		; very old, so it runs as it is and the next full save stamps it.
+		Version := Registry["current"]
+		return "current"
 	}
 	if (Version > Registry["current"])
 		return "newer"
 	if (Version == Registry["current"])
 		return "current"
-	if (Version < Registry["unstamped"])
+	if (Version < Registry["oldest"])
 		return "unsupported"
 	return "migrate"
 }
@@ -752,7 +853,7 @@ ConfigMigratePlan(Source, Registry, Driver, Context := 0) {
 		return Plan
 	}
 	try After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version, Context)
-	catch ConfigMigrateVariantRefusal as Err {
+	catch ConfigMigrateVariantRefusal, ConfigMigratePrefixRefusal as Err {
 		Plan["outcome"] := "invalid"
 		Plan["detail"] := Err.Message
 		return Plan
@@ -811,25 +912,29 @@ ConfigMigrateBackupPath(FilePath, Version, Stamp) {
 
 ; Replaces FilePath with Candidate while it still holds exactly Source,
 ; through a verified same-directory stage. Returns "" on success, else why not.
-_ConfigMigratePublish(FilePath, Candidate, Source) {
-	global _ParseTomlCache
+_ConfigMigratePublish(FilePath, Candidate, Source, AdmissionFn := 0) {
 	static Sequence := 0
 	Sequence += 1
 	StagePath := FilePath . "." . A_ScriptHwnd . "-migration-" . Sequence . ".stage"
+	if !_FSNativeAdmissionAccepted(AdmissionFn)
+		return "the actual migration owner lost registry/lease admission before staging"
 	if !FSWriteDurable(StagePath, Candidate) || !FSUtf8ExactMatches(StagePath, Candidate) {
 		try FSDelete(StagePath)
 		return "the staging file could not be written and verified"
 	}
+	; Report verified staging before the final source/native admission boundary;
+	; this identifies the owned path without disclosing configuration content.
+	try LoggerInfo("ConfigMigrate", "Verified durable migration stage '{1}' for '{2}' before native publication.",
+		StagePath, FilePath)
 	if !FSUtf8ExactMatches(FilePath, Source) {
 		try FSDelete(StagePath)
 		return "the file changed after it was read"
 	}
-	if !FSAtomicMoveReplace(StagePath, FilePath) {
+	if !FSConfigAtomicMoveReplace(StagePath, FilePath, &NativeError, AdmissionFn) {
 		try FSDelete(StagePath)
 		return "the atomic replace was refused"
 	}
-	if _ParseTomlCache.Has(FilePath)
-		_ParseTomlCache.Delete(FilePath)
+	_TOML_InvalidateParseCache(FilePath)
 	return ""
 }
 
@@ -841,7 +946,7 @@ _ConfigMigratePublish(FilePath, Candidate, Source) {
 ; (read_only = 1). Registry (a validated Map; the shipped one by default),
 ; Stamp, BackupFn(Path, Content) -> 1 (must refuse an existing path) and
 ; PublishFn(Path, Candidate, Source) -> "" are test seams.
-ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn := 0, Context := 0) {
+ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn := 0, Context := 0, AdmissionFn := 0) {
 	Result := Map("status", "failed", "read_only", 0, "from", "", "to", "",
 		"backup", "", "detail", "")
 	try LoggerStart("ConfigMigrate", "Checking the config schema version of '{1}' (ahk driver)…",
@@ -857,6 +962,8 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 		return Result
 	}
 
+	if !_FSNativeAdmissionAccepted(AdmissionFn)
+		return Refuse("failed", "the actual boot registry owner refused before migration effects")
 	if !(Registry is Map) {
 		try Registry := ConfigMigrateShippedRegistry()
 		catch as Err
@@ -872,7 +979,10 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 	Owner := _ConfigWriteLeaseTryAcquire(FilePath, "migration")
 	if !(Owner is Object)
 		return Refuse("failed", "another configuration transaction owns the file")
+	MigrationAdmission := () => _ConfigWriteLeaseOwns(Owner, FilePath) && _FSNativeAdmissionAccepted(AdmissionFn)
 	try {
+		if !_FSNativeAdmissionAccepted(MigrationAdmission)
+			return Refuse("failed", "the migration source/lease lost registry admission")
 		; Keep the loader's lenient current-file contract, but prove physical
 		; ownership before a fabricated version could authorize later writes.
 		Before := TOML_ParseFreshFileTyped(FilePath, &Discarded)
@@ -883,13 +993,13 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 		try {
 			VersionSource := FSReadStrict(FilePath)
 			VersionScan := _ConfigMigrateRecordScan(VersionSource)
-			_ConfigMigrateRecordValidateModel(VersionScan, Before)
 			VersionDocument := TOML_ParseDocument(VersionSource)
+			Outcome := _ConfigMigrateClassifyDocument(VersionDocument, Registry, &Version)
+			_ConfigMigrateRecordValidateModel(VersionScan, Before, Outcome == "current", VersionDocument)
 			if !ConfigMigrateSameModel(Before, _ConfigMigrateParse(VersionSource, "the version snapshot"))
 				return Refuse("failed", "the file changed while its physical version ownership was checked")
 		} catch as Err
 			return Refuse("failed", "the physical version owner refused: " . Err.Message)
-		Outcome := _ConfigMigrateClassifyDocument(VersionDocument, Registry, &Version)
 		Result["from"] := Version
 		switch Outcome {
 			case "current":
@@ -903,7 +1013,8 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 			case "invalid":
 				return Refuse("invalid", "[_meta] schema_version is not a positive integer")
 			case "unsupported":
-				return Refuse("unsupported", "no migration path from schema v" . Version)
+				return Refuse("unsupported", "no migration path from schema v" . Version
+					. ": the oldest this build migrates is v" . Registry["oldest"])
 		}
 
 		ConfigMigrateClassify(Before, Registry, &LegacyVersion)
@@ -917,12 +1028,16 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 			return Refuse("failed", "the file is not exact UTF-8, so it cannot be backed up byte for byte")
 		Plan := ConfigMigratePlan(Source, Registry, "ahk", Context)
 		if (Plan["outcome"] != "migrated") {
+			; A typed op refusal keeps its own named detail, as on macOS and Linux.
 			VariantInvalid := Plan["outcome"] == "invalid"
-				&& SubStr(Plan["detail"], 1, StrLen("Ergopti variant migration refused:")) == "Ergopti variant migration refused:"
+				&& (SubStr(Plan["detail"], 1, StrLen("Ergopti variant migration refused:")) == "Ergopti variant migration refused:"
+				|| SubStr(Plan["detail"], 1, StrLen("Prefix rename refused:")) == "Prefix rename refused:")
 			return Refuse(VariantInvalid ? "invalid" : "failed", Plan["detail"] != "" ? Plan["detail"]
 				: "the file changed while it was classified")
 		}
 
+		if !_FSNativeAdmissionAccepted(MigrationAdmission)
+			return Refuse("failed", "the migration source/lease lost registry admission before backup")
 		BackupPath := ConfigMigrateBackupPath(FilePath, Registry["current"],
 			Stamp != "" ? Stamp : FormatTime(A_Now, "yyyyMMdd-HHmmss"))
 		Result["backup"] := BackupPath
@@ -930,8 +1045,10 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 			: FSWriteCreateDurable(BackupPath, Source)
 		if !((Written is Integer) && Written == 1) || !FSUtf8ExactMatches(BackupPath, Source)
 			return Refuse("failed", "the backup '" . BackupPath . "' could not be written and verified")
+		if !_FSNativeAdmissionAccepted(MigrationAdmission)
+			return Refuse("failed", "the migration source/lease lost registry admission after backup")
 		Published := HasMethod(PublishFn, "Call") ? PublishFn.Call(FilePath, Plan["candidate"], Source)
-			: _ConfigMigratePublish(FilePath, Plan["candidate"], Source)
+			: _ConfigMigratePublish(FilePath, Plan["candidate"], Source, MigrationAdmission)
 		if (Published != "")
 			return Refuse("failed", "publication failed: " . Published)
 	} finally {
@@ -944,30 +1061,843 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 	return Result
 }
 
-; The boot entry point: ConfigMigrateRun with a raise turned into the same
-; refusal, so a defect in the engine can never leave the session writing a
-; file it did not version.
-ConfigMigrateBoot(FilePath) {
-	try Result := ConfigMigrateRun(FilePath)
-	catch as Err {
-		Detail := "the config migration raised: " . Err.Message
-		TOML_RefuseWrites(FilePath, Detail)
-		try LoggerError("ConfigMigrate", "Config migration of '{1}' refused (failed): {2}. The file is "
-			. "left untouched and this session will not write it.", FilePath, Detail)
-		return Map("status", "failed", "read_only", 1, "from", "", "to", "", "backup", "",
-			"detail", Detail)
-	}
-	VariantRefusal := _ConfigMigrateVariantBootRefusal(Result, FilePath)
-	if VariantRefusal != "" {
-		if !Result.Get("read_only", false)
-			TOML_RefuseWrites(FilePath, VariantRefusal)
-		throw ConfigMigrateVariantRefusal(VariantRefusal)
-	}
-	return Result
+; Number of deep registry liveness checks run in this process (diagnostics only).
+global ConfigMigrateRegistryChecks := 0
+
+; Number of those checks that really compared the registry (diagnostics only).
+global ConfigMigrateRegistryDeepCompares := 0
+
+; Memo of one synchronous proof scope: the shipped registry and the private
+; shadow whose deep comparison already succeeded inside the open scope.
+global ConfigMigrateRegistryProof := { depth: 0, registry: 0, shadow: 0 }
+
+; Memo of the boot's read-only stretch: one comparison serves the boot's reads.
+global ConfigMigrateBootReadProof := { open: false, registry: 0, shadow: 0 }
+
+; Opens the read-only stretch of the boot. Boot reads config.toml about twenty
+; times and each read paid two whole-registry comparisons. Nothing here holds
+; Critical, so unlike a proof scope this memo serves reads and write pre-checks
+; only: a read classifies with the private shadow, never the live registry, and
+; every durable effect still compares (RegistryLive). The close compares once.
+ConfigMigrateBootReadsOpen() {
+	global ConfigMigrateBootReadProof
+	if ConfigMigrateBootReadProof.open
+		throw Error("The boot read stretch is already open")
+	ConfigMigrateBootReadProof.open := true
 }
+
+; Closes the read stretch with one fresh comparison, so a registry changed while
+; it was open is reported at the close instead of having served reads unnoticed.
+; @param {String} Path The boot configuration destination.
+; @returns {Boolean} True when the registry still matches its private shadow.
+ConfigMigrateBootReadsClose(Path) {
+	global ConfigMigrateBootReadProof
+	Proof := ConfigMigrateBootReadProof
+	if !Proof.open
+		throw Error("The boot read stretch is not open")
+	Proof.open := false, Proof.registry := 0, Proof.shadow := 0
+	Result := ConfigMigrateBoot(Path, "close_boot_reads")
+	return (Result is Integer) && Result == 1
+}
+
+; True while a proof scope is open (the caller already runs under Critical).
+ConfigMigrateRegistryProofOpen() {
+	global ConfigMigrateRegistryProof
+	return ConfigMigrateRegistryProof.depth > 0
+}
+
+; Runs Body with one deep registry comparison per private shadow instead of one
+; per liveness check. The scope holds Critical, so no other thread can use the
+; memo or mutate state between two checks, and it is dropped when the outermost
+; scope ends. Callers close the proof with one fresh check (RegistryLive with
+; Fresh) after the scope, so a mutation made while Body ran is still refused.
+; A Standing proof carries the memo from one scope to the next of one transaction,
+; across native work that changes nothing; its owner empties it before any durable
+; effect, which therefore always compares again.
+; @param {Func} Body The checks to run.
+; @param {Object} Standing Optional { registry, shadow } kept by the caller.
+ConfigMigrateWithRegistryProof(Body, Standing := 0) {
+	global ConfigMigrateRegistryProof
+	PreviousCritical := Critical("On")
+	if IsObject(Standing) && !ConfigMigrateRegistryProof.depth
+		ConfigMigrateRegistryProof.registry := Standing.registry, ConfigMigrateRegistryProof.shadow := Standing.shadow
+	ConfigMigrateRegistryProof.depth += 1
+	try return Body.Call()
+	finally {
+		ConfigMigrateRegistryProof.depth -= 1
+		if !ConfigMigrateRegistryProof.depth {
+			if IsObject(Standing)
+				Standing.registry := ConfigMigrateRegistryProof.registry, Standing.shadow := ConfigMigrateRegistryProof.shadow
+			ConfigMigrateRegistryProof.registry := 0, ConfigMigrateRegistryProof.shadow := 0
+		}
+		Critical(PreviousCritical)
+	}
+}
+
+; Whether two registries are the same closed model, node for node: plain Maps with
+; the same case rule and exactly the same keys, dense plain Arrays, exact TOML_Bool
+; values, strings compared with case and numbers by value. Every liveness check
+; visits each of the registry's nodes, so this walk avoids what costs a call per
+; node: strings are compared in their parent's loop, and one Get replaces Has plus
+; an index. test_config_migrate_same_registry.ahk holds it to the plain definition.
+; NativeLive binds this owner: a replaced comparison refuses every liveness check.
+ConfigMigrateSameRegistry(Left, Right) {
+	static MapBase := Map.Prototype, ArrayBase := Array.Prototype, Absent := {}
+	if !IsObject(Left) {
+		if Left is String
+			return (Right is String) && Left == Right
+		return (Right is Integer || Right is Float) && Left = Right
+	}
+	Base := ObjGetBase(Left)
+	if Base == MapBase {
+		if !IsObject(Right) || ObjGetBase(Right) != MapBase || ObjOwnPropCount(Left) || ObjOwnPropCount(Right)
+				|| Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
+			return false
+		ExactRight := Right
+		if Right.CaseSense != "On" {
+			ExactRight := Map()
+			ExactRight.CaseSense := "On"
+			for Key, Value in Right
+				ExactRight[Key] := Value
+		}
+		for Key, Value in Left {
+			Other := ExactRight.Get(Key, Absent)
+			if Value is String {
+				if !(Other is String) || Value !== Other
+					return false
+			} else if !ConfigMigrateSameRegistry(Value, Other)
+				return false
+		}
+		return true
+	}
+	if Base == ArrayBase {
+		if !IsObject(Right) || ObjGetBase(Right) != ArrayBase || ObjOwnPropCount(Left) || ObjOwnPropCount(Right)
+				|| Left.Length != Right.Length
+			return false
+		loop Left.Length {
+			; A missing cell reads as Absent, which no value equals: Absent is
+			; neither a string nor a plain container, on either side.
+			Value := Left.Get(A_Index, Absent), Other := Right.Get(A_Index, Absent)
+			if Value is String {
+				if !(Other is String) || Value !== Other
+					return false
+			} else if !ConfigMigrateSameRegistry(Value, Other)
+				return false
+		}
+		return true
+	}
+	if Left is TOML_Bool {
+		if !IsObject(Right) || Base != TOML_Bool.Prototype || ObjGetBase(Right) != TOML_Bool.Prototype
+			return false
+		for Value in [Left, Right] {
+			Count := 0
+			for Name in ObjOwnProps(Value) {
+				if Name != "Value"
+					return false
+				Descriptor := Object.Prototype.GetOwnPropDesc.Call(Value, Name)
+				if !Descriptor.HasOwnProp("Value") || !(Descriptor.Value is Integer)
+					return false
+				Count += 1
+			}
+			if Count != 1
+				return false
+		}
+		return Left.Value == Right.Value
+	}
+	return false
+}
+
+; One private issuer owns both read-only preparation and actual boot completion.
+; Query requests expose checking closures, never mutable rows or phase setters.
+ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle := unset) {
+	static Destinations := Map()
+	static SharedShadow := 0
+	static Native := {
+		exists: FSStrictExists, read: FSConfigReadUtf8Exact, generic_read: FSReadUtf8Exact, load_registry: ConfigMigrateLoadRegistry,
+		registry_path: ConfigMigrateRegistryPath, registry: ConfigMigrateShippedRegistry,
+		decode: TOML_ParseDocument, classify: _ConfigMigrateClassifyDocument,
+		migrate: ConfigMigrateRun, key: FileReadActivityKey,
+		clone: ManifestCloneValue, same: ConfigMigrateSameValue, same_registry: ConfigMigrateSameRegistry,
+		terminal_owns: _ConfigWriteTerminalOwnsExact, variant_refusal: _ConfigMigrateVariantBootRefusal,
+		move: FSConfigAtomicMoveReplace, generic_move: FSAtomicMoveReplace, noop: FSNativeAcknowledge, settlement_port: ConfigTransitionProductionPort, settlement_inspect: ConfigTransitionInspect, settlement_result: ConfigTransitionResultIs, settlement_matches: FSUtf8ExactMatches, settlement_debt: _ConfigPublicationHasRecoveryDebt, settlement_refusal: TOML_WriteRefusal, settlement_bounds: _ConfigTransitionPresenceHashIsValid, config_write: TOML_ConfigBatchWrite, generic_write: TOML_BatchWrite, recovery_images: _ConfigTransitionNativeRecoveryImages
+	}
+
+	NativeLive() {
+		for Name, Owner in ObjOwnProps(Native)
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return Native.exists == FSStrictExists && Native.read == FSConfigReadUtf8Exact && Native.generic_read == FSReadUtf8Exact
+			&& Native.load_registry == ConfigMigrateLoadRegistry
+			&& Native.registry_path == ConfigMigrateRegistryPath
+			&& Native.registry == ConfigMigrateShippedRegistry
+			&& Native.decode == TOML_ParseDocument && Native.classify == _ConfigMigrateClassifyDocument
+			&& Native.settlement_port == ConfigTransitionProductionPort && Native.settlement_inspect == ConfigTransitionInspect
+			&& Native.settlement_result == ConfigTransitionResultIs && Native.settlement_matches == FSUtf8ExactMatches
+			&& Native.settlement_debt == _ConfigPublicationHasRecoveryDebt && Native.settlement_refusal == TOML_WriteRefusal
+			&& Native.settlement_bounds == _ConfigTransitionPresenceHashIsValid
+			&& Native.migrate == ConfigMigrateRun && Native.key == FileReadActivityKey
+			&& Native.clone == ManifestCloneValue && Native.same == ConfigMigrateSameValue
+			&& Native.same_registry == ConfigMigrateSameRegistry
+			&& Native.terminal_owns == _ConfigWriteTerminalOwnsExact
+			&& Native.variant_refusal == _ConfigMigrateVariantBootRefusal
+			&& Native.move == FSConfigAtomicMoveReplace && Native.generic_move == FSAtomicMoveReplace && Native.noop == FSNativeAcknowledge
+			&& Native.config_write == TOML_ConfigBatchWrite && Native.generic_write == TOML_BatchWrite
+			&& Native.recovery_images == _ConfigTransitionNativeRecoveryImages
+	}
+
+	PlainContainer(Value, Prototype) {
+		return IsObject(Value) && ObjGetBase(Value) == Prototype && !ObjOwnPropCount(Value)
+	}
+
+	RegistryLive(Row, Fresh := false) {
+		global ConfigMigrateRegistryChecks, ConfigMigrateRegistryProof, ConfigMigrateRegistryDeepCompares
+		global ConfigMigrateBootReadProof
+		; Each check deep-compares the whole shipped registry (about 10 ms); the
+		; count lets performance tests see how many a transaction pays for.
+		ConfigMigrateRegistryChecks += 1
+		if !NativeLive()
+			return false
+		try {
+			CurrentRegistry := Native.registry.Call()
+			if CurrentRegistry != Row.registry
+				return false
+			Proof := ConfigMigrateRegistryProof
+			; Inside a proof scope a shadow already compared equal to this very
+			; registry is not compared again; a Fresh check always is.
+			if !Fresh && Proof.depth && Proof.registry == CurrentRegistry
+					&& Proof.shadow == Row.registry_shadow
+				return true
+			ReadProof := ConfigMigrateBootReadProof
+			if !Fresh && ReadProof.open && (Request == "capture_read" || Request == "check_write"
+					|| Request == "read_only_status") && ReadProof.registry == CurrentRegistry
+					&& ReadProof.shadow == Row.registry_shadow
+				return true
+			ConfigMigrateRegistryDeepCompares += 1
+			CompareStarted := PerfStage_Begin()
+			Same := ConfigMigrateSameRegistry(CurrentRegistry, Row.registry_shadow)
+			PerfStage_End("ConfigMigrate.registry_deep_compare", CompareStarted)
+			if !Same
+				return false
+			if Proof.depth
+				Proof.registry := CurrentRegistry, Proof.shadow := Row.registry_shadow
+			if ReadProof.open
+				ReadProof.registry := CurrentRegistry, ReadProof.shadow := Row.registry_shadow
+			return true
+		} catch {
+			return false
+		}
+	}
+
+	ReadImage(ObserveReadFailure := false) {
+		if !NativeLive()
+			return false
+		try {
+			Present := Native.exists.Call(FilePath)
+			if !(Present is Integer) || (Present != 0 && Present != 1)
+				return false
+			NativeOpenError := 0
+			Source := Present ? Native.read.Call(FilePath, &NativeOpenError) : ""
+			if !(Source is String) {
+				if ObserveReadFailure && (Source is Integer) && Source == 0
+						&& (NativeOpenError is Integer) && NativeOpenError > 0
+					RecordReadFailure(Present)
+				return false
+			}
+			; An absent image needs the same strict native classification twice.
+			if !Present && Native.exists.Call(FilePath)
+				return false
+			return { present: Present, source: Source }
+		} catch as Err {
+			; Only the genuine strict native existence probe throws OSError here;
+			; acquisition/activity/type/owner refusal issues no physical receipt.
+			if ObserveReadFailure && !IsSet(Present) && Err is OSError
+				RecordReadFailure(0)
+			return false
+		}
+	}
+
+	RecordReadFailure(Present) {
+		if !NativeLive() || !RegistryLive(Row) || Destinations[Key] != Row
+				|| !(OwnerLive() || Row.phase == "prepared" || Row.phase == "refused")
+			return
+		; Private observed data is minted only by the original real native read.
+		; It conveys neither readable source bytes nor write/READY permission.
+		Row.read_failure := { path: FilePath, image: Row.image, phase: Row.phase,
+			owner: Row.phase == "owned" ? Row.owned_bundle : false, present: Present }
+	}
+
+	ClassifyImage(Image, Row) {
+		if !RegistryLive(Row)
+			return "failed"
+		if !Image.present
+			return "fresh-missing"
+		; Only deterministic parsing/classification is reused. Every caller still
+		; reads its genuine source and rechecks live registry/owner admission.
+		if Row.HasOwnProp("classification_image")
+				&& Image.source == Row.classification_image.source
+			return Row.classification_image.classification
+		try {
+			Classification := Native.classify.Call(Native.decode.Call(Image.source), Row.registry_shadow, &Version)
+		} catch {
+			return "failed"
+		}
+		if Classification == "current" || Classification == "migrate" || Classification == "newer"
+				|| Classification == "invalid" || Classification == "unsupported"
+			Row.classification_image := { source: Image.source, classification: Classification }
+		return Classification
+	}
+
+	if !(Request is String) || !(Request == "boot" || Request == "prepare" || Request == "prepare_owned" || Request == "settle_owned"
+			|| Request == "capture_read" || Request == "capture_write" || Request == "capture_noop" || Request == "capture_reconcile_noop" || Request == "capture_transition" || Request == "capture_recovery" || Request == "known" || Request == "check_write" || Request == "consume_read_failure" || Request == "read_only_status" || Request == "close_boot_reads")
+		throw ValueError("Unknown configuration journal request")
+	PerfCount("config_migrate.request." . Request)
+	if !(FilePath is String) || FilePath == "" || !NativeLive()
+		return false
+	if Request == "prepare_owned" && (!IsSet(OwnerBundle)
+			|| !Native.terminal_owns.Call(OwnerBundle, FilePath))
+		return false
+	if Request == "capture_recovery" && (!IsSet(OwnerBundle) || !IsSet(Candidate)
+			|| !(Candidate is String) || Candidate == "" || !Native.terminal_owns.Call(OwnerBundle, FilePath)
+			|| !Native.terminal_owns.Call(OwnerBundle, Candidate))
+		return false
+	Key := Native.key.Call(FilePath)
+	if Request == "known"
+		return Destinations.Has(Key)
+	if Request == "close_boot_reads"
+		return Destinations.Has(Key) && RegistryLive(Destinations[Key], true)
+	if Request == "read_only_status" {
+		; Observation returns only the retained boot classification, never source
+		; bytes, a mutable journal row or preparation/write permission.
+		if !Destinations.Has(Key)
+			return ""
+		ObservedRow := Destinations[Key]
+		if !RegistryLive(ObservedRow) || ObservedRow.phase == "ready"
+				|| !ObservedRow.HasOwnProp("classification")
+			return ""
+		for Status in ["newer", "invalid", "unsupported"]
+			if ObservedRow.classification == Status
+				return Status
+		return ""
+	}
+	if Request == "consume_read_failure" {
+		if !Destinations.Has(Key)
+			return 0
+		ObservedRow := Destinations[Key]
+		if !ObservedRow.HasOwnProp("read_failure") || !RegistryLive(ObservedRow)
+			return 0
+		Failure := ObservedRow.read_failure
+		Valid := Failure.image == ObservedRow.image && Failure.phase == ObservedRow.phase
+			&& StrCompare(Failure.path, FilePath, true) == 0
+			&& (Failure.phase == "ready" || Failure.phase == "prepared" || Failure.phase == "refused"
+				|| (Failure.phase == "owned" && Failure.owner == ObservedRow.owned_bundle
+					&& Native.terminal_owns.Call(Failure.owner, FilePath)))
+		ObservedRow.DeleteProp("read_failure")
+		return Valid ? (Failure.present == 1 ? 2 : 1) : 0
+	}
+	if Request == "settle_owned" {
+		if !IsSet(OwnerBundle) || !IsSet(Candidate)
+				|| !PlainContainer(Candidate, Map.Prototype) || !(Candidate.Count == 2 || Candidate.Count == 4)
+				|| !Candidate.Has("locator") || !Candidate.Has("side")
+				|| !(Candidate["locator"] is String) || Candidate["locator"] == ""
+				|| !(Candidate["side"] is String)
+				|| !(Candidate["side"] == "old" || Candidate["side"] == "new")
+			return false
+		Locator := Candidate["locator"], Side := Candidate["side"]
+		Bounded := Candidate.Count == 4
+		if Bounded {
+			if !Candidate.Has("expected_present") || !Candidate.Has("expected_hash")
+				return false
+			BoundPresent := Candidate["expected_present"], BoundHash := Candidate["expected_hash"]
+			if !Native.settlement_bounds.Call(BoundPresent, BoundHash)
+				return false
+		}
+		if !Native.terminal_owns.Call(OwnerBundle, FilePath)
+				|| !Native.terminal_owns.Call(OwnerBundle, Locator)
+			return false
+		if Native.settlement_debt.Call(FilePath)
+			return false
+		Port := Native.settlement_port.Call()
+		WalAbsent() {
+			return NativeLive() && Native.settlement_port.Call(Port)
+				&& Native.settlement_result.Call(Native.settlement_inspect.Call(Locator, Port), "absent")
+		}
+		if !WalAbsent()
+			return false
+		; An unmanaged target is a verified no-op, never a new schema destination.
+		if !Destinations.Has(Key)
+			return NativeLive() && Native.settlement_refusal.Call(FilePath) == ""
+				&& Native.terminal_owns.Call(OwnerBundle, FilePath)
+				&& Native.terminal_owns.Call(OwnerBundle, Locator)
+		Row := Destinations[Key]
+		if !RegistryLive(Row)
+			return false
+		; An absent unbounded recovery has no acquired source phase to settle.
+		; Keep its existing refusal and readonly/ready row unchanged; this result
+		; grants neither source admission nor a pending recovered-image receipt.
+		if !Bounded && (Row.phase == "prepared" || Row.phase == "ready") {
+			UnchangedPhase := Row.phase
+			return WalAbsent() && RegistryLive(Row) && Destinations[Key] == Row
+				&& Row.phase == UnchangedPhase && NativeLive()
+				&& !Native.settlement_debt.Call(FilePath)
+				&& Native.terminal_owns.Call(OwnerBundle, FilePath)
+				&& Native.terminal_owns.Call(OwnerBundle, Locator)
+				&& NativeLive() && Destinations[Key] == Row && Row.phase == UnchangedPhase
+		}
+		; Actual owned settlement and bounded retry observations keep the strict
+		; refusal fence before reading or acknowledging any recovered image.
+		if Native.settlement_refusal.Call(FilePath) != ""
+			return false
+		Image := false
+		if Bounded {
+			Image := ReadImage()
+			if !Native.settlement_port.Call(Port) || !NativeLive()
+				return false
+			if !(Image is Object) || Image.present != BoundPresent
+					|| (Image.present && Port["hash"].Call(Image.source) != BoundHash)
+					|| !Native.settlement_port.Call(Port) || !NativeLive()
+				return false
+		}
+		; No owned phase was acquired by cold recovery. Its legacy readonly source
+		; still needs ordinary later migration; settlement cannot grant READY.
+		if Row.phase == "prepared" || Row.phase == "ready"
+			return true
+		if !(Image is Object)
+			Image := ReadImage()
+		if !(Image is Object)
+			return false
+		Classification := ClassifyImage(Image, Row)
+		if !(Classification == "current" || Classification == "fresh-missing")
+			return false
+		if Row.phase != "owned" || Row.owned_bundle != OwnerBundle
+				|| !Row.HasOwnProp("owned_return_phase")
+				|| !(Row.owned_return_phase == "prepared" || Row.owned_return_phase == "ready")
+			return false
+		Expected := Side == "old" ? Row.owned_old_image
+			: (Row.HasOwnProp("owned_new_image") ? Row.owned_new_image : false)
+		if !(Expected is Object) || Image.present != Expected.present
+				|| StrCompare(Image.source, Expected.source, true) != 0
+			return false
+		ReturnPhase := Row.owned_return_phase
+		FinalAdmission() {
+			if !RegistryLive(Row) || Destinations[Key] != Row || Row.phase != "owned"
+					|| Row.owned_bundle != OwnerBundle || Row.owned_return_phase != ReturnPhase
+					|| !Native.terminal_owns.Call(OwnerBundle, FilePath)
+					|| !Native.terminal_owns.Call(OwnerBundle, Locator)
+					|| Native.settlement_debt.Call(FilePath) || Native.settlement_refusal.Call(FilePath) != "" || !WalAbsent()
+				return false
+			Matched := Image.present ? Native.settlement_matches.Call(FilePath, Image.source)
+				: !Native.exists.Call(FilePath)
+			return Matched && NativeLive() && RegistryLive(Row) && Native.settlement_refusal.Call(FilePath) == ""
+				&& Native.terminal_owns.Call(OwnerBundle, FilePath)
+				&& Native.terminal_owns.Call(OwnerBundle, Locator) && Row.phase == "owned"
+		}
+		PreviousCritical := Critical("On")
+		try {
+			if !Native.noop.Call(FinalAdmission) || !NativeLive()
+				return false
+			Row.image := Image, Row.classification := Classification, Row.phase := ReturnPhase
+			Row.DeleteProp("owned_bundle"), Row.DeleteProp("owned_return_phase"), Row.DeleteProp("owned_old_image")
+			if Row.HasOwnProp("owned_new_image")
+				Row.DeleteProp("owned_new_image")
+			return true
+		} finally Critical(PreviousCritical)
+	}
+	if !Destinations.Has(Key) {
+		; Public/custom migration results cannot construct a row. Only genuine
+		; native registry and exact source observations reach this constructor.
+		if Request != "boot" && Request != "prepare" && Request != "prepare_owned" && Request != "capture_recovery"
+			return false
+		Row := { phase: "constructing", path: FilePath, image: false, recovery_initialized: Request == "capture_recovery" }
+		PreviousCritical := Critical("On")
+		try Destinations[Key] := Row
+		finally Critical(PreviousCritical)
+		try {
+			; The live registry loads first: that load records the pristine copy the
+			; cross-check below is matched against by source content hash.
+			Row.registry := Native.registry.Call()
+			StageTicks := PerfStage_Begin()
+			FreshRegistry := Native.load_registry.Call(Native.registry_path.Call())
+			PerfStage_End("ConfigMigrate.row_load_registry", StageTicks)
+			StageTicks := PerfStage_Begin()
+			if !ConfigMigrateSameRegistry(FreshRegistry, Row.registry)
+				throw Error("The default registry differs from its native source")
+			; Rows built from the same registry source share one private shadow,
+			; so a proof scope compares the live registry with it only once.
+			if !(SharedShadow is Map) || !ConfigMigrateSameRegistry(FreshRegistry, SharedShadow)
+				SharedShadow := Native.clone.Call(FreshRegistry)
+			PerfStage_End("ConfigMigrate.row_compare_and_shadow", StageTicks)
+			Row.registry_shadow := SharedShadow
+			if !RegistryLive(Row)
+				throw Error("The default registry does not match its native source")
+			StageTicks := PerfStage_Begin()
+			Image := ReadImage()
+			PerfStage_End("ConfigMigrate.row_read_image", StageTicks)
+			if !(Image is Object)
+				throw Error("The exact configuration source could not be classified")
+			Row.image := Image
+			StageTicks := PerfStage_Begin()
+			Row.classification := ClassifyImage(Image, Row)
+			PerfStage_End("ConfigMigrate.row_classify_image", StageTicks)
+			if Row.classification == "failed"
+				throw Error("The canonical configuration source could not be classified")
+			Row.phase := "prepared"
+		} catch as Err {
+			Row.phase := "refused"
+			Row.detail := Err.Message
+			TOML_RefuseWrites(FilePath, Err.Message)
+			return false
+		}
+		if Request == "prepare"
+			return Map("status", Row.classification, "read_only", 1)
+	} else {
+		Row := Destinations[Key]
+		if Request == "prepare" {
+			if !Row.recovery_initialized || Row.phase != "prepared"
+				throw Error("The configuration source was already initialized")
+			; Cold native WAL recovery may restore the admitted old image before
+			; the normal readonly startup handoff. Observe it genuinely once.
+			Image := ReadImage()
+			if !(Image is Object) || !RegistryLive(Row)
+				return false
+			Classification := ClassifyImage(Image, Row)
+			if Classification == "failed"
+				return false
+			PreviousCritical := Critical("On")
+			try {
+				Row.image := Image
+				Row.classification := Classification
+				Row.recovery_initialized := false
+				Row.phase := "prepared"
+			} finally Critical(PreviousCritical)
+			return Map("status", Classification, "read_only", 1)
+		}
+	}
+
+	if Request == "prepare_owned" {
+		; Only the actual retained native target issuer may admit pre-boot wizard
+		; writes. Current/fresh source construction does not manufacture READY.
+		if !(Row.phase == "prepared" || Row.phase == "ready" || Row.phase == "owned")
+				|| !RegistryLive(Row) || TOML_WriteRefusal(FilePath) != ""
+			return false
+		Image := ReadImage()
+		if !(Image is Object)
+			return false
+		Classification := ClassifyImage(Image, Row)
+		if !(Classification == "current" || Classification == "fresh-missing")
+			return false
+		if Row.phase == "prepared" && (Image.present != Row.image.present
+				|| StrCompare(Image.source, Row.image.source, true) != 0)
+			return false
+		if Row.phase == "owned" && Row.owned_bundle != OwnerBundle
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			if !RegistryLive(Row) || !Native.terminal_owns.Call(OwnerBundle, FilePath)
+				return false
+			if Row.phase != "owned" {
+				Row.owned_return_phase := Row.phase
+				Row.owned_old_image := Image
+			}
+			Row.image := Image
+			Row.classification := Classification
+			Row.owned_bundle := OwnerBundle
+			Row.phase := "owned"
+		} finally Critical(PreviousCritical)
+		return Map("status", Classification, "read_only", 0)
+	}
+
+	OwnerLive() {
+		return Row.phase == "ready" || (Row.phase == "owned"
+			&& Native.terminal_owns.Call(Row.owned_bundle, FilePath))
+	}
+
+	PreserveVariantRefusal(Result) {
+		VariantRefusal := Native.variant_refusal.Call(Result, FilePath)
+		if VariantRefusal != "" {
+			Row.phase := "refused"
+			if !Result.Get("read_only", false)
+				TOML_RefuseWrites(FilePath, VariantRefusal)
+			throw ConfigMigrateVariantRefusal(VariantRefusal)
+		}
+		return Result
+	}
+
+	if Request == "boot" {
+		if !(Row.phase == "prepared" || Row.phase == "owned")
+			throw Error("Configuration boot requires its exact prepared source")
+		if Row.classification == "invalid" || Row.classification == "newer" || Row.classification == "unsupported" {
+			Row.phase := "refused"
+			Detail := "the original native source classification remains refused for this session"
+			TOML_RefuseWrites(FilePath, Detail)
+			return PreserveVariantRefusal(Map("status", Row.classification, "read_only", 1, "from", "", "to", Row.registry_shadow["current"],
+				"backup", "", "detail", Detail))
+		}
+		if !RegistryLive(Row) {
+			Row.phase := "refused"
+			Detail := "the actual registry owner changed before native boot migration"
+			TOML_RefuseWrites(FilePath, Detail)
+			return PreserveVariantRefusal(Map("status", "failed", "read_only", 1, "from", "", "to", "", "backup", "", "detail", Detail))
+		}
+		Row.phase := "booting"
+		MigrationRegistryAdmission := () => RegistryLive(Row) && Destinations[Key] == Row && Row.phase == "booting"
+		; The private model came from the exact genuine native registry source;
+		; its live original identity/image remains required through native replace.
+		try Result := Native.migrate.Call(FilePath, Row.registry_shadow, "", 0, 0, 0, MigrationRegistryAdmission)
+		catch as Err {
+			Detail := "the config migration raised: " . Err.Message
+			TOML_RefuseWrites(FilePath, Detail)
+			try LoggerError("ConfigMigrate", "Config migration of '{1}' refused (failed): {2}. The file is "
+				. "left untouched and this session will not write it.", FilePath, Detail)
+			Result := Map("status", "failed", "read_only", 1, "from", "", "to", "", "backup", "", "detail", Detail)
+		}
+		PreserveVariantRefusal(Result)
+		Image := ReadImage()
+		Status := Result.Get("status", "failed")
+		if RegistryLive(Row) && Image is Object && TOML_WriteRefusal(FilePath) == ""
+				&& (Status == "absent" || Status == "current" || Status == "migrated") {
+			Classification := ClassifyImage(Image, Row)
+			if Classification == "current" || (Status == "absent" && Classification == "fresh-missing") {
+				Row.image := Image
+				Row.classification := Classification
+				Row.phase := "ready"
+				return Result
+			}
+		}
+		; The initial classified image remains the only permitted read after
+		; invalid/newer or pending-migration refusal; it grants no write state.
+		Row.phase := "refused"
+		if TOML_WriteRefusal(FilePath) == ""
+			TOML_RefuseWrites(FilePath, "the native boot source lost configuration admission")
+		if Status == "absent" || Status == "current" || Status == "migrated" {
+			Result["status"] := "failed"
+			Result["read_only"] := 1
+			Result["detail"] := "the completed native migration lost its exact boot source/registry handoff"
+		}
+		return Result
+	}
+
+	; The three checks of one write admission share a single deep comparison.
+	if Request == "check_write" && !ConfigMigrateRegistryProofOpen()
+		return ConfigMigrateWithRegistryProof(ConfigMigrateBoot.Bind(FilePath, Request))
+	if !RegistryLive(Row) || !(Row.image is Object)
+		return false
+	if Request == "capture_read" {
+		if Row.HasOwnProp("read_failure")
+			Row.DeleteProp("read_failure")
+		if !(OwnerLive() || Row.phase == "prepared" || Row.phase == "refused")
+			return false
+	}
+	Image := ReadImage(Request == "capture_read")
+	if !(Image is Object)
+		return false
+	if Request == "capture_read" {
+		if OwnerLive() {
+			Classification := ClassifyImage(Image, Row)
+			if !(Classification == "current" || Classification == "fresh-missing")
+				return false
+		} else if !(Row.phase == "prepared" || Row.phase == "refused")
+			return false
+		; A retired semantic read may observe genuinely new native bytes. This
+		; does not alter Row.image, the initial boot classification, or READY.
+		ExpectedSource := SubStr(Image.source, 1, 1) == Chr(0xFEFF) ? SubStr(Image.source, 2) : Image.source
+		ExpectedPresent := Image.present
+		; Read ownership does not grant write READY or extend a native bundle.
+		return (Source, Present) => RegistryLive(Row) && Destinations[Key] == Row
+			&& (Present is Integer) && Present == ExpectedPresent && (Source is String)
+			&& Source == ExpectedSource
+	}
+	if Request == "capture_recovery" {
+		if !(Row.phase == "prepared" || Row.phase == "owned" || Row.phase == "ready")
+				|| (Row.classification == "invalid" || Row.classification == "newer" || Row.classification == "unsupported")
+				|| TOML_WriteRefusal(FilePath) != "" || _ConfigPublicationHasRecoveryDebt(FilePath)
+			return false
+		try Recovery := Native.recovery_images.Call(Candidate, FilePath, OwnerBundle)
+		catch
+			return false
+		if !(Recovery is Object)
+			return false
+		for Side in [Recovery.old, Recovery.new] {
+			if Side is Object && Side.present {
+				Classification := ClassifyImage(Side, Row)
+				if !(Classification == "current" || Classification == "migrate")
+					return false
+			}
+		}
+		OldImage := Recovery.old is Object ? { source: Recovery.old.source, present: Recovery.old.present } : false
+		NewImage := Recovery.new is Object ? { source: Recovery.new.source, present: Recovery.new.present } : false
+		RecoveryPhase := Row.phase, RecoveryBundle := OwnerBundle
+		RecoveredMatch(Source, Present, Expected) {
+			return Expected is Object && (Source is String) && (Present is Integer)
+				&& Present == Expected.present && Source == Expected.source
+		}
+		if !RecoveredMatch(Image.source, Image.present, OldImage) && !RecoveredMatch(Image.source, Image.present, NewImage)
+			return false
+		; Only actual native WAL/namespace/artifact observations admit older
+		; images for recovery. This never completes ordinary write READY.
+		return (Source, Present, NextContent, NextPresent) => RegistryLive(Row) && Destinations[Key] == Row
+			&& Row.phase == RecoveryPhase && Native.terminal_owns.Call(RecoveryBundle, FilePath)
+			&& Native.terminal_owns.Call(RecoveryBundle, Candidate) && TOML_WriteRefusal(FilePath) == ""
+			&& !_ConfigPublicationHasRecoveryDebt(FilePath)
+			&& (RecoveredMatch(Source, Present, OldImage) || RecoveredMatch(Source, Present, NewImage))
+			&& (RecoveredMatch(NextContent, NextPresent, OldImage) || RecoveredMatch(NextContent, NextPresent, NewImage))
+	}
+	if !OwnerLive() || TOML_WriteRefusal(FilePath) != ""
+			|| (Request != "capture_reconcile_noop" && _ConfigPublicationHasRecoveryDebt(FilePath))
+		return false
+	Classification := ClassifyImage(Image, Row)
+	if !(Classification == "current"
+			|| (Row.classification == "fresh-missing" && Classification == "fresh-missing"))
+		return false
+	if Request == "capture_transition" {
+		if !IsSet(OwnerBundle) || Row.phase != "owned" || Row.owned_bundle != OwnerBundle
+				|| !Native.terminal_owns.Call(OwnerBundle, FilePath)
+				|| !IsSet(Candidate) || !(Candidate is Map) || Candidate.Count != 2
+				|| !Candidate.Has("present") || !Candidate.Has("content")
+				|| !(Candidate["present"] is Integer) || (Candidate["present"] != 0 && Candidate["present"] != 1)
+				|| !(Candidate["content"] is String) || (!Candidate["present"] && Candidate["content"] != "")
+			return false
+		NewPresent := Candidate["present"], NewContent := Candidate["content"]
+		if NewPresent && ClassifyImage({ present: 1, source: NewContent }, Row) != "current"
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			if !RegistryLive(Row) || Row.phase != "owned" || Row.owned_bundle != OwnerBundle
+					|| !Native.terminal_owns.Call(OwnerBundle, FilePath)
+				return false
+			Row.owned_new_image := { present: NewPresent, source: NewContent }
+		} finally Critical(PreviousCritical)
+		OldPresent := Image.present, OldContent := Image.source, ExactBundle := OwnerBundle
+		Matches(Source, Present, ExpectedSource, ExpectedPresent) {
+			return (Present is Integer) && Present == ExpectedPresent && (Source is String)
+				&& Source == ExpectedSource
+		}
+		return (Source, Present, NextContent, NextPresent) => RegistryLive(Row) && Destinations[Key] == Row
+			&& Row.phase == "owned" && Row.owned_bundle == ExactBundle
+			&& Native.terminal_owns.Call(ExactBundle, FilePath) && TOML_WriteRefusal(FilePath) == ""
+			&& !_ConfigPublicationHasRecoveryDebt(FilePath)
+			&& (Matches(Source, Present, OldContent, OldPresent) || Matches(Source, Present, NewContent, NewPresent))
+			&& (Matches(NextContent, NextPresent, OldContent, OldPresent) || Matches(NextContent, NextPresent, NewContent, NewPresent))
+	}
+	if Request == "capture_noop" || Request == "capture_reconcile_noop" {
+		if Request == "capture_reconcile_noop" && Classification != "current"
+			return false
+		ExpectedNoopSource := Image.source
+		ExpectedNoopPresent := Image.present
+		ExpectedNoopPhase := Row.phase
+		ExpectedNoopBundle := Row.phase == "owned" ? Row.owned_bundle : false
+		return (Source, Present) => RegistryLive(Row) && Destinations[Key] == Row
+			&& Row.phase == ExpectedNoopPhase && OwnerLive() && TOML_WriteRefusal(FilePath) == ""
+			&& (Request == "capture_reconcile_noop" || !_ConfigPublicationHasRecoveryDebt(FilePath))
+			&& (ExpectedNoopPhase != "owned" || Row.owned_bundle == ExpectedNoopBundle)
+			&& (Source is String) && Source == ExpectedNoopSource
+			&& (Present is Integer) && Present == ExpectedNoopPresent
+	}
+	if Request == "check_write"
+		; The scope opened above holds Critical and the first check of this request already
+		; compared the live registry with its private shadow; nothing between that comparison
+		; and here runs foreign code (a native read, a parse, a lookup), so the memoised proof
+		; stands. A fresh second comparison here doubled the 21 ms cost of every admission.
+		return RegistryLive(Row) && OwnerLive() && TOML_WriteRefusal(FilePath) == ""
+	if !IsSet(Candidate)
+		return false
+	if IsSet(Candidate) {
+		if !(Candidate is String)
+			return false
+		if ClassifyImage({ present: 1, source: Candidate }, Row) != "current"
+			return false
+		; Only an existing file may stay unstamped: a file this build creates is stamped.
+		if !Image.present {
+			try CandidateDocument := Native.decode.Call(Candidate)
+			catch
+				return false
+			if !CandidateDocument.Has("_meta") || !CandidateDocument["_meta"].Has("schema_version")
+				return false
+		}
+	}
+	ExpectedWriteSource := Image.source
+	ExpectedWritePresent := Image.present
+	ExpectedCandidate := Candidate
+	ExpectedWritePhase := Row.phase
+	ExpectedWriteBundle := Row.phase == "owned" ? Row.owned_bundle : false
+	; This is early source/candidate admission. The genuine native final
+	; replacement and no-op API must later retain and invoke the same guard.
+	return (Source, Present, FinalCandidate) => RegistryLive(Row) && Destinations[Key] == Row && Row.phase == ExpectedWritePhase && OwnerLive()
+		&& (ExpectedWritePhase != "owned" || Row.owned_bundle == ExpectedWriteBundle)
+		&& TOML_WriteRefusal(FilePath) == "" && !_ConfigPublicationHasRecoveryDebt(FilePath)
+		&& (Present is Integer) && Present == ExpectedWritePresent && (Source is String)
+		&& Source == ExpectedWriteSource && (FinalCandidate is String)
+		&& FinalCandidate == ExpectedCandidate
+}
+
+/** Read-only constructor handoff; actual migration keeps its later boot timing. */
+ConfigSchemaPrepareSource(Path) {
+	return ConfigMigrateBoot(Path, "prepare")
+}
+
+/**
+ * Observes a retained incompatible boot schema without opening or changing it.
+ * @param {String} Path Exact boot configuration destination.
+ * @returns {String} newer/invalid/unsupported, or empty when no such state exists.
+ */
+ConfigSchemaReadOnlyStatus(Path) {
+	try Status := ConfigMigrateBoot(Path, "read_only_status")
+	catch
+		return ""
+	return Status is String ? Status : ""
+}
+
+/** Captures only genuinely initialized fresh source permission before effects. */
+ConfigSchemaCanPrepareWrite(Path) {
+	try {
+		Result := ConfigMigrateBoot(Path, "check_write")
+		return (Result is Integer) && Result == 1
+	} catch {
+		return false
+	}
+}
+
+
+/** Performs only native source reads while the exact chosen-target bundle lives. */
+ConfigSchemaPrepareOwnedSource(Path, Bundle) {
+	try {
+		Result := ConfigMigrateBoot(Path, "prepare_owned", , Bundle)
+		return Result is Map && Result.Get("read_only", 1) == 0
+	} catch {
+		return false
+	}
+}
+
+
+/** Checks fresh native source outside Critical, then acknowledges the captured noop. */
+ConfigSchemaAcknowledgeNoop(Path, SourceAdmission, LogicalAdmission := 0) {
+	static ExistsOwner := FSStrictExists, ReadOwner := FSReadUtf8Exact
+	if !HasMethod(SourceAdmission, "Call") || ExistsOwner != FSStrictExists || ReadOwner != FSReadUtf8Exact
+		return false
+	try {
+		Present := ExistsOwner.Call(Path)
+		if !(Present is Integer) || (Present != 0 && Present != 1)
+			return false
+		Source := Present ? ReadOwner.Call(Path) : ""
+		if !(Source is String) || (!Present && ExistsOwner.Call(Path))
+			return false
+		FinalNoop() {
+			return ExistsOwner == FSStrictExists && ReadOwner == FSReadUtf8Exact
+				&& _FSNativeAdmissionAccepted(LogicalAdmission) && SourceAdmission.Call(Source, Present)
+		}
+		return FSNativeAcknowledge(FinalNoop)
+	} catch {
+		return false
+	}
+}
+
 
 ; This typed refusal rejects successor readiness instead of changing helper ownership.
 class ConfigMigrateVariantRefusal extends Error {
+}
+
+; A rename_prefix target is occupied: the plan is "invalid" and the file is
+; never written, so neither of the two values is dropped.
+class ConfigMigratePrefixRefusal extends Error {
 }
 
 ; A scalar participant does not authorize an ancestor or descendant namespace.
@@ -1067,7 +1997,7 @@ _ConfigMigrateVariantBootRefusal(Result, FilePath) {
 			return ""
 		Document := TOML_ParseDocument(Source)
 		Legacy := _TOML_DocumentLookup(Document, ["layout", "ergopti_plus"])
-		Variant := _TOML_DocumentLookup(Document, ["layout", "ergopti_variant"])
+		Variant := _TOML_DocumentLookup(Document, ["layout", ConfigLeaf.ERGOPTI_VARIANT])
 	} catch {
 		return ""
 	}
@@ -1080,18 +2010,37 @@ _ConfigMigrateVariantBootRefusal(Result, FilePath) {
 		return Prefix . " current variant ownership is not a recognized exact choice"
 	if Result.Get("read_only", false)
 		return Prefix . " the joint source remains refused by its migration owner"
-	for Field in ["ergopti_base", "ergopti_alt_gr", "emulated_layout"] {
+	for Field in [ConfigLeaf.ERGOPTI_BASE, ConfigLeaf.ERGOPTI_ALT_GR, ConfigLeaf.EMULATED_LAYOUT] {
 		Read := _TOML_DocumentLookup(Document, ["layout", Field])
 		if Read["blocked"]
 			return Prefix . " an independent intent participant has an occupied namespace"
 		if !Read["found"]
 			continue
 		Value := Read["value"]
-		if Field == "emulated_layout" {
+		if Field == ConfigLeaf.EMULATED_LAYOUT {
 			if !(Value is String) || (Value != "" && !RegExMatch(Value, "^[a-z][a-z0-9_]*$"))
 				return Prefix . " the registry source intent is malformed"
 		} else if !(Value is TOML_Bool) || !(Value.Value is Integer) || (Value.Value != 0 && Value.Value != 1)
 			return Prefix . " an independent layer gate is not an exact TOML boolean"
 	}
 	return ""
+}
+
+/** Restores only the source phase retained before this exact terminal owner. */
+ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, Side, Bounds := 0) {
+	try {
+		Candidate := Map("locator", Locator, "side", Side)
+		if !((Bounds is Integer) && Bounds == 0) {
+			if !(Bounds is Map) || ObjGetBase(Bounds) != Map.Prototype
+				return false
+			for Name in ObjOwnProps(Bounds)
+				return false
+			if Bounds.Count != 2 || !Bounds.Has("present") || !Bounds.Has("hash")
+				return false
+			Candidate["expected_present"] := Bounds["present"]
+			Candidate["expected_hash"] := Bounds["hash"]
+		}
+		return ConfigMigrateBoot(Path, "settle_owned", Candidate, Bundle)
+	} catch
+		return false
 }

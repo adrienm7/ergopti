@@ -39,11 +39,15 @@
 ---    The waiting keys are then replayed in order, after the tap or under the
 ---    hold. Its tap needs no minimum duration and is not cancelled by the
 ---    release of an earlier key: both are what fast typing looks like.
+--- 6. A key whose hold is a modifier taken at key-down, pressed alone, still
+---    taps up to lone_tap_max_ms (tap_holds.lone_modifier_tap_max_ms, shared
+---    rule in tap_hold.lone_tap); 0 keeps the strict threshold.
 --- ==============================================================================
 
 local EvdevCodes = require("infra.evdev_codes")
 local OneShotShift = require("tap_hold.one_shot_shift")
-local CapsWord = require("tap_hold.caps_word")
+local LoneTap = require("tap_hold.lone_tap")
+local InputEvent = require("infra.input_event")
 
 local M = {}
 
@@ -61,6 +65,10 @@ M.KEY_CODES = {
 
 -- evdev codes of the holdable modifiers.
 M.MODIFIER_CODES = { ctrl = 29, shift = 42, alt = 56, alt_gr = 100, win = 125 }
+
+-- The keys whose plain "ctrl" / "shift" hold is their own side (the right
+-- Ctrl holds RCtrl, the right Shift holds RShift), as on Windows.
+local OWN_SIDE_MODIFIER_CODES = { right_ctrl = { ctrl = 97 }, right_shift = { shift = 54 } }
 
 local KEY_LEFTSHIFT = 42
 -- Every usual modifier key, left and right.
@@ -144,6 +152,8 @@ local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
 --- @param opts table {
 ---   keys = { [key_id] = { tap_action, hold_modifier, hold_layer, time_activation_seconds, enabled } },
 ---   tap_min_ms = number, one_shot_timeout_ms = number,
+---   lone_tap_max_ms = number, how long a modifier key pressed alone still taps,
+---     0 for the strict tap-hold (tap_hold.lone_tap),
 ---   roll_keys = { key_id }|nil, the typing keys decided by the order of the
 ---     releases when they keep their own key on a tap and have a hold,
 ---   nav_layer = table|nil, explicitly compiled navigation chords; absent is native,
@@ -154,6 +164,10 @@ local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
 ---   one_shot_result = function(char) -> string|nil, what the one-shot Shift
 ---     types for `char` instead of its capital (Space gives "-");
 ---   the three are required when a key taps the one-shot Shift,
+---   tap_blocked = function(action) -> boolean, whether a catalogue tap is
+---     unarmed right now (the AI actions while the AI is off): the key then
+---     does what it does with no tap action, asked at each press and release
+---     so that switching back on needs no reload; absent, none is,
 ---   held_modifiers = function() -> table, the modifiers down now, by role
 ---     ({ ctrl = true }), as the live layout names them (the keyboard hook's:
 ---     ctrl:nocaps makes CapsLock a Ctrl); without it, a caller with no layout
@@ -176,10 +190,11 @@ function M.new(opts)
 		by_code = {},
 		nav_layer = options.nav_layer or {},
 		tap_min_ms = assert(tonumber(options.tap_min_ms), "tap_min_ms is required"),
+		lone_tap_max_ms = LoneTap.validate(options.lone_tap_max_ms),
 		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
+		tap_blocked = options.tap_blocked,
 		key_text = options.key_text,
 		plan_text = options.plan_text,
-		caps_word_plan = options.caps_word_plan,
 		one_shot_result = options.one_shot_result,
 		held_modifiers = options.held_modifiers,
 		held_text_modifier_codes = options.held_text_modifier_codes,
@@ -188,7 +203,9 @@ function M.new(opts)
 		layer_depth = 0,     -- how many layer keys are down
 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
 		one_shot_until = nil,
-		one_shot_keys = {},  -- keys a one-shot Shift is wrapping (several can overlap)
+		-- code -> "shift" while a one-shot Shift wraps it, "spent" once a later
+		-- key took the Shift back, "rolled" for a key pressed then (several can overlap)
+		one_shot_keys = {},
 		one_shot_swallowed = {}, -- keys a one-shot Shift replaced by its result, until released
 		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
 		instant_down = {},   -- keys with a tap and no hold, down since their tap fired
@@ -206,11 +223,22 @@ function M.new(opts)
 		local code = M.KEY_CODES[key_id]
 		if code and type(config) == "table" and config.enabled ~= false then
 			local mods = {}
+			local left_forced = {}
+			if type(config.hold_left_modifiers) == "string" then
+				for part in config.hold_left_modifiers:gmatch("[^+]+") do left_forced[part] = true end
+			end
 			if type(config.hold_modifier) == "string" and config.hold_modifier ~= "" then
 				-- The loader hands over canonical ids only: anything else here is a
 				-- bug upstream, never a hold to drop without a word.
 				for part in config.hold_modifier:gmatch("[^+]+") do
 					local modifier_code = M.MODIFIER_CODES[part]
+					-- The right Ctrl and right Shift keys hold their own side, as on
+					-- Windows (_TapHoldOwnSideModifier), unless the file spelled the
+					-- modifier with a left alias (lctrl, lshift).
+					local own_side = OWN_SIDE_MODIFIER_CODES[key_id]
+					if own_side and own_side[part] and not left_forced[part] then
+						modifier_code = own_side[part]
+					end
 					if not modifier_code then
 						error(string.format("tap-hold key '%s': '%s' is not a canonical hold modifier",
 							tostring(key_id), config.hold_modifier), 2)
@@ -259,6 +287,15 @@ function M.new(opts)
 					and LAYER_BACKSPACE_TAP_NEEDS_UP_AT_RELEASE[key_id] or nil,
 				threshold_ms = math.floor((tonumber(config.time_activation_seconds) or 0) * 1000 + 0.5),
 			}
+			-- A modifier hold taken at key-down, on a key outside the typing keys:
+			-- pressed alone, its tap may last up to lone_tap_max_ms (see 6.).
+			local entry = self.by_code[code]
+			-- A one-shot Shift is no such tap: armed by a long press, it would shift
+			-- the next letter of a Shift the user held and let go unused.
+			-- Every typing key is left out, as on macOS and Windows, whatever its tap.
+			entry.lone_modifier = #entry.mods > 0 and not entry.layer and not roll_keys[key_id]
+				and not entry.hold_past_threshold and not entry.tap_at_down and not entry.instant
+				and tap ~= "one_shot_shift"
 		end
 		::continue::
 	end
@@ -296,6 +333,7 @@ end
 --- both Left, a physical Backspace and the layer's are each one key to the
 --- kernel, and the first release must not lift it under the others.
 local output_holders = setmetatable({}, { __mode = "k" })
+local source_holds = setmetatable({}, { __mode = "k" })
 
 --- Retains producer custody separately from the stable public event shape.
 local function hold_row(self, out, code, value)
@@ -437,12 +475,9 @@ end
 ---   in Shift, which types its capital; "text": type `text` instead of it.
 --- @return string|nil text
 local input_arms = setmetatable({}, { __mode = "k" })
-local caps_word_owners = setmetatable({}, { __mode = "k" })
-local caps_word_presses = setmetatable({}, { __mode = "k" })
 
 --- Publishes the existing logical deadline without acquiring output authority.
 local function arm_one_shot(self, now_ms, guard)
-	if caps_word_owners[self] then return false end
 	if type(now_ms) ~= "number" or now_ms ~= now_ms or math.abs(now_ms) == math.huge
 		or type(self.key_text) ~= "function" or type(self.plan_text) ~= "function"
 		or type(self.one_shot_result) ~= "function" then return false end
@@ -468,8 +503,6 @@ end
 --- Observes private logical ownership without calling an external provider.
 --- @return string|nil state
 function M:input_arm_state()
-	local caps = caps_word_owners[self]
-	if caps then return caps.pending and "consumed" or caps.active and "armed" or nil end
 	local arm = input_arms[self]
 	return arm and arm.state or nil
 end
@@ -477,12 +510,6 @@ end
 --- Clears only an unspent logical arm; consumed output requires release_all ACK.
 --- @return boolean cleared
 function M:clear_input_arm()
-	local caps = caps_word_owners[self]
-	if caps then
-		caps.active = false
-		if caps.pending then return false end
-		caps_word_owners[self] = nil
-	end
 	local arm = input_arms[self]
 	if arm and arm.state == "consumed" then return false end
 	if arm then self.one_shot_until, input_arms[self] = nil, nil end
@@ -495,36 +522,22 @@ local function input_arm_current(self, arm)
 	return ok and current == true and input_arms[self] == arm
 end
 
---- Arms an independent persistent word; no OneShot deadline or special result is used.
---- @param guard function Original installed input/source/output currentness.
---- @return boolean
-function M:arm_caps_word(guard)
-	if type(guard) ~= "function" or type(self.key_text) ~= "function"
-		or type(self.caps_word_plan) ~= "function" or input_arms[self] then return false end
-	local prior = caps_word_owners[self]
-	if prior and (prior.pending or prior.processing) then return false end
-	local called, current = pcall(guard)
-	if not called or current ~= true then return false end
-	if prior then prior.active = false; caps_word_owners[self] = nil; return true end
-	caps_word_owners[self] = { current = guard, active = true }
-	caps_word_presses[self] = caps_word_presses[self] or {}
-	return true
-end
-
---- Acknowledges only the original complete character batch after native delivery.
---- @param rows table Exact rows prepared by this owner.
---- @return boolean
-function M:ack_caps_word(rows)
-	local owner = caps_word_owners[self]
-	if not owner or owner.pending ~= rows then return false end
-	owner.pending = nil
-	if not owner.active then caps_word_owners[self] = nil end
-	return true
-end
-
-local function caps_word_current(self, owner)
-	local called, current = pcall(owner.current)
-	return called and current == true and owner.active == true and caps_word_owners[self] == owner
+--- Takes the one-shot Shift back from every key it still wraps. The Shift is
+--- that press's own, kept for its repeats only: a key struck before it is
+--- released is typed as it is, as on Windows, where the one-shot capture ends
+--- at the first character. Keeping it down capitalised a fast roll (« abc »
+--- gave « ABc »).
+--- @return boolean spent Whether a Shift went up.
+local function spend_one_shot_shift(self, out)
+	local spent = false
+	for wrapped, state in pairs(self.one_shot_keys) do
+		if state == "shift" then
+			self.one_shot_keys[wrapped] = "spent"
+			release(self, out, KEY_LEFTSHIFT)
+			spent = true
+		end
+	end
+	return spent
 end
 
 local function take_one_shot(self, code, now_ms)
@@ -612,73 +625,11 @@ local function type_text(self, out, text)
 	return nil
 end
 
-local function caps_word_input(self, out, code, value, receipt)
-	local owner, presses = caps_word_owners[self], caps_word_presses[self]
-	if owner and (owner.pending or owner.processing) then owner.active = false; return true end
-	local source = type(receipt) == "table" and receipt.source or "software-only"
-	local press_key = tostring(source) .. "\0" .. code
-	local physical_press = presses and presses[press_key]
-	if value == UP and physical_press then presses[press_key] = nil; return true end
-	if value == REPEAT and physical_press then
-		if not owner or not owner.active then return true end
-	elseif value ~= DOWN or not owner or not owner.active then return false end
-	if not caps_word_current(self, owner) then self:clear_input_arm(); return true end
-	if MODIFIER_KEYS[code] then return false end
-	local control = EvdevCodes.CONTROL_NAME_OF[code]
-	if code == M.KEY_CODES.space or code == EvdevCodes.KEY_CAPSLOCK or CapsWord.cancels(control) then
-		owner.active = false; caps_word_owners[self] = nil; return false
-	end
-	owner.processing = true
-	local got_text, text = pcall(self.key_text, code)
-	owner.processing = false
-	if not got_text then owner.active = false; caps_word_owners[self] = nil; return physical_press ~= nil end
-	if not caps_word_current(self, owner) then self:clear_input_arm(); return true end
-	if text == nil and control ~= "backspace" then
-		owner.active = false; caps_word_owners[self] = nil; return false
-	end
-	local upper = CapsWord.uppercase(text) or (physical_press and type(text) == "string" and text or nil)
-	if not upper then return false end
-	owner.processing = true
-	local got_plan, plan, plan_current = pcall(self.caps_word_plan, upper)
-	owner.processing = false
-	if not got_plan then owner.active = false; caps_word_owners[self] = nil; return physical_press ~= nil end
-	if type(plan) ~= "table" or #plan == 0 or type(plan_current) ~= "function"
-		or not caps_word_current(self, owner) or plan_current() ~= true then
-		owner.active = false; caps_word_owners[self] = nil; return physical_press ~= nil
-	end
-	local lifted = held_level_keys(self)
-	if not caps_word_current(self, owner) or plan_current() ~= true then return true end
-	for _, step in ipairs(plan) do
-		if type(step.keycode) ~= "number" or step.keycode % 1 ~= 0 or type(step.mods) ~= "table" then return true end
-		for _, role in ipairs(step.mods) do if role ~= "shift" then return true end end
-	end
-	for _, level in ipairs(lifted) do out[#out + 1] = { code = level, value = UP, handoff = "suspended" } end
-	for _, step in ipairs(plan) do
-		for _, role in ipairs(step.mods) do press(self, out, EvdevCodes.LEVEL_MODIFIER_CODE[role]) end
-		tap_key(self, out, step.keycode)
-		for index = #step.mods, 1, -1 do release(self, out, EvdevCodes.LEVEL_MODIFIER_CODE[step.mods[index]]) end
-	end
-	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN, handoff = "restored" } end
-	owner.pending = out
-	presses[press_key] = { source = owner }
-	return true
-end
-
--- A remapped key tap is also a word boundary when its actual output is one.
-local function cancel_caps_word_control(self, code)
-	local owner = caps_word_owners[self]
-	if owner and (code == M.KEY_CODES.space or CapsWord.cancels(EvdevCodes.CONTROL_NAME_OF[code])) then
-		owner.active = false
-		if not owner.pending then caps_word_owners[self] = nil end
-	end
-end
-
 --- Types the key a tap stands for, exactly as the same key pressed by hand
 --- would reach an armed one-shot Shift. A tap bypassing it typed its Enter
 --- unshifted and left the Shift for the next letter.
 --- @return table|nil tap Text for the injector, as type_text returns it.
 local function type_tap(self, out, code, now_ms)
-	cancel_caps_word_control(self, code)
 	local verdict, text = take_one_shot(self, code, now_ms)
 	if verdict == "text" then return type_text(self, out, text) end
 	if verdict == "shift" then press(self, out, KEY_LEFTSHIFT) end
@@ -689,7 +640,7 @@ end
 
 -- The usual shortcut modifier keys, counted when no live layout names them.
 local USUAL_SHORTCUT_KEYS = {
-	KEY_LEFTCTRL, EvdevCodes.KEY_RIGHTCTRL, KEY_LEFTALT, KEY_LEFTMETA, EvdevCodes.KEY_RIGHTMETA,
+	KEY_LEFTCTRL, EvdevCodes.KEY_RIGHTCTRL, KEY_LEFTALT, EvdevCodes.KEY_LEFTMETA, EvdevCodes.KEY_RIGHTMETA,
 }
 
 --- Every modifier key down now: the level keys (held_level_keys) and the
@@ -799,6 +750,17 @@ local function type_key_tap(self, out, config, typed, now_ms)
 	return nil
 end
 
+--- The tap a key runs now: its configured one, or no tap action (the key's
+--- own) when that is a catalogue action unarmed right now. Key taps, the
+--- one-shot Shift and "none" are the engine's own and are never unarmed.
+--- @return string tap
+local function effective_tap(self, config)
+	local tap = config.tap
+	if tap == "" or tap == "none" or tap == "one_shot_shift" or M.KEY_TAPS[tap] then return tap end
+	if self.tap_blocked and self.tap_blocked(tap) == true then return "" end
+	return tap
+end
+
 --- Fires the tap of a key that has no hold, at its key-down and at each of its
 --- repeats, as the Windows hotkey of such a key does (escape.ahk "Fire
 --- immediately on key-down"): there is no hold to tell it from, so waiting for
@@ -806,14 +768,16 @@ end
 --- Shift at key-down (NO_HOLD_BY_TAP).
 --- @return table out, string|table|nil tap As M:process returns them.
 local function fire_instant(self, out, config, now_ms)
-	if config.tap == "none" then return out, nil end
-	if config.tap == "one_shot_shift" then
+	local tap = effective_tap(self, config)
+	if tap == "none" then return out, nil end
+	if tap == "one_shot_shift" then
 		arm_one_shot(self, now_ms)
 		return out, nil
 	end
-	local typed = M.KEY_TAPS[config.tap]
+	-- An unarmed action leaves the key's own press.
+	local typed = tap == "" and M.KEY_CODES[config.id] or M.KEY_TAPS[tap]
 	if typed then return out, type_key_tap(self, out, config, typed, now_ms) end
-	return out, config.tap, "tap_hold__" .. config.id
+	return out, tap, "tap_hold__" .. config.id
 end
 
 --- Runs one event through the engine and appends what comes out, the event
@@ -857,7 +821,8 @@ local function resolve_roll(self, code, decision, now_ms, released)
 		state.tapped = true
 		-- A click or the wheel during the press made it something else than typing.
 		if not state.cancelled then
-			tap = type_key_tap(self, out, config, config.tap == "" and code or M.KEY_TAPS[config.tap], now_ms)
+			local roll_tap = effective_tap(self, config)
+			tap = type_key_tap(self, out, config, roll_tap == "" and code or M.KEY_TAPS[roll_tap], now_ms)
 		end
 	end
 	for _, queued_code in ipairs(queue) do
@@ -895,7 +860,6 @@ local function press_layer_key(self, code, spec)
 	local out = {}
 	local chords = spec.chords or { spec }
 	for index, item in ipairs(chords) do
-		for _, output_code in ipairs(item.keys or {}) do cancel_caps_word_control(self, output_code) end
 		chord_events(self, out, item, DOWN)
 		if index < #chords then chord_events(self, out, item, UP) end
 	end
@@ -919,7 +883,7 @@ end
 --- @return string|table|nil tap What to run after them: a catalogue action, or
 ---   { type_text } for text the layout cannot type
 --- @return string|nil binding Exact tap_hold__ source of a catalogue action.
-function M:process(code, value, now_ms, receipt)
+local function process(self, code, value, now_ms)
 	local config = self.by_code[code]
 	local out = {}
 	if value == DOWN then
@@ -1000,6 +964,8 @@ function M:process(code, value, now_ms, receipt)
 					return swallow_until_release(self, code, now_ms)
 				end
 			end
+			-- A tap-hold key struck under a wrapped key takes its Shift back too.
+			spend_one_shot_shift(self, out)
 			if config.instant then
 				cancel_taps(self, nil)
 				self.instant_down[code] = true
@@ -1049,24 +1015,24 @@ function M:process(code, value, now_ms, receipt)
 		if state.layer then self.layer_depth = math.max(0, self.layer_depth - 1) end
 		local elapsed = now_ms - state.down_at
 		local is_tap = not state.cancelled and not state.tap_blocked
-			and elapsed <= config.threshold_ms and elapsed >= self.tap_min_ms
+			and elapsed <= LoneTap.tap_max_ms(config.threshold_ms, config.lone_modifier, self.lone_tap_max_ms)
+			and elapsed >= self.tap_min_ms
 		for _, needed_up in ipairs(config.tap_needs_up_at_release or {}) do
 			if self.physical_down[needed_up] then is_tap = false end
 		end
-		if state.tapped or not is_tap or config.tap == "none" then return out, nil end
-		if config.tap == "one_shot_shift" then
+		local tap = effective_tap(self, config)
+		if state.tapped or not is_tap or tap == "none" then return out, nil end
+		if tap == "one_shot_shift" then
 			arm_one_shot(self, now_ms)
 			return out, nil
 		end
 		-- The native key (as if nothing were configured on a tap) or a key tap.
-		local typed = config.tap == "" and code or M.KEY_TAPS[config.tap]
+		local typed = tap == "" and code or M.KEY_TAPS[tap]
 		if typed then
 			return out, type_key_tap(self, out, config, typed, now_ms)
 		end
-		return out, config.tap, "tap_hold__" .. config.id
+		return out, tap, "tap_hold__" .. config.id
 	end
-
-	if caps_word_input(self, out, code, value, receipt) then return out end
 
 	-- A key the one-shot Shift replaced by its result: its repeats and its
 	-- release belong to the result, which is already typed.
@@ -1087,21 +1053,25 @@ function M:process(code, value, now_ms, receipt)
 	end
 
 	-- The one-shot Shift wraps the next key.
-	if self.one_shot_keys[code] and value == UP then
+	local wrapped = self.one_shot_keys[code]
+	if wrapped and value == UP then
 		self.one_shot_keys[code] = nil
 		release(self, out, code)
-		release(self, out, KEY_LEFTSHIFT)
+		if wrapped == "shift" then release(self, out, KEY_LEFTSHIFT) end
 		if input_arms[self] and input_arms[self].code == code then input_arms[self] = nil end
 		return out
 	end
-	if self.one_shot_keys[code] and value == REPEAT and input_arms[self] then
+	if wrapped and value == REPEAT and input_arms[self] then
 		hold_row(self, out, code, REPEAT)
 		return out
 	end
-	if value == DOWN and not self.one_shot_keys[code] then
+	if value == DOWN and not wrapped then
+		-- A key struck while a wrapped one is still down goes down after its
+		-- Shift is up, and is this engine's to release, like the wrapped key.
+		local rolled = not MODIFIER_KEYS[code] and spend_one_shot_shift(self, out)
 		local verdict, text = take_one_shot(self, code, now_ms)
 		if verdict == "shift" then
-			self.one_shot_keys[code] = true
+			self.one_shot_keys[code] = "shift"
 			press(self, out, KEY_LEFTSHIFT)
 			press(self, out, code)
 			return out
@@ -1109,16 +1079,106 @@ function M:process(code, value, now_ms, receipt)
 			self.one_shot_swallowed[code] = true
 			return out, type_text(self, out, text)
 		end
+		if rolled then
+			self.one_shot_keys[code] = "rolled"
+			press(self, out, code)
+			return out
+		end
 	end
 	return pass(self, code, value)
+end
+
+--- Each native source owns its own standalone hold. A concurrent same-code
+--- press adds a modifier reference but cannot inherit the first source's tap.
+--- Its UP can retire only the state admitted by its own original DOWN.
+function M:process(code, value, now_ms, receipt)
+	local source = type(receipt) == "table" and rawget(receipt, "source") or nil
+	local generation = source and rawget(receipt, "generation") or nil
+	local native_owner = source and rawget(receipt, "source_owner") or nil
+	local scoped = type(source) == "string" and source ~= "" and type(generation) == "number"
+	if scoped and native_owner and rawget(receipt, "source_current") ~= true then return {} end
+	local groups = source_holds[self]
+	if scoped and not groups then groups = {}; source_holds[self] = groups end
+	local group = groups and groups[code]
+	if scoped and group then
+		local own = group[source]
+		if own and (own.generation ~= generation or not rawequal(own.native_owner, native_owner)) then return {} end
+		if value == DOWN then
+			if own then return {} end
+			local original = self.held[code]
+			if not original or original.undecided then return {} end
+			local out, state = {}, { down_at = now_ms, cancelled = true, emitted = {},
+				layer = original.layer, hold_pending = original.hold_pending }
+			for _, other in pairs(group) do other.state.cancelled = true end
+			for _, mod in ipairs(original.emitted) do
+				press(self, out, mod); state.emitted[#state.emitted + 1] = mod
+			end
+			if state.layer then self.layer_depth = self.layer_depth + 1 end
+			group[source] = { state = state, generation = generation, native_owner = native_owner }
+			self.physical_down[code] = true
+			return out
+		elseif not own then return {}
+		elseif value == UP then
+			self.held[code], group[source] = own.state, nil
+			local out, tap, binding = process(self, code, value, now_ms)
+			if source_holds[self] ~= groups or groups[code] ~= group then return out, tap, binding end
+			local _, remaining = next(group)
+			if remaining then self.held[code], self.physical_down[code] = remaining.state, true
+			else groups[code] = nil end
+			return out, tap, binding
+		end
+	end
+	local out, tap, binding = process(self, code, value, now_ms)
+	if scoped and source_holds[self] == groups and value == DOWN and self.held[code] and not group then
+		groups[code] = { [source] = { state = self.held[code], generation = generation, native_owner = native_owner } }
+	end
+	return out, tap, binding
 end
 
 --- A click, its release or a wheel turn: it makes every held tap-hold key a
 --- chord.
 function M:activity()
-	local caps = caps_word_owners[self]
-	if caps then caps.active = false; if not caps.pending then caps_word_owners[self] = nil end end
 	cancel_taps(self, nil, true)
+end
+
+--- Whether the held navigation layer binds a wheel direction: the keyboard hook
+--- then owns the pointer, so a bound notch never also scrolls.
+--- @return boolean
+function M:wheel_bound()
+	if self.layer_depth <= 0 then return false end
+	for _, codes in pairs(InputEvent.WHEEL_LAYER_CODES) do
+		for _, code in pairs(codes) do
+			if self.nav_layer[code] then return true end
+		end
+	end
+	return false
+end
+
+--- The held layer's binding of one wheel direction, or nil.
+--- @param axis string "vertical" or "horizontal".
+--- @param direction integer 1 or -1.
+--- @return table|nil spec
+function M:wheel_binding(axis, direction)
+	if self.layer_depth <= 0 then return nil end
+	local code = InputEvent.wheel_layer_code(axis, direction)
+	return code and self.nav_layer[code] or nil
+end
+
+--- One wheel notch while the navigation layer is held: the binding of that
+--- direction, pressed and released (volume up for each notch, as on Windows),
+--- or nil when the layer leaves this direction alone and the notch scrolls.
+--- @param axis string "vertical" or "horizontal".
+--- @param direction integer 1 or -1, the sign evdev reports.
+--- @return table|nil events Key events to dispatch instead of the notch.
+function M:wheel(axis, direction)
+	local spec = self:wheel_binding(axis, direction)
+	if not spec then return nil end
+	local out = {}
+	for _, chord in ipairs(spec.chords or { spec }) do
+		chord_events(self, out, chord, DOWN)
+		chord_events(self, out, chord, UP)
+	end
+	return out
 end
 
 --- Lets time pass: presses the hold of every key held past its threshold
@@ -1144,16 +1204,20 @@ function M:tick(now_ms)
 		end
 		if tap ~= nil then out[#out + 1] = { tap = tap, binding = binding, owner = pending } end
 	end
-	for code, state in pairs(self.held) do
-		local config = self.by_code[code]
-		if state.hold_pending and now_ms - state.down_at > config.threshold_ms then
-			state.hold_pending = nil
-			local first = #out + 1
-			for _, mod in ipairs(config.mods) do
-				press(self, out, mod)
-				state.emitted[#state.emitted + 1] = mod
+	for code, primary in pairs(self.held) do
+		local group = source_holds[self] and source_holds[self][code]
+		local states = group or { { state = primary } }
+		for _, owner in pairs(states) do
+			local state, config = owner.state, self.by_code[code]
+			if state.hold_pending and now_ms - state.down_at > config.threshold_ms then
+				state.hold_pending = nil
+				local first = #out + 1
+				for _, mod in ipairs(config.mods) do
+					press(self, out, mod)
+					state.emitted[#state.emitted + 1] = mod
+				end
+				for index = first, #out do out[index].owner = code end
 			end
-			for index = first, #out do out[index].owner = code end
 		end
 	end
 	return out
@@ -1162,6 +1226,7 @@ end
 --- Releases everything this engine holds down and forgets its state.
 --- @return table events Key-ups, in the reverse of the order they went down.
 function M:release_all()
+	source_holds[self] = nil
 	local out = {}
 	-- Every key this engine holds down, once, whoever of it holds it.
 	-- Keys the hand still holds stay down: they are the kernel's to release.
@@ -1173,7 +1238,6 @@ function M:release_all()
 	self.undecided = nil
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
 	input_arms[self] = nil
-	caps_word_owners[self], caps_word_presses[self] = nil, nil
 	self.one_shot_swallowed, self.instant_down = {}, {}
 	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}
 	-- The hook swallows the rest of every key it took from this engine, so
@@ -1187,7 +1251,7 @@ end
 --- existing owners and native-under-modifier/instant precedence are unchanged.
 function M:combination_first_available(code)
 	if self.layer_depth > 0 or self.undecided or next(self.held) or self.held[code] or self.native_keys[code] or self.instant_down[code]
-		or self.layer_keys[code] or self.one_shot_until or caps_word_owners[self] then return false end
+		or self.layer_keys[code] or self.one_shot_until then return false end
 	local config = self.by_code[code]
 	if config then
 		if config.instant or config.tap_at_down or (NATIVE_UNDER_MODIFIER[code] or config.native_under_modifier) and modifier_held(self) then return false end

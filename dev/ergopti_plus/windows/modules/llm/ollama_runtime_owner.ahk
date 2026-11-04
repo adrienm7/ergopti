@@ -11,6 +11,15 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../../adapters/ollama_identity.ahk
+
+; Every field of the readiness receipt ollama-runtime-launch.ps1 writes: a foreign
+; or older image must not be admitted, and a field the launcher adds must be added
+; here (test-windows-route-plan.cjs compares the two lists).
+global OLLAMA_RUNTIME_RECEIPT_FIELDS := ["runtime_ticket", "ticket", "root_identity", "version_identity",
+	"manifest_sha256", "origin", "launcher_pid", "child_pid", "child_created_filetime", "ready_file_identity",
+	"leases_held", "proxy_mode", "proxy_tunnel", "proxy_relay"]
+
 /** Holds one exact server task; accepted launch never means AI is enabled. */
 class OllamaRuntimeOwner {
 	/**
@@ -22,9 +31,30 @@ class OllamaRuntimeOwner {
 				|| !this._LocalPath(Options.Get("helper", ""))
 				|| !RegExMatch(Options.Get("helper_sha256", ""), "^[0-9a-f]{64}$")
 			throw TypeError("Runtime ownership requires a trusted launcher path.")
+		; The shared serve environment (OLLAMA_NO_CLOUD) is part of every owned launch.
+		if !this._LocalPath(Options.Get("environment", ""))
+				|| !RegExMatch(Options.Get("environment_sha256", ""), "^[0-9a-f]{64}$")
+			throw TypeError("Runtime ownership requires the captured shared serve environment.")
+		; The proxy the owned daemon reads is looked up by the launcher itself
+		; (ollama-runtime-launch.ps1 Get-OllamaRuntimeProxy) from these captures
+		Proxy := Options.Get("proxy", 0)
+		if !(Proxy is Map)
+			throw TypeError("Runtime ownership requires the captured proxy dependencies.")
+		for Name in ["VendorDirectory", "ProxyPolicyPath", "UpdaterDefaultsPath", "RouteOriginsPath", "ProxyRelayContractPath"]
+			if !this._LocalPath(Proxy.Get(Name, ""))
+				throw TypeError("Runtime proxy capture requires a local path.", -1, Name)
+		for Name in ["VendorSha256", "ProxyPolicySha256", "UpdaterDefaultsSha256", "RouteOriginsSha256", "ProxyRelayContractSha256"]
+			if !RegExMatch(Proxy.Get(Name, ""), "^[0-9a-f]{64}$")
+				throw TypeError("Runtime proxy capture requires its digest.", -1, Name)
+		for Name in ["ProxyRelayDialMs", "ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs"]
+			if !(Proxy.Get(Name, 0) is Integer) || Proxy.Get(Name, 0) <= 0
+				throw TypeError("Runtime proxy capture requires its relay deadlines.", -1, Name)
+		if Proxy.Has("ProxyRelayPath") && (!this._LocalPath(Proxy["ProxyRelayPath"])
+				|| !RegExMatch(Proxy.Get("ProxyRelaySha256", ""), "^[0-9a-f]{64}$"))
+			throw TypeError("An installed relay requires its local path and digest.")
 		if !HasMethod(Options.Get("on_retired", 0), "Call")
 			throw TypeError("Runtime ownership requires an independent physical retirement observer.")
-		for Name in ["spawn", "factory", "read_ready", "clock", "on_error", "on_retired"]
+		for Name in ["spawn", "factory", "read_ready", "live_identity", "clock", "on_error", "on_retired"]
 			if Options.Has(Name) && !HasMethod(Options[Name], "Call")
 				throw TypeError("Runtime native port must be callable.", -1, Name)
 		this.Options := Options.Clone()
@@ -48,6 +78,8 @@ class OllamaRuntimeOwner {
 	}
 
 	_StartNonCritical(Target, Authority, OnReady, OnExit) {
+		if !OllamaNativeIdentityDrain()
+			return false
 		if !this._ValidTarget(Target) || !(Authority is Map)
 				|| !HasMethod(Authority.Get("authorize", 0), "Call")
 				|| !HasMethod(Authority.Get("is_current", 0), "Call")
@@ -91,6 +123,17 @@ class OllamaRuntimeOwner {
 				["StartedTick", "started_tick"], ["DeadlineMs", "deadline_ms"]] {
 				Arguments.Push("-" . Pair[1], String(Target[Pair[2]]))
 			}
+			Arguments.Push("-ServeEnvironmentPath", this.Options["environment"],
+				"-ServeEnvironmentSha256", this.Options["environment_sha256"])
+			for Name in ["VendorDirectory", "VendorSha256", "ProxyPolicyPath", "ProxyPolicySha256",
+					"UpdaterDefaultsPath", "UpdaterDefaultsSha256", "RouteOriginsPath", "RouteOriginsSha256",
+					"ProxyRelayContractPath", "ProxyRelayContractSha256", "ProxyRelayDialMs",
+					"ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs"]
+				Arguments.Push("-" . Name, String(this.Options["proxy"][Name]))
+			; No relay installed: the launcher reads the empty default.
+			if this.Options["proxy"].Has("ProxyRelayPath")
+				Arguments.Push("-ProxyRelayPath", this.Options["proxy"]["ProxyRelayPath"],
+					"-ProxyRelaySha256", this.Options["proxy"]["ProxyRelaySha256"])
 			Spawn := this.Options.Get("spawn", ObjBindMethod(this, "_NativeSpawn"))
 			Task := Spawn.Call(PowerShell, Arguments, ObjBindMethod(this, "_OnTerminal", Record),
 				ObjBindMethod(this, "_AdoptConstruction", Record))
@@ -125,13 +168,15 @@ class OllamaRuntimeOwner {
 		PreviousCritical := Critical("Off")
 		try {
 			Record := this.Record
-			return !(Record is Map) || this._CancelRecord(Record)
+			IdentityRetired := OllamaNativeIdentityDrain()
+			RuntimeRetired := !(Record is Map) || this._CancelRecord(Record)
+			return IdentityRetired && RuntimeRetired
 		} finally Critical(PreviousCritical)
 	}
 
 	/** @returns {Boolean} Includes stable ownership and unacknowledged cleanup. */
 	HasOwner() {
-		return this.Record is Map
+		return this.Record is Map || OllamaNativeIdentityHasDebt()
 	}
 
 	_Current(Record) {
@@ -159,6 +204,7 @@ class OllamaRuntimeOwner {
 		} finally Critical(PreviousCritical)
 		Stopped := !IsObject(Task)
 		if IsObject(Task) {
+			this._CaptureRetirementReceipt(Record, Task)
 			try Stopped := this._True(Task.requestTerminate())
 			catch as Err {
 				this._Report("termination", Err)
@@ -173,6 +219,45 @@ class OllamaRuntimeOwner {
 		if !Stopped || Record["building"]
 			return false
 		return this._Owns(Record) ? this._Release(Record) : !(this.Record is Map)
+	}
+
+
+	_CaptureRetirementReceipt(Record, Task) {
+		; Cancellation may precede logical ObserveReady, or arrive while paused.
+		; Capture only the exact task's file cleanup authority; no READY callback,
+		; inference success or source admission follows from this observation.
+		if !this._Owns(Record) || Record["task"] != Task || Record["ready_file_identity"] != ""
+			return false
+		Read := this.Options.Get("read_ready", ObjBindMethod(this, "_NativeReadReady"))
+		try {
+			Observation := Read.Call(Record["target"].Clone())
+			if !(Observation is Map) || Observation.Count != 2
+					|| !RegExMatch(Observation.Get("image_sha256", ""), "^[0-9a-f]{64}$")
+				return false
+			Receipt := Observation.Get("receipt", 0)
+			if !this._ReceiptHasExactFields(Receipt)
+				return false
+			Target := Record["target"]
+			for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin"]
+				if !(Receipt.Get(Name, 0) is String) || !(Receipt[Name] == Target[Name])
+					return false
+			Pid := Task.processId()
+			if !(Pid is Integer) || Pid <= 0 || !(Receipt.Get("launcher_pid", 0) is Integer)
+					|| Receipt["launcher_pid"] != Pid || !(Receipt.Get("child_pid", 0) is Integer)
+					|| Receipt["child_pid"] <= 0 || Receipt["child_pid"] == Pid
+					|| !(Receipt.Get("child_created_filetime", 0) is Integer) || Receipt.Get("child_created_filetime", 0) <= 0
+					|| !this._True(Receipt.Get("leases_held", 0))
+					|| !RegExMatch(Receipt.Get("ready_file_identity", ""), "^[0-9a-f]{8}:[0-9a-f]{16}$")
+				return false
+			if !this._Owns(Record) || Record["task"] != Task
+				return false
+			Record["ready_file_identity"] := Receipt["ready_file_identity"]
+			Record["ready_image_sha256"] := Observation["image_sha256"]
+			return true
+		} catch as Err {
+			this._Report("retirement receipt", Err)
+			return false
+		}
 	}
 
 	_OnTerminal(Record, ExitCode, Stdout, Stderr) {
@@ -257,25 +342,28 @@ class OllamaRuntimeOwner {
 				|| !RegExMatch(Observation["image_sha256"], "^[0-9a-f]{64}$")
 			return false
 		Receipt := Observation.Get("receipt", 0)
-		if !(Receipt is Map) || Receipt.Count != 10 || !IsObject(Record["task"]) || !this._Current(Record)
+		Task := Record["task"]
+		if !this._ReceiptHasExactFields(Receipt) || !IsObject(Task) || !this._Current(Record)
 				|| !this._ReadyDeadline(Record)
 			return false
 		Target := Record["target"]
 		for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin"]
-			if !(Receipt.Get(Name, 0) is String) || Receipt[Name] !== Target[Name]
+			if !(Receipt.Get(Name, 0) is String) || !(Receipt[Name] == Target[Name])
 				return false
-		Pid := Record["task"].processId()
-		if !(Pid is Integer) || Pid <= 0 || Receipt.Get("launcher_pid", 0) !== Pid
+		Pid := Task.processId()
+		if !(Pid is Integer) || Pid <= 0 || !(Receipt.Get("launcher_pid", 0) is Integer) || Receipt["launcher_pid"] != Pid
 				|| !(Receipt.Get("child_pid", 0) is Integer) || Receipt["child_pid"] <= 0
-				|| Receipt["child_pid"] == Pid || !this._True(Receipt.Get("leases_held", 0))
+				|| Receipt["child_pid"] == Pid || !(Receipt.Get("child_created_filetime", 0) is Integer)
+				|| Receipt.Get("child_created_filetime", 0) <= 0 || !this._True(Receipt.Get("leases_held", 0))
 				|| !(Receipt.Get("ready_file_identity", 0) is String)
 				|| !RegExMatch(Receipt.Get("ready_file_identity", ""), "^[0-9a-f]{8}:[0-9a-f]{16}$")
 			return false
 		PreviousCritical := Critical("On")
 		try {
-			if !this._Owns(Record) || Record["cancelled"] || Record["terminal"] || Record["ready"]
+			if !this._Owns(Record) || Record["task"] != Task || Record["cancelled"] || Record["terminal"] || Record["ready"]
 				return false
 			Record["ready"] := true
+			Record["process_receipt"] := Receipt.Clone()
 			Record["ready_file_identity"] := Receipt["ready_file_identity"]
 			Record["ready_image_sha256"] := Observation["image_sha256"]
 			Callback := Record["on_ready"]
@@ -286,6 +374,23 @@ class OllamaRuntimeOwner {
 		if HasMethod(Callback, "Call")
 			Callback.Call(Target.Clone(), Receipt.Clone())
 		return true
+	}
+
+	/** A retained cleanup task alone cannot authorize another HTTP request. */
+	IdentityReady() {
+		Record := this.Record
+		if !(Record is Map) || !this._Owns(Record) || !Record["ready"]
+				|| Record["cancelled"] || Record["terminal"] || !this._Current(Record)
+			return false
+		Probe := this.Options.Get("live_identity", OllamaNativeIdentityReady)
+		try {
+			Result := Probe.Call(Record.Get("process_receipt", 0), Record["target"].Clone())
+			return Result is Integer && Result == true && this._Owns(Record) && this._Current(Record)
+				&& !Record["cancelled"] && !Record["terminal"]
+		} catch as Err {
+			this._Report("live identity", Err)
+			return false
+		}
 	}
 
 	_AdoptConstruction(Record, Task) {
@@ -302,7 +407,20 @@ class OllamaRuntimeOwner {
 		if !(Now is Integer)
 			throw TypeError("Runtime readiness requires an exact monotonic observation.")
 		Elapsed := Now - Record["target"]["started_tick"]
+		; A timer may retire this exact task while the clock is observed.
 		return Elapsed >= 0 && Elapsed < Record["target"]["deadline_ms"]
+			&& this._Owns(Record) && !Record["cancelled"] && !Record["terminal"] && !A_IsSuspended
+	}
+
+	_ReceiptHasExactFields(Receipt) {
+		global OLLAMA_RUNTIME_RECEIPT_FIELDS
+		if !(Receipt is Map) || Receipt.Count != OLLAMA_RUNTIME_RECEIPT_FIELDS.Length
+			return false
+		for Name in OLLAMA_RUNTIME_RECEIPT_FIELDS {
+			if !Receipt.Has(Name)
+				return false
+		}
+		return true
 	}
 
 	_NativeReadReady(Target) {
@@ -310,6 +428,9 @@ class OllamaRuntimeOwner {
 		if !FileExist(Path)
 			return false
 		Image := FSReadUtf8ExactBounded(Path, 4096)
+		; The launcher readmits its image exclusively for an instant: not ready yet.
+		if !(Image is String)
+			return false
 		return Map("receipt", JsonParse(Image), "image_sha256", CryptoSha256(Image))
 	}
 
@@ -352,7 +473,7 @@ class OllamaRuntimeOwner {
 	}
 
 	_NativeSpawn(Executable, Arguments, OnDone, Adopt) {
-		Factory := this.Options.Get("factory", ShellRunner_SpawnTreeOwned)
+		Factory := this.Options.Get("factory", ProxyOverride_SpawnWorker)
 		Task := Factory.Call(Executable, Arguments, OnDone, , , 0, false, true)
 		Adopt.Call(Task)
 		return Task

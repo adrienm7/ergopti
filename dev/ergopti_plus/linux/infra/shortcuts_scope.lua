@@ -9,16 +9,19 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Parents = require("config_obsolete_parents")
 local Logger = require("logger.shim")
+local ConfigKeys = require("config_keys")
 local LOG = "infra.shortcuts_scope"
 local _owner, _sequence = nil, 0
 local _editor_owner, _editor_path, _editor_pause, _editor_busy = nil, nil, nil, false
+require("infra.scope_registry").register("shortcuts_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("infra.scope_registry").register("shortcuts_editor_scope", function() return _editor_owner ~= nil and _editor_owner.pending() == true end)
 
 --- The script chords' rows of the Shortcuts scope: their section and the
 --- parameters of the bindings they dispatch under. Their submenu's restore and
 --- clear narrow the scope to these rows.
 --- @param parameter_domain function Path -> parameter domain or nil.
 --- @return function select Path -> boolean.
-local SCRIPT_CHORD_SECTION = "shortcuts.script_control"
+local SCRIPT_CHORD_SECTION = ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL
 local function script_chord_rows(parameter_domain)
 	return function(path)
 		return path == SCRIPT_CHORD_SECTION
@@ -27,15 +30,55 @@ local function script_chord_rows(parameter_domain)
 	end
 end
 
+--- The rows of one modifier group of the keyboard slots (Ctrl, Ctrl+Shift,
+--- Alt, Super): every slot its submenu lists and the parameters of the
+--- bindings they dispatch under. The group's restore and clear narrow the
+--- scope to these rows.
+--- @param keyboard table The keyboard slot owner (available_slots, binding_id).
+--- @param prefix string The group's slot prefix.
+--- @return function select Path -> boolean.
+local KEYBOARD_GROUP = "^keyboard_group:(.+)$"
+local function keyboard_group_rows(keyboard, prefix)
+	local paths, parameter_prefixes = {}, {}
+	for _, slot in ipairs(keyboard.available_slots(prefix)) do
+		paths["shortcuts.keyboard." .. slot] = true
+		parameter_prefixes[#parameter_prefixes + 1] = "gesture_parameters." .. keyboard.binding_id(slot) .. "__"
+	end
+	assert(next(paths) ~= nil, "keyboard group " .. tostring(prefix) .. " has no slot")
+	return function(path)
+		if paths[path] then return true end
+		for _, parameter_prefix in ipairs(parameter_prefixes) do
+			if path:sub(1, #parameter_prefix) == parameter_prefix then return true end
+		end
+		return false
+	end
+end
+
+--- Whether `only` names a bindable modifier group of the keyboard slots.
+--- @param keyboard table The keyboard slot owner (SLOT_GROUPS).
+--- @param only string|nil
+--- @return string|nil prefix
+local function keyboard_group_prefix(keyboard, only)
+	local prefix = type(only) == "string" and only:match(KEYBOARD_GROUP) or nil
+	if not prefix then return nil end
+	for _, group in ipairs(keyboard.SLOT_GROUPS) do
+		if group.prefix == prefix and group.add_key ~= nil then return prefix end
+	end
+	return nil
+end
+
 --- Builds one terminal transaction without acquiring or closing input devices.
 --- @param options table Exact path, backup path, files and live pause getter;
----   `only = "script_chords"` narrows it to the script chords' submenu.
+---   `only = "script_chords"` narrows it to the script chords' submenu,
+---   `only = "keyboard_group:<prefix>"` to one modifier group of the keyboard slots.
 --- @return table owner Apply, pending and explicit compensation retry.
 function M.new(options)
 	assert(type(options) == "table" and type(options.is_paused) == "function", "shortcut scope requires live pause ownership")
-	assert(options.only == nil or options.only == "script_chords", "unknown shortcut scope narrowing")
 	local manager = options.manager or require("modules.shortcuts.manager")
 	local keyboard = options.keyboard or require("modules.shortcuts.keyboard_shortcuts")
+	local group_prefix = keyboard_group_prefix(keyboard, options.only)
+	assert(options.only == nil or options.only == "script_chords" or group_prefix ~= nil,
+		"unknown shortcut scope narrowing")
 	local taps = options.taps or require("modules.shortcuts.tap_keys")
 	local chords = options.chords or require("modules.shortcuts.script_chords")
 	local parameters = options.parameters or require("modules.gestures.manager")
@@ -175,11 +218,13 @@ function M.new(options)
 		keyboard = keyboard, parameters = parameters, recognizes = domain,
 	})
 	local edit_source = options.expected_source
+	local collision_inventory
 	local validators = { action_parameter_domain = parameter_domain }
 	--- Resolves every owner's view of a document. The pre-write source is the
 	--- user's, where outdated values are tolerated; the post-write candidate
 	--- (`written`) holds only this scope's output, so owners check it strictly.
-	--- Narrowed to the script chords, only their rows are this scope's output.
+	--- Narrowed to the script chords, only their rows are this scope's output;
+	--- narrowed to a keyboard group, no owner's whole section is.
 	--- @param config table Decoded document.
 	--- @param written boolean|nil True for the post-write candidate.
 	--- @return table state
@@ -189,7 +234,7 @@ function M.new(options)
 		return { manager = manager.configuration_candidate(config),
 			keyboard = keyboard.configuration_candidate(config, others),
 			taps = taps.configuration_candidate(config, others),
-			chords = chords.configuration_candidate(config, written),
+			chords = chords.configuration_candidate(config, group_prefix == nil and written or nil),
 			combinations = combinations and combinations.configuration_candidate(config, others) or nil }
 	end
 	local function inventory()
@@ -251,7 +296,7 @@ function M.new(options)
 		return snapshot
 	end
 	local function apply_state(state)
-		local stopped = { enabled = false, wrap = false, caps_word_active = false, caps_word_triggered = false }
+		local stopped = { enabled = false, wrap = false, caps_word_active = false }
 		if manager.apply_configuration(owner, stopped) ~= true then return false end
 		if keyboard.apply_configuration(owner, state.keyboard) ~= true then return false end
 		if taps.apply_configuration(owner, state.taps) ~= true then return false end
@@ -260,7 +305,8 @@ function M.new(options)
 		if parameters.apply_parameter_configuration(owner, state.parameters) ~= true then return false end
 		return manager.apply_configuration(owner, state.manager) == true
 	end
-	local select_row = options.only == "script_chords" and script_chord_rows(parameter_domain) or nil
+	local select_row = options.only == "script_chords" and script_chord_rows(parameter_domain)
+		or group_prefix and keyboard_group_rows(keyboard, group_prefix) or nil
 	local transaction_options = { path = options.path, backup_path = options.backup_path, files = files,
 		manifest = manifest, owned_paths = inventory, owners = validators, capture = capture, restore = apply_state,
 		select = select_row,
@@ -273,7 +319,7 @@ function M.new(options)
 		end,
 		validate_update = function(scope, row)
 			if scope ~= "shortcuts" or options.only ~= nil then return false end
-			if row.section == "shortcuts.keyboard" then
+			if row.section == ConfigKeys.KEY.SHORTCUTS_KEYBOARD then
 				return keyboard.physical_slot_descriptor(row.key) ~= nil
 					and (row.delete == true or parameters.is_assignable(row.value) == true)
 			end
@@ -420,9 +466,31 @@ function M.new(options)
 	function owner.edit(rows, receipt)
 		rows = PhysicalAvailability.capture_updates(rows)
 		if rows == nil then return false, "save_failed" end
-		if not owner.physical_delivery_available()
-			and PhysicalAvailability.requires_delivery(rows, "gesture_parameters", parameters.split_action_parameter_key) then
-			return false, "unavailable"
+		if PhysicalAvailability.requires_delivery(rows, "gesture_parameters", parameters.split_action_parameter_key) then
+			-- Preserve the original strict capability refusal before observing owners.
+			if not owner.physical_delivery_available() then return false, "unavailable" end
+			-- Parameters change no input identity; their original publisher still
+			-- owns typed validation, source currency, leases and retirement.
+			local mappings = {}
+			for _, row in ipairs(rows) do
+				if PhysicalAvailability.requires_delivery({ row }) then mappings[#mappings + 1] = row end
+			end
+			if #mappings > 0 then
+				if collision_inventory == nil then
+					local constructed, candidate = pcall(function()
+						return require("modules.shortcuts.physical_collisions").new(keyboard, taps, combinations,
+							require("platform.remap.tap_hold_manager"), require("adapters.xkb_capture"))
+					end)
+					if not constructed or type(candidate) ~= "table" or type(candidate.validate) ~= "function" then return false, "unavailable" end
+					collision_inventory = candidate
+				end
+				local observed, free, reason = pcall(collision_inventory.validate, mappings)
+				if not observed or free ~= true then
+					return false, observed and (reason == "collision" or reason == "source_changed") and reason or "unavailable"
+				end
+			end
+			-- Recheck after observers; this partial preflight grants no output rights.
+			if not owner.physical_delivery_available() then return false, "unavailable" end
 		end
 		if receipt ~= nil then
 			local called, expected = pcall(editor_inventory.expected_source, receipt)
@@ -482,7 +550,8 @@ end
 --- Applies a menu request while retaining any refused runtime compensation.
 --- @param mode string Clear or recommended.
 --- @param is_paused function Live pause getter.
---- @param only string|nil "script_chords" for the script chords' submenu.
+--- @param only string|nil "script_chords" for the script chords' submenu,
+---   "keyboard_group:<prefix>" for one modifier group of the keyboard slots.
 --- @return boolean committed
 function M.apply(mode, is_paused, only)
 	if type(is_paused) ~= "function" or is_paused() or (mode ~= "clear" and mode ~= "recommended") then return false end

@@ -4,14 +4,17 @@
 --- MODULE: LLM Prediction Line (Shared)
 --- DESCRIPTION:
 --- Decides what one line of the prediction tooltip reads: the prefix in front
---- of it, and the pieces of its text with the role each one plays.
+--- of it, the pieces of its text with the role each one plays, and the chord
+--- its right-aligned shortcut column shows.
 ---
 --- WHY IT IS SHARED:
 --- macOS drew this first, inside its canvas code. Linux then drew plain text
 --- with the indentation read the other way round, and Windows painted a whole
 --- line in the correction colour. One rule, read by the two Lua drivers and
 --- ported by the Windows one (ui/tooltip/llm.ahk), pinned on the three by
---- _shared/tests/corpus/tooltip/llm_line_vectors.json.
+--- _shared/tests/corpus/tooltip/llm_line_vectors.json. The shortcut labels
+--- once differed the same way (glyphs on Windows, no hint for bare digits,
+--- inline after the text); llm_shortcut_vectors.json pins them now.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Roles, not colours. A piece is "typed" (already in the document),
@@ -142,6 +145,93 @@ function M.segments(prediction, is_selected)
 	end
 
 	return segments
+end
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 3/ Shortcut column ==================
+-- =============================================
+-- =============================================
+
+--- Splits one comma-separated [llm_ui] list of constants.toml.
+--- @param value string
+--- @return table
+local function split_list(value)
+	local items = {}
+	for item in tostring(value or ""):gmatch("[^,]+") do items[#items + 1] = item end
+	return items
+end
+
+--- The shortcut spec of one OS from the [llm_ui] keys of constants.toml.
+--- @param order string shortcut_modifier_order.
+--- @param joiner string The OS's shortcut_joiner_*.
+--- @param label function Names one modifier of the order, asked at each
+---   rendering so a language switch is followed: the shared key name table's
+---   glyph on macOS, its translated name on Windows and Linux.
+--- @return table|nil spec { order, label, joiner }, nil when malformed.
+function M.shortcut_spec(order, joiner, label)
+	local names = split_list(order)
+	if #names == 0 or type(joiner) ~= "string" or type(label) ~= "function" then return nil end
+	return { order = names, label = label, joiner = joiner }
+end
+
+--- The chord that inserts prediction `index`, as its row shows it.
+---
+--- The modifiers come in the spec's order whatever order the configuration
+--- lists them in; the digit is the index, 0 for the tenth row. Rows past the
+--- tenth have no digit, so they show nothing.
+--- @param index number One-based prediction row.
+--- @param modifiers table Validation modifier names ("ctrl", "alt", ...).
+--- @param spec table From shortcut_spec.
+--- @return string The label, "" when the row has no chord.
+function M.shortcut_label(index, modifiers, spec)
+	if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > 10 then return "" end
+	local present = {}
+	for _, name in ipairs(type(modifiers) == "table" and modifiers or {}) do present[name] = true end
+	local parts = {}
+	for _, name in ipairs(spec.order) do
+		if present[name] then parts[#parts + 1] = spec.label(name) end
+	end
+	parts[#parts + 1] = index == 10 and "0" or tostring(index)
+	return table.concat(parts, spec.joiner)
+end
+
+--- How wide the prediction block wants to be with its shortcut column.
+---
+--- Widths are measured by each driver in its own font, so a proportional font
+--- needs no padding of spaces and the indentation, which is part of a line's
+--- measured width, cannot displace the column. The block never passes
+--- max_width: the lines give way so the column stays on the panel.
+--- @param widest_line number Widest line, prefix included, over every rendering.
+--- @param widest_label number Widest shortcut label, 0 when no row has one.
+--- @param gap number [layout].label_gap.
+--- @param max_width number [layout].llm_max_content_width.
+--- @return table { zone_w, preds_w }: the column and its gap, the whole block.
+function M.shortcut_column(widest_line, widest_label, gap, max_width)
+	local zone_w = widest_label > 0 and (gap + widest_label) or 0
+	return { zone_w = zone_w, preds_w = math.min(widest_line + zone_w, max_width) }
+end
+
+--- Where one row goes once the panel's content width is settled.
+---
+--- The panel can end up wider than the prediction block (a footer widens it),
+--- so the column hangs from the panel's right edge, never from the end of the
+--- widest line: a label placed from the line stays stuck to the text.
+--- @param content_w number Panel width between the paddings.
+--- @param zone_w number From shortcut_column.
+--- @param label_w number This row's label.
+--- @param line_w number This row's line.
+--- @return table { label_x, line_limit, truncated }, offsets from the content's left.
+function M.column_placement(content_w, zone_w, label_w, line_w)
+	local line_limit = content_w - zone_w
+	return {
+		label_x = content_w - label_w,
+		line_limit = line_limit,
+		truncated = line_w > line_limit,
+	}
 end
 
 return M

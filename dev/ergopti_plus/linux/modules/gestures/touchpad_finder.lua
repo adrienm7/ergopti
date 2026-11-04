@@ -49,6 +49,7 @@
 
 local M = {}
 
+local Errors = require("adapter_errors")
 local Logger = require("logger.shim")
 
 local LOG = "gestures.touchpad_finder"
@@ -200,7 +201,7 @@ function M.describe(device)
 	}
 
 	if not out.path then
-		out.reason = "no event node"
+		out.reason = Errors.TOUCHPAD_NO_EVENT_NODE
 		return out
 	end
 
@@ -208,13 +209,13 @@ function M.describe(device)
 	-- say "Touchpad" on something that reports a single point, and a real pad can
 	-- be named after its chipset.
 	if not M.bit_set(device.abs or "", ABS_MT_SLOT) then
-		out.reason = "no ABS_MT_SLOT — cannot report per-finger positions"
+		out.reason = Errors.TOUCHPAD_NO_MULTITOUCH_SLOT
 		return out
 	end
 
 	if not (M.bit_set(device.prop or "", INPUT_PROP_POINTER)
 		or M.bit_set(device.prop or "", INPUT_PROP_BUTTONPAD)) then
-		out.reason = "not a pointing device"
+		out.reason = Errors.TOUCHPAD_NOT_POINTING_DEVICE
 		return out
 	end
 
@@ -293,18 +294,7 @@ function M.find(text)
 	return chosen, nil
 end
 
---- Whether a gesture slot can ever fire on this hardware.
----
---- Answers TRUE when the capability is unknown. A wrong parse must not remove a
---- gesture that works; the worst it may do is fail to explain one that cannot.
---- @param slot string e.g. "swipe_5_up", "tap_4"
---- @param max_fingers integer|nil 0 or nil means unknown.
---- @return boolean
-function M.slot_is_reachable(slot, max_fingers)
-	if type(max_fingers) ~= "number" or max_fingers <= 0 then return true end
-	local needed = tostring(slot):match("^swipe_(%d)_") or tostring(slot):match("^tap_(%d)$")
-	if not needed then return true end
-	return tonumber(needed) <= max_fingers
-end
+--- Whether a gesture slot can ever fire on this hardware (gestures/slot_report.lua).
+M.slot_is_reachable = require("modules.gestures.slot_report").slot_is_reachable
 
 return M

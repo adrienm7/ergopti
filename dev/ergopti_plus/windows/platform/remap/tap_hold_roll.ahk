@@ -63,7 +63,7 @@ global TAPHOLD_ROLL_REPLAY_SEND_LEVEL := 4
 _TapHoldRollState() {
 	static State := Map("key", "", "sc", 0, "name", "", "down_at", 0, "threshold_ms", 0,
 		"tap_fn", 0, "press_fn", 0, "queue", [], "waiting", false, "generation", 0,
-		"tapping", "", "outcomes", Map())
+		"tapping", "", "tap_down_at", 0, "outcomes", Map())
 	return State
 }
 
@@ -105,7 +105,9 @@ TapHoldKeyRolls(KeyId) {
 ; the block of hotkeys in tap_hold_roll_keys.ahk.
 ; @returns {Boolean}
 TapHoldRollUndecided() {
-	return _TapHoldRollState()["key"] != ""
+	global _KeyCombinationChordBusy
+	; A key waiting for its chord partner holds the next characters the same way.
+	return (IsSet(_KeyCombinationChordBusy) && _KeyCombinationChordBusy) || _TapHoldRollState()["key"] != ""
 }
 
 ; Whether the tap of KeyId is being typed by the roll owner now: the keys
@@ -113,6 +115,14 @@ TapHoldRollUndecided() {
 ; @returns {Boolean}
 TapHoldRollTapIsRunning(KeyId) {
 	return _TapHoldRollState()["tapping"] == KeyId
+}
+
+; The tick at which the key whose tap is being typed now went down. A tap is typed
+; when the key comes up (or when the next key goes down), so a time gate on the
+; character it types would otherwise count the time the key stayed down.
+; @returns {Integer} A_TickCount of the press, 0 outside a roll tap.
+TapHoldRollTapDownTick() {
+	return _TapHoldRollState()["tap_down_at"]
 }
 
 
@@ -256,6 +266,7 @@ _TapHoldRollResolve(Decision, OnlyKeyId := "", Ports := 0) {
 		TapFn := State["tap_fn"]
 		PressFn := State["press_fn"]
 		Queue := State["queue"]
+		DownAt := State["down_at"]
 		State["key"] := ""
 		State["queue"] := []
 		Outcome := Map("decision", Decision, "pressed", false)
@@ -267,11 +278,16 @@ _TapHoldRollResolve(Decision, OnlyKeyId := "", Ports := 0) {
 		Outcome["pressed"] := PressFn.Call() ? true : false
 	} else {
 		Previous := State["tapping"]
+		PreviousDownAt := State["tap_down_at"]
 		State["tapping"] := KeyId
+		State["tap_down_at"] := DownAt
 		try TapFn.Call()
-		finally State["tapping"] := Previous
+		finally {
+			State["tapping"] := Previous
+			State["tap_down_at"] := PreviousDownAt
+		}
 	}
-	if (Queue.Length > 0)
+	if (!A_IsSuspended && Queue.Length > 0)
 		_TapHoldRollPort(Ports, "replay", _TapHoldRollReplay).Call(Queue)
 }
 
@@ -279,13 +295,20 @@ _TapHoldRollResolve(Decision, OnlyKeyId := "", Ports := 0) {
 ; the release of a key whose press a hotkey suppressed, and a key still held
 ; types on through its own auto-repeat.
 ; @param ScanCodes {Array} Scan codes, extended ones above 0x100.
-_TapHoldRollReplay(ScanCodes) {
+; @param SendFn {Func} Keystroke sender; injectable without typing into the OS.
+_TapHoldRollReplay(ScanCodes, SendFn := SendEvent) {
 	global TAPHOLD_ROLL_REPLAY_SEND_LEVEL
+	if A_IsSuspended
+		return
 	PreviousLevel := A_SendLevel
 	SendLevel(TAPHOLD_ROLL_REPLAY_SEND_LEVEL)
 	try {
-		for Sc in ScanCodes
-			SendEvent("{Blind}{" . Format("SC{:03X}", Sc) . "}")
+		for Sc in ScanCodes {
+			; SendEvent may yield between keys: a pause interrupts this same thread.
+			if A_IsSuspended
+				return
+			SendFn.Call("{Blind}{" . Format("SC{:03X}", Sc) . "}")
+		}
 	} finally SendLevel(PreviousLevel)
 }
 
@@ -296,10 +319,17 @@ _TapHoldRollReplay(ScanCodes) {
 ;        "replay"(ScanCodes).
 TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 	global TAPHOLD_ROLL_POLL_MS
+	if A_IsSuspended
+		return
 	Name := IsSet(HotkeyName) ? HotkeyName : A_ThisHotkey
 	if !RegExMatch(Name, "i)SC([0-9A-F]{3})$", &Found)
 		throw ValueError("A typing-key roll hotkey must be named by its scan code.", -1, Name)
 	Sc := Integer("0x" . Found[1])
+	global _KeyCombinationChordBusy
+	if (IsSet(_KeyCombinationChordBusy) && _KeyCombinationChordBusy) {
+		KeyCombinationChordInterrupt(Sc)
+		return
+	}
 	IsDown := _TapHoldRollPort(Ports, "is_down", _TapHoldRollScIsDown)
 	Tick := _TapHoldRollPort(Ports, "tick", _TapHoldModifierTickNow)
 	Wait := _TapHoldRollPort(Ports, "sleep", Sleep)
@@ -331,6 +361,12 @@ TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 		return
 	}
 	loop {
+		; Suspend leaves this waiting hotkey thread alive. Cancel before another
+		; physical-state poll, and let the owner release its press claim.
+		if A_IsSuspended {
+			_TapHoldRollResolve("tap", , Ports)
+			return
+		}
 		; Decided by a key struck after this one, which sent this one again too.
 		if (State["key"] == "" || State["generation"] != Generation)
 			return
@@ -346,8 +382,8 @@ TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 	}
 }
 
-; Whether the key of a scan code is physically down.
+; Whether the key of a scan code is held, a replayed press included.
 _TapHoldRollScIsDown(Sc) {
-	return GetKeyState(Format("SC{:03X}", Sc), "P")
+	return KS_IsHeld(Format("SC{:03X}", Sc))
 }
 

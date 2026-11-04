@@ -1,0 +1,12 @@
+# _shared/tests/corpus/config_migration_registries/rename_prefix_extends_prefix.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Defect: a new prefix that extends the old one would rename again on replay."
+ops = [{ op = "rename_prefix", section = "gestures.action_parameters", prefix = "keyboard__cmd_", to_prefix = "keyboard__cmd_primary_" }]

@@ -23,9 +23,11 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
+local NativePath = require("native_path")
 local Manifest      = require("infra.manifest_reader")
 local DeferredWork  = require("infra.deferred_work")
 local Timings       = require("infra.timings")
+local PhaseStats    = require("infra.phase_stats")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
@@ -34,15 +36,25 @@ local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
 local NumberRowPolicy = require("layout.number_row_policy")
+local PauseSwitchPolicy = require("layout.pause_switch_policy")
 local LOG           = "menu.keyboard_layout"
 
 M.DEFAULT_STATE = {
-	layout_number_row_mode       = Manifest.default_for("layout.direct_access_digits"),
-	layout_pause_switch_enabled = Manifest.default_for("layout.pause_switch_enabled"),
-	layout_on_pause             = Manifest.default_for("layout.on_pause"),
-	layout_on_resume            = Manifest.default_for("layout.on_resume"),
+	layout_number_row_mode       = Manifest.default_for(require("config_keys").KEY.LAYOUT_DIRECT_ACCESS_DIGITS),
+	layout_pause_switch_enabled = Manifest.default_for(require("config_keys").KEY.LAYOUT_PAUSE_SWITCH_ENABLED),
+	layout_on_pause             = Manifest.default_for(require("config_keys").KEY.LAYOUT_ON_PAUSE),
+	layout_on_resume            = Manifest.default_for(require("config_keys").KEY.LAYOUT_ON_RESUME),
 	-- config.toml [ui] menubar_icon; its values and default are the manifest's.
-	menubar_icon                = Manifest.default_for("ui.menubar_icon"),
+	menubar_icon                = Manifest.default_for(require("config_keys").KEY.UI_MENUBAR_ICON),
+	-- config.toml [layout] virtual_keyboard: the Karabiner virtual keyboard type.
+	layout_virtual_keyboard     = Manifest.default_for(require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD),
+}
+
+-- The phases one build records, so the field run's menu step names the one
+-- that costs (number_row and magic_key run inside rows).
+M.PHASES = {
+	"menu_keyboard_layout.sources", "menu_keyboard_layout.bundles", "menu_keyboard_layout.variants",
+	"menu_keyboard_layout.rows", "menu_keyboard_layout.number_row", "menu_keyboard_layout.magic_key",
 }
 
 
@@ -143,7 +155,7 @@ M._version_gt        = version_gt
 local function schedule_menu_refresh(update_menu)
 	if type(update_menu) ~= "function" then return false end
 	return DeferredWork.after(POST_INSTALL_REFRESH_DELAY,
-		function() pcall(update_menu) end,
+		update_menu,
 		"menu_keyboard_layout.refresh")
 end
 
@@ -158,7 +170,7 @@ end
 local function defer_tis_call(fn)
 	if type(fn) ~= "function" then return false end
 	return DeferredWork.after(TIS_CALL_DELAY,
-		function() pcall(fn) end,
+		fn,
 		"menu_keyboard_layout.tis_call")
 end
 
@@ -281,6 +293,53 @@ local function build_install_item(scope_label, emoji_install, installed, latest_
 	return layout_declared_row("layout_bundle_install", { layout_install = do_install }, getters)
 end
 
+--- The number-row rows: the stored choice, applied to the layout typing now by
+--- rebuilding it live (modules/keymap/number_row_live.lua), or greyed with the
+--- reason while no layout of ours types. The choice is saved first, then applied.
+--- @param state table|nil Live menu state.
+--- @param save_prefs function|nil Persists the state.
+--- @param update_menu function|nil Redraws the menu.
+--- @param render_ctx table The renderer context holding the row commands.
+--- @return table rows
+local function number_row_rows(state, save_prefs, update_menu, render_ctx)
+	local ManifestMenu = require("infra.manifest_menu")
+	if type(state) ~= "table" then return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
+	local Live = require("modules.keymap.number_row_live")
+	-- Timed here rather than around the call: the menu parity proofs read the
+	-- provider call shapes of M.build.
+	local started = PhaseStats.now()
+	local available, reason = Live.available()
+	PhaseStats.stop("menu_keyboard_layout.number_row", started)
+	local function stored()
+		return { order = state.layout_number_row_mode, edges = state.layout_number_row_reorder_edges == true }
+	end
+	local function store(key, value)
+		local previous = state[key]
+		state[key] = value
+		if type(save_prefs) ~= "function" or save_prefs() ~= true then
+			state[key] = previous
+			return false
+		end
+		Logger.info(LOG, "Number-row option %s set to %s.", key, tostring(value))
+		Live.apply(stored(), function(applied, code)
+			if not applied and code ~= Live.REASON_NO_SOURCE then
+				pcall(notifications.notify, i18n.get("layouts.rows_not_applied"), nil, "error")
+			end
+			schedule_menu_refresh(update_menu)
+		end)
+		return true
+	end
+	if not available then Logger.debug(LOG, "Number-row rows greyed: %s.", tostring(reason)) end
+	return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {
+		available = available,
+		reason_key = "platform_reason.number_row_live_no_layout",
+		get_order = function() return stored().order end,
+		get_edges = function() return stored().edges end,
+		set_order = function(value) return store("layout_number_row_mode", value) end,
+		set_edges = function(value) return store("layout_number_row_reorder_edges", value == true) end,
+	})
+end
+
 function M.build(ctx)
 	local update_menu  = ctx and ctx.updateMenu
 	local refresh_icon = ctx and ctx.refresh_icon
@@ -301,6 +360,10 @@ function M.build(ctx)
 	-- list_active_keyboard_layouts() returns rich records {id, name, selected}
 	-- filtered to actual keyboard layouts, so the menu never displays
 	-- internal services (PressAndHold, CharacterPalette, …).
+	-- Each stage is a named phase: the row costs 42 ms on a field Mac but 100 to
+	-- 420 ms in some rebuilds (2026-10-30 report), and only the hold report's
+	-- phase list can say which stage the slow ones spend it in.
+	local stage_started = PhaseStats.now()
 	local records    = list_active_keyboard_layouts()
 	-- Build the active-Ergopti set directly from records — the same source used
 	-- to display the i18n.get("menu.layout.active_layouts") list below. If an entry appears there
@@ -327,7 +390,9 @@ function M.build(ctx)
 		end
 	end
 	local list_state = ergopti_in_active_layouts(records)
+	PhaseStats.stop("menu_keyboard_layout.sources", stage_started)
 
+	stage_started = PhaseStats.now()
 	local latest = M.pick_latest_bundle(bundles_dir)
 	-- The list-upgrade only makes sense once the latest bundle is on disk —
 	-- TIS can't enable an input source whose .bundle isn't installed.
@@ -393,8 +458,10 @@ function M.build(ctx)
 		installed_dir  = USER_LAYOUTS_DIR
 		installed_name = user_best.name
 	end
+	PhaseStats.stop("menu_keyboard_layout.bundles", stage_started)
+	stage_started = PhaseStats.now()
 	local bundle_full_path = (installed_dir and installed_name) and
-		(installed_dir:gsub("[/\\]$", "") .. "/" .. installed_name) or ""
+		(NativePath.without_trailing_separators(installed_dir) .. "/" .. installed_name) or ""
 	local variants = bundle_full_path ~= "" and install.bundle_variants(bundle_full_path) or {}
 	local all_variants_active = #variants > 0
 	local active_variant_count = 0
@@ -408,6 +475,8 @@ function M.build(ctx)
 	-- Installed bundle version: system preferred, then user. Used for the label in state 1.
 	-- We derive this from the filesystem, not from TIS, which is unreliable on Sequoia.
 	local installed_ver = (system_best and system_best.version) or (user_best and user_best.version)
+	PhaseStats.stop("menu_keyboard_layout.variants", stage_started)
+	stage_started = PhaseStats.now()
 	Logger.debug(LOG,
 		"Active layout state — stable=%d/%d legacy=%d installed=%s latest_installed=%s.",
 		active_variant_count, #variants, #legacy_active,
@@ -465,9 +534,25 @@ function M.build(ctx)
 						defer_tis_call(function()
 							enable_keylayout_source_async(var.keylayout, label,
 								function(ok)
-									if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), label), nil, "success") end
-									if not ok then pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error") end
-									schedule_menu_refresh(update_menu)
+									if not ok then
+										pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error")
+										schedule_menu_refresh(update_menu)
+										return
+									end
+									-- The preference turns it on at once, but only a process started
+									-- after the write sees it (probe v5): Hammerspoon's list is stale.
+									input_sources.confirm_enabled_async(var.tis_id, {}, function(read, state)
+										if read and state.enabled == true then
+											-- macOS asks the user to allow a keyboard it has not seen before.
+											pcall(notifications.notify, string.format(i18n.get("menu.layout.add_consent"), label), nil, "success")
+										elseif read then
+											Logger.warn(LOG, "Layout '%s' is listed but not turned on (reason=not_enabled:macos_requires_logout).", label)
+											pcall(notifications.notify, string.format(i18n.get("menu.layout.add_pending_logout"), label), nil, "info")
+										else
+											pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error")
+										end
+										schedule_menu_refresh(update_menu)
+									end)
 								end)
 						end)
 					end,
@@ -529,7 +614,7 @@ function M.build(ctx)
 	if #records == 0 then
 		local ManifestMenu = require("infra.manifest_menu")
 		return ManifestMenu.template_rows("layout_active_source_empty_commands", {
-			["layout_open_preferences"] = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
+			[require("config_keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
 		}, {}, {}) or {}
 	else
 		for _, r in ipairs(records) do
@@ -558,7 +643,7 @@ function M.build(ctx)
 
 	-- Pause / resume layout switching — two dropdowns that let the user pick which
 	-- keyboard layout to activate automatically when the script is paused or resumed.
-	-- Nil / "auto" means "do nothing" (default). Stored in state.layout_on_pause and
+	-- Nil / "" means "do nothing" (default). Stored in state.layout_on_pause and
 	-- state.layout_on_resume so they survive a reload via preferences.lua.
 	local state      = ctx and ctx.state
 	local save_prefs = ctx and ctx.save_prefs
@@ -570,8 +655,9 @@ function M.build(ctx)
 		local feature_on = state.layout_pause_switch_enabled and true or false
 		local cur_pause, cur_resume = state.layout_on_pause, state.layout_on_resume
 		local function target_label(current)
-			return (current and current ~= false and current ~= "")
-				and display_for_record({ id = current, name = current:gsub("_", " "):gsub("%s+v%d.*$", "") })
+			local id = PauseSwitchPolicy.target_id(current)
+			return id
+				and display_for_record({ id = id, name = id:gsub("_", " "):gsub("%s+v%d.*$", "") })
 				or i18n.get("menu.layout.layout_auto")
 		end
 		local getters = {
@@ -598,7 +684,7 @@ function M.build(ctx)
 			local native_rows = {}
 			local picker_getters = {
 				layout_picker_auto_checked = function()
-					return current_id == nil or current_id == false or current_id == ""
+					return PauseSwitchPolicy.target_id(current_id) == nil
 				end,
 				layout_picker_has_choices = function() return #records > 0 end,
 			}
@@ -678,8 +764,8 @@ function M.build(ctx)
 	for key, value in pairs(type(ctx) == "table" and type(ctx.state_getters) == "table" and ctx.state_getters or {}) do
 		render_ctx.state_getters[key] = value
 	end
-	render_ctx.state_getters["ui.menubar_icon"] = function() return state and state.menubar_icon end
-	render_ctx.commands["menubar_icon"] = function(variant)
+	render_ctx.state_getters[require("config_keys").KEY.UI_MENUBAR_ICON] = function() return state and state.menubar_icon end
+	render_ctx.commands[require("config_keys").COMMAND.MENUBAR_ICON] = function(variant)
 		if not state then return false end
 		state.menubar_icon = variant
 		if type(save_prefs) ~= "function" or save_prefs() ~= true then return false end
@@ -690,7 +776,33 @@ function M.build(ctx)
 		if type(update_menu) == "function" then pcall(update_menu) end
 		return true
 	end
-	render_ctx.commands["layout_manager"] = LayoutManagerWindow.menu_command()
+	render_ctx.state_getters[require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD] = function() return state and state.layout_virtual_keyboard end
+	render_ctx.commands[require("config_keys").COMMAND.VIRTUAL_KEYBOARD] = function(choice)
+		if not state then return false end
+		local previous = state.layout_virtual_keyboard
+		state.layout_virtual_keyboard = choice
+		if type(save_prefs) ~= "function" or save_prefs() ~= true then
+			state.layout_virtual_keyboard = previous
+			return false
+		end
+		Logger.info(LOG, "Karabiner virtual keyboard set to %s.", tostring(choice))
+		-- The deployed karabiner.json names its keys for this product, so it is
+		-- regenerated now rather than at the next unrelated change.
+		local karabiner = ctx and ctx.karabiner
+		if type(karabiner) == "table" and type(karabiner.regenerate) == "function" then
+			local called, accepted = pcall(karabiner.regenerate, function(ok, reason)
+				if ok ~= true then
+					Logger.warn(LOG, "The Karabiner virtual keyboard is not redeployed yet: %s.", tostring(reason))
+				end
+			end)
+			if not called then
+				Logger.error(LOG, "The Karabiner virtual keyboard redeploy raised: %s.", tostring(accepted))
+			end
+		end
+		if type(update_menu) == "function" then pcall(update_menu) end
+		return true
+	end
+	render_ctx.commands[require("config_keys").COMMAND.LAYOUT_MANAGER] = LayoutManagerWindow.menu_command()
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		render_ctx.commands[command] = function()
 			if ctx.paused == true or type(ctx.apply_preference_scope) ~= "function" then return false end
@@ -698,7 +810,8 @@ function M.build(ctx)
 		end
 	end
 	-- Native-only status never acquires a preference or forced-input writer.
-	render_ctx.commands["number_row_mode"] = function() return false end
+	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
+	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
 	local function bundle_frame_rows()
 		local function system_provider() return latest and {bundle_rows[1]} or {} end
 		local function user_provider() return latest and {bundle_rows[2]} or {} end
@@ -725,13 +838,13 @@ function M.build(ctx)
 	local active_rows = active_layout_rows()
 	if active_rows == nil then return nil end
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
-		["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end,
+		["number_row_policy"] = function() return number_row_rows(state, save_prefs, update_menu, render_ctx) end,
 		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = function() return active_rows end,
 		["layout_bundle"] = function() return declared_bundle_rows end,
 		["layout_switching"] = function() return switching_rows end,
 		-- The physical magic key, chosen by pressing it or from the candidates.
-		["magic_key_source"] = function()
+		[require("config_keys").LEAF.MAGIC_KEY_SOURCE] = function()
 			return MagicKeySourceMenu.rows({
 				state = state, save_prefs = save_prefs, keymap = ctx and ctx.keymap,
 				update_menu = update_menu, paused = ctx and ctx.paused,
@@ -742,6 +855,7 @@ function M.build(ctx)
 	-- `submenu`, not `items`: these rows are already materialised. The tray
 	-- renders `items` as provider data, where every `title`/`fn` row is dropped,
 	-- which left this submenu empty on the real menu bar.
+	PhaseStats.stop("menu_keyboard_layout.rows", stage_started)
 	if type(submenu) ~= "table" or type(ManifestMenu.group_row) ~= "function" then return nil end
 	return ManifestMenu.group_row("layout_native_parent", "layout_parent_content", submenu, {})
 end
@@ -801,17 +915,19 @@ function M.set_layout_by_kl_name_async(kl_name, on_done)
 	return set_input_source_async(localised, kl_name, on_done)
 end
 
---- The layout a pause (or a resume) switches to, or nil when switching is off
---- or set to « no change ». Pause, resume and quit all read it here.
+--- The layout an event switches to, or nil when switching is off or set to
+--- « no change ». Pause, resume and quit all read it here, through the policy
+--- the Windows and Linux drivers share (_shared/lua/layout/pause_switch_policy.lua).
 --- @param state table|nil Menu state (layout_pause_switch_enabled, layout_on_pause, layout_on_resume).
---- @param is_paused boolean True for the pause target, false for the resume one.
+--- @param event string "pause", "resume" or "quit".
 --- @return string|nil kl_name
-local function switch_target(state, is_paused)
-	if type(state) ~= "table" or not state.layout_pause_switch_enabled then return nil end
-	local target = is_paused and state.layout_on_pause or state.layout_on_resume
-	-- Nil / false / "auto" / "" all mean « do nothing » (the dropdowns default to false).
-	if type(target) ~= "string" or target == "" then return nil end
-	return target
+local function switch_target(state, event)
+	if type(state) ~= "table" then return nil end
+	return PauseSwitchPolicy.target({
+		enabled = state.layout_pause_switch_enabled,
+		on_pause = state.layout_on_pause,
+		on_resume = state.layout_on_resume,
+	}, event)
 end
 
 --- Switches to the pause layout before ErgoptiPlus quits: quitting leaves the
@@ -821,7 +937,7 @@ end
 ---   switch was started (set_input_source_async answers on every path).
 --- @return string "none" when nothing is configured, "pending" once on_done is owed.
 function M.apply_quit_layout(state, on_done)
-	local target = switch_target(state, true)
+	local target = switch_target(state, "quit")
 	if target == nil then return "none" end
 	Logger.info(LOG, "Quit: applying the pause keyboard layout.")
 	-- Looked up on M at call time so a test stub on the module is honoured.
@@ -909,7 +1025,7 @@ end
 --- @param schedule function|nil Injectable scheduler(fn) for tests.
 --- @return string|nil The target layout that was scheduled, or nil when no switch is needed.
 function M.schedule_pause_layout_switch(is_paused, state, schedule)
-	local target = switch_target(state, is_paused)
+	local target = switch_target(state, is_paused and "pause" or "resume")
 	if target == nil then return nil end
 	-- Resolve hs.timer lazily so the module stays loadable in the cross-platform
 	-- test harness where hs is absent and the scheduler is injected.

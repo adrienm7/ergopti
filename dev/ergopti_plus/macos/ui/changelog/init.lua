@@ -10,8 +10,9 @@
 --- duplication.
 ---
 --- FEATURES & RATIONALE:
---- 1. Native fetch proxy: hs.http.asyncGet (NSURLSession, which applies the
----    system proxy and PAC settings) is used instead of the WebKit fetch() API.
+--- 1. Native fetch proxy: adapters.http_client (hs.http over NSURLSession, which
+---    applies the system proxy and PAC settings, with the adapter's own redirect
+---    policy) is used instead of the WebKit fetch() API.
 ---    The Lua backend injects the result via evaluateJavaScript("injectReleases(…)")
 ---    so the JS never touches the network directly.
 --- 1b. Bounded sources: every request carries a deadline, and a failed GitHub
@@ -38,6 +39,14 @@
 ---    (modules/updater/release_installer.lua) before the controlled quit. Each
 ---    phase reaches the page through setInstallProgress(). The restore banner
 ---    posts restore_backup; the driver reloads on the restored configuration.
+--- 6. Feed-only list: the Atom feed names no files and no digests, so a direct
+---    install is refused (install_error_no_details). Sparkle verifies a release
+---    on its own, against the EdDSA signature of the channel's appcast, and
+---    installs that channel's newest release only. The page therefore offers
+---    install_through_updater for the channel's newest feed release when the
+---    shared offer rule offers it; the host checks that again against the tags
+---    it read from the same feed, then asks Sparkle to check that channel
+---    (modules/updater/feed_handoff.lua), and Sparkle shows its own dialog.
 --- ==============================================================================
 
 local M = {}
@@ -49,9 +58,11 @@ local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
+local HttpClient = require("adapters.http_client")
 local Json       = require("json")
 local JsonCodec  = require("adapters.json_codec")
 local ReleaseSources = require("updater.release_sources")
+local RepositoryUrl = require("updater.repository_url")
 local UpdateChannels = require("updater.channels")
 local DocumentCsp = require("webview.document_csp")
 local ReleaseInstall = require("updater.release_install")
@@ -111,14 +122,18 @@ local function registry_channel(channel, purpose)
 	return nil
 end
 
---- Bounded GET over hs.http. NSURLSession honours the system proxy; the
---- deadline guarantees one terminal answer even when a proxy holds the socket.
+--- Bounded GET through the HttpClient adapter. NSURLSession still honours the
+--- system proxy, but the adapter, not the opaque native auto-follow, owns the
+--- redirects: an HTTPS response never downgrades to HTTP and every hop stays
+--- inside one request. The outer deadline guarantees one terminal answer even
+--- when a proxy holds the socket.
 --- @param url string
 --- @param headers table
 --- @param timeout_ms number
 --- @param callback function Receives status, body, err exactly once.
 local function http_get(url, headers, timeout_ms, callback)
 	local settled = false
+	local client = HttpClient.new({ timeout_ms = timeout_ms })
 	local function settle(status, body, err)
 		if settled then return end
 		settled = true
@@ -126,21 +141,22 @@ local function http_get(url, headers, timeout_ms, callback)
 	end
 	-- The deadline is armed before the request so a request that raises or never
 	-- answers still ends; an unarmed deadline is itself a terminal failure.
-	if not DeferredWork.after(timeout_ms / 1000, function() settle(0, "", "timeout") end,
-		"changelog.fetch_deadline")
+	if not DeferredWork.after(timeout_ms / 1000, function()
+		settle(0, "", "timeout")
+		client.cancel()
+	end, "changelog.fetch_deadline")
 	then
 		settle(0, "", "deadline unavailable")
 		return
 	end
-	local ok = pcall(hs.http.asyncGet, url, headers, function(status, body, _)
-		status = tonumber(status) or 0
-		if status < 0 then
-			settle(0, "", "network error " .. tostring(status))
+	local ok, accepted = pcall(client.get, url, headers, function(result)
+		if result.status == 0 then
+			settle(0, "", "network error: " .. tostring(result.error))
 		else
-			settle(status, body, nil)
+			settle(result.status, result.body, nil)
 		end
 	end)
-	if not ok then settle(0, "", "request refused") end
+	if not ok or accepted == false then settle(0, "", "request refused") end
 end
 
 M._http_get = http_get
@@ -162,14 +178,14 @@ local _closing = false
 -- window was opened without one (no subscription banner then).
 local _channel_owner = nil
 -- The release list the last fetch published: { kind = "json", releases } or
--- { kind = "feed" }. An install finds its release here, so the page and the
--- host act on one list.
+-- { kind = "feed", tags }. An install finds its release here, so the page and
+-- the host act on one list.
 local _last_list = nil
 -- The install session (created on the first request).
 local _install_session = nil
 local _failure_contract = nil
 
--- Test seam: { updater, backup, installer, coordinator }.
+-- Test seam: { updater, backup, installer, coordinator, handoff }.
 M._deps = nil
 
 --- The owners the install and the restore go through.
@@ -181,6 +197,7 @@ local function deps()
 		backup = require("modules.updater.config_backup"),
 		installer = require("modules.updater.release_installer"),
 		coordinator = require("infra.termination_coordinator"),
+		handoff = require("modules.updater.feed_handoff"),
 	}
 end
 
@@ -364,6 +381,24 @@ local function valid_releases(data, body)
 	return true
 end
 
+--- The release tags of an Atom feed, newest first, read by the shared feed
+--- reader of the update checks. A feed it cannot read lists none, so nothing
+--- can be handed to the updater from it.
+--- @param body string Feed document text.
+--- @param sources table Release sources (owner, repo).
+--- @return table tags
+local function feed_tags(body, sources)
+	local list, reason = ReleaseSources.feed_release_list(body, sources.owner, sources.repo)
+	local tags = {}
+	if not list then
+		Logger.warn(LOG, "The release feed names no tag the updater could install: %s.", tostring(reason))
+		return tags
+	end
+	-- The reader writes only tags of [A-Za-z0-9._+-], so no JSON escape occurs.
+	for tag in list:gmatch('"tag_name":"([^"]+)"') do tags[#tags + 1] = tag end
+	return tags
+end
+
 --- Fetches releases from the GitHub API and injects them into the webview. The
 --- page keeps what the channel's view lists (the shared registry's tag rule).
 --- @param channel string Registry channel id.
@@ -393,7 +428,7 @@ local function fetch_and_inject(channel)
 			return
 		end
 		if result.kind == "feed" then
-			_last_list = { kind = "feed" }
+			_last_list = { kind = "feed", tags = feed_tags(result.body, sources) }
 			-- The shared page converts the feed; the text travels as a JS string.
 			eval(string.format("injectReleasesFeed(%s,%s)", js_str(result.body), js_str(channel)),
 				request_generation)
@@ -526,10 +561,10 @@ local function install_session()
 					detail, failure_receipt)
 			end) == true
 		end,
-		install = function(staged)
-			local armed, err = deps().installer.arm_swap(staged)
-			if armed == true then return true end
-			return false, ReleaseInstall.REASON.install, err
+		install_async = function(staged, release, asset, done)
+			return deps().installer.arm_swap(staged, function(armed, detail)
+				done(armed == true, ReleaseInstall.REASON.install, detail)
+			end) == true
 		end,
 		restart = function()
 			return deps().coordinator.request_user_exit("release_install") == true
@@ -579,15 +614,80 @@ local function restore_from_page(id)
 	end
 end
 
---- The page seeds of what this build can install and restore.
+-- The page's reason when the launcher did not take the hand-off.
+local HANDOFF_FAILED = "changelog_window.install_error_handoff"
+
+--- Hands the newest release of a feed-only list to Sparkle. The feed names no
+--- digest, so this host cannot verify a download itself; Sparkle verifies the
+--- EdDSA signature of its channel's appcast, which lists that channel's newest
+--- release only, so no other tag is accepted. Only this click reaches it.
+--- @param tag any Release tag posted by the page.
+--- @param channel any Registry channel on screen.
+--- @return boolean handed True when the launcher accepted the check.
+local function hand_off_to_updater(tag, channel)
+	if type(tag) ~= "string" or tag == "" then
+		Logger.error(LOG, "Refused an updater hand-off without a release tag.")
+		return false
+	end
+	local owner = install_owner()
+	if not install_owner_current(owner) then return false end
+	local function answer(message)
+		if not install_owner_retained(owner) then return end
+		local encoded = js_value(message)
+		if encoded then eval(string.format("setInstallProgress(%s)", encoded), owner.generation, nil, owner) end
+	end
+	local function refuse(reason)
+		answer({ tag = tag, phase = "failed", reason_key = reason })
+		return false
+	end
+	local blocked = install_blocked()
+	if blocked then
+		Logger.error(LOG, "Refused to hand %s to the updater: this build cannot install a release (%s).", tag, blocked)
+		return refuse(ReleaseInstall.REASON.unexpected)
+	end
+	if _install_session and _install_session.busy() then
+		Logger.warn(LOG, "Refused to hand %s to the updater while another release is being installed.", tag)
+		return refuse(ReleaseInstall.REASON.busy)
+	end
+	local id = registry_channel(channel, "updater hand-off")
+	local registry = load_channels()
+	if not id or not registry then return refuse(ReleaseInstall.REASON.unexpected) end
+	if type(_last_list) ~= "table" or _last_list.kind ~= "feed" then
+		-- An API list names the digests: the page installs from it directly.
+		Logger.error(LOG, "Refused to hand %s to the updater: the window's list is not the release feed.", tag)
+		return refuse(ReleaseInstall.REASON.unknown_release)
+	end
+	local updater, Handoff = deps().updater, deps().handoff
+	local newest = Handoff.newest_offered(registry, _last_list.tags, id, updater.current_version(),
+		updater.installed_channel())
+	if not Handoff.is_newest(tag, newest) then
+		Logger.warn(LOG, "Refused to hand %s to the updater: Sparkle installs only the newest release it "
+			.. "would offer on channel %s (%s).", tag, id, tostring(newest))
+		return refuse(ReleaseInstall.REASON.no_details)
+	end
+	local ok, sent = pcall(Handoff.request, id)
+	if not ok or sent ~= true then
+		Logger.error(LOG, "The updater did not take the hand-off of %s: %s.", tag, tostring(ok and "refused" or sent))
+		return refuse(HANDOFF_FAILED)
+	end
+	Logger.info(LOG, "Handed %s to Sparkle on channel %s: it verifies the signature and asks the user.", tag, id)
+	answer({ tag = tag, phase = "handed_off" })
+	return true
+end
+
+M._hand_off_to_updater = hand_off_to_updater
+
+--- The page seeds of what this build can install and restore. The hand-off
+--- seed says Sparkle can install a feed-only list's newest release.
 --- @return string script
 local function install_seed()
 	local ok, seed = pcall(function()
 		local blocked = install_blocked()
 		local backup = restorable_backup()
 		return string.format("window.__installed_version=%s;window.__install_blocked_key=%s;"
-			.. "window.__restorable_backup=%s;", js_str(deps().updater.current_version()),
-			js_str(blocked or ""), backup and js_value(backup) or "null")
+			.. "window.__restorable_backup=%s;window.__feed_install_handoff=true;",
+			js_str(deps().updater.current_version()), js_str(blocked or ""),
+			backup and js_value(backup) or "null")
 	end)
 	if not ok then
 		Logger.error(LOG, "The Versions page gets no install buttons: %s.", tostring(seed))
@@ -672,14 +772,21 @@ local function ensure_ucc(owner)
 		elseif body.action == "install_release" then
 			-- Only this click installs a chosen release: nothing else calls the session.
 			install_session().install(body.tag, body.channel)
+		elseif body.action == "install_through_updater" then
+			-- A feed-only list's newest release: Sparkle verifies and asks the user.
+			hand_off_to_updater(body.tag, body.channel)
 		elseif body.action == "install_failure_action" then
 			if _install_session then
 				_install_session.failure_action(body.operation, body.epoch, body.id)
 			end
 		elseif body.action == "restore_backup" then
 			restore_from_page(body.id)
-		elseif body.action == "open_url" and type(body.url) == "string" then
-			if ui_builder.open_http_url(body.url) then
+		elseif body.action == "open_url" then
+			-- A page message is data: only this repository's https surface opens.
+			local updater = deps().updater
+			if not RepositoryUrl.is_repository_url(body.url, updater.GH_OWNER, updater.GH_REPO) then
+				Logger.warn(LOG, "Refused a changelog link outside the repository.")
+			elseif ui_builder.open_http_url(body.url) then
 				Logger.info(LOG, "Opened changelog release URL.")
 			end
 		end
@@ -758,6 +865,7 @@ local function build_window(channel, opening_generation, focus_owner)
 		return closed ~= true and candidate ~= nil and _wv == candidate and _focus_owner == focus_owner
 	end
 	local webview = ui_builder.show_webview({
+		delete_on_close = true,
 		frame             = frame,
 		title             = title,
 		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
@@ -771,7 +879,7 @@ local function build_window(channel, opening_generation, focus_owner)
 			if action == "didFinishNavigation" then
 				-- Safety flush after navigation — belt-and-suspenders alongside
 				-- the "ready" message from script.js.
-				DeferredWork.after(0.15, function()
+				DeferredWork.after(require("infra.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
 					if not candidate_is_owned() then return end
 					if not _ready then flush_queue() end
 					-- Kick off the first fetch from the Lua side so the JS
@@ -810,7 +918,7 @@ local function build_window(channel, opening_generation, focus_owner)
 
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
-	local scheduled = DeferredWork.after(1.5, function()
+	local scheduled = DeferredWork.after(require("infra.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
 		if candidate_is_owned() and not _ready then flush_queue() end
 	end, "changelog.ready_fallback")
 
@@ -902,6 +1010,10 @@ function M.open(opts)
 	Logger.success(LOG, "Changelog window created.")
 	return _focus_owner == owner and _wv_committed == true
 end
+
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _wv end
 
 --- Closes the changelog window if open.
 --- @return boolean committed

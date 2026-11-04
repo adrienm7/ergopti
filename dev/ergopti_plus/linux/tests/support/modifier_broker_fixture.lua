@@ -22,15 +22,20 @@ function M.new(options)
 		local file = assert(io.open(path, "w")); file:write("controlled source\n"); file:close()
 		paths[id], sources[#sources + 1], queues[path] = path, path, {}
 	end
+	local saved_finder = package.loaded["modules.hotstrings.device_finder"]
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_devices = function() return sources, {} end,
 		is_key_device = function() return true end,
+		-- Controlled keyboard sources have no REL/ABS axes.
+		is_interceptable_key_device = function() return true end,
+		is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 	}
 	local Reader = helpers.load_module("adapters.evdev_reader")
 	Reader._set_backend({
 		open = function(path) next_fd = next_fd + 1; handles[next_fd] = path; return next_fd end,
 		close = function(fd) handles[fd] = nil; return true end,
 		ioctl = function() return true end,
+		read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 		read_bits = function(_, _, count) return string.rep("\0", count) end,
 		read = function(fd)
 			local queue = queues[handles[fd]]
@@ -105,6 +110,7 @@ function M.new(options)
 		pcall(Hook.stop); pcall(Hook.set_remapper, nil)
 		Reader._reset_backend(); Writer.close_owned(session.cap)
 		for _, path in pairs(paths) do os.remove(path) end
+		package.loaded["modules.hotstrings.device_finder"] = saved_finder
 	end
 	return session
 end

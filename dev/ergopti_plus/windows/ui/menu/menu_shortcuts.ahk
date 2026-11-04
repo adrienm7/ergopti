@@ -11,6 +11,8 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -22,10 +24,12 @@
 ; Build the Shortcuts submenu from the manifest-driven renderer.
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,
 ; script control, extensions, edit action) that cannot be described in JSON.
-_BuildShortcutsSubmenu() {
-	DynHandlers := Map(
-		"personal_shortcuts",         (M, C) => _SC_Personal(M, C),
-	)
+_BuildShortcutsSubmenu(TargetMenu := unset) {
+	DynHandlers := Map()
+	DeclaredFrames := Map("personal_shortcuts", Map(
+		"manifest_key", "personal_shortcuts_frame",
+		"children_id", "personal_shortcuts_registered",
+		"provider", _PersonalShortcutRows))
 
 	; The keyboard slots are a list, not a group: their rows are the user's own
 	; assignments, so the manifest can name the section but not enumerate it. The
@@ -49,10 +53,12 @@ _BuildShortcutsSubmenu() {
 	Getters := _SC_Getters()
 
 	GroupBuilders := Map(
-		"key_combinations", () => _SC_KeyCombinationsSubmenu(),
-		"script_control",   () => _SC_ScriptControlSubmenu())
+		"key_combinations",   () => _SC_KeyCombinationsSubmenu(),
+		"caps_word_auto_off", () => _SC_CapsWordAutoOffSubmenu(),
+		ConfigLeaf.SCRIPT_CONTROL,     () => _SC_ScriptControlSubmenu())
 
-	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters)
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters,
+		IsSet(TargetMenu) ? TargetMenu : unset, , DeclaredFrames)
 }
 
 ; The checked_when getters of the Shortcuts submenu: its switch, and the ticks
@@ -69,8 +75,10 @@ _SC_Getters() {
 ; key listing the pairs it begins, all declared by key_combinations_group.
 _SC_KeyCombinationsSubmenu(Options := unset) {
 	Commands := _SC_KeyCombinationCommands(IsSet(Options) ? Options : Map())
-	Getters := Map("key_combinations_enabled", () => IsCategoryGated("KeyCombinations"))
+	Getters := Map("key_combinations_enabled", () => IsCategoryGated("KeyCombinations"),
+		MenuCommand.COMBO_SYMMETRIC, () => KeyCombinationChordCurrentSettings()[MenuCommand.COMBO_SYMMETRIC] ? true : false)
 	ListProviders := Map(
+		"combo_timings", KeyCombinationChordTimingRows,
 		"key_combination_rows_left", () => KeyCombinationRows("left"),
 		"key_combination_rows_right", () => KeyCombinationRows("right"))
 	return MenuRenderer_Build("key_combinations_group", "Shortcuts", "", "", ListProviders, Commands, Getters)
@@ -80,15 +88,98 @@ _SC_KeyCombinationsSubmenu(Options := unset) {
 _SC_KeyCombinationCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
-		"key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"),
-		"scope_restore", (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
-		"scope_clear", (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
+		MenuCommand.KEY_COMBINATIONS_TOGGLE, MenuRenderer_CategoryGateCommand("KeyCombinations"),
+		MenuCommand.COMBO_SYMMETRIC, (*) => KeyCombinationChordToggleSymmetric(),
+		MenuCommand.SCOPE_RESTORE, (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
 }
 
-; Dynamic handler: personal shortcuts submenu (if any registered).
-; Emits its own leading separator when items are present, matching pre-refactor behaviour.
-_SC_Personal(SubMenu, _Cat) {
-	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
+; « CapsWord : désactivation automatique », declared by caps_word_auto_off_group:
+; the delay choice, one checkbox per delimiter of the hotstring catalogue and
+; one per pointer kind of [shortcuts.caps_word.pointer]. Every row stores
+; through CapsWordAutoOffStore, which the next activation reads; no reload.
+_SC_CapsWordAutoOffSubmenu() {
+	Commands := Map(MenuCommand.CAPS_WORD_IDLE_TIMEOUT,
+		(Seconds, *) => CapsWordAutoOffStore(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS, Seconds))
+	Getters := Map(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS,
+		() => CapsWordAutoOffValues()[ConfigLeaf.IDLE_TIMEOUT_SECONDS])
+	ListProviders := Map(
+		"caps_word_terminators", () => _SC_CapsWordTerminatorRows(),
+		"caps_word_pointer_kinds", () => _SC_CapsWordPointerRows())
+	return MenuRenderer_Build("caps_word_auto_off_group", "Shortcuts", "", "", ListProviders, Commands, Getters)
+}
+
+; One checkbox per pointer kind the manifest declares for Windows, in its
+; order, then each kind it declares for other platforms only, greyed with the
+; kind's own reason and nothing to run (the touchpad gesture). The generated
+; manifest keeps no label key or position for a feature this platform lacks,
+; so such a row reads the kinds' shared key spelling,
+; menu.caps_word.pointer.<kind>.
+_SC_CapsWordPointerRows() {
+	global FEATURES_MANIFEST
+	Pointer := CapsWordAutoOffValues()["pointer"]
+	Rows := []
+	for Entry in ManifestFeaturesForSection("shortcuts.caps_word.pointer") {
+		Rows.Push(Map(
+			"label", t(Entry["description_key"]),
+			"checked", Pointer[Entry["id"]] == 1,
+			"action", _SC_CapsWordPointerToggle.Bind(Entry["id"])))
+	}
+	if !ManifestEnsureLoaded()
+		return Rows
+	for Entry in FEATURES_MANIFEST["unavailable"] {
+		if Entry["section"] != "shortcuts.caps_word.pointer"
+			continue
+		Kind := SubStr(Entry["path"], StrLen("shortcuts.caps_word.pointer.") + 1)
+		Rows.Push(Map(
+			"label", t("menu.caps_word.pointer." . Kind),
+			"disabled", true,
+			"disabled_reason_key", Entry["reason_key"]))
+	}
+	return Rows
+}
+
+_SC_CapsWordPointerToggle(Kind, *) {
+	return CapsWordAutoOffStore("shortcuts.caps_word.pointer." . Kind,
+		CapsWordAutoOffValues()["pointer"][Kind] != 1)
+}
+
+; One checkbox per catalogue delimiter, in its order, with its separators and
+; its translated label; a click stores the list with that delimiter flipped.
+_SC_CapsWordTerminatorRows() {
+	Current := CapsWordAutoOffValues()["terminators"]
+	Checked := Map()
+	for Key in Current
+		Checked[Key] := true
+	Rows := []
+	for Row in CapsWordAutoOffTerminatorRows() {
+		if Row.Has("separator") {
+			Boundary := MenuRenderer_TemplateRows("hotstrings_parameter_boundary", Map(), Map(), Map())
+			if !(Boundary is Array)
+				return []
+			for Separator in Boundary
+				Rows.Push(Separator)
+			continue
+		}
+		Rows.Push(Map(
+			"label", t(Row["label_key"]),
+			"checked", Checked.Has(Row["key"]),
+			"action", _SC_CapsWordTerminatorToggle.Bind(Row["key"])))
+	}
+	return Rows
+}
+
+_SC_CapsWordTerminatorToggle(Key, *) {
+	Current := CapsWordAutoOffValues()["terminators"]
+	Wanted := 1
+	for Existing in Current {
+		if Existing == Key
+			Wanted := 0
+	}
+	Next := CapsWordAutoOffWithTerminator(Current, Key, Wanted, &Reason)
+	if !(Next is Array)
+		throw ValueError("CapsWord delimiter '" . Key . "' refused: " . Reason)
+	return CapsWordAutoOffStore("shortcuts.caps_word.terminators", Next)
 }
 
 ; « Raccourcis de gestion du script », declared by script_control_group: its
@@ -110,10 +201,10 @@ _SC_ScriptControlSubmenu(Options := unset) {
 _SC_ScriptControlCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
-		"script_control_toggle", (*) => SetScriptShortcutChordsOn(!ScriptShortcutChordsAreOn(),
+		MenuCommand.SCRIPT_CONTROL_TOGGLE, (*) => SetScriptShortcutChordsOn(!ScriptShortcutChordsAreOn(),
 			OwnedOptions.Get("path", ""), OwnedOptions.Get("toggle_reload", 0)),
-		"scope_restore", (*) => ScriptShortcutsApplyScope("recommended", OwnedOptions),
-		"scope_clear", (*) => ScriptShortcutsApplyScope("clear", OwnedOptions))
+		MenuCommand.SCOPE_RESTORE, (*) => ScriptShortcutsApplyScope("recommended", OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => ScriptShortcutsApplyScope("clear", OwnedOptions))
 }
 
 ; Dynamic handler: extensions shortcuts submenus.
@@ -160,46 +251,14 @@ _SC_ExtensionRows() {
 						ExtName := NM[1]
 				}
 			}
-			MarkerState := Map("shortcut_extension_name", (*) => ExtId)
-			; Admit both possible complete markers before native allocation or builders.
-			ErrorRows := MenuRenderer_TemplateRows("shortcut_extension_error_frame", Map(), MarkerState, Map())
-			EmptyRows := MenuRenderer_TemplateRows("shortcut_extension_empty_frame", Map(), Map(), Map())
-			if !(ErrorRows is Array) || ErrorRows.Length == 0
-					|| !_MR_AppendTemplateRowsAdmitted(ErrorRows, 1, Map())
-					|| !(EmptyRows is Array) || EmptyRows.Length == 0
-					|| !_MR_AppendTemplateRowsAdmitted(EmptyRows, 1, Map())
+			ConstructorOwner := MenuRenderer_ConstructObservedMenu, ObserverOwner := _SC_ObserveExtensionMenu
+			if !(ConstructorOwner is Func) || !(ObserverOwner is Func)
+				|| Object.Prototype.HasOwnProp.Call(ConstructorOwner, "Call")
+				|| Object.Prototype.HasOwnProp.Call(ObserverOwner, "Call")
 				return []
-			ExtMenu := Menu()
-			OwnedMenus.Push(ExtMenu)
-			BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")
-			if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {
-				BuildFailed := false
-				try {
-					%BuilderFn%(ExtMenu, ExtName)
-				} catch as Err {
-					; A broken bundled extension is user-actionable, so fail LOUD:
-					; ERROR (not a Warn the user never reads) plus a visible disabled
-					; row in the submenu so a crashed builder is not indistinguishable
-					; from an absent one.
-					LoggerError("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
-					BuildFailed := true
-				}
-				; Even a builder that returns without throwing may have populated
-				; nothing (bad TOML, missing global) — an empty submenu is just as
-				; opaque, so surface the same marker.
-				if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {
-					if !BuildFailed
-						LoggerError("Extensions", "BuildExtMenu for '{1}' added no items — extension menu is empty.", ExtId)
-					; A label and nothing else: the renderer draws it inert and greyed,
-					; which is exactly what a marker is.
-					if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_error_frame", Map(), MarkerState, Map()) == 0
-						throw Error("Shortcut extension error marker was withdrawn during its native builder")
-				}
-			} else {
-				LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
-				if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_empty_frame", Map(), Map(), Map()) == 0
-					throw Error("Shortcut extension empty marker was withdrawn before publication")
-			}
+			ExtMenu := ConstructorOwner.Call("shortcut_extension_construction_ahk", ExtId, ExtName, ObserverOwner, OwnedMenus)
+			if !(ExtMenu is Menu)
+				return []
 			Rows.Push(Map("label", ExtName, "submenu", ExtMenu))
 		}
 		Completed := true
@@ -265,9 +324,9 @@ _WS_BuildSymbolRows() {
 	global _WS_BUILTIN_GROUPS, _WS_Custom
 	Getters := Map("wrap_symbols_ready", (*) => true)
 	Rows := MenuRenderer_TemplateRows("wrap_symbols_global_controls", Map(
-		"wrap_symbols_enable_all", (*) => _WS_MenuSetAll(true),
-		"wrap_symbols_disable_all", (*) => _WS_MenuSetAll(false),
-		"wrap_symbols_restore", (*) => _WS_MenuReset()), Getters, Map())
+		MenuCommand.WRAP_SYMBOLS_ENABLE_ALL, (*) => _WS_MenuSetAll(true),
+		MenuCommand.WRAP_SYMBOLS_DISABLE_ALL, (*) => _WS_MenuSetAll(false),
+		MenuCommand.WRAP_SYMBOLS_RESTORE, (*) => _WS_MenuReset()), Getters, Map())
 	if !(Rows is Array)
 		return []
 
@@ -281,8 +340,8 @@ _WS_BuildSymbolRows() {
 			GroupLefts.Push(Pair["left"])
 		}
 		GroupRows := MenuRenderer_TemplateRows("wrap_symbols_group_controls", Map(
-			"wrap_symbols_enable_group", _WS_ControlSetGroup.Bind(GroupLefts, true),
-			"wrap_symbols_disable_group", _WS_ControlSetGroup.Bind(GroupLefts, false)), Getters, Map())
+			MenuCommand.WRAP_SYMBOLS_ENABLE_GROUP, _WS_ControlSetGroup.Bind(GroupLefts, true),
+			MenuCommand.WRAP_SYMBOLS_DISABLE_GROUP, _WS_ControlSetGroup.Bind(GroupLefts, false)), Getters, Map())
 		if !(GroupRows is Array)
 			return []
 
@@ -316,7 +375,7 @@ _WS_BuildSymbolRows() {
 			R := Pair["right"]
 			Lbl := ((L != R) ? (L . " … " . R) : L) . " — " . t("menu.shortcuts.wrap_symbols_custom_label")
 			CustomControls := MenuRenderer_TemplateRows("wrap_symbols_custom_controls", Map(
-				"wrap_symbols_delete_custom", _WS_ControlRemoveCustom.Bind(Idx)), Getters, Map())
+				MenuCommand.WRAP_SYMBOLS_DELETE_CUSTOM, _WS_ControlRemoveCustom.Bind(Idx)), Getters, Map())
 			if !(CustomControls is Array)
 				return []
 			Rows.Push(Map("label", Lbl, "checked", true, "items", CustomControls))
@@ -325,7 +384,7 @@ _WS_BuildSymbolRows() {
 
 	; ── Add custom ───────────────────────────────────────────────────────────
 	AddControls := MenuRenderer_TemplateRows("wrap_symbols_add_controls", Map(
-		"wrap_symbols_add_custom", (*) => _WS_MenuAddCustom()), Getters, Map())
+		MenuCommand.WRAP_SYMBOLS_ADD_CUSTOM, (*) => _WS_MenuAddCustom()), Getters, Map())
 	if !(AddControls is Array)
 		return []
 	for _, Row in AddControls
@@ -449,10 +508,10 @@ _WS_MenuAddCustom() {
 _SC_ScopeCommands(Options := unset) {
 	OwnedOptions := IsSet(Options) ? Options : Map()
 	return Map(
-		"shortcuts_toggle", MenuRenderer_CategoryGateCommand("Shortcuts"),
-		"edit_shortcuts", OpenPersonalShortcuts,
-		"scope_restore", (*) => _SC_ApplyScope("recommended", OwnedOptions),
-		"scope_clear", (*) => _SC_ApplyScope("clear", OwnedOptions))
+		MenuCommand.SHORTCUTS_TOGGLE, MenuRenderer_CategoryGateCommand("Shortcuts"),
+		MenuCommand.EDIT_SHORTCUTS, OpenPersonalShortcuts,
+		MenuCommand.SCOPE_RESTORE, (*) => _SC_ApplyScope("recommended", OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => _SC_ApplyScope("clear", OwnedOptions))
 }
 
 _SC_ApplyScope(Mode, Options) {
@@ -460,4 +519,44 @@ _SC_ApplyScope(Mode, Options) {
 	CandidateOptions["supplement"] := ConfigIOShortcutScopeOperations
 	Providers := Map("personal", PersonalShortcutScopePaths, "parameters", ConfigScopeActionParameterPaths)
 	return ConfigScopeApply("shortcuts", Mode, Providers, CandidateOptions)
+}
+
+
+/**
+ * Observes the original native builder without selecting or placing presentation.
+ * @param {String} ExtId Exact physical extension identity.
+ * @param {String} ExtName Original manifest-derived display name.
+ * @param {Menu} ExtMenu The exact owned native Menu passed to the external builder.
+ * @returns {String} Original failed, empty, missing or populated observation.
+ */
+_SC_ObserveExtensionMenu(ExtId, ExtName, ExtMenu) {
+	MarkerOutcome := "populated"
+	BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")
+	if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {
+		BuildFailed := false
+		try {
+			%BuilderFn%(ExtMenu, ExtName)
+		} catch as Err {
+			; A broken bundled extension is user-actionable, so fail LOUD:
+			; ERROR (not a Warn the user never reads) plus a visible disabled
+			; row in the submenu so a crashed builder is not indistinguishable
+			; from an absent one.
+			LoggerError("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
+			BuildFailed := true
+		}
+		; Even a builder that returns without throwing may have populated
+		; nothing (bad TOML, missing global) — an empty submenu is just as
+		; opaque, so surface the same marker.
+		if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {
+			if !BuildFailed
+				LoggerError("Extensions", "BuildExtMenu for '{1}' added no items — extension menu is empty.", ExtId)
+			; A label and nothing else: the renderer draws it inert and greyed,
+			; which is exactly what a marker is.
+			MarkerOutcome := BuildFailed ? "failed" : "empty"
+		}
+	} else {
+		LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
+		MarkerOutcome := "missing"
+	}
+	return MarkerOutcome
 }

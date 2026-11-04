@@ -34,6 +34,7 @@ local notifications = require("infra.notifications")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
+local Timings       = require("infra.timings")
 local Logger        = require("infra.logger")
 local Keycodes      = require("infra.keycodes")
 local i18n          = require("infra.i18n")
@@ -41,8 +42,11 @@ local i18n          = require("infra.i18n")
 local Engine    = require("modules.gestures.engine")
 local GestActions = require("modules.gestures.actions")
 local KeyState  = require("adapters.key_state")
+local KeyEventHealth = require("infra.key_event_health")
 local ScriptChords = require("script_chords")
 local ChordCatalogue = require("infra.script_chord_catalogue")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "shortcuts.script_control"
 
@@ -56,7 +60,7 @@ local LOG = "shortcuts.script_control"
 -- ====================================
 -- ====================================
 
-local SCRIPT_CONTROL_SHORTCUT_CLAIM = "script_control"
+local SCRIPT_CONTROL_SHORTCUT_CLAIM = ConfigKeys.LEAF.SCRIPT_CONTROL
 
 -- Sentinel keycode -> script chord slot, built at the first key event.
 -- Karabiner's script-control rules (platform/remap/script_chord_rules.lua)
@@ -103,7 +107,7 @@ M.BINDING_PREFIX = "script__"
 -- osascript on that run loop (e.g. the pause/resume layout switch) can trip it.
 -- A disabled tap silently stops delivering events, stranding the un-pause
 -- shortcut, so a watchdog re-enables it on this interval as a hard safety net.
-local TAP_WATCHDOG_INTERVAL_SEC = 2
+local TAP_WATCHDOG_INTERVAL_SEC = Timings.sec("ui", "script_control_tap_watchdog_interval_ms")
 
 -- Module-level state
 local _is_paused       = false
@@ -165,6 +169,23 @@ local _pause_rollback_debt_steps = nil
 -- owner ledger: before any later resume may acquire successors, the exact
 -- re-pause operation must first settle.
 local _resume_rollback_debt_steps = nil
+
+--- An additive observer never replaces the existing pause-change singleton.
+local _physical_pause = require("keystats.physical_lifecycle_observation").new("pause", function()
+	return require("adapters.physical_observation_clock").now()
+end, function(reason) Logger.error(LOG, "Physical pause observer retired: %s.", tostring(reason)) end)
+
+local function physical_pause_snapshot()
+	return { paused = _is_paused, transition_generation = _pause_transition_serial,
+		admission_released = _pause_admission_fence == nil,
+		settled = _pause_transition == nil and _queued_pause_target == nil
+			and (_pause_rollback_debt_steps == nil or #_pause_rollback_debt_steps == 0)
+			and (_resume_rollback_debt_steps == nil or #_resume_rollback_debt_steps == 0)
+			and not (_pause_admission_fence ~= nil and _is_paused ~= true) }
+end
+local function finish_physical_pause(ticket, committed)
+	return _physical_pause.finish(ticket, physical_pause_snapshot, committed == true)
+end
 
 local _keymap     = nil
 local _shortcuts  = nil
@@ -864,21 +885,21 @@ local function resume_all()
 	-- pinned to whatever was frontmost when the pause began. Re-sync here rather than
 	-- weakening the pause guard, so « pause = tout éteint » still holds exactly.
 	-- Lazy require, like the two warmup drivers above: script_control is not wired to
-	-- the keylogger module and does not need to be for a one-shot resume call.
+	-- the keystats module and does not need to be for a one-shot resume call.
 	-- This one-shot refresh is deliberately best-effort: metrics OFF leaves the
-	-- keylogger uninitialized, and resync_context() then returns false even though
+	-- keystats uninitialized, and resync_context() then returns false even though
 	-- resume is otherwise valid. It activates nothing and therefore needs no inverse.
-	local ok_kl, kl = pcall(require, "modules.keylogger")
+	local ok_kl, kl = pcall(require, "modules.keystats")
 	if not ok_kl then
 		Logger.warn(LOG, "Optional resume operation failed without blocking activation: %s.",
-			"require(modules.keylogger) raised: " .. tostring(kl))
+			"require(modules.keystats) raised: " .. tostring(kl))
 		kl = nil
 	end
 	if kl and type(kl.resync_context) == "function" then
 		local ok_resync, resync_result = xpcall(kl.resync_context, debug.traceback)
 		if not ok_resync or resync_result == false then
 			Logger.warn(LOG,
-				"Optional resume operation keylogger.resync_context failed without blocking activation: %s.",
+				"Optional resume operation keystats.resync_context failed without blocking activation: %s.",
 				tostring(resync_result))
 		end
 	end
@@ -1010,6 +1031,7 @@ local function complete_pause_transition(transaction, ok, reason)
 			release_pause_admission(transaction.admission_fence)
 		end
 	end
+	finish_physical_pause(transaction.physical_ticket, ok == true)
 	if ok ~= true then
 		report_pause_transition_failure(transaction.target, reason)
 	else
@@ -1180,7 +1202,7 @@ end
 --- and a second toggle is coalesced as latest intent.
 --- @param target_paused boolean Desired state.
 --- @return boolean True when accepted or already satisfied.
-request_pause_transition = function(target_paused, input_drained, admission_fence)
+request_pause_transition = function(target_paused, input_drained, admission_fence, physical_ticket)
 	target_paused = target_paused == true
 	if _pause_transition then
 		local desired = desired_pause_state()
@@ -1199,13 +1221,24 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 		-- the recovery port: retry only those exact local re-pause operations, with
 		-- no new admission fence or native Karabiner transaction.
 		if target_paused and _resume_rollback_debt_steps ~= nil then
+			local ticket = _physical_pause.begin("pause")
 			local settled, settle_reason = settle_resume_rollback_debt()
+			finish_physical_pause(ticket, false)
 			if not settled then
 				report_pause_transition_failure(true, settle_reason)
 				return false
 			end
 		end
 		return true
+	end
+	if physical_ticket == nil then
+		physical_ticket = _physical_pause.begin(target_paused and "pause" or "resume")
+		-- A foreign observer may explicitly request another transition. Join its
+		-- actual native owner through the existing coordinator instead of replacing it.
+		if physical_ticket ~= nil and (_pause_transition ~= nil or _is_paused == target_paused) then
+			finish_physical_pause(physical_ticket, false)
+			return request_pause_transition(target_paused, input_drained, admission_fence)
+		end
 	end
 	if target_paused and input_drained ~= true and _pause_admission_fence ~= nil then
 		-- A failed preflight rollback keeps this exact token active and admission
@@ -1221,6 +1254,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 			id = _pause_transition_serial,
 			target = true,
 			stage = "synthetic-input-drain",
+			physical_ticket = physical_ticket,
 		}
 		_pause_transition = transaction
 		local drain_ok, accepted_or_error = pcall(SyntheticInput.when_idle, function()
@@ -1229,22 +1263,25 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 			_queued_pause_target = nil
 			if queued == false then
 				_pause_transition = nil
+				finish_physical_pause(physical_ticket, false)
 				return
 			end
 			local acquired_ok, fence_or_error = pcall(
 				SyntheticInput.acquire_admission_fence, "script_pause")
 			if not acquired_ok or fence_or_error == nil then
 				_pause_transition = nil
+				finish_physical_pause(physical_ticket, false)
 				report_pause_transition_failure(true,
 					"synthetic input admission fence was not committed: "
 						.. tostring(fence_or_error))
 				return
 			end
 			_pause_transition = nil
-			request_pause_transition(true, true, fence_or_error)
+			request_pause_transition(true, true, fence_or_error, physical_ticket)
 		end)
 		if not drain_ok or accepted_or_error ~= true then
 			_pause_transition = nil
+			finish_physical_pause(physical_ticket, false)
 			report_pause_transition_failure(true,
 				"synthetic input drain was not committed: " .. tostring(accepted_or_error))
 			return false
@@ -1257,6 +1294,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 			local acquired_ok, fence_or_error = pcall(
 				SyntheticInput.acquire_admission_fence, "script_pause")
 			if not acquired_ok or fence_or_error == nil then
+				finish_physical_pause(physical_ticket, false)
 				report_pause_transition_failure(true,
 					"synthetic input admission fence was not committed: "
 						.. tostring(fence_or_error))
@@ -1270,6 +1308,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 	end
 	if target_paused and admission_fence ~= nil then
 		if _pause_admission_fence ~= nil and _pause_admission_fence ~= admission_fence then
+			finish_physical_pause(physical_ticket, false)
 			report_pause_transition_failure(true,
 				"synthetic input admission fence ownership changed before pause")
 			return false
@@ -1281,6 +1320,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 		local release_ok = not target_paused or release_pause_admission(admission_fence)
 		local reason = "Karabiner enabled-state API unavailable"
 		if not release_ok then reason = reason .. "; admission rollback remains pending" end
+		finish_physical_pause(physical_ticket, false)
 		report_pause_transition_failure(target_paused, reason)
 		return false
 	end
@@ -1292,6 +1332,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 				or ("Karabiner enabled-state API returned "
 					.. type(enabled_or_err) .. ", expected boolean")
 			if not release_ok then reason = reason .. "; admission rollback remains pending" end
+			finish_physical_pause(physical_ticket, false)
 			report_pause_transition_failure(target_paused, reason)
 			return false
 		end
@@ -1301,12 +1342,14 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 		local committed, commit_reason = commit_pause_state(target_paused)
 		if not committed then
 			if target_paused then release_pause_admission(admission_fence) end
+			finish_physical_pause(physical_ticket, false)
 			report_pause_transition_failure(target_paused, commit_reason)
 			return false
 		end
 		if target_paused then
 			_pause_admission_fence = admission_fence
 		end
+		finish_physical_pause(physical_ticket, true)
 		return true
 	end
 
@@ -1316,6 +1359,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 		target = target_paused,
 		timer = nil,
 		admission_fence = target_paused and admission_fence or _pause_admission_fence,
+		physical_ticket = physical_ticket,
 	}
 	_pause_transition = transaction
 	local ok_timer, timer_or_err = pcall(hs.timer.doAfter, 0, function()
@@ -1405,10 +1449,10 @@ local function dispatch_action(action, binding)
 	return true
 end
 
---- Logs a shortcut activation via the keylogger if available.
+--- Logs a shortcut activation via the keystats if available.
 --- @param label string Human-readable shortcut label for the log.
 local function log_shortcut_if_available(label)
-	local ok_kl, kl = pcall(require, "modules.keylogger")
+	local ok_kl, kl = pcall(require, "modules.keystats")
 	if ok_kl and kl and type(kl.log_shortcut) == "function" then
 		local app = hs.application.frontmostApplication()
 		Logger.callback(LOG, "Shortcut telemetry", kl.log_shortcut,
@@ -1427,7 +1471,7 @@ local function slot_runs(slot_id, paused)
 	return ScriptChords.runs(ChordCatalogue.get(), actions[slot_id], chords_on, paused)
 end
 
---- The keylogger label of a slot's chord ("Alt+Enter"), stable across the
+--- The keystats label of a slot's chord ("Alt+Enter"), stable across the
 --- slot's action so the dashboard groups every press of the chord.
 --- @param slot_id string
 --- @return string label
@@ -1453,7 +1497,7 @@ end
 --- @return boolean True to consume the keystroke, false to pass it through.
 local function handle_key(e)
 	local provenance, status, fence = EventProvenance.classify_with_fence(
-		e, "shortcuts.script_control")
+		e, ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL)
 	local fence_events = fence and fence.events or nil
 	local function finish(consume) return consume == true, fence_events end
 	if fence and fence.consume_original == true then return finish(true) end
@@ -1501,6 +1545,8 @@ local function handle_key(e)
 			defer_rejected_sentinel(sentinel_slot, code)
 			return finish(false)
 		end
+		-- A chord seen after the main thread held the tap is not acted on late.
+		if KeyEventHealth.passes_late_event(e) then return finish(false) end
 		return finish(defer_dispatch("Script chord sentinel (" .. sentinel_slot .. ") — dispatching '%s'.",
 			sentinel_slot))
 	end
@@ -1509,6 +1555,7 @@ local function handle_key(e)
 	if not is_right_cmd_only(e) then return finish(false) end
 	local physical_slot = physical_slots[code]
 	if physical_slot == nil or not slot_runs(physical_slot) then return finish(false) end
+	if KeyEventHealth.passes_late_event(e) then return finish(false) end
 	return finish(defer_dispatch(
 		"Right-cmd + " .. physical_slot .. " (KE-paused fallback) — dispatching '%s'.", physical_slot))
 end
@@ -1574,8 +1621,8 @@ M.PAUSE_OWNER_IDS = {
 	"warmup_controller",
 	"ollama_warmup",
 	"remote_warmup",
-	"wpm_menubar",
-	"wpm_widget",
+	ConfigKeys.COMMAND.WPM_MENUBAR,
+	ConfigKeys.COMMAND.WPM_WIDGET,
 	"remap_onboarding",
 	"predictions",
 	"tooltip",
@@ -2001,8 +2048,7 @@ function M.set_extras(tbl)
 		return
 	end
 	_extras = tbl
-	local count = 0
-	for _ in pairs(tbl) do count = count + 1 end
+	local count = TableUtil.count(tbl)
 	Logger.debug(LOG, "Extras table registered (%d handler(s)).", count)
 end
 
@@ -2026,6 +2072,41 @@ end
 function M.resume_all()
 	Logger.info(LOG, "Programmatic resume transaction requested.")
 	return request_pause_transition(false)
+end
+
+
+--- Binds an additive dormant pause-writer observer without sampling native input.
+---@param owner table Exact observer owner.
+---@param capacity integer Positive native receipt budget.
+---@param receive function Literal-true acknowledger receiving record and exact token.
+---@param on_refused function|nil Receives terminal reason and the exact source token after revocation.
+---@param initial_snapshot boolean|nil Opt-in readonly pause ledger, never a resume commit.
+---@return table|nil token Exact observer token, or nil on refusal.
+---@return string|nil reason Explicit acquisition refusal, preserving the actual actor reason.
+---@return table|nil scope Exact subscription current, detach and post-frame retirement, including acquired bootstrap refusal.
+function M.bind_physical_pause_observer(owner, capacity, receive, on_refused, initial_snapshot)
+	if initial_snapshot ~= nil and type(initial_snapshot) ~= "boolean" then return nil, "Invalid initial lifecycle observation option" end
+	if math.type(capacity) ~= "integer" then return nil, "Invalid native pause receipt budget" end
+	return _physical_pause.bind(owner, capacity, receive, on_refused,
+		initial_snapshot == true and physical_pause_snapshot or nil)
+end
+
+--- Detaches only the exact additive pause observer, never the legacy singleton.
+---@param owner table Exact observer owner.
+---@param token table Exact binding token.
+---@return boolean detached Whether the owned observer was detached.
+function M.unbind_physical_pause_observer(owner, token) return _physical_pause.unbind(owner, token) end
+
+local original_stop = M.stop
+--- Denies before actual stop cleanup; a stop is never a resume commit.
+---@return boolean settled Unchanged native cleanup result.
+function M.stop()
+	local ticket = _physical_pause.begin("stop")
+	if ticket == nil then return original_stop() end
+	local ok, result = pcall(original_stop)
+	finish_physical_pause(ticket, false)
+	if not ok then error(result, 0) end
+	return result
 end
 
 return M

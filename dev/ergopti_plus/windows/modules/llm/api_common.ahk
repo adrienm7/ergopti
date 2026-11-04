@@ -6,7 +6,7 @@
 ; Shared helpers reused by every AHK LLM backend (api_ollama.ahk, api_remote.ahk,
 ; the prediction engine itself). 1:1 mirror of the Hammerspoon twin at
 ; ``modules/llm/api_common.lua`` — same surface (get_diversity_temperature,
-; get_retry_policy, get_rate_limit_min_interval_ms, insert_prediction,
+; get_retry_policy, insert_prediction,
 ; new_dedup_stats), same algorithm, and the same numeric tunables (loaded
 ; from ``static/ergopti_plus/_shared/modules/llm/inference.json``).
 ;
@@ -165,30 +165,6 @@ _LLM_Common_Cfg(section, key) {
  */
 LLM_ApiCommon_DefaultDedupEnabled() {
 	return _LLM_Common_Cfg("dedup", "enabled_by_default") == true
-}
-
-/**
- * Returns the minimum interval (milliseconds) between two prediction
- * requests for the given backend. Mirrors the HS
- * ``ApiCommon.get_rate_limit_min_interval_s`` API. For an unknown backend id it
- * returns the ollama floor from the JSON — all floors come from inference.json.
- * @param {string} backend_id - One of "ollama" / "mlx" / "api".
- * @returns {number} Floor interval in milliseconds.
- */
-LLM_ApiCommon_GetRateLimitMs(backend_id) {
-	cfg := _LLM_Common_GetInference()
-	if !cfg.Has("rate_limit_min_interval_ms") {
-		LoggerError("LLMCommon", "_shared/modules/llm/inference.json is missing section 'rate_limit_min_interval_ms'.")
-		throw Error("ergopti_plus: inference.json missing section rate_limit_min_interval_ms")
-	}
-	rateMap := cfg["rate_limit_min_interval_ms"]
-	if rateMap.Has(backend_id)
-		return rateMap[backend_id]
-	; Unknown backend id — use the ollama floor from the JSON as the default.
-	if rateMap.Has("ollama")
-		return rateMap["ollama"]
-	LoggerError("LLMCommon", "inference.json rate_limit_min_interval_ms has neither '{1}' nor 'ollama'.", backend_id)
-	throw Error("ergopti_plus: inference.json rate_limit floor unavailable")
 }
 
 /**
@@ -465,9 +441,9 @@ LLM_ApiCommon_LogSummary(mode, requested, stats, kept_count) {
  * Critical, because the poll ticks read them; killing the transport is OS work
  * and has no business being there.
  *
- * A negative SetTimer period runs the callback on a NEW thread once the current
+ * A one-shot (negative period) timer runs the callback on a NEW thread once the current
  * one finishes, i.e. after Critical has been restored. This is the same
- * mechanism the spawn side already uses to keep Run() off the keystroke path.
+ * mechanism the spawn side already uses to keep process launches off the keystroke path.
  *
  * Kills MUST be a snapshot taken under Critical, never a live Map: the entries
  * it refers to are mutated and deleted by the poll ticks that run in between.

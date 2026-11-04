@@ -19,7 +19,7 @@ local OWNED_MODULES = {
 	"infra.timings",
 	"adapters.timer_scheduler",
 	"infra.config_paths",
-	"modules.keylogger.kc_bridge",
+	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
 	"platform.remap.onboarding",
@@ -40,7 +40,7 @@ local OWNED_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"ui.tooltip",
-	"modules.keylogger",
+	"modules.keystats",
 	"adapters.synthetic_input",
 	"modules.shortcuts.script_control",
 	"platform.remap.ke_variables",
@@ -58,8 +58,12 @@ local OWNED_MODULES = {
 
 --- Runs native construction and every retained callback before restoring state.
 --- @param run function Receives the scoped fixture constructors and observers.
-return function(run)
+return function(run, dependencies)
 	return helpers.with_stub_scope(OWNED_MODULES, function()
+		if dependencies ~= nil then
+			assert(type(dependencies) == "table" and type(dependencies.files) == "table", "fixture file port is required")
+			package.loaded["adapters.file_system"] = dependencies.files
+		end
 		local RealConfig = helpers.load_with_stubs("platform.remap.config")
 
 		local REAL_ONBOARDING_CACHE_PATH = "/__ergopti_hs011_integration__/Karabiner-Elements.dmg"
@@ -92,6 +96,7 @@ return function(run)
 				save = 0,
 				saved_enabled = {},
 				saved_payloads = {},
+				saved_intents = {},
 				save_results = {},
 				save_result_index = 0,
 				lease_bound_starts = 0,
@@ -144,6 +149,9 @@ return function(run)
 			package.loaded["platform.remap.config"] = {
 				load_available_actions = function()
 					if options.empty_data then return {} end
+					if type(options.real_action_catalogue_path) == "string" then
+						return RealConfig.load_available_actions(options.real_action_catalogue_path)
+					end
 					return { { id = "none" } }
 				end,
 				load_tap_hold_keys = function() return { { id = "left_shift" } } end,
@@ -168,10 +176,11 @@ return function(run)
 						combo_symmetric = false,
 					}
 				end,
-				save_user_config = function(state)
+				save_user_config = function(state, path, overwrite_corrupt, expected_source, intent)
 					calls.save = calls.save + 1
 					calls.saved_enabled[#calls.saved_enabled + 1] = state.enabled == true
 					calls.saved_payloads[#calls.saved_payloads + 1] = clone_payload(state)
+					calls.saved_intents[#calls.saved_intents + 1] = intent or false
 					calls.save_result_index = calls.save_result_index + 1
 					local configured = calls.save_results[calls.save_result_index]
 					if configured == "throw" then
@@ -180,6 +189,11 @@ return function(run)
 					if configured == "nil" then return nil end
 					if configured == "false" then return false end
 					if configured == "true" then return true end
+					if options.real_user_config_writes == true then
+						-- Only the setter intent is forwarded: the reset and scope arguments
+						-- keep the earlier two-argument real-write contract of these fixtures.
+						return RealConfig.save_user_config(state, path, nil, nil, intent)
+					end
 					return calls.save_succeeds
 				end,
 				build_default_state = function()
@@ -196,7 +210,7 @@ return function(run)
 						combo_symmetric = false,
 					}
 				end,
-				resolve_layout_actions = function() return 0 end,
+				resolve_layout_actions = function() return 0, "ansi" end,
 			}
 			-- Controlled source port for the shared copy planner. The original save
 			-- callback and its failure/counter contract remain the publication port.
@@ -206,8 +220,9 @@ return function(run)
 			local copy_config = package.loaded["platform.remap.config"]
 			local original_save = copy_config.save_user_config
 			calls.copy_source = ""
-			copy_config.save_user_config = function(state)
-				local accepted = original_save(state)
+			copy_config.save_user_config = function(state, ...)
+				local result = table.pack(original_save(state, ...))
+				local accepted = result[1]
 				if accepted == true then
 					calls.copy_source = CopyCodec.encode({ mod_combos = {
 						enabled = state.mod_combos_enabled, config = state.mod_combos_config,
@@ -215,7 +230,7 @@ return function(run)
 						symmetric = state.combo_symmetric,
 					} })
 				end
-				return accepted
+				return table.unpack(result, 1, result.n)
 			end
 			copy_config.prepare_copy_taps_to_chords = function(entries, _, path)
 				if calls.copy_read then calls.copy_read() end
@@ -468,7 +483,7 @@ return function(run)
 				get = function() return "missing-config.toml" end,
 				get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 			}
-			package.loaded["modules.keylogger.kc_bridge"] = {
+			package.loaded["modules.keystats.kc_bridge"] = {
 				refresh_managed_set = function()
 					calls.classifier_refreshes = calls.classifier_refreshes + 1
 					if options.classifier_succeeds == false then error("classifier failed") end
@@ -536,6 +551,7 @@ return function(run)
 			calls.build, calls.deploy, calls.execute, calls.save = 0, 0, 0, 0
 			calls.saved_enabled = {}
 			calls.saved_payloads = {}
+			calls.saved_intents = {}
 			calls.lease_bound_starts = 0
 			calls.hotkey_attempts = 0
 			calls.lifecycle_stop_attempts = 0
@@ -784,8 +800,8 @@ return function(run)
 				end,
 			}
 			package.loaded["ui.tooltip"] = { hide_forced = record("tooltip_hide") }
-			package.loaded["modules.keylogger"] = {
-				resync_context = record("keylogger_resync"),
+			package.loaded["modules.keystats"] = {
+				resync_context = record("keystats_resync"),
 				log_shortcut = function() end,
 			}
 

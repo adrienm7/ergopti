@@ -102,7 +102,7 @@ NavigationLayerUpdateIndicator(IsActive, ReadFn := 0, WriteFn := 0, LabelFn := 0
 }
 
 _TapHoldLayerWaitRelease(KeyName, TimeoutSec) {
-	return KeyWait(KeyName, "U T" . TimeoutSec)
+	return KS_WaitReleased(KeyName, TimeoutSec)
 }
 
 _TapHoldLayerKeyIsDown(KeyName) {

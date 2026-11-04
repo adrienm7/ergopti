@@ -14,12 +14,18 @@ local Profiles  = require("modules.llm.profiles")
 local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
 local ApiRemote = require("modules.llm.api_remote")
+local LocalAuth = require("llm.local_server_auth")
+local LocalServers = require("modules.llm.local_servers")
+local RuntimeChoice = require("core.llm.ollama_runtime_choice")
+local EnableAdmission = require("llm.enable_admission")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local Logger    = require("infra.logger")
 local Paths     = require("infra.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Storage = require("adapters.storage")
 local JsonCodec = require("adapters.json_codec")
+local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "llm.core"
 
@@ -42,9 +48,11 @@ local _SHARED_SCALAR_KEYS = {
 	"llm_enabled", "llm_active_profile", "llm_temperature",
 	"llm_num_predictions", "llm_context_length", "llm_min_words",
 	"llm_max_words", "llm_pred_indent", "llm_show_info_bar",
-	"llm_streaming", "llm_streaming_multi", "llm_instant_on_word_end",
-	"llm_after_hotstring", "llm_reset_on_nav", "llm_auto_raise_temp",
-	"llm_ollama_port",
+	"llm_streaming", "llm_streaming_multi", ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END,
+	ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING, ConfigKeys.COMMAND.LLM_RESET_ON_NAV, "llm_auto_raise_temp",
+	-- llm_ollama_port names the stock Ollama port, which a user's own Ollama
+	-- keeps; Ergopti's own daemon listens on llm_ollama_owned_port.
+	"llm_ollama_port", "llm_ollama_owned_port",
 	-- Privacy gates for the prediction path. These were absent from this list AND
 	-- hardcoded to true in prediction_engine.lua, so the shared value was
 	-- unreachable and the two drivers shipped opposite defaults for the same
@@ -119,6 +127,13 @@ local function load_shared_defaults()
 		missing[#missing + 1] = "llm_debounce_ms"
 	else
 		merged.llm_debounce = parsed.llm_debounce_ms / 1000
+	end
+
+	-- llm_min_request_interval: the same unit change as the debounce.
+	if type(parsed.llm_min_request_interval_ms) ~= "number" then
+		missing[#missing + 1] = "llm_min_request_interval_ms"
+	else
+		merged.llm_min_request_interval = parsed.llm_min_request_interval_ms / 1000
 	end
 
 	if #missing > 0 then
@@ -199,7 +214,11 @@ local deferred_profile_warmup_cleanup_pending
 --- @return string|nil reason Why nothing is started, when not admitted.
 local function ollama_start_admitted()
 	if CoreState.runtime_llm_enabled ~= true then return false, "the AI is off" end
-	if OllamaBinary.resolve() == nil then return false, "Ollama is not installed" end
+	local source_path, _, source_kind = OllamaBinary.resolve()
+	if source_path == nil then return false, "Ollama is not installed" end
+	if RuntimeChoice.classify(source_kind) ~= "native" then
+		return false, "The selected Ollama service is managed outside Ergopti"
+	end
 	return true, nil
 end
 
@@ -218,9 +237,11 @@ end
 --- @param callback function|nil Optional callback(backend_name) called when detection completes.
 function M.auto_detect_backend(callback)
 	local now = hs.timer.secondsSinceEpoch()
+	local ollama_origin, mlx_origin = ApiOllama.get_base_url(), ApiMlx.get_base_url()
 
 	-- Return cached result immediately if checked recently (within 10s)
 	if now - CoreState.last_backend_check < CoreState.backend_check_interval
+		and CoreState.last_ollama_origin == ollama_origin and CoreState.last_mlx_origin == mlx_origin
 		and not deferred_profile_warmup_cleanup_pending() then
 		local result = CoreState.backend
 		if type(callback) == "function" then
@@ -228,8 +249,6 @@ function M.auto_detect_backend(callback)
 		end
 		return result
 	end
-
-	CoreState.last_backend_check = now
 
 	-- Capture the generation before launching probes so the closure can detect
 	-- whether set_backend() was called while the probes were in-flight; if it
@@ -252,6 +271,11 @@ function M.auto_detect_backend(callback)
 			Logger.debug(LOG, "auto_detect: user has set a manual backend override — skipping automatic write.")
 			return
 		end
+		if ollama_origin ~= ApiOllama.get_base_url() or mlx_origin ~= ApiMlx.get_base_url() then
+			CoreState.last_backend_check = 0
+			Logger.debug(LOG, "auto_detect: endpoint changed while probing; ignoring stale receipt.")
+			return
+		end
 		-- Prefer Ollama if both are available, otherwise MLX, and only invalidate
 		-- deferred work when the resolved identity actually changes. A same-backend
 		-- health refresh must not cancel an otherwise valid profile warmup.
@@ -272,6 +296,8 @@ function M.auto_detect_backend(callback)
 				return
 			end
 		end
+		CoreState.last_backend_check = now
+		CoreState.last_ollama_origin, CoreState.last_mlx_origin = ollama_origin, mlx_origin
 		CoreState.backend = next_backend
 		if next_backend == "ollama" then
 			-- Ensure the Ollama daemon is running now that we know it is the active
@@ -298,8 +324,8 @@ function M.auto_detect_backend(callback)
 	-- on_both_done() never completes and auto_detect_backend()'s callback is
 	-- silently dropped. Mark the leg done+failed instead, mirroring the
 	-- pattern already used in adapters/http_client.lua's post()/get() (F-MED-5).
-	local ollama_probe_ok = pcall(hs.http.asyncGet, "http://127.0.0.1:11434/api/version", {}, function(status, body)
-		ollama_ok = (status == 200) and type(body) == "string" and body:find('"version"') ~= nil
+	local ollama_probe_ok = pcall(hs.http.asyncGet, ollama_origin .. EnableAdmission.VERSION_PATH, {}, function(status, body)
+		ollama_ok = EnableAdmission.receipt({ ok = status == 200, status = status, body = body }) == true
 		ollama_done = true
 		on_both_done()
 	end)
@@ -313,7 +339,7 @@ function M.auto_detect_backend(callback)
 	-- The MLX probe follows the configured port via api_mlx.get_base_url() — the
 	-- single source of truth. ApiMlx is required at the top of this file, so no
 	-- local re-require and no hardcoded port literal here.
-	local mlx_models_url = ApiMlx.get_base_url() .. "/v1/models"
+	local mlx_models_url = mlx_origin .. "/v1/models"
 	local mlx_probe_ok = pcall(hs.http.asyncGet, mlx_models_url, {}, function(status, body)
 		mlx_ok = (status == 200) and type(body) == "string" and body:find('"object"') ~= nil
 		mlx_done = true
@@ -335,7 +361,7 @@ function M.warm_up_connections()
 		-- Parallel async pings to both backends (fire-and-forget). The MLX URL
 		-- follows the configured port via api_mlx.get_base_url() (required at the
 		-- top of this file) — the single source of truth, no hardcoded port.
-		hs.http.asyncGet("http://127.0.0.1:11434/api/version", {}, function() end)
+		hs.http.asyncGet(ApiOllama.get_base_url() .. EnableAdmission.VERSION_PATH, {}, function() end)
 		hs.http.asyncGet(ApiMlx.get_base_url() .. "/v1/models", {}, function() end)
 	end)
 end
@@ -378,19 +404,13 @@ local API_STATE_VERSION  = 1
 local KEYCHAIN_REFERENCE_PREFIX = "keychain:"
 local TokenCrypto = require("modules.llm.api_token_crypto")
 local ApiCommon = require("modules.llm.api_common")
+local WarmupController = require("modules.llm.warmup_controller")
 
 --- Copies acyclic settings data so later runtime mutations cannot mutate a test
 --- stub's by-reference backing store or our last-known durable snapshot.
 --- @param value any Value to copy.
 --- @return any copy
-local function copy_settings_value(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do
-		copy[copy_settings_value(key)] = copy_settings_value(child)
-	end
-	return copy
-end
+local copy_settings_value = TableUtil.deep_copy_with_keys
 
 --- Structural equality for the exact settings readback contract.
 --- @param left any First value.
@@ -429,7 +449,7 @@ end
 --- Validates the canonical entry-array shape shared by legacy migration,
 --- combined-state load, and runtime publication. The legacy path alone may
 --- contain cleartext; every durable combined entry must carry an opaque ref,
---- except the empty token of a local server the user gave no key to.
+--- except explicit keyless local endpoints admitted by the shared auth policy.
 --- @param entries any Candidate dense array.
 --- @param allow_plaintext boolean Whether historical cleartext is accepted.
 --- @param active_id string Candidate active identity.
@@ -443,7 +463,8 @@ local function validate_api_entries(entries, allow_plaintext, active_id)
 			or type(entry.provider) ~= "string" or entry.provider == ""
 			or type(entry.model) ~= "string" or entry.model == ""
 			or type(entry.token) ~= "string"
-			or (entry.token == "" and not ApiRemote.is_local_server(entry.provider))
+			or not LocalAuth.entry_token_allowed(entry.provider, entry.token,
+				entry.base_url, LocalServers.SERVERS)
 			or (entry.base_url ~= nil and type(entry.base_url) ~= "string")
 			or (entry.label ~= nil and type(entry.label) ~= "string")
 			or ids[entry.id] == true then
@@ -594,12 +615,7 @@ local function pending_id_set(state)
 	return ids
 end
 
-local function sorted_ids(ids)
-	local out = {}
-	for entry_id in pairs(ids) do out[#out + 1] = entry_id end
-	table.sort(out)
-	return out
-end
+local sorted_ids = TableUtil.sorted_keys
 
 local function validate_id_list(raw)
 	if raw == nil then return {} end
@@ -841,6 +857,9 @@ function M.load_api_entries()
 	end
 	ApiRemote.set_entries(copy_settings_value(state.entries))
 	ApiRemote.set_active_entry_id(state.active_id)
+	if WarmupController.retry_deferred_warmup("remote API identity restore") ~= true then
+		Logger.error(LOG, "Deferred warmup replay after remote API identity restore was refused.")
+	end
 
 	local prewarm_ok, prewarm_err = xpcall(ApiRemote.prewarm_active_entry_decrypt, debug.traceback)
 	if not prewarm_ok then Logger.error(LOG, "API token prewarm raised: %s", tostring(prewarm_err)) end
@@ -1255,7 +1274,7 @@ function M.warmup_model(model_name, profile)
 	local resolved_profile = profile or M.get_active_profile()
 	Logger.debug(LOG, "warmup_model: dispatching to backend '%s' for model '%s'.",
 		tostring(CoreState.backend), tostring(model_name))
-	local ok, accepted_or_err = pcall(function()
+	local ok, accepted_or_err, acquired = pcall(function()
 		return get_api().warmup(model_name, resolved_profile)
 	end)
 	if not ok or accepted_or_err ~= true then
@@ -1263,7 +1282,7 @@ function M.warmup_model(model_name, profile)
 			tostring(accepted_or_err))
 		return false
 	end
-	return true
+	return true, acquired
 end
 
 --- Returns true when the active backend has confirmed it can answer inference
@@ -1603,6 +1622,14 @@ function M.set_llm_streaming(v)
 	Logger.debug(LOG, "Streaming: %s.", _streaming_enabled and "on" or "off")
 end
 
+--- Hands the HttpClient port to every backend's inference path (engine init).
+--- @param client table Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	ApiOllama.set_inference_client(client)
+	ApiMlx.set_inference_client(client)
+	ApiRemote.set_inference_client(client)
+end
+
 --- Cancels the in-flight streaming task on the active backend, if any.
 --- Called when a new request supersedes the current stream.
 function M.cancel_streaming()
@@ -1642,8 +1669,9 @@ local function apply_backend_identity(backend, start_service)
 		CoreState.backend_transition_generation =
 			CoreState.backend_transition_generation + 1
 		local my_transition_generation = CoreState.backend_transition_generation
-		-- Any backend transition forces a fresh Ollama readiness verdict: leaving MLX
-		-- kills `ollama serve`, and returning relaunches it async (not yet listening).
+		-- Any backend transition forces a fresh Ollama readiness verdict: switching to
+		-- MLX retires the owned `ollama serve`, and returning relaunches it async (not
+		-- yet listening).
 		-- Without this, a stale-true _is_ready would make the warmup chain self-terminate
 		-- and predictions dispatch to a cold/dead server (F-M8). ensure_running launches
 		-- the daemon but must NEVER imply readiness.
@@ -1711,12 +1739,7 @@ end
 --- Clones preference data so callers cannot mutate the live profile registry.
 --- @param value any Configuration value.
 --- @return any copy Detached configuration value.
-local function clone_configuration(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone_configuration(child) end
-	return copy
-end
+local clone_configuration = TableUtil.deep_copy
 
 --- Captures actual configuration independently from the menu's desired values.
 --- Credentials and backend request ownership are deliberately outside this scope.
@@ -2107,7 +2130,12 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 	local profile = profile_override or M.get_active_profile()
 	local api = get_api()
 
-	if type(profile) == "table" and (not profile.batch) then
+	-- A batch profile asks once for every variant, but only above one prediction:
+	-- the rule of the shared plan and of the prompt selector, as on Windows and
+	-- Linux. A single prediction of a batch profile used to take the batch path.
+	local batching = require("llm.request_plan.batching").plan(
+		type(profile) == "table" and (profile.batch and true or false), num_predictions)
+	if type(profile) == "table" and batching.mode == "sequential" then
 		if num_predictions > 1 and not sequential_mode then
 			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)
 		else
@@ -2130,8 +2158,10 @@ end
 --- @param max_tokens number Output token budget.
 --- @param on_raw function Receives the answer text.
 --- @param on_fail function Called when no answer came back.
+--- @param current function|nil Original request authority until remote HTTP dispatch.
 function M.fetch_raw_completion(profile, full_text, tail_text, model_name, temperature, max_tokens,
-                                on_raw, on_fail)
+                                on_raw, on_fail, current)
+	assert(current == nil or type(current) == "function", "fetch_raw_completion: current must be a function or nil")
 	if type(profile) ~= "table" then
 		error("fetch_raw_completion: the profile must be a profile table, got " .. type(profile))
 	end
@@ -2140,7 +2170,7 @@ function M.fetch_raw_completion(profile, full_text, tail_text, model_name, tempe
 		error("fetch_raw_completion: backend '" .. tostring(CoreState.backend) .. "' has no single request")
 	end
 	api.request_raw(model_name, Profiles.resolve_system_prompt(profile, 1), full_text, tail_text,
-		temperature, max_tokens, on_raw, on_fail)
+		temperature, max_tokens, on_raw, on_fail, current and { current = current } or nil)
 end
 
 --- Sends one chat request with a system prompt of the caller's own to the
@@ -2155,7 +2185,9 @@ end
 --- @param max_tokens number Output token budget.
 --- @param on_raw function Receives the answer text.
 --- @param on_fail function Called when no answer came back.
-function M.fetch_raw_text(system_prompt, user_text, model_name, temperature, max_tokens, on_raw, on_fail)
+--- @param current function|nil Original request authority until remote HTTP dispatch.
+function M.fetch_raw_text(system_prompt, user_text, model_name, temperature, max_tokens, on_raw, on_fail, current)
+	assert(current == nil or type(current) == "function", "fetch_raw_text: current must be a function or nil")
 	if type(system_prompt) ~= "string" or system_prompt == "" or type(user_text) ~= "string" then
 		error("fetch_raw_text: a system prompt and a user text are required")
 	end
@@ -2164,7 +2196,7 @@ function M.fetch_raw_text(system_prompt, user_text, model_name, temperature, max
 		error("fetch_raw_text: backend '" .. tostring(CoreState.backend) .. "' has no single request")
 	end
 	api.request_raw(model_name, system_prompt, user_text, "", temperature, max_tokens, on_raw, on_fail,
-		{ chat = true })
+		{ chat = true, current = current })
 end
 
 --- Validates keystroke event modifiers against an expected explicit modifier set.

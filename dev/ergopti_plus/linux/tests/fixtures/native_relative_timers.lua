@@ -64,10 +64,10 @@ for _, in_callback in ipairs({ false, true }) do
 	check("valid child survives its new deadline " .. (in_callback and "inside a callback" or "after blocking work"), function()
 		local results, start, pid = {}, nil, nil
 		local function arm()
-			uv.sleep(160)
+			uv.sleep(600) -- stale by more than the deadline, so a loop-time deadline is already expired
 			start = uv.hrtime()
 			assert(Process.run("/bin/sh", { "-c", "sleep 0.04; printf done; printf warning >&2" },
-				{ timeout_ms = 100 }, function(result) results[#results + 1] = result end))
+				{ timeout_ms = 500 }, function(result) results[#results + 1] = result end))
 			uv.walk(function(handle)
 				if uv.handle_get_type(handle) == "process" and not uv.is_closing(handle) then
 					pid = uv.process_get_pid(handle)
@@ -80,7 +80,7 @@ for _, in_callback in ipairs({ false, true }) do
 		local duration = elapsed(start)
 		print(string.format("  native child completed %.2f ms exit %s", duration, tostring(results[1].exit_code)))
 		assert(#results == 1 and results[1].exit_code == 0 and results[1].error == nil,
-			"valid 40 ms child lost its newly armed 100 ms deadline: " .. tostring(results[1].error))
+			"valid 40 ms child lost its newly armed 500 ms deadline: " .. tostring(results[1].error))
 		assert(results[1].stdout == "done" and results[1].stderr == "warning", "native streams lost output")
 		assert(duration >= 25 and duration < 1000)
 		assert(pid and not uv.fs_stat("/proc/" .. pid), "completed native child was not reaped")

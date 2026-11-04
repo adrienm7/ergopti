@@ -1,0 +1,126 @@
+{
+	"max_reports": 20,
+	"fields": [
+		"version",
+		"driver",
+		"timestamp",
+		"module",
+		"error_msg",
+		"stack_trace",
+		"os_version",
+		"hs_version",
+		"screen_res",
+		"locale",
+		"config_dir",
+		"script_dir",
+		"git_hash",
+		"commit_source",
+		"active_app",
+		"active_title",
+		"uptime_sec",
+		"adapters_ok",
+		"adapters_failed",
+		"session_warnings",
+		"session_errors",
+		"log_tail"
+	],
+	"stems": [
+		{
+			"timestamp": "2026-10-25T21:04:11Z",
+			"stem": "2026-10-25T21-04-11Z"
+		},
+		{
+			"timestamp": "2026-01-02T03:04:05Z",
+			"stem": "2026-01-02T03-04-05Z"
+		}
+	],
+	"names": [
+		{
+			"stem": "2026-10-25T21-04-11Z",
+			"attempt": 1,
+			"name": "2026-10-25T21-04-11Z.json"
+		},
+		{
+			"stem": "2026-10-25T21-04-11Z",
+			"attempt": 2,
+			"name": "2026-10-25T21-04-11Z-2.json"
+		},
+		{
+			"stem": "2026-10-25T21-04-11Z",
+			"attempt": 10,
+			"name": "2026-10-25T21-04-11Z-10.json"
+		}
+	],
+	"not_report_names": [
+		"crash_2026-09-23T21-04-11_engine.txt",
+		".last_crash_notice",
+		"notes.json",
+		"2026-10-25T21-04-11Z.txt",
+		"2026-10-25T21-04-11Z-1.json",
+		"2026-10-25T21-04-11Z-0.json",
+		"2026-10-25T21:04:11Z.json",
+		"",
+		"2026-10-25T21-04-11Z-.json"
+	],
+	"retention": [
+		{
+			"case": "under the cap nothing is deleted",
+			"limit": 3,
+			"names": ["2026-10-25T10-00-00Z.json", "2026-10-25T11-00-00Z.json"],
+			"expired": []
+		},
+		{
+			"case": "exactly at the cap nothing is deleted",
+			"limit": 2,
+			"names": ["2026-10-25T10-00-00Z.json", "2026-10-25T11-00-00Z.json"],
+			"expired": []
+		},
+		{
+			"case": "the oldest by timestamp goes first whatever the listing order",
+			"limit": 2,
+			"names": [
+				"2026-10-25T12-00-00Z.json",
+				"2026-10-25T10-00-00Z.json",
+				"2026-10-25T11-00-00Z.json"
+			],
+			"expired": ["2026-10-25T10-00-00Z.json"]
+		},
+		{
+			"case": "a collision suffix sorts after its plain name, not before it",
+			"limit": 2,
+			"names": [
+				"2026-10-25T10-00-00Z.json",
+				"2026-10-25T10-00-00Z-2.json",
+				"2026-10-25T10-00-00Z-10.json",
+				"2026-10-25T10-00-01Z.json"
+			],
+			"expired": ["2026-10-25T10-00-00Z.json", "2026-10-25T10-00-00Z-2.json"]
+		},
+		{
+			"case": "files that are not reports are never selected",
+			"limit": 1,
+			"names": [
+				"notes.json",
+				".last_crash_notice",
+				"crash_2026-09-23T21-04-11_engine.txt",
+				"2026-10-25T10-00-00Z.json",
+				"2026-10-25T11-00-00Z.json"
+			],
+			"expired": ["2026-10-25T10-00-00Z.json"]
+		}
+	],
+	"documents": [
+		{
+			"case": "a complete record keeps the documented order and defaults",
+			"fields": {
+				"version": "1.2.3",
+				"driver": "linux",
+				"timestamp": "2026-10-25T21:04:11Z",
+				"module": "engine",
+				"error_msg": "boom",
+				"stack_trace": "line 1\nline \"2\"\t\\end"
+			},
+			"json": "{\n  \"version\": \"1.2.3\",\n  \"driver\": \"linux\",\n  \"timestamp\": \"2026-10-25T21:04:11Z\",\n  \"module\": \"engine\",\n  \"error_msg\": \"boom\",\n  \"stack_trace\": \"line 1\\nline \\\"2\\\"\\t\\\\end\",\n  \"os_version\": \"unknown\",\n  \"hs_version\": \"unknown\",\n  \"screen_res\": \"unknown\",\n  \"locale\": \"unknown\",\n  \"config_dir\": \"\",\n  \"script_dir\": \"\",\n  \"git_hash\": \"unknown\",\n  \"commit_source\": \"unknown\",\n  \"active_app\": \"\",\n  \"active_title\": \"\",\n  \"uptime_sec\": \"0\",\n  \"adapters_ok\": \"\",\n  \"adapters_failed\": \"\",\n  \"session_warnings\": \"0\",\n  \"session_errors\": \"0\",\n  \"log_tail\": \"\"\n}"
+		}
+	]
+}

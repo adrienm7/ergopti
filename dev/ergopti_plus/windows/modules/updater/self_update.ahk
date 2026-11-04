@@ -47,7 +47,7 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 	Assets := Release["assets"]
 	if !(Assets is Array)
 		return 0
-	ExpectedUrl := "https://github.com/" . UPDATER_GH_OWNER . "/"
+	ExpectedUrl := UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/"
 		. UPDATER_GH_REPO . "/releases/download/" . Tag . "/" . AssetName
 	for AssetIndex, Asset in Assets {
 		if !(Asset is Map)
@@ -171,9 +171,14 @@ _Updater_SaveCheckState(State) {
 }
 
 ; Records one completed background check. Ok means GitHub answered with a
-; usable release list (up to date, a new release or no release yet).
-_Updater_RecordBackgroundCheck(Ok) {
+; usable release list (up to date, a new release or no release yet). The result
+; logger and record/clock acquisition may yield after the callback's first gate.
+_Updater_RecordBackgroundCheck(Ok, Request) {
+	if !_Updater_RequestMayPublish(Request)
+		return false
 	Next := UpdateSchedule_RecordCheck(_Updater_CheckState(), _Updater_EpochNow(), Ok)
+	if !_Updater_RequestMayPublish(Request)
+		return false
 	_Updater_SaveCheckState(Next)
 	try LoggerInfo("Updater", "Background check recorded: {1} (consecutive failures: {2}).",
 		Ok ? "success" : "failure", Next["failures"])
@@ -623,7 +628,11 @@ Updater_BackgroundTick(Owner := 0, ArmEpoch := 0, *) {
 ; LAST_NOTIFIED_TAG, and on a genuinely new release caches it, rebuilds the tray
 ; menu, and surfaces a TrayTip. Any failure is logged and the loop just waits
 ; for the next interval — a network blip must not silently kill the updater.
-_Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
+; @param CheckOnly {Boolean} The answer comes from the public Atom feed: a release
+;   it names is announced, never cached for the tray's install row.
+; @param FeedFn {Func|Integer} Replaces _Updater_FetchFeedJsonAsync (tests only).
+; @param ShowFn {Func|Integer} Replaces the check-only balloon (tests only).
+_Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0, CheckOnly := false, FeedFn := 0, ShowFn := 0) {
 	; Background work may publish only in the exact pause generation where it
 	; was born. This also closes the register-vs-suspend race in the shared owner.
 	if !_Updater_RequestMayPublish(Request)
@@ -635,29 +644,42 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	}
 	; Every outcome is INFO: a check runs a few times a day, and "did it check,
 	; and what did it find" is the first question when an update never arrives.
+	if !CheckOnly && _Updater_JsonPayloadIsFailure(Json) {
+		; api.github.com gave no list (blocked, throttled, rate-limited), as on
+		; Linux: a user behind such a proxy would otherwise never hear of a release.
+		try LoggerInfo("Updater", "Background check: the GitHub API gave no list; reading the public Atom feed.")
+		OnFeed := (FeedJson, CompletedRequest, FeedTerminal := 0) => _Updater_HandleBackgroundResult(
+			FeedJson, Current, CompletedRequest, FeedTerminal, true, 0, ShowFn)
+		(IsObject(FeedFn) ? FeedFn : _Updater_FetchFeedJsonAsync).Call(Request.Channel, Request, OnFeed)
+		return
+	}
 	if _Updater_JsonPayloadIsFailure(Json) {
 		try LoggerInfo("Updater", "Background check result: network unreachable.")
-		_Updater_RecordBackgroundCheck(false)
+		_Updater_RecordBackgroundCheck(false, Request)
 		return
 	}
 	if _Updater_JsonIsNoChannelRelease(Json) {
 		try LoggerInfo("Updater", "Background check result: no release on channel {1} yet (current {2}).",
 			Request.Channel, Current)
-		_Updater_RecordBackgroundCheck(true)
+		_Updater_RecordBackgroundCheck(true, Request)
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
 	if (Latest == "") {
 		; This used to be reported as "up to date", hiding a malformed response.
 		try LoggerWarn("Updater", "Background check result: the release response carried no tag (current {1}).", Current)
-		_Updater_RecordBackgroundCheck(false)
+		_Updater_RecordBackgroundCheck(false, Request)
 		return
 	}
-	_Updater_RecordBackgroundCheck(true)
+	_Updater_RecordBackgroundCheck(true, Request)
 	if !UpdateChannels_ShouldOffer(
 		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
 		try LoggerInfo("Updater", "Background check result: up to date (current {1}, latest {2}, channel {3}).",
 			Current, Latest, Request.Channel)
+		return
+	}
+	if CheckOnly {
+		_Updater_AnnounceCheckOnlyRelease(Latest, Current, Request, ShowFn)
 		return
 	}
 	Release := {
@@ -689,13 +711,48 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	}
 	try {
 		_Updater_ClaimBalloon()
-		TrayTip(Format(t("updater.tray_new_version_body"), Latest), t("updater.tray_new_version_title"))
+		_Updater_ShowReleaseBalloon(Format(t("updater.tray_new_version_body"), Latest))
 		if _Updater_CommitReleaseNotification(Reservation, Request)
 			_Updater_RecordNotifiedTag(Latest)
 	} catch as Err {
 		_Updater_ReleaseNotificationReservation(Reservation)
 		try LoggerError("Updater", "Could not surface background update notification: {1}.", Err.Message)
 	}
+}
+
+; Tells once that the public feed names a newer release. The tray's row installs
+; from the cached release, which needs the API's asset list and digests, so
+; nothing is cached and the balloon stays unclaimed: its click offers nothing the
+; blocked API could not honour. Its text says why it cannot be installed yet.
+_Updater_AnnounceCheckOnlyRelease(Latest, Current, Request, ShowFn := 0) {
+	Reservation := _Updater_TryReserveReleaseNotification(Request, Latest)
+	if !IsObject(Reservation) {
+		try LoggerInfo("Updater", "Background check result: {1} available, already notified.", Latest)
+		return
+	}
+	try LoggerInfo("Updater", "New release available (public feed, check only): {1} (current: {2}).", Latest, Current)
+	if !_Updater_RequestMayPublish(Request) {
+		_Updater_ReleaseNotificationReservation(Reservation)
+		return
+	}
+	try {
+		_Updater_ReleaseBalloon()
+		Text := Format(t("updater.tray_new_version_body"), Latest) . " " . t("update_check.check_only")
+		if IsObject(ShowFn)
+			ShowFn.Call(Text)
+		else
+			_Updater_ShowReleaseBalloon(Text)
+		if _Updater_CommitReleaseNotification(Reservation, Request)
+			_Updater_RecordNotifiedTag(Latest)
+	} catch as Err {
+		_Updater_ReleaseNotificationReservation(Reservation)
+		try LoggerError("Updater", "Could not surface the check-only update notification: {1}.", Err.Message)
+	}
+}
+
+; The one balloon both release announcements show, under the same title.
+_Updater_ShowReleaseBalloon(Text) {
+	TrayTip(Text, t("updater.tray_new_version_title"))
 }
 
 ; Balloon ownership. Every balloon of the driver is a TrayTip on the one tray
@@ -800,12 +857,11 @@ global _UpdaterDownloadWorker := 0
 global _UpdaterDownloadRequest := 0
 global _UpdaterDownloadArtifacts := 0
 global _UpdaterDownloadStartedTick := 0
+; Detached state is still busy until native and shared-path retirement completes.
+global _UpdaterDownloadRetirement := 0
 global _UpdaterStagingTransportCounter := 0
+; Bound of one inherited staging value (a URL or a path) passed through cmd.exe.
 global UPDATER_STAGING_ENV_MAX_CHARS := 7000
-; Application source-publication budget, not a Windows environment-block limit.
-; Eight individually bounded fragments admit the production worker with room
-; for growth while refusing an unbounded encoded source before any EnvSet.
-global UPDATER_STAGING_MAX_SCRIPT_CHUNKS := 8
 global _UpdaterSwapOwner := 0
 ; Boot installs an admitted recovery claim before loading this module. Other
 ; ordinary module consumers own an absent target; never overwrite a boot claim.
@@ -890,8 +946,18 @@ _Updater_RetryCurlCaptureDebt(*) {
 	return _UpdaterCurlCaptureDebt.Count == 0
 }
 
-_Updater_RetireCurlCaptureArtifacts(Artifacts) {
-	if IsObject(Artifacts) && Artifacts.HasOwnProp("CurlCapture")
+_Updater_RetireCurlCaptureArtifacts(Artifacts, DiscardStaging := false) {
+	if !IsObject(Artifacts)
+		return true
+	if DiscardStaging {
+		if !Artifacts.HasOwnProp("StagingRetirement")
+			return _Updater_RetireCurlCaptureArtifacts(Artifacts)
+		Closed := _Updater_RetireCurlCapture(Artifacts.StagingRetirement)
+		if !Closed
+			try LoggerWarn("Updater", "Staged update retirement retains native file or process debt.")
+		return Closed
+	}
+	if Artifacts.HasOwnProp("CurlCapture")
 		return _Updater_RetireCurlCapture(Artifacts.CurlCapture)
 	return true
 }
@@ -1159,6 +1225,7 @@ _Updater_RequestRecoveryHandoffExit(*) {
 		_UpdaterRecoveryExitInvocation := true
 		TimerArmOneShotMs(_Updater_RequestRecoveryHandoffExit,
 			UPDATER_RECOVERY_HANDOFF_RETRY_MS)
+		LifecycleNoteExitRequester("the updater's recovery handoff")
 		ExitApp(0)
 	} finally {
 		_UpdaterRecoveryExitInvocation := false
@@ -1575,24 +1642,59 @@ global _UpdaterManagedFailurePresenter := 0
 global _UpdaterManagedFailureRetireFn := 0
 global _UpdaterManagedFailureOwner := 0
 
+; Capture callback identity and its admission epoch together before callouts.
+_Updater_CaptureInstallObservation() {
+	global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
+	PreviousCritical := Critical("On")
+	try return {Observer: _UpdaterInstallObserver, Epoch: _UpdaterInstallObserverEpoch}
+	finally Critical(PreviousCritical)
+}
+
+_Updater_InstallObservationValid(Observation) {
+	return Type(Observation) == "Object" && Observation.HasOwnProp("Observer")
+		&& Observation.HasOwnProp("Epoch") && Observation.Epoch is Integer
+		&& Observation.Epoch >= 0
+}
+
+_Updater_InstallObservationCurrent(Observation) {
+	global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
+	return _Updater_InstallObservationValid(Observation)
+		&& Observation.Epoch == _UpdaterInstallObserverEpoch
+		&& Observation.Observer == _UpdaterInstallObserver
+}
+
+; Missing transaction metadata never borrows the current observer. The actual
+; reservation, artifact registration and swap constructor own this receipt.
+_Updater_ArtifactInstallObservation(Artifacts) {
+	Observation := IsObject(Artifacts) && Artifacts.HasOwnProp("InstallObservation")
+		? Artifacts.InstallObservation : 0
+	return _Updater_InstallObservationValid(Observation) ? Observation : 0
+}
+
 ; Tells the Versions window one phase of the install it follows: "installing",
 ; "restarting" or "failed" (which ends the following).
 ; @param Phase {String}
 ; @param ReasonKey {String} Page locale key of a failure.
 ; @returns {Boolean} True when a window follows this install.
-_Updater_NotifyInstallPhase(Phase, ReasonKey := "", FailureReceipt := 0, ExpectedObserver := unset) {
+_Updater_NotifyInstallPhase(Phase, ReasonKey := "", FailureReceipt := 0, ExpectedObserver := unset, ExpectedEpoch := unset) {
 	global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
 	PreviousCritical := Critical("On")
 	try {
 		Observer := IsSet(ExpectedObserver) ? ExpectedObserver : _UpdaterInstallObserver
+		if IsSet(ExpectedEpoch) && (ExpectedEpoch != _UpdaterInstallObserverEpoch
+			|| Observer != _UpdaterInstallObserver)
+			return false
 		if IsObject(Observer) && Phase == "failed"
 			&& IsObject(_UpdaterInstallObserver) && _UpdaterInstallObserver == Observer {
 			_UpdaterInstallObserver := 0
 			_UpdaterInstallObserverEpoch += 1
 		}
+		DeliveryEpoch := _UpdaterInstallObserverEpoch
 	} finally {
 		Critical(PreviousCritical)
 	}
+	if IsSet(ExpectedEpoch) && _UpdaterInstallObserverEpoch != DeliveryEpoch
+		return false
 	if !IsObject(Observer)
 		return false
 	try {
@@ -1611,10 +1713,18 @@ _Updater_NotifyInstallPhase(Phase, ReasonKey := "", FailureReceipt := 0, Expecte
 ; @param MessageKey {String} Updater locale key of the modal box.
 ; @param ReasonKey {String} Page locale key of the window's failure.
 ; @param Icon {String} Modal box icon option.
-_Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!", FailureReceipt := 0) {
-	if _Updater_NotifyInstallPhase("failed", ReasonKey, FailureReceipt)
-		return
+_Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!", FailureReceipt := 0, Observation := unset) {
+	if !IsSet(Observation)
+		Observation := _Updater_CaptureInstallObservation()
+	if !_Updater_InstallObservationCurrent(Observation)
+		return false
+	if _Updater_NotifyInstallPhase("failed", ReasonKey, FailureReceipt,
+		Observation.Observer, Observation.Epoch)
+		return true
+	if !_Updater_InstallObservationCurrent(Observation)
+		return false
 	Ui_MsgBox(t(MessageKey), t("updater.window_title"), Icon)
+	return true
 }
 
 ; Whether the staging worker's ERR line is a refused verification (a missing or
@@ -1741,14 +1851,17 @@ _Updater_ParseStagingFailure(Stdout) {
 	Debt := []
 	if _Updater_ExactFailureField(Envelope, "cleanup_debt", -1) != -1 {
 		RawDebt := _Updater_ExactFailureField(Envelope, "cleanup_debt")
-		if !(RawDebt is Array) || RawDebt.Length > 6
+		Resources := Map()
+		Resources.CaseSense := "On"
+		for Name in ["request", "output", "input", "response", "staged_executable", "swap_worker", "staging_directory"]
+			Resources[Name] := true
+		if !(RawDebt is Array) || RawDebt.Length > Resources.Count
 			return Unknown
 		for Entry in RawDebt {
 			if !(Entry is Map) || Entry.Count != 2
 				return Unknown
 			Resource := _Updater_ExactFailureField(Entry, "resource")
-			if !(Resource is String) || !RegExMatch(Resource,
-				"^(?:request|output|input|response|staged_executable|swap_worker)$")
+			if !(Resource is String) || !Resources.Has(Resource)
 				return Unknown
 			CleanReceipt := _Updater_AdmitStagingReceipt(_Updater_ExactFailureField(Entry, "receipt"), Contract)
 			if !(CleanReceipt is Map)
@@ -1776,15 +1889,18 @@ _Updater_AdmitStagingReceipt(Receipt, Contract) {
 	return Admitted
 }
 
-_Updater_NewManagedFailureOwner(Release, Request, AssetUrl, Digest, StagingEpoch, ExpectedObserver := unset) {
+_Updater_NewManagedFailureOwner(Release, Request, AssetUrl, Digest, StagingEpoch, ExpectedObserver := unset, ExpectedObserverEpoch := unset) {
 	global _UpdaterInstallObserver
 	if !_Updater_RequestContextValid(Request) || Type(Release) != "Object"
 		|| !Release.HasProp("RawJson") || !Release.HasProp("Tag")
 		return 0
+	Observation := _Updater_CaptureInstallObservation()
 	return Map("release", { RawJson: Release.RawJson, Tag: Release.Tag },
 		"request", Request, "asset_url", AssetUrl, "digest", Digest,
 		"staging_epoch", StagingEpoch, "terminal", false, "retired", false,
-		"install_observer", IsSet(ExpectedObserver) ? ExpectedObserver : _UpdaterInstallObserver)
+		"install_observer", IsSet(ExpectedObserver) ? ExpectedObserver : Observation.Observer,
+		"install_observer_epoch", IsSet(ExpectedObserverEpoch) ? ExpectedObserverEpoch
+			: IsSet(ExpectedObserver) ? -1 : Observation.Epoch)
 }
 
 _Updater_DispatchManagedFailureRetirement(Owner) {
@@ -1843,10 +1959,11 @@ _Updater_RetryManagedFailure(Owner, Observer := unset) {
 	return _Updater_StartObservedInstall(Release, IsSet(Observer) ? Observer : _UpdaterInstallObserver, Owner["request"], Owner) == true
 }
 
-_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
+_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch, Observation := 0) {
 	global _UpdaterManagedFailureOwner, _UpdaterManagedFailurePresenter
 	global _UpdaterSelfUpdateEpoch, _UpdaterInstallObserver
-	Observer := Owner is Map ? Owner.Get("install_observer", 0) : _UpdaterInstallObserver
+	if Owner is Map
+		Observation := {Observer: Owner.Get("install_observer", 0), Epoch: Owner.Get("install_observer_epoch", -1)}
 	if Failure.Get("native_cleanup_debt", false)
 		try LoggerWarn("Updater", "Staging reported native resolver retirement debt; its owned process tree has physically retired.")
 	if Failure.Get("cleanup_debt", []).Length > 0
@@ -1866,17 +1983,21 @@ _Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if Owner is Map && !_Updater_ManagedFailureOwnerIsCurrent(Owner)
+	if (Owner is Map && !_Updater_ManagedFailureOwnerIsCurrent(Owner))
+		|| !_Updater_InstallObservationCurrent(Observation)
 		return false
 	if Failure["reason"] == "verify" {
 		if !_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_verify",
-			Failure["receipt"], Observer)
-			Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
+			Failure["receipt"], Observation.Observer, Observation.Epoch)
+			if _Updater_InstallObservationCurrent(Observation)
+				Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
 		return true
 	}
 	Observed := _Updater_NotifyInstallPhase("failed",
-		"changelog_window.install_error_download", Failure["receipt"], Observer)
+		"changelog_window.install_error_download", Failure["receipt"], Observation.Observer, Observation.Epoch)
 	if Owner is Map && !_Updater_ManagedFailureOwnerIsCurrent(Owner)
+		return false
+	if !Observed && !_Updater_InstallObservationCurrent(Observation)
 		return false
 	if !Observed && HasMethod(_UpdaterManagedFailurePresenter, "Call") {
 		try {
@@ -1884,7 +2005,7 @@ _Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
 				return true
 		}
 	}
-	if !Observed
+	if !Observed && _Updater_InstallObservationCurrent(Observation)
 		Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
 	return true
 }
@@ -1894,11 +2015,14 @@ _Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
 ; disk persistence, integrity checks and swap-script creation must never run here.
 ; This side only validates the request, launches/polls the worker and performs
 ; the final non-blocking process hand-off after the worker reports READY.
-_Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailureOwner := 0) {
+_Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailureOwner := 0, Observation := unset) {
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadRequest, _UpdaterRecoveryPublishTarget
-	global _UpdaterDownloadStartedTick, _UpdaterCurlCaptureDebt
+	global _UpdaterDownloadStartedTick, _UpdaterCurlCaptureDebt, _UpdaterDownloadArtifacts
+	global _UpdaterDownloadRetirement
 	global UPDATER_REQUEST_POLICY_ALLOW
+	if !IsSet(Observation)
+		Observation := _Updater_CaptureInstallObservation()
 	Outcome := {
 		Reserved: false,
 		ShouldDrop: false,
@@ -1917,7 +2041,7 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailu
 			Outcome.ShouldDrop := true
 		} else if (_UpdaterRecoveryPublishTarget != "" || _UpdaterCurlCaptureDebt.Count != 0) {
 			Outcome.RecoveryBusy := true
-		} else if _UpdaterDownloadInProgress {
+		} else if _UpdaterDownloadInProgress || IsObject(_UpdaterDownloadRetirement) {
 			Outcome.DuplicateDownload := true
 		} else {
 			if ExpectedFailureOwner is Map
@@ -1927,6 +2051,7 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailu
 			_UpdaterDownloadInProgress := true
 			Outcome.Epoch := ++_UpdaterSelfUpdateEpoch
 			_UpdaterDownloadRequest := Request
+			_UpdaterDownloadArtifacts := {InstallObservation: Observation}
 			_UpdaterDownloadStartedTick := A_TickCount
 			Outcome.Reserved := true
 		}
@@ -1940,11 +2065,13 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailu
 ; can pump lifecycle callbacks: if START itself is interrupted by Pause, there
 ; is deliberately no transaction for cancellation to terminate. The resumed
 ; reservation then observes stale provenance and closes START with WARNING.
-_Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl, ExpectedFailureOwner := 0) {
+_Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl, ExpectedFailureOwner := 0, Observation := unset) {
+	if !IsSet(Observation)
+		Observation := _Updater_CaptureInstallObservation()
 	try LoggerStart("Updater", "Downloading update '{1}' from {2}…", Tag, AssetUrl)
 	try {
 		Outcome := _Updater_TryReserveDownloadTransaction(
-			Request, BoundarySuspended, ExpectedFailureOwner)
+			Request, BoundarySuspended, ExpectedFailureOwner, Observation)
 	} catch as Err {
 		try LoggerError("Updater", "Download reservation failed after START: {1}.", Err.Message)
 		throw Err
@@ -1956,7 +2083,7 @@ _Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl, Exp
 	} else if Outcome.ShouldDrop {
 		try LoggerWarn("Updater", "Download start cancelled before reservation because request policy changed.")
 	} else if Outcome.RecoveryBusy {
-		try LoggerWarn("Updater", "Update reservation refused while rollback recovery became active.")
+		try LoggerWarn("Updater", "Update reservation refused while recovery or resource retirement is pending.")
 	} else if Outcome.DuplicateDownload {
 		try LoggerWarn("Updater", "Download reservation lost to a concurrent install request.")
 	} else {
@@ -1970,7 +2097,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	global _UpdaterDownloadInProgress
 	global _UpdaterRecoveryPublishTarget, UPDATER_REQUEST_ORIGIN_MANUAL
 	global _UpdaterInstallObserver
-	InstallObserver := _UpdaterInstallObserver
+	InstallObserver := _Updater_CaptureInstallObservation()
 	HasSuspendOverride := IsSet(IsSuspended)
 	if !IsSet(Request) {
 		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
@@ -2000,7 +2127,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_busy")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_busy", "Icon!", 0, InstallObserver)
 		return false
 	}
 	if (Type(Release) != "Object" or !Release.HasProp("RawJson")) {
@@ -2011,7 +2138,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_unexpected")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_unexpected", "Icon!", 0, InstallObserver)
 		return false
 	}
 	; Re-entrancy guard: two independent "Update now" triggers (the TrayTip
@@ -2024,11 +2151,12 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	; (updater-download-reentrancy).
 	if _UpdaterDownloadInProgress {
 		try LoggerWarn("Updater", "Download already in progress -- ignoring duplicate Updater_DownloadAndInstall call.")
-		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_busy")
+		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_busy", 0,
+			InstallObserver.Observer, InstallObserver.Epoch)
 		return false
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
-		? BUNDLE_RELEASE_ASSET : "ErgoptiPlus.exe"
+		? BUNDLE_RELEASE_ASSET : Identifiers.App.EXE
 	Asset := _Updater_FindAsset(Release.RawJson, AssetName, Release.Tag)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
@@ -2044,7 +2172,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		_Updater_ReportInstallFailure("updater.install_error_no_asset", "changelog_window.install_error_no_asset")
+		_Updater_ReportInstallFailure("updater.install_error_no_asset", "changelog_window.install_error_no_asset", "Icon!", 0, InstallObserver)
 		return false
 	}
 	AssetUrl := Asset.Url
@@ -2058,7 +2186,21 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		_Updater_ReportInstallFailure("updater.install_local_source", "changelog_window.install_error_unexpected", "Iconi")
+		_Updater_ReportInstallFailure("updater.install_local_source", "changelog_window.install_error_unexpected", "Iconi", 0, InstallObserver)
+		return false
+	}
+
+	; Before the transaction and the download: every install path, the release
+	; installer's included, ends here. The fetch can pump messages.
+	SignatureAllows := AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
+			return false
+	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
+		return false
+	}
+	if !SignatureAllows {
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_unexpected", "Icon!", 0, InstallObserver)
 		return false
 	}
 
@@ -2076,7 +2218,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		return false
 	}
 	if (LocalAppData == "") {
-		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install", "Icon!", 0, InstallObserver)
 		return false
 	}
 	StagingDir := LocalAppData . "\Ergopti\updates"
@@ -2088,7 +2230,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	; atomically claims the exact request + epoch.
 	BoundarySuspended := HasSuspendOverride ? IsSuspended : A_IsSuspended
 	Reservation := _Updater_BeginDownloadTransaction(
-		Request, BoundarySuspended, Release.Tag, AssetUrl, ExpectedFailureOwner)
+		Request, BoundarySuspended, Release.Tag, AssetUrl, ExpectedFailureOwner, InstallObserver)
 	if Reservation.RetryStale
 		return false
 	if Reservation.ShouldDrop {
@@ -2097,11 +2239,12 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 	if Reservation.RecoveryBusy {
 		if _Updater_RequestMayPublish(Request, BoundarySuspended, NotifyFn)
-			_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_busy")
+			_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_busy", "Icon!", 0, InstallObserver)
 		return false
 	}
 	if Reservation.DuplicateDownload {
-		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_busy")
+		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_busy", 0,
+			InstallObserver.Observer, InstallObserver.Epoch)
 		return false
 	}
 	if !Reservation.Reserved
@@ -2132,60 +2275,48 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 ; Starts an isolated PowerShell transaction. ShellRunner owns process polling,
 ; preventing a slow CDN, antivirus scan or file flush from entering AHK's hook
 ; dispatch loop.
-; PowerShell -EncodedCommand requires UTF-16LE before Base64. The shared crypto
-; adapter emits Base64 without CR/LF, so both the worker payload and bootstrap
-; satisfy ShellRunner's single-line cmd.exe transport.
-_Updater_EncodePowerShellCommand(Command) {
-	if Type(Command) != "String"
-		throw TypeError("PowerShell command must be a String")
-	ByteCount := StrLen(Command) * 2
-	if ByteCount <= 0
-		return ""
-	Bytes := Buffer(ByteCount, 0)
-	DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", StrPtr(Command),
-		"UPtr", ByteCount)
-	return CryptoBase64Encode(Bytes)
-}
-
 _Updater_PowerShellPath() {
 	return A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
 }
 
-; The persisted swap script is transported as UTF-8 data, not as an encoded
-; PowerShell command. UTF-8 keeps the independent environment payload below the
-; inherited-value budget while the staging worker writes the exact bytes that
-; Windows PowerShell later reads from the .ps1 file.
-_Updater_EncodeUtf8Payload(Text) {
-	if Type(Text) != "String"
-		throw TypeError("UTF-8 payload must be a String")
-	return CryptoBase64EncodeUtf8(Text)
+; Both workers are readable bundled scripts run with -File. Antivirus sandboxes
+; score an encoded command, or code decoded from the environment and compiled
+; into a script block, as a malware stage; a plain script file is not.
+_Updater_StagingWorkerPath() {
+	global _VendorDir
+	return _VendorDir . "\ergopti_updater_staging.ps1"
 }
 
-; Publish the large multi-line worker and its argv under unique inherited
-; environment names, then pass only a small single-line bootstrap to cmd.exe.
-; This avoids synchronous script-file I/O on the menu thread and preserves
-; release metadata as data rather than interpolating it into PowerShell syntax.
-_Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, NewExe,
+_Updater_SwapWorkerPath() {
+	global _VendorDir
+	return _VendorDir . "\ergopti_updater_swap.ps1"
+}
+
+; Publish the release data under unique inherited environment names and pass
+; only that name prefix to the -File worker. Environment values are data, never
+; PowerShell source, and unlike cmd.exe arguments they are not subject to the
+; wrapper's %VAR% expansion. No script file is written on the menu thread.
+; Bundled -File scripts still need -ExecutionPolicy Bypass: it applies to this
+; process only, and the default Windows client policy (Restricted) refuses
+; every script file without it.
+_Updater_BuildStagingTransport(WorkerPath, SwapSourcePath, AssetUrl, ExpectedSha256, NewExe,
 	SwapScriptPath, CurrentExe,
 	MinimumSize, TimeoutMs, DownloadModulePath := "", DeadlineMs := 0, StartedTick := 0,
 	ProxyPolicyPath := "", UpdaterDefaultsPath := "", AuthenticatedSize := 0) {
-	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS, UPDATER_STAGING_MAX_SCRIPT_CHUNKS
+	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS
+	if (Type(WorkerPath) != "String" or WorkerPath == "")
+		throw TypeError("Staging worker path must be a non-empty String")
+	if (Type(SwapSourcePath) != "String" or SwapSourcePath == "")
+		throw TypeError("Swap worker path must be a non-empty String")
 	_UpdaterStagingTransportCounter += 1
 	Prefix := "ERGOPTI_UPDATER_" . DllCall("GetCurrentProcessId", "UInt")
 		. "_" . A_TickCount . "_" . _UpdaterStagingTransportCounter
-	ScriptPayload := _Updater_EncodePowerShellCommand(Script)
-	SwapScriptPayload := _Updater_EncodeUtf8Payload(SwapScript)
-	ScriptChunkCount := Ceil(StrLen(ScriptPayload) / UPDATER_STAGING_ENV_MAX_CHARS)
-	if (ScriptPayload == "" or ScriptChunkCount > UPDATER_STAGING_MAX_SCRIPT_CHUNKS)
-		throw ValueError("Encoded staging worker exceeds the bounded chunk transport budget")
-	if (SwapScriptPayload == "")
-		throw ValueError("Encoded swap worker is empty")
 	Environment := [
-		{ Name: Prefix . "_SCRIPT", Value: SubStr(ScriptPayload, 1, UPDATER_STAGING_ENV_MAX_CHARS) },
 		{ Name: Prefix . "_URL", Value: AssetUrl },
 		{ Name: Prefix . "_DIGEST", Value: ExpectedSha256 },
 		{ Name: Prefix . "_NEW_EXE", Value: NewExe },
 		{ Name: Prefix . "_SWAP_PATH", Value: SwapScriptPath },
+		{ Name: Prefix . "_SWAP_SOURCE", Value: SwapSourcePath },
 		{ Name: Prefix . "_CURRENT", Value: CurrentExe },
 		{ Name: Prefix . "_MINIMUM", Value: MinimumSize },
 		{ Name: Prefix . "_TIMEOUT", Value: TimeoutMs },
@@ -2196,52 +2327,15 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 		{ Name: Prefix . "_UPDATER_DEFAULTS", Value: UpdaterDefaultsPath },
 		{ Name: Prefix . "_AUTHENTICATED_SIZE", Value: AuthenticatedSize }
 	]
-	Environment.Push({ Name: Prefix . "_SCRIPT_COUNT", Value: ScriptChunkCount })
-	Loop ScriptChunkCount - 1 {
-		ChunkNumber := A_Index + 1
-		Environment.Push({
-			Name: Prefix . "_SCRIPT_" . ChunkNumber,
-			Value: SubStr(ScriptPayload, ((ChunkNumber - 1) * UPDATER_STAGING_ENV_MAX_CHARS) + 1,
-				UPDATER_STAGING_ENV_MAX_CHARS)
-		})
-	}
-	SwapChunkCount := Ceil(StrLen(SwapScriptPayload)
-		/ UPDATER_STAGING_ENV_MAX_CHARS)
-	Environment.Push({ Name: Prefix . "_SWAP_COUNT", Value: SwapChunkCount })
-	Loop SwapChunkCount {
-		ChunkOffset := ((A_Index - 1) * UPDATER_STAGING_ENV_MAX_CHARS) + 1
-		Environment.Push({
-			Name: Prefix . "_SWAP_" . A_Index,
-			Value: SubStr(SwapScriptPayload, ChunkOffset,
-				UPDATER_STAGING_ENV_MAX_CHARS)
-		})
-	}
 	for Pair in Environment {
 		if StrLen(Pair.Value) > UPDATER_STAGING_ENV_MAX_CHARS
 			throw ValueError("Staging environment value exceeds the cmd.exe inheritance budget")
 	}
-	; Consumed payloads must not overflow the Framework compiler's inherited ANSI environment.
-	Bootstrap := '$ErrorActionPreference=' . Chr(39) . 'Stop' . Chr(39) . ';'
-		. '$ProgressPreference=' . Chr(39) . 'SilentlyContinue' . Chr(39) . ';'
-		. 'if($env:' . Prefix . '_SCRIPT_COUNT -cne ' . Chr(39) . ScriptChunkCount . Chr(39) . ' -or $env:' . Prefix . '_SWAP_COUNT -cne ' . Chr(39) . SwapChunkCount . Chr(39) . '){throw "Staging fragment counts were refused"};'
-		. '$scriptPayload=$env:' . Prefix . '_SCRIPT;if([string]::IsNullOrEmpty($scriptPayload)){throw "Staging source fragment was refused"};'
-		. 'for($i=2;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$chunk=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i);if([string]::IsNullOrEmpty($chunk)){throw "Staging source fragment was refused"};$scriptPayload+=$chunk};'
-		. '$source=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($scriptPayload));'
-		. '$swapPayload=' . Chr(39) . Chr(39) . ';'
-		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){$chunk=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i);if([string]::IsNullOrEmpty($chunk)){throw "Staging swap fragment was refused"};$swapPayload+=$chunk};'
-		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$chunkName=if($i -eq 1){' . Chr(39) . Prefix . '_SCRIPT' . Chr(39) . '}else{' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i};[Environment]::SetEnvironmentVariable($chunkName,[NullString]::Value)};'
-		. '[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_COUNT' . Chr(39) . ',[NullString]::Value);'
-		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i,[NullString]::Value)};'
-		. '[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_COUNT' . Chr(39) . ',[NullString]::Value);'
-		. '$worker=[ScriptBlock]::Create($source);'
-		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_DIGEST $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
-		. ' ([int64]$env:' . Prefix . '_MINIMUM) ([int]$env:' . Prefix . '_TIMEOUT'
-		. ') $swapPayload $env:' . Prefix . '_DOWNLOAD_MODULE ([int]$env:' . Prefix . '_DEADLINE) ([int64]$env:' . Prefix . '_STARTED_TICK) $env:' . Prefix . '_PROXY_POLICY $env:' . Prefix . '_UPDATER_DEFAULTS -AuthenticatedSize ([int64]$env:' . Prefix . '_AUTHENTICATED_SIZE)'
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-EncodedCommand", _Updater_EncodePowerShellCommand(Bootstrap)]
+		"-File", WorkerPath, "-TransportPrefix", Prefix]
 	for Arg in Args {
 		if (InStr(Arg, "`n") or InStr(Arg, "`r"))
-			throw ValueError("Encoded staging transport unexpectedly contains a newline")
+			throw ValueError("Staging worker arguments unexpectedly contain a newline")
 	}
 	Published := []
 	try {
@@ -2257,11 +2351,8 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 	return {
 		Args: Args,
 		Environment: Environment,
-		ScriptPayload: ScriptPayload,
-		ScriptChunkCount: ScriptChunkCount,
-		SwapScriptPayload: SwapScriptPayload,
-		SwapChunkCount: SwapChunkCount,
-		Bootstrap: Bootstrap
+		Prefix: Prefix,
+		WorkerPath: WorkerPath
 	}
 }
 
@@ -2271,22 +2362,20 @@ _Updater_BindCurlCaptureTransport(Transport, Capture) {
 	if !(Capture is _UpdaterCurlCaptureLedger) || Capture.Retired || Capture.Acquiring
 		|| Type(Transport) != "Object" || !Transport.HasOwnProp("Environment")
 		|| !(Transport.Environment is Array) || Transport.Environment.Length == 0
+		|| !Transport.HasOwnProp("Prefix")
 		|| !Capture.ValidatePaths()
 		throw Error("Parent-owned curl capture transport was refused.")
 	if StrLen(Capture.Path) > UPDATER_STAGING_ENV_MAX_CHARS
 		throw ValueError("Curl capture exceeds the private inheritance budget.")
-	First := Transport.Environment[1].Name
-	if !RegExMatch(First, "\A(ERGOPTI_UPDATER_[0-9]+_[0-9]+_[0-9]+)_SCRIPT\z", &Prefix)
+	if !RegExMatch(Transport.Prefix, "\AERGOPTI_UPDATER_[0-9]+_[0-9]+_[0-9]+\z")
+		|| Transport.Environment[1].Name != Transport.Prefix . "_URL"
 		throw Error("Curl capture requires the original staging environment owner.")
-	Name := Prefix[1] . "_CURL_CAPTURE"
+	Name := Transport.Prefix . "_CURL_CAPTURE"
 	for Pair in Transport.Environment
 		if Pair.Name == Name
 			throw Error("Curl capture transport has already been initialized.")
 	Transport.Environment.Push({Name: Name, Value: Capture.Path})
 	EnvSet(Name, Capture.Path)
-	Transport.Bootstrap .= ' -OwnedCaptureDirectory $env:' . Name
-	Transport.Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-EncodedCommand", _Updater_EncodePowerShellCommand(Transport.Bootstrap)]
 }
 
 
@@ -2301,13 +2390,16 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 	global _UpdaterDownloadWorker, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_MIN_EXE_SIZE_BYTES
 	global _VendorDir, _SharedDir, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, _UpdaterDownloadStartedTick
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch, _UpdaterDownloadArtifacts
-	StagingScript := _Updater_BuildStagingWorkerScript()
-	SwapScript := _Updater_BuildSwapWorkerScript()
-	FailureOwner := IsSet(InstallObserver)
-		? _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
-			ExpectedSha256, StagingEpoch, InstallObserver)
-		: _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
-			ExpectedSha256, StagingEpoch)
+	StagingWorker := _Updater_StagingWorkerPath()
+	SwapWorker := _Updater_SwapWorkerPath()
+	Observation := IsSet(InstallObserver) ? InstallObserver
+		: _Updater_ArtifactInstallObservation(_UpdaterDownloadArtifacts)
+	if !_Updater_InstallObservationValid(Observation) {
+		_Updater_CancelSelfUpdateTransaction("Staging launch lacked its original install observation.", false, false, StagingEpoch)
+		return
+	}
+	FailureOwner := _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
+		ExpectedSha256, StagingEpoch, Observation.Observer, Observation.Epoch)
 	_OnDone := (ExitCode, Stdout, Stderr) => _Updater_PollDownloadAsync(
 		ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, CurrentExe, Tag,
 		StagingEpoch, FailureOwner)
@@ -2318,6 +2410,8 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 	StartError := ""
 	Capture := 0
 	try {
+		if !(AuthenticatedSize is Integer) || AuthenticatedSize <= 0
+			throw Error("Authenticated release byte length is required before staging allocation.")
 		if AuthenticatedSize > 0 {
 			Capture := _UpdaterCurlCaptureLedger()
 			PreviousCritical := Critical("On")
@@ -2331,18 +2425,25 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 			if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 				throw Error("Curl capture allocation crossed transaction retirement.")
 		}
+		Staged := _Updater_AcquireStagingArtifacts(StagingEpoch)
+		if !(Staged is _UpdaterStagedArtifactRetirement)
+			throw Error("Staged artifact exclusive allocation was refused.")
+		for WorkerPath in [StagingWorker, SwapWorker]
+			if !FileExist(WorkerPath)
+				throw Error("Bundled updater worker is missing: " . WorkerPath)
 		Transport := _Updater_BuildStagingTransport(
-			StagingScript, SwapScript, AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe,
+			StagingWorker, SwapWorker, AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe,
 			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS,
 			_VendorDir . "\ergopti_updater_download.ps1", UPDATER_HTTP_DOWNLOAD_DEADLINE_MS,
 			_UpdaterDownloadStartedTick,
 			_SharedDir . "\modules\network\proxy_policy.json",
 			_SharedDir . "\modules\updater\defaults.json", AuthenticatedSize)
+		_Updater_BindStagedArtifactTransport(Transport, Staged)
 		if IsObject(Capture)
 			_Updater_BindCurlCaptureTransport(Transport, Capture)
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
 			NativeAdopt := IsObject(Capture) ? ObjBindMethod(Capture, "OnNativeAdopt") : 0
-			Worker := ShellRunner_SpawnTreeOwned(
+			Worker := ProxyOverride_SpawnWorker(
 				_Updater_PowerShellPath(), Transport.Args, _OnDone, , NativeAdopt)
 			if IsObject(Capture)
 				Capture.Attach(Worker)
@@ -2386,7 +2487,7 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 		} else {
 			try LoggerError("Updater", "Could not launch the isolated update staging worker.")
 		}
-		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download")
+		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download", "Icon!", 0, Observation)
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
@@ -2423,9 +2524,13 @@ _Updater_RegisterDownloadArtifacts(StagingEpoch, NewExe, SwapScriptPath) {
 		if (!_UpdaterDownloadInProgress
 			or _UpdaterSelfUpdateEpoch != StagingEpoch)
 			return false
+		Observation := _Updater_ArtifactInstallObservation(_UpdaterDownloadArtifacts)
+		if !_Updater_InstallObservationValid(Observation)
+			return false
 		_UpdaterDownloadArtifacts := {
 			NewExe: NewExe,
-			SwapScript: SwapScriptPath
+			SwapScript: SwapScriptPath,
+			InstallObservation: Observation
 		}
 		return true
 	} finally {
@@ -2449,19 +2554,38 @@ _Updater_QuiesceSelfUpdateForSuspend() {
 	return SwapClosed && CaptureClosed
 }
 
+; Retirement releases admission only for the exact detached terminal owner.
+; Resource cleanup stays interruptible; a successor cannot reuse its fixed paths.
+_Updater_ReleaseDownloadRetirement(Owner) {
+	global _UpdaterDownloadRetirement
+	if !IsObject(Owner)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if _UpdaterDownloadRetirement != Owner
+			return false
+		_UpdaterDownloadRetirement := 0
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
 	global _UpdaterDownloadRequest
 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
-	global _UpdaterSelfUpdateEpoch
+	global _UpdaterSelfUpdateEpoch, _UpdaterDownloadRetirement
 	Worker := 0
 	Owner := 0
 	Request := 0
 	Artifacts := 0
+	Observation := 0
 	HadTransaction := false
+	Retirement := 0
 	PreviousCritical := Critical("On")
 	try {
+		if IsObject(_UpdaterDownloadRetirement)
+			return false
 		if ExpectedEpoch && _UpdaterSelfUpdateEpoch != ExpectedEpoch
 			return false
 		HadTransaction := _UpdaterDownloadInProgress
@@ -2472,6 +2596,13 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		Request := IsObject(_UpdaterDownloadRequest) ? _UpdaterDownloadRequest : 0
 		Artifacts := IsObject(_UpdaterDownloadArtifacts)
 			? _UpdaterDownloadArtifacts : 0
+		if HadTransaction
+			Observation := Owner is Map ? Owner.Get("InstallObservation", 0)
+				: _Updater_ArtifactInstallObservation(Artifacts)
+		if HadTransaction {
+			Retirement := {Epoch: _UpdaterSelfUpdateEpoch}
+			_UpdaterDownloadRetirement := Retirement
+		}
 		_UpdaterDownloadWorker := 0
 		_UpdaterDownloadRequest := 0
 		_UpdaterDownloadArtifacts := 0
@@ -2485,26 +2616,23 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if IsObject(Worker)
-		try Worker.terminate()
-	if (Owner is Map)
-		_Updater_CloseSwapOwner(Owner, true)
-	CaptureClosed := _Updater_RetireCurlCaptureArtifacts(Artifacts)
-	if IsObject(Artifacts) && CaptureClosed {
-		for Name in ["NewExe", "SwapScript"] {
-			Path := Artifacts.HasOwnProp(Name) ? Artifacts.%Name% : ""
-			if (Path != "" and FSExists(Path) and !FSDelete(Path))
-				try LoggerError("Updater", "Could not delete cancelled staging artifact '{1}'.", Path)
-		}
-	}
-	SetTimer(_Updater_MonitorStagingWorker, 0)
+	try {
+		if IsObject(Worker)
+			try Worker.terminate()
+		if (Owner is Map)
+			_Updater_CloseSwapOwner(Owner, true)
+		_Updater_RetireCurlCaptureArtifacts(Artifacts, true)
+		SetTimer(_Updater_MonitorStagingWorker, 0)
+	} finally _Updater_ReleaseDownloadRetirement(Retirement)
 	; Process teardown wins before the visible terminal. RequestMayPublish queues
 	; exactly one manual notice for resume; a second cancellation has no Request.
 	if SurfacePausedRequest and IsObject(Request)
 		_Updater_RequestMayPublish(Request, true)
 	if HadTransaction {
 		try LoggerError("Updater", LogMessage)
-		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")
+		if _Updater_InstallObservationValid(Observation)
+			_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download", 0,
+				Observation.Observer, Observation.Epoch)
 		if RebuildMenu
 			try TimerArmOneShotMs((*) => _Updater_RebuildMenu(), 50)
 	}
@@ -2559,6 +2687,51 @@ _Updater_AdmitStagingCompletion(StagingEpoch) {
 	}
 }
 
+; READY is a creation/verification receipt from the exact completed worker.
+; A failed CreateNew collision conveys no authority over the existing paths.
+_Updater_AcquireStagingArtifacts(StagingEpoch) {
+	global _UpdaterDownloadArtifacts
+	PreviousCritical := Critical("On")
+	try {
+		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch) || !IsObject(_UpdaterDownloadArtifacts)
+			return 0
+		if _UpdaterDownloadArtifacts.HasOwnProp("StagingRetirement")
+			throw Error("Staged artifact ownership has already been published.")
+		Owner := _UpdaterStagedArtifactRetirement(_UpdaterDownloadArtifacts)
+		_UpdaterDownloadArtifacts.StagingRetirement := Owner
+	} finally Critical(PreviousCritical)
+	if !Owner.AcquireExclusive() || !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+		return 0
+	return Owner
+}
+
+_Updater_RetainVerifiedStagingArtifacts(StagingEpoch) {
+	global _UpdaterDownloadArtifacts
+	PreviousCritical := Critical("On")
+	try {
+		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch) || !IsObject(_UpdaterDownloadArtifacts)
+			return 0
+		Artifacts := _UpdaterDownloadArtifacts
+		if !Artifacts.HasOwnProp("StagingRetirement")
+			return 0
+		Artifacts.StagingComplete := true
+		return Artifacts.StagingRetirement
+	} finally Critical(PreviousCritical)
+}
+
+; Complete only the still-current staging owner's notification state. No I/O,
+; diagnostics, callbacks or native handoff belong in this short RAM transaction.
+_Updater_ClearNotifiedTagForStaging(StagingEpoch) {
+	global UPDATER_LAST_NOTIFIED_TAG
+	PreviousCritical := Critical("On")
+	try {
+		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+			return false
+		UPDATER_LAST_NOTIFIED_TAG := ""
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 ; The only staging completion callback running in AHK. The worker's READY
 ; token means it has already persisted and verified the executable plus the
 ; UTF-8 PowerShell swap worker.
@@ -2575,116 +2748,58 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	if !_Updater_AdmitStagingCompletion(StagingEpoch)
 		return
 	global _UpdaterDownloadArtifacts
+	Observation := FailureOwner is Map
+		? {Observer: FailureOwner.Get("install_observer", 0), Epoch: FailureOwner.Get("install_observer_epoch", -1)}
+		: _Updater_ArtifactInstallObservation(_UpdaterDownloadArtifacts)
+	if !_Updater_InstallObservationValid(Observation) {
+		_Updater_CancelSelfUpdateTransaction("Staging completion lacked its original install observation.", false, false, StagingEpoch)
+		return
+	}
+	if ExitCode == 0 && Stdout == "READY" {
+		StagingOwner := _Updater_RetainVerifiedStagingArtifacts(StagingEpoch)
+		Adopted := IsObject(StagingOwner) && StagingOwner.Validate()
+		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+			return
+		if !Adopted {
+			_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download", "Icon!", 0, Observation)
+			_Updater_EndDownloadTransaction(StagingEpoch)
+			return
+		}
+	}
 	if !_Updater_RetireCurlCaptureArtifacts(_UpdaterDownloadArtifacts) {
-		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download")
+		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download", "Icon!", 0, Observation)
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
 	if A_IsSuspended {
 		try LoggerWarn("Updater", "Update staging completion discarded while suspended.")
-		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")
+		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download", 0,
+			Observation.Observer, Observation.Epoch)
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
 	if (ExitCode != 0 or Stdout != "READY") {
 		try LoggerError("Updater", "Update staging worker failed (exit {1}); private output omitted.", ExitCode)
 		Failure := _Updater_ParseStagingFailure(Stdout)
-		_Updater_PublishManagedFailure(Failure, FailureOwner, StagingEpoch)
+		_Updater_PublishManagedFailure(Failure, FailureOwner, StagingEpoch, Observation)
 		return
 	}
 	try LoggerSuccess("Updater", "Update downloaded and verified for '{1}'.", Tag)
-	_Updater_NotifyInstallPhase("installing")
+	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+		return
+	_Updater_NotifyInstallPhase("installing", "", 0, Observation.Observer, Observation.Epoch)
 	if !_Updater_StartSwapTransaction(SwapScriptPath, NewExe, CurrentExe, Tag,
 		StagingEpoch) {
 		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 			return
-		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install", "Icon!", 0, Observation)
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
-	_Updater_NotifyInstallPhase("restarting")
-	global UPDATER_LAST_NOTIFIED_TAG := ""
-}
-
-; Returns the compact staging orchestrator. Trusted helper paths and release
-; data use the private inherited environment, never PowerShell interpolation.
-_Updater_BuildStagingWorkerScript() {
-	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null, [int64]$AuthenticatedSize=0, [string]$OwnedCaptureDirectory="")' . "`n"
-		. '$ErrorActionPreference = "Stop"' . "`n"
-		. '$State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()};if ($OwnedCaptureDirectory -ne "") {$State.OwnedCaptureDirectory=$OwnedCaptureDirectory}' . "`n"
-		. 'function CleanWorker($Path,$Name){try{[IO.File]::Delete($Path)}catch{if(Get-Command Add-ErgoptiUpdaterCleanupDebt -ErrorAction SilentlyContinue){Add-ErgoptiUpdaterCleanupDebt $State $Name "file_remove" $_.Exception}else{$State.CleanupDebt+=@{resource=$Name;receipt=@{backend="dotnet";stage="file_remove";failure_provenance="unknown"}}}}}' . "`n"
-		. 'try {' . "`n"
-		. '  . $DownloadModulePath' . "`n"
-		. '  . (Join-Path (Split-Path -Parent $DownloadModulePath) "ergopti_network_routes.ps1")' . "`n"
-		. '  $Resolver={param($Destination,$Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $ReadConfig $ReadEnvironment $ProxyPolicyPath $UpdaterDefaultsPath}' . "`n"
-		. '  $Request=[System.Net.HttpWebRequest]::Create($Url)' . "`n"
-		. '  $Request.ReadWriteTimeout = $TimeoutMs' . "`n"
-		. '  if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterCurlDownload ([Uri]$Url) $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment} else {$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick}' . "`n"
-		. '  $State.Stage="file_read"' . "`n"
-		. '  $ActualSize=(Get-Item -LiteralPath $NewExe).Length' . "`n"
-		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { throw "Content-Length mismatch" }' . "`n"
-		. '  if ($ActualSize -lt $MinimumSize) { $State.Reason="verify";throw "Downloaded file is too small" }' . "`n"
-		. '  if ($ExpectedSha256 -cnotmatch "^[0-9a-f]{64}$") { $State.Reason="verify";throw "Missing or invalid trusted SHA-256 digest" }' . "`n"
-		. '  $ActualDigest=& { $HashStream=$null; $Hasher=[Security.Cryptography.SHA256]::Create(); try { $HashStream=[IO.File]::Open($NewExe,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read); [BitConverter]::ToString($Hasher.ComputeHash($HashStream)).Replace("-","").ToLowerInvariant() } finally { try { if ($null -ne $HashStream) { $HashStream.Dispose() } } finally { $Hasher.Dispose() } } }' . "`n"
-		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
-		. '  if ($ActualDigest -cne $ExpectedSha256) { $State.Reason="verify";throw "SHA-256 digest mismatch" }' . "`n"
-		. '  $SwapSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"
-		. '  if ($AuthenticatedSize -le 0) {$State.Stage="file_remove";[IO.File]::Delete($SwapScriptPath)}' . "`n"
-		. '  $State.Stage="file_write"' . "`n"
-		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
-		. '  if ($AuthenticatedSize -le 0) {[IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))} else {$SwapOutput=$null;try{$State.Stage="file_create";$SwapOutput=[IO.File]::Open($SwapScriptPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None);$State.SwapWorkerOwned=$true;$State.Stage="file_write";$SwapBytes=[Text.Encoding]::UTF8.GetBytes($SwapSource);$SwapOutput.Write($SwapBytes,0,$SwapBytes.Length);$SwapOutput.Flush($true)}finally{Close-ErgoptiUpdaterResource $SwapOutput "swap_worker" "file_write" $State}}' . "`n"
-		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
-		. '  if ($State.NativeCleanupDebt -or $State.CleanupDebt.Count -ne 0) {throw "Staging resources have unacknowledged retirement"}' . "`n"
-		. '  Write-Output "READY"' . "`n"
-		. '  exit 0' . "`n"
-		. '} catch {' . "`n"
-		. '  $Receipt=@{}' . "`n"
-		. '  if (Get-Command Get-ErgoptiUpdaterFailureReceipt -ErrorAction SilentlyContinue) { $Receipt=Get-ErgoptiUpdaterFailureReceipt $_.Exception $State }' . "`n"
-		. '  if ($AuthenticatedSize -le 0 -or $State.StagedExecutableOwned) {CleanWorker $NewExe "staged_executable"}' . "`n"
-		. '  if ($AuthenticatedSize -le 0 -or $State.SwapWorkerOwned) {CleanWorker $SwapScriptPath "swap_worker"}' . "`n"
-		. '  @{schema_version=1;state="failed";operation="download";reason=$State.Reason;receipt=$Receipt;cleanup_debt=$State.CleanupDebt;native_cleanup_debt=[bool]$State.NativeCleanupDebt}|ConvertTo-Json -Depth 4 -Compress' . "`n"
-		. '  exit 1' . "`n"
-		. '}'
-}
-
-; The swapper is a separate PowerShell process because it must survive the AHK
-; process whose executable it replaces. Its four-event protocol prevents any
-; production-file mutation until AHK has passed every shutdown refusal gate and
-; the inherited exact parent HANDLE proves that process has really exited.
-_Updater_BuildSwapWorkerScript() {
-	return 'param([string]$ReadyName,[string]$CommitName,[string]$AckName,[string]$FinalExitName,[int64]$ParentHandle,[string]$NewExe,[string]$CurrentExe,[int]$ProbationMs,[int]$BootReadyTimeoutMs,[int]$RestoreAttempts,[int]$RestoreRetryMs,[string]$DiagnosticPath)' . "`n"
-		. '$ErrorActionPreference="Stop";$R=$null;$C=$null;$A=$null;$F=$null;$P=$null' . "`n"
-		. 'function Diag($M){try{[IO.File]::AppendAllText($DiagnosticPath,$M+[Environment]::NewLine)}catch{}}' . "`n"
-		. 'function RemoveBest($Path,$Label){try{if($Path -and [IO.File]::Exists($Path)){[IO.File]::Delete($Path)}}catch{Diag($Label+":"+$_.Exception.Message)}}' . "`n"
-		. 'function WriteTerminal($Path,$Message){$Temp=$Path+".tmp";$Utf8=[Text.UTF8Encoding]::new($false);try{RemoveBest $Temp "terminal-temp";RemoveBest $Path "terminal-stale";$Clean=($Message -replace "[\r\n]+"," ");if($Clean.Length -gt 2000){$Clean=$Clean.Substring(0,2000)};[IO.File]::WriteAllText($Temp,$Clean,$Utf8);[IO.File]::Move($Temp,$Path)}finally{RemoveBest $Temp "terminal-temp-cleanup"}}' . "`n"
-		. 'function PublishCopy($Source,$Destination){$Temp=$Destination+".tmp";try{RemoveBest $Temp "precopy-temp";if([IO.File]::Exists($Destination)){throw "Unique publish destination already exists"};[IO.File]::Copy($Source,$Temp,$false);$Expected=[IO.FileInfo]::new($Source).Length;if($Expected -le 0 -or [IO.FileInfo]::new($Temp).Length -ne $Expected){throw "Pre-copy size mismatch"};[IO.File]::Move($Temp,$Destination);if([IO.FileInfo]::new($Destination).Length -ne $Expected){throw "Published copy size mismatch"};return $Destination}finally{RemoveBest $Temp "precopy-temp-cleanup"}}' . "`n"
-		. 'function WriteClaim($Claim,$Target,$Stage){$Temp=$Claim+".tmp";$Utf8=[Text.UTF8Encoding]::new($false);try{RemoveBest $Temp "claim-temp";RemoveBest $Claim "claim-stale";[IO.File]::WriteAllText($Temp,$Target+[Environment]::NewLine+$Stage,$Utf8);[IO.File]::Move($Temp,$Claim)}finally{RemoveBest $Temp "claim-temp-cleanup"}}' . "`n"
-		. 'function StopExact($Process){if($null -eq $Process){return $true};try{$Exact=$Process.Handle;$Process.Refresh();if(!$Process.HasExited){$Process.Kill()};if(!$Process.WaitForExit(5000)){Diag("exact-stop-timeout");return $false};return $true}catch{Diag("exact-stop:"+$_.Exception.Message);return $false}}' . "`n"
-		. 'function StartReady($Path,$TimeoutMs,$Probation,$AllowLauncherExit){$Event=$null;$Process=$null;$ProcessWait=$null;$OldReady=[Environment]::GetEnvironmentVariable("ERGOPTI_UPDATER_BOOT_READY");try{$EventName="Local\ErgoptiPlus.Updater.BootReady."+[Guid]::NewGuid().ToString("N");$Event=[Threading.EventWaitHandle]::new($false,[Threading.EventResetMode]::AutoReset,$EventName);[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_BOOT_READY",$EventName);$Process=Start-Process -FilePath $Path -PassThru -WindowStyle Hidden;$Exact=$Process.Handle;if($AllowLauncherExit){if(!$Event.WaitOne($TimeoutMs)){throw "Canonical driver did not acknowledge recovery handoff"};return $Process};$ProcessWait=[Threading.EventWaitHandle]::new($false,[Threading.EventResetMode]::AutoReset);$OldSafe=$ProcessWait.SafeWaitHandle;$ProcessWait.SafeWaitHandle=[Microsoft.Win32.SafeHandles.SafeWaitHandle]::new([IntPtr]$Exact,$false);$OldSafe.Dispose();$Wait=[Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]@($Event,$ProcessWait),$TimeoutMs);if($Wait -eq 1){throw "Driver exited before boot-ready"};if($Wait -ne 0){throw "Driver boot-ready timeout"};Start-Sleep -Milliseconds $Probation;$Process.Refresh();if($Process.HasExited){throw "Driver exited during post-ready probation"};return $Process}catch{$Failure=$_;if($null -ne $Process -and !(StopExact $Process)){throw "UNSAFE_CHILD:"+$Failure.Exception.Message};throw $Failure}finally{[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_BOOT_READY",$OldReady);if($null -ne $ProcessWait){$ProcessWait.Dispose()};if($null -ne $Event){$Event.Dispose()}}}' . "`n"
-		. 'try {' . "`n"
-		. '  $R=[Threading.EventWaitHandle]::OpenExisting($ReadyName);$C=[Threading.EventWaitHandle]::OpenExisting($CommitName);$A=[Threading.EventWaitHandle]::OpenExisting($AckName);$F=[Threading.EventWaitHandle]::OpenExisting($FinalExitName)' . "`n"
-		. '  $P=[Threading.EventWaitHandle]::new($false,[Threading.EventResetMode]::AutoReset);$H=$P.SafeWaitHandle;$P.SafeWaitHandle=[Microsoft.Win32.SafeHandles.SafeWaitHandle]::new([IntPtr]$ParentHandle,$true);$H.Dispose()' . "`n"
-		. '  if(!$R.Set()){throw "Ready signal failed"};$G=[Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]@($C,$P));if($G -eq 1){exit 20};if($G -ne 0){throw "Commit wait failed"}' . "`n"
-		. '  if(!$A.Set()){throw "Ack signal failed"};$G=[Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]@($F,$P));if($G -eq 1){exit 21};if($G -ne 0){throw "FinalExit wait failed"};$P.WaitOne()|Out-Null' . "`n"
-		. '  $B=$CurrentExe+".bak";$Had=[IO.File]::Exists($CurrentExe);$Retired=(!$Had -and [IO.File]::Exists($B));$Installed=$false;$Token=[Guid]::NewGuid().ToString("N");$Candidate=$CurrentExe+"."+$Token+".candidate.exe";$RecoveryPath=$CurrentExe+"."+$Token+".recovery.exe";$RecoveryStage=$CurrentExe+"."+$Token+".republish.exe";$RecoveryClaim=$RecoveryPath+".claim";$Recovery=$null;$TerminalPath=$DiagnosticPath+".terminal";RemoveBest $TerminalPath "terminal-stale"' . "`n"
-		. '  try {' . "`n"
-		. '    PublishCopy $NewExe $Candidate|Out-Null;$OldSource=if($Had){$CurrentExe}elseif($Retired){$B}else{$null}' . "`n"
-		. '    if($null -ne $OldSource){PublishCopy $OldSource $RecoveryPath|Out-Null;PublishCopy $OldSource $RecoveryStage|Out-Null;WriteClaim $RecoveryClaim $CurrentExe $RecoveryStage;$Recovery=$RecoveryPath}' . "`n"
-		. '    if($Had){RemoveBest $B "stale-bak";[IO.File]::Replace($Candidate,$CurrentExe,$B,$true);$Retired=$true}else{[IO.File]::Move($Candidate,$CurrentExe)};$Installed=$true;RemoveBest $NewExe "new-cleanup"' . "`n"
-		. '    $Child=StartReady $CurrentExe $BootReadyTimeoutMs $ProbationMs $false' . "`n"
-		. '    RemoveBest $RecoveryClaim "success-claim-cleanup";RemoveBest $B "success-bak-cleanup";RemoveBest $RecoveryStage "success-stage-cleanup";RemoveBest $Recovery "success-recovery-cleanup";exit 0' . "`n"
-		. '  } catch {' . "`n"
-		. '    $Failure=$_;if($Failure.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw $Failure};$TerminalMessage="SWAP_ERROR:"+$Failure.Exception.Message;try{WriteTerminal $TerminalPath $TerminalMessage}catch{Diag("terminal-write:"+$_.Exception.Message)};RemoveBest $Candidate "rollback-candidate-cleanup";$Restored=(!$Installed -and $Had -and [IO.File]::Exists($CurrentExe))' . "`n"
-		. '    for($I=0;$I -lt $RestoreAttempts -and !$Restored;$I++){' . "`n"
-		. '      try{$Source=if([IO.File]::Exists($RecoveryStage)){$RecoveryStage}elseif([IO.File]::Exists($B)){$B}else{$null};if($null -eq $Source){break};if([IO.File]::Exists($CurrentExe)){$Bad=$CurrentExe+"."+$Token+".failed.exe";RemoveBest $Bad "rollback-failed-stale";[IO.File]::Replace($Source,$CurrentExe,$Bad,$true);RemoveBest $Bad "rollback-failed-cleanup"}else{[IO.File]::Move($Source,$CurrentExe)};$Restored=$true}' . "`n"
-		. '      catch{Diag("rollback-restore-"+$I+":"+$_.Exception.Message);if(($I+1) -lt $RestoreAttempts){Start-Sleep -Milliseconds $RestoreRetryMs}}' . "`n"
-		. '    }' . "`n"
-		. '    $OldTerminal=[Environment]::GetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL");[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL",$TerminalPath);try{$DriverReady=$false;if($Restored){try{$RestoredChild=StartReady $CurrentExe $BootReadyTimeoutMs $ProbationMs $false;$DriverReady=$true;RemoveBest $RecoveryClaim "rollback-claim-cleanup";RemoveBest $B "rollback-bak-cleanup";RemoveBest $RecoveryStage "rollback-stage-cleanup";RemoveBest $Recovery "rollback-recovery-cleanup"}catch{if($_.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw};Diag("rollback-relaunch:"+$_.Exception.Message)}}' . "`n"
-		. '    for($RecoveryAttempt=0;$RecoveryAttempt -lt $RestoreAttempts -and !$DriverReady -and $null -ne $Recovery -and [IO.File]::Exists($Recovery);$RecoveryAttempt++){try{if(![IO.File]::Exists($RecoveryStage)){PublishCopy $Recovery $RecoveryStage|Out-Null};WriteClaim $RecoveryClaim $CurrentExe $RecoveryStage;$RecoveryChild=StartReady $Recovery $BootReadyTimeoutMs $ProbationMs $true;$DriverReady=$true;Diag("rollback-recovery:"+$Recovery)}catch{if($_.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw};Diag("rollback-recovery-"+$RecoveryAttempt+":"+$_.Exception.Message);if(($RecoveryAttempt+1) -lt $RestoreAttempts){Start-Sleep -Milliseconds $RestoreRetryMs}}}' . "`n"
-		. '    if(!$DriverReady){throw "Rollback could not start either canonical or recovery driver"}}finally{[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL",$OldTerminal)};throw $Failure' . "`n"
-		. '  }' . "`n"
-		. '} catch {$M="SWAP_ERROR:"+$_.Exception.Message;Diag($M);[Console]::Error.WriteLine($M);exit 1}' . "`n"
-		. 'finally{foreach($W in @($R,$C,$A,$F,$P)){if($null -ne $W){$W.Dispose()}}}'
+	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+		return
+	_Updater_NotifyInstallPhase("restarting", "", 0, Observation.Observer, Observation.Epoch)
+	_Updater_ClearNotifiedTagForStaging(StagingEpoch)
 }
 
 _Updater_QuoteCreateProcessArg(Value) {
@@ -2943,7 +3058,8 @@ _Updater_NewSwapOwner(TransactionId) {
 		"PhaseStartedTick", A_TickCount,
 		"FinalExitSignaled", false,
 		"ExitRetryCount", 0,
-		"Tag", "")
+		"Tag", "",
+		"InstallObservation", _Updater_CaptureInstallObservation())
 }
 
 ; Reserve the process-wide owner before any native child exists. OnExit can
@@ -2952,7 +3068,7 @@ _Updater_NewSwapOwner(TransactionId) {
 ; suspended handles instead of orphaning an unpublished process.
 _Updater_ReserveSwapOwner(TransactionId, StagingEpoch := 0) {
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
-	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
+	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch, _UpdaterDownloadArtifacts
 	Owner := _Updater_NewSwapOwner(TransactionId)
 	PreviousCritical := Critical("On")
 	try {
@@ -2962,6 +3078,12 @@ _Updater_ReserveSwapOwner(TransactionId, StagingEpoch := 0) {
 		if (_UpdaterSwapOwner is Map)
 			return 0
 		Owner["Epoch"] := StagingEpoch
+		if StagingEpoch {
+			Observation := _Updater_ArtifactInstallObservation(_UpdaterDownloadArtifacts)
+			if !_Updater_InstallObservationValid(Observation)
+				return 0
+			Owner["InstallObservation"] := Observation
+		}
 		_UpdaterSwapOwner := Owner
 		_UpdaterExitIntent := 0
 		_UpdaterExitInvocation := 0
@@ -3257,10 +3379,11 @@ _Updater_FailSwapTransaction(TransactionId, Message, ShowUi := true) {
 	if !(Owner is Map)
 		return
 	StagingEpoch := Owner.Get("Epoch", 0)
+	Observation := Owner.Get("InstallObservation", 0)
 	_Updater_CloseSwapOwner(Owner, true)
 	try LoggerError("Updater", "Swap transaction {1} aborted: {2}.", TransactionId, Message)
 	if ShowUi {
-		try _Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install")
+		try _Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install", "Icon!", 0, Observation)
 	} else {
 		TimerArmOneShotMs(_Updater_ShowDeferredSwapFailureNotice, 1)
 	}
@@ -3583,8 +3706,10 @@ _Updater_RequestExitForIntent(TransactionId) {
 	InvocationPublished := false
 	try {
 		InvocationPublished := _Updater_PublishExitInvocation(TransactionId, Owner)
-		if InvocationPublished
+		if InvocationPublished {
+			LifecycleNoteExitRequester("the updater's swap")
 			ExitApp(0)
+		}
 	} finally {
 		_Updater_ClearExitInvocation(TransactionId, Owner)
 		Critical(PreviousCritical)
@@ -3722,12 +3847,17 @@ _Updater_TransferExitIntentAfterShutdownGates() {
 ; while both callbacks still target the same staging filenames.
 _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadRequest, _UpdaterSelfUpdateEpoch
-	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
+	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick, _UpdaterDownloadRetirement
 	Artifacts := 0
+	Retirement := 0
 	PreviousCritical := Critical("On")
 	try {
+		if IsObject(_UpdaterDownloadRetirement)
+			return false
 		if (StagingEpoch and _UpdaterSelfUpdateEpoch != StagingEpoch)
 			return false
+		Retirement := {Epoch: _UpdaterSelfUpdateEpoch}
+		_UpdaterDownloadRetirement := Retirement
 		Artifacts := _UpdaterDownloadArtifacts
 		_UpdaterDownloadInProgress := false
 		_UpdaterDownloadRequest := 0
@@ -3736,7 +3866,10 @@ _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	} finally {
 		Critical(PreviousCritical)
 	}
-	_Updater_RetireCurlCaptureArtifacts(Artifacts)
-	try SetTimer((*) => _Updater_RebuildMenu(), -50)
+	try {
+		DiscardStaging := IsObject(Artifacts) && Artifacts.HasOwnProp("StagingRetirement")
+		_Updater_RetireCurlCaptureArtifacts(Artifacts, DiscardStaging)
+		try SetTimer((*) => _Updater_RebuildMenu(), -TimingsGet("adapters", "updater_callback_defer_ms"))
+	} finally _Updater_ReleaseDownloadRetirement(Retirement)
 	return true
 }

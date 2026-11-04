@@ -8,6 +8,8 @@
 		<script defer src="../vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
 		<script defer src="../vendor/hammer.min.js"></script>
 		<script defer src="../vendor/chartjs-plugin-zoom.min.js"></script>
+		<link rel="stylesheet" href="../theme.css" />
+		<script src="../theme_tokens.js"></script>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
@@ -23,7 +25,7 @@
 						><input
 							type="date"
 							id="date_start"
-							onchange="app_state.hour_cutoff = null; apply_date_app_filters()"
+							onchange="app_state.hour_window = null; apply_date_app_filters()"
 						/>
 					</div>
 					<div>
@@ -31,7 +33,7 @@
 						><input
 							type="date"
 							id="date_end"
-							onchange="app_state.hour_cutoff = null; apply_date_app_filters()"
+							onchange="app_state.hour_window = null; apply_date_app_filters()"
 						/>
 					</div>
 					<select
@@ -65,7 +67,7 @@
 					<!-- Sans aucun toggle actif = texte final affiché à l'écran (output) -->
 					<!-- Avec un toggle actif = frappe brute pour produire cet output (input) -->
 					<button
-						class="filter-btn source-toggle"
+						class="filter-btn source-toggle active"
 						id="btn_toggle_llm"
 						onclick="toggle_llm_source()"
 						data-i18n-title="ui_typing.btn_toggle_llm_title"
@@ -73,7 +75,7 @@
 						+ IA
 					</button>
 					<button
-						class="filter-btn source-toggle"
+						class="filter-btn source-toggle active"
 						id="btn_toggle_hs"
 						onclick="toggle_hs_source()"
 						data-i18n-title="ui_typing.btn_toggle_hs_title"
@@ -82,7 +84,7 @@
 					</button>
 
 					<button
-						class="filter-btn"
+						class="filter-btn active"
 						id="btn_case_sensitive"
 						onclick="toggle_filter('btn_case_sensitive')"
 						data-i18n="ui_typing.btn_case_sensitive"
@@ -309,6 +311,8 @@
 					<div id="sfb_heatmap_container" style="width: 100%"></div>
 				</div>
 			</div>
+
+			<section id="media_keys_container" hidden style="margin-bottom: 16px"></section>
 
 			<!-- Calendrier d’activité : 12 mois glissants. Intensité = caractères tapés ce jour-là. -->
 			<div id="activity_calendar_container" style="margin-bottom: 16px"></div>
@@ -1249,7 +1253,10 @@
 		<script src="../dom_utils.js"></script>
 		<!-- Generated from _shared/data/keycodes/azerty.json (DC-1) — must load before state.js, which reads its KEYCODE_DATA global -->
 		<script src="_generated/keycode_data.js"></script>
+		<script src="_generated/keystats_tokens.js"></script>
+		<script src="key_tokens.js"></script>
 		<script src="state.js"></script>
+		<script src="../metrics_calendar.js"></script>
 		<script src="format.js"></script>
 		<script src="filters.js"></script>
 		<script src="modal.js"></script>
@@ -1274,14 +1281,31 @@
 				// window._prefetch_data on the first paint, so we can't rely on
 				// it for the live merge — we keep our own copy here instead.
 				let cached_historical = null;
+				// Whether that history came from an incomplete host read.
+				let cached_historical_incomplete = false;
 				let manifest_seeded = false;
 				// Apply a prefetch blob (initial fetch or live push) onto the
 				// global state and re-render.
 				function apply_prefetch(blob) {
 					if (!blob) return;
+					const has_prefetch = blob._prefetch_data !== undefined;
+					// Reject stale native replies before metadata, mailbox or history
+					// changes; a later live delta must not resurrect rejected history.
+					if (
+						(has_prefetch || blob.range_request_id !== undefined) &&
+						!window.can_receive_range_data(blob.range_request_id ?? null)
+					)
+						return;
 					// A partial rebuild snapshot is labelled until a complete one lands.
 					if (window.metrics_rebuild) window.metrics_rebuild.mark_snapshot(blob);
 					window.metrics_manifest = blob.metrics_manifest || {};
+					// The host shows what it read but never caches an incomplete read.
+					if (window.metrics_freshness) {
+						window.metrics_freshness.mark_incomplete(
+							'manifest',
+							blob.metrics_manifest_incomplete === true
+						);
+					}
 					window.app_icons = blob.app_icons || {};
 					window.driver_meta = blob.driver_meta ||
 						window.driver_meta || { os: 'mac', heatmap_id: 'kc' };
@@ -1292,34 +1316,37 @@
 						typeof window.build_keycode_layout_for_driver === 'function'
 							? window.build_keycode_layout_for_driver(window.driver_meta, blob.keycode_layout)
 							: blob.keycode_layout || {};
-					const has_prefetch = blob._prefetch_data !== undefined;
 					let merged = null;
+					let next_historical = cached_historical;
+					let next_historical_incomplete = cached_historical_incomplete;
 					if (has_prefetch) {
 						const incoming = blob._prefetch_data || {};
 						let incoming_hist = incoming.historical || {};
 						let incoming_today = incoming.today || {};
 						// PC-scancode drivers: translate sc_kb → kc per app so
-						// the renderer keeps reading the same field.
+						// the renderer keeps reading the same field. heatmap_win.js
+						// owns both the translation and which drivers need it.
 						if (
-							window.driver_meta &&
-							(window.driver_meta.os === 'win' || window.driver_meta.os === 'linux') &&
-							typeof window.translate_win_today === 'function'
+							typeof window.translate_win_today === 'function' &&
+							is_pc_scancode_driver(window.driver_meta)
 						) {
 							incoming_today = window.translate_win_today(incoming_today);
 							incoming_hist = window.translate_win_today(incoming_hist);
 						}
 						// Omission is a live delta; an explicit empty object clears history.
 						if (Object.prototype.hasOwnProperty.call(incoming, 'historical')) {
-							cached_historical = incoming_hist;
+							next_historical = incoming_hist;
+							next_historical_incomplete = incoming.incomplete === true;
 						}
 						merged = {
-							historical: cached_historical || incoming_hist || {},
-							today: incoming_today
+							historical: next_historical || incoming_hist || {},
+							today: incoming_today,
+							incomplete: next_historical_incomplete || incoming.incomplete === true
 						};
 						window._prefetch_data = merged;
 					}
-					// First apply seeds the dashboard (process_manifest does the
-					// initial reset, sets up filters, and triggers request_range_data
+					// First apply seeds the dashboard (process_manifest initializes
+					// dates/apps and triggers request_range_data
 					// — which synchronously paints the loader spinner). Subsequent
 					// live pushes go directly to receive_range_data so the spinner
 					// doesn't clobber the rendered tables every 200 ms.
@@ -1332,11 +1359,23 @@
 								'[apply_prefetch] window.process_manifest not defined — JS scripts may have failed to load'
 							);
 						}
+					} else {
+						// Keep the admitted manifest's charts and inventories current
+						// while the existing native range owner keeps its mailbox.
+						window.refresh_manifest_projection();
 					}
 					if (merged && typeof window.receive_range_data === 'function') {
 						try {
-							window._lua_request = null;
-							window.receive_range_data(merged, blob.range_request_id ?? null);
+							// process_manifest can discover a new scope. Recheck before
+							// touching its mailbox and never relabel this response's id.
+							const request_id = blob.range_request_id ?? null;
+							if (window.can_receive_range_data(request_id)) {
+								window._lua_request = null;
+								if (window.receive_range_data(merged, request_id) === true) {
+									cached_historical = next_historical;
+									cached_historical_incomplete = next_historical_incomplete;
+								}
+							}
 						} catch (e) {
 							console.error('receive_range_data failed:', e);
 						}
@@ -1359,7 +1398,7 @@
 				// WebKitGTK cannot receive the macOS evaluateJavaScript injection and
 				// has no file-sidecar fallback. Request the shared prefetch envelope
 				// through its native bridge, then keep the dashboard live with polling.
-				if (window.__ergopti_host === 'linux') {
+				if (hostHasCapability('document_bridge')) {
 					const request_linux_refresh = () => {
 						try {
 							window.webkit.messageHandlers.metrics_typing_bridge.postMessage({

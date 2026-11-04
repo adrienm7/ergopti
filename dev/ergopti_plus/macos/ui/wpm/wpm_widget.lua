@@ -17,7 +17,7 @@
 local M = {}
 
 local hs         = hs
-local keylogger  = require("modules.keylogger")
+local keystats  = require("modules.keystats")
 local WPMShared  = require("ui.wpm.shared")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
@@ -167,15 +167,16 @@ local _canvas_geom = { canvas_width = 0, canvas_height = 0, compact_w = 0, compa
 
 -- Saved position: top-left of the compact mode widget; nil = recalculate default.
 -- Persisted across sessions via hs.settings so drag survives a Hammerspoon reload.
-local _SETTINGS_X = "wpm_widget.pos_x"
-local _SETTINGS_Y = "wpm_widget.pos_y"
+-- The two keys come from the shared canon ([position]), the same on every driver.
+local _SETTINGS_X = CONFIG.canon and CONFIG.canon.position.storage_x
+local _SETTINGS_Y = CONFIG.canon and CONFIG.canon.position.storage_y
 -- Coerce with tonumber: a corrupt / hand-edited plist can return a STRING here,
 -- which is only guarded by `if not _pos_x` downstream (a non-empty string passes)
 -- and then flows into arithmetic (_pos_x + compact_w …) and hs.canvas geometry,
 -- raising in the timer/layout callback (swallowed to the HS Console). tonumber
 -- yields nil for a non-numeric value so the existing default-recompute fires.
-local _pos_x      = tonumber(Storage.get(_SETTINGS_X))
-local _pos_y      = tonumber(Storage.get(_SETTINGS_Y))
+local _pos_x      = _SETTINGS_X and tonumber(Storage.get(_SETTINGS_X)) or nil
+local _pos_y      = _SETTINGS_Y and tonumber(Storage.get(_SETTINGS_Y)) or nil
 
 -- Drag state.
 local _drag_start_mouse = nil
@@ -201,31 +202,40 @@ end
 -- body so the body can be a plain local function referenced by name below.
 local update_widget_body
 
+local function is_current(generation)
+	return _running and generation == _generation
+end
+
 --- Polls the engine and redraws the canvas.
 --- Wrapped end-to-end in a pcall (mirrors tooltip_hotstring.lua / tooltip_llm.lua):
 --- this runs on a bare hs.timer callback with no caller to catch a raised error,
 --- and there is no hs.uncaughtErrorHandler anywhere in the tree, so an unguarded
 --- fault here would silently kill the 0.2 s timer with nothing in the file logger.
-local function update_widget()
-	local ok, err = pcall(update_widget_body)
+local function update_widget(generation)
+	if not is_current(generation) then return false end
+	local ok, err = pcall(update_widget_body, generation)
 	if not ok then Logger.error(LOG, "Crash during widget update: " .. tostring(err) .. ".") end
+	return ok and err ~= false and is_current(generation)
 end
 
 --- Actual widget-update body, wrapped by update_widget() above.
-update_widget_body = function()
-	local stats = keylogger.get_live_stats()
+update_widget_body = function(generation)
+	local stats = keystats.get_live_stats()
+	if not is_current(generation) then return false end
 	local display_wpm = stats.wpm or 0
 	local now = hs.timer.absoluteTime() / 1000000000
 	local active_source = WPMShared.get_active_source(stats, CONFIG.source_color_duration, now)
+	if not is_current(generation) then return false end
 
 	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
 	local tooltip_visible = false
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_visible) == "function" then
 		tooltip_visible = tooltip.is_visible()
 	end
+	if not is_current(generation) then return false end
 
 	local canon = CONFIG.canon
-	if not canon then return end
+	if not canon then return false end
 	local frame_opts = {
 		now_s = now,
 		hold_s = CONFIG.source_color_duration,
@@ -233,6 +243,7 @@ update_widget_body = function()
 		resolve = WPMShared.resolve_group_hex,
 		unit = WPMShared.unit_label(),
 	}
+	if not is_current(generation) then return false end
 
 	-- One sample per refresh for the graph, and the shared rule for showing:
 	-- while text appears or a preview is up, and briefly after — unless the
@@ -250,16 +261,19 @@ update_widget_body = function()
 		-- unconditionally would raise inside this pcall-wrapped body every 0.2 s
 		-- until a screen reappears. Skip this cycle instead of crashing.
 		local screen = hs.screen.mainScreen()
+		if not is_current(generation) then return false end
 		if not screen then
 			Logger.error(LOG, "update_widget: hs.screen.mainScreen() returned nil — skipping this cycle.")
 			return
 		end
 		local full_frame = screen:fullFrame()
+		if not is_current(generation) then return false end
 		local frame = _show_graph and WPMModel.graph_frame(canon, _wpm_history, stats, frame_opts)
 			or WPMModel.compact_frame(canon, stats, frame_opts)
 		local canvas_width, canvas_height = frame.width, frame.height
 		local compact_w = canon.compact.width
 		local compact_h = canon.compact.height_number + canon.compact.height_gap + canon.compact.height_unit
+		if not is_current(generation) then return false end
 
 		-- Publish this cycle's geometry for the mouseCallback closure (see the
 		-- _canvas_geom declaration in section 2 for why this indirection exists).
@@ -269,21 +283,27 @@ update_widget_body = function()
 		_canvas_geom.compact_h     = compact_h
 
 		-- The pill's top-left is the anchor; the graph keeps its bottom-right.
-		if not _pos_x then _pos_x, _pos_y = WPMModel.default_anchor(canon, full_frame) end
+		if not _pos_x or not _pos_y then _pos_x, _pos_y = WPMModel.default_anchor(canon, full_frame) end
 		local target_x, target_y = WPMModel.frame_origin(canon, frame, _pos_x, _pos_y)
 
 		if not _canvas then
-			_canvas = GraphicsRenderer.createWindow({
+			local candidate = GraphicsRenderer.createWindow({
 				x = target_x, y = target_y, w = canvas_width, h = canvas_height,
 				clickThrough = false, alwaysOnTop = false,
 			})
-			if _canvas == 0 then
-				_canvas = nil
-				Logger.error(LOG, "update_widget_body(): failed to allocate the widget canvas.")
-				return
+			if not is_current(generation) then
+				if candidate and candidate ~= 0 then candidate:delete() end
+				return false
 			end
+			if not candidate or candidate == 0 then
+				Logger.error(LOG, "update_widget_body(): failed to allocate the widget canvas.")
+				return false
+			end
+			_canvas = candidate
 			_canvas:level(hs.drawing.windowLevels.cursor)
+			if not is_current(generation) or _canvas ~= candidate then return false end
 			_canvas:behavior({ "canJoinAllSpaces", "stationary" })
+			if not is_current(generation) or _canvas ~= candidate then return false end
 			local callback_canvas = _canvas
 			local callback_generation = _generation
 			-- Drag: mouseCallback fires on left-button down inside the canvas.
@@ -315,8 +335,10 @@ update_widget_body = function()
 						_pos_x = f.x
 						_pos_y = f.y
 					end
-					Storage.set(_SETTINGS_X, _pos_x)
-					Storage.set(_SETTINGS_Y, _pos_y)
+					if _SETTINGS_X then
+						Storage.set(_SETTINGS_X, _pos_x)
+						Storage.set(_SETTINGS_Y, _pos_y)
+					end
 				elseif event == "mouseMove" and _drag_start_mouse then
 					local cur = hs.mouse.absolutePosition()
 					local dx  = cur.x - _drag_start_mouse.x
@@ -329,12 +351,15 @@ update_widget_body = function()
 					})
 				end
 			end)
+			if not is_current(generation) or _canvas ~= candidate then return false end
 		else
 			-- Only reposition when not dragging.
 			if not _drag_start_mouse then
 				_canvas:frame({ x = target_x, y = target_y, w = canvas_width, h = canvas_height })
 			end
 		end
+		if not is_current(generation) then return false end
+		local canvas = _canvas
 
 		-- The frame the shared model computed, as hs.canvas elements.
 		local elements = {}
@@ -374,8 +399,9 @@ update_widget_body = function()
 				frame = { x = 0, y = frame.strip_y, w = frame.width, h = frame.height_unit } })
 		end
 
-		_canvas:replaceElements(elements)
-		_canvas:show()
+		canvas:replaceElements(elements)
+		if not is_current(generation) or _canvas ~= canvas then return false end
+		canvas:show()
 	else
 		if _canvas then _canvas:hide() end
 	end
@@ -421,9 +447,11 @@ end
 --- Releases both runtime capabilities without hiding a sibling cleanup failure.
 --- @return boolean settled True only when both exact capabilities were released.
 local function release_runtime()
+	local generation = _generation
 	local timer_stopped = release_timer()
+	if generation ~= _generation then return false end
 	local tap_stopped = release_mouse_tap()
-	return timer_stopped and tap_stopped
+	return generation == _generation and timer_stopped and tap_stopped
 end
 
 
@@ -451,25 +479,29 @@ function M.start(show_graph)
 	end
 	if _running then
 		_show_graph = want_graph
-		_pause_restore_pending = false
-		update_widget()
-		return true
+		local updated = update_widget(_generation)
+		if updated then _pause_restore_pending = false end
+		return updated
 	end
 	-- A destroyed canvas cannot deliver the mouseUp that closes its drag. Never
 	-- let that lease gate positioning or move a later canvas generation.
+	-- Diagnostic sinks can stop or restart this owner before acquisition begins.
+	local before_start = _generation
 	clear_drag_lease()
 	Logger.debug(LOG, "Starting floating WPM widget…")
+	if before_start ~= _generation then return false end
 	if not release_runtime() then
 		Logger.error(LOG, "WPM widget start refused: prior cleanup remains pending.")
 		return false
 	end
+	if before_start ~= _generation then return false end
 	_show_graph = want_graph
 	_generation = _generation + 1
 	local generation = _generation
 	local timer_ok, timer_candidate, timer_committed = xpcall(function()
 		return TimerScheduler.every(CONFIG.update_s, function()
 			if not _running or generation ~= _generation then return end
-			update_widget()
+			update_widget(generation)
 		end)
 	end, debug.traceback)
 	if type(timer_candidate) == "table" then _timer = timer_candidate end
@@ -522,10 +554,12 @@ function M.start(show_graph)
 		return false
 	end
 	_running = true
+	local updated = update_widget(generation)
+	if not is_current(generation) then return false end
+	if not updated then M.stop(); return false end
 	_pause_restore_pending = false
-	update_widget()
 	Logger.info(LOG, "Floating WPM widget started successfully.")
-	return true
+	return is_current(generation)
 end
 
 --- Halts the widget and clears the screen.
@@ -534,18 +568,26 @@ function M.stop()
 	clear_drag_lease()
 	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
 	-- Nothing to tear down means nothing to log — return before the start/stop banner.
-	if not _running and not _timer and not _mouse_tap and not _canvas then return true end
-	Logger.debug(LOG, "Stopping floating WPM widget…")
+	if not _running and not _timer and not _mouse_tap and not _canvas then
+		-- A sink may cancel startup before it acquires its first native handle.
+		_generation = _generation + 1
+		return true
+	end
 	_running = false
 	_generation = _generation + 1
+	local generation = _generation
 	local runtime_stopped = release_runtime()
+	if generation ~= _generation then return false end
 	if _canvas then _canvas:delete(); _canvas = nil end
+	if generation ~= _generation then return false end
+	Logger.debug(LOG, "Stopping floating WPM widget…")
+	if generation ~= _generation then return false end
 	if not runtime_stopped then
 		Logger.error(LOG, "WPM widget stop incomplete: runtime cleanup remains pending.")
 		return false
 	end
 	Logger.info(LOG, "Floating WPM widget stopped.")
-	return true
+	return generation == _generation and not _running
 end
 
 function M.is_running()
@@ -563,8 +605,10 @@ end
 function M.reset_position()
 	_pos_x = nil
 	_pos_y = nil
-	Storage.delete(_SETTINGS_X)
-	Storage.delete(_SETTINGS_Y)
+	if _SETTINGS_X then
+		Storage.delete(_SETTINGS_X)
+		Storage.delete(_SETTINGS_Y)
+	end
 	Logger.info(LOG, "Widget position reset to default.")
 end
 

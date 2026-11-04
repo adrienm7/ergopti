@@ -105,7 +105,7 @@ SC038:: {
 	if !TapHoldSyntheticKeyDown("LShift")
 		return
 	try {
-		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+		KS_WaitReleased("SC038", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
 		TapHoldSyntheticKeyUp("LShift")
 	}
@@ -164,7 +164,7 @@ SC11D & SC038:: {
 {
 	if !TapHoldSyntheticKeyDown("LAlt")
 		return
-	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
+	tap := KS_WaitReleased("SC038", TapHoldDuration(TapHold, "left_alt"))
 	if tap {
 		; The synthetic LAlt Down armed above must always be released regardless
 		; of Suspend state; only the AltTabMonitor() side effect is guarded —
@@ -178,7 +178,7 @@ SC11D & SC038:: {
 		; Down system-wide — this else is the SOLE release path (no SC038 Up:: fallback
 		; exists here, unlike tab.ahk) (hold-modifier-unbounded-keywait)
 		try {
-			KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+			KS_WaitReleased("SC038", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 		} finally {
 			TapHoldSyntheticKeyUp("LAlt")
 		}

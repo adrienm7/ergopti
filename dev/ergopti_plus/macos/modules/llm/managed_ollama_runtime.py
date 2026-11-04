@@ -2,9 +2,12 @@
 """Native ports for a source-qualified, runtime-only Ollama installation."""
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
+import traceback
+import re
 from pathlib import Path
 import platform
 import secrets
@@ -293,6 +296,40 @@ def inputs():
     return contract_bytes, catalogue_bytes, host, contract, asset
 
 
+def developer_archive(catalogue_bytes, asset):
+    """Return the asset a developer clone built from its pinned sources, or None.
+
+    Only an unpublished catalogue, which names no download URL, may point here:
+    tools/dev/stage-macos-dev-ollama-catalogue.py generated it with the release
+    producer and kept the archive in the clone. A sealed bundle has no such
+    folder, so its unpublished catalogue stays unavailable. The bytes are still
+    admitted against the catalogue's SHA-256 and size before extraction.
+    """
+    if POLICY.metadata_bytes(catalogue_bytes)["publication"].get("mode") != "unpublished-ci":
+        return None
+    path = SHARED.parents[2] / POLICY.DEVELOPER_ASSET_DIRECTORY / asset["filename"]
+    if path.is_symlink() or not path.is_file():
+        return None
+    return path
+
+
+def copy_verified(source, destination, expected_sha256, expected_bytes, deadline):
+    """Copy a local asset, refusing any byte count or digest the catalogue does not pin."""
+    digest = hashlib.sha256()
+    size = 0
+    with source.open("rb") as reader, destination.open("xb") as writer:
+        while chunk := reader.read(1024 * 1024):
+            if deadline - time.monotonic() <= 0:
+                raise POLICY.RuntimeRefusal("deadline")
+            size += len(chunk)
+            if size > expected_bytes:
+                raise POLICY.RuntimeRefusal("checksum")
+            digest.update(chunk)
+            writer.write(chunk)
+    if size != expected_bytes or digest.hexdigest() != expected_sha256:
+        raise POLICY.RuntimeRefusal("checksum")
+
+
 def owned_directory():
     home = os.environ.get("HOME", "")
     if not home.startswith("/"):
@@ -374,6 +411,90 @@ def _native_verify(root, contract, asset, expected_receipt, deadline, *, alias_c
     return binary
 
 
+# renameatx_np flags (<stdio.h>): RENAME_SWAP exchanges two existing entries,
+# RENAME_EXCL refuses an existing destination. AT_FDCWD is -2 on Darwin.
+RENAME_SWAP = 0x00000002
+RENAME_EXCL = 0x00000004
+AT_FDCWD = -2
+
+
+def rename_at(source, destination, flags):
+    """Call macOS renameatx_np: one kernel step, so no reader sees a half state.
+
+    Only Darwin has renameatx_np, and inputs() already refuses every other
+    platform: the owned runtime is a macOS-only install.
+    """
+    import ctypes
+
+    libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+    libc.renameatx_np.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    libc.renameatx_np.restype = ctypes.c_int
+    return (
+        libc.renameatx_np(AT_FDCWD, os.fsencode(source), AT_FDCWD, os.fsencode(destination), flags)
+        == 0
+    )
+
+
+def directory_identity(path):
+    status = os.stat(path, follow_symlinks=False)
+    return status.st_dev, status.st_ino
+
+
+def earlier_owned_install(target, contract, host, expected_receipt):
+    """Admit the target as an intact runtime an earlier Ergopti install published.
+
+    A new catalogue (an upgrade, or a developer clone whose ad hoc signed
+    rebuild has a new archive digest) binds another receipt, and install()
+    refused such a runtime for good: every bootstrap ended with exit 78. Its
+    own receipt still proves what Ergopti installed there, so it may be
+    replaced. Anything that receipt does not vouch for stays where it is: a
+    symlink, a folder of another user, a missing or foreign receipt, a binary
+    whose digest differs from its receipt, a link out of the folder, or the
+    image and lease files of a live operation.
+    Returns the folder's (device, inode), checked again before the swap.
+    """
+    if target.is_symlink() or not target.is_dir():
+        raise POLICY.RuntimeRefusal("runtime")
+    status = os.stat(target, follow_symlinks=False)
+    if status.st_uid != os.geteuid():
+        raise POLICY.RuntimeRefusal("runtime")
+    receipt_path = target / POLICY.RECEIPT_BASENAME
+    if receipt_path.is_symlink() or not receipt_path.is_file():
+        raise POLICY.RuntimeRefusal("runtime")
+    earlier = POLICY.metadata_bytes(receipt_path.read_bytes())
+    if (
+        set(earlier) != set(expected_receipt)
+        or earlier == expected_receipt
+        or earlier.get("schema_version") != 1
+        or earlier.get("host") != host
+        or not isinstance(earlier.get("binary_sha256"), str)
+    ):
+        raise POLICY.RuntimeRefusal("runtime")
+    binary = target / contract["binary_path"]
+    if binary.is_symlink() or not binary.is_file():
+        raise POLICY.RuntimeRefusal("runtime")
+    if POLICY.sha256(binary.read_bytes()) != earlier["binary_sha256"]:
+        raise POLICY.RuntimeRefusal("runtime")
+    resolved = target.resolve(strict=True)
+    for path in target.rglob("*"):
+        name = path.relative_to(target).as_posix()
+        if name.split("/", 1)[0].startswith(".ergopti-") and name != POLICY.RECEIPT_BASENAME:
+            raise POLICY.RuntimeRefusal("runtime")
+        try:
+            path.resolve(strict=True).relative_to(resolved)
+        except (ValueError, OSError) as error:
+            raise POLICY.RuntimeRefusal("runtime") from error
+        if not (path.is_dir() or path.is_file()):
+            raise POLICY.RuntimeRefusal("runtime")
+    return directory_identity(target)
+
+
 def install(
     deadline,
     idle_timeout,
@@ -381,11 +502,16 @@ def install(
     connect_timeout=None,
     minimum_bytes_per_second=None,
 ):
-    """Download actual catalogue bytes and publish only a new owned directory.
+    """Download actual catalogue bytes and publish a new owned directory.
+
+    An intact runtime an earlier catalogue installed is exchanged for the new
+    one (earlier_owned_install); any other existing folder is never displaced.
 
     A manual native receiver may inject its own exact loopback fixture URL;
     hashes and source qualification always come from the unchanged catalogue.
-    The production command exposes no fixture URL option.
+    The production command exposes no fixture URL option. An unpublished
+    catalogue of a developer clone installs the archive that clone built
+    (developer_archive), admitted against the same pinned digest and size.
     """
     contract_bytes, catalogue_bytes, host, contract, asset = inputs()
     url = asset["url"]
@@ -405,13 +531,26 @@ def install(
         ):
             raise POLICY.RuntimeRefusal("unavailable")
         url = fixture_url
+    local_archive = None
     if not url:
-        raise POLICY.RuntimeRefusal("unavailable")
+        local_archive = developer_archive(catalogue_bytes, asset)
+        if local_archive is None:
+            raise POLICY.RuntimeRefusal("unavailable")
     target = owned_directory()
     expected_receipt = POLICY.receipt(contract_bytes, catalogue_bytes, host, asset)
+    replaced = None
     if target.exists() or target.is_symlink():
-        # An existing foreign/modified runtime is never displaced silently.
-        return native_verify(target, contract, asset, expected_receipt, deadline)
+        receipt_path = target / POLICY.RECEIPT_BASENAME
+        current = None
+        if receipt_path.is_file() and not receipt_path.is_symlink():
+            try:
+                current = POLICY.metadata_bytes(receipt_path.read_bytes())
+            except (POLICY.RuntimeRefusal, OSError, ValueError):
+                current = None
+        if current == expected_receipt or target.is_symlink() or not target.is_dir():
+            # The current install, or a foreign/modified runtime: never displaced.
+            return native_verify(target, contract, asset, expected_receipt, deadline)
+        replaced = earlier_owned_install(target, contract, host, expected_receipt)
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     if target.parent.is_symlink():
         raise POLICY.RuntimeRefusal("runtime")
@@ -424,20 +563,23 @@ def install(
             or minimum_bytes_per_second <= 0
         ):
             raise POLICY.RuntimeRefusal("protocol")
-        request = functools.partial(
-            runtime_request,
-            connect_timeout=connect_timeout,
-            minimum_bytes_per_second=minimum_bytes_per_second,
-        )
-        BOOTSTRAP.download(
-            url,
-            archive,
-            asset["sha256"],
-            asset["bytes"],
-            deadline,
-            idle_timeout,
-            request=request,
-        )
+        if local_archive is not None:
+            copy_verified(local_archive, archive, asset["sha256"], asset["bytes"], deadline)
+        else:
+            request = functools.partial(
+                runtime_request,
+                connect_timeout=connect_timeout,
+                minimum_bytes_per_second=minimum_bytes_per_second,
+            )
+            BOOTSTRAP.download(
+                url,
+                archive,
+                asset["sha256"],
+                asset["bytes"],
+                deadline,
+                idle_timeout,
+                request=request,
+            )
         stage = root / "runtime"
         stage.mkdir(mode=0o700)
         with tarfile.open(archive) as source:
@@ -450,22 +592,32 @@ def install(
             stream.flush()
             os.fsync(stream.fileno())
         native_verify(stage, contract, asset, expected_receipt, deadline)
-        # macOS renameatx_np(RENAME_EXCL) makes the final publication exclusive
-        # at the kernel boundary; an intervening foreign target survives.
-        import ctypes
-
-        libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
-        libc.renameatx_np.argtypes = [
-            ctypes.c_int,
-            ctypes.c_char_p,
-            ctypes.c_int,
-            ctypes.c_char_p,
-            ctypes.c_uint,
-        ]
-        libc.renameatx_np.restype = ctypes.c_int
-        if libc.renameatx_np(-2, os.fsencode(stage), -2, os.fsencode(target), 0x00000004) != 0:
+        if replaced is None:
+            # RENAME_EXCL makes the publication exclusive at the kernel
+            # boundary; an intervening foreign target survives.
+            if not rename_at(stage, target, RENAME_EXCL):
+                raise POLICY.RuntimeRefusal("publish")
+            return native_verify(target, contract, asset, expected_receipt, deadline)
+        # RENAME_SWAP exchanges the earlier install with the new one in one
+        # step: the folder is never absent, and the earlier install lands in the
+        # stage, removed with the temporary folder only once the new one
+        # verified in place. A folder that changed since its admission stays.
+        if directory_identity(target) != replaced:
             raise POLICY.RuntimeRefusal("publish")
-    return native_verify(target, contract, asset, expected_receipt, deadline)
+        if not rename_at(stage, target, RENAME_SWAP):
+            raise POLICY.RuntimeRefusal("publish")
+        try:
+            binary = native_verify(target, contract, asset, expected_receipt, deadline)
+        except BaseException:
+            # Roll back: the earlier install returns to its place.
+            if not rename_at(stage, target, RENAME_SWAP):
+                raise POLICY.RuntimeRefusal("publish")
+            raise
+        print(
+            "Managed Ollama runtime replaced an earlier owned install.",
+            file=sys.stderr,
+        )
+        return binary
 
 
 def create_session(deadline, port):
@@ -480,7 +632,7 @@ def create_session(deadline, port):
         POLICY.receipt(contract_bytes, catalogue_bytes, host, asset),
         deadline,
     )
-    identity = binary.stat(follow_symlinks=False)
+    identity = os.stat(binary, follow_symlinks=False)
     data = {
         "version": 1,
         "token": secrets.token_hex(32),
@@ -511,6 +663,47 @@ def create_session(deadline, port):
 
 def cancelled(signum, frame):
     raise POLICY.RuntimeRefusal("cancelled")
+
+
+_REFUSAL_FACT_WORD = re.compile(r"[a-z][a-z0-9_]{0,63}")
+
+
+def describe_refusal(error, owner_file):
+    """Name an unexpected refusal with fixed words and numbers only.
+
+    The serve and pull owners print this on stderr, which the driver logs:
+    before it named its check, the field runs of 2026-10-30 logged only
+    "admission refused" and each cause needed a new run.
+
+    The innermost frame names the failing check, the last frame in the owner
+    script the phase, and a native HTTP failure adds its fixed reason, stage
+    and worker exit status.
+    """
+    owner = os.path.basename(owner_file)
+    frames = traceback.extract_tb(error.__traceback__)
+    inner = frames[-1]
+    facts = [
+        "%s at %s:%d %s"
+        % (type(error).__name__, os.path.basename(inner.filename), inner.lineno, inner.name)
+    ]
+    phases = [
+        frame
+        for frame in frames
+        if os.path.basename(frame.filename) == owner and frame.name != "main"
+    ]
+    if phases and phases[-1] is not inner:
+        facts.append("from %s:%d %s" % (owner, phases[-1].lineno, phases[-1].name))
+    named = {"reason": getattr(error, "reason", None)}
+    native = getattr(error, "native_diagnostic", None)
+    if type(native) is dict:
+        for key in ("stage", "native_child_status", "native_receipt_reason", "cleanup"):
+            named[key] = native.get(key)
+    for key, value in named.items():
+        if (type(value) is int and -65535 <= value <= 65535) or (
+            type(value) is str and _REFUSAL_FACT_WORD.fullmatch(value)
+        ):
+            facts.append("%s=%s" % (key, value))
+    return ", ".join(facts)
 
 
 if __name__ == "__main__":

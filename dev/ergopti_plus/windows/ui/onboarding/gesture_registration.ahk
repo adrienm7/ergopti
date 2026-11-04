@@ -45,9 +45,9 @@ _Onboarding_ReserveGestureAuto(Candidate, TimerFn := 0) {
 			return false
 		PollFn := _Onboarding_PollGestureAuto.Bind(Candidate["epoch"])
 		if HasMethod(TimerFn, "Call")
-			TimerFn.Call(PollFn, -100)
+			TimerFn.Call(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))
 		else
-			SetTimer(PollFn, -100)
+			SetTimer(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))
 		_OnboardingGestureJob := Candidate
 		return true
 	} finally {
@@ -106,7 +106,8 @@ _Onboarding_StartGestureAuto(OnDone) {
 		return false
 	FSDelete(ResultPath)
 	FSDelete(ResultPath . ".stage")
-	if !FSWrite(ScriptPath, _Onboarding_BuildGesturePsScript(ResultPath)) {
+	; Windows PowerShell 5.1 otherwise decodes a BOMless source with the ANSI code page.
+	if !FSWrite(ScriptPath, Chr(0xFEFF) . _Onboarding_BuildGesturePsScript(ResultPath)) {
 		_Onboarding_AbortGestureAutoReservation(Epoch)
 		try LoggerError("Onboarding", "Could not write gesture PS script.")
 		return false
@@ -137,7 +138,7 @@ _Onboarding_PollGestureAuto(Epoch) {
 	if (_OnboardingGestureJob["epoch"] != Epoch)
 		return
 	if _OnboardingGestureJob.Get("starting", false) {
-		SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -100)
+		SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -TimingsGet("gestures", "worker_result_poll_ms"))
 		return
 	}
 	if !_OnboardingGestureJob["pid"]
@@ -146,14 +147,14 @@ _Onboarding_PollGestureAuto(Epoch) {
 	; callback while the keyboard driver is suspended; retain the job until it
 	; resumes instead.
 	if A_IsSuspended {
-		SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -100)
+		SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -TimingsGet("gestures", "worker_result_poll_ms"))
 		return
 	}
 	; The atomically published result is the terminal authority. Check it before
 	; the diagnostic PID because Windows may already have recycled that number.
 	if !FileExist(_OnboardingGestureJob["result"])
 			&& ProcessExist(_OnboardingGestureJob["pid"]) {
-		SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -100)
+		SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -TimingsGet("gestures", "worker_result_poll_ms"))
 		return
 	}
 	Ok := _Onboarding_ReadGestureAutoResult(_OnboardingGestureJob["result"])

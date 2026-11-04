@@ -3,33 +3,26 @@
 	"label": "+ Add an API",
 	"mutated_key": "button.cancel",
 	"mutated_label": "Cancel",
-	"command_section": "llm_api_add_command",
 	"group_section": "llm_api_add_provider_group",
 	"separator_section": "llm_api_add_separator",
 	"identity": "api_add_entry",
 	"mac_decoration": "➕ ",
 	"group_ready": "llm_api_add_group_ready",
-	"command": {
-		"type": "command",
-		"id": "api_add_entry",
-		"i18n": "menu.llm.api_add_entry",
-		"platforms": ["ahk"],
-		"unavailable": "hide"
-	},
 	"group": {
 		"type": "group",
 		"id": "api_add_entry",
 		"i18n": "menu.llm.api_add_entry",
 		"disabled_when": ["llm_api_add_group_ready"],
-		"platforms": ["hs", "linux"],
+		"platforms": ["hs"],
 		"unavailable": "hide"
 	},
 	"separator": {
-		"type": "---"
+		"type": "---",
+		"platforms": ["hs"],
+		"unavailable": "hide"
 	},
+	"_comment": "Since 2026-10-27 Windows and Linux add API entries from the model selector page; only the macOS API panel still draws this frame, which the page collects.",
 	"native_positions": {
-		"ahk": "after Add only with entries",
-		"hs": "after Add only with entries",
-		"linux": "before Add"
+		"hs": "after Add only with entries"
 	}
 }
