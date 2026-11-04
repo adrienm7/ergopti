@@ -77,14 +77,28 @@ function M.probe(host, port, timeout_ms, callback, luv)
 	request = luv.getaddrinfo(host, tostring(port), { socktype = "stream" }, function(err, addresses)
 		resolving = false
 		if answered then settle(); return end
-		local first = type(addresses) == "table" and addresses[1] or nil
-		if err or not first then answer(false, "resolve"); return end
-		tcp = luv.new_tcp()
-		if not tcp then answer(false, "connect"); return end
-		local started = tcp:connect(first.addr, first.port, function(connect_error)
-			answer(connect_error == nil, connect_error and "connect" or nil)
-		end)
-		if not started then answer(false, "connect") end
+		if err or type(addresses) ~= "table" or not addresses[1] then answer(false, "resolve"); return end
+		local index = 0
+		local function try_next()
+			if answered then return end
+			index = index + 1
+			local address = addresses[index]
+			if not address then answer(false, "connect"); return end
+			tcp = luv.new_tcp()
+			if not tcp then answer(false, "connect"); return end
+			local candidate = tcp
+			local function failed()
+				close(candidate)
+				if tcp == candidate then tcp = nil end
+				try_next()
+			end
+			local started = candidate:connect(address.addr, address.port, function(connect_error)
+				if answered then return end
+				if connect_error then failed() else answer(true) end
+			end)
+			if not started then failed() end
+		end
+		try_next()
 	end)
 	if not request then
 		resolving = false
