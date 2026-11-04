@@ -13,6 +13,18 @@ local Editor = require("infra.toml.record_editor")
 local Codec = require("infra.toml.codec")
 
 helpers.describe("TOML record editor preserves bytes outside the mutation", function()
+	helpers.it("retains the header comment when its final field is cleared", function()
+		for _, header in ipairs({"[owned]# keep", "[owned]  # keep"}) do
+			local source = header .. "\r\nvalue = 2\r\n[next]\r\nvalue = 3\r\n"
+			local expected = header .. "\r\n[next]\r\nvalue = 3\r\n"
+			local patched = assert(Editor.patch_table_field(source, "[owned]", "value", nil,
+				{remove_empty_section = true}))
+			helpers.assert_eq(patched, expected)
+			local decoded = assert(Codec.decode(patched))
+			helpers.assert_eq(decoded.next.value, 3)
+		end
+	end)
+
 	helpers.it("leaves a quoted key containing an equals sign and other sections untouched", function()
 		local source = "[_meta]\n\"delay=other\" = 4\n'delay' = 250\n"
 			.. "[other]\ndelay = 99\n"

@@ -221,6 +221,7 @@ function M.new(opts)
 	local generation = 0
 	-- Manual answers survive channel changes, but not a retired schedule owner.
 	local manual_generation = 0
+	local check_sequence = 0
 
 	--- The check record, loaded once; a missing install seed is created.
 	local function load_record()
@@ -352,8 +353,9 @@ function M.new(opts)
 	end
 
 	--- Records one completed check and announces a new release once.
-	local function complete(ok, release)
+	local function complete(ok, release, request_sequence)
 		in_flight = false
+		if request_sequence ~= check_sequence then return end
 		local state = Schedule.record_check(load_record(), opts.now(), ok)
 		save_record(state)
 		Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
@@ -413,7 +415,7 @@ function M.new(opts)
 	--- @return string|nil body
 	--- @return string|nil reason
 	--- @return string|nil detail
-	local function read_response(result, request_copy)
+	local function read_response(result, request_copy, may_store)
 		local status = type(result) == "table" and tonumber(result.status) or 0
 		if status == 304 and request_copy then
 			Logger.debug(LOG, "Release list unchanged (304); reusing the stored copy.")
@@ -430,7 +432,7 @@ function M.new(opts)
 					return nil, "parse_failed", "a release without a tag"
 				end
 			end
-			store_list_cache(decoded, header_value(result.headers, "etag"))
+			if may_store ~= false then store_list_cache(decoded, header_value(result.headers, "etag")) end
 			return result.body
 		end
 		local limited = RateLimit.exhausted_detail(status, header_value(result.headers, "x-ratelimit-remaining"),
@@ -471,6 +473,8 @@ function M.new(opts)
 	local function dispatch(channel)
 		in_flight = true
 		local request_generation = generation
+		check_sequence = check_sequence + 1
+		local request_sequence = check_sequence
 		local completed = false
 		local request_copy = list_cache
 		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(request_copy), function(result)
@@ -481,7 +485,7 @@ function M.new(opts)
 				Logger.info(LOG, "Discarded a completed check for the previous channel '%s'.", channel)
 				return
 			end
-			local body, reason, detail = read_response(result, request_copy)
+			local body, reason, detail = read_response(result, request_copy, request_sequence == check_sequence)
 			if not body and reason == "no_connection" then
 				Logger.info(LOG, "Background check: the GitHub API gave no list (%s); reading the Atom feed.", detail)
 				read_feed(opts.http, detail, function(feed_body, feed_detail)
@@ -493,10 +497,10 @@ function M.new(opts)
 					end
 					if not feed_body then
 						Logger.warn(LOG, "Background check failed: %s.", feed_detail)
-						complete(false, nil)
+						complete(false, nil, request_sequence)
 						return
 					end
-					complete(true, read_list(feed_body, channel))
+					complete(true, read_list(feed_body, channel), request_sequence)
 				end)
 				return
 			end
@@ -506,15 +510,15 @@ function M.new(opts)
 				else
 					Logger.warn(LOG, "Background check failed: %s.", detail)
 				end
-				complete(false, nil)
+				complete(false, nil, request_sequence)
 				return
 			end
-			complete(true, read_list(body, channel))
+			complete(true, read_list(body, channel), request_sequence)
 		end)
 		if (not ok_dispatch or sent ~= true) and not completed and active and request_generation == generation then
 			completed = true
 			Logger.error(LOG, "The update-check request was not dispatched: %s.", tostring(sent))
-			complete(false, nil)
+			complete(false, nil, request_sequence)
 		end
 	end
 
@@ -561,6 +565,7 @@ function M.new(opts)
 	--- @return boolean dispatched
 	function owner.check_now(channel, on_result)
 		local request_generation = manual_generation
+		local request_sequence
 		local base = { channel = channel, current = current_version() }
 		local answered = false
 		local function answer(result)
@@ -571,7 +576,9 @@ function M.new(opts)
 		end
 		local function fail(reason, detail)
 			if answered or request_generation ~= manual_generation then return end
-			save_record(Schedule.record_check(load_record(), opts.now(), false))
+			if request_sequence == check_sequence then
+				save_record(Schedule.record_check(load_record(), opts.now(), false))
+			end
 			Logger.warn(LOG, "Manual update check failed on channel '%s': %s.", tostring(channel), tostring(detail))
 			answer(CheckResult.failure(base, reason, detail))
 		end
@@ -581,6 +588,8 @@ function M.new(opts)
 			answer(CheckResult.failure(base, "unexpected", "not a registry channel"))
 			return false
 		end
+		check_sequence = check_sequence + 1
+		request_sequence = check_sequence
 		--- Answers the window from one release list, the API's or the feed's.
 		--- @param body string Release list JSON.
 		local function answer_from(body)
@@ -588,6 +597,10 @@ function M.new(opts)
 				registry = Updater.channels(), channel = channel,
 				current = base.current, installed = installed_channel(),
 			})
+			if request_sequence ~= check_sequence then
+				answer(result)
+				return
+			end
 			local state = Schedule.record_check(load_record(), opts.now(), true)
 			-- A channel switched while the request ran leaves the About row to the
 			-- new channel, as dispatch() does: the window still gets its answer
@@ -609,7 +622,7 @@ function M.new(opts)
 		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(request_copy), function(response)
 			if api_completed or answered or request_generation ~= manual_generation then return end
 			api_completed = true
-			local body, reason, detail = read_response(response, request_copy)
+			local body, reason, detail = read_response(response, request_copy, request_sequence == check_sequence)
 			if body then return answer_from(body) end
 			if reason ~= "no_connection" then return fail(reason, detail) end
 			Logger.info(LOG, "Manual update check on channel '%s': the GitHub API gave no list (%s); reading the Atom feed.",

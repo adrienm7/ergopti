@@ -19,6 +19,23 @@ local owned_registry_count = Fixture.owned_registry_count
 
 
 helpers.describe("TimerScheduler adapter — every()", function()
+	helpers.it("rejects invalid callbacks without arming either timer type (timer-invalid-callback)", function()
+		local invalid_callbacks = { false, "not a callback", {} }
+		for _, method in ipairs({ "after", "every" }) do
+			for index = 1, 4 do
+				local invalid = invalid_callbacks[index]
+				local timer_stub = make_timer_stub()
+				local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+				local handle, committed = TS[method](1, invalid)
+				helpers.assert_eq(committed, false, method .. " must not claim an unusable callback")
+				helpers.assert_true(handle.fired)
+				helpers.assert_nil(handle.timer)
+				helpers.assert_eq(#timer_stub._pending, 0)
+				helpers.assert_eq(TS.activeCount(), 0)
+			end
+		end
+	end)
+
 	helpers.it("does not register a nil repeating timer as live", function()
 		local timer_stub = make_timer_stub()
 		timer_stub.new = function() return nil end

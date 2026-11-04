@@ -518,6 +518,20 @@ end)
 -- ======================================================
 
 helpers.describe("system_pixel parent scopes", function()
+	helpers.it("refuses an unreadable mouse position without retaining the capture", function()
+		for _, pos in ipairs({ {}, { x = 0/0, y = 1 }, { x = math.huge, y = 1 }, { x = 1e100, y = 1 } }) do
+			local subject, fixture = fresh_pixel_owner()
+			hs.mouse.absolutePosition = function() return pos end
+			local ok, accepted = pcall(subject.copy_pixel_color)
+			helpers.assert_eq(ok, true)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(subject.has_pending_pixel_action(), false)
+			helpers.assert_eq(#fixture.tasks, 0)
+			helpers.assert_eq(next(fixture.existing_temp_paths), nil)
+			hs.mouse.absolutePosition = function() return { x = 10, y = 20 } end
+			helpers.assert_eq(subject.copy_pixel_color(), true, "a later valid position can start a capture")
+		end
+	end)
 	for _, action in ipairs({ "copy_pixel_color", "interactive_screenshot" }) do
 		helpers.it(action .. " retains a file acquired during a reentrant pause", function()
 			local subject, fixture = fresh_pixel_owner()

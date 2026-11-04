@@ -441,11 +441,13 @@ end
 local function start_download(ctx, backend, name, custom)
 	local key = pending_key(backend, name)
 	if _pending[key] then return false end
+	local owner = { backend = backend, name = name }
 	local function settled()
+		if _pending[key] ~= owner then return end
 		_pending[key] = nil
 		M.refresh()
 	end
-	_pending[key] = { backend = backend, name = name }
+	_pending[key] = owner
 	Logger.info(LOG, "Model download requested via the selector page: %s/%s.", backend, name)
 	local ok, accepted
 	if backend == "mlx" then
@@ -459,7 +461,7 @@ local function start_download(ctx, backend, name, custom)
 		ok, accepted = Logger.callback(LOG, "Ollama model download", ctx.models_mgr.pull_ollama_model, tag, settled, settled)
 	end
 	if not ok or accepted ~= true then
-		_pending[key] = nil
+		if _pending[key] == owner then _pending[key] = nil end
 		Logger.error(LOG, "Model download of %s/%s was refused.", backend, name)
 		return false
 	end

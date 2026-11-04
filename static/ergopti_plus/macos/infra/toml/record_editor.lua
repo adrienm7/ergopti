@@ -220,7 +220,10 @@ function M.patch_table_field(source, target_header, field, encoded_value, option
 
 	if not new_line and scan.header_line
 		and options and options.remove_empty_section == true
-		and not section_has_value(lines, scan.header_line) then
+		and not section_has_value(lines, scan.header_line)
+		-- A header can carry user-authored context. Retaining a harmless empty
+		-- table preserves that text, including quoted keys containing '#'.
+		and not lines[scan.header_line].text:find("#", 1, true) then
 		table.remove(lines, scan.header_line)
 	end
 
