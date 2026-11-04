@@ -165,6 +165,10 @@ local function judge(output, action, wizard)
 		problems[#problems + 1] = "the saved delimiters, unknown fields or comment did not survive"
 	end
 	if action == "delimiters_edit" then
+		if facts.delimiter_rows_greyed_while_off ~= "true" then
+			problems[#problems + 1] = "the delimiter rows were not greyed while Hotstrings was off, or its enable row "
+				.. "did not turn it on: " .. tostring(facts.delimiter_rows_greyed_while_off)
+		end
 		if facts.delimiter_toggled_off ~= "true" or facts.delimiter_deleted ~= "true" then
 			problems[#problems + 1] = string.format("the tray's toggle or Delete row did not commit (toggled_off=%s deleted=%s)",
 				tostring(facts.delimiter_toggled_off), tostring(facts.delimiter_deleted))

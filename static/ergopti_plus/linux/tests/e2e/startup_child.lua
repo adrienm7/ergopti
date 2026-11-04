@@ -276,6 +276,21 @@ local function delimiter_rows(label)
 	return search(published_menu, false)
 end
 
+--- The Hotstrings category's own enable row in the published tray: the one
+--- row of that submenu an off category leaves clickable.
+--- @return table|nil row
+local function hotstrings_switch()
+	local title = require("infra.i18n").get("menu.hotstrings.enable")
+	local function search(items)
+		for _, row in ipairs(items or {}) do
+			if type(row) == "table" and row.title == title and type(row.fn) == "function" then return row end
+			local found = type(row) == "table" and search(row.menu) or nil
+			if found then return found end
+		end
+	end
+	return search(published_menu)
+end
+
 -- Long enough for every deferred start-up step (the longest, the AI warm-up,
 -- waits 2 s; the error window 0.25 s), short enough to keep the suite fast.
 local SOAK_SECONDS = 30
@@ -427,6 +442,16 @@ package.preload["adapters.event_loop"] = function()
 				return true
 			end
 			if ACTION == "delimiters_edit" then
+				-- The seed enables no hotstring section, so the category reads off
+				-- and its submenu is greyed but for its enable row (b76cfff999): the
+				-- delimiter rows are unreachable until the user turns Hotstrings on
+				-- from that row, as here.
+				local switch = hotstrings_switch()
+				local greyed = delimiter_rows("¤") == nil and switch ~= nil and switch.checked ~= true
+				if switch then click(switch) end
+				local enabled = hotstrings_switch()
+				record("FACT", "delimiter_rows_greyed_while_off=" .. tostring(greyed
+					and enabled ~= nil and enabled.checked == true))
 				record("FACT", "delimiter_toggled_off=" .. tostring(click_toggle() and not Terminators.is_terminator("¤")
 					and saved_state() == false))
 				local _, removal = delimiter_rows("µ")
