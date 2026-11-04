@@ -431,6 +431,29 @@ os.getenv = original_getenv
 -- The macOS 26 TIS probe showed that the same bundle in both folders makes macOS load both copies
 -- and renumber one; a user install must not write the second copy.
 helpers.describe("layout_install: one copy per bundle (composer-macos26)", function()
+	helpers.it("checks the user scope before accepting an existing system copy", function()
+		local old_dir, old_fs, old_popen = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"], io.popen
+		local readable = true
+		package.loaded["adapters.file_system"] = { classify_no_follow = function() return { mode = "directory" }, "ok" end }
+		package.loaded["infra.fs_dir"] = { try_entries = function(dir)
+			if dir:find("/Library/Keyboard Layouts", 1, true) == 1 then return { "Ergopti_v1.0.0.bundle" }, true end
+			return {}, readable
+		end }
+		io.popen = function() return nil end
+		local ok, err = xpcall(function()
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				fs = { attributes = function() return { mode = "file" } end },
+			})
+			helpers.assert_eq(install.install_user("/tmp/bundles", "Ergopti_v1.0.0.bundle"), true)
+			readable = false
+			local installed, reason = install.install_user("/tmp/bundles", "Ergopti_v1.0.0.bundle")
+			helpers.assert_eq(installed, false)
+			helpers.assert_eq(reason, "other_scope_unverified")
+		end, debug.traceback)
+		package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"], io.popen = old_dir, old_fs, old_popen
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("writes no user copy of a bundle the system folder already holds", function()
 		with_fake_bundle_listing("Ergopti_v1.0.0.bundle", function()
 			local commands = {}
@@ -441,7 +464,9 @@ helpers.describe("layout_install: one copy per bundle (composer-macos26)", funct
 				end,
 				fs = { attributes = function() return { mode = "file" } end },
 			})
-			helpers.assert_eq(install.install_user("/tmp/bundles", "Ergopti_v1.0.0.bundle"), true)
+			local installed, reason = install.install_user("/tmp/bundles", "Ergopti_v1.0.0.bundle")
+			helpers.assert_eq(installed, false)
+			helpers.assert_eq(reason, "other_scope_occupied")
 			for _, command in ipairs(commands) do
 				helpers.assert_true(command:find("cp -R", 1, true) == nil, "no copy is staged: " .. command)
 			end
