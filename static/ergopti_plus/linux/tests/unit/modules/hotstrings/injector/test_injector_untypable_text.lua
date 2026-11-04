@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local original_layout = package.loaded["adapters.keyboard_layout"]
 
 
 -- A layout with no Spanish letters: exactly what a French or US keymap gives a
@@ -671,3 +672,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 	end)
 
 end)
+
+-- Several cases replace the layout planner; never leave their test function in
+-- the module cache for a later suite to observe.
+package.loaded["adapters.keyboard_layout"] = original_layout
