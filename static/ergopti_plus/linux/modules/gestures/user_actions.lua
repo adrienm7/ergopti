@@ -117,8 +117,9 @@ end
 --- @param text string The captured output.
 --- @param output string none, type or copy.
 --- @param max_typed number Longest text typed, in code points (send_keys.json).
+--- @param publication table|nil Destination retained when the command started.
 --- @return boolean delivered
-function M.deliver_output(text, output, max_typed)
+function M.deliver_output(text, output, max_typed, publication)
 	if output == "none" then return true end
 	local value = tostring(text or ""):gsub("[\r\n]+$", "")
 	if value == "" then
@@ -141,7 +142,14 @@ function M.deliver_output(text, output, max_typed)
 		M.notify("user_actions.output_too_long_to_type", max_typed)
 		return false
 	end
-	local typed = require("modules.shortcuts.manager").insert_text(value) == true
+	if publication then
+		local checked, current = pcall(publication.current)
+		if not checked or current ~= true then
+			Logger.warn(LOG, "Command output was not typed: its original destination changed.")
+			return false
+		end
+	end
+	local typed = require("modules.shortcuts.manager").insert_text(value, publication) == true
 	if not typed then Logger.error(LOG, "The output of a run_command binding could not be typed.") end
 	return typed
 end
@@ -216,7 +224,7 @@ end
 --- @param answer table ShellRunner.run_async's result.
 --- @param fields table The decoded parameter.
 --- @param max_typed number Longest text typed, in code points.
-local function finish_hidden(answer, fields, max_typed)
+local function finish_hidden(answer, fields, max_typed, publication)
 	if answer.timed_out then
 		Logger.error(LOG, "The command of a run_command binding was stopped after %d ms.", M.COMMAND_TIMEOUT_MS)
 		M.notify("user_actions.command_timeout", string.format("%.0f", M.COMMAND_TIMEOUT_MS / 1000))
@@ -237,7 +245,7 @@ local function finish_hidden(answer, fields, max_typed)
 		return
 	end
 	Logger.info(LOG, "The command of a run_command binding exited with code 0.")
-	M.deliver_output(answer.stdout, fields.output, max_typed)
+	M.deliver_output(answer.stdout, fields.output, max_typed, publication)
 end
 
 --- Runs a decoded run_command parameter.
@@ -265,13 +273,22 @@ function M.run_command(fields, max_typed)
 		end
 		return started
 	end
+	local publication
+	if fields.output == "type" then
+		local shortcuts = require("modules.shortcuts.manager")
+		publication = shortcuts.capture_text_destination()
+		if not publication or _paused then
+			Logger.warn(LOG, "run_command refused: no retained text destination.")
+			return false
+		end
+	end
 	local token, finished = {}, false
 	local handle, refusal = ShellRunner.run_async(M.SHELL_BIN, M.shell_args(fields.command),
 		{ timeout_ms = M.COMMAND_TIMEOUT_MS, max_output_bytes = M.MAX_OUTPUT_BYTES }, function(answer)
 			finished = true
 			_handles[token] = nil
 			publish_settled()
-			finish_hidden(answer, fields, max_typed)
+			finish_hidden(answer, fields, max_typed, publication)
 		end)
 	if not handle then
 		Logger.error(LOG, "The command of a run_command binding could not start: %s.", tostring(refusal))

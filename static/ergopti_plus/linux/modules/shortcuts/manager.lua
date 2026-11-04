@@ -276,8 +276,12 @@ function M.resolve_wrap_pair(value)
 	return WrapPair.parse(value, WRAP_PAIR_LIST)
 end
 
---- Types a text at the text destination focused now, as send_text does: the
---- run_command and its output use it once their child has finished.
+--- Retains the current destination for an asynchronous text producer.
+--- @return table|nil publication
+function M.capture_text_destination() return capture_text_destination() end
+
+--- Types text at the retained destination, or captures the current one for a
+--- synchronous caller.
 --- @param text string Text to type.
 --- @param publication table|nil A destination already captured (send_text).
 --- @return boolean typed
