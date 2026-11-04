@@ -61,11 +61,14 @@ return {
 	},
 	migration = {
 		backup_suffix = ".before-folder-migration",
+		backup_folder = "before-folder-migration",
 		macos = {
 			legacy_support_relative = "Library/Application Support/ErgoptiPlus",
 			moved_support_entries = { "paths.toml", "RemapRuntime" },
 			legacy_config_relative = ".config/ergopti_plus",
 			legacy_logs_relative = "Library/Logs/ergopti_plus",
+			legacy_cache_relative = "Library/Caches/ergopti_plus",
+			legacy_control_relative = "Library/Application Support/ergopti_plus",
 		},
 		linux = {
 			legacy_folder = "ergopti_plus",

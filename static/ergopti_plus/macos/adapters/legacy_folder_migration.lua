@@ -4,11 +4,13 @@
 --- MODULE: macOS Legacy Folder Migration
 --- DESCRIPTION:
 --- Moves, once at boot, what the builds before the single folder name kept
---- outside ~/Library/Application Support/Ergopti: paths.toml and the downloaded
---- remap runtime of ~/Library/Application Support/ErgoptiPlus, and the default
---- configuration folder ~/.config/ergopti_plus (now Ergopti/config). A
---- paths.toml that named an old default folder is rewritten to the new one,
---- after a backup of its previous text.
+--- outside the Ergopti folders: paths.toml and the downloaded remap runtime of
+--- the old support folder, the old default configuration folder (now
+--- Ergopti/config), and every entry of the old logs, cache and reload control
+--- folders. An entry whose destination is taken goes to the backup folder of
+--- the support root. A paths.toml that named an old default folder is
+--- rewritten to the new one, after a backup of its previous text. The old names
+--- are those of app_dirs `migration.macos`.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Before paths.toml: init.lua runs this before infra/config_paths reads
@@ -18,9 +20,9 @@
 ---    legacy_folder_migration.lua; this adapter resolves the folders from
 ---    app_dirs and owns the native effects (hs.fs and os.rename).
 --- 3. What Stays: the owned Karabiner runtime's folders keep their compiled name
----    (app_dirs owned_runtime); runtime state the launcher recreates (locks, the
----    lease guardian, the PTY sources, the reload control) and the old logs and
----    caches are not moved. docs/tooling/one-folder-name-handoff.md lists them.
+---    (app_dirs owned_runtime), and the runtime state of the old support folder
+---    (locks, the lease guardian, the PTY sources) stays for a build that may
+---    still run until the next login.
 --- 4. Maintainer Machines Only: no build was published with the old folders;
 ---    this goes once the maintainer's machines are moved.
 --- ==============================================================================
@@ -96,17 +98,26 @@ end
 -- ================================
 -- ================================
 
---- The moves of one home folder.
+--- The moves of one home folder. An old entry whose destination is taken goes
+--- to <support>/<backup folder>/<its path below the home folder>.
 --- @param home string Absolute home folder, without a trailing slash.
 --- @return table plan
 --- @return string support The new support root.
 function M.plan(home)
 	local legacy = AppDirs.migration.macos
 	local support = home .. "/" .. AppDirs.macos.support_relative
+	local backup = support .. "/" .. AppDirs.migration.backup_folder
+	local function merge(old_relative, new_relative, entries)
+		return { from_dir = home .. "/" .. old_relative, to_dir = home .. "/" .. new_relative,
+			backup_dir = backup .. "/" .. old_relative, entries = entries }
+	end
 	local plan = {
-		{ from_dir = home .. "/" .. legacy.legacy_support_relative, to_dir = support,
-			entries = legacy.moved_support_entries },
-		{ from = home .. "/" .. legacy.legacy_config_relative, to = home .. "/" .. AppDirs.config.macos_relative },
+		merge(legacy.legacy_support_relative, AppDirs.macos.support_relative, legacy.moved_support_entries),
+		{ from = home .. "/" .. legacy.legacy_config_relative, to = home .. "/" .. AppDirs.config.macos_relative,
+			backup = backup .. "/" .. legacy.legacy_config_relative },
+		merge(legacy.legacy_logs_relative, AppDirs.macos.relative),
+		merge(legacy.legacy_cache_relative, AppDirs.macos.cache_relative),
+		merge(legacy.legacy_control_relative, AppDirs.macos.support_relative),
 	}
 	return plan, support
 end

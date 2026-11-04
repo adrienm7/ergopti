@@ -5,9 +5,10 @@
 --- DESCRIPTION:
 --- Replays the shared migration contract, then runs the macOS plan over an
 --- in-memory home: paths.toml and the remap runtime leave the old support
---- folder, the old default configuration folder becomes Ergopti/config, the
---- owned runtime's karabiner folder stays, and paths.toml is rewritten after a
---- backup. init.lua runs it before config_paths reads paths.toml. Nothing here
+--- folder, the old default configuration folder becomes Ergopti/config, the old
+--- logs, cache and control folders merge (a clash goes to the backup folder),
+--- the owned runtime's karabiner folder stays, and paths.toml is rewritten
+--- after a backup. init.lua runs it before config_paths reads paths.toml. Nothing here
 --- touches a real user folder.
 --- ==============================================================================
 
@@ -39,11 +40,14 @@ local function ports_with_files(tree, files)
 	ports.rename = function(from, to)
 		local ok, why = rename(from, to)
 		if ok then
+			-- Collected first: adding keys while pairs walks a table is undefined.
+			local moved = {}
 			for path, text in pairs(files) do
-				if path == from or path:sub(1, #from + 1) == from .. "/" then
-					files[path] = nil
-					files[to .. path:sub(#from + 1)] = text
-				end
+				if path == from or path:sub(1, #from + 1) == from .. "/" then moved[path] = text end
+			end
+			for path, text in pairs(moved) do
+				files[path] = nil
+				files[to .. path:sub(#from + 1)] = text
 			end
 		end
 		return ok, why
@@ -81,12 +85,55 @@ helpers.describe("macOS legacy folder migration", function()
 			"the owned runtime's configuration home keeps its compiled folder")
 		helpers.assert_true(after:find(OLD .. "/launcher.lock", 1, true) ~= nil, "runtime state is not moved")
 		helpers.assert_eq(#report.moved, 3)
+		helpers.assert_eq(#report.backed_up, 0)
 		helpers.assert_eq(report.paths_file, "rewritten")
 		helpers.assert_eq(files[NEW .. "/paths.toml"],
 			'ConfigDirPath = "' .. HOME .. "/" .. AppDirs.config.macos_relative .. '/"\nLogsDirPath = ""\n')
 		helpers.assert_eq(files[NEW .. "/paths.toml" .. AppDirs.migration.backup_suffix],
 			'ConfigDirPath = "' .. OLD_CONFIG .. '/"\nLogsDirPath = ""\n', "the previous text is kept")
 		helpers.assert_true(#logged >= 4, "every move and the rewrite are logged")
+	end)
+
+	helpers.it("merges the old logs, cache and control folders, backing up what clashes (legacy-folder-migration-macos-merge)",
+		function()
+		local LOGS = HOME .. "/" .. AppDirs.macos.relative
+		local OLD_LOGS = HOME .. "/" .. AppDirs.migration.macos.legacy_logs_relative
+		local OLD_CACHE = HOME .. "/" .. AppDirs.migration.macos.legacy_cache_relative
+		local OLD_CONTROL = HOME .. "/" .. AppDirs.migration.macos.legacy_control_relative
+		local BACKUP = NEW .. "/" .. AppDirs.migration.backup_folder
+		local ports, snapshot = ports_with_files({
+			OLD_LOGS .. "/",
+			OLD_CACHE .. "/",
+			OLD_CONTROL .. "/",
+			OLD_LOGS .. "/ErgoptiPlus_2026-11-01.log",
+			OLD_LOGS .. "/" .. AppDirs.macos.launcher_log,
+			LOGS .. "/" .. AppDirs.macos.launcher_log,
+			OLD_CACHE .. "/metrics/day.bin",
+			OLD_CONTROL .. "/control/token",
+		}, {})
+		local logged = {}
+		local logger = {
+			info = function(_, fmt, ...) logged[#logged + 1] = fmt:format(...) end,
+			warn = function(_, fmt, ...) logged[#logged + 1] = "WARN " .. fmt:format(...) end,
+		}
+		local report = Migration.run(logger, { home = HOME, ports = ports })
+		local after = " " .. table.concat(snapshot(), " ") .. " "
+		helpers.assert_true(after:find(LOGS .. "/ErgoptiPlus_2026-11-01.log ", 1, true) ~= nil, "an old log moved")
+		helpers.assert_true(after:find(BACKUP .. "/" .. AppDirs.migration.macos.legacy_logs_relative .. "/"
+			.. AppDirs.macos.launcher_log .. " ", 1, true) ~= nil, "the clashing launcher log went to the backup")
+		helpers.assert_true(after:find(HOME .. "/" .. AppDirs.macos.cache_relative .. "/metrics/day.bin ", 1, true) ~= nil,
+			"the cache merged")
+		helpers.assert_true(after:find(NEW .. "/control/token ", 1, true) ~= nil, "the control folder merged")
+		helpers.assert_true(after:find(OLD_LOGS, 1, true) == nil and after:find(OLD_CACHE, 1, true) == nil
+			and after:find(OLD_CONTROL .. "/", 1, true) == nil, "every merged old folder is gone")
+		helpers.assert_eq(#report.backed_up, 1)
+		helpers.assert_eq(#report.kept, 0)
+		helpers.assert_eq(#report.removed, 3)
+		local warned = false
+		for _, line in ipairs(logged) do
+			if line:find("WARN", 1, true) == 1 and line:find(BACKUP, 1, true) then warned = true end
+		end
+		helpers.assert_true(warned, "the backup is logged as a warning")
 	end)
 
 	helpers.it("names the owned runtime folder apart from the Ergopti root", function()

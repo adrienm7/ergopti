@@ -5,8 +5,9 @@
 --- DESCRIPTION:
 --- Replays the shared migration contract, then runs the Linux plan over an
 --- in-memory home: the config, state and data folders of the old name merge
---- into the ergopti folder of the same XDG base, a clashing entry stays where it
---- was, the cache folder is created and the daemon runs it before its logger.
+--- into the ergopti folder of the same XDG base, a clashing entry goes to the
+--- backup folder of that base, the cache folder is created and the daemon runs
+--- it before its logger.
 --- Nothing here touches a real user folder.
 --- ==============================================================================
 
@@ -38,6 +39,9 @@ end
 helpers.describe("Linux legacy folder migration", function()
 	helpers.it("merges each XDG base's old folder into its ergopti folder (legacy-folder-migration-linux)", function()
 		local ports, snapshot = Contract.memory_ports({
+			"/home/u/.config/" .. LEGACY .. "/",
+			"/home/u/.local/state/" .. LEGACY .. "/",
+			"/home/u/.local/share/" .. LEGACY .. "/",
 			"/home/u/.config/" .. LEGACY .. "/storage.json",
 			"/home/u/.config/" .. LEGACY .. "/api_keys.json",
 			"/home/u/.config/" .. NAME .. "/config.toml",
@@ -49,8 +53,10 @@ helpers.describe("Linux legacy folder migration", function()
 		local after = table.concat(snapshot(), " ")
 		helpers.assert_true(after:find("/home/u/.config/" .. NAME .. "/storage.json", 1, true) ~= nil,
 			"the bootstrap storage moved beside the configuration")
-		helpers.assert_true(after:find("/home/u/.config/" .. LEGACY .. "/api_keys.json", 1, true) ~= nil,
-			"a clashing entry stays in the old folder")
+		helpers.assert_true(after:find("/home/u/.config/" .. NAME .. "/" .. AppDirs.migration.backup_folder .. "/"
+			.. LEGACY .. "/api_keys.json", 1, true) ~= nil, "a clashing entry goes to the backup folder")
+		helpers.assert_true(after:find("/home/u/.config/" .. LEGACY, 1, true) == nil,
+			"the old configuration folder is gone")
 		helpers.assert_true(after:find("/home/u/.local/state/" .. NAME .. "/logs/a.log", 1, true) ~= nil,
 			"the logs moved with the state folder")
 		helpers.assert_true(after:find("/home/u/.local/share/" .. NAME .. "/runtimes/ollama/x", 1, true) ~= nil,
@@ -59,11 +65,12 @@ helpers.describe("Linux legacy folder migration", function()
 			"an emptied old folder is removed")
 		helpers.assert_true(after:find("/home/u/.cache/" .. NAME .. "/", 1, true) ~= nil, "the cache folder exists")
 		helpers.assert_eq(#report.moved, 3, "storage, logs and runtimes moved")
-		helpers.assert_eq(#report.kept, 1, "one entry kept")
+		helpers.assert_eq(#report.backed_up, 1, "one entry backed up")
+		helpers.assert_eq(#report.kept, 0, "nothing left behind")
 		helpers.assert_true(report.cache_ready, "cache folder reported ready")
 	end)
 
-	helpers.it("logs every move and every kept entry", function()
+	helpers.it("logs every move, backup and kept entry", function()
 		local lines = {}
 		local logger = {
 			info = function(_, fmt, ...) lines[#lines + 1] = "INFO " .. fmt:format(...) end,
@@ -71,13 +78,15 @@ helpers.describe("Linux legacy folder migration", function()
 		}
 		Migration.log(logger, {
 			moved = { { from = "/a", to = "/b" } },
-			kept = { { from = "/c", to = "/d", reason = "destination_exists" } },
+			backed_up = { { from = "/e", to = "/bak/e", taken = "/f" } },
+			kept = { { from = "/c", to = "/d", reason = "backup_exists" } },
 			removed = {},
 			cache_ready = true,
 		})
-		helpers.assert_eq(#lines, 2)
+		helpers.assert_eq(#lines, 3)
 		helpers.assert_true(lines[1]:find("^INFO Moved legacy folder entry /a to /b") ~= nil, lines[1])
-		helpers.assert_true(lines[2]:find("^WARN Kept legacy folder entry /c") ~= nil, lines[2])
+		helpers.assert_true(lines[2]:find("^WARN Moved legacy folder entry /e to the backup /bak/e") ~= nil, lines[2])
+		helpers.assert_true(lines[3]:find("^WARN Kept legacy folder entry /c") ~= nil, lines[3])
 	end)
 
 	helpers.it("runs before the logger sink and the bootstrap storage (legacy-folder-migration-boot-order)", function()

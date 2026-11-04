@@ -39,10 +39,13 @@ const {
 	prepareStartupPersonalInclude
 } = require('./lib/ahk-startup-fixture.cjs');
 const { createStartupDiagnostics } = require('./lib/ahk-startup-diagnostics.cjs');
+const AppDirs = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const ENTRY = path.join(WINDOWS, 'ErgoptiPlus.ahk');
+// The smoke tree mirrors %LOCALAPPDATA%: its logs are <tree>\<logs.windows segments>.
+const SMOKE_LOGS = AppDirs.segments('logs.windows', 'windows');
 const CORPUS = path.join(
 	ROOT,
 	'static',
@@ -147,7 +150,7 @@ function realisticPersonalHotstrings(file) {
  * @returns {string} The missing evidence, or '' when both lines were logged.
  */
 function aiHotkeyResumeProblem(configRoot) {
-	const logs = path.join(configRoot, 'ergopti_plus', 'logs');
+	const logs = path.join(configRoot, ...SMOKE_LOGS);
 	let text = '';
 	if (fs.existsSync(logs))
 		for (const name of fs.readdirSync(logs))
@@ -167,7 +170,7 @@ function aiHotkeyResumeProblem(configRoot) {
  * @returns {string}
  */
 function logText(configRoot) {
-	const logs = path.join(configRoot, 'ergopti_plus', 'logs');
+	const logs = path.join(configRoot, ...SMOKE_LOGS);
 	if (!fs.existsSync(logs)) return '';
 	return fs
 		.readdirSync(logs)
@@ -285,7 +288,7 @@ function fail(message) {
  * @returns {string[]}
  */
 function loggedErrors(configRoot) {
-	const logs = path.join(configRoot, 'ergopti_plus', 'logs');
+	const logs = path.join(configRoot, ...SMOKE_LOGS);
 	if (!fs.existsSync(logs)) return [];
 	const found = [];
 	for (const name of fs.readdirSync(logs)) {
@@ -516,7 +519,7 @@ function configTypesProblem(configRoot, pid, nonce) {
 function logTail(configRoot) {
 	// Under the smoke, boot puts the default logs folder at
 	// <smoke dir>\<AppDirsWindowsLogsRelative()>.
-	const logs = path.join(configRoot, 'ergopti_plus', 'logs');
+	const logs = path.join(configRoot, ...SMOKE_LOGS);
 	if (!fs.existsSync(logs)) return '';
 	const files = fs
 		.readdirSync(logs)
@@ -825,7 +828,7 @@ async function main() {
 						!/Refusing full-state persistence|identical line|error window for 'ConfigIO'/.test(line)
 				);
 				if (foreign.length > 0) return fail(`${fixture}: ${foreign[0]}`);
-				const logs = path.join(configRoot, 'ergopti_plus', 'logs');
+				const logs = path.join(configRoot, ...SMOKE_LOGS);
 				const text = fs
 					.readdirSync(logs)
 					.filter((name) => name.endsWith('.log'))

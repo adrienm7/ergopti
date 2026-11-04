@@ -97,13 +97,15 @@ function M.run(helpers, shared_root)
 	local corpus = Json.decode(read(shared_root .. "/tests/corpus/paths/legacy_folder_migration_vectors.json"))
 
 	helpers.describe("Shared legacy folder migration", function()
-		helpers.it("moves what is free, keeps what clashes (legacy-folder-migration-moves)", function()
-			helpers.assert_eq(#corpus.moves, 7, "complete move vectors")
+		helpers.it("moves what is free, backs up what clashes (legacy-folder-migration-moves)", function()
+			helpers.assert_eq(#corpus.moves, 9, "complete move vectors")
 			for _, row in ipairs(corpus.moves) do
 				local ports, snapshot = M.memory_ports(row.tree)
 				local report = Migration.apply(row.plan, ports)
 				helpers.assert_eq(table.concat(snapshot(), " "), table.concat(row.after, " "), row.name)
 				helpers.assert_eq(#report.moved, row.moved, row.name .. " moved")
+				helpers.assert_eq(#report.backed_up, row.backed_up, row.name .. " backed up")
+				helpers.assert_eq(#report.removed, row.removed, row.name .. " removed")
 				local reasons = {}
 				for _, kept in ipairs(report.kept) do reasons[#reasons + 1] = kept.reason end
 				helpers.assert_eq(table.concat(reasons, ","), table.concat(row.kept_reasons, ","), row.name .. " kept")
@@ -137,9 +139,33 @@ function M.run(helpers, shared_root)
 			helpers.assert_eq(Migration.rewrite_paths_file("/r/none.toml", rewrites, ".bak", ports), "absent")
 		end)
 
-		helpers.it("refuses a plan without its ports", function()
+		helpers.it("refuses a plan without its ports or its backup", function()
 			helpers.assert_true(not pcall(Migration.apply, {}, { exists = function() return false end }),
 				"a missing port stops the migration")
+			local ports = M.memory_ports({})
+			helpers.assert_true(not pcall(Migration.apply, { { from = "/h/old", to = "/h/new" } }, ports),
+				"a move without its backup path stops the migration")
+			helpers.assert_true(not pcall(Migration.apply, { { from_dir = "/h/old", to_dir = "/h/new" } }, ports),
+				"a merge without its backup folder stops the migration")
+		end)
+
+		helpers.it("logs every outcome once (legacy-folder-migration-log)", function()
+			local lines = {}
+			local logger = {
+				info = function(_, fmt, ...) lines[#lines + 1] = "INFO " .. fmt:format(...) end,
+				warn = function(_, fmt, ...) lines[#lines + 1] = "WARN " .. fmt:format(...) end,
+			}
+			Migration.log_report(logger, "test", {
+				moved = { { from = "/a", to = "/b" } },
+				backed_up = { { from = "/c", to = "/bak/c", taken = "/d" } },
+				kept = { { from = "/e", to = "/bak/e", reason = "backup_exists" } },
+				removed = { "/old" },
+				paths_file = "rewritten",
+			})
+			helpers.assert_eq(#lines, 5, "one line per outcome")
+			helpers.assert_true(lines[2]:find("WARN", 1, true) == 1 and lines[2]:find("/bak/c", 1, true) ~= nil,
+				"a backed-up entry is a warning naming its backup")
+			helpers.assert_true(lines[3]:find("a backup already exists", 1, true) ~= nil, "a kept entry says why")
 		end)
 	end)
 end
