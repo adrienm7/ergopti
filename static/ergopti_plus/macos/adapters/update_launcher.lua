@@ -25,6 +25,7 @@ local Logger = require("infra.logger")
 local dialog = require("infra.dialog_util")
 local i18n   = require("infra.i18n")
 local Notifier = require("adapters.application_notifier")
+local ErrorDescription = require("error_description")
 
 local LOG = "update_launcher"
 local COMMAND_ROOT = "ergoptiplus://updater/"
@@ -36,6 +37,8 @@ local CHANNEL_ID_PATTERN = "^[a-z][a-z0-9_]*$"
 --- @return string|nil url
 local function command_url(verb, channel)
 	if type(channel) ~= "string" or not channel:match(CHANNEL_ID_PATTERN) then return nil end
+	local ok, entry = pcall(function() return require("modules.updater").channels().channel(channel) end)
+	if not ok or type(entry) ~= "table" then return nil end
 	return COMMAND_ROOT .. verb .. "/" .. channel
 end
 
@@ -48,7 +51,7 @@ local function open_command(url)
 		return hs.urlevent.openURL(url)
 	end)
 	if ok and accepted_or_error == true then return true, nil end
-	return false, ok and "Launch Services refused the URL" or tostring(accepted_or_error)
+	return false, ok and "Launch Services refused the URL" or ErrorDescription.describe(accepted_or_error)
 end
 
 --- Asks the running native launcher to check the channel's feed with Sparkle's UI.

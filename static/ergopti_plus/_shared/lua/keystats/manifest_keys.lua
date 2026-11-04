@@ -1,4 +1,4 @@
---- keystats/manifest_keys.lua
+--- _shared/lua/keystats/manifest_keys.lua
 
 --- ==============================================================================
 --- MODULE: Metrics Manifest Application Keys

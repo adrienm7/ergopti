@@ -40,6 +40,36 @@ vm.runInContext(source.slice(saveStart, saveEnd), context);
 context.doSave();
 assert.strictEqual(context.message.prompt, 'First\n' + original);
 assert.strictEqual(context.message.edit_id, 'edit-1');
+const mixedCase = 'Explain {CONTEXT} and {Language} exactly.';
+context.editorElement = { childNodes: context.parseToNodes(mixedCase) };
+context.doSave();
+assert.strictEqual(
+	context.message.prompt,
+	mixedCase,
+	'editing must preserve the case of literal prompt text'
+);
+const typedNode = { nodeType: 3, textContent: '{CONTEXT}' };
+let inserted;
+const range = {
+	collapsed: true,
+	startContainer: typedNode,
+	startOffset: 9,
+	insertNode: (node) => {
+		inserted = node;
+	}
+};
+const selection = { rangeCount: 1, getRangeAt: () => range, removeAllRanges() {}, addRange() {} };
+context.window = { getSelection: () => selection };
+context.document.createRange = () => ({
+	setStart() {},
+	setEnd() {},
+	deleteContents() {},
+	setStartAfter() {},
+	collapse() {}
+});
+context.checkPlaceholder = () => {};
+context.tryConvertToken({});
+assert.strictEqual(inserted.dataset.token, 'CONTEXT', 'typing must preserve token case as well');
 context.editorElement = { childNodes: context.parseToNodes('  Prefix {context}\n\n') };
 context.doSave();
 assert.strictEqual(

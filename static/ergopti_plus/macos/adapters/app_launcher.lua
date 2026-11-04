@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Argument-aware launch: launchWithArgs separates executable path from
----    arguments so the adapter can quote them correctly for macOS shell semantics.
+---    arguments and passes them directly to the asynchronous native task.
 --- 2. Boolean process check: isRunning returns a boolean so callers can branch
 ---    on process existence without parsing PID integers or catching exceptions.
 --- 3. Fire-and-forget semantics: launches do not block waiting for the process.
@@ -20,7 +20,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
-local text_utils = require("infra.text_utils")
+local ShellRunner = require("adapters.shell_runner")
 local RunningApplication = require("adapters.running_application")
 
 local LOG = "adapters.app_launcher"
@@ -39,38 +39,36 @@ local LOG = "adapters.app_launcher"
 --- @return boolean True when Hammerspoon accepted the launch/focus request.
 function M.launch(app_path)
 	local ok, result = pcall(function()
-		return hs.application.launchOrFocus(app_path)
+		if hs.application.launchOrFocus(app_path) == true then return true end
+		-- Bundle identifiers use a separate Hammerspoon API from names/paths.
+		if type(hs.application.launchOrFocusByBundleID) ~= "function" then return false end
+		return hs.application.launchOrFocusByBundleID(app_path) == true
 	end)
 	local err = result
 	if not ok then
 		Logger.error(LOG, "launch(): failed to launch %q — %s", tostring(app_path), tostring(err))
 	end
-	return result == true
+	return ok and result == true
 end
 
---- Launches an application with command-line arguments via the macOS shell.
---- Each argument is single-quote escaped to prevent shell metachar injection.
+--- Launches an application with command-line arguments without blocking the run loop.
+--- The shared task runner owns the native process until its completion callback.
 --- @param app_path string Absolute path to the executable.
---- @param args     string|table Single arg string or list of arg strings to append.
+--- @param args string|table Single argument or list of arguments.
 function M.launchWithArgs(app_path, args)
 	local ok, err = pcall(function()
-		-- Single-quote POSIX escape: replace each ' with '\'' and wrap in '…'
-		local shq = text_utils.shell_quote
-		local quoted_args
+		local argv = { "-a", tostring(app_path), "--args" }
 		if type(args) == "table" then
-			local parts = {}
-			for _, a in ipairs(args) do
-				table.insert(parts, shq(a))
-			end
-			quoted_args = table.concat(parts, " ")
+			for _, value in ipairs(args) do argv[#argv + 1] = tostring(value) end
 		else
-			quoted_args = shq(args or "")
+			argv[#argv + 1] = tostring(args or "")
 		end
-		-- %q escapes for a LUA literal and leaves $, backticks and ! live for
-		-- /bin/sh. Every app path here is user-configurable, so the shell quoter
-		-- is the only correct escape. The class guard misses this two-line form.
-		local cmd = string.format("open -a %s --args %s", text_utils.shell_quote(app_path), quoted_args)
-		hs.execute(cmd)
+		local handle = ShellRunner.spawn("/usr/bin/open", argv, function(exit_code)
+			if exit_code ~= 0 then
+				Logger.error(LOG, "launchWithArgs(): open exited with status %s.", tostring(exit_code))
+			end
+		end)
+		if handle.start() ~= true then error("open task did not start") end
 	end)
 	if not ok then
 		Logger.error(LOG, "launchWithArgs(): failed — %s", tostring(err))

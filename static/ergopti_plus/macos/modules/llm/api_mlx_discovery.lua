@@ -733,6 +733,10 @@ function M.discover(on_done)
 		local was_draining = _discovery_callbacks_draining
 		_discovery_callbacks_draining = true
 		for _, waiter in ipairs(cbs) do
+			-- An earlier waiter may switch models or stop discovery. The detached
+			-- snapshot still belongs to the old generation even after reset clears
+			-- the live queue; never deliver those waiters into the new session.
+			if my_discovery_gen ~= _discovery_gen or _quiesced then break end
 			ApiCommon.protected_call(waiter.callback, "discovery on_done")
 		end
 		_discovery_callbacks_draining = was_draining

@@ -116,6 +116,36 @@ local function last_install_message(state)
 end
 
 helpers.describe("Changelog one-click release install (macOS)", function()
+	helpers.it("does not install a release while its replacement list is unavailable", function()
+		for _, mode in ipairs({ "pending", "invalid", "encode_failure" }) do
+			with_changelog(function(changelog, state, post)
+				local deps, events = owners()
+				open_listed(changelog, state, post, deps)
+				post({ action = "fetch", channel = "dev" })
+				if mode == "invalid" then state.callbacks[#state.callbacks](200, "[invalid", {}) end
+				if mode == "encode_failure" then
+					hs.json.encode = function() return nil end
+					state.callbacks[#state.callbacks](200, LIST_BODY, {})
+				end
+				post({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" })
+				helpers.assert_eq(#events, 0, "a stale release list must not authorize installation")
+				helpers.assert_true(last_install_message(state):find("changelog_window.install_error_unknown_release", 1, true) ~= nil,
+					last_install_message(state))
+			end)
+		end
+	end)
+
+	helpers.it("reports an active install when a refresh is also pending", function()
+		with_changelog(function(changelog, state, post)
+			local options = { defer_arm = true }
+			local deps = owners(options)
+			open_listed(changelog, state, post, deps)
+			post({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" })
+			post({ action = "fetch", channel = "dev" })
+			post({ action = "install_release", tag = "v0.0.0-dev.140", channel = "dev" })
+			helpers.assert_true(last_install_message(state):find("changelog_window.install_error_busy", 1, true) ~= nil)
+		end)
+	end)
 	helpers.it("tells the user to move an existing app backup before retrying", function()
 		with_changelog(function(changelog, state, post)
 			local deps, events = owners({ previous = true })

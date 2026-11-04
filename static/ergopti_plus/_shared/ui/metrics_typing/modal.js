@@ -162,14 +162,14 @@ function toggle_app_selection(checkbox) {
  * search input and decorated with icons or colored badge fallbacks.
  */
 function render_app_list() {
-	const query = (document.getElementById('app_search')?.value ?? '').toLowerCase();
+	const query = (document.getElementById('app_search')?.value ?? '').toLowerCase().normalize('NFC');
 	const container = document.getElementById('app_list');
 	if (!container) return;
 
 	let html = '';
 
 	app_state.available_apps.forEach((app) => {
-		if (!app.toLowerCase().includes(query)) return;
+		if (!app.toLowerCase().normalize('NFC').includes(query)) return;
 
 		const checked = app_state.selected_apps.has(app) ? 'checked' : '';
 		const icon_src =

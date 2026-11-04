@@ -163,8 +163,10 @@ local function inject_init_data(owner)
 		-- Native errors may echo personal field values, so report only fixed metadata
 		Logger.error(LOG, "Personal editor JavaScript %s (session=%d); repeats suppressed.", category, owner.serial)
 	end
+	-- Both readiness and navigation can inject into the same page. Keep the
+	-- guard in that page so a later injection cannot erase an edited draft.
 	local submitted, result = pcall(function()
-		return view:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")", function(_, script_error)
+		return view:evaluateJavaScript("if(window.initData && !window.__personalInfoInitialized){window.initData(" .. json .. ");window.__personalInfoInitialized=true;}", function(_, script_error)
 			if WebviewResult.is_error(script_error) then report("execution failed") end
 		end)
 	end)

@@ -72,10 +72,39 @@ local function boot(outcomes)
 
 	helpers.assert_type(interceptor, "function",
 		"personal_info must register the real interceptor used by the keymap")
-	return interceptor, record
+	return interceptor, record, PI, keymap
 end
 
 helpers.describe("personal_info: consecutive expansions have no blind interval", function()
+	helpers.it("does not inject personal data after the classifier disables the feature", function()
+		local interceptor, record, personal, keymap = boot({ true })
+		keymap.classify_trigger = function(trigger)
+			if trigger == "@p" .. TRIGGER then personal.disable() end
+			return false, false, false
+		end
+		helpers.assert_nil(expand(interceptor, "p"))
+		helpers.assert_eq(#record.attempts, 0)
+	end)
+
+	helpers.it("does not revive an old expansion after disable and enable during classification", function()
+		local interceptor, record, personal, keymap = boot({ true })
+		keymap.classify_trigger = function(trigger)
+			if trigger == "@p" .. TRIGGER then personal.disable(); personal.enable() end
+			return false, false, false
+		end
+		helpers.assert_nil(expand(interceptor, "p"))
+		helpers.assert_eq(#record.attempts, 0)
+	end)
+
+	helpers.it("does not start a stale collection when classification disables tracking", function()
+		local interceptor, record, personal, keymap = boot({ true })
+		keymap.classify_trigger = function(trigger)
+			if trigger == "@" then personal.disable(); personal.enable() end
+			return false, false, false
+		end
+		helpers.assert_nil(expand(interceptor, "p"))
+		helpers.assert_eq(#record.attempts, 0)
+	end)
 	helpers.it("processes two immediately consecutive combos without advancing timers", function()
 		local interceptor, record = boot({ true, true })
 		local first = expand(interceptor, "p")

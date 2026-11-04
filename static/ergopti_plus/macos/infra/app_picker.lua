@@ -210,7 +210,8 @@ function M.discover_apps(on_ready)
 	-- Warm results avoid another subprocess and per-application native hydration
 	-- A different HOME must never inherit another root set's cached snapshot
 	local now = os.time()
-	if _apps_cache and _apps_cache_home == home and (now - _apps_cache_at) < APPS_CACHE_TTL_SEC then
+	if _apps_cache and _apps_cache_home == home and now >= _apps_cache_at
+		and (now - _apps_cache_at) < APPS_CACHE_TTL_SEC then
 		local choices = _apps_cache
 		Logger.debug(LOG, "Serving %d application(s) from cache.", #choices)
 		on_ready(choices, true)

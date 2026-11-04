@@ -56,6 +56,7 @@ helpers.describe("n-gram history merge yields to the run loop (ngram-merge-paced
 		local reader = {
 			next_day = Real.next_day,
 			split_bounds = Real.split_bounds,
+			history_fingerprint_exact = true, -- Controlled fixture with immutable historical rows.
 			fingerprint = function() return "unchanged" end,
 			read_today_split = function() return {} end,
 			read_ngrams = function() return dict_of(TOKENS), true end,

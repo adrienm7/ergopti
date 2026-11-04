@@ -624,7 +624,13 @@ helpers.describe("Personal information editor save result (personal-info-editor-
 	helpers.it("keeps the same editor open when the save callback refuses the commit", function()
 		local editor, dispatch, state, cleanup = load_editor()
 		with_cleanup(function()
-			editor.open({}, function() return false end)
+			local outcome, replacement_calls = false, 0
+			local function original_save()
+				if outcome == "throw" then error("simulated save callback crash") end
+				return outcome
+			end
+			local function replacement_save() replacement_calls = replacement_calls + 1; return true end
+			editor.open({}, original_save)
 			dispatch({ action = "save", values = { first_name = "Bob" } })
 
 			helpers.assert_eq(state.deletes, 0,
@@ -632,22 +638,27 @@ helpers.describe("Personal information editor save result (personal-info-editor-
 			helpers.assert_true(#state.errors > 0,
 				"a rejected save must leave a developer-visible diagnostic")
 
-			editor.open({}, function() return "truthy" end)
+			outcome = "truthy"
+			editor.open({}, replacement_save)
 			dispatch({ action = "save", values = { first_name = "Bob" } })
 			helpers.assert_eq(state.deletes, 0,
 				"a truthy non-boolean callback result must not close the editor")
 
-			editor.open({}, function() error("simulated save callback crash") end)
+			outcome = "throw"
+			editor.open({}, replacement_save)
 			dispatch({ action = "save", values = { first_name = "Bob" } })
 			helpers.assert_eq(state.deletes, 0,
 				"a throwing save callback must not escape or close the editor")
 
-			editor.open({}, function() return true end)
+			outcome = true
+			editor.open({}, replacement_save)
 			helpers.assert_eq(state.focuses, 3,
 				"reopening after rejected saves must focus the retained singleton")
 			dispatch({ action = "save", values = { first_name = "Bob" } })
 			helpers.assert_eq(state.deletes, 1,
 				"the editor may close only after the callback reports an exact commit")
+			helpers.assert_eq(replacement_calls, 0,
+				"focusing the existing form must preserve its original save owner")
 		end, cleanup)
 	end)
 end)
