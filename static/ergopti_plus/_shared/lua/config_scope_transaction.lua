@@ -59,6 +59,7 @@ function M.new(options)
 		and type(options.files.write) == "function" and type(options.files.write_if_unchanged) == "function",
 		"scope transactions require serialized conditional publication")
 	assert(options.prepare_batch == nil or type(options.prepare_batch) == "function", "invalid scope preparation owner")
+	assert(options.preserve_unchanged == nil or type(options.preserve_unchanged) == "boolean", "invalid unchanged-source policy")
 	assert(options.select == nil or type(options.select) == "function", "invalid scope row selection")
 	assert(options.presets == nil or type(options.presets) == "table", "invalid scope preset owners")
 	for id, port in pairs(options.presets or {}) do check_preset(id, port, options) end
@@ -206,7 +207,9 @@ function M.new(options)
 				decoded = Codec.decode(candidate)
 				if type(decoded) ~= "table" then return false, "scope candidate is not valid TOML" end
 				config = { path = options.path, backup_path = options.backup_path, candidate = candidate,
-					source = { status = source.status, content = source.status == "ok" and source.content or nil } }
+					source = { status = source.status, content = source.status == "ok" and source.content or nil },
+					skip = options.preserve_unchanged == true and (source.status == "ok" and candidate == source.content
+						or source.status == "absent" and candidate == "") }
 			end
 			local rendered, files = {}, {}
 			for _, preset in ipairs(presets) do
@@ -215,10 +218,10 @@ function M.new(options)
 				rendered[preset.id] = { decoded = file.decoded, shapes = file.shapes, candidate = file.candidate, source = file.source }
 				files[#files + 1] = file
 			end
-			if config then files[#files + 1] = config end
+			if config and not config.skip then files[#files + 1] = config end
 			local function prepared_source_current()
 				if not preparation_current(preparation_check) then return false end
-				if preparation_check == nil then return true end
+				if preparation_check == nil and not (config and config.skip) then return true end
 				local bytes, status = Writer.read_classified(config.path, options.files)
 				return preparation_current(preparation_check) and status == config.source.status
 					and (status ~= "ok" or bytes == config.source.content)
@@ -239,6 +242,7 @@ function M.new(options)
 			if options.apply(decoded, updates, source, candidate, rendered) ~= true then
 				return false, "runtime application refused"
 			end
+			if not prepared_source_current() then return false, "scope preparation changed during runtime" end
 			for _, file in ipairs(files) do
 				local expected = file.source.status == "ok" and { status = "ok", content = file.source.content }
 					or { status = "absent" }

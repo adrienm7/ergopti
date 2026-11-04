@@ -332,6 +332,36 @@ end)
 
 
 helpers.describe("metrics private native claim", function()
+	helpers.it("(fenced-edit-owner) edits retain claims and compensate a refused release", function()
+		local held, committed, reverted, refusal = false, false, 0, true
+		local primary = {
+			apply = function() return false end,
+			apply_updates = function(scope, rows)
+				helpers.assert_true(held)
+				helpers.assert_eq(scope, "metrics")
+				helpers.assert_eq(rows, { { section = "metrics", key = "enabled", value = "true" } })
+				committed = true; return true
+			end,
+			committed = function() return committed end,
+			pending = function() return false end,
+			retry_restore = function() return true end,
+			revert = function() committed = false; reverted = reverted + 1; return true end,
+			release = function() end,
+		}
+		local owner = require("config_scope_fenced_transaction").new({ owner = {}, transaction = primary,
+			scope = "metrics", available = function() return true end, fences = { {
+				acquire = function() held = true; return true end,
+				release = function() if refusal then return false end; held = false; return true end,
+			} } })
+		local rows = { { section = "metrics", key = "enabled", value = "true" } }
+		helpers.assert_eq(owner.apply_updates(rows), false)
+		helpers.assert_eq(reverted, 1)
+		helpers.assert_true(owner.pending())
+		refusal = false
+		helpers.assert_true(owner.retry_restore())
+		helpers.assert_eq(held, false)
+		helpers.assert_eq(owner.pending(), false)
+	end)
 	helpers.it("releases the actual preference primitive without hiding public pending", function()
 		with_scope(function(_, _, _, _, controls, path, backup)
 			local Preferences = require("infra.metrics_preferences")
