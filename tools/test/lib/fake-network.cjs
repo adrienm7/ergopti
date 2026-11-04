@@ -725,7 +725,12 @@ async function startFakePacServer({ script = pacScript('DIRECT'), status = 200 }
  * @returns {string} The script.
  */
 function pacScript(route) {
-	return `function FindProxyForURL(url, host) { return ${JSON.stringify(route)}; }\n`;
+	// A route is a list of "DIRECT" or "<TYPE> host:port" entries. Holding it
+	// to that grammar keeps quotes and backslashes out of the generated source.
+	const entry = '(?:DIRECT|(?:PROXY|HTTPS|SOCKS|SOCKS5) [A-Za-z0-9.-]+:[0-9]{1,5})';
+	if (typeof route !== 'string' || !new RegExp(`^${entry}(?:; ?${entry})*$`).test(route))
+		throw new Error(`pacScript: ${JSON.stringify(route)} is not a PAC route`);
+	return `function FindProxyForURL(url, host) { return "${route}"; }\n`;
 }
 
 // ======================================
