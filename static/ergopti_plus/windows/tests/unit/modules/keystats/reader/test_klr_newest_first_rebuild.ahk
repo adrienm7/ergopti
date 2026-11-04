@@ -458,3 +458,46 @@ Test("KLR rebuild: a directory guard refusal cannot invent a peer (klr-rebuild-g
 	_KLRDC_CheckTeardown.Bind(_KLRNF_GuardRefusalIsNotPeerContention.Bind(false)))
 Test("KLR rebuild: actual peer contention waits for native release (klr-rebuild-guard-admission)",
 	_KLRDC_CheckTeardown.Bind(_KLRNF_GuardRefusalIsNotPeerContention.Bind(true)))
+
+
+_KLRNF_GuardRefusalKeepsPublishedImage() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Deadline := 0
+	UnexpectedDb := 0
+	try {
+		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger())
+		Published := _KLRNF_Build(false)
+		Fingerprint := _KLRDC_DerivedFingerprint(Published)
+		ImageBefore := KLR_LedgerSnapshot(KLR_CachePath(_KLRDC_Root()))
+		LedgerBefore := KLR_LedgerSnapshot(_KLRDC_LedgerPath())
+		AssertTrue(ImageBefore.Get("ok", false))
+		Path := KLR_RebuildLockPath(_KLRDC_Root())
+		DirCreate(Path)
+		Probe := Map("released", false, "held", 0, "close_ok", false)
+		Deadline := _KLRNF_ReleaseLockProbe.Bind(Path, Probe, false)
+		try {
+			SetTimer(Deadline, -1000)
+			Result := KLR_BuildColdSegmented(_KLRDC_Root(), "", [_KLRDC_LedgerPath()])
+			UnexpectedDb := Result.Get("db", 0)
+		} finally SetTimer(Deadline, 0)
+		_TestPrint("# KLR_NATIVE_GUARD_CALLER " . KL_JsonEncode(Map("release_used", Probe["released"],
+			"ok", Result["ok"], "db", UnexpectedDb != 0, "peer_published", Result.Get("peer_published", false))))
+		AssertFalse(Probe["released"], "the cold builder must propagate guard refusal without a fake peer wait")
+		AssertFalse(Result["ok"])
+		AssertEqual(0, UnexpectedDb, "guard refusal must never return a successful empty replacement")
+		AssertFalse(Result.Get("peer_published", false), "a path-type refusal is not proof of another publisher")
+		AssertEqual(Published, KLRCache.db, "refusal leaves the exact last-good handle published")
+		AssertEqual(Fingerprint, _KLRDC_DerivedFingerprint(Published))
+		AssertTrue(KLR_LedgerSnapshotIsSame(ImageBefore, KLR_LedgerSnapshot(KLR_CachePath(_KLRDC_Root()))))
+		AssertTrue(KLR_LedgerSnapshotIsSame(LedgerBefore, KLR_LedgerSnapshot(_KLRDC_LedgerPath())))
+	} finally {
+		if IsObject(Deadline)
+			SetTimer(Deadline, 0)
+		if UnexpectedDb && UnexpectedDb != KLRCache.db
+			SQLite_Close(UnexpectedDb)
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR rebuild: refused guard preserves the exact published image (klr-rebuild-guard-caller)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_GuardRefusalKeepsPublishedImage))

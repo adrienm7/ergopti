@@ -519,14 +519,19 @@ FSDeleteVerified(Path, VerifyFn) {
 ; Acquire a persistent guard file without sharing, truncation, or inheritance.
 ; Windows-only protocol helper, intentionally outside the portable port map.
 ; @param Path {String} Guard path in an existing owned directory.
+; @param Contended {Boolean} True only when a competing native owner blocked opening.
 ; @returns {Integer} Owned handle, or 0 when unavailable or not an ordinary file.
-FSOpenExclusiveGuard(Path) {
+FSOpenExclusiveGuard(Path, &Contended := false) {
+	Contended := false
 	if !FSPathIsAdmissible(Path)
 		throw ValueError("An exclusive guard requires a non-empty path without NUL.")
 	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0xC0000000,
 		"UInt", 0, "Ptr", 0, "UInt", 4, "UInt", 0x00200080, "Ptr", 0, "Ptr")
-	if Handle = -1
+	if Handle = -1 {
+		Code := A_LastError
+		Contended := Code = 32 || Code = 33 ; Sharing or byte-range lock violation.
 		return 0
+	}
 	Info := Buffer(52, 0)
 	if !DllCall("kernel32\GetFileInformationByHandle", "Ptr", Handle, "Ptr", Info, "Int")
 			|| (NumGet(Info, 0, "UInt") & 0x410) {
